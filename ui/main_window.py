@@ -620,28 +620,43 @@ class MainWindow(QMainWindow):
         # ── V2V (ReTake / Talk): editing di un video sorgente ──
         v2v = self.video_tab.v2v_panel.get_v2v_config() if hasattr(self.video_tab, "v2v_panel") else {"v2v_mode": "normal"}
         self._v2v_keep_audio_src = None
-        if v2v.get("v2v_mode") != "normal":
-            errs = self.video_tab.v2v_panel.validation_errors()
-            if errs:
-                QMessageBox.warning(self, f"Manca qualcosa per {v2v['v2v_mode'].upper()}",
-                                    "Per generare in questa modalità:\n\n• " + "\n• ".join(errs))
-                return
+        _mode = v2v.get("v2v_mode", "normal")
+        if _mode != "normal":
             src = v2v.pop("v2v_video_path", None)
-            vname = self._upload_video(src) if src else None
-            if not vname:
-                QMessageBox.warning(self, "Video sorgente", "Impossibile caricare il video sorgente in ComfyUI.")
-                return
-            v2v["v2v_video"] = vname
-            w, h = self._probe_resolution(src)
-            if w and h:
-                vals["width"], vals["height"] = w, h
-            dur = self._probe_duration(src)
-            if dur > 0:
-                vals["length_s"] = dur
-            # ReTake "tieni audio originale" → muxa il sorgente sul risultato a fine generazione
-            if v2v.get("v2v_mode") == "retake" and not v2v.get("v2v_regen_audio"):
-                self._v2v_keep_audio_src = src
-            vals.update(v2v)
+            if _mode == "talk" and not src:
+                # TALK SENZA VIDEO → genera il parlato DALL'IMMAGINE (Frame 1) come I2V normale:
+                # niente maschera V2V; voce dall'albero del tab Audio, dialogo dal prompt principale.
+                if not self.frame1_tab.image_path:
+                    QMessageBox.warning(self, "Talk", "Per Talk: fornisci un VIDEO da modificare, "
+                                        "oppure un'IMMAGINE nel Frame 1 (genero il parlato dall'immagine).")
+                    return
+                self._log("[Talk] nessun video → genero dall'immagine (I2V + lip-sync da audio/prompt).")
+                # NON impostiamo v2v_mode → prosegue il percorso I2V normale (use_image più sotto).
+            else:
+                errs = self.video_tab.v2v_panel.validation_errors()
+                if errs:
+                    QMessageBox.warning(self, f"Manca qualcosa per {_mode.upper()}",
+                                        "Per generare in questa modalità:\n\n• " + "\n• ".join(errs))
+                    return
+                vname = self._upload_video(src) if src else None
+                if not vname:
+                    QMessageBox.warning(self, "Video sorgente", "Impossibile caricare il video sorgente in ComfyUI.")
+                    return
+                v2v["v2v_video"] = vname
+                w, h = self._probe_resolution(src)
+                if w and h:
+                    vals["width"], vals["height"] = w, h
+                dur = self._probe_duration(src)
+                if dur > 0:
+                    vals["length_s"] = dur
+                if _mode == "talk":
+                    # Talk DA VIDEO: la finestra di rigenerazione = TUTTO il video → l'INTERO dialogo
+                    # viene sintetizzato (prima [0,5s] di default → seconda metà del testo persa).
+                    v2v["v2v_start"] = 0.0
+                    v2v["v2v_end"] = dur if dur > 0 else v2v.get("v2v_end", 5.0)
+                if _mode == "retake" and not v2v.get("v2v_regen_audio"):
+                    self._v2v_keep_audio_src = src
+                vals.update(v2v)
 
         # ── VIDEO LUNGHI: auto-extend oltre la soglia ──
         # Se la durata richiesta supera la soglia (impostata in Avanzate), generiamo una

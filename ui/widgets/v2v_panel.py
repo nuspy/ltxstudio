@@ -146,8 +146,9 @@ class V2VPanel(QWidget):
         # --- sezione Talk (accordion) ---
         self.sec_talk = CollapsibleSection("Talk — lip-sync (voce dal tab Audio)")
         tl = QVBoxLayout(self.sec_talk.content)
-        tl.addWidget(QLabel("La voce segue l'albero del tab Audio: file → voce TTS+testo → dialogo "
-                            "nel prompt. Scrivi il dialogo nel prompt principale."))
+        tl.addWidget(QLabel("Due modi: (1) scegli un VIDEO sotto → modifica un video esistente in lip-sync; "
+                            "(2) NESSUN video → genero il parlato dall'IMMAGINE del Frame 1 (I2V). "
+                            "Scrivi il dialogo nel prompt principale."))
         reg = QHBoxLayout(); reg.addWidget(QLabel("Maschera volto:"))
         self.cmb_region = QComboBox()
         self.cmb_region.addItem("Bocca/labbra (lip-sync fedele)", "mouth")
@@ -322,7 +323,9 @@ class V2VPanel(QWidget):
         if m == "normal":
             return errs
         if not self._video_path:
-            errs.append("Seleziona un video sorgente (Scegli video / Usa ultima generazione).")
+            # ReTake richiede il video; Talk SENZA video genera dall'immagine del Frame 1 (ok).
+            if m == "retake":
+                errs.append("Seleziona un video sorgente (Scegli video / Usa ultima generazione).")
             return errs
         if self._duration_s <= 0:
             errs.append("Impossibile leggere la durata del video sorgente.")
