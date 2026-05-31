@@ -834,6 +834,42 @@ class TemplateEngine:
         if crop:
             prompt[crop].setdefault("inputs", {})["positive"] = [guide_id, 0]
             prompt[crop]["inputs"]["negative"] = [guide_id, 1]
+        # CONTINUITÀ AUDIO (solution 2): condiziona l'audio del segmento sulla CODA AUDIO del
+        # precedente → l'audio CONTINUA invece di ricominciare (risolve la RIPETIZIONE del parlato e
+        # l'incoerenza ambientale tra spezzoni). Disattivabile con values['extend_audio_continuity']=False.
+        if values.get("extend_audio_continuity", True):
+            self._extend_audio_continuity(prompt, values, load_id, concat)
+        return True
+
+    def _extend_audio_continuity(self, prompt: dict, values: dict, load_id: str, concat: str) -> bool:
+        """Modellato sul V2V_Extend di riferimento: l'audio della coda (VHS_LoadVideo[2]) viene
+        VAE-encodato e usato come CONTESTO in LTXVAudioVideoMask (rigenera [overlap_s, seg_len]) →
+        il nuovo segmento CONTINUA l'audio precedente (niente parlato ripetuto). L'uscita audio della
+        maschera ([1]) sostituisce l'audio_latent del LTXVConcatAVLatent."""
+        avae = None
+        for n in prompt.values():
+            if n.get("class_type") in ("LTXVAudioVAEEncode", "LTXVAudioVAEDecode"):
+                avae = n.get("inputs", {}).get("audio_vae")
+                if avae:
+                    break
+        if not avae:
+            return False
+        fps = float(values.get("fps", 24))
+        overlap_s = float(values.get("v2v_overlap_s", float(values.get("overlap", 24)) / max(1.0, fps)))
+        seg_len = float(values.get("length_s", 8.0))
+        aenc = "ltxstudio_ext_aenc"
+        prompt[aenc] = {"class_type": "LTXVAudioVAEEncode",
+                        "inputs": {"audio": [load_id, 2], "audio_vae": avae},
+                        "_meta": {"title": "LTX Studio extend: encode coda audio"}}
+        amask = "ltxstudio_ext_amask"
+        prompt[amask] = {"class_type": "LTXVAudioVideoMask",
+                         "inputs": {"video_fps": fps, "video_start_time": overlap_s,
+                                    "video_end_time": seg_len, "audio_start_time": overlap_s,
+                                    "audio_end_time": seg_len, "max_length": "pad",
+                                    "audio_latent": [aenc, 0], "existing_mask_mode": "add"},
+                         "_meta": {"title": "LTX Studio extend: continuità audio"}}
+        # uscita audio della maschera ([1]) → audio_latent del concat
+        prompt[concat].setdefault("inputs", {})["audio_latent"] = [amask, 1]
         return True
 
     # ---------- V2V: helper comune (carica sorgente + encode video/audio + maschera tempo) ----------

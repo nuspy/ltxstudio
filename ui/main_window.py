@@ -1534,6 +1534,13 @@ class MainWindow(QMainWindow):
         try:
             vals = _copy.deepcopy(es["base_vals"])
             vals.pop("ref_image_file", None)
+            # Evita la RIPETIZIONE del parlato negli spezzoni extend: togli il dialogo tra virgolette
+            # dal prompt (es. «she says: "…"»). Il dialogo lo dice SOLO la base; gli extend continuano
+            # scena+ambiente (l'audio è già in continuità via la maschera audio). Tieni il resto del prompt.
+            import re as _re
+            _pp = vals.get("prompt_positive", "")
+            _stripped = _re.sub(r'["“”][^"“”]*["“”]', '', _pp)
+            vals["prompt_positive"] = _re.sub(r'\s{2,}', ' ', _stripped).strip() or _pp
             # MULTI-FRAME: condiziona sugli ultimi ~16 frame IN MOTO (saltando il freeze finale) →
             # continuità di moto/scena (no salto). Fallback ad AddGuide single-frame se il clip fallisce.
             # MULTI-FRAME: il contesto = esattamente gli ULTIMI `overlap` frame IN MOTO di A (saltando
@@ -1554,6 +1561,8 @@ class MainWindow(QMainWindow):
             remaining = es["target"] - es["produced"]
             consume_s = (es["overlap"] + es["tail_trim"]) / max(1, es["fps"])
             vals["length_s"] = max(4.0, min(es["seg_seconds"], remaining + consume_s))
+            # durata overlap (s) per la continuità AUDIO del segmento (audio mask: rigenera [overlap_s, len])
+            vals["v2v_overlap_s"] = es["overlap"] / max(1, es["fps"])
             # FORZA il superset (la base I2V validata): build + prune come la generazione normale
             self.engine.use_template("superset")
             prompt = self.engine.build_prompt(vals, loras=es["loras"], overrides=self._overrides)
