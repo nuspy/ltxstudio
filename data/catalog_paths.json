@@ -1,0 +1,8 @@
+{
+  "tools_dir": "E:\\AI\\dictionary\\tools",
+  "models": "E:\\AI\\Models",
+  "workflows": "E:\\AI\\workflows",
+  "dict_root": "E:\\AI\\dictionary",
+  "inbox": "E:\\AI\\inbox",
+  "hashes_jsonl": "E:\\AI\\_reorg_log\\hashes.jsonl"
+}

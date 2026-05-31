@@ -1,0 +1,992 @@
+"""Tab 2 — Frame 1 / Prompt + editor inpaint/outpaint + generazione immagine di partenza.
+
+- Canvas editor (mask_canvas) con inpaint/outpaint.
+- Generazione immagine di partenza: arch FLUX / Z-Image / Ernie, checkpoint/modello filtrato,
+  LoRA filtrate per architettura con icona 🔞 NSFW (come nel tab LoRA).
+- Inpaint/outpaint: modello + LoRA compatibili (anch'esse con 🔞).
+La generazione vera (FLUX Fill / txt2img) è cablata in main_window.
+"""
+from __future__ import annotations
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QLabel,
+    QComboBox, QSlider, QFormLayout, QGroupBox, QSpinBox, QPushButton, QLineEdit,
+    QCheckBox, QTabWidget, QScrollArea, QFrame, QDoubleSpinBox, QToolButton,
+)
+
+from ui.mask_canvas import MaskCanvas
+from ui.tabs.lora_tab import LoraTab
+from core.lora_catalog import LoraCatalog
+from core.model_catalog import ModelCatalog
+from core import user_prefs
+from core.gen_pipeline import GenPipeline
+
+DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, deformed, "
+               "low quality, blurry, watermark, text")
+
+# inpaint/outpaint: etichetta -> {arch (per LoRA), unet (file modello), steps}
+INPAINT_MODELS = {
+    "FLUX.2 Klein NSFW (Miraclein, edit-evoluto)":
+        {"arch": "Flux2", "unet": "Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors", "steps": 12},
+    "FLUX Fill GGUF NSFW (Hyper-8, RAM bassa)":
+        {"arch": "Flux", "unet": "Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf", "steps": 8},
+    "FLUX Fill (inpaint/outpaint, 22GB)":
+        {"arch": "Flux", "unet": "Flux\\FLUX_DEV_Fill.safetensors", "steps": 20},
+    "Nessuno (solo LTX I2V)": {"arch": None, "unet": None, "steps": 0},
+}
+# generazione: arch -> (architettura catalogo LoRA, keyword per filtrare i modelli in diffusion_models)
+GEN_ARCH = {
+    "FLUX": ("Flux", ("flux", "getphat", "fuxcapacity", "krea")),
+    "Z-Image": ("Z-Image", ("z-image", "z_image", "zimage")),
+    "Ernie": ("Ernie", ("ernie",)),
+}
+
+
+def _is_flux2(name: str) -> bool:
+    """FLUX.2 (es. FLUX_2_Dev): VAE/encoder diversi da FLUX.1 → non supportato dalle pipeline FLUX.1."""
+    n = (name or "").lower()
+    return "flux_2" in n or "flux2" in n or "flux 2" in n
+
+
+def fill_lora_combo(combo: QComboBox, arch: str | None, allow_nsfw: bool = True):
+    """Popola un combo con le LoRA dell'architettura (filtrate per NSFW), icona 🔞 per le NSFW."""
+    combo.clear(); combo.addItem("(nessuna)", None)
+    if not arch:
+        return
+    try:
+        cat = LoraCatalog(compatible_arch=arch)
+        for e in cat.loras(allow_nsfw=allow_nsfw):
+            label = ("🔞 " if e.nsfw else "") + e.name
+            combo.addItem(label, e.comfy_name)
+    except Exception:
+        pass
+
+
+# modelli upscale preferiti (i più potenti per foto reali), se presenti
+_UPSCALE_PREFERRED = ("4xNomos8kSCHAT-L.pth", "4xRealWebPhoto_v4_dat2.safetensors",
+                      "4xNomos2_hq_dat2.safetensors", "4x-UltraSharpV2.safetensors",
+                      "4x-UltraSharp.safetensors")
+
+
+class Frame1Tab(QWidget):
+    request_generate = Signal()         # genera immagine di partenza
+    request_segment_text = Signal()     # seleziona oggetto da testo (CLIPSeg+SAM)
+    request_upscale = Signal()          # aumenta definizione (upscale AI)
+    request_recolor = Signal()          # cambia colore (Kontext prompt-based)
+    request_restore_photo = Signal()    # restaura / colora foto (invia al tab Restauro)
+    request_integrate = Signal()        # integra immagini (spostato qui dal canvas)
+
+    def __init__(self):
+        super().__init__()
+        self._models: list[str] = []      # diffusion_models disponibili (da ComfyUI)
+        self._inpaint_avail: set[str] = set()   # unet_name realmente presenti in ComfyUI
+        # Checkpoint FLUX (es. getphat Reality, fuxcapacity) montati come modelli inpaint
+        # via CheckpointLoaderSimple. label_inpaint -> ckpt_name (relativo a models/checkpoints).
+        self._dynamic_checkpoints: dict[str, str] = {}
+        self._mcat = ModelCatalog()       # per architettura + nsfw dei modelli
+
+        # spazio di lavoro + selezione AI: vivono nel pannello principale (esposti a main_window)
+        self.canvas = MaskCanvas()
+
+        # controlli in SOTTO-TAB (tutti allineati in alto)
+        # Il sub-tab "Immagini" è stato rimosso: i suoi controlli sono migrati altrove
+        # (NSFW → «Genera immagine», Prompt/Negativo → tab Video). _prompt_tab() viene
+        # comunque chiamato per istanziare i widget placeholder (img_nsfw, prompt, neg)
+        # necessari come back-compat per le call-site esistenti.
+        _placeholder = self._prompt_tab()        # crea self.img_nsfw / self.prompt / self.neg
+        _placeholder.setVisible(False)
+        sub = QTabWidget()
+        sub.addTab(self._scroll(self._gen_box()), "Genera immagine")
+        sub.addTab(self._scroll(self._inpaint_box()), "Inpaint / Outpaint")
+        sub.addTab(self._scroll(self._color_box()), "Colore")
+        sub.addTab(self._scroll(self._upscale_box()), "Definizione")
+        self.segment_box = self._segment_box()    # selezione AI (sotto il canvas, nel pannello principale)
+
+        lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(sub)
+        lay.addWidget(_placeholder)     # hidden: tiene vivi i widget back-compat
+        self._reload_inpaint_loras(); self._reload_gen(); self._reload_flux_combos()
+
+    def _scroll(self, w: QWidget) -> QScrollArea:
+        """Wrappa il widget in alto (stretch sotto) dentro uno scroll → controlli allineati in alto."""
+        cont = QWidget(); cv = QVBoxLayout(cont); cv.setContentsMargins(8, 8, 8, 8)
+        cv.addWidget(w); cv.addStretch(1)
+        sc = QScrollArea(); sc.setWidgetResizable(True); sc.setFrameShape(QScrollArea.NoFrame); sc.setWidget(cont)
+        return sc
+
+    def _prompt_tab(self) -> QWidget:
+        # NSFW selector → spostato in "Genera immagine"; Prompt globale/negativo → spostati
+        # nel tab Video. Resta un placeholder pronto ad accogliere altri controlli "Immagini".
+        # NOTE: self.prompt / self.neg / self.img_nsfw vengono creati comunque (alias da
+        # main_window.py post-init verso i widget del tab Video) per non rompere
+        # get_values() e tutte le call-site esistenti.
+        w = QWidget(); bl = QVBoxLayout(w)
+        # img_nsfw è creato qui ma il suo widget viene inserito in _gen_box (vedi sotto).
+        self.img_nsfw = QComboBox(); self.img_nsfw.addItems(["SFW", "NSFW"])
+        self.img_nsfw.currentTextChanged.connect(self._on_img_nsfw)
+        # placeholder text — il tab è ora vuoto, in attesa di altri controlli immagine.
+        info = QLabel("I controlli «Contenuto immagine», «Prompt» e «Prompt negativo» "
+                      "sono stati spostati: NSFW → tab «Genera immagine»; "
+                      "Prompt / Prompt negativo → tab «Video».")
+        info.setWordWrap(True); info.setStyleSheet("color:#888; padding:8px;")
+        bl.addWidget(info)
+        # widget back-compat per get_values() — sostituiti con alias da main_window
+        # subito dopo la creazione di video_tab, ma servono già qui per evitare AttributeError.
+        self.prompt = QPlainTextEdit(); self.prompt.setVisible(False)
+        self.neg = QPlainTextEdit(DEFAULT_NEG); self.neg.setVisible(False)
+        bl.addWidget(self.prompt); bl.addWidget(self.neg)
+        return w
+
+    # ---------- generazione immagine di partenza ----------
+    def _gen_box(self) -> QGroupBox:
+        box = QGroupBox("Genera immagine di partenza")
+        f = QFormLayout(box)
+        f.addRow("Contenuto immagine:", self.img_nsfw)
+        self.gen_arch = QComboBox(); self.gen_arch.addItems(list(GEN_ARCH.keys()))
+        self.gen_arch.currentTextChanged.connect(self._reload_gen)
+        self.gen_arch.currentTextChanged.connect(self._sync_gen_lora_arch)
+        self.gen_arch.currentTextChanged.connect(self._apply_arch_defaults)
+        f.addRow("Architettura:", self.gen_arch)
+        self.gen_model = QComboBox()
+        self.gen_model.currentIndexChanged.connect(self._update_gen_star)
+        gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
+        gmrow.addWidget(self.gen_model, 1)
+        self.gen_star = QToolButton(); self.gen_star.setText("☆")
+        self.gen_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
+        self.gen_star.setToolTip("Preferito: il modello selezionato va in cima alla lista.")
+        self.gen_star.clicked.connect(self._toggle_gen_fav)
+        gmrow.addWidget(self.gen_star)
+        gmw = QWidget(); gmw.setLayout(gmrow); f.addRow("Modello:", gmw)
+        # Encoder / VAE / Type CLIP — popolati dall'inventario ComfyUI via set_gen_inventory().
+        # I default si auto-impostano al cambio di architettura (_apply_arch_defaults).
+        self.gen_encoder = QComboBox(); self.gen_encoder.setEditable(False)
+        f.addRow("Text encoder:", self.gen_encoder)
+        self.gen_clip_type = QComboBox()
+        f.addRow("CLIP type:", self.gen_clip_type)
+        self.gen_vae = QComboBox()
+        f.addRow("VAE:", self.gen_vae)
+        # LoRA multi-select (come nel tab Video)
+        lora_group = QGroupBox("LoRA per l'immagine")
+        lora_vl = QVBoxLayout(lora_group)
+        self.gen_lora_tab = LoraTab(allow_nsfw_getter=self._allow_nsfw, embedded=True, arch="Flux")
+        lora_vl.addWidget(self.gen_lora_tab)
+        f.addRow(lora_group)
+        # Sampler / scheduler / steps / CFG con default applicati per arch.
+        # "auto" come prima voce: lascia decidere al pipeline il default per architettura.
+        self.gen_sampler = QComboBox()
+        self.gen_sampler.addItem("auto", None)
+        # euler/dpmpp affidabili in cima. I RES restano disponibili (su Flux spesso ok) ma NON
+        # in cima: su LTX-2.3 rompono (rumore) — verificato — quindi niente default rischiosi.
+        self.gen_sampler.addItems(["euler", "euler_ancestral_cfg_pp", "dpmpp_2m", "res_2s"])
+        self.gen_sampler.setToolTip("euler/dpmpp = affidabili. res_2s = più dettaglio su Flux "
+                                    "(NON usarlo su LTX video, lì rompe).")
+        f.addRow("Sampler:", self.gen_sampler)
+        self.gen_scheduler = QComboBox()
+        self.gen_scheduler.addItem("auto", None)
+        self.gen_scheduler.addItems(["karras", "bong_tangent", "beta", "simple"])
+        self.gen_scheduler.setToolTip(
+            "Per le IMMAGINI lo scheduler cambia molto la resa:\n"
+            "• bong_tangent / kl_optimal / beta57 — alta qualità (flow-aware), spesso i migliori su Flux\n"
+            "• karras — dettaglio classico · beta — distilled · exponential — morbido"
+        )
+        f.addRow("Scheduler:", self.gen_scheduler)
+        self.gen_enhance = QCheckBox("🪄 Migliora prompt (LLM Qwen3)")
+        self.gen_enhance.setChecked(False)
+        self.gen_enhance.setToolTip(
+            "Se attivo, un LLM (Qwen3) espande il tuo prompt in una descrizione visiva dettagliata "
+            "prima di generare. Utile per prompt brevi. In NSFW inietta la direttiva di sblocco. "
+            "Primo uso: scarica il modello Qwen3-4B (~3GB).")
+        f.addRow(self.gen_enhance)
+        self.gen_steps = QSpinBox(); self.gen_steps.setRange(1, 80); self.gen_steps.setValue(20)
+        f.addRow("Steps:", self.gen_steps)
+        self.gen_cfg = QDoubleSpinBox(); self.gen_cfg.setRange(0.0, 20.0); self.gen_cfg.setSingleStep(0.1)
+        self.gen_cfg.setValue(3.5)
+        f.addRow("CFG:", self.gen_cfg)
+        # Seed + checkbox random/fisso
+        seedrow = QHBoxLayout()
+        self.gen_seed = QSpinBox(); self.gen_seed.setRange(0, 2_147_483_647); self.gen_seed.setValue(0)
+        self.gen_seed_rand = QCheckBox("🎲 casuale"); self.gen_seed_rand.setChecked(True)
+        self.gen_seed.setEnabled(False)
+        self.gen_seed_rand.toggled.connect(lambda on: self.gen_seed.setEnabled(not on))
+        seedrow.addWidget(self.gen_seed, 1); seedrow.addWidget(self.gen_seed_rand)
+        seedw = QWidget(); seedw.setLayout(seedrow); f.addRow("Seed:", seedw)
+        # Prompt positivo dedicato (opzionale) + Prompt negativo
+        self.gen_prompt = QPlainTextEdit(); self.gen_prompt.setMaximumHeight(40)
+        self.gen_prompt.setPlaceholderText("Prompt immagine (vuoto = usa il prompt globale)")
+        f.addRow("Prompt img:", self.gen_prompt)
+        self.gen_neg = QPlainTextEdit(DEFAULT_NEG); self.gen_neg.setMaximumHeight(40)
+        self.gen_neg.setPlaceholderText("Prompt negativo per l'immagine…")
+        f.addRow("Negativo:", self.gen_neg)
+        self.gen_btn = QPushButton("🖼️ Genera immagine")
+        self.gen_btn.clicked.connect(lambda: self.request_generate.emit())
+        f.addRow(self.gen_btn)
+        self.gen_warn_lbl = QLabel("")
+        self.gen_warn_lbl.setWordWrap(True)
+        self.gen_warn_lbl.setStyleSheet("color:#e67e22; font-size:11px;")
+        self.gen_warn_lbl.setVisible(False)
+        f.addRow(self.gen_warn_lbl)
+        # Default coerenti con l'architettura iniziale
+        self._apply_arch_defaults(self.gen_arch.currentText())
+        return box
+
+    # Default per architettura (sampler/scheduler/steps/cfg/clip_type) — applicati a ogni
+    # cambio di architettura. Allineati ai workflow ufficiali Comfy-Org.
+    _ARCH_DEFAULTS = {
+        "FLUX":    {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 3.5, "clip_type": "flux"},
+        "Z-Image": {"sampler": "res_multistep", "scheduler": "simple", "steps": 8, "cfg": 1.0, "clip_type": "lumina2"},
+        "Ernie":   {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 4.0, "clip_type": "flux2"},
+    }
+
+    def _apply_arch_defaults(self, arch_lbl: str):
+        d = self._ARCH_DEFAULTS.get(arch_lbl)
+        if not d:
+            return
+        # Default ARCH = "auto" su sampler/scheduler/clip_type: l'utente vede subito che è
+        # in modalità auto, e il pipeline applica i valori corretti del modello scelto.
+        if hasattr(self, "gen_sampler"):
+            self.gen_sampler.setCurrentIndex(0)              # "auto"
+            self.gen_sampler.setToolTip(f"Default per {arch_lbl}: {d['sampler']}")
+        if hasattr(self, "gen_scheduler"):
+            self.gen_scheduler.setCurrentIndex(0)            # "auto"
+            self.gen_scheduler.setToolTip(f"Default per {arch_lbl}: {d['scheduler']}")
+        if hasattr(self, "gen_steps"):
+            self.gen_steps.setValue(int(d["steps"]))
+        if hasattr(self, "gen_cfg"):
+            self.gen_cfg.setValue(float(d["cfg"]))
+        if hasattr(self, "gen_clip_type"):
+            self.gen_clip_type.setCurrentIndex(0)            # "auto"
+            self.gen_clip_type.setToolTip(f"Default per {arch_lbl}: {d['clip_type']}")
+
+    def _sync_gen_lora_arch(self, arch_lbl: str):
+        """Sincronizza l'architettura del LoraTab con quella selezionata per la generazione."""
+        arch_map = {"FLUX": "Flux", "Z-Image": "Z-Image", "Ernie": "Ernie"}
+        arch = arch_map.get(arch_lbl, "Flux")
+        self.gen_lora_tab.set_arch(arch)
+
+    def _allow_nsfw(self) -> bool:
+        return self.img_nsfw.currentText() == "NSFW"
+
+    def _on_img_nsfw(self, *_):
+        """Cambio NSFW/SFW immagine → re-filtro istantaneo di modelli e LoRA."""
+        self._reload_gen()
+        self._reload_inpaint_loras()
+        self._reload_flux_combos()
+
+    def _reload_gen(self, *_):
+        arch_lbl = self.gen_arch.currentText()
+        _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
+        allow = self._allow_nsfw()
+        models = []
+        # FLUX: includi sia FLUX.1 che FLUX.2 da diffusion_models, escludendo solo
+        # Fill (inpaint) e Kontext (editing). Aggiungi anche i checkpoint Flux.
+        if arch_lbl == "FLUX":
+            for m in (self._models or []):
+                ml = m.lower()
+                if "fill" in ml or "kontext" in ml:
+                    continue
+                if any(k in ml for k in kws):
+                    if not allow and self._mcat.is_nsfw(m):
+                        continue
+                    models.append(m)
+            # Checkpoint Flux (lista dinamica dall'inventario ComfyUI)
+            for c in (getattr(self, "_gen_checkpoint_models", []) or []):
+                cl = c.lower()
+                if "kontext" in cl or _is_flux2(c):
+                    continue
+                if any(k in cl for k in kws):
+                    if not allow and self._mcat.is_nsfw(c):
+                        continue
+                    if c not in models:
+                        models.append(c)
+        else:
+            for m in self._models:
+                ml = m.lower()
+                if not any(k in ml for k in kws):
+                    continue
+                if not allow and self._mcat.is_nsfw(m):
+                    continue
+                models.append(m)
+        # fav-first: i modelli preferiti in cima (i nomi restano i filename reali, nessun prefisso
+        # nel testo → currentText() resta valido per get_gen_config)
+        models = sorted(models, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
+        self.gen_model.blockSignals(True)
+        self.gen_model.clear()
+        self.gen_model.addItems(models or ["(nessun modello trovato)"])
+        self.gen_model.blockSignals(False)
+        self._update_gen_star()
+        # Controlla se il golden template è disponibile per questa arch
+        arch_key = {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(arch_lbl, "flux")
+        golden_ok = GenPipeline.golden_exists(arch_key)
+        if hasattr(self, "gen_warn_lbl"):
+            if not golden_ok:
+                self.gen_warn_lbl.setText(
+                    f"⚠️ Template mancante per {arch_lbl}. "
+                    f"Per generare: apri ComfyUI con il workflow {arch_lbl} attivo, "
+                    f"clicca 'Save (API format)' e salva in templates/txt2img_{arch_key}.api.json. "
+                    f"Oppure usa FLUX (sempre disponibile)."
+                )
+                self.gen_warn_lbl.setVisible(True)
+                self.gen_btn.setEnabled(False)
+            else:
+                self.gen_warn_lbl.setVisible(False)
+                self.gen_btn.setEnabled(True)
+        if hasattr(self, "gen_lora_tab"):
+            self.gen_lora_tab.refresh()
+
+    def _inp_label(self) -> str:
+        return self.inp_model.currentText().split("  ⛔")[0] if self.inp_model.count() else ""
+
+    def _update_inp_star(self, *_):
+        if not hasattr(self, "inp_star"):
+            return
+        is_fav = user_prefs.is_fav_model("inpaint:" + self._inp_label())
+        self.inp_star.setText("★" if is_fav else "☆")
+        self.inp_star.setStyleSheet(
+            "QToolButton{border:none;font-size:16px;color:%s;}" % ("#f5c518" if is_fav else "#777"))
+
+    def _toggle_inp_fav(self):
+        lbl = self._inp_label()
+        if not lbl:
+            return
+        user_prefs.toggle_fav_model("inpaint:" + lbl)
+        self._update_inp_star()
+
+    def _gen_model_name(self) -> str:
+        t = self.gen_model.currentText() if self.gen_model.count() else ""
+        return "" if t.startswith("(") else t
+
+    def _update_gen_star(self, *_):
+        if not hasattr(self, "gen_star"):
+            return
+        m = self._gen_model_name()
+        is_fav = bool(m) and user_prefs.is_fav_model(m)
+        self.gen_star.setText("★" if is_fav else "☆")
+        self.gen_star.setStyleSheet(
+            "QToolButton{border:none;font-size:16px;color:%s;}" % ("#f5c518" if is_fav else "#777"))
+
+    def _toggle_gen_fav(self):
+        m = self._gen_model_name()
+        if not m:
+            return
+        user_prefs.toggle_fav_model(m)
+        self._reload_gen()      # riordina (preferiti in cima)
+
+    def _reload_flux_combos(self):
+        """Re-popola i combo FLUX:
+        - `up_refine_model` (rifinitura upscale): solo FLUX.2 (escludendo Fill)
+        - `integrate_model`: contestuale al motore Integra selezionato
+            * Kontext (FLUX.1)  → modelli che contengono "kontext" (es. FLUX_Kontext_Dev)
+            * FLUX.2 (sperimentale) → modelli FLUX.2 (escludendo Fill)
+        """
+        allow = self._allow_nsfw()
+        # rifinitura upscale → sempre FLUX.2
+        flux2 = [m for m in self._models
+                 if _is_flux2(m) and "fill" not in m.lower()
+                 and (allow or not self._mcat.is_nsfw(m))]
+        refine_combo = getattr(self, "up_refine_model", None)
+        if refine_combo is not None:
+            cur = refine_combo.currentText()
+            refine_combo.clear()
+            refine_combo.addItems(flux2) if flux2 else refine_combo.addItem("(nessun modello FLUX.2)")
+            if cur in flux2:
+                refine_combo.setCurrentText(cur)
+        # integra: liste separate per engine
+        ic = getattr(self, "integrate_model", None)
+        if ic is not None:
+            cur = ic.currentText()
+            engine = (self.integrate_engine.currentIndex()
+                      if hasattr(self, "integrate_engine") else 0)
+            if engine == 1:                        # FLUX.2
+                pool = flux2
+                empty = "(nessun modello FLUX.2)"
+            else:                                  # Kontext (FLUX.1)
+                pool = [m for m in self._models
+                        if "kontext" in m.lower() and "fill" not in m.lower()
+                        and not _is_flux2(m)
+                        and (allow or not self._mcat.is_nsfw(m))]
+                empty = "(nessun modello Kontext FLUX.1)"
+            ic.clear()
+            ic.addItems(pool) if pool else ic.addItem(empty)
+            if cur in pool:
+                ic.setCurrentText(cur)
+        # puzzle_lora è una LoRA FLUX.1 → disabilita in modalità FLUX.2
+        if hasattr(self, "integrate_puzzle") and hasattr(self, "integrate_engine"):
+            is_flux2_mode = (self.integrate_engine.currentIndex() == 1)
+            self.integrate_puzzle.setEnabled(not is_flux2_mode)
+            if is_flux2_mode:
+                self.integrate_puzzle.setChecked(False)
+                self.integrate_puzzle.setToolTip(
+                    "Disabilitato in modalità FLUX.2: puzzle_lora è una LoRA FLUX.1 "
+                    "(applicarla su FLUX.2 causa errori di shape sui pesi).")
+            else:
+                self.integrate_puzzle.setToolTip(
+                    "LoRA 'foreground' di MagicQuill: aiuta a fondere l'oggetto.")
+
+    # ---------- inpaint / outpaint ----------
+    def _inpaint_box(self) -> QWidget:
+        """Tab Inpaint/Outpaint diviso in DUE sezioni indipendenti, ognuna con i suoi
+        parametri (anche duplicati: negativo/steps/seed) e il proprio bottone di generazione:
+
+        1. «Inpaint / Outpaint» — riempi area mascherata o estendi oltre i bordi.
+        2. «Integra» — fondi immagini extra incollate sul canvas (era sul canvas, ora qui).
+        """
+        wrap = QWidget(); wv = QVBoxLayout(wrap); wv.setContentsMargins(0, 0, 0, 0); wv.setSpacing(10)
+
+        # Styling: bordo + titolo evidente per evitare che le due sezioni si "fondano"
+        # visivamente. Applicato sul wrapper così è ereditato da entrambi i QGroupBox.
+        wrap.setStyleSheet(
+            "QGroupBox {"
+            "  border: 1px solid #555;"
+            "  border-radius: 6px;"
+            "  margin-top: 14px;"
+            "  padding-top: 10px;"
+            "  font-weight: bold;"
+            "}"
+            "QGroupBox::title {"
+            "  subcontrol-origin: margin;"
+            "  subcontrol-position: top left;"
+            "  left: 10px;"
+            "  padding: 0 6px;"
+            "  color: #c8d7e3;"
+            "}"
+        )
+
+        # ============ SEZIONE 1: INPAINT / OUTPAINT ============
+        ipo_box = QGroupBox("🎨 Inpaint / Outpaint")
+        f = QFormLayout(ipo_box)
+        self.inpaint_prompt = QPlainTextEdit(); self.inpaint_prompt.setMaximumHeight(36)
+        self.inpaint_prompt.setPlaceholderText("Prompt area mascherata (inpaint)…")
+        f.addRow("Prompt inpaint:", self.inpaint_prompt)
+        self.outpaint_prompt = QPlainTextEdit(); self.outpaint_prompt.setMaximumHeight(36)
+        self.outpaint_prompt.setPlaceholderText("Estensione oltre i bordi (outpaint)…")
+        f.addRow("Prompt outpaint:", self.outpaint_prompt)
+        self.inp_neg = QPlainTextEdit(DEFAULT_NEG); self.inp_neg.setMaximumHeight(36)
+        self.inp_neg.setPlaceholderText("Prompt negativo (cosa evitare)…")
+        f.addRow("Negativo:", self.inp_neg)
+        srow = QHBoxLayout()
+        self.strength = QSlider(Qt.Horizontal); self.strength.setRange(0, 100); self.strength.setValue(75)
+        self.strength_lbl = QLabel("0.75")
+        self.strength.valueChanged.connect(lambda v: self.strength_lbl.setText(f"{v/100:.2f}"))
+        srow.addWidget(self.strength); srow.addWidget(self.strength_lbl)
+        sw = QWidget(); sw.setLayout(srow); f.addRow("Forza (mantenimento):", sw)
+        self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
+        self.inp_model.currentTextChanged.connect(self._reload_inpaint_loras)
+        self.inp_model.currentTextChanged.connect(self._update_inp_star)
+        imrow = QHBoxLayout(); imrow.setContentsMargins(0, 0, 0, 0)
+        imrow.addWidget(self.inp_model, 1)
+        self.inp_star = QToolButton(); self.inp_star.setText("☆")
+        self.inp_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
+        self.inp_star.setToolTip("Preferito: segna il modello inpaint selezionato.")
+        self.inp_star.clicked.connect(self._toggle_inp_fav)
+        imrow.addWidget(self.inp_star)
+        imw = QWidget(); imw.setLayout(imrow); f.addRow("Modello:", imw)
+        self.inp_lora = QComboBox(); f.addRow("LoRA:", self.inp_lora)
+        self.inp_steps = QSpinBox(); self.inp_steps.setRange(1, 80); self.inp_steps.setValue(20)
+        f.addRow("Steps:", self.inp_steps)
+        seedrow = QHBoxLayout()
+        self.inp_seed = QSpinBox(); self.inp_seed.setRange(0, 2_147_483_647); self.inp_seed.setValue(0)
+        self.inp_seed_rand = QCheckBox("🎲 casuale"); self.inp_seed_rand.setChecked(True)
+        self.inp_seed.setEnabled(False)
+        self.inp_seed_rand.toggled.connect(lambda on: self.inp_seed.setEnabled(not on))
+        seedrow.addWidget(self.inp_seed, 1); seedrow.addWidget(self.inp_seed_rand)
+        sw2 = QWidget(); sw2.setLayout(seedrow); f.addRow("Seed:", sw2)
+        # bottoni Genera per inpaint/outpaint
+        brow = QHBoxLayout()
+        b_in = QPushButton("🎨 Genera inpaint"); b_in.clicked.connect(lambda: self.canvas.request_inpaint.emit())
+        b_out = QPushButton("⬜ Genera outpaint"); b_out.clicked.connect(lambda: self.canvas.request_outpaint.emit())
+        brow.addWidget(b_in); brow.addWidget(b_out)
+        bw = QWidget(); bw.setLayout(brow); f.addRow(bw)
+        wv.addWidget(ipo_box)
+        # separatore visivo orizzontale fra le due sezioni
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setFrameShadow(QFrame.Sunken)
+        sep.setStyleSheet("color: #444; margin: 6px 0;")
+        wv.addWidget(sep)
+
+        # ============ SEZIONE 2: INTEGRA ============
+        int_box = QGroupBox("🧩 Integra immagini (fondi le immagini extra incollate sul canvas)")
+        g = QFormLayout(int_box)
+        self.integrate_prompt = QPlainTextEdit(); self.integrate_prompt.setMaximumHeight(36)
+        self.integrate_prompt.setPlaceholderText("Opzionale: come integrare (vuoto = automatico)…")
+        g.addRow("Prompt integra:", self.integrate_prompt)
+        self.integrate_engine = QComboBox()
+        self.integrate_engine.addItems(["Kontext (FLUX.1)", "FLUX.2 (sperimentale)"])
+        self.integrate_engine.setToolTip("Kontext: modello di editing dedicato (consigliato). "
+                                         "FLUX.2: usa il modello FLUX.2 selezionato sotto.")
+        # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 vs FLUX.2) +
+        # abilitazione del puzzle_lora (LoRA FLUX.1 incompatibile con FLUX.2).
+        self.integrate_engine.currentIndexChanged.connect(self._on_integrate_engine_changed)
+        g.addRow("Motore integra:", self.integrate_engine)
+        self.integrate_puzzle = QCheckBox("usa puzzle_lora (MagicQuill, solo Kontext)")
+        self.integrate_puzzle.setChecked(True)
+        self.integrate_puzzle.setToolTip("LoRA 'foreground' di MagicQuill: aiuta a fondere l'oggetto. "
+                                         "Richiede MagicQuill\\puzzle_lora.safetensors tra le LoRA.")
+        g.addRow("", self.integrate_puzzle)
+        self.integrate_model = QComboBox()
+        # Label dinamica: aggiornata da _on_integrate_engine_changed.
+        self._integrate_model_label = QLabel("Modello:")
+        g.addRow(self._integrate_model_label, self.integrate_model)
+        # Campi duplicati (negativo/steps/seed) dedicati all'integrazione: il pipeline
+        # generate_integrate userà questi al posto di quelli inpaint.
+        self.int_neg = QPlainTextEdit(DEFAULT_NEG); self.int_neg.setMaximumHeight(36)
+        self.int_neg.setPlaceholderText("Prompt negativo (cosa evitare)…")
+        g.addRow("Negativo:", self.int_neg)
+        self.int_steps = QSpinBox(); self.int_steps.setRange(1, 80); self.int_steps.setValue(20)
+        g.addRow("Steps:", self.int_steps)
+        intseedrow = QHBoxLayout()
+        self.int_seed = QSpinBox(); self.int_seed.setRange(0, 2_147_483_647); self.int_seed.setValue(0)
+        self.int_seed_rand = QCheckBox("🎲 casuale"); self.int_seed_rand.setChecked(True)
+        self.int_seed.setEnabled(False)
+        self.int_seed_rand.toggled.connect(lambda on: self.int_seed.setEnabled(not on))
+        intseedrow.addWidget(self.int_seed, 1); intseedrow.addWidget(self.int_seed_rand)
+        sw3 = QWidget(); sw3.setLayout(intseedrow); g.addRow("Seed:", sw3)
+        # bottone Integra spostato qui dal canvas/workspace
+        b_int = QPushButton("🧩 Integra immagini")
+        b_int.clicked.connect(lambda: self.request_integrate.emit())
+        g.addRow(b_int)
+        wv.addWidget(int_box)
+
+        return wrap
+
+    # ---------- cambia colore (Kontext prompt-based, stile MagicQuill) ----------
+    def _color_box(self) -> QGroupBox:
+        box = QGroupBox("Cambia colore (Kontext)")
+        f = QFormLayout(box)
+        crow = QHBoxLayout()
+        self.color_target = QLineEdit(); self.color_target.setPlaceholderText("es. rosso acceso, blu navy, #cc0000")
+        self.color_swatch = QLabel(); self.color_swatch.setFixedSize(26, 26)
+        self.color_swatch.setStyleSheet("border:1px solid #555; border-radius:5px;")
+        cbtn = QPushButton("🎨 scegli"); cbtn.clicked.connect(self._pick_color)
+        crow.addWidget(self.color_target, 1); crow.addWidget(self.color_swatch); crow.addWidget(cbtn)
+        f.addRow("Colore:", self._wrapw(crow))
+        self.color_subject = QLineEdit()
+        self.color_subject.setPlaceholderText("opzionale: cosa ricolorare (es. la maglietta, l'auto)")
+        f.addRow("Soggetto:", self.color_subject)
+        self.color_engine = QComboBox(); self.color_engine.addItems(["Kontext (FLUX.1)", "FLUX.2 (sperimentale)"])
+        f.addRow("Motore:", self.color_engine)
+        self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
+        f.addRow("Steps:", self.color_steps)
+        self.color_btn = QPushButton("🎨 Cambia colore")
+        self.color_btn.clicked.connect(lambda: self.request_recolor.emit())
+        f.addRow(self.color_btn)
+        note = QLabel("Indica il soggetto col testo (o usa la selezione AI / maschera). "
+                      "Mantiene texture, materiale e luce: cambia solo il colore.")
+        note.setWordWrap(True); note.setStyleSheet("color:#888;")
+        f.addRow(note)
+        return box
+
+    def _wrapw(self, layout) -> QWidget:
+        w = QWidget(); w.setLayout(layout); return w
+
+    def _pick_color(self):
+        from PySide6.QtWidgets import QColorDialog
+        c = QColorDialog.getColor()
+        if c.isValid():
+            self.color_target.setText(c.name())
+            self.color_swatch.setStyleSheet(f"background:{c.name()}; border:1px solid #555; border-radius:5px;")
+
+    def get_color_config(self) -> dict:
+        return {
+            "target": self.color_target.text().strip(),
+            "subject": self.color_subject.text().strip(),
+            "engine": "flux2" if self.color_engine.currentIndex() == 1 else "kontext",
+            "steps": self.color_steps.value(),
+        }
+
+    def _reload_inpaint_loras(self, *_):
+        label = self.inp_model.currentText().split("  ⛔")[0]
+        # Tutte le voci dinamiche FLUX (checkpoint o UNET) usano lo stesso pool LoRA Flux.
+        if label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {}):
+            fill_lora_combo(self.inp_lora, "Flux", allow_nsfw=self._allow_nsfw())
+            return
+        spec = INPAINT_MODELS.get(label, {})
+        fill_lora_combo(self.inp_lora, spec.get("arch"), allow_nsfw=self._allow_nsfw())
+        # allinea gli steps al default consigliato del modello (l'utente può ri-modificarli)
+        if spec.get("steps"):
+            self.inp_steps.setValue(int(spec["steps"]))
+
+    # ---------- selezione oggetto (GroundingDINO / CLIPSeg + SAM) ----------
+    def _segment_box(self) -> QGroupBox:
+        box = QGroupBox("Seleziona oggetto (maschera automatica — segue i contorni)")
+        v = QVBoxLayout(box)
+        r1 = QHBoxLayout()
+        r1.addWidget(QLabel("Da testo:"))
+        self.seg_text = QLineEdit(); self.seg_text.setPlaceholderText("es. costume da bagno, capelli, viso, mani…")
+        self.seg_text.returnPressed.connect(lambda: self.request_segment_text.emit())
+        r1.addWidget(self.seg_text, 1)
+        seg_btn = QPushButton("🎯 Seleziona"); seg_btn.clicked.connect(lambda: self.request_segment_text.emit())
+        r1.addWidget(seg_btn)
+        v.addLayout(r1)
+        r2 = QHBoxLayout()
+        r2.addWidget(QLabel("Detector:"))
+        self.seg_detector = QComboBox()
+        # Il «Detector» riguarda SOLO la selezione DA TESTO (pulsante 🎯). La selezione col
+        # PUNTATORE (click/box sul canvas) usa sempre SAM vanilla in automatico e non passa
+        # da qui. Niente «SAM v1» qui: da testo SAM da solo non funziona (serve un detector) e
+        # in passato finiva su CLIPSeg (non installato) → errore.
+        self.seg_detector.addItem("GroundingDINO + SAM-HQ (bordo rifinito, consigliato)", userData="grounding_dino")
+        self.seg_detector.addItem("GroundingDINO (solo, più veloce)", userData="grounding_dino_only")
+        self.seg_detector.setCurrentIndex(0)
+        r2.addWidget(self.seg_detector, 1)
+        r2.addWidget(QLabel("Soglia:"))
+        self.seg_threshold = QDoubleSpinBox()
+        self.seg_threshold.setRange(0.10, 0.95); self.seg_threshold.setSingleStep(0.05)
+        # 0.50 per GroundingDINO: 0.30-0.40 selezionava spesso l'intera immagine
+        # su prompt generici (es. "viso"). Valori alti (0.50-0.70) sono più precisi.
+        self.seg_threshold.setValue(0.50)
+        self.seg_threshold.setToolTip(
+            "Soglia di selezione (agisce su ENTRAMBE le modalità):\n"
+            "• Da testo (GroundingDINO): confidenza minima del detector.\n"
+            "• Col puntatore (SAM): soglia della maschera.\n"
+            "Valori ALTI (0.50-0.70) = selezione più stretta/precisa; BASSI (0.20-0.35) = più ampia "
+            "(prende tutto l'oggetto). Se col click prende solo una macchia, ABBASSALA.")
+        r2.addWidget(self.seg_threshold)
+        v.addLayout(r2)
+        self.seg_detector.currentIndexChanged.connect(self._on_seg_detector_changed)
+        r3 = QHBoxLayout()
+        r3.addWidget(QLabel("Modello SAM (puntatore):"))
+        self.seg_sam = QComboBox(); self.seg_sam.setMinimumWidth(200)
+        self.seg_sam.setToolTip("Usato SOLO dalla selezione col puntatore (click/box sul canvas). "
+                                "Deve essere un SAM vanilla (sam_vit_b/l/h): i SAM-HQ qui non sono compatibili.")
+        r3.addWidget(self.seg_sam, 1)
+        v.addLayout(r3)
+        hint = QLabel(
+            "<b>Da testo</b> (🎯 Seleziona): GroundingDINO trova l'oggetto descritto; con +SAM-HQ ne rifinisce il bordo. "
+            "<b>Col puntatore</b> (click/riquadro sul canvas): SAM vanilla raffina la regione disegnata. "
+            "La maschera risultante è modificabile a mano con pennello/gomma."
+        )
+        hint.setTextFormat(Qt.RichText)
+        hint.setStyleSheet("color:#888;"); hint.setWordWrap(True); v.addWidget(hint)
+        return box
+
+    def _on_integrate_engine_changed(self, _idx: int):
+        """Cambio motore Integra → ricarica modelli compatibili + label dinamica."""
+        engine_label = "Modello Kontext (FLUX.1):" if _idx == 0 else "Modello FLUX.2:"
+        if hasattr(self, "_integrate_model_label"):
+            self._integrate_model_label.setText(engine_label)
+        self._reload_flux_combos()
+
+    def _on_seg_detector_changed(self, _idx: int):
+        # Solo detector da testo (GroundingDINO): la soglia è sempre rilevante. Default 0.50.
+        self.seg_threshold.setEnabled(True)
+
+    def set_sam_models(self, models: list[str]):
+        self.seg_sam.clear()
+        if models:
+            # Questo menu serve SOLO alla selezione a click/box (puntatore), che usa il
+            # SAMLoader di Impact-Pack: carica solo SAM *vanilla* (sam_vit_b/l/h). Un
+            # SAM-HQ qui darebbe mismatch di state_dict → vanilla in cima e selezionato.
+            # (La selezione «da testo»/GroundingDINO usa SAM-HQ in automatico, non questo menu.)
+            vanilla = [m for m in models if "hq" not in m.lower()]
+            hq = [m for m in models if "hq" in m.lower()]
+            self.seg_sam.addItems(vanilla + hq)
+            if not vanilla:
+                # solo SAM-HQ disponibili: il puntatore non può funzionare finché non si
+                # aggiunge un SAM vanilla in models/sams.
+                self.seg_sam.insertItem(0, "⚠ serve un SAM vanilla per il puntatore")
+                self.seg_sam.setCurrentIndex(0)
+        else:
+            self.seg_sam.addItem("(nessun SAM — riavvia ComfyUI)")
+
+    def get_segment_config(self) -> dict:
+        sam = self.seg_sam.currentText() if self.seg_sam.count() else ""
+        if sam.startswith("(") or sam.startswith("⚠"):
+            sam = ""
+        detector = self.seg_detector.currentData() if hasattr(self, "seg_detector") else "grounding_dino"
+        thr = float(self.seg_threshold.value()) if hasattr(self, "seg_threshold") else 0.50
+        return {"text": self.seg_text.text().strip(),
+                "detector": detector,
+                "threshold": thr,
+                "sam_model": sam or None,
+                "clipseg_threshold": thr}  # back-compat con vecchio main_window
+
+    # ---------- aumenta definizione (upscale AI) ----------
+    def _upscale_box(self) -> QGroupBox:
+        box = QGroupBox("🔍 Aumenta definizione (upscale AI)")
+        f = QFormLayout(box)
+        self.up_model = QComboBox(); self.up_model.setMinimumWidth(220)
+        f.addRow("Modello:", self.up_model)
+        srow = QHBoxLayout()
+        self.up_scale = QComboBox(); self.up_scale.addItems(["2x", "3x", "4x"]); self.up_scale.setCurrentText("4x")
+        srow.addWidget(self.up_scale)
+        srow.addWidget(QLabel("Modalità:"))
+        self.up_mode = QComboBox(); self.up_mode.addItems(["Solo modello (veloce)", "Modello + rifinitura AI (più dettaglio)"])
+        self.up_mode.currentIndexChanged.connect(self._on_up_mode)
+        srow.addWidget(self.up_mode, 1)
+        sw = QWidget(); sw.setLayout(srow); f.addRow("Fattore:", sw)
+        # rifinitura AI (FLUX img2img a denoise basso)
+        self.up_refine_model = QComboBox()
+        f.addRow("Modello rifinitura:", self.up_refine_model)
+        rrow = QHBoxLayout()
+        self.up_refine_str = QSlider(Qt.Horizontal); self.up_refine_str.setRange(5, 70); self.up_refine_str.setValue(30)
+        self.up_refine_str_lbl = QLabel("0.30")
+        self.up_refine_str.valueChanged.connect(lambda v: self.up_refine_str_lbl.setText(f"{v/100:.2f}"))
+        rrow.addWidget(self.up_refine_str); rrow.addWidget(self.up_refine_str_lbl)
+        self.up_refine_steps = QSpinBox(); self.up_refine_steps.setRange(4, 40); self.up_refine_steps.setValue(12)
+        rrow.addWidget(QLabel("Steps:")); rrow.addWidget(self.up_refine_steps)
+        rw = QWidget(); rw.setLayout(rrow); f.addRow("Forza rifinitura:", rw)
+        up_btn = QPushButton("🔍 Aumenta definizione")
+        up_btn.clicked.connect(lambda: self.request_upscale.emit())
+        f.addRow(up_btn)
+        hint = QLabel("Modello: super-risoluzione AI sull'immagine del canvas (forti per foto: 4xNomos8kSCHAT-L, "
+                      "4xRealWebPhoto, 4x-UltraSharpV2). Rifinitura AI: passata FLUX a denoise basso sull'immagine "
+                      "ingrandita per inventare dettaglio (più lenta/pesante).")
+        hint.setStyleSheet("color:#888;"); hint.setWordWrap(True); f.addRow(hint)
+
+        from PySide6.QtWidgets import QFrame as _QFrame
+        sep = _QFrame(); sep.setFrameShape(_QFrame.HLine)
+        sep.setStyleSheet("color:#333; margin-top:6px;")
+        f.addRow(sep)
+        restore_btn = QPushButton("🔧 Restaura / Colora foto…")
+        restore_btn.setToolTip(
+            "Apre il tab Restauro Foto con questa immagine pre-selezionata.\n"
+            "Operazioni disponibili:\n"
+            "• Restauro qualità (ESRGAN super-resolution)\n"
+            "• Colorazione B&W → colore (FLUX.2)\n"
+            "• Restauro + Colorazione combinati"
+        )
+        restore_btn.clicked.connect(lambda: self.request_restore_photo.emit())
+        f.addRow(restore_btn)
+        self._on_up_mode()
+        return box
+
+    def _on_up_mode(self, *_):
+        refine = self.up_mode.currentIndex() == 1
+        for w in (self.up_refine_model, self.up_refine_str, self.up_refine_str_lbl, self.up_refine_steps):
+            w.setEnabled(refine)
+
+    def set_upscale_models(self, models: list[str]):
+        self.up_model.clear()
+        if not models:
+            self.up_model.addItem("(nessun modello upscale)"); return
+        pref = [m for m in _UPSCALE_PREFERRED if m in models]      # preferiti (più potenti) davanti
+        rest = [m for m in models if m not in pref]
+        for m in pref + rest:
+            self.up_model.addItem(m)
+
+    def get_upscale_config(self) -> dict:
+        m = self.up_model.currentText() if self.up_model.count() else ""
+        if m.startswith("("):
+            m = ""
+        rm = self.up_refine_model.currentText() if self.up_refine_model.count() else ""
+        if rm.startswith("("):
+            rm = ""
+        return {
+            "model": m or None, "scale": float(self.up_scale.currentText().rstrip("x")),
+            "refine": self.up_mode.currentIndex() == 1,
+            "refine_model": rm or None,
+            "refine_denoise": self.up_refine_str.value() / 100.0,
+            "refine_steps": self.up_refine_steps.value(),
+        }
+
+    # ---------- inventario modelli (da ComfyUI, passato da main_window) ----------
+    def set_model_inventory(self, diffusion_models: list[str],
+                            checkpoint_models: list[str] | None = None):
+        self._models = list(diffusion_models)
+        self._gen_checkpoint_models = list(checkpoint_models or [])
+        self._mcat.reload_if_changed()
+        if checkpoint_models is not None:
+            self._refresh_inpaint_checkpoints(checkpoint_models)
+        self._reload_gen()
+        self._reload_flux_combos()        # modelli FLUX per rifinitura upscale e integrazione
+
+    def set_gen_inventory(self, text_encoders: list[str] | None = None,
+                          vaes: list[str] | None = None,
+                          clip_types: list[str] | None = None):
+        """Popola i dropdown Text encoder / CLIP type / VAE della sezione «Genera immagine»
+        con i valori reali esposti da ComfyUI (CLIPLoader/VAELoader). Mantiene la selezione
+        corrente se ancora valida; altrimenti applica il default dell'architettura.
+        """
+        if text_encoders is not None and hasattr(self, "gen_encoder"):
+            cur = self.gen_encoder.currentText()
+            self.gen_encoder.clear()
+            self.gen_encoder.addItem("(auto: scegli da modello)", None)
+            for e in text_encoders:
+                self.gen_encoder.addItem(e, e)
+            if cur:
+                i = self.gen_encoder.findText(cur)
+                if i >= 0: self.gen_encoder.setCurrentIndex(i)
+        if clip_types is not None and hasattr(self, "gen_clip_type"):
+            cur = self.gen_clip_type.currentText()
+            self.gen_clip_type.clear()
+            self.gen_clip_type.addItem("auto", None)
+            for t in clip_types:
+                self.gen_clip_type.addItem(t, t)
+            if cur and cur != "auto":
+                i = self.gen_clip_type.findText(cur)
+                if i >= 0: self.gen_clip_type.setCurrentIndex(i)
+            # forza i default per arch (clip_type → auto)
+            self._apply_arch_defaults(self.gen_arch.currentText())
+        if vaes is not None and hasattr(self, "gen_vae"):
+            cur = self.gen_vae.currentText()
+            self.gen_vae.clear()
+            self.gen_vae.addItem("(auto: scegli da modello)", None)
+            for v in vaes:
+                self.gen_vae.addItem(v, v)
+            if cur:
+                i = self.gen_vae.findText(cur)
+                if i >= 0: self.gen_vae.setCurrentIndex(i)
+
+    # Popola dinamicamente il dropdown Inpaint con TUTTI i modelli FLUX disponibili:
+    # - checkpoint Flux (CheckpointLoaderSimple → ramo `checkpoint` del pipeline)
+    # - UNET Flux/Fill da diffusion_models (UNETLoader → ramo `unet`)
+    # Il filtro è permissivo: include qualunque file che sembra FLUX.1, escludendo solo
+    # FLUX.2 (encoder/VAE incompatibili) e i Kontext (modello editing, non inpaint).
+    def _refresh_inpaint_checkpoints(self, checkpoint_models: list[str]):
+        # heuristic: identifica file FLUX-compatibili dal nome (catalogo è opzionale)
+        def is_flux_like(name: str) -> bool:
+            n = (name or "").lower()
+            if _is_flux2(n):
+                return False
+            if "kontext" in n:
+                return False
+            # esclusioni tecniche
+            if any(x in n for x in ("text_encoders", "vae", ".vae.", "clip")):
+                return False
+            # keyword positive (catalogo o derivate)
+            return any(k in n for k in (
+                "flux", "getphat", "fuxcapacity", "krea", "reality", "fluxunchained",
+                "sigma", "verus", "pixelwave",
+            ))
+        ckpts = [c for c in checkpoint_models if is_flux_like(c)]
+        # in più: prendi anche i UNET Flux da diffusion_models (Fill, Dev, ecc.)
+        unets = [m for m in (self._models or []) if is_flux_like(m)]
+        # rimuovi voci dinamiche precedenti
+        for label in list(self._dynamic_checkpoints.keys()):
+            idx = self.inp_model.findText(label)
+            if idx >= 0:
+                self.inp_model.removeItem(idx)
+        self._dynamic_checkpoints.clear()
+        # inserisci nuove voci PRIMA di "Nessuno (solo LTX I2V)"
+        none_idx = self.inp_model.findText("Nessuno (solo LTX I2V)")
+        insert_at = none_idx if none_idx >= 0 else self.inp_model.count()
+        import os as _os
+        # `_dynamic_checkpoints` mappa label → file checkpoint (ramo CheckpointLoaderSimple).
+        # I UNET Flux/Fill di diffusion_models vanno via `_dynamic_unets` (UNETLoader).
+        for ckpt in sorted(ckpts):
+            base = _os.path.splitext(_os.path.basename(ckpt))[0]
+            label = f"{base}  · checkpoint Flux"
+            self._dynamic_checkpoints[label] = ckpt
+            self.inp_model.insertItem(insert_at, label)
+            insert_at += 1
+        # UNET-style FLUX (diffusion_models): non duplicare i file già esposti dalle
+        # voci hardcoded di INPAINT_MODELS (fluxunchained-fill / FLUX_DEV_Fill).
+        hardcoded_unets = {(spec.get("unet") or "").lower()
+                           for spec in INPAINT_MODELS.values() if spec.get("unet")}
+        self._dynamic_unets = getattr(self, "_dynamic_unets", {})
+        for label in list(self._dynamic_unets.keys()):
+            idx = self.inp_model.findText(label)
+            if idx >= 0:
+                self.inp_model.removeItem(idx)
+        self._dynamic_unets.clear()
+        for u in sorted(unets):
+            if u.lower() in hardcoded_unets:
+                continue
+            base = _os.path.splitext(_os.path.basename(u))[0]
+            label = f"{base}  · UNET Flux"
+            self._dynamic_unets[label] = u
+            self.inp_model.insertItem(insert_at, label)
+            insert_at += 1
+
+    def set_inpaint_availability(self, unet_names: list[str]):
+        """Marca nel menu i modelli inpaint NON ancora presenti in ComfyUI (es. in download)."""
+        self._inpaint_avail = set(unet_names or [])
+        for i in range(self.inp_model.count()):
+            label = self.inp_model.itemText(i).split("  ⛔")[0]
+            # Modelli dinamici (checkpoint Flux o UNET Flux): vengono dall'inventario
+            # ComfyUI → sono per definizione installati, niente marker ⛔.
+            if label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {}):
+                self.inp_model.setItemText(i, label)
+                continue
+            spec = INPAINT_MODELS.get(label, {})
+            unet = spec.get("unet")
+            if unet and unet not in self._inpaint_avail:
+                self.inp_model.setItemText(i, label + "  ⛔ non installato")
+            else:
+                self.inp_model.setItemText(i, label)
+
+    # ---------- API per il controller ----------
+    def set_video_aspect(self, w: int, h: int):
+        self.canvas.set_aspect(w, h)
+
+    def get_values(self) -> dict:
+        return {
+            "prompt_positive": self.prompt.toPlainText().strip(),
+            "prompt_negative": self.neg.toPlainText().strip(),
+        }
+
+    def get_inpaint_config(self) -> dict:
+        label = self.inp_model.currentText().split("  ⛔")[0]
+        # Risoluzione voce dinamica:
+        # - checkpoint Flux (CheckpointLoaderSimple): _dynamic_checkpoints
+        # - UNET Flux/Fill (UNETLoader):              _dynamic_unets
+        # - hardcoded (FLUX Fill / FLUX Fill GGUF):    INPAINT_MODELS
+        ckpt = self._dynamic_checkpoints.get(label)
+        dyn_unet = getattr(self, "_dynamic_unets", {}).get(label)
+        if ckpt:
+            spec = {"arch": "Flux", "unet": None, "steps": self.inp_steps.value()}
+        elif dyn_unet:
+            spec = {"arch": "Flux", "unet": dyn_unet, "steps": self.inp_steps.value()}
+        else:
+            spec = INPAINT_MODELS.get(label, {})
+        unet = spec.get("unet")
+        available = (unet is None) or (unet in self._inpaint_avail) if self._inpaint_avail else True
+        imodel = self.integrate_model.currentText() if self.integrate_model.count() else ""
+        if imodel.startswith("("):
+            imodel = ""
+        return {
+            "inpaint_prompt": self.inpaint_prompt.toPlainText().strip(),
+            "outpaint_prompt": self.outpaint_prompt.toPlainText().strip(),
+            "integrate_prompt": self.integrate_prompt.toPlainText().strip(),
+            "integrate_model": imodel or None,
+            "integrate_engine": "flux2" if self.integrate_engine.currentIndex() == 1 else "kontext",
+            "integrate_puzzle_lora": ("MagicQuill\\puzzle_lora.safetensors"
+                                      if self.integrate_puzzle.isChecked() else None),
+            # Campi dedicati all'integrazione (duplicati rispetto a inpaint/outpaint)
+            "integrate_negative": self.int_neg.toPlainText().strip(),
+            "integrate_steps": self.int_steps.value(),
+            "integrate_seed": None if self.int_seed_rand.isChecked() else self.int_seed.value(),
+            # Campi inpaint/outpaint
+            "negative": self.inp_neg.toPlainText().strip(),
+            "strength": self.strength.value() / 100.0,
+            "model": label,
+            "unet": unet,
+            "checkpoint": ckpt,
+            "steps": self.inp_steps.value(),
+            "seed": None if self.inp_seed_rand.isChecked() else self.inp_seed.value(),
+            "lora": self.inp_lora.currentData(),
+            "available": available,
+        }
+
+    def get_gen_config(self) -> dict:
+        enc = self.gen_encoder.currentData() if hasattr(self, "gen_encoder") else None
+        vae = self.gen_vae.currentData() if hasattr(self, "gen_vae") else None
+        # `auto` → None (il pipeline sceglie il default per arch).
+        ctype = self.gen_clip_type.currentData() if hasattr(self, "gen_clip_type") else None
+        smp = self.gen_sampler.currentText() if hasattr(self, "gen_sampler") else None
+        if smp == "auto": smp = None
+        sch = self.gen_scheduler.currentText() if hasattr(self, "gen_scheduler") else None
+        if sch == "auto": sch = None
+        # Seed: random se checkbox attivo → None (il caller userà random.randint())
+        seed_fixed = (not self.gen_seed_rand.isChecked()) if hasattr(self, "gen_seed_rand") else False
+        return {
+            "arch": {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
+            "model": self.gen_model.currentText(),
+            "loras": self.gen_lora_tab.selected_loras(),
+            "steps": self.gen_steps.value(),
+            "cfg": float(self.gen_cfg.value()) if hasattr(self, "gen_cfg") else None,
+            "sampler": smp,
+            "scheduler": sch,
+            "encoder": enc,
+            "clip_type": ctype,
+            "vae": vae,
+            "seed": self.gen_seed.value() if seed_fixed else None,
+            "prompt": self.gen_prompt.toPlainText().strip() or self.prompt.toPlainText().strip(),
+            "negative": self.gen_neg.toPlainText().strip() if hasattr(self, "gen_neg") else "",
+            "enhance": self.gen_enhance.isChecked() if hasattr(self, "gen_enhance") else False,
+            "nsfw": self._allow_nsfw(),
+        }
+
+    @property
+    def image_path(self):
+        return self.canvas.image_path

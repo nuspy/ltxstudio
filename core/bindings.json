@@ -1,0 +1,215 @@
+{
+  "_comment": "Mappa parametro -> nodo/input nel golden prompt (pluto_t2v.api.json). Node id verificati dalla cattura. I valori 'targets' supportano piu' nodi (es. seed). Node id con ':' sono dentro subgraph.",
+  "params": {
+    "prompt_positive": [
+      {
+        "node": "5119",
+        "input": "value"
+      }
+    ],
+    "prompt_negative": [
+      {
+        "node": "5117",
+        "input": "text"
+      }
+    ],
+    "fps": [
+      {
+        "node": "5521",
+        "input": "value"
+      }
+    ],
+    "length_s": [
+      {
+        "node": "5530",
+        "input": "value"
+      }
+    ],
+    "width": [
+      {
+        "node": "5722",
+        "input": "width"
+      }
+    ],
+    "height": [
+      {
+        "node": "5722",
+        "input": "height"
+      }
+    ],
+    "seed": [
+      {
+        "node": "5120",
+        "input": "value"
+      },
+      {
+        "node": "5755",
+        "input": "noise_seed"
+      },
+      {
+        "node": "5756",
+        "input": "noise_seed"
+      }
+    ],
+    "steps": [
+      {
+        "node": "5748:6273",
+        "input": "steps"
+      }
+    ],
+    "cfg": [
+      {
+        "node": "5748:4828",
+        "input": "cfg"
+      }
+    ],
+    "sampler": [
+      {
+        "node": "5748:4831",
+        "input": "sampler_name"
+      }
+    ],
+    "scheduler": [
+      {
+        "node": "5748:6273",
+        "input": "scheduler"
+      }
+    ],
+    "output_format": [
+      {
+        "node": "5082",
+        "input": "format"
+      }
+    ],
+    "model_standard": [
+      {
+        "node": "5751",
+        "input": "unet_name"
+      }
+    ],
+    "model_eros": [
+      {
+        "node": "6402",
+        "input": "unet_name"
+      }
+    ],
+    "text_encoder": [
+      {
+        "node": "5079",
+        "input": "clip_name1"
+      }
+    ],
+    "vae_video": [
+      {
+        "node": "5074",
+        "input": "vae_name"
+      }
+    ],
+    "vae_audio": [
+      {
+        "node": "5075",
+        "input": "vae_name"
+      }
+    ],
+    "upscaler": [
+      {
+        "node": "5606",
+        "input": "model_name"
+      }
+    ],
+    "ref_image": [
+      {
+        "node": "5541",
+        "input": "image"
+      }
+    ],
+    "ref_size": [
+      {
+        "node": "5523",
+        "input": "value"
+      }
+    ],
+    "ref_strength": [
+      {
+        "node": "5647",
+        "input": "value"
+      }
+    ],
+    "id_lora": [
+      {
+        "node": "5668",
+        "input": "lora_name"
+      }
+    ],
+    "detailer_lora": [
+      {
+        "node": "5906",
+        "input": "lora_name"
+      }
+    ],
+    "_comment_modules": "input dei moduli (presenti solo nel superset; su t2v vengono ignorati)",
+    "ref_image_file": [
+      {
+        "node": "5541",
+        "input": "image"
+      }
+    ],
+    "control_video": [
+      {
+        "node": "5069",
+        "input": "video"
+      }
+    ],
+    "controlnet_type": [
+      {
+        "node": "5564",
+        "input": "select"
+      }
+    ],
+    "voice_sample_file": [
+      {
+        "node": "5669",
+        "input": "audio"
+      }
+    ],
+    "user_audio_file": [
+      {
+        "node": "5098",
+        "input": "audio"
+      }
+    ],
+    "upscaler_mode": [
+      {
+        "node": "6396",
+        "input": "select"
+      }
+    ],
+    "distilled_lora": [
+      {
+        "node": "6428",
+        "input": "lora_name"
+      },
+      {
+        "node": "6429",
+        "input": "lora_name"
+      }
+    ]
+  },
+  "nsfw_presets": {
+    "sfw": {
+      "text_encoder": "gemma_3_12B_it.safetensors",
+      "model_standard": "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors"
+    },
+    "nsfw": {
+      "text_encoder": "gemma_3_12B_it_abliterated.safetensors",
+      "model_standard": "ltx2310eros_v1.safetensors",
+      "_note": "AUTO encoder: NSFW usa il gemma ABLITERATED (decensurato → descrive soggetti espliciti senza ammorbidire); SFW usa il gemma full. Override manuale dal selettore Text encoder (default 'Auto').",
+      "distilled_lora": "LTX-2\\ltx-2.3-22b-distilled-lora-dynamic_fro09_avg_rank_105_bf16.safetensors"
+    }
+  },
+  "models": {
+    "_comment": "file selezionabili nel tab Video (model_standard = nodo UNETLoader 5751). GGUF richiede il golden GGUF separato.",
+    "standard_1_1": "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+    "eros": "ltx2310eros_v1.safetensors"
+  }
+}

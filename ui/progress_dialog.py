@@ -1,0 +1,169 @@
+"""Dialog di avanzamento generazione (video / inpaint / outpaint / immagine).
+
+Mostra: cosa sta succedendo ora (caricamento modello, codifica prompt, sampling, decodifica…),
+una barra dell'operazione corrente e una barra del totale APPROSSIMATIVO (pesata: il sampling
+pesa molto). Alimentato dagli eventi WebSocket di ComfyUI (executing / progress / preview).
+"""
+from __future__ import annotations
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QDialog, QVBoxLayout, QLabel, QProgressBar, QDialogButtonBox, QSizePolicy,
+)
+
+
+def _weight(ct: str) -> int:
+    """Peso del nodo per il totale approssimato (il sampling domina i tempi)."""
+    c = ct.lower()
+    if "sampler" in c or "ksampler" in c:
+        return 40
+    if "unetloader" in c or "gguf" in c or "checkpointloader" in c:
+        return 6
+    if "vaedecode" in c:
+        return 5
+    if "dualcliploader" in c or "cliploader" in c or "samloader" in c:
+        return 4
+    if "vaeencode" in c:
+        return 3
+    return 1
+
+
+def _label(ct: str) -> str:
+    c = ct.lower()
+    if "sampler" in c or "ksampler" in c:
+        return "Generazione (sampling)…"
+    if "unetloader" in c or "gguf" in c or "checkpointloader" in c:
+        return "Caricamento modello…"
+    if "dualcliploader" in c or "cliploader" in c:
+        return "Caricamento text encoder…"
+    if "vaeloader" in c:
+        return "Caricamento VAE…"
+    if "vaedecode" in c:
+        return "Decodifica immagine/video…"
+    if "vaeencode" in c:
+        return "Codifica immagine…"
+    if "cliptextencode" in c or "conditioning" in c or "fluxguidance" in c or "promptrelay" in c:
+        return "Codifica prompt…"
+    if "loadimage" in c or "loadmask" in c:
+        return "Caricamento immagine…"
+    if "loraloader" in c or "powerlora" in c or "lora" in c:
+        return "Applicazione LoRA…"
+    if "sam" in c or "clipseg" in c or "detector" in c or "segs" in c:
+        return "Segmentazione…"
+    if "save" in c or "videocombine" in c or "combine" in c:
+        return "Salvataggio…"
+    if "upscale" in c or "resize" in c:
+        return "Upscaling/ridimensionamento…"
+    if "padforoutpaint" in c or "growmask" in c or "inpaintmodel" in c:
+        return "Preparazione maschera…"
+    return "Elaborazione…"
+
+
+class GenProgressDialog(QDialog):
+    def __init__(self, parent=None, on_cancel=None):
+        super().__init__(parent)
+        self.setWindowTitle("Generazione in corso")
+        # Dialog ridimensionabile e grande di default → l'anteprima taesd ha spazio.
+        self.setMinimumSize(900, 760)
+        self.resize(1100, 900)
+        self._on_cancel = on_cancel
+        self._weights: dict[str, int] = {}
+        self._classes: dict[str, str] = {}
+        self._total_w = 1
+        self._done_w = 0
+        self._counted: set[str] = set()
+        self._cur: str | None = None
+
+        v = QVBoxLayout(self)
+        self.title_lbl = QLabel("…"); self.title_lbl.setStyleSheet("font-weight:bold;font-size:14px;")
+        v.addWidget(self.title_lbl)
+        self.status_lbl = QLabel("Preparazione…"); self.status_lbl.setStyleSheet("color:#cdd;")
+        v.addWidget(self.status_lbl)
+
+        v.addWidget(QLabel("Operazione corrente:"))
+        self.cur_bar = QProgressBar(); v.addWidget(self.cur_bar)
+        v.addWidget(QLabel("Avanzamento totale (approssimativo):"))
+        self.tot_bar = QProgressBar(); self.tot_bar.setRange(0, 100); v.addWidget(self.tot_bar)
+
+        self.preview = QLabel("(anteprima — arriverà ad ogni step durante il sampling)")
+        self.preview.setAlignment(Qt.AlignCenter)
+        self.preview.setMinimumSize(800, 560)
+        self.preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.preview.setScaledContents(False)        # niente stretch, riscala manualmente con KeepAspectRatio
+        self.preview.setStyleSheet("background:#111;color:#666;border:1px solid #333;")
+        v.addWidget(self.preview, 1)
+        # Tieni il pixmap originale per riscalare correttamente al resize del dialog
+        self._preview_pix: QPixmap | None = None
+
+        bb = QDialogButtonBox()
+        bb.addButton("✖ Annulla generazione", QDialogButtonBox.RejectRole)
+        bb.rejected.connect(self._cancel)
+        v.addWidget(bb)
+        self.setModal(False)
+
+    # ---------- ciclo di vita ----------
+    def start(self, prompt: dict, title: str):
+        self.title_lbl.setText(title)
+        self.status_lbl.setText("Invio alla coda di ComfyUI…")
+        self._weights = {nid: _weight(n.get("class_type", "")) for nid, n in prompt.items()}
+        self._classes = {nid: n.get("class_type", "") for nid, n in prompt.items()}
+        self._total_w = max(1, sum(self._weights.values()))
+        self._done_w = 0; self._counted = set(); self._cur = None
+        self.cur_bar.setRange(0, 0)        # "busy" finché non arriva un progress
+        self.tot_bar.setValue(0)
+        self._preview_pix = None
+        self.preview.setPixmap(QPixmap())
+        self.preview.setText("(anteprima — arriverà ad ogni step durante il sampling)")
+        self.show(); self.raise_(); self.activateWindow()
+
+    def on_executing(self, node_id: str):
+        # il nodo precedente è terminato → accumula il suo peso
+        if self._cur and self._cur not in self._counted:
+            self._done_w += self._weights.get(self._cur, 1); self._counted.add(self._cur)
+        if not node_id:
+            self.status_lbl.setText("Completamento / salvataggio…"); self.tot_bar.setValue(99)
+            self.cur_bar.setRange(0, 100); self.cur_bar.setValue(100); return
+        self._cur = node_id
+        self.status_lbl.setText(_label(self._classes.get(node_id, "")))
+        self.cur_bar.setRange(0, 0)        # busy
+        self._update_total(0.0)
+
+    def on_progress(self, value: int, maximum: int):
+        if maximum > 0:
+            self.cur_bar.setRange(0, maximum); self.cur_bar.setValue(value)
+            ct = self._classes.get(self._cur or "", "")
+            extra = f"  (step {value}/{maximum})" if ("sampler" in ct.lower() or "ksampler" in ct.lower()) else ""
+            self.status_lbl.setText(_label(ct) + extra)
+            self._update_total(value / maximum)
+
+    def on_preview(self, data: bytes):
+        pix = QPixmap()
+        if pix.loadFromData(data):
+            self._preview_pix = pix
+            self.preview.setPixmap(pix.scaled(self.preview.size(),
+                                              Qt.KeepAspectRatio,
+                                              Qt.SmoothTransformation))
+
+    def resizeEvent(self, event):
+        # Mantieni l'anteprima nitida quando l'utente ridimensiona il dialog.
+        super().resizeEvent(event)
+        if self._preview_pix is not None:
+            self.preview.setPixmap(self._preview_pix.scaled(self.preview.size(),
+                                                            Qt.KeepAspectRatio,
+                                                            Qt.SmoothTransformation))
+
+    def _update_total(self, frac: float):
+        cw = self._weights.get(self._cur or "", 0)
+        pct = int(100 * (self._done_w + cw * frac) / self._total_w)
+        self.tot_bar.setValue(max(self.tot_bar.value(), min(99, pct)))   # monotono, 100 solo a fine
+
+    def finish(self):
+        self.tot_bar.setValue(100)
+        self.cur_bar.setRange(0, 100); self.cur_bar.setValue(100)
+        self.hide()
+
+    def _cancel(self):
+        if self._on_cancel:
+            self._on_cancel()
+        self.hide()

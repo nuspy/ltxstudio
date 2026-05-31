@@ -1,0 +1,825 @@
+{
+  "1241": {
+    "inputs": {
+      "frame_rate": 24,
+      "positive": [
+        "5695",
+        4
+      ],
+      "negative": [
+        "5695",
+        5
+      ]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": {
+      "title": "LTXVConditioning"
+    }
+  },
+  "4848": {
+    "inputs": {
+      "samples": [
+        "5748:4845",
+        1
+      ],
+      "audio_vae": [
+        "5075",
+        0
+      ]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": {
+      "title": "LTXV Audio VAE Decode"
+    }
+  },
+  "5011": {
+    "inputs": {
+      "lora_name": "LTX-2\\ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+      "strength_model": 1,
+      "model": [
+        "5752",
+        0
+      ]
+    },
+    "class_type": "LTXICLoRALoaderModelOnly",
+    "_meta": {
+      "title": "🅛🅣🅧 IC-LoRA Loader Model Only"
+    }
+  },
+  "5065": {
+    "inputs": {
+      "horizontal_tiles": 2,
+      "vertical_tiles": 2,
+      "overlap": 6,
+      "last_frame_fix": false,
+      "working_device": "auto",
+      "working_dtype": "auto",
+      "vae": [
+        "5074",
+        0
+      ],
+      "latents": [
+        "6234",
+        0
+      ]
+    },
+    "class_type": "LTXVTiledVAEDecode",
+    "_meta": {
+      "title": "🅛🅣🅧 LTXV Tiled VAE Decode"
+    }
+  },
+  "5073": {
+    "inputs": {
+      "anything": [
+        "5079",
+        0
+      ]
+    },
+    "class_type": "Anything Everywhere",
+    "_meta": {
+      "title": "Anything Everywhere"
+    }
+  },
+  "5074": {
+    "inputs": {
+      "vae_name": "LTX23_video_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "5075": {
+    "inputs": {
+      "vae_name": "LTX23_audio_vae_bf16.safetensors",
+      "device": "main_device",
+      "weight_dtype": "bf16"
+    },
+    "class_type": "VAELoaderKJ",
+    "_meta": {
+      "title": "VAELoader KJ"
+    }
+  },
+  "5076": {
+    "inputs": {
+      "model_name": "LTXVideo\\LTX-2\\quantstack\\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
+      "extra_model_name": "none",
+      "dequant_dtype": "default",
+      "patch_dtype": "default",
+      "patch_on_device": false,
+      "enable_fp16_accumulation": true,
+      "attention_override": "none"
+    },
+    "class_type": "GGUFLoaderKJ",
+    "_meta": {
+      "title": "GGUFLoaderKJ"
+    }
+  },
+  "5079": {
+    "inputs": {
+      "clip_name1": "gemma_3_12B_it_fp8_scaled.safetensors",
+      "clip_name2": "ltx-2.3_text_projection_bf16.safetensors",
+      "type": "ltxv",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "5082": {
+    "inputs": {
+      "frame_rate": 8,
+      "loop_count": 0,
+      "filename_prefix": "LTX2_3",
+      "format": "video/nvenc_av1-mp4",
+      "pix_fmt": "yuv420p",
+      "bitrate": 10,
+      "megabit": true,
+      "save_metadata": true,
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "5572",
+        0
+      ],
+      "audio": [
+        "5659",
+        0
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "5095": {
+    "inputs": {
+      "model_name": "MelBandRoformer_fp16.safetensors"
+    },
+    "class_type": "MelBandRoFormerModelLoader",
+    "_meta": {
+      "title": "Mel-Band RoFormer Model Loader"
+    }
+  },
+  "5120": {
+    "inputs": {
+      "value": 736794389380784,
+      "mode": true,
+      "action": "fixed",
+      "last_seed": 736794389380784
+    },
+    "class_type": "easy globalSeed",
+    "_meta": {
+      "title": "EasyGlobalSeed"
+    }
+  },
+  "5572": {
+    "inputs": {
+      "width": [
+        "5977",
+        0
+      ],
+      "height": [
+        "5977",
+        1
+      ],
+      "upscale_method": "bicubic",
+      "keep_proportion": "crop",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 2,
+      "device": "gpu",
+      "image": [
+        "5065",
+        0
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "5606": {
+    "inputs": {
+      "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+    },
+    "class_type": "LatentUpscaleModelLoader",
+    "_meta": {
+      "title": "Load Latent Upscale Model"
+    }
+  },
+  "5627": {
+    "inputs": {
+      "ctx_02": [
+        "5793",
+        0
+      ],
+      "ctx_03": [
+        "5630",
+        0
+      ]
+    },
+    "class_type": "Context Switch (rgthree)",
+    "_meta": {
+      "title": "Context Switch (rgthree)"
+    }
+  },
+  "5630": {
+    "inputs": {
+      "model": [
+        "5695",
+        1
+      ],
+      "positive": [
+        "1241",
+        0
+      ],
+      "negative": [
+        "1241",
+        1
+      ]
+    },
+    "class_type": "Context (rgthree)",
+    "_meta": {
+      "title": "T2V CONTEXT"
+    }
+  },
+  "5657": {
+    "inputs": {},
+    "class_type": "Any Switch (rgthree)",
+    "_meta": {
+      "title": "Any Switch (rgthree)"
+    }
+  },
+  "5659": {
+    "inputs": {
+      "any_02": [
+        "4848",
+        0
+      ]
+    },
+    "class_type": "Any Switch (rgthree)",
+    "_meta": {
+      "title": "Any Switch (rgthree)"
+    }
+  },
+  "5668": {
+    "inputs": {
+      "lora_name": "LTX-2\\LTX-2_3-ID-LoRA-CelebVHQ-3K.safetensors",
+      "strength_model": 1,
+      "model": [
+        "5691",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "ID LORA"
+    }
+  },
+  "5673": {
+    "inputs": {},
+    "class_type": "ImpactIfNone",
+    "_meta": {
+      "title": "ImpactIfNone"
+    }
+  },
+  "5683": {
+    "inputs": {},
+    "class_type": "ImpactIfNone",
+    "_meta": {
+      "title": "ImpactIfNone"
+    }
+  },
+  "5691": {
+    "inputs": {
+      "switch": [
+        "5673",
+        1
+      ],
+      "on_false": [
+        "5752",
+        0
+      ],
+      "on_true": [
+        "5011",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch"
+    }
+  },
+  "5692": {
+    "inputs": {
+      "switch": [
+        "5683",
+        1
+      ],
+      "on_false": [
+        "5691",
+        0
+      ],
+      "on_true": [
+        "5668",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch"
+    }
+  },
+  "5695": {
+    "inputs": {},
+    "class_type": "Context Switch (rgthree)",
+    "_meta": {
+      "title": "Context Switch (rgthree)"
+    }
+  },
+  "5702": {
+    "inputs": {
+      "text": "False",
+      "anything": [
+        "5673",
+        1
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Is controlnet activated?"
+    }
+  },
+  "5703": {
+    "inputs": {
+      "text": "False",
+      "anything": [
+        "5683",
+        1
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Is ID LoRA activated?"
+    }
+  },
+  "5751": {
+    "inputs": {
+      "unet_name": "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "5752": {
+    "inputs": {
+      "any_01": [
+        "5751",
+        0
+      ],
+      "any_02": [
+        "6402",
+        0
+      ],
+      "any_03": [
+        "5076",
+        0
+      ]
+    },
+    "class_type": "Any Switch (rgthree)",
+    "_meta": {
+      "title": "Any Switch (rgthree)"
+    }
+  },
+  "5755": {
+    "inputs": {
+      "noise_seed": 736794389380784
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "5793": {
+    "inputs": {},
+    "class_type": "Context Switch (rgthree)",
+    "_meta": {
+      "title": "Context Switch (rgthree)"
+    }
+  },
+  "5826": {
+    "inputs": {
+      "text": "1"
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Keframe count"
+    }
+  },
+  "5835": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 2 INDEX"
+    }
+  },
+  "5844": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 3 INDEX"
+    }
+  },
+  "5847": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 4 INDEX"
+    }
+  },
+  "5906": {
+    "inputs": {
+      "lora_name": "LTX-2\\ltx-2-19b-ic-lora-detailer.safetensors",
+      "strength_model": 1,
+      "model": [
+        "6428",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "DETAILER LORA"
+    }
+  },
+  "5929": {
+    "inputs": {
+      "positive": [
+        "5748:5013",
+        0
+      ],
+      "negative": [
+        "5748:5013",
+        1
+      ],
+      "latent": [
+        "5748:5013",
+        2
+      ]
+    },
+    "class_type": "Context (rgthree)",
+    "_meta": {
+      "title": "Context (rgthree)"
+    }
+  },
+  "5930": {
+    "inputs": {
+      "ctx_02": [
+        "5929",
+        0
+      ]
+    },
+    "class_type": "Context Switch (rgthree)",
+    "_meta": {
+      "title": "SAMPLER CONTEXT"
+    }
+  },
+  "5977": {
+    "inputs": {
+      "image": [
+        "5065",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "5998": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 5 INDEX"
+    }
+  },
+  "6092": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 6 INDEX"
+    }
+  },
+  "6108": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 7 INDEX"
+    }
+  },
+  "6122": {
+    "inputs": {
+      "value": 0
+    },
+    "class_type": "easy int",
+    "_meta": {
+      "title": "KEYFRAME 8 INDEX"
+    }
+  },
+  "6181": {
+    "inputs": {},
+    "class_type": "Context Switch (rgthree)",
+    "_meta": {
+      "title": "Context Switch (rgthree)"
+    }
+  },
+  "6216": {
+    "inputs": {
+      "positive": [
+        "5930",
+        4
+      ],
+      "negative": [
+        "5930",
+        5
+      ],
+      "latent": [
+        "5930",
+        6
+      ]
+    },
+    "class_type": "Context (rgthree)",
+    "_meta": {
+      "title": "UPSCALER LATENT"
+    }
+  },
+  "6234": {
+    "inputs": {
+      "any_02": [
+        "5930",
+        6
+      ]
+    },
+    "class_type": "Any Switch (rgthree)",
+    "_meta": {
+      "title": "Any Switch (rgthree)"
+    }
+  },
+  "6235": {
+    "inputs": {
+      "image": [
+        "5065",
+        0
+      ]
+    },
+    "class_type": "easy imageSize",
+    "_meta": {
+      "title": "ImageSize"
+    }
+  },
+  "6396": {
+    "inputs": {
+      "select": 2,
+      "sel_mode": false,
+      "input1": [
+        "5752",
+        0
+      ]
+    },
+    "class_type": "ImpactSwitch",
+    "_meta": {
+      "title": "UPSCALER MODEL MODE"
+    }
+  },
+  "6402": {
+    "inputs": {
+      "unet_name": "ltx2310eros_v1.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "6413": {
+    "inputs": {},
+    "class_type": "ImpactIfNone",
+    "_meta": {
+      "title": "ImpactIfNone"
+    }
+  },
+  "6415": {
+    "inputs": {
+      "switch": [
+        "6413",
+        1
+      ],
+      "on_false": [
+        "6417",
+        0
+      ],
+      "on_true": [
+        "6416",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch"
+    }
+  },
+  "6416": {
+    "inputs": {
+      "value": 1
+    },
+    "class_type": "easy float",
+    "_meta": {
+      "title": "Float"
+    }
+  },
+  "6417": {
+    "inputs": {
+      "value": 0.65
+    },
+    "class_type": "easy float",
+    "_meta": {
+      "title": "Float"
+    }
+  },
+  "6428": {
+    "inputs": {
+      "lora_name": "LTX-2\\ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors",
+      "strength_model": [
+        "6415",
+        0
+      ],
+      "model": [
+        "5627",
+        1
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "6429": {
+    "inputs": {
+      "lora_name": "LTX-2\\ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors",
+      "strength_model": 0.58,
+      "model": [
+        "6396",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "5748:4831": {
+    "inputs": {
+      "sampler_name": "euler_ancestral_cfg_pp"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "5748:4829": {
+    "inputs": {
+      "noise": [
+        "5755",
+        0
+      ],
+      "guider": [
+        "5748:4828",
+        0
+      ],
+      "sampler": [
+        "5748:4831",
+        0
+      ],
+      "sigmas": [
+        "5748:6387",
+        0
+      ],
+      "latent_image": [
+        "5748:4528",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "5748:4528": {
+    "inputs": {
+      "video_latent": [
+        "5627",
+        6
+      ],
+      "audio_latent": [
+        "5657",
+        0
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "LTXVConcatAVLatent"
+    }
+  },
+  "5748:6273": {
+    "inputs": {
+      "scheduler": "linear_quadratic",
+      "steps": 8,
+      "denoise": 1,
+      "model": [
+        "6428",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "5748:4845": {
+    "inputs": {
+      "av_latent": [
+        "5748:4829",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "LTXVSeparateAVLatent"
+    }
+  },
+  "5748:5013": {
+    "inputs": {
+      "positive": [
+        "5627",
+        4
+      ],
+      "negative": [
+        "5627",
+        5
+      ],
+      "latent": [
+        "5748:4845",
+        0
+      ]
+    },
+    "class_type": "LTXVCropGuides",
+    "_meta": {
+      "title": "LTXVCropGuides"
+    }
+  },
+  "5748:4828": {
+    "inputs": {
+      "cfg": 0.9,
+      "model": [
+        "6428",
+        0
+      ],
+      "positive": [
+        "5627",
+        4
+      ],
+      "negative": [
+        "5627",
+        5
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFGGuider"
+    }
+  },
+  "5748:6387": {
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "ManualSigmas"
+    }
+  }
+}

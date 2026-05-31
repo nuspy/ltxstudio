@@ -1,0 +1,10 @@
+{
+  "name": "Pluto",
+  "engine": "edge",
+  "voice_id": "it-IT-ElsaNeural",
+  "language": "it-IT",
+  "note": "",
+  "sample_path": null,
+  "sample_transcript": "",
+  "custom": true
+}

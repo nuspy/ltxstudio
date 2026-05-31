@@ -1,0 +1,31 @@
+# Output e media generati
+output/
+*.mp4
+*.webm
+*.mkv
+*.mov
+*.wav
+*.png
+*.jpg
+*.jpeg
+!templates/**/*.png
+
+# Cache / temporanei
+__pycache__/
+*.pyc
+.oi*.json
+.hist*.json
+.h.json
+.diag/
+.diag2.png
+.frames*/
+
+# Stato runtime / preferenze locali
+data/gui_state.json
+data/user_prefs.json
+
+# Modelli / pesi (mai nel repo)
+*.safetensors
+*.ckpt
+*.pth
+*.gguf

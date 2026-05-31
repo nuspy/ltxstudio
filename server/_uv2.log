@@ -1,0 +1,8 @@
+INFO:     Started server process [33128]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8201 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52746 - "GET /models/image?allow_nsfw=false HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52755 - "GET /models/video HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52757 - "GET /models/loras?arch=LTX&allow_nsfw=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52758 - "GET /models/upscale HTTP/1.1" 200 OK
