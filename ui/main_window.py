@@ -753,22 +753,6 @@ class MainWindow(QMainWindow):
                       "Scegli/crea nel tab Audio una voce con campione per il voice cloning.")
             audio["audio_mode"] = "native"; audio["audio_clone"] = False
             audio["audio_native"] = True
-        # ── EROS + audio nativo = RONZIO: il finetune NSFW eros NON è addestrato sull'audio →
-        # l'audio "nativo" (generato da LTX) esce come ronzio. Avvisa (una volta) e suggerisci. ──
-        _uses_eros = (vals.get("model_kind") == "eros"
-                      or (vals.get("nsfw_mode") == "nsfw" and vals.get("model_kind") == "auto"))
-        if _uses_eros and audio.get("audio_mode") == "native" and not audio.get("audio_mute"):
-            self._log("[Audio] ⚠ eros non genera audio (solo ronzio): usa «Clona voce»/«Audio fornito "
-                      "da me», o cambia modello (dev-fp8/distilled), o «Muto».")
-            if not getattr(self, "_warned_eros_audio", False):
-                self._warned_eros_audio = True
-                QMessageBox.warning(self, "Audio con eros",
-                    "Il modello eros (finetune NSFW) NON è addestrato sull'audio → l'audio «nativo» "
-                    "esce come RONZIO.\n\nPer avere audio:\n"
-                    "• tab Audio → «Clona voce» (TTS) o «Audio fornito da me» (file): la voce non la "
-                    "genera eros;\n"
-                    "• oppure cambia modello (dev-fp8 / distilled 1.1);\n"
-                    "• oppure «Muto».\n\nProcedo comunque con questa generazione.")
         # ── VIDEO LUNGO + voce: la voce (TTS/file) è UNA traccia lunga → affettala per segmento ──
         # Ogni spezzone usa la sua FINESTRA temporale della voce (il dialogo è già tolto dal prompt
         # degli extend; LTX fa solo visivo+ambiente). Risolve "5 minuti di parlato nei 10s della base".
