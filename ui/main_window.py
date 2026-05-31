@@ -753,6 +753,15 @@ class MainWindow(QMainWindow):
                       "Scegli/crea nel tab Audio una voce con campione per il voice cloning.")
             audio["audio_mode"] = "native"; audio["audio_clone"] = False
             audio["audio_native"] = True
+        # ── VIDEO LUNGO + voce: la voce (TTS/file) è UNA traccia lunga → affettala per segmento ──
+        # Ogni spezzone usa la sua FINESTRA temporale della voce (il dialogo è già tolto dal prompt
+        # degli extend; LTX fa solo visivo+ambiente). Risolve "5 minuti di parlato nei 10s della base".
+        if self._auto_extend is not None and audio.get("audio_mode") == "user" and audio.get("audio_file"):
+            self._auto_extend["tts_full"] = audio["audio_file"]
+            _base = self._slice_audio(audio["audio_file"], 0.0, float(vals.get("length_s", 10.0)))
+            if _base:
+                audio["audio_file"] = str(Path(r"E:\AI\Comfy_Nexus\ComfyUI\input") / _base)
+                self._log("[Video lungo] voce lunga → affetto il TTS per segmento (base + extend).")
         vals["audio_mode"] = audio["audio_mode"]      # → collapse_audio_selector in build_prompt
         # LTX-2.3 (audio-video) tende a CANTARE il dialogo del prompt invece di pronunciarlo.
         # Per far PARLARE ma non CANTARE: sopprimo solo il canto nel negativo (NON tocco
@@ -1524,6 +1533,7 @@ class MainWindow(QMainWindow):
             "audio": ae["audio"], "cnet": ae["cnet"], "fps": ae["fps"], "segs": 0,
             "overlap": int(ae.get("overlap", 24)),   # frame di SOVRAPPOSIZIONE fusi alla giunzione
             "tail_trim": 10,                          # frame tagliati a FINE segmento (freeze finale LTX)
+            "tts_full": ae.get("tts_full"),           # traccia voce completa → affettata per segmento
         }
         self._log(f"[Video lungo] base pronta → estensione I2V fino a {ae['target']:.0f}s")
         self._start_extend_segment()
@@ -1563,6 +1573,20 @@ class MainWindow(QMainWindow):
             vals["length_s"] = max(4.0, min(es["seg_seconds"], remaining + consume_s))
             # durata overlap (s) per la continuità AUDIO del segmento (audio mask: rigenera [overlap_s, len])
             vals["v2v_overlap_s"] = es["overlap"] / max(1, es["fps"])
+            # VOCE LUNGA (TTS): usa la FETTA della traccia voce per questo segmento (parlato continuo,
+            # niente ripetizione). Allineo ~overlap_s prima (il segmento riproduce l'overlap).
+            if es.get("tts_full"):
+                seg_audio_start = max(0.0, es["produced"] - vals["v2v_overlap_s"])
+                _slice = self._slice_audio(es["tts_full"], seg_audio_start, vals["length_s"])
+                if _slice:
+                    vals["user_audio_file"] = _slice
+                    vals["audio_mode"] = "user"
+                    es["audio"] = dict(es["audio"], audio_mode="user")
+                    vals["extend_audio_continuity"] = False   # la voce è il TTS, non l'audio LTX
+                else:
+                    # TTS finito → questo segmento resta ambiente LTX (dialogo già tolto dal prompt)
+                    vals["audio_mode"] = "native"
+                    es["audio"] = dict(es["audio"], audio_mode="native")
             # FORZA il superset (la base I2V validata): build + prune come la generazione normale
             self.engine.use_template("superset")
             prompt = self.engine.build_prompt(vals, loras=es["loras"], overrides=self._overrides)
@@ -1927,6 +1951,25 @@ class MainWindow(QMainWindow):
             self._log("[Modelli] Catalogo LoRA ricaricato dopo ingest.")
         except Exception as e:
             self._log(f"[warn] Ricarica catalogo: {e}")
+
+    def _slice_audio(self, src: str, start_s: float, dur_s: float) -> str | None:
+        """Estrae [start_s, start_s+dur_s] dall'audio `src` → file nella input di ComfyUI (per usarlo
+        come audio 'user' di un segmento del video lungo). Ritorna il NOME del file, None se vuoto/errore."""
+        import subprocess
+        try:
+            comfy_in = Path(r"E:\AI\Comfy_Nexus\ComfyUI\input")
+            comfy_in.mkdir(parents=True, exist_ok=True)
+            name = f"_tts_seg_{int(start_s*100):07d}.wav"
+            out = comfy_in / name
+            r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, start_s):.3f}",
+                                "-t", f"{max(0.1, dur_s):.3f}", "-i", src, "-ac", "2", "-ar", "44100",
+                                str(out)], capture_output=True, text=True)
+            if r.returncode == 0 and out.exists() and out.stat().st_size > 1024:
+                return name
+            return None
+        except Exception as e:
+            self._log(f"[ERR] slice audio TTS: {e}")
+            return None
 
     def _mux_source_audio(self, video: str, audio_src: str) -> str:
         """ReTake 'tieni audio originale': rimpiazza la traccia audio del risultato con quella del
