@@ -17,7 +17,11 @@ CATALOG_PATH = Path(r"E:\AI\dictionary\data\catalog.json")
 _RECOMMENDED: dict[str, dict] = {
     "ltx-2.3-22b-distilled": {"steps": 8, "cfg": 0.9, "note": "distilled"},
     "ltx-2.3-22b": {"steps": 30, "cfg": 3.0, "note": ""},
-    "ltx2310eros": {"steps": 8, "cfg": 0.9, "note": "distilled"},
+    # eros: finetune NSFW del 22B. A 8 step il SINGOLO SamplerCustomAdvanced (audio+video
+    # congiunti in LTXVConcatAVLatent) resta sotto-denoised → video rumoroso E audio nativo
+    # come ronzio/parlato incomprensibile. Serve la ricetta piena del 22B (≈32 step + LTXVScheduler,
+    # CFG 1.0 con NAG), come per il dev/base: solo così l'audio nativo diventa intelligibile.
+    "ltx2310eros": {"steps": 32, "cfg": 1.0, "note": "32 step + LTXVScheduler (audio+video puliti)"},
     "q4_k_m": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
     "q4_k_s": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
     "q4_k": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
