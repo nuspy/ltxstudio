@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
     QGroupBox,
 )
 
+from ui.i18n_manager import tr
+
 
 class ControlNetTab(QWidget):
     # Mantengo l'ordine UI: 0 Canny, 1 Depth, 2 Pose
@@ -40,21 +42,17 @@ class ControlNetTab(QWidget):
         self._video: str | None = None
         lay = QVBoxLayout(self)
 
-        intro = QLabel(
-            "<b>ControlNet</b> copia il <i>movimento/forma</i> da un video di riferimento al video generato. "
-            "Il contenuto rimane definito dal prompt nel tab <b>Video</b>; il movimento è dettato dal video qui caricato. "
-            "Tutti e tre i tipi sono completamente implementati nel workflow."
-        )
+        intro = QLabel(tr("cn.intro.lbl"))
         intro.setWordWrap(True); intro.setStyleSheet("color:#ccd; padding:4px;")
         lay.addWidget(intro)
 
-        self.enable = QCheckBox("✅ Abilita ControlNet (copia il movimento dal video qui sotto)")
+        self.enable = QCheckBox(tr("cn.enable"))
         lay.addWidget(self.enable)
 
-        type_box = QGroupBox("Tipo di guida")
+        type_box = QGroupBox(tr("cn.type.group"))
         tv = QVBoxLayout(type_box)
         row = QHBoxLayout()
-        row.addWidget(QLabel("Tipo:"))
+        row.addWidget(QLabel(tr("cn.type_lbl")))
         self.type = QComboBox()
         for label, _ in self.TYPES:
             self.type.addItem(label)
@@ -66,34 +64,21 @@ class ControlNetTab(QWidget):
         tv.addWidget(self.type_hint)
         lay.addWidget(type_box)
 
-        video_box = QGroupBox("Video di riferimento")
+        video_box = QGroupBox(tr("cn.video.group"))
         vb = QVBoxLayout(video_box)
         row2 = QHBoxLayout()
-        self.pick = QPushButton("📁 Carica video di riferimento…"); self.pick.clicked.connect(self._pick)
-        self.lbl = QLabel("(nessun video)")
+        self.pick = QPushButton(tr("cn.video.pick.btn")); self.pick.clicked.connect(self._pick)
+        self.lbl = QLabel(tr("cn.video.none.lbl"))
         row2.addWidget(self.pick); row2.addWidget(self.lbl, 1)
         vb.addLayout(row2)
-        vhint = QLabel(
-            "Il video deve avere movimento chiaramente leggibile (es. per Pose: il soggetto deve "
-            "essere ben visibile). Risoluzione e durata: indifferenti — il workflow ricampiona "
-            "alla risoluzione del tab Video e tronca alla durata configurata."
-        )
+        vhint = QLabel(tr("cn.video.hint.lbl"))
         vhint.setWordWrap(True); vhint.setStyleSheet("color:#888;")
         vb.addWidget(vhint)
         lay.addWidget(video_box)
 
-        usage_box = QGroupBox("Come si usa")
+        usage_box = QGroupBox(tr("cn.usage.group"))
         uv = QVBoxLayout(usage_box)
-        usage = QLabel(
-            "<b>1. Configura</b>: abilita la checkbox sopra, scegli il tipo, carica il video di riferimento.<br>"
-            "<b>2. Prompt</b>: nel tab <b>Video</b> scrivi il prompt che descrive il <i>contenuto</i> del video "
-            "che vuoi generare (soggetto, ambiente, stile). Il prompt è obbligatorio — descrive la scena.<br>"
-            "<b>3. Lancia</b>: dal pannello principale, bottone <b>«🎬 Genera»</b> (in basso a sinistra, "
-            "lo stesso del flusso normale).<br><br>"
-            "<b>Esempio</b>: video reference = persona che balla → prompt = "
-            "<i>«una ballerina con abito rosso danza in una sala elegante, illuminazione soffusa»</i> → "
-            "il modello produce una ballerina con quel movimento."
-        )
+        usage = QLabel(tr("cn.usage.lbl"))
         usage.setTextFormat(__import__("PySide6.QtCore", fromlist=["Qt"]).Qt.RichText)
         usage.setWordWrap(True)
         uv.addWidget(usage)

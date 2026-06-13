@@ -17,6 +17,7 @@ from PySide6.QtCore import Signal, Qt
 
 from core.video_enhance_pipeline import SEEDVR2_MODELS
 from core import face_restore_pipeline as facerestore
+from ui.i18n_manager import tr
 
 ENGINES = ["SeedVR2 (AI, consigliato)", "ESRGAN per-fotogramma (veloce)", "FlashVSR (richiede nodo)"]
 _ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr"}
@@ -35,78 +36,74 @@ class VideoDefTab(QWidget):
 
         # sorgente
         srow = QHBoxLayout()
-        self.video_lbl = QLabel("(nessun video — genera un video o caricane uno)")
+        self.video_lbl = QLabel(tr("def.no_video.lbl"))
         self.video_lbl.setWordWrap(True)
-        pick = QPushButton("📁 Carica video…"); pick.clicked.connect(self._pick)
+        pick = QPushButton(tr("def.pick.btn")); pick.clicked.connect(self._pick)
         srow.addWidget(self.video_lbl, 1); srow.addWidget(pick)
         root.addLayout(srow)
 
         # motore + parametri
-        box = QGroupBox("Restauro / super-risoluzione"); f = QFormLayout(box)
+        box = QGroupBox(tr("def.restore.group")); f = QFormLayout(box)
         self.engine = QComboBox(); self.engine.addItems(ENGINES)
         self.engine.currentIndexChanged.connect(self._on_engine)
-        f.addRow("Motore:", self.engine)
+        f.addRow(tr("def.engine_lbl"), self.engine)
         self.seedvr2_model = QComboBox(); self.seedvr2_model.addItems(list(SEEDVR2_MODELS.keys()))
-        f.addRow("Modello SeedVR2:", self.seedvr2_model)
+        f.addRow(tr("def.seedvr2_model_lbl"), self.seedvr2_model)
         self.resolution = QSpinBox(); self.resolution.setRange(256, 8192); self.resolution.setSingleStep(64)
         self.resolution.setValue(1080); self.resolution.setSuffix(" px (lato corto)")
-        f.addRow("Risoluzione target:", self.resolution)
+        f.addRow(tr("def.resolution_lbl"), self.resolution)
         self.blocks = QSpinBox(); self.blocks.setRange(0, 36); self.blocks.setValue(0)
-        self.blocks.setToolTip("BlockSwap: >0 riduce la VRAM (più lento). 0 = tutto in GPU (32GB ok).")
-        f.addRow("BlockSwap (VRAM):", self.blocks)
+        self.blocks.setToolTip(tr("def.blocks.tt"))
+        f.addRow(tr("def.blocks_lbl"), self.blocks)
         self.batch = QSpinBox(); self.batch.setRange(1, 121); self.batch.setSingleStep(4); self.batch.setValue(5)
-        self.batch.setToolTip("Fotogrammi per batch (formula 4n+1: 1,5,9,…). Più alto = più coerenza, più VRAM.")
-        f.addRow("Batch (4n+1):", self.batch)
+        self.batch.setToolTip(tr("def.batch.tt"))
+        f.addRow(tr("def.batch_lbl"), self.batch)
         # esrgan
         self.esrgan_model = QComboBox()
         self.esrgan_model.setMaxVisibleItems(20)   # fix: mostra tutti i modelli nel popup
         self.esrgan_model.view().setMinimumWidth(420)
-        f.addRow("Modello ESRGAN:", self.esrgan_model)
+        f.addRow(tr("def.esrgan_model_lbl"), self.esrgan_model)
         self.scale = QDoubleSpinBox(); self.scale.setRange(1.0, 8.0); self.scale.setSingleStep(0.5); self.scale.setValue(2.0)
-        f.addRow("Scala (ESRGAN):", self.scale)
+        f.addRow(tr("def.scale_lbl"), self.scale)
         root.addWidget(box)
 
         # RIFE / FPS
-        rbox = QGroupBox("Aumento FPS (RIFE, opzionale)"); rf = QFormLayout(rbox)
-        self.rife = QCheckBox("Interpola fotogrammi (più fluidità)"); rf.addRow(self.rife)
+        rbox = QGroupBox(tr("def.rife.group")); rf = QFormLayout(rbox)
+        self.rife = QCheckBox(tr("def.rife.check")); rf.addRow(self.rife)
         self.rife_mult = QComboBox(); self.rife_mult.addItems(["2×", "3×", "4×"])
-        rf.addRow("Moltiplicatore FPS:", self.rife_mult)
+        rf.addRow(tr("def.rife_mult_lbl"), self.rife_mult)
         self.rife_ckpt = QComboBox(); self.rife_ckpt.addItems(["rife47.pth", "rife48.pth", "rife46.pth"])
-        rf.addRow("Modello RIFE:", self.rife_ckpt)
+        rf.addRow(tr("def.rife_ckpt_lbl"), self.rife_ckpt)
         root.addWidget(rbox)
 
-        self.run_btn = QPushButton("✨ Migliora video")
+        self.run_btn = QPushButton(tr("def.run.btn"))
         self.run_btn.setObjectName("generate"); self.run_btn.clicked.connect(lambda: self.request_enhance.emit())
         root.addWidget(self.run_btn)
-        note = QLabel("SeedVR2 scarica il modello al primo uso (in ComfyUI/models/SEEDVR2). "
-                      "Mantiene l'audio originale.")
+        note = QLabel(tr("def.note.lbl"))
         note.setWordWrap(True); note.setStyleSheet("color:#888;")
         root.addWidget(note)
 
         # ── Restauro volti (CodeFormer/GFPGAN) ──
-        fbox = QGroupBox("🙂 Restauro volti (CodeFormer / GFPGAN)")
+        fbox = QGroupBox(tr("def.face.group"))
         ff = QFormLayout(fbox)
-        info = QLabel("Ricostruisce i volti frame-by-frame correggendo l'aspetto «plastico» e la "
-                      "deriva d'identità di LTX, <b>preservando l'identità</b> (non ri-genera col "
-                      "diffusion). Applicalo come passaggio finale sul video.")
+        info = QLabel(tr("def.face.info.lbl"))
         info.setWordWrap(True); info.setStyleSheet("color:#9aa1b0;"); info.setTextFormat(Qt.RichText)
         ff.addRow(info)
         self.fr_model = QComboBox(); self.fr_model.addItems(facerestore.FACERESTORE_MODELS)
-        ff.addRow("Modello:", self.fr_model)
+        ff.addRow(tr("def.face.model_lbl"), self.fr_model)
         self.fr_detection = QComboBox(); self.fr_detection.addItems(facerestore.FACE_DETECTORS)
-        ff.addRow("Rilevatore volti:", self.fr_detection)
+        ff.addRow(tr("def.face.detection_lbl"), self.fr_detection)
         frow = QHBoxLayout()
         self.fr_fidelity = QSlider(Qt.Horizontal); self.fr_fidelity.setRange(0, 100); self.fr_fidelity.setValue(70)
         self.fr_fidelity_lbl = QLabel("0.70")
         self.fr_fidelity.valueChanged.connect(lambda v: self.fr_fidelity_lbl.setText(f"{v/100:.2f}"))
-        self.fr_fidelity.setToolTip("Fedeltà all'input: 1.0 preserva di più l'originale; "
-                                    "0.0 ricostruisce di più (più nitido, può scostarsi). ~0.7 consigliato.")
+        self.fr_fidelity.setToolTip(tr("def.face.fidelity.tt"))
         frow.addWidget(self.fr_fidelity, 1); frow.addWidget(self.fr_fidelity_lbl)
-        ff.addRow("Fedeltà (fidelity):", self._wrap(frow))
+        ff.addRow(tr("def.face.fidelity_lbl"), self._wrap(frow))
         brow = QHBoxLayout()
-        self.fr_run_btn = QPushButton("🙂 Restaura volti del video")
+        self.fr_run_btn = QPushButton(tr("def.face.run.btn"))
         self.fr_run_btn.clicked.connect(self._on_face_restore_clicked)
-        self.fr_install_btn = QPushButton("📥 Installa face-restore")
+        self.fr_install_btn = QPushButton(tr("def.face.install.btn"))
         self.fr_install_btn.clicked.connect(self._install_facerestore)
         brow.addWidget(self.fr_run_btn); brow.addWidget(self.fr_install_btn)
         ff.addRow(self._wrap(brow))
@@ -160,22 +157,21 @@ class VideoDefTab(QWidget):
             installed = False
         self.fr_install_btn.setVisible(not installed)
         self.fr_run_btn.setEnabled(installed)
-        self.fr_status.setText("✅ facerestore_cf installato." if installed else
-                               "⬇ Nodo non installato: premi «Installa face-restore» (poi riavvia ComfyUI).")
+        self.fr_status.setText(tr("def.face.status_ok") if installed else tr("def.face.status_nok"))
 
     def _on_face_restore_clicked(self):
         if not self._video:
-            QMessageBox.warning(self, "Nessun video", "Carica o genera un video prima.")
+            QMessageBox.warning(self, tr("def.face.no_video.title"), tr("def.face.no_video.msg"))
             return
         self.request_face_restore.emit()
 
     def _install_facerestore(self):
-        if QMessageBox.question(self, "Installa face-restore",
+        if QMessageBox.question(self, tr("def.face.install.title"),
                                 f"Clonare {facerestore.FACERESTORE_REPO['url']} in custom_nodes e "
                                 "installarne le dipendenze?\n\n"
                                 f"{facerestore.FACERESTORE_REPO['note']}") != QMessageBox.Yes:
             return
-        self.fr_install_btn.setEnabled(False); self.fr_install_btn.setText("⏳ Installazione…")
+        self.fr_install_btn.setEnabled(False); self.fr_install_btn.setText(tr("def.face.install_update.btn"))
         QApplication.processEvents()
         try:
             ok, msg = facerestore.install_node()
@@ -183,9 +179,9 @@ class VideoDefTab(QWidget):
             ok, msg = False, str(e)
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Information if ok else QMessageBox.Warning)
-        box.setWindowTitle("Installazione " + ("ok" if ok else "fallita"))
+        box.setWindowTitle(tr("def.face.install.title"))
         box.setText(msg if len(msg) < 400 else msg[:400] + "…"); box.setDetailedText(msg); box.exec()
-        self.fr_install_btn.setEnabled(True); self.fr_install_btn.setText("📥 Installa face-restore")
+        self.fr_install_btn.setEnabled(True); self.fr_install_btn.setText(tr("def.face.install.btn"))
         self._refresh_facerestore_status()
 
     # ---- interno ----

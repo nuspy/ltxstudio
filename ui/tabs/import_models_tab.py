@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QPlainTextEdit, QProgressBar, QFileDialog, QSplitter,
     QGroupBox, QScrollArea, QFrame, QMessageBox, QToolButton, QCheckBox,
 )
+from ui.i18n_manager import tr
 
 from core import catalog_paths
 from core import comfy_compat
@@ -114,7 +115,7 @@ class ImportModelsTab(QWidget):
         log_w = QWidget()
         lv = QVBoxLayout(log_w)
         lv.setContentsMargins(0, 4, 0, 0)
-        lv.addWidget(QLabel("Output operazioni:"))
+        lv.addWidget(QLabel(tr("imp.output_lbl")))
         self.log_txt = QPlainTextEdit()
         self.log_txt.setReadOnly(True)
         self.log_txt.setStyleSheet("font-family: Consolas, monospace; font-size:11px;")
@@ -130,7 +131,7 @@ class ImportModelsTab(QWidget):
 
     # ---- gruppo configurazione percorsi ----
     def _build_paths_group(self) -> QGroupBox:
-        grp = QGroupBox("📁 Percorsi (configurabili)")
+        grp = QGroupBox(tr("imp.paths.group"))
         grp.setCheckable(True)
         grp.setChecked(False)           # collassato di default (default = installazione attuale)
         outer = QVBoxLayout(grp)
@@ -155,7 +156,7 @@ class ImportModelsTab(QWidget):
             self._path_edits[key] = edit
             browse = QToolButton()
             browse.setText("…")
-            browse.setToolTip("Sfoglia")
+            browse.setToolTip(tr("imp.paths.browse.tt"))
             browse.clicked.connect(lambda _=False, k=key: self._browse_path(k))
             grid.addWidget(lab, row, 0)
             grid.addWidget(edit, row, 1)
@@ -163,13 +164,12 @@ class ImportModelsTab(QWidget):
         outer.addLayout(grid)
 
         btns = QHBoxLayout()
-        save_btn = QPushButton("💾 Salva percorsi")
+        save_btn = QPushButton(tr("imp.paths.save.btn"))
         save_btn.clicked.connect(self._save_paths)
         reset_btn = QPushButton("↺ Ripristina default")
         reset_btn.clicked.connect(self._reset_paths)
-        suggest_btn = QPushButton("🔍 Suggerisci da ComfyUI")
-        suggest_btn.setToolTip("Propone modelli/workflow in base all'installazione ComfyUI rilevata "
-                               "(decisione finale tua: nulla viene salvato finché non premi «Salva»).")
+        suggest_btn = QPushButton(tr("imp.paths.suggest.btn"))
+        suggest_btn.setToolTip(tr("imp.paths.suggest.tt"))
         suggest_btn.clicked.connect(self._suggest_paths)
         btns.addWidget(save_btn)
         btns.addWidget(reset_btn)
@@ -288,17 +288,16 @@ class ImportModelsTab(QWidget):
 
     # ---- gruppo sorgente / staging ----
     def _build_source_group(self) -> QGroupBox:
-        grp = QGroupBox("📥 File da importare")
+        grp = QGroupBox(tr("imp.files.group"))
         v = QVBoxLayout(grp)
 
         # sorgente
         srow = QHBoxLayout()
-        srow.addWidget(QLabel("Sorgente operazioni:"))
+        srow.addWidget(QLabel(tr("imp.source_lbl")))
         self.source_edit = QLineEdit()
-        self.source_edit.setToolTip("Cartella su cui agiscono «Analizza» e «Sposta» (e «Ingest»). "
-                                    "Di default è l'inbox; puoi puntarla a una cartella di download.")
+        self.source_edit.setToolTip(tr("imp.source.tt"))
         srow.addWidget(self.source_edit, 1)
-        src_browse = QPushButton("📁 Sfoglia…")
+        src_browse = QPushButton(tr("imp.source.browse.btn"))
         src_browse.clicked.connect(self._browse_source)
         srow.addWidget(src_browse)
         v.addLayout(srow)
@@ -315,16 +314,16 @@ class ImportModelsTab(QWidget):
         v.addWidget(self.file_list)
 
         lb = QHBoxLayout()
-        b_files = QPushButton("📂 Aggiungi file…")
+        b_files = QPushButton(tr("imp.files.add.btn"))
         b_files.clicked.connect(self._browse_files)
-        b_dir = QPushButton("📁 Aggiungi cartella…")
+        b_dir = QPushButton(tr("imp.files.add_dir.btn"))
         b_dir.clicked.connect(self._browse_adddir)
-        self.b_to_inbox = QPushButton("📥 Copia nell'inbox")
-        self.b_to_inbox.setToolTip("Copia i file elencati nell'inbox configurata, pronti per «Sposta».")
+        self.b_to_inbox = QPushButton(tr("imp.files.inbox.btn"))
+        self.b_to_inbox.setToolTip(tr("imp.files.inbox.tt"))
         self.b_to_inbox.clicked.connect(self._copy_to_inbox)
         b_rm = QPushButton("✖ Rimuovi")
         b_rm.clicked.connect(self._remove_selected)
-        b_clr = QPushButton("🗑 Pulisci")
+        b_clr = QPushButton(tr("imp.files.clear.btn"))
         b_clr.clicked.connect(self._clear_list)
         for b in (b_files, b_dir, self.b_to_inbox, b_rm, b_clr):
             lb.addWidget(b)
@@ -362,8 +361,7 @@ class ImportModelsTab(QWidget):
         self.btn_ingest = QPushButton("▶  Ingest completo  (Sposta → Scansiona → Arricchisci → HTML)")
         self.btn_ingest.setObjectName("generate")
         self.btn_ingest.setMinimumHeight(40)
-        self.btn_ingest.setToolTip("Esegue l'intera pipeline in sequenza sulla sorgente. "
-                                   "Al termine il catalogo LoRA dell'app viene ricaricato.")
+        self.btn_ingest.setToolTip(tr("imp.ingest.tt"))
         self.btn_ingest.clicked.connect(self._do_ingest)
         irow.addWidget(self.btn_ingest)
         v.addLayout(irow)

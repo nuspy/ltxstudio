@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox, QComboBox, QCheckBox,
     QGroupBox, QLabel, QPushButton, QHBoxLayout, QFrame, QTabWidget,
 )
+from ui.i18n_manager import tr
 
 # Sampler VERIFICATI su LTX-2.3 (test reali 30/05): la famiglia RES (res_2s/res_multistep/…),
 # pur ottima in teoria per il flow-matching, in PRATICA ROMPE LTX-2.3 → output a rumore
@@ -58,7 +59,7 @@ class SamplerSeedGroup(QGroupBox):
     _DEFAULT_SCHEDULER = "LTXVScheduler (shift)"
 
     def __init__(self):
-        super().__init__("Sampler / Seed")
+        super().__init__(tr("adv.sampler.group"))
         self._steps_user_modified = False
         self._cfg_user_modified = False
         self._sampler_user_modified = False
@@ -77,11 +78,11 @@ class SamplerSeedGroup(QGroupBox):
         self.cfg.valueChanged.connect(lambda _: setattr(self, "_cfg_user_modified", True))
         # Steps e CFG sulla stessa riga (compattazione)
         steps_cfg = QHBoxLayout()
-        steps_cfg.addWidget(QLabel("Steps")); steps_cfg.addWidget(self.steps)
+        steps_cfg.addWidget(QLabel(tr("adv.steps_lbl"))); steps_cfg.addWidget(self.steps)
         steps_cfg.addSpacing(12)
-        steps_cfg.addWidget(QLabel("CFG")); steps_cfg.addWidget(self.cfg)
+        steps_cfg.addWidget(QLabel(tr("adv.cfg_lbl"))); steps_cfg.addWidget(self.cfg)
         steps_cfg.addStretch(1)
-        f.addRow("Steps / CFG:", steps_cfg)
+        f.addRow(tr("adv.steps_cfg_lbl"), steps_cfg)
 
         self.sampler = QComboBox()
         self.sampler.addItems(SAMPLERS)
@@ -89,34 +90,19 @@ class SamplerSeedGroup(QGroupBox):
             self.sampler.setCurrentText(self._DEFAULT_SAMPLER)
         self.sampler.currentIndexChanged.connect(
             lambda _: setattr(self, "_sampler_user_modified", True))
-        self.sampler.setToolTip(
-            "Sampler VERIFICATI compatibili con LTX-2.3:\n"
-            "• euler_ancestral_cfg_pp — DEFAULT, qualità migliore (reference AuthorStorm)\n"
-            "• euler_cfg_pp / euler — deterministici, robusti\n"
-            "• dpmpp_2m / _sde — alternative valide\n"
-            "⚠ I sampler RES (res_2s, res_multistep…) sono stati RIMOSSI: in teoria ottimi per il "
-            "flow, ma in pratica producono RUMORE verde su LTX-2.3 (verificato A/B)."
-        )
+        self.sampler.setToolTip(tr("adv.sampler.tt"))
         self.scheduler = QComboBox()
         self.scheduler.addItems(SCHEDULERS)
         if self._DEFAULT_SCHEDULER in SCHEDULERS:
             self.scheduler.setCurrentText(self._DEFAULT_SCHEDULER)
         self.scheduler.currentIndexChanged.connect(
             lambda _: setattr(self, "_scheduler_user_modified", True))
-        self.scheduler.setToolTip(
-            "Ora EFFETTIVO anche sul video:\n"
-            "• LTXVScheduler (shift) — default: usa l'LTXVScheduler con gli SHIFT qui sotto "
-            "(consigliato, flow-aware, shape-aware)\n"
-            "• linear_quadratic — schedule nativo LTX\n"
-            "• bong_tangent / kl_optimal / beta57 — alta qualità (flow-aware)\n"
-            "• karras — dettaglio (diffusione) · beta — distilled · exponential — morbido\n"
-            "Scegliendo uno scheduler classico, gli Shift LTX vengono ignorati."
-        )
+        self.scheduler.setToolTip(tr("adv.scheduler.tt"))
         # Sampler e Scheduler sulla stessa riga (compattazione)
         samp_sched = QHBoxLayout()
         samp_sched.addWidget(self.sampler, 1)
         samp_sched.addWidget(self.scheduler, 1)
-        f.addRow("Sampler / Sched.:", samp_sched)
+        f.addRow(tr("adv.sampler_sched_lbl"), samp_sched)
 
         # SHIFT di LTXVScheduler = leva qualità REALE del video (sposta il campionamento tra
         # struttura/movimento e dettaglio). Costo nullo, alto impatto.
@@ -124,50 +110,33 @@ class SamplerSeedGroup(QGroupBox):
         self.base_shift = QDoubleSpinBox()
         self.base_shift.setRange(0.10, 6.00); self.base_shift.setSingleStep(0.05)
         self.base_shift.setValue(0.95)
-        self.base_shift.setToolTip(
-            "Shift BASE di LTXVScheduler (default 0.95). Più ALTO = più step su struttura e "
-            "MOVIMENTO (coerenza temporale, meno flicker); più BASSO = più dettaglio fine ma "
-            "rischio di incoerenza tra frame. È la leva qualità #1 del video LTX."
-        )
+        self.base_shift.setToolTip(tr("adv.shift_base.tt"))
         self.max_shift = QDoubleSpinBox()
         self.max_shift.setRange(0.50, 12.00); self.max_shift.setSingleStep(0.05)
         self.max_shift.setValue(2.05)
-        self.max_shift.setToolTip(
-            "Shift MAX di LTXVScheduler (default 2.05). Limite superiore dello shift dipendente "
-            "dalla risoluzione/lunghezza. Alzalo per clip più lunghe/grandi se il movimento è incerto."
-        )
-        shift_row.addWidget(QLabel("base")); shift_row.addWidget(self.base_shift)
-        shift_row.addWidget(QLabel("max")); shift_row.addWidget(self.max_shift)
-        f.addRow("Shift (LTX):", shift_row)
+        self.max_shift.setToolTip(tr("adv.shift_max.tt"))
+        shift_row.addWidget(QLabel(tr("adv.shift_base_lbl"))); shift_row.addWidget(self.base_shift)
+        shift_row.addWidget(QLabel(tr("adv.shift_max_lbl"))); shift_row.addWidget(self.max_shift)
+        f.addRow(tr("adv.shift_lbl"), shift_row)
 
         self.encoder = QComboBox()
         for label, fn in VIDEO_ENCODERS:
             self.encoder.addItem(label, fn)
-        self.encoder.setToolTip(
-            "Encoder testo del VIDEO LTX — incide soprattutto sull'ADERENZA al prompt "
-            "(composizione, soggetto, azione), meno sulla texture:\n"
-            "• Gemma 3 12B full — massima fedeltà semantica, ma 'ammorbidisce' i contenuti espliciti\n"
-            "• Gemma 3 12B abliterated — versione decensurata: molto migliore su prompt NSFW spinti\n"
-            "Stesso 12B → nessuna perdita di velocità tra i due. '⛔ assente' = file non ancora presente."
-        )
-        f.addRow("Text encoder:", self.encoder)
+        self.encoder.setToolTip(tr("adv.encoder.tt"))
+        f.addRow(tr("adv.encoder_lbl"), self.encoder)
 
-        self.prompt_enhance = QCheckBox("🪄 Migliora prompt (LTX enhancer)")
+        self.prompt_enhance = QCheckBox(tr("adv.prompt_enhance"))
         self.prompt_enhance.setChecked(False)
-        self.prompt_enhance.setToolTip(
-            "Se attivo, un LLM (Gemma) ESPANDE il tuo prompt in una descrizione cinematografica "
-            "dettagliata (stile, visivi, azioni, AUDIO/dialoghi) prima di darlo al modello video. "
-            "Utile per prompt brevi; con prompt già dettagliati lascialo OFF. In NSFW inietta "
-            "automaticamente la direttiva di sblocco così non rifiuta di descrivere i soggetti.")
+        self.prompt_enhance.setToolTip(tr("adv.prompt_enhance.tt"))
         f.addRow(self.prompt_enhance)
 
-        self.fixed_seed = QCheckBox("Seed fisso")
+        self.fixed_seed = QCheckBox(tr("adv.fixed_seed"))
         f.addRow(self.fixed_seed)
 
         self.seed = QSpinBox()
         self.seed.setRange(0, 2**31 - 1)
         self.seed.setValue(777)
-        f.addRow("Seed:", self.seed)
+        f.addRow(tr("adv.seed_lbl"), self.seed)
 
     # ---------- suggest API (chiamata da VideoTab quando cambia il modello) ----------
     def set_suggested_steps(self, steps: int, note: str = ""):
@@ -232,7 +201,7 @@ class SamplerSeedGroup(QGroupBox):
         for i in range(self.encoder.count()):
             base = self.encoder.itemText(i).split("  ⛔")[0]
             fn = self.encoder.itemData(i)
-            self.encoder.setItemText(i, base + ("  ⛔ assente" if avail and fn not in avail else ""))
+            self.encoder.setItemText(i, base + (("  " + tr("adv.encoder.absent")) if avail and fn not in avail else ""))
 
     def wants_fixed_seed(self) -> bool:
         return self.fixed_seed.isChecked()
@@ -258,35 +227,32 @@ class AdvancedTab(QWidget):
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
         self.sub = QTabWidget()
         outer.addWidget(self.sub)
-        self.sub.addTab(self._build_tools_tab(), "🛠 Strumenti")
+        self.sub.addTab(self._build_tools_tab(), tr("adv.tab.tools"))
         # Host per Import Models (riempito da attach_models dopo la costruzione)
         self._models_host = QWidget(); QVBoxLayout(self._models_host).setContentsMargins(0, 0, 0, 0)
-        self.sub.addTab(self._models_host, "📦 Import Models")
+        self.sub.addTab(self._models_host, tr("adv.tab.models"))
 
     def _build_tools_tab(self) -> QWidget:
         host = QWidget(); root = QVBoxLayout(host); root.setSpacing(10)
-        intro = QLabel("<b>Funzioni avanzate</b> — strumenti e impostazioni di LTX Studio.")
+        intro = QLabel(tr("adv.intro.lbl"))
         intro.setWordWrap(True); intro.setStyleSheet("color: #aaa; padding: 4px;")
         root.addWidget(intro)
 
         # ── Generazione ──
-        gen_grp = QGroupBox("🎬 Generazione"); gv = QVBoxLayout(gen_grp)
+        gen_grp = QGroupBox(tr("adv.gen.group")); gv = QVBoxLayout(gen_grp)
         gv.addWidget(self._big_btn(
-            "🎬  Workflow Predefiniti…",
-            "35 workflow ottimizzati: Talking Head, Landscape Cinematografico, Product Showcase, "
-            "Action Scene, Cyberpunk, Fashion, e molti altri.", self.open_workflow))
+            tr("adv.workflow.btn"),
+            tr("adv.workflow.tt"), self.open_workflow))
         gv.addWidget(self._big_btn(
-            "🔍  Analizza Impostazioni…",
-            "Controlla steps, CFG, risoluzione, LoRA strength e conflitti NSFW/architettura. "
-            "Suggerisce auto-fix dove possibile.", self.open_analyzer))
+            tr("adv.analyzer.btn"),
+            tr("adv.analyzer.tt"), self.open_analyzer))
         root.addWidget(gen_grp)
 
         # ── Galleria ──
-        nav_grp = QGroupBox("🗂 Galleria"); nv = QVBoxLayout(nav_grp)
+        nav_grp = QGroupBox(tr("adv.gallery.group")); nv = QVBoxLayout(nav_grp)
         nv.addWidget(self._big_btn(
-            "🗂  Navigator Gallery…  (Ctrl+G)",
-            "Sfoglia le generazioni precedenti con anteprima, metadati completi e riutilizzo "
-            "parametri.", self.open_navigator))
+            tr("adv.navigator.btn"),
+            tr("adv.navigator.tt"), self.open_navigator))
         root.addWidget(nav_grp)
 
         # ── Video lunghi (auto-extend) ──
@@ -295,10 +261,7 @@ class AdvancedTab(QWidget):
         # ── Nota impostazioni sampler ──
         sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setStyleSheet("color: #333;")
         root.addWidget(sep)
-        note = QLabel(
-            "⚙️  <b>Steps / CFG / Sampler / Scheduler / Seed</b> → tab <b>Video</b>.<br>"
-            "🔧 <b>Migliora qualità</b> (upscale foto/video, restauro, colorazione) → tab dedicato.<br>"
-            "📦 <b>Import Models</b> + patch di compatibilità ComfyUI → sotto-tab qui accanto.")
+        note = QLabel(tr("adv.note.lbl"))
         note.setWordWrap(True); note.setStyleSheet("color: #777; font-size: 11px; padding: 4px;")
         root.addWidget(note)
         root.addStretch(1)
@@ -306,38 +269,30 @@ class AdvancedTab(QWidget):
 
     def _build_longvideo_group(self) -> QGroupBox:
         """Impostazioni per i video lunghi: auto-extend oltre la soglia + parametri continuità."""
-        grp = QGroupBox("🎞 Video lunghi (lunghezza illimitata)")
+        grp = QGroupBox(tr("adv.lv.group"))
         f = QFormLayout(grp)
-        self.lv_auto = QCheckBox("Genera automaticamente i video più lunghi della soglia (a spezzoni)")
+        self.lv_auto = QCheckBox(tr("adv.lv.auto"))
         self.lv_auto.setChecked(True)
-        self.lv_auto.setToolTip("Se attivo, quando la durata richiesta nel tab Video supera la soglia "
-                                "qui sotto, il video viene prodotto in una passata base + estensioni "
-                                "automatiche a spezzoni (lunghezza illimitata, VRAM costante).")
+        self.lv_auto.setToolTip(tr("adv.lv.auto.tt"))
         f.addRow(self.lv_auto)
         self.lv_threshold = QDoubleSpinBox(); self.lv_threshold.setRange(4, 30); self.lv_threshold.setValue(20.0)
         self.lv_threshold.setSuffix(" s")
-        self.lv_threshold.setToolTip("Durata massima della singola passata LTX. Oltre questa, scatta "
-                                     "l'estensione automatica. LTX-2.3 arriva a ~20s nativi in passata "
-                                     "singola → tienila a 20.")
-        f.addRow("Soglia passata singola:", self.lv_threshold)
+        self.lv_threshold.setToolTip(tr("adv.lv.threshold.tt"))
+        f.addRow(tr("adv.lv.threshold_lbl"), self.lv_threshold)
         self.lv_seg = QDoubleSpinBox(); self.lv_seg.setRange(4, 15); self.lv_seg.setValue(10.0)
         self.lv_seg.setSuffix(" s")
-        self.lv_seg.setToolTip("Lunghezza di ogni spezzone I2V concatenato. Più lungo = meno giunzioni "
-                               "= meno transizioni. Consigliato 10s.")
-        f.addRow("Spezzone estensione:", self.lv_seg)
+        self.lv_seg.setToolTip(tr("adv.lv.seg.tt"))
+        f.addRow(tr("adv.lv.seg_lbl"), self.lv_seg)
         self.lv_overlap = QSpinBox(); self.lv_overlap.setRange(0, 48); self.lv_overlap.setValue(24)
-        self.lv_overlap.setToolTip("Fotogrammi DROPPATI all'inizio di ogni spezzone (nascondono la "
-                                   "transizione I2V dal frame statico). 24 = 1s @24fps. Più alti = "
-                                   "transizioni più pulite ma più contenuto scartato.")
-        f.addRow("Overlap/drop (frame):", self.lv_overlap)
+        self.lv_overlap.setToolTip(tr("adv.lv.overlap.tt"))
+        f.addRow(tr("adv.lv.overlap_lbl"), self.lv_overlap)
         self.lv_context = QSpinBox(); self.lv_context.setRange(8, 64); self.lv_context.setValue(16)
-        self.lv_context.setToolTip("Fotogrammi della coda usati come contesto per lo spezzone successivo.")
-        f.addRow("Contesto (frame):", self.lv_context)
+        self.lv_context.setToolTip(tr("adv.lv.context.tt"))
+        f.addRow(tr("adv.lv.context_lbl"), self.lv_context)
         self.lv_ctx_strength = QDoubleSpinBox(); self.lv_ctx_strength.setRange(0.0, 1.0)
         self.lv_ctx_strength.setSingleStep(0.05); self.lv_ctx_strength.setValue(0.5)
-        self.lv_ctx_strength.setToolTip("Quanto il contesto vincola lo spezzone: 1.0=molto ancorato "
-                                        "(meno deriva, meno movimento), 0.0=libero (più movimento, più deriva).")
-        f.addRow("Forza contesto:", self.lv_ctx_strength)
+        self.lv_ctx_strength.setToolTip(tr("adv.lv.ctx_strength.tt"))
+        f.addRow(tr("adv.lv.ctx_strength_lbl"), self.lv_ctx_strength)
         return grp
 
     # ---- API ----

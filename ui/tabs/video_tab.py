@@ -16,6 +16,7 @@ from core.model_catalog import ModelCatalog
 from core.presets import VIDEO_PRESETS
 from core import user_prefs
 from ui.widgets.tag_palette import install_tag_palette
+from ui.i18n_manager import tr
 
 # Default per il prompt negativo (spostato qui dal tab Frame 1)
 DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, deformed, "
@@ -71,14 +72,14 @@ class VideoTab(QWidget):
         host = QWidget(); root = QVBoxLayout(host); sc.setWidget(host); outer.addWidget(sc)
 
         # --- Prompt (spostato qui dal tab Frame 1) ---
-        prompt_group = QGroupBox("Prompt")
+        prompt_group = QGroupBox(tr("vid.prompt.group"))
         prompt_vl = QVBoxLayout(prompt_group)
-        prompt_vl.addWidget(QLabel("Prompt (digita <b>\\</b> per la palette tag con filtro):"))
+        prompt_vl.addWidget(QLabel(tr("vid.prompt.lbl")))
         self.prompt = QPlainTextEdit()
-        self.prompt.setPlaceholderText("Descrivi il video… Digita \\ per la palette tag (pause, emozioni, velocità, ecc.)")
+        self.prompt.setPlaceholderText(tr("vid.prompt.ph"))
         self.prompt.setMaximumHeight(100)
         prompt_vl.addWidget(self.prompt)
-        prompt_vl.addWidget(QLabel("Prompt negativo:"))
+        prompt_vl.addWidget(QLabel(tr("vid.neg.lbl")))
         self.neg = QPlainTextEdit(DEFAULT_NEG)
         self.neg.setMaximumHeight(70)
         prompt_vl.addWidget(self.neg)
@@ -91,28 +92,28 @@ class VideoTab(QWidget):
 
         # --- Preset selector ---
         preset_row = QHBoxLayout()
-        preset_row.addWidget(QLabel("Preset:"))
+        preset_row.addWidget(QLabel(tr("vid.preset_lbl")))
         self.preset_combo = QComboBox()
         self.preset_combo.setMaxVisibleItems(20)
         self.preset_combo.currentIndexChanged.connect(self._on_preset_apply)
         preset_row.addWidget(self.preset_combo, 1)
-        self.preset_save_btn = QPushButton("💾 Salva preset")
-        self.preset_save_btn.setToolTip("Salva le impostazioni video correnti come preset personale.")
+        self.preset_save_btn = QPushButton(tr("vid.preset.save.btn"))
+        self.preset_save_btn.setToolTip(tr("vid.preset.save.tt"))
         self.preset_save_btn.clicked.connect(self._save_current_preset)
         preset_row.addWidget(self.preset_save_btn)
         self.preset_del_btn = QPushButton("🗑")
         self.preset_del_btn.setMaximumWidth(36)
-        self.preset_del_btn.setToolTip("Elimina il preset personale selezionato.")
+        self.preset_del_btn.setToolTip(tr("vid.preset.del.tt"))
         self.preset_del_btn.clicked.connect(self._delete_selected_preset)
         preset_row.addWidget(self.preset_del_btn)
         root.addLayout(preset_row)
         self._reload_presets()
 
         # --- controlli video ---
-        vbox = QGroupBox("Video"); form = QFormLayout(vbox)
+        vbox = QGroupBox(tr("vid.video.group")); form = QFormLayout(vbox)
         self.nsfw = QComboBox(); self.nsfw.addItems(["SFW", "NSFW"])
         self.nsfw.currentTextChanged.connect(self._on_nsfw)
-        form.addRow("Contenuto:", self.nsfw)
+        form.addRow(tr("vid.content_lbl"), self.nsfw)
         self.model = QComboBox()
         self.model.setMaxVisibleItems(20)       # fix: mostra tutti i modelli nel popup
         self.model.currentIndexChanged.connect(self._on_model_changed)
@@ -121,27 +122,27 @@ class VideoTab(QWidget):
         mrow.addWidget(self.model, 1)
         self.model_star = QToolButton(); self.model_star.setText("☆")
         self.model_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
-        self.model_star.setToolTip("Segna come preferito il modello selezionato (mostrato in cima).")
+        self.model_star.setToolTip(tr("vid.model_star.tt"))
         self.model_star.clicked.connect(self._toggle_fav_model_current)
         mrow.addWidget(self.model_star)
-        form.addRow("Modello:", self._wrap(mrow))
+        form.addRow(tr("vid.model_lbl"), self._wrap(mrow))
         self.res_preset = QComboBox(); self.res_preset.addItems(list(RES_PRESETS.keys()))
         self.res_preset.currentTextChanged.connect(self._on_preset)
-        form.addRow("Risoluzione:", self.res_preset)
+        form.addRow(tr("vid.res_lbl"), self.res_preset)
         wh = QHBoxLayout()
         self.width = QSpinBox(); self.width.setRange(256, 2048); self.width.setSingleStep(32); self.width.setValue(704)
         self.height = QSpinBox(); self.height.setRange(256, 2048); self.height.setSingleStep(32); self.height.setValue(1280)
-        wh.addWidget(QLabel("W")); wh.addWidget(self.width)
-        wh.addWidget(QLabel("H")); wh.addWidget(self.height)
+        wh.addWidget(QLabel(tr("vid.w_lbl"))); wh.addWidget(self.width)
+        wh.addWidget(QLabel(tr("vid.h_lbl"))); wh.addWidget(self.height)
         form.addRow("", self._wrap(wh))
         # FPS e Durata sulla stessa riga (compattazione richiesta)
         self.fps = QSpinBox(); self.fps.setRange(1, 60); self.fps.setValue(24)
         self.length = QDoubleSpinBox(); self.length.setRange(1, 60); self.length.setValue(8.0); self.length.setSuffix(" s")
         fpsdur = QHBoxLayout()
-        fpsdur.addWidget(QLabel("FPS")); fpsdur.addWidget(self.fps)
+        fpsdur.addWidget(QLabel(tr("vid.fps_lbl"))); fpsdur.addWidget(self.fps)
         fpsdur.addSpacing(12)
-        fpsdur.addWidget(QLabel("Durata")); fpsdur.addWidget(self.length, 1)
-        form.addRow("FPS / Durata:", self._wrap(fpsdur))
+        fpsdur.addWidget(QLabel(tr("vid.dur_lbl"))); fpsdur.addWidget(self.length, 1)
+        form.addRow(tr("vid.fps_dur_lbl"), self._wrap(fpsdur))
         # Forza immagine: quanto la foto di partenza è rispettata nel VIDEO (nodo 5647 → LTXVAddGuide.strength).
         # Default 0.50 ("soft reference" come il workflow di riferimento): valori alti (0.8+) ancorano
         # troppo al fotogramma → movimento rigido/innaturale; 0.45-0.6 lasciano al modello libertà di
@@ -155,7 +156,7 @@ class VideoTab(QWidget):
             "0.45-0.60 = movimento naturale (consigliato, 'soft reference').\n"
             "0.80+ = aderenza stretta ma movimento più rigido.")
         isr.addWidget(self.img_strength, 1); isr.addWidget(self.img_strength_lbl)
-        form.addRow("Forza immagine (soft reference):", self._wrap(isr))
+        form.addRow(tr("vid.img_strength_lbl"), self._wrap(isr))
         # Metodo di condizionamento immagine→video (solo quando si parte da un'immagine)
         self.i2v_method = QComboBox()
         self.i2v_method.addItem("AddGuide multi-keyframe (default)", "addguide")
@@ -166,19 +167,19 @@ class VideoTab(QWidget):
             "• Inplace soft: scrive l'immagine nel 1° frame del latent + noise_mask (1-forza). "
             "Avvio 'fisico' dall'immagine con movimento naturale — replica il workflow di riferimento. "
             "La «Forza immagine» qui sopra controlla quanto il 1° frame resta fedele.")
-        form.addRow("Metodo immagine→video:", self.i2v_method)
+        form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
         # Pacchetto risoluzione (ex "veloce" AuthorStorm, ora opzionale).
-        self.downscale_half = QCheckBox("Downscale 50% (genera a metà risoluzione — più veloce, meno dettaglio)")
+        self.downscale_half = QCheckBox(tr("vid.downscale"))
         self.downscale_half.setToolTip(
             "OFF (default) = generazione NATIVA a piena risoluzione → massimo dettaglio.\n"
             "ON = genera a metà e poi ingrandisce in bicubico (più veloce, più molle, "
             "ma nasconde il reticolo del decoder VAE).")
-        self.upscale_x2 = QCheckBox("Upscale ×2 (super-risoluzione spaziale latente — più nitido, più lento)")
+        self.upscale_x2 = QCheckBox(tr("vid.upscale"))
         self.upscale_x2.setToolTip(
             "RESCALE puro: raddoppia la risoluzione via LTXVLatentUpsampler (latente vero, non bicubico).\n"
             "Indipendente dal Refine. Usalo con 'Downscale 50%' per qualità a velocità maggiore,\n"
             "o da solo su generazione nativa per più risoluzione.")
-        self.refine_hr = QCheckBox("Refine HR (passata di dettaglio tiled — più definizione, più lento)")
+        self.refine_hr = QCheckBox(tr("vid.refine_hr"))
         self.refine_hr.setToolTip(
             "Passata di RIFINITURA del dettaglio (ramo tiled LTXVAddGuide), SENZA cambiare risoluzione.\n"
             "Indipendente dall'Upscale: puoi applicarla da sola (refine sul latente nativo) o insieme\n"
@@ -197,22 +198,22 @@ class VideoTab(QWidget):
         form.addRow("", self.downscale_half)
         form.addRow("", self.upscale_x2)
         form.addRow("", self.refine_hr)
-        note = QLabel("W/H arrotondati a multipli di 32. Con 'Auto', NSFW seleziona 10EROS; SFW il distilled 1.1.")
+        note = QLabel(tr("vid.res.note"))
         note.setWordWrap(True); note.setStyleSheet("color:#888;")
         form.addRow(note)
         root.addWidget(vbox)
 
         # --- V2V: editing video (Normal / Talk / ReTake) ---
         from ui.widgets.v2v_panel import V2VPanel
-        v2v_box = QGroupBox("🎬 Editing video (V2V)")
+        v2v_box = QGroupBox(tr("vid.v2v.group"))
         v2v_l = QVBoxLayout(v2v_box)
         self.v2v_panel = V2VPanel()
         v2v_l.addWidget(self.v2v_panel)
         root.addWidget(v2v_box)
 
         # --- Restauro volti automatico (post-generazione, opzionale) ---
-        frbox = QGroupBox("🙂 Restauro volti automatico"); frf = QFormLayout(frbox)
-        self.fr_auto = QCheckBox("Restaura i volti al termine della generazione (CodeFormer / GFPGAN)")
+        frbox = QGroupBox(tr("vid.face.group")); frf = QFormLayout(frbox)
+        self.fr_auto = QCheckBox(tr("vid.face.auto"))
         self.fr_auto.setToolTip(
             "Dopo aver generato (ed eventualmente esteso) il video, applica automaticamente un "
             "restauro volti per-fotogramma che corregge l'aspetto «plastico» e la deriva d'identità "
@@ -221,7 +222,7 @@ class VideoTab(QWidget):
         frf.addRow(self.fr_auto)
         from core import face_restore_pipeline as _frp
         self.fr_auto_model = QComboBox(); self.fr_auto_model.addItems(_frp.FACERESTORE_MODELS)
-        frf.addRow("Modello:", self.fr_auto_model)
+        frf.addRow(tr("vid.face.model_lbl"), self.fr_auto_model)
         fr_isr = QHBoxLayout()
         self.fr_auto_fidelity = QSlider(Qt.Horizontal); self.fr_auto_fidelity.setRange(0, 100)
         self.fr_auto_fidelity.setValue(70)
@@ -231,13 +232,12 @@ class VideoTab(QWidget):
         self.fr_auto_fidelity.setToolTip("1.0 preserva di più l'originale; 0.0 ricostruisce di più "
                                          "(più nitido, può scostarsi). ~0.7 consigliato.")
         fr_isr.addWidget(self.fr_auto_fidelity, 1); fr_isr.addWidget(self.fr_auto_fidelity_lbl)
-        frf.addRow("Fedeltà (fidelity):", self._wrap(fr_isr))
+        frf.addRow(tr("vid.face.fidelity_lbl"), self._wrap(fr_isr))
         # abilita i controlli solo se la spunta è attiva
         def _toggle_fr(on):
             self.fr_auto_model.setEnabled(on); self.fr_auto_fidelity.setEnabled(on)
         self.fr_auto.toggled.connect(_toggle_fr); _toggle_fr(False)
-        fr_note = QLabel("Richiede il custom node facerestore_cf (installabile da «Migliora qualità → Video»). "
-                         "I modelli (~350MB) si scaricano al primo uso.")
+        fr_note = QLabel(tr("vid.face.note"))
         fr_note.setWordWrap(True); fr_note.setStyleSheet("color:#888;")
         frf.addRow(fr_note)
         root.addWidget(frbox)
@@ -247,7 +247,7 @@ class VideoTab(QWidget):
         root.addWidget(self.sampler_seed)
 
         # --- LoRA LTX-2 (integrato; NSFW pilotato dal selettore video) ---
-        lbox = QGroupBox("LoRA (LTX-2)"); ll = QVBoxLayout(lbox)
+        lbox = QGroupBox(tr("vid.lora.group")); ll = QVBoxLayout(lbox)
         self.lora = LoraTab(allow_nsfw_getter=lambda: self.nsfw.currentText() == "NSFW", embedded=True)
         ll.addWidget(self.lora)
         root.addWidget(lbox, 1)
