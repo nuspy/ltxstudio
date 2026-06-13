@@ -21,6 +21,7 @@ from core.lora_catalog import LoraCatalog
 from core.model_catalog import ModelCatalog
 from core import user_prefs
 from core.gen_pipeline import GenPipeline
+from ui.i18n_manager import tr
 
 DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, deformed, "
                "low quality, blurry, watermark, text")
@@ -51,7 +52,7 @@ def _is_flux2(name: str) -> bool:
 
 def fill_lora_combo(combo: QComboBox, arch: str | None, allow_nsfw: bool = True):
     """Popola un combo con le LoRA dell'architettura (filtrate per NSFW), icona 🔞 per le NSFW."""
-    combo.clear(); combo.addItem("(nessuna)", None)
+    combo.clear(); combo.addItem(tr("f1.inp.none"), None)
     if not arch:
         return
     try:
@@ -126,9 +127,7 @@ class Frame1Tab(QWidget):
         self.img_nsfw = QComboBox(); self.img_nsfw.addItems(["SFW", "NSFW"])
         self.img_nsfw.currentTextChanged.connect(self._on_img_nsfw)
         # placeholder text — il tab è ora vuoto, in attesa di altri controlli immagine.
-        info = QLabel("I controlli «Contenuto immagine», «Prompt» e «Prompt negativo» "
-                      "sono stati spostati: NSFW → tab «Genera immagine»; "
-                      "Prompt / Prompt negativo → tab «Video».")
+        info = QLabel(tr("f1.info.lbl"))
         info.setWordWrap(True); info.setStyleSheet("color:#888; padding:8px;")
         bl.addWidget(info)
         # widget back-compat per get_values() — sostituiti con alias da main_window
@@ -179,24 +178,16 @@ class Frame1Tab(QWidget):
         # euler/dpmpp affidabili in cima. I RES restano disponibili (su Flux spesso ok) ma NON
         # in cima: su LTX-2.3 rompono (rumore) — verificato — quindi niente default rischiosi.
         self.gen_sampler.addItems(["euler", "euler_ancestral_cfg_pp", "dpmpp_2m", "res_2s"])
-        self.gen_sampler.setToolTip("euler/dpmpp = affidabili. res_2s = più dettaglio su Flux "
-                                    "(NON usarlo su LTX video, lì rompe).")
+        self.gen_sampler.setToolTip(tr("f1.gen.sampler.tt"))
         f.addRow(tr("f1.sampler_lbl"), self.gen_sampler)
         self.gen_scheduler = QComboBox()
         self.gen_scheduler.addItem("auto", None)
         self.gen_scheduler.addItems(["karras", "bong_tangent", "beta", "simple"])
-        self.gen_scheduler.setToolTip(
-            "Per le IMMAGINI lo scheduler cambia molto la resa:\n"
-            "• bong_tangent / kl_optimal / beta57 — alta qualità (flow-aware), spesso i migliori su Flux\n"
-            "• karras — dettaglio classico · beta — distilled · exponential — morbido"
-        )
+        self.gen_scheduler.setToolTip(tr("f1.gen.scheduler.tt"))
         f.addRow(tr("f1.scheduler_lbl"), self.gen_scheduler)
-        self.gen_enhance = QCheckBox("🪄 Migliora prompt (LLM Qwen3)")
+        self.gen_enhance = QCheckBox(tr("f1.gen.enhance"))
         self.gen_enhance.setChecked(False)
-        self.gen_enhance.setToolTip(
-            "Se attivo, un LLM (Qwen3) espande il tuo prompt in una descrizione visiva dettagliata "
-            "prima di generare. Utile per prompt brevi. In NSFW inietta la direttiva di sblocco. "
-            "Primo uso: scarica il modello Qwen3-4B (~3GB).")
+        self.gen_enhance.setToolTip(tr("f1.gen.enhance.tt"))
         f.addRow(self.gen_enhance)
         self.gen_steps = QSpinBox(); self.gen_steps.setRange(1, 80); self.gen_steps.setValue(20)
         f.addRow(tr("f1.steps_lbl"), self.gen_steps)
@@ -246,17 +237,17 @@ class Frame1Tab(QWidget):
         # in modalità auto, e il pipeline applica i valori corretti del modello scelto.
         if hasattr(self, "gen_sampler"):
             self.gen_sampler.setCurrentIndex(0)              # "auto"
-            self.gen_sampler.setToolTip(f"Default per {arch_lbl}: {d['sampler']}")
+            self.gen_sampler.setToolTip(tr("f1.gen.default_for.tt").format(arch=arch_lbl, val=d['sampler']))
         if hasattr(self, "gen_scheduler"):
             self.gen_scheduler.setCurrentIndex(0)            # "auto"
-            self.gen_scheduler.setToolTip(f"Default per {arch_lbl}: {d['scheduler']}")
+            self.gen_scheduler.setToolTip(tr("f1.gen.default_for.tt").format(arch=arch_lbl, val=d['scheduler']))
         if hasattr(self, "gen_steps"):
             self.gen_steps.setValue(int(d["steps"]))
         if hasattr(self, "gen_cfg"):
             self.gen_cfg.setValue(float(d["cfg"]))
         if hasattr(self, "gen_clip_type"):
             self.gen_clip_type.setCurrentIndex(0)            # "auto"
-            self.gen_clip_type.setToolTip(f"Default per {arch_lbl}: {d['clip_type']}")
+            self.gen_clip_type.setToolTip(tr("f1.gen.default_for.tt").format(arch=arch_lbl, val=d['clip_type']))
 
     def _sync_gen_lora_arch(self, arch_lbl: str):
         """Sincronizza l'architettura del LoraTab con quella selezionata per la generazione."""
@@ -312,7 +303,7 @@ class Frame1Tab(QWidget):
         models = sorted(models, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
         self.gen_model.blockSignals(True)
         self.gen_model.clear()
-        self.gen_model.addItems(models or ["(nessun modello trovato)"])
+        self.gen_model.addItems(models or [tr("f1.gen.no_model")])
         self.gen_model.blockSignals(False)
         self._update_gen_star()
         # Controlla se il golden template è disponibile per questa arch
@@ -321,11 +312,7 @@ class Frame1Tab(QWidget):
         if hasattr(self, "gen_warn_lbl"):
             if not golden_ok:
                 self.gen_warn_lbl.setText(
-                    f"⚠️ Template mancante per {arch_lbl}. "
-                    f"Per generare: apri ComfyUI con il workflow {arch_lbl} attivo, "
-                    f"clicca 'Save (API format)' e salva in templates/txt2img_{arch_key}.api.json. "
-                    f"Oppure usa FLUX (sempre disponibile)."
-                )
+                    tr("f1.gen.warn.tt").format(arch=arch_lbl, key=arch_key))
                 self.gen_warn_lbl.setVisible(True)
                 self.gen_btn.setEnabled(False)
             else:
@@ -388,7 +375,7 @@ class Frame1Tab(QWidget):
         if refine_combo is not None:
             cur = refine_combo.currentText()
             refine_combo.clear()
-            refine_combo.addItems(flux2) if flux2 else refine_combo.addItem("(nessun modello FLUX.2)")
+            refine_combo.addItems(flux2) if flux2 else refine_combo.addItem(tr("f1.flux2.none"))
             if cur in flux2:
                 refine_combo.setCurrentText(cur)
         # integra: liste separate per engine
@@ -399,13 +386,13 @@ class Frame1Tab(QWidget):
                       if hasattr(self, "integrate_engine") else 0)
             if engine == 1:                        # FLUX.2
                 pool = flux2
-                empty = "(nessun modello FLUX.2)"
+                empty = tr("f1.flux2.none")
             else:                                  # Kontext (FLUX.1)
                 pool = [m for m in self._models
                         if "kontext" in m.lower() and "fill" not in m.lower()
                         and not _is_flux2(m)
                         and (allow or not self._mcat.is_nsfw(m))]
-                empty = "(nessun modello Kontext FLUX.1)"
+                empty = tr("f1.kontext.none")
             ic.clear()
             ic.addItems(pool) if pool else ic.addItem(empty)
             if cur in pool:
@@ -416,12 +403,9 @@ class Frame1Tab(QWidget):
             self.integrate_puzzle.setEnabled(not is_flux2_mode)
             if is_flux2_mode:
                 self.integrate_puzzle.setChecked(False)
-                self.integrate_puzzle.setToolTip(
-                    "Disabilitato in modalità FLUX.2: puzzle_lora è una LoRA FLUX.1 "
-                    "(applicarla su FLUX.2 causa errori di shape sui pesi).")
+                self.integrate_puzzle.setToolTip(tr("f1.integrate.puzzle.tt.flux2"))
             else:
-                self.integrate_puzzle.setToolTip(
-                    "LoRA 'foreground' di MagicQuill: aiuta a fondere l'oggetto.")
+                self.integrate_puzzle.setToolTip(tr("f1.integrate.puzzle.tt.on"))
 
     # ---------- inpaint / outpaint ----------
     def _inpaint_box(self) -> QWidget:
@@ -494,7 +478,7 @@ class Frame1Tab(QWidget):
         # bottoni Genera per inpaint/outpaint
         brow = QHBoxLayout()
         b_in = QPushButton(tr("f1.inpaint.btn")); b_in.clicked.connect(lambda: self.canvas.request_inpaint.emit())
-        b_out = QPushButton("⬜ Genera outpaint"); b_out.clicked.connect(lambda: self.canvas.request_outpaint.emit())
+        b_out = QPushButton(tr("f1.outpaint.btn")); b_out.clicked.connect(lambda: self.canvas.request_outpaint.emit())
         brow.addWidget(b_in); brow.addWidget(b_out)
         bw = QWidget(); bw.setLayout(brow); f.addRow(bw)
         wv.addWidget(ipo_box)
@@ -504,13 +488,13 @@ class Frame1Tab(QWidget):
         wv.addWidget(sep)
 
         # ============ SEZIONE 2: INTEGRA ============
-        int_box = QGroupBox("🧩 Integra immagini (fondi le immagini extra incollate sul canvas)")
+        int_box = QGroupBox(tr("f1.integrate.group"))
         g = QFormLayout(int_box)
         self.integrate_prompt = QPlainTextEdit(); self.integrate_prompt.setMaximumHeight(36)
         self.integrate_prompt.setPlaceholderText(tr("f1.integrate.prompt.ph"))
         g.addRow(tr("f1.integrate.prompt_lbl"), self.integrate_prompt)
         self.integrate_engine = QComboBox()
-        self.integrate_engine.addItems(["Kontext (FLUX.1)", "FLUX.2 (sperimentale)"])
+        self.integrate_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2")])
         self.integrate_engine.setToolTip(tr("f1.integrate.engine.tt"))
         # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 vs FLUX.2) +
         # abilitazione del puzzle_lora (LoRA FLUX.1 incompatibile con FLUX.2).
@@ -518,10 +502,7 @@ class Frame1Tab(QWidget):
         g.addRow(tr("f1.integrate.engine_lbl"), self.integrate_engine)
         self.integrate_puzzle = QCheckBox(tr("f1.integrate.puzzle"))
         self.integrate_puzzle.setChecked(False)   # OFF di default: introduce un artefatto a cornice
-        self.integrate_puzzle.setToolTip(
-            "SPERIMENTALE / sconsigliato. puzzle_lora è una LoRA FLUX.1 (formato diffusers) NON di "
-            "armonizzazione: applicata da sola su Kontext inietta una CORNICE attorno alla figura.\n"
-            "L'integrazione Kontext armonizza già senza (riferimento + prompt). Lasciala spenta.")
+        self.integrate_puzzle.setToolTip(tr("f1.integrate.puzzle.tt"))
         g.addRow("", self.integrate_puzzle)
         self.integrate_model = QComboBox()
         # Label dinamica: aggiornata da _on_integrate_engine_changed.
@@ -552,7 +533,7 @@ class Frame1Tab(QWidget):
         intseedrow.addWidget(self.int_seed, 1); intseedrow.addWidget(self.int_seed_rand)
         sw3 = QWidget(); sw3.setLayout(intseedrow); g.addRow(tr("f1.seed_lbl"), sw3)
         # bottone Integra spostato qui dal canvas/workspace
-        b_int = QPushButton("🧩 Integra immagini")
+        b_int = QPushButton(tr("f1.integrate.btn"))
         b_int.clicked.connect(lambda: self.request_integrate.emit())
         g.addRow(b_int)
         wv.addWidget(int_box)
@@ -567,13 +548,13 @@ class Frame1Tab(QWidget):
         self.color_target = QLineEdit(); self.color_target.setPlaceholderText(tr("f1.color.target.ph"))
         self.color_swatch = QLabel(); self.color_swatch.setFixedSize(26, 26)
         self.color_swatch.setStyleSheet("border:1px solid #555; border-radius:5px;")
-        cbtn = QPushButton("🎨 scegli"); cbtn.clicked.connect(self._pick_color)
+        cbtn = QPushButton(tr("f1.color.pick.btn")); cbtn.clicked.connect(self._pick_color)
         crow.addWidget(self.color_target, 1); crow.addWidget(self.color_swatch); crow.addWidget(cbtn)
         f.addRow(tr("f1.color.color_lbl"), self._wrapw(crow))
         self.color_subject = QLineEdit()
         self.color_subject.setPlaceholderText(tr("f1.color.subject.ph"))
         f.addRow(tr("f1.color.subject_lbl"), self.color_subject)
-        self.color_engine = QComboBox(); self.color_engine.addItems(["Kontext (FLUX.1)", "FLUX.2 (sperimentale)"])
+        self.color_engine = QComboBox(); self.color_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2")])
         f.addRow(tr("f1.engine_lbl"), self.color_engine)
         self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
         f.addRow(tr("f1.steps_lbl"), self.color_steps)
@@ -634,8 +615,8 @@ class Frame1Tab(QWidget):
         # PUNTATORE (click/box sul canvas) usa sempre SAM vanilla in automatico e non passa
         # da qui. Niente «SAM v1» qui: da testo SAM da solo non funziona (serve un detector) e
         # in passato finiva su CLIPSeg (non installato) → errore.
-        self.seg_detector.addItem("GroundingDINO + SAM-HQ (bordo rifinito, consigliato)", userData="grounding_dino")
-        self.seg_detector.addItem("GroundingDINO (solo, più veloce)", userData="grounding_dino_only")
+        self.seg_detector.addItem(tr("f1.seg.detector.dino_sam"), userData="grounding_dino")
+        self.seg_detector.addItem(tr("f1.seg.detector.dino"), userData="grounding_dino_only")
         self.seg_detector.setCurrentIndex(0)
         r2.addWidget(self.seg_detector, 1)
         r2.addWidget(QLabel(tr("f1.seg.threshold_lbl")))
@@ -644,12 +625,7 @@ class Frame1Tab(QWidget):
         # 0.50 per GroundingDINO: 0.30-0.40 selezionava spesso l'intera immagine
         # su prompt generici (es. "viso"). Valori alti (0.50-0.70) sono più precisi.
         self.seg_threshold.setValue(0.50)
-        self.seg_threshold.setToolTip(
-            "Soglia di selezione (agisce su ENTRAMBE le modalità):\n"
-            "• Da testo (GroundingDINO): confidenza minima del detector.\n"
-            "• Col puntatore (SAM): soglia della maschera.\n"
-            "Valori ALTI (0.50-0.70) = selezione più stretta/precisa; BASSI (0.20-0.35) = più ampia "
-            "(prende tutto l'oggetto). Se col click prende solo una macchia, ABBASSALA.")
+        self.seg_threshold.setToolTip(tr("f1.seg.threshold.tt"))
         r2.addWidget(self.seg_threshold)
         v.addLayout(r2)
         self.seg_detector.currentIndexChanged.connect(self._on_seg_detector_changed)
@@ -659,18 +635,14 @@ class Frame1Tab(QWidget):
         self.seg_sam.setToolTip(tr("f1.seg.sam.tt"))
         r3.addWidget(self.seg_sam, 1)
         v.addLayout(r3)
-        hint = QLabel(
-            "<b>Da testo</b> (🎯 Seleziona): GroundingDINO trova l'oggetto descritto; con +SAM-HQ ne rifinisce il bordo. "
-            "<b>Col puntatore</b> (click/riquadro sul canvas): SAM vanilla raffina la regione disegnata. "
-            "La maschera risultante è modificabile a mano con pennello/gomma."
-        )
+        hint = QLabel(tr("f1.seg.hint"))
         hint.setTextFormat(Qt.RichText)
         hint.setStyleSheet("color:#888;"); hint.setWordWrap(True); v.addWidget(hint)
         return box
 
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica."""
-        engine_label = "Modello Kontext (FLUX.1):" if _idx == 0 else "Modello FLUX.2:"
+        engine_label = tr("f1.integrate.model.kontext") if _idx == 0 else tr("f1.integrate.model.flux2")
         if hasattr(self, "_integrate_model_label"):
             self._integrate_model_label.setText(engine_label)
         self._reload_flux_combos()
@@ -692,10 +664,10 @@ class Frame1Tab(QWidget):
             if not vanilla:
                 # solo SAM-HQ disponibili: il puntatore non può funzionare finché non si
                 # aggiunge un SAM vanilla in models/sams.
-                self.seg_sam.insertItem(0, "⚠ serve un SAM vanilla per il puntatore")
+                self.seg_sam.insertItem(0, tr("f1.seg.sam.need_vanilla"))
                 self.seg_sam.setCurrentIndex(0)
         else:
-            self.seg_sam.addItem("(nessun SAM — riavvia ComfyUI)")
+            self.seg_sam.addItem(tr("f1.seg.sam.none"))
 
     def get_segment_config(self) -> dict:
         sam = self.seg_sam.currentText() if self.seg_sam.count() else ""
@@ -719,7 +691,7 @@ class Frame1Tab(QWidget):
         self.up_scale = QComboBox(); self.up_scale.addItems(["2x", "3x", "4x"]); self.up_scale.setCurrentText("4x")
         srow.addWidget(self.up_scale)
         srow.addWidget(QLabel(tr("f1.upscale.mode_lbl")))
-        self.up_mode = QComboBox(); self.up_mode.addItems(["Solo modello (veloce)", "Modello + rifinitura AI (più dettaglio)"])
+        self.up_mode = QComboBox(); self.up_mode.addItems([tr("f1.upscale.mode.fast"), tr("f1.upscale.mode.refine")])
         self.up_mode.currentIndexChanged.connect(self._on_up_mode)
         srow.addWidget(self.up_mode, 1)
         sw = QWidget(); sw.setLayout(srow); f.addRow(tr("f1.upscale.factor_lbl"), sw)
@@ -745,13 +717,7 @@ class Frame1Tab(QWidget):
         sep.setStyleSheet("color:#333; margin-top:6px;")
         f.addRow(sep)
         restore_btn = QPushButton(tr("f1.restore.btn"))
-        restore_btn.setToolTip(
-            "Apre il tab Restauro Foto con questa immagine pre-selezionata.\n"
-            "Operazioni disponibili:\n"
-            "• Restauro qualità (ESRGAN super-resolution)\n"
-            "• Colorazione B&W → colore (FLUX.2)\n"
-            "• Restauro + Colorazione combinati"
-        )
+        restore_btn.setToolTip(tr("f1.restore.tt"))
         restore_btn.clicked.connect(lambda: self.request_restore_photo.emit())
         f.addRow(restore_btn)
         self._on_up_mode()
@@ -765,7 +731,7 @@ class Frame1Tab(QWidget):
     def set_upscale_models(self, models: list[str]):
         self.up_model.clear()
         if not models:
-            self.up_model.addItem("(nessun modello upscale)"); return
+            self.up_model.addItem(tr("f1.upscale.none")); return
         pref = [m for m in _UPSCALE_PREFERRED if m in models]      # preferiti (più potenti) davanti
         rest = [m for m in models if m not in pref]
         for m in pref + rest:
@@ -807,7 +773,7 @@ class Frame1Tab(QWidget):
         if text_encoders is not None and hasattr(self, "gen_encoder"):
             cur = self.gen_encoder.currentText()
             self.gen_encoder.clear()
-            self.gen_encoder.addItem("(auto: scegli da modello)", None)
+            self.gen_encoder.addItem(tr("f1.gen.auto_from_model"), None)
             for e in text_encoders:
                 self.gen_encoder.addItem(e, e)
             if cur:
@@ -827,7 +793,7 @@ class Frame1Tab(QWidget):
         if vaes is not None and hasattr(self, "gen_vae"):
             cur = self.gen_vae.currentText()
             self.gen_vae.clear()
-            self.gen_vae.addItem("(auto: scegli da modello)", None)
+            self.gen_vae.addItem(tr("f1.gen.auto_from_model"), None)
             for v in vaes:
                 self.gen_vae.addItem(v, v)
             if cur:
