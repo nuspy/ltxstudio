@@ -23,6 +23,7 @@ from core.audio_recorder import AudioRecorder
 from core.tts_engine import (
     VoicePreset, available_engines, edge_list_voices, save_voice,
 )
+from ui.i18n_manager import tr
 
 
 class VoiceDialog(QDialog):
@@ -34,7 +35,7 @@ class VoiceDialog(QDialog):
         super().__init__(parent)
         self._preset = preset
         self._is_edit = preset is not None
-        self.setWindowTitle("Modifica voce" if self._is_edit else "Nuova voce")
+        self.setWindowTitle(tr("voice.edit_title") if self._is_edit else tr("voice.new_title"))
         self.setMinimumWidth(480)
 
         self.recorder = AudioRecorder() if AudioRecorder.available() else None
@@ -56,31 +57,29 @@ class VoiceDialog(QDialog):
         form = QFormLayout()
 
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("es. «Alice calma», «Narratore grave»…")
-        form.addRow("Nome:", self.name_edit)
+        self.name_edit.setPlaceholderText(tr("voice.name_placeholder"))
+        form.addRow(tr("voice.name_label"), self.name_edit)
 
         # Motore: tutti gli engine; tooltip su chi supporta il cloning
         self.engine_combo = QComboBox()
         for eid, disp, clone, emo, installed in available_engines():
             badge = "✅" if installed else "⬇"
-            cap = "clonabile" if clone else "solo preset"
+            cap = tr("voice.cap_clonable") if clone else tr("voice.cap_preset_only")
             self.engine_combo.addItem(f"{badge} {disp}  [{cap}]", eid)
-        self.engine_combo.setToolTip(
-            "Engine di sintesi. Gli engine 'clonabili' (CosyVoice 2, F5-TTS, XTTS, …) usano "
-            "il campione vocale per imitare il timbro. Edge TTS usa voci preset Microsoft.")
+        self.engine_combo.setToolTip(tr("voice.engine_tooltip"))
         # default = engine corrente del pannello TTS
         idx = next((i for i in range(self.engine_combo.count())
                     if self.engine_combo.itemData(i) == default_engine), 0)
         self.engine_combo.setCurrentIndex(idx)
         self.engine_combo.currentIndexChanged.connect(self._on_engine_changed)
-        form.addRow("Motore:", self.engine_combo)
+        form.addRow(tr("voice.engine_label"), self.engine_combo)
 
         # Voce base (solo Edge): preset Microsoft IT
         self.base_voice_combo = QComboBox()
         for v in edge_list_voices("it"):
             self.base_voice_combo.addItem(v.name, v.voice_id)
         self.base_voice_row = self._wrap(self.base_voice_combo)
-        self.base_voice_label = QLabel("Voce base:")
+        self.base_voice_label = QLabel(tr("voice.base_voice_label"))
         form.addRow(self.base_voice_label, self.base_voice_row)
 
         root.addLayout(form)
@@ -88,14 +87,14 @@ class VoiceDialog(QDialog):
         # ── Campione vocale (unico meccanismo attach/record) ──
         self.sample_box = QWidget()
         sb = QVBoxLayout(self.sample_box); sb.setContentsMargins(0, 0, 0, 0)
-        sb.addWidget(QLabel("<b>Campione vocale</b> (5-15s di parlato pulito, una sola persona):"))
+        sb.addWidget(QLabel(tr("voice.sample_header")))
         row = QHBoxLayout()
-        self.pick_btn = QPushButton("📁 Carica file…"); self.pick_btn.clicked.connect(self._pick)
-        self.rec_btn = QPushButton("● Registra"); self.rec_btn.setCheckable(True)
+        self.pick_btn = QPushButton(tr("voice.load_file_btn")); self.pick_btn.clicked.connect(self._pick)
+        self.rec_btn = QPushButton(tr("voice.record_btn")); self.rec_btn.setCheckable(True)
         self.rec_btn.toggled.connect(self._toggle_rec)
         if not self.recorder:
-            self.rec_btn.setEnabled(False); self.rec_btn.setText("● Registra (microfono non disponibile)")
-        self.play_btn = QPushButton("▶ Anteprima"); self.play_btn.clicked.connect(self._preview)
+            self.rec_btn.setEnabled(False); self.rec_btn.setText(tr("voice.record_btn_no_mic"))
+        self.play_btn = QPushButton(tr("voice.preview_btn")); self.play_btn.clicked.connect(self._preview)
         self.play_btn.setEnabled(bool(self._sample_path))
         row.addWidget(self.pick_btn); row.addWidget(self.rec_btn); row.addWidget(self.play_btn)
         sb.addLayout(row)
@@ -105,21 +104,21 @@ class VoiceDialog(QDialog):
         root.addWidget(self.sample_box)
 
         # ── Trascrizione del campione ──
-        self.transcript_label = QLabel("Trascrizione del campione (opzionale, migliora il clone):")
+        self.transcript_label = QLabel(tr("voice.transcript_label"))
         root.addWidget(self.transcript_label)
         self.transcript_edit = QPlainTextEdit(); self.transcript_edit.setMaximumHeight(60)
-        self.transcript_edit.setPlaceholderText("Scrivi esattamente ciò che si sente nel campione…")
+        self.transcript_edit.setPlaceholderText(tr("voice.transcript_placeholder"))
         root.addWidget(self.transcript_edit)
 
         # ── Note ──
-        root.addWidget(QLabel("Note (libere):"))
+        root.addWidget(QLabel(tr("voice.note_label")))
         self.note_edit = QLineEdit()
         root.addWidget(self.note_edit)
 
         # ── Pulsanti ──
         bb = QDialogButtonBox()
-        bb.addButton("💾 Salva", QDialogButtonBox.AcceptRole)
-        bb.addButton("Annulla", QDialogButtonBox.RejectRole)
+        bb.addButton(tr("voice.save_btn"), QDialogButtonBox.AcceptRole)
+        bb.addButton(tr("voice.cancel_btn"), QDialogButtonBox.RejectRole)
         bb.accepted.connect(self._on_accept); bb.rejected.connect(self.reject)
         root.addWidget(bb)
 
@@ -128,8 +127,8 @@ class VoiceDialog(QDialog):
 
     def _sample_caption(self) -> str:
         if self._sample_path:
-            return f"🎤 campione: {Path(self._sample_path).name}"
-        return "(nessun campione allegato)"
+            return tr("voice.sample_caption").format(name=Path(self._sample_path).name)
+        return tr("voice.sample_none")
 
     # ──────────────────────────────────────────────────────────────────
     def _load_preset(self, p: VoicePreset):
@@ -162,7 +161,7 @@ class VoiceDialog(QDialog):
 
     # ──────────────────────────────────────────────────────────────────
     def _pick(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Campione vocale", "", "Audio (*.wav *.mp3 *.flac *.m4a)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("voice.pick_dialog_title"), "", tr("voice.audio_filter"))
         if fn:
             self._sample_path = fn
             self._sample_to_copy = fn
@@ -173,11 +172,11 @@ class VoiceDialog(QDialog):
         if not self.recorder:
             return
         if on:
-            self._recording = True; self.rec_btn.setText("■ Stop")
+            self._recording = True; self.rec_btn.setText(tr("voice.stop_btn"))
             self.recorder.start()
-            self.sample_lbl.setText("● registrazione in corso…")
+            self.sample_lbl.setText(tr("voice.recording_in_progress"))
         else:
-            self._recording = False; self.rec_btn.setText("● Registra")
+            self._recording = False; self.rec_btn.setText(tr("voice.record_btn"))
             # nome unico per non sovrascrivere registrazioni precedenti
             import uuid as _uuid
             path = self.recorder.stop(f"rec_{_uuid.uuid4().hex[:8]}.wav")
@@ -200,17 +199,17 @@ class VoiceDialog(QDialog):
     def _on_accept(self):
         name = self.name_edit.text().strip()
         if not name:
-            QMessageBox.warning(self, "Nome mancante", "Dai un nome alla voce."); return
+            QMessageBox.warning(self, tr("voice.warn_name_title"), tr("voice.warn_name_text")); return
         engine = self._current_engine()
         if engine == "edge":
             voice_id = self.base_voice_combo.currentData()
             if not voice_id:
-                QMessageBox.warning(self, "Voce base", "Seleziona una voce base Edge."); return
+                QMessageBox.warning(self, tr("voice.warn_base_title"), tr("voice.warn_base_text")); return
         else:
             voice_id = ""
             if not self._sample_path:
-                QMessageBox.warning(self, "Campione mancante",
-                    "Gli engine di cloning richiedono un campione vocale: caricalo o registralo."); return
+                QMessageBox.warning(self, tr("voice.warn_sample_title"),
+                    tr("voice.warn_sample_text")); return
 
         # costruisci/aggiorna il preset
         if self._preset is not None:
@@ -232,6 +231,6 @@ class VoiceDialog(QDialog):
             # copy_sample_from copia il file in voices/samples/ e aggiorna v.sample_path
             save_voice(v, copy_sample_from=self._sample_to_copy)
         except Exception as e:
-            QMessageBox.critical(self, "Errore salvataggio", str(e)); return
+            QMessageBox.critical(self, tr("voice.err_save_title"), str(e)); return
         self.saved_voice = v
         self.accept()

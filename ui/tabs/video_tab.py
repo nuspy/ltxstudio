@@ -151,45 +151,26 @@ class VideoTab(QWidget):
         self.img_strength = QSlider(Qt.Horizontal); self.img_strength.setRange(0, 100); self.img_strength.setValue(50)
         self.img_strength_lbl = QLabel("0.50")
         self.img_strength.valueChanged.connect(lambda v: self.img_strength_lbl.setText(f"{v/100:.2f}"))
-        self.img_strength.setToolTip(
-            "Quanto il video resta fedele al fotogramma di partenza.\n"
-            "0.45-0.60 = movimento naturale (consigliato, 'soft reference').\n"
-            "0.80+ = aderenza stretta ma movimento più rigido.")
+        self.img_strength.setToolTip(tr("vid.img_strength.tt"))
         isr.addWidget(self.img_strength, 1); isr.addWidget(self.img_strength_lbl)
         form.addRow(tr("vid.img_strength_lbl"), self._wrap(isr))
         # Metodo di condizionamento immagine→video (solo quando si parte da un'immagine)
         self.i2v_method = QComboBox()
-        self.i2v_method.addItem("AddGuide multi-keyframe (default)", "addguide")
-        self.i2v_method.addItem("Inplace soft (singolo frame, come reference)", "inplace")
-        self.i2v_method.setToolTip(
-            "Come l'immagine di partenza condiziona il video:\n"
-            "• AddGuide multi-keyframe: guida ad attenzione, supporta più keyframe (catena attuale).\n"
-            "• Inplace soft: scrive l'immagine nel 1° frame del latent + noise_mask (1-forza). "
-            "Avvio 'fisico' dall'immagine con movimento naturale — replica il workflow di riferimento. "
-            "La «Forza immagine» qui sopra controlla quanto il 1° frame resta fedele.")
+        self.i2v_method.addItem(tr("vid.i2v_method.addguide"), "addguide")
+        self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
+        self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
         form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
         # Pacchetto risoluzione (ex "veloce" AuthorStorm, ora opzionale).
         self.downscale_half = QCheckBox(tr("vid.downscale"))
-        self.downscale_half.setToolTip(
-            "OFF (default) = generazione NATIVA a piena risoluzione → massimo dettaglio.\n"
-            "ON = genera a metà e poi ingrandisce in bicubico (più veloce, più molle, "
-            "ma nasconde il reticolo del decoder VAE).")
+        self.downscale_half.setToolTip(tr("vid.downscale.tt"))
         self.upscale_x2 = QCheckBox(tr("vid.upscale"))
-        self.upscale_x2.setToolTip(
-            "RESCALE puro: raddoppia la risoluzione via LTXVLatentUpsampler (latente vero, non bicubico).\n"
-            "Indipendente dal Refine. Usalo con 'Downscale 50%' per qualità a velocità maggiore,\n"
-            "o da solo su generazione nativa per più risoluzione.")
+        self.upscale_x2.setToolTip(tr("vid.upscale.tt"))
         self.refine_hr = QCheckBox(tr("vid.refine_hr"))
-        self.refine_hr.setToolTip(
-            "Passata di RIFINITURA del dettaglio (ramo tiled LTXVAddGuide), SENZA cambiare risoluzione.\n"
-            "Indipendente dall'Upscale: puoi applicarla da sola (refine sul latente nativo) o insieme\n"
-            "all'Upscale ×2 (refine sull'immagine ingrandita). Più nitidezza/micro-dettaglio.")
+        self.refine_hr.setToolTip(tr("vid.refine_hr.tt"))
         # Upscale ×2 / Refine HR TEMPORANEAMENTE DISATTIVATI: il ramo super-res del template è
         # incompatibile col pruning dei moduli (fa ripartire l'enhancer e lascia il controlnet con
         # video baked inesistente → errore). Restano in GUI ma disabilitati finché non si rifà il ramo.
-        _hr_off = "⚠ Temporaneamente SENZA EFFETTO: il ramo super-res del template è incompatibile " \
-                  "col pruning (va rifatto). Spuntarlo non cambia nulla — la generazione resta NATIVA " \
-                  "a piena risoluzione. Lasciati abilitati (non disabilitati) per non bloccare la GUI."
+        _hr_off = tr("vid.hr_off.tt")
         # NB: NON disabilitati (setEnabled(False) + ripristino gui_state 'spuntato' = checkbox bloccato).
         self.upscale_x2.setChecked(False)
         self.refine_hr.setChecked(False)
@@ -214,11 +195,7 @@ class VideoTab(QWidget):
         # --- Restauro volti automatico (post-generazione, opzionale) ---
         frbox = QGroupBox(tr("vid.face.group")); frf = QFormLayout(frbox)
         self.fr_auto = QCheckBox(tr("vid.face.auto"))
-        self.fr_auto.setToolTip(
-            "Dopo aver generato (ed eventualmente esteso) il video, applica automaticamente un "
-            "restauro volti per-fotogramma che corregge l'aspetto «plastico» e la deriva d'identità "
-            "di LTX, PRESERVANDO l'identità (non ri-genera col diffusion). Aggiunge un secondo "
-            "passaggio: il video finale è quello coi volti restaurati.")
+        self.fr_auto.setToolTip(tr("vid.face.auto.tt"))
         frf.addRow(self.fr_auto)
         from core import face_restore_pipeline as _frp
         self.fr_auto_model = QComboBox(); self.fr_auto_model.addItems(_frp.FACERESTORE_MODELS)
@@ -229,8 +206,7 @@ class VideoTab(QWidget):
         self.fr_auto_fidelity_lbl = QLabel("0.70")
         self.fr_auto_fidelity.valueChanged.connect(
             lambda v: self.fr_auto_fidelity_lbl.setText(f"{v/100:.2f}"))
-        self.fr_auto_fidelity.setToolTip("1.0 preserva di più l'originale; 0.0 ricostruisce di più "
-                                         "(più nitido, può scostarsi). ~0.7 consigliato.")
+        self.fr_auto_fidelity.setToolTip(tr("vid.face.fidelity.tt"))
         fr_isr.addWidget(self.fr_auto_fidelity, 1); fr_isr.addWidget(self.fr_auto_fidelity_lbl)
         frf.addRow(tr("vid.face.fidelity_lbl"), self._wrap(fr_isr))
         # abilita i controlli solo se la spunta è attiva
@@ -268,7 +244,7 @@ class VideoTab(QWidget):
         cur_key = cur_data.get("key")
         self.model.blockSignals(True)
         self.model.clear()
-        self.model.addItem("Auto (da NSFW/SFW)", {"kind": "auto", "key": "auto"})
+        self.model.addItem(tr("vid.model.auto"), {"kind": "auto", "key": "auto"})
 
         def add(label: str, kind: str, model: str, is_nsfw: bool, enabled: bool = True):
             if (not nsfw) and is_nsfw:
@@ -281,13 +257,13 @@ class VideoTab(QWidget):
             _steps = self._mcat.recommended_steps(model)
             _cfg = self._mcat.recommended_cfg(model)
             _note = self._mcat.recommended_note(model)
-            _tip_parts = [model, f"Tipo: {kind}"]
+            _tip_parts = [model, tr("vid.model.tip_type").format(kind=kind)]
             if _steps is not None:
-                _tip_parts.append(f"Steps consigliati: {_steps}")
+                _tip_parts.append(tr("vid.model.tip_steps").format(steps=_steps))
             if _cfg is not None:
-                _tip_parts.append(f"CFG consigliato: {_cfg}")
+                _tip_parts.append(tr("vid.model.tip_cfg").format(cfg=_cfg))
             if _note:
-                _tip_parts.append(f"Nota: {_note}")
+                _tip_parts.append(tr("vid.model.tip_note").format(note=_note))
             self.model.setItemData(self.model.count() - 1, "\n".join(_tip_parts), Qt.ToolTipRole)
             if not enabled:
                 item = self.model.model().item(self.model.count() - 1)
@@ -313,7 +289,7 @@ class VideoTab(QWidget):
             for m in ggufs:
                 add(f"{m}  · GGUF", "gguf", m, self._is_nsfw_model(m))
         else:
-            add("GGUF Q4_K_M (13GB, RAM bassa)", "gguf", GGUF_FALLBACK_FILE, False)
+            add(tr("vid.model.gguf_fallback"), "gguf", GGUF_FALLBACK_FILE, False)
 
         for m in checkpoints:
             add(f"{m}  · checkpoint", "checkpoint", m, self._is_nsfw_model(m))
@@ -441,8 +417,8 @@ class VideoTab(QWidget):
         if not hasattr(self, "sampler_seed"):
             return
         # Config qualità allineata al reference, uniforme per tutti i modelli
-        self.sampler_seed.set_suggested_steps(32, note or "32 step + LTXVScheduler (qualità)")
-        self.sampler_seed.set_suggested_cfg(1.0, note or "CFG 1.0 (la guida la dà il NAG)")
+        self.sampler_seed.set_suggested_steps(32, note or tr("vid.suggested.steps"))
+        self.sampler_seed.set_suggested_cfg(1.0, note or tr("vid.suggested.cfg"))
         self.sampler_seed.set_suggested_sampler("euler_ancestral_cfg_pp")
         self.sampler_seed.set_suggested_scheduler("karras")
 
@@ -517,15 +493,15 @@ class VideoTab(QWidget):
         """Popola il combo: built-in + preset personali (⭐) da user_prefs."""
         self.preset_combo.blockSignals(True)
         self.preset_combo.clear()
-        self.preset_combo.addItem("— Scegli preset —", None)
+        self.preset_combo.addItem(tr("vid.preset.choose"), None)
         customs = user_prefs.custom_presets()
         if customs:
-            self.preset_combo.addItem("── I miei preset ──", None)
+            self.preset_combo.addItem(tr("vid.preset.mine"), None)
             for name, cfg in customs.items():
                 self.preset_combo.addItem(f"⭐ {name}", {**cfg, "_custom": True, "_name": name})
                 self.preset_combo.setItemData(self.preset_combo.count() - 1,
-                                              cfg.get("description", "Preset personale"), Qt.ToolTipRole)
-            self.preset_combo.addItem("── Preset di sistema ──", None)
+                                              cfg.get("description", tr("vid.preset.personal")), Qt.ToolTipRole)
+            self.preset_combo.addItem(tr("vid.preset.system"), None)
         for pname, pcfg in VIDEO_PRESETS.items():
             self.preset_combo.addItem(pname, pcfg)
             self.preset_combo.setItemData(self.preset_combo.count() - 1,
@@ -546,16 +522,16 @@ class VideoTab(QWidget):
             "length_s": self.length.value(),
             # LoRA selezionate (comfy_name + strength) → il preset le ripristina
             "loras": self.lora.gui_get_state().get("loras", []),
-            "description": "Preset personale",
+            "description": tr("vid.preset.personal"),
         }
 
     def _save_current_preset(self):
-        name, ok = QInputDialog.getText(self, "Salva preset", "Nome del preset:")
+        name, ok = QInputDialog.getText(self, tr("vid.preset.save.title"), tr("vid.preset.save.prompt"))
         if not ok or not name.strip():
             return
         name = name.strip()
         if name in user_prefs.custom_presets():
-            if QMessageBox.question(self, "Sovrascrivi", f"Il preset «{name}» esiste già. Sovrascrivere?") != QMessageBox.Yes:
+            if QMessageBox.question(self, tr("vid.preset.overwrite.title"), tr("vid.preset.overwrite.msg").format(name=name)) != QMessageBox.Yes:
                 return
         user_prefs.save_preset(name, self._current_settings_as_preset())
         self._reload_presets()
@@ -567,10 +543,10 @@ class VideoTab(QWidget):
     def _delete_selected_preset(self):
         data = self.preset_combo.currentData()
         if not (isinstance(data, dict) and data.get("_custom")):
-            QMessageBox.information(self, "Preset", "Seleziona un preset personale (⭐) da eliminare.")
+            QMessageBox.information(self, tr("vid.preset.del.title"), tr("vid.preset.del.none"))
             return
         name = data.get("_name", "")
-        if QMessageBox.question(self, "Elimina preset", f"Eliminare il preset «{name}»?") != QMessageBox.Yes:
+        if QMessageBox.question(self, tr("vid.preset.del.confirm.title"), tr("vid.preset.del.confirm.msg").format(name=name)) != QMessageBox.Yes:
             return
         user_prefs.delete_preset(name)
         self._reload_presets()

@@ -19,7 +19,6 @@ from core.video_enhance_pipeline import SEEDVR2_MODELS
 from core import face_restore_pipeline as facerestore
 from ui.i18n_manager import tr
 
-ENGINES = ["SeedVR2 (AI, consigliato)", "ESRGAN per-fotogramma (veloce)", "FlashVSR (richiede nodo)"]
 _ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr"}
 
 
@@ -44,13 +43,14 @@ class VideoDefTab(QWidget):
 
         # motore + parametri
         box = QGroupBox(tr("def.restore.group")); f = QFormLayout(box)
-        self.engine = QComboBox(); self.engine.addItems(ENGINES)
+        self.engine = QComboBox()
+        self.engine.addItems([tr("def.engine.seedvr2"), tr("def.engine.esrgan"), tr("def.engine.flashvsr")])
         self.engine.currentIndexChanged.connect(self._on_engine)
         f.addRow(tr("def.engine_lbl"), self.engine)
         self.seedvr2_model = QComboBox(); self.seedvr2_model.addItems(list(SEEDVR2_MODELS.keys()))
         f.addRow(tr("def.seedvr2_model_lbl"), self.seedvr2_model)
         self.resolution = QSpinBox(); self.resolution.setRange(256, 8192); self.resolution.setSingleStep(64)
-        self.resolution.setValue(1080); self.resolution.setSuffix(" px (lato corto)")
+        self.resolution.setValue(1080); self.resolution.setSuffix(tr("def.resolution.suffix"))
         f.addRow(tr("def.resolution_lbl"), self.resolution)
         self.blocks = QSpinBox(); self.blocks.setRange(0, 36); self.blocks.setValue(0)
         self.blocks.setToolTip(tr("def.blocks.tt"))
@@ -122,7 +122,7 @@ class VideoDefTab(QWidget):
 
     def set_upscale_models(self, names: list[str]):
         self.esrgan_model.clear()
-        self.esrgan_model.addItems(names or ["(nessun modello upscale)"])
+        self.esrgan_model.addItems(names or [tr("def.no_upscale_model")])
 
     def get_config(self) -> dict:
         return {
@@ -167,9 +167,9 @@ class VideoDefTab(QWidget):
 
     def _install_facerestore(self):
         if QMessageBox.question(self, tr("def.face.install.title"),
-                                f"Clonare {facerestore.FACERESTORE_REPO['url']} in custom_nodes e "
-                                "installarne le dipendenze?\n\n"
-                                f"{facerestore.FACERESTORE_REPO['note']}") != QMessageBox.Yes:
+                                tr("def.face.install.confirm").format(
+                                    url=facerestore.FACERESTORE_REPO['url'],
+                                    note=facerestore.FACERESTORE_REPO['note'])) != QMessageBox.Yes:
             return
         self.fr_install_btn.setEnabled(False); self.fr_install_btn.setText(tr("def.face.install_update.btn"))
         QApplication.processEvents()
@@ -193,6 +193,6 @@ class VideoDefTab(QWidget):
         self.esrgan_model.setEnabled(es); self.scale.setEnabled(es)
 
     def _pick(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Video", "", "Video (*.mp4 *.webm *.mkv *.mov)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("def.pick.dialog.title"), "", tr("def.pick.dialog.filter"))
         if fn:
             self.set_video(fn)

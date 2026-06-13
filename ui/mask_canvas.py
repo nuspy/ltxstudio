@@ -28,17 +28,18 @@ from PySide6.QtWidgets import (
 )
 
 from core.mask_store import MaskStore
+from ui.i18n_manager import tr
 
 MAX_UNDO = 100
 
-# strumenti: (modo, icona, titolo, descrizione)
+# strumenti: (modo, icona, chiave_titolo, chiave_descrizione)
 TOOLS = [
-    ("move",      "✥",  "Sposta",     "Sposta, scala e ruota l'immagine selezionata (maniglie ai bordi)."),
-    ("brush",     "✎",  "Pennello",   "Disegna la maschera sull'area da rigenerare."),
-    ("erase",     "⌫",  "Gomma",      "Cancella parti della maschera disegnata."),
-    ("fill",      "▣",  "Riempi",     "Riempimento a secchio dell'area contigua."),
-    ("lasso",     "❍",  "Lazzo",      "Traccia un contorno continuo: si aggancia ai bordi (magnetico)."),
-    ("sam_point", "✛",  "Oggetto AI", "Clicca su un oggetto: l'AI (SAM) ne seleziona il contorno."),
+    ("move",      "✥",  "canvas.tool_move_title",   "canvas.tool_move_desc"),
+    ("brush",     "✎",  "canvas.tool_brush_title",  "canvas.tool_brush_desc"),
+    ("erase",     "⌫",  "canvas.tool_erase_title",  "canvas.tool_erase_desc"),
+    ("fill",      "▣",  "canvas.tool_fill_title",   "canvas.tool_fill_desc"),
+    ("lasso",     "❍",  "canvas.tool_lasso_title",  "canvas.tool_lasso_desc"),
+    ("sam_point", "✛",  "canvas.tool_sam_title",    "canvas.tool_sam_desc"),
 ]
 
 
@@ -214,7 +215,7 @@ class MaskCanvas(QWidget):
         self.img_item.setZValue(0)
         self.scene.addItem(self.img_item)
         self._entries: list[dict] = [
-            {"item": self.img_item, "mask": self._new_mask(), "name": "📷 Foto base", "base": True}
+            {"item": self.img_item, "mask": self._new_mask(), "name": tr("canvas.base_photo_name"), "base": True}
         ]
         self._active = 0               # voce selezionata (0 = base)
 
@@ -260,10 +261,10 @@ class MaskCanvas(QWidget):
             bar.addWidget(x); return x
         b("📁", self._load_dialog, 40); b("⤢", self._fit, 40)
         b("↶", self.undo, 40); b("↷", self.redo, 40)
-        b("🧹 Pulisci", self.clear_mask); b("💾 Salva", self.save_mask); b("↺ Reset", self.reset_saved)
+        b(tr("canvas.clear_btn"), self.clear_mask); b(tr("canvas.save_btn"), self.save_mask); b(tr("canvas.reset_btn"), self.reset_saved)
         # Bottone «Integra immagini» spostato nel tab «Inpaint / Outpaint», sezione Integra.
         bar.addStretch(1)
-        bar.addWidget(QLabel("Pennello"))
+        bar.addWidget(QLabel(tr("canvas.brush_label")))
         self.brush_sl = QSlider(Qt.Horizontal); self.brush_sl.setRange(3, 200); self.brush_sl.setValue(self.brush_size)
         self.brush_sl.setMaximumWidth(140); self.brush_sl.valueChanged.connect(self.set_brush)
         bar.addWidget(self.brush_sl)
@@ -284,24 +285,24 @@ class MaskCanvas(QWidget):
         mid.addWidget(self.view, 1)
         # ---- pannello layer (immagini importate) a destra ----
         side = QVBoxLayout()
-        side.addWidget(QLabel("Immagini (ognuna ha la sua maschera)"))
+        side.addWidget(QLabel(tr("canvas.images_panel_label")))
         self.layer_list = QListWidget(); self.layer_list.setMaximumWidth(170)
         self.layer_list.currentRowChanged.connect(self._on_layer_sel)
         side.addWidget(self.layer_list)
         lb = QHBoxLayout()
-        for t, fn in [("+ Img", self._import_layer), ("↑", self._layer_up),
+        for t, fn in [(tr("canvas.add_img_btn"), self._import_layer), ("↑", self._layer_up),
                       ("↓", self._layer_down), ("🗑", self._layer_del)]:
             x = QPushButton(t); x.setMaximumWidth(48); x.clicked.connect(fn); lb.addWidget(x)
         side.addLayout(lb)
         mid.addLayout(side)
         lay.addLayout(mid, 1)
         self._hint = _ToolHint(self)        # tooltip grafico animato (fluttua sul canvas)
-        self.status = QLabel("Strumenti a sinistra (passa sopra per il suggerimento). Rotella = zoom.")
+        self.status = QLabel(tr("canvas.status_hint"))
         self.status.setStyleSheet("color:#888;")
         lay.addWidget(self.status)
 
         # icona di caricamento centrata sul frame (al posto del bottone), visibile se non c'è foto
-        self.upload_overlay = QPushButton("⬆\nCarica foto", self.view)
+        self.upload_overlay = QPushButton(tr("canvas.upload_overlay"), self.view)
         self.upload_overlay.setCursor(Qt.PointingHandCursor)
         self.upload_overlay.setStyleSheet(
             "QPushButton{background:rgba(30,34,46,210);color:#cdd;border:2px dashed #5a86c0;"
@@ -322,7 +323,7 @@ class MaskCanvas(QWidget):
     # ---------- tooltip grafico degli strumenti ----------
     def _show_hint(self, btn: "_ToolButton"):
         p = btn.mapTo(self, QPoint(btn.width() + 8, btn.height() // 2))
-        self._hint.popup(p.x(), p.y(), btn._tool[1], btn._tool[2], btn._tool[3])
+        self._hint.popup(p.x(), p.y(), btn._tool[1], tr(btn._tool[2]), tr(btn._tool[3]))
 
     def _hide_hint(self):
         if getattr(self, "_hint", None) is not None:
@@ -344,9 +345,9 @@ class MaskCanvas(QWidget):
         if m not in ("brush", "erase"):
             self._hide_brush_cursor()
         if m == "sam_point":
-            self.status.setText("Selezione oggetto: clicca sull'oggetto. SAM rifinisce sul bordo reale.")
+            self.status.setText(tr("canvas.status_sam"))
         elif m == "lasso":
-            self.status.setText("Lazzo: tieni premuto e traccia il contorno (tratto continuo, magnetico sui bordi).")
+            self.status.setText(tr("canvas.status_lasso"))
         self._update_handles()      # maniglie visibili solo in modalità Sposta
 
     # ---------- cursore-cerchio del pennello (mostra il diametro reale) ----------
@@ -389,7 +390,7 @@ class MaskCanvas(QWidget):
             p.setBrush(QColor(255, 40, 40, 150)); p.setPen(Qt.NoPen)
             p.drawPolygon(QPolygonF(self._lasso_pts)); p.end()
             self._refresh_mask()
-            self.status.setText("Lazzo applicato alla maschera.")
+            self.status.setText(tr("canvas.status_lasso_applied"))
         self._lasso_reset()
 
     def _draw_lasso(self):
@@ -461,7 +462,7 @@ class MaskCanvas(QWidget):
         self._seg_marker = self.scene.addEllipse(sp.x()-r, sp.y()-r, 2*r, 2*r,
                                                  QPen(QColor("#36f"), 3), QBrush(QColor(60, 120, 255, 90)))
         self._seg_marker.setZValue(650)
-        self.status.setText("Punto selezionato → segmento con SAM…")
+        self.status.setText(tr("canvas.status_point_selected"))
         self.request_segment_region.emit()
 
     def export_region_mask(self, out_dir: Path) -> dict:
@@ -502,7 +503,7 @@ class MaskCanvas(QWidget):
         out = QImage(arr.data, w, h, QImage.Format_ARGB32).copy()
         self.mask_image = out; self._refresh_mask()
         self._clear_seg_marker(); self.set_mode("brush")
-        self.status.setText("Maschera dalla selezione caricata — affinala con pennello/gomma se serve.")
+        self.status.setText(tr("canvas.status_mask_loaded"))
 
     def set_brush(self, v: int):
         self.brush_size = max(3, min(200, int(v)))
@@ -519,7 +520,7 @@ class MaskCanvas(QWidget):
         self._refresh_mask(); self._fit()
 
     def _load_dialog(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Foto", "", "Immagini (*.png *.jpg *.jpeg *.webp)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("canvas.load_photo_title"), "", tr("canvas.image_filter"))
         if fn:
             self.load_image(fn)
 
@@ -543,12 +544,12 @@ class MaskCanvas(QWidget):
             tr = saved.get("transform", {})
             if "scale" in tr: self.img_item.setScale(tr["scale"])
             if "x" in tr and "y" in tr: self.img_item.setPos(tr["x"], tr["y"])
-            self.status.setText("Maschera + posizione ricaricate.")
+            self.status.setText(tr("canvas.status_reloaded"))
         self._undo.clear(); self._redo.clear(); self._fit()
 
     # ---------- layer immagini importate (ognuno con la sua maschera) ----------
     def _import_layer(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Immagine da integrare", "", "Immagini (*.png *.jpg *.jpeg *.webp)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("canvas.import_layer_title"), "", tr("canvas.image_filter"))
         if not fn:
             return
         pix = QPixmap(fn)
@@ -645,7 +646,7 @@ class MaskCanvas(QWidget):
         self._undo.clear(); self._redo.clear()      # undo è per-maschera
         self._refresh_mask()                          # mostra SOLO la maschera dell'immagine selezionata
         self._update_handles()                        # maniglie sull'immagine selezionata
-        self.status.setText(f"Selezionato: {self._entries[row]['name']} — vedi/modifichi la sua maschera.")
+        self.status.setText(tr("canvas.status_selected").format(name=self._entries[row]['name']))
 
     def _reindex_z(self):
         for i, e in enumerate(self._entries):
@@ -748,11 +749,11 @@ class MaskCanvas(QWidget):
         self._mask_white().save(str(tmp))
         self.store.save(self._image_path, str(tmp),
                         {"scale": self.img_item.scale(), "x": self.img_item.x(), "y": self.img_item.y()})
-        self.status.setText("Maschera + posizione salvate.")
+        self.status.setText(tr("canvas.status_saved"))
 
     def reset_saved(self):
         if self._image_path:
-            self.store.reset(self._image_path); self.clear_mask(); self.status.setText("Salvataggio azzerato.")
+            self.store.reset(self._image_path); self.clear_mask(); self.status.setText(tr("canvas.status_reset"))
 
     def _fit(self):
         self.view.fitInView(self.frame_item, Qt.KeepAspectRatio)

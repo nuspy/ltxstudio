@@ -33,7 +33,7 @@ class _DropArea(QLabel):
     files_dropped = Signal(list)
 
     def __init__(self):
-        super().__init__("📂  Trascina qui file o cartelle di modelli da importare")
+        super().__init__(tr("imp.drop.lbl"))
         self.setAlignment(Qt.AlignCenter)
         self.setMinimumHeight(64)
         self._base = ("border: 2px dashed {c}; color:#999; font-size:13px; "
@@ -64,9 +64,6 @@ class ImportModelsTab(QWidget):
 
     catalog_updated = Signal()   # emesso dopo enrich/build/ingest → ricarica catalogo LoRA
 
-    _MODEL_FILTER = ("Modelli AI (*.safetensors *.ckpt *.pt *.pth *.gguf *.bin *.pkl);;"
-                     "Tutti i file (*.*)")
-
     def __init__(self):
         super().__init__()
         self._pending: list[str] = []
@@ -92,12 +89,7 @@ class ImportModelsTab(QWidget):
         v = QVBoxLayout(host)
         v.setSpacing(8)
 
-        intro = QLabel(
-            "<b>Import Models</b> — cataloga i tuoi modelli AI. Flusso: metti i file "
-            "nell'<b>inbox</b>, poi <b>Sposta</b> (li ordina per tipo/architettura), "
-            "<b>Scansiona</b> (estrae i metadati), <b>Arricchisci</b> (dati da Civitai), "
-            "<b>Genera HTML</b> (pagina del catalogo). «Ingest completo» fa tutto in sequenza."
-        )
+        intro = QLabel(tr("imp.intro.lbl"))
         intro.setWordWrap(True)
         intro.setStyleSheet("color:#bbb; padding:2px;")
         v.addWidget(intro)
@@ -136,11 +128,7 @@ class ImportModelsTab(QWidget):
         grp.setChecked(False)           # collassato di default (default = installazione attuale)
         outer = QVBoxLayout(grp)
 
-        note = QLabel(
-            "I valori predefiniti corrispondono all'installazione attuale. Modificali solo se hai "
-            "spostato ComfyUI, i modelli o il dizionario. Al salvataggio vengono sincronizzati negli "
-            "strumenti (paths.json)."
-        )
+        note = QLabel(tr("imp.paths.note"))
         note.setWordWrap(True)
         note.setStyleSheet("color:#888; font-size:11px;")
         outer.addWidget(note)
@@ -166,7 +154,7 @@ class ImportModelsTab(QWidget):
         btns = QHBoxLayout()
         save_btn = QPushButton(tr("imp.paths.save.btn"))
         save_btn.clicked.connect(self._save_paths)
-        reset_btn = QPushButton("↺ Ripristina default")
+        reset_btn = QPushButton(tr("imp.paths.reset.btn"))
         reset_btn.clicked.connect(self._reset_paths)
         suggest_btn = QPushButton(tr("imp.paths.suggest.btn"))
         suggest_btn.setToolTip(tr("imp.paths.suggest.tt"))
@@ -185,15 +173,10 @@ class ImportModelsTab(QWidget):
 
     # ---- gruppo compatibilità ComfyUI (patch LTX-2.3) ----
     def _build_compat_group(self) -> QGroupBox:
-        grp = QGroupBox("🧩 Compatibilità ComfyUI (patch LTX-2.3)")
+        grp = QGroupBox(tr("imp.compat.group"))
         v = QVBoxLayout(grp)
 
-        note = QLabel(
-            "Installa una patch di compatibilità come custom node di ComfyUI: abilita LTX-2.3 "
-            "su qualsiasi versione di ComfyUI <b>senza modificare i file core</b> (sopravvive agli "
-            "aggiornamenti). Necessaria per la generazione video. Dopo l'installazione, <b>riavvia "
-            "ComfyUI</b> per applicarla."
-        )
+        note = QLabel(tr("imp.compat.note"))
         note.setWordWrap(True)
         note.setStyleSheet("color:#888; font-size:11px;")
         v.addWidget(note)
@@ -203,19 +186,16 @@ class ImportModelsTab(QWidget):
         self._compat_status.setStyleSheet("font-size:11px; padding:2px;")
         v.addWidget(self._compat_status)
 
-        self.chk_prompt_unlock = QCheckBox(
-            "Sblocca il prompt-enhancer LTX-2 (descrive i soggetti senza rifiuti, per contenuti NSFW)")
+        self.chk_prompt_unlock = QCheckBox(tr("imp.compat.prompt_unlock"))
         self.chk_prompt_unlock.setChecked(True)
-        self.chk_prompt_unlock.setToolTip(
-            "Inietta una direttiva nel system prompt dell'enhancer LTX-2 così non rifiuta di descrivere "
-            "le persone. Se installato, la modifica è effettiva al riavvio di ComfyUI.")
+        self.chk_prompt_unlock.setToolTip(tr("imp.compat.prompt_unlock.tt"))
         self.chk_prompt_unlock.toggled.connect(self._on_prompt_unlock_toggled)
         v.addWidget(self.chk_prompt_unlock)
 
         btns = QHBoxLayout()
-        self.btn_compat_install = QPushButton("🧩 Installa / Aggiorna patch")
+        self.btn_compat_install = QPushButton(tr("imp.compat.install.btn"))
         self.btn_compat_install.clicked.connect(self._do_install_compat)
-        self.btn_compat_uninstall = QPushButton("✖ Disinstalla patch")
+        self.btn_compat_uninstall = QPushButton(tr("imp.compat.uninstall.btn"))
         self.btn_compat_uninstall.clicked.connect(self._do_uninstall_compat)
         btns.addWidget(self.btn_compat_install)
         btns.addWidget(self.btn_compat_uninstall)
@@ -227,30 +207,30 @@ class ImportModelsTab(QWidget):
         try:
             st = comfy_compat.status()
         except Exception as e:
-            self._compat_status.setText(f"⚠️ Stato non disponibile: {e}")
+            self._compat_status.setText(tr("imp.compat.status.unavailable").format(e=e))
             return
         if not st["comfy_valid"]:
             self._compat_status.setText(
-                f"⚠️ ComfyUI non trovato in: {st['comfy_root']} (manca main.py). "
-                "Configura «Cartella ComfyUI» nei Percorsi.")
+                tr("imp.compat.status.not_found").format(comfy_root=st['comfy_root']))
             self.btn_compat_install.setEnabled(False)
             self.btn_compat_uninstall.setEnabled(False)
             return
         self.btn_compat_install.setEnabled(st["repo_shim_present"])
         self.btn_compat_uninstall.setEnabled(st["installed"])
         if st["installed"]:
-            agg = "aggiornata" if st["up_to_date"] else f"DA AGGIORNARE (installata {st['installed_version']} < repo {st['repo_version']})"
+            agg = (tr("imp.compat.status.uptodate") if st["up_to_date"]
+                   else tr("imp.compat.status.outdated").format(
+                       installed_version=st['installed_version'], repo_version=st['repo_version']))
             self._compat_status.setText(
-                f"✅ Patch installata v{st['installed_version']} ({agg}). "
-                f"Prompt-enhancer NSFW: {'ON' if st['prompt_unlock'] else 'OFF'}. "
-                "Riavvia ComfyUI per applicare eventuali modifiche.")
+                tr("imp.compat.status.installed").format(
+                    installed_version=st['installed_version'], agg=agg,
+                    nsfw=(tr("imp.compat.on") if st['prompt_unlock'] else tr("imp.compat.off"))))
             self.chk_prompt_unlock.blockSignals(True)
             self.chk_prompt_unlock.setChecked(st["prompt_unlock"])
             self.chk_prompt_unlock.blockSignals(False)
         else:
             self._compat_status.setText(
-                f"⛔ Patch NON installata (repo v{st['repo_version']}). "
-                "Premi «Installa» e riavvia ComfyUI.")
+                tr("imp.compat.status.not_installed").format(repo_version=st['repo_version']))
 
     def _do_install_compat(self):
         try:
@@ -258,21 +238,19 @@ class ImportModelsTab(QWidget):
             self._log("\n🧩 Patch di compatibilità installata/aggiornata in custom_nodes. "
                       "RIAVVIA ComfyUI per applicarla.")
         except Exception as e:
-            QMessageBox.critical(self, "Errore installazione patch", str(e))
+            QMessageBox.critical(self, tr("imp.compat.install.err.title"), str(e))
             self._log(f"[ERR] install patch: {e}")
         self._refresh_compat_status()
 
     def _do_uninstall_compat(self):
-        if QMessageBox.question(self, "Disinstalla patch",
-                                "Rimuovere la patch di compatibilità dai custom_nodes di ComfyUI?\n"
-                                "(LTX-2.3 potrebbe non funzionare finché non la reinstalli o "
-                                "ripristini le modifiche ai file core.)") != QMessageBox.Yes:
+        if QMessageBox.question(self, tr("imp.compat.uninstall.confirm.title"),
+                                tr("imp.compat.uninstall.confirm.text")) != QMessageBox.Yes:
             return
         try:
             comfy_compat.uninstall()
             self._log("\n🧩 Patch disinstallata. Riavvia ComfyUI per applicare.")
         except Exception as e:
-            QMessageBox.critical(self, "Errore disinstallazione", str(e))
+            QMessageBox.critical(self, tr("imp.compat.uninstall.err.title"), str(e))
         self._refresh_compat_status()
 
     def _on_prompt_unlock_toggled(self, checked: bool):
@@ -321,7 +299,7 @@ class ImportModelsTab(QWidget):
         self.b_to_inbox = QPushButton(tr("imp.files.inbox.btn"))
         self.b_to_inbox.setToolTip(tr("imp.files.inbox.tt"))
         self.b_to_inbox.clicked.connect(self._copy_to_inbox)
-        b_rm = QPushButton("✖ Rimuovi")
+        b_rm = QPushButton(tr("imp.files.remove.btn"))
         b_rm.clicked.connect(self._remove_selected)
         b_clr = QPushButton(tr("imp.files.clear.btn"))
         b_clr.clicked.connect(self._clear_list)
@@ -333,22 +311,16 @@ class ImportModelsTab(QWidget):
 
     # ---- gruppo operazioni ----
     def _build_ops_group(self) -> QGroupBox:
-        grp = QGroupBox("⚙️ Operazioni")
+        grp = QGroupBox(tr("imp.ops.group"))
         v = QVBoxLayout(grp)
 
         row = QHBoxLayout()
-        self.btn_analyze = self._op_btn("🔍 Analizza", "Classifica i file della sorgente per "
-                                        "tipo/architettura SENZA spostarli (dry-run).", self._do_analyze)
-        self.btn_place = self._op_btn("📦 Sposta", "Sposta i file dalla sorgente nelle cartelle "
-                                      "giuste (LoRA/Checkpoints/VAE/… o workflows).", self._do_place)
-        self.btn_scan = self._op_btn("🗂 Scansiona", "Aggiorna catalog.json con i metadati di base "
-                                     "(architettura, trigger, NSFW). Nessuna rete.", self._do_scan)
-        self.btn_enrich = self._op_btn("🌐 Arricchisci", "Lookup Civitai by-hash + riapplica gli "
-                                       "override manuali. Richiede internet.", self._do_enrich)
-        self.btn_overrides = self._op_btn("✍️ Override", "Riapplica solo gli override manuali "
-                                          "(manual_enrichment.json), senza rete.", self._do_overrides)
-        self.btn_build = self._op_btn("🖼 Genera HTML", "Rigenera il catalogo HTML statico "
-                                      "(index.html + pagine entries/).", self._do_build)
+        self.btn_analyze = self._op_btn(tr("imp.ops.analyze.btn"), tr("imp.ops.analyze.tt"), self._do_analyze)
+        self.btn_place = self._op_btn(tr("imp.ops.place.btn"), tr("imp.ops.place.tt"), self._do_place)
+        self.btn_scan = self._op_btn(tr("imp.ops.scan.btn"), tr("imp.ops.scan.tt"), self._do_scan)
+        self.btn_enrich = self._op_btn(tr("imp.ops.enrich.btn"), tr("imp.ops.enrich.tt"), self._do_enrich)
+        self.btn_overrides = self._op_btn(tr("imp.ops.overrides.btn"), tr("imp.ops.overrides.tt"), self._do_overrides)
+        self.btn_build = self._op_btn(tr("imp.ops.build.btn"), tr("imp.ops.build.tt"), self._do_build)
         for b in (self.btn_analyze, self.btn_place, self.btn_scan, self.btn_enrich,
                   self.btn_overrides, self.btn_build):
             row.addWidget(b)
@@ -358,7 +330,7 @@ class ImportModelsTab(QWidget):
         v.addWidget(sep)
 
         irow = QHBoxLayout()
-        self.btn_ingest = QPushButton("▶  Ingest completo  (Sposta → Scansiona → Arricchisci → HTML)")
+        self.btn_ingest = QPushButton(tr("imp.ops.ingest.btn"))
         self.btn_ingest.setObjectName("generate")
         self.btn_ingest.setMinimumHeight(40)
         self.btn_ingest.setToolTip(tr("imp.ingest.tt"))
@@ -390,12 +362,12 @@ class ImportModelsTab(QWidget):
     def _browse_path(self, key: str):
         cur = self._path_edits[key].text().strip() or catalog_paths.DEFAULTS.get(key, "")
         if key == "hashes_jsonl":
-            fn, _ = QFileDialog.getOpenFileName(self, "Scegli file hashes.jsonl", cur,
-                                                "JSON Lines (*.jsonl);;Tutti i file (*.*)")
+            fn, _ = QFileDialog.getOpenFileName(self, tr("imp.paths.pick_hashes.dlg"), cur,
+                                                tr("imp.paths.hashes_filter"))
             if fn:
                 self._path_edits[key].setText(fn)
         else:
-            d = QFileDialog.getExistingDirectory(self, "Scegli cartella", cur)
+            d = QFileDialog.getExistingDirectory(self, tr("imp.paths.pick_dir.dlg"), cur)
             if d:
                 self._path_edits[key].setText(d)
 
@@ -404,23 +376,21 @@ class ImportModelsTab(QWidget):
         out = catalog_paths.save(cfg)
         self.source_edit.setText(cfg.get("inbox") or catalog_paths.DEFAULTS["inbox"])
         if out:
-            self._paths_status.setText(f"✅ Percorsi salvati e sincronizzati: {out}")
+            self._paths_status.setText(tr("imp.paths.saved").format(out=out))
         else:
-            self._paths_status.setText(
-                "⚠️ Percorsi salvati in LTX Studio, ma la cartella strumenti non esiste: "
-                "gli script non sono stati sincronizzati. Verifica «Cartella strumenti».")
+            self._paths_status.setText(tr("imp.paths.saved_no_tools"))
         self._check_tools()
         self._refresh_compat_status()
 
     def _reset_paths(self):
         for key, edit in self._path_edits.items():
             edit.setText(catalog_paths.DEFAULTS.get(key, ""))
-        self._paths_status.setText("Ripristinati i default (premi «Salva percorsi» per applicarli).")
+        self._paths_status.setText(tr("imp.paths.reset.done"))
 
     def _suggest_paths(self):
         comfy = catalog_paths.detect_comfy_root()
         if not comfy:
-            d = QFileDialog.getExistingDirectory(self, "Seleziona la cartella di ComfyUI (radice)")
+            d = QFileDialog.getExistingDirectory(self, tr("imp.paths.pick_comfy.dlg"))
             if not d:
                 return
             comfy = Path(d)
@@ -428,13 +398,11 @@ class ImportModelsTab(QWidget):
         for key, val in sug.items():
             if key in self._path_edits:
                 self._path_edits[key].setText(val)
-        self._paths_status.setText(
-            f"Suggeriti da ComfyUI ({comfy}). Controlla e premi «Salva percorsi» per applicare. "
-            "La decisione resta tua.")
+        self._paths_status.setText(tr("imp.paths.suggested").format(comfy=comfy))
 
     # ============================================================ sorgente/lista
     def _browse_source(self):
-        d = QFileDialog.getExistingDirectory(self, "Cartella sorgente",
+        d = QFileDialog.getExistingDirectory(self, tr("imp.source.pick.dlg"),
                                              self.source_edit.text().strip() or "")
         if d:
             self.source_edit.setText(d)
@@ -451,14 +419,14 @@ class ImportModelsTab(QWidget):
             self._pending.append(p)
 
     def _browse_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "Scegli file modelli",
+        paths, _ = QFileDialog.getOpenFileNames(self, tr("imp.files.pick.dlg"),
                                                 self._path_edits["models"].text().strip() or "",
-                                                self._MODEL_FILTER)
+                                                tr("imp.model_filter"))
         if paths:
             self._add_paths(paths)
 
     def _browse_adddir(self):
-        d = QFileDialog.getExistingDirectory(self, "Scegli cartella di modelli")
+        d = QFileDialog.getExistingDirectory(self, tr("imp.files.pick_dir.dlg"))
         if d:
             self._add_paths([d])
 
@@ -527,8 +495,8 @@ class ImportModelsTab(QWidget):
     def _source(self) -> str | None:
         s = self.source_edit.text().strip()
         if not s or not Path(s).exists():
-            QMessageBox.warning(self, "Sorgente non valida",
-                                "Imposta una cartella sorgente esistente (di default l'inbox).")
+            QMessageBox.warning(self, tr("imp.source.invalid.title"),
+                                tr("imp.source.invalid.text"))
             return None
         return s
 
@@ -578,14 +546,12 @@ class ImportModelsTab(QWidget):
     def _check_tools(self):
         td = catalog_paths.tools_dir()
         if not td.exists():
-            self._tools_note.setText(
-                f"⚠️ Cartella strumenti non trovata: {td}\n"
-                "Configura «Cartella strumenti» nei Percorsi qui sopra e premi «Salva».")
+            self._tools_note.setText(tr("imp.tools.not_found").format(td=td))
             for b in (self.btn_analyze, self.btn_place, self.btn_scan, self.btn_enrich,
                       self.btn_overrides, self.btn_build, self.btn_ingest):
                 b.setEnabled(False)
         else:
-            self._tools_note.setText(f"✅ Strumenti: {td}")
+            self._tools_note.setText(tr("imp.tools.found").format(td=td))
             for b in (self.btn_analyze, self.btn_place, self.btn_scan, self.btn_enrich,
                       self.btn_overrides, self.btn_build, self.btn_ingest):
                 b.setEnabled(True)

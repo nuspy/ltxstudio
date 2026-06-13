@@ -40,12 +40,12 @@ class VideoExtendTab(QWidget):
 
         box = QGroupBox(tr("ext.group")); f = QFormLayout(box)
         self.add_seconds = QDoubleSpinBox(); self.add_seconds.setRange(1, 3600); self.add_seconds.setValue(20.0)
-        self.add_seconds.setSuffix(" s da aggiungere")
+        self.add_seconds.setSuffix(tr("ext.duration.suffix"))
         self.add_seconds.setToolTip(tr("ext.duration.tt"))
         self.add_seconds.valueChanged.connect(self._update_seg_estimate)
         f.addRow(tr("ext.duration_lbl"), self.add_seconds)
         self.seg_seconds = QDoubleSpinBox(); self.seg_seconds.setRange(2, 20); self.seg_seconds.setValue(18.0)
-        self.seg_seconds.setSuffix(" s per spezzone")
+        self.seg_seconds.setSuffix(tr("ext.seg.suffix"))
         self.seg_seconds.setToolTip(tr("ext.seg.tt"))
         self.seg_seconds.valueChanged.connect(self._update_seg_estimate)
         f.addRow(tr("ext.seg_lbl"), self.seg_seconds)
@@ -79,12 +79,12 @@ class VideoExtendTab(QWidget):
         import math
         add = self.add_seconds.value()
         if add <= 20.0:
-            self.seg_estimate.setText(f"1 spezzone (passata unica, {add:.0f}s ≤ 20s → niente giunzioni)")
+            self.seg_estimate.setText(tr("ext.seg_estimate.single").format(add=f"{add:.0f}"))
             return
         seg = max(2.0, self.seg_seconds.value())
         n = max(2, math.ceil(add / seg))
-        warn = "  ⚠ molti spezzoni: tempo lungo" if n > 30 else ""
-        self.seg_estimate.setText(f"≈ {n} spezzoni da {seg:.0f}s con sovrapposizione{warn}")
+        warn = tr("ext.seg_estimate.warn") if n > 30 else ""
+        self.seg_estimate.setText(tr("ext.seg_estimate.multi").format(n=n, seg=f"{seg:.0f}", warn=warn))
 
     def get_config(self) -> dict:
         return {
@@ -98,6 +98,6 @@ class VideoExtendTab(QWidget):
         }
 
     def _pick(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Video", "", "Video (*.mp4 *.webm *.mkv *.mov)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("ext.pick.dialog.title"), "", tr("ext.pick.dialog.filter"))
         if fn:
             self.set_video(fn)

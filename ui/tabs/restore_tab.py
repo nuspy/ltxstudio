@@ -150,7 +150,7 @@ class RestoreTab(QWidget):
         path, _ = QFileDialog.getOpenFileName(
             self, tr("res.input.browse.dlg"),
             str(Path.home()),
-            "Immagini (*.png *.jpg *.jpeg *.webp *.bmp *.tiff *.tif)")
+            tr("res.input.image_filter"))
         if path:
             self._input_path = path
             self.path_edit.setText(path)

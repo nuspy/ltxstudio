@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.settings_analyzer import SettingsAnalyzer, AnalysisResult, AnalyzerIssue
+from ui.i18n_manager import tr
 
 
 # Colori per severità
@@ -37,9 +38,9 @@ class _IssueRow(QFrame):
         h.addWidget(lbl, 1)
 
         if issue.autofix and autofix_callback:
-            btn = QPushButton("🔧 Auto-fix")
+            btn = QPushButton(tr("analyzer.autofix_btn"))
             btn.setMaximumWidth(90)
-            btn.setToolTip("Applica automaticamente la correzione suggerita")
+            btn.setToolTip(tr("analyzer.autofix_tooltip"))
             btn.clicked.connect(lambda: autofix_callback(issue.autofix))
             h.addWidget(btn)
 
@@ -57,7 +58,7 @@ class SettingsAnalyzerDialog(QDialog):
         super().__init__(parent)
         self.result = result
         self.autofix_callback = autofix_callback
-        self.setWindowTitle("🔍 Analizzatore impostazioni")
+        self.setWindowTitle(tr("analyzer.window_title"))
         self.setMinimumWidth(620)
         self.setMinimumHeight(420)
         self._build()
@@ -72,13 +73,13 @@ class SettingsAnalyzerDialog(QDialog):
         total = len(self.result.issues)
 
         if total == 0:
-            summary = "✅ Nessun problema rilevato — le impostazioni sono valide."
+            summary = tr("analyzer.summary_ok")
             color = "#51cf66"
         elif errs:
-            summary = f"❌ Trovati {errs} errori, {warns} avvisi, {infos} info — correggi gli errori prima di generare."
+            summary = tr("analyzer.summary_errors").format(errs=errs, warns=warns, infos=infos)
             color = "#ff6b6b"
         else:
-            summary = f"⚠️ Trovati {warns} avvisi, {infos} info — la generazione è possibile ma controllare."
+            summary = tr("analyzer.summary_warnings").format(warns=warns, infos=infos)
             color = "#ffa94d"
 
         hdr = QLabel(summary)
@@ -87,7 +88,7 @@ class SettingsAnalyzerDialog(QDialog):
         v.addWidget(hdr)
 
         if total == 0:
-            v.addWidget(QLabel("Le impostazioni correnti sono compatibili con LTX Studio."))
+            v.addWidget(QLabel(tr("analyzer.settings_compatible")))
         else:
             # Scroll area con le righe degli issue
             scroll = QScrollArea()
@@ -103,7 +104,10 @@ class SettingsAnalyzerDialog(QDialog):
                 if not group:
                     continue
                 _, icon = _COLORS[severity]
-                sec_lbl = QLabel(f"{icon}  {'Errori' if severity == 'error' else 'Avvisi' if severity == 'warning' else 'Info'} ({len(group)})")
+                sec_name = (tr("analyzer.section_errors") if severity == "error"
+                            else tr("analyzer.section_warnings") if severity == "warning"
+                            else tr("analyzer.section_info"))
+                sec_lbl = QLabel(f"{icon}  {sec_name} ({len(group)})")
                 sec_lbl.setStyleSheet("font-weight: bold; margin-top: 8px; border: none;")
                 cv.addWidget(sec_lbl)
                 for issue in group:
@@ -117,12 +121,12 @@ class SettingsAnalyzerDialog(QDialog):
         # Pulsanti Auto-fix tutto + Chiudi
         bb_row = QHBoxLayout()
         if any(i.autofix for i in self.result.issues) and self.autofix_callback:
-            btn_fix_all = QPushButton("🔧 Auto-fix tutto")
-            btn_fix_all.setToolTip("Applica tutte le correzioni automatiche disponibili")
+            btn_fix_all = QPushButton(tr("analyzer.autofix_all_btn"))
+            btn_fix_all.setToolTip(tr("analyzer.autofix_all_tooltip"))
             btn_fix_all.clicked.connect(self._fix_all)
             bb_row.addWidget(btn_fix_all)
         bb_row.addStretch()
-        close_btn = QPushButton("Chiudi")
+        close_btn = QPushButton(tr("analyzer.close"))
         close_btn.clicked.connect(self.accept)
         bb_row.addWidget(close_btn)
         v.addLayout(bb_row)

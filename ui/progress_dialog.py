@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QProgressBar, QDialogButtonBox, QSizePolicy,
 )
 
+from ui.i18n_manager import tr
+
 
 def _weight(ct: str) -> int:
     """Peso del nodo per il totale approssimato (il sampling domina i tempi)."""
@@ -32,38 +34,38 @@ def _weight(ct: str) -> int:
 def _label(ct: str) -> str:
     c = ct.lower()
     if "sampler" in c or "ksampler" in c:
-        return "Generazione (sampling)…"
+        return tr("progress.step_sampling")
     if "unetloader" in c or "gguf" in c or "checkpointloader" in c:
-        return "Caricamento modello…"
+        return tr("progress.step_load_model")
     if "dualcliploader" in c or "cliploader" in c:
-        return "Caricamento text encoder…"
+        return tr("progress.step_load_text_encoder")
     if "vaeloader" in c:
-        return "Caricamento VAE…"
+        return tr("progress.step_load_vae")
     if "vaedecode" in c:
-        return "Decodifica immagine/video…"
+        return tr("progress.step_decode")
     if "vaeencode" in c:
-        return "Codifica immagine…"
+        return tr("progress.step_encode")
     if "cliptextencode" in c or "conditioning" in c or "fluxguidance" in c or "promptrelay" in c:
-        return "Codifica prompt…"
+        return tr("progress.step_encode_prompt")
     if "loadimage" in c or "loadmask" in c:
-        return "Caricamento immagine…"
+        return tr("progress.step_load_image")
     if "loraloader" in c or "powerlora" in c or "lora" in c:
-        return "Applicazione LoRA…"
+        return tr("progress.step_apply_lora")
     if "sam" in c or "clipseg" in c or "detector" in c or "segs" in c:
-        return "Segmentazione…"
+        return tr("progress.step_segmentation")
     if "save" in c or "videocombine" in c or "combine" in c:
-        return "Salvataggio…"
+        return tr("progress.step_saving")
     if "upscale" in c or "resize" in c:
-        return "Upscaling/ridimensionamento…"
+        return tr("progress.step_upscaling")
     if "padforoutpaint" in c or "growmask" in c or "inpaintmodel" in c:
-        return "Preparazione maschera…"
-    return "Elaborazione…"
+        return tr("progress.step_prepare_mask")
+    return tr("progress.step_processing")
 
 
 class GenProgressDialog(QDialog):
     def __init__(self, parent=None, on_cancel=None):
         super().__init__(parent)
-        self.setWindowTitle("Generazione in corso")
+        self.setWindowTitle(tr("progress.window_title"))
         # Dialog ridimensionabile e grande di default → l'anteprima taesd ha spazio.
         self.setMinimumSize(900, 760)
         self.resize(1100, 900)
@@ -78,15 +80,15 @@ class GenProgressDialog(QDialog):
         v = QVBoxLayout(self)
         self.title_lbl = QLabel("…"); self.title_lbl.setStyleSheet("font-weight:bold;font-size:14px;")
         v.addWidget(self.title_lbl)
-        self.status_lbl = QLabel("Preparazione…"); self.status_lbl.setStyleSheet("color:#cdd;")
+        self.status_lbl = QLabel(tr("progress.preparing")); self.status_lbl.setStyleSheet("color:#cdd;")
         v.addWidget(self.status_lbl)
 
-        v.addWidget(QLabel("Operazione corrente:"))
+        v.addWidget(QLabel(tr("progress.current_operation")))
         self.cur_bar = QProgressBar(); v.addWidget(self.cur_bar)
-        v.addWidget(QLabel("Avanzamento totale (approssimativo):"))
+        v.addWidget(QLabel(tr("progress.total_progress")))
         self.tot_bar = QProgressBar(); self.tot_bar.setRange(0, 100); v.addWidget(self.tot_bar)
 
-        self.preview = QLabel("(anteprima — arriverà ad ogni step durante il sampling)")
+        self.preview = QLabel(tr("progress.preview_placeholder"))
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumSize(800, 560)
         self.preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -97,7 +99,7 @@ class GenProgressDialog(QDialog):
         self._preview_pix: QPixmap | None = None
 
         bb = QDialogButtonBox()
-        bb.addButton("✖ Annulla generazione", QDialogButtonBox.RejectRole)
+        bb.addButton(tr("progress.cancel_generation"), QDialogButtonBox.RejectRole)
         bb.rejected.connect(self._cancel)
         v.addWidget(bb)
         self.setModal(False)
@@ -105,7 +107,7 @@ class GenProgressDialog(QDialog):
     # ---------- ciclo di vita ----------
     def start(self, prompt: dict, title: str):
         self.title_lbl.setText(title)
-        self.status_lbl.setText("Invio alla coda di ComfyUI…")
+        self.status_lbl.setText(tr("progress.sending_to_queue"))
         self._weights = {nid: _weight(n.get("class_type", "")) for nid, n in prompt.items()}
         self._classes = {nid: n.get("class_type", "") for nid, n in prompt.items()}
         self._total_w = max(1, sum(self._weights.values()))
@@ -114,7 +116,7 @@ class GenProgressDialog(QDialog):
         self.tot_bar.setValue(0)
         self._preview_pix = None
         self.preview.setPixmap(QPixmap())
-        self.preview.setText("(anteprima — arriverà ad ogni step durante il sampling)")
+        self.preview.setText(tr("progress.preview_placeholder"))
         self.show(); self.raise_(); self.activateWindow()
 
     def on_executing(self, node_id: str):
@@ -122,7 +124,7 @@ class GenProgressDialog(QDialog):
         if self._cur and self._cur not in self._counted:
             self._done_w += self._weights.get(self._cur, 1); self._counted.add(self._cur)
         if not node_id:
-            self.status_lbl.setText("Completamento / salvataggio…"); self.tot_bar.setValue(99)
+            self.status_lbl.setText(tr("progress.finalizing")); self.tot_bar.setValue(99)
             self.cur_bar.setRange(0, 100); self.cur_bar.setValue(100); return
         self._cur = node_id
         self.status_lbl.setText(_label(self._classes.get(node_id, "")))
@@ -133,7 +135,7 @@ class GenProgressDialog(QDialog):
         if maximum > 0:
             self.cur_bar.setRange(0, maximum); self.cur_bar.setValue(value)
             ct = self._classes.get(self._cur or "", "")
-            extra = f"  (step {value}/{maximum})" if ("sampler" in ct.lower() or "ksampler" in ct.lower()) else ""
+            extra = tr("progress.step_counter").format(value=value, maximum=maximum) if ("sampler" in ct.lower() or "ksampler" in ct.lower()) else ""
             self.status_lbl.setText(_label(ct) + extra)
             self._update_total(value / maximum)
 

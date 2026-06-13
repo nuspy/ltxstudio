@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.workflow_templates import WORKFLOW_PRESETS
+from ui.i18n_manager import tr
 
 
 class WorkflowDialog(QDialog):
@@ -25,7 +26,7 @@ class WorkflowDialog(QDialog):
     def __init__(self, apply_callback=None, parent=None):
         super().__init__(parent)
         self.apply_callback = apply_callback
-        self.setWindowTitle("🎬 Workflow Predefiniti")
+        self.setWindowTitle(tr("wf.window_title"))
         self.setMinimumWidth(680)
         self.setMinimumHeight(540)
         self._build()
@@ -37,7 +38,7 @@ class WorkflowDialog(QDialog):
 
         # ── Selezione workflow ────────────────────────────────────────────
         row = QHBoxLayout()
-        row.addWidget(QLabel("<b>Workflow:</b>"))
+        row.addWidget(QLabel(tr("wf.workflow_label")))
         self.combo = QComboBox()
         self.combo.setMaxVisibleItems(30)
         self.combo.view().setMinimumWidth(520)
@@ -48,7 +49,7 @@ class WorkflowDialog(QDialog):
         v.addLayout(row)
 
         # ── Dettagli workflow ─────────────────────────────────────────────
-        detail_grp = QGroupBox("Dettagli")
+        detail_grp = QGroupBox(tr("wf.details"))
         df = QFormLayout(detail_grp)
         df.setLabelAlignment(Qt.AlignRight)
         df.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
@@ -56,24 +57,22 @@ class WorkflowDialog(QDialog):
         self.note_lbl = QLabel()
         self.note_lbl.setWordWrap(True)
         self.note_lbl.setStyleSheet("color: #74c0fc;")
-        df.addRow("Note:", self.note_lbl)
+        df.addRow(tr("wf.notes_row"), self.note_lbl)
 
         self.params_lbl = QLabel()
         self.params_lbl.setWordWrap(True)
         self.params_lbl.setStyleSheet("font-family: monospace; font-size: 11px;")
-        df.addRow("Parametri:", self.params_lbl)
+        df.addRow(tr("wf.params_row"), self.params_lbl)
 
         self.lora_lbl = QLabel()
         self.lora_lbl.setWordWrap(True)
         self.lora_lbl.setStyleSheet("color: #a9e34b; font-size: 11px;")
-        df.addRow("LoRA suggerite:", self.lora_lbl)
+        df.addRow(tr("wf.lora_suggested_row"), self.lora_lbl)
 
         v.addWidget(detail_grp)
 
         # ── Prompt template ───────────────────────────────────────────────
-        v.addWidget(QLabel(
-            "Prompt template — <b>sostituisci le parti tra {…} con i tuoi valori</b> prima di applicare:"
-        ))
+        v.addWidget(QLabel(tr("wf.prompt_template_hint")))
         self.prompt_txt = QPlainTextEdit()
         self.prompt_txt.setMaximumHeight(110)
         self.prompt_txt.textChanged.connect(self._check_placeholders)
@@ -94,32 +93,30 @@ class WorkflowDialog(QDialog):
         sep.setStyleSheet("color: #333; margin: 4px 0;")
         v.addWidget(sep)
 
-        opts_grp = QGroupBox("Cosa applicare")
+        opts_grp = QGroupBox(tr("wf.what_to_apply"))
         ov = QHBoxLayout(opts_grp)
 
-        self.chk_params = QCheckBox("Parametri tecnici\n(steps, CFG, sampler, risoluzione, FPS, durata, audio)")
+        self.chk_params = QCheckBox(tr("wf.chk_params"))
         self.chk_params.setChecked(True)
         ov.addWidget(self.chk_params)
 
-        self.chk_prompt = QCheckBox("Prompt template\n(sostituisce il prompt positivo nella GUI)")
+        self.chk_prompt = QCheckBox(tr("wf.chk_prompt"))
         self.chk_prompt.setChecked(True)
         ov.addWidget(self.chk_prompt)
 
         v.addWidget(opts_grp)
 
         # Nota LoRA
-        lora_note = QLabel(
-            "💡 Le LoRA suggerite non vengono attivate automaticamente — cercale nel tab LoRA e spuntale manualmente."
-        )
+        lora_note = QLabel(tr("wf.lora_note"))
         lora_note.setWordWrap(True)
         lora_note.setStyleSheet("color: #888; font-size: 11px; padding: 2px;")
         v.addWidget(lora_note)
 
         # ── Pulsanti ─────────────────────────────────────────────────────
         bb = QDialogButtonBox()
-        btn_apply = bb.addButton("✅ Applica workflow", QDialogButtonBox.AcceptRole)
+        btn_apply = bb.addButton(tr("wf.btn_apply"), QDialogButtonBox.AcceptRole)
         btn_apply.clicked.connect(self._on_apply)
-        bb.addButton("Chiudi", QDialogButtonBox.RejectRole)
+        bb.addButton(tr("wf.btn_close"), QDialogButtonBox.RejectRole)
         bb.rejected.connect(self.reject)
         v.addWidget(bb)
 
@@ -151,7 +148,7 @@ class WorkflowDialog(QDialog):
         if loras:
             self.lora_lbl.setText("• " + "\n• ".join(loras))
         else:
-            self.lora_lbl.setText("(nessuna LoRA specifica richiesta)")
+            self.lora_lbl.setText(tr("wf.lora_none"))
 
         # Prompt template
         self.prompt_txt.setPlainText(wf.get("prompt_template", ""))
@@ -165,10 +162,10 @@ class WorkflowDialog(QDialog):
         if placeholders:
             unique = list(dict.fromkeys(placeholders))   # mantieni ordine, dedup
             self.placeholder_warn.setText(
-                f"⚠️  Il prompt contiene {len(unique)} placeholder da sostituire: "
-                + ", ".join(f"{{{p}}}" for p in unique)
-                + "\n    Modificali prima di cliccare Applica, oppure applicalo così "
-                  "e completalo nel campo Prompt della GUI."
+                tr("wf.placeholder_warn").format(
+                    count=len(unique),
+                    placeholders=", ".join(f"{{{p}}}" for p in unique),
+                )
             )
             self.placeholder_warn.setVisible(True)
         else:

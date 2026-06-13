@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QSlider, QComboBox, QSpinBox, QFileDialog, QFrame, QSizePolicy,
 )
 
+from ui.i18n_manager import tr
+
 try:
     from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
     from PySide6.QtMultimediaWidgets import QVideoWidget
@@ -68,10 +70,10 @@ class V2VPanel(QWidget):
 
         # --- radio modalità (accanto a "Risoluzione" nel tab Video) ---
         moderow = QHBoxLayout()
-        moderow.addWidget(QLabel("Modalità:"))
-        self.rb_normal = QRadioButton("Normal")
-        self.rb_talk = QRadioButton("Talk")
-        self.rb_retake = QRadioButton("ReTake")
+        moderow.addWidget(QLabel(tr("v2v.mode_label")))
+        self.rb_normal = QRadioButton(tr("v2v.mode_normal"))
+        self.rb_talk = QRadioButton(tr("v2v.mode_talk"))
+        self.rb_retake = QRadioButton(tr("v2v.mode_retake"))
         self.rb_normal.setChecked(True)
         self._mode_group = QButtonGroup(self)
         for rb in (self.rb_normal, self.rb_talk, self.rb_retake):
@@ -85,13 +87,13 @@ class V2VPanel(QWidget):
         self._src_wrap = QWidget()
         sv = QVBoxLayout(self._src_wrap); sv.setContentsMargins(0, 0, 0, 0)
         pick = QHBoxLayout()
-        self.btn_pick = QPushButton("📂 Scegli video…")
+        self.btn_pick = QPushButton(tr("v2v.pick_video_btn"))
         self.btn_pick.clicked.connect(self._pick_file)
-        self.btn_lastgen = QPushButton("Usa ultima generazione")
+        self.btn_lastgen = QPushButton(tr("v2v.use_last_gen_btn"))
         self.btn_lastgen.clicked.connect(self._use_last)
         pick.addWidget(self.btn_pick); pick.addWidget(self.btn_lastgen); pick.addStretch(1)
         sv.addLayout(pick)
-        self.lbl_video = QLabel("Nessun video selezionato.")
+        self.lbl_video = QLabel(tr("v2v.no_video"))
         self.lbl_video.setStyleSheet("color:#888;")
         sv.addWidget(self.lbl_video)
         # anteprima
@@ -109,33 +111,33 @@ class V2VPanel(QWidget):
             pc.addWidget(self.btn_play); pc.addStretch(1)
             sv.addLayout(pc)
         else:
-            sv.addWidget(QLabel("(anteprima video non disponibile: QtMultimedia assente)"))
+            sv.addWidget(QLabel(tr("v2v.preview_unavailable")))
         self._src_wrap.setVisible(False)
         root.addWidget(self._src_wrap)
 
         # --- sezione ReTake (accordion) ---
-        self.sec_retake = CollapsibleSection("ReTake — rigenera una sezione")
+        self.sec_retake = CollapsibleSection(tr("v2v.retake_section_title"))
         rl = QVBoxLayout(self.sec_retake.content)
-        self.lbl_range = QLabel("Sezione da rigenerare:")
+        self.lbl_range = QLabel(tr("v2v.range_label"))
         rl.addWidget(self.lbl_range)
         # slider START
-        sr = QHBoxLayout(); sr.addWidget(QLabel("Inizio"))
+        sr = QHBoxLayout(); sr.addWidget(QLabel(tr("v2v.start_label")))
         self.sl_start = QSlider(Qt.Horizontal); self.sl_start.setRange(0, 1000)
         self.lbl_start = QLabel("3.0 s")
         self.sl_start.valueChanged.connect(self._on_start)
         sr.addWidget(self.sl_start, 1); sr.addWidget(self.lbl_start); rl.addLayout(sr)
         # slider END
-        er = QHBoxLayout(); er.addWidget(QLabel("Fine "))
+        er = QHBoxLayout(); er.addWidget(QLabel(tr("v2v.end_label")))
         self.sl_end = QSlider(Qt.Horizontal); self.sl_end.setRange(0, 1000)
         self.lbl_end = QLabel("— s")
         self.sl_end.valueChanged.connect(self._on_end)
         er.addWidget(self.sl_end, 1); er.addWidget(self.lbl_end); rl.addLayout(er)
-        self.lbl_guard = QLabel(f"Vincolo: almeno {EDGE_GUARD_S:.0f}s di video prima e dopo la sezione.")
+        self.lbl_guard = QLabel(tr("v2v.guard_constraint").format(guard=f"{EDGE_GUARD_S:.0f}"))
         self.lbl_guard.setStyleSheet("color:#888;"); rl.addWidget(self.lbl_guard)
         # audio
-        ar = QHBoxLayout(); ar.addWidget(QLabel("Audio della sezione:"))
-        self.rb_audio_keep = QRadioButton("Tieni originale")
-        self.rb_audio_regen = QRadioButton("Rigenera")
+        ar = QHBoxLayout(); ar.addWidget(QLabel(tr("v2v.section_audio_label")))
+        self.rb_audio_keep = QRadioButton(tr("v2v.audio_keep"))
+        self.rb_audio_regen = QRadioButton(tr("v2v.audio_regen"))
         self.rb_audio_keep.setChecked(True)
         ag = QButtonGroup(self); ag.addButton(self.rb_audio_keep); ag.addButton(self.rb_audio_regen)
         ar.addWidget(self.rb_audio_keep); ar.addWidget(self.rb_audio_regen); ar.addStretch(1)
@@ -144,35 +146,24 @@ class V2VPanel(QWidget):
         root.addWidget(self.sec_retake)
 
         # --- sezione Talk (accordion) ---
-        self.sec_talk = CollapsibleSection("Talk — lip-sync (voce dal tab Audio)")
+        self.sec_talk = CollapsibleSection(tr("v2v.talk_section_title"))
         tl = QVBoxLayout(self.sec_talk.content)
-        tl.addWidget(QLabel("Due modi: (1) scegli un VIDEO sotto → modifica un video esistente in lip-sync; "
-                            "(2) NESSUN video → genero il parlato dall'IMMAGINE del Frame 1 (I2V). "
-                            "Scrivi il dialogo nel prompt principale."))
-        reg = QHBoxLayout(); reg.addWidget(QLabel("Maschera volto:"))
+        tl.addWidget(QLabel(tr("v2v.talk_intro")))
+        reg = QHBoxLayout(); reg.addWidget(QLabel(tr("v2v.face_mask_label")))
         self.cmb_region = QComboBox()
-        self.cmb_region.addItem("Bocca/labbra (lip-sync fedele)", "mouth")
-        self.cmb_region.addItem("Tutto il volto (più naturale)", "face")
+        self.cmb_region.addItem(tr("v2v.region_mouth"), "mouth")
+        self.cmb_region.addItem(tr("v2v.region_face"), "face")
         reg.addWidget(self.cmb_region, 1); tl.addLayout(reg)
-        off = QHBoxLayout(); off.addWidget(QLabel("Offset maschera (px):"))
+        off = QHBoxLayout(); off.addWidget(QLabel(tr("v2v.mask_offset_label")))
         self.sp_offset = QSpinBox(); self.sp_offset.setRange(0, 128); self.sp_offset.setValue(0)
         off.addWidget(self.sp_offset); off.addStretch(1); tl.addLayout(off)
-        self.cb_reimagine = QPushButton("Re-Imagine (rigenera tutto il frame)")
+        self.cb_reimagine = QPushButton(tr("v2v.reimagine_btn"))
         self.cb_reimagine.setCheckable(True)
         tl.addWidget(self.cb_reimagine)
-        warn = QLabel("⚠ La maschera spaziale del volto è in completamento (richiede verifica con "
-                      "ComfyUI). Per ora Talk rigenera la finestra temporale col lip-sync dall'audio.")
+        warn = QLabel(tr("v2v.talk_warning"))
         warn.setWordWrap(True); warn.setStyleSheet("color:#c80;"); tl.addWidget(warn)
         # descrizione dell'albero di decisione audio (in fondo alla sezione Talk)
-        tree = QLabel(
-            "<b>Da dove viene la voce (albero di decisione del tab Audio):</b><br>"
-            "1. <b>File audio</b> caricato nel tab Audio (modalità «Audio fornito da me») → si usa "
-            "quel file (lip-sync su di esso).<br>"
-            "2. Altrimenti, se è selezionata una <b>voce</b> nel TTS <b>e</b> c'è del <b>testo</b> nel "
-            "campo TTS → si sintetizza il testo con quella voce (clonata o no) e si fa il lip-sync.<br>"
-            "3. Altrimenti → si usa il <b>dialogo scritto nel prompt principale</b> e la voce la genera "
-            "LTX (es. «…she says: \"…\", perfect lip-sync»)."
-        )
+        tree = QLabel(tr("v2v.audio_tree"))
         tree.setWordWrap(True); tree.setTextFormat(Qt.RichText)
         tree.setStyleSheet("color:#bbb; background:#202020; padding:6px; border-radius:4px;")
         tl.addWidget(tree)
@@ -207,8 +198,8 @@ class V2VPanel(QWidget):
             self._set_video(self._last_generation)
 
     def _pick_file(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Scegli un video",
-                                            "", "Video (*.mp4 *.webm *.mkv *.mov *.avi)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("v2v.pick_dialog_title"),
+                                            "", tr("v2v.video_filter"))
         if fn:
             self._set_video(fn)
 
@@ -242,13 +233,12 @@ class V2VPanel(QWidget):
             # video troppo corto per un ReTake con i 3s di contesto
             self.sl_start.setEnabled(False); self.sl_end.setEnabled(False)
             self.lbl_start.setText("—"); self.lbl_end.setText("—")
-            self.lbl_guard.setText(f"⚠ Video troppo corto: servono > {2*EDGE_GUARD_S:.0f}s "
-                                   f"(3s prima + 3s dopo la sezione).")
+            self.lbl_guard.setText(tr("v2v.guard_too_short").format(min=f"{2*EDGE_GUARD_S:.0f}"))
             self.lbl_guard.setStyleSheet("color:#c00;")
             return
         self.sl_start.setEnabled(True); self.sl_end.setEnabled(True)
         self.lbl_guard.setStyleSheet("color:#888;")
-        self.lbl_guard.setText(f"Vincolo: almeno {EDGE_GUARD_S:.0f}s di video prima e dopo la sezione.")
+        self.lbl_guard.setText(tr("v2v.guard_constraint").format(guard=f"{EDGE_GUARD_S:.0f}"))
         # default: sezione centrale
         self._set_start_s(EDGE_GUARD_S)
         self._set_end_s(min(d - EDGE_GUARD_S, EDGE_GUARD_S + max(1.0, (d - 2 * EDGE_GUARD_S) / 2)))
@@ -325,13 +315,13 @@ class V2VPanel(QWidget):
         if not self._video_path:
             # ReTake richiede il video; Talk SENZA video genera dall'immagine del Frame 1 (ok).
             if m == "retake":
-                errs.append("Seleziona un video sorgente (Scegli video / Usa ultima generazione).")
+                errs.append(tr("v2v.err_no_source_video"))
             return errs
         if self._duration_s <= 0:
-            errs.append("Impossibile leggere la durata del video sorgente.")
+            errs.append(tr("v2v.err_no_duration"))
         if m == "retake":
             if self._duration_s and self._duration_s <= 2 * EDGE_GUARD_S:
-                errs.append(f"Il video è troppo corto: servono almeno {2*EDGE_GUARD_S:.0f}s.")
+                errs.append(tr("v2v.err_too_short").format(min=f"{2*EDGE_GUARD_S:.0f}"))
             elif self.v2v_end() - self.v2v_start() < 0.5:
-                errs.append("La sezione ReTake è troppo corta (imposta Inizio < Fine).")
+                errs.append(tr("v2v.err_section_too_short"))
         return errs

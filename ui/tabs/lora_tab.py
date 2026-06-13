@@ -233,7 +233,8 @@ class LoraTab(QWidget):
             self._show_entry(cur.data(Qt.UserRole))
 
     def _show_entry(self, e: "LoraEntry"):
-        lines = [f"Nome: {e.name}", f"File: {e.comfy_name}"]
+        lines = [tr("lora.info.name").format(name=e.name),
+                 tr("lora.info.file").format(file=e.comfy_name)]
         if e.triggers:
             lines.append(tr("lora.info.trigger") + ": " + ", ".join(e.triggers))
         else:
@@ -247,7 +248,7 @@ class LoraTab(QWidget):
         self.preview.setText(tr("lora.preview.loading"))
         url = self.catalog.preview_url_for(e, allow_nsfw=self.allow_nsfw_getter())
         if not url:
-            self.preview.setText("(nessuna preview)")
+            self.preview.setText(tr("lora.preview.none"))
             return
         if e.preview_is_video:
             self.preview.setText(tr("lora.preview.video"))
@@ -258,13 +259,13 @@ class LoraTab(QWidget):
 
     def _set_thumb(self, data: bytes):
         if not data:
-            self.preview.setText("(preview non caricata)")
+            self.preview.setText(tr("lora.preview.failed"))
             return
         pix = QPixmap()
         if pix.loadFromData(data):
             self.preview.setPixmap(pix.scaled(self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            self.preview.setText("(formato preview non supportato)")
+            self.preview.setText(tr("lora.preview.unsupported"))
 
     # API per il controller
     def selected_loras(self) -> list[dict]:
@@ -339,5 +340,5 @@ class LoraTab(QWidget):
             e: LoraEntry = sel["_entry"]
             miss = self.catalog.missing_triggers_in_prompt(e, prompt)
             if miss:
-                warns.append(f"'{e.name}': aggiungi una trigger word nel prompt → {', '.join(miss)}")
+                warns.append(tr("lora.trigger.warn").format(name=e.name, triggers=', '.join(miss)))
         return warns

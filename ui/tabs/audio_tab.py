@@ -35,17 +35,17 @@ from ui.i18n_manager import tr
 
 # Marker testuali alti-livello con tooltip leggibile.
 _SSML_MARKERS = [
-    ("⏸ pausa",   "[pause:500ms]",              "Pausa di 500ms"),
-    ("⏸⏸ lunga",  "[pause:1200ms]",             "Pausa lunga di 1.2s"),
-    ("🐢 lento",   '<prosody rate="slow">…</prosody>', "Rallenta la parte selezionata"),
-    ("🐇 veloce",  '<prosody rate="fast">…</prosody>', "Accelera la parte selezionata"),
-    ("🔉 piano",   '<prosody volume="soft">…</prosody>', "Abbassa il volume"),
-    ("🔊 forte",   '<prosody volume="loud">…</prosody>', "Alza il volume"),
-    ("😊 felice",  '<emotion type="happy">…</emotion>',  "Tono felice"),
-    ("😢 triste",  '<emotion type="sad">…</emotion>',    "Tono triste"),
-    ("😡 rabbia",  '<emotion type="angry">…</emotion>',  "Tono arrabbiato"),
-    ("🤫 sussurro",'<emotion type="whisper">…</emotion>','Sussurro'),
-    ("😌 calmo",   '<emotion type="calm">…</emotion>',   "Tono calmo"),
+    (tr("aud.ssml.pause.lbl"),   "[pause:500ms]",              tr("aud.ssml.pause.tt")),
+    (tr("aud.ssml.pause_long.lbl"),  "[pause:1200ms]",             tr("aud.ssml.pause_long.tt")),
+    (tr("aud.ssml.slow.lbl"),   '<prosody rate="slow">…</prosody>', tr("aud.ssml.slow.tt")),
+    (tr("aud.ssml.fast.lbl"),  '<prosody rate="fast">…</prosody>', tr("aud.ssml.fast.tt")),
+    (tr("aud.ssml.soft.lbl"),   '<prosody volume="soft">…</prosody>', tr("aud.ssml.soft.tt")),
+    (tr("aud.ssml.loud.lbl"),   '<prosody volume="loud">…</prosody>', tr("aud.ssml.loud.tt")),
+    (tr("aud.ssml.happy.lbl"),  '<emotion type="happy">…</emotion>',  tr("aud.ssml.happy.tt")),
+    (tr("aud.ssml.sad.lbl"),  '<emotion type="sad">…</emotion>',    tr("aud.ssml.sad.tt")),
+    (tr("aud.ssml.angry.lbl"),  '<emotion type="angry">…</emotion>',  tr("aud.ssml.angry.tt")),
+    (tr("aud.ssml.whisper.lbl"),'<emotion type="whisper">…</emotion>',tr("aud.ssml.whisper.tt")),
+    (tr("aud.ssml.calm.lbl"),   '<emotion type="calm">…</emotion>',   tr("aud.ssml.calm.tt")),
 ]
 
 
@@ -207,13 +207,13 @@ class AudioTab(QWidget):
         installed = _engine_installed(eid)
         if installed:
             self.tts_install_btn.setVisible(True)
-            self.tts_install_btn.setText("🔄 Aggiorna")
-            self.tts_install_btn.setToolTip("Esegue git pull + pip install -r requirements.txt")
+            self.tts_install_btn.setText(tr("aud.install.update.btn"))
+            self.tts_install_btn.setToolTip(tr("aud.install.update.tt"))
         else:
             self.tts_install_btn.setVisible(True)
-            self.tts_install_btn.setText("📥 Installa")
+            self.tts_install_btn.setText(tr("aud.install.install.btn"))
             self.tts_install_btn.setToolTip(
-                ENGINE_REPOS.get(eid, {}).get("note", "Installa il custom node ComfyUI di questo engine."))
+                ENGINE_REPOS.get(eid, {}).get("note", tr("aud.install.install.tt")))
 
     def _install_selected_engine(self):
         """Conferma + git clone + pip install dei requirements + refresh stato."""
@@ -222,27 +222,22 @@ class AudioTab(QWidget):
             return
         spec = ENGINE_REPOS[eid]
         ans = QMessageBox.question(
-            self, f"Installa engine '{eid}'",
-            f"Procedere con:\n\n"
-            f"  • git clone {spec['url']}\n"
-            f"  • pip install -r requirements.txt (nel venv di ComfyUI)\n\n"
-            f"{spec['note']}\n\n"
-            f"Il modello del motore verrà scaricato al primo uso (potrebbe richiedere alcuni GB).\n"
-            f"Continuare?",
+            self, tr("aud.install.confirm.title").format(eid=eid),
+            tr("aud.install.confirm.text").format(url=spec['url'], note=spec['note']),
             QMessageBox.Yes | QMessageBox.No)
         if ans != QMessageBox.Yes:
             return
         # disabilita UI durante l'install
-        self.tts_install_btn.setEnabled(False); self.tts_install_btn.setText("⏳ Installazione…")
+        self.tts_install_btn.setEnabled(False); self.tts_install_btn.setText(tr("aud.install.progress.btn"))
         QApplication.processEvents()      # repaint immediato
         try:
             ok, msg = install_engine(eid)
         except Exception as e:
-            ok, msg = False, f"Errore inatteso: {e}"
+            ok, msg = False, tr("aud.install.unexpected_err").format(e=e)
         # mostra log in un dialog scrollabile
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Information if ok else QMessageBox.Warning)
-        box.setWindowTitle("Installazione " + ("completata" if ok else "fallita"))
+        box.setWindowTitle(tr("aud.install.result.ok") if ok else tr("aud.install.result.fail"))
         box.setText(msg if len(msg) < 400 else msg[:400] + "…")
         box.setDetailedText(msg)
         box.exec()
@@ -262,15 +257,15 @@ class AudioTab(QWidget):
         self.tts_engine.clear()
         first_avail = None
         for eid, disp, clone, emo, installed in available_engines():
-            badge = "✅" if installed else "⬇ da installare"
+            badge = "✅" if installed else tr("aud.engine.to_install")
             tags = []
-            if clone: tags.append("clone")
-            if emo: tags.append("emozioni")
-            label = f"{badge}  {disp}   [{', '.join(tags) or 'preset'}]"
+            if clone: tags.append(tr("aud.engine.tag.clone"))
+            if emo: tags.append(tr("aud.engine.tag.emotions"))
+            label = f"{badge}  {disp}   [{', '.join(tags) or tr('aud.engine.tag.preset')}]"
             self.tts_engine.addItem(label, eid)
             self.tts_engine.setItemData(self.tts_engine.count() - 1,
-                                         "✓ disponibile" if installed else
-                                         "Non installato in ComfyUI", Qt.ToolTipRole)
+                                         tr("aud.engine.available") if installed else
+                                         tr("aud.engine.not_installed"), Qt.ToolTipRole)
             if installed and first_avail is None:
                 first_avail = self.tts_engine.count() - 1
         if first_avail is not None:
@@ -287,27 +282,27 @@ class AudioTab(QWidget):
         # 1) voci clonabili (con campione) — visibili a prescindere dall'engine
         clonable = [v for v in all_users if v.sample_path]
         if clonable:
-            self.tts_voice.addItem("── Mie voci (clonabili) ──", None)
+            self.tts_voice.addItem(tr("aud.voices.hdr.clonable"), None)
             for v in clonable:
                 self.tts_voice.addItem(f"⭐ {v.name}  🎤", v)
         # 2) voci custom edge-style senza campione, dell'engine corrente
         edge_custom = [v for v in all_users if not v.sample_path and v.engine == engine_id]
         if edge_custom:
-            self.tts_voice.addItem("── Mie voci preset ──", None)
+            self.tts_voice.addItem(tr("aud.voices.hdr.preset"), None)
             for v in edge_custom:
                 self.tts_voice.addItem(f"⭐ {v.name}", v)
         # 3) preset di sistema dell'engine
         if engine_id == "edge":
             if edge_available():
-                self.tts_voice.addItem("── Edge TTS (Microsoft) — Italiano ──", None)
+                self.tts_voice.addItem(tr("aud.voices.hdr.edge_it"), None)
                 for v in edge_list_voices("it"):
                     self.tts_voice.addItem(v.name, v)
             else:
-                self.tts_voice.addItem("(edge-tts non installato — installa con: pip install edge-tts)", None)
+                self.tts_voice.addItem(tr("aud.voices.edge_not_installed"), None)
         else:
             if not clonable:
                 self.tts_voice.addItem(
-                    "(nessuna voce clonabile — crea con ➕ allegando/registrando un campione)", None)
+                    tr("aud.voices.none_clonable"), None)
         self.tts_voice.blockSignals(False)
         self._update_clone_badge()
 
@@ -320,9 +315,9 @@ class AudioTab(QWidget):
             self.clone_badge.setText(tr("aud.clone_badge.none"))
             return
         if v.sample_path:
-            self.clone_badge.setText(f"↳ voce: <b>{v.name}</b> — 🎤 ha campione (clonabile)")
+            self.clone_badge.setText(tr("aud.clone_badge.with_sample").format(name=v.name))
         else:
-            self.clone_badge.setText(f"↳ voce: <b>{v.name}</b> — ⚠ nessun campione (non clonabile, è una voce preset)")
+            self.clone_badge.setText(tr("aud.clone_badge.no_sample").format(name=v.name))
         self.clone_badge.setTextFormat(Qt.RichText)
 
     def _current_voice(self) -> VoicePreset | None:
@@ -341,15 +336,15 @@ class AudioTab(QWidget):
         if dlg.exec() and getattr(dlg, "saved_voice", None):
             self._reload_voices()
             self._select_voice_by_file(dlg.saved_voice.file)
-            self.tts_status.setText(f"Voce '{dlg.saved_voice.name}' creata.")
+            self.tts_status.setText(tr("aud.voice_created").format(name=dlg.saved_voice.name))
 
     def _voice_edit(self):
         v = self._current_voice()
         if not isinstance(v, VoicePreset):
             return
         if not v.custom:
-            QMessageBox.information(self, "Voce preset",
-                "Le voci preset di sistema (Edge Microsoft) non sono modificabili. Usa 📋 per duplicarle."); return
+            QMessageBox.information(self, tr("aud.voice_preset.title"),
+                tr("aud.voice_preset.not_editable")); return
         dlg = VoiceDialog(self, preset=v, default_engine=v.engine)
         if dlg.exec() and getattr(dlg, "saved_voice", None):
             self._reload_voices()
@@ -360,7 +355,7 @@ class AudioTab(QWidget):
         if not isinstance(v, VoicePreset):
             return
         # crea una copia (nuovo slug → save_voice ricopia il campione con un nome proprio)
-        dup = VoicePreset(name=f"{v.name} (copia)", engine=v.engine, voice_id=v.voice_id,
+        dup = VoicePreset(name=tr("aud.voice_dup.copy_suffix").format(name=v.name), engine=v.engine, voice_id=v.voice_id,
                           language=v.language, note=v.note,
                           sample_transcript=v.sample_transcript, custom=True)
         # apri il dialog pre-compilato così l'utente può rinominare/cambiare il campione
@@ -380,8 +375,8 @@ class AudioTab(QWidget):
         if not isinstance(v, VoicePreset):
             return
         if not v.custom:
-            QMessageBox.information(self, "Voce preset", "Le voci preset di sistema non possono essere eliminate."); return
-        if QMessageBox.question(self, "Elimina voce", f"Eliminare '{v.name}'?") != QMessageBox.Yes:
+            QMessageBox.information(self, tr("aud.voice_preset.title"), tr("aud.voice_preset.not_deletable")); return
+        if QMessageBox.question(self, tr("aud.voice_delete.title"), tr("aud.voice_delete.confirm").format(name=v.name)) != QMessageBox.Yes:
             return
         delete_voice(v); self._reload_voices()
 
@@ -403,7 +398,7 @@ class AudioTab(QWidget):
 
     def _refresh_preview(self):
         clean = strip_markers(self.tts_text.toPlainText())
-        self.tts_preview.setText(f"📖 “{clean}”" if clean else "(testo vuoto)")
+        self.tts_preview.setText(tr("aud.preview.text").format(clean=clean) if clean else tr("aud.preview.empty"))
 
     # ──────────────────────────────────────────────────────────────────
     # Generazione TTS
@@ -411,22 +406,22 @@ class AudioTab(QWidget):
     def _generate_tts(self):
         v = self._current_voice()
         if not v:
-            QMessageBox.warning(self, "Voce", "Seleziona una voce."); return
+            QMessageBox.warning(self, tr("aud.gen.voice.title"), tr("aud.gen.voice.text")); return
         text = self.tts_text.toPlainText().strip()
         if not text:
-            QMessageBox.warning(self, "Testo", "Scrivi del testo da sintetizzare."); return
+            QMessageBox.warning(self, tr("aud.gen.text.title"), tr("aud.gen.text.text")); return
         engine_id = self.tts_engine.currentData() or "edge"
         try:
-            self.tts_status.setText(f"Sintesi in corso con {engine_id}…")
+            self.tts_status.setText(tr("aud.gen.synth_running").format(engine_id=engine_id))
             out = synthesize(engine_id, v, text)
             self._tts_last_file = str(out)
-            self.tts_status.setText(f"✅ Generato: {Path(self._tts_last_file).name}  (motore: {engine_id})")
+            self.tts_status.setText(tr("aud.gen.done").format(name=Path(self._tts_last_file).name, engine_id=engine_id))
             self.tts_play_btn.setEnabled(True)
             self.tts_use_btn.setEnabled(True)
             self.tts_generated.emit(self._tts_last_file)
         except Exception as e:
-            self.tts_status.setText(f"⛔ Errore: {e}")
-            QMessageBox.critical(self, "Errore TTS", str(e))
+            self.tts_status.setText(tr("aud.gen.error").format(e=e))
+            QMessageBox.critical(self, tr("aud.gen.error.title"), str(e))
 
     def _play_tts(self):
         if not self._tts_last_file:
@@ -443,7 +438,7 @@ class AudioTab(QWidget):
         if not self._tts_last_file:
             return
         self._audio_file = self._tts_last_file
-        self.file_lbl.setText(Path(self._tts_last_file).name + " (TTS)")
+        self.file_lbl.setText(tr("aud.file.tts_suffix").format(name=Path(self._tts_last_file).name))
         self.rb_user.setChecked(True)
         self._on_mode()
 
@@ -464,7 +459,7 @@ class AudioTab(QWidget):
             self._update_clone_badge()
 
     def _pick(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Audio", "", "Audio (*.wav *.mp3 *.flac *.m4a)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("aud.pick.dialog_title"), "", tr("aud.pick.filter"))
         if fn:
             self._audio_file = fn; self.file_lbl.setText(Path(fn).name)
 

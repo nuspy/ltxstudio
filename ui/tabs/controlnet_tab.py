@@ -31,10 +31,11 @@ from ui.i18n_manager import tr
 class ControlNetTab(QWidget):
     # Mantengo l'ordine UI: 0 Canny, 1 Depth, 2 Pose
     # (la mappatura a ImpactSwitch.select avviene in main_window: 0→2, 1→1, 2→3)
+    # Coppie (chiave_etichetta, chiave_descrizione) — tradotte al display
     TYPES = [
-        ("Canny — contorni del soggetto",      "Adatto a oggetti, prodotti, forme rigide"),
-        ("Depth — geometria 3D / profondità",  "Adatto a scene complete (ambienti, paesaggi)"),
-        ("Pose — scheletro umano (DWPose)",    "Adatto al movimento del corpo (danza, sport, gesti)"),
+        ("cn.type.canny.label",  "cn.type.canny.hint"),
+        ("cn.type.depth.label",  "cn.type.depth.hint"),
+        ("cn.type.pose.label",   "cn.type.pose.hint"),
     ]
 
     def __init__(self):
@@ -54,12 +55,12 @@ class ControlNetTab(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel(tr("cn.type_lbl")))
         self.type = QComboBox()
-        for label, _ in self.TYPES:
-            self.type.addItem(label)
+        for label_key, _ in self.TYPES:
+            self.type.addItem(tr(label_key))
         self.type.currentIndexChanged.connect(self._on_type_changed)
         row.addWidget(self.type); row.addStretch(1)
         tv.addLayout(row)
-        self.type_hint = QLabel(self.TYPES[0][1])
+        self.type_hint = QLabel(tr(self.TYPES[0][1]))
         self.type_hint.setStyleSheet("color:#888; padding:2px 6px;")
         tv.addWidget(self.type_hint)
         lay.addWidget(type_box)
@@ -89,10 +90,10 @@ class ControlNetTab(QWidget):
 
     def _on_type_changed(self, idx: int):
         if 0 <= idx < len(self.TYPES):
-            self.type_hint.setText(self.TYPES[idx][1])
+            self.type_hint.setText(tr(self.TYPES[idx][1]))
 
     def _pick(self):
-        fn, _ = QFileDialog.getOpenFileName(self, "Video riferimento", "", "Video (*.mp4 *.mov *.webm *.mkv)")
+        fn, _ = QFileDialog.getOpenFileName(self, tr("cn.video.pick.dlg"), "", "Video (*.mp4 *.mov *.webm *.mkv)")
         if fn:
             self._video = fn; self.lbl.setText(Path(fn).name)
 

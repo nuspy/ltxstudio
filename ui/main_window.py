@@ -286,7 +286,7 @@ class MainWindow(QMainWindow):
 
     def open_settings(self):
         if not self.engine:
-            QMessageBox.warning(self, "Template mancante", self._engine_err or ""); return
+            QMessageBox.warning(self, tr("mw.template_missing_title"), self._engine_err or ""); return
         dlg = SettingsDialog(self.engine, self.driver, self._overrides, self)
         if dlg.exec():
             self._overrides = dlg.overrides()
@@ -469,7 +469,7 @@ class MainWindow(QMainWindow):
             ok, msg = launch()
             self._log(f"[ComfyUI] {msg}" if ok else f"[ComfyUI] auto-avvio saltato: {msg}")
             if ok and hasattr(self, "status_lbl"):
-                self.status_lbl.setText("ComfyUI: 🟡 avvio automatico in corso… (pronto tra ~30-90s)")
+                self.status_lbl.setText(tr("mw.comfy_autostart_status"))
         except Exception as e:                   # noqa: BLE001
             self._log(f"[ComfyUI] auto-avvio errore: {e}")
 
@@ -492,9 +492,8 @@ class MainWindow(QMainWindow):
                 return True                          # nessuna fonte nota → il build mostrerà il messaggio
             repo, _f, local_name, gb, label = src
             ans = QMessageBox.question(
-                self, "Encoder FLUX.2 mancante",
-                f"Il modello FLUX.2 selezionato richiede l'encoder testo {label} (~{gb:.1f} GB), "
-                f"non installato.\n\nScaricarlo ora da Hugging Face?\n({repo})",
+                self, tr("mw.flux2_encoder_missing_title"),
+                tr("mw.flux2_encoder_missing_msg").format(label=label, gb=gb, repo=repo),
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
             if ans != QMessageBox.Yes:
                 return False
@@ -509,12 +508,11 @@ class MainWindow(QMainWindow):
                         pass
                 self._log(f"[FLUX.2] {msg} → {rel}")
                 QMessageBox.information(
-                    self, "Encoder pronto",
-                    f"Encoder scaricato:\n{rel}\n\nProcedo con la generazione.\n"
-                    "(Se ComfyUI segnala 'value not in list', riavvialo una volta.)")
+                    self, tr("mw.encoder_ready_title"),
+                    tr("mw.encoder_ready_msg").format(rel=rel))
                 return True
-            QMessageBox.warning(self, "Download non riuscito",
-                                f"{msg}\n\nIn alternativa usa FLUX.2 [dev] o un modello FLUX Fill.")
+            QMessageBox.warning(self, tr("mw.download_failed_title"),
+                                tr("mw.download_failed_msg").format(msg=msg))
             return False
         except Exception as e:                       # noqa: BLE001
             self._log(f"[FLUX.2] pre-check encoder errore: {e}")
@@ -528,9 +526,8 @@ class MainWindow(QMainWindow):
         from core.encoder_downloader import download, source_for
         gb = source_for(indim)[3] if source_for(indim) else 0.0
         dlg = QProgressDialog(
-            f"Scaricamento encoder FLUX.2 (~{gb:.1f} GB) in corso…\n"
-            "Può richiedere diversi minuti (download resumable).", "", 0, 0, self)
-        dlg.setWindowTitle("Download encoder FLUX.2")
+            tr("mw.encoder_download_progress").format(gb=gb), "", 0, 0, self)
+        dlg.setWindowTitle(tr("mw.encoder_download_title"))
         dlg.setCancelButton(None)
         dlg.setWindowModality(Qt.WindowModal)
         dlg.setMinimumDuration(0)
@@ -546,9 +543,10 @@ class MainWindow(QMainWindow):
 
     def _refresh_status(self):
         up = self.driver.is_up()
+        _conn = tr("mw.status_connected") if up else tr("mw.status_offline")
+        _tpl = tr("mw.status_template_ok") if self.engine else tr("mw.status_template_missing")
         self.status_lbl.setText(
-            f"ComfyUI: {'🟢 connesso' if up else '🔴 offline'} @ {self.driver.cfg.http}  |  "
-            f"Template: {'OK' if self.engine else 'mancante'}")
+            tr("mw.status_line").format(conn=_conn, http=self.driver.cfg.http, tpl=_tpl))
         self.gen_btn.setEnabled(up and self.engine is not None)
         if up and not self._inventory_set:
             try:
@@ -730,14 +728,14 @@ class MainWindow(QMainWindow):
     # ---------- generazione ----------
     def on_generate(self):
         if not self.engine:
-            QMessageBox.warning(self, "Template mancante", self._engine_err or "Golden prompt non caricato.")
+            QMessageBox.warning(self, tr("mw.template_missing_title"), self._engine_err or tr("mw.golden_prompt_not_loaded"))
             return
         vals = {}
         vals.update(self.frame1_tab.get_values())
         vals.update(self.video_tab.get_values())
         vals.update(self.video_tab.get_sampler_values())   # Steps/CFG/Sampler/Seed (ora sotto Video)
         if not vals.get("prompt_positive"):
-            QMessageBox.warning(self, "Prompt vuoto", "Inserisci un prompt nel tab Prompt / Frame 1.")
+            QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_prompt_msg"))
             return
         if not self.video_tab.wants_fixed_seed():
             vals["seed"] = random.randint(0, 2**31)
@@ -752,20 +750,19 @@ class MainWindow(QMainWindow):
                 # TALK SENZA VIDEO → genera il parlato DALL'IMMAGINE (Frame 1) come I2V normale:
                 # niente maschera V2V; voce dall'albero del tab Audio, dialogo dal prompt principale.
                 if not self.frame1_tab.image_path:
-                    QMessageBox.warning(self, "Talk", "Per Talk: fornisci un VIDEO da modificare, "
-                                        "oppure un'IMMAGINE nel Frame 1 (genero il parlato dall'immagine).")
+                    QMessageBox.warning(self, tr("mw.talk_title"), tr("mw.talk_need_input_msg"))
                     return
                 self._log("[Talk] nessun video → genero dall'immagine (I2V + lip-sync da audio/prompt).")
                 # NON impostiamo v2v_mode → prosegue il percorso I2V normale (use_image più sotto).
             else:
                 errs = self.video_tab.v2v_panel.validation_errors()
                 if errs:
-                    QMessageBox.warning(self, f"Manca qualcosa per {_mode.upper()}",
-                                        "Per generare in questa modalità:\n\n• " + "\n• ".join(errs))
+                    QMessageBox.warning(self, tr("mw.missing_for_mode_title").format(mode=_mode.upper()),
+                                        tr("mw.missing_for_mode_msg") + "\n• ".join(errs))
                     return
                 vname = self._upload_video(src) if src else None
                 if not vname:
-                    QMessageBox.warning(self, "Video sorgente", "Impossibile caricare il video sorgente in ComfyUI.")
+                    QMessageBox.warning(self, tr("mw.source_video_title"), tr("mw.source_video_upload_failed_msg"))
                     return
                 v2v["v2v_video"] = vname
                 w, h = self._probe_resolution(src)
@@ -820,10 +817,8 @@ class MainWindow(QMainWindow):
                 self._log(f"[Restauro volti] attivo: verrà applicato a fine generazione "
                           f"(fidelity {fr_cfg['fidelity']:.2f}, {fr_cfg['model']}).")
             else:
-                QMessageBox.information(self, "Restauro volti non disponibile",
-                    "Il restauro volti automatico è attivo ma il custom node facerestore_cf non è "
-                    "installato. Installalo da «Migliora qualità → Video» (poi riavvia ComfyUI). "
-                    "Procedo SENZA restauro volti per questa generazione.")
+                QMessageBox.information(self, tr("mw.face_restore_unavailable_title"),
+                    tr("mw.face_restore_unavailable_msg"))
                 self._log("[Restauro volti] nodo non installato → salto il passaggio.")
 
         # aggiorna stato per i conflitti (audio, controlnet, modello, nsfw)
@@ -833,10 +828,8 @@ class MainWindow(QMainWindow):
         # traccia. Se rifiuta, resta la modalità corrente (es. native → audio dal prompt).
         pending_tts = self.audio_tab.has_pending_tts() if hasattr(self.audio_tab, "has_pending_tts") else None
         if pending_tts and audio.get("audio_mode") != "user":
-            ans = QMessageBox.question(self, "Audio TTS disponibile",
-                f"È stato generato un audio TTS:\n\n  {Path(pending_tts).name}\n\n"
-                "Vuoi usarlo come traccia audio del video?\n"
-                "(annulla = usa l'audio del prompt — modalità nativa)",
+            ans = QMessageBox.question(self, tr("mw.tts_available_title"),
+                tr("mw.tts_available_msg").format(name=Path(pending_tts).name),
                 QMessageBox.Yes | QMessageBox.No)
             if ans == QMessageBox.Yes:
                 self.audio_tab.apply_tts_as_user_audio()
@@ -858,10 +851,8 @@ class MainWindow(QMainWindow):
                 audio["audio_user"] = True; audio["audio_clone"] = False
                 self._log(f"[TTS] audio clonato pronto: {Path(str(out)).name} → traccia del video")
             except Exception as e:
-                QMessageBox.warning(self, "Sintesi TTS fallita",
-                    f"Non sono riuscito a sintetizzare la voce clonata:\n{e}\n\n"
-                    "Procedo in modalità riferimento (il modello genera il parlato dal prompt "
-                    "usando solo il timbro del campione).")
+                QMessageBox.warning(self, tr("mw.tts_synth_failed_title"),
+                    tr("mw.tts_synth_failed_msg").format(error=e))
                 self._log(f"[warn] sintesi TTS clone fallita: {e} → fallback a riferimento")
                 # resta clone: usa solo il campione
         # Fallback se l'utente ha selezionato un audio_mode che richiede un file ma non
@@ -908,7 +899,7 @@ class MainWindow(QMainWindow):
         }, auto_apply_implies=True)
         blocking = [c for c in self.state.evaluate(auto_apply_implies=False) if c.severity == "blocking"]
         if blocking:
-            QMessageBox.warning(self, "Conflitti da risolvere", "\n".join("• " + c.message for c in blocking))
+            QMessageBox.warning(self, tr("mw.conflicts_title"), "\n".join("• " + c.message for c in blocking))
             return
 
         # LoRA + trigger word
@@ -925,11 +916,11 @@ class MainWindow(QMainWindow):
             warns = self.lora_tab.trigger_warnings(vals["prompt_positive"])
             if warns:
                 box = QMessageBox(self)
-                box.setWindowTitle("Trigger word mancanti")
-                box.setText("Alcune LoRA hanno trigger word non presenti nel prompt:\n\n" + "\n".join(warns))
-                b_ins = box.addButton("Inserisci e genera", QMessageBox.AcceptRole)
-                b_gen = box.addButton("Genera comunque", QMessageBox.YesRole)
-                box.addButton("Annulla", QMessageBox.RejectRole)
+                box.setWindowTitle(tr("mw.trigger_missing_title"))
+                box.setText(tr("mw.trigger_missing_msg") + "\n".join(warns))
+                b_ins = box.addButton(tr("mw.btn_insert_and_generate"), QMessageBox.AcceptRole)
+                b_gen = box.addButton(tr("mw.btn_generate_anyway"), QMessageBox.YesRole)
+                box.addButton(tr("mw.btn_cancel"), QMessageBox.RejectRole)
                 box.exec()
                 clicked = box.clickedButton()
                 if clicked == b_ins:
@@ -1005,9 +996,9 @@ class MainWindow(QMainWindow):
             )
             self._log(f"Inviato. prompt_id={self._current_pid}  ({len(prompt)} nodi)")
             self.progress.setValue(0)
-            self.gen_dialog.start(prompt, "Generazione video")
+            self.gen_dialog.start(prompt, tr("mw.gen_video_label"))
         except Exception as e:
-            QMessageBox.critical(self, "Errore invio", str(e))
+            QMessageBox.critical(self, tr("mw.send_error_title"), str(e))
             self._log(f"[ERR] {e}")
 
     def _pick_template(self, use_image: bool, audio_mode: str, cnet_enabled: bool,
@@ -1080,17 +1071,15 @@ class MainWindow(QMainWindow):
 
     def generate_inpaint(self, mode: str):
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per generare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, "Nessuna immagine", "Carica una foto nel canvas."); return
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
         if self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Generazione immagine già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
         cfg = self.frame1_tab.get_inpaint_config()
         if cfg.get("unet") and not cfg.get("available", True):
-            QMessageBox.warning(self, "Modello non installato",
-                                f"Il modello inpaint selezionato non è ancora presente in ComfyUI:\n\n"
-                                f"{cfg.get('unet')}\n\n"
-                                f"Se è in download, attendi il termine e l'ingest; poi riavvia ComfyUI.")
+            QMessageBox.warning(self, tr("mw.model_not_installed_title"),
+                                tr("mw.inpaint_model_not_installed_msg").format(unet=cfg.get('unet')))
             return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if not self._ensure_flux2_encoder(cfg.get("unet")):
@@ -1101,14 +1090,11 @@ class MainWindow(QMainWindow):
         denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * retention))
         # guard: serve un'area da rigenerare, altrimenti il modello non fa nulla
         if mode == "outpaint" and not self.frame1_tab.canvas.has_outpaint_area():
-            QMessageBox.information(self, "Niente da estendere",
-                                    "La foto riempie già tutto il frame: non c'è bordo da generare.\n\n"
-                                    "Riduci lo zoom della foto (rotella in modalità ✋ Sposta) per lasciare "
-                                    "spazio vuoto attorno, poi rilancia l'outpaint."); return
+            QMessageBox.information(self, tr("mw.nothing_to_extend_title"),
+                                    tr("mw.nothing_to_extend_msg")); return
         if mode == "inpaint" and not self.frame1_tab.canvas.has_mask():
-            QMessageBox.information(self, "Nessuna maschera",
-                                    "Disegna una maschera (✏ Maschera / 🪣 Fill / lazzo / selezione oggetto) "
-                                    "sull'area da rigenerare prima dell'inpaint."); return
+            QMessageBox.information(self, tr("mw.no_mask_title"),
+                                    tr("mw.no_mask_msg")); return
         try:
             exp = self.frame1_tab.canvas.export_inpaint(OUTPUT_DIR, mode)
             self._inpaint_bbox = exp.get("bbox")    # per rimettere l'inpaint al suo posto
@@ -1130,25 +1116,24 @@ class MainWindow(QMainWindow):
                 steps=steps, negative=negative, retention=retention)
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = mode
-            self.gen_dialog.start(prompt, "Outpainting" if mode == "outpaint" else "Inpainting")
+            self.gen_dialog.start(prompt, tr("mw.outpainting_label") if mode == "outpaint" else tr("mw.inpainting_label"))
             self._log(f"{mode}: inviato (id={self._inpaint_pid}, steps={steps}, seed={seed}, denoise={denoise:.2f}).")
         except Exception as e:
-            QMessageBox.critical(self, f"Errore {mode}", str(e)); self._log(f"[ERR] {mode}: {e}")
+            QMessageBox.critical(self, tr("mw.error_with_mode_title").format(mode=mode), str(e)); self._log(f"[ERR] {mode}: {e}")
 
     def generate_integrate(self):
         """Integra l'oggetto incollato nella scena con FLUX **Kontext** (o FLUX.2): il composito
         (scena + prop) è dato come RIFERIMENTO + prompt → il modello RIGENERA/armonizza (luce,
         ombre, prospettiva), non incolla l'originale. Prompt opzionale (default auto)."""
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per generare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, "Nessuna immagine", "Carica una foto base nel canvas."); return
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_base_photo_canvas_msg")); return
         if self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Generazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
         if not self.frame1_tab.canvas.has_layers():
-            QMessageBox.information(self, "Nessuna immagine da integrare",
-                                    "Aggiungi una o più immagini con «+ Img» e posizionale, "
-                                    "poi premi «🧩 Integra immagini»."); return
+            QMessageBox.information(self, tr("mw.no_image_to_integrate_title"),
+                                    tr("mw.no_image_to_integrate_msg")); return
         cfg = self.frame1_tab.get_inpaint_config()
         engine = cfg.get("integrate_engine", "kontext")
         # Modello deciso dall'utente nel combo (contestuale all'engine selezionato).
@@ -1156,8 +1141,8 @@ class MainWindow(QMainWindow):
         # KontextPipeline ricade sul default hardcoded `FLUX_Kontext_Dev.safetensors`.
         model = cfg.get("integrate_model")
         if engine == "flux2" and not model:
-            QMessageBox.warning(self, "Modello FLUX.2 mancante",
-                                "Per il motore FLUX.2 scegli un modello FLUX.2 nel menu integra."); return
+            QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
+                                tr("mw.flux2_model_missing_integrate_msg")); return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if not self._ensure_flux2_encoder(model):
             return
@@ -1165,8 +1150,8 @@ class MainWindow(QMainWindow):
         try:
             exp = self.frame1_tab.canvas.export_integrate(OUTPUT_DIR)
             if not exp.get("has_region"):
-                QMessageBox.information(self, "Niente da integrare",
-                                        "Le immagini non hanno né maschera né area valida nel frame."); return
+                QMessageBox.information(self, tr("mw.nothing_to_integrate_title"),
+                                        tr("mw.nothing_to_integrate_msg")); return
             self._inpaint_bbox = None
             self._inpaint_before = exp.get("image")     # confronto prima/dopo (composito di partenza)
             img_name = self._upload_local(exp["image"])
@@ -1182,29 +1167,29 @@ class MainWindow(QMainWindow):
                                             guidance=guidance, aux_lora=aux)
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = "integrazione"
-            self.gen_dialog.start(prompt, f"Integrazione ({'FLUX.2' if engine == 'flux2' else 'Kontext'})")
+            self.gen_dialog.start(prompt, tr("mw.integrate_label").format(engine='FLUX.2' if engine == 'flux2' else 'Kontext'))
             self._log(f"Integrazione {engine}: inviata (steps={steps}, seed={seed}, puzzle_lora={'sì' if aux else 'no'}).")
         except Exception as e:
-            QMessageBox.critical(self, "Errore integrazione", str(e)); self._log(f"[ERR] integrate: {e}")
+            QMessageBox.critical(self, tr("mw.integrate_error_title"), str(e)); self._log(f"[ERR] integrate: {e}")
 
     def generate_recolor(self):
         """Cambia colore (Kontext/FLUX.2 prompt-based): ricolora il soggetto mantenendo texture/luce."""
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per generare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, "Nessuna immagine", "Carica o genera un'immagine nel canvas."); return
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_or_gen_image_canvas_msg")); return
         if self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Generazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
         cc = self.frame1_tab.get_color_config()
         if not cc["target"]:
-            QMessageBox.warning(self, "Colore mancante",
-                                "Indica il colore di destinazione (es. «rosso acceso» o #cc0000)."); return
+            QMessageBox.warning(self, tr("mw.color_missing_title"),
+                                tr("mw.color_missing_msg")); return
         engine = cc["engine"]; model = None
         if engine == "flux2":
             model = self.frame1_tab.get_inpaint_config().get("integrate_model")
             if not model:
-                QMessageBox.warning(self, "Modello FLUX.2 mancante",
-                                    "Per il motore FLUX.2 scegli un modello nel tab Inpaint/Outpaint."); return
+                QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
+                                    tr("mw.flux2_model_missing_inpaint_tab_msg")); return
         try:
             img_name = self._upload_local(self.frame1_tab.image_path)
             self._inpaint_bbox = None
@@ -1214,24 +1199,24 @@ class MainWindow(QMainWindow):
                                           engine=engine, model=model, steps=cc["steps"], seed=seed)
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = "cambio colore"
-            self.gen_dialog.start(prompt, f"Cambio colore ({'FLUX.2' if engine == 'flux2' else 'Kontext'})")
+            self.gen_dialog.start(prompt, tr("mw.recolor_label").format(engine='FLUX.2' if engine == 'flux2' else 'Kontext'))
             self._log(f"Cambio colore: {cc['subject'] or 'soggetto'} → {cc['target']} ({engine}).")
         except Exception as e:
-            QMessageBox.critical(self, "Errore cambio colore", str(e)); self._log(f"[ERR] recolor: {e}")
+            QMessageBox.critical(self, tr("mw.recolor_error_title"), str(e)); self._log(f"[ERR] recolor: {e}")
 
     def generate_video_enhance(self):
         """Definizione video: restore + super-risoluzione (+ opz. FPS) sull'ultimo video generato."""
         import shutil
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per migliorare il video."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_enhance_msg")); return
         cfg = self.video_def_tab.get_config()
         if not cfg.get("video"):
-            QMessageBox.warning(self, "Nessun video", "Genera un video o caricane uno nel tab."); return
+            QMessageBox.warning(self, tr("mw.no_video_title"), tr("mw.no_video_msg")); return
         if self._current_pid or self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Generazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
         src = Path(cfg["video"])
         if not src.exists():
-            QMessageBox.warning(self, "File mancante", f"Video non trovato: {src}"); return
+            QMessageBox.warning(self, tr("mw.file_missing_title"), tr("mw.video_not_found_msg").format(path=src)); return
         try:
             comfy_input = Path(r"E:\AI\Comfy_Nexus\ComfyUI\input"); comfy_input.mkdir(parents=True, exist_ok=True)
             dest = comfy_input / src.name
@@ -1246,27 +1231,27 @@ class MainWindow(QMainWindow):
                 rife_multiplier=cfg["rife_multiplier"], rife_ckpt=cfg["rife_ckpt"],
                 seed=random.randint(0, 2**31))
             self._current_pid = self.driver.submit(prompt)
-            self.gen_dialog.start(prompt, f"Definizione video ({cfg['engine']})")
+            self.gen_dialog.start(prompt, tr("mw.video_def_label").format(engine=cfg['engine']))
             self._log(f"Definizione video: {cfg['engine']} su {src.name} ({len(prompt)} nodi). "
                       f"Il modello SeedVR2 può scaricarsi al primo uso.")
         except Exception as e:
-            QMessageBox.critical(self, "Errore definizione video", str(e)); self._log(f"[ERR] enhance: {e}")
+            QMessageBox.critical(self, tr("mw.video_def_error_title"), str(e)); self._log(f"[ERR] enhance: {e}")
 
     def generate_video_extend(self):
         """Prolunga video: estensione LTX-2.3 nativa multi-segmento sull'ultimo video (o caricato)."""
         import shutil
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per prolungare il video."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_extend_msg")); return
         cfg = self.video_extend_tab.get_config()
         if not cfg.get("video"):
-            QMessageBox.warning(self, "Nessun video", "Genera un video o caricane uno nel tab."); return
+            QMessageBox.warning(self, tr("mw.no_video_title"), tr("mw.no_video_msg")); return
         if self._current_pid or self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Generazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
         src = Path(cfg["video"])
         if not src.exists():
-            QMessageBox.warning(self, "File mancante", f"Video non trovato: {src}"); return
+            QMessageBox.warning(self, tr("mw.file_missing_title"), tr("mw.video_not_found_msg").format(path=src)); return
         if not cfg["prompt"]:
-            QMessageBox.warning(self, "Prompt mancante", "Scrivi come prosegue la scena."); return
+            QMessageBox.warning(self, tr("mw.prompt_missing_title"), tr("mw.extend_prompt_missing_msg")); return
         try:
             comfy_input = Path(r"E:\AI\Comfy_Nexus\ComfyUI\input"); comfy_input.mkdir(parents=True, exist_ok=True)
             dest = comfy_input / src.name
@@ -1300,34 +1285,33 @@ class MainWindow(QMainWindow):
                 max_shift=float(sv.get("ltxv_max_shift", 2.05)),
                 clip1=sv.get("text_encoder"))
             self._current_pid = self.driver.submit(prompt)
-            self.gen_dialog.start(prompt, "Prolunga video (LTX-2.3, illimitato)")
+            self.gen_dialog.start(prompt, tr("mw.extend_video_label"))
             self._log(f"Prolunga video: +{cfg['add_seconds']:.0f}s in {n_seg} spezzoni su {src.name} "
                       f"({len(prompt)} nodi).")
         except Exception as e:
-            QMessageBox.critical(self, "Errore prolunga video", str(e)); self._log(f"[ERR] extend: {e}")
+            QMessageBox.critical(self, tr("mw.extend_video_error_title"), str(e)); self._log(f"[ERR] extend: {e}")
 
     def generate_face_restore(self):
         """Restauro volti per-frame (CodeFormer/GFPGAN) sul video del tab Migliora qualità."""
         import shutil
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per elaborare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_process_msg")); return
         if self._current_pid or self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Elaborazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.processing_in_progress_msg")); return
         cfg = self.video_def_tab.get_face_restore_config()
         if not cfg.get("video"):
-            QMessageBox.warning(self, "Nessun video", "Carica o genera un video."); return
+            QMessageBox.warning(self, tr("mw.no_video_title"), tr("mw.load_or_gen_video_msg")); return
         src = Path(cfg["video"])
         if not src.exists():
-            QMessageBox.warning(self, "File mancante", f"Video non trovato: {src}"); return
+            QMessageBox.warning(self, tr("mw.file_missing_title"), tr("mw.video_not_found_msg").format(path=src)); return
         try:
             from core.face_restore_pipeline import node_installed, ensure_model
             if not node_installed():
-                QMessageBox.warning(self, "Nodo mancante",
-                    "Il custom node facerestore_cf non è installato. Usa «📥 Installa face-restore» "
-                    "nel tab Migliora qualità → Video, poi riavvia ComfyUI."); return
+                QMessageBox.warning(self, tr("mw.node_missing_title"),
+                    tr("mw.face_restore_node_missing_msg")); return
             ok, msg = ensure_model(cfg["model"], log=self._log)
             if not ok:
-                QMessageBox.warning(self, "Modello restauro mancante", msg); return
+                QMessageBox.warning(self, tr("mw.restore_model_missing_title"), msg); return
             comfy_input = Path(r"E:\AI\Comfy_Nexus\ComfyUI\input"); comfy_input.mkdir(parents=True, exist_ok=True)
             dest = comfy_input / src.name
             if str(dest) != str(src):
@@ -1337,21 +1321,21 @@ class MainWindow(QMainWindow):
                 src.name, fps=int(v.get("fps", 24)), fidelity=cfg["fidelity"],
                 model=cfg["model"], detection=cfg["detection"])
             self._current_pid = self.driver.submit(prompt)
-            self.gen_dialog.start(prompt, "Restauro volti (CodeFormer/GFPGAN)")
+            self.gen_dialog.start(prompt, tr("mw.face_restore_label"))
             self._log(f"Restauro volti su {src.name} (fidelity {cfg['fidelity']:.2f}, {cfg['model']}).")
         except Exception as e:
-            QMessageBox.critical(self, "Errore restauro volti", str(e)); self._log(f"[ERR] face restore: {e}")
+            QMessageBox.critical(self, tr("mw.face_restore_error_title"), str(e)); self._log(f"[ERR] face restore: {e}")
 
     def generate_image(self):
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per generare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Generazione immagine già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
-            QMessageBox.warning(self, "Prompt vuoto", "Inserisci un prompt immagine o globale."); return
+            QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
         if not cfg["model"] or cfg["model"].startswith("("):
-            QMessageBox.warning(self, "Nessun modello", f"Nessun modello {cfg['arch']} trovato."); return
+            QMessageBox.warning(self, tr("mw.no_model_title"), tr("mw.no_model_arch_msg").format(arch=cfg['arch'])); return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
             return
@@ -1384,28 +1368,26 @@ class MainWindow(QMainWindow):
             self._inpaint_mode = "generazione immagine"
             self._inpaint_bbox = None
             self._inpaint_before = None      # da zero: nessun confronto
-            self.gen_dialog.start(prompt, f"Generazione immagine ({cfg['arch']})")
+            self.gen_dialog.start(prompt, tr("mw.image_gen_label").format(arch=cfg['arch']))
             self._log(f"Generazione immagine ({cfg['arch']} · {cfg['model']}) inviata…")
         except Exception as e:
-            QMessageBox.critical(self, "Errore generazione", str(e)); self._log(f"[ERR] gen: {e}")
+            QMessageBox.critical(self, tr("mw.gen_error_title"), str(e)); self._log(f"[ERR] gen: {e}")
 
     def generate_upscale(self):
         """Aumenta la definizione dell'immagine corrente del canvas con un modello AI di super-risoluzione."""
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per generare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, "Nessuna immagine", "Carica o genera un'immagine nel canvas."); return
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_or_gen_image_canvas_msg")); return
         if self._inpaint_pid:
-            QMessageBox.information(self, "Attendi", "Operazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.operation_in_progress_msg")); return
         cfg = self.frame1_tab.get_upscale_config()
         if not cfg.get("model"):
-            QMessageBox.warning(self, "Nessun modello upscale",
-                                "Nessun modello di super-risoluzione in elenco. Riavvia l'app per "
-                                "ricaricare i modelli (sono in E:\\AI\\Models\\Upscale)."); return
+            QMessageBox.warning(self, tr("mw.no_upscale_model_title"),
+                                tr("mw.no_upscale_model_msg")); return
         if cfg.get("refine") and not cfg.get("refine_model"):
-            QMessageBox.warning(self, "Modello rifinitura mancante",
-                                "La rifinitura AI richiede un modello FLUX in diffusion_models. "
-                                "Selezionane uno nel menu «Modello rifinitura»."); return
+            QMessageBox.warning(self, tr("mw.refine_model_missing_title"),
+                                tr("mw.refine_model_missing_msg")); return
         self._inpaint_before = self.frame1_tab.image_path   # confronto prima/dopo
         try:
             img = self._upload_local(self.frame1_tab.image_path)
@@ -1419,11 +1401,11 @@ class MainWindow(QMainWindow):
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = "aumento definizione"
             self._inpaint_bbox = None
-            extra = " + rifinitura AI" if cfg.get("refine") else ""
-            self.gen_dialog.start(prompt, f"Aumento definizione ({cfg['scale']:.0f}x{extra})")
+            extra = tr("mw.upscale_refine_extra") if cfg.get("refine") else ""
+            self.gen_dialog.start(prompt, tr("mw.upscale_label").format(scale=cfg['scale'], extra=extra))
             self._log(f"Upscale {cfg['scale']:.0f}x con {cfg['model']}{extra} inviato…")
         except Exception as e:
-            QMessageBox.critical(self, "Errore upscale", str(e)); self._log(f"[ERR] upscale: {e}")
+            QMessageBox.critical(self, tr("mw.upscale_error_title"), str(e)); self._log(f"[ERR] upscale: {e}")
 
     def _check_inpaint_done(self):
         try:
@@ -1455,7 +1437,7 @@ class MainWindow(QMainWindow):
 
     def _show_inpaint_result(self, path: str):
         from PySide6.QtWidgets import QDialog, QDialogButtonBox
-        dlg = QDialog(self); dlg.setWindowTitle(f"Risultato {self._inpaint_mode} — Accetta o Annulla")
+        dlg = QDialog(self); dlg.setWindowTitle(tr("mw.result_dialog_title").format(mode=self._inpaint_mode))
         v = QVBoxLayout(dlg)
         before_pix = QPixmap(self._inpaint_before) if self._inpaint_before else None
         if before_pix is not None and before_pix.isNull():
@@ -1463,11 +1445,11 @@ class MainWindow(QMainWindow):
         lbl = _HoldCompareLabel(QPixmap(path), before_pix)
         v.addWidget(lbl)
         if before_pix is not None:
-            hint = QLabel("🖱️ Tieni premuto sull'immagine per vedere l'originale (confronto prima/dopo)")
+            hint = QLabel(tr("mw.compare_hint"))
             hint.setStyleSheet("color:#9aa1b0;"); hint.setAlignment(Qt.AlignCenter); v.addWidget(hint)
         bb = QDialogButtonBox()
-        b_ok = bb.addButton("✔ Accetta (usa questa)", QDialogButtonBox.AcceptRole)
-        bb.addButton("↩ Revert (scarta)", QDialogButtonBox.RejectRole)
+        b_ok = bb.addButton(tr("mw.btn_accept"), QDialogButtonBox.AcceptRole)
+        bb.addButton(tr("mw.btn_revert"), QDialogButtonBox.RejectRole)
         bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
         v.addWidget(bb)
         if dlg.exec():
@@ -1482,11 +1464,11 @@ class MainWindow(QMainWindow):
     # ---------- selezione oggetto (SAM / CLIPSeg) ----------
     def _segment_preconds(self) -> bool:
         if not self.driver.is_up():
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per segmentare."); return False
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_segment_msg")); return False
         if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, "Nessuna immagine", "Carica una foto nel canvas."); return False
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return False
         if self._seg_pid:
-            QMessageBox.information(self, "Attendi", "Selezione in corso."); return False
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.selection_in_progress_msg")); return False
         return True
 
     def segment_by_text(self):
@@ -1494,7 +1476,7 @@ class MainWindow(QMainWindow):
             return
         cfg = self.frame1_tab.get_segment_config()
         if not cfg.get("text"):
-            QMessageBox.warning(self, "Testo mancante", "Scrivi cosa selezionare (es. 'costume da bagno')."); return
+            QMessageBox.warning(self, tr("mw.text_missing_title"), tr("mw.segment_text_missing_msg")); return
         try:
             img = self._upload_local(self.frame1_tab.canvas._composite(OUTPUT_DIR))
             detector = cfg.get("detector", "grounding_dino")
@@ -1511,29 +1493,23 @@ class MainWindow(QMainWindow):
                          "sam_only": "SAM"}.get(detector, detector)
             self._log(f"Selezione '{cfg['text']}' inviata via {det_label} (soglia {threshold:.2f})…")
         except Exception as e:
-            QMessageBox.critical(self, "Errore selezione", str(e)); self._log(f"[ERR] segment text: {e}")
+            QMessageBox.critical(self, tr("mw.selection_error_title"), str(e)); self._log(f"[ERR] segment text: {e}")
 
     def segment_by_region(self):
         if not self._segment_preconds():
             return
         cfg = self.frame1_tab.get_segment_config()
         if not self._sam_models:
-            QMessageBox.warning(self, "SAM non disponibile",
-                                "La selezione a click/riquadro richiede un modello SAM in models/sams.\n"
-                                "Ho mappato E:\\AI\\Models\\Segmentation in extra_model_paths.yaml: "
-                                "riavvia ComfyUI per caricarlo."); return
+            QMessageBox.warning(self, tr("mw.sam_unavailable_title"),
+                                tr("mw.sam_unavailable_msg")); return
         # Il puntatore (Impact SAMLoader) carica solo SAM vanilla: se la scelta è un SAM-HQ
         # o assente, ripiega su un vanilla disponibile (sam_vit_b/l/h).
         sam = cfg.get("sam_model")
         if not sam or "hq" in sam.lower():
             vanilla = next((m for m in self._sam_models if "hq" not in m.lower()), None)
             if not vanilla:
-                QMessageBox.warning(self, "Serve un SAM vanilla",
-                                    "La selezione a click/box richiede un SAM vanilla "
-                                    "(es. sam_vit_b / sam_vit_l) in models/sams. "
-                                    "Ho solo modelli SAM-HQ (usati dalla selezione «da testo»).\n\n"
-                                    "Aggiungi un sam_vit_*.pth e riavvia ComfyUI, oppure usa la "
-                                    "selezione «da testo» (GroundingDINO).")
+                QMessageBox.warning(self, tr("mw.sam_vanilla_needed_title"),
+                                    tr("mw.sam_vanilla_needed_msg"))
                 return
             sam = vanilla
         try:
@@ -1547,7 +1523,7 @@ class MainWindow(QMainWindow):
             self._seg_pid = self.driver.submit(prompt)
             self._log(f"Selezione magnetica ({exp.get('hint')}) inviata…")
         except Exception as e:
-            QMessageBox.critical(self, "Errore selezione", str(e)); self._log(f"[ERR] segment region: {e}")
+            QMessageBox.critical(self, tr("mw.selection_error_title"), str(e)); self._log(f"[ERR] segment region: {e}")
 
     def _check_segment_done(self):
         try:
@@ -1744,8 +1720,8 @@ class MainWindow(QMainWindow):
             prompt, _ = self.engine.disable_modules(prompt, disable)
             es["segs"] += 1
             self._current_pid = self.driver.submit(prompt)
-            self.gen_dialog.start(prompt, f"Video lungo: segmento {es['segs']} "
-                                          f"({es['produced']:.0f}/{es['target']:.0f}s)")
+            self.gen_dialog.start(prompt, tr("mw.long_video_segment_label").format(
+                seg=es['segs'], produced=es['produced'], target=es['target']))
             self._log(f"[Video lungo] segmento {es['segs']}: I2V multi-frame, +{vals['length_s']:.0f}s")
         except Exception as e:
             self._log(f"[ERR] segmento extend: {e}")
@@ -2018,7 +1994,7 @@ class MainWindow(QMainWindow):
                 src.name, fps=int(v.get("fps", 24)), fidelity=cfg["fidelity"],
                 model=cfg["model"], detection=cfg.get("detection", "retinaface_resnet50"))
             self._current_pid = self.driver.submit(prompt)
-            self.gen_dialog.start(prompt, "Restauro volti (CodeFormer/GFPGAN)")
+            self.gen_dialog.start(prompt, tr("mw.face_restore_label"))
             self._log(f"[Restauro volti] passaggio finale su {src.name} "
                       f"(fidelity {cfg['fidelity']:.2f}, {cfg['model']}).")
             return True
@@ -2030,17 +2006,17 @@ class MainWindow(QMainWindow):
         """Restauro / colorazione foto tramite RestorePipeline."""
         if not self.driver.is_up():
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "ComfyUI offline", "Avvia ComfyUI per elaborare."); return
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_process_msg")); return
         if self._inpaint_pid:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Attendi", "Elaborazione già in corso."); return
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.processing_in_progress_msg")); return
 
         image_path = cfg.get("image_path", "")
         if image_path == "<from_canvas>":
             image_path = self.frame1_tab.image_path or ""
         if not image_path:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Nessuna immagine", "Seleziona un'immagine da elaborare."); return
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.select_image_to_process_msg")); return
 
         op = cfg.get("operation", "restore")
         try:
@@ -2057,7 +2033,7 @@ class MainWindow(QMainWindow):
                     denoise=cfg["denoise"],
                     denoise_strength=cfg["denoise_strength"],
                     seed=seed)
-                label = f"Restauro ({cfg['target_scale']:.0f}×)"
+                label = tr("mw.restore_label").format(scale=cfg['target_scale'])
             elif op == "colorize":
                 prompt = self.restorer.build_colorize(
                     img_name,
@@ -2066,7 +2042,7 @@ class MainWindow(QMainWindow):
                     style=cfg["style"],
                     seed=seed,
                     steps=cfg["color_steps"])
-                label = "Colorazione B&W"
+                label = tr("mw.colorize_label")
             else:  # restore_and_colorize
                 prompt = self.restorer.build_restore_and_colorize(
                     img_name,
@@ -2076,7 +2052,7 @@ class MainWindow(QMainWindow):
                     style=cfg["style"],
                     seed=seed,
                     steps=cfg["color_steps"])
-                label = "Restauro + Colorazione"
+                label = tr("mw.restore_colorize_label")
 
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = label
@@ -2084,7 +2060,7 @@ class MainWindow(QMainWindow):
             self._log(f"{label}: inviato (seed={seed}).")
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "Errore restauro", str(e))
+            QMessageBox.critical(self, tr("mw.restore_error_title"), str(e))
             self._log(f"[ERR] restauro: {e}")
 
     def _restore_from_canvas(self):
@@ -2093,8 +2069,8 @@ class MainWindow(QMainWindow):
         if not img:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(
-                self, "Nessuna immagine",
-                "Carica o genera un'immagine nel canvas prima di usare il Restauro.")
+                self, tr("mw.no_image_title"),
+                tr("mw.load_image_before_restore_msg"))
             return
         # Pre-imposta il path nel tab Restauro
         self.restore_tab._input_path = img

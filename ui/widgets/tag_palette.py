@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QFrame, QLabel, QSizePolicy,
 )
 
+from ui.i18n_manager import tr
+
 
 # ────────────────────────────────────────────────────────────────────────────
 # Elenco MASTER dei tag SSML/markup — ampio, organizzato per categoria.
@@ -120,9 +122,9 @@ class TagPalettePopup(QFrame):
         self.setFixedWidth(440)
 
         v = QVBoxLayout(self); v.setContentsMargins(6, 6, 6, 6); v.setSpacing(4)
-        self.title = QLabel("Inserisci tag SSML / markup")
+        self.title = QLabel(tr("tagpal.title"))
         v.addWidget(self.title)
-        self.filter_edit = QLineEdit(); self.filter_edit.setPlaceholderText("Cerca…")
+        self.filter_edit = QLineEdit(); self.filter_edit.setPlaceholderText(tr("tagpal.search_placeholder"))
         self.filter_edit.textChanged.connect(self._refresh)
         v.addWidget(self.filter_edit)
         self.list = QListWidget()
@@ -130,7 +132,7 @@ class TagPalettePopup(QFrame):
         self.list.itemActivated.connect(self._on_pick)        # Enter
         self.list.itemDoubleClicked.connect(self._on_pick)    # double-click
         v.addWidget(self.list)
-        hint = QLabel("↑↓ scegli · Enter inserisci · Esc annulla")
+        hint = QLabel(tr("tagpal.hint"))
         hint.setStyleSheet("color:#777; font-size:10px; padding:4px 2px;")
         v.addWidget(hint)
         self.setFixedHeight(380)

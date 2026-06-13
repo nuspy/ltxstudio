@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel,
 )
 
+from ui.i18n_manager import tr
+
 
 def _fmt(ms: int) -> str:
     s = max(0, ms) // 1000
@@ -22,7 +24,7 @@ def _fmt(ms: int) -> str:
 class VideoPlayerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Video generato")
+        self.setWindowTitle(tr("player.window_title"))
         self.resize(740, 760)
         self._path: str | None = None
         self._loop = True
@@ -46,12 +48,12 @@ class VideoPlayerDialog(QDialog):
 
         # comandi
         c = QHBoxLayout()
-        self.play_btn = QPushButton("⏸ Pausa")
-        self.stop_btn = QPushButton("⏹ Stop")
-        self.back_btn = QPushButton("⏪ Indietro 5s")
-        self.restart_btn = QPushButton("↺ Reinizia")
-        self.loop_btn = QPushButton("🔁 Loop"); self.loop_btn.setCheckable(True); self.loop_btn.setChecked(True)
-        self.folder_btn = QPushButton("📂 Apri cartella")
+        self.play_btn = QPushButton(tr("player.pause"))
+        self.stop_btn = QPushButton(tr("player.stop"))
+        self.back_btn = QPushButton(tr("player.back_5s"))
+        self.restart_btn = QPushButton(tr("player.restart"))
+        self.loop_btn = QPushButton(tr("player.loop")); self.loop_btn.setCheckable(True); self.loop_btn.setChecked(True)
+        self.folder_btn = QPushButton(tr("player.open_folder"))
         for b in (self.play_btn, self.stop_btn, self.back_btn, self.restart_btn, self.loop_btn):
             c.addWidget(b)
         c.addStretch(1)
@@ -77,7 +79,7 @@ class VideoPlayerDialog(QDialog):
 
     def play_file(self, path: str):
         self._path = path
-        self.setWindowTitle(f"Video generato — {Path(path).name}")
+        self.setWindowTitle(tr("player.window_title_file").format(name=Path(path).name))
         self.player.setSource(QUrl.fromLocalFile(path))
         self.player.play()
         self.show(); self.raise_(); self.activateWindow()
@@ -100,7 +102,7 @@ class VideoPlayerDialog(QDialog):
         self.seek.setRange(0, ms); self.dur_lbl.setText(_fmt(ms))
 
     def _on_state(self, st):
-        self.play_btn.setText("⏸ Pausa" if st == QMediaPlayer.PlayingState else "▶ Play")
+        self.play_btn.setText(tr("player.pause") if st == QMediaPlayer.PlayingState else tr("player.play"))
 
     def _on_media_status(self, st):
         if self._loop and st == QMediaPlayer.MediaStatus.EndOfMedia:

@@ -36,9 +36,9 @@ SCHEDULERS = [
 # Encoder testo del VIDEO LTX (nodo 5079), ordinati per QUALITÀ/aderenza al prompt.
 # Stessa dimensione (12B) → nessuna differenza di velocità: si sceglie solo per resa.
 VIDEO_ENCODERS = [
-    ("Auto (da SFW/NSFW)", None),   # default: il preset sceglie (SFW→full, NSFW→abliterated)
-    ("Gemma 3 12B — full (qualità max)", "gemma_3_12B_it.safetensors"),
-    ("Gemma 3 12B — abliterated (NSFW, decensurato)", "gemma_3_12B_it_abliterated.safetensors"),
+    ("adv.encoder.auto", None),   # default: il preset sceglie (SFW→full, NSFW→abliterated)
+    ("adv.encoder.gemma_full", "gemma_3_12B_it.safetensors"),
+    ("adv.encoder.gemma_abliterated", "gemma_3_12B_it_abliterated.safetensors"),
 ]
 
 
@@ -120,8 +120,8 @@ class SamplerSeedGroup(QGroupBox):
         f.addRow(tr("adv.shift_lbl"), shift_row)
 
         self.encoder = QComboBox()
-        for label, fn in VIDEO_ENCODERS:
-            self.encoder.addItem(label, fn)
+        for label_key, fn in VIDEO_ENCODERS:
+            self.encoder.addItem(tr(label_key), fn)
         self.encoder.setToolTip(tr("adv.encoder.tt"))
         f.addRow(tr("adv.encoder_lbl"), self.encoder)
 
@@ -140,9 +140,9 @@ class SamplerSeedGroup(QGroupBox):
 
     # ---------- suggest API (chiamata da VideoTab quando cambia il modello) ----------
     def set_suggested_steps(self, steps: int, note: str = ""):
-        tip = f"Consigliato per questo modello: {steps}"
+        tip = tr("adv.suggested.tip").format(value=steps)
         if note:
-            tip += f" ({note})"
+            tip += tr("adv.suggested.note").format(note=note)
         self.steps.setToolTip(tip)
         if not self._steps_user_modified or self.steps.value() == self._DEFAULT_STEPS:
             self._steps_user_modified = False
@@ -168,9 +168,9 @@ class SamplerSeedGroup(QGroupBox):
             self._scheduler_user_modified = False
 
     def set_suggested_cfg(self, cfg: float, note: str = ""):
-        tip = f"Consigliato per questo modello: {cfg}"
+        tip = tr("adv.suggested.tip").format(value=cfg)
         if note:
-            tip += f" ({note})"
+            tip += tr("adv.suggested.note").format(note=note)
         self.cfg.setToolTip(tip)
         if not self._cfg_user_modified or abs(self.cfg.value() - self._DEFAULT_CFG) < 0.01:
             self._cfg_user_modified = False

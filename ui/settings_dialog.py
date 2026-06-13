@@ -10,11 +10,13 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, QLabel, QScrollArea, QWidget,
 )
 
+from ui.i18n_manager import tr
+
 
 class SettingsDialog(QDialog):
     def __init__(self, engine, driver, current_overrides: dict | None = None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Impostazioni — modelli per nodo")
+        self.setWindowTitle(tr("settings.window_title"))
         self.resize(640, 560)
         self.engine = engine
         self.driver = driver
@@ -22,8 +24,7 @@ class SettingsDialog(QDialog):
         self._overrides = current_overrides or {}
 
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("Per ogni nodo loader puoi scegliere un modello diverso. "
-                             "Le liste vengono dai file disponibili in ComfyUI."))
+        lay.addWidget(QLabel(tr("settings.intro")))
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         inner = QWidget(); form = QFormLayout(inner)
         # cache liste per folder

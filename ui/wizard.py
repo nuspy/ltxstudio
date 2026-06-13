@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QLabel, QComboBox, QPlainTextEdit, QDoubleSpinBox,
 )
 
+from ui.i18n_manager import tr
+
 
 GOALS = {
     "Text → Video": {"image": False, "audio_mode": "native"},
@@ -21,29 +23,29 @@ GOALS = {
 class _GoalPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Cosa vuoi creare?")
+        self.setTitle(tr("wizard.goal_title"))
         lay = QVBoxLayout(self)
         self.goal = QComboBox(); self.goal.addItems(list(GOALS.keys()))
-        lay.addWidget(QLabel("Scegli l'obiettivo:")); lay.addWidget(self.goal)
+        lay.addWidget(QLabel(tr("wizard.goal_label"))); lay.addWidget(self.goal)
         self.nsfw = QComboBox(); self.nsfw.addItems(["SFW", "NSFW"])
-        lay.addWidget(QLabel("Contenuto:")); lay.addWidget(self.nsfw)
+        lay.addWidget(QLabel(tr("wizard.content_label"))); lay.addWidget(self.nsfw)
 
 
 class _PromptPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Descrivi il video (prompt)")
+        self.setTitle(tr("wizard.prompt_title"))
         lay = QVBoxLayout(self)
-        self.prompt = QPlainTextEdit(); self.prompt.setPlaceholderText("Descrizione del video…")
+        self.prompt = QPlainTextEdit(); self.prompt.setPlaceholderText(tr("wizard.prompt_placeholder"))
         lay.addWidget(self.prompt)
         self.length = QDoubleSpinBox(); self.length.setRange(1, 60); self.length.setValue(8); self.length.setSuffix(" s")
-        lay.addWidget(QLabel("Durata:")); lay.addWidget(self.length)
+        lay.addWidget(QLabel(tr("wizard.length_label"))); lay.addWidget(self.length)
 
 
 class SetupWizard(QWizard):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("LTX Studio — Wizard")
+        self.setWindowTitle(tr("wizard.window_title"))
         self.goal_page = _GoalPage(); self.prompt_page = _PromptPage()
         self.addPage(self.goal_page); self.addPage(self.prompt_page)
 
