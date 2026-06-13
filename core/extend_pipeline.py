@@ -30,6 +30,13 @@ LTX = {
 # Limite di sicurezza: oltre questo numero di segmenti avvisiamo (tempo/disco), non blocchiamo.
 SOFT_MAX_SEGMENTS = 60
 
+# Regola di segmentazione (richiesta utente):
+# - durata da aggiungere <= SINGLE_PASS_MAX_S → UN UNICO spezzone (niente giunzioni → niente
+#   segmento nero da stitch);
+# - oltre → spezzoni da SPLIT_SEG_S con sovrapposizione (overlap_frames) per la continuità.
+SINGLE_PASS_MAX_S = 20.0
+SPLIT_SEG_S = 18.0
+
 
 def to_8np1(n: int) -> int:
     """LTX richiede length = 8n+1."""
@@ -66,6 +73,20 @@ class ExtendPipeline:
         seg_seconds = max(1.0, float(seg_seconds))
         import math
         return max(1, math.ceil(max(1.0, add_seconds) / seg_seconds))
+
+    def plan_segments(self, add_seconds: float,
+                      split_seg_s: float | None = None) -> tuple[int, float]:
+        """Pianifica (n_segmenti, secondi_per_segmento) secondo la regola:
+        - `add_seconds` <= SINGLE_PASS_MAX_S (20s): 1 spezzone della durata piena (niente giunzioni);
+        - oltre: spezzoni da `split_seg_s` (default 18s) CON sovrapposizione (overlap_frames).
+        """
+        import math
+        add = max(1.0, float(add_seconds))
+        seg = float(split_seg_s or SPLIT_SEG_S)
+        seg = max(2.0, min(seg, SINGLE_PASS_MAX_S))
+        if add <= SINGLE_PASS_MAX_S:
+            return 1, add
+        return max(2, math.ceil(add / seg)), seg
 
     def build(self, video_name: str, prompt: str, *, width: int = 768, height: int = 768,
               fps: int = 24, add_seconds: float = 5.0, seg_seconds: float = 4.0,
