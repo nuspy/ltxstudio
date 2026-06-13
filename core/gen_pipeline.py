@@ -47,6 +47,7 @@ class GenPipeline:
         self.ernie_encoder: str | None = None     # risolto solo se presente su disco
         self.ernie_vae = FLUX2_VAE
         self._clip_types: list[str] | None = None  # tipi CLIPLoader supportati (inventario live)
+        self._text_encoders: list[str] = []        # encoder testo installati (per FLUX.2 per-variante)
 
     # ---------- inventario live (chiamato da MainWindow dopo object_info) ----------
     def set_inventory(self, text_encoders: list[str] | None = None,
@@ -55,6 +56,8 @@ class GenPipeline:
         """Risolve encoder/VAE per Z-Image ed Ernie dai nomi reali delle combo ComfyUI."""
         if clip_types is not None:
             self._clip_types = list(clip_types)
+        if text_encoders is not None:
+            self._text_encoders = list(text_encoders)
         if text_encoders:
             zi = self._pick(text_encoders, ("qwen_3_4b", "qwen3_4b", "qwen_3", "qwen3"))
             if zi:
@@ -169,8 +172,8 @@ class GenPipeline:
         """Applica gli override UI sui nodi del workflow generato (post-build).
 
         - sampler/scheduler/cfg → KSampler.sampler_name/scheduler/cfg (se presenti)
-        - encoder → CLIPLoader.clip_name (primo che trova)
-        - clip_type → CLIPLoader.type
+        - encoder → CLIPLoader.clip_name OPPURE DualCLIPLoader.clip_name1 (encoder primario/T5)
+        - clip_type → CLIPLoader.type / DualCLIPLoader.type
         - vae → VAELoader.vae_name
         """
         for n in prompt.values():
@@ -184,6 +187,14 @@ class GenPipeline:
             elif ct == "CLIPLoader":
                 if encoder and isinstance(ins.get("clip_name"), str):
                     ins["clip_name"] = encoder
+                if clip_type and isinstance(ins.get("type"), str):
+                    ins["type"] = clip_type
+            elif ct == "DualCLIPLoader":
+                # FLUX usa DualCLIPLoader: clip_name1 = encoder grande (T5xxl), clip_name2 = clip_l.
+                # L'"Encoder" scelto in GUI sovrascrive il PRIMARIO (clip_name1); clip_l resta invariato.
+                # Senza questo ramo la scelta dell'encoder era un no-op silenzioso su FLUX.
+                if encoder and isinstance(ins.get("clip_name1"), str):
+                    ins["clip_name1"] = encoder
                 if clip_type and isinstance(ins.get("type"), str):
                     ins["type"] = clip_type
             elif ct == "VAELoader":
@@ -218,7 +229,15 @@ class GenPipeline:
         return self._from_golden(arch, prompt, width, height, seed)
 
     def _flux2(self, unet, prompt, w, h, seed, steps, guidance, negative, loras):
-        """FLUX.2: CLIPLoader(mistral, type flux2) + VAE flux2 + EmptyFlux2LatentImage."""
+        """FLUX.2: CLIPLoader(encoder per-variante, type flux2) + VAE flux2 + EmptyFlux2LatentImage.
+
+        L'encoder NON è unico: FLUX.2 [dev]/[pro] usa Mistral-3 24B (15360), Klein usa Qwen3-8B
+        (12288) o Qwen3-4B (7680). Lo risolviamo leggendo `txt_in` del modello → niente più
+        crash `mat1 and mat2 shapes cannot be multiplied`."""
+        from core.flux2_encoder import resolve_encoder
+        encoder, err = resolve_encoder(unet, self._text_encoders, default=FLUX2_CLIP)
+        if err:
+            raise RuntimeError("[ERR] gen FLUX.2: " + err)
         p = {}
         p["1"] = {"class_type": "UNETLoader", "inputs": {"unet_name": unet, "weight_dtype": "default"}}
         mref = ["1", 0]
@@ -228,7 +247,7 @@ class GenPipeline:
                       "inputs": {"model": mref, "lora_name": lo["name"],
                                  "strength_model": float(lo.get("strength", 1.0))}}
             mref = [nid, 0]
-        p["2"] = {"class_type": "CLIPLoader", "inputs": {"clip_name": FLUX2_CLIP, "type": "flux2"}}
+        p["2"] = {"class_type": "CLIPLoader", "inputs": {"clip_name": encoder, "type": "flux2"}}
         p["3"] = {"class_type": "VAELoader", "inputs": {"vae_name": FLUX2_VAE}}
         p["4"] = {"class_type": "CLIPTextEncode", "inputs": {"text": prompt or "", "clip": ["2", 0]}}
         p["5"] = {"class_type": "FluxGuidance", "inputs": {"conditioning": ["4", 0], "guidance": float(guidance)}}

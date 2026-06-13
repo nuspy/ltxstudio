@@ -25,13 +25,22 @@ class KontextPipeline:
         self.fx = dict(FLUX1_DEFAULTS)
         if flux1:
             self.fx.update({k: v for k, v in flux1.items() if v})
+        self._text_encoders: list[str] = []      # encoder testo installati (FLUX.2 per-variante)
+
+    def set_inventory(self, text_encoders: list[str] | None = None) -> None:
+        """Inventario encoder live (per scegliere l'encoder FLUX.2 corretto per-variante)."""
+        if text_encoders is not None:
+            self._text_encoders = list(text_encoders)
 
     def build(self, image_file: str, prompt: str, *, engine: str = "kontext",
               model: str | None = None, negative: str = "", steps: int = 20,
               guidance: float = 2.5, seed: int = 0,
               aux_lora: str | None = None, aux_strength: float = 1.0) -> dict:
-        flux2 = (engine == "flux2")
         unet = model or KONTEXT_MODEL
+        # flux2-ness DERIVATA DAL MODELLO (non dal flag engine): così VAE/encoder/latent combaciano
+        # SEMPRE col modello caricato. Selezionare engine FLUX.2 con un modello FLUX.1 (o il
+        # fallback Kontext) dava `img_in` 512-vs-64 (VAE flux2 → modello flux1). Ora impossibile.
+        flux2 = is_flux2(unet)
         p: dict = {}
         p["1"] = {"class_type": "UNETLoader", "inputs": {"unet_name": unet, "weight_dtype": "default"}}
         mref = ["1", 0]
@@ -40,7 +49,11 @@ class KontextPipeline:
                        "inputs": {"model": mref, "lora_name": aux_lora, "strength_model": float(aux_strength)}}
             mref = ["20", 0]
         if flux2:
-            p["2"] = {"class_type": "CLIPLoader", "inputs": {"clip_name": FLUX2_CLIP, "type": "flux2"}}
+            from core.flux2_encoder import resolve_encoder
+            encoder, err = resolve_encoder(unet, self._text_encoders, default=FLUX2_CLIP)
+            if err:
+                raise RuntimeError("[ERR] integra FLUX.2: " + err)
+            p["2"] = {"class_type": "CLIPLoader", "inputs": {"clip_name": encoder, "type": "flux2"}}
             p["3"] = {"class_type": "VAELoader", "inputs": {"vae_name": FLUX2_VAE}}
         else:
             p["2"] = {"class_type": "DualCLIPLoader",
