@@ -97,10 +97,10 @@ class Frame1Tab(QWidget):
         _placeholder = self._prompt_tab()        # crea self.img_nsfw / self.prompt / self.neg
         _placeholder.setVisible(False)
         sub = QTabWidget()
-        sub.addTab(self._scroll(self._gen_box()), "Genera immagine")
-        sub.addTab(self._scroll(self._inpaint_box()), "Inpaint / Outpaint")
-        sub.addTab(self._scroll(self._color_box()), "Colore")
-        sub.addTab(self._scroll(self._upscale_box()), "Definizione")
+        sub.addTab(self._scroll(self._gen_box()), tr("f1.tab.gen"))
+        sub.addTab(self._scroll(self._inpaint_box()), tr("f1.tab.inpaint"))
+        sub.addTab(self._scroll(self._color_box()), tr("f1.tab.color"))
+        sub.addTab(self._scroll(self._upscale_box()), tr("f1.tab.upscale"))
         self.segment_box = self._segment_box()    # selezione AI (sotto il canvas, nel pannello principale)
 
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
@@ -140,34 +140,34 @@ class Frame1Tab(QWidget):
 
     # ---------- generazione immagine di partenza ----------
     def _gen_box(self) -> QGroupBox:
-        box = QGroupBox("Genera immagine di partenza")
+        box = QGroupBox(tr("f1.gen.group"))
         f = QFormLayout(box)
-        f.addRow("Contenuto immagine:", self.img_nsfw)
+        f.addRow(tr("f1.gen.content_lbl"), self.img_nsfw)
         self.gen_arch = QComboBox(); self.gen_arch.addItems(list(GEN_ARCH.keys()))
         self.gen_arch.currentTextChanged.connect(self._reload_gen)
         self.gen_arch.currentTextChanged.connect(self._sync_gen_lora_arch)
         self.gen_arch.currentTextChanged.connect(self._apply_arch_defaults)
-        f.addRow("Architettura:", self.gen_arch)
+        f.addRow(tr("f1.gen.arch_lbl"), self.gen_arch)
         self.gen_model = QComboBox()
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)
         gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
         gmrow.addWidget(self.gen_model, 1)
         self.gen_star = QToolButton(); self.gen_star.setText("☆")
         self.gen_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
-        self.gen_star.setToolTip("Preferito: il modello selezionato va in cima alla lista.")
+        self.gen_star.setToolTip(tr("f1.gen.star.tt"))
         self.gen_star.clicked.connect(self._toggle_gen_fav)
         gmrow.addWidget(self.gen_star)
-        gmw = QWidget(); gmw.setLayout(gmrow); f.addRow("Modello:", gmw)
+        gmw = QWidget(); gmw.setLayout(gmrow); f.addRow(tr("f1.model_lbl"), gmw)
         # Encoder / VAE / Type CLIP — popolati dall'inventario ComfyUI via set_gen_inventory().
         # I default si auto-impostano al cambio di architettura (_apply_arch_defaults).
         self.gen_encoder = QComboBox(); self.gen_encoder.setEditable(False)
-        f.addRow("Text encoder:", self.gen_encoder)
+        f.addRow(tr("f1.gen.encoder_lbl"), self.gen_encoder)
         self.gen_clip_type = QComboBox()
-        f.addRow("CLIP type:", self.gen_clip_type)
+        f.addRow(tr("f1.gen.clip_lbl"), self.gen_clip_type)
         self.gen_vae = QComboBox()
-        f.addRow("VAE:", self.gen_vae)
+        f.addRow(tr("f1.gen.vae_lbl"), self.gen_vae)
         # LoRA multi-select (come nel tab Video)
-        lora_group = QGroupBox("LoRA per l'immagine")
+        lora_group = QGroupBox(tr("f1.gen.lora.group"))
         lora_vl = QVBoxLayout(lora_group)
         self.gen_lora_tab = LoraTab(allow_nsfw_getter=self._allow_nsfw, embedded=True, arch="Flux")
         lora_vl.addWidget(self.gen_lora_tab)
@@ -181,7 +181,7 @@ class Frame1Tab(QWidget):
         self.gen_sampler.addItems(["euler", "euler_ancestral_cfg_pp", "dpmpp_2m", "res_2s"])
         self.gen_sampler.setToolTip("euler/dpmpp = affidabili. res_2s = più dettaglio su Flux "
                                     "(NON usarlo su LTX video, lì rompe).")
-        f.addRow("Sampler:", self.gen_sampler)
+        f.addRow(tr("f1.sampler_lbl"), self.gen_sampler)
         self.gen_scheduler = QComboBox()
         self.gen_scheduler.addItem("auto", None)
         self.gen_scheduler.addItems(["karras", "bong_tangent", "beta", "simple"])
@@ -190,7 +190,7 @@ class Frame1Tab(QWidget):
             "• bong_tangent / kl_optimal / beta57 — alta qualità (flow-aware), spesso i migliori su Flux\n"
             "• karras — dettaglio classico · beta — distilled · exponential — morbido"
         )
-        f.addRow("Scheduler:", self.gen_scheduler)
+        f.addRow(tr("f1.scheduler_lbl"), self.gen_scheduler)
         self.gen_enhance = QCheckBox("🪄 Migliora prompt (LLM Qwen3)")
         self.gen_enhance.setChecked(False)
         self.gen_enhance.setToolTip(
@@ -199,26 +199,26 @@ class Frame1Tab(QWidget):
             "Primo uso: scarica il modello Qwen3-4B (~3GB).")
         f.addRow(self.gen_enhance)
         self.gen_steps = QSpinBox(); self.gen_steps.setRange(1, 80); self.gen_steps.setValue(20)
-        f.addRow("Steps:", self.gen_steps)
+        f.addRow(tr("f1.steps_lbl"), self.gen_steps)
         self.gen_cfg = QDoubleSpinBox(); self.gen_cfg.setRange(0.0, 20.0); self.gen_cfg.setSingleStep(0.1)
         self.gen_cfg.setValue(3.5)
-        f.addRow("CFG:", self.gen_cfg)
+        f.addRow(tr("f1.cfg_lbl"), self.gen_cfg)
         # Seed + checkbox random/fisso
         seedrow = QHBoxLayout()
         self.gen_seed = QSpinBox(); self.gen_seed.setRange(0, 2_147_483_647); self.gen_seed.setValue(0)
-        self.gen_seed_rand = QCheckBox("🎲 casuale"); self.gen_seed_rand.setChecked(True)
+        self.gen_seed_rand = QCheckBox(tr("f1.seed_rand")); self.gen_seed_rand.setChecked(True)
         self.gen_seed.setEnabled(False)
         self.gen_seed_rand.toggled.connect(lambda on: self.gen_seed.setEnabled(not on))
         seedrow.addWidget(self.gen_seed, 1); seedrow.addWidget(self.gen_seed_rand)
-        seedw = QWidget(); seedw.setLayout(seedrow); f.addRow("Seed:", seedw)
+        seedw = QWidget(); seedw.setLayout(seedrow); f.addRow(tr("f1.seed_lbl"), seedw)
         # Prompt positivo dedicato (opzionale) + Prompt negativo
         self.gen_prompt = QPlainTextEdit(); self.gen_prompt.setMaximumHeight(40)
-        self.gen_prompt.setPlaceholderText("Prompt immagine (vuoto = usa il prompt globale)")
-        f.addRow("Prompt img:", self.gen_prompt)
+        self.gen_prompt.setPlaceholderText(tr("f1.gen.prompt.ph"))
+        f.addRow(tr("f1.gen.prompt_lbl"), self.gen_prompt)
         self.gen_neg = QPlainTextEdit(DEFAULT_NEG); self.gen_neg.setMaximumHeight(40)
-        self.gen_neg.setPlaceholderText("Prompt negativo per l'immagine…")
-        f.addRow("Negativo:", self.gen_neg)
-        self.gen_btn = QPushButton("🖼️ Genera immagine")
+        self.gen_neg.setPlaceholderText(tr("f1.gen.neg.ph"))
+        f.addRow(tr("f1.neg_lbl"), self.gen_neg)
+        self.gen_btn = QPushButton(tr("f1.gen.btn"))
         self.gen_btn.clicked.connect(lambda: self.request_generate.emit())
         f.addRow(self.gen_btn)
         self.gen_warn_lbl = QLabel("")
@@ -453,23 +453,23 @@ class Frame1Tab(QWidget):
         )
 
         # ============ SEZIONE 1: INPAINT / OUTPAINT ============
-        ipo_box = QGroupBox("🎨 Inpaint / Outpaint")
+        ipo_box = QGroupBox(tr("f1.inpaint.group"))
         f = QFormLayout(ipo_box)
         self.inpaint_prompt = QPlainTextEdit(); self.inpaint_prompt.setMaximumHeight(36)
-        self.inpaint_prompt.setPlaceholderText("Prompt area mascherata (inpaint)…")
-        f.addRow("Prompt inpaint:", self.inpaint_prompt)
+        self.inpaint_prompt.setPlaceholderText(tr("f1.inpaint.prompt.ph"))
+        f.addRow(tr("f1.inpaint.prompt_lbl"), self.inpaint_prompt)
         self.outpaint_prompt = QPlainTextEdit(); self.outpaint_prompt.setMaximumHeight(36)
-        self.outpaint_prompt.setPlaceholderText("Estensione oltre i bordi (outpaint)…")
-        f.addRow("Prompt outpaint:", self.outpaint_prompt)
+        self.outpaint_prompt.setPlaceholderText(tr("f1.outpaint.prompt.ph"))
+        f.addRow(tr("f1.outpaint.prompt_lbl"), self.outpaint_prompt)
         self.inp_neg = QPlainTextEdit(DEFAULT_NEG); self.inp_neg.setMaximumHeight(36)
-        self.inp_neg.setPlaceholderText("Prompt negativo (cosa evitare)…")
-        f.addRow("Negativo:", self.inp_neg)
+        self.inp_neg.setPlaceholderText(tr("f1.inpaint.neg.ph"))
+        f.addRow(tr("f1.neg_lbl"), self.inp_neg)
         srow = QHBoxLayout()
         self.strength = QSlider(Qt.Horizontal); self.strength.setRange(0, 100); self.strength.setValue(75)
         self.strength_lbl = QLabel("0.75")
         self.strength.valueChanged.connect(lambda v: self.strength_lbl.setText(f"{v/100:.2f}"))
         srow.addWidget(self.strength); srow.addWidget(self.strength_lbl)
-        sw = QWidget(); sw.setLayout(srow); f.addRow("Forza (mantenimento):", sw)
+        sw = QWidget(); sw.setLayout(srow); f.addRow(tr("f1.inpaint.strength_lbl"), sw)
         self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
         self.inp_model.currentTextChanged.connect(self._reload_inpaint_loras)
         self.inp_model.currentTextChanged.connect(self._update_inp_star)
@@ -477,23 +477,23 @@ class Frame1Tab(QWidget):
         imrow.addWidget(self.inp_model, 1)
         self.inp_star = QToolButton(); self.inp_star.setText("☆")
         self.inp_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
-        self.inp_star.setToolTip("Preferito: segna il modello inpaint selezionato.")
+        self.inp_star.setToolTip(tr("f1.inpaint.star.tt"))
         self.inp_star.clicked.connect(self._toggle_inp_fav)
         imrow.addWidget(self.inp_star)
-        imw = QWidget(); imw.setLayout(imrow); f.addRow("Modello:", imw)
-        self.inp_lora = QComboBox(); f.addRow("LoRA:", self.inp_lora)
+        imw = QWidget(); imw.setLayout(imrow); f.addRow(tr("f1.model_lbl"), imw)
+        self.inp_lora = QComboBox(); f.addRow(tr("f1.inpaint.lora_lbl"), self.inp_lora)
         self.inp_steps = QSpinBox(); self.inp_steps.setRange(1, 80); self.inp_steps.setValue(20)
-        f.addRow("Steps:", self.inp_steps)
+        f.addRow(tr("f1.steps_lbl"), self.inp_steps)
         seedrow = QHBoxLayout()
         self.inp_seed = QSpinBox(); self.inp_seed.setRange(0, 2_147_483_647); self.inp_seed.setValue(0)
-        self.inp_seed_rand = QCheckBox("🎲 casuale"); self.inp_seed_rand.setChecked(True)
+        self.inp_seed_rand = QCheckBox(tr("f1.seed_rand")); self.inp_seed_rand.setChecked(True)
         self.inp_seed.setEnabled(False)
         self.inp_seed_rand.toggled.connect(lambda on: self.inp_seed.setEnabled(not on))
         seedrow.addWidget(self.inp_seed, 1); seedrow.addWidget(self.inp_seed_rand)
-        sw2 = QWidget(); sw2.setLayout(seedrow); f.addRow("Seed:", sw2)
+        sw2 = QWidget(); sw2.setLayout(seedrow); f.addRow(tr("f1.seed_lbl"), sw2)
         # bottoni Genera per inpaint/outpaint
         brow = QHBoxLayout()
-        b_in = QPushButton("🎨 Genera inpaint"); b_in.clicked.connect(lambda: self.canvas.request_inpaint.emit())
+        b_in = QPushButton(tr("f1.inpaint.btn")); b_in.clicked.connect(lambda: self.canvas.request_inpaint.emit())
         b_out = QPushButton("⬜ Genera outpaint"); b_out.clicked.connect(lambda: self.canvas.request_outpaint.emit())
         brow.addWidget(b_in); brow.addWidget(b_out)
         bw = QWidget(); bw.setLayout(brow); f.addRow(bw)
@@ -507,39 +507,50 @@ class Frame1Tab(QWidget):
         int_box = QGroupBox("🧩 Integra immagini (fondi le immagini extra incollate sul canvas)")
         g = QFormLayout(int_box)
         self.integrate_prompt = QPlainTextEdit(); self.integrate_prompt.setMaximumHeight(36)
-        self.integrate_prompt.setPlaceholderText("Opzionale: come integrare (vuoto = automatico)…")
-        g.addRow("Prompt integra:", self.integrate_prompt)
+        self.integrate_prompt.setPlaceholderText(tr("f1.integrate.prompt.ph"))
+        g.addRow(tr("f1.integrate.prompt_lbl"), self.integrate_prompt)
         self.integrate_engine = QComboBox()
         self.integrate_engine.addItems(["Kontext (FLUX.1)", "FLUX.2 (sperimentale)"])
-        self.integrate_engine.setToolTip("Kontext: modello di editing dedicato (consigliato). "
-                                         "FLUX.2: usa il modello FLUX.2 selezionato sotto.")
+        self.integrate_engine.setToolTip(tr("f1.integrate.engine.tt"))
         # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 vs FLUX.2) +
         # abilitazione del puzzle_lora (LoRA FLUX.1 incompatibile con FLUX.2).
         self.integrate_engine.currentIndexChanged.connect(self._on_integrate_engine_changed)
-        g.addRow("Motore integra:", self.integrate_engine)
-        self.integrate_puzzle = QCheckBox("usa puzzle_lora (MagicQuill, solo Kontext)")
-        self.integrate_puzzle.setChecked(True)
-        self.integrate_puzzle.setToolTip("LoRA 'foreground' di MagicQuill: aiuta a fondere l'oggetto. "
-                                         "Richiede MagicQuill\\puzzle_lora.safetensors tra le LoRA.")
+        g.addRow(tr("f1.integrate.engine_lbl"), self.integrate_engine)
+        self.integrate_puzzle = QCheckBox(tr("f1.integrate.puzzle"))
+        self.integrate_puzzle.setChecked(False)   # OFF di default: introduce un artefatto a cornice
+        self.integrate_puzzle.setToolTip(
+            "SPERIMENTALE / sconsigliato. puzzle_lora è una LoRA FLUX.1 (formato diffusers) NON di "
+            "armonizzazione: applicata da sola su Kontext inietta una CORNICE attorno alla figura.\n"
+            "L'integrazione Kontext armonizza già senza (riferimento + prompt). Lasciala spenta.")
         g.addRow("", self.integrate_puzzle)
         self.integrate_model = QComboBox()
         # Label dinamica: aggiornata da _on_integrate_engine_changed.
-        self._integrate_model_label = QLabel("Modello:")
+        self._integrate_model_label = QLabel(tr("f1.model_lbl"))
         g.addRow(self._integrate_model_label, self.integrate_model)
         # Campi duplicati (negativo/steps/seed) dedicati all'integrazione: il pipeline
         # generate_integrate userà questi al posto di quelli inpaint.
         self.int_neg = QPlainTextEdit(DEFAULT_NEG); self.int_neg.setMaximumHeight(36)
-        self.int_neg.setPlaceholderText("Prompt negativo (cosa evitare)…")
-        g.addRow("Negativo:", self.int_neg)
+        self.int_neg.setPlaceholderText(tr("f1.inpaint.neg.ph"))
+        g.addRow(tr("f1.neg_lbl"), self.int_neg)
         self.int_steps = QSpinBox(); self.int_steps.setRange(1, 80); self.int_steps.setValue(20)
-        g.addRow("Steps:", self.int_steps)
+        g.addRow(tr("f1.steps_lbl"), self.int_steps)
+        # Guidance (FluxGuidance) regolabile: Kontext FLUX.1 ~2.5; FLUX.2 ~4. Più alta = più aderenza
+        # al prompt/riferimento (e più "forzatura"); più bassa = integrazione più morbida.
+        grow = QHBoxLayout()
+        self.int_guidance = QSlider(Qt.Horizontal); self.int_guidance.setRange(10, 100)  # /10 → 1.0..10.0
+        self.int_guidance.setValue(25)
+        self.int_guidance_lbl = QLabel("2.5")
+        self.int_guidance.valueChanged.connect(lambda v: self.int_guidance_lbl.setText(f"{v/10:.1f}"))
+        self.int_guidance.setToolTip(tr("f1.integrate.guidance.tt"))
+        grow.addWidget(self.int_guidance, 1); grow.addWidget(self.int_guidance_lbl)
+        g.addRow(tr("f1.integrate.guidance_lbl"), self._wrapw(grow))
         intseedrow = QHBoxLayout()
         self.int_seed = QSpinBox(); self.int_seed.setRange(0, 2_147_483_647); self.int_seed.setValue(0)
-        self.int_seed_rand = QCheckBox("🎲 casuale"); self.int_seed_rand.setChecked(True)
+        self.int_seed_rand = QCheckBox(tr("f1.seed_rand")); self.int_seed_rand.setChecked(True)
         self.int_seed.setEnabled(False)
         self.int_seed_rand.toggled.connect(lambda on: self.int_seed.setEnabled(not on))
         intseedrow.addWidget(self.int_seed, 1); intseedrow.addWidget(self.int_seed_rand)
-        sw3 = QWidget(); sw3.setLayout(intseedrow); g.addRow("Seed:", sw3)
+        sw3 = QWidget(); sw3.setLayout(intseedrow); g.addRow(tr("f1.seed_lbl"), sw3)
         # bottone Integra spostato qui dal canvas/workspace
         b_int = QPushButton("🧩 Integra immagini")
         b_int.clicked.connect(lambda: self.request_integrate.emit())
@@ -550,27 +561,26 @@ class Frame1Tab(QWidget):
 
     # ---------- cambia colore (Kontext prompt-based, stile MagicQuill) ----------
     def _color_box(self) -> QGroupBox:
-        box = QGroupBox("Cambia colore (Kontext)")
+        box = QGroupBox(tr("f1.color.group"))
         f = QFormLayout(box)
         crow = QHBoxLayout()
-        self.color_target = QLineEdit(); self.color_target.setPlaceholderText("es. rosso acceso, blu navy, #cc0000")
+        self.color_target = QLineEdit(); self.color_target.setPlaceholderText(tr("f1.color.target.ph"))
         self.color_swatch = QLabel(); self.color_swatch.setFixedSize(26, 26)
         self.color_swatch.setStyleSheet("border:1px solid #555; border-radius:5px;")
         cbtn = QPushButton("🎨 scegli"); cbtn.clicked.connect(self._pick_color)
         crow.addWidget(self.color_target, 1); crow.addWidget(self.color_swatch); crow.addWidget(cbtn)
-        f.addRow("Colore:", self._wrapw(crow))
+        f.addRow(tr("f1.color.color_lbl"), self._wrapw(crow))
         self.color_subject = QLineEdit()
-        self.color_subject.setPlaceholderText("opzionale: cosa ricolorare (es. la maglietta, l'auto)")
-        f.addRow("Soggetto:", self.color_subject)
+        self.color_subject.setPlaceholderText(tr("f1.color.subject.ph"))
+        f.addRow(tr("f1.color.subject_lbl"), self.color_subject)
         self.color_engine = QComboBox(); self.color_engine.addItems(["Kontext (FLUX.1)", "FLUX.2 (sperimentale)"])
-        f.addRow("Motore:", self.color_engine)
+        f.addRow(tr("f1.engine_lbl"), self.color_engine)
         self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
-        f.addRow("Steps:", self.color_steps)
-        self.color_btn = QPushButton("🎨 Cambia colore")
+        f.addRow(tr("f1.steps_lbl"), self.color_steps)
+        self.color_btn = QPushButton(tr("f1.color.btn"))
         self.color_btn.clicked.connect(lambda: self.request_recolor.emit())
         f.addRow(self.color_btn)
-        note = QLabel("Indica il soggetto col testo (o usa la selezione AI / maschera). "
-                      "Mantiene texture, materiale e luce: cambia solo il colore.")
+        note = QLabel(tr("f1.color.note"))
         note.setWordWrap(True); note.setStyleSheet("color:#888;")
         f.addRow(note)
         return box
@@ -607,18 +617,18 @@ class Frame1Tab(QWidget):
 
     # ---------- selezione oggetto (GroundingDINO / CLIPSeg + SAM) ----------
     def _segment_box(self) -> QGroupBox:
-        box = QGroupBox("Seleziona oggetto (maschera automatica — segue i contorni)")
+        box = QGroupBox(tr("f1.seg.group"))
         v = QVBoxLayout(box)
         r1 = QHBoxLayout()
-        r1.addWidget(QLabel("Da testo:"))
-        self.seg_text = QLineEdit(); self.seg_text.setPlaceholderText("es. costume da bagno, capelli, viso, mani…")
+        r1.addWidget(QLabel(tr("f1.seg.text_lbl")))
+        self.seg_text = QLineEdit(); self.seg_text.setPlaceholderText(tr("f1.seg.text.ph"))
         self.seg_text.returnPressed.connect(lambda: self.request_segment_text.emit())
         r1.addWidget(self.seg_text, 1)
-        seg_btn = QPushButton("🎯 Seleziona"); seg_btn.clicked.connect(lambda: self.request_segment_text.emit())
+        seg_btn = QPushButton(tr("f1.seg.btn")); seg_btn.clicked.connect(lambda: self.request_segment_text.emit())
         r1.addWidget(seg_btn)
         v.addLayout(r1)
         r2 = QHBoxLayout()
-        r2.addWidget(QLabel("Detector:"))
+        r2.addWidget(QLabel(tr("f1.seg.detector_lbl")))
         self.seg_detector = QComboBox()
         # Il «Detector» riguarda SOLO la selezione DA TESTO (pulsante 🎯). La selezione col
         # PUNTATORE (click/box sul canvas) usa sempre SAM vanilla in automatico e non passa
@@ -628,7 +638,7 @@ class Frame1Tab(QWidget):
         self.seg_detector.addItem("GroundingDINO (solo, più veloce)", userData="grounding_dino_only")
         self.seg_detector.setCurrentIndex(0)
         r2.addWidget(self.seg_detector, 1)
-        r2.addWidget(QLabel("Soglia:"))
+        r2.addWidget(QLabel(tr("f1.seg.threshold_lbl")))
         self.seg_threshold = QDoubleSpinBox()
         self.seg_threshold.setRange(0.10, 0.95); self.seg_threshold.setSingleStep(0.05)
         # 0.50 per GroundingDINO: 0.30-0.40 selezionava spesso l'intera immagine
@@ -644,10 +654,9 @@ class Frame1Tab(QWidget):
         v.addLayout(r2)
         self.seg_detector.currentIndexChanged.connect(self._on_seg_detector_changed)
         r3 = QHBoxLayout()
-        r3.addWidget(QLabel("Modello SAM (puntatore):"))
+        r3.addWidget(QLabel(tr("f1.seg.sam_lbl")))
         self.seg_sam = QComboBox(); self.seg_sam.setMinimumWidth(200)
-        self.seg_sam.setToolTip("Usato SOLO dalla selezione col puntatore (click/box sul canvas). "
-                                "Deve essere un SAM vanilla (sam_vit_b/l/h): i SAM-HQ qui non sono compatibili.")
+        self.seg_sam.setToolTip(tr("f1.seg.sam.tt"))
         r3.addWidget(self.seg_sam, 1)
         v.addLayout(r3)
         hint = QLabel(
@@ -702,42 +711,40 @@ class Frame1Tab(QWidget):
 
     # ---------- aumenta definizione (upscale AI) ----------
     def _upscale_box(self) -> QGroupBox:
-        box = QGroupBox("🔍 Aumenta definizione (upscale AI)")
+        box = QGroupBox(tr("f1.upscale.group"))
         f = QFormLayout(box)
         self.up_model = QComboBox(); self.up_model.setMinimumWidth(220)
-        f.addRow("Modello:", self.up_model)
+        f.addRow(tr("f1.model_lbl"), self.up_model)
         srow = QHBoxLayout()
         self.up_scale = QComboBox(); self.up_scale.addItems(["2x", "3x", "4x"]); self.up_scale.setCurrentText("4x")
         srow.addWidget(self.up_scale)
-        srow.addWidget(QLabel("Modalità:"))
+        srow.addWidget(QLabel(tr("f1.upscale.mode_lbl")))
         self.up_mode = QComboBox(); self.up_mode.addItems(["Solo modello (veloce)", "Modello + rifinitura AI (più dettaglio)"])
         self.up_mode.currentIndexChanged.connect(self._on_up_mode)
         srow.addWidget(self.up_mode, 1)
-        sw = QWidget(); sw.setLayout(srow); f.addRow("Fattore:", sw)
+        sw = QWidget(); sw.setLayout(srow); f.addRow(tr("f1.upscale.factor_lbl"), sw)
         # rifinitura AI (FLUX img2img a denoise basso)
         self.up_refine_model = QComboBox()
-        f.addRow("Modello rifinitura:", self.up_refine_model)
+        f.addRow(tr("f1.upscale.refine_model_lbl"), self.up_refine_model)
         rrow = QHBoxLayout()
         self.up_refine_str = QSlider(Qt.Horizontal); self.up_refine_str.setRange(5, 70); self.up_refine_str.setValue(30)
         self.up_refine_str_lbl = QLabel("0.30")
         self.up_refine_str.valueChanged.connect(lambda v: self.up_refine_str_lbl.setText(f"{v/100:.2f}"))
         rrow.addWidget(self.up_refine_str); rrow.addWidget(self.up_refine_str_lbl)
         self.up_refine_steps = QSpinBox(); self.up_refine_steps.setRange(4, 40); self.up_refine_steps.setValue(12)
-        rrow.addWidget(QLabel("Steps:")); rrow.addWidget(self.up_refine_steps)
-        rw = QWidget(); rw.setLayout(rrow); f.addRow("Forza rifinitura:", rw)
-        up_btn = QPushButton("🔍 Aumenta definizione")
+        rrow.addWidget(QLabel(tr("f1.steps_lbl"))); rrow.addWidget(self.up_refine_steps)
+        rw = QWidget(); rw.setLayout(rrow); f.addRow(tr("f1.upscale.refine_strength_lbl"), rw)
+        up_btn = QPushButton(tr("f1.upscale.btn"))
         up_btn.clicked.connect(lambda: self.request_upscale.emit())
         f.addRow(up_btn)
-        hint = QLabel("Modello: super-risoluzione AI sull'immagine del canvas (forti per foto: 4xNomos8kSCHAT-L, "
-                      "4xRealWebPhoto, 4x-UltraSharpV2). Rifinitura AI: passata FLUX a denoise basso sull'immagine "
-                      "ingrandita per inventare dettaglio (più lenta/pesante).")
+        hint = QLabel(tr("f1.upscale.hint"))
         hint.setStyleSheet("color:#888;"); hint.setWordWrap(True); f.addRow(hint)
 
         from PySide6.QtWidgets import QFrame as _QFrame
         sep = _QFrame(); sep.setFrameShape(_QFrame.HLine)
         sep.setStyleSheet("color:#333; margin-top:6px;")
         f.addRow(sep)
-        restore_btn = QPushButton("🔧 Restaura / Colora foto…")
+        restore_btn = QPushButton(tr("f1.restore.btn"))
         restore_btn.setToolTip(
             "Apre il tab Restauro Foto con questa immagine pre-selezionata.\n"
             "Operazioni disponibili:\n"
@@ -830,14 +837,12 @@ class Frame1Tab(QWidget):
     # Popola dinamicamente il dropdown Inpaint con TUTTI i modelli FLUX disponibili:
     # - checkpoint Flux (CheckpointLoaderSimple → ramo `checkpoint` del pipeline)
     # - UNET Flux/Fill da diffusion_models (UNETLoader → ramo `unet`)
-    # Il filtro è permissivo: include qualunque file che sembra FLUX.1, escludendo solo
-    # FLUX.2 (encoder/VAE incompatibili) e i Kontext (modello editing, non inpaint).
+    # - UNET FLUX.2 (es. FLUX.2 [dev]): ora gestiti da `_build_flux2` (VAE flux2 + encoder
+    #   per-variante). Restano fuori solo i Kontext (modello editing, non inpaint).
     def _refresh_inpaint_checkpoints(self, checkpoint_models: list[str]):
-        # heuristic: identifica file FLUX-compatibili dal nome (catalogo è opzionale)
+        # heuristic: identifica file FLUX/FLUX.2-compatibili dal nome (catalogo è opzionale)
         def is_flux_like(name: str) -> bool:
             n = (name or "").lower()
-            if _is_flux2(n):
-                return False
             if "kontext" in n:
                 return False
             # esclusioni tecniche
@@ -945,6 +950,7 @@ class Frame1Tab(QWidget):
             # Campi dedicati all'integrazione (duplicati rispetto a inpaint/outpaint)
             "integrate_negative": self.int_neg.toPlainText().strip(),
             "integrate_steps": self.int_steps.value(),
+            "integrate_guidance": self.int_guidance.value() / 10.0,
             "integrate_seed": None if self.int_seed_rand.isChecked() else self.int_seed.value(),
             # Campi inpaint/outpaint
             "negative": self.inp_neg.toPlainText().strip(),

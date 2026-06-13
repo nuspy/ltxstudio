@@ -9,8 +9,11 @@ from PySide6.QtCore import QObject, QTimer, Signal, Qt
 from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QPushButton,
-    QLabel, QProgressBar, QPlainTextEdit, QMessageBox,
+    QLabel, QProgressBar, QPlainTextEdit, QMessageBox, QProgressDialog, QApplication,
+    QMenu, QToolButton,
 )
+
+from ui.i18n_manager import tr, i18n, LANGUAGES, LANG_FLAGS
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.comfy_driver import ComfyDriver           # noqa: E402
@@ -81,7 +84,7 @@ class ComfyBridge(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("LTX Studio — LTX-2.3 (MVP)")
+        self.setWindowTitle(tr("window.title"))
         self.resize(1180, 740)
 
         self.driver = ComfyDriver()
@@ -115,6 +118,7 @@ class MainWindow(QMainWindow):
         self._sam_models: list[str] = []
         self._seg_pid: str | None = None
         self._inventory_set = False
+        self._text_encoders: list[str] = []     # encoder testo installati (cache per auto-download FLUX.2)
         self.gen_dialog = GenProgressDialog(self, on_cancel=self._cancel_gen)
         self.video_player: VideoPlayerDialog | None = None
         self._build_ui()
@@ -144,6 +148,9 @@ class MainWindow(QMainWindow):
         if getattr(self, "_last_video_path", None):
             self.video_def_tab.set_video(self._last_video_path)
             self.video_extend_tab.set_video(self._last_video_path)
+
+        # Auto-avvio ComfyUI se non è già in esecuzione (il polling sotto lo rileva quando è pronto).
+        self._maybe_autostart_comfyui()
 
         # poll stato ComfyUI + completamento job
         self._status_timer = QTimer(self); self._status_timer.timeout.connect(self._refresh_status)
@@ -181,19 +188,19 @@ class MainWindow(QMainWindow):
         self.video_extend_tab = VideoExtendTab()
         self.restore_tab = RestoreTab()
         self.models_tab = ImportModelsTab()
-        self.tabs.addTab(self.frame1_tab, "Immagini")
-        self.tabs.addTab(self.audio_tab, "Audio / Voce")
-        self.tabs.addTab(self.video_tab, "Video")
-        self.tabs.addTab(self.controlnet_tab, "ControlNet")
-        self.tabs.addTab(self.video_extend_tab, "Prolunga video")
+        self.tabs.addTab(self.frame1_tab, tr("tab.images"))
+        self.tabs.addTab(self.audio_tab, tr("tab.audio_voice"))
+        self.tabs.addTab(self.video_tab, tr("tab.video"))
+        self.tabs.addTab(self.controlnet_tab, tr("tab.controlnet"))
+        self.tabs.addTab(self.video_extend_tab, tr("tab.extend_video"))
         # «Migliora qualità» = unione di Restauro foto (🖼 Foto) + Definizione video (🎬 Video)
         self.quality_tab = QTabWidget()
-        self.quality_tab.addTab(self.restore_tab, "🖼 Foto")
-        self.quality_tab.addTab(self.video_def_tab, "🎬 Video")
-        self.tabs.addTab(self.quality_tab, "✨ Migliora qualità")
+        self.quality_tab.addTab(self.restore_tab, tr("tab.quality.photo"))
+        self.quality_tab.addTab(self.video_def_tab, tr("tab.quality.video"))
+        self.tabs.addTab(self.quality_tab, tr("tab.quality"))
         # Import Models diventa un sotto-tab di Avanzate
         self.advanced_tab.attach_models(self.models_tab)
-        self.tabs.addTab(self.advanced_tab, "Avanzate")
+        self.tabs.addTab(self.advanced_tab, tr("tab.advanced"))
         # NB: i tab (immagine di editing) vengono aggiunti DOPO il pannello anteprima,
         #     così l'anteprima sta a SINISTRA e l'editing a DESTRA (posizioni invertite).
 
@@ -212,14 +219,14 @@ class MainWindow(QMainWindow):
         work.addWidget(self.frame1_tab.canvas, 1)        # spazio di lavoro per l'immagine
         work.addWidget(self.frame1_tab.segment_box)      # sistema di selezione con AI, sotto il canvas
         btns = QHBoxLayout()
-        self.gen_btn = QPushButton("🎬 Genera"); self.gen_btn.setObjectName("generate")
+        self.gen_btn = QPushButton(tr("btn.generate")); self.gen_btn.setObjectName("generate")
         self.gen_btn.clicked.connect(self.on_generate)
-        self.cancel_btn = QPushButton("⏹ Interrompi"); self.cancel_btn.clicked.connect(self.driver.interrupt)
-        self.free_vram_btn = QPushButton("🗑 Libera VRAM")
-        self.free_vram_btn.setToolTip("Scarica i modelli dalla VRAM di ComfyUI (libera memoria GPU)")
+        self.cancel_btn = QPushButton(tr("btn.stop")); self.cancel_btn.clicked.connect(self.driver.interrupt)
+        self.free_vram_btn = QPushButton(tr("btn.free_vram"))
+        self.free_vram_btn.setToolTip(tr("btn.free_vram.tt"))
         self.free_vram_btn.clicked.connect(self._on_free_vram)
-        self.navigator_btn = QPushButton("🗂 Navigator")
-        self.navigator_btn.setToolTip("Sfoglia le generazioni precedenti e riutilizza i parametri (Ctrl+G)")
+        self.navigator_btn = QPushButton(tr("btn.navigator"))
+        self.navigator_btn.setToolTip(tr("btn.navigator.tt"))
         self.navigator_btn.clicked.connect(self._open_navigator)
         btns.addWidget(self.gen_btn, 2); btns.addWidget(self.cancel_btn, 1)
         btns.addWidget(self.free_vram_btn, 1); btns.addWidget(self.navigator_btn, 1)
@@ -241,12 +248,41 @@ class MainWindow(QMainWindow):
             self._log("    Cattura il golden prompt (templates/README_capture.md) e riavvia.")
 
     def _build_menu(self):
-        m = self.menuBar().addMenu("Strumenti")
-        act_wiz = m.addAction("Wizard guidato…"); act_wiz.triggered.connect(self.open_wizard)
-        act_set = m.addAction("Impostazioni modelli…"); act_set.triggered.connect(self.open_settings)
-        act_nav = m.addAction("🗂 Navigator Gallery…  Ctrl+G"); act_nav.triggered.connect(self._open_navigator)
-        act_ana = m.addAction("🔍 Analizza impostazioni…"); act_ana.triggered.connect(self._open_analyzer)
-        act_wfl = m.addAction("🎬 Workflow predefiniti…"); act_wfl.triggered.connect(self._open_workflow)
+        m = self.menuBar().addMenu(tr("menu.tools"))
+        act_wiz = m.addAction(tr("menu.wizard")); act_wiz.triggered.connect(self.open_wizard)
+        act_set = m.addAction(tr("menu.settings")); act_set.triggered.connect(self.open_settings)
+        act_nav = m.addAction(tr("menu.navigator_gallery")); act_nav.triggered.connect(self._open_navigator)
+        act_ana = m.addAction(tr("menu.analyzer")); act_ana.triggered.connect(self._open_analyzer)
+        act_wfl = m.addAction(tr("menu.workflow")); act_wfl.triggered.connect(self._open_workflow)
+        # ── selettore lingua (sempre visibile nella status bar) ──────────────────────
+        self._lang_btn = QToolButton()
+        self._lang_btn.setText(f"{LANG_FLAGS.get(i18n.current_lang(), '🌐')} {LANGUAGES.get(i18n.current_lang(), '')}")
+        self._lang_btn.setToolTip(tr("lang.icon_tt"))
+        self._lang_btn.setPopupMode(QToolButton.InstantPopup)
+        lang_menu = QMenu(self._lang_btn)
+        for code, name in LANGUAGES.items():
+            flag = LANG_FLAGS.get(code, "")
+            act = lang_menu.addAction(f"{flag} {name}")
+            act.setData(code)
+            if code == i18n.current_lang():
+                act.setCheckable(True); act.setChecked(True)
+            act.triggered.connect(lambda _=False, c=code: self._change_language(c))
+        self._lang_btn.setMenu(lang_menu)
+        self.statusBar().addPermanentWidget(self._lang_btn)
+
+    def _change_language(self, lang_code: str):
+        """Cambia lingua, aggiorna il pulsante e avvisa di riavviare."""
+        changed = i18n.set_language(lang_code)
+        if not changed:
+            return
+        flag = LANG_FLAGS.get(lang_code, "🌐")
+        name = LANGUAGES.get(lang_code, lang_code)
+        self._lang_btn.setText(f"{flag} {name}")
+        QMessageBox.information(
+            self,
+            tr("lang.changed.title"),
+            tr("lang.changed.msg"),
+        )
 
     def open_settings(self):
         if not self.engine:
@@ -422,6 +458,92 @@ class MainWindow(QMainWindow):
             pass
         super().closeEvent(event)
 
+    def _maybe_autostart_comfyui(self):
+        """Se ComfyUI non risponde su 127.0.0.1:8188, lo avvia in automatico (finestra separata,
+        via run_nvidia.bat). Non blocca: `_refresh_status` rileva quando è pronto e carica
+        l'inventario. Se è già attivo, non fa nulla."""
+        try:
+            if self.driver.is_up():
+                return
+            from core.comfy_launcher import launch
+            ok, msg = launch()
+            self._log(f"[ComfyUI] {msg}" if ok else f"[ComfyUI] auto-avvio saltato: {msg}")
+            if ok and hasattr(self, "status_lbl"):
+                self.status_lbl.setText("ComfyUI: 🟡 avvio automatico in corso… (pronto tra ~30-90s)")
+        except Exception as e:                   # noqa: BLE001
+            self._log(f"[ComfyUI] auto-avvio errore: {e}")
+
+    def _ensure_flux2_encoder(self, unet: str | None) -> bool:
+        """Pre-check FLUX.2: se il modello è FLUX.2 e il suo encoder testo manca, OFFRE di scaricarlo
+        (Comfy-Org via huggingface_hub). Ritorna True se si può procedere (encoder presente o appena
+        scaricato), False se l'utente annulla o il download fallisce. Per i non-FLUX.2 ritorna True."""
+        try:
+            from core.gen_pipeline import is_flux2
+            if not unet or not is_flux2(unet):
+                return True
+            from core.flux2_encoder import resolve_encoder, txt_in_indim
+            _enc, err = resolve_encoder(unet, self._text_encoders)
+            if not err:
+                return True                          # encoder già presente
+            from core.encoder_downloader import source_for
+            indim = txt_in_indim(unet)
+            src = source_for(indim)
+            if not src:
+                return True                          # nessuna fonte nota → il build mostrerà il messaggio
+            repo, _f, local_name, gb, label = src
+            ans = QMessageBox.question(
+                self, "Encoder FLUX.2 mancante",
+                f"Il modello FLUX.2 selezionato richiede l'encoder testo {label} (~{gb:.1f} GB), "
+                f"non installato.\n\nScaricarlo ora da Hugging Face?\n({repo})",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+            if ans != QMessageBox.Yes:
+                return False
+            ok, msg, rel = self._run_encoder_download(indim)
+            if ok and rel:
+                if rel not in self._text_encoders:
+                    self._text_encoders.append(rel)
+                for p in (self.inpainter, self.genpipe, self.kontext):
+                    try:
+                        p.set_inventory(text_encoders=self._text_encoders)
+                    except Exception:
+                        pass
+                self._log(f"[FLUX.2] {msg} → {rel}")
+                QMessageBox.information(
+                    self, "Encoder pronto",
+                    f"Encoder scaricato:\n{rel}\n\nProcedo con la generazione.\n"
+                    "(Se ComfyUI segnala 'value not in list', riavvialo una volta.)")
+                return True
+            QMessageBox.warning(self, "Download non riuscito",
+                                f"{msg}\n\nIn alternativa usa FLUX.2 [dev] o un modello FLUX Fill.")
+            return False
+        except Exception as e:                       # noqa: BLE001
+            self._log(f"[FLUX.2] pre-check encoder errore: {e}")
+            return True                              # non bloccare: il build deciderà
+
+    def _run_encoder_download(self, indim: int):
+        """Esegue il download in un thread tenendo viva la UI (dialog indeterminato). Ritorna
+        (ok, msg, nome_relativo)."""
+        import concurrent.futures
+        import time as _time
+        from core.encoder_downloader import download, source_for
+        gb = source_for(indim)[3] if source_for(indim) else 0.0
+        dlg = QProgressDialog(
+            f"Scaricamento encoder FLUX.2 (~{gb:.1f} GB) in corso…\n"
+            "Può richiedere diversi minuti (download resumable).", "", 0, 0, self)
+        dlg.setWindowTitle("Download encoder FLUX.2")
+        dlg.setCancelButton(None)
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.show()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(download, indim, log=self._log)
+            while not fut.done():
+                QApplication.processEvents()
+                _time.sleep(0.05)
+            res = fut.result()
+        dlg.close()
+        return res
+
     def _refresh_status(self):
         up = self.driver.is_up()
         self.status_lbl.setText(
@@ -509,7 +631,10 @@ class MainWindow(QMainWindow):
         _tes = names("CLIPLoader", "clip_name")
         _vaes = names("VAELoader", "vae_name")
         _ctypes = names("CLIPLoader", "type")
+        self._text_encoders = list(_tes)     # cache per l'auto-download encoder FLUX.2
         self.genpipe.set_inventory(text_encoders=_tes, vaes=_vaes, clip_types=_ctypes)
+        self.inpainter.set_inventory(text_encoders=_tes)   # encoder FLUX.2 per-variante (inpaint/outpaint)
+        self.kontext.set_inventory(text_encoders=_tes)     # encoder FLUX.2 per-variante (integra/colore)
         # Popola anche i dropdown UI della sezione «Genera immagine»
         if hasattr(self.frame1_tab, "set_gen_inventory"):
             self.frame1_tab.set_gen_inventory(text_encoders=_tes, vaes=_vaes, clip_types=_ctypes)
@@ -967,6 +1092,9 @@ class MainWindow(QMainWindow):
                                 f"{cfg.get('unet')}\n\n"
                                 f"Se è in download, attendi il termine e l'ingest; poi riavvia ComfyUI.")
             return
+        # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
+        if not self._ensure_flux2_encoder(cfg.get("unet")):
+            return
         ptxt = (cfg["inpaint_prompt"] if mode == "inpaint" else cfg["outpaint_prompt"]) \
             or self.frame1_tab.get_values().get("prompt_positive", "")
         retention = cfg.get("strength", 0.75)
@@ -999,7 +1127,7 @@ class MainWindow(QMainWindow):
                 img_name, ptxt, mode=mode, mask_file=mask_name, denoise=denoise,
                 seed=seed, lora=cfg.get("lora"), feather=feather, mask_grow=grow,
                 unet=cfg.get("unet"), checkpoint=cfg.get("checkpoint"),
-                steps=steps, negative=negative)
+                steps=steps, negative=negative, retention=retention)
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = mode
             self.gen_dialog.start(prompt, "Outpainting" if mode == "outpaint" else "Inpainting")
@@ -1030,6 +1158,9 @@ class MainWindow(QMainWindow):
         if engine == "flux2" and not model:
             QMessageBox.warning(self, "Modello FLUX.2 mancante",
                                 "Per il motore FLUX.2 scegli un modello FLUX.2 nel menu integra."); return
+        # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
+        if not self._ensure_flux2_encoder(model):
+            return
         ptxt = cfg.get("integrate_prompt") or ""        # opzionale: default auto in KontextPipeline
         try:
             exp = self.frame1_tab.canvas.export_integrate(OUTPUT_DIR)
@@ -1045,8 +1176,10 @@ class MainWindow(QMainWindow):
             steps = cfg.get("integrate_steps") or 20
             negative = cfg.get("integrate_negative") or ""
             aux = cfg.get("integrate_puzzle_lora") or None    # puzzle_lora opzionale (solo Kontext)
+            guidance = cfg.get("integrate_guidance", 2.5)
             prompt = self.kontext.integrate(img_name, ptxt, engine=engine, model=model,
-                                            negative=negative, seed=seed, steps=steps, aux_lora=aux)
+                                            negative=negative, seed=seed, steps=steps,
+                                            guidance=guidance, aux_lora=aux)
             self._inpaint_pid = self.driver.submit(prompt)
             self._inpaint_mode = "integrazione"
             self.gen_dialog.start(prompt, f"Integrazione ({'FLUX.2' if engine == 'flux2' else 'Kontext'})")
@@ -1140,7 +1273,9 @@ class MainWindow(QMainWindow):
             if str(dest) != str(src):
                 shutil.copy2(src, dest)
             v = self.video_tab.get_values()
-            n_seg = self.extender.segment_count(cfg["add_seconds"], cfg.get("seg_seconds", 4.0))
+            # Regola: <=20s → 1 spezzone (no giunzioni); >20s → spezzoni da 18s con sovrapposizione.
+            n_seg, seg_seconds = self.extender.plan_segments(
+                cfg["add_seconds"], cfg.get("seg_seconds"))
             # forza contesto: override dall'auto-extend, altrimenti dai settings Avanzate
             ctx_strength = getattr(self, "_auto_extend_ctx_strength", None)
             if ctx_strength is None:
@@ -1155,7 +1290,7 @@ class MainWindow(QMainWindow):
             ext_model = v.get("model_standard")        # modello diffusion attivo (None se gguf/auto → fallback distilled)
             prompt = self.extender.build(
                 src.name, cfg["prompt"], width=v["width"], height=v["height"], fps=int(v.get("fps", 24)),
-                add_seconds=cfg["add_seconds"], seg_seconds=cfg.get("seg_seconds", 4.0),
+                add_seconds=cfg["add_seconds"], seg_seconds=seg_seconds, segments=n_seg,
                 overlap_frames=cfg["overlap_frames"], context_frames=cfg["context_frames"],
                 overlap_strength=float(ctx_strength),
                 steps=int(sv.get("steps") or cfg["steps"]), cfg=float(sv.get("cfg") or 1.0),
@@ -1217,6 +1352,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Prompt vuoto", "Inserisci un prompt immagine o globale."); return
         if not cfg["model"] or cfg["model"].startswith("("):
             QMessageBox.warning(self, "Nessun modello", f"Nessun modello {cfg['arch']} trovato."); return
+        # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
+        if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
+            return
         v = self.video_tab.get_values()
         loras = [{"name": l["name"], "strength": l["strength"]} for l in cfg.get("loras", [])]
         # FLUX: distinguo checkpoint vs UNET (CheckpointLoaderSimple vs UNETLoader)
@@ -1566,6 +1704,10 @@ class MainWindow(QMainWindow):
             else:
                 vals["ref_image_file"] = self._upload_local(self._extract_last_frame(es["accumulated"]))
                 vals["i2v_method"] = "addguide"
+            # Continuità audio dalla coda SOLO se la coda ha davvero una traccia audio (la base muta,
+            # o eros, produce video senza audio → niente da encodare). Il blocco TTS sotto può
+            # comunque forzarla a False (in quel caso la voce è il TTS affettato, non l'audio LTX).
+            vals["extend_audio_continuity"] = bool(tail) and self._has_audio_stream(es["accumulated"])
             vals["ref_strength"] = 0.6   # ancora più stretta → i primi `overlap` frame combaciano meglio
             # genera abbastanza da coprire il netto + l'overlap (fuso) + il freeze finale (tagliato)
             remaining = es["target"] - es["produced"]
@@ -1657,7 +1799,13 @@ class MainWindow(QMainWindow):
             cmd = ["ffmpeg", "-y", "-ss", str(start)]
             if end:
                 cmd += ["-to", str(end)]
-            cmd += ["-i", video, "-c:v", "libx264", "-an", str(out)]
+            cmd += ["-i", video, "-c:v", "libx264"]
+            # CONSERVA l'audio della coda se la sorgente ne ha uno: serve a _extend_audio_continuity
+            # (LTXVAudioVAEEncode legge l'audio della coda). Con `-an` il file restava senza stream
+            # audio e ffmpeg falliva ("Output file does not contain any stream"). Se la sorgente è
+            # muta, resta `-an` (niente continuità audio, gestita a monte).
+            cmd += (["-c:a", "aac"] if self._has_audio_stream(video) else ["-an"])
+            cmd += [str(out)]
             r = subprocess.run(cmd, capture_output=True, text=True)
             return name if (r.returncode == 0 and out.exists()) else None
         except Exception:
@@ -1672,6 +1820,19 @@ class MainWindow(QMainWindow):
             return float(r.stdout.strip())
         except Exception:
             return 0.0
+
+    @staticmethod
+    def _has_audio_stream(video: str) -> bool:
+        """True se il video contiene almeno una traccia audio (ffprobe). Evita di chiedere a
+        LTXVAudioVAEEncode di leggere l'audio da un file muto (crash ffmpeg 'no stream')."""
+        import subprocess
+        try:
+            r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a",
+                                "-show_entries", "stream=index", "-of", "csv=p=0", video],
+                               capture_output=True, text=True)
+            return bool(r.stdout.strip())
+        except Exception:
+            return False
 
     @staticmethod
     def _probe_resolution(video: str):
