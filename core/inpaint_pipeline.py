@@ -30,11 +30,47 @@ def is_flux2(name: str) -> bool:
     return "flux_2" in n or "flux2" in n or "flux 2" in n or "klein" in n
 
 
+def _is_hyper(name: str) -> bool:
+    """True per i modelli guidance-distilled (Hyper/Turbo/Lightning/Schnell/LCM): vanno usati a
+    guidance BASSA (~1-3.5). Alta guidance (es. 30 di FLUX Fill) → output piatto/monocolore."""
+    n = (name or "").lower()
+    return any(k in n for k in ("hyper", "hyp8", "hyp-8", "hyp_8", "turbo",
+                                "lightning", "schnell", "distill", "lcm"))
+
+
 class InpaintPipeline:
     def __init__(self, models: dict | None = None):
         self.m = dict(DEFAULTS)
         if models:
             self.m.update({k: v for k, v in models.items() if v})
+        self._text_encoders: list[str] = []      # encoder testo installati (per FLUX.2 per-variante)
+
+    def set_inventory(self, text_encoders: list[str] | None = None) -> None:
+        """Inventario encoder live (per scegliere l'encoder FLUX.2 giusto per-variante)."""
+        if text_encoders is not None:
+            self._text_encoders = list(text_encoders)
+
+    @staticmethod
+    def effective_guidance(model_name: str, guidance: float,
+                           retention: float | None, flux2: bool) -> float:
+        """Guidance EFFETTIVA per inpaint/outpaint.
+
+        - `retention` (Forza mantenimento, 0..1) la pilota quando fornita, per ENTRAMBE le modalità:
+          più mantenimento = più aderenza al contesto = guidance più alta.
+        - i modelli hyper/distilled e FLUX.2 lavorano a guidance bassa → range dedicati (evita il
+          bordo monocolore del Fill Hyper-8 a guidance 30).
+        """
+        hyper = _is_hyper(model_name)
+        if retention is None:
+            if flux2:
+                return guidance if (guidance and guidance <= 10) else 4.0
+            return min(guidance, 3.5) if hyper else guidance
+        r = max(0.0, min(1.0, float(retention)))
+        if flux2:
+            return round(2.0 + r * 4.0, 2)        # [2 .. 6]
+        if hyper:
+            return round(1.0 + r * 2.5, 2)        # [1 .. 3.5] — distillati: alta guidance = piatto
+        return round(4.0 + r * 26.0, 2)           # [4 .. 30] — FLUX Fill standard
 
     def build(self, image_file: str, prompt: str, *, mode: str = "inpaint",
               mask_file: str | None = None, denoise: float = 1.0, steps: int = 20,
@@ -43,9 +79,12 @@ class InpaintPipeline:
               feather: int = 24, mask_grow: int = 0,
               lora: str | None = None, lora_strength: float = 1.0,
               negative: str = "", checkpoint: str | None = None,
-              unet: str | None = None) -> dict:
+              unet: str | None = None, retention: float | None = None) -> dict:
         p: dict = {}
         unet = unet or self.m["unet"]
+        # Guidance da "Forza mantenimento" (inpaint E outpaint), con protezione hyper/FLUX.2.
+        guidance = self.effective_guidance(checkpoint or unet, guidance, retention,
+                                           flux2=(not checkpoint and is_flux2(unet)))
         # FLUX.2 (Klein NSFW): architettura edit, grafo dedicato (encoder Mistral + VAE flux2).
         if not checkpoint and is_flux2(unet):
             return self._build_flux2(image_file, prompt, mode=mode, mask_file=mask_file,
@@ -132,6 +171,11 @@ class InpaintPipeline:
         Guidance FLUX.2 bassa (default 4.0); il 30 di FLUX.1 Fill non si applica qui."""
         g = guidance if (guidance and guidance <= 10) else 4.0
         st = steps or 12
+        # Encoder per-variante (Klein Qwen3-8B/4B vs dev Mistral): leggi txt_in → niente crash dim.
+        from core.flux2_encoder import resolve_encoder
+        encoder, err = resolve_encoder(unet, self._text_encoders, default=FLUX2_CLIP)
+        if err:
+            raise RuntimeError("[ERR] inpaint FLUX.2: " + err)
         p: dict = {}
         if unet.lower().endswith(".gguf"):
             p["10"] = {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": unet}}
@@ -148,7 +192,7 @@ class InpaintPipeline:
         p["11"] = {"class_type": "DifferentialDiffusion", "inputs": {"model": model_ref}}
 
         p["12"] = {"class_type": "CLIPLoader",
-                   "inputs": {"clip_name": FLUX2_CLIP, "type": "flux2"}}
+                   "inputs": {"clip_name": encoder, "type": "flux2"}}
         p["13"] = {"class_type": "VAELoader", "inputs": {"vae_name": FLUX2_VAE}}
 
         p["17"] = {"class_type": "LoadImage", "inputs": {"image": image_file}}
