@@ -18,6 +18,7 @@ import asyncio
 import json
 import re
 import shutil
+import subprocess
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
@@ -26,6 +27,48 @@ from pathlib import Path
 VOICES_DIR = Path(__file__).resolve().parent.parent / "voices"
 SAMPLES_DIR = VOICES_DIR / "samples"     # campioni vocali persistiti (associati alle voci)
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "tts"
+# CosyVoice/F5/XTTS: il tokenizer vocale (Whisper) ha un tetto FISSO di 1500 frame = 30s.
+# Un campione più lungo crasha (ONNX "right operand cannot broadcast"). Tronchiamo a un valore
+# sotto soglia con margine. Per il zero-shot cloning bastano comunque 3-15s di parlato pulito.
+MAX_CLONE_SAMPLE_S = 28.0
+# Attesa massima per la sintesi via ComfyUI. Generosa: il PRIMO avvio scarica i pesi del
+# modello (CosyVoice-300M ~1.5GB da modelscope) + carica gli ONNX. Le run successive sono rapide.
+TTS_SYNTH_TIMEOUT_S = 1200.0
+
+
+def _probe_audio_duration(path: str | Path) -> float | None:
+    """Durata in secondi via ffprobe; None se non determinabile."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", str(path)],
+            capture_output=True, text=True, timeout=20)
+        return float((r.stdout or "").strip())
+    except Exception:
+        return None
+
+
+def prepare_clone_sample(sample_path: str | Path, max_seconds: float = MAX_CLONE_SAMPLE_S) -> str:
+    """Restituisce un campione pronto per il cloning, garantendo durata ≤ max_seconds.
+    Se il campione è già abbastanza corto lo ritorna invariato; altrimenti ne tronca i
+    primi `max_seconds` secondi (16 kHz mono WAV) in una cache, evitando il crash del
+    tokenizer Whisper di CosyVoice/F5/XTTS (limite 1500 frame = 30 s)."""
+    src = Path(sample_path)
+    dur = _probe_audio_duration(src)
+    if dur is not None and dur <= max_seconds + 0.05:
+        return str(src)
+    # tronca + normalizza a 16k mono (ciò che gli engine usano internamente)
+    cache = OUTPUT_DIR / "clone_cache"
+    cache.mkdir(parents=True, exist_ok=True)
+    out = cache / f"{src.stem}_{int(max_seconds)}s16k.wav"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-t", f"{max_seconds:.2f}", "-i", str(src),
+             "-ac", "1", "-ar", "16000", str(out)],
+            capture_output=True, text=True, timeout=60, check=True)
+        return str(out)
+    except Exception:
+        return str(src)   # se ffmpeg fallisce, prova comunque con l'originale
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -511,6 +554,14 @@ def _synthesize_comfy(engine: str, voice: VoicePreset, text: str, output: Path) 
             "Per il voice cloning serve un campione vocale (5-15s di parlato pulito).\n"
             "Usa il bottone «✏️ Modifica voce» per allegare un file e una trascrizione."
         )
+    # CosyVoice zero-shot (3s极速复刻) richiede la TRASCRIZIONE del campione (prompt_text):
+    # senza, il nodo asserisce "prompt文本为空" (prompt text vuoto). Diamo un errore chiaro.
+    if engine in ("cosyvoice2", "f5tts", "fish") and not (voice.sample_transcript or "").strip():
+        raise RuntimeError(
+            f"Il motore '{engine}' (clone zero-shot) richiede la TRASCRIZIONE del campione "
+            f"(cosa dice esattamente l'audio di '{voice.name}').\n"
+            "Aprila con «✏️ Modifica voce» e compila il campo «Trascrizione campione», poi riprova."
+        )
     # Costruzione workflow specifico per engine. Endpoint singolo: POST /prompt.
     workflow = _build_tts_workflow(engine, voice, text, output)
     # Esegue tramite ComfyDriver (API reale: ComfyDriver() + download_view, niente singleton)
@@ -518,8 +569,10 @@ def _synthesize_comfy(engine: str, voice: VoicePreset, text: str, output: Path) 
     drv = ComfyDriver()
     if not drv.is_up():
         raise RuntimeError(f"ComfyUI non è in esecuzione. Avvialo prima di usare il TTS '{engine}'.")
-    # Upload del sample audio nel folder input di ComfyUI (upload_image accetta anche audio)
-    sample_name = drv.upload_image(voice.sample_path).get("name", Path(voice.sample_path).name)
+    # Upload del sample audio nel folder input di ComfyUI (upload_image accetta anche audio).
+    # Tronca a ≤30s: oltre, il tokenizer Whisper di CosyVoice/F5/XTTS crasha (limite 1500 frame).
+    sample_for_upload = prepare_clone_sample(voice.sample_path)
+    sample_name = drv.upload_image(sample_for_upload).get("name", Path(sample_for_upload).name)
     # Rimpiazza il placeholder del sample nel workflow
     for n in workflow.values():
         ins = n.get("inputs", {})
@@ -527,13 +580,27 @@ def _synthesize_comfy(engine: str, voice: VoicePreset, text: str, output: Path) 
             if v == "__SAMPLE_AUDIO__":
                 ins[k] = sample_name
     pid = drv.submit(workflow)
-    # Attesa risultato (blocking, max ~120s)
+    # Attesa risultato. `history[pid]` compare SOLO a esecuzione conclusa (successo o errore):
+    # mentre ComfyUI lavora resta assente. Quindi NON è un timeout di inattività — il primo
+    # avvio di CosyVoice/F5/XTTS scarica i pesi (CosyVoice-300M ~1.5GB da modelscope) e carica
+    # gli ONNX: può richiedere parecchi minuti. Attesa generosa + uscita immediata su errore.
     import time
-    for _ in range(120):
+    deadline = time.monotonic() + TTS_SYNTH_TIMEOUT_S
+    while time.monotonic() < deadline:
         hist = drv.history(pid)
-        if hist and pid in hist:
-            outputs = hist[pid].get("outputs", {})
-            for nout in outputs.values():
+        entry = hist.get(pid) if hist else None
+        if entry:
+            status = entry.get("status", {}) or {}
+            # errore reale del nodo → esci subito col messaggio, non aspettare la deadline
+            if status.get("status_str") == "error" or status.get("completed") is False:
+                msgs = status.get("messages") or []
+                detail = ""
+                for m in msgs:
+                    if isinstance(m, list) and len(m) == 2 and "error" in str(m[0]).lower():
+                        detail = str(m[1])
+                        break
+                raise RuntimeError(f"TTS {engine}: errore in ComfyUI durante la sintesi. {detail}".strip())
+            for nout in (entry.get("outputs", {}) or {}).values():
                 for audio in nout.get("audio", []) or []:
                     fn = audio.get("filename", "")
                     if not fn:
@@ -543,9 +610,16 @@ def _synthesize_comfy(engine: str, voice: VoicePreset, text: str, output: Path) 
                     final = output.with_suffix(Path(fn).suffix)
                     final.write_bytes(data)
                     return final
-            break
-        time.sleep(1)
-    raise RuntimeError(f"TTS {engine} non ha prodotto output entro 120s.")
+            # concluso ma senza audio → inutile attendere oltre
+            raise RuntimeError(f"TTS {engine}: esecuzione conclusa ma nessun output audio prodotto.")
+        time.sleep(2)
+    # timeout: il job è quasi certamente piantato (es. deadlock del nodo CosyVoice su mix CPU/GPU).
+    # Interrompi su ComfyUI così non resta appeso a occupare VRAM.
+    drv.interrupt()
+    raise RuntimeError(
+        f"TTS {engine}: nessun output entro {int(TTS_SYNTH_TIMEOUT_S)}s — sintesi interrotta. "
+        "Il nodo si è probabilmente piantato (deadlock noto di CosyVoice-ComfyUI su alcune GPU). "
+        "Usa «Audio fornito da me» con una traccia pronta, oppure un altro engine di clone (F5-TTS/XTTS).")
 
 
 def _build_tts_workflow(engine: str, voice: VoicePreset, text: str, output: Path) -> dict:

@@ -162,6 +162,10 @@ class TemplateEngine:
         # alimenta il CFGGuider. Disattivabile con values["nag"] = False.
         if values.get("nag", True):
             self._apply_nag(prompt, values)
+        # PromptRelayEncodeTimeline pretende >=1 prompt LOCALE: senza, crasha
+        # ("At least one local prompt is required"). Nel superset il prompt entra da global_prompt
+        # e i local sono vuoti -> normalizziamo (sposta il globale in un singolo locale).
+        self._normalize_prompt_relay(prompt)
         # Pota i nodi NON raggiungibili dall'output principale: rimuove i rami inutilizzati (es. la
         # catena refine HR non selezionata, l'anteprima controlnet 5069→5103 con video baked 'A-5.mp4')
         # → niente errori di validazione ComfyUI per file inesistenti e niente abort di disable_modules.
@@ -557,13 +561,13 @@ class TemplateEngine:
                 node["class_type"] = "VAEDecodeTiled"
                 node["inputs"] = {"samples": latents, "vae": vae, "tile_size": 512,
                                   "overlap": 64, "temporal_size": 4096, "temporal_overlap": 8}
-        # OUTPUT come il riferimento: h264-mp4 crf 19 (NON nvenc_av1, che aggiunge dithering nei
-        # gradienti). Il VHS_VideoCombine accetta format/pix_fmt/crf come widget piatti.
-        for node in prompt.values():
-            if node.get("class_type") == "VHS_VideoCombine" and node.get("inputs", {}).get("save_output"):
-                node["inputs"]["format"] = "video/h264-mp4"
-                node["inputs"]["pix_fmt"] = "yuv420p"
-                node["inputs"]["crf"] = 19
+        # NB: NON forziamo più il formato di output a h264-mp4. Era un tentativo (sbagliato) di
+        # togliere il "dithering", che in realtà era lo scheduler dei "puntini" (già risolto a
+        # monte non collegando il latent a LTXVScheduler). Il config di formato `h264-mp4` di
+        # VHS_VideoCombine rimuxa l'audio con parametri (sample-rate/codec) diversi dal default del
+        # template e lo trasforma in RUMORE (es. modello `eros`), mentre il video — che dipende dal
+        # denoising, non dal contenitore — resta pulito. Lasciamo il nodo di output del template
+        # così com'è (formato provato che preserva l'audio).
         return prompt
 
     # ---------- cg-use-everywhere: risoluzione broadcast virtuali ----------
@@ -997,6 +1001,38 @@ class TemplateEngine:
             ins["model"] = [nag_id, 0]
             applied = True
         return applied
+
+    def _normalize_prompt_relay(self, prompt: dict) -> None:
+        """`PromptRelayEncode(Timeline)` richiede almeno un prompt LOCALE non vuoto
+        (`local_prompts` separati da '|'); altrimenti `_encode_relay` solleva
+        "At least one local prompt is required". Il nodo combina `global_prompt` (tutto il video)
+        + `local_prompts` (per-segmento) in un unico prompt mascherato per tempo.
+
+        Nel superset il prompt reale arriva da `global_prompt` (ShowText, eventualmente l'enhancer)
+        e `local_prompts` resta ' | ' (vuoto) → crash. Quando NON si usano davvero prompt timeline
+        (nessun local valido), spostiamo la sorgente del global in UN SINGOLO local e svuotiamo il
+        global: `full_prompt = " " + prompt`, 1 segmento = tutti i frame → stesso prompt, una sola
+        volta, su tutto il video. Preserva l'enhancer (manteniamo la connessione, non un literal).
+        Se invece l'utente ha messo local prompt veri (timeline), non tocchiamo nulla."""
+        for n in prompt.values():
+            if n.get("class_type") not in ("PromptRelayEncodeTimeline", "PromptRelayEncode"):
+                continue
+            ins = n.setdefault("inputs", {})
+            lp = ins.get("local_prompts")
+            if isinstance(lp, list):
+                continue  # local_prompts è una connessione → l'utente alimenta i segmenti, lascia stare
+            if lp and any(s.strip() for s in str(lp).split("|")):
+                continue  # ci sono già local prompt validi (timeline reale) → non toccare
+            gp = ins.get("global_prompt")
+            if isinstance(gp, list):
+                ins["local_prompts"] = gp            # sposta la connessione (enhancer/ShowText) nel locale
+                ins["global_prompt"] = ""
+            elif gp and str(gp).strip():
+                ins["local_prompts"] = gp             # global literal → diventa il locale
+                ins["global_prompt"] = ""
+            else:
+                continue  # nessun prompt né in global né in local → lascia il crash esplicito originale
+            ins["segment_lengths"] = ""               # auto-distribuzione: 1 local = 1 segmento su tutti i frame
 
     def _reroute_sigmas_to_scheduler(self, prompt: dict) -> None:
         """Per ogni SamplerCustomAdvanced il cui input `sigmas` punta a un nodo ManualSigmas,

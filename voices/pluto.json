@@ -1,10 +1,10 @@
 {
   "name": "Pluto",
-  "engine": "edge",
-  "voice_id": "it-IT-ElsaNeural",
+  "engine": "cosyvoice2",
+  "voice_id": "",
   "language": "it-IT",
   "note": "",
-  "sample_path": null,
-  "sample_transcript": "",
+  "sample_path": "E:\\AI\\ltxstudio\\voices\\samples\\pluto_8c832ad5.wav",
+  "sample_transcript": "Note: When logging into your Adobe account, you will see Welcome to Art Grid Dynamics Data Stream. Click Join Team, then select Keep files in personal cloud storage. After logging in, click the profile icon and switch to the team profile. Do not change the email, share login details, or leave the organization. If you have any issues with apps or features in future, log out and log in again, then join the new team using the same process.",
   "custom": true
 }

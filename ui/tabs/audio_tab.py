@@ -30,6 +30,7 @@ from core.tts_engine import (
 )
 from ui.widgets.tag_palette import install_tag_palette
 from ui.voice_dialog import VoiceDialog
+from ui.i18n_manager import tr
 
 
 # Marker testuali alti-livello con tooltip leggibile.
@@ -67,17 +68,13 @@ class AudioTab(QWidget):
     # ──────────────────────────────────────────────────────────────────
     def _build(self):
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("<b>Sorgente audio</b> (una sola attiva; le altre opzioni si disattivano)"))
+        lay.addWidget(QLabel(tr("aud.source.lbl")))
         self.grp = QButtonGroup(self)
-        self.rb_native = QRadioButton("Audio nativo LTX (il modello genera l'audio)"); self.rb_native.setChecked(True)
-        self.rb_user = QRadioButton("Audio fornito da me (file pronto)")
-        self.rb_clone = QRadioButton("Clona voce (usa una voce salvata col suo campione)")
-        self.rb_clone.setToolTip(
-            "Usa una voce salvata col suo campione (gestita nella libreria TTS qui sotto).\n"
-            "• Se scrivi un testo nel TTS → viene sintetizzato con quella voce.\n"
-            "• Se lasci il testo vuoto → il modello LTX genera il parlato dal prompt video "
-            "usando solo il timbro del campione.")
-        self.rb_mute = QRadioButton("🔇 Muto (nessun audio)")
+        self.rb_native = QRadioButton(tr("aud.rb_native")); self.rb_native.setChecked(True)
+        self.rb_user = QRadioButton(tr("aud.rb_user"))
+        self.rb_clone = QRadioButton(tr("aud.rb_clone"))
+        self.rb_clone.setToolTip(tr("aud.rb_clone.tt"))
+        self.rb_mute = QRadioButton(tr("aud.rb_mute"))
         for i, rb in enumerate((self.rb_native, self.rb_user, self.rb_clone, self.rb_mute)):
             self.grp.addButton(rb, i); lay.addWidget(rb)
         self.grp.buttonClicked.connect(self._on_mode)
@@ -88,47 +85,43 @@ class AudioTab(QWidget):
         self.clone_badge.setWordWrap(True)
         lay.addWidget(self.clone_badge)
 
-        self.no_sing = QCheckBox("🎤 Parla ma non cantare (pronuncia i dialoghi, niente canto)")
+        self.no_sing = QCheckBox(tr("aud.no_sing"))
         self.no_sing.setChecked(True)
         lay.addWidget(self.no_sing)
 
         # ── box file audio per la sola modalità «Audio fornito da me» (traccia pronta) ──
-        self.file_box = QGroupBox("Traccia audio pronta (per «Audio fornito da me»)")
+        self.file_box = QGroupBox(tr("aud.file.group"))
         fb = QHBoxLayout(self.file_box)
-        self.pick_btn = QPushButton("📁 Carica file audio…"); self.pick_btn.clicked.connect(self._pick)
-        self.rec_btn = QPushButton("● Registra"); self.rec_btn.setCheckable(True)
+        self.pick_btn = QPushButton(tr("aud.file.pick.btn")); self.pick_btn.clicked.connect(self._pick)
+        self.rec_btn = QPushButton(tr("aud.rec.btn")); self.rec_btn.setCheckable(True)
         self.rec_btn.toggled.connect(self._toggle_rec)
         if not self.recorder:
-            self.rec_btn.setEnabled(False); self.rec_btn.setText("● Registra (microfono non disponibile)")
-        self.file_lbl = QLabel("(nessun audio)")
+            self.rec_btn.setEnabled(False); self.rec_btn.setText(tr("aud.rec.no_mic"))
+        self.file_lbl = QLabel(tr("aud.file.none"))
         fb.addWidget(self.pick_btn); fb.addWidget(self.rec_btn); fb.addWidget(self.file_lbl, 1)
         lay.addWidget(self.file_box)
 
         lay.addWidget(self._build_tts_box())
 
-        note = QLabel("ℹ️ <b>Clona voce</b>: scegli una voce dalla libreria TTS (ognuna ha il suo "
-                      "campione). Col testo nel TTS → sintesi con quella voce; senza testo → solo il "
-                      "timbro al modello LTX, che genera il parlato dal prompt video. "
-                      "<br>ℹ️ <b>Audio fornito da me</b>: una traccia audio già pronta (file o "
-                      "registrazione), oppure il TTS generato qui col bottone «⤴ Usa come audio».")
+        note = QLabel(tr("aud.note.lbl"))
         note.setWordWrap(True); note.setStyleSheet("color:#888;"); note.setTextFormat(Qt.RichText)
         lay.addWidget(note)
         self._reload_voices()
         self._on_mode()
 
     def _build_tts_box(self) -> QGroupBox:
-        box = QGroupBox("🎙️ TTS — Genera audio dal testo (multi-engine + voci salvate)")
+        box = QGroupBox(tr("aud.tts.group"))
         v = QVBoxLayout(box)
 
         # ── riga 0: engine selector + bottone install ──
         r0 = QHBoxLayout()
-        r0.addWidget(QLabel("Motore:"))
+        r0.addWidget(QLabel(tr("aud.tts.engine_lbl")))
         self.tts_engine = QComboBox(); self.tts_engine.setMinimumWidth(360)
         self._populate_engines()
         self.tts_engine.currentIndexChanged.connect(self._on_engine_changed)
         r0.addWidget(self.tts_engine, 1)
-        self.tts_install_btn = QPushButton("📥 Installa")
-        self.tts_install_btn.setToolTip("Clona il custom node ComfyUI per questo engine e installa le dipendenze.")
+        self.tts_install_btn = QPushButton(tr("aud.tts.install.btn"))
+        self.tts_install_btn.setToolTip(tr("aud.tts.install.tt"))
         self.tts_install_btn.clicked.connect(self._install_selected_engine)
         r0.addWidget(self.tts_install_btn)
         v.addLayout(r0)
@@ -136,22 +129,22 @@ class AudioTab(QWidget):
 
         # ── riga 1: voce ──
         r1 = QHBoxLayout()
-        r1.addWidget(QLabel("Voce:"))
+        r1.addWidget(QLabel(tr("aud.tts.voice_lbl")))
         self.tts_voice = QComboBox(); self.tts_voice.setMinimumWidth(280)
         self.tts_voice.currentIndexChanged.connect(self._update_clone_badge)
         r1.addWidget(self.tts_voice, 1)
         # CRUD voci
-        b_new = QPushButton("➕"); b_new.setToolTip("Salva una nuova voce custom (es. clonata)"); b_new.clicked.connect(self._voice_create)
-        b_edit = QPushButton("✏️"); b_edit.setToolTip("Modifica la voce selezionata"); b_edit.clicked.connect(self._voice_edit)
-        b_dup = QPushButton("📋"); b_dup.setToolTip("Duplica la voce selezionata"); b_dup.clicked.connect(self._voice_duplicate)
-        b_del = QPushButton("🗑️"); b_del.setToolTip("Elimina la voce custom selezionata"); b_del.clicked.connect(self._voice_delete)
+        b_new = QPushButton("➕"); b_new.setToolTip(tr("aud.tts.voice.new.tt")); b_new.clicked.connect(self._voice_create)
+        b_edit = QPushButton("✏️"); b_edit.setToolTip(tr("aud.tts.voice.edit.tt")); b_edit.clicked.connect(self._voice_edit)
+        b_dup = QPushButton("📋"); b_dup.setToolTip(tr("aud.tts.voice.dup.tt")); b_dup.clicked.connect(self._voice_duplicate)
+        b_del = QPushButton("🗑️"); b_del.setToolTip(tr("aud.tts.voice.del.tt")); b_del.clicked.connect(self._voice_delete)
         for b in (b_new, b_edit, b_dup, b_del):
             b.setMaximumWidth(36); r1.addWidget(b)
         v.addLayout(r1)
 
         # ── riga 2: toolbar marker SSML ──
         tb = QHBoxLayout(); tb.setSpacing(2)
-        tb.addWidget(QLabel("Inserisci:"))
+        tb.addWidget(QLabel(tr("aud.tts.insert_lbl")))
         for label, marker, tip in _SSML_MARKERS:
             b = QToolButton(); b.setText(label); b.setToolTip(tip)
             b.clicked.connect(lambda _=False, m=marker: self._insert_marker(m))
@@ -160,16 +153,15 @@ class AudioTab(QWidget):
         v.addLayout(tb)
 
         # ── riga 3: testo da sintetizzare ──
-        v.addWidget(QLabel("Testo (digita <b>\\</b> per la palette tag con filtro progressivo):"))
+        v.addWidget(QLabel(tr("aud.tts.text_lbl")))
         self.tts_text = QPlainTextEdit()
-        self.tts_text.setPlaceholderText(
-            "Scrivi il testo. Digita \\ per aprire la palette di tag SSML (filtra mentre scrivi).")
+        self.tts_text.setPlaceholderText(tr("aud.tts.text.ph"))
         self.tts_text.setMaximumHeight(110)
         v.addWidget(self.tts_text)
         install_tag_palette(self.tts_text)
 
         # ── riga 4: anteprima testo pulito ──
-        self.tts_preview = QLabel("(anteprima leggibile aggiornata al cambio testo)")
+        self.tts_preview = QLabel(tr("aud.tts.preview.lbl"))
         self.tts_preview.setStyleSheet("color:#999; font-style:italic; padding:2px;")
         self.tts_preview.setWordWrap(True)
         v.addWidget(self.tts_preview)
@@ -177,14 +169,14 @@ class AudioTab(QWidget):
 
         # ── riga 5: bottoni genera/play + stato ──
         r5 = QHBoxLayout()
-        self.tts_gen_btn = QPushButton("🎙️ Genera TTS")
+        self.tts_gen_btn = QPushButton(tr("aud.tts.gen.btn"))
         self.tts_gen_btn.clicked.connect(self._generate_tts)
         r5.addWidget(self.tts_gen_btn)
-        self.tts_play_btn = QPushButton("▶ Riproduci")
+        self.tts_play_btn = QPushButton(tr("aud.tts.play.btn"))
         self.tts_play_btn.setEnabled(False)
         self.tts_play_btn.clicked.connect(self._play_tts)
         r5.addWidget(self.tts_play_btn)
-        self.tts_use_btn = QPushButton("⤴ Usa come audio per il video")
+        self.tts_use_btn = QPushButton(tr("aud.tts.use.btn"))
         self.tts_use_btn.setEnabled(False)
         self.tts_use_btn.clicked.connect(self._use_tts_as_audio)
         r5.addWidget(self.tts_use_btn)
@@ -325,7 +317,7 @@ class AudioTab(QWidget):
             return
         v = self._current_voice()
         if not isinstance(v, VoicePreset):
-            self.clone_badge.setText("↳ nessuna voce selezionata — scegline una nel TTS o creane una con ➕")
+            self.clone_badge.setText(tr("aud.clone_badge.none"))
             return
         if v.sample_path:
             self.clone_badge.setText(f"↳ voce: <b>{v.name}</b> — 🎤 ha campione (clonabile)")
@@ -479,12 +471,12 @@ class AudioTab(QWidget):
     def _toggle_rec(self, on: bool):
         if not self.recorder: return
         if on:
-            self._recording = True; self.rec_btn.setText("■ Stop"); self.recorder.start()
-            self.file_lbl.setText("registrazione…")
+            self._recording = True; self.rec_btn.setText(tr("aud.rec.stop")); self.recorder.start()
+            self.file_lbl.setText(tr("aud.rec.recording"))
         else:
-            self._recording = False; self.rec_btn.setText("● Registra")
+            self._recording = False; self.rec_btn.setText(tr("aud.rec.btn"))
             path = self.recorder.stop("voice_sample.wav")
-            self._audio_file = path; self.file_lbl.setText("voice_sample.wav (registrato)")
+            self._audio_file = path; self.file_lbl.setText(tr("aud.rec.done"))
 
     def has_pending_tts(self) -> str | None:
         """Ritorna il path dell'ultimo TTS generato se non ancora applicato come audio_file."""
