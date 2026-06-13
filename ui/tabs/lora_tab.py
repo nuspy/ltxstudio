@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from core.lora_catalog import LoraCatalog, LoraEntry
 from core import user_prefs
+from ui.i18n_manager import tr
 
 
 class _ThumbLoader(QThread):
@@ -65,17 +66,16 @@ class LoraTab(QWidget):
     def _build(self):
         root = QVBoxLayout(self)
         top = QHBoxLayout()
-        self.search = QLineEdit(); self.search.setPlaceholderText("Cerca LoRA…")
+        self.search = QLineEdit(); self.search.setPlaceholderText(tr("lora.search.ph"))
         self.search.textChanged.connect(self.refresh)
-        self.hide_nsfw = QCheckBox("Nascondi NSFW")
+        self.hide_nsfw = QCheckBox(tr("lora.hide_nsfw"))
         self.hide_nsfw.stateChanged.connect(self.refresh)
         if self._embedded:
             self.hide_nsfw.setVisible(False)     # filtro pilotato dal selettore NSFW della sezione
-        self.auto_triggers = QCheckBox("Inserisci trigger nel prompt")
+        self.auto_triggers = QCheckBox(tr("lora.auto_triggers"))
         self.auto_triggers.setChecked(True)
-        self.auto_triggers.setToolTip("Se attivo, le trigger word delle LoRA selezionate vengono "
-                                      "aggiunte automaticamente al prompt all'invio (senza chiedere).")
-        self.reload_btn = QPushButton("Ricarica catalogo")
+        self.auto_triggers.setToolTip(tr("lora.auto_triggers.tt"))
+        self.reload_btn = QPushButton(tr("lora.reload.btn"))
         self.reload_btn.clicked.connect(self._reload)
         top.addWidget(self.search, 1); top.addWidget(self.auto_triggers)
         top.addWidget(self.hide_nsfw); top.addWidget(self.reload_btn)
@@ -87,7 +87,7 @@ class LoraTab(QWidget):
         split.addWidget(self.list)
 
         right = QWidget(); rl = QVBoxLayout(right)
-        self.preview = QLabel("Anteprima LoRA"); self.preview.setAlignment(Qt.AlignCenter)
+        self.preview = QLabel(tr("lora.preview.lbl")); self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumSize(260, 260)
         self.preview.setStyleSheet("background:#111;color:#666;border:1px solid #333;")
         rl.addWidget(self.preview)
@@ -133,7 +133,7 @@ class LoraTab(QWidget):
             star.setText("★" if is_fav else "☆")
             star.setStyleSheet(
                 "QToolButton{border:none;font-size:16px;color:%s;}" % ("#f5c518" if is_fav else "#777"))
-            star.setToolTip("Preferita (mostrata in cima). Salva anche la strength corrente come default.")
+            star.setToolTip(tr("lora.fav.tt"))
             star.clicked.connect(lambda _c, ent=e: self._toggle_fav(ent))
             h.addWidget(star)
             cb = QCheckBox(f"{e.name}{badge}{trig}")
@@ -149,7 +149,7 @@ class LoraTab(QWidget):
             cb.setChecked(prev_checked)
             cb.clicked.connect(lambda _c, ent=e: self._show_entry(ent))
             h.addWidget(cb, 1)
-            h.addWidget(QLabel("str"))
+            h.addWidget(QLabel(tr("lora.str_lbl")))
             sp = QDoubleSpinBox(); sp.setRange(0, 2); sp.setSingleStep(0.05); sp.setDecimals(2)
             sp.setValue(prev_strength)
             sp.setMinimumWidth(96); sp.setMaximumWidth(110)
@@ -172,9 +172,8 @@ class LoraTab(QWidget):
         n_sel_hidden = sum(1 for name, (chk, _str, _ent) in self._persistent_selection.items()
                           if chk and name not in self._rows)
         n_sel = n_sel_visible + n_sel_hidden
-        hidden_note = f" (+{n_sel_hidden} nascoste dal filtro, incluse nella generazione)" if n_sel_hidden else ""
-        self.count_lbl.setText(f"{shown} LoRA compatibili {self._arch_label} — spunta per usarne quante vuoi "
-                               f"({n_sel} selezionate{hidden_note})")
+        hidden_note = (tr("lora.count.hidden").format(n=n_sel_hidden)) if n_sel_hidden else ""
+        self.count_lbl.setText(tr("lora.count.lbl").format(shown=shown, arch=self._arch_label, n_sel=n_sel, hidden_note=hidden_note))
 
     def set_available_loras(self, names: list[str]):
         """Aggiunge al catalogo UI le LoRA LTX presenti in ComfyUI ma non catalogate.
@@ -202,7 +201,7 @@ class LoraTab(QWidget):
             extra.append(LoraEntry(
                 sha256=f"comfy:{low}", filename=filename,
                 path=f"E:\\AI\\Models\\LoRA\\{comfy}", architecture="LTX",
-                nsfw=nsfw, tags=["ComfyUI"], description="Presente in ComfyUI, non ancora nel catalogo.",
+                nsfw=nsfw, tags=["ComfyUI"], description=tr("lora.extra.desc"),
             ))
         self._extra_entries = extra
         self.refresh()
@@ -236,22 +235,22 @@ class LoraTab(QWidget):
     def _show_entry(self, e: "LoraEntry"):
         lines = [f"Nome: {e.name}", f"File: {e.comfy_name}"]
         if e.triggers:
-            lines.append("Trigger: " + ", ".join(e.triggers))
+            lines.append(tr("lora.info.trigger") + ": " + ", ".join(e.triggers))
         else:
-            lines.append("Trigger: (nessuno richiesto)")
+            lines.append(tr("lora.info.no_trigger"))
         if e.downloads:
-            lines.append(f"Download Civitai: {e.downloads}")
+            lines.append(tr("lora.info.downloads").format(n=e.downloads))
         if e.description:
             lines.append("\n" + e.description[:600])
         self.info.setPlainText("\n".join(lines))
         # preview
-        self.preview.setText("…")
+        self.preview.setText(tr("lora.preview.loading"))
         url = self.catalog.preview_url_for(e, allow_nsfw=self.allow_nsfw_getter())
         if not url:
             self.preview.setText("(nessuna preview)")
             return
         if e.preview_is_video:
-            self.preview.setText("🎞️ anteprima video (Civitai)\n— non mostrabile inline —")
+            self.preview.setText(tr("lora.preview.video"))
             return
         self._thumb = _ThumbLoader(url)
         self._thumb.loaded.connect(self._set_thumb)
@@ -278,9 +277,14 @@ class LoraTab(QWidget):
                 e: LoraEntry = r["entry"]
                 out.append({"name": e.comfy_name, "strength": r["sp"].value(), "_entry": e})
                 seen.add(name)
-        # LoRA selezionate ma nascoste dal filtro corrente (incluse nella generazione)
+        # LoRA selezionate ma nascoste dal filtro corrente (incluse nella generazione).
+        # IMPORTANTE: salta i nomi che hanno una riga VISIBILE (`name in self._rows`): per quelle
+        # lo stato vivo della checkbox è autoritativo (già gestito sopra). Senza questo controllo,
+        # una riga deselezionata a mano rientrava qui perché `_persistent_selection` (aggiornato
+        # solo da refresh(), non al toggle) conservava lo snapshot stantio chk=True → la LoRA
+        # deselezionata veniva ri-aggiunta e usata davvero nella generazione.
         for name, (chk, strength, entry) in self._persistent_selection.items():
-            if chk and name not in seen and entry is not None:
+            if chk and name not in seen and name not in self._rows and entry is not None:
                 out.append({"name": entry.comfy_name, "strength": strength, "_entry": entry})
         return out
 
