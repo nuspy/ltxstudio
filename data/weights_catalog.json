@@ -1,0 +1,70 @@
+{
+  "_comment": "Catalogo pesi del wizard. La destinazione è derivata: <base_dir>/<type>/<family>/<repo_basename> (per snapshot) o <base_dir>/<type>/<family>/<filename> (per file). I pesi tool-specifici hanno 'tool_dest' (percorso fisso del modulo, ignora base_dir). 'scan_names' = nomi cartella/file da cercare nel pre-scan per capire se esiste già. gated=true richiede HF token + accettazione licenza su HF.",
+  "weights": [
+    {
+      "id": "flux1-dev", "module": "Immagini", "label": "FLUX.1 [dev]", "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.1-dev", "type": "diffusers", "family": "Flux",
+      "gated": true, "approx_gb": 24, "scan_names": ["FLUX.1-dev", "flux1-dev"]
+    },
+    {
+      "id": "flux1-fill", "module": "Inpaint", "label": "FLUX.1 Fill [dev]", "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.1-Fill-dev", "type": "diffusers", "family": "Flux",
+      "gated": true, "approx_gb": 24, "scan_names": ["FLUX.1-Fill-dev", "FLUX_DEV_Fill"]
+    },
+    {
+      "id": "flux1-kontext", "module": "Editing", "label": "FLUX.1 Kontext [dev]", "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.1-Kontext-dev", "type": "diffusers", "family": "Flux",
+      "gated": true, "approx_gb": 24, "scan_names": ["FLUX.1-Kontext-dev", "Kontext"]
+    },
+    {
+      "id": "flux2-dev", "module": "Immagini", "label": "FLUX.2 [dev]", "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.2-dev", "type": "diffusers", "family": "Flux",
+      "gated": true, "approx_gb": 64, "scan_names": ["FLUX.2-dev", "flux2-dev", "FLUX_2_Dev"]
+    },
+    {
+      "id": "mistral-flux2-te", "module": "Immagini", "label": "Mistral-3 24B (TE FLUX.2)", "kind": "snapshot",
+      "repo_id": "mistralai/Mistral-Small-3.1-24B-Instruct-2503", "type": "text_encoders", "family": "Flux",
+      "gated": true, "approx_gb": 48, "scan_names": ["Mistral-Small-3.1-24B", "mistral_3_small_flux2"]
+    },
+    {
+      "id": "zimage-turbo", "module": "Immagini", "label": "Z-Image Turbo", "kind": "snapshot",
+      "repo_id": "Tongyi-MAI/Z-Image-Turbo", "type": "diffusers", "family": "Z-Image",
+      "gated": false, "approx_gb": 12, "scan_names": ["Z-Image-Turbo", "z_image"]
+    },
+    {
+      "id": "ernie-image", "module": "Immagini", "label": "ERNIE-Image", "kind": "snapshot",
+      "repo_id": "baidu/ERNIE-Image", "type": "diffusers", "family": "Ernie",
+      "gated": false, "approx_gb": 16, "scan_names": ["ERNIE-Image", "ernie"]
+    },
+    {
+      "id": "ltx23", "module": "Video", "label": "LTX-2.3 (video+audio)", "kind": "snapshot",
+      "repo_id": "Lightricks/LTX-2.3", "type": "diffusers", "family": "LTX",
+      "gated": true, "approx_gb": 40, "scan_names": ["LTX-2.3", "ltx23", "ltx-2.3"]
+    },
+    {
+      "id": "da2", "module": "Mondo 3D (WorldGen)", "label": "DA-2 depth", "kind": "snapshot",
+      "repo_id": "haodongli/DA-2", "type": "depth", "family": "DA-2",
+      "gated": false, "approx_gb": 2, "scan_names": ["DA-2", "da2"]
+    },
+    {
+      "id": "mmaudio", "module": "Musica (MMAudio)", "label": "MMAudio large_44k_v2", "kind": "snapshot",
+      "repo_id": "hkchengrex/MMAudio", "type": "audio", "family": "MMAudio",
+      "gated": false, "approx_gb": 6, "scan_names": ["MMAudio", "mmaudio"]
+    },
+    {
+      "id": "heartmula-gen", "module": "Musica (HeartMuLa)", "label": "HeartMuLa Gen config", "kind": "snapshot",
+      "repo_id": "HeartMuLa/HeartMuLaGen", "type": "audio", "family": "HeartMuLa",
+      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt", "gated": false, "approx_gb": 1, "scan_names": ["HeartMuLaGen"]
+    },
+    {
+      "id": "heartmula-3b", "module": "Musica (HeartMuLa)", "label": "HeartMuLa 3B", "kind": "snapshot",
+      "repo_id": "HeartMuLa/HeartMuLa-oss-3B-happy-new-year", "type": "audio", "family": "HeartMuLa",
+      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartMuLa-oss-3B", "gated": false, "approx_gb": 12, "scan_names": ["HeartMuLa-oss-3B"]
+    },
+    {
+      "id": "heartcodec", "module": "Musica (HeartMuLa)", "label": "HeartCodec", "kind": "snapshot",
+      "repo_id": "HeartMuLa/HeartCodec-oss-20260123", "type": "audio", "family": "HeartMuLa",
+      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartCodec-oss", "gated": false, "approx_gb": 3, "scan_names": ["HeartCodec"]
+    }
+  ]
+}
