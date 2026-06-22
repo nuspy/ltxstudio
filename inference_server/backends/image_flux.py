@@ -68,6 +68,38 @@ def _set_attention(pipe) -> str:
     return "sdpa"                                       # default torch (sempre presente)
 
 
+def _apply_fbcache(pipe) -> bool:
+    """First Block Cache (come WaveSpeed di ComfyUI): salta i blocchi DiT quando il residuo
+    cambia poco → ~2x sui modelli multi-step. Env NATIVE_FBCACHE=0|1 (default 1),
+    NATIVE_FBCACHE_THRESHOLD (default 0.12: più alto = più veloce, meno fedele)."""
+    import os
+    if os.environ.get("NATIVE_FBCACHE", "1") != "1":
+        return False
+    try:
+        from diffusers import FirstBlockCacheConfig            # cache NATIVO diffusers (compatibile)
+        thr = float(os.environ.get("NATIVE_FBCACHE_THRESHOLD", "0.12"))
+        pipe.transformer.enable_cache(FirstBlockCacheConfig(threshold=thr))
+        return True
+    except Exception as e:                              # noqa: BLE001
+        print(f"[image] FBCache non applicato: {e}", flush=True)
+        return False
+
+
+def _maybe_compile(pipe) -> bool:
+    """torch.compile del transformer (+~1.5x). Warm-up lungo, ma il server è persistente.
+    Env NATIVE_COMPILE=0|1 (default 0: opt-in, può fallire su alcuni checkpoint fp8)."""
+    import os
+    import torch
+    if os.environ.get("NATIVE_COMPILE", "0") != "1":
+        return False
+    try:
+        pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead", fullgraph=False)
+        return True
+    except Exception as e:                              # noqa: BLE001
+        print(f"[image] compile non applicato: {e}", flush=True)
+        return False
+
+
 def _assemble_flux(Pipe, transformer_path: str):
     """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
     (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
@@ -143,8 +175,10 @@ def _load(model_path: str, arch: str):
     except Exception:                                   # noqa: BLE001
         pass
     attn = _set_attention(pipe)
+    fb = _apply_fbcache(pipe)
+    comp = _maybe_compile(pipe)
     where = _place(pipe, VRAM_MB.get(arch, 16000))
-    print(f"[image] {arch}: pipeline su {where}, attention={attn}", flush=True)
+    print(f"[image] {arch}: {where}, attention={attn}, fbcache={fb}, compile={comp}", flush=True)
     return pipe, VRAM_MB.get(arch, 16000)
 
 
