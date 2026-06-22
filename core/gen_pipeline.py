@@ -121,6 +121,15 @@ class GenPipeline:
         # Se è specificato un cfg esplicito dalla UI, sovrascrive guidance/CFG nei pipeline.
         if cfg is not None:
             guidance = float(cfg)
+        # FLUX.2: scarta un override di encoder incompatibile (es. Gemma/T5 scelti a mano o
+        # ripristinati dallo stato salvato) — manderebbe in crash il sampler con
+        # "Input img and txt tensors must have 3 dimensions". Si usa l'encoder corretto del modello.
+        if arch == "flux" and is_flux2(model) and encoder:
+            from core.flux2_encoder import is_compatible_encoder
+            if not is_compatible_encoder(model, encoder):
+                print(f"[WARN] gen FLUX.2: encoder '{encoder}' incompatibile col modello "
+                      f"→ uso l'encoder corretto risolto dal modello", flush=True)
+                encoder = None
         if arch == "flux":
             if is_flux2(model):
                 p = self._flux2(model, prompt, width, height, seed, steps, guidance, negative, loras or [])

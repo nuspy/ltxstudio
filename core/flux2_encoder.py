@@ -81,6 +81,25 @@ def txt_in_indim(model_name: str | None) -> int | None:
     return None
 
 
+def is_compatible_encoder(model_name: str | None, encoder_name: str | None) -> bool:
+    """True se `encoder_name` è un encoder testo VALIDO per il modello FLUX.2 dato.
+
+    FLUX.2 accetta solo Mistral-3 (dev/pro) o Qwen3 (Klein). Qualsiasi altro encoder
+    (Gemma, T5, CLIP-L, …) caricato con type `flux2` produce un conditioning di forma
+    incompatibile → il sampler crasha con
+    'Input img and txt tensors must have 3 dimensions.'. Serve per scartare un override
+    di encoder sbagliato (scelto a mano o ripristinato dallo stato salvato)."""
+    if not encoder_name:
+        return True                                   # nessun override → ok
+    en = encoder_name.lower().replace("\\", "/")
+    indim = txt_in_indim(model_name)
+    kws = INDIM_KEYWORDS.get(indim) if indim is not None else None
+    if kws:                                           # indim noto → l'encoder deve combaciare
+        return any(kw in en for kw in kws)
+    # indim sconosciuto (es. GGUF): accetta genericamente solo famiglie Mistral/Qwen3
+    return any(k in en for k in ("mistral", "qwen_3", "qwen3"))
+
+
 def resolve_encoder(model_name: str | None, text_encoders: list[str] | None,
                     default: str = DEFAULT_ENCODER) -> tuple[str | None, str | None]:
     """Ritorna (encoder_file, errore).

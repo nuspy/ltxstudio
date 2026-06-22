@@ -21,6 +21,7 @@ from core.lora_catalog import LoraCatalog
 from core.model_catalog import ModelCatalog
 from core import user_prefs
 from core.gen_pipeline import GenPipeline
+from core.flux2_encoder import is_compatible_encoder
 from ui.i18n_manager import tr
 
 DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, deformed, "
@@ -149,6 +150,7 @@ class Frame1Tab(QWidget):
         f.addRow(tr("f1.gen.arch_lbl"), self.gen_arch)
         self.gen_model = QComboBox()
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)
+        self.gen_model.currentIndexChanged.connect(self._refilter_gen_encoder)
         gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
         gmrow.addWidget(self.gen_model, 1)
         self.gen_star = QToolButton(); self.gen_star.setText("☆")
@@ -771,14 +773,8 @@ class Frame1Tab(QWidget):
         corrente se ancora valida; altrimenti applica il default dell'architettura.
         """
         if text_encoders is not None and hasattr(self, "gen_encoder"):
-            cur = self.gen_encoder.currentText()
-            self.gen_encoder.clear()
-            self.gen_encoder.addItem(tr("f1.gen.auto_from_model"), None)
-            for e in text_encoders:
-                self.gen_encoder.addItem(e, e)
-            if cur:
-                i = self.gen_encoder.findText(cur)
-                if i >= 0: self.gen_encoder.setCurrentIndex(i)
+            self._all_text_encoders = list(text_encoders)   # inventario completo (per il refiltro)
+            self._refilter_gen_encoder()                     # mostra solo gli encoder compatibili
         if clip_types is not None and hasattr(self, "gen_clip_type"):
             cur = self.gen_clip_type.currentText()
             self.gen_clip_type.clear()
@@ -799,6 +795,29 @@ class Frame1Tab(QWidget):
             if cur:
                 i = self.gen_vae.findText(cur)
                 if i >= 0: self.gen_vae.setCurrentIndex(i)
+
+    def _refilter_gen_encoder(self, *_):
+        """Aggiorna il dropdown «Text encoder» in base al modello selezionato.
+
+        Per i modelli FLUX.2 mostra SOLO gli encoder compatibili (Mistral-3 / Qwen3):
+        gli altri (Gemma, T5, CLIP-L, …) caricati come `flux2` fanno crashare il sampler
+        con «Input img and txt tensors must have 3 dimensions». Per gli altri modelli
+        mostra l'intero inventario. Mantiene la selezione corrente se resta valida."""
+        if not hasattr(self, "gen_encoder") or not getattr(self, "_all_text_encoders", None):
+            return
+        model = self.gen_model.currentText()
+        flux2 = _is_flux2(model)
+        cur = self.gen_encoder.currentData()
+        self.gen_encoder.blockSignals(True)
+        self.gen_encoder.clear()
+        self.gen_encoder.addItem(tr("f1.gen.auto_from_model"), None)
+        for e in self._all_text_encoders:
+            if flux2 and not is_compatible_encoder(model, e):
+                continue                                  # encoder incompatibile → nascosto
+            self.gen_encoder.addItem(e, e)
+        idx = self.gen_encoder.findData(cur) if cur else 0
+        self.gen_encoder.setCurrentIndex(idx if idx >= 0 else 0)  # se sparito → «auto»
+        self.gen_encoder.blockSignals(False)
 
     # Popola dinamicamente il dropdown Inpaint con TUTTI i modelli FLUX disponibili:
     # - checkpoint Flux (CheckpointLoaderSimple → ramo `checkpoint` del pipeline)
