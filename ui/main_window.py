@@ -5,7 +5,7 @@ import random
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer, Signal, Qt
+from PySide6.QtCore import QObject, QTimer, QThread, Signal, Qt
 from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QPushButton,
@@ -94,6 +94,23 @@ class ComfyBridge(QObject):
     preview = Signal(bytes)
     status = Signal(str)
     executing = Signal(str)
+
+
+class _NativeImageWorker(QThread):
+    """Esegue una generazione immagine sul backend NATIVO (InferenceServer) fuori dal thread UI."""
+    done = Signal(dict)
+
+    def __init__(self, params: dict):
+        super().__init__()
+        self.params = params
+
+    def run(self):
+        from core import native_driver
+        try:
+            res = native_driver.run_and_wait("image", self.params, timeout=3600)
+        except Exception as e:                          # noqa: BLE001
+            res = {"status": "error", "error": str(e)}
+        self.done.emit(res)
 
 
 class MainWindow(QMainWindow):
@@ -1461,6 +1478,10 @@ class MainWindow(QMainWindow):
         seed = cfg.get("seed") if cfg.get("seed") is not None else random.randint(0, 2**31)
         # Negativo dalla sezione gen; fallback al prompt negativo globale del tab Video
         negative = cfg.get("negative") or self.frame1_tab.get_values().get("prompt_negative", "")
+        # Backend astratto: se il modulo "image" è su "native", usa l'InferenceServer (no ComfyUI).
+        from core import backend
+        if backend.is_native("image"):
+            self._start_native_image(cfg, v, loras, seed, negative); return
         try:
             prompt = self.genpipe.build(
                 cfg["arch"],
@@ -1487,6 +1508,43 @@ class MainWindow(QMainWindow):
             self._log(f"Generazione immagine ({cfg['arch']} · {cfg['model']}) inviata…")
         except Exception as e:
             QMessageBox.critical(self, tr("mw.gen_error_title"), str(e)); self._log(f"[ERR] gen: {e}")
+
+    def _start_native_image(self, cfg, v, loras, seed, negative):
+        """Genera un'immagine via backend nativo (InferenceServer) invece di ComfyUI."""
+        from core import native_driver
+        if not native_driver.is_up():
+            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
+                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde. "
+                   "Avvialo, oppure rimetti il backend 'image' su ComfyUI."))
+            return
+        params = {"model": cfg["model"], "arch": cfg["arch"], "prompt": cfg["prompt"],
+                  "negative": negative, "width": v["width"], "height": v["height"],
+                  "steps": cfg["steps"], "guidance": cfg.get("cfg") or 3.5,
+                  "seed": seed, "loras": loras}
+        self._log("Generazione immagine (backend NATIVO) inviata…")
+        self._native_worker = _NativeImageWorker(params)
+        self._native_worker.done.connect(self._on_native_image_done)
+        self._native_worker.start()
+
+    def _on_native_image_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[native] errore: {res.get('error','')[:300]}")
+            QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000])
+            return
+        out = (res.get("output") or [None])[0]
+        self._log(f"[native] immagine generata: {out}")
+        # carica nel canvas se l'API è disponibile; altrimenti notifica col path
+        loaded = False
+        try:
+            cv = getattr(self.frame1_tab, "canvas", None)
+            for m in ("load_image", "set_image", "load"):
+                if cv is not None and hasattr(cv, m):
+                    getattr(cv, m)(out); loaded = True; break
+        except Exception:                               # noqa: BLE001
+            loaded = False
+        if not loaded and out:
+            QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
+                                    tr("mw.native_done_msg", "Generata: {f}").format(f=out))
 
     def generate_upscale(self):
         """Aumenta la definizione dell'immagine corrente del canvas con un modello AI di super-risoluzione."""
