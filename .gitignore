@@ -23,6 +23,19 @@ __pycache__/
 # Stato runtime / preferenze locali
 data/gui_state.json
 data/user_prefs.json
+data/age_ack.json
+data/usage.json
+data/catalog_paths.json
+
+# Edizioni / build (Nuitka) — generati, mai nel repo
+core/edition.py
+dist/
+build/_work/
+build/versions.json
+*.build/
+*.dist/
+*.onefile-build/
+installer/_cache/
 
 # Modelli / pesi (mai nel repo)
 *.safetensors

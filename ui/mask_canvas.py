@@ -802,6 +802,29 @@ class MaskCanvas(QWidget):
             res["mask"] = str(mpath); res["has_mask"] = True
         return res
 
+    def export_subject_rgba(self, out_dir: Path) -> dict:
+        """Soggetto isolato dal canvas con canale ALPHA = maschera (sfondo trasparente).
+
+        Usato per alimentare la generazione 3D (TRELLIS) col SOLO soggetto
+        selezionato a maschera (pennello o SAM), escludendo sfondo e oggetti
+        indesiderati. Ritorna {"image": <png rgba>, "has_mask": bool}. Se non
+        c'è maschera ritorna has_mask=False (il chiamante userà l'immagine piena).
+        """
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        if not self.has_mask():
+            return {"image": None, "has_mask": False}
+        comp = QImage(self.aspect_w, self.aspect_h, QImage.Format_ARGB32)
+        comp.fill(Qt.transparent)
+        p = QPainter(comp)
+        self._render_scene(p, QRectF(0, 0, self.aspect_w, self.aspect_h),
+                           QRectF(0, 0, self.aspect_w, self.aspect_h))
+        p.end()
+        # alpha = maschera disegnata (opaco dove tenere il soggetto)
+        comp.setAlphaChannel(self.mask_image.convertToFormat(QImage.Format_Alpha8))
+        path = out_dir / "frame1_subject.png"
+        comp.save(str(path))
+        return {"image": str(path), "has_mask": True}
+
     def _composite(self, out_dir: Path) -> str:
         """Renderizza cornice + foto + layer (senza maschera) a WxH → PNG."""
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)

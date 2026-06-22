@@ -5,3 +5,10 @@ websocket-client>=1.7
 sounddevice>=0.4.7
 soundfile>=0.12
 # packaging finale: pyinstaller>=6.0
+
+# ── Feature 3D (tab "Modello 3D" TRELLIS.2 + tab "Rig 3D" SkinTokens) ──
+# Richiedono i custom node ComfyUI + Blender. Installa con:
+#   install_3d_features.bat        (oppure)
+#   <venv>\python.exe scripts\install_3d_features.py
+# Lo script clona ComfyUI-TRELLIS2 + ComfyUI-SkinToken, installa le loro
+# dipendenze e Blender (winget). Il visore 3D usa PySide6 QtWebEngine (incluso in PySide6).

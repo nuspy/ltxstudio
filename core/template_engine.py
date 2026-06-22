@@ -100,6 +100,17 @@ class TemplateEngine:
         loras: LoRA utente da innestare. overrides: {node_id:{input:value}} dal Settings dialog."""
         prompt = copy.deepcopy(self._template)
         mode = values.get("nsfw_mode")
+        # GATE EDIZIONE: la modalità sbloccata (18+) richiede la feature cap.adult_mode
+        # (premium/studio). Se non disponibile in questa edizione, forza SFW anche se
+        # la UI o un preset la chiedesse — gating sicuro e centralizzato.
+        if mode == "nsfw":
+            try:
+                from core import features
+                if not features.is_enabled("cap.adult_mode"):
+                    mode = "sfw"
+                    values = dict(values); values["nsfw_mode"] = "sfw"
+            except Exception:
+                pass
         if mode in self.nsfw_presets:
             for k, v in self.nsfw_presets[mode].items():
                 if not k.startswith("_") and k not in values:

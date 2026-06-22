@@ -1,0 +1,16 @@
+# Build Linux della GUI con Nuitka (Nuitka NON cross-compila → serve un host Linux).
+# Uso:
+#   docker build -f build/Dockerfile.linuxbuild -t ltxstudio-linuxbuild .
+#   docker run --rm -v "$PWD":/app -v /path/feature_matrix:/fm ltxstudio-linuxbuild \
+#     python build/build.py --os linux --edition free --project /fm/projects/ltxstudio/project.json
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential patchelf ccache git libgl1 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir nuitka ordered-set zstandard PySide6
+
+WORKDIR /app
+# il sorgente dell'app e il dataset feature_matrix vengono montati a runtime (-v)
+ENTRYPOINT []

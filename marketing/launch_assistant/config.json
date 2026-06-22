@@ -1,0 +1,17 @@
+{
+  "brand": "AI Tools Forge",
+  "patreon_url": "https://www.patreon.com/c/AIToolsForge",
+  "why": "Sono rimasto senza lavoro. Questo lancio mi ridà l'indipendenza e mi permette di continuare i miei progetti. Ogni piccolo passo oggi è un mattone della mia libertà.",
+  "daily_goal": 3,
+  "hermes": {
+    "enabled": true,
+    "mode": "cli",
+    "wsl_python": "/home/ataini/.hermes/hermes-agent/venv/bin/python",
+    "wsl_distro": "",
+    "timeout_seconds": 180,
+    "base_url": "http://localhost:8642/v1",
+    "model": "default",
+    "api_key": "",
+    "_note": "mode=cli: parla col tuo Hermes Agent in WSL via CLI (-z), NESSUN token. mode=http: gateway OpenAI-compatibile su :8642 (richiede token in api_key) oppure LM Studio http://localhost:1234/v1 (senza token, modello grezzo)."
+  }
+}

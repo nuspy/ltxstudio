@@ -1,4 +1,5 @@
 {
+  "comfy_root": "E:\\AI\\Comfy_Nexus\\ComfyUI",
   "tools_dir": "E:\\AI\\dictionary\\tools",
   "models": "E:\\AI\\Models",
   "workflows": "E:\\AI\\workflows",
