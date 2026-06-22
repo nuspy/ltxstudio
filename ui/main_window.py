@@ -29,10 +29,20 @@ from core.video_enhance_pipeline import VideoEnhancePipeline  # noqa: E402
 from core.extend_pipeline import ExtendPipeline         # noqa: E402
 from core.face_restore_pipeline import FaceRestorePipeline  # noqa: E402
 from core import gui_state                                # noqa: E402  (persistenza impostazioni GUI)
+from core import features, gating_apply, watermark        # noqa: E402  (feature-gating per edizione)
 from ui.tabs.video_def_tab import VideoDefTab          # noqa: E402
 from ui.tabs.video_extend_tab import VideoExtendTab    # noqa: E402
 from ui.tabs.restore_tab import RestoreTab             # noqa: E402
+from ui.tabs.trellis_tab import TrellisTab             # noqa: E402
+from ui.tabs.rig_tab import RigTab                     # noqa: E402
 from ui.tabs.import_models_tab import ImportModelsTab  # noqa: E402
+from ui.tabs.convert_tab import ConvertTab             # noqa: E402
+from ui.tabs.anim_tab import AnimTab                   # noqa: E402
+from ui.tabs.train_tab import TrainTab                 # noqa: E402
+from ui.tabs.music_tab import MusicTab                 # noqa: E402
+from ui.tabs.world_tab import WorldTab                 # noqa: E402
+from ui.tabs.weights_tab import WeightsTab             # noqa: E402
+from core.mocap_service import MocapService            # noqa: E402
 from ui.tabs.video_tab import VideoTab              # noqa: E402
 from ui.tabs.frame1_tab import Frame1Tab            # noqa: E402
 from ui.tabs.lora_tab import LoraTab                # noqa: E402
@@ -46,8 +56,13 @@ from ui.video_player_dialog import VideoPlayerDialog # noqa: E402
 from ui.navigator_dialog import NavigatorDialog      # noqa: E402
 from core.metadata_saver import MetadataSaver        # noqa: E402
 from core.restore_pipeline import RestorePipeline    # noqa: E402
+from core.trellis_pipeline import TrellisPipeline    # noqa: E402
+from core.rig_pipeline import RigPipeline            # noqa: E402
 
 OUTPUT_DIR = Path(r"E:\AI\ltxstudio\output")
+# Cartella output di ComfyUI (stessa macchina) — per recuperare i .glb di TRELLIS/rig.
+# NB: run_nvidia.bat avvia ComfyUI con --output-directory E:\AI\Comfy_Nexus\Output\
+COMFY_OUTPUT_DIR = Path(r"E:\AI\Comfy_Nexus\Output")
 
 
 class _HoldCompareLabel(QLabel):
@@ -98,6 +113,9 @@ class MainWindow(QMainWindow):
 
         self._current_pid: str | None = None
         self._inpaint_pid: str | None = None
+        self._trellis_pid: str | None = None    # job TRELLIS.2 in corso
+        self._trellis_prefix: str = ""          # prefisso file atteso in output ComfyUI
+        self._rig_pid: str | None = None        # job rigging SkinTokens in corso
         self._generation_cache: dict[str, dict] = {}   # prompt_id → meta dict per sidecar
         self._inpaint_mode: str = "inpaint"
         self._inpaint_bbox: tuple[int, int, int, int] | None = None
@@ -114,6 +132,8 @@ class MainWindow(QMainWindow):
         self.extender = ExtendPipeline()        # prolunga video (LTX-2.3 nativo, multi-segmento)
         self.facerestorer = FaceRestorePipeline()   # restauro volti per-frame (CodeFormer/GFPGAN)
         self.restorer = RestorePipeline()       # restauro foto + colorazione
+        self.trellisser = TrellisPipeline()     # immagine → modello 3D (TRELLIS.2)
+        self.rigger = RigPipeline()             # mesh → rig automatico (SkinTokens)
         self._last_video_path: str | None = None
         self._sam_models: list[str] = []
         self._seg_pid: str | None = None
@@ -139,6 +159,20 @@ class MainWindow(QMainWindow):
         self.video_def_tab.request_face_restore.connect(self.generate_face_restore)
         self.video_extend_tab.request_extend.connect(self.generate_video_extend)
         self.restore_tab.request_restore.connect(self.generate_restore)
+        self.trellis_tab.request_trellis.connect(self.generate_trellis)
+        self.rig_tab.request_rig.connect(self.generate_rig)
+        # Convertitore + operazioni mesh nei visori 3D (Blender headless)
+        self.convert_tab.request_convert.connect(self.run_convert)
+        self._wire_viewer_ops(self.trellis_tab)
+        self._wire_viewer_ops(self.rig_tab)
+        # Animazione / Mocap
+        self.anim_tab.request_mocap_start.connect(self.start_mocap)
+        self.anim_tab.request_mocap_stop.connect(self.mocap.stop)
+        self.anim_tab.request_retarget.connect(self.run_retarget)
+        self.mocap.frame.connect(self.anim_tab.set_preview)
+        self.mocap.finished_ok.connect(self._on_mocap_done)
+        self.mocap.failed.connect(self._on_mocap_failed)
+        self._wire_viewer_ops(self.anim_tab)
         self.models_tab.catalog_updated.connect(self._on_catalog_updated)
         self.frame1_tab.request_restore_photo.connect(self._restore_from_canvas)
         # Segnali del tab Avanzate → funzioni della finestra principale
@@ -164,6 +198,16 @@ class MainWindow(QMainWindow):
         self._gui_state_restored = False
         QTimer.singleShot(0, self._restore_gui_state)
 
+        # ── Feature-gating per EDIZIONE: nasconde tab/funzioni non incluse e
+        #    mostra l'age-gate se l'edizione consente contenuti 18+. In dev
+        #    (core/edition.py assente) il profilo è permissivo (tutto visibile).
+        try:
+            report = gating_apply.apply(self)
+            self._log(f"[Edizione: {report['edition']}] tab rimossi: "
+                      f"{len(report['removed_tabs'])}")
+        except Exception as e:                       # noqa: BLE001
+            self._log(f"[gating] errore non bloccante: {e}")
+
     # ---------- UI ----------
     def _build_ui(self):
         central = QWidget(); self.setCentralWidget(central)
@@ -187,6 +231,16 @@ class MainWindow(QMainWindow):
         self.video_def_tab = VideoDefTab()
         self.video_extend_tab = VideoExtendTab()
         self.restore_tab = RestoreTab()
+        self.trellis_tab = TrellisTab()
+        self.rig_tab = RigTab()
+        self.convert_tab = ConvertTab()
+        self.anim_tab = AnimTab()
+        self.train_tab = TrainTab()
+        self.train_tab.lora_ready.connect(lambda _p: self._refresh_status())
+        self.music_tab = MusicTab()
+        self.world_tab = WorldTab()
+        self.weights_tab = WeightsTab()
+        self.mocap = MocapService(self)
         self.models_tab = ImportModelsTab()
         self.tabs.addTab(self.frame1_tab, tr("tab.images"))
         self.tabs.addTab(self.audio_tab, tr("tab.audio_voice"))
@@ -198,6 +252,22 @@ class MainWindow(QMainWindow):
         self.quality_tab.addTab(self.restore_tab, tr("tab.quality.photo"))
         self.quality_tab.addTab(self.video_def_tab, tr("tab.quality.video"))
         self.tabs.addTab(self.quality_tab, tr("tab.quality"))
+        # Modello 3D da immagine (TRELLIS.2) — tab separato
+        self.tabs.addTab(self.trellis_tab, tr("tab.trellis"))
+        # Rig 3D automatico (SkinTokens) — tab separato
+        self.tabs.addTab(self.rig_tab, tr("tab.rig"))
+        # Convertitore di formati 3D (Blender headless) — tab separato
+        self.tabs.addTab(self.convert_tab, tr("tab.convert"))
+        # Animazione / Mocap (FreeMoCap single-camera + retarget) — tab separato
+        self.tabs.addTab(self.anim_tab, tr("tab.anim"))
+        # Allena LoRA (FLUX.1/FLUX.2 via ai-toolkit) — tab separato
+        self.tabs.addTab(self.train_tab, tr("tab.train", "Allena LoRA"))
+        # Musica (HeartMuLa canzoni/strumentale + MMAudio sonorizzazione) — tab separato
+        self.tabs.addTab(self.music_tab, tr("tab.music", "Musica"))
+        # Mondo 3D (WorldGen: scena/ambiente da foto, mesh+splat, player) — tab separato
+        self.tabs.addTab(self.world_tab, tr("tab.world", "Mondo 3D"))
+        # Pesi modelli (wizard download da HuggingFace, locale-first) — tab separato
+        self.tabs.addTab(self.weights_tab, tr("tab.weights", "Pesi modelli"))
         # Import Models diventa un sotto-tab di Avanzate
         self.advanced_tab.attach_models(self.models_tab)
         self.tabs.addTab(self.advanced_tab, tr("tab.advanced"))
@@ -575,6 +645,10 @@ class MainWindow(QMainWindow):
             self._check_inpaint_done()
         if self._seg_pid:
             self._check_segment_done()
+        if self._trellis_pid:
+            self._check_trellis_done()
+        if self._rig_pid:
+            self._check_rig_done()
 
     def _apply_comfy_inventory(self, oi: dict):
         """Estrae da object_info le liste reali: inpaint, SAM, upscale. Gestisce sia il
@@ -724,6 +798,38 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         self._log(f"[Analyzer] Applicati fix: {fixes}")
+
+    # ---------- gating per edizione (helper) ----------
+    def _feature_gate(self, fid: str) -> bool:
+        """True se la feature è disponibile nell'edizione; altrimenti mostra un
+        messaggio di upsell e ritorna False."""
+        if features.is_enabled(fid):
+            return True
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.information(self, tr("gate.locked.title"),
+                                tr("gate.locked.msg").format(edition=features.edition()))
+        self._log(f"[gating] funzione '{fid}' non disponibile in '{features.edition()}'.")
+        return False
+
+    def _gen_limit_ok(self) -> bool:
+        """Limite generazioni della demo (cap.gen_images.params.gen_limit)."""
+        from core import usage
+        lim = int(features.param("cap.gen_images", "gen_limit", 0) or 0)
+        if usage.limit_reached(lim):
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, tr("gate.limit.title"),
+                                    tr("gate.limit.msg").format(n=lim))
+            return False
+        return True
+
+    def _clamp_resolution(self, vals: dict) -> None:
+        """Applica il tetto di risoluzione dell'edizione (cap.gen_images.params.max_px)."""
+        max_px = int(features.param("cap.gen_images", "max_px", 0) or 0)
+        if not max_px:
+            return
+        for key in ("width", "height"):
+            if vals.get(key) and int(vals[key]) > max_px:
+                vals[key] = max_px
 
     # ---------- generazione ----------
     def on_generate(self):
@@ -1070,6 +1176,8 @@ class MainWindow(QMainWindow):
         return f"{sub}/{name}" if sub else name
 
     def generate_inpaint(self, mode: str):
+        if not self._feature_gate("cap.inpaint"):
+            return
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
@@ -1174,6 +1282,8 @@ class MainWindow(QMainWindow):
 
     def generate_recolor(self):
         """Cambia colore (Kontext/FLUX.2 prompt-based): ricolora il soggetto mantenendo texture/luce."""
+        if not self._feature_gate("cap.inpaint"):
+            return
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
@@ -1331,6 +1441,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
+        if not self._gen_limit_ok():
+            return
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
@@ -1340,6 +1452,7 @@ class MainWindow(QMainWindow):
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
             return
         v = self.video_tab.get_values()
+        self._clamp_resolution(v)        # tetto risoluzione per edizione (es. demo 768px)
         loras = [{"name": l["name"], "strength": l["strength"]} for l in cfg.get("loras", [])]
         # FLUX: distinguo checkpoint vs UNET (CheckpointLoaderSimple vs UNETLoader)
         ckpts = set(getattr(self.frame1_tab, "_gen_checkpoint_models", []) or [])
@@ -1365,6 +1478,8 @@ class MainWindow(QMainWindow):
                 enhance=cfg.get("enhance", False), nsfw=cfg.get("nsfw", False),
             )
             self._inpaint_pid = self.driver.submit(prompt)
+            from core import usage
+            usage.increment()                 # conteggio per il limite della demo
             self._inpaint_mode = "generazione immagine"
             self._inpaint_bbox = None
             self._inpaint_before = None      # da zero: nessun confronto
@@ -1375,6 +1490,8 @@ class MainWindow(QMainWindow):
 
     def generate_upscale(self):
         """Aumenta la definizione dell'immagine corrente del canvas con un modello AI di super-risoluzione."""
+        if not self._feature_gate("cap.upscale_image"):
+            return
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
@@ -1431,6 +1548,7 @@ class MainWindow(QMainWindow):
                 try:
                     data = self.driver.download_view(fn, item.get("subfolder", ""), item.get("type", "output"))
                     rp = OUTPUT_DIR / f"result_{fn}"; rp.write_bytes(data)
+                    watermark.apply_to_file(str(rp))          # watermark obbligatorio (edizioni demo/supporter)
                     self._show_inpaint_result(str(rp)); return
                 except Exception as e:
                     self._log(f"[ERR] download risultato: {e}")
@@ -1463,6 +1581,8 @@ class MainWindow(QMainWindow):
 
     # ---------- selezione oggetto (SAM / CLIPSeg) ----------
     def _segment_preconds(self) -> bool:
+        if not self._feature_gate("cap.sam"):
+            return False
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_segment_msg")); return False
         if not self.frame1_tab.image_path:
@@ -1605,6 +1725,8 @@ class MainWindow(QMainWindow):
                     self.video_def_tab.set_video(video_path)
                 if hasattr(self, "video_extend_tab"):
                     self.video_extend_tab.set_video(video_path)
+                if hasattr(self, "music_tab"):
+                    self.music_tab.set_last_video(video_path)   # per "Sonorizza ultimo video"
                 # ── VIDEO LUNGHI: chaining I2V con la pipeline base (sostituisce l'IAMCCS) ──
                 # Se siamo in un chaining attivo, questo video è un SEGMENTO → unisci + continua.
                 if getattr(self, "_extend_state", None) is not None:
@@ -2078,6 +2200,427 @@ class MainWindow(QMainWindow):
         # Porta al tab «Migliora qualità» → sotto-tab Foto (Restauro)
         self.tabs.setCurrentWidget(self.quality_tab)
         self.quality_tab.setCurrentWidget(self.restore_tab)
+
+    # ---------- TRELLIS.2 (immagine → modello 3D) ----------
+    def generate_trellis(self, cfg: dict):
+        """Genera un modello 3D dall'immagine selezionata tramite TrellisPipeline."""
+        from PySide6.QtWidgets import QMessageBox
+        if not self.driver.is_up():
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"),
+                                tr("mw.comfy_offline_process_msg")); return
+        if self._trellis_pid or self._inpaint_pid:
+            QMessageBox.information(self, tr("mw.wait_title"),
+                                   tr("mw.processing_in_progress_msg")); return
+
+        image_path = cfg.get("image_path", "")
+        force_no_bg = False
+        if image_path == "<from_canvas>":
+            image_path = self.frame1_tab.image_path or ""
+        elif image_path == "<from_canvas_masked>":
+            # Soggetto isolato dalla maschera del canvas (sfondo trasparente):
+            # esclude sfondo/oggetti indesiderati e disattiva il remove-bg automatico.
+            if not self.frame1_tab.canvas.has_mask():
+                QMessageBox.warning(self, tr("trellis.no_mask.title"),
+                                    tr("trellis.no_mask.msg")); return
+            exp = self.frame1_tab.canvas.export_subject_rgba(OUTPUT_DIR)
+            image_path = exp.get("image") or ""
+            force_no_bg = True
+        if not image_path:
+            QMessageBox.warning(self, tr("mw.no_image_title"),
+                                tr("mw.select_image_to_process_msg")); return
+
+        # Verifica che i nodi TRELLIS.2 siano installati in ComfyUI
+        try:
+            if "LoadTrellis2Models" not in self.driver.object_info("LoadTrellis2Models"):
+                QMessageBox.warning(self, tr("trellis.missing.title"),
+                                    tr("trellis.missing.msg")); return
+        except Exception:
+            QMessageBox.warning(self, tr("trellis.missing.title"),
+                                tr("trellis.missing.msg")); return
+
+        try:
+            img_name = self._upload_local(image_path)
+            seed = random.randint(0, 2**31 - 1) if cfg.get("seed_random", True) else int(cfg.get("seed", 0))
+            self._trellis_prefix = f"ltxstudio_trellis_{seed}"
+            prompt = self.trellisser.build(
+                img_name,
+                resolution=cfg.get("resolution", "1024_cascade"),
+                precision=cfg.get("precision", "auto"),
+                attn_backend=cfg.get("attn_backend", "auto"),
+                remove_background=False if force_no_bg else cfg.get("remove_background", True),
+                background_color=cfg.get("background_color", "black"),
+                seed=seed,
+                ss_guidance_strength=cfg.get("guidance", 6.5),
+                shape_guidance_strength=cfg.get("guidance", 6.5),
+                ss_sampling_steps=cfg.get("steps", 12),
+                shape_sampling_steps=cfg.get("steps", 12),
+                max_tokens=cfg.get("max_tokens", 49152),
+                target_face_count=cfg.get("target_face_count", 500000),
+                texture=cfg.get("texture", True),
+                tex_guidance_strength=cfg.get("tex_guidance", 3.0),
+                tex_sampling_steps=cfg.get("tex_steps", 12),
+                texture_size=cfg.get("texture_size", 2048),
+                file_format=cfg.get("file_format", "glb"),
+                filename_prefix=self._trellis_prefix,
+            )
+            self._trellis_pid = self.driver.submit(prompt)
+            label = tr("trellis.run.label").format(res=cfg.get("resolution", ""))
+            self.gen_dialog.start(prompt, label)
+            self._log(f"{label}: inviato (seed={seed}).")
+        except Exception as e:
+            QMessageBox.critical(self, tr("trellis.error.title"), str(e))
+            self._log(f"[ERR] TRELLIS: {e}")
+
+    def _check_trellis_done(self):
+        try:
+            hist = self.driver.history(self._trellis_pid)
+        except Exception:
+            return
+        entry = hist.get(self._trellis_pid)
+        if not entry:
+            return
+        st = entry.get("status", {})
+        if st.get("status_str") == "error":
+            self.gen_dialog.finish()
+            self._log("[ERR] generazione 3D fallita"); self._trellis_pid = None; return
+        if not st.get("completed"):
+            return
+        self._trellis_pid = None
+        self.gen_dialog.finish()
+        glb = self._latest_trellis_file()
+        if not glb:
+            self._log("[ERR] nessun file 3D prodotto da TRELLIS."); return
+        # Copia nell'output di LTX Studio + mostra nel visore
+        try:
+            dest = OUTPUT_DIR / Path(glb).name
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copyfile(glb, dest)
+        except Exception:
+            dest = Path(glb)   # fallback: usa direttamente il file di ComfyUI
+        self._log(f"✔ modello 3D salvato: {dest}")
+        self.trellis_tab.show_result(str(dest))
+        # rendi disponibile al tab Rig come "ultimo modello 3D"
+        self.rig_tab.set_last_mesh(str(dest))
+        self.tabs.setCurrentWidget(self.trellis_tab)
+
+    def _latest_trellis_file(self) -> str | None:
+        """Trova il .glb/.obj/... più recente col prefisso atteso nella output di ComfyUI."""
+        try:
+            cands = [f for f in COMFY_OUTPUT_DIR.glob(f"{self._trellis_prefix}*")
+                     if f.suffix.lower() in (".glb", ".obj", ".ply", ".stl", ".gltf")]
+            if not cands:
+                return None
+            return str(max(cands, key=lambda f: f.stat().st_mtime))
+        except Exception:
+            return None
+
+    # ---------- Rig 3D (SkinTokens) ----------
+    def generate_rig(self, cfg: dict):
+        """Rigging automatico di una mesh tramite RigPipeline (SkinTokens)."""
+        import os, shutil
+        from PySide6.QtWidgets import QMessageBox
+        if not self.driver.is_up():
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"),
+                                tr("mw.comfy_offline_process_msg")); return
+        if self._rig_pid or self._trellis_pid:
+            QMessageBox.information(self, tr("mw.wait_title"),
+                                   tr("mw.processing_in_progress_msg")); return
+
+        mesh_path = cfg.get("mesh_path", "")
+        if not mesh_path or not Path(mesh_path).exists():
+            QMessageBox.warning(self, tr("rig.no_mesh.title"), tr("rig.no_mesh.msg")); return
+
+        # Pre-check nodo installato
+        try:
+            if "SkinTokenRigTrimesh" not in self.driver.object_info("SkinTokenRigTrimesh"):
+                QMessageBox.warning(self, tr("rig.missing.title"), tr("rig.missing.msg")); return
+        except Exception:
+            QMessageBox.warning(self, tr("rig.missing.title"), tr("rig.missing.msg")); return
+
+        # Pre-check Blender (richiesto per l'export headless su Python 3.12).
+        # Se manca, offri l'installazione automatica via winget (previo consenso).
+        from core import blender_installer
+        if not blender_installer.find_blender():
+            if not self._offer_blender_install():
+                return
+            # installazione avviata in background: l'utente riproverà dopo il riavvio
+            return
+
+        try:
+            self._rig_prefix = "3D/ltxstudio_rig"
+            prompt = self.rigger.build(
+                mesh_path,
+                file_format=cfg.get("file_format", "glb"),
+                skeleton_template=cfg.get("skeleton_template", "Keep model names"),
+                use_transfer=cfg.get("use_transfer", True),
+                use_postprocess=cfg.get("use_postprocess", False),
+                group_per_vertex=cfg.get("group_per_vertex", 4),
+                bottom_center_origin=cfg.get("bottom_center_origin", False),
+                smooth_angle=cfg.get("smooth_angle", 55.0),
+                top_k=cfg.get("top_k", 5),
+                top_p=cfg.get("top_p", 0.95),
+                temperature=cfg.get("temperature", 1.0),
+                repetition_penalty=cfg.get("repetition_penalty", 2.0),
+                num_beams=cfg.get("num_beams", 10),
+                filename_prefix=self._rig_prefix,
+            )
+            self._rig_pid = self.driver.submit(prompt)
+            label = tr("rig.run.label").format(tpl=cfg.get("skeleton_template", ""))
+            self.gen_dialog.start(prompt, label)
+            self._log(f"{label}: inviato.")
+        except Exception as e:
+            QMessageBox.critical(self, tr("rig.error.title"), str(e))
+            self._log(f"[ERR] rig: {e}")
+
+    def _check_rig_done(self):
+        try:
+            hist = self.driver.history(self._rig_pid)
+        except Exception:
+            return
+        entry = hist.get(self._rig_pid)
+        if not entry:
+            return
+        st = entry.get("status", {})
+        if st.get("status_str") == "error":
+            self.gen_dialog.finish()
+            self._log("[ERR] rigging fallito"); self._rig_pid = None; return
+        if not st.get("completed"):
+            return
+        self._rig_pid = None
+        self.gen_dialog.finish()
+        rigged = self._latest_rig_file()
+        if not rigged:
+            self._log("[ERR] nessun file rigged prodotto."); return
+        try:
+            dest = OUTPUT_DIR / Path(rigged).name
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copyfile(rigged, dest)
+        except Exception:
+            dest = Path(rigged)
+        self._log(f"✔ modello rigged salvato: {dest}")
+        self.rig_tab.show_result(str(dest))
+        # handoff continuità: rendi il rig disponibile al tab Animazione
+        self.anim_tab.set_last_rig(str(dest))
+        self.tabs.setCurrentWidget(self.rig_tab)
+
+    def _latest_rig_file(self) -> str | None:
+        """Trova il file rigged più recente (SkinTokens salva in output/3D/)."""
+        try:
+            base = COMFY_OUTPUT_DIR / "3D"
+            cands = [f for f in base.glob("ltxstudio_rig*")
+                     if f.suffix.lower() in (".glb", ".fbx", ".gltf")]
+            if not cands:
+                return None
+            return str(max(cands, key=lambda f: f.stat().st_mtime))
+        except Exception:
+            return None
+
+    # ---------- Convertitore + operazioni mesh (Blender headless) ----------
+    def _wire_viewer_ops(self, tab):
+        """Collega i segnali del visore 3D interattivo (se presente) agli handler."""
+        viewer = getattr(tab, "viewer", None)
+        if viewer is None:
+            return
+        if hasattr(viewer, "request_mesh_op"):
+            viewer.request_mesh_op.connect(self.run_mesh_op)
+        if hasattr(viewer, "request_import"):
+            viewer.request_import.connect(lambda t=tab: self._viewer_import(t))
+        if hasattr(viewer, "request_export"):
+            viewer.request_export.connect(lambda t=tab: self._viewer_export(t))
+
+    def _viewer_import(self, tab):
+        from PySide6.QtWidgets import QFileDialog
+        from ui.tabs.convert_tab import INPUT_FILTER
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("viewer.import"), str(Path.home()), INPUT_FILTER)
+        if not path:
+            return
+        if hasattr(tab, "set_input_path"):
+            tab.set_input_path(path)
+        elif hasattr(tab, "set_last_mesh"):
+            tab.set_last_mesh(path)
+        if hasattr(tab, "show_result"):
+            tab.show_result(path)
+        self._log(f"[3D] importato nello stadio: {path}")
+
+    def _viewer_export(self, tab):
+        from PySide6.QtWidgets import QMessageBox
+        v = getattr(tab, "viewer", None)
+        path = v.get_edited_path() if (v and hasattr(v, "get_edited_path")) else ""
+        if not path:
+            QMessageBox.information(self, tr("viewer.export"), tr("viewer.no_asset"))
+            return
+        self.convert_tab.set_input_path(path)
+        self.tabs.setCurrentWidget(self.convert_tab)
+
+    def run_convert(self, cfg: dict):
+        """Converte un file 3D nel formato scelto (Blender headless)."""
+        import os
+        from core.blender_service import blender_available
+        if not cfg.get("input"):
+            return
+        if not blender_available():
+            self._offer_blender_install(); return
+        out_dir = OUTPUT_DIR / "converted"; out_dir.mkdir(parents=True, exist_ok=True)
+        args = dict(cfg)
+        args["output"] = str(out_dir / f"{Path(cfg['input']).stem}.{cfg['format']}")
+        self.convert_tab.log_msg(tr("convert.running").format(fmt=cfg["format"]))
+        self._start_blender("convert.py", args, self._on_convert_done, self._on_blender_err)
+
+    def _on_convert_done(self, res: dict):
+        import os
+        out = res.get("output", "")
+        self.convert_tab.log_msg(tr("convert.done").format(path=out))
+        self._log(f"✔ convertito: {out}")
+        try:
+            os.startfile(str(Path(out).parent))  # noqa: S606 (Windows)
+        except Exception:
+            pass
+
+    def run_mesh_op(self, cfg: dict):
+        """Esegue un'operazione mesh (separa/cancella) in-place via Blender e ricarica il viewer."""
+        from core.blender_service import blender_available
+        inp = cfg.get("input")
+        if not inp:
+            return
+        if not blender_available():
+            self._offer_blender_install(); return
+        args = dict(cfg)
+        args["output"] = inp                                   # editing in-place
+        args["format"] = Path(inp).suffix.lstrip(".") or "glb"
+        self._mesh_op_tab = self._tab_owning_viewer(inp)
+        self._log(tr("viewer.mesh_op_running").format(op=cfg.get("op")))
+        self._start_blender("mesh_ops.py", args, self._on_mesh_op_done, self._on_blender_err)
+
+    def _on_mesh_op_done(self, res: dict):
+        out = res.get("output", "")
+        self._log(f"✔ operazione mesh completata ({len(res.get('objects', []))} oggetti).")
+        tab = getattr(self, "_mesh_op_tab", None)
+        if tab is not None and out and hasattr(tab, "show_result"):
+            tab.show_result(out)
+
+    def _tab_owning_viewer(self, path: str):
+        for tab in (self.trellis_tab, self.rig_tab, getattr(self, "anim_tab", None)):
+            if tab is None:
+                continue
+            v = getattr(tab, "viewer", None)
+            if v is not None and hasattr(v, "get_edited_path") and v.get_edited_path() == path:
+                return tab
+        return self.trellis_tab
+
+    def _start_blender(self, script: str, args: dict, on_ok, on_err, timeout: int = 900):
+        from core.blender_service import BlenderWorker
+        worker = BlenderWorker(script, args, timeout)
+        self._blender_jobs = getattr(self, "_blender_jobs", [])
+        self._blender_jobs.append(worker)                      # no GC finché vivo
+        worker.finished_ok.connect(on_ok)
+        worker.failed.connect(on_err)
+        worker.finished.connect(
+            lambda w=worker: self._blender_jobs.remove(w) if w in self._blender_jobs else None)
+        worker.start()
+
+    def _on_blender_err(self, msg: str):
+        from PySide6.QtWidgets import QMessageBox
+        self._log(f"[ERR] Blender: {msg}")
+        QMessageBox.warning(self, tr("convert.error.title"), msg)
+
+    # ---------- Animazione / Mocap ----------
+    def start_mocap(self, cfg: dict):
+        """Avvia la cattura webcam (worker MediaPipe→BVH nel venv mocap)."""
+        from PySide6.QtWidgets import QMessageBox
+        from core.mocap_service import mocap_env_ready
+        if not mocap_env_ready():
+            QMessageBox.warning(self, tr("anim.env.title"), tr("anim.env.msg"))
+            return
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        self._mocap_bvh = str(OUTPUT_DIR / "mocap_capture.bvh")
+        preview = str(OUTPUT_DIR / "mocap_preview.png")
+        if self.mocap.start(self._mocap_bvh, preview, camera=int(cfg.get("camera", 0))):
+            self.anim_tab.set_capturing(True)
+            self._log(tr("anim.cam.started"))
+
+    def _on_mocap_done(self, bvh: str, frames: int):
+        self.anim_tab.set_capturing(False)
+        self.anim_tab.set_anim(bvh)
+        self._log(tr("anim.cam.done").format(frames=frames, path=bvh))
+
+    def _on_mocap_failed(self, msg: str):
+        from PySide6.QtWidgets import QMessageBox
+        self.anim_tab.set_capturing(False)
+        self._log(f"[ERR] mocap: {msg}")
+        QMessageBox.warning(self, tr("anim.env.title"), msg)
+
+    def run_retarget(self, cfg: dict):
+        """Applica l'animazione (BVH) al rig via Blender (retarget su armatura esistente)."""
+        from PySide6.QtWidgets import QMessageBox
+        from core.blender_service import blender_available
+        model = cfg.get("model", "")
+        anim = cfg.get("anim", "")
+        if not model or not Path(model).exists():
+            QMessageBox.warning(self, tr("anim.need.title"), tr("anim.need_rig.msg")); return
+        if not anim or not Path(anim).exists():
+            QMessageBox.warning(self, tr("anim.need.title"), tr("anim.need_anim.msg")); return
+        if not blender_available():
+            self._offer_blender_install(); return
+        out_dir = OUTPUT_DIR / "animated"; out_dir.mkdir(parents=True, exist_ok=True)
+        args = dict(cfg)
+        args["output"] = str(out_dir / f"{Path(model).stem}_anim.{cfg.get('format', 'fbx')}")
+        self._log(tr("anim.retarget.running"))
+        self._start_blender("retarget.py", args, self._on_retarget_done, self._on_blender_err)
+
+    def _on_retarget_done(self, res: dict):
+        out = res.get("output", "")
+        rt = res.get("retargeted", False)
+        self._log(tr("anim.retarget.done").format(path=out, mode="rig esistente" if rt else "armatura BVH"))
+        if out and Path(out).suffix.lower() in (".glb", ".gltf"):
+            self.anim_tab.show_result(out)
+        else:
+            import os
+            try:
+                os.startfile(str(Path(out).parent))  # noqa: S606
+            except Exception:
+                pass
+
+    def _offer_blender_install(self) -> bool:
+        """Chiede consenso e avvia l'installazione automatica di Blender (winget)."""
+        from PySide6.QtWidgets import QMessageBox, QProgressDialog
+        from core import blender_installer
+        if not blender_installer.winget_available():
+            QMessageBox.warning(self, tr("rig.no_blender.title"), tr("rig.no_blender.msg"))
+            return False
+        ans = QMessageBox.question(
+            self, tr("rig.blender_install.title"), tr("rig.blender_install.msg"),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if ans != QMessageBox.Yes:
+            return False
+        dlg = QProgressDialog(tr("rig.blender_install.progress"), "", 0, 0, self)
+        dlg.setWindowTitle(tr("rig.blender_install.title"))
+        dlg.setCancelButton(None)
+        dlg.setMinimumDuration(0)
+        dlg.setRange(0, 0)
+        dlg.show()
+        worker = blender_installer.BlenderInstallWorker()
+        self._blender_worker = worker        # mantieni il riferimento (no GC)
+        worker.finished_ok.connect(self._on_blender_installed)
+        worker.failed.connect(self._on_blender_install_failed)
+        worker.finished.connect(dlg.close)
+        worker.start()
+        self._log(tr("rig.blender_install.progress"))
+        return True
+
+    def _on_blender_installed(self, path: str):
+        from PySide6.QtWidgets import QMessageBox
+        self._log(f"✔ Blender installato: {path}")
+        QMessageBox.information(self, tr("rig.blender_ok.title"),
+                               tr("rig.blender_ok.msg").format(path=path))
+
+    def _on_blender_install_failed(self, msg: str):
+        from PySide6.QtWidgets import QMessageBox
+        self._log(f"[ERR] install Blender: {msg}")
+        QMessageBox.warning(self, tr("rig.blender_fail.title"),
+                            tr("rig.blender_fail.msg").format(err=msg))
         self._log(f"[Restauro] Immagine canvas inviata al tab Migliora qualità → Foto: {img}")
 
     def _on_catalog_updated(self):
@@ -2144,6 +2687,7 @@ class MainWindow(QMainWindow):
         return str(src)
 
     def _show_video(self, path: str):
+        path = watermark.apply_to_file(path)        # watermark obbligatorio (edizioni demo/supporter)
         # rendi l'ultimo video disponibile come sorgente V2V ("Usa ultima generazione")
         try:
             if hasattr(self.video_tab, "v2v_panel"):
