@@ -18,7 +18,7 @@ VENV = TOOLS / "inference_server_venv"
 VENV_PY = VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 TORCH = ["torch", "torchvision"]
 TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
-DEPS = ["diffusers>=0.33.1", "transformers>=4.48.3", "accelerate>=1.1.1", "safetensors",
+DEPS = ["diffusers>=0.33.1", "transformers>=4.48.3,<5", "accelerate>=1.1.1", "safetensors",  # transformers 5.x rompe from_single_file (CLIPTextModel.text_model)
         "sentencepiece", "protobuf", "pillow", "huggingface_hub", "peft",
         "fastapi", "uvicorn"]
 

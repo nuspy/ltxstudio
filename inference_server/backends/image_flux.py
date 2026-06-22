@@ -12,13 +12,22 @@ from pathlib import Path
 
 
 def _load_flux(model_path: str, is_flux2: bool):
-    """Loader per il ModelManager: ritorna (pipe, vram_mb stimati)."""
+    """Loader per il ModelManager: ritorna (pipe, vram_mb stimati).
+
+    - model_path = FILE .safetensors  → from_single_file (riusa i pesi LOCALI ComfyUI;
+      per i checkpoint ALL-IN-ONE include transformer+TE+VAE → nessun download).
+    - model_path = cartella/repo       → from_pretrained (formato diffusers).
+    """
     import torch
+    from pathlib import Path
     if is_flux2:
         from diffusers import Flux2Pipeline as Pipe
     else:
         from diffusers import FluxPipeline as Pipe
-    pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)
+    if Path(model_path).is_file():
+        pipe = Pipe.from_single_file(model_path, torch_dtype=torch.bfloat16)
+    else:
+        pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)
     pipe.enable_model_cpu_offload()                     # gestione VRAM: tiene su GPU solo il modulo attivo
     try:
         pipe.vae.enable_tiling()
