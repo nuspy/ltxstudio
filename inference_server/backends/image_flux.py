@@ -57,6 +57,22 @@ def _assemble_flux(Pipe, transformer_path: str):
                 text_encoder_2=te2, tokenizer_2=tok2, scheduler=sched)
 
 
+def _assemble_zimage(transformer_path: str):
+    """Assembla ZImagePipeline da: transformer LOCALE + VAE FLUX LOCALE + Qwen3 convertito."""
+    import os
+    import torch
+    from diffusers import (ZImageTransformer2DModel, AutoencoderKL,
+                           FlowMatchEulerDiscreteScheduler, ZImagePipeline)
+    from transformers import AutoModel, AutoTokenizer
+    bf16 = torch.bfloat16
+    tr = ZImageTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+    vae = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)
+    te = AutoModel.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"), torch_dtype=bf16)
+    tok = AutoTokenizer.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"))
+    sched = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=3.0)
+    return ZImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
+
+
 def _arch_of(params: dict) -> str:
     a = (params.get("task") or params.get("arch") or "flux").lower()
     if a == "flux" and "flux2" in str(params.get("model", "")).lower():
@@ -82,6 +98,8 @@ def _load(model_path: str, arch: str):
             # file 'solo transformer' (manca TE/VAE nel checkpoint) → assembla coi componenti locali
             if arch in ("flux", "kontext", "inpaint"):
                 pipe = _assemble_flux(Pipe, model_path)
+            elif arch == "zimage":
+                pipe = _assemble_zimage(model_path)
             else:
                 raise
     else:
