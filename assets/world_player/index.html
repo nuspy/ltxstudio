@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LTX Studio — World Player</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0d12;color:#cdd3df;font-family:system-ui,sans-serif;overflow:hidden}
+  #app{position:fixed;inset:0}
+  #hud{position:fixed;left:12px;top:12px;z-index:10;font-size:13px;background:rgba(0,0,0,.45);
+       padding:8px 10px;border-radius:8px;line-height:1.5}
+  #hud b{color:#fff}
+  #hud .k{display:inline-block;background:#222;border:1px solid #444;border-radius:4px;padding:0 5px;margin:0 1px}
+  button{background:#2a3142;color:#dfe5f0;border:1px solid #3a435a;border-radius:6px;padding:5px 10px;cursor:pointer;margin-top:6px}
+  button:hover{background:#39425a}
+  #drop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+        background:rgba(10,12,18,.85);z-index:20;font-size:18px;border:3px dashed #4a567a}
+  #err{position:fixed;left:12px;bottom:12px;color:#ff8a8a;font-size:12px;max-width:60ch}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <div><b>LTX Studio — World Player</b></div>
+  <div>Orbita: mouse · Zoom: rotella</div>
+  <div>Cammina: <span class="k">W</span><span class="k">A</span><span class="k">S</span><span class="k">D</span>
+       <span class="k">Spazio</span>/<span class="k">Shift</span> su/giù · mouse per guardare</div>
+  <button id="walk">🚶 Cammina (WASD)</button>
+  <button id="pick">📂 Apri file…</button>
+  <input id="file" type="file" accept=".glb,.gltf,.ply" style="display:none" />
+</div>
+<div id="drop">Rilascia qui un .glb o uno splat .ply</div>
+<div id="err"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.6/build/gaussian-splats-3d.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+const errEl = document.getElementById('err');
+const showErr = (m) => { errEl.textContent = m; console.error(m); };
+
+// ── parametri (?src=...&type=glb|splat) ───────────────────────────────────
+const qs = new URLSearchParams(location.search);
+let src = qs.get('src');
+let type = (qs.get('type') || '').toLowerCase();
+const guessType = (u) => u && u.toLowerCase().endsWith('.ply') ? 'splat' : 'glb';
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d12);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 1000);
+camera.position.set(0, 1.5, 4);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.2));
+const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(3, 10, 4); scene.add(dir);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.target.set(0, 1, 0); orbit.update();
+
+// ── controlli "cammina" (first-person, WASD + mouse) ──────────────────────
+const fp = new PointerLockControls(camera, renderer.domElement);
+let walking = false;
+const keys = {};
+addEventListener('keydown', e => keys[e.code] = true);
+addEventListener('keyup', e => keys[e.code] = false);
+document.getElementById('walk').onclick = () => {
+  walking = !walking;
+  if (walking) { orbit.enabled = false; fp.lock(); } else { orbit.enabled = true; fp.unlock(); }
+};
+fp.addEventListener('unlock', () => { walking = false; orbit.enabled = true; });
+
+const vel = new THREE.Vector3();
+function moveFP(dt) {
+  const s = (keys['ShiftLeft'] ? 6 : 3) * dt;
+  vel.set(0, 0, 0);
+  if (keys['KeyW']) vel.z -= 1; if (keys['KeyS']) vel.z += 1;
+  if (keys['KeyA']) vel.x -= 1; if (keys['KeyD']) vel.x += 1;
+  if (keys['Space']) camera.position.y += s; if (keys['ControlLeft']) camera.position.y -= s;
+  if (vel.lengthSq() > 0) { vel.normalize(); fp.moveRight(vel.x * s); fp.moveForward(-vel.z * s); }
+}
+
+// ── caricamento contenuto ─────────────────────────────────────────────────
+let splatViewer = null;
+function clearScene() {
+  if (splatViewer) { try { splatViewer.dispose(); } catch (e) {} splatViewer = null; }
+  for (let i = scene.children.length - 1; i >= 0; i--) {
+    const o = scene.children[i];
+    if (o.isMesh || o.isGroup) scene.remove(o);
+  }
+}
+
+async function loadGLB(url) {
+  clearScene();
+  new GLTFLoader().load(url, (g) => {
+    scene.add(g.scene);
+    const box = new THREE.Box3().setFromObject(g.scene);
+    const c = box.getCenter(new THREE.Vector3());
+    orbit.target.copy(c); camera.position.set(c.x, c.y + 1.5, c.z + box.getSize(new THREE.Vector3()).length() * 0.6);
+    orbit.update();
+  }, undefined, (e) => showErr('Errore GLB: ' + e));
+}
+
+async function loadSplat(url) {
+  clearScene();
+  try {
+    const GS = await import('@mkkellogg/gaussian-splats-3d');
+    splatViewer = new GS.Viewer({ selfDrivenMode: false, renderer, camera, useBuiltInControls: false, sharedMemoryForWorkers: false });
+    await splatViewer.addSplatScene(url, { showLoadingUI: false });
+  } catch (e) { showErr('Errore splat: ' + e + ' (richiede WebGL2 e connessione alla CDN)'); }
+}
+
+function load(url, t) {
+  if (!url) return;
+  errEl.textContent = '';
+  (t || guessType(url)) === 'splat' ? loadSplat(url) : loadGLB(url);
+}
+
+// ── file picker / drag&drop (per il player web autonomo) ──────────────────
+const fileInput = document.getElementById('file');
+document.getElementById('pick').onclick = () => fileInput.click();
+fileInput.onchange = () => { const f = fileInput.files[0]; if (f) load(URL.createObjectURL(f), guessType(f.name)); };
+const drop = document.getElementById('drop');
+addEventListener('dragover', e => { e.preventDefault(); drop.style.display = 'flex'; });
+drop.addEventListener('dragleave', () => drop.style.display = 'none');
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.style.display = 'none';
+  const f = e.dataTransfer.files[0]; if (f) load(URL.createObjectURL(f), guessType(f.name));
+});
+
+// ── loop ──────────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (walking) moveFP(dt); else orbit.update();
+  if (splatViewer) { try { splatViewer.update(); splatViewer.render(); return; } catch (e) {} }
+  renderer.render(scene, camera);
+}
+animate();
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+if (src) load(src, type); else showErr('Nessun modello: usa «Apri file…» o trascina un .glb / .ply');
+</script>
+</body>
+</html>
