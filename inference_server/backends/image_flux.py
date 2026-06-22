@@ -34,6 +34,40 @@ TE_DIR = r"E:\AI\Models\diffusers\_te"
 AE_FLUX = r"E:\AI\Models\VAE\Flux\ae.safetensors"
 
 
+def _place(pipe, vram_mb: int) -> str:
+    """Posizionamento VRAM (sicuro e portabile, default).
+
+    NB Windows: forzare tutto su GPU quando la VRAM è stretta innesca il *system memory fallback*
+    del driver NVIDIA (usa la RAM come VRAM) → lentezza estrema. Quindi DEFAULT =
+    enable_model_cpu_offload (funziona su ogni GPU/VRAM, dalle 5090 alle schede minori).
+    Il "full GPU" è opt-in solo con VRAM molto abbondante (NATIVE_FULL_GPU=1) e margine ampio."""
+    import os
+    import torch
+    full = os.environ.get("NATIVE_FULL_GPU") == "1"
+    if full and torch.cuda.is_available():
+        free_mb = torch.cuda.mem_get_info()[0] / 1024**2
+        if free_mb > vram_mb * 2.5:                     # margine ampio per evitare sysmem fallback
+            pipe.to("cuda")
+            return "gpu"
+    pipe.enable_model_cpu_offload()
+    return "offload"
+
+
+def _set_attention(pipe) -> str:
+    """Backend di attention configurabile con FALLBACK (per la distribuzione su GPU diverse).
+    NATIVE_ATTENTION: auto|sage|sage3|sdpa. 'auto' prova Sage e ricade su SDPA (sempre disponibile)."""
+    import os
+    want = (os.environ.get("NATIVE_ATTENTION") or "auto").lower()
+    if want in ("auto", "sage", "sage3"):
+        try:
+            pipe.transformer.set_attention_backend("sage")
+            return "sage"
+        except Exception:                               # noqa: BLE001
+            if want in ("sage", "sage3"):
+                print("[image] Sage non disponibile su questa GPU → SDPA", flush=True)
+    return "sdpa"                                       # default torch (sempre presente)
+
+
 def _assemble_flux(Pipe, transformer_path: str):
     """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
     (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
@@ -104,11 +138,13 @@ def _load(model_path: str, arch: str):
                 raise
     else:
         pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)
-    pipe.enable_model_cpu_offload()
     try:
         pipe.vae.enable_tiling()
     except Exception:                                   # noqa: BLE001
         pass
+    attn = _set_attention(pipe)
+    where = _place(pipe, VRAM_MB.get(arch, 16000))
+    print(f"[image] {arch}: pipeline su {where}, attention={attn}", flush=True)
     return pipe, VRAM_MB.get(arch, 16000)
 
 
