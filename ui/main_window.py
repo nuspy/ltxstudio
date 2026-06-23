@@ -203,6 +203,7 @@ class MainWindow(QMainWindow):
             self.video_extend_tab.set_video(self._last_video_path)
 
         # Auto-avvio ComfyUI se non è già in esecuzione (il polling sotto lo rileva quando è pronto).
+        self._maybe_autostart_native()
         self._maybe_autostart_comfyui()
 
         # poll stato ComfyUI + completamento job
@@ -546,6 +547,19 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         super().closeEvent(event)
+
+    def _maybe_autostart_native(self):
+        """Avvia l'InferenceServer nativo (porta 8189) se non risponde. Necessario per le feature
+        migrate (immagini/inpaint/kontext/upscale nativi) — sostituisce gradualmente ComfyUI."""
+        try:
+            from core import native_driver
+            if native_driver.is_up():
+                return
+            from core.native_launcher import launch
+            ok, msg = launch()
+            self._log(f"[Nativo] {msg}" if ok else f"[Nativo] auto-avvio saltato: {msg}")
+        except Exception as e:                   # noqa: BLE001
+            self._log(f"[Nativo] auto-avvio errore: {e}")
 
     def _maybe_autostart_comfyui(self):
         """Se ComfyUI non risponde su 127.0.0.1:8188, lo avvia in automatico (finestra separata,
