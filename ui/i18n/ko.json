@@ -1225,5 +1225,21 @@
   "weights.scan.none": "검색할 폴더를 선택하세요.",
   "weights.scanning": "검색 중…",
   "weights.scan.done": "이미 존재하는 가중치 {n}개를 찾았습니다.",
-  "weights.found": "이미 존재함: {p}"
+  "weights.found": "이미 존재함: {p}",
+  "f1.compose.group": "🧩 여러 사진 합성",
+  "f1.compose.info": "2장 이상의 사진을 붙여넣지 않고 하나의 이미지로 합칩니다(숨겨진 부분이 사라지지 않도록). 사진을 추가하고 방법을 선택한 뒤 프롬프트에 최종 장면을 설명하세요(예: 「사진 1의 인물을 사진 2의 배경에」).",
+  "f1.compose.list.tt": "합칠 사진들. 순서가 중요합니다: 첫 번째가 기준입니다.",
+  "f1.compose.add": "➕ 사진 추가",
+  "f1.compose.remove": "➖ 제거",
+  "f1.compose.mask": "🎭 마스크",
+  "f1.compose.mask.tt": "선택 사항: PNG 마스크를 불러와(흰색 = 사용할 부분) 선택한 사진에서 무엇을 가져올지 지정합니다.",
+  "f1.compose.mask.pick_first": "먼저 목록에서 사진을 선택하세요.",
+  "f1.compose.method_lbl": "방법",
+  "f1.compose.method.multiref": "다중 참조 (권장)",
+  "f1.compose.method.stitch": "나란히 배치 (스티치)",
+  "f1.compose.method.tt": "다중 참조: 각 사진이 별도의 참조이며 모델이 이를 융합합니다(더 자연스러움). 나란히 배치: 사진들을 하나의 참조 이미지로 나란히 놓습니다.",
+  "f1.compose.prompt.ph": "최종 구성을 설명하세요(예: 「사진 1의 피사체를 사진 2의 풍경에, 같은 조명으로」)",
+  "f1.compose.btn": "🧩 합성",
+  "mw.compose_need_two_msg": "합성하려면 최소 2장의 사진이 필요합니다.",
+  "mw.compose_label": "합성 ({n}장 · {method})"
 }

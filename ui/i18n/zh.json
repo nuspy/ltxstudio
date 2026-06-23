@@ -1225,5 +1225,21 @@
   "weights.scan.none": "请选择要搜索的文件夹。",
   "weights.scanning": "正在搜索…",
   "weights.scan.done": "找到 {n} 个已存在的权重。",
-  "weights.found": "已存在于：{p}"
+  "weights.found": "已存在于：{p}",
+  "f1.compose.group": "🧩 合成多张照片",
+  "f1.compose.info": "将2张或更多照片合成为一张图像，无需粘贴它们（这样不会丢失被遮挡的部分）。添加照片，选择方法，并在提示词中描述最终场景（例如「将照片1中的人物放到照片2的背景中」）。",
+  "f1.compose.list.tt": "要合成的照片。顺序很重要：第1张为基准。",
+  "f1.compose.add": "➕ 添加照片",
+  "f1.compose.remove": "➖ 移除",
+  "f1.compose.mask": "🎭 蒙版",
+  "f1.compose.mask.tt": "可选：加载一张PNG蒙版（白色=要使用的部分），以指定从所选照片中提取什么。",
+  "f1.compose.mask.pick_first": "请先在列表中选择一张照片。",
+  "f1.compose.method_lbl": "方法",
+  "f1.compose.method.multiref": "多重参考（推荐）",
+  "f1.compose.method.stitch": "并排拼接（stitch）",
+  "f1.compose.method.tt": "多重参考：每张照片是独立的参考，模型将它们融合（更自然）。并排拼接：照片彼此相邻放置，作为一张参考图像。",
+  "f1.compose.prompt.ph": "描述最终合成（例如「将照片1的主体放入照片2的风景中，相同的光线」）",
+  "f1.compose.btn": "🧩 合成",
+  "mw.compose_need_two_msg": "合成至少需要2张照片。",
+  "mw.compose_label": "合成（{n} 张照片 · {method}）"
 }

@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
         self.frame1_tab.canvas.request_outpaint.connect(lambda: self.generate_inpaint("outpaint"))
         # Bottone «Integra immagini» spostato dal canvas al tab Inpaint/Outpaint
         self.frame1_tab.request_integrate.connect(self.generate_integrate)
+        self.frame1_tab.request_compose.connect(self.generate_compose)
         self.frame1_tab.request_generate.connect(self.generate_image)
         self.frame1_tab.request_upscale.connect(self.generate_upscale)
         self.frame1_tab.request_recolor.connect(self.generate_recolor)
@@ -1296,6 +1297,46 @@ class MainWindow(QMainWindow):
             self._log(f"Integrazione {engine}: inviata (steps={steps}, seed={seed}, puzzle_lora={'sì' if aux else 'no'}).")
         except Exception as e:
             QMessageBox.critical(self, tr("mw.integrate_error_title"), str(e)); self._log(f"[ERR] integrate: {e}")
+
+    def generate_compose(self):
+        """Componi 2+ foto SEPARATE in un'unica immagine senza incollarle (niente occlusione):
+        multi-reference (catena ReferenceLatent) o stitch (affianca). FLUX.1 (Kontext) o FLUX.2.
+        Maschere opzionali per-foto (prep_masked) per indicare cosa usare."""
+        if not self.driver.is_up():
+            QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
+        if self._inpaint_pid:
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
+        cfg = self.frame1_tab.get_compose_config()
+        imgs = cfg.get("images") or []
+        if len(imgs) < 2:
+            QMessageBox.information(self, tr("f1.compose.group"), tr("mw.compose_need_two_msg")); return
+        engine = cfg.get("engine", "kontext")
+        model = cfg.get("model")
+        if engine == "flux2" and not model:
+            QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
+                                tr("mw.flux2_model_missing_integrate_msg")); return
+        if not self._ensure_flux2_encoder(model):
+            return
+        masks = cfg.get("masks") or {}
+        try:
+            uploaded = []
+            for f in imgs:
+                src = f
+                if f in masks:                          # applica la maschera "cosa usare" a monte
+                    src = self.kontext.prep_masked(f, masks[f], OUTPUT_DIR)
+                uploaded.append(self._upload_local(src))
+            seed = random.randint(0, 2**31)
+            graph = self.kontext.compose(uploaded, cfg.get("prompt") or "", method=cfg.get("method", "multiref"),
+                                         engine=engine, model=model, seed=seed)
+            self._inpaint_pid = self.driver.submit(graph)
+            self._inpaint_mode = "composizione"
+            self._inpaint_bbox = None
+            self._inpaint_before = None
+            self.gen_dialog.start(graph, tr("mw.compose_label").format(
+                n=len(imgs), method=cfg.get("method", "multiref")))
+            self._log(f"Composizione {engine} ({cfg.get('method')}): {len(imgs)} foto, seed={seed}.")
+        except Exception as e:
+            QMessageBox.critical(self, tr("mw.integrate_error_title"), str(e)); self._log(f"[ERR] compose: {e}")
 
     def generate_recolor(self):
         """Cambia colore (Kontext/FLUX.2 prompt-based): ricolora il soggetto mantenendo texture/luce."""

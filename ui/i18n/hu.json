@@ -1225,5 +1225,21 @@
   "weights.scan.none": "Válassz egy mappát a kereséshez.",
   "weights.scanning": "Keresés folyamatban…",
   "weights.scan.done": "{n} meglévő súly található.",
-  "weights.found": "már megtalálható itt: {p}"
+  "weights.found": "már megtalálható itt: {p}",
+  "f1.compose.group": "🧩 Több fotó összeállítása",
+  "f1.compose.info": "Egyesíts 2 vagy több fotót egyetlen képpé anélkül, hogy beillesztenéd őket (így nem vesznek el a rejtett részek). Add hozzá a fotókat, válassz módszert, és írd le a promptban a végső jelenetet (pl. «az 1. fotó személye a 2. fotó hátterében»).",
+  "f1.compose.list.tt": "Az egyesítendő fotók. A sorrend számít: az 1. az alap.",
+  "f1.compose.add": "➕ Fotó hozzáadása",
+  "f1.compose.remove": "➖ Eltávolítás",
+  "f1.compose.mask": "🎭 Maszk",
+  "f1.compose.mask.tt": "Opcionális: tölts be egy PNG maszkot (fehér = a használandó rész), hogy megadd, mit vegyen át a kiválasztott fotóból.",
+  "f1.compose.mask.pick_first": "Előbb válassz egy fotót a listából.",
+  "f1.compose.method_lbl": "Módszer",
+  "f1.compose.method.multiref": "Több referencia (ajánlott)",
+  "f1.compose.method.stitch": "Egymás mellé (összefűzés)",
+  "f1.compose.method.tt": "Több referencia: minden fotó külön referencia, és a modell összeolvasztja őket (természetesebb). Egymás mellé: a fotók egymás mellé kerülnek egyetlen referenciaképként.",
+  "f1.compose.prompt.ph": "Írd le a végső kompozíciót (pl. «tedd az 1. fotó alanyát a 2. fotó tájába, ugyanazzal a fénnyel»)",
+  "f1.compose.btn": "🧩 Összeállítás",
+  "mw.compose_need_two_msg": "Legalább 2 fotó kell az összeállításhoz.",
+  "mw.compose_label": "Kompozíció ({n} fotó · {method})"
 }

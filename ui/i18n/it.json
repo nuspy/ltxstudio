@@ -1322,5 +1322,21 @@
   "weights.scan.none": "Indica una cartella in cui cercare.",
   "weights.scanning": "Ricerca in corso…",
   "weights.scan.done": "Trovati {n} pesi già esistenti.",
-  "weights.found": "già presente in: {p}"
+  "weights.found": "già presente in: {p}",
+  "f1.compose.group": "🧩 Componi più foto",
+  "f1.compose.info": "Combina 2 o più foto in un'unica immagine SENZA incollarle (così non perdi le parti nascoste). Aggiungi le foto, scegli il metodo e descrivi nel prompt la scena finale (es. «la persona della foto 1 nello sfondo della foto 2»).",
+  "f1.compose.list.tt": "Le foto da combinare. L'ordine conta: la 1ª è la base.",
+  "f1.compose.add": "➕ Aggiungi foto",
+  "f1.compose.remove": "➖ Rimuovi",
+  "f1.compose.mask": "🎭 Maschera",
+  "f1.compose.mask.tt": "Opzionale: carica una maschera PNG (bianco = parte da usare) per indicare cosa prendere dalla foto selezionata.",
+  "f1.compose.mask.pick_first": "Seleziona prima una foto nella lista.",
+  "f1.compose.method_lbl": "Metodo",
+  "f1.compose.method.multiref": "Riferimenti multipli (consigliato)",
+  "f1.compose.method.stitch": "Affianca le foto (stitch)",
+  "f1.compose.method.tt": "Riferimenti multipli: ogni foto è un riferimento separato e il modello le fonde (più naturale). Affianca: le foto vengono messe una accanto all'altra come un'unica immagine di riferimento.",
+  "f1.compose.prompt.ph": "Descrivi la composizione finale (es. «metti il soggetto della foto 1 nel paesaggio della foto 2, stessa luce»)",
+  "f1.compose.btn": "🧩 Componi",
+  "mw.compose_need_two_msg": "Servono almeno 2 foto per comporre.",
+  "mw.compose_label": "Composizione ({n} foto · {method})"
 }

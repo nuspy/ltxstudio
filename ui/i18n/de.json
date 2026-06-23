@@ -1225,5 +1225,21 @@
   "weights.scan.none": "Wähle einen Ordner zum Durchsuchen.",
   "weights.scanning": "Suche läuft…",
   "weights.scan.done": "{n} bereits vorhandene Gewichte gefunden.",
-  "weights.found": "bereits vorhanden in: {p}"
+  "weights.found": "bereits vorhanden in: {p}",
+  "f1.compose.group": "🧩 Mehrere Fotos zusammenfügen",
+  "f1.compose.info": "Kombiniere 2 oder mehr Fotos zu einem Bild, OHNE sie einzufügen (so gehen verdeckte Teile nicht verloren). Füge die Fotos hinzu, wähle die Methode und beschreibe im Prompt die finale Szene (z. B. «die Person aus Foto 1 im Hintergrund von Foto 2»).",
+  "f1.compose.list.tt": "Die zu kombinierenden Fotos. Die Reihenfolge zählt: Das 1. ist die Basis.",
+  "f1.compose.add": "➕ Foto hinzufügen",
+  "f1.compose.remove": "➖ Entfernen",
+  "f1.compose.mask": "🎭 Maske",
+  "f1.compose.mask.tt": "Optional: Lade eine PNG-Maske (weiß = zu verwendender Teil), um anzugeben, was aus dem ausgewählten Foto übernommen wird.",
+  "f1.compose.mask.pick_first": "Wähle zuerst ein Foto in der Liste aus.",
+  "f1.compose.method_lbl": "Methode",
+  "f1.compose.method.multiref": "Mehrere Referenzen (empfohlen)",
+  "f1.compose.method.stitch": "Nebeneinander (Stitch)",
+  "f1.compose.method.tt": "Mehrere Referenzen: Jedes Foto ist eine eigene Referenz und das Modell verschmilzt sie (natürlicher). Nebeneinander: Die Fotos werden als ein einziges Referenzbild nebeneinander gesetzt.",
+  "f1.compose.prompt.ph": "Beschreibe die finale Komposition (z. B. «setze das Motiv aus Foto 1 in die Landschaft von Foto 2, gleiches Licht»)",
+  "f1.compose.btn": "🧩 Zusammenfügen",
+  "mw.compose_need_two_msg": "Du brauchst mindestens 2 Fotos zum Zusammenfügen.",
+  "mw.compose_label": "Komposition ({n} Fotos · {method})"
 }

@@ -1322,5 +1322,21 @@
   "weights.scan.none": "Choose a folder to search.",
   "weights.scanning": "Searching…",
   "weights.scan.done": "Found {n} already-existing weights.",
-  "weights.found": "already present in: {p}"
+  "weights.found": "already present in: {p}",
+  "f1.compose.group": "🧩 Compose multiple photos",
+  "f1.compose.info": "Combine 2+ photos into one image WITHOUT pasting them (so you don't lose hidden parts). Add the photos, pick a method, and describe the final scene in the prompt (e.g. 'the person from photo 1 in the background of photo 2').",
+  "f1.compose.list.tt": "Photos to combine. Order matters: the 1st is the base.",
+  "f1.compose.add": "➕ Add photo",
+  "f1.compose.remove": "➖ Remove",
+  "f1.compose.mask": "🎭 Mask",
+  "f1.compose.mask.tt": "Optional: load a PNG mask (white = part to use) to tell what to take from the selected photo.",
+  "f1.compose.mask.pick_first": "Select a photo in the list first.",
+  "f1.compose.method_lbl": "Method",
+  "f1.compose.method.multiref": "Multiple references (recommended)",
+  "f1.compose.method.stitch": "Side-by-side (stitch)",
+  "f1.compose.method.tt": "Multiple references: each photo is a separate reference and the model blends them (more natural). Side-by-side: photos are placed next to each other as a single reference image.",
+  "f1.compose.prompt.ph": "Describe the final composition (e.g. 'put the subject from photo 1 into the landscape of photo 2, same lighting')",
+  "f1.compose.btn": "🧩 Compose",
+  "mw.compose_need_two_msg": "You need at least 2 photos to compose.",
+  "mw.compose_label": "Composition ({n} photos · {method})"
 }

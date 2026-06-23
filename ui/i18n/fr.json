@@ -1225,5 +1225,21 @@
   "weights.scan.none": "Indiquez un dossier où rechercher.",
   "weights.scanning": "Recherche en cours…",
   "weights.scan.done": "{n} poids déjà existants trouvés.",
-  "weights.found": "déjà présent dans : {p}"
+  "weights.found": "déjà présent dans : {p}",
+  "f1.compose.group": "🧩 Composer plusieurs photos",
+  "f1.compose.info": "Combinez 2 photos ou plus en une seule image SANS les coller (pour ne pas perdre les parties cachées). Ajoutez les photos, choisissez la méthode et décrivez la scène finale dans le prompt (ex. «la personne de la photo 1 dans l'arrière-plan de la photo 2»).",
+  "f1.compose.list.tt": "Les photos à combiner. L'ordre compte : la 1ère est la base.",
+  "f1.compose.add": "➕ Ajouter une photo",
+  "f1.compose.remove": "➖ Retirer",
+  "f1.compose.mask": "🎭 Masque",
+  "f1.compose.mask.tt": "Facultatif : chargez un masque PNG (blanc = partie à utiliser) pour indiquer quoi prendre dans la photo sélectionnée.",
+  "f1.compose.mask.pick_first": "Sélectionnez d'abord une photo dans la liste.",
+  "f1.compose.method_lbl": "Méthode",
+  "f1.compose.method.multiref": "Références multiples (recommandé)",
+  "f1.compose.method.stitch": "Côte à côte (stitch)",
+  "f1.compose.method.tt": "Références multiples : chaque photo est une référence distincte et le modèle les fusionne (plus naturel). Côte à côte : les photos sont placées l'une à côté de l'autre comme une seule image de référence.",
+  "f1.compose.prompt.ph": "Décrivez la composition finale (ex. «mettez le sujet de la photo 1 dans le paysage de la photo 2, même lumière»)",
+  "f1.compose.btn": "🧩 Composer",
+  "mw.compose_need_two_msg": "Il faut au moins 2 photos pour composer.",
+  "mw.compose_label": "Composition ({n} photos · {method})"
 }

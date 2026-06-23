@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QLabel,
     QComboBox, QSlider, QFormLayout, QGroupBox, QSpinBox, QPushButton, QLineEdit,
     QCheckBox, QTabWidget, QScrollArea, QFrame, QDoubleSpinBox, QToolButton,
+    QListWidget,
 )
 
 from ui.mask_canvas import MaskCanvas
@@ -78,6 +79,7 @@ class Frame1Tab(QWidget):
     request_recolor = Signal()          # cambia colore (Kontext prompt-based)
     request_restore_photo = Signal()    # restaura / colora foto (invia al tab Restauro)
     request_integrate = Signal()        # integra immagini (spostato qui dal canvas)
+    request_compose = Signal()          # componi più foto (multi-reference / stitch)
 
     def __init__(self):
         super().__init__()
@@ -540,6 +542,41 @@ class Frame1Tab(QWidget):
         g.addRow(b_int)
         wv.addWidget(int_box)
 
+        # ============ SEZIONE 3: COMPONI PIÙ FOTO (senza incollare → niente occlusione) ============
+        sep2 = QFrame(); sep2.setFrameShape(QFrame.HLine); sep2.setFrameShadow(QFrame.Sunken)
+        sep2.setStyleSheet("color: #444; margin: 6px 0;")
+        wv.addWidget(sep2)
+        comp_box = QGroupBox(tr("f1.compose.group"))
+        cg = QVBoxLayout(comp_box)
+        info = QLabel(tr("f1.compose.info")); info.setWordWrap(True)
+        info.setStyleSheet("color:#9bd; font-size:11px;")
+        cg.addWidget(info)
+        self.compose_list = QListWidget(); self.compose_list.setMaximumHeight(110)
+        self.compose_list.setToolTip(tr("f1.compose.list.tt"))
+        cg.addWidget(self.compose_list)
+        crow = QHBoxLayout()
+        b_add = QPushButton(tr("f1.compose.add")); b_add.clicked.connect(self._compose_add)
+        b_del = QPushButton(tr("f1.compose.remove")); b_del.clicked.connect(self._compose_remove)
+        b_msk = QPushButton(tr("f1.compose.mask")); b_msk.clicked.connect(self._compose_mask)
+        b_msk.setToolTip(tr("f1.compose.mask.tt"))
+        crow.addWidget(b_add); crow.addWidget(b_del); crow.addWidget(b_msk)
+        cg.addLayout(crow)
+        mrow = QHBoxLayout()
+        mrow.addWidget(QLabel(tr("f1.compose.method_lbl")))
+        self.compose_method = QComboBox()
+        self.compose_method.addItems([tr("f1.compose.method.multiref"), tr("f1.compose.method.stitch")])
+        self.compose_method.setToolTip(tr("f1.compose.method.tt"))
+        mrow.addWidget(self.compose_method, 1)
+        cg.addLayout(mrow)
+        self.compose_prompt = QPlainTextEdit(); self.compose_prompt.setMaximumHeight(48)
+        self.compose_prompt.setPlaceholderText(tr("f1.compose.prompt.ph"))
+        cg.addWidget(self.compose_prompt)
+        b_comp = QPushButton(tr("f1.compose.btn"))
+        b_comp.clicked.connect(lambda: self.request_compose.emit())
+        cg.addWidget(b_comp)
+        wv.addWidget(comp_box)
+        self._compose_masks: dict[str, str] = {}
+
         return wrap
 
     # ---------- cambia colore (Kontext prompt-based, stile MagicQuill) ----------
@@ -947,6 +984,42 @@ class Frame1Tab(QWidget):
             "seed": None if self.inp_seed_rand.isChecked() else self.inp_seed.value(),
             "lora": self.inp_lora.currentData(),
             "available": available,
+        }
+
+    # ---------- composizione multi-foto (multi-reference / stitch) ----------
+    def _compose_add(self):
+        from PySide6.QtWidgets import QFileDialog
+        files, _ = QFileDialog.getOpenFileNames(
+            self, tr("f1.compose.add"), "", "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
+        for f in files:
+            self.compose_list.addItem(f)
+
+    def _compose_remove(self):
+        for it in self.compose_list.selectedItems():
+            self._compose_masks.pop(it.text().split("  🎭")[0], None)
+            self.compose_list.takeItem(self.compose_list.row(it))
+
+    def _compose_mask(self):
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        it = self.compose_list.currentItem()
+        if not it:
+            QMessageBox.information(self, tr("f1.compose.group"), tr("f1.compose.mask.pick_first")); return
+        key = it.text().split("  🎭")[0]
+        f, _ = QFileDialog.getOpenFileName(
+            self, tr("f1.compose.mask"), "", "Maschera (*.png *.jpg *.jpeg *.bmp)")
+        if f:
+            self._compose_masks[key] = f
+            it.setText(key + "  🎭")
+
+    def get_compose_config(self) -> dict:
+        imgs = [self.compose_list.item(i).text().split("  🎭")[0] for i in range(self.compose_list.count())]
+        return {
+            "images": imgs,
+            "masks": dict(getattr(self, "_compose_masks", {})),
+            "method": "stitch" if self.compose_method.currentIndex() == 1 else "multiref",
+            "prompt": self.compose_prompt.toPlainText().strip(),
+            "engine": "flux2" if self.integrate_engine.currentIndex() == 1 else "kontext",
+            "model": (self.integrate_model.currentText() if self.integrate_model.count() else "") or None,
         }
 
     def get_gen_config(self) -> dict:
