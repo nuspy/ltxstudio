@@ -88,6 +88,23 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
         shutil.rmtree(td, ignore_errors=True)
 
 
+def run_fps(params: dict, mm, output_dir: str) -> dict:
+    """Aumento FPS video — interpolazione movimento ffmpeg (minterpolate). Niente ComfyUI/modelli.
+    RIFE (qualità superiore via rete neurale) = upgrade futuro con modello dedicato."""
+    video = params["image_path"]
+    if not os.path.exists(video):
+        return {"status": "error", "error": f"video non trovato: {video}"}
+    target = int(params.get("target_fps", 60))
+    os.makedirs(output_dir, exist_ok=True)
+    out_path = str(Path(output_dir) / f"native_fps{target}_{params.get('seed', 0)}.mp4")
+    r = subprocess.run([_ffmpeg(), "-y", "-i", video, "-filter:v",
+                        f"minterpolate=fps={target}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir",
+                        "-c:a", "copy", out_path], capture_output=True, timeout=1800)
+    if not os.path.exists(out_path):
+        return {"status": "error", "error": f"ffmpeg minterpolate fallito: {r.stderr[-400:]!r}"}
+    return {"status": "success", "output": [out_path]}
+
+
 def run(params: dict, mm, output_dir: str) -> dict:
     """params: image_path (= video), model (ESRGAN), target_scale, seed."""
     import numpy as np

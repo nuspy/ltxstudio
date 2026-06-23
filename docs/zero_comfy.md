@@ -69,7 +69,7 @@ Legenda: ✅ nativo verificato · 🟢 nativo codice pronto (attende pesi) · �
 ## Piano a fasi
 **A — Immagini (DONE per FLUX.1/ESRGAN, verificato)**: gen, inpaint/outpaint, kontext/integra, recolor, upscale, restore, compose-stitch ✅. Segmentazione 🟢 (download pesi). Restano: SD3, prompt-enhance, FLUX.2 (inpaint/kontext/compose-multiref/colorize → download).
 **B — Video core nativo**: t2v/i2v 🟢 (download Gemma) → keyframe-multipli, extend, durata-illimitata, ReTake, Just_Talk, ControlNet, HR, scaling. *La durata illimitata va RIPROGETTATA (instabile anche su ComfyUI).*
-**C — Post-process video**: SeedVR2, ESRGAN-per-frame, RIFE, FlashVSR, face-restore (CodeFormer/GFPGAN), audio-slicing.
+**C — Post-process video**: ESRGAN-per-frame ✅ (verificato), aumento-FPS ✅ (ffmpeg minterpolate, verificato), face-restore 🟢 (GFPGAN, serve `pip gfpgan`). Restano: SeedVR2, RIFE (qualità sup.), FlashVSR, audio-slicing. Handler `video_postprocess.py` (video_upscale/video_face/video_fps).
 **D — 3D + voce a venv standalone**: TRELLIS, rigging, CosyVoice.
 **E — Cleanup**: rimuovere driver/launcher/shim/path ComfyUI, convert_tab, semplificare backend.py.
 
