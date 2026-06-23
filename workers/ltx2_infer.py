@@ -21,6 +21,7 @@ from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
 from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
 from ltx_pipelines.utils.args import ImageConditioningInput
 from ltx_pipelines.utils.media_io import encode_video
+from ltx_pipelines.utils.types import OffloadMode
 
 # Fix meta-tensor: il meta-device loading di ltx-core + l'ottimizzazione SDPA-mask di transformers
 # fa `.item()` su un tensore 'meta' (crash su qualsiasi torch recente). Disabilitando lo skip,
@@ -122,9 +123,10 @@ def main() -> None:
         from ltx_core.quantization import fp8_cast
         quant = fp8_cast.build_policy(ckpt)
     t0 = time.time()
+    offload = OffloadMode.CPU if p.get("offload", "cpu") == "cpu" else OffloadMode.NONE
     pipe = TI2VidTwoStagesPipeline(
         checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
-        gemma_root=GEMMA, loras=loras, quantization=quant)
+        gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode})", flush=True)
 
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)), stg_scale=1.0,
