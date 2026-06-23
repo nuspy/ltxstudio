@@ -1388,6 +1388,16 @@ class MainWindow(QMainWindow):
             if not model:
                 QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
                                     tr("mw.flux2_model_missing_inpaint_tab_msg")); return
+        # ── BACKEND NATIVO (recolor Kontext FLUX.1): niente ComfyUI. FLUX.2 → ComfyUI.
+        from core import backend
+        if backend.is_native("image") and engine == "kontext":
+            what = (cc.get("subject") or "").strip() or "the indicated subject"
+            rprompt = (f"Recolor {what} to {cc['target']}. Keep the original texture, material, "
+                       f"lighting and shadows; change only the color.")
+            self._inpaint_before = self.frame1_tab.image_path
+            self._start_native_kontext({"image": self.frame1_tab.image_path}, None, rprompt, "",
+                                       cc["steps"], random.randint(0, 2**31), 2.5)
+            return
         try:
             img_name = self._upload_local(self.frame1_tab.image_path)
             self._inpaint_bbox = None
@@ -1681,14 +1691,14 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
                                     tr("mw.native_done_msg", "Generata: {f}").format(f=out))
 
-    def _start_native_upscale(self, model, scale):
+    def _start_native_upscale(self, model, scale, image_path=None):
         """Upscale via backend NATIVO (ESRGAN/spandrel) — niente ComfyUI."""
         from core import native_driver
         if not native_driver.is_up():
             QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
                 tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde."))
             return
-        params = {"model": model, "arch": "upscale", "image_path": self.frame1_tab.image_path,
+        params = {"model": model, "arch": "upscale", "image_path": image_path or self.frame1_tab.image_path,
                   "target_scale": float(scale), "seed": 0}
         self._log(f"Upscale (backend NATIVO) inviato (×{scale})…")
         self._native_worker = _NativeImageWorker(params, module="upscale")
@@ -2355,6 +2365,13 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.select_image_to_process_msg")); return
 
         op = cfg.get("operation", "restore")
+        # ── BACKEND NATIVO: il restauro 'restore' è upscale ESRGAN (nativo via spandrel).
+        #    colorize/restore_and_colorize usano FLUX.2 → restano su ComfyUI (posticipato).
+        from core import backend
+        if op == "restore" and backend.is_native("image"):
+            self._inpaint_before = image_path
+            self._start_native_upscale(cfg["upscale_model"], cfg["target_scale"], image_path=image_path)
+            return
         try:
             img_name = self._upload_local(image_path)
             self._inpaint_before = image_path
