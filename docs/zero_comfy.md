@@ -1,81 +1,82 @@
-# Migrazione a ZERO dipendenze ComfyUI — piano di finalizzazione
+# Migrazione a ZERO dipendenze ComfyUI — piano + INVENTARIO ESAUSTIVO
 
-Obiettivo: eliminare ComfyUI come runtime. Oggi l'app usa **tre** runtime:
-- **ComfyUI** (porta 8188, `core/comfy_driver.py` + `core/comfy_launcher.py`) — da eliminare.
-- **Backend nativo** (porta 8189, `inference_server/`, diffusers) — il sostituto; dispatch via `core/backend.py` (`is_native(module)`) + `core/native_driver.py`.
-- **Standalone** (venv isolati, subprocess) — musica/training/3D-scene/TTS: **già zero-ComfyUI**, non toccare.
+Obiettivo: eliminare ComfyUI come runtime. Runtime attuali:
+- **ComfyUI** (8188, `core/comfy_driver.py`/`comfy_launcher.py`) → da eliminare.
+- **Backend nativo** (8189, `inference_server/`, diffusers) → il sostituto; dispatch `core/backend.py` (`is_native`/`comfy_blocked`/`strict_native`) + `core/native_driver.py` + autostart `core/native_launcher.py`.
+- **Standalone** (venv isolati, subprocess) → musica/training/world/mocap/TTS-edge: **già zero-comfy**, non toccare.
 
-Aggiornato: 2026-06-23.
+Aggiornato: 2026-06-23. Stato `Comfy_Nexus` rinominato `.bak` (ComfyUI assente) → indipendenza nativa VERIFICATA per la Fase A.
 
-## 1. Stato per componente
+## INVENTARIO COMPLETO (43 feature) — stato migrazione
+Legenda: ✅ nativo verificato · 🟢 nativo codice pronto (attende pesi) · 🟡 nativo parziale/fallback · 🔴 da migrare · ⬛ già standalone (no comfy).
 
-| Feature | Pipeline (costruisce grafo Comfy) | Handler GUI | Equivalente diffusers | Stato |
-|---|---|---|---|---|
-| Immagini (FLUX/Z-Image/Kontext/inpaint) | `core/gen_pipeline.py` | `generate_image` | `inference_server/backends/image_flux.py` | ✅ **NATIVO** (flag `image`) |
-| Inpaint/Outpaint (FLUX Fill) | `core/inpaint_pipeline.py` | `generate_inpaint` | `FluxFillPipeline` (in image_flux, `inpaint`) | 🟡 nativo pronto, **cablare il flag** |
-| Kontext / Integra | `core/kontext_pipeline.py` | `generate_integrate` | `FluxKontextPipeline` (in image_flux, `kontext`) | 🟡 nativo pronto per 1-img; **multi-ref/ReferenceLatent da reimplementare** |
-| Compose multi-foto | `core/kontext_pipeline.py:compose` | `generate_compose` | come Kontext + multi-reference | 🟡 dipende da Kontext nativo |
-| Upscale immagine | `core/upscale_pipeline.py` | `generate_upscale` | ESRGAN (spandrel) + rifinitura FLUX | 🔴 da migrare (semplice) |
-| Restauro/colorazione foto | `core/restore_pipeline.py` | `generate_restore` | ESRGAN + Kontext colorize | 🔴 da migrare (dipende da Kontext) |
-| Segmentazione testo (SAM+GroundingDINO) | `core/segment_pipeline.py` | `segment_by_text` | SAM2 + GroundingDINO via transformers | 🔴 da migrare (custom_node → libreria) |
-| **Video t2v/i2v** | `core/template_engine.py` | `on_generate` | `LTX2Pipeline` (`video_ltx.py`, task #18) | 🟡 **scaffold nativo** (in corso) |
-| **Video prolunga/long** | `core/extend_pipeline.py` | `generate_video_extend` | `LTXI2VLongMultiPromptPipeline` / logica IAMCCS da reimplementare | 🔴 nodi IAMCCS custom → reimplementare in diffusers |
-| Video ReTake / Just_Talk | `core/template_engine.py` (v2v) | `on_generate` (v2v) | LTX2 condition + mask | 🔴 da reimplementare |
-| Video ControlNet (copia movimenti) | `core/template_engine.py` (controlnet) | `on_generate` (cnet) | `LTX2ConditionPipeline` | 🔴 da migrare |
-| Definizione/upscale video (SeedVR2/RIFE) | `core/video_enhance_pipeline.py` | `generate_video_enhance` | SeedVR2 (repo standalone) + RIFE (torch) | 🔴 da migrare (modelli estraibili) |
-| Restauro volti video (CodeFormer/GFPGAN) | `core/face_restore_pipeline.py` | `generate_face_restore` | codeformer/gfpgan (pip) per-frame | 🔴 da migrare (librerie pip esistono) |
-| 3D da immagine (TRELLIS.2) | `core/trellis_pipeline.py` | `generate_trellis` | `microsoft/TRELLIS` repo Python standalone | 🔴 migrare a venv standalone (come WorldGen), NON ComfyUI |
-| Rigging (SkinTokens) | `core/rig_pipeline.py` | `generate_rig` | SkinTokens repo + Blender headless | 🔴 migrare a venv standalone |
+### Immagini
+| Feature | core | Stato | Note |
+|---|---|---|---|
+| Gen FLUX.1 / Z-Image | gen_pipeline → image_flux | ✅ | single-file locale |
+| Gen FLUX.2 / Ernie | gen_pipeline → image_flux | 🟢 | repo diffusers (download) |
+| Gen **SD3** | gen_pipeline | 🔴 | diffusers SD3Pipeline (raro) |
+| Inpaint/Outpaint FLUX.1 Fill | inpaint_pipeline → image_flux | ✅ | FluxFillPipeline |
+| Inpaint FLUX.2 Klein | inpaint_pipeline | 🔴 | FLUX.2 (download) |
+| Kontext / Integra (1 ref) | kontext_pipeline → image_flux | ✅ | FluxKontextPipeline |
+| Compose multi-foto (stitch) | kontext_pipeline → image_flux | ✅ | stitch PIL → Kontext |
+| Compose multi-ref VERO | kontext_pipeline | 🔴 | FLUX.2 ReferenceLatent (download) |
+| Recolor (prompt) | kontext_pipeline → image_flux | ✅ | Kontext |
+| Upscale ESRGAN | upscale_pipeline → image_upscale | ✅ | spandrel |
+| Restauro foto (ESRGAN) | restore_pipeline → image_upscale | ✅ | via upscale |
+| Colorizzazione B&W | restore_pipeline | 🔴 | FLUX.2 Kontext (download) |
+| Segmentazione testo | segment_pipeline → image_segment | 🟢 | GroundingDINO+SAM2 transformers (download pesi) |
+| Segmentazione regione (click/box) | segment_pipeline → image_segment | 🟢 | SAM2 (download pesi) |
+| **Prompt-enhance (QwenVL)** | gen_pipeline | 🔴 | LLM enhance prompt (valutare nativo) |
 
-## 2. Già ZERO-ComfyUI (non toccare)
-- **Musica** (`core/music_service.py`): HeartMuLa + MMAudio, venv isolati `E:\AI\Tools\heartlib`, `...\MMAudio`.
-- **Training LoRA** (`core/training_service.py`): ai-toolkit, venv `E:\AI\Tools\ai-toolkit`.
-- **Mondo 3D** (`core/world_service.py`): WorldGen, venv `E:\AI\Tools\WorldGen`.
-- **TTS** (`core/tts_engine.py`): default Edge TTS (no ComfyUI); il voice-clone CosyVoice usa un custom_node → va spostato su un venv standalone.
+### Video (LTX-2.3) — runtime nostro template_engine, eseguito da ComfyUI
+| Feature | core | Stato | Note |
+|---|---|---|---|
+| t2v | template_engine → video_ltx | 🟢 | LTX2Pipeline (download Gemma) |
+| i2v | template_engine → video_ltx | 🟢 | LTX2ImageToVideoPipeline |
+| **i2v keyframe multipli** | template_engine apply_i2v_multiframe | 🔴 | condiz. su più frame |
+| Estensione/Prolunga | extend_pipeline (IAMCCS) | 🔴 | reimpl. context-latent+extend-sampler |
+| **Durata illimitata / auto-extend** | template_engine + extend_pipeline (loop) | 🔴 | catena segmenti (NB: instabile anche su ComfyUI → rivedere) |
+| ReTake (rigenera sezione) | template_engine apply_retake (v2v+mask) | 🔴 | LTX2 condition+mask |
+| Just_Talk (lip-sync) | template_engine apply_just_talk | 🔴 | audio conditioning |
+| ControlNet (depth/canny/pose) | template_engine collapse_controlnet | 🔴 | LTX2ConditionPipeline + preprocessor |
+| **HR/upscale interno i2v** | template_engine apply_hr_pipeline | 🔴 | upscale in-generazione |
+| **Scaling risoluzione** | template_engine apply_resolution_mode | 🔴 | parametrico |
+| Definizione/enhance (SeedVR2) | video_enhance_pipeline | 🔴 | repo standalone |
+| Upscale video (ESRGAN per-frame) | video_enhance_pipeline | 🔴 | image_upscale in loop + imageio/ffmpeg |
+| Aumento FPS (RIFE) | video_enhance_pipeline | 🔴 | torch per-frame |
+| **FlashVSR** | video_enhance_pipeline | 🔴 | opzionale |
+| Restauro volti (CodeFormer/GFPGAN) | face_restore_pipeline | 🔴 | pip per-frame |
+| Audio nativo LTX | template_engine | 🟢 | vocoder LTX2 (nel checkpoint locale) |
+| **Voice-clone conditioning** | template_engine + tts_engine | 🔴 | LTXVReferenceAudio + CosyVoice venv |
+| **Audio slicing extend** | main_window _slice_audio | 🔴 | supporto extend (Python, già no-comfy) |
 
-## 3. Dipendenze "fisiche" da rimuovere a fine migrazione
-- Driver/launcher: `core/comfy_driver.py`, `core/comfy_launcher.py`, `core/comfy_compat.py` (shim).
-- Shim custom node: `comfy_compat/ltxstudio_comfy_compat/`.
-- Path hardcoded `E:\AI\Comfy_Nexus\*` (root, custom_nodes, input, `Comfy_Nexus\Output`).
-- Custom node usati da sostituire con librerie/pipeline: `FluxKontextImageScale`+`ReferenceLatent`, `IAMCCS_LTX2_*`, `GroundingDinoSAMSegment`, `FaceRestoreCFWithModel`, `SeedVR2Upscaler`, RIFE VFI, `VHS_*` (I/O video → imageio/ffmpeg), `Trellis2*`, `SkinTokenRigTrimesh`.
+### 3D / Audio / Meta
+| Feature | core | Stato |
+|---|---|---|
+| TRELLIS.2 (img→3D) | trellis_pipeline | 🔴 → venv standalone (microsoft/TRELLIS) |
+| Rigging (SkinTokens) | rig_pipeline | 🔴 → venv standalone + Blender |
+| Mocap / Retarget / Import anim | mocap_service/blender_service | ⬛ standalone |
+| Musica (HeartMuLa/MMAudio) | music_service | ⬛ standalone |
+| Training LoRA | training_service | ⬛ standalone |
+| Mondo 3D (WorldGen) | world_service | ⬛ standalone |
+| TTS Edge | tts_engine | ⬛ standalone |
+| TTS CosyVoice/F5 (clone) | tts_engine (custom_node) | 🔴 → venv standalone |
+| **Watermark / Gating** | watermark.py / gating_apply.py | ⬛ Python post-process (no comfy) |
+| **Conversione modelli** | convert_tab | 🔴 verificare (ComfyUI-Manager?) |
+| Workflow analyzer / navigator/gallery | settings_analyzer / UI | ⬛ tool UI (no comfy) |
 
-## 4. Piano a fasi (priorità → sforzo)
+## Piano a fasi
+**A — Immagini (DONE per FLUX.1/ESRGAN, verificato)**: gen, inpaint/outpaint, kontext/integra, recolor, upscale, restore, compose-stitch ✅. Segmentazione 🟢 (download pesi). Restano: SD3, prompt-enhance, FLUX.2 (inpaint/kontext/compose-multiref/colorize → download).
+**B — Video core nativo**: t2v/i2v 🟢 (download Gemma) → keyframe-multipli, extend, durata-illimitata, ReTake, Just_Talk, ControlNet, HR, scaling. *La durata illimitata va RIPROGETTATA (instabile anche su ComfyUI).*
+**C — Post-process video**: SeedVR2, ESRGAN-per-frame, RIFE, FlashVSR, face-restore (CodeFormer/GFPGAN), audio-slicing.
+**D — 3D + voce a venv standalone**: TRELLIS, rigging, CosyVoice.
+**E — Cleanup**: rimuovere driver/launcher/shim/path ComfyUI, convert_tab, semplificare backend.py.
 
-**Fase A — chiudere le IMMAGINI (in corso)**
-1. ✅ **FATTO** (commit 4be8f8a): inpaint/outpaint nativo FLUX.1 Fill (`_start_native_inpaint`, branch in `generate_inpaint`). FLUX.2 Klein/checkpoint → ComfyUI fallback.
-2. ✅ **FATTO** (commit b05ed75) per Kontext 1-img integrate (`_start_native_kontext`, branch in `generate_integrate`). 🔸 multi-reference vero (compose N foto) POSTICIPATO: FLUX.1 single-ref; multi-ref serve FLUX.2 (download) o reimplementazione ReferenceLatent multi-latent.
-3. ✅ **FATTO** (commit 666b3dc): **upscale** nativo ESRGAN via `spandrel` (`image_upscale.py`, validato 1024²→2048² 4s) + `HANDLERS['upscale']` + branch in `generate_upscale`. 🔸 rifinitura FLUX e **restauro/colorizzazione foto** (generate_restore) ancora da cablare.
-4. 🟡 **Segmentazione**: handler `image_segment.py` (GroundingDINO+SAM2 transformers) **scritto e registrato** (commit a9e5841) → `HANDLERS['segment']`. Runtime in attesa dei pesi HF (download A.4 frenato dal CDN).
-- ✅ **EXTRA migrati** (commit 3a2a62e, 60ef236): **recolor** (Kontext nativo), **restauro 'restore'** (ESRGAN nativo), **compose multi-foto** (FLUX.1 via stitch lato Python → Kontext nativo). compose multi-ref VERO + colorize → FLUX.2 (posticipato).
+**Principio**: ComfyUI resta solo fallback per-feature finché ogni feature non ha il percorso nativo/standalone **validato** (flag `is_native(module)`). `strict_native` blocca i fallback per scovare dipendenze.
 
-**STATO Fase A (immagini)**: tutto ciò che è FLUX.1/ESRGAN è **migrato in nativo e verificato indipendente da ComfyUI** (gen, inpaint/outpaint, kontext/integra, recolor, upscale, restore, compose-stitch). Restano solo: segmentazione (pesi in download), colorize/compose-multiref (FLUX.2 download), → Fase B+ video/3D.
+## Abilitatori già fatti
+`image=native`; autostart nativo (`native_launcher`); autostart ComfyUI OFF; `strict_native`/`comfy_blocked`; backend nativo INDIPENDENTE da `Comfy_Nexus` (pesi in `E:\AI\Models`). Handler nativi: `image_flux.py`, `image_upscale.py`, `image_segment.py`, `video_ltx.py`. HANDLERS = image/upscale/segment/video.
 
-**Abilitatori migrazione (FATTO 2026-06-23):**
-- `backend.strict_native()` / `comfy_blocked()` — blocco NON distruttivo del fallback ComfyUI (commit 666b3dc).
-- `core/native_launcher.py` + `_maybe_autostart_native` — l'app avvia il server nativo (8189, Sage+FBCache) da sola (commit b832826).
-- `backend.set_backend('image','native')` attivato.
-- Backend nativo reso INDIPENDENTE da `Comfy_Nexus` (i pesi sono in `E:\AI\Models`; rimosso il fallback in image_upscale).
-- **Strategia utente: rinominare `E:\AI\Comfy_Nexus` → `.bak`** (non eliminare) per far emergere ogni dipendenza nascosta. Con `.bak`: nativo OK per immagini/inpaint(FLUX.1)/kontext(FLUX.1)/upscale; emergono da migrare → video (serve Gemma), FLUX.2, segmentazione, restauro/face video, 3D (TRELLIS/rig), CosyVoice. Path ComfyUI residui nel codice (comfy_launcher, runner, tts, 3D, main_window comfy_input/output) si romperanno: è lo scopo.
-
-**Fase B — VIDEO core nativo (task #18, in corso)**
-5. PoC **t2v** `LTX2Pipeline` (`video_ltx.py`) → poi **i2v** (`LTX2ImageToVideoPipeline`). Bloccato dal download Gemma (CDN HF lento).
-6. **Long/extend** nativo: usare `LTXI2VLongMultiPromptPipeline` o reimplementare la catena IAMCCS (context-latent + extend-sampler) in diffusers. Sforzo: alto.
-7. **ControlNet** video (`LTX2ConditionPipeline`) + **ReTake/Just_Talk** (condition+mask). Sforzo: alto.
-
-**Fase C — POST-PROCESS video nativo**
-8. **SeedVR2** (repo standalone) + **RIFE** (torch) + I/O video con **imageio/ffmpeg** (sostituisce VHS). Sforzo: medio.
-9. **Restauro volti** per-frame con `codeformer`/`gfpgan` pip. Sforzo: medio.
-
-**Fase D — 3D fuori da ComfyUI (a venv standalone, come WorldGen)**
-10. **TRELLIS.2** → venv `microsoft/TRELLIS` (subprocess, come music/world). Sforzo: medio.
-11. **SkinTokens** rigging → venv standalone + Blender headless (già usiamo Blender). Sforzo: medio.
-12. **CosyVoice** voice-clone → venv standalone.
-
-**Fase E — rimozione finale**
-13. Eliminare driver/launcher/shim ComfyUI, path `Comfy_Nexus`, `core/backend.py` semplificato (sempre nativo). Aggiornare installer (niente ComfyUI). Aggiornare wizard pesi (organizzazione nativa).
-
-## 5. Principio guida
-ComfyUI resta SOLO come fallback finché ogni feature non ha il percorso nativo/standalone validato (flag `backend.is_native(module)` per modulo). Si smonta ComfyUI quando tutti i flag sono `native`/standalone. Nessuna regressione: ogni fase mantiene il fallback ComfyUI fino alla validazione.
-
-## 6. Blocco corrente
-Il PoC video nativo (Fase B) è frenato dal **download del TE Gemma-3** su CDN-LFS HuggingFace throttlato (~3 Mbit/s misurati, contro 150 Mbit della linea). Rimedi: mirror `hf-mirror.com`, HF Pro, VPN, o orari diversi.
+## Blocco
+Download pesi su CDN-LFS HuggingFace ~3 Mbit/s (config volano, pesi LFS appesi). Vedi `docs/download_manuale.md`. Indipendente da banda/script/hf_transfer/mirror.
