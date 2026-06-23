@@ -100,14 +100,15 @@ class _NativeImageWorker(QThread):
     """Esegue una generazione immagine sul backend NATIVO (InferenceServer) fuori dal thread UI."""
     done = Signal(dict)
 
-    def __init__(self, params: dict):
+    def __init__(self, params: dict, module: str = "image"):
         super().__init__()
         self.params = params
+        self.module = module
 
     def run(self):
         from core import native_driver
         try:
-            res = native_driver.run_and_wait("image", self.params, timeout=3600)
+            res = native_driver.run_and_wait(self.module, self.params, timeout=3600)
         except Exception as e:                          # noqa: BLE001
             res = {"status": "error", "error": str(e)}
         self.done.emit(res)
@@ -1665,6 +1666,20 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
                                     tr("mw.native_done_msg", "Generata: {f}").format(f=out))
 
+    def _start_native_upscale(self, model, scale):
+        """Upscale via backend NATIVO (ESRGAN/spandrel) — niente ComfyUI."""
+        from core import native_driver
+        if not native_driver.is_up():
+            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
+                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde."))
+            return
+        params = {"model": model, "arch": "upscale", "image_path": self.frame1_tab.image_path,
+                  "target_scale": float(scale), "seed": 0}
+        self._log(f"Upscale (backend NATIVO) inviato (×{scale})…")
+        self._native_worker = _NativeImageWorker(params, module="upscale")
+        self._native_worker.done.connect(self._on_native_inpaint_done)
+        self._native_worker.start()
+
     def generate_upscale(self):
         """Aumenta la definizione dell'immagine corrente del canvas con un modello AI di super-risoluzione."""
         if not self._feature_gate("cap.upscale_image"):
@@ -1682,6 +1697,13 @@ class MainWindow(QMainWindow):
         if cfg.get("refine") and not cfg.get("refine_model"):
             QMessageBox.warning(self, tr("mw.refine_model_missing_title"),
                                 tr("mw.refine_model_missing_msg")); return
+        # ── BACKEND NATIVO (ESRGAN via spandrel): upscale puro senza ComfyUI.
+        #    La rifinitura FLUX resta su ComfyUI finché non migrata.
+        from core import backend
+        if backend.is_native("image") and not cfg.get("refine"):
+            self._inpaint_before = self.frame1_tab.image_path
+            self._start_native_upscale(cfg["model"], cfg.get("target_scale") or cfg.get("scale") or 2.0)
+            return
         self._inpaint_before = self.frame1_tab.image_path   # confronto prima/dopo
         try:
             img = self._upload_local(self.frame1_tab.image_path)

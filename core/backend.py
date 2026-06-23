@@ -33,3 +33,22 @@ def set_backend(module: str, backend: str) -> None:
     cfg = _cfg(); cfg[module] = backend
     _CONFIG.parent.mkdir(parents=True, exist_ok=True)
     _CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", "utf-8")
+
+
+def strict_native() -> bool:
+    """STRICT: se True, le feature NON ancora native NON ripiegano su ComfyUI — vanno bloccate
+    con errore esplicito. Serve a non usare ComfyUI 'per errore' durante la migrazione, SENZA
+    eliminare l'installazione (reversibile). Default False (fallback ComfyUI attivo)."""
+    return bool(_cfg().get("strict_native", False))
+
+
+def set_strict(on: bool) -> None:
+    cfg = _cfg(); cfg["strict_native"] = bool(on)
+    _CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    _CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", "utf-8")
+
+
+def comfy_blocked(module: str) -> bool:
+    """True se il modulo userebbe ComfyUI ma STRICT lo vieta → la UI deve mostrare errore
+    'feature non ancora migrata al nativo' invece di usare ComfyUI."""
+    return strict_native() and not is_native(module)
