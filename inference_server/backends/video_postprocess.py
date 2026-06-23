@@ -35,6 +35,59 @@ def _fps(video: str) -> float:
         return 24.0
 
 
+def _frames_io(video: str):
+    """Estrae i frame di un video in una tmpdir; ritorna (tmpdir, lista_path, fps, ffmpeg)."""
+    import tempfile
+    td = tempfile.mkdtemp(prefix="vpp_")
+    ind = os.path.join(td, "in"); os.makedirs(ind)
+    ff = _ffmpeg()
+    subprocess.run([ff, "-y", "-i", video, os.path.join(ind, "f_%06d.png")],
+                   capture_output=True, timeout=600)
+    frames = sorted(Path(ind).glob("f_*.png"))
+    return td, ind, frames, _fps(video), ff
+
+
+def _reassemble(outd: str, fps: float, video_audio_src: str, out_path: str) -> None:
+    ff = _ffmpeg()
+    subprocess.run([ff, "-y", "-framerate", f"{fps}", "-i", os.path.join(outd, "f_%06d.png"),
+                    "-i", video_audio_src, "-map", "0:v:0", "-map", "1:a:0?", "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p", "-c:a", "copy", "-shortest", out_path],
+                   capture_output=True, timeout=900)
+
+
+def run_face(params: dict, mm, output_dir: str) -> dict:
+    """Restauro VOLTI video per-frame (GFPGAN) — niente ComfyUI. Richiede `pip install gfpgan`
+    nel venv nativo + modello .pth (params['model']). Codice pronto, test a lib+modello presenti."""
+    import shutil
+    from PIL import Image
+    import numpy as np
+    try:
+        from gfpgan import GFPGANer
+    except Exception as e:                                  # noqa: BLE001
+        return {"status": "error", "error": f"GFPGAN non installato nel venv nativo ({e}). "
+                "pip install gfpgan; poi riprova."}
+    video = params["image_path"]
+    if not os.path.exists(video):
+        return {"status": "error", "error": f"video non trovato: {video}"}
+    model = params.get("model") or r"E:\AI\Models\facerestore_models\GFPGANv1.4.pth"
+    restorer = GFPGANer(model_path=model, upscale=1, arch="clean", channel_multiplier=2)
+    td, ind, frames, fps, _ = _frames_io(video)
+    try:
+        if not frames:
+            return {"status": "error", "error": "estrazione frame fallita"}
+        outd = os.path.join(td, "out"); os.makedirs(outd)
+        for fp in frames:
+            arr = np.array(Image.open(fp).convert("RGB"))[:, :, ::-1]   # BGR per gfpgan
+            _, _, restored = restorer.enhance(arr, has_aligned=False, paste_back=True)
+            Image.fromarray(restored[:, :, ::-1]).save(os.path.join(outd, fp.name))
+        os.makedirs(output_dir, exist_ok=True)
+        out_path = str(Path(output_dir) / f"native_faces_{params.get('seed', 0)}.mp4")
+        _reassemble(outd, fps, video, out_path)
+        return {"status": "success", "output": [out_path]}
+    finally:
+        shutil.rmtree(td, ignore_errors=True)
+
+
 def run(params: dict, mm, output_dir: str) -> dict:
     """params: image_path (= video), model (ESRGAN), target_scale, seed."""
     import numpy as np

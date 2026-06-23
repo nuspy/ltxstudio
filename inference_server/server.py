@@ -33,7 +33,8 @@ _q: "queue.Queue[str]" = queue.Queue()
 # dispatch modulo → handler.run(params, mm, output_dir) → {status, output}
 HANDLERS = {"image": image_flux.run, "video": video_ltx.run,
             "upscale": image_upscale.run, "segment": image_segment.run,
-            "video_upscale": video_postprocess.run}
+            "video_upscale": video_postprocess.run,
+            "video_face": video_postprocess.run_face}
 
 
 class SubmitReq(BaseModel):
