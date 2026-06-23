@@ -34,9 +34,17 @@ Lavoro autonomo. Tutto committato. Legenda: ✅ validato runtime · 🧪 a secco
 ## Video (#6–#8) — inventario + smoke
 Pipeline video **non modificate** in questa sessione → nessuna regressione. Tutte cablate:
 t2v, i2v, extend (prolunga), face-restore, super-res (SeedVR2/ESRGAN), scaling, ControlNet (depth/canny/pose), ReTake, Just_Talk (lip-sync), LoRA video, RIFE (fps), audio.
-- **smoke t2v** (standalone): il grafo si costruisce (**148 nodi**) e il **modello LTX-2.3 carica** ✅; la generazione si ferma sul nodo enhancer `TextGenerateLTX2Prompt` (richiede `clip`), che è cablato dal **setup completo della GUI** (`main_window.on_generate` + inventory encoder) e non da uno smoke minimale. **Non è una regressione**: la pipeline non è stata toccata e funziona dalla GUI.
-- Le altre funzioni (i2v, extend, ReTake, Just_Talk, ControlNet, face-restore, super-res, scaling, RIFE, audio) sono **cablate e invariate** → da validare con input reali.
-- Il **giudizio di qualità** richiede te (valutazione visiva). Consiglio: generare 1 video per funzione dalla GUI e verificare.
+### 🐛 BUG REALE TROVATO E FIXATO (generazione video)
+Lo smoke t2v ha rivelato un **bug reale** (non del test) che rompeva **TUTTA** la generazione video, inclusa quella **a lunghezza illimitata**: un aggiornamento di ComfyUI ha aggiunto `clip` come **input required** ai nodi text-encode LTX (`TextGenerateLTX2Prompt`, `PromptRelayEncode*`), assente dal template golden → `missing clip` **abortiva ogni video** (t2v/i2v/extend/long).
+**Fix (commit `0cefc60`)** in `core/template_engine.py`:
+- `_bypass_enhancer` — bypassa gli enhancer LTX2 privi di `clip` (prompt grezzo diretto);
+- `_ensure_ltx_clip` — collega un `DualCLIPLoader` (`gemma_3_12B_it` + `ltx-2.3_text_projection_bf16`, type `ltxv`) ai nodi PromptRelay/CLIPTextEncode che lo richiedono (loader preso dal workflow ufficiale LTX-2.3).
+- Entrambi **auto-disattivanti** (se il template avrà già `clip`, non intervengono).
+**Verifica**: dopo il fix gli errori "missing clip" SPARISCONO (prima su enhancer, poi su PromptRelay → ora nessuno). Gli errori residui dello smoke sono solo **file-esempio baked nel template** (`Cand2B.png`, `FBC.png`, `A-5.mp4`, un `.mp3`) che la GUI pota/sostituisce nel flusso reale; il mio smoke minimale non replica quel pruning.
+
+### Stato funzioni video
+- Pipeline **non modificate** (a parte il fix clip) → nessuna regressione. Tutte cablate: i2v, extend, ReTake, Just_Talk, ControlNet, face-restore, super-res, scaling, RIFE, audio.
+- **DA FARE (tu)**: generare 1 video dalla GUI (t2v + long-video) per confermare il fix end-to-end e valutare la qualità.
 
 ## FLUX.2 / Ernie nativi (#2 / #14 / #1)
 ⏳ download in corso (FLUX.2 TE Mistral è grande → ore). Codice pronto: `_assemble_flux2` (transformer+VAE locali + TE Mistral HF), branch `flux2*` nel loader. Test al completamento del download. NB: il TE FLUX.2 locale era comfy_quant → si scarica il Mistral HF (solo quello).
