@@ -1348,6 +1348,32 @@ class MainWindow(QMainWindow):
         if not self._ensure_flux2_encoder(model):
             return
         masks = cfg.get("masks") or {}
+        # ── BACKEND NATIVO (FLUX.1 Kontext): affianca le foto (pre-mascherate) in un unico
+        #    riferimento (stitch lato Python) → Kontext nativo. Il multi-reference VERO (N latenti
+        #    separati) richiede FLUX.2 → resta su ComfyUI (posticipato).
+        from core import backend
+        if backend.is_native("image") and engine == "kontext":
+            try:
+                import os
+                from PIL import Image
+                prepped = []
+                for f in imgs:
+                    src = self.kontext.prep_masked(f, masks[f], OUTPUT_DIR) if f in masks else f
+                    prepped.append(Image.open(src).convert("RGB"))
+                h = min(im.height for im in prepped)
+                row = [im.resize((max(1, int(im.width * h / im.height)), h)) for im in prepped]
+                comp = Image.new("RGB", (sum(im.width for im in row), h), (255, 255, 255))
+                x = 0
+                for im in row:
+                    comp.paste(im, (x, 0)); x += im.width
+                cpath = os.path.join(OUTPUT_DIR, "compose_stitch.png"); comp.save(cpath)
+                self._inpaint_before = None
+                self._start_native_kontext({"image": cpath}, model,
+                    cfg.get("prompt") or "combine these reference images into one coherent scene",
+                    "", 20, random.randint(0, 2**31), 2.5)
+                return
+            except Exception as e:                       # noqa: BLE001
+                self._log(f"[compose nativo] fallback ComfyUI: {e}")
         try:
             uploaded = []
             for f in imgs:
