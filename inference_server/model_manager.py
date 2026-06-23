@@ -121,10 +121,17 @@ class ModelManager:
             pass
         if not loras:
             return
+        import os
         names, weights = [], []
         for i, lo in enumerate(loras):
             adapter = f"a{i}"
-            pipe.load_lora_weights(lo["name"], adapter_name=adapter)
+            name = lo["name"]
+            # la GUI passa il nome RELATIVO stile ComfyUI (es. 'Flux\\x.safetensors') → risolvi il path
+            if name and not os.path.isabs(name) and not os.path.exists(name):
+                cand = os.path.join(r"E:\AI\Models\LoRA", name)
+                if os.path.exists(cand):
+                    name = cand
+            pipe.load_lora_weights(name, adapter_name=adapter)
             names.append(adapter); weights.append(float(lo.get("strength", 1.0)))
         try:
             pipe.set_adapters(names, adapter_weights=weights)

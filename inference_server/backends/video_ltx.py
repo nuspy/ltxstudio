@@ -86,6 +86,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
             text_encoder=pipe.text_encoder, tokenizer=pipe.tokenizer, connectors=pipe.connectors,
             transformer=pipe.transformer, vocoder=pipe.vocoder, processor=pipe.processor)
         kw["image"] = Image.open(image_path).convert("RGB")
+    # ── #24 video editing nativo (roadmap, da abilitare a Gemma scaricato + test API):
+    #   ControlNet / ReTake → diffusers.LTX2ConditionPipeline(**{comp meno 'processor'}),
+    #     call(conditions=[...], prompt=...). 'conditions' = riferimenti video/immagine (depth/canny/pose
+    #     per controlnet; sezione+maschera per ReTake). Stessi 8 componenti già caricati.
+    #   Durata illimitata → diffusers.LTXI2VLongMultiPromptPipeline (prompt_segments + cond_image/
+    #     cond_strength) OPPURE catena autoregressiva LTX2 (riprogettare: era instabile su ComfyUI).
+    #   i2v keyframe multipli → LTX2ImageToVideoPipeline con più frame guida.
     out = pipe(**kw)
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_ltx2_{seed}.mp4")
