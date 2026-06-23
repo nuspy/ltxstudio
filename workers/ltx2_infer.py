@@ -22,9 +22,71 @@ from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
 from ltx_pipelines.utils.args import ImageConditioningInput
 from ltx_pipelines.utils.media_io import encode_video
 
+# Fix meta-tensor: il meta-device loading di ltx-core + l'ottimizzazione SDPA-mask di transformers
+# fa `.item()` su un tensore 'meta' (crash su qualsiasi torch recente). Disabilitando lo skip,
+# la causal mask viene costruita normalmente (un filo più lavoro, nessun crash).
+try:
+    import transformers.masking_utils as _mu
+    _mu._ignore_causal_mask_sdpa = lambda *a, **k: False
+except Exception:  # noqa: BLE001
+    pass
+
+
+def _materialize_meta(model, device):
+    """ltx-core costruisce su 'meta' e carica i pesi con assign=True, ma i BUFFER calcolati
+    (rotary inv_freq, embed_scale) non sono nel checkpoint Gemma di ComfyUI → restano su meta.
+    Qui li ricreiamo sul device reale (inv_freq via rope_init_fn)."""
+    import torch
+    cfg = getattr(model, "config", None)
+    txt = cfg.get_text_config() if hasattr(cfg, "get_text_config") else cfg
+    hidden = getattr(txt, "hidden_size", None)
+    for mod in model.modules():
+        for bn, buf in list(getattr(mod, "_buffers", {}).items()):
+            if buf is None or not getattr(buf, "is_meta", False):
+                continue
+            if bn in ("inv_freq", "original_inv_freq") and hasattr(mod, "rope_init_fn") and hasattr(mod, "config"):
+                inv, scaling = mod.rope_init_fn(mod.config, device)
+                mod.register_buffer("inv_freq", inv.to(device=device), persistent=False)
+                if hasattr(mod, "attention_scaling"):
+                    mod.attention_scaling = scaling
+                if hasattr(mod, "original_inv_freq"):
+                    mod.original_inv_freq = mod.inv_freq
+            elif bn == "embed_scale" and hidden:
+                mod.register_buffer("embed_scale", torch.tensor(float(hidden) ** 0.5, device=device,
+                                                                dtype=torch.float32), persistent=False)
+            else:
+                mod.register_buffer(bn, torch.zeros(buf.shape, dtype=buf.dtype, device=device), persistent=False)
+
+
+try:
+    import ltx_core.loader.single_gpu_model_builder as _sgmb
+    _orig_build = _sgmb.SingleGPUModelBuilder.build
+
+    def _patched_build(self, device=None, dtype=None, **kw):
+        import torch
+        dev = torch.device("cuda") if device is None else device
+        m = _orig_build(self, device=device, dtype=dtype, **kw)
+        metas = [n for n, b in m.named_buffers() if getattr(b, "is_meta", False)]
+        metap = [n for n, p in m.named_parameters() if getattr(p, "is_meta", False)]
+        print(f"[meta-fix] build {type(m).__name__}: {len(metas)} buffer meta, {len(metap)} param meta", flush=True)
+        print("[meta-fix] ATTESI(primi):", metap[:6], flush=True)
+        print("[meta-fix] ATTESI(text):", [n for n in metap if 'language_model' in n][:5], flush=True)
+        print("[meta-fix] ATTESI(altro):", [n for n in metap if 'vision' not in n and 'language_model' not in n][:6], flush=True)
+        try:
+            _materialize_meta(m, dev)
+            left = [n for n, b in m.named_buffers() if getattr(b, "is_meta", False)]
+            print(f"[meta-fix] dopo fix: {len(left)} buffer meta rimasti {left[:3]}", flush=True)
+        except Exception as _e:  # noqa: BLE001
+            print(f"[meta-fix] warn: {_e}", flush=True)
+        return m
+
+    _sgmb.SingleGPUModelBuilder.build = _patched_build
+except Exception:  # noqa: BLE001
+    pass
+
 CHECKPOINT = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors"
 UPSAMPLER = r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
-GEMMA = r"E:\AI\Models\TextEncoders\gemma3"
+GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"              # Gemma-3 12B UFFICIALE Lightricks (non-gated, formato ltx-core)
 LORA_DIR = r"E:\AI\Models\LoRA"
 
 
@@ -41,21 +103,29 @@ def main() -> None:
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
                                               LTXV_LORA_COMFY_RENAMING_MAP))
 
-    # quantizzazione fp8 (equivalente di --fast fp8_matrix_mult di ComfyUI). dev-fp8 27GB → 32GB ok.
+    # MODELLO scelto dalla GUI (checkpoint): la PRECISIONE la determina il modello stesso.
     import time
+    ckpt = p.get("model") or CHECKPOINT
+    if not os.path.isabs(ckpt):
+        for base in (r"E:\AI\Models\diffusion_models\LTX", r"E:\AI\Models\Checkpoints\LTX"):
+            cand = os.path.join(base, ckpt)
+            if os.path.exists(cand):
+                ckpt = cand
+                break
+    # quant: dedotta dal nome del modello (fp8 → scaled_mm, bf16 → cast); override opz. via param
+    qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
     quant = None
-    qmode = p.get("quant", "fp8_scaled_mm")
     if qmode == "fp8_scaled_mm":
         from ltx_core.quantization import fp8_scaled_mm
-        quant = fp8_scaled_mm.build_policy(CHECKPOINT)
+        quant = fp8_scaled_mm.build_policy(ckpt)
     elif qmode == "fp8_cast":
         from ltx_core.quantization import fp8_cast
-        quant = fp8_cast.build_policy(CHECKPOINT)
+        quant = fp8_cast.build_policy(ckpt)
     t0 = time.time()
     pipe = TI2VidTwoStagesPipeline(
-        checkpoint_path=CHECKPOINT, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
+        checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
         gemma_root=GEMMA, loras=loras, quantization=quant)
-    print(f"[load] {time.time() - t0:.0f}s (quant={qmode})", flush=True)
+    print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode})", flush=True)
 
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)), stg_scale=1.0,
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
