@@ -41,11 +41,11 @@ Aggiornato: 2026-06-23.
 
 ## 4. Piano a fasi (priorità → sforzo)
 
-**Fase A — chiudere le IMMAGINI (quasi fatto)**
-1. Cablare flag nativo per **inpaint/outpaint** (handler `FluxFillPipeline` già in image_flux). Sforzo: basso.
-2. **Kontext nativo** 1-img + **multi-reference** (riscrivere `ReferenceLatent` come concat di latenti nel forward diffusers). Sblocca anche compose, restauro-colorizzazione. Sforzo: medio.
-3. **Upscale** (spandrel/ESRGAN in-process) + **restauro foto**. Sforzo: basso/medio.
-4. **Segmentazione** SAM2+GroundingDINO via transformers (no custom_node). Sforzo: medio.
+**Fase A — chiudere le IMMAGINI (in corso)**
+1. ✅ **FATTO** (commit 4be8f8a): inpaint/outpaint nativo FLUX.1 Fill (`_start_native_inpaint`, branch in `generate_inpaint`). FLUX.2 Klein/checkpoint → ComfyUI fallback.
+2. ✅ **FATTO** (commit b05ed75) per Kontext 1-img integrate (`_start_native_kontext`, branch in `generate_integrate`). 🔸 multi-reference vero (compose N foto) POSTICIPATO: FLUX.1 single-ref; multi-ref serve FLUX.2 (download) o reimplementazione ReferenceLatent multi-latent.
+3. ⬜ **Upscale** (spandrel/ESRGAN in-process) + **restauro foto**. Nuovo handler `image_upscale.py`. Sforzo: basso/medio.
+4. ⬜ **Segmentazione** SAM2+GroundingDINO via transformers (no custom_node). Sforzo: medio.
 
 **Fase B — VIDEO core nativo (task #18, in corso)**
 5. PoC **t2v** `LTX2Pipeline` (`video_ltx.py`) → poi **i2v** (`LTX2ImageToVideoPipeline`). Bloccato dal download Gemma (CDN HF lento).
