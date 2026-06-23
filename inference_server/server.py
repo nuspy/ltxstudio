@@ -21,6 +21,7 @@ from inference_server.backends import image_flux
 from inference_server.backends import video_ltx
 from inference_server.backends import image_upscale
 from inference_server.backends import image_segment
+from inference_server.backends import video_postprocess
 
 app = FastAPI(title="LTX Studio — Native Inference Server")
 MM = ModelManager()
@@ -31,7 +32,8 @@ _q: "queue.Queue[str]" = queue.Queue()
 
 # dispatch modulo → handler.run(params, mm, output_dir) → {status, output}
 HANDLERS = {"image": image_flux.run, "video": video_ltx.run,
-            "upscale": image_upscale.run, "segment": image_segment.run}
+            "upscale": image_upscale.run, "segment": image_segment.run,
+            "video_upscale": video_postprocess.run}
 
 
 class SubmitReq(BaseModel):
