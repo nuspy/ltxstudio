@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-UPSCALE_DIRS = [r"E:\AI\Models\Upscale", r"E:\AI\Comfy_Nexus\ComfyUI\models\upscale_models"]
+UPSCALE_DIRS = [r"E:\AI\Models\Upscale", r"E:\AI\Models\upscale_models"]   # zero-comfy: solo E:\AI\Models
 VRAM_MB = 4000
 
 
