@@ -1225,11 +1225,20 @@ class MainWindow(QMainWindow):
             exp = self.frame1_tab.canvas.export_inpaint(OUTPUT_DIR, mode)
             self._inpaint_bbox = exp.get("bbox")    # per rimettere l'inpaint al suo posto
             self._inpaint_before = exp.get("image") # per confronto prima/dopo nel dialog
-            img_name = self._upload_local(exp["image"])
-            mask_name = self._upload_local(exp["mask"])
             seed = cfg["seed"] if cfg.get("seed") is not None else random.randint(0, 2**31)
             steps = cfg.get("steps") or 20
             negative = cfg.get("negative") or self.frame1_tab.get_values().get("prompt_negative", "")
+            # ── BACKEND NATIVO (FLUX.1 Fill): niente ComfyUI. FLUX.2 Klein e i checkpoint
+            #    restano su ComfyUI finché non migrati (vedi docs/zero_comfy.md Fase A).
+            from core import backend
+            from core.gen_pipeline import is_flux2
+            _unet = cfg.get("unet") or ""
+            if (backend.is_native("image") and not cfg.get("checkpoint")
+                    and _unet and not is_flux2(_unet)):
+                self._start_native_inpaint(exp, _unet, ptxt, negative, steps, seed, retention, mode)
+                return
+            img_name = self._upload_local(exp["image"])
+            mask_name = self._upload_local(exp["mask"])
             # feather/overlap della maschera per fondere la giunzione (no linee di separazione).
             # Outpaint: la crescita DEVE superare la sfumatura, altrimenti la sfumatura sborda nel
             # bordo lasciando una fascia scura non riempita (distacco). grow(40) > feather(24) →
@@ -1575,6 +1584,47 @@ class MainWindow(QMainWindow):
         out = (res.get("output") or [None])[0]
         self._log(f"[native] immagine generata: {out}")
         # carica nel canvas se l'API è disponibile; altrimenti notifica col path
+        loaded = False
+        try:
+            cv = getattr(self.frame1_tab, "canvas", None)
+            for m in ("load_image", "set_image", "load"):
+                if cv is not None and hasattr(cv, m):
+                    getattr(cv, m)(out); loaded = True; break
+        except Exception:                               # noqa: BLE001
+            loaded = False
+        if not loaded and out:
+            QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
+                                    tr("mw.native_done_msg", "Generata: {f}").format(f=out))
+
+    def _start_native_inpaint(self, exp, unet, prompt, negative, steps, seed, retention, mode):
+        """Inpaint/outpaint via backend NATIVO (FluxFillPipeline) — niente ComfyUI.
+        Passa i path LOCALI di immagine+maschera (image_flux li apre con PIL)."""
+        import os
+        from core import native_driver
+        from core.inpaint_pipeline import InpaintPipeline
+        if not native_driver.is_up():
+            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
+                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde. "
+                   "Avvialo, oppure rimetti il backend 'image' su ComfyUI."))
+            return
+        model = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
+        guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=False)
+        params = {"model": model, "arch": "inpaint", "prompt": prompt, "negative": negative,
+                  "image_path": exp["image"], "mask_path": exp["mask"],
+                  "steps": steps, "guidance": guidance, "seed": seed}
+        self._inpaint_mode = mode
+        self._log(f"{mode} (backend NATIVO) inviato (steps={steps}, seed={seed}, guidance={guidance:.1f})…")
+        self._native_worker = _NativeImageWorker(params)
+        self._native_worker.done.connect(self._on_native_inpaint_done)
+        self._native_worker.start()
+
+    def _on_native_inpaint_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[native inpaint] errore: {res.get('error','')[:300]}")
+            QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000])
+            return
+        out = (res.get("output") or [None])[0]
+        self._log(f"[native inpaint] generato: {out}")
         loaded = False
         try:
             cv = getattr(self.frame1_tab, "canvas", None)
