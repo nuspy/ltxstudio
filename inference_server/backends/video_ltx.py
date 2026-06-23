@@ -16,7 +16,7 @@ from pathlib import Path
 LTX2_DIR = r"E:\AI\Models\diffusers\ltx2"                       # componenti + config diffusers LTX-2
 TRANSFORMER = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors"
 VAE_VIDEO = r"E:\AI\Models\VAE\LTX\LTX2_video_vae.safetensors"
-TE_GEMMA = r"E:\AI\Models\diffusers\_te\gemma3_ltx_fp8"        # Gemma-3 12B fp8 (MISHANM, ~12GB)
+TE_GEMMA = r"E:\AI\Models\TextEncoders\gemma3"                 # Gemma-3 12B bf16 HF locale (già presente, 13.7GB)
 VRAM_MB = 30000
 
 

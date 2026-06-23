@@ -1,58 +1,26 @@
-# Download manuale dei pesi (CDN HF lento) — indirizzi e destinazioni
+# Pesi per il backend nativo — SONO GIÀ TUTTI SUL DISCO (no download GB)
 
-Il backend nativo cerca i pesi nei percorsi sotto. Scarica MANTENENDO la struttura delle
-sottocartelle del repo (config + safetensors). Ordinati per **priorità (impatto, più piccoli prima)**.
+**Scoperta (2026-06-23)**: tutti i pesi pesanti che servono erano già in `E:\AI\Models` (o `Comfy_Nexus.bak`),
+perché ComfyUI li usava. I download da HF erano inutili (e bloccati dal CDN). Restano da risolvere
+solo **config piccoli (KB-MB)** o **adattamenti di formato** (single-file ComfyUI ≠ cartella diffusers/HF).
 
-CLI consigliata (mantiene la struttura): `huggingface-cli download <repo> --local-dir "<dest>"`.
-Eseguibile: `E:\AI\Tools\inference_server_venv\Scripts\huggingface-cli.exe`
-(oppure `E:\AI\Tools\inference_server_venv\Scripts\python.exe -m huggingface_hub` ).
-Mirror alternativo se il CDN è lento: anteporre `set HF_ENDPOINT=https://hf-mirror.com`.
+## Pesi trovati in locale
+| Modello | Peso locale | Formato | Cosa serve ancora |
+|---|---|---|---|
+| **Gemma-3-12B** (TE video) | `E:\AI\Models\TextEncoders\gemma3\` | cartella HF completa ✅ | NIENTE — usabile diretto |
+| **LTX-2.3 transformer** | `E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors` | single-file ComfyUI | **config 2.3** (il config diffusers scaricato è per LTX-2 base: audio_scale_shift_table 6≠9) |
+| LTX-2 componenti (audio_vae/connectors/vocoder/upsampler) | `E:\AI\Models\diffusers\ltx2\` | diffusers ✅ | NIENTE |
+| LTX-2 video VAE | `E:\AI\Models\VAE\LTX\LTX2_video_vae.safetensors` | single-file | config vae ✅ (presente) |
+| **FLUX.2 transformer** | `E:\AI\Models\diffusion_models\Flux\miraclein_flux2klein_nsfw_v2_fp8.safetensors` | single-file | config transformer flux2 ✅ |
+| **FLUX.2 TE (Mistral)** | `E:\AI\Models\TextEncoders\Flux\mistral_3_small_flux2.safetensors` | single-file | **config Mistral pruned** (da FLUX.2-dev, ~KB) |
+| FLUX.2 VAE | `E:\AI\Models\VAE\Flux\flux2-vae.safetensors` | single-file | config ✅ |
+| **SAM2** | `E:\AI\Models\Segmentation\sam2\sam2_hiera_large.safetensors` (+ `.pt`) | originale facebook/kijai | **lib `sam2` originale** o conversione HF |
+| **GroundingDINO** | `E:\AI\Models\Segmentation\grounding-dino\groundingdino_swinb_cogcoor.pth` | originale IDEA-Research | **lib `groundingdino` originale** o config+conversione HF |
+| **Ernie** | `E:\AI\Models\diffusion_models\Ernie\ernie-image.safetensors` | single-file | `ErnieImageTransformer2DModel` NON ha from_single_file → serve config/conversione |
+| SAM v1 / SAM-HQ | `E:\AI\Models\Segmentation\sam_vit_*.pth`, `Comfy_Nexus.bak\...\sams\sam_hq_vit_l.pth` | originale | lib segment_anything |
 
----
-
-## 1. Segmentazione (sblocca A.4) — ~1.6GB, NON gated
-**GroundingDINO** — https://huggingface.co/IDEA-Research/grounding-dino-base
-→ destinazione: `E:\AI\Models\Segmentation\hf\grounding-dino-base`
-```
-huggingface-cli download IDEA-Research/grounding-dino-base --local-dir "E:\AI\Models\Segmentation\hf\grounding-dino-base"
-```
-**SAM2** — https://huggingface.co/facebook/sam2-hiera-large
-→ destinazione: `E:\AI\Models\Segmentation\hf\sam2-hiera-large`
-```
-huggingface-cli download facebook/sam2-hiera-large --local-dir "E:\AI\Models\Segmentation\hf\sam2-hiera-large"
-```
-
-## 2. Motore VIDEO nativo (sblocca Fase B) — NON gated
-**Text-encoder Gemma-3 fp8** (~12GB) — https://huggingface.co/MISHANM/google-gemma-3-12b-it-fp8
-→ destinazione: `E:\AI\Models\diffusers\_te\gemma3_ltx_fp8`
-```
-huggingface-cli download MISHANM/google-gemma-3-12b-it-fp8 --local-dir "E:\AI\Models\diffusers\_te\gemma3_ltx_fp8"
-```
-**Componenti LTX-2** (audio_vae/connectors/vocoder/upsampler — il transformer/vae li abbiamo già nel checkpoint locale) — https://huggingface.co/Lightricks/LTX-2
-→ destinazione: `E:\AI\Models\diffusers\ltx2`
-```
-huggingface-cli download Lightricks/LTX-2 --local-dir "E:\AI\Models\diffusers\ltx2" --include "audio_vae/*" "connectors/*" "vocoder/*" "latent_upsampler/*" "tokenizer/*" "scheduler/*" "processor/*" "model_index.json"
-```
-
-## 3. FLUX.2 nativo (sblocca #2/#14) — ⚠️ GATED (serve login + accettare licenza)
-1) Accetta la licenza sul sito: https://huggingface.co/black-forest-labs/FLUX.2-dev
-2) `huggingface-cli login` (col tuo token HF)
-3) Scarica SOLO il TE + config (transformer/vae li abbiamo locali) — https://huggingface.co/black-forest-labs/FLUX.2-dev
-→ destinazione: `E:\AI\Models\diffusers\flux2`
-```
-huggingface-cli download black-forest-labs/FLUX.2-dev --local-dir "E:\AI\Models\diffusers\flux2" --include "text_encoder/*" "tokenizer/*" "vae/config.json" "scheduler/*" "model_index.json"
-```
-
-## 4. Ernie nativo (sblocca #1) — ~16GB, NON gated
-**ERNIE-Image** — https://huggingface.co/baidu/ERNIE-Image
-→ destinazione: `E:\AI\Models\diffusers\Ernie\ERNIE-Image`
-```
-huggingface-cli download baidu/ERNIE-Image --local-dir "E:\AI\Models\diffusers\Ernie\ERNIE-Image"
-```
-
----
-
-### Note
-- Riprende da dove interrotto se rilanci lo stesso comando (resume nativo di huggingface-cli).
-- Dopo aver scaricato 1 e/o 2, avvisami: testo **segmentazione** e **video** nativi (codice già pronto: `image_segment.py`, `video_ltx.py`).
-- I percorsi sopra sono quelli HARDCODED negli handler nativi — se cambi cartella, vanno aggiornati nel codice.
+## Azioni (config/adattamenti, NON download GB)
+1. **Video LTX-2.3**: ottenere/derivare il config transformer per la 2.3 (audio_scale_shift_table 9). Opzioni: cercare repo diffusers LTX-2.3, oppure patchare il config, oppure `ignore_mismatched_sizes` (audio non garantito).
+2. **FLUX.2**: scaricare SOLO il config Mistral pruned (`text_encoder/config.json`+tokenizer da black-forest-labs/FLUX.2-dev, gated, ~KB) → `image_flux._assemble_flux2` carica il TE dal single-file locale.
+3. **Segmentazione**: `pip install groundingdino-py segment-anything-2` nel venv nativo → riscrivere `image_segment.py` con le lib originali sui pesi locali (come faceva comfyui_segment_anything). NIENTE download pesi.
+4. **Ernie**: serve config/conversione del transformer (single-file non caricabile da diffusers as-is).
