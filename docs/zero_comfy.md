@@ -44,8 +44,15 @@ Aggiornato: 2026-06-23.
 **Fase A — chiudere le IMMAGINI (in corso)**
 1. ✅ **FATTO** (commit 4be8f8a): inpaint/outpaint nativo FLUX.1 Fill (`_start_native_inpaint`, branch in `generate_inpaint`). FLUX.2 Klein/checkpoint → ComfyUI fallback.
 2. ✅ **FATTO** (commit b05ed75) per Kontext 1-img integrate (`_start_native_kontext`, branch in `generate_integrate`). 🔸 multi-reference vero (compose N foto) POSTICIPATO: FLUX.1 single-ref; multi-ref serve FLUX.2 (download) o reimplementazione ReferenceLatent multi-latent.
-3. ⬜ **Upscale** (spandrel/ESRGAN in-process) + **restauro foto**. Nuovo handler `image_upscale.py`. Sforzo: basso/medio.
+3. ✅ **FATTO** (commit 666b3dc): **upscale** nativo ESRGAN via `spandrel` (`image_upscale.py`, validato 1024²→2048² 4s) + `HANDLERS['upscale']` + branch in `generate_upscale`. 🔸 rifinitura FLUX e **restauro/colorizzazione foto** (generate_restore) ancora da cablare.
 4. ⬜ **Segmentazione** SAM2+GroundingDINO via transformers (no custom_node). Sforzo: medio.
+
+**Abilitatori migrazione (FATTO 2026-06-23):**
+- `backend.strict_native()` / `comfy_blocked()` — blocco NON distruttivo del fallback ComfyUI (commit 666b3dc).
+- `core/native_launcher.py` + `_maybe_autostart_native` — l'app avvia il server nativo (8189, Sage+FBCache) da sola (commit b832826).
+- `backend.set_backend('image','native')` attivato.
+- Backend nativo reso INDIPENDENTE da `Comfy_Nexus` (i pesi sono in `E:\AI\Models`; rimosso il fallback in image_upscale).
+- **Strategia utente: rinominare `E:\AI\Comfy_Nexus` → `.bak`** (non eliminare) per far emergere ogni dipendenza nascosta. Con `.bak`: nativo OK per immagini/inpaint(FLUX.1)/kontext(FLUX.1)/upscale; emergono da migrare → video (serve Gemma), FLUX.2, segmentazione, restauro/face video, 3D (TRELLIS/rig), CosyVoice. Path ComfyUI residui nel codice (comfy_launcher, runner, tts, 3D, main_window comfy_input/output) si romperanno: è lo scopo.
 
 **Fase B — VIDEO core nativo (task #18, in corso)**
 5. PoC **t2v** `LTX2Pipeline` (`video_ltx.py`) → poi **i2v** (`LTX2ImageToVideoPipeline`). Bloccato dal download Gemma (CDN HF lento).

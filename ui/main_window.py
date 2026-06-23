@@ -204,7 +204,8 @@ class MainWindow(QMainWindow):
 
         # Auto-avvio ComfyUI se non è già in esecuzione (il polling sotto lo rileva quando è pronto).
         self._maybe_autostart_native()
-        self._maybe_autostart_comfyui()
+        # ComfyUI NON viene più avviato in automatico (migrazione zero-comfy): solo il server nativo.
+        # _maybe_autostart_comfyui() resta definito per il fallback manuale/diagnostica, non chiamato.
 
         # poll stato ComfyUI + completamento job
         self._status_timer = QTimer(self); self._status_timer.timeout.connect(self._refresh_status)
