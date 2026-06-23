@@ -1297,6 +1297,11 @@ class MainWindow(QMainWindow):
             negative = cfg.get("integrate_negative") or ""
             aux = cfg.get("integrate_puzzle_lora") or None    # puzzle_lora opzionale (solo Kontext)
             guidance = cfg.get("integrate_guidance", 2.5)
+            # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. FLUX.2 e puzzle_lora → ComfyUI.
+            from core import backend
+            if backend.is_native("image") and engine == "kontext" and not aux:
+                self._start_native_kontext(exp, model, ptxt, negative, steps, seed, guidance)
+                return
             prompt = self.kontext.integrate(img_name, ptxt, engine=engine, model=model,
                                             negative=negative, seed=seed, steps=steps,
                                             guidance=guidance, aux_lora=aux)
@@ -1614,6 +1619,29 @@ class MainWindow(QMainWindow):
                   "steps": steps, "guidance": guidance, "seed": seed}
         self._inpaint_mode = mode
         self._log(f"{mode} (backend NATIVO) inviato (steps={steps}, seed={seed}, guidance={guidance:.1f})…")
+        self._native_worker = _NativeImageWorker(params)
+        self._native_worker.done.connect(self._on_native_inpaint_done)
+        self._native_worker.start()
+
+    def _start_native_kontext(self, exp, model, prompt, negative, steps, seed, guidance):
+        """Kontext/integra via backend NATIVO (FluxKontextPipeline) — niente ComfyUI.
+        Il composito (scena+oggetto) è il riferimento; il modello rigenera/armonizza."""
+        import os
+        from core import native_driver
+        from core.kontext_pipeline import KONTEXT_MODEL
+        if not native_driver.is_up():
+            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
+                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde."))
+            return
+        unet = model or KONTEXT_MODEL
+        mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
+        if not prompt:
+            prompt = ("Seamlessly integrate the added object into the scene: match the lighting, "
+                      "shadows, color and perspective so it looks naturally part of the photo.")
+        params = {"model": mp, "arch": "kontext", "prompt": prompt, "negative": negative,
+                  "image_path": exp["image"], "steps": steps, "guidance": guidance, "seed": seed}
+        self._inpaint_mode = "integrazione"
+        self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._native_worker = _NativeImageWorker(params)
         self._native_worker.done.connect(self._on_native_inpaint_done)
         self._native_worker.start()
