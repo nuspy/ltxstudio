@@ -646,25 +646,31 @@ class MainWindow(QMainWindow):
         return res
 
     def _refresh_status(self):
+        from core import native_driver, offline_inventory
         up = self.driver.is_up()
-        _conn = tr("mw.status_connected") if up else tr("mw.status_offline")
+        native_up = native_driver.is_up()
+        # NO-COMFY: se ComfyUI è assente ma il nativo è attivo, l'inventario viene dal FILESYSTEM.
+        ready = up or native_up
+        _conn = tr("mw.status_connected") if up else (
+            "NATIVO" if native_up else tr("mw.status_offline"))
         _tpl = tr("mw.status_template_ok") if self.engine else tr("mw.status_template_missing")
         self.status_lbl.setText(
             tr("mw.status_line").format(conn=_conn, http=self.driver.cfg.http, tpl=_tpl))
-        self.gen_btn.setEnabled(up and self.engine is not None)
-        if up and not self._inventory_set:
+        self.gen_btn.setEnabled(ready and self.engine is not None)
+        if ready and not self._inventory_set:
             try:
-                diffusion_models = self.driver.models_in("diffusion_models")
-                checkpoint_models = self.driver.models_in("checkpoints")
-                lora_models = self.driver.models_in("loras")
+                src = self.driver if up else offline_inventory   # ComfyUI o filesystem
+                diffusion_models = src.models_in("diffusion_models")
+                checkpoint_models = src.models_in("checkpoints")
+                lora_models = src.models_in("loras")
                 self.frame1_tab.set_model_inventory(diffusion_models, checkpoint_models)
-                oi = self.driver.object_info()
+                oi = src.object_info()
                 if self.engine:
                     self.engine.set_object_info(oi)  # per resolve_everywhere
                 self._apply_comfy_inventory(oi)      # disponibilità inpaint + modelli SAM
                 self.video_tab.set_model_inventory(
                     diffusion_models, checkpoint_models, self._video_gguf_models(oi),
-                    vram_gb=self.driver.gpu_vram_gb())
+                    vram_gb=src.gpu_vram_gb())
                 self.video_tab.set_lora_inventory(lora_models)
                 self._inventory_set = True
                 # menu dinamici ora popolati → ri-applica le impostazioni salvate (una volta)
