@@ -62,10 +62,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
     from diffusers.utils import export_to_video
     key = "video:ltx2"
     mm.register(key, _load)
-    pipe = mm.ensure(key, need_mb=VRAM_MB)
+    pipe = mm.ensure(key, need_mb=VRAM_MB)            # LTX2Pipeline (t2v); componenti condivisi
     seed = int(params.get("seed", 0))
     g = torch.Generator(device="cuda").manual_seed(seed)
-    out = pipe(
+    kw = dict(
         prompt=params.get("prompt", ""),
         negative_prompt=params.get("negative") or None,
         width=int(params.get("width", 768)),
@@ -76,6 +76,17 @@ def run(params: dict, mm, output_dir: str) -> dict:
         guidance_scale=float(params.get("guidance", 3.0)),
         generator=g,
     )
+    # i2v: stessa pipeline-family, RIUSA i componenti già caricati (no ricarica pesi/VRAM)
+    image_path = params.get("image_path")
+    if image_path:
+        from PIL import Image
+        from diffusers import LTX2ImageToVideoPipeline
+        pipe = LTX2ImageToVideoPipeline(
+            scheduler=pipe.scheduler, vae=pipe.vae, audio_vae=pipe.audio_vae,
+            text_encoder=pipe.text_encoder, tokenizer=pipe.tokenizer, connectors=pipe.connectors,
+            transformer=pipe.transformer, vocoder=pipe.vocoder, processor=pipe.processor)
+        kw["image"] = Image.open(image_path).convert("RGB")
+    out = pipe(**kw)
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_ltx2_{seed}.mp4")
     frames = out.frames[0] if hasattr(out, "frames") else out[0]
