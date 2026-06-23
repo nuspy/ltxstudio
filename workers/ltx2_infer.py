@@ -91,30 +91,25 @@ GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"              # Gemma-3 12B UFFI
 LORA_DIR = r"E:\AI\Models\LoRA"
 
 
-def main() -> None:
-    with open(sys.argv[1], encoding="utf-8") as fh:
-        p = json.load(fh)
+_PIPE_CACHE: dict = {}
 
-    # LoRA (formato ComfyUI → renaming map ufficiale). path relativo risolto su LORA_DIR.
-    loras = []
-    for lo in p.get("loras", []):
-        path = lo["name"]
-        if not os.path.isabs(path):
-            path = os.path.join(LORA_DIR, path)
-        loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
-                                              LTXV_LORA_COMFY_RENAMING_MAP))
 
-    # MODELLO scelto dalla GUI (checkpoint): la PRECISIONE la determina il modello stesso.
-    import time
-    ckpt = p.get("model") or CHECKPOINT
+def _resolve_ckpt(model: str) -> str:
+    ckpt = model or CHECKPOINT
     if not os.path.isabs(ckpt):
         for base in (r"E:\AI\Models\diffusion_models\LTX", r"E:\AI\Models\Checkpoints\LTX"):
             cand = os.path.join(base, ckpt)
             if os.path.exists(cand):
-                ckpt = cand
-                break
-    # quant: dedotta dal nome del modello (fp8 → scaled_mm, bf16 → cast); override opz. via param
-    qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
+                return cand
+    return ckpt
+
+
+def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list):
+    """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco."""
+    lkey = tuple((lo.path, lo.strength) for lo in loras)
+    key = (ckpt, qmode, offload_str, lkey)
+    if key in _PIPE_CACHE:
+        return _PIPE_CACHE[key]
     quant = None
     if qmode == "fp8_scaled_mm":
         from ltx_core.quantization import fp8_scaled_mm
@@ -122,46 +117,58 @@ def main() -> None:
     elif qmode == "fp8_cast":
         from ltx_core.quantization import fp8_cast
         quant = fp8_cast.build_policy(ckpt)
-    t0 = time.time()
-    offload = OffloadMode.CPU if p.get("offload", "cpu") == "cpu" else OffloadMode.NONE
+    offload = OffloadMode.CPU if offload_str == "cpu" else OffloadMode.NONE
     pipe = TI2VidTwoStagesPipeline(
         checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
         gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+    _PIPE_CACHE.clear()                                       # 1 pipeline alla volta (VRAM/RAM)
+    _PIPE_CACHE[key] = pipe
+    return pipe
+
+
+def run_generation(p: dict) -> str:
+    """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
+    import time
+    loras = []
+    for lo in p.get("loras", []):
+        path = lo["name"]
+        if not os.path.isabs(path):
+            path = os.path.join(LORA_DIR, path)
+        loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
+                                              LTXV_LORA_COMFY_RENAMING_MAP))
+    ckpt = _resolve_ckpt(p.get("model"))
+    qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
+    t0 = time.time()
+    pipe = _get_pipe(ckpt, qmode, p.get("offload", "cpu"), loras)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode})", flush=True)
 
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)), stg_scale=1.0,
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
     ag = MultiModalGuiderParams(cfg_scale=7.0, stg_scale=1.0, rescale_scale=0.7,
                                 modality_scale=3.0, stg_blocks=[29])
-
     images = []
     if p.get("image_path"):                                  # i2v: condiziona sul primo frame
         images = [ImageConditioningInput(p["image_path"], 0, 1.0, 33)]
-
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
     tg = time.time()
     video, audio = pipe(
-        prompt=p.get("prompt", ""),
-        negative_prompt=p.get("negative", "worst quality, blurry"),
-        seed=int(p.get("seed", 42)),
-        height=int(p.get("height", 512)),
-        width=int(p.get("width", 768)),
-        num_frames=nf,
-        frame_rate=fps,
-        num_inference_steps=int(p.get("steps", 40)),
-        video_guider_params=vg,
-        audio_guider_params=ag,
-        images=images,
-        tiling_config=TilingConfig.default(),
-        enhance_prompt=bool(p.get("enhance", False)),
-    )
-
+        prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+        seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+        num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
+        video_guider_params=vg, audio_guider_params=ag, images=images,
+        tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
     print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video)", flush=True)
     out = p["output"]
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
-    print("OK:" + out, flush=True)
+    return out
+
+
+def main() -> None:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        p = json.load(fh)
+    print("OK:" + run_generation(p), flush=True)
 
 
 if __name__ == "__main__":
