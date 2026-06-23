@@ -100,3 +100,77 @@ def run(params: dict, mm, output_dir: str) -> dict:
     export_to_video(frames, path, fps=int(params.get("fps", 24)))
     # TODO fase audio: muxare out.audio (LTX2 genera audio joint) nel file finale.
     return {"status": "success", "output": [path]}
+
+
+def run_condition(params: dict, mm, output_dir: str) -> dict:
+    """#24 — video editing CONDIZIONATO (keyframe multipli / ReTake / extend / ControlNet) via
+    LTX2ConditionPipeline. params['conditions'] = [{'image_path', 'index', 'strength'}] (frame guida
+    a posizioni date). ControlNet: passare frame pre-processati (depth/canny/pose). Test a Gemma."""
+    import torch
+    from PIL import Image
+    from diffusers import LTX2ConditionPipeline
+    from diffusers.pipelines.ltx2.pipeline_ltx2_condition import LTX2VideoCondition
+    from diffusers.utils import export_to_video
+    key = "video:ltx2"
+    mm.register(key, _load)
+    pipe = mm.ensure(key, need_mb=VRAM_MB)
+    cpipe = LTX2ConditionPipeline(
+        scheduler=pipe.scheduler, vae=pipe.vae, audio_vae=pipe.audio_vae,
+        text_encoder=pipe.text_encoder, tokenizer=pipe.tokenizer, connectors=pipe.connectors,
+        transformer=pipe.transformer, vocoder=pipe.vocoder)
+    conds = []
+    for c in params.get("conditions", []):
+        img = Image.open(c["image_path"]).convert("RGB")
+        conds.append(LTX2VideoCondition(frames=[img], index=int(c.get("index", 0)),
+                                        strength=float(c.get("strength", 1.0))))
+    seed = int(params.get("seed", 0))
+    g = torch.Generator(device="cuda").manual_seed(seed)
+    out = cpipe(conditions=conds, prompt=params.get("prompt", ""),
+                negative_prompt=params.get("negative") or None,
+                width=int(params.get("width", 768)), height=int(params.get("height", 768)),
+                num_frames=int(params.get("num_frames", 49)), frame_rate=int(params.get("fps", 24)),
+                num_inference_steps=int(params.get("steps", 30)),
+                guidance_scale=float(params.get("guidance", 3.0)), generator=g)
+    os.makedirs(output_dir, exist_ok=True)
+    path = str(Path(output_dir) / f"native_ltxcond_{seed}.mp4")
+    frames = out.frames[0] if hasattr(out, "frames") else out[0]
+    export_to_video(frames, path, fps=int(params.get("fps", 24)))
+    return {"status": "success", "output": [path]}
+
+
+def run_long(params: dict, mm, output_dir: str) -> dict:
+    """#24 — DURATA ILLIMITATA riprogettata (era instabile su ComfyUI): catena di segmenti, ognuno
+    i2v condizionato sull'ULTIMO frame del precedente; stitch ffmpeg. Memory-bounded (1 seg/volta)."""
+    import os
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    from inference_server.backends.video_postprocess import _ffmpeg
+    total = int(params.get("total_frames", 200))
+    seg_len = int(params.get("num_frames", 97))
+    n_seg = max(1, -(-total // seg_len))                    # ceil
+    td = tempfile.mkdtemp(prefix="ltxlong_")
+    ff = _ffmpeg()
+    segs, last_image = [], params.get("image_path")
+    for i in range(n_seg):
+        p = dict(params); p["num_frames"] = seg_len; p["seed"] = int(params.get("seed", 0)) + i
+        if last_image:
+            p["image_path"] = last_image
+        else:
+            p.pop("image_path", None)                       # primo segmento: t2v
+        res = run(p, mm, td)
+        if res.get("status") != "success":
+            return res
+        segs.append(res["output"][0])
+        last_image = os.path.join(td, f"last_{i}.png")       # ultimo frame → guida del prossimo
+        subprocess.run([ff, "-y", "-sseof", "-0.2", "-i", segs[-1], "-frames:v", "1", last_image],
+                       capture_output=True, timeout=60)
+    os.makedirs(output_dir, exist_ok=True)
+    out = str(Path(output_dir) / f"native_long_{params.get('seed', 0)}.mp4")
+    lst = os.path.join(td, "list.txt")
+    with open(lst, "w", encoding="utf-8") as f:
+        for s in segs:
+            f.write(f"file '{s}'\n")
+    subprocess.run([ff, "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", out],
+                   capture_output=True, timeout=300)
+    return {"status": "success", "output": [out], "segments": len(segs)}
