@@ -45,7 +45,10 @@ Aggiornato: 2026-06-23.
 1. ✅ **FATTO** (commit 4be8f8a): inpaint/outpaint nativo FLUX.1 Fill (`_start_native_inpaint`, branch in `generate_inpaint`). FLUX.2 Klein/checkpoint → ComfyUI fallback.
 2. ✅ **FATTO** (commit b05ed75) per Kontext 1-img integrate (`_start_native_kontext`, branch in `generate_integrate`). 🔸 multi-reference vero (compose N foto) POSTICIPATO: FLUX.1 single-ref; multi-ref serve FLUX.2 (download) o reimplementazione ReferenceLatent multi-latent.
 3. ✅ **FATTO** (commit 666b3dc): **upscale** nativo ESRGAN via `spandrel` (`image_upscale.py`, validato 1024²→2048² 4s) + `HANDLERS['upscale']` + branch in `generate_upscale`. 🔸 rifinitura FLUX e **restauro/colorizzazione foto** (generate_restore) ancora da cablare.
-4. ⬜ **Segmentazione** SAM2+GroundingDINO via transformers (no custom_node). Sforzo: medio.
+4. 🟡 **Segmentazione**: handler `image_segment.py` (GroundingDINO+SAM2 transformers) **scritto e registrato** (commit a9e5841) → `HANDLERS['segment']`. Runtime in attesa dei pesi HF (download A.4 frenato dal CDN).
+- ✅ **EXTRA migrati** (commit 3a2a62e, 60ef236): **recolor** (Kontext nativo), **restauro 'restore'** (ESRGAN nativo), **compose multi-foto** (FLUX.1 via stitch lato Python → Kontext nativo). compose multi-ref VERO + colorize → FLUX.2 (posticipato).
+
+**STATO Fase A (immagini)**: tutto ciò che è FLUX.1/ESRGAN è **migrato in nativo e verificato indipendente da ComfyUI** (gen, inpaint/outpaint, kontext/integra, recolor, upscale, restore, compose-stitch). Restano solo: segmentazione (pesi in download), colorize/compose-multiref (FLUX.2 download), → Fase B+ video/3D.
 
 **Abilitatori migrazione (FATTO 2026-06-23):**
 - `backend.strict_native()` / `comfy_blocked()` — blocco NON distruttivo del fallback ComfyUI (commit 666b3dc).
