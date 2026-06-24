@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox, QComboBox,
     QHBoxLayout, QLabel, QGroupBox, QSlider, QCheckBox, QPushButton,
-    QPlainTextEdit, QToolButton, QInputDialog, QMessageBox, QScrollArea,
+    QPlainTextEdit, QToolButton, QInputDialog, QMessageBox, QScrollArea, QLineEdit,
 )
 
 from ui.tabs.advanced_tab import SamplerSeedGroup
