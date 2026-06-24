@@ -1249,5 +1249,16 @@
   "f1.pulid.face.ph": "مسار صورة الوجه…",
   "f1.pulid.strength_lbl": "القوة",
   "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
-  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended).",
+  "v2v.mode_sing": "غناء",
+  "v2v.sing_section_title": "غناء (صورة + أغنية ← فيديو)",
+  "v2v.sing_intro": "من صورة Frame 1 يُنشئ فيديو للوجه وهو يغني أغنية حقيقية، مع تزامن الشفاه والحركة على الإيقاع.",
+  "v2v.sing_pick_audio": "اختر أغنية…",
+  "v2v.sing_no_audio": "لم يتم اختيار أغنية",
+  "v2v.sing_isolate_vocals": "عزل الصوت (موصى به)",
+  "v2v.sing_isolate_vocals.tt": "يفصل الصوت عن الموسيقى (demucs) لتزامن شفاه أدق.",
+  "v2v.sing_audio_scale": "قوة التزامن",
+  "v2v.sing_audio_scale.tt": "مدى تحكم الصوت في الشفاه والحركة: أعلى = تزامن أقوى.",
+  "v2v.sing_note": "يستخدم صورة Frame 1 كوجه. الحركة تتبع الإيقاع؛ التزامن الدقيق بين الأصابع والآلة تقريبي (حدود النماذج الحالية).",
+  "v2v.err_no_sing_audio": "وضع الغناء: اختر أغنية (صوت)."
 }

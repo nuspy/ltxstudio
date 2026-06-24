@@ -1249,5 +1249,16 @@
   "f1.pulid.face.ph": "얼굴 이미지 경로…",
   "f1.pulid.strength_lbl": "강도",
   "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
-  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended).",
+  "v2v.mode_sing": "노래",
+  "v2v.sing_section_title": "노래 (사진 + 곡 → 영상)",
+  "v2v.sing_intro": "Frame 1 사진에서 얼굴이 실제 노래를 부르는 영상을 생성합니다. 립싱크와 박자에 맞춘 움직임 포함.",
+  "v2v.sing_pick_audio": "곡 선택…",
+  "v2v.sing_no_audio": "선택된 곡 없음",
+  "v2v.sing_isolate_vocals": "보컬 분리 (권장)",
+  "v2v.sing_isolate_vocals.tt": "음악에서 목소리를 분리(demucs)하여 더 정확한 립싱크를 얻습니다.",
+  "v2v.sing_audio_scale": "동기화 강도",
+  "v2v.sing_audio_scale.tt": "오디오가 입술과 움직임을 얼마나 이끄는지: 높을수록 동기화가 강해집니다.",
+  "v2v.sing_note": "Frame 1 사진을 얼굴로 사용합니다. 움직임은 박자를 따르며, 손가락과 악기의 정밀한 동기화는 근사치입니다(현재 모델의 한계).",
+  "v2v.err_no_sing_audio": "노래 모드: 곡(오디오)을 선택하세요."
 }

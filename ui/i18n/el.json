@@ -1249,5 +1249,16 @@
   "f1.pulid.face.ph": "Διαδρομή εικόνας προσώπου…",
   "f1.pulid.strength_lbl": "Ισχύς",
   "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
-  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended).",
+  "v2v.mode_sing": "Τραγούδι",
+  "v2v.sing_section_title": "Τραγούδι (φωτογραφία + τραγούδι → βίντεο)",
+  "v2v.sing_intro": "Από τη φωτογραφία του Frame 1 δημιουργεί βίντεο όπου το πρόσωπο τραγουδά ένα πραγματικό τραγούδι, με συγχρονισμό χειλιών και κίνηση στον ρυθμό.",
+  "v2v.sing_pick_audio": "Επιλογή τραγουδιού…",
+  "v2v.sing_no_audio": "Δεν επιλέχθηκε τραγούδι",
+  "v2v.sing_isolate_vocals": "Απομόνωση φωνής (συνιστάται)",
+  "v2v.sing_isolate_vocals.tt": "Διαχωρίζει τη φωνή από τη μουσική (demucs) για ακριβέστερο συγχρονισμό χειλιών.",
+  "v2v.sing_audio_scale": "Ένταση συγχρονισμού",
+  "v2v.sing_audio_scale.tt": "Πόσο ο ήχος καθοδηγεί χείλη και κίνηση: υψηλότερο = ισχυρότερος συγχρονισμός.",
+  "v2v.sing_note": "Χρησιμοποιεί τη φωτογραφία του Frame 1 ως πρόσωπο. Η κίνηση ακολουθεί τον ρυθμό· ο λεπτός συγχρονισμός δακτύλων-οργάνου είναι κατά προσέγγιση (όριο των τρεχόντων μοντέλων).",
+  "v2v.err_no_sing_audio": "Λειτουργία Τραγουδιού: επιλέξτε ένα τραγούδι (ήχος)."
 }

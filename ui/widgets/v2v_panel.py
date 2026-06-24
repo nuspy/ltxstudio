@@ -55,13 +55,14 @@ class CollapsibleSection(QWidget):
 
 
 class V2VPanel(QWidget):
-    mode_changed = Signal(str)   # "normal" | "talk" | "retake"
+    mode_changed = Signal(str)   # "normal" | "talk" | "sing" | "retake"
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._video_path: str | None = None
         self._duration_s: float = 0.0
         self._last_generation: str | None = None
+        self._sing_audio_path: str | None = None
         self._build()
 
     # ---------------- UI ----------------
@@ -73,14 +74,15 @@ class V2VPanel(QWidget):
         moderow.addWidget(QLabel(tr("v2v.mode_label")))
         self.rb_normal = QRadioButton(tr("v2v.mode_normal"))
         self.rb_talk = QRadioButton(tr("v2v.mode_talk"))
+        self.rb_sing = QRadioButton(tr("v2v.mode_sing"))
         self.rb_retake = QRadioButton(tr("v2v.mode_retake"))
         self.rb_normal.setChecked(True)
         self._mode_group = QButtonGroup(self)
-        for rb in (self.rb_normal, self.rb_talk, self.rb_retake):
+        for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_retake):
             self._mode_group.addButton(rb); moderow.addWidget(rb)
         moderow.addStretch(1)
         root.addLayout(moderow)
-        for rb in (self.rb_normal, self.rb_talk, self.rb_retake):
+        for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_retake):
             rb.toggled.connect(self._on_mode)
 
         # --- sorgente video (condivisa Talk/ReTake) ---
@@ -170,24 +172,71 @@ class V2VPanel(QWidget):
         self.sec_talk.setVisible(False)
         root.addWidget(self.sec_talk)
 
+        # --- sezione Canta (accordion) — MultiTalk: foto + canzone reale -> video lip-sync ---
+        self.sec_sing = CollapsibleSection(tr("v2v.sing_section_title"))
+        gl = QVBoxLayout(self.sec_sing.content)
+        gl.addWidget(QLabel(tr("v2v.sing_intro")))
+        # picker audio (canzone)
+        ap = QHBoxLayout()
+        self.btn_sing_audio = QPushButton(tr("v2v.sing_pick_audio"))
+        self.btn_sing_audio.clicked.connect(self._pick_sing_audio)
+        ap.addWidget(self.btn_sing_audio); ap.addStretch(1)
+        gl.addLayout(ap)
+        self.lbl_sing_audio = QLabel(tr("v2v.sing_no_audio"))
+        self.lbl_sing_audio.setStyleSheet("color:#888;")
+        gl.addWidget(self.lbl_sing_audio)
+        # isola voce (demucs)
+        from PySide6.QtWidgets import QCheckBox
+        self.cb_sing_vocals = QCheckBox(tr("v2v.sing_isolate_vocals"))
+        self.cb_sing_vocals.setChecked(True)
+        self.cb_sing_vocals.setToolTip(tr("v2v.sing_isolate_vocals.tt"))
+        gl.addWidget(self.cb_sing_vocals)
+        # forza lip-sync / ritmo (audio_scale)
+        sc = QHBoxLayout(); sc.addWidget(QLabel(tr("v2v.sing_audio_scale")))
+        self.sl_sing_scale = QSlider(Qt.Horizontal); self.sl_sing_scale.setRange(5, 30)
+        self.sl_sing_scale.setValue(20)              # 2.0
+        self.lbl_sing_scale = QLabel("2.0")
+        self.sl_sing_scale.valueChanged.connect(lambda v: self.lbl_sing_scale.setText(f"{v/10:.1f}"))
+        self.sl_sing_scale.setToolTip(tr("v2v.sing_audio_scale.tt"))
+        sc.addWidget(self.sl_sing_scale, 1); sc.addWidget(self.lbl_sing_scale)
+        gl.addLayout(sc)
+        snote = QLabel(tr("v2v.sing_note")); snote.setWordWrap(True)
+        snote.setStyleSheet("color:#74c0fc; padding:4px;")
+        gl.addWidget(snote)
+        self.sec_sing.setVisible(False)
+        root.addWidget(self.sec_sing)
+
     # ---------------- logica ----------------
     def current_mode(self) -> str:
         if self.rb_talk.isChecked():
             return "talk"
+        if self.rb_sing.isChecked():
+            return "sing"
         if self.rb_retake.isChecked():
             return "retake"
         return "normal"
 
     def _on_mode(self):
         m = self.current_mode()
-        self._src_wrap.setVisible(m in ("talk", "retake"))
+        self._src_wrap.setVisible(m in ("talk", "retake"))   # 'sing' usa la foto del Frame 1, non un video
         self.sec_retake.setVisible(m == "retake")
         self.sec_talk.setVisible(m == "talk")
+        self.sec_sing.setVisible(m == "sing")
         if m == "retake":
             self.sec_retake.set_expanded(True)
         if m == "talk":
             self.sec_talk.set_expanded(True)
+        if m == "sing":
+            self.sec_sing.set_expanded(True)
         self.mode_changed.emit(m)
+
+    def _pick_sing_audio(self):
+        fn, _ = QFileDialog.getOpenFileName(self, tr("v2v.sing_pick_audio"),
+                                            "", tr("common.file_audio_filter"))
+        if fn:
+            self._sing_audio_path = fn
+            self.lbl_sing_audio.setText(f"🎵 {Path(fn).name}")
+            self.lbl_sing_audio.setStyleSheet("")
 
     def set_last_generation(self, path: str | None):
         self._last_generation = path
@@ -304,6 +353,10 @@ class V2VPanel(QWidget):
             cfg.update({"talk_region": self.cmb_region.currentData(),
                         "talk_mask_offset": self.sp_offset.value(),
                         "talk_reimagine": self.cb_reimagine.isChecked()})
+        if m == "sing":
+            cfg.update({"sing_audio_path": self._sing_audio_path,
+                        "sing_separate_vocals": self.cb_sing_vocals.isChecked(),
+                        "sing_audio_scale": round(self.sl_sing_scale.value() / 10.0, 1)})
         return cfg
 
     def validation_errors(self) -> list[str]:
@@ -311,6 +364,10 @@ class V2VPanel(QWidget):
         m = self.current_mode()
         errs = []
         if m == "normal":
+            return errs
+        if m == "sing":                       # 'Canta': serve l'audio (la foto viene dal Frame 1)
+            if not self._sing_audio_path:
+                errs.append(tr("v2v.err_no_sing_audio"))
             return errs
         if not self._video_path:
             # ReTake richiede il video; Talk SENZA video genera dall'immagine del Frame 1 (ok).

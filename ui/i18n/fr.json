@@ -1249,5 +1249,16 @@
   "f1.pulid.face.ph": "Chemin de l'image du visage…",
   "f1.pulid.strength_lbl": "Force",
   "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
-  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended).",
+  "v2v.mode_sing": "Chanter",
+  "v2v.sing_section_title": "Chanter (photo + chanson → vidéo)",
+  "v2v.sing_intro": "À partir de la photo du Frame 1, génère une vidéo du visage chantant une vraie chanson, avec lip-sync et mouvement en rythme.",
+  "v2v.sing_pick_audio": "Choisir une chanson…",
+  "v2v.sing_no_audio": "Aucune chanson sélectionnée",
+  "v2v.sing_isolate_vocals": "Isoler la voix (recommandé)",
+  "v2v.sing_isolate_vocals.tt": "Sépare la voix de la musique (demucs) pour un lip-sync plus précis.",
+  "v2v.sing_audio_scale": "Force de synchro",
+  "v2v.sing_audio_scale.tt": "À quel point l'audio guide les lèvres et le mouvement : plus élevé = synchro plus marquée.",
+  "v2v.sing_note": "Utilise la photo du Frame 1 comme visage. Le mouvement suit le rythme ; la synchro fine doigts-instrument reste approximative (limite des modèles actuels).",
+  "v2v.err_no_sing_audio": "Mode Chanter : sélectionnez une chanson (audio)."
 }

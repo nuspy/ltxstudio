@@ -1249,5 +1249,16 @@
   "f1.pulid.face.ph": "人脸图像路径…",
   "f1.pulid.strength_lbl": "强度",
   "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
-  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended).",
+  "v2v.mode_sing": "唱歌",
+  "v2v.sing_section_title": "唱歌（照片 + 歌曲 → 视频）",
+  "v2v.sing_intro": "根据 Frame 1 的照片生成人脸演唱真实歌曲的视频，带口型同步和随节奏的动作。",
+  "v2v.sing_pick_audio": "选择歌曲…",
+  "v2v.sing_no_audio": "未选择歌曲",
+  "v2v.sing_isolate_vocals": "分离人声（推荐）",
+  "v2v.sing_isolate_vocals.tt": "将人声从音乐中分离（demucs），以获得更精确的口型同步。",
+  "v2v.sing_audio_scale": "同步强度",
+  "v2v.sing_audio_scale.tt": "音频对口型和动作的驱动程度：越高 = 同步越明显。",
+  "v2v.sing_note": "使用 Frame 1 的照片作为人脸。动作随节奏；手指与乐器的精细同步只是近似（当前模型的局限）。",
+  "v2v.err_no_sing_audio": "唱歌模式：请选择一首歌曲（音频）。"
 }

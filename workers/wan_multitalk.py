@@ -80,6 +80,47 @@ def _load_audio(path):
     return {"waveform": wav.unsqueeze(0), "sample_rate": sr}   # [1, C, N]
 
 
+def _first_frame(video_path):
+    """Estrae il primo frame di un video come PNG (per applicare MultiTalk a un video esistente)."""
+    out = os.path.splitext(video_path)[0] + "_frame0.png"
+    subprocess.run(["ffmpeg", "-y", "-i", video_path, "-frames:v", "1", out],
+                   check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return out
+
+
+def _vocals_audio(path):
+    """Isola la VOCE dalla traccia (demucs htdemucs via CLI, robusto a ogni versione): MultiTalk è
+    addestrato sul parlato/canto, la musica di sottofondo peggiora il lip-sync. Ritorna un AUDIO dict
+    coi soli vocals (cache su disco)."""
+    out = os.path.join(os.path.dirname(path) or ".", "_demucs")
+    name = os.path.splitext(os.path.basename(path))[0]
+    voc = os.path.join(out, "htdemucs", name, "vocals.wav")
+    if not os.path.exists(voc):
+        os.makedirs(out, exist_ok=True)
+        subprocess.run([sys.executable, "-m", "demucs", "--two-stems=vocals", "-o", out, path], check=True)
+    return _load_audio(voc)
+
+
+def _auto_blocks_to_swap(fp, model_name, total_blocks=40, reserve_gb=12.0):
+    """Tara block_swap sulla VRAM del computer: tiene più blocchi possibile residenti in VRAM,
+    lasciando `reserve_gb` per attivazioni/VAE/altri modelli. Generico per ogni GPU (5090→0 swap,
+    4090→pochi, 3060→molti). reserve_gb scala con la richiesta di attivazioni (passata da run())."""
+    import torch
+    if not torch.cuda.is_available():
+        return total_blocks
+    total_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+    try:
+        model_gb = os.path.getsize(fp.get_full_path("diffusion_models", model_name)) / 1e9
+    except Exception:
+        model_gb = 16.0
+    per_block = (model_gb / total_blocks) or 0.4
+    resident = int(max(0.0, total_gb - reserve_gb) / per_block)
+    swap = max(0, min(total_blocks, total_blocks - resident))
+    print(f"[auto-vram] {total_gb:.0f}GB tot, modello {model_gb:.0f}GB ({per_block:.2f}GB/blk), "
+          f"reserve {reserve_gb:.0f}GB -> blocks_to_swap={swap}/{total_blocks}", flush=True)
+    return swap
+
+
 def run(p: dict) -> str:
     import time, numpy as np, torch
     from PIL import Image
@@ -91,15 +132,24 @@ def run(p: dict) -> str:
     t0 = time.time()
 
     # ---- loaders (tutti i nodi via _call: kwargs + hidden inputs auto) ----
+    model_name = p.get("model", "Wan2.1_14b_Image_to_Video_720p_GGUF_Q8.gguf")
+    # block_swap tarato DINAMICAMENTE sulla VRAM del computer ("auto") o forzato (numero)
+    bts = p.get("blocks_to_swap", "auto")
+    if bts in ("auto", None, ""):
+        # riserva = attivazioni(∝risoluzione) + latent(∝num_frames) + margine
+        reserve = float(p.get("vram_reserve_gb") or 0) or (10.0 + 5.0 * (W * H) / (640.0 * 640.0) + 0.004 * F)
+        bts = _auto_blocks_to_swap(fp, model_name, reserve_gb=reserve)
+    else:
+        bts = int(bts)
     mt = _call(NM["MultiTalkModelLoader"],
                model=p.get("multitalk", "WanVideo_2_1_Multitalk_14B_fp32.safetensors"))
     bs = _call(NM["WanVideoBlockSwap"],
-               blocks_to_swap=int(p.get("blocks_to_swap", 25)), offload_img_emb=False, offload_txt_emb=False)
+               blocks_to_swap=bts, offload_img_emb=False, offload_txt_emb=False)
     lora = _call(NM["WanVideoLoraSelect"],
                  lora=p.get("lora", "Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64_fixed.safetensors"),
                  strength=float(p.get("lora_strength", 0.6)), merge_loras=False)
     model = _call(NM["WanVideoModelLoader"],
-                  model=p.get("model", "Wan2.1_14b_Image_to_Video_720p_GGUF_Q8.gguf"),
+                  model=model_name,
                   base_precision="fp16_fast", quantization="disabled", load_device="offload_device",
                   attention_mode="sageattn", block_swap_args=bs, lora=lora, multitalk_model=mt)
     vae = _call(NM["WanVideoVAELoader"],
@@ -118,7 +168,12 @@ def run(p: dict) -> str:
                 negative_prompt=p.get("negative", "static, blurry, deformed, extra fingers, bad hands, low quality"),
                 t5=t5)
 
-    im = Image.open(p["image_path"]).convert("RGB").resize((W, H), Image.LANCZOS)
+    # sorgente volto: foto (Frame 1) oppure primo frame di un video esistente
+    img_path = p.get("image_path")
+    if p.get("source_video") and not img_path:
+        img_path = _first_frame(p["source_video"])
+        print(f"[src] primo frame del video -> {os.path.basename(img_path)}", flush=True)
+    im = Image.open(img_path).convert("RGB").resize((W, H), Image.LANCZOS)
     img_t = torch.from_numpy(np.asarray(im, dtype="float32") / 255.0)[None]    # [1,H,W,3]
     clipemb = _call(NM["WanVideoClipVisionEncode"],
                     clip_vision=clipv, image_1=img_t, strength_1=1.0, strength_2=1.0,
@@ -127,10 +182,19 @@ def run(p: dict) -> str:
                    width=W, height=H, num_frames=F, noise_aug_strength=0.0, start_latent_strength=1.0,
                    end_latent_strength=1.0, force_offload=True, vae=vae, clip_embeds=clipemb, start_image=img_t)
 
-    audio = _load_audio(p["audio_path"])
+    if p.get("separate_vocals", True):
+        try:
+            audio = _vocals_audio(p["audio_path"])
+            print("[audio] vocals isolati (demucs) -> lip-sync su voce pulita", flush=True)
+        except Exception as _e:                          # noqa: BLE001
+            print(f"[audio] separazione vocals fallita ({_e}); uso audio intero", flush=True)
+            audio = _load_audio(p["audio_path"])
+    else:
+        audio = _load_audio(p["audio_path"])
     mtemb = _call(NM["MultiTalkWav2VecEmbeds"],
                   wav2vec_model=w2v, audio_1=audio, normalize_loudness=True, num_frames=F, fps=FPS,
-                  audio_scale=1.0, audio_cfg_scale=1.0, multi_audio_type="para")
+                  audio_scale=float(p.get("audio_scale", 2.0)),
+                  audio_cfg_scale=float(p.get("audio_cfg_scale", 1.0)), multi_audio_type="para")
 
     ctx = None
     if p.get("context", False):
@@ -148,6 +212,9 @@ def run(p: dict) -> str:
                     shift=float(p.get("shift", 5.0)), seed=int(p.get("seed", 8)), force_offload=True,
                     scheduler=p.get("scheduler", "dpm++_sde"), riflex_freq_index=0, **kw)
     print(f"[gen] {time.time()-tg:.0f}s", flush=True)
+    if torch.cuda.is_available():
+        print(f"[vram] peak {torch.cuda.max_memory_allocated()/1e9:.1f}GB / "
+              f"{torch.cuda.get_device_properties(0).total_memory/1e9:.0f}GB", flush=True)
 
     images = _call(NM["WanVideoDecode"],
                    vae=vae, samples=samples, enable_vae_tiling=True,

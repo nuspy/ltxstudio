@@ -1346,5 +1346,16 @@
   "f1.pulid.face.ph": "Percorso immagine del volto…",
   "f1.pulid.strength_lbl": "Forza",
   "f1.pulid.enable.tt": "Imprime l'identità del volto nella foto sull'immagine generata (solo FLUX).",
-  "f1.pulid.strength.tt": "Quanto viene applicata l'identità del volto (0.6–0.9 consigliato)."
+  "f1.pulid.strength.tt": "Quanto viene applicata l'identità del volto (0.6–0.9 consigliato).",
+  "v2v.mode_sing": "Canta",
+  "v2v.sing_section_title": "Canta (foto + canzone → video)",
+  "v2v.sing_intro": "Dalla foto del Frame 1 genera un video del volto che canta una canzone reale, con lip-sync e movimento a ritmo.",
+  "v2v.sing_pick_audio": "Scegli canzone…",
+  "v2v.sing_no_audio": "Nessuna canzone selezionata",
+  "v2v.sing_isolate_vocals": "Isola la voce (consigliato)",
+  "v2v.sing_isolate_vocals.tt": "Separa la voce dalla musica (demucs) per un lip-sync più preciso.",
+  "v2v.sing_audio_scale": "Forza sincronia",
+  "v2v.sing_audio_scale.tt": "Quanto l'audio guida labbra e movimento: più alto = sincronia più marcata.",
+  "v2v.sing_note": "Usa la foto del Frame 1 come volto. Il movimento segue il ritmo; la sincronia fine dita-strumento resta approssimativa (limite dei modelli attuali).",
+  "v2v.err_no_sing_audio": "Modalità Canta: seleziona una canzone (audio)."
 }

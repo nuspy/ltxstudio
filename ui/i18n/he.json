@@ -1249,5 +1249,16 @@
   "f1.pulid.face.ph": "נתיב תמונת הפנים…",
   "f1.pulid.strength_lbl": "עוצמה",
   "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
-  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended).",
+  "v2v.mode_sing": "שירה",
+  "v2v.sing_section_title": "שירה (תמונה + שיר ← וידאו)",
+  "v2v.sing_intro": "מתמונת Frame 1 נוצר וידאו שבו הפנים שרות שיר אמיתי, עם סנכרון שפתיים ותנועה בקצב.",
+  "v2v.sing_pick_audio": "בחר שיר…",
+  "v2v.sing_no_audio": "לא נבחר שיר",
+  "v2v.sing_isolate_vocals": "בידוד הקול (מומלץ)",
+  "v2v.sing_isolate_vocals.tt": "מפריד את הקול מהמוזיקה (demucs) לסנכרון שפתיים מדויק יותר.",
+  "v2v.sing_audio_scale": "עוצמת סנכרון",
+  "v2v.sing_audio_scale.tt": "כמה האודיו מנחה את השפתיים והתנועה: גבוה יותר = סנכרון חזק יותר.",
+  "v2v.sing_note": "משתמש בתמונת Frame 1 כפנים. התנועה עוקבת אחר הקצב; הסנכרון העדין בין אצבעות לכלי משוער (מגבלת המודלים הנוכחיים).",
+  "v2v.err_no_sing_audio": "מצב שירה: בחר שיר (אודיו)."
 }
