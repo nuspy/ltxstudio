@@ -70,7 +70,10 @@ Legenda: ✅ nativo verificato · 🟢 nativo codice pronto (attende pesi) · �
 **A — Immagini (DONE per FLUX.1/ESRGAN, verificato)**: gen, inpaint/outpaint, kontext/integra, recolor, upscale, restore, compose-stitch ✅. Segmentazione 🟢 (download pesi). Restano: SD3, prompt-enhance, FLUX.2 (inpaint/kontext/compose-multiref/colorize → download).
 **B — Video core nativo**: t2v/i2v 🟢 (download Gemma) → keyframe-multipli, extend, durata-illimitata, ReTake, Just_Talk, ControlNet, HR, scaling. *La durata illimitata va RIPROGETTATA (instabile anche su ComfyUI).*
 **C — Post-process video**: ESRGAN-per-frame ✅ (verificato), aumento-FPS ✅ (ffmpeg minterpolate, verificato), face-restore 🟢 (GFPGAN, serve `pip gfpgan`). Restano: SeedVR2, RIFE (qualità sup.), FlashVSR, audio-slicing. Handler `video_postprocess.py` (video_upscale/video_face/video_fps).
-**D — 3D + voce a venv standalone**: TRELLIS, rigging, CosyVoice.
+**D — 3D + audio/voce a venv standalone** (in corso #26):
+- ✅ già zero-comfy: MMAudio, WorldGen, Edge TTS, mocap-retarget (Blender).
+- 🟢 **service standalone SCRITTI** (sostituiscono i custom node ComfyUI): TRELLIS.2 (`core/trellis_service.py`+`scripts/trellis_generate.py`, API microsoft/TRELLIS), voce-clone CosyVoice2 (`core/cosyvoice_service.py`+`scripts/cosyvoice_generate.py`), rigging SkinTokens (`core/rig_service.py`+`scripts/rig_generate.py`, +Blender). Pattern subprocess `world_service`/`music_service.Job`.
+- 🔴 restano: **installer** (clona repo + venv: TRELLIS2/SkinTokens/CosyVoice), **venv mancanti** (heartlib=HeartMuLa, mocap), **cablaggio handler** (generate_trellis/generate_rig/tts-clone → service quando native) — tutti richiedono download (rete lenta).
 **E — Cleanup**: rimuovere driver/launcher/shim/path ComfyUI, convert_tab, semplificare backend.py.
 
 **Principio**: ComfyUI resta solo fallback per-feature finché ogni feature non ha il percorso nativo/standalone **validato** (flag `is_native(module)`). `strict_native` blocca i fallback per scovare dipendenze.
