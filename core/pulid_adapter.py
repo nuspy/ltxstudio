@@ -75,15 +75,24 @@ def extract_id(pulid, face_image_path: str):
 
 
 def attach(transformer, pulid, id_emb, strength: float = 0.8):
-    """Hook sui blocchi del FluxTransformer2DModel diffusers: applica pulid_ca[idx](id, hidden)."""
+    """Hook sui blocchi del FluxTransformer2DModel diffusers: replica il forward di PuLID-FLUX
+    (flux/model.py) — `hid = hid + strength * pulid_ca[ca_idx](id, hid)` ogni `double_interval`
+    double-block e ogni `single_interval` single-block, con ca_idx CONDIVISO double→single e
+    AZZERATO a ogni forward del transformer (ogni step di denoising)."""
     ca = pulid.pulid_ca
     di = int(getattr(transformer, "pulid_double_interval", 2) or 2)
     si = int(getattr(transformer, "pulid_single_interval", 4) or 4)
     handles = []
     idx = [0]
 
-    def _double_hook(_m, _inp, out):
-        # FluxTransformerBlock → (encoder_hidden_states, hidden_states)
+    # CRITICO: azzera il contatore ca_idx all'inizio di OGNI forward del transformer (per-step),
+    # altrimenti accumula tra gli step e dopo ~2 step esaurisce i pulid_ca → effetto nullo.
+    def _reset(_m, _inp):
+        idx[0] = 0
+    handles.append(transformer.register_forward_pre_hook(_reset))
+
+    def _ca_hook(_m, _inp, out):
+        # FluxTransformerBlock / FluxSingleTransformerBlock → (encoder_hidden_states, hidden_states)
         if idx[0] >= len(ca):
             return out
         enc, hid = out if isinstance(out, tuple) else (None, out)
@@ -91,10 +100,14 @@ def attach(transformer, pulid, id_emb, strength: float = 0.8):
         idx[0] += 1
         return (enc, hid) if enc is not None else hid
 
-    dblocks = getattr(transformer, "transformer_blocks", [])
-    for i, blk in enumerate(dblocks):
+    # double-block (transformer_blocks) — eseguiti per primi nel forward → ca_idx 0..N
+    for i, blk in enumerate(getattr(transformer, "transformer_blocks", [])):
         if i % di == 0:
-            handles.append(blk.register_forward_hook(_double_hook))
+            handles.append(blk.register_forward_hook(_ca_hook))
+    # single-block (single_transformer_blocks) — eseguiti dopo → ca_idx prosegue (come l'originale)
+    for i, blk in enumerate(getattr(transformer, "single_transformer_blocks", [])):
+        if i % si == 0:
+            handles.append(blk.register_forward_hook(_ca_hook))
     return handles
 
 
