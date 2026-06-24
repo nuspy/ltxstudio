@@ -1060,7 +1060,13 @@ class Frame1Tab(QWidget):
         if sch == "auto": sch = None
         # Seed: random se checkbox attivo → None (il caller userà random.randint())
         seed_fixed = (not self.gen_seed_rand.isChecked()) if hasattr(self, "gen_seed_rand") else False
+        pulid_face = None
+        if getattr(self, "gen_pulid_enable", None) and self.gen_pulid_enable.isChecked():
+            _f = self.gen_pulid_face.text().strip()
+            pulid_face = _f or None
         return {
+            "pulid_face": pulid_face,
+            "pulid_strength": (self.gen_pulid_strength.value() if hasattr(self, "gen_pulid_strength") else 0.8),
             "arch": {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
             "model": self.gen_model.currentText(),
             "loras": self.gen_lora_tab.selected_loras(),

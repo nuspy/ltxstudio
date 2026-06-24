@@ -1633,7 +1633,8 @@ class MainWindow(QMainWindow):
         params = {"model": cfg["model"], "arch": cfg["arch"], "prompt": cfg["prompt"],
                   "negative": negative, "width": v["width"], "height": v["height"],
                   "steps": cfg["steps"], "guidance": cfg.get("cfg") or 3.5,
-                  "seed": seed, "loras": loras}
+                  "seed": seed, "loras": loras,
+                  "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8)}
         self._log("Generazione immagine (backend NATIVO) inviata…")
         self._native_worker = _NativeImageWorker(params)
         self._native_worker.done.connect(self._on_native_image_done)
