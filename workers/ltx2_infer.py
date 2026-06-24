@@ -63,6 +63,84 @@ def _materialize_meta(model, device):
                 mod.register_buffer(bn, torch.zeros(buf.shape, dtype=buf.dtype, device=device), persistent=False)
 
 
+def _apply_blockwise_offload(model, device):
+    """Offload per-blocco STILE ComfyUI (replica DynamicVram): il transformer LTX resta su CPU,
+    ogni blocco va su GPU solo durante il suo forward e torna su CPU subito dopo → ~poche GB VRAM
+    invece di 27GB. Le parti non-block (patchify/embeddings/timestep/norm/proj) restano su GPU.
+    Cerca i transformer_blocks anche dentro wrapper (X0Model)."""
+    import torch
+    best = None
+    best_n = 0
+    holder = None
+    for mod in model.modules():                          # stack di layer più grande (transformer/Gemma)
+        for attr in ("transformer_blocks", "layers"):
+            tb = getattr(mod, attr, None)
+            if isinstance(tb, torch.nn.ModuleList) and len(tb) > best_n:
+                best, best_n, holder = tb, len(tb), mod
+    if best is None or best_n < 8:
+        return 0
+    model.to(device)                                    # parti non-layer (embed/norm/proj) su GPU
+    blocks = list(best)
+    # Wrappiamo direttamente .forward di ogni layer (NON forward_hook: transformers chiama i
+    # decoder layer via .forward() diretto / GradientCheckpointingLayer, bypassando gli hook).
+    # Il layer va su GPU per il suo forward e torna su CPU subito dopo → 1 layer alla volta su GPU.
+    for blk in blocks:
+        blk.to("cpu")
+
+        def _make_fwd(b, orig):
+            def _fwd(*a, **k):
+                b.to(device)
+                try:
+                    return orig(*a, **k)
+                finally:
+                    b.to("cpu")
+            return _fwd
+
+        blk.forward = _make_fwd(blk, blk.forward)
+
+    # Il pacchetto fa .to(device) rimettendo TUTTI i layer su GPU prima del forward: qui li
+    # rispingiamo su CPU all'inizio del forward del modulo proprietario, poi il wrapping di
+    # .forward li carica 1 alla volta on-demand. (forward_hook NON basta: i layer sono chiamati
+    # via .forward() diretto.)
+    def _force_layers_cpu(mod, args):
+        for blk in blocks:
+            blk.to("cpu")
+        torch.cuda.empty_cache()
+
+    holder.register_forward_pre_hook(_force_layers_cpu)
+    return best_n
+
+
+def _patch_block_offload():
+    """Monkey-patch DiffusionStage._build_transformer: dopo la build (X0Model su GPU), applica
+    l'offload per-blocco → solo le parti non-block + 1 blocco alla volta restano su GPU."""
+    import os as _os
+    if _os.environ.get("LTX_BLOCK_OFFLOAD") != "1":
+        return
+    try:
+        import torch
+        import ltx_pipelines.utils.blocks as _blk
+        _orig_bt = _blk.DiffusionStage._build_transformer
+
+        def _patched_bt(self, **kwargs):
+            print(f"[bt] _build_transformer chiamato, VRAM={torch.cuda.memory_allocated()/1e9:.1f}GB", flush=True)
+            x0 = _orig_bt(self, **kwargs)
+            try:
+                n = _apply_blockwise_offload(x0, torch.device("cuda"))
+                print(f"[block-offload] transformer: {n} blocchi su CPU on-demand", flush=True)
+            except Exception as _e:  # noqa: BLE001
+                print(f"[block-offload] warn: {_e}", flush=True)
+            return x0
+
+        _blk.DiffusionStage._build_transformer = _patched_bt
+        print("[block-offload] patch _build_transformer attivo", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        print(f"[block-offload] patch fallito: {_e}", flush=True)
+
+
+_patch_block_offload()
+
+
 try:
     import ltx_core.loader.single_gpu_model_builder as _sgmb
     _orig_build = _sgmb.SingleGPUModelBuilder.build
@@ -83,6 +161,13 @@ try:
             print(f"[meta-fix] dopo fix: {len(left)} buffer meta rimasti {left[:3]}", flush=True)
         except Exception as _e:  # noqa: BLE001
             print(f"[meta-fix] warn: {_e}", flush=True)
+        if os.environ.get("LTX_BLOCK_OFFLOAD") == "1":
+            try:
+                n = _apply_blockwise_offload(m, dev)
+                if n:
+                    print(f"[block-offload] {type(m).__name__}: {n} layer su CPU on-demand", flush=True)
+            except Exception as _e:  # noqa: BLE001
+                print(f"[block-offload] warn: {_e}", flush=True)
         return m
 
     _sgmb.SingleGPUModelBuilder.build = _patched_build
@@ -161,7 +246,8 @@ def run_generation(p: dict) -> str:
         print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "
               f"{torch.cuda.memory_reserved()/1e9:.1f}GB reserved", flush=True)
 
-    vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)), stg_scale=1.0,
+    vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)),
+                                stg_scale=float(p.get("stg", 1.0)),
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
     ag = MultiModalGuiderParams(cfg_scale=7.0, stg_scale=1.0, rescale_scale=0.7,
                                 modality_scale=3.0, stg_blocks=[29])
