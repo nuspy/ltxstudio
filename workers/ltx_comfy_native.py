@@ -32,14 +32,17 @@ for _folder, _path in (("diffusion_models", r"E:\AI\Models\diffusion_models"),
         pass
 
 
-def _unwrap(x):
-    """I nodi nuovi ritornano io.NodeOutput; i vecchi una tuple. Normalizza al primo valore."""
+def _vals(x):
+    """Tutti i valori di ritorno (tuple o io.NodeOutput)."""
     if isinstance(x, tuple):
-        return x[0]
+        return list(x)
     items = getattr(x, "result", None) or getattr(x, "items", None)
-    if items is not None:
-        return items[0]
-    return x
+    return list(items) if items is not None else [x]
+
+
+def _unwrap(x):
+    """Primo valore di ritorno (tuple o io.NodeOutput)."""
+    return _vals(x)[0]
 
 
 async def _init():
@@ -69,10 +72,21 @@ def run(p: dict) -> str:
     enc = nodes.CLIPTextEncode()
     pos = _unwrap(enc.encode(clip, p.get("prompt", "")))
     neg = _unwrap(enc.encode(clip, p.get("negative", "worst quality, blurry")))
-    latent = _unwrap(EmptyLTXVLatentVideo().execute(
-        int(p.get("width", 768)), int(p.get("height", 512)), int(p.get("num_frames", 97))))
+    W, H, F = int(p.get("width", 768)), int(p.get("height", 512)), int(p.get("num_frames", 97))
+    if p.get("image_path"):                              # i2v: condiziona sul primo frame
+        import numpy as np
+        from PIL import Image
+        from comfy_extras.nodes_lt import LTXVImgToVideo
+        im = Image.open(p["image_path"]).convert("RGB")
+        img_t = torch.from_numpy(np.asarray(im, dtype="float32") / 255.0)[None]   # [1,H,W,3]
+        v = _vals(LTXVImgToVideo().execute(pos, neg, img_t, vae, W, H, F, 1,
+                                           float(p.get("img_strength", 1.0))))
+        pos, neg, latent = v[0], v[1], v[2]
+    else:
+        latent = _unwrap(EmptyLTXVLatentVideo().execute(W, H, F))
     if not isinstance(latent, dict):
         latent = {"samples": getattr(latent, "samples", latent)}
+    print(f"[cond] ok, latent={tuple(latent['samples'].shape)}", flush=True)
 
     cfg = float(p.get("guidance", 1.0))
     if cfg <= 1.0:
