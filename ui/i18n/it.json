@@ -1359,5 +1359,12 @@
   "v2v.sing_note": "Usa la foto del Frame 1 come volto. Il movimento segue il ritmo; la sincronia fine dita-strumento resta approssimativa (limite dei modelli attuali).",
   "v2v.err_no_sing_audio": "Modalità Canta: seleziona una canzone (audio).",
   "mw.multitalk_need_audio_title": "Audio mancante",
-  "mw.multitalk_need_audio_msg": "La modalità lip-sync (MultiTalk) richiede un file audio reale: scegli una canzone in «Canta», o un file/voce nel tab Audio per «Talk»."
+  "mw.multitalk_need_audio_msg": "La modalità lip-sync (MultiTalk) richiede un file audio reale: scegli una canzone in «Canta», o un file/voce nel tab Audio per «Talk».",
+  "music.lyr_ai.prompt_ph": "Tema della canzone (es. amore d'estate, nostalgia…)",
+  "music.lyr_ai.lang.tt": "Lingua del testo della canzone",
+  "music.lyr_ai.btn": "✨ Genera testo con AI",
+  "music.lyr_ai.btn.tt": "Scrive il testo con l'AI dal tema e lo inserisce sopra (Gemma-3 locale)",
+  "music.lyr_ai.need_prompt": "Scrivi prima un tema per la canzone.",
+  "music.lyr_ai.working": "Generazione…",
+  "music.lyr_ai.error": "Generazione testo fallita:"
 }

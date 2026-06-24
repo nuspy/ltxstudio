@@ -1262,5 +1262,12 @@
   "v2v.sing_note": "A Frame 1 fotót használja arcként. A mozgás követi az ütemet; az ujj-hangszer finom szinkronja közelítő (a jelenlegi modellek korlátja).",
   "v2v.err_no_sing_audio": "Ének mód: válassz egy dalt (hang).",
   "mw.multitalk_need_audio_title": "Hiányzó hang",
-  "mw.multitalk_need_audio_msg": "A szájszinkron mód (MultiTalk) valódi hangfájlt igényel: válassz egy dalt az «Ének» alatt, vagy egy fájlt/hangot az Audió fülön a «Talk»-hoz."
+  "mw.multitalk_need_audio_msg": "A szájszinkron mód (MultiTalk) valódi hangfájlt igényel: válassz egy dalt az «Ének» alatt, vagy egy fájlt/hangot az Audió fülön a «Talk»-hoz.",
+  "music.lyr_ai.prompt_ph": "A dal témája (pl. nyári szerelem, nosztalgia…)",
+  "music.lyr_ai.lang.tt": "A dalszöveg nyelve",
+  "music.lyr_ai.btn": "✨ Szöveg generálása AI-val",
+  "music.lyr_ai.btn.tt": "AI-val megírja a szöveget a témából és beszúrja fent (helyi Gemma-3)",
+  "music.lyr_ai.need_prompt": "Először adj meg egy témát a dalhoz.",
+  "music.lyr_ai.working": "Generálás…",
+  "music.lyr_ai.error": "A szöveg generálása sikertelen:"
 }

@@ -1262,5 +1262,12 @@
   "v2v.sing_note": "משתמש בתמונת Frame 1 כפנים. התנועה עוקבת אחר הקצב; הסנכרון העדין בין אצבעות לכלי משוער (מגבלת המודלים הנוכחיים).",
   "v2v.err_no_sing_audio": "מצב שירה: בחר שיר (אודיו).",
   "mw.multitalk_need_audio_title": "חסר אודיו",
-  "mw.multitalk_need_audio_msg": "מצב סנכרון שפתיים (MultiTalk) דורש קובץ אודיו אמיתי: בחר שיר ב«שירה», או קובץ/קול בלשונית האודיו עבור «Talk»."
+  "mw.multitalk_need_audio_msg": "מצב סנכרון שפתיים (MultiTalk) דורש קובץ אודיו אמיתי: בחר שיר ב«שירה», או קובץ/קול בלשונית האודיו עבור «Talk».",
+  "music.lyr_ai.prompt_ph": "נושא השיר (למשל אהבת קיץ, נוסטלגיה…)",
+  "music.lyr_ai.lang.tt": "שפת מילות השיר",
+  "music.lyr_ai.btn": "✨ צור מילים עם AI",
+  "music.lyr_ai.btn.tt": "כותב את המילים עם AI מהנושא ומשבץ אותן למעלה (Gemma-3 מקומי)",
+  "music.lyr_ai.need_prompt": "כתוב תחילה נושא לשיר.",
+  "music.lyr_ai.working": "מייצר…",
+  "music.lyr_ai.error": "יצירת המילים נכשלה:"
 }

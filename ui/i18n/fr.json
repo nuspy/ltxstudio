@@ -1262,5 +1262,12 @@
   "v2v.sing_note": "Utilise la photo du Frame 1 comme visage. Le mouvement suit le rythme ; la synchro fine doigts-instrument reste approximative (limite des modèles actuels).",
   "v2v.err_no_sing_audio": "Mode Chanter : sélectionnez une chanson (audio).",
   "mw.multitalk_need_audio_title": "Audio manquant",
-  "mw.multitalk_need_audio_msg": "Le mode lip-sync (MultiTalk) nécessite un fichier audio réel : choisissez une chanson dans « Chanter », ou un fichier/voix dans l'onglet Audio pour « Talk »."
+  "mw.multitalk_need_audio_msg": "Le mode lip-sync (MultiTalk) nécessite un fichier audio réel : choisissez une chanson dans « Chanter », ou un fichier/voix dans l'onglet Audio pour « Talk ».",
+  "music.lyr_ai.prompt_ph": "Thème de la chanson (ex. amour d'été, nostalgie…)",
+  "music.lyr_ai.lang.tt": "Langue des paroles",
+  "music.lyr_ai.btn": "✨ Générer les paroles avec l'IA",
+  "music.lyr_ai.btn.tt": "Écrit les paroles avec l'IA à partir du thème et les insère ci-dessus (Gemma-3 local)",
+  "music.lyr_ai.need_prompt": "Écris d'abord un thème pour la chanson.",
+  "music.lyr_ai.working": "Génération…",
+  "music.lyr_ai.error": "Échec de la génération des paroles :"
 }

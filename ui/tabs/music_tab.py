@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, QProcess
+from PySide6.QtCore import QObject, Signal, QProcess, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QPushButton, QLineEdit, QCheckBox,
@@ -22,6 +22,31 @@ from PySide6.QtWidgets import (
 )
 
 from ui.i18n_manager import tr
+
+# lingue per la generazione del testo (codice → nome nativo), allineate all'i18n dell'app
+_LYRIC_LANGS = [
+    ("it", "Italiano"), ("en", "English"), ("es", "Español"), ("fr", "Français"),
+    ("de", "Deutsch"), ("pt", "Português"), ("ru", "Русский"), ("uk", "Українська"),
+    ("zh", "中文"), ("ko", "한국어"), ("ar", "العربية"), ("he", "עברית"),
+    ("hi", "हिन्दी"), ("el", "Ελληνικά"), ("hu", "Magyar"),
+]
+
+
+class _LyricsWorker(QThread):
+    """Genera le liriche con l'LLM locale (Gemma-3) fuori dal thread UI."""
+    done = Signal(str)
+    failed = Signal(str)
+
+    def __init__(self, prompt: str, language: str, tags: str):
+        super().__init__()
+        self._prompt, self._lang, self._tags = prompt, language, tags
+
+    def run(self):
+        try:
+            from core import lyrics_llm
+            self.done.emit(lyrics_llm.generate(self._prompt, self._lang, self._tags))
+        except Exception as e:                          # noqa: BLE001
+            self.failed.emit(str(e))
 from core import music_service as ms
 
 
@@ -74,6 +99,23 @@ class MusicTab(QWidget):
         self.song_lyrics.setPlaceholderText("[Verse]\n…\n[Chorus]\n…")
         self.song_lyrics.setFixedHeight(140)
         v.addWidget(self.song_lyrics)
+        # --- Genera il testo con l'AI (LLM locale Gemma-3) ---
+        ai = QHBoxLayout()
+        self.lyr_prompt = QLineEdit()
+        self.lyr_prompt.setPlaceholderText(
+            tr("music.lyr_ai.prompt_ph", "Tema della canzone (es. amore d'estate, nostalgia…)"))
+        self.lyr_lang = QComboBox()
+        for _code, _name in _LYRIC_LANGS:
+            self.lyr_lang.addItem(_name, _code)
+        self.lyr_lang.setToolTip(tr("music.lyr_ai.lang.tt", "Lingua del testo della canzone"))
+        self.btn_lyr_ai = QPushButton(tr("music.lyr_ai.btn", "✨ Genera testo con AI"))
+        self.btn_lyr_ai.setToolTip(tr("music.lyr_ai.btn.tt",
+            "Scrive il testo con l'AI dal tema e lo inserisce qui sopra (usa Gemma-3 locale)"))
+        self.btn_lyr_ai.clicked.connect(self._gen_lyrics_ai)
+        ai.addWidget(self.lyr_prompt, 1)
+        ai.addWidget(self.lyr_lang)
+        ai.addWidget(self.btn_lyr_ai)
+        v.addLayout(ai)
         g = QGridLayout()
         self.song_instr = QCheckBox(tr("music.instrumental", "Strumentale (senza voce)"))
         self.song_instr.toggled.connect(lambda on: self.song_lyrics.setDisabled(on))
@@ -97,6 +139,33 @@ class MusicTab(QWidget):
         h.addWidget(self.btn_song_install); h.addStretch(1); h.addWidget(self.btn_song)
         v.addLayout(h)
         return box
+
+    # ── Generazione testo canzone con AI (LLM locale Gemma-3) ──
+    def _gen_lyrics_ai(self):
+        prompt = self.lyr_prompt.text().strip()
+        if not prompt:
+            QMessageBox.information(self, tr("music.lyr_ai.btn", "Genera testo"),
+                                    tr("music.lyr_ai.need_prompt", "Scrivi prima un tema per la canzone."))
+            return
+        self.btn_lyr_ai.setEnabled(False)
+        self.btn_lyr_ai.setText(tr("music.lyr_ai.working", "Generazione…"))
+        self._lyr_worker = _LyricsWorker(prompt, self.lyr_lang.currentData(), self.song_tags.text().strip())
+        self._lyr_worker.done.connect(self._on_lyrics_done)
+        self._lyr_worker.failed.connect(self._on_lyrics_failed)
+        self._lyr_worker.start()
+
+    def _reset_lyr_btn(self):
+        self.btn_lyr_ai.setEnabled(True)
+        self.btn_lyr_ai.setText(tr("music.lyr_ai.btn", "✨ Genera testo con AI"))
+
+    def _on_lyrics_done(self, text: str):
+        self.song_lyrics.setPlainText(text)             # inserimento automatico nel campo liriche
+        self._reset_lyr_btn()
+
+    def _on_lyrics_failed(self, err: str):
+        self._reset_lyr_btn()
+        QMessageBox.warning(self, tr("music.lyr_ai.btn", "Genera testo"),
+                            tr("music.lyr_ai.error", "Generazione testo fallita:") + "\n" + err)
 
     # ── Sonorizza video (MMAudio) ──────────────────────────────────────────────
     def _sonify_box(self) -> QGroupBox:

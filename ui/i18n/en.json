@@ -1359,5 +1359,12 @@
   "v2v.sing_note": "Uses the Frame 1 photo as the face. Motion follows the beat; fine finger-instrument sync is approximate (current model limitation).",
   "v2v.err_no_sing_audio": "Sing mode: select a song (audio).",
   "mw.multitalk_need_audio_title": "Audio missing",
-  "mw.multitalk_need_audio_msg": "Lip-sync mode (MultiTalk) needs a real audio file: pick a song in 'Sing', or a file/voice in the Audio tab for 'Talk'."
+  "mw.multitalk_need_audio_msg": "Lip-sync mode (MultiTalk) needs a real audio file: pick a song in 'Sing', or a file/voice in the Audio tab for 'Talk'.",
+  "music.lyr_ai.prompt_ph": "Song theme (e.g. summer love, nostalgia…)",
+  "music.lyr_ai.lang.tt": "Language of the song lyrics",
+  "music.lyr_ai.btn": "✨ Generate lyrics with AI",
+  "music.lyr_ai.btn.tt": "Writes the lyrics with AI from the theme and inserts them above (local Gemma-3)",
+  "music.lyr_ai.need_prompt": "Write a song theme first.",
+  "music.lyr_ai.working": "Generating…",
+  "music.lyr_ai.error": "Lyrics generation failed:"
 }

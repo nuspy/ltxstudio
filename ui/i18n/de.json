@@ -1262,5 +1262,12 @@
   "v2v.sing_note": "Verwendet das Frame-1-Foto als Gesicht. Die Bewegung folgt dem Takt; die feine Finger-Instrument-Synchronisation ist nur ungefähr (Grenze aktueller Modelle).",
   "v2v.err_no_sing_audio": "Singen-Modus: Bitte ein Lied (Audio) auswählen.",
   "mw.multitalk_need_audio_title": "Audio fehlt",
-  "mw.multitalk_need_audio_msg": "Der Lippensynchron-Modus (MultiTalk) benötigt eine echte Audiodatei: Wähle ein Lied in „Singen“ oder eine Datei/Stimme im Audio-Tab für „Talk“."
+  "mw.multitalk_need_audio_msg": "Der Lippensynchron-Modus (MultiTalk) benötigt eine echte Audiodatei: Wähle ein Lied in „Singen“ oder eine Datei/Stimme im Audio-Tab für „Talk“.",
+  "music.lyr_ai.prompt_ph": "Thema des Lieds (z. B. Sommerliebe, Nostalgie…)",
+  "music.lyr_ai.lang.tt": "Sprache des Liedtexts",
+  "music.lyr_ai.btn": "✨ Text mit KI erzeugen",
+  "music.lyr_ai.btn.tt": "Schreibt den Text per KI aus dem Thema und fügt ihn oben ein (lokales Gemma-3)",
+  "music.lyr_ai.need_prompt": "Gib zuerst ein Thema für das Lied ein.",
+  "music.lyr_ai.working": "Wird erzeugt…",
+  "music.lyr_ai.error": "Texterzeugung fehlgeschlagen:"
 }

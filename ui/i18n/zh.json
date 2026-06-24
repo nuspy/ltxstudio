@@ -1262,5 +1262,12 @@
   "v2v.sing_note": "使用 Frame 1 的照片作为人脸。动作随节奏；手指与乐器的精细同步只是近似（当前模型的局限）。",
   "v2v.err_no_sing_audio": "唱歌模式：请选择一首歌曲（音频）。",
   "mw.multitalk_need_audio_title": "缺少音频",
-  "mw.multitalk_need_audio_msg": "口型同步模式（MultiTalk）需要真实音频文件：在「唱歌」中选择歌曲，或在音频选项卡中为「Talk」选择文件/语音。"
+  "mw.multitalk_need_audio_msg": "口型同步模式（MultiTalk）需要真实音频文件：在「唱歌」中选择歌曲，或在音频选项卡中为「Talk」选择文件/语音。",
+  "music.lyr_ai.prompt_ph": "歌曲主题（如夏日恋情、怀旧…）",
+  "music.lyr_ai.lang.tt": "歌词语言",
+  "music.lyr_ai.btn": "✨ 用 AI 生成歌词",
+  "music.lyr_ai.btn.tt": "根据主题用 AI 写歌词并插入上方（本地 Gemma-3）",
+  "music.lyr_ai.need_prompt": "请先填写歌曲主题。",
+  "music.lyr_ai.working": "生成中…",
+  "music.lyr_ai.error": "歌词生成失败："
 }
