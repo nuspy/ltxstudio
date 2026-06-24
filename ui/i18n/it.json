@@ -1371,5 +1371,9 @@
   "vid.faceswap.auto.tt": "Dopo la generazione sostituisce il volto in ogni frame con quello della foto (InsightFace).",
   "vid.faceswap.face.ph": "Foto del volto da imporre…",
   "vid.faceswap.face.btn": "Scegli volto…",
-  "vid.faceswap.face_lbl": "Volto sorgente"
+  "vid.faceswap.face_lbl": "Volto sorgente",
+  "vid.rife.auto": "Fluidifica (RIFE): meno scatti, più fps",
+  "vid.rife.auto.tt": "A fine generazione interpola frame intermedi (anti-scatto); raddoppia/quadruplica gli fps.",
+  "vid.rife.factor.tt": "x2 raddoppia gli fps, x4 li quadruplica",
+  "vid.rife.factor_lbl": "Interpolazione"
 }

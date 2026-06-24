@@ -172,6 +172,28 @@ class _FaceSwapWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _RifeWorker(QThread):
+    """Fluidificazione RIFE post-process (anti-judder / +fps) fuori dal thread UI."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, video: str, out: str, factor: int = 2):
+        super().__init__()
+        self.video, self.out, self.factor = video, out, factor
+
+    def run(self):
+        try:
+            from core import rife
+            if not rife.available():
+                self.done.emit({"status": "error", "error": "Practical-RIFE non trovato."})
+                return
+            out = rife.interpolate_video(self.video, self.out, factor=self.factor,
+                                         progress=lambda i, n: self.progress.emit(f"frame {i}/{n}"))
+            self.done.emit({"status": "success", "output": [out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1750,7 +1772,7 @@ class MainWindow(QMainWindow):
             self._fs_worker.done.connect(self._on_faceswap_done)
             self._fs_worker.start()
             return
-        self._announce_video(out)
+        self._maybe_rife(out)
 
     def _on_faceswap_done(self, res: dict):
         if res.get("status") != "success":
@@ -1760,6 +1782,30 @@ class MainWindow(QMainWindow):
         out = (res.get("output") or [None])[0]
         self._last_video_path = out
         self._log(f"[Face-swap] video finale: {out}")
+        self._maybe_rife(out)
+
+    def _maybe_rife(self, out):
+        """Post-process RIFE (fluidifica) se attivo, altrimenti annuncia il video."""
+        rf = self.video_tab.get_rife_auto() if hasattr(self.video_tab, "get_rife_auto") else None
+        if rf and out:
+            from pathlib import Path as _P
+            fluid = str(_P(out).with_name(_P(out).stem + f"_rife{rf['factor']}x.mp4"))
+            self._log(f"[RIFE] fluidifico il video (x{rf['factor']})…")
+            self._rife_worker = _RifeWorker(out, fluid, int(rf["factor"]))
+            self._rife_worker.progress.connect(lambda s: self._log("[RIFE] " + s))
+            self._rife_worker.done.connect(self._on_rife_done)
+            self._rife_worker.start()
+            return
+        self._announce_video(out)
+
+    def _on_rife_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[RIFE] errore: {res.get('error','')[:300]}")
+            self._announce_video(self._last_video_path)   # annuncia comunque il video pre-RIFE
+            return
+        out = (res.get("output") or [None])[0]
+        self._last_video_path = out
+        self._log(f"[RIFE] video fluidificato: {out}")
         self._announce_video(out)
 
     def _announce_video(self, out):

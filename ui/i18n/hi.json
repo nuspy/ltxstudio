@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "जनरेशन के बाद हर फ़्रेम के चेहरे को फ़ोटो वाले चेहरे से बदल देता है (InsightFace)।",
   "vid.faceswap.face.ph": "लगाने हेतु चेहरे की फ़ोटो…",
   "vid.faceswap.face.btn": "चेहरा चुनें…",
-  "vid.faceswap.face_lbl": "स्रोत चेहरा"
+  "vid.faceswap.face_lbl": "स्रोत चेहरा",
+  "vid.rife.auto": "स्मूद (RIFE): कम झटके, ज़्यादा fps",
+  "vid.rife.auto.tt": "जनरेशन के बाद बीच के फ़्रेम जोड़ता है (एंटी-जडर); fps दोगुना/चौगुना करता है।",
+  "vid.rife.factor.tt": "x2 fps दोगुना, x4 चौगुना",
+  "vid.rife.factor_lbl": "इंटरपोलेशन"
 }

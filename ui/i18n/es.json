@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "Tras la generación, reemplaza el rostro en cada fotograma con el de la foto (InsightFace).",
   "vid.faceswap.face.ph": "Foto del rostro a imponer…",
   "vid.faceswap.face.btn": "Elegir rostro…",
-  "vid.faceswap.face_lbl": "Rostro de origen"
+  "vid.faceswap.face_lbl": "Rostro de origen",
+  "vid.rife.auto": "Suavizar (RIFE): menos saltos, más fps",
+  "vid.rife.auto.tt": "Tras la generación interpola fotogramas intermedios (anti-saltos); duplica/cuadruplica los fps.",
+  "vid.rife.factor.tt": "x2 duplica los fps, x4 los cuadruplica",
+  "vid.rife.factor_lbl": "Interpolación"
 }

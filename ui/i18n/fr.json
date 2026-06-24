@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "Après la génération, remplace le visage dans chaque image par celui de la photo (InsightFace).",
   "vid.faceswap.face.ph": "Photo du visage à imposer…",
   "vid.faceswap.face.btn": "Choisir un visage…",
-  "vid.faceswap.face_lbl": "Visage source"
+  "vid.faceswap.face_lbl": "Visage source",
+  "vid.rife.auto": "Fluidifier (RIFE) : moins de saccades, plus de fps",
+  "vid.rife.auto.tt": "Après la génération, interpole des images intermédiaires (anti-saccade) ; double/quadruple les fps.",
+  "vid.rife.factor.tt": "x2 double les fps, x4 les quadruple",
+  "vid.rife.factor_lbl": "Interpolation"
 }

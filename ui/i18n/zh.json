@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "生成后用照片中的人脸替换每一帧中的脸（InsightFace）。",
   "vid.faceswap.face.ph": "要替换成的人脸照片…",
   "vid.faceswap.face.btn": "选择人脸…",
-  "vid.faceswap.face_lbl": "源人脸"
+  "vid.faceswap.face_lbl": "源人脸",
+  "vid.rife.auto": "平滑（RIFE）：减少卡顿，提高帧率",
+  "vid.rife.auto.tt": "生成后插入中间帧（防卡顿）；将帧率加倍/翻四倍。",
+  "vid.rife.factor.tt": "x2 帧率加倍，x4 翻四倍",
+  "vid.rife.factor_lbl": "插帧"
 }

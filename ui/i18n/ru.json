@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "После генерации заменяет лицо в каждом кадре на лицо с фото (InsightFace).",
   "vid.faceswap.face.ph": "Фото лица для подстановки…",
   "vid.faceswap.face.btn": "Выбрать лицо…",
-  "vid.faceswap.face_lbl": "Исходное лицо"
+  "vid.faceswap.face_lbl": "Исходное лицо",
+  "vid.rife.auto": "Сглаживание (RIFE): меньше рывков, больше fps",
+  "vid.rife.auto.tt": "После генерации интерполирует промежуточные кадры (антирывки); удваивает/учетверяет fps.",
+  "vid.rife.factor.tt": "x2 удваивает fps, x4 учетверяет",
+  "vid.rife.factor_lbl": "Интерполяция"
 }

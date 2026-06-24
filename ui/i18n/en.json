@@ -1371,5 +1371,9 @@
   "vid.faceswap.auto.tt": "After generation, replaces the face in every frame with the one from the photo (InsightFace).",
   "vid.faceswap.face.ph": "Photo of the face to impose…",
   "vid.faceswap.face.btn": "Choose face…",
-  "vid.faceswap.face_lbl": "Source face"
+  "vid.faceswap.face_lbl": "Source face",
+  "vid.rife.auto": "Smooth (RIFE): less judder, more fps",
+  "vid.rife.auto.tt": "After generation, interpolates in-between frames (anti-judder); doubles/quadruples the fps.",
+  "vid.rife.factor.tt": "x2 doubles the fps, x4 quadruples them",
+  "vid.rife.factor_lbl": "Interpolation"
 }

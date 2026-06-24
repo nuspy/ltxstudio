@@ -233,6 +233,19 @@ class VideoTab(QWidget):
         def _toggle_fs(on):
             self.fs_face.setEnabled(on); self.fs_face_btn.setEnabled(on)
         self.fs_auto.toggled.connect(_toggle_fs); _toggle_fs(False)
+
+        # --- Fluidifica (RIFE): interpola frame → meno scatti, più fps ---
+        self.rife_auto = QCheckBox(tr("vid.rife.auto", "Fluidifica (RIFE): meno scatti, più fps"))
+        self.rife_auto.setToolTip(tr("vid.rife.auto.tt",
+            "A fine generazione interpola frame intermedi (anti-judder); raddoppia/quadruplica gli fps."))
+        frf.addRow(self.rife_auto)
+        self.rife_factor = QComboBox(); self.rife_factor.addItems(["x2", "x4"])
+        self.rife_factor.setToolTip(tr("vid.rife.factor.tt", "x2 raddoppia gli fps, x4 li quadruplica"))
+        frf.addRow(tr("vid.rife.factor_lbl", "Interpolazione"), self.rife_factor)
+
+        def _toggle_rife(on):
+            self.rife_factor.setEnabled(on)
+        self.rife_auto.toggled.connect(_toggle_rife); _toggle_rife(False)
         root.addWidget(frbox)
 
         # --- Sampler / Seed (spostati da Avanzate) ---
@@ -637,6 +650,12 @@ class VideoTab(QWidget):
             tr("common.file_image_filter", "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)"))
         if fn:
             self.fs_face.setText(fn)
+
+    def get_rife_auto(self) -> dict | None:
+        """Config dell'interpolazione RIFE post-generazione, o None se disattiva."""
+        if not self.rife_auto.isChecked():
+            return None
+        return {"factor": int(self.rife_factor.currentText().lstrip("x"))}
 
     def get_sampler_values(self) -> dict:
         return self.sampler_seed.get_values()

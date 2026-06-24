@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "بعد التوليد يستبدل الوجه في كل إطار بوجه الصورة (InsightFace).",
   "vid.faceswap.face.ph": "صورة الوجه المراد فرضه…",
   "vid.faceswap.face.btn": "اختر وجهًا…",
-  "vid.faceswap.face_lbl": "الوجه المصدر"
+  "vid.faceswap.face_lbl": "الوجه المصدر",
+  "vid.rife.auto": "تنعيم (RIFE): اهتزاز أقل، إطارات أكثر",
+  "vid.rife.auto.tt": "بعد التوليد يُدرج إطارات وسيطة (ضد التقطيع)؛ يضاعف/يربّع عدد الإطارات.",
+  "vid.rife.factor.tt": "x2 يضاعف الإطارات، x4 يربّعها",
+  "vid.rife.factor_lbl": "الاستيفاء"
 }

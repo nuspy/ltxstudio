@@ -1274,5 +1274,9 @@
   "vid.faceswap.auto.tt": "생성 후 모든 프레임의 얼굴을 사진의 얼굴로 교체합니다 (InsightFace).",
   "vid.faceswap.face.ph": "적용할 얼굴 사진…",
   "vid.faceswap.face.btn": "얼굴 선택…",
-  "vid.faceswap.face_lbl": "원본 얼굴"
+  "vid.faceswap.face_lbl": "원본 얼굴",
+  "vid.rife.auto": "부드럽게 (RIFE): 끊김 감소, fps 증가",
+  "vid.rife.auto.tt": "생성 후 중간 프레임을 보간합니다(끊김 방지); fps를 2배/4배로.",
+  "vid.rife.factor.tt": "x2는 fps 2배, x4는 4배",
+  "vid.rife.factor_lbl": "보간"
 }
