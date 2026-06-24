@@ -78,9 +78,19 @@ def _apply_blockwise_offload(model, device):
             if isinstance(tb, torch.nn.ModuleList) and len(tb) > best_n:
                 best, best_n, holder = tb, len(tb), mod
     if best is None or best_n < 8:
+        model.to(device)                                # modello piccolo (VAE/...): tutto su GPU
         return 0
-    model.to(device)                                    # parti non-layer (embed/norm/proj) su GPU
+    # Modello grande (transformer 27GB / Gemma 22GB): NON spostare tutto su GPU (OOM). Solo le
+    # parti NON-layer (embed/patchify/timestep/norm/proj, ~1GB) su GPU; i layer restano su CPU
+    # e vanno su GPU 1 alla volta via wrapping di .forward.
     blocks = list(best)
+    _layer_ids = {id(t) for blk in blocks for t in list(blk.parameters()) + list(blk.buffers())}
+    for p in model.parameters():
+        if id(p) not in _layer_ids:
+            p.data = p.data.to(device)
+    for b in model.buffers():
+        if id(b) not in _layer_ids:
+            b.data = b.data.to(device)
     # Wrappiamo direttamente .forward di ogni layer (NON forward_hook: transformers chiama i
     # decoder layer via .forward() diretto / GradientCheckpointingLayer, bypassando gli hook).
     # Il layer va su GPU per il suo forward e torna su CPU subito dopo → 1 layer alla volta su GPU.
@@ -94,6 +104,7 @@ def _apply_blockwise_offload(model, device):
                     return orig(*a, **k)
                 finally:
                     b.to("cpu")
+                    torch.cuda.empty_cache()           # libera subito i pesi del layer (no accumulo)
             return _fwd
 
         blk.forward = _make_fwd(blk, blk.forward)
@@ -123,13 +134,17 @@ def _patch_block_offload():
         _orig_bt = _blk.DiffusionStage._build_transformer
 
         def _patched_bt(self, **kwargs):
-            print(f"[bt] _build_transformer chiamato, VRAM={torch.cuda.memory_allocated()/1e9:.1f}GB", flush=True)
-            x0 = _orig_bt(self, **kwargs)
+            # _build_transformer fa `X0Model(build).to(target)`: il `.to(target)` rimette i 27GB su
+            # GPU. Lo neutralizziamo (no-op) SOLO qui; l'offload (parti non-layer su GPU via
+            # Tensor.to, layer su CPU) è già applicato dentro build() via _patched_build. Tensor.to
+            # NON è intaccato (patchiamo solo Module.to), quindi le parti non-layer restano su GPU.
+            _real_to = torch.nn.Module.to
+            torch.nn.Module.to = lambda s, *a, **k: s
             try:
-                n = _apply_blockwise_offload(x0, torch.device("cuda"))
-                print(f"[block-offload] transformer: {n} blocchi su CPU on-demand", flush=True)
-            except Exception as _e:  # noqa: BLE001
-                print(f"[block-offload] warn: {_e}", flush=True)
+                x0 = _orig_bt(self, **kwargs)
+            finally:
+                torch.nn.Module.to = _real_to
+            print(f"[bt] transformer pronto (offload attivo), VRAM={torch.cuda.memory_allocated()/1e9:.1f}GB", flush=True)
             return x0
 
         _blk.DiffusionStage._build_transformer = _patched_bt
@@ -141,6 +156,67 @@ def _patch_block_offload():
 _patch_block_offload()
 
 
+def _patch_fe_diag():
+    """DIAGNOSTICO: logga la shape degli hidden-states concatenati nel feature_extractor."""
+    if os.environ.get("LTX_FE_DIAG") != "1":
+        return
+    try:
+        import ltx_core.text_encoders.gemma.feature_extractor as _fe
+        _orig = _fe.norm_and_concat_per_token_rms
+
+        def _logged(encoded, mask, *a, **k):
+            print(f"[fe-diag] encoded.shape={tuple(encoded.shape)} dtype={encoded.dtype} "
+                  f"GB={encoded.numel()*encoded.element_size()/1e9:.1f}", flush=True)
+            return _orig(encoded, mask, *a, **k)
+
+        _fe.norm_and_concat_per_token_rms = _logged
+    except Exception as _e:  # noqa: BLE001
+        print(f"[fe-diag] patch fallito: {_e}", flush=True)
+
+
+_patch_fe_diag()
+
+
+def _patch_cpu_prompt_encoder():
+    """FIX VRAM: esegue l'encode del Gemma (12B, 22GB) su CPU (0 VRAM pesi; gli hidden-states sono
+    solo ~0.4GB). Poi sposta gli hidden-states su GPU per l'embeddings_processor. Così durante il
+    denoising la GPU ha solo il transformer. Encode su CPU ~30-60s ma sblocca i 32GB."""
+    if os.environ.get("LTX_CPU_ENCODE") != "1":
+        return
+    try:
+        import gc
+        import torch
+        import ltx_pipelines.utils.blocks as _blk
+
+        def _cpu_call(self, prompts, *, enhance_first_prompt=False,
+                      enhance_prompt_image=None, enhance_prompt_seed=42):
+            te = self._text_encoder_builder.build(device=torch.device("cpu"), dtype=self._dtype).eval()
+            raw = te.encode(list(prompts))
+            del te
+            gc.collect()
+            torch.cuda.empty_cache()
+
+            def _to_gpu(x):
+                if torch.is_tensor(x):
+                    return x.to("cuda")
+                if isinstance(x, (list, tuple)):
+                    return type(x)(_to_gpu(e) for e in x)
+                return x
+
+            raw_gpu = [(_to_gpu(hs), _to_gpu(mask)) for hs, mask in raw]
+            with _blk.gpu_model(self._build_embeddings_processor()) as ep:
+                result = [ep.process_hidden_states(hs, mask) for hs, mask in raw_gpu]
+            return result
+
+        _blk.PromptEncoder.__call__ = _cpu_call
+        print("[cpu-encode] PromptEncoder patchato: Gemma encode su CPU", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        print(f"[cpu-encode] patch fallito: {_e}", flush=True)
+
+
+_patch_cpu_prompt_encoder()
+
+
 try:
     import ltx_core.loader.single_gpu_model_builder as _sgmb
     _orig_build = _sgmb.SingleGPUModelBuilder.build
@@ -148,7 +224,9 @@ try:
     def _patched_build(self, device=None, dtype=None, **kw):
         import torch
         dev = torch.device("cuda") if device is None else device
-        m = _orig_build(self, device=device, dtype=dtype, **kw)
+        _offl = os.environ.get("LTX_BLOCK_OFFLOAD") == "1"
+        load_dev = torch.device("cpu") if _offl else dev
+        m = _orig_build(self, device=load_dev, dtype=dtype, **kw)
         metas = [n for n, b in m.named_buffers() if getattr(b, "is_meta", False)]
         metap = [n for n, p in m.named_parameters() if getattr(p, "is_meta", False)]
         print(f"[meta-fix] build {type(m).__name__}: {len(metas)} buffer meta, {len(metap)} param meta", flush=True)
@@ -156,7 +234,7 @@ try:
         print("[meta-fix] ATTESI(text):", [n for n in metap if 'language_model' in n][:5], flush=True)
         print("[meta-fix] ATTESI(altro):", [n for n in metap if 'vision' not in n and 'language_model' not in n][:6], flush=True)
         try:
-            _materialize_meta(m, dev)
+            _materialize_meta(m, load_dev)
             left = [n for n, b in m.named_buffers() if getattr(b, "is_meta", False)]
             print(f"[meta-fix] dopo fix: {len(left)} buffer meta rimasti {left[:3]}", flush=True)
         except Exception as _e:  # noqa: BLE001
@@ -226,10 +304,11 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
-    # Niente sysmem-fallback Windows (che gonfia a 80-90GB mascherando l'OOM reale):
-    # limita PyTorch alla VRAM fisica → numeri veri + OOM pulito, come fa ComfyUI.
-    if torch.cuda.is_available():
-        torch.cuda.set_per_process_memory_fraction(0.98)
+    # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
+    # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
+    # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)
+    if torch.cuda.is_available() and os.environ.get("LTX_VRAM_FRACTION"):
+        torch.cuda.set_per_process_memory_fraction(float(os.environ["LTX_VRAM_FRACTION"]))
     loras = []
     for lo in p.get("loras", []):
         path = lo["name"]
