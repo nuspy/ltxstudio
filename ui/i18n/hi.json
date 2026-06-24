@@ -1241,5 +1241,13 @@
   "f1.compose.prompt.ph": "अंतिम रचना का वर्णन करें (जैसे «फ़ोटो 1 के विषय को फ़ोटो 2 के परिदृश्य में रखें, वही रोशनी»)",
   "f1.compose.btn": "🧩 जोड़ें",
   "mw.compose_need_two_msg": "जोड़ने के लिए कम से कम 2 फ़ोटो चाहिए।",
-  "mw.compose_label": "रचना ({n} फ़ोटो · {method})"
+  "mw.compose_label": "रचना ({n} फ़ोटो · {method})",
+  "f1.pulid.group": "चेहरा अडैप्टर (PuLID)",
+  "f1.pulid.enable": "PuLID सक्षम करें (फ़ोटो से चेहरा)",
+  "f1.pulid.face_lbl": "चेहरे की फ़ोटो",
+  "f1.pulid.face.btn": "ब्राउज़…",
+  "f1.pulid.face.ph": "चेहरे की छवि का पथ…",
+  "f1.pulid.strength_lbl": "ताकत",
+  "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
 }

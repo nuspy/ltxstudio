@@ -1241,5 +1241,13 @@
   "f1.compose.prompt.ph": "Опишіть фінальну композицію (наприклад, «помістіть об'єкт з фото 1 у пейзаж з фото 2, те саме освітлення»)",
   "f1.compose.btn": "🧩 Поєднати",
   "mw.compose_need_two_msg": "Для поєднання потрібно щонайменше 2 фото.",
-  "mw.compose_label": "Композиція ({n} фото · {method})"
+  "mw.compose_label": "Композиція ({n} фото · {method})",
+  "f1.pulid.group": "Адаптер обличчя (PuLID)",
+  "f1.pulid.enable": "Увімкнути PuLID (обличчя з фото)",
+  "f1.pulid.face_lbl": "Фото обличчя",
+  "f1.pulid.face.btn": "Огляд…",
+  "f1.pulid.face.ph": "Шлях до зображення обличчя…",
+  "f1.pulid.strength_lbl": "Сила",
+  "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
 }

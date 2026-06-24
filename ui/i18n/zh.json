@@ -1241,5 +1241,13 @@
   "f1.compose.prompt.ph": "描述最终合成（例如「将照片1的主体放入照片2的风景中，相同的光线」）",
   "f1.compose.btn": "🧩 合成",
   "mw.compose_need_two_msg": "合成至少需要2张照片。",
-  "mw.compose_label": "合成（{n} 张照片 · {method}）"
+  "mw.compose_label": "合成（{n} 张照片 · {method}）",
+  "f1.pulid.group": "面部适配器 (PuLID)",
+  "f1.pulid.enable": "启用 PuLID（照片人脸）",
+  "f1.pulid.face_lbl": "人脸照片",
+  "f1.pulid.face.btn": "浏览…",
+  "f1.pulid.face.ph": "人脸图像路径…",
+  "f1.pulid.strength_lbl": "强度",
+  "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
 }

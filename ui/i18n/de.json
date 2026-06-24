@@ -1241,5 +1241,13 @@
   "f1.compose.prompt.ph": "Beschreibe die finale Komposition (z. B. «setze das Motiv aus Foto 1 in die Landschaft von Foto 2, gleiches Licht»)",
   "f1.compose.btn": "🧩 Zusammenfügen",
   "mw.compose_need_two_msg": "Du brauchst mindestens 2 Fotos zum Zusammenfügen.",
-  "mw.compose_label": "Komposition ({n} Fotos · {method})"
+  "mw.compose_label": "Komposition ({n} Fotos · {method})",
+  "f1.pulid.group": "Gesichts-Adapter (PuLID)",
+  "f1.pulid.enable": "PuLID aktivieren (Gesicht aus Foto)",
+  "f1.pulid.face_lbl": "Gesichtsfoto",
+  "f1.pulid.face.btn": "Durchsuchen…",
+  "f1.pulid.face.ph": "Pfad zum Gesichtsbild…",
+  "f1.pulid.strength_lbl": "Stärke",
+  "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
 }

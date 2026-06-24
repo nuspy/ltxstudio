@@ -221,9 +221,36 @@ class Frame1Tab(QWidget):
         self.gen_warn_lbl.setStyleSheet("color:#e67e22; font-size:11px;")
         self.gen_warn_lbl.setVisible(False)
         f.addRow(self.gen_warn_lbl)
+        # --- Face adapter PuLID: imprime l'identità di un volto da una foto (solo FLUX) ---
+        pulid_group = QGroupBox(tr("f1.pulid.group"))
+        pf = QFormLayout(pulid_group)
+        self.gen_pulid_enable = QCheckBox(tr("f1.pulid.enable"))
+        self.gen_pulid_enable.setToolTip(tr("f1.pulid.enable.tt"))
+        pf.addRow(self.gen_pulid_enable)
+        prow = QHBoxLayout()
+        self.gen_pulid_face = QLineEdit(); self.gen_pulid_face.setPlaceholderText(tr("f1.pulid.face.ph"))
+        self.gen_pulid_face_btn = QPushButton(tr("f1.pulid.face.btn"))
+        self.gen_pulid_face_btn.clicked.connect(self._pick_pulid_face)
+        prow.addWidget(self.gen_pulid_face, 1); prow.addWidget(self.gen_pulid_face_btn)
+        pf.addRow(tr("f1.pulid.face_lbl"), self._wrapw(prow))
+        self.gen_pulid_strength = QDoubleSpinBox()
+        self.gen_pulid_strength.setRange(0.0, 1.0); self.gen_pulid_strength.setSingleStep(0.05)
+        self.gen_pulid_strength.setValue(0.8)
+        self.gen_pulid_strength.setToolTip(tr("f1.pulid.strength.tt"))
+        pf.addRow(tr("f1.pulid.strength_lbl"), self.gen_pulid_strength)
+        f.addRow(pulid_group)
         # Default coerenti con l'architettura iniziale
         self._apply_arch_defaults(self.gen_arch.currentText())
         return box
+
+    def _pick_pulid_face(self):
+        """Selettore della foto del volto per PuLID."""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("f1.pulid.face.btn"), "",
+            "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
+        if path:
+            self.gen_pulid_face.setText(path)
 
     # Default per architettura (sampler/scheduler/steps/cfg/clip_type) — applicati a ogni
     # cambio di architettura. Allineati ai workflow ufficiali Comfy-Org.

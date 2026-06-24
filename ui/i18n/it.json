@@ -1338,5 +1338,13 @@
   "f1.compose.prompt.ph": "Descrivi la composizione finale (es. «metti il soggetto della foto 1 nel paesaggio della foto 2, stessa luce»)",
   "f1.compose.btn": "🧩 Componi",
   "mw.compose_need_two_msg": "Servono almeno 2 foto per comporre.",
-  "mw.compose_label": "Composizione ({n} foto · {method})"
+  "mw.compose_label": "Composizione ({n} foto · {method})",
+  "f1.pulid.group": "Adattatore volto (PuLID)",
+  "f1.pulid.enable": "Abilita PuLID (volto da foto)",
+  "f1.pulid.face_lbl": "Foto volto",
+  "f1.pulid.face.btn": "Sfoglia…",
+  "f1.pulid.face.ph": "Percorso immagine del volto…",
+  "f1.pulid.strength_lbl": "Forza",
+  "f1.pulid.enable.tt": "Imprime l'identità del volto nella foto sull'immagine generata (solo FLUX).",
+  "f1.pulid.strength.tt": "Quanto viene applicata l'identità del volto (0.6–0.9 consigliato)."
 }

@@ -1241,5 +1241,13 @@
   "f1.compose.prompt.ph": "Írd le a végső kompozíciót (pl. «tedd az 1. fotó alanyát a 2. fotó tájába, ugyanazzal a fénnyel»)",
   "f1.compose.btn": "🧩 Összeállítás",
   "mw.compose_need_two_msg": "Legalább 2 fotó kell az összeállításhoz.",
-  "mw.compose_label": "Kompozíció ({n} fotó · {method})"
+  "mw.compose_label": "Kompozíció ({n} fotó · {method})",
+  "f1.pulid.group": "Arc-adapter (PuLID)",
+  "f1.pulid.enable": "PuLID engedélyezése (arc fotóról)",
+  "f1.pulid.face_lbl": "Arckép",
+  "f1.pulid.face.btn": "Tallózás…",
+  "f1.pulid.face.ph": "Arckép elérési útja…",
+  "f1.pulid.strength_lbl": "Erősség",
+  "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
 }

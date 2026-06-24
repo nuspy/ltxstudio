@@ -1338,5 +1338,13 @@
   "f1.compose.prompt.ph": "Describe the final composition (e.g. 'put the subject from photo 1 into the landscape of photo 2, same lighting')",
   "f1.compose.btn": "🧩 Compose",
   "mw.compose_need_two_msg": "You need at least 2 photos to compose.",
-  "mw.compose_label": "Composition ({n} photos · {method})"
+  "mw.compose_label": "Composition ({n} photos · {method})",
+  "f1.pulid.group": "Face adapter (PuLID)",
+  "f1.pulid.enable": "Enable PuLID (face from photo)",
+  "f1.pulid.face_lbl": "Face photo",
+  "f1.pulid.face.btn": "Browse…",
+  "f1.pulid.face.ph": "Path to face image…",
+  "f1.pulid.strength_lbl": "Strength",
+  "f1.pulid.enable.tt": "Inject the identity of the face in the photo into the generated image (FLUX only).",
+  "f1.pulid.strength.tt": "How strongly the face identity is applied (0.6–0.9 recommended)."
 }
