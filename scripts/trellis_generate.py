@@ -1,0 +1,52 @@
+"""Generazione 3D headless con TRELLIS (microsoft/TRELLIS) — eseguito nel venv E:\\AI\\Tools\\TRELLIS2.
+
+immagine → mesh GLB (con texture PBR). Nessun ComfyUI: usa direttamente l'API ufficiale TRELLIS.
+Chiamato da core/trellis_service.py via subprocess. Stampa `OK:<glb>` a fine.
+
+API ufficiale (github.com/microsoft/TRELLIS):
+  TrellisImageTo3DPipeline.from_pretrained("microsoft/TRELLIS-image-large").run(image)
+  postprocessing_utils.to_glb(gaussian, mesh) -> trimesh -> .export(glb)
+"""
+import argparse
+import os
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--image", required=True)
+    ap.add_argument("--output_dir", required=True)
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--ss_steps", type=int, default=12)
+    ap.add_argument("--slat_steps", type=int, default=12)
+    ap.add_argument("--simplify", type=float, default=0.95)
+    ap.add_argument("--texture_size", type=int, default=1024)
+    a = ap.parse_args()
+
+    # backend attention/sparse-conv (TRELLIS): flash-attn + spconv se disponibili
+    os.environ.setdefault("ATTN_BACKEND", "flash-attn")
+    os.environ.setdefault("SPCONV_ALGO", "native")
+
+    from PIL import Image
+    from trellis.pipelines import TrellisImageTo3DPipeline
+    from trellis.utils import postprocessing_utils
+
+    pipe = TrellisImageTo3DPipeline.from_pretrained("microsoft/TRELLIS-image-large")
+    pipe.cuda()
+
+    image = Image.open(a.image).convert("RGB")
+    outputs = pipe.run(
+        image,
+        seed=a.seed,
+        sparse_structure_sampler_params={"steps": a.ss_steps, "cfg_strength": 7.5},
+        slat_sampler_params={"steps": a.slat_steps, "cfg_strength": 3.0},
+    )
+    glb = postprocessing_utils.to_glb(
+        outputs["gaussian"][0], outputs["mesh"][0],
+        simplify=a.simplify, texture_size=a.texture_size)
+    out = os.path.join(a.output_dir, "model.glb")
+    glb.export(out)
+    print("OK:" + out, flush=True)
+
+
+if __name__ == "__main__":
+    main()
