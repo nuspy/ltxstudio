@@ -32,6 +32,8 @@ VRAM_MB = {"flux": 16000, "flux2": 24000, "zimage": 12000, "ernie": 16000,
 # Text encoder convertiti (pesi locali + config/tokenizer) e VAE locale, per i file solo-transformer
 TE_DIR = r"E:\AI\Models\diffusers\_te"
 AE_FLUX = r"E:\AI\Models\VAE\Flux\ae.safetensors"
+FLUX2_DIR = r"E:\AI\Models\diffusers\flux2"          # TE Mistral HF + tokenizer + config (gated, scaricati)
+FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
 
 
 def _place(pipe, vram_mb: int) -> str:
@@ -139,6 +141,26 @@ def _assemble_zimage(transformer_path: str):
     return ZImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
+def _assemble_flux2(Pipe, transformer_path: str):
+    """Assembla una pipeline FLUX.2 (t2i/inpaint/kontext) da: transformer LOCALE (single_file) +
+    VAE FLUX.2 LOCALE + TE Mistral HF + tokenizer (scaricati gated, solo questi). Pipe è la
+    classe diffusers concreta (Flux2Pipeline, Flux2KleinInpaintPipeline, …)."""
+    import os
+    import torch
+    from diffusers import Flux2Transformer2DModel, AutoencoderKLFlux2, FlowMatchEulerDiscreteScheduler
+    from transformers import AutoModel, AutoTokenizer
+    bf16 = torch.bfloat16
+    tr = Flux2Transformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+    vae = AutoencoderKLFlux2.from_single_file(FLUX2_VAE, config=os.path.join(FLUX2_DIR, "vae"), torch_dtype=bf16)
+    te = AutoModel.from_pretrained(os.path.join(FLUX2_DIR, "text_encoder"), torch_dtype=bf16)
+    tok = AutoTokenizer.from_pretrained(os.path.join(FLUX2_DIR, "tokenizer"))
+    try:
+        sched = FlowMatchEulerDiscreteScheduler.from_pretrained(os.path.join(FLUX2_DIR, "scheduler"))
+    except Exception:                                   # noqa: BLE001
+        sched = FlowMatchEulerDiscreteScheduler()
+    return Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
+
+
 def _arch_of(params: dict) -> str:
     a = (params.get("task") or params.get("arch") or "flux").lower()
     if a == "flux" and "flux2" in str(params.get("model", "")).lower():
@@ -150,14 +172,23 @@ def _load(model_path: str, arch: str):
     """Loader per il ModelManager: ritorna (pipe, vram_mb)."""
     import torch
     import diffusers
+    # AUTO-DEQUANT: se è un checkpoint quantizzato ComfyUI (comfy_quant), convertilo in bf16 (cache).
+    try:
+        from core.dequant_comfy import ensure_dequantized
+        model_path = ensure_dequantized(model_path)
+    except Exception:                                       # noqa: BLE001
+        pass
     cls_name, supports_sf, _ = SPEC[arch]
     Pipe = getattr(diffusers, cls_name)
     is_file = Path(model_path).is_file()
-    if is_file and not supports_sf:
+    if arch.startswith("flux2") and is_file:
+        # FLUX.2: transformer locale + VAE locale + TE Mistral HF (assemblaggio, anche inpaint/kontext)
+        pipe = _assemble_flux2(Pipe, model_path)
+    elif is_file and not supports_sf:
         raise RuntimeError(
             f"{cls_name} non supporta from_single_file: per '{arch}' serve un repo diffusers "
             f"(scaricalo col wizard pesi), non il file singolo {Path(model_path).name}.")
-    if is_file:
+    elif is_file:
         try:
             pipe = Pipe.from_single_file(model_path, torch_dtype=torch.bfloat16)
         except Exception:                               # noqa: BLE001
