@@ -149,6 +149,29 @@ class _NativeMultiTalkWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _FaceSwapWorker(QThread):
+    """Face-swap post-process su un video (InsightFace inswapper) fuori dal thread UI."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, video: str, face: str, out: str):
+        super().__init__()
+        self.video, self.face, self.out = video, face, out
+
+    def run(self):
+        try:
+            from core import faceswap
+            if not faceswap.available():
+                self.done.emit({"status": "error",
+                                "error": "inswapper_128.onnx mancante in E:\\AI\\Models\\insightface."})
+                return
+            out = faceswap.swap_video(self.video, self.face, self.out,
+                                      progress=lambda i, n: self.progress.emit(f"frame {i}/{n}"))
+            self.done.emit({"status": "success", "output": [out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1716,7 +1739,31 @@ class MainWindow(QMainWindow):
         out = (res.get("output") or [None])[0]
         self._last_video_path = out
         self._log(f"[MultiTalk] video pronto: {out}")
-        try:                                             # rendi disponibile come 'ultima generazione' al V2V
+        # post-process: face-swap automatico se attivo (impone un volto da foto su tutti i frame)
+        fs = self.video_tab.get_face_swap_auto() if hasattr(self.video_tab, "get_face_swap_auto") else None
+        if fs and fs.get("face") and out:
+            from pathlib import Path as _P
+            swapped = str(_P(out).with_name(_P(out).stem + "_faceswap.mp4"))
+            self._log("[Face-swap] applico il volto da foto al video…")
+            self._fs_worker = _FaceSwapWorker(out, fs["face"], swapped)
+            self._fs_worker.progress.connect(lambda s: self._log("[Face-swap] " + s))
+            self._fs_worker.done.connect(self._on_faceswap_done)
+            self._fs_worker.start()
+            return
+        self._announce_video(out)
+
+    def _on_faceswap_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[Face-swap] errore: {res.get('error','')[:300]}")
+            QMessageBox.warning(self, "Face-swap", str(res.get("error", ""))[:800])
+            return
+        out = (res.get("output") or [None])[0]
+        self._last_video_path = out
+        self._log(f"[Face-swap] video finale: {out}")
+        self._announce_video(out)
+
+    def _announce_video(self, out):
+        try:
             self.video_tab.v2v_panel.set_last_generation(out)
         except Exception:                               # noqa: BLE001
             pass
@@ -1751,6 +1798,13 @@ class MainWindow(QMainWindow):
         length = float(vals.get("length_s") or 0)
         if length <= 0:
             length = self._probe_duration(audio_path) or 5.0
+        # durata segmento + overlap crossfade dalla GUI (Avanzate → Video lungo); default chunk 15s
+        try:
+            lv = self.advanced_tab.long_video_config()
+            seg_frames = int(float(lv.get("seg_seconds", 15) or 15) * fps)
+            overlap_frames = int(lv.get("overlap", 12) or 12)
+        except Exception:                               # noqa: BLE001
+            seg_frames, overlap_frames = int(15 * fps), 12
         params = {
             "image_path": image_path, "source_video": src_video,
             "audio_path": audio_path,
@@ -1758,6 +1812,7 @@ class MainWindow(QMainWindow):
             "width": int(vals.get("width", 640) or 640), "height": int(vals.get("height", 640) or 640),
             "num_frames": max(25, int(length * fps)), "fps": fps,
             "separate_vocals": sep, "audio_scale": ascale, "blocks_to_swap": "auto", "context": True,
+            "seg_frames": seg_frames, "overlap_frames": overlap_frames,
             "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
         }
         self._start_native_multitalk(params)

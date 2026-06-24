@@ -1269,5 +1269,10 @@
   "music.lyr_ai.btn.tt": "根据主题用 AI 写歌词并插入上方（本地 Gemma-3）",
   "music.lyr_ai.need_prompt": "请先填写歌曲主题。",
   "music.lyr_ai.working": "生成中…",
-  "music.lyr_ai.error": "歌词生成失败："
+  "music.lyr_ai.error": "歌词生成失败：",
+  "vid.faceswap.auto": "换脸：用照片中的人脸替换",
+  "vid.faceswap.auto.tt": "生成后用照片中的人脸替换每一帧中的脸（InsightFace）。",
+  "vid.faceswap.face.ph": "要替换成的人脸照片…",
+  "vid.faceswap.face.btn": "选择人脸…",
+  "vid.faceswap.face_lbl": "源人脸"
 }

@@ -1269,5 +1269,10 @@
   "music.lyr_ai.btn.tt": "विषय से AI द्वारा बोल लिखता है और ऊपर डालता है (स्थानीय Gemma-3)",
   "music.lyr_ai.need_prompt": "पहले गीत का विषय लिखें।",
   "music.lyr_ai.working": "बना रहा है…",
-  "music.lyr_ai.error": "बोल बनाना विफल:"
+  "music.lyr_ai.error": "बोल बनाना विफल:",
+  "vid.faceswap.auto": "फेस-स्वैप: फ़ोटो से चेहरा लगाएं",
+  "vid.faceswap.auto.tt": "जनरेशन के बाद हर फ़्रेम के चेहरे को फ़ोटो वाले चेहरे से बदल देता है (InsightFace)।",
+  "vid.faceswap.face.ph": "लगाने हेतु चेहरे की फ़ोटो…",
+  "vid.faceswap.face.btn": "चेहरा चुनें…",
+  "vid.faceswap.face_lbl": "स्रोत चेहरा"
 }

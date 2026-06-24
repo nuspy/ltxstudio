@@ -216,6 +216,23 @@ class VideoTab(QWidget):
         fr_note = QLabel(tr("vid.face.note"))
         fr_note.setWordWrap(True); fr_note.setStyleSheet("color:#888;")
         frf.addRow(fr_note)
+
+        # --- Face-swap automatico (post-generazione): impone un volto da foto su tutti i frame ---
+        self.fs_auto = QCheckBox(tr("vid.faceswap.auto", "Face-swap: imponi un volto da foto"))
+        self.fs_auto.setToolTip(tr("vid.faceswap.auto.tt",
+            "Dopo la generazione sostituisce il volto in ogni frame con quello della foto scelta (InsightFace)."))
+        frf.addRow(self.fs_auto)
+        fs_row = QHBoxLayout()
+        self.fs_face = QLineEdit(); self.fs_face.setReadOnly(True)
+        self.fs_face.setPlaceholderText(tr("vid.faceswap.face.ph", "Foto del volto da imporre…"))
+        self.fs_face_btn = QPushButton(tr("vid.faceswap.face.btn", "Scegli volto…"))
+        self.fs_face_btn.clicked.connect(self._pick_faceswap)
+        fs_row.addWidget(self.fs_face, 1); fs_row.addWidget(self.fs_face_btn)
+        frf.addRow(tr("vid.faceswap.face_lbl", "Volto sorgente"), self._wrap(fs_row))
+
+        def _toggle_fs(on):
+            self.fs_face.setEnabled(on); self.fs_face_btn.setEnabled(on)
+        self.fs_auto.toggled.connect(_toggle_fs); _toggle_fs(False)
         root.addWidget(frbox)
 
         # --- Sampler / Seed (spostati da Avanzate) ---
@@ -605,6 +622,21 @@ class VideoTab(QWidget):
             "fidelity": self.fr_auto_fidelity.value() / 100.0,
             "detection": "retinaface_resnet50",
         }
+
+    def get_face_swap_auto(self) -> dict | None:
+        """Config del face-swap automatico post-generazione (volto da foto), o None se disattivo."""
+        if not self.fs_auto.isChecked():
+            return None
+        face = self.fs_face.text().strip()
+        return {"face": face} if face else None
+
+    def _pick_faceswap(self):
+        from PySide6.QtWidgets import QFileDialog
+        fn, _ = QFileDialog.getOpenFileName(
+            self, tr("vid.faceswap.face.btn", "Scegli volto…"), "",
+            tr("common.file_image_filter", "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)"))
+        if fn:
+            self.fs_face.setText(fn)
 
     def get_sampler_values(self) -> dict:
         return self.sampler_seed.get_values()

@@ -1269,5 +1269,10 @@
   "music.lyr_ai.btn.tt": "Escreve a letra com IA a partir do tema e a insere acima (Gemma-3 local)",
   "music.lyr_ai.need_prompt": "Escreva primeiro um tema para a música.",
   "music.lyr_ai.working": "Gerando…",
-  "music.lyr_ai.error": "Falha ao gerar a letra:"
+  "music.lyr_ai.error": "Falha ao gerar a letra:",
+  "vid.faceswap.auto": "Face-swap: impor um rosto de uma foto",
+  "vid.faceswap.auto.tt": "Após a geração, substitui o rosto em cada frame pelo da foto (InsightFace).",
+  "vid.faceswap.face.ph": "Foto do rosto a impor…",
+  "vid.faceswap.face.btn": "Escolher rosto…",
+  "vid.faceswap.face_lbl": "Rosto de origem"
 }

@@ -1366,5 +1366,10 @@
   "music.lyr_ai.btn.tt": "Scrive il testo con l'AI dal tema e lo inserisce sopra (Gemma-3 locale)",
   "music.lyr_ai.need_prompt": "Scrivi prima un tema per la canzone.",
   "music.lyr_ai.working": "Generazione…",
-  "music.lyr_ai.error": "Generazione testo fallita:"
+  "music.lyr_ai.error": "Generazione testo fallita:",
+  "vid.faceswap.auto": "Face-swap: imponi un volto da foto",
+  "vid.faceswap.auto.tt": "Dopo la generazione sostituisce il volto in ogni frame con quello della foto (InsightFace).",
+  "vid.faceswap.face.ph": "Foto del volto da imporre…",
+  "vid.faceswap.face.btn": "Scegli volto…",
+  "vid.faceswap.face_lbl": "Volto sorgente"
 }
