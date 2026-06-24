@@ -15,6 +15,10 @@ import sys
 
 import torch
 
+# Il block-streaming (offload CPU) di LTX salva tensori per autograd → incompatibile con
+# torch.inference_mode() usato di default dalle pipeline. Lo rimpiazziamo con no_grad.
+torch.inference_mode = torch.no_grad
+
 from ltx_core.components.guiders import MultiModalGuiderParams
 from ltx_core.loader import LoraPathStrengthAndSDOps, LTXV_LORA_COMFY_RENAMING_MAP
 from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
@@ -104,10 +108,10 @@ def _resolve_ckpt(model: str) -> str:
     return ckpt
 
 
-def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list):
+def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two"):
     """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco."""
     lkey = tuple((lo.path, lo.strength) for lo in loras)
-    key = (ckpt, qmode, offload_str, lkey)
+    key = (ckpt, qmode, offload_str, lkey, stages)
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     quant = None
@@ -117,7 +121,15 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list):
     elif qmode == "fp8_cast":
         from ltx_core.quantization import fp8_cast
         quant = fp8_cast.build_policy(ckpt)
-    offload = OffloadMode.CPU if offload_str == "cpu" else OffloadMode.NONE
+    offload = {"cpu": OffloadMode.CPU, "disk": OffloadMode.DISK,
+               "none": OffloadMode.NONE}.get(offload_str, OffloadMode.NONE)
+    # ComfyUI-like: fp8 NATIVO (scaled_mm, niente upcast a bf16) + offload per-blocco insieme.
+    # Il pacchetto blocca questa combo con un assert (streaming solo con fp8_cast) che però
+    # confronta solo il fuse_rule (serve solo per fondere LoRA, qui assenti). Allineandolo
+    # rendiamo l'assert un no-op → transformer streamato a blocchi + matmul fp8 = ~poche GB VRAM.
+    if qmode == "fp8_scaled_mm" and offload != OffloadMode.NONE and quant is not None:
+        import ltx_pipelines.utils.blocks as _blocks
+        _blocks.fp8_cast_fuse_rule = quant.fuse_rule
     pipe = TI2VidTwoStagesPipeline(
         checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
         gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
@@ -129,6 +141,10 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list):
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
+    # Niente sysmem-fallback Windows (che gonfia a 80-90GB mascherando l'OOM reale):
+    # limita PyTorch alla VRAM fisica → numeri veri + OOM pulito, come fa ComfyUI.
+    if torch.cuda.is_available():
+        torch.cuda.set_per_process_memory_fraction(0.98)
     loras = []
     for lo in p.get("loras", []):
         path = lo["name"]
@@ -141,6 +157,9 @@ def run_generation(p: dict) -> str:
     t0 = time.time()
     pipe = _get_pipe(ckpt, qmode, p.get("offload", "cpu"), loras)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode})", flush=True)
+    if torch.cuda.is_available():
+        print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "
+              f"{torch.cuda.memory_reserved()/1e9:.1f}GB reserved", flush=True)
 
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)), stg_scale=1.0,
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
