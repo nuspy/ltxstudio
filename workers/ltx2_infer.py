@@ -72,18 +72,20 @@ def _apply_blockwise_offload(model, device):
     best = None
     best_n = 0
     holder = None
-    for mod in model.modules():                          # stack di layer più grande (transformer/Gemma)
+    stacks = []                                          # TUTTI gli stack (video + audio + Gemma)
+    for mod in model.modules():
         for attr in ("transformer_blocks", "layers"):
             tb = getattr(mod, attr, None)
-            if isinstance(tb, torch.nn.ModuleList) and len(tb) > best_n:
-                best, best_n, holder = tb, len(tb), mod
-    if best is None or best_n < 8:
+            if isinstance(tb, torch.nn.ModuleList) and len(tb) >= 8:
+                stacks.append((mod, tb))
+    if not stacks:
         model.to(device)                                # modello piccolo (VAE/...): tutto su GPU
         return 0
     # Modello grande (transformer 27GB / Gemma 22GB): NON spostare tutto su GPU (OOM). Solo le
-    # parti NON-layer (embed/patchify/timestep/norm/proj, ~1GB) su GPU; i layer restano su CPU
-    # e vanno su GPU 1 alla volta via wrapping di .forward.
-    blocks = list(best)
+    # parti NON-layer (embed/patchify/timestep/norm/proj) su GPU; i layer di TUTTI gli stack
+    # restano su CPU e vanno su GPU 1 alla volta via wrapping di .forward.
+    holders = [m for m, _ in stacks]
+    blocks = [blk for _, tb in stacks for blk in tb]
     _layer_ids = {id(t) for blk in blocks for t in list(blk.parameters()) + list(blk.buffers())}
     for p in model.parameters():
         if id(p) not in _layer_ids:
@@ -118,8 +120,9 @@ def _apply_blockwise_offload(model, device):
             blk.to("cpu")
         torch.cuda.empty_cache()
 
-    holder.register_forward_pre_hook(_force_layers_cpu)
-    return best_n
+    for _h in holders:
+        _h.register_forward_pre_hook(_force_layers_cpu)
+    return len(blocks)
 
 
 def _patch_block_offload():
