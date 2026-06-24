@@ -21,6 +21,18 @@ INSWAPPER = os.path.join(INSIGHTFACE_ROOT, "inswapper_128.onnx")
 _CACHE: dict = {}
 
 
+def _add_torch_cuda_dlls():
+    """Rende le DLL CUDA/cuDNN incluse in torch (torch/lib) trovabili da onnxruntime-gpu,
+    così CUDAExecutionProvider si inizializza senza un'installazione CUDA/cuDNN di sistema."""
+    try:
+        import torch
+        lib = os.path.join(os.path.dirname(torch.__file__), "lib")
+        if os.path.isdir(lib):
+            os.add_dll_directory(lib)
+    except Exception:                                   # noqa: BLE001
+        pass
+
+
 def available() -> bool:
     if not os.path.exists(INSWAPPER):
         return False
@@ -43,6 +55,7 @@ def _providers():
 def _load():
     if "app" in _CACHE:
         return _CACHE["app"], _CACHE["sw"]
+    _add_torch_cuda_dlls()                              # cuDNN/cublas di torch → onnxruntime CUDA
     import insightface
     from insightface.app import FaceAnalysis
     prov = _providers()
