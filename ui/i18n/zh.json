@@ -1260,5 +1260,7 @@
   "v2v.sing_audio_scale": "同步强度",
   "v2v.sing_audio_scale.tt": "音频对口型和动作的驱动程度：越高 = 同步越明显。",
   "v2v.sing_note": "使用 Frame 1 的照片作为人脸。动作随节奏；手指与乐器的精细同步只是近似（当前模型的局限）。",
-  "v2v.err_no_sing_audio": "唱歌模式：请选择一首歌曲（音频）。"
+  "v2v.err_no_sing_audio": "唱歌模式：请选择一首歌曲（音频）。",
+  "mw.multitalk_need_audio_title": "缺少音频",
+  "mw.multitalk_need_audio_msg": "口型同步模式（MultiTalk）需要真实音频文件：在「唱歌」中选择歌曲，或在音频选项卡中为「Talk」选择文件/语音。"
 }

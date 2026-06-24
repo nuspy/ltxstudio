@@ -114,6 +114,41 @@ class _NativeImageWorker(QThread):
         self.done.emit(res)
 
 
+class _NativeMultiTalkWorker(QThread):
+    """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI; riporta progress e path finale."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    COMFY_PY = r"E:\AI\Comfy_Nexus\ComfyUI\venv\Scripts\python.exe"
+
+    def __init__(self, params: dict):
+        super().__init__()
+        self.params = params
+
+    def run(self):
+        import json as _json, os as _os, subprocess as _sp, tempfile as _tf
+        try:
+            worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "wan_multitalk.py")
+            jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+            _json.dump(self.params, jf); jf.close()
+            proc = _sp.Popen([self.COMFY_PY, "-u", worker, jf.name],
+                             stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
+            out_path = None
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line.startswith("[") or line.startswith("OK:") or "Error" in line:
+                    self.progress.emit(line)
+                if line.startswith("OK:"):
+                    out_path = line[3:].strip()
+            proc.wait()
+            if out_path:
+                self.done.emit({"status": "success", "output": [out_path]})
+            else:
+                self.done.emit({"status": "error", "error": "MultiTalk: nessun output prodotto"})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -890,6 +925,9 @@ class MainWindow(QMainWindow):
         v2v = self.video_tab.v2v_panel.get_v2v_config() if hasattr(self.video_tab, "v2v_panel") else {"v2v_mode": "normal"}
         self._v2v_keep_audio_src = None
         _mode = v2v.get("v2v_mode", "normal")
+        # Lip-sync MultiTalk (Wan2.1) per Talk/Canta → motore nativo dedicato, salta il flusso ComfyUI
+        if _mode in ("sing", "talk") and self._maybe_multitalk(vals, v2v, _mode):
+            return
         if _mode != "normal":
             src = v2v.pop("v2v_video_path", None)
             if _mode == "talk" and not src:
@@ -1659,6 +1697,71 @@ class MainWindow(QMainWindow):
         if not loaded and out:
             QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
                                     tr("mw.native_done_msg", "Generata: {f}").format(f=out))
+
+    def _start_native_multitalk(self, params: dict):
+        """Lip-sync MultiTalk (Wan2.1) via worker nel venv ComfyUI — modalità Talk/Canta, no app ComfyUI.
+        Audio reale (parlato o canzone), opz. isola-voce; sorgente volto = foto Frame 1 o video."""
+        self._log(f"[MultiTalk] lip-sync avviato — {params.get('num_frames')} frame "
+                  f"{params.get('width')}x{params.get('height')} (può richiedere parecchi minuti)…")
+        self._mt_worker = _NativeMultiTalkWorker(params)
+        self._mt_worker.progress.connect(lambda s: self._log("[MultiTalk] " + s))
+        self._mt_worker.done.connect(self._on_multitalk_done)
+        self._mt_worker.start()
+
+    def _on_multitalk_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[MultiTalk] errore: {res.get('error','')[:300]}")
+            QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000])
+            return
+        out = (res.get("output") or [None])[0]
+        self._last_video_path = out
+        self._log(f"[MultiTalk] video pronto: {out}")
+        try:                                             # rendi disponibile come 'ultima generazione' al V2V
+            self.video_tab.v2v_panel.set_last_generation(out)
+        except Exception:                               # noqa: BLE001
+            pass
+        QMessageBox.information(self, tr("mw.native_done_title", "Video pronto"),
+                                tr("mw.native_done_msg", "Generato: {f}").format(f=out))
+
+    def _maybe_multitalk(self, vals: dict, v2v: dict, mode: str) -> bool:
+        """Instrada Talk/Canta al motore MultiTalk nativo. Ritorna True se gestito (→ on_generate
+        deve fermarsi). MultiTalk è audio-driven: serve un audio REALE (file/canzone)."""
+        if mode == "sing":
+            audio_path = v2v.get("sing_audio_path")
+            sep = bool(v2v.get("sing_separate_vocals", True))
+            ascale = float(v2v.get("sing_audio_scale", 2.0))
+        else:                                            # talk: audio dal tab Audio (file utente/TTS)
+            ac = self.audio_tab.get_audio_config() if hasattr(self, "audio_tab") else {}
+            audio_path = ac.get("audio_file")
+            sep = False
+            ascale = 2.0
+        if not audio_path or not Path(audio_path).exists():
+            QMessageBox.warning(self, tr("mw.multitalk_need_audio_title", "Audio mancante"),
+                tr("mw.multitalk_need_audio_msg",
+                   "La modalità lip-sync (MultiTalk) richiede un file audio reale: "
+                   "scegli una canzone in 'Canta', o un file/voce nel tab Audio per 'Talk'."))
+            return True
+        src_video = v2v.get("v2v_video_path")            # talk da video esistente (→ primo frame)
+        image_path = None if src_video else (self.frame1_tab.image_path or None)
+        if not src_video and not image_path:
+            QMessageBox.warning(self, tr("mw.talk_title", "Talk/Canta"),
+                                tr("mw.talk_need_input_msg", "Serve una foto (Frame 1) o un video sorgente."))
+            return True
+        fps = int(vals.get("fps", 25) or 25)
+        length = float(vals.get("length_s") or 0)
+        if length <= 0:
+            length = self._probe_duration(audio_path) or 5.0
+        params = {
+            "image_path": image_path, "source_video": src_video,
+            "audio_path": audio_path,
+            "prompt": vals.get("prompt_positive", ""), "negative": vals.get("prompt_negative", ""),
+            "width": int(vals.get("width", 640) or 640), "height": int(vals.get("height", 640) or 640),
+            "num_frames": max(25, int(length * fps)), "fps": fps,
+            "separate_vocals": sep, "audio_scale": ascale, "blocks_to_swap": "auto", "context": True,
+            "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
+        }
+        self._start_native_multitalk(params)
+        return True
 
     def _start_native_inpaint(self, exp, unet, prompt, negative, steps, seed, retention, mode):
         """Inpaint/outpaint via backend NATIVO (FluxFillPipeline) — niente ComfyUI.

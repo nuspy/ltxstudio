@@ -1260,5 +1260,7 @@
   "v2v.sing_audio_scale": "Force de synchro",
   "v2v.sing_audio_scale.tt": "À quel point l'audio guide les lèvres et le mouvement : plus élevé = synchro plus marquée.",
   "v2v.sing_note": "Utilise la photo du Frame 1 comme visage. Le mouvement suit le rythme ; la synchro fine doigts-instrument reste approximative (limite des modèles actuels).",
-  "v2v.err_no_sing_audio": "Mode Chanter : sélectionnez une chanson (audio)."
+  "v2v.err_no_sing_audio": "Mode Chanter : sélectionnez une chanson (audio).",
+  "mw.multitalk_need_audio_title": "Audio manquant",
+  "mw.multitalk_need_audio_msg": "Le mode lip-sync (MultiTalk) nécessite un fichier audio réel : choisissez une chanson dans « Chanter », ou un fichier/voix dans l'onglet Audio pour « Talk »."
 }

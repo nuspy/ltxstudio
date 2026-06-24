@@ -1260,5 +1260,7 @@
   "v2v.sing_audio_scale": "동기화 강도",
   "v2v.sing_audio_scale.tt": "오디오가 입술과 움직임을 얼마나 이끄는지: 높을수록 동기화가 강해집니다.",
   "v2v.sing_note": "Frame 1 사진을 얼굴로 사용합니다. 움직임은 박자를 따르며, 손가락과 악기의 정밀한 동기화는 근사치입니다(현재 모델의 한계).",
-  "v2v.err_no_sing_audio": "노래 모드: 곡(오디오)을 선택하세요."
+  "v2v.err_no_sing_audio": "노래 모드: 곡(오디오)을 선택하세요.",
+  "mw.multitalk_need_audio_title": "오디오 없음",
+  "mw.multitalk_need_audio_msg": "립싱크 모드(MultiTalk)에는 실제 오디오 파일이 필요합니다: '노래'에서 곡을 선택하거나 'Talk'용으로 오디오 탭에서 파일/음성을 선택하세요."
 }

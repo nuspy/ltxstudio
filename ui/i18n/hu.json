@@ -1260,5 +1260,7 @@
   "v2v.sing_audio_scale": "Szinkron erőssége",
   "v2v.sing_audio_scale.tt": "Mennyire vezérli a hang az ajkakat és a mozgást: magasabb = erősebb szinkron.",
   "v2v.sing_note": "A Frame 1 fotót használja arcként. A mozgás követi az ütemet; az ujj-hangszer finom szinkronja közelítő (a jelenlegi modellek korlátja).",
-  "v2v.err_no_sing_audio": "Ének mód: válassz egy dalt (hang)."
+  "v2v.err_no_sing_audio": "Ének mód: válassz egy dalt (hang).",
+  "mw.multitalk_need_audio_title": "Hiányzó hang",
+  "mw.multitalk_need_audio_msg": "A szájszinkron mód (MultiTalk) valódi hangfájlt igényel: válassz egy dalt az «Ének» alatt, vagy egy fájlt/hangot az Audió fülön a «Talk»-hoz."
 }

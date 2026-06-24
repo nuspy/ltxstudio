@@ -1357,5 +1357,7 @@
   "v2v.sing_audio_scale": "Sync strength",
   "v2v.sing_audio_scale.tt": "How much the audio drives lips and motion: higher = stronger sync.",
   "v2v.sing_note": "Uses the Frame 1 photo as the face. Motion follows the beat; fine finger-instrument sync is approximate (current model limitation).",
-  "v2v.err_no_sing_audio": "Sing mode: select a song (audio)."
+  "v2v.err_no_sing_audio": "Sing mode: select a song (audio).",
+  "mw.multitalk_need_audio_title": "Audio missing",
+  "mw.multitalk_need_audio_msg": "Lip-sync mode (MultiTalk) needs a real audio file: pick a song in 'Sing', or a file/voice in the Audio tab for 'Talk'."
 }

@@ -1260,5 +1260,7 @@
   "v2v.sing_audio_scale": "Sync-Stärke",
   "v2v.sing_audio_scale.tt": "Wie stark das Audio Lippen und Bewegung steuert: höher = stärkere Synchronisation.",
   "v2v.sing_note": "Verwendet das Frame-1-Foto als Gesicht. Die Bewegung folgt dem Takt; die feine Finger-Instrument-Synchronisation ist nur ungefähr (Grenze aktueller Modelle).",
-  "v2v.err_no_sing_audio": "Singen-Modus: Bitte ein Lied (Audio) auswählen."
+  "v2v.err_no_sing_audio": "Singen-Modus: Bitte ein Lied (Audio) auswählen.",
+  "mw.multitalk_need_audio_title": "Audio fehlt",
+  "mw.multitalk_need_audio_msg": "Der Lippensynchron-Modus (MultiTalk) benötigt eine echte Audiodatei: Wähle ein Lied in „Singen“ oder eine Datei/Stimme im Audio-Tab für „Talk“."
 }
