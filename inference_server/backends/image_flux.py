@@ -228,6 +228,20 @@ def run(params: dict, mm, output_dir: str) -> dict:
     pipe = mm.ensure(key, need_mb=VRAM_MB.get(arch, 16000))
     mm.apply_loras(pipe, params.get("loras"))
 
+    # Face adapter PuLID (identità del volto da una foto) — FLUX/kontext
+    _pulid_h = None
+    if params.get("pulid_face") and arch in ("flux", "kontext"):
+        try:
+            from core import pulid_adapter
+            _pl = pulid_adapter.load(pipe.transformer)
+            _emb = pulid_adapter.extract_id(_pl, params["pulid_face"])
+            _pulid_h = pulid_adapter.attach(pipe.transformer, _pl, _emb,
+                                            float(params.get("pulid_strength", 0.8)))
+            print(f"[pulid] attivo ({len(_pulid_h)} hook, strength={params.get('pulid_strength', 0.8)})", flush=True)
+        except Exception as _e:                          # noqa: BLE001
+            print(f"[pulid] disattivato (errore): {_e}", flush=True)
+            _pulid_h = None
+
     g = torch.Generator(device="cuda").manual_seed(int(params.get("seed", 0)))
     kw = dict(prompt=params.get("prompt", ""),
               num_inference_steps=int(params.get("steps", 20)),
@@ -253,7 +267,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if neg and arch not in ("zimage",):
         kw["negative_prompt"] = neg
 
-    out = pipe(**kw)
+    try:
+        out = pipe(**kw)
+    finally:
+        if _pulid_h:
+            from core import pulid_adapter
+            pulid_adapter.detach(_pulid_h)
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_{arch}_{params.get('seed', 0)}.png")
     out.images[0].save(path)
