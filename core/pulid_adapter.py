@@ -35,9 +35,25 @@ def available() -> bool:
         return False
 
 
-# TODO (al completamento del download dei pesi):
-#  1. _get_face_encoder(): insightface.app.FaceAnalysis(name="antelopev2") + EVA-CLIP (facexlib).
-#  2. extract_id(face_image_path) -> id_embedding (ArcFace + eva-clip features).
-#  3. load_pulid_adapter(transformer): carica PULID_WEIGHTS, inserisce i moduli pulid_ca nel FLUX transformer.
-#  4. apply(pipe, face_image_path, strength): estrae l'embedding e configura l'adapter con la scala.
-#  Poi cablaggio in image_flux.run (param pulid_face/pulid_strength) + main_window (legge gen_pulid_*).
+# STRUTTURA PESI (verificata): 312 chiavi = 20 moduli `pulid_ca.0..19`, ognuno norm1/norm2/to_q/to_kv/
+# to_out (cross-attention ID). Si agganciano ai blocchi del FluxTransformer: dopo l'attention del
+# blocco i, `hidden = hidden + strength * pulid_ca[i](id_embedding, hidden)`.
+#
+# CODICE DI RIFERIMENTO (clonato): E:\AI\Tools\PuLID
+#  - pulid/encoders.py + encoders_transformer.py : IDEncoder/IDFormer (id_embedding finale)
+#  - pulid/pipeline_flux.py : get_id_embedding() (insightface antelopev2 + eva_clip) + come aggancia pulid_ca
+#  - pulid/attention_processor.py : PuLIDAttnProcessor (la cross-attention)
+#  - eva_clip/ : EVA-CLIP incluso nel repo (no download)
+#  NB il repo usa il SUO flux (cartella flux/), NON diffusers → l'integrazione va PORTATA al
+#  diffusers FluxTransformer2DModel (i nostri image_flux usano diffusers).
+#
+# TODO core (tutto pronto: lib+pesi+codice+eva_clip):
+#  1. extract_id(face_path): sys.path PuLID → from pulid.pipeline_flux import ... ; FaceAnalysis(antelopev2)
+#     + eva_clip → id_embedding (tensor). antelopev2 auto-download da insightface al 1° uso.
+#  2. load_pulid_ca(): carica PULID_WEIGHTS → 20 moduli pulid_ca (nn.Module), su device/dtype del transformer.
+#  3. attach(transformer, id_embedding, strength): forward_hook sui transformer_blocks (double) del
+#     FluxTransformer2DModel diffusers → applica pulid_ca[i] all'output, scalato da strength.
+#  4. detach(): rimuove gli hook (per generazioni senza PuLID).
+#  Cablaggio: image_flux._load/run legge params pulid_face/pulid_strength (arch flux/kontext) →
+#  extract_id + load_pulid_ca + attach prima del denoising, detach dopo. main_window.on_generate
+#  legge gen_pulid_enable/face/strength da frame1_tab e li mette nei params.
