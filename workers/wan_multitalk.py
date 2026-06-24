@@ -101,6 +101,12 @@ def _vocals_audio(path):
     return _load_audio(voc)
 
 
+def _slice_audio(audio: dict, t0: float, t1: float) -> dict:
+    """Estrae la finestra [t0,t1] secondi da un AUDIO dict (per i segmenti dei video lunghi)."""
+    sr = int(audio["sample_rate"]); w = audio["waveform"]
+    return {"waveform": w[:, :, int(t0 * sr):int(t1 * sr)], "sample_rate": sr}
+
+
 def _auto_blocks_to_swap(fp, model_name, total_blocks=40, reserve_gb=12.0):
     """Tara block_swap sulla VRAM del computer: tiene più blocchi possibile residenti in VRAM,
     lasciando `reserve_gb` per attivazioni/VAE/altri modelli. Generico per ogni GPU (5090→0 swap,
@@ -108,16 +114,18 @@ def _auto_blocks_to_swap(fp, model_name, total_blocks=40, reserve_gb=12.0):
     import torch
     if not torch.cuda.is_available():
         return total_blocks
-    total_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+    free, total = torch.cuda.mem_get_info()           # VRAM REALMENTE libera ORA (esclude altri modelli)
+    free_gb, total_gb = free / 1e9, total / 1e9
     try:
         model_gb = os.path.getsize(fp.get_full_path("diffusion_models", model_name)) / 1e9
     except Exception:
         model_gb = 16.0
     per_block = (model_gb / total_blocks) or 0.4
-    resident = int(max(0.0, total_gb - reserve_gb) / per_block)
+    resident = int(max(0.0, free_gb - reserve_gb) / per_block)
     swap = max(0, min(total_blocks, total_blocks - resident))
-    print(f"[auto-vram] {total_gb:.0f}GB tot, modello {model_gb:.0f}GB ({per_block:.2f}GB/blk), "
-          f"reserve {reserve_gb:.0f}GB -> blocks_to_swap={swap}/{total_blocks}", flush=True)
+    print(f"[auto-vram] {free_gb:.0f}GB liberi / {total_gb:.0f}GB tot "
+          f"(occupati da altro: {total_gb - free_gb:.0f}GB), modello {model_gb:.0f}GB "
+          f"({per_block:.2f}GB/blk), reserve {reserve_gb:.0f}GB -> blocks_to_swap={swap}/{total_blocks}", flush=True)
     return swap
 
 
@@ -136,8 +144,9 @@ def run(p: dict) -> str:
     # block_swap tarato DINAMICAMENTE sulla VRAM del computer ("auto") o forzato (numero)
     bts = p.get("blocks_to_swap", "auto")
     if bts in ("auto", None, ""):
-        # riserva = attivazioni(∝risoluzione) + latent(∝num_frames) + margine
-        reserve = float(p.get("vram_reserve_gb") or 0) or (10.0 + 5.0 * (W * H) / (640.0 * 640.0) + 0.004 * F)
+        # riserva = base + attivazioni(∝risoluzione) + latent Wan reale(∝frame, ma piccolo) + margine
+        lat_gb = 16 * (F / 4.0) * (H / 8.0) * (W / 8.0) * 2 / 1e9   # latent bf16 [16, T/4, H/8, W/8]
+        reserve = float(p.get("vram_reserve_gb") or 0) or (9.0 + 6.0 * (W * H) / (640.0 * 640.0) + 6.0 * lat_gb + 3.0)
         bts = _auto_blocks_to_swap(fp, model_name, reserve_gb=reserve)
     else:
         bts = int(bts)
@@ -162,7 +171,7 @@ def run(p: dict) -> str:
                 model="TencentGameMate/chinese-wav2vec2-base", base_precision="fp16", load_device="main_device")
     print(f"[load] {time.time()-t0:.0f}s", flush=True)
 
-    # ---- conditioning ----
+    # ---- conditioning testo (una volta sola, condiviso da tutti i segmenti) ----
     txt = _call(NM["WanVideoTextEncode"],
                 positive_prompt=p.get("prompt", "a woman singing, expressive performance, close-up"),
                 negative_prompt=p.get("negative", "static, blurry, deformed, extra fingers, bad hands, low quality"),
@@ -175,51 +184,117 @@ def run(p: dict) -> str:
         print(f"[src] primo frame del video -> {os.path.basename(img_path)}", flush=True)
     im = Image.open(img_path).convert("RGB").resize((W, H), Image.LANCZOS)
     img_t = torch.from_numpy(np.asarray(im, dtype="float32") / 255.0)[None]    # [1,H,W,3]
-    clipemb = _call(NM["WanVideoClipVisionEncode"],
-                    clip_vision=clipv, image_1=img_t, strength_1=1.0, strength_2=1.0,
-                    crop="center", combine_embeds="average", force_offload=True)
-    imgemb = _call(NM["WanVideoImageToVideoEncode"],
-                   width=W, height=H, num_frames=F, noise_aug_strength=0.0, start_latent_strength=1.0,
-                   end_latent_strength=1.0, force_offload=True, vae=vae, clip_embeds=clipemb, start_image=img_t)
 
+    # audio completo (vocals isolati opz.) — verrà affettato per segmento
     if p.get("separate_vocals", True):
         try:
-            audio = _vocals_audio(p["audio_path"])
+            audio_full = _vocals_audio(p["audio_path"])
             print("[audio] vocals isolati (demucs) -> lip-sync su voce pulita", flush=True)
         except Exception as _e:                          # noqa: BLE001
             print(f"[audio] separazione vocals fallita ({_e}); uso audio intero", flush=True)
-            audio = _load_audio(p["audio_path"])
+            audio_full = _load_audio(p["audio_path"])
     else:
-        audio = _load_audio(p["audio_path"])
-    mtemb = _call(NM["MultiTalkWav2VecEmbeds"],
-                  wav2vec_model=w2v, audio_1=audio, normalize_loudness=True, num_frames=F, fps=FPS,
-                  audio_scale=float(p.get("audio_scale", 2.0)),
-                  audio_cfg_scale=float(p.get("audio_cfg_scale", 1.0)), multi_audio_type="para")
+        audio_full = _load_audio(p["audio_path"])
 
-    ctx = None
-    if p.get("context", False):
-        ctx = _call(NM["WanVideoContextOptions"],
-                    context_schedule="static_standard", context_frames=81, context_stride=4,
-                    context_overlap=32, freenoise=True, verbose=False)
+    steps = int(p.get("steps", 10)); cfg = float(p.get("cfg", 1.0))
+    shift = float(p.get("shift", 5.0)); seed = int(p.get("seed", 8))
+    sched = p.get("scheduler", "dpm++_sde"); ascale = float(p.get("audio_scale", 2.0))
+    acfg = float(p.get("audio_cfg_scale", 1.0)); use_ctx = bool(p.get("context", False))
 
-    # ---- sample ----
+    def _gen_chunk(start_t, audio_d, nf, seed_c):
+        """Genera UN segmento da `nf` frame partendo da start_t (continuità) + finestra audio."""
+        clipemb = _call(NM["WanVideoClipVisionEncode"],
+                        clip_vision=clipv, image_1=start_t, strength_1=1.0, strength_2=1.0,
+                        crop="center", combine_embeds="average", force_offload=True)
+        imgemb = _call(NM["WanVideoImageToVideoEncode"],
+                       width=W, height=H, num_frames=nf, noise_aug_strength=0.0, start_latent_strength=1.0,
+                       end_latent_strength=1.0, force_offload=True, vae=vae, clip_embeds=clipemb, start_image=start_t)
+        mtemb = _call(NM["MultiTalkWav2VecEmbeds"],
+                      wav2vec_model=w2v, audio_1=audio_d, normalize_loudness=True, num_frames=nf, fps=FPS,
+                      audio_scale=ascale, audio_cfg_scale=acfg, multi_audio_type="para")
+        kw = dict(text_embeds=txt, multitalk_embeds=mtemb)
+        if use_ctx and nf > 81:
+            kw["context_options"] = _call(NM["WanVideoContextOptions"],
+                                          context_schedule="static_standard", context_frames=81,
+                                          context_stride=4, context_overlap=32, freenoise=True, verbose=False)
+        samples = _call(NM["WanVideoSampler"],
+                        model=model, image_embeds=imgemb, steps=steps, cfg=cfg, shift=shift,
+                        seed=seed_c, force_offload=True, scheduler=sched, riflex_freq_index=0, **kw)
+        return _call(NM["WanVideoDecode"], vae=vae, samples=samples, enable_vae_tiling=True,
+                     tile_x=272, tile_y=272, tile_stride_x=144, tile_stride_y=128)
+
+    # ---- generazione a SEGMENTI in STREAMING su disco (memory-bounded in VRAM **e** RAM) ----
+    # Scrive ogni chunk subito via ffmpeg, tenendo in RAM solo 1 chunk + l'overlap (niente torch.cat
+    # di tutti i frame → su 3:30 erano migliaia di frame che saturavano la RAM e crashavano il sistema).
+    SEG = int(p.get("seg_frames", 0) or 0) or int(15 * FPS)   # default 15s/segmento (override da GUI)
+    OVERLAP = int(p.get("overlap_frames", 0) or 0) or 12       # frame di crossfade (override da GUI: lv_overlap)
+    anchor_every = int(p.get("anchor_every", 0) or 0)         # 0=continuità; N=ri-ancora la FOTO ogni N chunk (anti-drift volto)
     tg = time.time()
-    kw = dict(text_embeds=txt, multitalk_embeds=mtemb)
-    if ctx is not None:
-        kw["context_options"] = ctx
-    samples = _call(NM["WanVideoSampler"],
-                    model=model, image_embeds=imgemb, steps=int(p.get("steps", 10)), cfg=float(p.get("cfg", 1.0)),
-                    shift=float(p.get("shift", 5.0)), seed=int(p.get("seed", 8)), force_offload=True,
-                    scheduler=p.get("scheduler", "dpm++_sde"), riflex_freq_index=0, **kw)
-    print(f"[gen] {time.time()-tg:.0f}s", flush=True)
-    if torch.cuda.is_available():
-        print(f"[vram] peak {torch.cuda.max_memory_allocated()/1e9:.1f}GB / "
-              f"{torch.cuda.get_device_properties(0).total_memory/1e9:.0f}GB", flush=True)
+    os.makedirs(os.path.dirname(p["output"]) or ".", exist_ok=True)
+    tmp = p["output"] + ".noaudio.mp4"
+    writer = {"proc": None}
 
-    images = _call(NM["WanVideoDecode"],
-                   vae=vae, samples=samples, enable_vae_tiling=True,
-                   tile_x=272, tile_y=272, tile_stride_x=144, tile_stride_y=128)
-    return _save(images, p["output"], FPS, p["audio_path"])
+    def _emit(frames):
+        if frames is None or frames.shape[0] == 0:
+            return
+        arr = (frames.clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)
+        n, h, w, _ = arr.shape
+        if writer["proc"] is None:
+            writer["proc"] = subprocess.Popen(
+                ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", str(FPS),
+                 "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", tmp], stdin=subprocess.PIPE)
+        writer["proc"].stdin.write(arr.tobytes())
+
+    def _xfade(prev_tail, imgs):
+        ov = min(OVERLAP, prev_tail.shape[0], imgs.shape[0])
+        if ov <= 0:
+            return imgs, 0
+        t = torch.linspace(0.0, 1.0, ov, device=imgs.device, dtype=torch.float32)
+        t = t * t * t * (t * (t * 6.0 - 15.0) + 10.0)        # smootherstep
+        wgt = t.view(ov, 1, 1, 1).to(imgs.dtype)
+        _emit(prev_tail[-ov:] * (1.0 - wgt) + imgs[:ov] * wgt)
+        return imgs[ov:], ov
+
+    nframes = 0
+    if F <= SEG:
+        imgs = _gen_chunk(img_t, audio_full, F, seed)
+        _emit(imgs); nframes = imgs.shape[0]
+    else:
+        stride = max(1, SEG - OVERLAP)
+        n0 = 0; cur = img_t; ci = 0; prev_tail = None
+        while n0 < F:
+            nf = min(SEG, F - n0)
+            if nf < 25:
+                break
+            a0, a1 = n0 / FPS, (n0 + nf) / FPS
+            print(f"[chunk {ci}] frame {n0}..{n0 + nf} ({a0:.1f}-{a1:.1f}s)", flush=True)
+            start = img_t if (anchor_every and ci % anchor_every == 0) else cur   # anti-drift opzionale
+            imgs = _gen_chunk(start, _slice_audio(audio_full, a0, a1), nf, seed + ci)
+            body = imgs
+            if ci > 0:                                   # fonde l'overlap col chunk precedente (crossfade)
+                body, ov = _xfade(prev_tail, imgs); nframes += ov
+            head = body[:-OVERLAP] if OVERLAP > 0 else body   # trattieni la coda per il prossimo crossfade
+            _emit(head); nframes += head.shape[0]
+            prev_tail = imgs[-OVERLAP:].clone() if OVERLAP > 0 else None
+            cur = imgs[-1:].clone()
+            n0 += stride; ci += 1
+            del imgs, body
+        if prev_tail is not None:                        # coda finale (nessun chunk successivo)
+            _emit(prev_tail); nframes += prev_tail.shape[0]
+
+    if writer["proc"] is not None:
+        writer["proc"].stdin.close(); writer["proc"].wait()
+    print(f"[gen] {time.time()-tg:.0f}s, {nframes} frame totali (streaming)", flush=True)
+    # mux audio reale (durata = nframes/FPS) → resta in sync
+    dur = nframes / FPS
+    subprocess.run(["ffmpeg", "-y", "-i", tmp, "-i", p["audio_path"], "-t", f"{dur:.3f}",
+                    "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", p["output"]],
+                   check=False)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    return p["output"]
 
 
 def _save(images, out_path, fps, audio_path):
