@@ -33,6 +33,9 @@ HEARTLIB_DIR = TOOLS / "heartlib"
 HEARTLIB_VENV_PY = HEARTLIB_DIR / "venv" / "Scripts" / "python.exe"
 HEARTLIB_CKPT = HEARTLIB_DIR / "ckpt"
 HEARTLIB_RUN = HEARTLIB_DIR / "examples" / "run_music_generation.py"
+# Wrapper NOSTRO: monkey-patcha torchaudio.save → soundfile prima di lanciare HeartMuLa
+# (torchaudio>=2.9 richiederebbe torchcodec per salvare → la canzone falliva DOPO la generazione).
+HEARTLIB_WRAPPER = Path(__file__).resolve().parent.parent / "workers" / "heartmula_run.py"
 
 MMAUDIO_DIR = TOOLS / "MMAudio"
 MMAUDIO_VENV_PY = MMAUDIO_DIR / "venv" / "Scripts" / "python.exe"
@@ -192,7 +195,7 @@ def write_song_inputs(p: SongParams) -> tuple[Path, Path]:
 
 def make_song_job(p: SongParams, **cbs) -> Job:
     lyr, tag = write_song_inputs(p)
-    cmd = [HEARTLIB_VENV_PY, "-u", HEARTLIB_RUN,
+    cmd = [HEARTLIB_VENV_PY, "-u", str(HEARTLIB_WRAPPER),
            "--model_path", HEARTLIB_CKPT, "--version", p.version,
            "--lyrics", lyr, "--tags", tag, "--save_path", p.out_mp3(),
            "--max_audio_length_ms", int(max(5, p.duration_s) * 1000),
