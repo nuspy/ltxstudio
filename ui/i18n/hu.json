@@ -1285,5 +1285,22 @@
   "adv.lv.anchor_every.tt": "Minden N szegmensnél az EREDETI fotóról indul újra az utolsó képkocka helyett (nullázza az arc elcsúszását). 0=soha (maximális folytonosság). 2-4 csak akkor, ha az arc túlságosan elcsúszik.",
   "adv.lv.resume": "Folytatás összeomlás után",
   "adv.lv.resume.tt": "Minden legenerált szegmenst lemezre ment: ha a generálás megszakad (összeomlás/bezárás), újraindításkor csak a hiányzó szegmenseket generálja újra, nem kezdi elölről.",
-  "f1.gen.auto": "⚡ Auto (legjobb)"
+  "f1.gen.auto": "⚡ Auto (legjobb)",
+  "vid.sb.group": "🎬 Többjelenetes storyboard",
+  "vid.sb.enable": "Storyboard bekapcsolása (több jelenet)",
+  "vid.sb.enable.tt": "Egyetlen folyamatos videót hoz létre több, különböző időponthoz rögzített kulcskép-képből: a modell interpolál a jelenetek között, vágás nélkül.",
+  "vid.sb.hint": "Minden kép egy időponthoz rögzített kulcskép; a modell interpolál a jelenetek között → egyetlen folyamatos videó, vágás nélkül.",
+  "vid.sb.add": "+ Jelenet hozzáadása",
+  "vid.sb.pick": "📷 Kép",
+  "vid.sb.no_img": "(nincs kép)",
+  "vid.sb.at": "ekkor:",
+  "vid.sb.force": "erő",
+  "vid.sb.remove": "Jelenet eltávolítása",
+  "vid.sb.second.tt": "Az időpont (másodperc), amelyhez ezt a képet rögzíteni kell a videóban.",
+  "vid.sb.strength.tt": "Mennyire köti a kép a jelenetet: 1=merev (kevés mozgás), 0=szabad.",
+  "vid.sb.err_min": "Legalább 2 jelenet kell képpel.",
+  "mw.sb_title": "Storyboard",
+  "mw.sb_invalid": "Érvénytelen storyboard:",
+  "mw.sb_upload_failed": "A jelenet képének feltöltése sikertelen: {img}",
+  "mw.sb_log": "[Storyboard] {n} kulcskép-jelenet → többjelenetes interpoláció."
 }

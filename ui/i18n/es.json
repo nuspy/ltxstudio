@@ -1285,5 +1285,22 @@
   "adv.lv.anchor_every.tt": "Cada N segmentos reinicia desde la FOTO original en lugar del último fotograma (reinicia la deriva del rostro). 0=nunca (máxima continuidad). Usar 2-4 solo si el rostro se desvía demasiado.",
   "adv.lv.resume": "Reanudar tras un fallo",
   "adv.lv.resume.tt": "Guarda cada segmento generado en disco: si la generación se interrumpe (fallo/cierre), al reiniciar regenera solo los segmentos que faltan en lugar de empezar de cero.",
-  "f1.gen.auto": "⚡ Auto (mejor)"
+  "f1.gen.auto": "⚡ Auto (mejor)",
+  "vid.sb.group": "🎬 Storyboard multiescena",
+  "vid.sb.enable": "Activar storyboard (varias escenas)",
+  "vid.sb.enable.tt": "Crea un único vídeo continuo a partir de varias imágenes-keyframe ancladas en momentos distintos: el modelo interpola entre escenas, sin montaje.",
+  "vid.sb.hint": "Cada imagen es un keyframe anclado a un instante; el modelo interpola entre escenas → un solo vídeo continuo, sin montaje.",
+  "vid.sb.add": "+ Añadir escena",
+  "vid.sb.pick": "📷 Imagen",
+  "vid.sb.no_img": "(sin imagen)",
+  "vid.sb.at": "en",
+  "vid.sb.force": "fuerza",
+  "vid.sb.remove": "Quitar escena",
+  "vid.sb.second.tt": "Instante (segundos) en el que anclar esta imagen en el vídeo.",
+  "vid.sb.strength.tt": "Cuánto limita la imagen la escena: 1=rígida (poco movimiento), 0=libre.",
+  "vid.sb.err_min": "Se necesitan al menos 2 escenas con imagen.",
+  "mw.sb_title": "Storyboard",
+  "mw.sb_invalid": "Storyboard no válido:",
+  "mw.sb_upload_failed": "Error al subir la imagen de la escena: {img}",
+  "mw.sb_log": "[Storyboard] {n} escenas-keyframe → interpolación multiescena."
 }

@@ -1285,5 +1285,22 @@
   "adv.lv.anchor_every.tt": "Tous les N segments, repart de la PHOTO originale au lieu de la dernière image (réinitialise la dérive du visage). 0=jamais (continuité maximale). Utiliser 2-4 seulement si le visage dérive trop.",
   "adv.lv.resume": "Reprendre après un plantage",
   "adv.lv.resume.tt": "Enregistre chaque segment généré sur le disque : si la génération est interrompue (plantage/fermeture), au redémarrage seuls les segments manquants sont régénérés au lieu de tout recommencer.",
-  "f1.gen.auto": "⚡ Auto (meilleur)"
+  "f1.gen.auto": "⚡ Auto (meilleur)",
+  "vid.sb.group": "🎬 Storyboard multi-scènes",
+  "vid.sb.enable": "Activer le storyboard (plusieurs scènes)",
+  "vid.sb.enable.tt": "Crée une seule vidéo continue à partir de plusieurs images-clés ancrées à des instants différents : le modèle interpole entre les scènes, sans montage.",
+  "vid.sb.hint": "Chaque image est une image-clé ancrée à un instant ; le modèle interpole entre les scènes → une seule vidéo continue, sans montage.",
+  "vid.sb.add": "+ Ajouter une scène",
+  "vid.sb.pick": "📷 Image",
+  "vid.sb.no_img": "(aucune image)",
+  "vid.sb.at": "à",
+  "vid.sb.force": "force",
+  "vid.sb.remove": "Supprimer la scène",
+  "vid.sb.second.tt": "Instant (secondes) où ancrer cette image dans la vidéo.",
+  "vid.sb.strength.tt": "À quel point l'image contraint la scène : 1=rigide (peu de mouvement), 0=libre.",
+  "vid.sb.err_min": "Au moins 2 scènes avec une image sont requises.",
+  "mw.sb_title": "Storyboard",
+  "mw.sb_invalid": "Storyboard invalide :",
+  "mw.sb_upload_failed": "Échec de l'envoi de l'image de scène : {img}",
+  "mw.sb_log": "[Storyboard] {n} scènes-clés → interpolation multi-scènes."
 }

@@ -192,6 +192,14 @@ class VideoTab(QWidget):
         v2v_l.addWidget(self.v2v_panel)
         root.addWidget(v2v_box)
 
+        # --- Storyboard multi-scena (immagini-keyframe a tempo → video senza montaggio) ---
+        from ui.widgets.storyboard_panel import StoryboardPanel
+        sb_box = QGroupBox(tr("vid.sb.group"))
+        sb_l = QVBoxLayout(sb_box)
+        self.storyboard_panel = StoryboardPanel()
+        sb_l.addWidget(self.storyboard_panel)
+        root.addWidget(sb_box)
+
         # --- Restauro volti automatico (post-generazione, opzionale) ---
         frbox = QGroupBox(tr("vid.face.group")); frf = QFormLayout(frbox)
         self.fr_auto = QCheckBox(tr("vid.face.auto"))

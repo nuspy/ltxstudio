@@ -1285,5 +1285,22 @@
   "adv.lv.anchor_every.tt": "Alle N Segmente Neustart vom ORIGINALFOTO statt vom letzten Frame (setzt die Gesichtsabweichung zurück). 0=nie (max. Kontinuität). 2-4 nur verwenden, wenn das Gesicht zu stark abweicht.",
   "adv.lv.resume": "Nach Absturz fortsetzen",
   "adv.lv.resume.tt": "Speichert jedes erzeugte Segment auf der Festplatte: Wird die Generierung unterbrochen (Absturz/Schließen), werden beim Neustart nur die fehlenden Segmente neu erzeugt statt von vorne zu beginnen.",
-  "f1.gen.auto": "⚡ Auto (beste)"
+  "f1.gen.auto": "⚡ Auto (beste)",
+  "vid.sb.group": "🎬 Mehrszenen-Storyboard",
+  "vid.sb.enable": "Storyboard aktivieren (mehrere Szenen)",
+  "vid.sb.enable.tt": "Erstellt ein durchgehendes Video aus mehreren Keyframe-Bildern, die zu verschiedenen Zeiten verankert sind: das Modell interpoliert zwischen den Szenen, ohne Schnitt.",
+  "vid.sb.hint": "Jedes Bild ist ein Keyframe zu einem Zeitpunkt; das Modell interpoliert zwischen den Szenen → ein einziges durchgehendes Video, ohne Schnitt.",
+  "vid.sb.add": "+ Szene hinzufügen",
+  "vid.sb.pick": "📷 Bild",
+  "vid.sb.no_img": "(kein Bild)",
+  "vid.sb.at": "bei",
+  "vid.sb.force": "Stärke",
+  "vid.sb.remove": "Szene entfernen",
+  "vid.sb.second.tt": "Zeitpunkt (Sekunden), an dem dieses Bild im Video verankert wird.",
+  "vid.sb.strength.tt": "Wie stark das Bild die Szene einschränkt: 1=starr (wenig Bewegung), 0=frei.",
+  "vid.sb.err_min": "Mindestens 2 Szenen mit Bild erforderlich.",
+  "mw.sb_title": "Storyboard",
+  "mw.sb_invalid": "Ungültiges Storyboard:",
+  "mw.sb_upload_failed": "Upload des Szenenbilds fehlgeschlagen: {img}",
+  "mw.sb_log": "[Storyboard] {n} Keyframe-Szenen → Mehrszenen-Interpolation."
 }

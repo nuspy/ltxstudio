@@ -1382,5 +1382,22 @@
   "adv.lv.anchor_every.tt": "Every N segments restarts from the ORIGINAL photo instead of the last frame (resets face drift). 0=never (max continuity). Use 2-4 only if the face drifts too much.",
   "adv.lv.resume": "Resume after crash",
   "adv.lv.resume.tt": "Saves every generated segment to disk: if generation is interrupted (crash/close), on restart it regenerates only the missing segments instead of starting over.",
-  "f1.gen.auto": "⚡ Auto (best)"
+  "f1.gen.auto": "⚡ Auto (best)",
+  "vid.sb.group": "🎬 Multi-scene storyboard",
+  "vid.sb.enable": "Enable storyboard (multiple scenes)",
+  "vid.sb.enable.tt": "Builds one continuous video from several keyframe images anchored at different times: the model interpolates between scenes, no editing.",
+  "vid.sb.hint": "Each image is a keyframe anchored at a time; the model interpolates between scenes → a single continuous video, no editing.",
+  "vid.sb.add": "+ Add scene",
+  "vid.sb.pick": "📷 Image",
+  "vid.sb.no_img": "(no image)",
+  "vid.sb.at": "at",
+  "vid.sb.force": "strength",
+  "vid.sb.remove": "Remove scene",
+  "vid.sb.second.tt": "Time (seconds) at which to anchor this image in the video.",
+  "vid.sb.strength.tt": "How strongly the image constrains the scene: 1=rigid (little motion), 0=free.",
+  "vid.sb.err_min": "At least 2 scenes with an image are required.",
+  "mw.sb_title": "Storyboard",
+  "mw.sb_invalid": "Invalid storyboard:",
+  "mw.sb_upload_failed": "Scene image upload failed: {img}",
+  "mw.sb_log": "[Storyboard] {n} keyframe scenes → multi-scene interpolation."
 }

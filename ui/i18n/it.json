@@ -1382,5 +1382,22 @@
   "adv.lv.anchor_every.tt": "Ogni N spezzoni riparte dalla FOTO originale invece che dall'ultimo frame (azzera la deriva del volto). 0=mai (massima continuità). Usare 2-4 solo se il volto deriva troppo.",
   "adv.lv.resume": "Riprendi dopo crash",
   "adv.lv.resume.tt": "Salva ogni spezzone generato su disco: se la generazione si interrompe (crash/chiusura), al riavvio rigenera solo gli spezzoni mancanti invece di ripartire da zero.",
-  "f1.gen.auto": "⚡ Auto (migliore)"
+  "f1.gen.auto": "⚡ Auto (migliore)",
+  "vid.sb.group": "🎬 Storyboard multi-scena",
+  "vid.sb.enable": "Attiva storyboard (più scene)",
+  "vid.sb.enable.tt": "Crea un unico video continuo da più immagini-keyframe ancorate a istanti diversi: il modello interpola tra le scene, senza montaggio.",
+  "vid.sb.hint": "Ogni immagine è un keyframe ancorato a un istante; il modello interpola tra le scene → un solo video continuo, senza montaggio.",
+  "vid.sb.add": "+ Aggiungi scena",
+  "vid.sb.pick": "📷 Immagine",
+  "vid.sb.no_img": "(nessuna immagine)",
+  "vid.sb.at": "a",
+  "vid.sb.force": "forza",
+  "vid.sb.remove": "Rimuovi scena",
+  "vid.sb.second.tt": "Istante (secondi) in cui ancorare questa immagine nel video.",
+  "vid.sb.strength.tt": "Quanto l'immagine vincola la scena: 1=rigida (poco movimento), 0=libera.",
+  "vid.sb.err_min": "Servono almeno 2 scene con immagine.",
+  "mw.sb_title": "Storyboard",
+  "mw.sb_invalid": "Storyboard non valido:",
+  "mw.sb_upload_failed": "Upload immagine scena fallito: {img}",
+  "mw.sb_log": "[Storyboard] {n} scene-keyframe → interpolazione multi-scena."
 }

@@ -1009,6 +1009,26 @@ class MainWindow(QMainWindow):
                     self._v2v_keep_audio_src = src
                 vals.update(v2v)
 
+        # ── STORYBOARD multi-scena: immagini-keyframe a tempo → video senza montaggio ──
+        sb_panel = getattr(self.video_tab, "storyboard_panel", None)
+        scenes = sb_panel.get_storyboard() if sb_panel else []
+        if scenes:
+            errs = sb_panel.validation_errors()
+            if errs:
+                QMessageBox.warning(self, tr("mw.sb_title", "Storyboard"),
+                                    tr("mw.sb_invalid", "Storyboard non valido:") + "\n• " + "\n• ".join(errs))
+                return
+            uploaded = []
+            for sc in scenes:
+                name = self._upload_local(sc["image"])
+                if not name:
+                    QMessageBox.warning(self, tr("mw.sb_title", "Storyboard"),
+                                        tr("mw.sb_upload_failed", "Upload immagine scena fallito: {img}").format(img=sc["image"]))
+                    return
+                uploaded.append({"image": name, "second": sc["second"], "strength": sc["strength"]})
+            vals["storyboard"] = uploaded
+            self._log(tr("mw.sb_log", "[Storyboard] {n} scene-keyframe → interpolazione multi-scena.").format(n=len(uploaded)))
+
         # ── VIDEO LUNGHI: auto-extend oltre la soglia ──
         # Se la durata richiesta supera la soglia (impostata in Avanzate), generiamo una
         # passata base = soglia, poi al completamento estendiamo automaticamente a spezzoni

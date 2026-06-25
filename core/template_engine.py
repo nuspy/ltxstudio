@@ -160,7 +160,12 @@ class TemplateEngine:
         # V2V (ReTake / Just_Talk): rigenera una sezione/regione di un video sorgente. Ha precedenza
         # sull'I2V normale (è una modalità di editing video distinta, attivata dai radio in GUI).
         _v2v = values.get("v2v_mode")
-        if _v2v == "retake" and values.get("v2v_video"):
+        # STORYBOARD multi-scena: N immagini-keyframe a tempi diversi → catena LTXVAddLatentGuide
+        # (come LTXSequencer del workflow di riferimento). Ha precedenza su V2V/I2V: è una modalità
+        # di composizione distinta (video multi-scena senza montaggio).
+        if values.get("storyboard"):
+            self.apply_storyboard(prompt, values)
+        elif _v2v == "retake" and values.get("v2v_video"):
             self.apply_retake(prompt, values)
         elif _v2v == "talk" and values.get("v2v_video"):
             self.apply_just_talk(prompt, values)
@@ -853,6 +858,82 @@ class TemplateEngine:
         if crop:
             prompt[crop].setdefault("inputs", {})["positive"] = [plain_cond, 0]
             prompt[crop]["inputs"]["negative"] = [plain_cond, 1]
+        return True
+
+    # ---------- STORYBOARD multi-scena (catena LTXVAddLatentGuide, come LTXSequencer) ----------
+    # compressione temporale del latent LTX (1 frame latent ≈ 8 frame pixel)
+    LTX_TEMPORAL_COMPRESSION = 8
+
+    def apply_storyboard(self, prompt: dict, values: dict) -> bool:
+        """Video multi-scena senza montaggio: N immagini-keyframe ancorate a tempi diversi del
+        clip, concatenando una CATENA di LTXVAddLatentGuide (uno per keyframe) — è esattamente ciò
+        che fa LTXSequencer nel workflow 'LTX2.3 Multi Image Reference': ogni immagine condiziona
+        il latent alla sua posizione temporale e il modello INTERPOLA tra i keyframe.
+
+        values['storyboard'] = lista ORDINATA di scene, ognuna:
+            {'image': <path>, 'frame': <int frame pixel> | 'second': <float>, 'strength': 0..1}
+        Il frame pixel viene convertito in latent_idx = frame // 8. `fps` (default 25) serve per
+        convertire i 'second' in frame. Ogni immagine è caricata via LoadImage → VAEEncode →
+        guiding_latent. Le uscite [pos,neg,latent] dell'ultimo guide alimentano CFGGuider /
+        LTXVCropGuides / LTXVConcatAVLatent (come l'extend). Ritorna True se applicato."""
+        sb = values.get("storyboard") or []
+        if not sb:
+            return False
+
+        def first(ct):
+            return next((nid for nid, n in prompt.items() if n.get("class_type") == ct), None)
+        concat = first("LTXVConcatAVLatent")
+        guider = first("CFGGuider")
+        empty_lat = first("EmptyLTXVLatentVideo")
+        plain_cond = first("LTXVConditioning")
+        vae = first("VAELoader")
+        crop = first("LTXVCropGuides")
+        if not (concat and guider and empty_lat and plain_cond and vae):
+            return False
+        fps = float(values.get("fps", 25) or 25)
+        tc = self.LTX_TEMPORAL_COMPRESSION
+        # azzera i keyframe AddGuide baked nel template (eviterebbero doppio condizionamento)
+        for _n in prompt.values():
+            if _n.get("class_type") == "LTXVAddGuide":
+                _n.setdefault("inputs", {})["strength"] = 0.0
+        # catena: ogni guide prende [pos,neg,latent] dal precedente (partendo da cond PLAIN + empty)
+        prev_pos, prev_neg, prev_lat = [plain_cond, 0], [plain_cond, 1], [empty_lat, 0]
+        used = 0
+        for i, kf in enumerate(sb):
+            img = kf.get("image") or kf.get("image_path")
+            if not img:
+                continue
+            # frame pixel → latent_idx (priorità a 'frame'; altrimenti da 'second')
+            if kf.get("frame") is not None:
+                frame_px = int(kf["frame"])
+            else:
+                frame_px = int(round(float(kf.get("second", 0.0)) * fps))
+            idx = max(0, frame_px // tc)
+            strength = max(0.0, min(1.0, float(kf.get("strength", 0.8))))
+            img_id = f"ltxstudio_sb_img{i}"
+            prompt[img_id] = {"class_type": "LoadImage", "inputs": {"image": img},
+                              "_meta": {"title": f"LTX Studio storyboard: scena {i+1} (img)"}}
+            enc_id = f"ltxstudio_sb_enc{i}"
+            prompt[enc_id] = {"class_type": "VAEEncode",
+                              "inputs": {"pixels": [img_id, 0], "vae": [vae, 0]},
+                              "_meta": {"title": f"LTX Studio storyboard: scena {i+1} (encode)"}}
+            g_id = f"ltxstudio_sb_guide{i}"
+            prompt[g_id] = {"class_type": "LTXVAddLatentGuide",
+                            "inputs": {"vae": [vae, 0], "positive": prev_pos, "negative": prev_neg,
+                                       "latent": prev_lat, "guiding_latent": [enc_id, 0],
+                                       "latent_idx": idx, "strength": strength},
+                            "_meta": {"title": f"LTX Studio storyboard: scena {i+1} @frame {frame_px} (idx {idx})"}}
+            prev_pos, prev_neg, prev_lat = [g_id, 0], [g_id, 1], [g_id, 2]
+            used += 1
+        if used == 0:
+            return False
+        # wiring finale (come l'extend): catena guide → sampler/crop/concat
+        prompt[concat].setdefault("inputs", {})["video_latent"] = prev_lat
+        prompt[guider].setdefault("inputs", {})["positive"] = prev_pos
+        prompt[guider]["inputs"]["negative"] = prev_neg
+        if crop:
+            prompt[crop].setdefault("inputs", {})["positive"] = prev_pos
+            prompt[crop]["inputs"]["negative"] = prev_neg
         return True
 
     # ---------- I2V/EXTEND in spazio LATENTE (LTXVAddLatentGuide, come i V2V di riferimento) ----------

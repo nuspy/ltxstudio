@@ -1285,5 +1285,22 @@
   "adv.lv.anchor_every.tt": "每 N 个片段从原始照片而非上一帧重新开始（重置面部漂移）。0=从不（最大连续性）。仅当面部漂移过大时使用 2-4。",
   "adv.lv.resume": "崩溃后恢复",
   "adv.lv.resume.tt": "将每个已生成的片段保存到磁盘：如果生成中断（崩溃/关闭），重启时只重新生成缺失的片段，而不是从头开始。",
-  "f1.gen.auto": "⚡ 自动（最佳）"
+  "f1.gen.auto": "⚡ 自动（最佳）",
+  "vid.sb.group": "🎬 多场景故事板",
+  "vid.sb.enable": "启用故事板（多场景）",
+  "vid.sb.enable.tt": "用锚定在不同时间的多张关键帧图像生成一段连续视频：模型在场景间插值，无需剪辑。",
+  "vid.sb.hint": "每张图像是锚定在某一时刻的关键帧；模型在场景间插值 → 一段连续视频，无需剪辑。",
+  "vid.sb.add": "+ 添加场景",
+  "vid.sb.pick": "📷 图像",
+  "vid.sb.no_img": "（无图像）",
+  "vid.sb.at": "于",
+  "vid.sb.force": "强度",
+  "vid.sb.remove": "移除场景",
+  "vid.sb.second.tt": "在视频中锚定该图像的时刻（秒）。",
+  "vid.sb.strength.tt": "图像对场景的约束强度：1=刚性（运动少），0=自由。",
+  "vid.sb.err_min": "至少需要 2 个带图像的场景。",
+  "mw.sb_title": "故事板",
+  "mw.sb_invalid": "故事板无效：",
+  "mw.sb_upload_failed": "场景图像上传失败：{img}",
+  "mw.sb_log": "[故事板] {n} 个关键帧场景 → 多场景插值。"
 }

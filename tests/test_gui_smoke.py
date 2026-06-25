@@ -65,3 +65,48 @@ def test_faceswap_module_api():
     from core import faceswap
     assert isinstance(faceswap.available(), bool)
     assert hasattr(faceswap, "swap_image") and hasattr(faceswap, "swap_video")
+
+
+# ───────────────────────── Storyboard multi-scena ─────────────────────────
+def test_storyboard_panel(qtbot):
+    from ui.widgets.storyboard_panel import StoryboardPanel
+    p = StoryboardPanel(); qtbot.addWidget(p)
+    assert p.get_storyboard() == []                  # disattivo di default
+    p.enable.setChecked(True)
+    p._rows[0].image_path = "a.png"; p._rows[0].second.setValue(0.0)
+    p._rows[1].image_path = "b.png"; p._rows[1].second.setValue(5.0)
+    sb = p.get_storyboard()
+    assert len(sb) == 2 and sb[0]["second"] == 0.0 and sb[1]["image"] == "b.png"
+    assert p.validation_errors() == []               # 2 scene → valido
+
+
+def test_storyboard_chain():
+    """apply_storyboard costruisce una catena di LTXVAddLatentGuide correttamente connessa."""
+    from core.template_engine import TemplateEngine
+    prompt = {
+        "cc": {"class_type": "LTXVConcatAVLatent", "inputs": {}},
+        "cfg": {"class_type": "CFGGuider", "inputs": {}},
+        "el": {"class_type": "EmptyLTXVLatentVideo", "inputs": {}},
+        "pc": {"class_type": "LTXVConditioning", "inputs": {}},
+        "vae": {"class_type": "VAELoader", "inputs": {}},
+        "cg": {"class_type": "LTXVCropGuides", "inputs": {}},
+    }
+    eng = TemplateEngine.__new__(TemplateEngine)
+    eng.params = {}
+    ok = eng.apply_storyboard(prompt, {"fps": 25, "storyboard": [
+        {"image": "s1.png", "frame": 0, "strength": 0.8},
+        {"image": "s2.png", "second": 5.0, "strength": 0.6},
+        {"image": "s3.png", "frame": 260, "strength": 0.5},
+    ]})
+    assert ok
+    guides = sorted(k for k, v in prompt.items() if v["class_type"] == "LTXVAddLatentGuide")
+    assert len(guides) == 3
+    # frame→latent_idx (//8): 0→0, 125→15, 260→32
+    assert prompt[guides[1]]["inputs"]["latent_idx"] == 15
+    assert prompt[guides[2]]["inputs"]["latent_idx"] == 32
+    # catena: guide1 prende il latent dell'uscita di guide0
+    assert prompt[guides[1]]["inputs"]["latent"] == [guides[0], 2]
+    # uscita finale cablata su concat/guider/crop
+    assert prompt["cc"]["inputs"]["video_latent"] == [guides[2], 2]
+    assert prompt["cfg"]["inputs"]["positive"] == [guides[2], 0]
+    assert prompt["cg"]["inputs"]["negative"] == [guides[2], 1]
