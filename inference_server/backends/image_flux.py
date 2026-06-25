@@ -25,9 +25,17 @@ SPEC = {
     "ernie":   ("ErnieImagePipeline",  False, False),
     "kontext": ("FluxKontextPipeline", True,  True),
     "inpaint": ("FluxFillPipeline",    True,  True),
+    # #14 — FLUX.2 per editing/inpaint/outpaint/kontext (assemblati via _assemble_flux2; assemblaggio
+    # locale = supports_sf irrilevante, gestito da arch.startswith('flux2') in _load). I nomi delle
+    # classi diffusers vanno VALIDATI su GPU (diffusers evolve): qui le best-guess attuali. L'outpaint
+    # riusa flux2_inpaint con maschera INVERTITA (core.mask_utils.invert_mask).
+    "flux2_kontext": ("Flux2KontextPipeline",      False, True),
+    "flux2_inpaint": ("Flux2KleinInpaintPipeline", False, True),
 }
 VRAM_MB = {"flux": 16000, "flux2": 24000, "zimage": 12000, "ernie": 16000,
-           "kontext": 16000, "inpaint": 16000}
+           "kontext": 16000, "inpaint": 16000, "flux2_kontext": 24000, "flux2_inpaint": 24000}
+# archi che richiedono una maschera (inpaint-family)
+_MASK_ARCHS = ("inpaint", "flux2_inpaint")
 
 # Text encoder convertiti (pesi locali + config/tokenizer) e VAE locale, per i file solo-transformer
 TE_DIR = r"E:\AI\Models\diffusers\_te"
@@ -255,10 +263,19 @@ def run(params: dict, mm, output_dir: str) -> dict:
         if not img_p or not Path(img_p).exists():
             return {"status": "error", "error": f"'{arch}' richiede 'image_path' valido."}
         kw["image"] = Image.open(img_p).convert("RGB")
-        if arch == "inpaint":
+        if arch in _MASK_ARCHS:
             mk = params.get("mask_path")
             if not mk or not Path(mk).exists():
-                return {"status": "error", "error": "inpaint richiede 'mask_path' valido."}
+                return {"status": "error", "error": f"'{arch}' richiede 'mask_path' valido."}
+            # OUTPAINT = inpaint della regione COMPLEMENTARE → maschera invertita (riusa mask_utils)
+            if params.get("outpaint"):
+                try:
+                    from core import mask_utils
+                    inv = str(Path(output_dir) / "_outpaint_mask.png")
+                    os.makedirs(output_dir, exist_ok=True)
+                    mk = mask_utils.invert_mask(mk, inv)
+                except Exception as _e:                      # noqa: BLE001
+                    print(f"[inpaint] invert_mask fallito ({_e}); uso maschera originale", flush=True)
             kw["mask_image"] = Image.open(mk).convert("RGB")
     else:
         kw["width"] = int(params.get("width", 1024))

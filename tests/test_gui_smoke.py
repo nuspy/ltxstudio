@@ -155,3 +155,29 @@ def test_upload_manager(tmp_path, monkeypatch):
     assert upload_manager.stage_file(staged) == staged
     b = upload_manager.stage_bytes(b"\x89PNG", ".png")
     assert b.endswith(".png") and open(b, "rb").read() == b"\x89PNG"
+
+
+# ───────────────────────── #14 FLUX.2 inpaint/outpaint/kontext (scaffold) ─────────────────────────
+def test_flux2_spec():
+    from inference_server.backends import image_flux
+    # le nuove entry FLUX.2 editing devono esistere, richiedere immagine, e avere VRAM definita
+    for arch in ("flux2_kontext", "flux2_inpaint"):
+        assert arch in image_flux.SPEC
+        assert image_flux.SPEC[arch][2] is True            # needs_image
+        assert image_flux.VRAM_MB.get(arch)
+    assert "flux2_inpaint" in image_flux._MASK_ARCHS       # inpaint-family → richiede maschera
+
+
+# ───────────────────────── #24 ControlNet preprocess (canny a freddo) ─────────────────────────
+def test_controlnet_canny(tmp_path):
+    from core import controlnet_preprocess as cn
+    from PIL import Image
+    import numpy as np
+    # immagine con un bordo netto → canny deve produrre dei pixel bianchi
+    a = np.zeros((32, 32, 3), dtype="uint8"); a[:, 16:] = 255
+    src = tmp_path / "in.png"; Image.fromarray(a).save(src)
+    out = tmp_path / "canny.png"
+    cn.canny(str(src), str(out))
+    res = np.asarray(Image.open(out).convert("L"))
+    assert res.shape == (32, 32) and res.max() == 255     # ha trovato il bordo
+    assert "canny" in cn.KINDS and "depth" in cn.KINDS

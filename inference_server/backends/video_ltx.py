@@ -120,7 +120,17 @@ def run_condition(params: dict, mm, output_dir: str) -> dict:
         transformer=pipe.transformer, vocoder=pipe.vocoder)
     conds = []
     for c in params.get("conditions", []):
-        img = Image.open(c["image_path"]).convert("RGB")
+        ip = c["image_path"]
+        # ControlNet: pre-processa l'immagine-guida (canny/depth/pose) se richiesto (#24)
+        cn = c.get("controlnet")
+        if cn:
+            try:
+                from core import controlnet_preprocess
+                pre = os.path.join(output_dir, f"_cn_{cn}_{int(c.get('index', 0))}.png")
+                ip = controlnet_preprocess.preprocess(ip, cn, pre)
+            except Exception as _e:                          # noqa: BLE001
+                print(f"[video_edit] controlnet '{cn}' fallito ({_e}); uso immagine grezza", flush=True)
+        img = Image.open(ip).convert("RGB")
         conds.append(LTX2VideoCondition(frames=[img], index=int(c.get("index", 0)),
                                         strength=float(c.get("strength", 1.0))))
     seed = int(params.get("seed", 0))
