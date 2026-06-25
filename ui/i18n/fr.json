@@ -1278,5 +1278,12 @@
   "vid.rife.auto": "Fluidifier (RIFE) : moins de saccades, plus de fps",
   "vid.rife.auto.tt": "Après la génération, interpole des images intermédiaires (anti-saccade) ; double/quadruple les fps.",
   "vid.rife.factor.tt": "x2 double les fps, x4 les quadruple",
-  "vid.rife.factor_lbl": "Interpolation"
+  "vid.rife.factor_lbl": "Interpolation",
+  "adv.lv.ref_anchor_lbl": "Anti-dérive de scène (photo) :",
+  "adv.lv.ref_anchor.tt": "Réinjecte l'apparence de la photo originale dans chaque segment pour freiner la dégradation cumulative de toute la scène (flou, surexposition, artefacts) dans les vidéos très longues. 0=désactivé, 0.25 recommandé ; les valeurs élevées figent l'apparence et réduisent le mouvement.",
+  "adv.lv.anchor_every_lbl": "Réancrer le visage tous les (segments) :",
+  "adv.lv.anchor_every.tt": "Tous les N segments, repart de la PHOTO originale au lieu de la dernière image (réinitialise la dérive du visage). 0=jamais (continuité maximale). Utiliser 2-4 seulement si le visage dérive trop.",
+  "adv.lv.resume": "Reprendre après un plantage",
+  "adv.lv.resume.tt": "Enregistre chaque segment généré sur le disque : si la génération est interrompue (plantage/fermeture), au redémarrage seuls les segments manquants sont régénérés au lieu de tout recommencer.",
+  "f1.gen.auto": "⚡ Auto (meilleur)"
 }

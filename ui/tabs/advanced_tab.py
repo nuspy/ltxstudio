@@ -293,6 +293,19 @@ class AdvancedTab(QWidget):
         self.lv_ctx_strength.setSingleStep(0.05); self.lv_ctx_strength.setValue(0.5)
         self.lv_ctx_strength.setToolTip(tr("adv.lv.ctx_strength.tt"))
         f.addRow(tr("adv.lv.ctx_strength_lbl"), self.lv_ctx_strength)
+        # --- anti-drift (degrado cumulativo della scena nei video molto lunghi) ---
+        self.lv_ref_anchor = QDoubleSpinBox(); self.lv_ref_anchor.setRange(0.0, 1.0)
+        self.lv_ref_anchor.setSingleStep(0.05); self.lv_ref_anchor.setValue(0.25)
+        self.lv_ref_anchor.setToolTip(tr("adv.lv.ref_anchor.tt"))
+        f.addRow(tr("adv.lv.ref_anchor_lbl"), self.lv_ref_anchor)
+        self.lv_anchor_every = QSpinBox(); self.lv_anchor_every.setRange(0, 20); self.lv_anchor_every.setValue(0)
+        self.lv_anchor_every.setToolTip(tr("adv.lv.anchor_every.tt"))
+        f.addRow(tr("adv.lv.anchor_every_lbl"), self.lv_anchor_every)
+        # --- resume dopo crash ---
+        self.lv_resume = QCheckBox(tr("adv.lv.resume"))
+        self.lv_resume.setChecked(True)
+        self.lv_resume.setToolTip(tr("adv.lv.resume.tt"))
+        f.addRow(self.lv_resume)
         return grp
 
     # ---- API ----
@@ -308,6 +321,9 @@ class AdvancedTab(QWidget):
             "overlap": int(self.lv_overlap.value()),
             "context": int(self.lv_context.value()),
             "context_strength": float(self.lv_ctx_strength.value()),
+            "ref_anchor_strength": float(self.lv_ref_anchor.value()),
+            "anchor_every": int(self.lv_anchor_every.value()),
+            "resume": self.lv_resume.isChecked(),
         }
 
     @staticmethod

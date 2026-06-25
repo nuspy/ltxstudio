@@ -1278,5 +1278,12 @@
   "vid.rife.auto": "Simítás (RIFE): kevesebb akadás, több fps",
   "vid.rife.auto.tt": "Generálás után köztes képkockákat interpolál (akadásmentes); duplázza/négyszerezi az fps-t.",
   "vid.rife.factor.tt": "x2 duplázza az fps-t, x4 négyszerezi",
-  "vid.rife.factor_lbl": "Interpoláció"
+  "vid.rife.factor_lbl": "Interpoláció",
+  "adv.lv.ref_anchor_lbl": "Jelenet-elcsúszás elleni védelem (fotó):",
+  "adv.lv.ref_anchor.tt": "Az eredeti fotó megjelenését minden szegmensbe újra beadja, hogy fékezze az egész jelenet halmozódó romlását (elmosódás, túlexponálás, műtermékek) nagyon hosszú videóknál. 0=ki, 0.25 ajánlott; a magas értékek befagyasztják a megjelenést és csökkentik a mozgást.",
+  "adv.lv.anchor_every_lbl": "Arc újrahorgonyzása minden (szegmens):",
+  "adv.lv.anchor_every.tt": "Minden N szegmensnél az EREDETI fotóról indul újra az utolsó képkocka helyett (nullázza az arc elcsúszását). 0=soha (maximális folytonosság). 2-4 csak akkor, ha az arc túlságosan elcsúszik.",
+  "adv.lv.resume": "Folytatás összeomlás után",
+  "adv.lv.resume.tt": "Minden legenerált szegmenst lemezre ment: ha a generálás megszakad (összeomlás/bezárás), újraindításkor csak a hiányzó szegmenseket generálja újra, nem kezdi elölről.",
+  "f1.gen.auto": "⚡ Auto (legjobb)"
 }

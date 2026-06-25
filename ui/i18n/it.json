@@ -1375,5 +1375,12 @@
   "vid.rife.auto": "Fluidifica (RIFE): meno scatti, più fps",
   "vid.rife.auto.tt": "A fine generazione interpola frame intermedi (anti-scatto); raddoppia/quadruplica gli fps.",
   "vid.rife.factor.tt": "x2 raddoppia gli fps, x4 li quadruplica",
-  "vid.rife.factor_lbl": "Interpolazione"
+  "vid.rife.factor_lbl": "Interpolazione",
+  "adv.lv.ref_anchor_lbl": "Anti-drift scena (foto):",
+  "adv.lv.ref_anchor.tt": "Re-inietta l'aspetto della foto originale in ogni spezzone per frenare il degrado cumulativo dell'intera scena (sfocatura, sovraesposizione, artefatti) nei video molto lunghi. 0=off, 0.25 consigliato; valori alti congelano l'aspetto e riducono il movimento.",
+  "adv.lv.anchor_every_lbl": "Ri-ancora volto ogni (spezzoni):",
+  "adv.lv.anchor_every.tt": "Ogni N spezzoni riparte dalla FOTO originale invece che dall'ultimo frame (azzera la deriva del volto). 0=mai (massima continuità). Usare 2-4 solo se il volto deriva troppo.",
+  "adv.lv.resume": "Riprendi dopo crash",
+  "adv.lv.resume.tt": "Salva ogni spezzone generato su disco: se la generazione si interrompe (crash/chiusura), al riavvio rigenera solo gli spezzoni mancanti invece di ripartire da zero.",
+  "f1.gen.auto": "⚡ Auto (migliore)"
 }

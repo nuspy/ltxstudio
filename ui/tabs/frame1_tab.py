@@ -334,7 +334,12 @@ class Frame1Tab(QWidget):
         models = sorted(models, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
         self.gen_model.blockSignals(True)
         self.gen_model.clear()
-        self.gen_model.addItems(models or [tr("f1.gen.no_model")])
+        if models:
+            self.gen_model.addItem(tr("f1.gen.auto"), "__auto__")   # auto-select: miglior modello dell'arch
+            for m in models:
+                self.gen_model.addItem(m, m)
+        else:
+            self.gen_model.addItem(tr("f1.gen.no_model"), None)
         self.gen_model.blockSignals(False)
         self._update_gen_star()
         # Controlla se il golden template è disponibile per questa arch
@@ -371,7 +376,21 @@ class Frame1Tab(QWidget):
         self._update_inp_star()
 
     def _gen_model_name(self) -> str:
-        t = self.gen_model.currentText() if self.gen_model.count() else ""
+        """Nome modello selezionato; risolve la voce '⚡ Auto' al miglior modello dell'arch corrente
+        (stesso criterio del motore auto_select: preferiti + qualità di famiglia)."""
+        if not self.gen_model.count():
+            return ""
+        if self.gen_model.currentData() == "__auto__":
+            cands = [self.gen_model.itemData(i) for i in range(self.gen_model.count())
+                     if self.gen_model.itemData(i) not in ("__auto__", None)]
+            if not cands:
+                return ""
+            try:
+                from core import auto_select
+                return max(cands, key=lambda m: (user_prefs.is_fav_model(m), auto_select._pref(m)))
+            except Exception:                            # noqa: BLE001
+                return cands[0]
+        t = self.gen_model.currentText()
         return "" if t.startswith("(") else t
 
     def _update_gen_star(self, *_):
@@ -1068,7 +1087,7 @@ class Frame1Tab(QWidget):
             "pulid_face": pulid_face,
             "pulid_strength": (self.gen_pulid_strength.value() if hasattr(self, "gen_pulid_strength") else 0.8),
             "arch": {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
-            "model": self.gen_model.currentText(),
+            "model": self._gen_model_name(),
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),
             "cfg": float(self.gen_cfg.value()) if hasattr(self, "gen_cfg") else None,

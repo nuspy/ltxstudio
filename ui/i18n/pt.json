@@ -1278,5 +1278,12 @@
   "vid.rife.auto": "Suavizar (RIFE): menos tremores, mais fps",
   "vid.rife.auto.tt": "Após a geração interpola quadros intermediários (anti-tremor); duplica/quadruplica os fps.",
   "vid.rife.factor.tt": "x2 duplica os fps, x4 os quadruplica",
-  "vid.rife.factor_lbl": "Interpolação"
+  "vid.rife.factor_lbl": "Interpolação",
+  "adv.lv.ref_anchor_lbl": "Anti-deriva de cena (foto):",
+  "adv.lv.ref_anchor.tt": "Reinjeta a aparência da foto original em cada segmento para conter a degradação cumulativa de toda a cena (desfoque, superexposição, artefactos) em vídeos muito longos. 0=desligado, 0.25 recomendado; valores altos congelam a aparência e reduzem o movimento.",
+  "adv.lv.anchor_every_lbl": "Reancorar rosto a cada (segmentos):",
+  "adv.lv.anchor_every.tt": "A cada N segmentos reinicia a partir da FOTO original em vez do último fotograma (zera a deriva do rosto). 0=nunca (máxima continuidade). Usar 2-4 só se o rosto desviar demasiado.",
+  "adv.lv.resume": "Retomar após falha",
+  "adv.lv.resume.tt": "Guarda cada segmento gerado no disco: se a geração for interrompida (falha/fecho), ao reiniciar regenera apenas os segmentos em falta em vez de começar do zero.",
+  "f1.gen.auto": "⚡ Auto (melhor)"
 }

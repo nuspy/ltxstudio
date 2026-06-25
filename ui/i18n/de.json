@@ -1278,5 +1278,12 @@
   "vid.rife.auto": "Glätten (RIFE): weniger Ruckeln, mehr fps",
   "vid.rife.auto.tt": "Interpoliert nach der Generierung Zwischenbilder (Anti-Ruckeln); verdoppelt/vervierfacht die fps.",
   "vid.rife.factor.tt": "x2 verdoppelt die fps, x4 vervierfacht sie",
-  "vid.rife.factor_lbl": "Interpolation"
+  "vid.rife.factor_lbl": "Interpolation",
+  "adv.lv.ref_anchor_lbl": "Szenen-Anti-Drift (Foto):",
+  "adv.lv.ref_anchor.tt": "Speist das Erscheinungsbild des Originalfotos in jedes Segment ein, um die kumulative Verschlechterung der gesamten Szene (Unschärfe, Überbelichtung, Artefakte) in sehr langen Videos zu bremsen. 0=aus, 0.25 empfohlen; hohe Werte frieren das Aussehen ein und reduzieren die Bewegung.",
+  "adv.lv.anchor_every_lbl": "Gesicht neu verankern alle (Segmente):",
+  "adv.lv.anchor_every.tt": "Alle N Segmente Neustart vom ORIGINALFOTO statt vom letzten Frame (setzt die Gesichtsabweichung zurück). 0=nie (max. Kontinuität). 2-4 nur verwenden, wenn das Gesicht zu stark abweicht.",
+  "adv.lv.resume": "Nach Absturz fortsetzen",
+  "adv.lv.resume.tt": "Speichert jedes erzeugte Segment auf der Festplatte: Wird die Generierung unterbrochen (Absturz/Schließen), werden beim Neustart nur die fehlenden Segmente neu erzeugt statt von vorne zu beginnen.",
+  "f1.gen.auto": "⚡ Auto (beste)"
 }

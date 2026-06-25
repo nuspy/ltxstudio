@@ -107,6 +107,46 @@ def _slice_audio(audio: dict, t0: float, t1: float) -> dict:
     return {"waveform": w[:, :, int(t0 * sr):int(t1 * sr)], "sample_rate": sr}
 
 
+# ---- cache per-chunk su disco (RESUME dopo crash: rigenera solo i segmenti mancanti) ----
+def _save_chunk(imgs, path):
+    """Salva un chunk generato (tensor [n,H,W,3] 0..1) come mp4 quasi-lossless, in modo ATOMICO
+    (scrive su .part poi rinomina) così un crash a metà file non lascia un chunk corrotto valido."""
+    import numpy as np, subprocess, os
+    arr = (imgs.clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)
+    n, h, w, _ = arr.shape
+    part = path + ".part"
+    proc = subprocess.Popen(
+        ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", "25",
+         "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "12", "-pix_fmt", "yuv444p", part],
+        stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc.stdin.write(arr.tobytes()); proc.stdin.close()
+    if proc.wait() != 0:
+        try: os.remove(part)
+        except OSError: pass
+        return
+    os.replace(part, path)
+
+
+def _load_chunk(path, expect_nf):
+    """Ricarica un chunk dalla cache come tensor [n,H,W,3] float 0..1 (cpu). Ritorna None se il file
+    manca o il numero di frame non combacia (chunk troncato da un crash → va rigenerato)."""
+    import cv2, numpy as np, torch, os
+    if not os.path.exists(path):
+        return None
+    cap = cv2.VideoCapture(path)
+    frames = []
+    while True:
+        ok, fr = cap.read()
+        if not ok:
+            break
+        frames.append(cv2.cvtColor(fr, cv2.COLOR_BGR2RGB))
+    cap.release()
+    if not frames or abs(len(frames) - expect_nf) > 1:    # tolleranza 1 frame (arrotondamenti encoder)
+        return None
+    arr = np.stack(frames).astype("float32") / 255.0
+    return torch.from_numpy(arr)
+
+
 def _auto_blocks_to_swap(fp, model_name, total_blocks=40, reserve_gb=12.0):
     """Tara block_swap sulla VRAM del computer: tiene più blocchi possibile residenti in VRAM,
     lasciando `reserve_gb` per attivazioni/VAE/altri modelli. Generico per ogni GPU (5090→0 swap,
@@ -201,11 +241,20 @@ def run(p: dict) -> str:
     sched = p.get("scheduler", "dpm++_sde"); ascale = float(p.get("audio_scale", 2.0))
     acfg = float(p.get("audio_cfg_scale", 1.0)); use_ctx = bool(p.get("context", False))
 
-    def _gen_chunk(start_t, audio_d, nf, seed_c):
-        """Genera UN segmento da `nf` frame partendo da start_t (continuità) + finestra audio."""
-        clipemb = _call(NM["WanVideoClipVisionEncode"],
-                        clip_vision=clipv, image_1=start_t, strength_1=1.0, strength_2=1.0,
-                        crop="center", combine_embeds="average", force_offload=True)
+    def _gen_chunk(start_t, audio_d, nf, seed_c, anchor=None, anchor_str=0.0):
+        """Genera UN segmento da `nf` frame partendo da start_t (continuità) + finestra audio.
+        Anti-drift: se `anchor` (foto originale) e anchor_str>0, re-inietta l'aspetto GLOBALE originale
+        nel clip-vision di OGNI chunk (image_2) → frena il degrado cumulativo di tutta la scena
+        (sfocatura/sovraesposizione/artefatti) tipico dell'autoregressione, senza stacchi netti."""
+        if anchor is not None and anchor_str > 0:
+            clipemb = _call(NM["WanVideoClipVisionEncode"],
+                            clip_vision=clipv, image_1=start_t, image_2=anchor,
+                            strength_1=1.0, strength_2=float(anchor_str),
+                            crop="center", combine_embeds="average", force_offload=True)
+        else:
+            clipemb = _call(NM["WanVideoClipVisionEncode"],
+                            clip_vision=clipv, image_1=start_t, strength_1=1.0, strength_2=1.0,
+                            crop="center", combine_embeds="average", force_offload=True)
         imgemb = _call(NM["WanVideoImageToVideoEncode"],
                        width=W, height=H, num_frames=nf, noise_aug_strength=0.0, start_latent_strength=1.0,
                        end_latent_strength=1.0, force_offload=True, vae=vae, clip_embeds=clipemb, start_image=start_t)
@@ -229,10 +278,40 @@ def run(p: dict) -> str:
     SEG = int(p.get("seg_frames", 0) or 0) or int(15 * FPS)   # default 15s/segmento (override da GUI)
     OVERLAP = int(p.get("overlap_frames", 0) or 0) or 12       # frame di crossfade (override da GUI: lv_overlap)
     anchor_every = int(p.get("anchor_every", 0) or 0)         # 0=continuità; N=ri-ancora la FOTO ogni N chunk (anti-drift volto)
+    ref_anchor = float(p.get("ref_anchor_strength", 0.25) or 0.0)  # 0..1: re-inietta l'aspetto GLOBALE originale in OGNI chunk (anti-drift scena)
+    resume = bool(p.get("resume", True))                       # RESUME: rigenera solo i chunk mancanti dopo un crash
     tg = time.time()
     os.makedirs(os.path.dirname(p["output"]) or ".", exist_ok=True)
     tmp = p["output"] + ".noaudio.mp4"
     writer = {"proc": None}
+
+    # cache per-chunk: dir + chiave-parametri. Se i parametri cambiano, la cache è invalidata (i chunk
+    # vecchi non sono più coerenti col nuovo render → si rigenera tutto).
+    cdir = p["output"] + ".chunks"
+    if resume and F > SEG:
+        from glob import glob as _glob
+        os.makedirs(cdir, exist_ok=True)
+        key = {"W": W, "H": H, "F": F, "FPS": FPS, "SEG": SEG, "OVERLAP": OVERLAP, "seed": seed,
+               "steps": steps, "cfg": cfg, "shift": shift, "model": model_name, "anchor_every": anchor_every,
+               "audio": os.path.abspath(p["audio_path"]), "image": os.path.abspath(img_path or "")}
+        mpath = os.path.join(cdir, "meta.json")
+        old = None
+        if os.path.exists(mpath):
+            try:
+                with open(mpath, encoding="utf-8") as fh:
+                    old = json.load(fh)
+            except Exception:                                # noqa: BLE001
+                old = None
+        if old != key:
+            for f in _glob(os.path.join(cdir, "chunk_*.mp4")):
+                try: os.remove(f)
+                except OSError: pass
+            with open(mpath, "w", encoding="utf-8") as fh:
+                json.dump(key, fh)
+        else:
+            done = len(_glob(os.path.join(cdir, "chunk_*.mp4")))
+            if done:
+                print(f"[resume] trovati {done} chunk in cache -> rigenero solo i mancanti", flush=True)
 
     def _emit(frames):
         if frames is None or frames.shape[0] == 0:
@@ -267,9 +346,19 @@ def run(p: dict) -> str:
             if nf < 25:
                 break
             a0, a1 = n0 / FPS, (n0 + nf) / FPS
-            print(f"[chunk {ci}] frame {n0}..{n0 + nf} ({a0:.1f}-{a1:.1f}s)", flush=True)
-            start = img_t if (anchor_every and ci % anchor_every == 0) else cur   # anti-drift opzionale
-            imgs = _gen_chunk(start, _slice_audio(audio_full, a0, a1), nf, seed + ci)
+            cpath = os.path.join(cdir, f"chunk_{ci:04d}.mp4")
+            imgs = _load_chunk(cpath, nf) if (resume and F > SEG) else None
+            if imgs is not None:
+                print(f"[chunk {ci}] RIPRESO da cache ({imgs.shape[0]} frame, {a0:.1f}-{a1:.1f}s)", flush=True)
+            else:
+                print(f"[chunk {ci}] frame {n0}..{n0 + nf} ({a0:.1f}-{a1:.1f}s)", flush=True)
+                start = img_t if (anchor_every and ci % anchor_every == 0) else cur   # anti-drift opzionale
+                # anti-drift globale: dal 2° chunk in poi re-inietta l'aspetto della foto originale
+                anc = img_t if (ref_anchor > 0 and ci > 0) else None
+                imgs = _gen_chunk(start, _slice_audio(audio_full, a0, a1), nf, seed + ci,
+                                  anchor=anc, anchor_str=ref_anchor)
+                if resume and F > SEG:
+                    _save_chunk(imgs, cpath)               # persisti SUBITO: se crasha qui, alla ripresa lo si salta
             body = imgs
             if ci > 0:                                   # fonde l'overlap col chunk precedente (crossfade)
                 body, ov = _xfade(prev_tail, imgs); nframes += ov
@@ -294,6 +383,10 @@ def run(p: dict) -> str:
         os.remove(tmp)
     except OSError:
         pass
+    # video completato con successo → libera la cache dei chunk (a meno di keep_chunks per debug)
+    if resume and F > SEG and not p.get("keep_chunks"):
+        import shutil
+        shutil.rmtree(cdir, ignore_errors=True)
     return p["output"]
 
 

@@ -1849,8 +1849,12 @@ class MainWindow(QMainWindow):
             lv = self.advanced_tab.long_video_config()
             seg_frames = int(float(lv.get("seg_seconds", 15) or 15) * fps)
             overlap_frames = int(lv.get("overlap", 12) or 12)
+            ref_anchor = float(lv.get("ref_anchor_strength", 0.25))
+            anchor_every = int(lv.get("anchor_every", 0) or 0)
+            resume = bool(lv.get("resume", True))
         except Exception:                               # noqa: BLE001
             seg_frames, overlap_frames = int(15 * fps), 12
+            ref_anchor, anchor_every, resume = 0.25, 0, True
         params = {
             "image_path": image_path, "source_video": src_video,
             "audio_path": audio_path,
@@ -1859,6 +1863,7 @@ class MainWindow(QMainWindow):
             "num_frames": max(25, int(length * fps)), "fps": fps,
             "separate_vocals": sep, "audio_scale": ascale, "blocks_to_swap": "auto", "context": True,
             "seg_frames": seg_frames, "overlap_frames": overlap_frames,
+            "ref_anchor_strength": ref_anchor, "anchor_every": anchor_every, "resume": resume,
             "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
         }
         self._start_native_multitalk(params)

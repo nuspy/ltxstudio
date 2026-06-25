@@ -1278,5 +1278,12 @@
   "vid.rife.auto": "平滑（RIFE）：减少卡顿，提高帧率",
   "vid.rife.auto.tt": "生成后插入中间帧（防卡顿）；将帧率加倍/翻四倍。",
   "vid.rife.factor.tt": "x2 帧率加倍，x4 翻四倍",
-  "vid.rife.factor_lbl": "插帧"
+  "vid.rife.factor_lbl": "插帧",
+  "adv.lv.ref_anchor_lbl": "场景防漂移（照片）:",
+  "adv.lv.ref_anchor.tt": "将原始照片的外观重新注入每个片段，以抑制超长视频中整个场景的累积退化（模糊、过曝、伪影）。0=关闭，推荐 0.25；过高的值会冻结外观并减少运动。",
+  "adv.lv.anchor_every_lbl": "每隔（片段）重新锚定面部:",
+  "adv.lv.anchor_every.tt": "每 N 个片段从原始照片而非上一帧重新开始（重置面部漂移）。0=从不（最大连续性）。仅当面部漂移过大时使用 2-4。",
+  "adv.lv.resume": "崩溃后恢复",
+  "adv.lv.resume.tt": "将每个已生成的片段保存到磁盘：如果生成中断（崩溃/关闭），重启时只重新生成缺失的片段，而不是从头开始。",
+  "f1.gen.auto": "⚡ 自动（最佳）"
 }

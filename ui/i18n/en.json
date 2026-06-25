@@ -1375,5 +1375,12 @@
   "vid.rife.auto": "Smooth (RIFE): less judder, more fps",
   "vid.rife.auto.tt": "After generation, interpolates in-between frames (anti-judder); doubles/quadruples the fps.",
   "vid.rife.factor.tt": "x2 doubles the fps, x4 quadruples them",
-  "vid.rife.factor_lbl": "Interpolation"
+  "vid.rife.factor_lbl": "Interpolation",
+  "adv.lv.ref_anchor_lbl": "Scene anti-drift (photo):",
+  "adv.lv.ref_anchor.tt": "Re-injects the original photo's appearance into every segment to curb cumulative degradation of the whole scene (blur, over-exposure, artifacts) in very long videos. 0=off, 0.25 recommended; high values freeze the look and reduce motion.",
+  "adv.lv.anchor_every_lbl": "Re-anchor face every (segments):",
+  "adv.lv.anchor_every.tt": "Every N segments restarts from the ORIGINAL photo instead of the last frame (resets face drift). 0=never (max continuity). Use 2-4 only if the face drifts too much.",
+  "adv.lv.resume": "Resume after crash",
+  "adv.lv.resume.tt": "Saves every generated segment to disk: if generation is interrupted (crash/close), on restart it regenerates only the missing segments instead of starting over.",
+  "f1.gen.auto": "⚡ Auto (best)"
 }
