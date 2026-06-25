@@ -139,7 +139,7 @@ class LoraTab(QWidget):
             cb = QCheckBox(f"{e.name}{badge}{trig}")
             # Ripristina dal dict persistente (sopravvive ai cicli di filtro);
             # default strength = ultima salvata a mano per questa LoRA (user_prefs).
-            default_strength = user_prefs.get_lora_strength(e.comfy_name, 1.0)
+            default_strength = user_prefs.get_lora_strength(e.comfy_name, 0.6)
             _sel = self._persistent_selection.get(e.name, (False, default_strength, None))
             prev_checked, prev_strength = _sel[0], _sel[1]
             # restore da gui_state/preset (per comfy_name): forza selezione + strength

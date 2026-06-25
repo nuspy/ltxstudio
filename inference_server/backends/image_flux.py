@@ -214,7 +214,9 @@ def _load(model_path: str, arch: str):
     except Exception:                                   # noqa: BLE001
         pass
     attn = _set_attention(pipe)
-    fb = _apply_fbcache(pipe)
+    # FBCache rompe gli arch image-conditioned (Kontext/inpaint): la pipeline non entra nel context
+    # manager dell'hook → "No context is set". Lo applichiamo solo ai t2i puri.
+    fb = _apply_fbcache(pipe) if not SPEC.get(arch, ("", False, False))[2] else False
     comp = _maybe_compile(pipe)
     where = _place(pipe, VRAM_MB.get(arch, 16000))
     print(f"[image] {arch}: {where}, attention={attn}, fbcache={fb}, compile={comp}", flush=True)

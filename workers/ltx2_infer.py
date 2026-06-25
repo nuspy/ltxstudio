@@ -19,6 +19,19 @@ import torch
 # torch.inference_mode() usato di default dalle pipeline. Lo rimpiazziamo con no_grad.
 torch.inference_mode = torch.no_grad
 
+# Compat torch 2.9.1+cu130: torch._scaled_mm (path quant fp8_scaled_mm di ltx_core) ora ESIGE le
+# scale in float32 ("scales should be float and singletons"); ltx_core le passa in bf16 →
+# "RuntimeError: Invalid scaling configuration". Patchiamo qui (nostro worker, NON il pacchetto):
+# castiamo a float32 le scale prima della chiamata.
+_orig_scaled_mm = torch._scaled_mm
+def _scaled_mm_f32(*args, **kw):                              # noqa: ANN001,ANN201
+    if kw.get("scale_a") is not None and kw["scale_a"].dtype != torch.float32:
+        kw["scale_a"] = kw["scale_a"].float()
+    if kw.get("scale_b") is not None and kw["scale_b"].dtype != torch.float32:
+        kw["scale_b"] = kw["scale_b"].float()
+    return _orig_scaled_mm(*args, **kw)
+torch._scaled_mm = _scaled_mm_f32
+
 from ltx_core.components.guiders import MultiModalGuiderParams
 from ltx_core.loader import LoraPathStrengthAndSDOps, LTXV_LORA_COMFY_RENAMING_MAP
 from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
