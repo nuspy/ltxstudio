@@ -104,6 +104,11 @@ def test_storyboard_chain():
     # frame→latent_idx (//8): 0→0, 125→15, 260→32
     assert prompt[guides[1]]["inputs"]["latent_idx"] == 15
     assert prompt[guides[2]]["inputs"]["latent_idx"] == 32
+    # ogni keyframe è ridimensionato (ImageScale) alla risoluzione del video prima del VAEEncode
+    scales = [k for k, v in prompt.items() if v["class_type"] == "ImageScale"]
+    assert len(scales) == 3
+    enc0 = next(k for k, v in prompt.items() if v["class_type"] == "VAEEncode" and "enc0" in k)
+    assert prompt[enc0]["inputs"]["pixels"][0].endswith("scale0")     # encode legge dal resize
     # catena: guide1 prende il latent dell'uscita di guide0
     assert prompt[guides[1]]["inputs"]["latent"] == [guides[0], 2]
     # uscita finale cablata su concat/guider/crop

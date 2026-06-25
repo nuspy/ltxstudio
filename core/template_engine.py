@@ -892,6 +892,15 @@ class TemplateEngine:
             return False
         fps = float(values.get("fps", 25) or 25)
         tc = self.LTX_TEMPORAL_COMPRESSION
+        # risoluzione del video: i keyframe vanno RIDIMENSIONATI a W×H, altrimenti LTXVAddLatentGuide
+        # fallisce ("ratio of height/width of latents and guiding_latents must be an integer").
+        # La risoluzione del video latent può essere CALCOLATA da nodi (FluxResolutionNode) → l'input
+        # width/height dell'EmptyLTXVLatentVideo è spesso un collegamento [node,slot], non un numero.
+        # Per far combaciare il keyframe col latent video (vincolo LTXVAddLatentGuide), ridimensiono il
+        # keyframe usando la STESSA sorgente width/height dell'empty latent (literal o connessione).
+        _ei = prompt[empty_lat].get("inputs", {})
+        w_src = _ei.get("width", int(values.get("width") or 768))
+        h_src = _ei.get("height", int(values.get("height") or 768))
         # azzera i keyframe AddGuide baked nel template (eviterebbero doppio condizionamento)
         for _n in prompt.values():
             if _n.get("class_type") == "LTXVAddGuide":
@@ -913,9 +922,14 @@ class TemplateEngine:
             img_id = f"ltxstudio_sb_img{i}"
             prompt[img_id] = {"class_type": "LoadImage", "inputs": {"image": img},
                               "_meta": {"title": f"LTX Studio storyboard: scena {i+1} (img)"}}
+            scale_id = f"ltxstudio_sb_scale{i}"     # resize alla STESSA risoluzione del latent video
+            prompt[scale_id] = {"class_type": "ImageScale",
+                                "inputs": {"image": [img_id, 0], "upscale_method": "lanczos",
+                                           "width": w_src, "height": h_src, "crop": "center"},
+                                "_meta": {"title": f"LTX Studio storyboard: scena {i+1} (resize=video)"}}
             enc_id = f"ltxstudio_sb_enc{i}"
             prompt[enc_id] = {"class_type": "VAEEncode",
-                              "inputs": {"pixels": [img_id, 0], "vae": [vae, 0]},
+                              "inputs": {"pixels": [scale_id, 0], "vae": [vae, 0]},
                               "_meta": {"title": f"LTX Studio storyboard: scena {i+1} (encode)"}}
             g_id = f"ltxstudio_sb_guide{i}"
             prompt[g_id] = {"class_type": "LTXVAddLatentGuide",
