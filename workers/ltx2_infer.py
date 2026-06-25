@@ -36,6 +36,7 @@ from ltx_core.components.guiders import MultiModalGuiderParams
 from ltx_core.loader import LoraPathStrengthAndSDOps, LTXV_LORA_COMFY_RENAMING_MAP
 from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
 from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
+from ltx_pipelines.a2vid_two_stage import A2VidPipelineTwoStage   # audio→video (lip-sync canto), nativo
 from ltx_pipelines.utils.args import ImageConditioningInput
 from ltx_pipelines.utils.media_io import encode_video
 from ltx_pipelines.utils.types import OffloadMode
@@ -287,10 +288,11 @@ def _resolve_ckpt(model: str) -> str:
     return ckpt
 
 
-def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two"):
-    """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco."""
+def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two", ptype: str = "ti2v"):
+    """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco.
+    ptype: 'ti2v' (testo/immagine→video) oppure 'a2v' (audio→video, lip-sync/canto)."""
     lkey = tuple((lo.path, lo.strength) for lo in loras)
-    key = (ckpt, qmode, offload_str, lkey, stages)
+    key = (ckpt, qmode, offload_str, lkey, stages, ptype)
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     quant = None
@@ -309,7 +311,8 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     if qmode == "fp8_scaled_mm" and offload != OffloadMode.NONE and quant is not None:
         import ltx_pipelines.utils.blocks as _blocks
         _blocks.fp8_cast_fuse_rule = quant.fuse_rule
-    pipe = TI2VidTwoStagesPipeline(
+    Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
+    pipe = Klass(
         checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
         gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     _PIPE_CACHE.clear()                                       # 1 pipeline alla volta (VRAM/RAM)
@@ -335,8 +338,9 @@ def run_generation(p: dict) -> str:
     ckpt = _resolve_ckpt(p.get("model"))
     qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
     t0 = time.time()
-    pipe = _get_pipe(ckpt, qmode, p.get("offload", "cpu"), loras)
-    print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode})", flush=True)
+    ptype = "a2v" if p.get("audio_path") else "ti2v"          # audio dato → lip-sync/canto NATIVO
+    pipe = _get_pipe(ckpt, qmode, p.get("offload", "cpu"), loras, ptype=ptype)
+    print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)
     if torch.cuda.is_available():
         print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "
               f"{torch.cuda.memory_reserved()/1e9:.1f}GB reserved", flush=True)
@@ -346,19 +350,30 @@ def run_generation(p: dict) -> str:
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
     ag = MultiModalGuiderParams(cfg_scale=7.0, stg_scale=1.0, rescale_scale=0.7,
                                 modality_scale=3.0, stg_blocks=[29])
-    images = []
-    if p.get("image_path"):                                  # i2v: condiziona sul primo frame
-        images = [ImageConditioningInput(p["image_path"], 0, 1.0, 33)]
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
     tg = time.time()
-    video, audio = pipe(
-        prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
-        seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
-        num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
-        video_guider_params=vg, audio_guider_params=ag, images=images,
-        tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
-    print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video)", flush=True)
+    if ptype == "a2v":                                       # AUDIO→VIDEO nativo: foto + canzone → canto
+        imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
+        video, audio = pipe(
+            prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+            seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+            num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 30)),
+            video_guider_params=vg, images=imgs, audio_path=p["audio_path"],
+            audio_start_time=float(p.get("audio_start_time", 0.0)),
+            audio_max_duration=p.get("audio_max_duration"),
+            tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+    else:
+        images = []
+        if p.get("image_path"):                              # i2v: condiziona sul primo frame
+            images = [ImageConditioningInput(p["image_path"], 0, 1.0, 33)]
+        video, audio = pipe(
+            prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+            seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+            num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
+            video_guider_params=vg, audio_guider_params=ag, images=images,
+            tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+    print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video, {ptype})", flush=True)
     out = p["output"]
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
