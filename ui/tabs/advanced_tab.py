@@ -57,6 +57,13 @@ class SamplerSeedGroup(QGroupBox):
     _DEFAULT_CFG = 1.0
     _DEFAULT_SAMPLER = "euler_ancestral_cfg_pp"
     _DEFAULT_SCHEDULER = "LTXVScheduler (shift)"
+    # Preset qualità Fast/Pro/HQ → (steps, cfg). Il primo è "Personalizzato" (no-op, steps/cfg None).
+    _QUALITY_PRESETS = [
+        ("adv.quality.custom", None, None),
+        ("adv.quality.fast", 8, 1.0),
+        ("adv.quality.pro", 30, 3.0),
+        ("adv.quality.hq", 50, 4.0),
+    ]
 
     def __init__(self):
         super().__init__(tr("adv.sampler.group"))
@@ -83,6 +90,17 @@ class SamplerSeedGroup(QGroupBox):
         steps_cfg.addWidget(QLabel(tr("adv.cfg_lbl"))); steps_cfg.addWidget(self.cfg)
         steps_cfg.addStretch(1)
         f.addRow(tr("adv.steps_cfg_lbl"), steps_cfg)
+
+        # Preset qualità Fast/Pro/HQ (modalità ufficiali LTX-2.3): scorciatoia che imposta steps+cfg.
+        # "Personalizzato" (default) = non tocca nulla; scegliere un preset compila i campi sopra,
+        # che restano modificabili a mano. NB: non cambia il MODELLO (la vecchia quality-mode
+        # Distilled/Base era diversa ed è stata rimossa).
+        self.quality_preset = QComboBox()
+        for key, _s, _c in self._QUALITY_PRESETS:
+            self.quality_preset.addItem(tr(key), (_s, _c))
+        self.quality_preset.setToolTip(tr("adv.quality.tt"))
+        self.quality_preset.currentIndexChanged.connect(self._apply_quality_preset)
+        f.addRow(tr("adv.quality_lbl"), self.quality_preset)
 
         self.sampler = QComboBox()
         self.sampler.addItems(SAMPLERS)
@@ -137,6 +155,17 @@ class SamplerSeedGroup(QGroupBox):
         self.seed.setRange(0, 2**31 - 1)
         self.seed.setValue(777)
         f.addRow(tr("adv.seed_lbl"), self.seed)
+
+    def _apply_quality_preset(self, *_):
+        """Preset Fast/Pro/HQ: compila steps+cfg (restano modificabili). 'Personalizzato'=no-op."""
+        data = self.quality_preset.currentData()
+        if not data:
+            return
+        steps, cfg = data
+        if steps is not None:
+            self.steps.setValue(int(steps))
+        if cfg is not None:
+            self.cfg.setValue(float(cfg))
 
     # ---------- suggest API (chiamata da VideoTab quando cambia il modello) ----------
     def set_suggested_steps(self, steps: int, note: str = ""):

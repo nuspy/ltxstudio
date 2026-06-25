@@ -1302,5 +1302,11 @@
   "mw.sb_title": "Storyboard",
   "mw.sb_invalid": "Storyboard no válido:",
   "mw.sb_upload_failed": "Error al subir la imagen de la escena: {img}",
-  "mw.sb_log": "[Storyboard] {n} escenas-keyframe → interpolación multiescena."
+  "mw.sb_log": "[Storyboard] {n} escenas-keyframe → interpolación multiescena.",
+  "adv.quality_lbl": "Calidad (preajuste):",
+  "adv.quality.tt": "Atajo para fijar pasos+CFG según los modos oficiales LTX-2.3. 'Personalizado' no cambia nada; los valores siguen siendo editables.",
+  "adv.quality.custom": "Personalizado",
+  "adv.quality.fast": "Fast (rápido, 8 pasos)",
+  "adv.quality.pro": "Pro (equilibrado, 30 pasos)",
+  "adv.quality.hq": "HQ (máx, 50 pasos)"
 }

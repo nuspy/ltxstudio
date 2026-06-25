@@ -1302,5 +1302,11 @@
   "mw.sb_title": "Storyboard",
   "mw.sb_invalid": "Storyboard inválido:",
   "mw.sb_upload_failed": "Falha no envio da imagem da cena: {img}",
-  "mw.sb_log": "[Storyboard] {n} cenas-keyframe → interpolação multicena."
+  "mw.sb_log": "[Storyboard] {n} cenas-keyframe → interpolação multicena.",
+  "adv.quality_lbl": "Qualidade (predefinição):",
+  "adv.quality.tt": "Atalho para definir passos+CFG conforme os modos oficiais LTX-2.3. 'Personalizado' não altera nada; os valores continuam editáveis.",
+  "adv.quality.custom": "Personalizado",
+  "adv.quality.fast": "Fast (rápido, 8 passos)",
+  "adv.quality.pro": "Pro (equilibrado, 30 passos)",
+  "adv.quality.hq": "HQ (máx, 50 passos)"
 }

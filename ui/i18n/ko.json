@@ -1302,5 +1302,11 @@
   "mw.sb_title": "스토리보드",
   "mw.sb_invalid": "잘못된 스토리보드:",
   "mw.sb_upload_failed": "장면 이미지 업로드 실패: {img}",
-  "mw.sb_log": "[스토리보드] {n}개 키프레임 장면 → 다중 장면 보간."
+  "mw.sb_log": "[스토리보드] {n}개 키프레임 장면 → 다중 장면 보간.",
+  "adv.quality_lbl": "품질 (프리셋):",
+  "adv.quality.tt": "공식 LTX-2.3 모드에 따라 스텝+CFG를 설정하는 단축. '사용자 지정'은 아무것도 바꾸지 않으며 값은 수동 편집 가능합니다.",
+  "adv.quality.custom": "사용자 지정",
+  "adv.quality.fast": "Fast (빠름, 8 스텝)",
+  "adv.quality.pro": "Pro (균형, 30 스텝)",
+  "adv.quality.hq": "HQ (최대, 50 스텝)"
 }

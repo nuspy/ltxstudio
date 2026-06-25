@@ -1302,5 +1302,11 @@
   "mw.sb_title": "Storyboard",
   "mw.sb_invalid": "Μη έγκυρο storyboard:",
   "mw.sb_upload_failed": "Αποτυχία μεταφόρτωσης εικόνας σκηνής: {img}",
-  "mw.sb_log": "[Storyboard] {n} σκηνές-keyframe → παρεμβολή πολλαπλών σκηνών."
+  "mw.sb_log": "[Storyboard] {n} σκηνές-keyframe → παρεμβολή πολλαπλών σκηνών.",
+  "adv.quality_lbl": "Ποιότητα (προεπιλογή):",
+  "adv.quality.tt": "Συντόμευση για ορισμό βημάτων+CFG σύμφωνα με τις επίσημες λειτουργίες LTX-2.3. Το 'Προσαρμοσμένο' δεν αλλάζει τίποτα· οι τιμές παραμένουν επεξεργάσιμες.",
+  "adv.quality.custom": "Προσαρμοσμένο",
+  "adv.quality.fast": "Fast (γρήγορο, 8 βήματα)",
+  "adv.quality.pro": "Pro (ισορροπημένο, 30 βήματα)",
+  "adv.quality.hq": "HQ (μέγ., 50 βήματα)"
 }

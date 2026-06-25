@@ -110,3 +110,48 @@ def test_storyboard_chain():
     assert prompt["cc"]["inputs"]["video_latent"] == [guides[2], 2]
     assert prompt["cfg"]["inputs"]["positive"] == [guides[2], 0]
     assert prompt["cg"]["inputs"]["negative"] == [guides[2], 1]
+
+
+# ───────────────────────── #29 Preset qualità Fast/Pro/HQ ─────────────────────────
+def test_quality_preset(qtbot):
+    from ui.tabs.advanced_tab import SamplerSeedGroup
+    g = SamplerSeedGroup(); qtbot.addWidget(g)
+    # default = "Personalizzato" → non altera steps/cfg di default
+    assert g.quality_preset.currentIndex() == 0
+    base_steps = g.steps.value()
+    # Fast → 8 step / cfg 1.0
+    g.quality_preset.setCurrentIndex(1)
+    assert g.steps.value() == 8 and abs(g.cfg.value() - 1.0) < 0.01
+    # HQ → 50 step / cfg 4.0
+    g.quality_preset.setCurrentIndex(3)
+    assert g.steps.value() == 50 and abs(g.cfg.value() - 4.0) < 0.01
+    assert base_steps  # sanity
+
+
+# ───────────────────────── #28 Helper no-ComfyUI (mask/upload) ─────────────────────────
+def test_mask_utils(tmp_path):
+    from core import mask_utils
+    from PIL import Image
+    ref = tmp_path / "ref.png"; Image.new("RGB", (16, 16), (120, 30, 200)).save(ref)
+    mask = tmp_path / "mask.png"
+    m = Image.new("L", (16, 16), 0); m.putpixel((4, 4), 255); m.save(mask)
+    out = tmp_path / "merged.png"
+    mask_utils.merge_mask_into_alpha(str(ref), str(mask), str(out))
+    merged = Image.open(out)
+    assert merged.mode == "RGBA"
+    assert merged.getchannel("A").getpixel((4, 4)) == 255
+    assert merged.getchannel("A").getpixel((0, 0)) == 0
+    arr = mask_utils.load_mask_array(str(mask))
+    assert arr.shape == (16, 16) and arr.max() <= 1.0 and arr[4, 4] == 1.0
+
+
+def test_upload_manager(tmp_path, monkeypatch):
+    from core import upload_manager
+    monkeypatch.setattr(upload_manager, "_DEFAULT_DIR", str(tmp_path / "inputs"))
+    src = tmp_path / "a.txt"; src.write_text("hello", encoding="utf-8")
+    staged = upload_manager.stage_file(str(src))
+    assert staged != str(src) and open(staged).read() == "hello"
+    # idempotente: ri-staging di un file già staged lo ritorna invariato
+    assert upload_manager.stage_file(staged) == staged
+    b = upload_manager.stage_bytes(b"\x89PNG", ".png")
+    assert b.endswith(".png") and open(b, "rb").read() == b"\x89PNG"

@@ -1302,5 +1302,11 @@
   "mw.sb_title": "Storyboard",
   "mw.sb_invalid": "Érvénytelen storyboard:",
   "mw.sb_upload_failed": "A jelenet képének feltöltése sikertelen: {img}",
-  "mw.sb_log": "[Storyboard] {n} kulcskép-jelenet → többjelenetes interpoláció."
+  "mw.sb_log": "[Storyboard] {n} kulcskép-jelenet → többjelenetes interpoláció.",
+  "adv.quality_lbl": "Minőség (beállítás):",
+  "adv.quality.tt": "Gyorsbeállítás a lépések+CFG megadására a hivatalos LTX-2.3 módok szerint. Az 'Egyéni' nem módosít semmit; az értékek kézzel szerkeszthetők maradnak.",
+  "adv.quality.custom": "Egyéni",
+  "adv.quality.fast": "Fast (gyors, 8 lépés)",
+  "adv.quality.pro": "Pro (kiegyensúlyozott, 30 lépés)",
+  "adv.quality.hq": "HQ (max, 50 lépés)"
 }

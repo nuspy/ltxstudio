@@ -1302,5 +1302,11 @@
   "mw.sb_title": "故事板",
   "mw.sb_invalid": "故事板无效：",
   "mw.sb_upload_failed": "场景图像上传失败：{img}",
-  "mw.sb_log": "[故事板] {n} 个关键帧场景 → 多场景插值。"
+  "mw.sb_log": "[故事板] {n} 个关键帧场景 → 多场景插值。",
+  "adv.quality_lbl": "质量（预设）：",
+  "adv.quality.tt": "按官方 LTX-2.3 模式快速设置步数+CFG。“自定义”不更改任何内容；数值仍可手动编辑。",
+  "adv.quality.custom": "自定义",
+  "adv.quality.fast": "Fast（快速，8 步）",
+  "adv.quality.pro": "Pro（均衡，30 步）",
+  "adv.quality.hq": "HQ（最高，50 步）"
 }

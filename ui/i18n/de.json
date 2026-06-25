@@ -1302,5 +1302,11 @@
   "mw.sb_title": "Storyboard",
   "mw.sb_invalid": "Ungültiges Storyboard:",
   "mw.sb_upload_failed": "Upload des Szenenbilds fehlgeschlagen: {img}",
-  "mw.sb_log": "[Storyboard] {n} Keyframe-Szenen → Mehrszenen-Interpolation."
+  "mw.sb_log": "[Storyboard] {n} Keyframe-Szenen → Mehrszenen-Interpolation.",
+  "adv.quality_lbl": "Qualität (Voreinstellung):",
+  "adv.quality.tt": "Schnellwahl für Steps+CFG gemäß den offiziellen LTX-2.3-Modi. 'Benutzerdefiniert' ändert nichts; Werte bleiben manuell editierbar.",
+  "adv.quality.custom": "Benutzerdefiniert",
+  "adv.quality.fast": "Fast (schnell, 8 Schritte)",
+  "adv.quality.pro": "Pro (ausgewogen, 30 Schritte)",
+  "adv.quality.hq": "HQ (max, 50 Schritte)"
 }
