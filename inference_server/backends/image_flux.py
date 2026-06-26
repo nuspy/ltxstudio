@@ -29,7 +29,9 @@ SPEC = {
     # locale = supports_sf irrilevante, gestito da arch.startswith('flux2') in _load). I nomi delle
     # classi diffusers vanno VALIDATI su GPU (diffusers evolve): qui le best-guess attuali. L'outpaint
     # riusa flux2_inpaint con maschera INVERTITA (core.mask_utils.invert_mask).
-    "flux2_kontext": ("Flux2KontextPipeline",      False, True),
+    # FLUX.2 editing per istruzione (no maschera) = Klein (Flux2KontextPipeline NON esiste in diffusers
+    # 0.38; l'editing FLUX.2 è la famiglia Klein). API da validare su GPU.
+    "flux2_kontext": ("Flux2KleinPipeline",        False, True),
     "flux2_inpaint": ("Flux2KleinInpaintPipeline", False, True),
 }
 VRAM_MB = {"flux": 16000, "flux2": 24000, "zimage": 12000, "ernie": 16000,
