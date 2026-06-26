@@ -363,7 +363,11 @@ def _run_chunked(p: dict, chunk: int) -> str:
             cp["audio_max_duration"] = round(seg_dur, 3)
         cp["output"] = f"{base}_chunk{i}.mp4"
         print(f"[chunk] {i + 1}/{n} ({cf} frame, audio_start={cp.get('audio_start_time', 0)})", flush=True)
-        run_generation(cp)                                   # pipe in cache dal 2° chunk → veloce
+        try:
+            run_generation(cp)                               # pipe in cache dal 2° chunk → veloce
+        except Exception as _e:                              # es. ultimo chunk con audio più corto dei frame
+            print(f"[chunk] {i} saltato ({type(_e).__name__}: {_e})", flush=True)
+            break
         import gc as _gc
         _gc.collect()
         if torch.cuda.is_available():
