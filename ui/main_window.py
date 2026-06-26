@@ -1631,6 +1631,8 @@ class MainWindow(QMainWindow):
     def generate_video_extend(self):
         """Prolunga video: estensione LTX-2.3 nativa multi-segmento sull'ultimo video (o caricato)."""
         import shutil
+        if backend.is_native("video"):
+            return self._extend_video_native()
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_extend_msg")); return
         cfg = self.video_extend_tab.get_config()
@@ -1851,6 +1853,63 @@ class MainWindow(QMainWindow):
         self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
         self._ltx2_worker.done.connect(self._on_multitalk_done)   # riusa: face-swap/RIFE/announce
         self._ltx2_worker.start()
+
+    def _extend_video_native(self):
+        """Prolunga un video NATIVAMENTE (LTX-2.3 GGUF): i2v dall'ULTIMO frame del video sorgente per
+        N secondi, poi concatena originale + continuazione. Zero ComfyUI."""
+        import subprocess as _sp, time as _t
+        cfg = self.video_extend_tab.get_config()
+        src = cfg.get("video")
+        if not src or not os.path.exists(src):
+            QMessageBox.warning(self, tr("mw.no_video_title", "Video"), tr("mw.no_video_msg", "Scegli un video da prolungare.")); return
+        if not cfg.get("prompt"):
+            QMessageBox.warning(self, tr("mw.prompt_missing_title", "Prompt"), tr("mw.extend_prompt_missing_msg", "Inserisci un prompt per l'estensione.")); return
+        v = self.video_tab.get_values()
+        fps = int(v.get("fps", 25) or 25)
+        add_s = float(cfg.get("add_seconds", 5) or 5)
+        nf = max(9, int(add_s * fps) // 8 * 8 + 1)
+        lastf = str(OUTPUT_DIR / f"_ext_last_{int(_t.time())}.png")
+        _sp.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", src, "-vframes", "1", lastf, "-y"], check=False)
+        if not os.path.exists(lastf):
+            QMessageBox.warning(self, tr("mw.extend_video_error_title", "Prolunga"), "Impossibile estrarre l'ultimo frame."); return
+        cont = str(OUTPUT_DIR / f"_ext_cont_{int(_t.time())}.mp4")
+        self._ext_src = src
+        params = {
+            "image_path": lastf, "prompt": cfg["prompt"],
+            "negative": v.get("prompt_negative", "") or "worst quality, blurry",
+            "width": int(v.get("width", 512)), "height": int(v.get("height", 512)),
+            "num_frames": nf, "fps": fps, "steps": int(self.advanced_tab.steps.value()),
+            "guidance": float(self.advanced_tab.cfg.value()), "seed": int(self.advanced_tab.seed.value()),
+            "offload": "cpu", "ref_strength": 1.0, "output": cont,
+        }
+        if nf > 150:
+            params["chunk_frames"] = 121
+        self._log(f"[nativo] prolunga +{add_s:.0f}s ({nf} frame) da {Path(src).name}…")
+        self._ltx2_worker = _NativeLtx2Worker(params)
+        self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
+        self._ltx2_worker.done.connect(self._on_extend_native_done)
+        self._ltx2_worker.start()
+
+    def _on_extend_native_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[nativo] extend errore: {res.get('error','')[:300]}")
+            QMessageBox.critical(self, tr("mw.extend_video_error_title", "Prolunga"), str(res.get("error", ""))[:1000]); return
+        import subprocess as _sp, time as _t
+        cont = (res.get("output") or [None])[0]
+        src = getattr(self, "_ext_src", None)
+        final = str(OUTPUT_DIR / f"extended_{int(_t.time())}.mp4")
+        lst = str(OUTPUT_DIR / "_ext_list.txt")
+        try:
+            # concat con re-encode (codec/risoluzione possono differire tra sorgente e continuazione)
+            with open(lst, "w", encoding="utf-8") as fh:
+                fh.write(f"file '{src}'\nfile '{cont}'\n")
+            _sp.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", final, "-y"], check=False)
+        except Exception as e:                              # noqa: BLE001
+            self._log(f"[nativo] concat extend fallito ({e}) → uso la sola continuazione")
+            final = cont
+        out = final if os.path.exists(final) else cont
+        self._on_multitalk_done({"status": "success", "output": [out]})
 
     def _start_native_multitalk(self, params: dict):
         """Lip-sync/canto NATIVO via a2v LTX-2.3 (GGUF, zero ComfyUI). Sostituisce MultiTalk/Wan
