@@ -1841,6 +1841,9 @@ class MainWindow(QMainWindow):
         # video lungo → chunking memory-bounded (chunk da ~5s)
         if nf > 150:
             params["chunk_frames"] = 121
+        if vals.get("storyboard"):
+            self._log("[nativo] NB: lo storyboard multi-keyframe non è ancora nativo "
+                      "(pipeline keyframe_interpolation da cablare) → genero la scena base.")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
