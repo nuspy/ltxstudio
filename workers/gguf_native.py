@@ -196,16 +196,26 @@ def gguf_state_dict(path: str, rename_map: dict | None = None) -> dict:
 
 
 # ───────────────────────── dequant Linear in-place (forward GGUF) ─────────────────────────
+_GGUF_FWD_N = [0]
+
+
 def _gguf_linear_forward(self, x):
     """forward che dequantizza il peso GGML on-the-fly. Montato come metodo d'istanza sull'nn.Linear
     ESISTENTE (mutazione in-place) così TUTTI i riferimenti — incluso il TransformerArgsPreprocessor
     che cattura patchify_proj per riferimento al costruttore — usano lo stesso oggetto."""
-    w = dequantize_tensor(self.weight.to(x.device), self._gguf_dtype)
-    bias = self.bias
-    if bias is not None:
-        bias = dequantize_tensor(bias.to(x.device), self._gguf_dtype).to(x.dtype)
-    out = F.linear(x, w.to(x.dtype), bias)
-    del w
+    _GGUF_FWD_N[0] += 1
+    if _GGUF_FWD_N[0] % 400 == 1:
+        import torch as _t
+        if _t.cuda.is_available():
+            print(f"[gguf-vram] fwd#{_GGUF_FWD_N[0]} alloc={_t.cuda.memory_allocated()/1e9:.1f}GB", flush=True)
+    # no_grad esplicito: senza, l'autograd trattiene ogni peso dequantizzato (accumulo ~40GB/forward).
+    with torch.no_grad():
+        w = dequantize_tensor(self.weight.to(x.device), self._gguf_dtype)
+        bias = self.bias
+        if bias is not None:
+            bias = dequantize_tensor(bias.to(x.device), self._gguf_dtype).to(x.dtype)
+        out = F.linear(x, w.to(x.dtype), bias)
+        del w
     return out
 
 
@@ -254,8 +264,9 @@ def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
     gguf_keys = set(quantized)
     for k in quantized:
         gguf_keys.add(k[: -len("weight")] + "bias")
-    # state_dict NON-quantizzato per il load_state_dict normale (norm/scale_shift/embedding…)
-    nonquant_sd = {k: (dequantize_tensor(v, torch.bfloat16) if is_quantized(v) else torch.Tensor(v))
+    # state_dict NON-quantizzato per il load_state_dict normale (norm/scale_shift/embedding…), in bf16
+    # per evitare il mismatch dtype (norm F32 vs input bf16) e dimezzare la memoria.
+    nonquant_sd = {k: dequantize_tensor(v, torch.bfloat16)
                    for k, v in sd.items() if k not in gguf_keys}
 
     class _GGUFLoader:
