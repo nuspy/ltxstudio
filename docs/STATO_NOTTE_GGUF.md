@@ -27,11 +27,23 @@ il 22B sta nei 32GB. `ltx-core` (motore nativo) leggeva solo safetensors → ho 
   concatenati con continuità (ultimo frame → conditioning del successivo). [in generazione stanotte]
 - `TESTmartina_gguf256.mp4` — primo test 256² (2s).
 
-## Limiti / note
-- Il full 98s **one-shot** NON entra: lo stage_2 (upscale) a lunghezza piena sborda ~17GB in shared
-  (attenzione O(token²)). Per questo la canzone completa è fatta a **segmenti** (ognuno entra pieno).
-- Per integrare nella GUI: cablare `gguf_transformer` nell'auto-select video (SFW→GGUF) e il chunking
-  per i video lunghi (riusare l'infra resume #38/#39). Flip `backend_config` video=native.
+## Chunking video lunghi (FATTO nel worker)
+- `run_generation` ora: **auto-GGUF** di default (`_auto_gguf` trova il Q4) + **chunking in-process**
+  (`chunk_frames>0` → `_run_chunked`): genera a chunk corti riusando la PIPE IN CACHE (carica una
+  volta), continuità via ultimo-frame→conditioning, audio affettato per chunk, concat ffmpeg.
+- Il full 98s **one-shot** NON entra (stage_2/upscale a lunghezza piena sborda; ComfyUI lo gestiva col
+  **tiled-sampler** — qui risolto col chunking, ~60s/chunk da 5s). NB: la VRAM reale è ridotta da STT
+  + processi di sistema → tenere chunk corti (5s/121 frame) e verificare `nvidia-smi memory.free`.
+
+## ANCORA DA FARE — cablaggio GUI (serve TE per il test interfaccia)
+Il motore video nativo è completo (`workers/ltx2_infer.py` + `core/ltx2_service.py` server :8190) ma
+**NON è ancora collegato al tab Video**: la GUI genera video via `self.driver.submit(workflow ComfyUI)`
+costruito da `TemplateEngine` (in `ui/main_window.py`: `generate_video*`, `generate_video_extend`, …).
+Per migrare: in ogni metodo `generate_video*` aggiungere il ramo `if backend.is_native("video"):
+params=...; core.ltx2_service.generate(params)` (additivo, non rompe il path comfy finché
+`backend_config` video=comfy). Poi flip `backend_config` video=native e TEST in GUI. **Non fatto
+stanotte perché non testabile senza interfaccia** (rischio di lasciare la GUI rotta).
+Stesso discorso per storyboard #37 (→ pipeline `keyframe_interpolation` nativa).
 
 ## Modello usato
 `E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf` (13.5GB)
