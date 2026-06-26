@@ -1,6 +1,6 @@
 {
-  "image": "comfy",
-  "video": "comfy",
+  "image": "native",
+  "video": "native",
   "enhance": "comfy",
   "segment": "comfy",
   "face": "comfy"

@@ -194,6 +194,49 @@ class _RifeWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _NativeLtx2Worker(QThread):
+    """Generazione video NATIVA LTX-2.3 (GGUF, zero ComfyUI) come subprocess nel venv ltx2.
+    Legge i params da JSON, esegue workers/ltx2_infer.py (auto-GGUF + chunking per i lunghi),
+    riporta progress e il path finale (riga 'OK:<path>')."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    LTX2_PY = r"E:\AI\Tools\ltx2_venv\Scripts\python.exe"
+
+    def __init__(self, params: dict):
+        super().__init__()
+        self.params = params
+
+    def run(self):
+        import json as _json, os as _os, subprocess as _sp, tempfile as _tf
+        try:
+            worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "ltx2_infer.py")
+            if not _os.path.exists(self.LTX2_PY):
+                self.done.emit({"status": "error", "error": f"venv ltx2 mancante: {self.LTX2_PY}"})
+                return
+            jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+            _json.dump(self.params, jf); jf.close()
+            env = dict(_os.environ)
+            env["HF_HUB_OFFLINE"] = "1"
+            env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+            proc = _sp.Popen([self.LTX2_PY, "-u", worker, jf.name], env=env,
+                             stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
+            out_path = None
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line.startswith("[") or line.startswith("OK:") or "Error" in line or "error" in line:
+                    self.progress.emit(line)
+                if line.startswith("OK:"):
+                    out_path = line[3:].strip()
+            proc.wait()
+            if out_path and _os.path.exists(out_path):
+                self.done.emit({"status": "success", "output": [out_path]})
+            else:
+                self.done.emit({"status": "error", "error": "LTX-2 nativo: nessun output prodotto"})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1182,6 +1225,11 @@ class MainWindow(QMainWindow):
                     return
         # seleziona il template in base ai moduli attivi (i golden specifici se presenti, altrimenti superset)
         use_image = bool(self.frame1_tab.image_path)
+        # BACKEND NATIVO (LTX-2.3 GGUF, zero ComfyUI): ramo additivo, attivo solo se backend_config
+        # video=native. Bypassa la costruzione del workflow ComfyUI/TemplateEngine.
+        if backend.is_native("video"):
+            self._log("Backend video: NATIVO (LTX-2.3 GGUF)")
+            return self._generate_video_native(vals, audio, loras, use_image)
         mode = self._pick_template(use_image, audio["audio_mode"], cnet["controlnet_enabled"],
                                    vals.get("model_kind", "auto"))
         self.engine.use_template(mode)
@@ -1762,6 +1810,44 @@ class MainWindow(QMainWindow):
         if not loaded and out:
             QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
                                     tr("mw.native_done_msg", "Generata: {f}").format(f=out))
+
+    def _generate_video_native(self, vals: dict, audio: dict, loras: list, use_image: bool):
+        """Generazione video NATIVA (LTX-2.3 GGUF, zero ComfyUI) — ramo attivo solo se
+        backend_config video=native. Costruisce i params dal tab Video/Avanzate e lancia il worker
+        ltx2 (auto-GGUF + chunking per i lunghi). Audio (native/user) → a2v (canto/lip-sync)."""
+        import time as _t
+        fps = int(self.video_tab.fps.value())
+        length_s = float(self.video_tab.length.value()) if hasattr(self.video_tab, "length") else 5.0
+        nf = max(9, int(round(length_s * fps)) // 8 * 8 + 1)
+        out = str(OUTPUT_DIR / f"ltx_native_{int(_t.time())}.mp4")
+        params = {
+            "prompt": vals.get("prompt_positive", ""),
+            "negative": vals.get("prompt_negative", "worst quality, blurry"),
+            "width": int(self.video_tab.width.value()),
+            "height": int(self.video_tab.height.value()),
+            "num_frames": nf, "fps": fps,
+            "steps": int(self.advanced_tab.steps.value()),
+            "guidance": float(self.advanced_tab.cfg.value()),
+            "seed": int(self.advanced_tab.seed.value()),
+            "offload": "cpu", "loras": loras, "output": out,
+        }
+        if use_image and self.frame1_tab.image_path:
+            params["image_path"] = self.frame1_tab.image_path
+            params["ref_strength"] = float(vals.get("ref_strength", 1.0))
+        # audio reale → audio→video (canto/lip-sync) nativo
+        af = audio.get("audio_file")
+        if af and os.path.exists(af):
+            params["audio_path"] = af
+        # video lungo → chunking memory-bounded (chunk da ~5s)
+        if nf > 150:
+            params["chunk_frames"] = 121
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
+                  f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
+        self._ltx2_worker = _NativeLtx2Worker(params)
+        self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
+        self._ltx2_worker.done.connect(self._on_multitalk_done)   # riusa: face-swap/RIFE/announce
+        self._ltx2_worker.start()
 
     def _start_native_multitalk(self, params: dict):
         """Lip-sync MultiTalk (Wan2.1) via worker nel venv ComfyUI — modalità Talk/Canta, no app ComfyUI.
