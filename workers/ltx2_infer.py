@@ -18,6 +18,9 @@ import torch
 # Il block-streaming (offload CPU) di LTX salva tensori per autograd → incompatibile con
 # torch.inference_mode() usato di default dalle pipeline. Lo rimpiazziamo con no_grad.
 torch.inference_mode = torch.no_grad
+# Inferenza pura: disabilito l'autograd GLOBALMENTE. Senza, il conditioning (Gemma/encoder) costruisce
+# un grafo trattenuto (~37GB di tensori live non-modulo) → con la via GGUF il transformer non entra.
+torch.set_grad_enabled(False)
 
 # Compat torch 2.9.1+cu130: torch._scaled_mm (path quant fp8_scaled_mm di ltx_core) ora ESIGE le
 # scale in float32 ("scales should be float and singletons"); ltx_core le passa in bf16 →

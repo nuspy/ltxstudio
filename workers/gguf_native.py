@@ -196,19 +196,10 @@ def gguf_state_dict(path: str, rename_map: dict | None = None) -> dict:
 
 
 # ───────────────────────── dequant Linear in-place (forward GGUF) ─────────────────────────
-_GGUF_FWD_N = [0]
-
-
 def _gguf_linear_forward(self, x):
     """forward che dequantizza il peso GGML on-the-fly. Montato come metodo d'istanza sull'nn.Linear
     ESISTENTE (mutazione in-place) così TUTTI i riferimenti — incluso il TransformerArgsPreprocessor
     che cattura patchify_proj per riferimento al costruttore — usano lo stesso oggetto."""
-    _GGUF_FWD_N[0] += 1
-    if _GGUF_FWD_N[0] % 400 == 1:
-        import torch as _t
-        if _t.cuda.is_available():
-            print(f"[gguf-vram] fwd#{_GGUF_FWD_N[0]} alloc={_t.cuda.memory_allocated()/1e9:.1f}GB", flush=True)
-    # no_grad esplicito: senza, l'autograd trattiene ogni peso dequantizzato (accumulo ~40GB/forward).
     with torch.no_grad():
         w = dequantize_tensor(self.weight.to(x.device), self._gguf_dtype)
         bias = self.bias
