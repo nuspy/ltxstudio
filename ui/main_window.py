@@ -1850,12 +1850,30 @@ class MainWindow(QMainWindow):
         self._ltx2_worker.start()
 
     def _start_native_multitalk(self, params: dict):
-        """Lip-sync MultiTalk (Wan2.1) via worker nel venv ComfyUI — modalità Talk/Canta, no app ComfyUI.
-        Audio reale (parlato o canzone), opz. isola-voce; sorgente volto = foto Frame 1 o video."""
-        self._log(f"[MultiTalk] lip-sync avviato — {params.get('num_frames')} frame "
-                  f"{params.get('width')}x{params.get('height')} (può richiedere parecchi minuti)…")
-        self._mt_worker = _NativeMultiTalkWorker(params)
-        self._mt_worker.progress.connect(lambda s: self._log("[MultiTalk] " + s))
+        """Lip-sync/canto NATIVO via a2v LTX-2.3 (GGUF, zero ComfyUI). Sostituisce MultiTalk/Wan
+        (era accoppiato al venv ComfyUI, rotto dal rename). Sorgente volto = foto Frame 1 o primo
+        frame del video sorgente; audio reale (parlato/canzone). Chunking per i lunghi."""
+        import subprocess as _sp, time as _t
+        img = params.get("image_path")
+        src = params.get("source_video")
+        if not img and src:                              # talk da video → estrai il primo frame
+            img = str(OUTPUT_DIR / f"_talk_src_{int(_t.time())}.png")
+            _sp.run(["ffmpeg", "-v", "error", "-i", src, "-vframes", "1", img, "-y"], check=False)
+        nf = int(params.get("num_frames", 121))
+        nat = {
+            "image_path": img, "audio_path": params.get("audio_path"),
+            "prompt": params.get("prompt", ""),
+            "negative": params.get("negative", "") or "worst quality, blurry",
+            "width": int(params.get("width", 512)), "height": int(params.get("height", 512)),
+            "num_frames": nf, "fps": int(params.get("fps", 25)),
+            "steps": 8, "guidance": 3.0, "seed": 8, "offload": "cpu",
+            "ref_strength": 1.0, "output": params.get("output", str(OUTPUT_DIR / "talk_native.mp4")),
+        }
+        if nf > 150:
+            nat["chunk_frames"] = 121
+        self._log(f"[lip-sync nativo] a2v LTX-2 GGUF — {nf} frame {nat['width']}x{nat['height']}…")
+        self._mt_worker = _NativeLtx2Worker(nat)
+        self._mt_worker.progress.connect(lambda s: self._log("[lip-sync] " + s))
         self._mt_worker.done.connect(self._on_multitalk_done)
         self._mt_worker.start()
 
