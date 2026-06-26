@@ -345,6 +345,19 @@ def run_generation(p: dict) -> str:
         print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "
               f"{torch.cuda.memory_reserved()/1e9:.1f}GB reserved", flush=True)
 
+    # TRANSFORMER da GGUF (~14GB) per entrare nei 32GB come ComfyUI: gli altri componenti (Gemma/vae/
+    # vocoder) restano sul checkpoint fp8 con offload; il transformer si carica quantizzato dal GGUF e
+    # dequantizza per-layer al volo. config dal fp8 (stessa arch).
+    if p.get("gguf_transformer"):
+        try:
+            from workers import gguf_native as _GG
+        except ModuleNotFoundError:
+            import gguf_native as _GG          # eseguito come script: workers/ è già nel sys.path
+        for _st in (getattr(pipe, "stage_1", None), getattr(pipe, "stage_2", None)):
+            if _st is not None:
+                _GG.patch_stage_to_gguf(_st, p["gguf_transformer"], ckpt)
+        print(f"[gguf] transformer da {os.path.basename(p['gguf_transformer'])} (dequant on-the-fly)", flush=True)
+
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)),
                                 stg_scale=float(p.get("stg", 1.0)),
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])

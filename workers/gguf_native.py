@@ -1,17 +1,14 @@
 """GGUF on-the-fly dequant per il motore video NATIVO (ltx-core) — porta la tecnica di ComfyUI-GGUF.
 
-Permette di caricare i checkpoint LTX-2.3 in formato **GGUF quantizzato** (es. Q4_K_M 13.5GB invece
-del dev-fp8 27.8GB) così il 22B entra nei 32GB: i pesi restano QUANTIZZATI in VRAM e ogni Linear
-dequantizza SOLO il proprio peso al volo nel forward, poi lo scarta.
+Permette di caricare il transformer LTX-2.3 in **GGUF quantizzato** (Q4_K_M ~14GB invece del dev-fp8
+27.8GB) così il 22B entra nei 32GB: i pesi restano QUANTIZZATI in VRAM e ogni Linear dequantizza SOLO
+il proprio peso al volo nel forward, poi lo scarta. Dequant (c) City96, Apache-2.0.
 
-Parti:
-- dequant_* : funzioni di dequantizzazione per tipo GGML (Q4_K/Q6_K/…), portate da ComfyUI-GGUF
-  (c) City96, Apache-2.0.
-- GGMLTensor : tensor che conserva i dati quantizzati + tipo + shape originale.
-- gguf_state_dict(path) : legge il .gguf → {nome: GGMLTensor}, rimappando i nomi ComfyUI→ltx-core.
-- GGUFLinear : nn.Linear che dequantizza il peso nel forward (sostituisce nn.Linear).
-- swap_linears_to_gguf(model, sd) : sostituisce gli nn.Linear del modello con GGUFLinear caricando i
-  pesi quantizzati dal state_dict GGUF.
+Uso (dal worker, quando il checkpoint transformer è un .gguf):
+  from workers import gguf_native as GG
+  GG.patch_stage_to_gguf(pipe.stage_1, gguf_path, config_source_safetensors)
+  GG.patch_stage_to_gguf(pipe.stage_2, gguf_path, config_source_safetensors)
+Gli altri componenti (Gemma, vae, vocoder…) restano sul checkpoint fp8 con offload.
 """
 from __future__ import annotations
 
@@ -19,6 +16,7 @@ import warnings
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 import gguf
 
@@ -114,35 +112,58 @@ _DEQUANT = {
 }
 
 
-def dequantize(data, qtype, oshape, dtype):
+def _dequantize(data, qtype, oshape, dtype):
     block_size, type_size = gguf.GGML_QUANT_SIZES[qtype]
     rows = data.reshape((-1, data.shape[-1])).view(torch.uint8)
     n_blocks = rows.numel() // type_size
     blocks = rows.reshape((n_blocks, type_size))
-    out = _DEQUANT[qtype](blocks, block_size, type_size, dtype)
-    return out.reshape(oshape)
+    return _DEQUANT[qtype](blocks, block_size, type_size, dtype).reshape(oshape)
 
 
-class GGMLTensor(torch.Tensor):
-    """Tensor che conserva i dati quantizzati grezzi + il tipo GGML + la shape originale."""
-    def __new__(cls, data, tensor_type, tensor_shape):
-        t = super().__new__(cls, data)
-        return t
-
-    def __init__(self, data, tensor_type, tensor_shape):
-        self.tensor_type = tensor_type
-        self.tensor_shape = tensor_shape
+def is_quantized(t):
+    return getattr(t, "tensor_type", None) not in TORCH_COMPATIBLE
 
 
 def dequantize_tensor(t, dtype):
     qtype = getattr(t, "tensor_type", None)
-    oshape = getattr(t, "tensor_shape", t.shape)
+    # strip del subclass SENZA perdere device (torch.Tensor(t) ricreerebbe su CPU/meta)
+    raw = t.as_subclass(torch.Tensor) if isinstance(t, GGMLTensor) else t
     if qtype in TORCH_COMPATIBLE:
-        return torch.Tensor(t).to(dtype)
+        return raw.to(dtype)
+    oshape = getattr(t, "tensor_shape", None) or raw.shape
     if qtype in _DEQUANT:
-        return dequantize(torch.Tensor(t).data, qtype, oshape, dtype).to(dtype)
-    new = gguf.quants.dequantize(torch.Tensor(t).cpu().numpy(), qtype)   # fallback lento
-    return torch.from_numpy(new).to(t.device, dtype=dtype)
+        return _dequantize(raw, qtype, oshape, dtype).to(dtype)
+    new = gguf.quants.dequantize(raw.cpu().numpy(), qtype)
+    return torch.from_numpy(new).to(raw.device, dtype=dtype)
+
+
+# ───────────────────────── GGMLTensor (preserva tensor_type dopo .to) — port ComfyUI ─────────────────────────
+class GGMLTensor(torch.Tensor):
+    def __init__(self, *args, tensor_type, tensor_shape, **kwargs):
+        super().__init__()
+        self.tensor_type = tensor_type
+        self.tensor_shape = tensor_shape
+
+    def __new__(cls, *args, tensor_type, tensor_shape, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
+
+    def to(self, *args, **kwargs):
+        new = super().to(*args, **kwargs)
+        new.tensor_type = getattr(self, "tensor_type", None)
+        new.tensor_shape = getattr(self, "tensor_shape", new.data.shape)
+        return new
+
+    def clone(self, *a, **k):
+        return self
+
+    def detach(self, *a, **k):
+        return self
+
+    @property
+    def shape(self):
+        if not hasattr(self, "tensor_shape"):
+            self.tensor_shape = self.size()
+        return self.tensor_shape
 
 
 # ───────────────────────── loader GGUF → state_dict quantizzato ─────────────────────────
@@ -154,7 +175,7 @@ def _orig_shape(reader, name):
 
 
 def gguf_state_dict(path: str, rename_map: dict | None = None) -> dict:
-    """Legge il .gguf → {nome_ltx: GGMLTensor}. Applica rename ComfyUI→ltx-core se fornito."""
+    """Legge il .gguf → {nome: GGMLTensor}. Applica rename se fornito (ComfyUI↔ltx)."""
     reader = gguf.GGUFReader(path)
     sd = {}
     for tensor in reader.tensors:
@@ -174,20 +195,102 @@ def gguf_state_dict(path: str, rename_map: dict | None = None) -> dict:
     return sd
 
 
-# ───────────────────────── GGUFLinear (dequant on-the-fly nel forward) ─────────────────────────
-class GGUFLinear(nn.Module):
-    """nn.Linear con peso GGML quantizzato: dequantizza il peso nel forward, poi lo scarta.
-    Sostituisce nn.Linear nel modello ltx-core (pattern identico a FP8Linear)."""
-    def __init__(self, in_features, out_features, bias=True, compute_dtype=torch.bfloat16):
-        super().__init__()
-        self.in_features, self.out_features = in_features, out_features
-        self.compute_dtype = compute_dtype
-        self.weight = None          # GGMLTensor (quantizzato), assegnato dal loader
-        self.bias = None
+# ───────────────────────── dequant Linear in-place (forward GGUF) ─────────────────────────
+def _gguf_linear_forward(self, x):
+    """forward che dequantizza il peso GGML on-the-fly. Montato come metodo d'istanza sull'nn.Linear
+    ESISTENTE (mutazione in-place) così TUTTI i riferimenti — incluso il TransformerArgsPreprocessor
+    che cattura patchify_proj per riferimento al costruttore — usano lo stesso oggetto."""
+    w = dequantize_tensor(self.weight.to(x.device), self._gguf_dtype)
+    bias = self.bias
+    if bias is not None:
+        bias = dequantize_tensor(bias.to(x.device), self._gguf_dtype).to(x.dtype)
+    out = F.linear(x, w.to(x.dtype), bias)
+    del w
+    return out
 
-    def forward(self, x):
-        w = dequantize_tensor(self.weight.to(x.device), self.compute_dtype)
-        b = dequantize_tensor(self.bias.to(x.device), self.compute_dtype) if self.bias is not None else None
-        out = torch.nn.functional.linear(x.to(self.compute_dtype), w, b)
-        del w
-        return out.to(x.dtype)
+
+def swap_and_assign_gguf(model: nn.Module, sd: dict, quantized_names: set) -> nn.Module:
+    """MUTA in-place gli nn.Linear con peso quantizzato nel GGUF: assegna il GGMLTensor come peso e
+    monta il forward-dequant sull'istanza (NON sostituisce il modulo → i riferimenti catturati, es.
+    patchify_proj nel preprocessor, restano validi)."""
+    import types as _types
+    cnt = 0
+    for name, mod in model.named_modules():
+        if not isinstance(mod, nn.Linear) or getattr(mod, "_gguf", False):
+            continue
+        wk = name + ".weight"
+        if wk not in quantized_names:
+            continue
+        mod.weight = nn.Parameter(sd[wk], requires_grad=False)
+        bk = name + ".bias"
+        if mod.bias is not None and bk in sd:
+            mod.bias = nn.Parameter(torch.Tensor(sd[bk]), requires_grad=False)
+        mod._gguf = True
+        mod._gguf_dtype = torch.bfloat16
+        mod.forward = _types.MethodType(_gguf_linear_forward, mod)
+        cnt += 1
+    print(f"[gguf] Linear mutati in-place (GGUF dequant)={cnt}", flush=True)
+    return model
+
+
+# ───────────────────────── integrazione ltx-core ─────────────────────────
+def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
+    """Aggancia un DiffusionStage di ltx-core a caricare il transformer dal GGUF (quantizzato,
+    dequant on-the-fly). `config_source` = un safetensors con la STESSA architettura (es. il dev-fp8)
+    da cui leggere la config del modello. Forza offload_mode=NONE per lo stadio (il GGUF ~14GB entra
+    in GPU senza streaming; Gemma/conditioner restano con l'offload della pipeline)."""
+    from ltx_core.loader.single_gpu_model_builder import SingleGPUModelBuilder
+    from ltx_core.loader.sft_loader import SafetensorsModelStateDictLoader
+    from ltx_core.loader.primitives import StateDict
+    from ltx_core.loader.module_ops import ModuleOps
+
+    orig_builder = stage._transformer_builder
+    configurator = orig_builder._model_class_configurator
+
+    # rename ComfyUI→ltx (se serve): qui i nomi GGUF combaciano già coi nomi transformer.
+    sd = gguf_state_dict(gguf_path)
+    quantized = {k for k, v in sd.items() if is_quantized(v)}
+    # chiavi gestite dallo swap (peso quantizzato + suo bias): escluse dal load_state_dict
+    gguf_keys = set(quantized)
+    for k in quantized:
+        gguf_keys.add(k[: -len("weight")] + "bias")
+    # state_dict NON-quantizzato per il load_state_dict normale (norm/scale_shift/embedding…)
+    nonquant_sd = {k: (dequantize_tensor(v, torch.bfloat16) if is_quantized(v) else torch.Tensor(v))
+                   for k, v in sd.items() if k not in gguf_keys}
+
+    class _GGUFLoader:
+        """StateDictLoader: config dal safetensors gemello, pesi NON-quantizzati dal GGUF
+        (i quantizzati li assegna lo swap)."""
+        def __init__(self):
+            self._meta = SafetensorsModelStateDictLoader()
+
+        def metadata(self, path):
+            return self._meta.metadata(config_source)
+
+        def load(self, path, sd_ops=None, device=None):
+            size = sum(v.numel() * v.element_size() for v in nonquant_sd.values())
+            dtypes = {v.dtype for v in nonquant_sd.values()}
+            return StateDict(sd=nonquant_sd, device=torch.device("cpu"), size=size, dtype=dtypes)
+
+    swap_op = ModuleOps(
+        name="gguf_swap_linears",
+        matcher=lambda m: True,
+        mutator=lambda m: swap_and_assign_gguf(m, sd, quantized),
+    )
+    new_builder = SingleGPUModelBuilder(
+        model_class_configurator=configurator,
+        model_path=gguf_path,
+        model_loader=_GGUFLoader(),
+        module_ops=(swap_op,),
+    )
+    stage._transformer_builder = new_builder
+    from ltx_pipelines.utils.types import OffloadMode
+    stage._offload_mode = OffloadMode.NONE
+    # niente torch.compile sul transformer GGUF: la compilation traccia con fake/meta tensor e il
+    # GGMLTensor (dequant custom on-the-fly) non è tracciabile → "Tensor on device meta".
+    if getattr(stage, "_compilation_config", None) is not None:
+        stage._compilation_config = None
+    # niente policy fp8: _build_transformer farebbe _chain_quantization che ri-swappa i GGUFLinear in
+    # FP8Linear (GGUFLinear è sottoclasse di nn.Linear) → pesi persi/meta. Il GGUF gestisce già tutto.
+    if getattr(stage, "_quantization", None) is not None:
+        stage._quantization = None
