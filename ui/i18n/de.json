@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "Benutzerdefiniert",
   "adv.quality.fast": "Fast (schnell, 8 Schritte)",
   "adv.quality.pro": "Pro (ausgewogen, 30 Schritte)",
-  "adv.quality.hq": "HQ (max, 50 Schritte)"
+  "adv.quality.hq": "HQ (max, 50 Schritte)",
+  "music.mv.gen": "🎬 Musikvideo erstellen",
+  "music.mv.gen.tt": "Erstellt Song + Video passend zum Text (LLM-Storyboard + natives LTX-2.3). Benötigt ein Startbild.",
+  "music.mv.image": "Videobild",
+  "music.mv.image_ph": "Start-/Hintergrundbild für das Musikvideo",
+  "music.mv.browse": "Durchsuchen…",
+  "music.mv.need_lyrics": "Gib den Text ein (mit Abschnitten [Verse]/[Chorus]).",
+  "music.mv.need_image": "Wähle ein Start-/Hintergrundbild für das Video.",
+  "music.mv.started": "Musikvideo: Song + Storyboard + Video (kann einige Minuten dauern)…",
+  "music.mv.done": "Musikvideo fertig: {f}",
+  "music.mv.fail": "Musikvideo fehlgeschlagen: ",
+  "music.busy": "Eine andere Generierung läuft bereits.",
+  "feat.cap.music_video": "Musikvideo (Song + Video)"
 }

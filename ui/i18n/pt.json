@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "Personalizado",
   "adv.quality.fast": "Fast (rápido, 8 passos)",
   "adv.quality.pro": "Pro (equilibrado, 30 passos)",
-  "adv.quality.hq": "HQ (máx, 50 passos)"
+  "adv.quality.hq": "HQ (máx, 50 passos)",
+  "music.mv.gen": "🎬 Gerar videoclipe",
+  "music.mv.gen.tt": "Cria música + vídeo coerente com a letra (storyboard com LLM + LTX-2.3 nativo). Requer uma imagem inicial.",
+  "music.mv.image": "Imagem do vídeo",
+  "music.mv.image_ph": "Imagem inicial/de fundo para o videoclipe",
+  "music.mv.browse": "Procurar…",
+  "music.mv.need_lyrics": "Insira a letra (com seções [Verse]/[Chorus]).",
+  "music.mv.need_image": "Escolha uma imagem inicial/de fundo para o vídeo.",
+  "music.mv.started": "Videoclipe: música + storyboard + vídeo (pode demorar vários minutos)…",
+  "music.mv.done": "Videoclipe pronto: {f}",
+  "music.mv.fail": "Falha no videoclipe: ",
+  "music.busy": "Outra geração está em andamento.",
+  "feat.cap.music_video": "Videoclipe (música + vídeo)"
 }

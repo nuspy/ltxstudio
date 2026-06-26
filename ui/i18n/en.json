@@ -1405,5 +1405,17 @@
   "adv.quality.custom": "Custom",
   "adv.quality.fast": "Fast (8 steps)",
   "adv.quality.pro": "Pro (balanced, 30 steps)",
-  "adv.quality.hq": "HQ (max, 50 steps)"
+  "adv.quality.hq": "HQ (max, 50 steps)",
+  "music.mv.gen": "🎬 Generate music video",
+  "music.mv.gen.tt": "Create song + video coherent with the lyrics (LLM storyboard + native LTX-2.3). Needs a starting image.",
+  "music.mv.image": "Video image",
+  "music.mv.image_ph": "Starting/background image for the music video",
+  "music.mv.browse": "Browse…",
+  "music.mv.need_lyrics": "Enter the lyrics (with [Verse]/[Chorus] sections).",
+  "music.mv.need_image": "Choose a starting/background image for the video.",
+  "music.mv.started": "Music video: song + storyboard + video (may take several minutes)…",
+  "music.mv.done": "Music video ready: {f}",
+  "music.mv.fail": "Music video failed: ",
+  "music.busy": "Another generation is in progress.",
+  "feat.cap.music_video": "Music video (song + video)"
 }

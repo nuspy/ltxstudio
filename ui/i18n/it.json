@@ -1405,5 +1405,17 @@
   "adv.quality.custom": "Personalizzato",
   "adv.quality.fast": "Fast (veloce, 8 step)",
   "adv.quality.pro": "Pro (bilanciato, 30 step)",
-  "adv.quality.hq": "HQ (massima, 50 step)"
+  "adv.quality.hq": "HQ (massima, 50 step)",
+  "music.mv.gen": "🎬 Genera videomusicale",
+  "music.mv.gen.tt": "Crea canzone + video coerente col testo (storyboard LLM + LTX-2.3 nativo). Serve un'immagine iniziale.",
+  "music.mv.image": "Immagine video",
+  "music.mv.image_ph": "Immagine iniziale/sfondo per il videomusicale",
+  "music.mv.browse": "Sfoglia…",
+  "music.mv.need_lyrics": "Inserisci le liriche (con sezioni [Verse]/[Chorus]).",
+  "music.mv.need_image": "Scegli un'immagine iniziale/sfondo per il video.",
+  "music.mv.started": "Videomusicale: canzone + storyboard + video (può richiedere parecchi minuti)…",
+  "music.mv.done": "Videomusicale pronto: {f}",
+  "music.mv.fail": "Videomusicale fallito: ",
+  "music.busy": "Un'altra generazione è in corso.",
+  "feat.cap.music_video": "Videomusicale (canzone + video)"
 }

@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "Personnalisé",
   "adv.quality.fast": "Fast (rapide, 8 étapes)",
   "adv.quality.pro": "Pro (équilibré, 30 étapes)",
-  "adv.quality.hq": "HQ (max, 50 étapes)"
+  "adv.quality.hq": "HQ (max, 50 étapes)",
+  "music.mv.gen": "🎬 Générer un clip musical",
+  "music.mv.gen.tt": "Crée chanson + vidéo cohérente avec les paroles (storyboard LLM + LTX-2.3 natif). Nécessite une image de départ.",
+  "music.mv.image": "Image vidéo",
+  "music.mv.image_ph": "Image de départ/de fond pour le clip",
+  "music.mv.browse": "Parcourir…",
+  "music.mv.need_lyrics": "Saisissez les paroles (avec sections [Verse]/[Chorus]).",
+  "music.mv.need_image": "Choisissez une image de départ/de fond pour la vidéo.",
+  "music.mv.started": "Clip musical : chanson + storyboard + vidéo (peut prendre plusieurs minutes)…",
+  "music.mv.done": "Clip musical prêt : {f}",
+  "music.mv.fail": "Échec du clip musical : ",
+  "music.busy": "Une autre génération est en cours.",
+  "feat.cap.music_video": "Clip musical (chanson + vidéo)"
 }

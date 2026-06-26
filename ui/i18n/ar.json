@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "مخصص",
   "adv.quality.fast": "Fast (سريع، 8 خطوات)",
   "adv.quality.pro": "Pro (متوازن، 30 خطوة)",
-  "adv.quality.hq": "HQ (أقصى، 50 خطوة)"
+  "adv.quality.hq": "HQ (أقصى، 50 خطوة)",
+  "music.mv.gen": "🎬 إنشاء فيديو موسيقي",
+  "music.mv.gen.tt": "ينشئ أغنية + فيديو متوافقًا مع الكلمات (لوحة قصة بالذكاء الاصطناعي + LTX-2.3 أصلي). يتطلب صورة بداية.",
+  "music.mv.image": "صورة الفيديو",
+  "music.mv.image_ph": "صورة البداية/الخلفية للفيديو الموسيقي",
+  "music.mv.browse": "استعراض…",
+  "music.mv.need_lyrics": "أدخل الكلمات (مع أقسام [Verse]/[Chorus]).",
+  "music.mv.need_image": "اختر صورة بداية/خلفية للفيديو.",
+  "music.mv.started": "فيديو موسيقي: أغنية + لوحة قصة + فيديو (قد يستغرق عدة دقائق)…",
+  "music.mv.done": "الفيديو الموسيقي جاهز: {f}",
+  "music.mv.fail": "فشل الفيديو الموسيقي: ",
+  "music.busy": "هناك عملية إنشاء أخرى قيد التشغيل.",
+  "feat.cap.music_video": "فيديو موسيقي (أغنية + فيديو)"
 }

@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "מותאם אישית",
   "adv.quality.fast": "Fast (מהיר, 8 צעדים)",
   "adv.quality.pro": "Pro (מאוזן, 30 צעדים)",
-  "adv.quality.hq": "HQ (מקסימום, 50 צעדים)"
+  "adv.quality.hq": "HQ (מקסימום, 50 צעדים)",
+  "music.mv.gen": "🎬 צור קליפ",
+  "music.mv.gen.tt": "יוצר שיר + וידאו התואם למילים (סטוריבורד עם LLM + LTX-2.3 מקומי). דרושה תמונת פתיחה.",
+  "music.mv.image": "תמונת וידאו",
+  "music.mv.image_ph": "תמונת פתיחה/רקע לקליפ",
+  "music.mv.browse": "עיון…",
+  "music.mv.need_lyrics": "הזן את המילים (עם מקטעי [Verse]/[Chorus]).",
+  "music.mv.need_image": "בחר תמונת פתיחה/רקע לווידאו.",
+  "music.mv.started": "קליפ: שיר + סטוריבורד + וידאו (עשוי לקחת מספר דקות)…",
+  "music.mv.done": "הקליפ מוכן: {f}",
+  "music.mv.fail": "הקליפ נכשל: ",
+  "music.busy": "מתבצעת יצירה אחרת.",
+  "feat.cap.music_video": "קליפ (שיר + וידאו)"
 }

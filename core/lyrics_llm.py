@@ -76,6 +76,56 @@ def _load():
     return model, proc
 
 
+_SB_SYSTEM = (
+    "You are a music-video art director. Given song lyrics in ANY language, design a sequence of "
+    "cinematic visual SCENES for a music video, in the SAME order as the lyrics, coherent with the "
+    "narrative and mood. Translate/understand the lyrics yourself. "
+    "Output ONLY a JSON array (no prose, no markdown fences). Each item: "
+    '{"prompt": "<vivid ENGLISH visual description ~30 words, cinematic, coherent with this part of the song>", '
+    '"weight": <integer 1-10 = relative on-screen duration, roughly proportional to how many lyric lines '
+    "this scene covers>}. Cover the WHOLE song in order. Use 6 to 12 scenes. "
+    "Keep a consistent setting/characters across scenes (it is one continuous music video)."
+)
+
+
+def storyboard(lyrics: str, image_hint: str = "", max_new_tokens: int = 900) -> list[dict]:
+    """Gemma-3 locale → storyboard per il videomusicale: lista ORDINATA di scene {prompt, weight}
+    coerenti col testo (l'LLM traduce/interpreta). `image_hint` = descrizione dell'immagine iniziale/
+    sfondo da mantenere coerente. Ritorna [] se l'LLM non è disponibile/non produce JSON valido."""
+    import json
+    import re
+    import torch
+    model, proc = _load()
+    user = "Song lyrics (keep scene order matching the song):\n" + (lyrics or "").strip()
+    if (image_hint or "").strip():
+        user += ("\n\nThe music video STARTS from and stays visually consistent with this background "
+                 f"image: {image_hint.strip()}. Keep that setting/lighting coherent across scenes.")
+    messages = [
+        {"role": "system", "content": [{"type": "text", "text": _SB_SYSTEM}]},
+        {"role": "user", "content": [{"type": "text", "text": user}]},
+    ]
+    inputs = proc.apply_chat_template(messages, add_generation_prompt=True, tokenize=True,
+                                      return_dict=True, return_tensors="pt").to(model.device)
+    n_in = inputs["input_ids"].shape[1]
+    with torch.inference_mode():
+        out = model.generate(**inputs, max_new_tokens=int(max_new_tokens),
+                             do_sample=True, temperature=0.8, top_p=0.95)
+    text = proc.decode(out[0][n_in:], skip_special_tokens=True).strip()
+    m = re.search(r"\[.*\]", text, re.DOTALL)              # estrai l'array JSON anche se circondato da testo
+    if not m:
+        return []
+    try:
+        arr = json.loads(m.group(0))
+    except Exception:                                       # noqa: BLE001
+        return []
+    scenes = []
+    for it in arr:
+        if isinstance(it, dict) and it.get("prompt"):
+            scenes.append({"prompt": str(it["prompt"]).strip(),
+                           "weight": max(1, int(it.get("weight", 1) or 1))})
+    return scenes
+
+
 def generate(user_prompt: str, language: str = "it", tags: str = "", max_new_tokens: int = 600) -> str:
     """Genera le liriche con Gemma-3 locale. Solleva RuntimeError se il modello non è disponibile."""
     import torch

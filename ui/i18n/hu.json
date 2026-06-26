@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "Egyéni",
   "adv.quality.fast": "Fast (gyors, 8 lépés)",
   "adv.quality.pro": "Pro (kiegyensúlyozott, 30 lépés)",
-  "adv.quality.hq": "HQ (max, 50 lépés)"
+  "adv.quality.hq": "HQ (max, 50 lépés)",
+  "music.mv.gen": "🎬 Zenei videó készítése",
+  "music.mv.gen.tt": "Dalt + a szöveggel összhangban lévő videót készít (LLM storyboard + natív LTX-2.3). Kezdőkép szükséges.",
+  "music.mv.image": "Videó kép",
+  "music.mv.image_ph": "Kezdő/háttérkép a zenei videóhoz",
+  "music.mv.browse": "Tallózás…",
+  "music.mv.need_lyrics": "Add meg a dalszöveget ([Verse]/[Chorus] szakaszokkal).",
+  "music.mv.need_image": "Válassz kezdő/háttérképet a videóhoz.",
+  "music.mv.started": "Zenei videó: dal + storyboard + videó (több percig is eltarthat)…",
+  "music.mv.done": "A zenei videó kész: {f}",
+  "music.mv.fail": "A zenei videó sikertelen: ",
+  "music.busy": "Már fut egy másik generálás.",
+  "feat.cap.music_video": "Zenei videó (dal + videó)"
 }

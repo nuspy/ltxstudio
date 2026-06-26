@@ -47,6 +47,30 @@ class _LyricsWorker(QThread):
             self.done.emit(lyrics_llm.generate(self._prompt, self._lang, self._tags))
         except Exception as e:                          # noqa: BLE001
             self.failed.emit(str(e))
+
+
+class _MusicVideoWorker(QThread):
+    """Workflow videomusicale completo (canzone → storyboard LLM → video nativo → mux) fuori dal thread UI."""
+    progress = Signal(str)
+    finished_mv = Signal(dict)
+
+    def __init__(self, lyrics: str, tags: str, image: str, out_video: str, duration: float):
+        super().__init__()
+        self._args = (lyrics, tags, image, out_video, duration)
+
+    def run(self):
+        lyrics, tags, image, out_video, duration = self._args
+        try:
+            from core import music_video_service as mvs
+            res = mvs.generate_song_and_video(
+                lyrics=lyrics, tags=tags, image_path=image, out_video=out_video,
+                song_duration_s=duration, image_hint="the provided starting photo",
+                progress=self.progress.emit)
+            self.finished_mv.emit(res)
+        except Exception as e:                          # noqa: BLE001
+            self.finished_mv.emit({"error": str(e)})
+
+
 from core import music_service as ms
 
 
@@ -131,14 +155,37 @@ class MusicTab(QWidget):
         g.addWidget(QLabel(tr("music.cfg", "CFG")), 2, 2); g.addWidget(self.song_cfg, 2, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
         v.addLayout(g)
+        # --- Videomusicale: immagine iniziale/sfondo ---
+        mv = QHBoxLayout()
+        self.mv_image = QLineEdit()
+        self.mv_image.setPlaceholderText(tr("music.mv.image_ph", "Immagine iniziale/sfondo per il videomusicale"))
+        self.btn_mv_browse = QPushButton(tr("music.mv.browse", "Sfoglia…"))
+        self.btn_mv_browse.clicked.connect(self._pick_mv_image)
+        mv.addWidget(QLabel(tr("music.mv.image", "Immagine video")))
+        mv.addWidget(self.mv_image, 1)
+        mv.addWidget(self.btn_mv_browse)
+        v.addLayout(mv)
         h = QHBoxLayout()
         self.btn_song_install = QPushButton(tr("music.install.heart", "Installa HeartMuLa"))
         self.btn_song_install.clicked.connect(lambda: self._install("--heartmula"))
         self.btn_song = QPushButton(tr("music.song.gen", "Genera musica"))
         self.btn_song.clicked.connect(self._gen_song)
-        h.addWidget(self.btn_song_install); h.addStretch(1); h.addWidget(self.btn_song)
+        # Videomusicale automatico: canzone → storyboard LLM → video nativo coerente col testo
+        self.btn_music_video = QPushButton(tr("music.mv.gen", "🎬 Genera videomusicale"))
+        self.btn_music_video.setToolTip(tr("music.mv.gen.tt",
+            "Crea canzone + video coerente col testo (storyboard LLM + LTX-2.3 nativo). Richiede un'immagine iniziale."))
+        self.btn_music_video.clicked.connect(self._gen_music_video)
+        h.addWidget(self.btn_song_install); h.addStretch(1)
+        h.addWidget(self.btn_song); h.addWidget(self.btn_music_video)
         v.addLayout(h)
         return box
+
+    def _pick_mv_image(self):
+        from PySide6.QtWidgets import QFileDialog
+        p, _ = QFileDialog.getOpenFileName(self, tr("music.mv.image", "Immagine video"), "",
+                                           "Immagini (*.png *.jpg *.jpeg *.webp)")
+        if p:
+            self.mv_image.setText(p)
 
     # ── Generazione testo canzone con AI (LLM locale Gemma-3) ──
     def _gen_lyrics_ai(self):
@@ -271,6 +318,42 @@ class MusicTab(QWidget):
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         self._start_job(ms.make_sonify_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                                            on_done=self._b.sonify_done.emit), "sonify", None)
+
+    def _gen_music_video(self):
+        if getattr(self, "_mv_worker", None) and self._mv_worker.isRunning():
+            return
+        if self._busy():
+            QMessageBox.information(self, tr("music.mv.gen", "Videomusicale"),
+                                   tr("music.busy", "Un'altra generazione è in corso.")); return
+        lyrics = self.song_lyrics.toPlainText().strip()
+        tags = self.song_tags.text().strip() or ms.DEFAULT_TAGS
+        image = self.mv_image.text().strip()
+        if not lyrics:
+            QMessageBox.warning(self, tr("music.mv.gen", "Videomusicale"),
+                               tr("music.mv.need_lyrics", "Inserisci le liriche (con sezioni [Verse]/[Chorus]).")); return
+        if not image or not Path(image).exists():
+            QMessageBox.warning(self, tr("music.mv.gen", "Videomusicale"),
+                               tr("music.mv.need_image", "Scegli un'immagine iniziale/sfondo per il video.")); return
+        ms.MUSIC_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        out = str(ms.MUSIC_OUTPUT_DIR / ((self.song_name.text().strip() or "song") + "_video.mp4"))
+        self.btn_music_video.setEnabled(False)
+        self._t0 = time.time()
+        self._log(tr("music.mv.started", "Videomusicale: canzone + storyboard + video (può richiedere parecchi minuti)…"))
+        self._mv_worker = _MusicVideoWorker(lyrics, tags, image, out, float(self.song_dur.value()))
+        self._mv_worker.progress.connect(self._log)
+        self._mv_worker.finished_mv.connect(self._on_mv_done)
+        self._mv_worker.start()
+
+    def _on_mv_done(self, res: dict):
+        self.btn_music_video.setEnabled(True)
+        if res.get("error"):
+            self._log(tr("music.mv.fail", "Videomusicale fallito: ") + str(res["error"])[:300])
+            QMessageBox.critical(self, tr("music.mv.gen", "Videomusicale"), str(res["error"])[:1000]); return
+        vid = res.get("video")
+        self._log(tr("music.mv.done", "Videomusicale pronto: {f}").format(f=vid))
+        self.status.setText(tr("music.mv.done", "Videomusicale pronto: {f}").format(f=Path(vid).name if vid else ""))
+        if vid:
+            self.music_ready.emit(vid)
 
     def son_name(self) -> str:
         v = self.son_video.text().strip()

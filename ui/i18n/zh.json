@@ -1308,5 +1308,17 @@
   "adv.quality.custom": "自定义",
   "adv.quality.fast": "Fast（快速，8 步）",
   "adv.quality.pro": "Pro（均衡，30 步）",
-  "adv.quality.hq": "HQ（最高，50 步）"
+  "adv.quality.hq": "HQ（最高，50 步）",
+  "music.mv.gen": "🎬 生成音乐视频",
+  "music.mv.gen.tt": "创建与歌词一致的歌曲+视频（LLM 分镜 + 原生 LTX-2.3）。需要一张起始图片。",
+  "music.mv.image": "视频图片",
+  "music.mv.image_ph": "音乐视频的起始/背景图片",
+  "music.mv.browse": "浏览…",
+  "music.mv.need_lyrics": "请输入歌词（含 [Verse]/[Chorus] 段落）。",
+  "music.mv.need_image": "请为视频选择起始/背景图片。",
+  "music.mv.started": "音乐视频：歌曲 + 分镜 + 视频（可能需要几分钟）…",
+  "music.mv.done": "音乐视频已就绪：{f}",
+  "music.mv.fail": "音乐视频失败：",
+  "music.busy": "已有另一个生成任务在进行中。",
+  "feat.cap.music_video": "音乐视频（歌曲+视频）"
 }
