@@ -1598,6 +1598,8 @@ class MainWindow(QMainWindow):
     def generate_video_enhance(self):
         """Definizione video: restore + super-risoluzione (+ opz. FPS) sull'ultimo video generato."""
         import shutil
+        if backend.is_native("video"):
+            return self._enhance_video_native()
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_enhance_msg")); return
         cfg = self.video_def_tab.get_config()
@@ -1853,6 +1855,23 @@ class MainWindow(QMainWindow):
         self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
         self._ltx2_worker.done.connect(self._on_multitalk_done)   # riusa: face-swap/RIFE/announce
         self._ltx2_worker.start()
+
+    def _enhance_video_native(self):
+        """Definizione video NATIVA: super-risoluzione per-frame (ESRGAN/spandrel via inference_server,
+        handler video_upscale) + opz. restore volti / FPS. Zero ComfyUI."""
+        import random as _r
+        cfg = self.video_def_tab.get_config()
+        src = cfg.get("video")
+        if not src or not os.path.exists(src):
+            QMessageBox.warning(self, tr("mw.no_video_title", "Video"), tr("mw.no_video_msg", "Scegli un video.")); return
+        params = {
+            "video": src, "model": cfg.get("esrgan_model"),
+            "scale": int(cfg.get("target_scale", 2) or 2), "seed": _r.randint(0, 2**31),
+        }
+        self._log(f"[nativo] definizione video (upscale per-frame x{params['scale']}) su {Path(src).name}…")
+        self._native_worker = _NativeImageWorker(params, module="video_upscale")
+        self._native_worker.done.connect(self._on_multitalk_done)   # annuncia + opz. face/rife
+        self._native_worker.start()
 
     def _extend_video_native(self):
         """Prolunga un video NATIVAMENTE (LTX-2.3 GGUF): i2v dall'ULTIMO frame del video sorgente per
