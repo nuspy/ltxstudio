@@ -245,6 +245,11 @@ def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
     from ltx_core.loader.primitives import StateDict
     from ltx_core.loader.module_ops import ModuleOps
 
+    # Idempotente: su pipe in cache (chunking in-process) NON ri-patchare/ri-caricare il GGUF (14GB)
+    # ad ogni chunk — altrimenti sd+closure si accumulano → OOM dopo N chunk.
+    if getattr(stage, "_gguf_patched", False):
+        return
+
     orig_builder = stage._transformer_builder
     configurator = orig_builder._model_class_configurator
 
@@ -296,3 +301,4 @@ def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
     # FP8Linear (GGUFLinear è sottoclasse di nn.Linear) → pesi persi/meta. Il GGUF gestisce già tutto.
     if getattr(stage, "_quantization", None) is not None:
         stage._quantization = None
+    stage._gguf_patched = True

@@ -364,6 +364,10 @@ def _run_chunked(p: dict, chunk: int) -> str:
         cp["output"] = f"{base}_chunk{i}.mp4"
         print(f"[chunk] {i + 1}/{n} ({cf} frame, audio_start={cp.get('audio_start_time', 0)})", flush=True)
         run_generation(cp)                                   # pipe in cache dal 2° chunk → veloce
+        import gc as _gc
+        _gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         last = f"{base}_chunk{i}_last.png"
         subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", cp["output"],
                         "-update", "1", "-q:v", "2", last, "-y"], check=False)
