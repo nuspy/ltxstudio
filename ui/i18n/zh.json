@@ -1320,5 +1320,8 @@
   "music.mv.done": "音乐视频已就绪：{f}",
   "music.mv.fail": "音乐视频失败：",
   "music.busy": "已有另一个生成任务在进行中。",
-  "feat.cap.music_video": "音乐视频（歌曲+视频）"
+  "feat.cap.music_video": "音乐视频（歌曲+视频）",
+  "feat.cap.model3d": "3D 模型（照片→网格）",
+  "feat.cap.rig3d": "3D 绑定（骨骼+蒙皮）",
+  "feat.cap.mocap": "动作捕捉动画（摄像头→BVH+重定向）"
 }

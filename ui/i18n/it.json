@@ -1417,5 +1417,8 @@
   "music.mv.done": "Videomusicale pronto: {f}",
   "music.mv.fail": "Videomusicale fallito: ",
   "music.busy": "Un'altra generazione è in corso.",
-  "feat.cap.music_video": "Videomusicale (canzone + video)"
+  "feat.cap.music_video": "Videomusicale (canzone + video)",
+  "feat.cap.model3d": "Modello 3D (foto→mesh)",
+  "feat.cap.rig3d": "Rig 3D (scheletro + skinning)",
+  "feat.cap.mocap": "Animazioni mocap (webcam→BVH + retarget)"
 }

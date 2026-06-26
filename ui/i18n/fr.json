@@ -1320,5 +1320,8 @@
   "music.mv.done": "Clip musical prêt : {f}",
   "music.mv.fail": "Échec du clip musical : ",
   "music.busy": "Une autre génération est en cours.",
-  "feat.cap.music_video": "Clip musical (chanson + vidéo)"
+  "feat.cap.music_video": "Clip musical (chanson + vidéo)",
+  "feat.cap.model3d": "Modèle 3D (photo→maillage)",
+  "feat.cap.rig3d": "Rig 3D (squelette + skinning)",
+  "feat.cap.mocap": "Animations mocap (webcam→BVH + retarget)"
 }

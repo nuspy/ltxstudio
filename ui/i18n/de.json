@@ -1320,5 +1320,8 @@
   "music.mv.done": "Musikvideo fertig: {f}",
   "music.mv.fail": "Musikvideo fehlgeschlagen: ",
   "music.busy": "Eine andere Generierung läuft bereits.",
-  "feat.cap.music_video": "Musikvideo (Song + Video)"
+  "feat.cap.music_video": "Musikvideo (Song + Video)",
+  "feat.cap.model3d": "3D-Modell (Foto→Mesh)",
+  "feat.cap.rig3d": "3D-Rig (Skelett + Skinning)",
+  "feat.cap.mocap": "Mocap-Animationen (Webcam→BVH + Retarget)"
 }

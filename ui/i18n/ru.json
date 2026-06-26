@@ -1320,5 +1320,8 @@
   "music.mv.done": "Клип готов: {f}",
   "music.mv.fail": "Ошибка клипа: ",
   "music.busy": "Уже идёт другая генерация.",
-  "feat.cap.music_video": "Клип (песня + видео)"
+  "feat.cap.music_video": "Клип (песня + видео)",
+  "feat.cap.model3d": "3D-модель (фото→меш)",
+  "feat.cap.rig3d": "3D-риг (скелет + скиннинг)",
+  "feat.cap.mocap": "Mocap-анимации (вебкамера→BVH + ретаргет)"
 }

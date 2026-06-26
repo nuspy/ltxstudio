@@ -1320,5 +1320,8 @@
   "music.mv.done": "Videoclipe pronto: {f}",
   "music.mv.fail": "Falha no videoclipe: ",
   "music.busy": "Outra geração está em andamento.",
-  "feat.cap.music_video": "Videoclipe (música + vídeo)"
+  "feat.cap.music_video": "Videoclipe (música + vídeo)",
+  "feat.cap.model3d": "Modelo 3D (foto→malha)",
+  "feat.cap.rig3d": "Rig 3D (esqueleto + skinning)",
+  "feat.cap.mocap": "Animações mocap (webcam→BVH + retarget)"
 }

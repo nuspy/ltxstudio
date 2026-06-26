@@ -1320,5 +1320,8 @@
   "music.mv.done": "Το μουσικό βίντεο είναι έτοιμο: {f}",
   "music.mv.fail": "Αποτυχία μουσικού βίντεο: ",
   "music.busy": "Εκτελείται ήδη άλλη δημιουργία.",
-  "feat.cap.music_video": "Μουσικό βίντεο (τραγούδι + βίντεο)"
+  "feat.cap.music_video": "Μουσικό βίντεο (τραγούδι + βίντεο)",
+  "feat.cap.model3d": "Μοντέλο 3D (φωτογραφία→πλέγμα)",
+  "feat.cap.rig3d": "3D rig (σκελετός + skinning)",
+  "feat.cap.mocap": "Κινούμενα mocap (κάμερα→BVH + retarget)"
 }

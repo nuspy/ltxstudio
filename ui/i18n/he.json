@@ -1320,5 +1320,8 @@
   "music.mv.done": "הקליפ מוכן: {f}",
   "music.mv.fail": "הקליפ נכשל: ",
   "music.busy": "מתבצעת יצירה אחרת.",
-  "feat.cap.music_video": "קליפ (שיר + וידאו)"
+  "feat.cap.music_video": "קליפ (שיר + וידאו)",
+  "feat.cap.model3d": "מודל תלת-ממד (תמונה→רשת)",
+  "feat.cap.rig3d": "ריג תלת-ממד (שלד + סקינינג)",
+  "feat.cap.mocap": "אנימציות מוקאפ (מצלמה→BVH + ריטרגוט)"
 }

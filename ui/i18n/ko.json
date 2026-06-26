@@ -1320,5 +1320,8 @@
   "music.mv.done": "뮤직비디오 완료: {f}",
   "music.mv.fail": "뮤직비디오 실패: ",
   "music.busy": "다른 생성이 진행 중입니다.",
-  "feat.cap.music_video": "뮤직비디오 (노래 + 영상)"
+  "feat.cap.music_video": "뮤직비디오 (노래 + 영상)",
+  "feat.cap.model3d": "3D 모델 (사진→메시)",
+  "feat.cap.rig3d": "3D 리그 (스켈레톤 + 스키닝)",
+  "feat.cap.mocap": "모캡 애니메이션 (웹캠→BVH + 리타깃)"
 }

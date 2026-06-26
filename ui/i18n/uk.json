@@ -1320,5 +1320,8 @@
   "music.mv.done": "Кліп готовий: {f}",
   "music.mv.fail": "Помилка кліпу: ",
   "music.busy": "Уже триває інша генерація.",
-  "feat.cap.music_video": "Кліп (пісня + відео)"
+  "feat.cap.music_video": "Кліп (пісня + відео)",
+  "feat.cap.model3d": "3D-модель (фото→меш)",
+  "feat.cap.rig3d": "3D-риг (скелет + скінінг)",
+  "feat.cap.mocap": "Mocap-анімації (вебкамера→BVH + ретаргет)"
 }

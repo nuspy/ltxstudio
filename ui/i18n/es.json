@@ -1320,5 +1320,8 @@
   "music.mv.done": "Videoclip listo: {f}",
   "music.mv.fail": "Videoclip fallido: ",
   "music.busy": "Hay otra generación en curso.",
-  "feat.cap.music_video": "Videoclip (canción + vídeo)"
+  "feat.cap.music_video": "Videoclip (canción + vídeo)",
+  "feat.cap.model3d": "Modelo 3D (foto→malla)",
+  "feat.cap.rig3d": "Rig 3D (esqueleto + skinning)",
+  "feat.cap.mocap": "Animaciones mocap (webcam→BVH + retarget)"
 }

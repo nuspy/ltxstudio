@@ -1417,5 +1417,8 @@
   "music.mv.done": "Music video ready: {f}",
   "music.mv.fail": "Music video failed: ",
   "music.busy": "Another generation is in progress.",
-  "feat.cap.music_video": "Music video (song + video)"
+  "feat.cap.music_video": "Music video (song + video)",
+  "feat.cap.model3d": "3D model (photo→mesh)",
+  "feat.cap.rig3d": "3D rig (skeleton + skinning)",
+  "feat.cap.mocap": "Mocap animations (webcam→BVH + retarget)"
 }

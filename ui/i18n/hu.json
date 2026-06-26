@@ -1320,5 +1320,8 @@
   "music.mv.done": "A zenei videó kész: {f}",
   "music.mv.fail": "A zenei videó sikertelen: ",
   "music.busy": "Már fut egy másik generálás.",
-  "feat.cap.music_video": "Zenei videó (dal + videó)"
+  "feat.cap.music_video": "Zenei videó (dal + videó)",
+  "feat.cap.model3d": "3D modell (fotó→háló)",
+  "feat.cap.rig3d": "3D rig (csontváz + skinning)",
+  "feat.cap.mocap": "Mocap animációk (webkamera→BVH + retarget)"
 }
