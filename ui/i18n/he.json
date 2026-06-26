@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "קליפ (שיר + וידאו)",
   "feat.cap.model3d": "מודל תלת-ממד (תמונה→רשת)",
   "feat.cap.rig3d": "ריג תלת-ממד (שלד + סקינינג)",
-  "feat.cap.mocap": "אנימציות מוקאפ (מצלמה→BVH + ריטרגוט)"
+  "feat.cap.mocap": "אנימציות מוקאפ (מצלמה→BVH + ריטרגוט)",
+  "music.mv.style": "סגנון הווידאו",
+  "music.mv.style_ph": "סגנון/מראה: ריאליסטי, מצויר, שחור-לבן, רומנטי עצוב…",
+  "music.mv.pace": "קצב חילופי סצנות",
+  "music.mv.pace.slow": "איטי (~12ש)",
+  "music.mv.pace.medium": "בינוני (~7ש)",
+  "music.mv.pace.fast": "מהיר (~4ש)",
+  "music.mv.pace.vfast": "מהיר מאוד (~2.5ש)"
 }

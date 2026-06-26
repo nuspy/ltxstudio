@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "म्यूज़िक वीडियो (गाना + वीडियो)",
   "feat.cap.model3d": "3D मॉडल (फ़ोटो→मेश)",
   "feat.cap.rig3d": "3D रिग (कंकाल + स्किनिंग)",
-  "feat.cap.mocap": "मोकैप एनिमेशन (वेबकैम→BVH + रीटार्गेट)"
+  "feat.cap.mocap": "मोकैप एनिमेशन (वेबकैम→BVH + रीटार्गेट)",
+  "music.mv.style": "वीडियो शैली",
+  "music.mv.style_ph": "शैली/रूप: यथार्थवादी, कार्टून, श्वेत-श्याम, उदास रोमांटिक…",
+  "music.mv.pace": "दृश्य-परिवर्तन गति",
+  "music.mv.pace.slow": "धीमा (~12स)",
+  "music.mv.pace.medium": "मध्यम (~7स)",
+  "music.mv.pace.fast": "तेज़ (~4स)",
+  "music.mv.pace.vfast": "बहुत तेज़ (~2.5स)"
 }

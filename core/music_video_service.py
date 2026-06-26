@@ -58,13 +58,15 @@ def generate_song(*, lyrics: str, tags: str, out_mp3: str, duration_s: float = 1
 
 def generate_song_and_video(*, lyrics: str, tags: str, image_path: str, out_video: str,
                             song_duration_s: float = 180.0, width: int = 704, height: int = 512,
+                            scene_seconds: float = 6.0, video_style: str = "",
                             image_hint: str = "", progress=None) -> dict:
     """Workflow COMPLETO: canzone → storyboard LLM → video a chunk → mux. Ritorna {song, video}."""
     base = os.path.splitext(out_video)[0]
     song = generate_song(lyrics=lyrics, tags=tags, out_mp3=base + ".mp3",
                          duration_s=song_duration_s, progress=progress)
     video = make_music_video(lyrics=lyrics, song_path=song, image_path=image_path, out_path=out_video,
-                             width=width, height=height, image_hint=image_hint, progress=progress)
+                             width=width, height=height, scene_seconds=scene_seconds,
+                             video_style=video_style, image_hint=image_hint, progress=progress)
     return {"song": song, "video": video}
 
 
@@ -89,11 +91,24 @@ def _scene_for_chunk(i: int, nch: int, scenes: list[dict]) -> dict:
     return scenes[-1]
 
 
+def _valid_nf(seconds: float, fps: int) -> int:
+    """Numero frame valido per LTX (8·k+1), corrispondente a ~`seconds`, clamp ~2s..6.7s."""
+    k = round((seconds * fps - 1) / 8)
+    k = max(6, min(21, k))           # 8*6+1=49 (~2s) … 8*21+1=169 (~6.7s)
+    return k * 8 + 1
+
+
+MAX_SCENES = 40                       # tetto scene LLM (oltre, mappatura proporzionale)
+
+
 def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: str,
-                     width: int = 704, height: int = 512, fps: int = 25, chunk_frames: int = 121,
+                     width: int = 704, height: int = 512, fps: int = 25, scene_seconds: float = 6.0,
+                     video_style: str = "", chunk_frames: int | None = None,
                      steps: int = 8, image_hint: str = "", scratch: str | None = None,
                      progress=None) -> str:
     """Genera il videomusicale dato l'mp3 GIÀ generato + le liriche + l'immagine iniziale.
+    `scene_seconds` = durata media di una scena = ritmo dei cambi (più piccolo = stacchi più rapidi).
+    `video_style` = stile/resa applicato a OGNI segmento (es. 'cartone animato', 'bianco e nero triste').
     Ritorna il path del video finale (video+audio)."""
     def log(m):
         if progress:
@@ -104,41 +119,52 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
     dur = _dur(song_path)
     if dur <= 0:
         raise RuntimeError(f"durata canzone non valida: {song_path}")
-    seg = chunk_frames / fps
+    # chunk corto per qualità/VRAM (≤5s); le scene possono durare più chunk se il ritmo è lento
+    nf = chunk_frames or _valid_nf(min(scene_seconds, 5.0), fps)
+    seg = nf / fps
     nch = max(1, math.ceil(dur / seg))
-
+    target = max(2, round(dur / max(1.0, scene_seconds)))  # numero scene = ritmo dei cambi
     log("Storyboard (LLM)…")
     try:
-        scenes = lyrics_llm.storyboard(lyrics, image_hint=image_hint)
+        scenes = lyrics_llm.storyboard(lyrics, image_hint=image_hint,
+                                       target_scenes=min(target, MAX_SCENES), video_style=video_style)
     except Exception as e:                                  # noqa: BLE001
         log(f"[storyboard] LLM non disponibile ({e}) → scena unica")
         scenes = []
     if not scenes:
-        scenes = [{"prompt": "cinematic music video coherent with the song, dynamic, atmospheric", "weight": 1}]
-    log(f"Storyboard: {len(scenes)} scene, {nch} chunk ({dur:.0f}s)")
+        base = "cinematic music video coherent with the song, dynamic, atmospheric"
+        scenes = [{"prompt": base, "weight": 1}]
+    style_sfx = (", " + video_style.strip()) if (video_style or "").strip() else ""
+    log(f"Storyboard: {len(scenes)} scene · {nch} chunk da {seg:.1f}s ({dur:.0f}s)"
+        + (f" · stile: {video_style.strip()}" if style_sfx else ""))
 
     prev = image_path
+    prev_prompt = None
     parts: list[str] = []
     env = dict(os.environ)
     env["HF_HUB_OFFLINE"] = "1"
     env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     for i in range(nch):
-        scene = _scene_for_chunk(i, nch, scenes)
+        scene = scenes[min(len(scenes) - 1, i * len(scenes) // nch)]   # scene distribuite uniformemente nel tempo
+        # STACCO NETTO al cambio scena: riparti dall'immagine di sfondo (non dall'ultimo frame).
+        cut = scene["prompt"] != prev_prompt
+        cond = image_path if cut else prev
         out_i = os.path.join(scratch, f"chunk_{i:03d}.mp4")
         if not os.path.exists(out_i):
             params = {
-                "image_path": prev, "gguf_transformer": GGUF,
-                "prompt": scene["prompt"], "negative": NEG,
-                "width": width, "height": height, "num_frames": chunk_frames, "fps": fps,
+                "image_path": cond, "gguf_transformer": GGUF,
+                "prompt": scene["prompt"] + style_sfx, "negative": NEG,
+                "width": width, "height": height, "num_frames": nf, "fps": fps,
                 "steps": steps, "guidance": 3.0, "seed": 8, "offload": "cpu",
                 "ref_strength": 1.0, "output": out_i,
             }
             jf = os.path.join(scratch, f"c_{i:03d}.json")
             json.dump(params, open(jf, "w"))
-            log(f"Chunk {i + 1}/{nch}…")
+            log(f"Chunk {i + 1}/{nch}{' ✂' if cut else ''}…")
             r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
             if not os.path.exists(out_i):
                 raise RuntimeError(f"chunk {i} fallito: " + (r.stdout[-500:] + r.stderr[-500:]))
+        prev_prompt = scene["prompt"]
         last = os.path.join(scratch, f"last_{i:03d}.png")
         subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", out_i, "-update", "1",
                         "-q:v", "2", last, "-y"])

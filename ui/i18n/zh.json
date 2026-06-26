@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "音乐视频（歌曲+视频）",
   "feat.cap.model3d": "3D 模型（照片→网格）",
   "feat.cap.rig3d": "3D 绑定（骨骼+蒙皮）",
-  "feat.cap.mocap": "动作捕捉动画（摄像头→BVH+重定向）"
+  "feat.cap.mocap": "动作捕捉动画（摄像头→BVH+重定向）",
+  "music.mv.style": "视频风格",
+  "music.mv.style_ph": "风格/质感：写实、卡通、黑白、伤感浪漫…",
+  "music.mv.pace": "切换节奏",
+  "music.mv.pace.slow": "慢（~12秒）",
+  "music.mv.pace.medium": "中（~7秒）",
+  "music.mv.pace.fast": "快（~4秒）",
+  "music.mv.pace.vfast": "很快（~2.5秒）"
 }

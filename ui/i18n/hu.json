@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "Zenei videó (dal + videó)",
   "feat.cap.model3d": "3D modell (fotó→háló)",
   "feat.cap.rig3d": "3D rig (csontváz + skinning)",
-  "feat.cap.mocap": "Mocap animációk (webkamera→BVH + retarget)"
+  "feat.cap.mocap": "Mocap animációk (webkamera→BVH + retarget)",
+  "music.mv.style": "Videó stílusa",
+  "music.mv.style_ph": "Stílus/megjelenés: realisztikus, rajzfilm, fekete-fehér, szomorú romantikus…",
+  "music.mv.pace": "Jelenetváltás üteme",
+  "music.mv.pace.slow": "Lassú (~12s)",
+  "music.mv.pace.medium": "Közepes (~7s)",
+  "music.mv.pace.fast": "Gyors (~4s)",
+  "music.mv.pace.vfast": "Nagyon gyors (~2.5s)"
 }

@@ -54,18 +54,19 @@ class _MusicVideoWorker(QThread):
     progress = Signal(str)
     finished_mv = Signal(dict)
 
-    def __init__(self, lyrics: str, tags: str, image: str, out_video: str, duration: float):
+    def __init__(self, lyrics: str, tags: str, image: str, out_video: str, duration: float,
+                 scene_seconds: float = 6.0, video_style: str = ""):
         super().__init__()
-        self._args = (lyrics, tags, image, out_video, duration)
+        self._args = (lyrics, tags, image, out_video, duration, scene_seconds, video_style)
 
     def run(self):
-        lyrics, tags, image, out_video, duration = self._args
+        lyrics, tags, image, out_video, duration, scene_seconds, video_style = self._args
         try:
             from core import music_video_service as mvs
             res = mvs.generate_song_and_video(
                 lyrics=lyrics, tags=tags, image_path=image, out_video=out_video,
-                song_duration_s=duration, image_hint="the provided starting photo",
-                progress=self.progress.emit)
+                song_duration_s=duration, scene_seconds=scene_seconds, video_style=video_style,
+                image_hint="the provided starting photo", progress=self.progress.emit)
             self.finished_mv.emit(res)
         except Exception as e:                          # noqa: BLE001
             self.finished_mv.emit({"error": str(e)})
@@ -165,6 +166,24 @@ class MusicTab(QWidget):
         mv.addWidget(self.mv_image, 1)
         mv.addWidget(self.btn_mv_browse)
         v.addLayout(mv)
+        # --- Videomusicale: stile video + ritmo dei cambi scena ---
+        mv2 = QHBoxLayout()
+        self.mv_style = QLineEdit()
+        self.mv_style.setPlaceholderText(tr("music.mv.style_ph",
+            "Stile/resa del video: realistico, cartone animato, bianco e nero, romantico triste…"))
+        mv2.addWidget(QLabel(tr("music.mv.style", "Stile video")))
+        mv2.addWidget(self.mv_style, 1)
+        self.mv_pace = QComboBox()
+        # (etichetta, secondi/scena) — più piccolo = stacchi più rapidi
+        for _lab, _sec in (("music.mv.pace.slow", 12.0), ("music.mv.pace.medium", 7.0),
+                           ("music.mv.pace.fast", 4.0), ("music.mv.pace.vfast", 2.5)):
+            self.mv_pace.addItem(tr(_lab, {"music.mv.pace.slow": "Lento (~12s)",
+                "music.mv.pace.medium": "Medio (~7s)", "music.mv.pace.fast": "Veloce (~4s)",
+                "music.mv.pace.vfast": "Molto veloce (~2.5s)"}[_lab]), _sec)
+        self.mv_pace.setCurrentIndex(2)                   # default Veloce
+        mv2.addWidget(QLabel(tr("music.mv.pace", "Ritmo cambi scena")))
+        mv2.addWidget(self.mv_pace)
+        v.addLayout(mv2)
         h = QHBoxLayout()
         self.btn_song_install = QPushButton(tr("music.install.heart", "Installa HeartMuLa"))
         self.btn_song_install.clicked.connect(lambda: self._install("--heartmula"))
@@ -339,7 +358,9 @@ class MusicTab(QWidget):
         self.btn_music_video.setEnabled(False)
         self._t0 = time.time()
         self._log(tr("music.mv.started", "Videomusicale: canzone + storyboard + video (può richiedere parecchi minuti)…"))
-        self._mv_worker = _MusicVideoWorker(lyrics, tags, image, out, float(self.song_dur.value()))
+        self._mv_worker = _MusicVideoWorker(lyrics, tags, image, out, float(self.song_dur.value()),
+                                            scene_seconds=float(self.mv_pace.currentData()),
+                                            video_style=self.mv_style.text().strip())
         self._mv_worker.progress.connect(self._log)
         self._mv_worker.finished_mv.connect(self._on_mv_done)
         self._mv_worker.start()

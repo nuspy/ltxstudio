@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "뮤직비디오 (노래 + 영상)",
   "feat.cap.model3d": "3D 모델 (사진→메시)",
   "feat.cap.rig3d": "3D 리그 (스켈레톤 + 스키닝)",
-  "feat.cap.mocap": "모캡 애니메이션 (웹캠→BVH + 리타깃)"
+  "feat.cap.mocap": "모캡 애니메이션 (웹캠→BVH + 리타깃)",
+  "music.mv.style": "영상 스타일",
+  "music.mv.style_ph": "스타일/룩: 사실적, 만화, 흑백, 슬픈 로맨틱…",
+  "music.mv.pace": "장면 전환 속도",
+  "music.mv.pace.slow": "느림 (~12초)",
+  "music.mv.pace.medium": "보통 (~7초)",
+  "music.mv.pace.fast": "빠름 (~4초)",
+  "music.mv.pace.vfast": "매우 빠름 (~2.5초)"
 }

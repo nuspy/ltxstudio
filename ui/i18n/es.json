@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "Videoclip (canción + vídeo)",
   "feat.cap.model3d": "Modelo 3D (foto→malla)",
   "feat.cap.rig3d": "Rig 3D (esqueleto + skinning)",
-  "feat.cap.mocap": "Animaciones mocap (webcam→BVH + retarget)"
+  "feat.cap.mocap": "Animaciones mocap (webcam→BVH + retarget)",
+  "music.mv.style": "Estilo de vídeo",
+  "music.mv.style_ph": "Estilo/aspecto: realista, dibujos animados, blanco y negro, romántico triste…",
+  "music.mv.pace": "Ritmo de cambios",
+  "music.mv.pace.slow": "Lento (~12s)",
+  "music.mv.pace.medium": "Medio (~7s)",
+  "music.mv.pace.fast": "Rápido (~4s)",
+  "music.mv.pace.vfast": "Muy rápido (~2.5s)"
 }

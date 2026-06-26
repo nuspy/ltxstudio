@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "Клип (песня + видео)",
   "feat.cap.model3d": "3D-модель (фото→меш)",
   "feat.cap.rig3d": "3D-риг (скелет + скиннинг)",
-  "feat.cap.mocap": "Mocap-анимации (вебкамера→BVH + ретаргет)"
+  "feat.cap.mocap": "Mocap-анимации (вебкамера→BVH + ретаргет)",
+  "music.mv.style": "Стиль видео",
+  "music.mv.style_ph": "Стиль/вид: реалистично, мультфильм, чёрно-белое, грустно-романтично…",
+  "music.mv.pace": "Темп смены сцен",
+  "music.mv.pace.slow": "Медленно (~12с)",
+  "music.mv.pace.medium": "Средне (~7с)",
+  "music.mv.pace.fast": "Быстро (~4с)",
+  "music.mv.pace.vfast": "Очень быстро (~2.5с)"
 }

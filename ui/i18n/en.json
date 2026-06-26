@@ -1420,5 +1420,12 @@
   "feat.cap.music_video": "Music video (song + video)",
   "feat.cap.model3d": "3D model (photo→mesh)",
   "feat.cap.rig3d": "3D rig (skeleton + skinning)",
-  "feat.cap.mocap": "Mocap animations (webcam→BVH + retarget)"
+  "feat.cap.mocap": "Mocap animations (webcam→BVH + retarget)",
+  "music.mv.style": "Video style",
+  "music.mv.style_ph": "Style/look: realistic, cartoon, black & white, sad romantic…",
+  "music.mv.pace": "Scene-change pace",
+  "music.mv.pace.slow": "Slow (~12s)",
+  "music.mv.pace.medium": "Medium (~7s)",
+  "music.mv.pace.fast": "Fast (~4s)",
+  "music.mv.pace.vfast": "Very fast (~2.5s)"
 }

@@ -1323,5 +1323,12 @@
   "feat.cap.music_video": "Μουσικό βίντεο (τραγούδι + βίντεο)",
   "feat.cap.model3d": "Μοντέλο 3D (φωτογραφία→πλέγμα)",
   "feat.cap.rig3d": "3D rig (σκελετός + skinning)",
-  "feat.cap.mocap": "Κινούμενα mocap (κάμερα→BVH + retarget)"
+  "feat.cap.mocap": "Κινούμενα mocap (κάμερα→BVH + retarget)",
+  "music.mv.style": "Στυλ βίντεο",
+  "music.mv.style_ph": "Στυλ/όψη: ρεαλιστικό, κινούμενο σχέδιο, ασπρόμαυρο, λυπητερό ρομαντικό…",
+  "music.mv.pace": "Ρυθμός αλλαγής σκηνών",
+  "music.mv.pace.slow": "Αργός (~12s)",
+  "music.mv.pace.medium": "Μεσαίος (~7s)",
+  "music.mv.pace.fast": "Γρήγορος (~4s)",
+  "music.mv.pace.vfast": "Πολύ γρήγορος (~2.5s)"
 }

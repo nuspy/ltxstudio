@@ -88,15 +88,28 @@ _SB_SYSTEM = (
 )
 
 
-def storyboard(lyrics: str, image_hint: str = "", max_new_tokens: int = 900) -> list[dict]:
+def storyboard(lyrics: str, image_hint: str = "", target_scenes: int | None = None,
+               video_style: str = "", max_new_tokens: int = 1600) -> list[dict]:
     """Gemma-3 locale → storyboard per il videomusicale: lista ORDINATA di scene {prompt, weight}
-    coerenti col testo (l'LLM traduce/interpreta). `image_hint` = descrizione dell'immagine iniziale/
-    sfondo da mantenere coerente. Ritorna [] se l'LLM non è disponibile/non produce JSON valido."""
+    coerenti col testo (l'LLM traduce/interpreta). Parametri:
+      image_hint    = descrizione dell'immagine iniziale/sfondo da mantenere coerente.
+      target_scenes = numero scene desiderato (più scene = cambi più rapidi); None = 6-12 a scelta LLM.
+      video_style   = stile/resa del video (es. 'cartone animato divertente', 'bianco e nero malinconico',
+                      'realistico romantico'): NON è contenuto, va applicato a TUTTE le scene.
+    Ritorna [] se l'LLM non è disponibile/non produce JSON valido."""
     import json
     import re
     import torch
     model, proc = _load()
     user = "Song lyrics (keep scene order matching the song):\n" + (lyrics or "").strip()
+    if (video_style or "").strip():
+        user += (f"\n\nVISUAL STYLE (apply to EVERY scene, this is the look/mood NOT the content): "
+                 f"{video_style.strip()}. Every scene description must reflect this style consistently.")
+    if target_scenes:
+        n = max(2, int(target_scenes))
+        user += (f"\n\nProduce EXACTLY about {n} scenes (one every few seconds of the song) so the music "
+                 "video has frequent, dynamic scene changes. Each scene visually DISTINCT "
+                 "(different shot/angle/action) yet coherent with the same world, characters and style.")
     if (image_hint or "").strip():
         user += ("\n\nThe music video STARTS from and stays visually consistent with this background "
                  f"image: {image_hint.strip()}. Keep that setting/lighting coherent across scenes.")
