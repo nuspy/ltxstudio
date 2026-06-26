@@ -164,8 +164,13 @@ def _assemble_flux2(Pipe, transformer_path: str):
     from diffusers import Flux2Transformer2DModel, AutoencoderKLFlux2, FlowMatchEulerDiscreteScheduler
     from transformers import AutoModel, AutoTokenizer
     bf16 = torch.bfloat16
+    import json
+    from safetensors.torch import load_file
     tr = Flux2Transformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
-    vae = AutoencoderKLFlux2.from_single_file(FLUX2_VAE, config=os.path.join(FLUX2_DIR, "vae"), torch_dtype=bf16)
+    # AutoencoderKLFlux2 NON supporta from_single_file → from_config + load_state_dict (chiavi 1:1)
+    vae = AutoencoderKLFlux2.from_config(json.load(open(os.path.join(FLUX2_DIR, "vae", "config.json"))))
+    vae.load_state_dict(load_file(FLUX2_VAE), assign=True)
+    vae = vae.to(bf16)
     te = AutoModel.from_pretrained(os.path.join(FLUX2_DIR, "text_encoder"), torch_dtype=bf16)
     tok = AutoTokenizer.from_pretrained(os.path.join(FLUX2_DIR, "tokenizer"))
     try:
