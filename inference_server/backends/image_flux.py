@@ -187,7 +187,14 @@ def _load(model_path: str, arch: str):
     except Exception:                                       # noqa: BLE001
         pass
     cls_name, supports_sf, _ = SPEC[arch]
-    Pipe = getattr(diffusers, cls_name)
+    Pipe = getattr(diffusers, cls_name, None)
+    if Pipe is None:
+        # es. Flux2KontextPipeline non esiste in diffusers 0.38 → messaggio chiaro + suggerimento
+        alt = "kontext" if arch == "flux2_kontext" else "flux2_inpaint" if arch.startswith("flux2") else ""
+        raise RuntimeError(
+            f"La classe diffusers '{cls_name}' per arch '{arch}' non esiste in diffusers "
+            f"{diffusers.__version__}." + (f" Usa '{alt}' per questa funzione." if alt else
+            " Aggiorna diffusers o scegli un'altra pipeline."))
     is_file = Path(model_path).is_file()
     if arch.startswith("flux2") and is_file:
         # FLUX.2: transformer locale + VAE locale + TE Mistral HF (assemblaggio, anche inpaint/kontext)
