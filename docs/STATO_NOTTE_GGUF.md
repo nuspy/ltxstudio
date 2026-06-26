@@ -42,8 +42,15 @@ il 22B sta nei 32GB. `ltx-core` (motore nativo) leggeva solo safetensors → ho 
 - **Lip-sync/canto → nativo**: `_start_native_multitalk` ora usa l'a2v nativo (non più Wan/ComfyUI).
 - 14/14 smoke test GUI passano. Validato a import/costruzione + worker standalone; il flusso
   end-to-end in GUI va provato con l'app aperta.
-- **Ancora ComfyUI (warn/da cablare)**: storyboard #37 (avvisa, genera scena base), `generate_video_extend`,
-  `generate_video_enhance` (usano ancora `driver.submit`).
+- **Extend video → nativo** (`_extend_video_native`): i2v dall'ultimo frame + concat.
+- **Enhance/definizione → nativo** (`_enhance_video_native`): upscale per-frame ESRGAN (handler video_upscale).
+- **Ancora ComfyUI (warn/da cablare)**: storyboard #37 (avvisa, genera scena base; serve pipeline
+  keyframe_interpolation nel worker).
+
+## PESI già presenti in E:\AI\Models (verificato 26/06)
+- SAM2 + GroundingDINO (#22 segmentazione) ✅ · FLUX.2 fp8 33GB + vae + mistral text-enc (#14) ✅ ·
+  Ernie diffusers completo (#1) ✅ · **SD3 (#27) MANCA** (unico da scaricare).
+- → #22/#14/#1 sbloccabili SENZA download: restano da validare/abilitare i handler nativi.
 
 ## ALTRO ANCORA DA FARE (storico)
 Il motore video nativo è completo (`workers/ltx2_infer.py` + `core/ltx2_service.py` server :8190) ma
