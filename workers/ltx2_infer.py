@@ -323,9 +323,77 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     return pipe
 
 
+def _auto_gguf() -> str | None:
+    """Trova il miglior GGUF transformer LTX disponibile (Q4 distilled di default). Permette al 22B di
+    entrare nei 32GB col dequant on-the-fly (come ComfyUI). Restituisce None se nessun .gguf."""
+    import glob
+    bases = [r"E:\AI\Models\diffusion_models", r"E:\AI\Models\Checkpoints"]
+    pats = ["**/*distilled*Q4_K_M*.gguf", "**/*Q4_K_M*.gguf", "**/ltx*Q6_K*.gguf", "**/ltx*Q4*.gguf"]
+    for b in bases:
+        for pat in pats:
+            hits = glob.glob(os.path.join(b, pat), recursive=True)
+            if hits:
+                return hits[0]
+    return None
+
+
+def _run_chunked(p: dict, chunk: int) -> str:
+    """Genera un video lungo a CHUNK in-process (pipe in cache → carica una volta sola), con
+    continuità: l'ultimo frame di un chunk diventa l'immagine di conditioning del successivo;
+    l'audio è affettato per chunk (audio_start_time/max_duration). Concat finale via ffmpeg.
+    Evita l'OOM/sborzo dello stage_2 a lunghezza piena tenendo ogni chunk corto."""
+    import subprocess
+    fps = float(p.get("fps", 25.0))
+    total = int(p["num_frames"])
+    seg_dur = chunk / fps
+    prev_img = p.get("image_path")
+    base = os.path.splitext(p["output"])[0]
+    parts: list[str] = []
+    n = (total + chunk - 1) // chunk
+    for i in range(n):
+        cf = min(chunk, total - i * chunk)
+        if cf < 9:
+            break
+        cp = dict(p)
+        cp.pop("chunk_frames", None)
+        cp["num_frames"] = cf
+        cp["image_path"] = prev_img
+        if p.get("audio_path"):
+            cp["audio_start_time"] = round(i * seg_dur, 3)
+            cp["audio_max_duration"] = round(seg_dur, 3)
+        cp["output"] = f"{base}_chunk{i}.mp4"
+        print(f"[chunk] {i + 1}/{n} ({cf} frame, audio_start={cp.get('audio_start_time', 0)})", flush=True)
+        run_generation(cp)                                   # pipe in cache dal 2° chunk → veloce
+        last = f"{base}_chunk{i}_last.png"
+        subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", cp["output"],
+                        "-update", "1", "-q:v", "2", last, "-y"], check=False)
+        if os.path.exists(last):
+            prev_img = last                                  # continuità visiva
+        parts.append(cp["output"])
+    lst = f"{base}_list.txt"
+    with open(lst, "w", encoding="utf-8") as fh:
+        for pt in parts:
+            fh.write(f"file '{pt}'\n")
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                    "-c", "copy", p["output"], "-y"], check=False)
+    print(f"[chunk] concat → {p['output']} ({len(parts)} chunk)", flush=True)
+    return p["output"]
+
+
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
+    # Video lungo → chunking in-process (memory-bounded, niente sborzo stage_2). Attiva con
+    # chunk_frames>0 (o auto sotto). Ricorsione sicura: i chunk hanno num_frames<=chunk.
+    _chunk = int(p.get("chunk_frames", 0))
+    if _chunk and int(p.get("num_frames", 0)) > _chunk:
+        return _run_chunked(p, _chunk)
+    # Auto-GGUF: se non specificato, usa il GGUF Q4 (dequant on-the-fly) così il 22B entra nei 32GB.
+    # Disattivabile passando esplicitamente gguf_transformer="".
+    if "gguf_transformer" not in p:
+        g = _auto_gguf()
+        if g:
+            p["gguf_transformer"] = g
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
     # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)
