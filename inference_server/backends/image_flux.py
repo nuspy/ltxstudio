@@ -42,6 +42,10 @@ _MASK_ARCHS = ("inpaint", "flux2_inpaint")
 # Text encoder convertiti (pesi locali + config/tokenizer) e VAE locale, per i file solo-transformer
 TE_DIR = r"E:\AI\Models\diffusers\_te"
 AE_FLUX = r"E:\AI\Models\VAE\Flux\ae.safetensors"
+# Ernie: repo diffusers (config/vae/tokenizer/scheduler) + transformer e text-encoder come single-file locali
+ERNIE_REPO = r"E:\AI\Models\diffusers\Ernie\ERNIE-Image"
+ERNIE_TRANSFORMER = r"E:\AI\Models\diffusion_models\Ernie\ernie-image.safetensors"
+ERNIE_TE = r"E:\AI\Models\TextEncoders\Ernie\ministral-3-3b.safetensors"
 FLUX2_DIR = r"E:\AI\Models\diffusers\flux2"          # TE Mistral HF + tokenizer + config (gated, scaricati)
 FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
 
@@ -171,6 +175,46 @@ def _assemble_flux2(Pipe, transformer_path: str):
     return Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
+def _assemble_ernie():
+    """Assembla ErnieImagePipeline (Baidu ERNIE-Image) da pesi LOCALI, con shim per transformers <5
+    (il repo diffusers vuole transformers 5: TokenizersBackend / Ministral3 / model_type 'ministral3').
+    transformer (single-file, chiavi 1:1) + text-encoder Mistral3 (single-file, remap model.→language_model.)
+    + vae/tokenizer/scheduler dal repo. NIENTE ComfyUI."""
+    import json
+    import torch
+    import transformers
+    from transformers import (Mistral3Model, Mistral3Config, MinistralForCausalLM, PreTrainedTokenizerFast)
+    from safetensors.torch import load_file
+    from diffusers import (ErnieImageTransformer2DModel, AutoencoderKLFlux2,
+                           FlowMatchEulerDiscreteScheduler, ErnieImagePipeline)
+    bf16 = torch.bfloat16
+    if not hasattr(transformers, "Ministral3ForCausalLM"):
+        transformers.Ministral3ForCausalLM = MinistralForCausalLM
+    if not hasattr(transformers, "TokenizersBackend"):
+        transformers.TokenizersBackend = PreTrainedTokenizerFast
+    # transformer: config dal repo + pesi dal single-file (chiavi identiche, 409/409)
+    tr = ErnieImageTransformer2DModel.from_config(json.load(open(os.path.join(ERNIE_REPO, "transformer", "config.json"))))
+    tr.load_state_dict(load_file(ERNIE_TRANSFORMER), assign=True)
+    tr = tr.to(bf16)
+    # text encoder Mistral3: 'ministral3' (sconosciuto a transformers 4) → 'ministral' + sliding_window=full
+    tcfg = json.load(open(os.path.join(ERNIE_REPO, "text_encoder", "config.json")))
+    tc = tcfg.get("text_config", {})
+    if tc.get("model_type") == "ministral3":
+        tc["model_type"] = "ministral"
+    if tc.get("sliding_window") is None:
+        tc["sliding_window"] = tc.get("max_position_embeddings", 262144)
+    te = Mistral3Model(Mistral3Config(**tcfg))
+    raw = load_file(ERNIE_TE)
+    rem = {("language_model." + k[6:]) if k.startswith("model.") else k: v
+           for k, v in raw.items() if not k.startswith("tekken_model")}
+    te.load_state_dict(rem, strict=False)
+    te = te.to(bf16)
+    vae = AutoencoderKLFlux2.from_pretrained(os.path.join(ERNIE_REPO, "vae"), torch_dtype=bf16)
+    tok = PreTrainedTokenizerFast(tokenizer_file=os.path.join(ERNIE_REPO, "tokenizer", "tokenizer.json"))
+    sched = FlowMatchEulerDiscreteScheduler.from_pretrained(os.path.join(ERNIE_REPO, "scheduler"))
+    return ErnieImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
+
+
 def _arch_of(params: dict) -> str:
     a = (params.get("task") or params.get("arch") or "flux").lower()
     if a == "flux" and "flux2" in str(params.get("model", "")).lower():
@@ -198,7 +242,9 @@ def _load(model_path: str, arch: str):
             f"{diffusers.__version__}." + (f" Usa '{alt}' per questa funzione." if alt else
             " Aggiorna diffusers o scegli un'altra pipeline."))
     is_file = Path(model_path).is_file()
-    if arch.startswith("flux2") and is_file:
+    if arch == "ernie":
+        pipe = _assemble_ernie()                            # assemblaggio locale (shim transformers <5)
+    elif arch.startswith("flux2") and is_file:
         # FLUX.2: transformer locale + VAE locale + TE Mistral HF (assemblaggio, anche inpaint/kontext)
         pipe = _assemble_flux2(Pipe, model_path)
     elif is_file and not supports_sf:
