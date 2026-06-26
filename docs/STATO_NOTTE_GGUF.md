@@ -35,7 +35,17 @@ il 22B sta nei 32GB. `ltx-core` (motore nativo) leggeva solo safetensors → ho 
   **tiled-sampler** — qui risolto col chunking, ~60s/chunk da 5s). NB: la VRAM reale è ridotta da STT
   + processi di sistema → tenere chunk corti (5s/121 frame) e verificare `nvidia-smi memory.free`.
 
-## ANCORA DA FARE — cablaggio GUI (serve TE per il test interfaccia)
+## CABLAGGIO GUI — FATTO (additivo, da validare con interfaccia aperta)
+- **Tab Video → nativo**: ramo `if backend.is_native("video")` in `generate` → `_generate_video_native`
+  → `_NativeLtx2Worker` (subprocess venv ltx2, auto-GGUF + chunking + a2v se audio), risultato su
+  `_on_multitalk_done` (face-swap/RIFE/announce). **`backend_config` video=native** (flippato).
+- **Lip-sync/canto → nativo**: `_start_native_multitalk` ora usa l'a2v nativo (non più Wan/ComfyUI).
+- 14/14 smoke test GUI passano. Validato a import/costruzione + worker standalone; il flusso
+  end-to-end in GUI va provato con l'app aperta.
+- **Ancora ComfyUI (warn/da cablare)**: storyboard #37 (avvisa, genera scena base), `generate_video_extend`,
+  `generate_video_enhance` (usano ancora `driver.submit`).
+
+## ALTRO ANCORA DA FARE (storico)
 Il motore video nativo è completo (`workers/ltx2_infer.py` + `core/ltx2_service.py` server :8190) ma
 **NON è ancora collegato al tab Video**: la GUI genera video via `self.driver.submit(workflow ComfyUI)`
 costruito da `TemplateEngine` (in `ui/main_window.py`: `generate_video*`, `generate_video_extend`, …).
