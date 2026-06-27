@@ -1746,5 +1746,7 @@
   "aud.handy.ok": "Handy-API avviato.",
   "fs.mt.relip": "re-lip-sync",
   "fs.mt.dub_to": "Lingua",
-  "fs.mt.dub_done2": "Doppiaggio {l}: {n} battute; {m} video in re-lip-sync (coda)."
+  "fs.mt.dub_done2": "Doppiaggio {l}: {n} battute; {m} video in re-lip-sync (coda).",
+  "fs.sb.auto_vid": "[Auto] keyframe pronti → video in coda.",
+  "fs.sb.auto_done": "[Auto] video pronti → montaggio automatico."
 }

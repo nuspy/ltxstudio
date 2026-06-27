@@ -23,9 +23,12 @@ _SYS = ("You are a film script supervisor. Break the screenplay into SCENES and 
 
 
 class StoryboardTab(QWidget):
+    auto_complete = Signal(int)        # #54: project_id quando l'Auto ha finito i video → montaggio
+
     def __init__(self, get_project):
         super().__init__()
         self._get_project = get_project
+        self._auto = None
         v = QVBoxLayout(self)
         h = QHBoxLayout()
         self.btn_break = QPushButton(tr("fs.sb.breakdown", "🎬 Breakdown scene/inquadrature (LLM)"))
@@ -144,6 +147,7 @@ class StoryboardTab(QWidget):
         guard = json.loads(proj.get("config") or "{}")
         forbidden, required = guard.get("forbidden", ""), guard.get("required", "")
         n = 0
+        jids = []
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
             state = json.loads(sc.get("continuity") or "{}")
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
@@ -153,7 +157,7 @@ class StoryboardTab(QWidget):
                 Path(outdir).mkdir(parents=True, exist_ok=True)
                 if what == "keyframe":
                     out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
-                    scheduler.enqueue("image", {"prompt": prompt, "out": out,
+                    jid = scheduler.enqueue("image", {"prompt": prompt, "out": out,
                                                 "face_ref": (refs["ref_images"] or [""])[0],
                                                 "loras": refs["loras"], "negative": forbidden},
                                       owner_kind="shot", owner_id=sh["id"])
@@ -161,14 +165,14 @@ class StoryboardTab(QWidget):
                     out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
                     kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
                     kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
-                    # LIP-SYNC: se lo shot ha un dialogo, sintetizza l'audio con la voce legata e
-                    # passalo al video (a2v nativo = labiale sincronizzato sul parlato)
                     audio_path = self._shot_dialogue_audio(sh, outdir)
-                    scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
+                    jid = scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
                                                 "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
                                                 "negative": forbidden}, owner_kind="shot", owner_id=sh["id"])
                 n += 1
+                jids.append(jid)
         self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))
+        return jids
 
     def _gen_all(self):
         """Modalità Auto (spec §5.6): breakdown (se serve) → keyframe → video in coda. Il master si fa
@@ -184,9 +188,12 @@ class StoryboardTab(QWidget):
                                 tr("fs.sb.auto_confirm", "Genererò {s} shot (keyframe+video). Stima ~{m} min. Procedere?")
                                 .format(s=shots, m=round(est["seconds"] / 60))) != QMessageBox.Yes:
             return
-        self._gen("keyframe")
-        self._gen("video")
-        self.log.appendPlainText(tr("fs.sb.auto_started", "Film completo in coda: keyframe+video. Poi vai a Montaggio → Master."))
+        # ORCHESTRAZIONE A FASI: prima i keyframe; quando TUTTI pronti, i video (così il kf esiste);
+        # quando tutti i video pronti, emette auto_complete → la finestra fa audio+master.
+        kf_jids = [j for j in self._gen("keyframe") if j]
+        self._auto = {"phase": "keyframe", "pending": set(kf_jids), "pid": pid}
+        self.log.appendPlainText(tr("fs.sb.auto_started",
+            "Film completo (Auto): keyframe → video → montaggio automatici."))
 
     def _export_shotlist(self):
         """1.6 Esporta la shot-list come documento HTML (scene/shot/durate/dialoghi/keyframe)."""
@@ -308,3 +315,17 @@ class StoryboardTab(QWidget):
         if ev.get("event") in ("done", "error"):
             self.log.appendPlainText(f"[{ev['event']}] job {ev.get('job_id')} {ev.get('type')} "
                                      f"{ev.get('error','') or ev.get('output','')}"[:120])
+            # #54 orchestrazione Auto a fasi: keyframe → video → montaggio
+            auto = getattr(self, "_auto", None)
+            if auto and ev.get("job_id") in auto["pending"]:
+                auto["pending"].discard(ev["job_id"])
+                if not auto["pending"]:
+                    if auto["phase"] == "keyframe":
+                        self._refresh()                      # i kf ora esistono → accoda i video
+                        vids = [j for j in self._gen("video") if j]
+                        auto["phase"] = "video"; auto["pending"] = set(vids)
+                        self.log.appendPlainText(tr("fs.sb.auto_vid", "[Auto] keyframe pronti → video in coda."))
+                    else:                                    # video finiti → montaggio automatico
+                        pid = auto["pid"]; self._auto = None
+                        self.log.appendPlainText(tr("fs.sb.auto_done", "[Auto] video pronti → montaggio automatico."))
+                        self.auto_complete.emit(pid)

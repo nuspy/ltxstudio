@@ -51,6 +51,7 @@ class FilmStudioWindow(QWidget):
         self.asset_tab = AssetManagerTab()
         self.sb_tab = StoryboardTab(self._get_project)
         self.mt_tab = MontageTab(self._get_project)
+        self.sb_tab.auto_complete.connect(self._on_auto_complete)   # #54: Auto → montaggio automatico
         self.voice_tab = VoiceTab()
         self.lora_tab = LoraStudioTab()
         self.tabs.addTab(self.script_tab, tr("fs.tab.script", "Copione"))
@@ -131,6 +132,17 @@ class FilmStudioWindow(QWidget):
         db.update("project", self._project_id,
                   config=json.dumps({"forbidden": self.forbidden.text().strip(),
                                      "required": self.required.text().strip()}, ensure_ascii=False))
+
+    def _on_auto_complete(self, pid: int):
+        """#54 Auto end-to-end: i video sono pronti → genera dialoghi+musica+ambient e il master."""
+        self.mt_tab._refresh()
+        try:
+            self.mt_tab._gen_audio()                        # dialoghi (voce legata)
+            self.mt_tab._gen_music()                        # colonna sonora (mood)
+        except Exception:                                   # noqa: BLE001
+            pass
+        self.mt_tab._master()                              # master ffmpeg (video + audio multitraccia)
+        self.tabs.setCurrentWidget(self.mt_tab)
 
     def _manage_projects(self):
         from ui.film_studio.projects_dialog import FsProjectsDialog

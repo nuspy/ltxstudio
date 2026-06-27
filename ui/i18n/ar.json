@@ -1649,5 +1649,7 @@
   "aud.handy.ok": "Handy-API started.",
   "fs.mt.relip": "re-lip-sync",
   "fs.mt.dub_to": "Language",
-  "fs.mt.dub_done2": "Dub {l}: {n} lines; {m} videos re-lip-syncing (queued)."
+  "fs.mt.dub_done2": "Dub {l}: {n} lines; {m} videos re-lip-syncing (queued).",
+  "fs.sb.auto_vid": "[Auto] keyframes ready → videos queued.",
+  "fs.sb.auto_done": "[Auto] videos ready → automatic montage."
 }
