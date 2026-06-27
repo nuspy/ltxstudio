@@ -5,7 +5,7 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 
 ## AREA 3 — migrazione no‑ComfyUI
 - [x] 3.1 ControlNet IC‑LoRA reale — ICLoraPipeline GGUF-patchata + IC-LoRA canny/depth/pose da disco (no download), firma video_conditioning; full-GPU val in #43
-- [ ] 3.2 FLUX.2 t2i nativo su 32GB (TE fp8 scaled locale, mixed_ops)
+- [~] 3.2 FLUX.2 t2i — TE è nvfp4 (no fp8): modulo dequant nvfp4→bf16 PRONTO (flux2_te.py, no download 48GB); resta validazione live swizzle su Blackwell → Task #44
 - [ ] 3.3 SeedVR2 nativo (se ≤15GB, altrimenti DEFERRED)
 - [ ] 3.4 ReTake + video inpaint/outpaint nativi (RetakePipeline)
 - [ ] 3.5 UI conversione modelli (3 script in Import Models)
