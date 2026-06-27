@@ -91,6 +91,106 @@ def _scene_for_chunk(i: int, nch: int, scenes: list[dict]) -> dict:
     return scenes[-1]
 
 
+# ───────────────────── workflow INTERATTIVO (storyboard editabile) ─────────────────────
+def plan_scenes(*, lyrics: str, song_path: str, scene_seconds: float = 4.0, video_style: str = "",
+                image_hint: str = "", progress=None) -> list[dict]:
+    """Crea l'ELENCO delle riprese SENZA generare: per ogni scena {order, start_s, length_s,
+    img_prompt, video_prompt, image_path, video_path}. start_s distribuito sul tempo (pesi LLM);
+    length_s = distanza dalla scena successiva (auto). Editabile dall'utente."""
+    def log(m):
+        if progress:
+            progress(m)
+    dur = _dur(song_path)
+    target = max(2, round(dur / max(1.0, scene_seconds)))
+    log("Storyboard (LLM)…")
+    try:
+        scenes = lyrics_llm.storyboard(lyrics, image_hint=image_hint,
+                                       target_scenes=min(target, MAX_SCENES), video_style=video_style)
+    except Exception:                                       # noqa: BLE001
+        scenes = []
+    finally:
+        try:
+            lyrics_llm.unload()
+        except Exception:                                   # noqa: BLE001
+            pass
+    if not scenes:
+        scenes = [{"prompt": "cinematic music video, dynamic, atmospheric", "weight": 1}]
+    sfx = (", " + video_style.strip()) if (video_style or "").strip() else ""
+    total_w = sum(max(1, s.get("weight", 1)) for s in scenes) or 1
+    out, acc = [], 0.0
+    for i, s in enumerate(scenes):
+        start = round(acc / total_w * dur, 2)
+        vp = s["prompt"].strip() + sfx
+        out.append({"order": i, "start_s": start, "length_s": 0.0,
+                    "video_prompt": vp, "img_prompt": vp + ", cinematic still frame",
+                    "image_path": "", "video_path": ""})
+        acc += max(1, s.get("weight", 1))
+    recompute_lengths(out, dur)
+    return out
+
+
+def recompute_lengths(scenes: list[dict], song_dur: float) -> None:
+    """length_s di ogni scena = distanza dall'inizio della successiva (l'ultima fino a fine canzone).
+    Le scene vengono ordinate per start_s e ri-numerate (order)."""
+    scenes.sort(key=lambda s: s["start_s"])
+    for i, s in enumerate(scenes):
+        s["order"] = i
+        nxt = scenes[i + 1]["start_s"] if i + 1 < len(scenes) else song_dur
+        s["length_s"] = round(max(0.5, nxt - s["start_s"]), 2)
+
+
+def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int = 512) -> str:
+    """Genera l'immagine di apertura della scena (modulo immagini nativo, FLUX)."""
+    from core import native_driver
+    res = native_driver.run_and_wait("image", {
+        "arch": "flux", "prompt": scene["img_prompt"], "negative": NEG,
+        "width": width, "height": height, "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png,
+    }, timeout=600)
+    p = res.get("output") or out_png
+    p = p[0] if isinstance(p, list) else p
+    if p and os.path.exists(p) and p != out_png:
+        import shutil
+        shutil.copyfile(p, out_png)
+    if not os.path.exists(out_png):
+        raise RuntimeError(res.get("error", "immagine non generata"))
+    scene["image_path"] = out_png
+    return out_png
+
+
+def gen_scene_video(scene: dict, out_mp4: str, *, width: int = 704, height: int = 512, fps: int = 25) -> str:
+    """Genera lo spezzone video della scena (i2v dall'immagine di apertura, durata = length_s)."""
+    nf = _valid_nf(min(float(scene["length_s"]), 6.7), fps)
+    params = {"image_path": scene.get("image_path", ""), "gguf_transformer": GGUF,
+              "prompt": scene["video_prompt"], "negative": NEG, "width": width, "height": height,
+              "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0, "seed": 8,
+              "offload": "cpu", "ref_strength": 1.0, "output": out_mp4}
+    jf = out_mp4 + ".json"
+    json.dump(params, open(jf, "w"))
+    env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
+    if not os.path.exists(out_mp4):
+        raise RuntimeError("video scena fallito: " + (r.stdout[-400:] + r.stderr[-400:]))
+    scene["video_path"] = out_mp4
+    return out_mp4
+
+
+def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: int = 25) -> str:
+    """Monta i video delle scene (nell'ordine) + traccia audio della canzone."""
+    ordered = sorted(scenes, key=lambda s: s["order"])
+    clips = [s["video_path"] for s in ordered if s.get("video_path") and os.path.exists(s["video_path"])]
+    if not clips:
+        raise RuntimeError("nessun video di scena da montare")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    lst = out_path + ".list.txt"
+    open(lst, "w", encoding="utf-8").write("".join(f"file '{c}'\n" for c in clips))
+    silent = out_path + ".silent.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
+    subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", song_path, "-map", "0:v", "-map", "1:a",
+                    "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"], check=False)
+    return out_path
+
+
 def _valid_nf(seconds: float, fps: int) -> int:
     """Numero frame valido per LTX (8·k+1), corrispondente a ~`seconds`, clamp ~2s..6.7s."""
     k = round((seconds * fps - 1) / 8)

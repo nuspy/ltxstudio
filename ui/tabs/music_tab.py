@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, QProcess, QThread
+from PySide6.QtCore import QObject, Qt, Signal, QProcess, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QPushButton, QLineEdit, QCheckBox,
@@ -50,7 +50,7 @@ class _LyricsWorker(QThread):
 
 
 class _MusicVideoWorker(QThread):
-    """Workflow videomusicale completo (canzone → storyboard LLM → video nativo → mux) fuori dal thread UI."""
+    """Genera SOLO la canzone (poi si apre il Music Video Studio interattivo) fuori dal thread UI."""
     progress = Signal(str)
     finished_mv = Signal(dict)
 
@@ -62,12 +62,12 @@ class _MusicVideoWorker(QThread):
     def run(self):
         lyrics, tags, image, out_video, duration, scene_seconds, video_style = self._args
         try:
+            import os as _os
             from core import music_video_service as mvs
-            res = mvs.generate_song_and_video(
-                lyrics=lyrics, tags=tags, image_path=image, out_video=out_video,
-                song_duration_s=duration, scene_seconds=scene_seconds, video_style=video_style,
-                image_hint="the provided starting photo", progress=self.progress.emit)
-            self.finished_mv.emit(res)
+            song = mvs.generate_song(lyrics=lyrics, tags=tags, out_mp3=_os.path.splitext(out_video)[0] + ".mp3",
+                                     duration_s=duration, progress=self.progress.emit)
+            self.finished_mv.emit({"song": song, "lyrics": lyrics, "image": image,
+                                   "scene_seconds": scene_seconds, "video_style": video_style})
         except Exception as e:                          # noqa: BLE001
             self.finished_mv.emit({"error": str(e)})
 
@@ -370,11 +370,16 @@ class MusicTab(QWidget):
         if res.get("error"):
             self._log(tr("music.mv.fail", "Videomusicale fallito: ") + str(res["error"])[:300])
             QMessageBox.critical(self, tr("music.mv.gen", "Videomusicale"), str(res["error"])[:1000]); return
-        vid = res.get("video")
-        self._log(tr("music.mv.done", "Videomusicale pronto: {f}").format(f=vid))
-        self.status.setText(tr("music.mv.done", "Videomusicale pronto: {f}").format(f=Path(vid).name if vid else ""))
-        if vid:
-            self.music_ready.emit(vid)
+        # canzone pronta → apre il Music Video Studio interattivo (storyboard editabile → immagini → video)
+        song = res.get("song")
+        self._log(tr("music.mv.song_done", "Canzone pronta → apro lo Studio interattivo."))
+        from ui.music_video_studio import MusicVideoStudio
+        self._mv_studio = MusicVideoStudio(
+            song_path=song, lyrics=res.get("lyrics", ""), image_hint="the provided starting photo",
+            scene_seconds=res.get("scene_seconds", 4.0), video_style=res.get("video_style", ""),
+            parent=self.window())
+        self._mv_studio.setWindowFlag(Qt.Window, True)
+        self._mv_studio.show(); self._mv_studio.raise_(); self._mv_studio.activateWindow()
 
     def son_name(self) -> str:
         v = self.son_video.text().strip()
