@@ -1626,5 +1626,9 @@
   "fs.mt.need_master": "Genera prima il Master (A).",
   "fs.sb.edit": "Modifica selezione (@Nome per gli asset)",
   "fs.sb.regen_seg": "↻ Rigenera (LLM)",
-  "fs.sb.saved_sel": "Selezione salvata."
+  "fs.sb.saved_sel": "Selezione salvata.",
+  "fs.script.styles": "Stile",
+  "fs.script.genres": "Genere",
+  "fs.script.styles_tt": "Stile visivo (più separati da virgola)",
+  "fs.script.genres_tt": "Genere/i (più separati da virgola)"
 }

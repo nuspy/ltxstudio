@@ -50,6 +50,18 @@ class ScriptTab(QWidget):
         row.addWidget(QLabel(tr("fs.script.kind", "Tipo input")))
         row.addWidget(self.kind, 1)
         bv.addLayout(row)
+        # stili (~60) e generi (~23) — spec §9.1 (multi-selezione via menu a tendina con checkbox)
+        from core.film_studio import style_catalog as SC
+        row2 = QHBoxLayout()
+        self.styles = QComboBox(); self.styles.setEditable(True)
+        self.styles.addItems([""] + SC.STYLES)
+        self.styles.setToolTip(tr("fs.script.styles_tt", "Stile visivo (puoi scriverne più separati da virgola)"))
+        self.genres = QComboBox(); self.genres.setEditable(True)
+        self.genres.addItems([""] + SC.GENRES)
+        self.genres.setToolTip(tr("fs.script.genres_tt", "Genere/i (puoi scriverne più separati da virgola)"))
+        row2.addWidget(QLabel(tr("fs.script.styles", "Stile"))); row2.addWidget(self.styles, 1)
+        row2.addWidget(QLabel(tr("fs.script.genres", "Genere"))); row2.addWidget(self.genres, 1)
+        bv.addLayout(row2)
         self.inp = QPlainTextEdit(); self.inp.setPlaceholderText(
             tr("fs.script.input_ph", "Incolla la storia, l'idea o il tema… (@Nome per gli asset)"))
         self.inp.setFixedHeight(120)
@@ -114,6 +126,7 @@ class ScriptTab(QWidget):
         pid = self._get_project()
         if not pid:
             QMessageBox.information(self, tr("fs.save", "Salva"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        db.update("project", pid, styles=self.styles.currentText().strip(), genres=self.genres.currentText().strip())
         n = len(db.query("script", "project_id=?", (pid,))) + 1
         db.insert("script", project_id=pid, text=self.text.toPlainText(),
                   summary=self.summary.toPlainText(), version=n)

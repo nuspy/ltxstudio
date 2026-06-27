@@ -1529,5 +1529,9 @@
   "fs.mt.need_master": "Generate the Master (A) first.",
   "fs.sb.edit": "Edit selection (@Name for assets)",
   "fs.sb.regen_seg": "↻ Regenerate (LLM)",
-  "fs.sb.saved_sel": "Selection saved."
+  "fs.sb.saved_sel": "Selection saved.",
+  "fs.script.styles": "Stil",
+  "fs.script.genres": "Genre",
+  "fs.script.styles_tt": "Visual style (comma-separated for multiple)",
+  "fs.script.genres_tt": "Genre(s) (comma-separated for multiple)"
 }
