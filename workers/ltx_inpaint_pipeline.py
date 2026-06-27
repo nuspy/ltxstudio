@@ -22,22 +22,28 @@ class InpaintPipeline(ICLoraPipeline):
     def inpaint(self, *, prompt: str, seed: int, height: int, width: int, num_frames: int,
                 frame_rate: float, original_frames: list[str], masks: torch.Tensor,
                 video_conditioning: list[tuple[str, float]], strength: float = 1.0,
-                stage_1_sigmas=None, skip_stage_2: bool = True):
-        """original_frames: PNG del video originale. masks: [T,H,W] in [0,1] (SAM2 tracking)."""
+                stage_1_sigmas=None, skip_stage_2: bool = True, num_steps: int = 30,
+                negative_prompt: str = "worst quality, blurry", cfg_scale: float = 4.0):
+        """original_frames: PNG del video originale. masks: [T,H,W] in [0,1] (SAM2 tracking).
+        Usa CFG (GuidedDenoiser, cfg_scale>1) per FORZARE il prompt nell'area mascherata: senza guidance
+        il modello dev rigenera un blob/l'oggetto originale invece di seguire il prompt."""
         import logging
 
         import numpy as np
+        from ltx_core.components.guiders import MultiModalGuider, MultiModalGuiderParams
         from ltx_core.components.noisers import GaussianNoiser
-        from ltx_pipelines.utils.constants import DISTILLED_SIGMAS
-        from ltx_pipelines.utils.denoisers import SimpleDenoiser
+        from ltx_pipelines.utils.denoisers import GuidedDenoiser
         from PIL import Image
 
         if stage_1_sigmas is None:
-            stage_1_sigmas = DISTILLED_SIGMAS
+            # sigmas PIENI (num_steps): da rumore servono molti step per costruire l'oggetto nuovo.
+            from ltx_core.components.schedulers import LTX2Scheduler
+            stage_1_sigmas = LTX2Scheduler().execute(steps=num_steps)
         generator = torch.Generator(device=self.device).manual_seed(seed)
         noiser = GaussianNoiser(generator=generator)
-        (ctx_p,) = self.prompt_encoder([prompt])
+        ctx_p, ctx_n = self.prompt_encoder([prompt, negative_prompt])
         video_context, audio_context = ctx_p.video_encoding, ctx_p.audio_encoding
+        v_context_n = ctx_n.video_encoding
 
         s1 = VideoPixelShape(batch=1, frames=num_frames, width=width // 2, height=height // 2, fps=frame_rate)
 
@@ -63,10 +69,17 @@ class InpaintPipeline(ICLoraPipeline):
 
         clean_latent, stage_1_conditionings = self.image_conditioner(_build)
         stage_1_conditionings = list(stage_1_conditionings) + [SpatialRegionMask(masks=masks_s1)]
+        # NB: NIENTE noise-injection manuale — partire da rumore puro nell'area dà un blob non denoisato.
+        # Il denoise_mask (SpatialRegionMask) + il noiser dello stage rigenerano l'area dal clean latent;
+        # il CFG (GuidedDenoiser, cfg_scale) spinge l'area verso il prompt (sostituzione). Sfondo preservato.
 
         sig = stage_1_sigmas.to(dtype=torch.float32, device=self.device)
         video_state, _ = self.stage_1(
-            denoiser=SimpleDenoiser(video_context, audio_context),
+            denoiser=GuidedDenoiser(
+                v_context=video_context, a_context=audio_context,
+                video_guider=MultiModalGuider(params=MultiModalGuiderParams(cfg_scale=cfg_scale),
+                                              negative_context=v_context_n),
+                audio_guider=MultiModalGuider(params=MultiModalGuiderParams())),
             sigmas=sig, noiser=noiser, width=s1.width, height=s1.height, frames=num_frames, fps=frame_rate,
             video=ModalitySpec(context=video_context, conditionings=stage_1_conditionings,
                                initial_latent=clean_latent, noise_scale=float(sig[0].item())),
