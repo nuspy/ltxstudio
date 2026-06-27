@@ -179,6 +179,10 @@ class _VideoEditAIWorker(QThread):
                       "edit_lora": cfg["edit_lora"], "control_strength": float(cfg.get("strength", 1.0)),
                       "width": 512, "height": 320, "num_frames": 25, "fps": 25,
                       "seed": 42, "offload": "cpu", "output": out}
+            if cfg["mode"] == "inpaint":                       # #59 parametri inpaint dalla GUI
+                params["control_strength"] = float(cfg.get("guide", 0.4))
+                params["cfg_scale"] = float(cfg.get("cfg_scale", 6.0))
+                params["mask_dilate"] = int(cfg.get("mask_dilate", 24))
             if cfg["mode"] == "inpaint":                       # SAM2 track → latent-inpaint (vinpaint)
                 self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")

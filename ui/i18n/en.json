@@ -1793,5 +1793,8 @@
   "vedit.queued": "Processing: {m}…",
   "vedit.start": "[edit] starting {m}…",
   "vedit.done": "✅ Ready: {o}",
-  "vedit.fail": "❌ Error: {e}"
+  "vedit.fail": "❌ Error: {e}",
+  "vedit.cfg_lbl": "CFG (prompt adherence) — inpaint",
+  "vedit.guide_lbl": "Guide strength (anchor to original)",
+  "vedit.dilate_lbl": "Mask dilation (px)"
 }

@@ -60,6 +60,15 @@ class VideoEditAITab(QWidget):
             self.strength.addItem(s, float(s))
         self.strength.setCurrentText("1.0")
         f.addRow(tr("vedit.strength_lbl", "Forza editing"), self.strength)
+        # #59 parametri inpaint (regolabili): CFG (aderenza prompt), guide (ancoraggio all'originale),
+        # dilatazione maschera (spazio al nuovo oggetto). Valori equilibrati di default.
+        from PySide6.QtWidgets import QDoubleSpinBox as _DSB, QSpinBox as _SB
+        self.cfg = _DSB(); self.cfg.setRange(1.0, 10.0); self.cfg.setSingleStep(0.5); self.cfg.setValue(6.0)
+        f.addRow(tr("vedit.cfg_lbl", "CFG (aderenza prompt) — inpaint"), self.cfg)
+        self.guide = _DSB(); self.guide.setRange(0.1, 1.0); self.guide.setSingleStep(0.1); self.guide.setValue(0.4)
+        f.addRow(tr("vedit.guide_lbl", "Forza guide (ancoraggio originale)"), self.guide)
+        self.dilate = _SB(); self.dilate.setRange(0, 64); self.dilate.setValue(24)
+        f.addRow(tr("vedit.dilate_lbl", "Dilatazione maschera (px)"), self.dilate)
         v.addLayout(f)
 
         self.note = QLabel(""); self.note.setWordWrap(True); v.addWidget(self.note)
@@ -98,7 +107,9 @@ class VideoEditAITab(QWidget):
         lora = next((l for k, _i, l in MODES if k == key), "")
         cfg = {"video": self._video, "mode": key, "edit_lora": lora,
                "object": self.obj.text().strip(), "prompt": self.prompt.toPlainText().strip(),
-               "strength": float(self.strength.currentData())}
+               "strength": float(self.strength.currentData()),
+               "cfg_scale": float(self.cfg.value()), "guide": float(self.guide.value()),
+               "mask_dilate": int(self.dilate.value())}
         if key == "inpaint" and not cfg["object"]:
             self.log.appendPlainText(tr("vedit.err_no_obj", "Inpaint: indica l'oggetto da selezionare (a parole).")); return
         if not cfg["prompt"]:

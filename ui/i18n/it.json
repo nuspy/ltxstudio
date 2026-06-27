@@ -1793,5 +1793,8 @@
   "vedit.queued": "In elaborazione: {m}…",
   "vedit.start": "[edit] avvio {m}…",
   "vedit.done": "✅ Pronto: {o}",
-  "vedit.fail": "❌ Errore: {e}"
+  "vedit.fail": "❌ Errore: {e}",
+  "vedit.cfg_lbl": "CFG (aderenza prompt) — inpaint",
+  "vedit.guide_lbl": "Forza guide (ancoraggio originale)",
+  "vedit.dilate_lbl": "Dilatazione maschera (px)"
 }
