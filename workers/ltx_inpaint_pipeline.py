@@ -30,9 +30,11 @@ class InpaintPipeline(ICLoraPipeline):
         import logging
 
         import numpy as np
+        from ltx_core.components.diffusion_steps import EulerCfgPpDiffusionStep
         from ltx_core.components.guiders import MultiModalGuider, MultiModalGuiderParams
         from ltx_core.components.noisers import GaussianNoiser
         from ltx_pipelines.utils.denoisers import GuidedDenoiser
+        from ltx_pipelines.utils.samplers import euler_cfg_pp_denoising_loop
         from PIL import Image
 
         if stage_1_sigmas is None:
@@ -43,7 +45,7 @@ class InpaintPipeline(ICLoraPipeline):
         noiser = GaussianNoiser(generator=generator)
         ctx_p, ctx_n = self.prompt_encoder([prompt, negative_prompt])
         video_context, audio_context = ctx_p.video_encoding, ctx_p.audio_encoding
-        v_context_n = ctx_n.video_encoding
+        v_context_n, a_context_n = ctx_n.video_encoding, ctx_n.audio_encoding
 
         s1 = VideoPixelShape(batch=1, frames=num_frames, width=width // 2, height=height // 2, fps=frame_rate)
 
@@ -69,9 +71,13 @@ class InpaintPipeline(ICLoraPipeline):
 
         clean_latent, stage_1_conditionings = self.image_conditioner(_build)
         stage_1_conditionings = list(stage_1_conditionings) + [SpatialRegionMask(masks=masks_s1)]
-        # NB: NIENTE noise-injection manuale — partire da rumore puro nell'area dà un blob non denoisato.
-        # Il denoise_mask (SpatialRegionMask) + il noiser dello stage rigenerano l'area dal clean latent;
-        # il CFG (GuidedDenoiser, cfg_scale) spinge l'area verso il prompt (sostituzione). Sfondo preservato.
+        # SetLatentNoiseMask: nell'AREA rumore puro (genera da zero col prompt), FUORI clean latent.
+        # Ora col sampler euler_ancestral_cfg_pp (sotto) il rumore viene denoisato correttamente verso il
+        # prompt (col denoiser euler standard dava un blob). Sostituzione di categoria possibile.
+        Fl, Hl, Wl = clean_latent.shape[-3:]
+        ml = torch.nn.functional.interpolate(masks_s1[None, None].float().to(clean_latent.device),
+                                             size=(Fl, Hl, Wl), mode="nearest").to(clean_latent.dtype)
+        clean_latent = clean_latent * (1 - ml) + torch.randn_like(clean_latent) * ml
 
         sig = stage_1_sigmas.to(dtype=torch.float32, device=self.device)
         video_state, _ = self.stage_1(
@@ -79,7 +85,10 @@ class InpaintPipeline(ICLoraPipeline):
                 v_context=video_context, a_context=audio_context,
                 video_guider=MultiModalGuider(params=MultiModalGuiderParams(cfg_scale=cfg_scale),
                                               negative_context=v_context_n),
-                audio_guider=MultiModalGuider(params=MultiModalGuiderParams())),
+                audio_guider=MultiModalGuider(params=MultiModalGuiderParams(), negative_context=a_context_n),
+                force_uncond_pass=True),                 # cfg_pp loop richiede l'uncond denoised
+            stepper=EulerCfgPpDiffusionStep(eta=1.0),    # euler_ancestral_cfg_pp (come il workflow inpaint)
+            loop=euler_cfg_pp_denoising_loop,            # loop che alimenta lo stepper con uncond_denoised
             sigmas=sig, noiser=noiser, width=s1.width, height=s1.height, frames=num_frames, fps=frame_rate,
             video=ModalitySpec(context=video_context, conditionings=stage_1_conditionings,
                                initial_latent=clean_latent, noise_scale=float(sig[0].item())),
