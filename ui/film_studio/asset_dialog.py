@@ -90,6 +90,21 @@ class AtReferenceFilter(QObject):
             if dlg.exec() and dlg.result_ref:
                 self.editor.insertPlainText(dlg.result_ref)
                 return True                                 # consuma l'evento (il @ è già nel ref)
+        # NOTA A: '#' dopo un @Nome → apre direttamente la sezione VARIANTI di quell'asset
+        if event.type() == QEvent.KeyPress and event.text() == "#":
+            txt = self.editor.toPlainText() if hasattr(self.editor, "toPlainText") else self.editor.text()
+            import re
+            m = re.search(r"@([A-Za-z0-9_]+)$", txt)
+            if m:
+                dlg = AssetDialog(self.editor, start_variant_of=m.group(1))
+                if dlg.exec() and dlg.result_ref:
+                    # sostituisci l'@Nome appena scritto col riferimento completo @Nome#Variante
+                    new = txt[:m.start()] + dlg.result_ref
+                    if hasattr(self.editor, "setPlainText"):
+                        self.editor.setPlainText(new)
+                    else:
+                        self.editor.setText(new)
+                    return True
         return False
 
 

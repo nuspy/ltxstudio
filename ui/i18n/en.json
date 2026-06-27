@@ -1729,5 +1729,11 @@
   "fs.sb.shotlist": "📄 Shot-list",
   "fs.sb.shotlist_done": "Shot-list exported: {f}",
   "fs.forbidden": "forbidden (negative)",
-  "fs.required": "must-have (always)"
+  "fs.required": "must-have (always)",
+  "fs.mt.animatic": "🎞 Animatic (preview)",
+  "fs.mt.animatic_done": "Animatic: {f}",
+  "fs.mt.no_kf": "Generate keyframes first.",
+  "fs.mt.dub": "🌐 Dub to language…",
+  "fs.mt.dub_lang": "Target language (e.g. English, Español):",
+  "fs.mt.dub_done": "Dub {l}: {n} lines (re-lip-sync by regenerating videos)."
 }

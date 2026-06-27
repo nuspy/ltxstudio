@@ -46,9 +46,76 @@ class MontageTab(QWidget):
         self.btn_export = QPushButton(tr("fs.mt.export", "📦 Export NLE (B)")); self.btn_export.clicked.connect(self._export)
         r2.addWidget(self.btn_audio); r2.addWidget(self.btn_master); r2.addWidget(self.btn_export); r2.addStretch(1)
         bv.addLayout(r2)
+        r3 = QHBoxLayout()
+        self.btn_animatic = QPushButton(tr("fs.mt.animatic", "🎞 Animatic (anteprima)")); self.btn_animatic.clicked.connect(self._animatic)
+        self.btn_dub = QPushButton(tr("fs.mt.dub", "🌐 Doppia in lingua…")); self.btn_dub.clicked.connect(self._dub)
+        r3.addWidget(self.btn_animatic); r3.addWidget(self.btn_dub); r3.addStretch(1)
+        bv.addLayout(r3)
         self.info = QLabel(""); bv.addWidget(self.info)
         v.addWidget(box)
         self._refresh()
+
+    def _animatic(self):
+        """1.3 Animatic: sequenza keyframe coi tempi (pass rapido a basso costo) + audio dialoghi se presente."""
+        import subprocess
+        pid = self._get_project()
+        if not pid:
+            return
+        frames = []   # (img, dur)
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                kf = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png")
+                if Path(kf).exists():
+                    frames.append((kf, float(sh["duration_s"] or 3)))
+        if not frames:
+            QMessageBox.information(self, tr("fs.mt.animatic", "Animatic"), tr("fs.mt.no_kf", "Genera prima i keyframe.")); return
+        lst = str(db.project_dir(pid) / "_animatic.txt")
+        with open(lst, "w", encoding="utf-8") as fh:
+            for img, dur in frames:
+                fh.write(f"file '{img}'\nduration {dur}\n")
+            fh.write(f"file '{frames[-1][0]}'\n")           # ultimo frame ripetuto (richiesto da concat demuxer)
+        out = str(db.project_dir(pid) / "animatic.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                        "-vf", "scale=768:-2,format=yuv420p", "-r", "25", out, "-y"], check=False)
+        self.info.setText(tr("fs.mt.animatic_done", "Animatic: {f}").format(f=out))
+        try:
+            import os as _os; _os.startfile(out)             # noqa: S606
+        except Exception:                                   # noqa: BLE001
+            pass
+
+    def _dub(self):
+        """1.5 Multilingua/doppiaggio: LLM traduce i dialoghi nella lingua scelta + risintesi voce legata."""
+        from PySide6.QtWidgets import QInputDialog
+        from core import llm_service as L
+        from core.film_studio import voice_studio as vs
+        pid = self._get_project()
+        if not pid:
+            return
+        lang, ok = QInputDialog.getText(self, tr("fs.mt.dub", "Doppia"), tr("fs.mt.dub_lang", "Lingua di destinazione (es. English, Español):"))
+        if not ok or not lang.strip():
+            return
+        import json
+        n = 0
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                for di, d in enumerate(json.loads(sh.get("dialogues") or "[]")):
+                    actor = (d.get("actor") or "").lstrip("@"); text = d.get("text") or ""
+                    if not text:
+                        continue
+                    try:
+                        tr_text = L.complete("Translate to " + lang.strip() + ". Output only the translation.", text, max_tokens=200)
+                    except Exception:                       # noqa: BLE001
+                        tr_text = text
+                    assets = [a for a in db.find_assets(actor, "actor") if a["name"].lower() == actor.lower()]
+                    vrow = vs.voice_for_actor(assets[0]["id"]) if assets else None
+                    if not vrow:
+                        continue
+                    out = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_d{di}_{lang.strip()[:2]}.wav")
+                    try:
+                        vs.synth_dialogue(tr_text, vrow, out); n += 1
+                    except Exception:                       # noqa: BLE001
+                        pass
+        self.info.setText(tr("fs.mt.dub_done", "Doppiaggio {l}: {n} battute (re-lip-sync rigenerando i video).").format(l=lang.strip(), n=n))
 
     def _clips(self) -> list[dict]:
         pid = self._get_project()

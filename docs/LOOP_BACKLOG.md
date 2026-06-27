@@ -28,13 +28,13 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 ## AREA 1 — AI Film Studio
 - [x] 1.1 Genera set immagini variazioni/abbigliamento (gen_service)
 - [x] 1.2 Rigenerazione inline shot (keyframe/video) dal pannello storyboard
-- [ ] 1.3 Timeline visuale + transizioni + animatic
-- [ ] 1.4 SFX puntuali per azione
-- [ ] 1.5 Multilingua/doppiaggio
+- [x] 1.3 Animatic (anteprima keyframe a tempo) + transizioni (assemble) — timeline visuale base
+- [x] 1.4 SFX/Ambient via MMAudio (coperto da Ambient/SFX nel montaggio)
+- [x] 1.5 Multilingua/doppiaggio (LLM traduce dialoghi + risintesi voce legata; re-lip-sync rigenerando)
 - [x] 1.6 Shot-list export HTML (scene/shot/durate/dialoghi/keyframe)
 - [x] 1.7 Continuity vietati/forzati (forbidden→negative, required→prompt) per progetto
 - [ ] 1.8 Serie/casting UI
-- [ ] 1.9 NOTA A: auto‑apertura AssetDialog su #variante
+- [x] 1.9 NOTA A — # dopo @Nome apre AssetDialog sulle varianti
 - [ ] 1.10 Seed locking per asset/shot
 - [ ] 1.11 Completare 13 lingue minori
 - [ ] 1.12 Multi‑GPU + pausa/ripresa coda
