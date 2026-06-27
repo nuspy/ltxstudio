@@ -1590,5 +1590,8 @@
   "fs.mvp.ph_song": "Song",
   "fs.mvp.ph_sb": "Shots",
   "fs.mvp.ph_vid": "Videos",
-  "fs.mvp.ph_done": "Done"
+  "fs.mvp.ph_done": "Done",
+  "fs.project_manage": "📂 Проєкти",
+  "fs.proj.title": "Projects — AI Film Studio",
+  "fs.proj.list": "Saved projects"
 }

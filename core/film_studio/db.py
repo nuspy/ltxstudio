@@ -153,3 +153,37 @@ def project_dir(project_id: int) -> Path:
     d = ROOT / f"project_{project_id}"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def delete_project(project_id: int) -> None:
+    """Elimina il progetto e tutte le entità collegate (scene/shot/script/montage)."""
+    scenes = query("scene", "project_id=?", (project_id,))
+    for sc in scenes:
+        for sh in query("shot", "scene_id=?", (sc["id"],)):
+            delete("shot", sh["id"])
+        delete("scene", sc["id"])
+    for t in ("script", "montage"):
+        for r in query(t, "project_id=?", (project_id,)):
+            delete(t, r["id"])
+    delete("project", project_id)
+
+
+def duplicate_project(project_id: int) -> int:
+    """Duplica progetto + copione + scene + shot (gli artefatti binari NON sono ri-renderizzati)."""
+    p = get("project", project_id)
+    if not p:
+        raise ValueError("progetto inesistente")
+    p.pop("id", None)
+    p["name"] = (p.get("name") or "progetto") + " (copia)"
+    nid = insert("project", **p)
+    for sc in query("scene", "project_id=?", (project_id,), order="ord"):
+        old_scid = sc.pop("id")
+        sc["project_id"] = nid
+        new_scid = insert("scene", **sc)
+        for sh in query("shot", "scene_id=?", (old_scid,), order="ord"):
+            sh.pop("id", None); sh["scene_id"] = new_scid
+            insert("shot", **sh)
+    for s in query("script", "project_id=?", (project_id,)):
+        s.pop("id", None); s["project_id"] = nid
+        insert("script", **s)
+    return nid

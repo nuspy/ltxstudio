@@ -1687,5 +1687,8 @@
   "fs.mvp.ph_song": "Canzone",
   "fs.mvp.ph_sb": "Riprese",
   "fs.mvp.ph_vid": "Video",
-  "fs.mvp.ph_done": "Completo"
+  "fs.mvp.ph_done": "Completo",
+  "fs.project_manage": "📂 Progetti",
+  "fs.proj.title": "Progetti — AI Film Studio",
+  "fs.proj.list": "Progetti salvati"
 }

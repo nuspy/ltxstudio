@@ -82,7 +82,18 @@ class FilmStudioWindow(QWidget):
         h.addWidget(self.run_mode)
         b = QPushButton(tr("fs.project_create", "➕ Crea")); b.clicked.connect(self._create_project)
         h.addWidget(b)
+        b_mng = QPushButton(tr("fs.project_manage", "📂 Progetti")); b_mng.clicked.connect(self._manage_projects)
+        h.addWidget(b_mng)
         return w
+
+    def _manage_projects(self):
+        from ui.film_studio.projects_dialog import FsProjectsDialog
+        dlg = FsProjectsDialog(self)
+        if dlg.exec() and dlg.opened_id:
+            self._refresh_projects()
+            idx = self.proj_combo.findData(dlg.opened_id)
+            if idx >= 0:
+                self.proj_combo.setCurrentIndex(idx)
 
     def _refresh_projects(self):
         self.proj_combo.blockSignals(True)
