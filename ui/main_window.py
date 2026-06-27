@@ -2276,6 +2276,9 @@ class MainWindow(QMainWindow):
         cfg = self.frame1_tab.get_segment_config()
         if not cfg.get("text"):
             QMessageBox.warning(self, tr("mw.text_missing_title"), tr("mw.segment_text_missing_msg")); return
+        if backend.is_native("segment"):
+            return self._segment_native(text=cfg["text"],
+                                        threshold=float(cfg.get("threshold", cfg.get("clipseg_threshold", 0.30))))
         try:
             img = self._upload_local(self.frame1_tab.canvas._composite(OUTPUT_DIR))
             detector = cfg.get("detector", "grounding_dino")
@@ -2298,6 +2301,12 @@ class MainWindow(QMainWindow):
         if not self._segment_preconds():
             return
         cfg = self.frame1_tab.get_segment_config()
+        if backend.is_native("segment"):
+            try:
+                exp = self.frame1_tab.canvas.export_region_mask(OUTPUT_DIR)
+                return self._segment_native(region_mask=exp["mask"], image_path=exp["image"])
+            except Exception as e:                          # noqa: BLE001
+                QMessageBox.critical(self, tr("mw.selection_error_title"), str(e)); return
         if not self._sam_models:
             QMessageBox.warning(self, tr("mw.sam_unavailable_title"),
                                 tr("mw.sam_unavailable_msg")); return
@@ -2323,6 +2332,32 @@ class MainWindow(QMainWindow):
             self._log(f"Selezione magnetica ({exp.get('hint')}) inviata…")
         except Exception as e:
             QMessageBox.critical(self, tr("mw.selection_error_title"), str(e)); self._log(f"[ERR] segment region: {e}")
+
+    def _segment_native(self, *, text: str = "", threshold: float = 0.30,
+                        region_mask: str = "", image_path: str = ""):
+        """Segmentazione NATIVA (GroundingDINO+SAM2 via inference_server, handler 'segment'). Zero ComfyUI.
+        Per testo: usa il composite locale; per regione: usa image/region mask locali (no upload)."""
+        img = image_path or self.frame1_tab.canvas._composite(OUTPUT_DIR)
+        params = {"image_path": img}
+        if region_mask:
+            params["region_mask"] = region_mask
+            self._log(tr("mw.segment_native_region", "[nativo] selezione magnetica…"))
+        else:
+            params["text"] = text
+            params["threshold"] = threshold
+            self._log(f"[nativo] selezione '{text}' (soglia {threshold:.2f})…")
+        self._seg_native_worker = _NativeImageWorker(params, module="segment")
+        self._seg_native_worker.done.connect(self._on_segment_native_done)
+        self._seg_native_worker.start()
+
+    def _on_segment_native_done(self, res: dict):
+        if res.get("status") != "success":
+            self._log(f"[nativo] segment errore: {str(res.get('error', ''))[:200]}")
+            QMessageBox.critical(self, tr("mw.selection_error_title"), str(res.get("error", ""))[:600]); return
+        mask = (res.get("output") or [None])[0]
+        if mask and os.path.exists(mask):
+            self.frame1_tab.canvas.load_mask_result(mask)
+            self._log(tr("mw.segment_native_applied", "Selezione applicata alla maschera (modificabile)."))
 
     def _check_segment_done(self):
         try:

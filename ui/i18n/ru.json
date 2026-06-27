@@ -1377,5 +1377,7 @@
   "ilora.install": "Установить ai-toolkit",
   "ilora.gen_train": "🎓 Создать + Обучить LoRA FLUX.2",
   "ilora.started": "Запуск LoRA FLUX.2 (может занять много времени)…",
-  "feat.cap.lora_image_train": "Обучение фото-LoRA (FLUX.2, авто-датасет)"
+  "feat.cap.lora_image_train": "Обучение фото-LoRA (FLUX.2, авто-датасет)",
+  "mw.segment_native_region": "[нативно] магнитное выделение…",
+  "mw.segment_native_applied": "Выделение применено к маске (редактируемо)."
 }

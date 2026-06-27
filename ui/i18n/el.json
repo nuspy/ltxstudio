@@ -1377,5 +1377,7 @@
   "ilora.install": "Εγκατάσταση ai-toolkit",
   "ilora.gen_train": "🎓 Δημιουργία + Εκπαίδευση LoRA FLUX.2",
   "ilora.started": "Εκκίνηση LoRA FLUX.2 (μπορεί να πάρει ώρα)…",
-  "feat.cap.lora_image_train": "Εκπαίδευση LoRA φωτογραφιών (FLUX.2, αυτόματο dataset)"
+  "feat.cap.lora_image_train": "Εκπαίδευση LoRA φωτογραφιών (FLUX.2, αυτόματο dataset)",
+  "mw.segment_native_region": "[εγγενές] μαγνητική επιλογή…",
+  "mw.segment_native_applied": "Η επιλογή εφαρμόστηκε στη μάσκα (επεξεργάσιμη)."
 }

@@ -1377,5 +1377,7 @@
   "ilora.install": "تثبيت ai-toolkit",
   "ilora.gen_train": "🎓 توليد + تدريب لورا FLUX.2",
   "ilora.started": "بدء لورا FLUX.2 (قد يستغرق وقتًا طويلًا)…",
-  "feat.cap.lora_image_train": "تدريب لورا صور (FLUX.2، مجموعة بيانات تلقائية)"
+  "feat.cap.lora_image_train": "تدريب لورا صور (FLUX.2، مجموعة بيانات تلقائية)",
+  "mw.segment_native_region": "[أصلي] تحديد مغناطيسي…",
+  "mw.segment_native_applied": "تم تطبيق التحديد على القناع (قابل للتعديل)."
 }

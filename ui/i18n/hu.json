@@ -1377,5 +1377,7 @@
   "ilora.install": "ai-toolkit telepítése",
   "ilora.gen_train": "🎓 Generálás + FLUX.2 LoRA tréning",
   "ilora.started": "FLUX.2 LoRA indítása (sokáig tarthat)…",
-  "feat.cap.lora_image_train": "Fotó LoRA tréning (FLUX.2, automatikus adatkészlet)"
+  "feat.cap.lora_image_train": "Fotó LoRA tréning (FLUX.2, automatikus adatkészlet)",
+  "mw.segment_native_region": "[natív] mágneses kijelölés…",
+  "mw.segment_native_applied": "Kijelölés alkalmazva a maszkra (szerkeszthető)."
 }

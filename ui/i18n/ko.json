@@ -1377,5 +1377,7 @@
   "ilora.install": "ai-toolkit 설치",
   "ilora.gen_train": "🎓 생성 + FLUX.2 LoRA 학습",
   "ilora.started": "FLUX.2 LoRA 시작 (오래 걸릴 수 있습니다)…",
-  "feat.cap.lora_image_train": "사진 LoRA 학습 (FLUX.2, 자동 데이터셋)"
+  "feat.cap.lora_image_train": "사진 LoRA 학습 (FLUX.2, 자동 데이터셋)",
+  "mw.segment_native_region": "[네이티브] 자석 선택…",
+  "mw.segment_native_applied": "마스크에 적용됨(편집 가능)."
 }

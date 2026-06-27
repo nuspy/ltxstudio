@@ -1474,5 +1474,7 @@
   "ilora.install": "Installa ai-toolkit",
   "ilora.gen_train": "🎓 Genera + Allena LoRA FLUX.2",
   "ilora.started": "Avvio LoRA FLUX.2 (può richiedere molto tempo)…",
-  "feat.cap.lora_image_train": "Allena LoRA foto (FLUX.2, dataset automatico)"
+  "feat.cap.lora_image_train": "Allena LoRA foto (FLUX.2, dataset automatico)",
+  "mw.segment_native_region": "[nativo] selezione magnetica…",
+  "mw.segment_native_applied": "Selezione applicata alla maschera (modificabile)."
 }

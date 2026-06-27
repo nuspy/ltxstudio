@@ -1377,5 +1377,7 @@
   "ilora.install": "ai-toolkit इंस्टॉल करें",
   "ilora.gen_train": "🎓 बनाएँ + FLUX.2 LoRA प्रशिक्षित करें",
   "ilora.started": "FLUX.2 LoRA शुरू हो रहा है (समय लग सकता है)…",
-  "feat.cap.lora_image_train": "फ़ोटो LoRA प्रशिक्षण (FLUX.2, स्वतः डेटासेट)"
+  "feat.cap.lora_image_train": "फ़ोटो LoRA प्रशिक्षण (FLUX.2, स्वतः डेटासेट)",
+  "mw.segment_native_region": "[नेटिव] चुंबकीय चयन…",
+  "mw.segment_native_applied": "चयन मास्क पर लागू (संपादन योग्य)."
 }

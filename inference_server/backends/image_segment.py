@@ -41,6 +41,30 @@ def run(params: dict, mm, output_dir: str) -> dict:
     gproc, gmodel, sproc, smodel, dev = m["gproc"], m["gmodel"], m["sproc"], m["smodel"], m["dev"]
 
     img = Image.open(params["image_path"]).convert("RGB")
+
+    # MODALITÀ REGIONE (selezione magnetica da box/click): bbox dalla region mask → SAM2, no GroundingDINO
+    if params.get("region_mask"):
+        rm = np.array(Image.open(params["region_mask"]).convert("L"))
+        ys, xs = np.where(rm > 127)
+        if len(xs) == 0:
+            return {"status": "error", "error": "region mask vuota"}
+        box = [float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())]
+        if sproc is not None and smodel is not None:
+            sin = sproc(images=img, input_boxes=[[box]], return_tensors="pt").to(dev)
+            with torch.no_grad():
+                sout = smodel(**sin)
+            masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
+            m_np = (masks.sum(0) > 0).numpy().astype("uint8") * 255 if masks.ndim == 3 \
+                else (masks[0] > 0).numpy().astype("uint8") * 255
+        else:
+            m_np = np.zeros((img.height, img.width), dtype="uint8")
+            x0, y0, x1, y1 = (int(v) for v in box)
+            m_np[y0:y1, x0:x1] = 255
+        os.makedirs(output_dir, exist_ok=True)
+        path = str(Path(output_dir) / "native_segmask_region.png")
+        Image.fromarray(m_np).save(path)
+        return {"status": "success", "output": [path]}
+
     text = (params.get("text") or "object").strip()
     if not text.endswith("."):
         text += "."                                        # GroundingDINO vuole il punto finale

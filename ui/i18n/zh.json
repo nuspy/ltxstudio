@@ -1377,5 +1377,7 @@
   "ilora.install": "安装 ai-toolkit",
   "ilora.gen_train": "🎓 生成 + 训练 FLUX.2 LoRA",
   "ilora.started": "启动 FLUX.2 LoRA（可能需要较长时间）…",
-  "feat.cap.lora_image_train": "训练照片 LoRA（FLUX.2，自动数据集）"
+  "feat.cap.lora_image_train": "训练照片 LoRA（FLUX.2，自动数据集）",
+  "mw.segment_native_region": "[原生] 磁性选择…",
+  "mw.segment_native_applied": "已应用到蒙版（可编辑）。"
 }

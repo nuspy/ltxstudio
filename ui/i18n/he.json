@@ -1377,5 +1377,7 @@
   "ilora.install": "התקן ai-toolkit",
   "ilora.gen_train": "🎓 צור + אמן LoRA FLUX.2",
   "ilora.started": "מתחיל LoRA FLUX.2 (עשוי לקחת זמן רב)…",
-  "feat.cap.lora_image_train": "אימון LoRA תמונות (FLUX.2, מאגר אוטומטי)"
+  "feat.cap.lora_image_train": "אימון LoRA תמונות (FLUX.2, מאגר אוטומטי)",
+  "mw.segment_native_region": "[מקומי] בחירה מגנטית…",
+  "mw.segment_native_applied": "הבחירה הוחלה על המסכה (ניתן לעריכה)."
 }
