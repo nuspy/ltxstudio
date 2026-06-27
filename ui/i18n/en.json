@@ -1749,5 +1749,8 @@
   "fs.mt.dub_done2": "Dub {l}: {n} lines; {m} videos re-lip-syncing (queued).",
   "fs.sb.auto_vid": "[Auto] keyframes ready → videos queued.",
   "fs.sb.auto_done": "[Auto] videos ready → automatic montage.",
-  "fs.sb.too_many_lora": "⚠ Scene {s} shot {h}: {n} simultaneous LoRA (>3) — interference risk, consider splitting."
+  "fs.sb.too_many_lora": "⚠ Scene {s} shot {h}: {n} simultaneous LoRA (>3) — interference risk, consider splitting.",
+  "fs.sb.continuity": "Scene continuity",
+  "fs.sb.ct_apply": "Apply + propagate",
+  "fs.sb.ct_done": "Continuity applied and propagated to following scenes."
 }

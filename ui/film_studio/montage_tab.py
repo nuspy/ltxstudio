@@ -63,27 +63,53 @@ class MontageTab(QWidget):
         self._refresh()
 
     def _animatic(self):
-        """1.3 Animatic: sequenza keyframe coi tempi (pass rapido a basso costo) + audio dialoghi se presente."""
+        """#56 Animatic: sequenza keyframe coi tempi (pass rapido) + TRACCIA AUDIO DIALOGHI sincronizzata."""
+        import os
         import subprocess
         pid = self._get_project()
         if not pid:
             return
-        frames = []   # (img, dur)
+        frames = []   # (img, dur, dialog_wav|"")
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            scd = db.project_dir(pid) / f"scene_{sc['ord']}"
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
-                kf = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png")
+                kf = str(scd / f"shot_{sh['ord']}_kf.png")
                 if Path(kf).exists():
-                    frames.append((kf, float(sh["duration_s"] or 3)))
+                    wavs = sorted(scd.glob(f"shot_{sh['ord']}_d*.wav"))
+                    frames.append((kf, float(sh["duration_s"] or 3), str(wavs[0]) if wavs else ""))
         if not frames:
             QMessageBox.information(self, tr("fs.mt.animatic", "Animatic"), tr("fs.mt.no_kf", "Genera prima i keyframe.")); return
         lst = str(db.project_dir(pid) / "_animatic.txt")
         with open(lst, "w", encoding="utf-8") as fh:
-            for img, dur in frames:
+            for img, dur, _w in frames:
                 fh.write(f"file '{img}'\nduration {dur}\n")
             fh.write(f"file '{frames[-1][0]}'\n")           # ultimo frame ripetuto (richiesto da concat demuxer)
-        out = str(db.project_dir(pid) / "animatic.mp4")
+        vid = str(db.project_dir(pid) / "_animatic_mute.mp4")
         subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
-                        "-vf", "scale=768:-2,format=yuv420p", "-r", "25", out, "-y"], check=False)
+                        "-vf", "scale=768:-2,format=yuv420p", "-r", "25", vid, "-y"], check=False)
+        out = str(db.project_dir(pid) / "animatic.mp4")
+        if any(w for _i, _d, w in frames):                  # traccia audio: 1 segmento/shot (wav o silenzio)
+            segdir = db.project_dir(pid) / "_anim_seg"; segdir.mkdir(exist_ok=True)
+            segs = []
+            for i, (_img, dur, wav) in enumerate(frames):
+                seg = str(segdir / f"a{i}.wav")
+                if wav and Path(wav).exists():
+                    subprocess.run(["ffmpeg", "-v", "error", "-i", wav, "-af", f"apad,atrim=0:{dur}",
+                                    "-ar", "44100", "-ac", "2", seg, "-y"], check=False)
+                else:
+                    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+                                    "-t", str(dur), seg, "-y"], check=False)
+                segs.append(seg)
+            alst = str(segdir / "list.txt")
+            with open(alst, "w", encoding="utf-8") as fh:
+                for s in segs:
+                    fh.write(f"file '{s}'\n")
+            atrk = str(segdir / "track.wav")
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", alst, "-c", "copy", atrk, "-y"], check=False)
+            subprocess.run(["ffmpeg", "-v", "error", "-i", vid, "-i", atrk, "-c:v", "copy", "-c:a", "aac",
+                            "-shortest", out, "-y"], check=False)
+        elif os.path.exists(vid):
+            os.replace(vid, out)
         self.info.setText(tr("fs.mt.animatic_done", "Animatic: {f}").format(f=out))
         try:
             import os as _os; _os.startfile(out)             # noqa: S606

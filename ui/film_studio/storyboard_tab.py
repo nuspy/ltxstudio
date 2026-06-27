@@ -57,6 +57,19 @@ class StoryboardTab(QWidget):
         self.shot_seed.editingFinished.connect(self._save_seed)
         sh_seed.addWidget(self.shot_seed); sh_seed.addStretch(1)
         ev.addLayout(sh_seed)
+        # #56 Continuity State (editabile quando selezioni una SCENA): orario/meteo/luce/mood
+        from PySide6.QtWidgets import QComboBox as _CB
+        self.ct_box = QGroupBox(tr("fs.sb.continuity", "Continuity scena")); cg = QHBoxLayout(self.ct_box)
+        self.ct_time = _CB(); self.ct_time.addItems(["day", "night", "dawn", "dusk", "golden hour"])
+        self.ct_weather = _CB(); self.ct_weather.addItems(["clear", "cloudy", "rain", "snow", "fog", "storm"])
+        self.ct_light = _CB(); self.ct_light.addItems(["natural soft", "hard sun", "low key", "high key", "candlelight", "neon"])
+        self.ct_mood = _CB(); self.ct_mood.addItems(["neutral", "tense", "joyful", "melancholic", "epic", "romantic", "scary"])
+        for lbl, w in [("⏱", self.ct_time), ("☁", self.ct_weather), ("💡", self.ct_light), ("🎭", self.ct_mood)]:
+            cg.addWidget(QLabel(lbl)); cg.addWidget(w)
+        self.btn_ct = QPushButton(tr("fs.sb.ct_apply", "Applica + propaga")); self.btn_ct.clicked.connect(self._save_continuity)
+        cg.addWidget(self.btn_ct); cg.addStretch(1)
+        self.ct_box.setVisible(False)
+        ev.addWidget(self.ct_box)
         eh = QHBoxLayout()
         self.btn_save_sel = QPushButton(tr("fs.save", "💾 Salva")); self.btn_save_sel.clicked.connect(self._save_sel)
         self.btn_regen_sel = QPushButton(tr("fs.sb.regen_seg", "↻ Rigenera (LLM)")); self.btn_regen_sel.clicked.connect(self._regen_sel)
@@ -289,10 +302,39 @@ class StoryboardTab(QWidget):
         self.edit.setPlainText((row or {}).get("description", "") if row else "")
         if kind == "shot" and row:
             self.shot_seed.setValue(int(row.get("seed", 0) or 0))
+        # #56 mostra/popola l'editor Continuity solo per le SCENE
+        self.ct_box.setVisible(kind == "scene")
+        if kind == "scene" and row:
+            import json
+            st = json.loads(row.get("continuity") or "{}")
+            for w, k, d in [(self.ct_time, "time_of_day", "day"), (self.ct_weather, "weather", "clear"),
+                            (self.ct_light, "light", "natural soft"), (self.ct_mood, "mood", "neutral")]:
+                i = w.findText(str(st.get(k, d)))
+                w.setCurrentIndex(max(0, i))
 
     def _save_seed(self):
         if self._sel and self._sel[0] == "shot":
             db.update("shot", self._sel[1], seed=int(self.shot_seed.value()))
+
+    def _save_continuity(self):
+        """#56 Salva il Continuity State della scena selezionata e lo PROPAGA alle scene successive."""
+        if not self._sel or self._sel[0] != "scene":
+            return
+        import json
+        from core.film_studio import continuity as ct
+        rid = self._sel[1]
+        sc = db.get("scene", rid)
+        st = json.loads(sc.get("continuity") or "{}")
+        st.update({"time_of_day": self.ct_time.currentText(), "weather": self.ct_weather.currentText(),
+                   "light": self.ct_light.currentText(), "mood": self.ct_mood.currentText()})
+        db.update("scene", rid, continuity=json.dumps(st, ensure_ascii=False))
+        # propaga in avanti: ogni scena successiva eredita lo stato (override mantenuti dove già impostati)
+        prev = st
+        for nx in db.query("scene", "project_id=? AND ord>?", (sc["project_id"], sc["ord"]), order="ord"):
+            nst = ct.propagate(prev, json.loads(nx.get("continuity") or "{}"))
+            db.update("scene", nx["id"], continuity=json.dumps(nst, ensure_ascii=False))
+            prev = nst
+        self.log.appendPlainText(tr("fs.sb.ct_done", "Continuity applicata e propagata alle scene successive."))
 
     def _save_sel(self):
         if not self._sel:
