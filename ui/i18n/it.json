@@ -1748,5 +1748,6 @@
   "fs.mt.dub_to": "Lingua",
   "fs.mt.dub_done2": "Doppiaggio {l}: {n} battute; {m} video in re-lip-sync (coda).",
   "fs.sb.auto_vid": "[Auto] keyframe pronti → video in coda.",
-  "fs.sb.auto_done": "[Auto] video pronti → montaggio automatico."
+  "fs.sb.auto_done": "[Auto] video pronti → montaggio automatico.",
+  "fs.sb.too_many_lora": "⚠ Scena {s} shot {h}: {n} LoRA simultanee (>3) — rischio interferenza, valuta split."
 }

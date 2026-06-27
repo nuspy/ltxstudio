@@ -152,6 +152,10 @@ class StoryboardTab(QWidget):
             state = json.loads(sc.get("continuity") or "{}")
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
                 refs = gen_service.resolve_refs(sh["description"], pmode)
+                if len(refs.get("loras") or []) > 3:        # #55 warning composizione multi-LoRA (concept bleed)
+                    self.log.appendPlainText(tr("fs.sb.too_many_lora",
+                        "⚠ Scena {s} shot {h}: {n} LoRA simultanee (>3) — rischio interferenza, valuta split.")
+                        .format(s=sc["ord"], h=sh["ord"], n=len(refs["loras"])))
                 prompt = refs["clean_text"] + ". " + ct.to_prompt(state) + ((", " + required) if required else "")
                 outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
                 Path(outdir).mkdir(parents=True, exist_ok=True)

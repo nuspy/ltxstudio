@@ -77,7 +77,9 @@ class AssetManagerTab(QWidget):
             self.e_type.addItem(tr(key, code), code)
         self.e_name = QLineEdit()
         self.e_desc = QPlainTextEdit(); self.e_desc.setFixedHeight(80)
-        self.e_desc.setPlaceholderText(tr("fs.asset.desc_ph", "Descrizione (es. donna 23 anni, capelli neri…)"))
+        self.e_desc.setPlaceholderText(tr("fs.asset.desc_ph", "Descrizione (es. donna 23 anni, capelli neri…) — @ per citare asset"))
+        from ui.film_studio.asset_dialog import attach as _attach_at
+        _attach_at(self.e_desc)                              # #55 @Reference anche nella descrizione asset
         self.e_tags = QLineEdit(); self.e_tags.setPlaceholderText(tr("fs.asset.tags_ph", "tag, separati, da, virgola"))
         self.e_photo = QLineEdit(); self.e_photo.setReadOnly(True)
         b_ph = QPushButton(tr("tlora.add_photo", "Foto base…")); b_ph.clicked.connect(self._pick_photo)

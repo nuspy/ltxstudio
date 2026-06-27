@@ -1748,5 +1748,6 @@
   "fs.mt.dub_to": "Language",
   "fs.mt.dub_done2": "Dub {l}: {n} lines; {m} videos re-lip-syncing (queued).",
   "fs.sb.auto_vid": "[Auto] keyframes ready → videos queued.",
-  "fs.sb.auto_done": "[Auto] videos ready → automatic montage."
+  "fs.sb.auto_done": "[Auto] videos ready → automatic montage.",
+  "fs.sb.too_many_lora": "⚠ Scene {s} shot {h}: {n} simultaneous LoRA (>3) — interference risk, consider splitting."
 }
