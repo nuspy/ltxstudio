@@ -216,6 +216,13 @@ def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: i
 
 
 def whisper_available() -> bool:
+    """STT disponibile: preferito Handy-API (REST :8720), fallback faster-whisper locale."""
+    try:
+        from core import handy_api
+        if handy_api.available():
+            return True
+    except Exception:                                       # noqa: BLE001
+        pass
     try:
         import faster_whisper  # noqa: F401
         return True
@@ -224,21 +231,38 @@ def whisper_available() -> bool:
 
 
 def align_scenes_with_whisper(song_path: str, scenes: list[dict], *, model_size: str = "base") -> list[dict]:
-    """#2.2 Allineamento temporale: ASR (faster-whisper) sull'mp3 → timestamp segmenti cantati →
-    ridistribuisce gli start_s delle scene sui confini reali del canto (anziché proporzionali).
-    Se faster-whisper non è installato, ritorna le scene invariate (fallback proporzionale)."""
-    if not whisper_available() or not scenes:
-        return scenes
-    from faster_whisper import WhisperModel
-    model = WhisperModel(model_size, device="cuda" if _has_cuda() else "cpu",
-                         compute_type="int8" if not _has_cuda() else "float16")
-    segments, _info = model.transcribe(song_path, word_timestamps=False)
-    starts = [float(s.start) for s in segments]
-    if not starts:
+    """#2.2 Allineamento temporale: STT sull'mp3 → onset cantati → ridistribuisce gli start_s delle
+    scene sui confini reali del canto. Backend: Handy-API (/transcribe) se attivo, altrimenti
+    faster-whisper locale (timestamp per segmento). Se nessuno è disponibile → scene invariate."""
+    if not scenes:
         return scenes
     dur = _dur(song_path)
+    starts: list[float] = []
+    # 1) Handy-API (preferito): trascrizione testo (per ora senza timestamp di segmento esposti via REST)
+    try:
+        from core import handy_api
+        if handy_api.available():
+            txt = handy_api.transcribe(song_path)
+            if txt.strip():
+                # senza timestamp espliciti, distribuiamo sul numero di righe/frasi trascritte
+                lines = [ln for ln in txt.replace(". ", ".\n").splitlines() if ln.strip()]
+                k = max(1, len(lines))
+                starts = [round(dur * i / k, 2) for i in range(k)]
+    except Exception:                                       # noqa: BLE001
+        starts = []
+    # 2) faster-whisper (fallback, timestamp di segmento reali)
+    if not starts:
+        try:
+            from faster_whisper import WhisperModel
+            model = WhisperModel(model_size, device="cuda" if _has_cuda() else "cpu",
+                                 compute_type="float16" if _has_cuda() else "int8")
+            segments, _info = model.transcribe(song_path, word_timestamps=False)
+            starts = [float(s.start) for s in segments]
+        except Exception:                                   # noqa: BLE001
+            starts = []
+    if not starts:
+        return scenes
     n = len(scenes)
-    # distribuisci le n scene sui tempi dei segmenti (campionamento uniforme degli onset cantati)
     ordered = sorted(scenes, key=lambda s: s["start_s"])
     for i, sc in enumerate(ordered):
         idx = min(len(starts) - 1, round(i * (len(starts) - 1) / max(1, n - 1)))
