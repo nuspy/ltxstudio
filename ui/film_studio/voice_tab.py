@@ -3,8 +3,9 @@ Riusa core/tts_engine e core/film_studio/voice_studio. Zero ComfyUI."""
 from __future__ import annotations
 
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QMessageBox, QPlainTextEdit, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                               QLineEdit, QListWidget, QMessageBox, QPlainTextEdit, QPushButton,
+                               QVBoxLayout, QWidget)
 
 from core.film_studio import db, voice_studio as vs
 from ui.i18n_manager import tr
@@ -46,6 +47,36 @@ class VoiceTab(QWidget):
         self.btn_desc = QPushButton(tr("fs.voice.create_desc", "🗣 Crea voce da descrizione")); self.btn_desc.clicked.connect(self._create_desc)
         dv.addWidget(self.btn_desc)
         right.addWidget(d)
+        # voce da PARAMETRI (spec §8.2)
+        pbox = QGroupBox(tr("fs.voice.params", "Voce da parametri")); pg = QGridLayout(pbox)
+        self.p_name = QLineEdit(); self.p_name.setPlaceholderText(tr("fs.voice.name_ph", "Nome voce"))
+        self.p_gender = QComboBox(); self.p_gender.addItem(tr("fs.voice.female", "Femminile"), "female"); self.p_gender.addItem(tr("fs.voice.male", "Maschile"), "male")
+        self.p_age = QComboBox()
+        for code, key in (("child", "fs.voice.age_child"), ("young", "fs.voice.age_young"), ("adult", "fs.voice.age_adult"), ("old", "fs.voice.age_old")):
+            self.p_age.addItem(tr(key, code), code)
+        self.p_age.setCurrentIndex(2)
+        self.p_lang = QComboBox(); self.p_lang.addItems(["it", "en", "es", "fr", "de", "pt", "ru", "zh", "ar"])
+        self.p_rate = QComboBox()
+        for code, key in (("molto_lento", "fs.voice.r_vslow"), ("lento", "fs.voice.r_slow"), ("normale", "fs.voice.r_norm"), ("veloce", "fs.voice.r_fast"), ("molto_veloce", "fs.voice.r_vfast")):
+            self.p_rate.addItem(tr(key, code), code)
+        self.p_rate.setCurrentIndex(2)
+        self.p_pitch = QComboBox()
+        for code, key in (("molto_basso", "fs.voice.p_vlow"), ("basso", "fs.voice.p_low"), ("medio", "fs.voice.p_mid"), ("alto", "fs.voice.p_high"), ("molto_alto", "fs.voice.p_vhigh")):
+            self.p_pitch.addItem(tr(key, code), code)
+        self.p_pitch.setCurrentIndex(2)
+        self.p_emotion = QComboBox()
+        for e in vs.EMOTIONS:
+            self.p_emotion.addItem(tr("fs.voice.emo_" + e, e), e)
+        pg.addWidget(self.p_name, 0, 0, 1, 4)
+        pg.addWidget(QLabel(tr("fs.voice.gender", "Genere")), 1, 0); pg.addWidget(self.p_gender, 1, 1)
+        pg.addWidget(QLabel(tr("fs.voice.age", "Età")), 1, 2); pg.addWidget(self.p_age, 1, 3)
+        pg.addWidget(QLabel(tr("fs.voice.lang", "Lingua")), 2, 0); pg.addWidget(self.p_lang, 2, 1)
+        pg.addWidget(QLabel(tr("fs.voice.emotion", "Emozione")), 2, 2); pg.addWidget(self.p_emotion, 2, 3)
+        pg.addWidget(QLabel(tr("fs.voice.rate", "Ritmo")), 3, 0); pg.addWidget(self.p_rate, 3, 1)
+        pg.addWidget(QLabel(tr("fs.voice.pitch", "Tono")), 3, 2); pg.addWidget(self.p_pitch, 3, 3)
+        self.btn_params = QPushButton(tr("fs.voice.create_params", "🎚 Crea voce da parametri")); self.btn_params.clicked.connect(self._create_params)
+        pg.addWidget(self.btn_params, 4, 0, 1, 4)
+        right.addWidget(pbox)
         # clonazione
         c = QGroupBox(tr("fs.voice.cloned", "Voce clonata (da campione)")); cv = QVBoxLayout(c)
         self.c_name = QLineEdit(); self.c_name.setPlaceholderText(tr("fs.voice.name_ph", "Nome voce"))
@@ -95,6 +126,18 @@ class VoiceTab(QWidget):
             self.status.setText(""); QMessageBox.critical(self, tr("fs.voice.described", "Voce"), str(res["error"])[:400]); return
         self.status.setText(tr("fs.voice.created", "Voce creata: {v}").format(v=res.get("edge_voice", "")))
         self._refresh()
+
+    def _create_params(self):
+        try:
+            res = vs.voice_from_params(
+                self.p_name.text().strip(), gender=self.p_gender.currentData(),
+                age=self.p_age.currentData(), language=self.p_lang.currentText(),
+                rate=self.p_rate.currentData(), pitch=self.p_pitch.currentData(),
+                emotion=self.p_emotion.currentData())
+            self._refresh()
+            self.status.setText(tr("fs.voice.created", "Voce creata: {v}").format(v=res.get("edge_voice", "")))
+        except Exception as e:                              # noqa: BLE001
+            QMessageBox.critical(self, tr("fs.voice.params", "Voce"), str(e)[:400])
 
     def _pick_sample(self):
         p, _ = QFileDialog.getOpenFileName(self, tr("fs.voice.sample", "Campione"), "", "Audio (*.wav *.mp3 *.flac)")

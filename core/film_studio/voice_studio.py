@@ -51,6 +51,49 @@ def voice_from_description(description: str, name: str = "", *, actor_id: int = 
     return {"voice_id": db_id, "preset_slug": vp.slug(), "attrs": attrs, "edge_voice": vid_str}
 
 
+# mappe parametri → prosodia Edge (rate/pitch/volume)
+_RATE = {"molto_lento": "-30%", "lento": "-15%", "normale": "+0%", "veloce": "+15%", "molto_veloce": "+30%"}
+_PITCH = {"molto_basso": "-50Hz", "basso": "-25Hz", "medio": "+0Hz", "alto": "+25Hz", "molto_alto": "+50Hz"}
+_AGE_PITCH = {"child": "+40Hz", "young": "+15Hz", "adult": "+0Hz", "old": "-15Hz"}
+EMOTIONS = ["neutral", "happy", "sad", "angry", "whisper", "calm"]
+
+
+def voice_from_params(name: str, *, gender: str = "female", age: str = "adult", language: str = "it",
+                      rate: str = "normale", pitch: str = "medio", emotion: str = "neutral",
+                      actor_id: int = 0) -> dict:
+    """Crea una voce dai PARAMETRI espliciti (spec §8.2): genere/età/lingua/ritmo/tono/emozione.
+    Sceglie il preset Edge per lingua+genere e salva la prosodia (rate/pitch/volume) nel profilo."""
+    from core import tts_engine as T
+    lang = _LANG.get(str(language).lower(), "it-IT")
+    presets = T.edge_list_voices(lang.split("-")[0]) if T.edge_available() else []
+    chosen = None
+    for p in presets:
+        disp = (p.name or "").lower()
+        if ("female" in disp) == (str(gender).lower() == "female"):
+            chosen = p; break
+    chosen = chosen or (presets[0] if presets else None)
+    vid_str = chosen.voice_id if chosen else ""
+    # prosodia: combina ritmo/tono scelti + offset per età + preset emozione
+    emo = T._EMOTION_PRESETS.get(emotion, {})
+    pr = {"rate": _RATE.get(rate, "+0%"), "pitch": _PITCH.get(pitch, "+0Hz"), "volume": emo.get("volume", "+0%")}
+    if emotion in T._EMOTION_PRESETS:
+        pr["rate"] = emo.get("rate", pr["rate"])
+    # somma offset età al pitch (in Hz)
+    def _hz(s):
+        try: return int(s.replace("Hz", "").replace("+", ""))
+        except Exception: return 0
+    pr["pitch"] = f"{_hz(pr['pitch']) + _hz(_AGE_PITCH.get(age, '+0Hz')):+d}Hz"
+    disp_name = (name or "").strip() or f"voce_{gender}_{age}_{lang}"
+    vp = T.VoicePreset(name=disp_name, engine="edge", voice_id=vid_str, language=lang,
+                       note=f"params: {gender},{age},{rate},{pitch},{emotion}")
+    T.save_voice(vp)
+    db_id = db.insert("voice", origin="params", name=disp_name,
+                      params=json.dumps({"engine": "edge", "voice_id": vid_str, "gender": gender, "age": age,
+                                         "emotion": emotion, "prosody": pr}, ensure_ascii=False),
+                      sample="", actor_id=actor_id or 0)
+    return {"voice_id": db_id, "preset_slug": vp.slug(), "edge_voice": vid_str, "prosody": pr}
+
+
 def register_clone(name: str, sample_wav: str, *, transcript: str = "", actor_id: int = 0,
                    language: str = "it-IT") -> dict:
     """Registra una voce CLONATA (CosyVoice) da un campione reale, legabile a un attore."""
@@ -78,7 +121,10 @@ def synth_dialogue(text: str, voice_row: dict, out_wav: str) -> str:
     engine = params.get("engine", "edge")
     Path(out_wav).parent.mkdir(parents=True, exist_ok=True)
     if engine == "edge":
-        T.edge_synthesize(text, params.get("voice_id", ""), Path(out_wav))
+        pr = params.get("prosody") or {}
+        T.edge_synthesize(text, params.get("voice_id", ""), Path(out_wav),
+                          rate=pr.get("rate", "+0%"), volume=pr.get("volume", "+0%"),
+                          pitch=pr.get("pitch", "+0Hz"))
     else:                                                   # clone CosyVoice via job
         job = __import__("core.cosyvoice_service", fromlist=["make_job"]).make_job(
             text, voice_row.get("sample", ""), out_name=Path(out_wav).stem)
