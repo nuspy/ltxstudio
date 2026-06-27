@@ -1758,5 +1758,10 @@
   "feat.cap.filmstudio_voice": "Film Studio — Voce",
   "feat.cap.filmstudio_script": "Film Studio — Copione",
   "feat.cap.filmstudio_scenografia": "Film Studio — Scenografia",
-  "feat.cap.filmstudio_montaggio": "Film Studio — Montaggio"
+  "feat.cap.filmstudio_montaggio": "Film Studio — Montaggio",
+  "fs.tl.video": "Video",
+  "fs.tl.dialoghi": "Dialoghi",
+  "fs.tl.musica": "Musica",
+  "fs.tl.ambient": "Ambient",
+  "fs.mt.reordered": "Ordine clip aggiornato dalla timeline."
 }

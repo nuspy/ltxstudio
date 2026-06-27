@@ -25,6 +25,11 @@ class MontageTab(QWidget):
         self.btn_refresh = QPushButton(tr("fs.mt.refresh", "↻ Aggiorna timeline")); self.btn_refresh.clicked.connect(self._refresh)
         h.addWidget(self.btn_refresh); h.addStretch(1)
         v.addLayout(h)
+        # #53 timeline visuale (clip video trascinabili + tracce audio)
+        from ui.film_studio.timeline_widget import TimelineWidget
+        self.timeline = TimelineWidget()
+        self.timeline.reordered.connect(self._on_reorder)
+        v.addWidget(self.timeline)
         self.lst = QListWidget(); v.addWidget(self.lst, 1)
         box = QGroupBox(tr("fs.mt.output", "Output")); bv = QVBoxLayout(box)
         r1 = QHBoxLayout()
@@ -174,7 +179,7 @@ class MontageTab(QWidget):
                 f = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}.mp4")
                 if Path(f).exists():
                     out.append({"file": f, "in_s": 0.0, "out_s": float(sh["duration_s"] or 4),
-                                "name": f"S{sc['ord']}.{sh['ord']}"})
+                                "name": f"S{sc['ord']}.{sh['ord']}", "shot_id": sh["id"], "sh_ord": sh["ord"]})
         return out
 
     def _refresh(self):
@@ -182,7 +187,27 @@ class MontageTab(QWidget):
         self._cur_clips = self._clips()
         for c in self._cur_clips:
             self.lst.addItem(f"{c['name']}  ({c['out_s']:.0f}s)  {Path(c['file']).name}")
+        # #53 popola la timeline visuale (clip video + tracce audio già generate)
+        audio = []
+        for tr_name, src in [("dialoghi", getattr(self, "_audio_tracks", [])),
+                             ("musica", getattr(self, "_extra_tracks", [])),
+                             ("ambient", getattr(self, "_ambient_tracks", []))]:
+            for a in src:
+                audio.append({"track": tr_name, "start_s": a.get("start_s", 0),
+                              "dur_s": a.get("dur_s", 4), "label": tr_name})
+        self.timeline.set_data([{"id": c["shot_id"], "label": c["name"], "duration_s": c["out_s"]}
+                                for c in self._cur_clips], audio)
         self.info.setText(tr("fs.mt.count", "{n} clip in timeline").format(n=len(self._cur_clips)))
+
+    def _on_reorder(self, shot_ids: list):
+        """#53 Drop sulla timeline → riscrive l'ord degli shot secondo il nuovo ordine visuale."""
+        for new_ord, sid in enumerate(shot_ids, start=1):
+            try:
+                db.update("shot", int(sid), ord=new_ord)
+            except Exception:                               # noqa: BLE001
+                pass
+        self._refresh()
+        self.info.setText(tr("fs.mt.reordered", "Ordine clip aggiornato dalla timeline."))
 
     def _gen_audio(self):
         """Sintetizza i dialoghi (voce legata all'attore) per ogni shot → tracce audio temporizzate."""

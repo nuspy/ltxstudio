@@ -1661,5 +1661,10 @@
   "feat.cap.filmstudio_voice": "Film Studio — Voice",
   "feat.cap.filmstudio_script": "Film Studio — Screenplay",
   "feat.cap.filmstudio_scenografia": "Film Studio — Storyboard",
-  "feat.cap.filmstudio_montaggio": "Film Studio — Montage"
+  "feat.cap.filmstudio_montaggio": "Film Studio — Montage",
+  "fs.tl.video": "Video",
+  "fs.tl.dialoghi": "Dialogue",
+  "fs.tl.musica": "Music",
+  "fs.tl.ambient": "Ambient",
+  "fs.mt.reordered": "Clip order updated from timeline."
 }
