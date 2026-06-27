@@ -276,6 +276,12 @@ CHECKPOINT = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors
 UPSAMPLER = r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"              # Gemma-3 12B UFFICIALE Lightricks (non-gated, formato ltx-core)
 LORA_DIR = r"E:\AI\Models\LoRA"
+# IC-LoRA di controllo (canny/depth/pose) presenti su disco — #24 ControlNet nativo, nessun download
+IC_LORA = {
+    "canny": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-canny-control.safetensors",
+    "depth": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-depth-control.safetensors",
+    "pose": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-pose-control.safetensors",
+}
 
 
 _PIPE_CACHE: dict = {}
@@ -314,10 +320,16 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     if qmode == "fp8_scaled_mm" and offload != OffloadMode.NONE and quant is not None:
         import ltx_pipelines.utils.blocks as _blocks
         _blocks.fp8_cast_fuse_rule = quant.fuse_rule
-    Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
-    pipe = Klass(
-        checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
-        gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+    if ptype == "iclora":                                    # #24 ControlNet IC-LoRA (canny/depth/pose)
+        from ltx_pipelines.ic_lora import ICLoraPipeline
+        pipe = ICLoraPipeline(
+            distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
+            gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+    else:
+        Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
+        pipe = Klass(
+            checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
+            gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     _PIPE_CACHE.clear()                                       # 1 pipeline alla volta (VRAM/RAM)
     _PIPE_CACHE[key] = pipe
     return pipe
@@ -417,7 +429,14 @@ def run_generation(p: dict) -> str:
     ckpt = _resolve_ckpt(p.get("model"))
     qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
     t0 = time.time()
-    ptype = "a2v" if p.get("audio_path") else "ti2v"          # audio dato → lip-sync/canto NATIVO
+    # #24 ControlNet IC-LoRA: se c'è un control_video e il peso IC-LoRA del tipo è su disco → pipeline iclora
+    _ic = IC_LORA.get(p.get("control_type", "")) if p.get("control_video") else None
+    if _ic and os.path.exists(_ic):
+        ptype = "iclora"
+        loras = list(loras) + [LoraPathStrengthAndSDOps(_ic, float(p.get("control_strength", 0.8)),
+                                                        LTXV_LORA_COMFY_RENAMING_MAP)]
+    else:
+        ptype = "a2v" if p.get("audio_path") else "ti2v"      # audio dato → lip-sync/canto NATIVO
     pipe = _get_pipe(ckpt, qmode, p.get("offload", "cpu"), loras, ptype=ptype)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)
     if torch.cuda.is_available():
@@ -455,30 +474,16 @@ def run_generation(p: dict) -> str:
             audio_start_time=float(p.get("audio_start_time", 0.0)),
             audio_max_duration=p.get("audio_max_duration"),
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
-    elif p.get("control_video"):                             # #24 ControlNet: video-guida (canny/depth/pose già preprocessato)
-        cv = p["control_video"]
-        cstr = float(p.get("control_strength", 0.8))
-        print(f"[controlnet] guida '{p.get('control_type','?')}' da {cv} (strength {cstr})", flush=True)
-        try:
-            from ltx_pipelines.ic_lora import ICLoraPipeline  # type: ignore
-            video, audio = pipe(
-                prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
-                seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
-                num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
-                video_guider_params=vg, control_video=cv, control_strength=cstr,
-                tiling_config=TilingConfig.default())
-        except Exception as _cn:                             # noqa: BLE001
-            print(f"[controlnet] IC-LoRA non disponibile ({_cn}) → i2v dal primo frame del control video", flush=True)
-            import subprocess as _sp
-            f0 = cv + ".f0.png"
-            _sp.run(["ffmpeg", "-v", "error", "-i", cv, "-vframes", "1", f0, "-y"], check=False)
-            images = [ImageConditioningInput(f0, 0, cstr, 33)] if os.path.exists(f0) else []
-            video, audio = pipe(
-                prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
-                seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
-                num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
-                video_guider_params=vg, audio_guider_params=ag, images=images,
-                tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+    elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
+        cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
+        print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
+        imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
+        video, audio = pipe(
+            prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+            seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+            num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
+            video_guider_params=vg, images=imgs, video_conditioning=[(cv, cstr)],
+            tiling_config=TilingConfig.default())
     else:
         images = []
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
