@@ -1069,16 +1069,21 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, tr("mw.sb_title", "Storyboard"),
                                     tr("mw.sb_invalid", "Storyboard non valido:") + "\n• " + "\n• ".join(errs))
                 return
-            uploaded = []
-            for sc in scenes:
-                name = self._upload_local(sc["image"])
-                if not name:
-                    QMessageBox.warning(self, tr("mw.sb_title", "Storyboard"),
-                                        tr("mw.sb_upload_failed", "Upload immagine scena fallito: {img}").format(img=sc["image"]))
-                    return
-                uploaded.append({"image": name, "second": sc["second"], "strength": sc["strength"]})
-            vals["storyboard"] = uploaded
-            self._log(tr("mw.sb_log", "[Storyboard] {n} scene-keyframe → interpolazione multi-scena.").format(n=len(uploaded)))
+            if backend.is_native("video"):
+                # NATIVO: niente upload ComfyUI, si usano i path LOCALI (→ keyframe in _generate_video_native)
+                vals["storyboard"] = [{"image": sc["image"], "second": sc["second"],
+                                       "strength": sc["strength"]} for sc in scenes]
+            else:
+                uploaded = []
+                for sc in scenes:
+                    name = self._upload_local(sc["image"])
+                    if not name:
+                        QMessageBox.warning(self, tr("mw.sb_title", "Storyboard"),
+                                            tr("mw.sb_upload_failed", "Upload immagine scena fallito: {img}").format(img=sc["image"]))
+                        return
+                    uploaded.append({"image": name, "second": sc["second"], "strength": sc["strength"]})
+                vals["storyboard"] = uploaded
+            self._log(tr("mw.sb_log", "[Storyboard] {n} scene-keyframe → interpolazione multi-scena.").format(n=len(scenes)))
 
         # ── VIDEO LUNGHI: auto-extend oltre la soglia ──
         # Se la durata richiesta supera la soglia (impostata in Avanzate), generiamo una
@@ -1856,9 +1861,15 @@ class MainWindow(QMainWindow):
         # video lungo → chunking memory-bounded (chunk da ~5s)
         if nf > 150:
             params["chunk_frames"] = 121
-        if vals.get("storyboard"):
-            self._log("[nativo] NB: lo storyboard multi-keyframe non è ancora nativo "
-                      "(pipeline keyframe_interpolation da cablare) → genero la scena base.")
+        # STORYBOARD multi-scena → keyframe a tempo (il worker li condiziona a frame diversi)
+        sb = vals.get("storyboard")
+        if sb:
+            kfs = [{"path": sc["image"], "frame": max(0, min(nf - 1, int(round(float(sc["second"]) * fps)))),
+                    "strength": float(sc.get("strength", 1.0))} for sc in sb if sc.get("image")]
+            if kfs:
+                params["keyframes"] = kfs
+                params.pop("image_path", None)        # i keyframe sostituiscono il singolo frame iniziale
+                self._log(f"[nativo] storyboard: {len(kfs)} keyframe a tempo → video multi-scena")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
