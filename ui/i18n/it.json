@@ -1752,5 +1752,11 @@
   "fs.sb.too_many_lora": "⚠ Scena {s} shot {h}: {n} LoRA simultanee (>3) — rischio interferenza, valuta split.",
   "fs.sb.continuity": "Continuity scena",
   "fs.sb.ct_apply": "Applica + propaga",
-  "fs.sb.ct_done": "Continuity applicata e propagata alle scene successive."
+  "fs.sb.ct_done": "Continuity applicata e propagata alle scene successive.",
+  "feat.cap.filmstudio_asset": "Film Studio — Asset/Personaggi",
+  "feat.cap.filmstudio_lora": "Film Studio — LoRA Studio",
+  "feat.cap.filmstudio_voice": "Film Studio — Voce",
+  "feat.cap.filmstudio_script": "Film Studio — Copione",
+  "feat.cap.filmstudio_scenografia": "Film Studio — Scenografia",
+  "feat.cap.filmstudio_montaggio": "Film Studio — Montaggio"
 }
