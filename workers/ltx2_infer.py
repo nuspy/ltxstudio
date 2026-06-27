@@ -405,9 +405,37 @@ def _run_chunked(p: dict, chunk: int) -> str:
     return p["output"]
 
 
+def run_t2a(p: dict) -> str:
+    """#29 text→audio NATIVO (T2AOneStagePipeline, audio-only). Genera audio dal prompt → wav. ≤10s test."""
+    import time
+    from ltx_pipelines.t2a_one_stage import T2AOneStagePipeline
+    from ltx_pipelines.utils.media_io import encode_audio
+    ckpt = _resolve_ckpt(p.get("model", CHECKPOINT))
+    qmode = p.get("quant", "fp8_scaled_mm")
+    quant = None
+    if qmode == "fp8_scaled_mm":
+        from ltx_core.quantization import fp8_scaled_mm
+        quant = fp8_scaled_mm.build_policy(ckpt)
+    pipe = T2AOneStagePipeline(checkpoint_path=ckpt, gemma_root=GEMMA, loras=[], quantization=quant,
+                               offload_mode=OffloadMode.CPU)
+    fps = float(p.get("fps", 25.0))
+    nf = int(p.get("num_frames", int(float(p.get("seconds", 5.0)) * fps) // 8 * 8 + 1))
+    ag = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 7.0)), stg_scale=1.0,
+                                rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
+    t0 = time.time()
+    audio = pipe(prompt=p.get("prompt", ""), negative_prompt=p.get("negative", ""),
+                 seed=int(p.get("seed", 42)), num_frames=nf, frame_rate=fps, audio_guider_params=ag)
+    out = p["output"]
+    encode_audio(audio=audio, output_path=out)
+    print(f"[t2a] {time.time()-t0:.0f}s → {out}", flush=True)
+    return out
+
+
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
+    if p.get("t2a"):                                          # #29 text→audio (no video)
+        return run_t2a(p)
     # Video lungo → chunking in-process (memory-bounded, niente sborzo stage_2). Attiva con
     # chunk_frames>0 (o auto sotto). Ricorsione sicura: i chunk hanno num_frames<=chunk.
     _chunk = int(p.get("chunk_frames", 0))
