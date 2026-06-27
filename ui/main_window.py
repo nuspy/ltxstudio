@@ -116,6 +116,26 @@ class _NativeImageWorker(QThread):
         self.done.emit(res)
 
 
+class _SeedVR2Worker(QThread):
+    """SeedVR2 super-risoluzione video (CLI standalone, venv isolato). Stream log + path finale."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, src: str, out: str, *, resolution: int, batch_size: int, chunk_size: int):
+        super().__init__()
+        self.src, self.out = src, out
+        self.resolution, self.batch_size, self.chunk_size = resolution, batch_size, chunk_size
+
+    def run(self):
+        from core import seedvr2_service as sv
+        try:
+            sv.upscale_video(self.src, self.out, resolution=self.resolution, batch_size=self.batch_size,
+                             chunk_size=self.chunk_size, on_log=lambda l: self.progress.emit(l))
+            self.done.emit({"status": "success", "output": [self.out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class _NativeMultiTalkWorker(QThread):
     """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI; riporta progress e path finale."""
     done = Signal(dict)
@@ -1936,6 +1956,25 @@ class MainWindow(QMainWindow):
         src = cfg.get("video")
         if not src or not os.path.exists(src):
             QMessageBox.warning(self, tr("mw.no_video_title", "Video"), tr("mw.no_video_msg", "Scegli un video.")); return
+        engine = cfg.get("engine", "seedvr2")
+        if engine == "seedvr2":                          # SeedVR2 nativo (diffusion VSR, coerenza temporale)
+            from core import seedvr2_service as sv
+            errs = sv.preflight()
+            if errs:
+                QMessageBox.warning(self, "SeedVR2", "\n".join(errs) +
+                    "\n\n" + tr("mw.seedvr2_install_hint", "Installa con: python scripts/install_seedvr2.py")); return
+            out = str(OUTPUT_DIR / f"seedvr2_{Path(src).stem}.mp4")
+            self._log(f"[nativo] SeedVR2 super-risoluzione (res {cfg.get('resolution',1080)}) su {Path(src).name}…")
+            self._sv2_worker = _SeedVR2Worker(src, out, resolution=int(cfg.get("resolution", 1080) or 1080),
+                                              batch_size=int(cfg.get("batch_size", 5) or 5), chunk_size=120)
+            self._sv2_worker.progress.connect(self._log)
+            self._sv2_worker.done.connect(self._on_multitalk_done)
+            self._sv2_worker.start()
+            return
+        if engine == "flashvsr":                         # in arrivo (download/integrazione #46)
+            QMessageBox.information(self, "FlashVSR", tr("mw.flashvsr_soon",
+                "FlashVSR in arrivo: usa SeedVR2 o ESRGAN per ora.")); return
+        # esrgan: upscale per-frame nativo (spandrel)
         params = {
             "video": src, "model": cfg.get("esrgan_model"),
             "scale": int(cfg.get("target_scale", 2) or 2), "seed": _r.randint(0, 2**31),

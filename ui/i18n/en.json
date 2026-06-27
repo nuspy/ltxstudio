@@ -1766,5 +1766,7 @@
   "fs.mt.reordered": "Clip order updated from timeline.",
   "fs.mt.sfx": "💥 Action SFX",
   "fs.mt.sfx_done": "Action SFX: {n} effects.",
-  "fs.mt.sfx_run": "SFX {i}/{n}…"
+  "fs.mt.sfx_run": "SFX {i}/{n}…",
+  "mw.seedvr2_install_hint": "Install with: python scripts/install_seedvr2.py",
+  "mw.flashvsr_soon": "FlashVSR coming soon: use SeedVR2 or ESRGAN for now."
 }

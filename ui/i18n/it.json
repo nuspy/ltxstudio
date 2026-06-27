@@ -1766,5 +1766,7 @@
   "fs.mt.reordered": "Ordine clip aggiornato dalla timeline.",
   "fs.mt.sfx": "💥 SFX per-azione",
   "fs.mt.sfx_done": "SFX per-azione: {n} effetti.",
-  "fs.mt.sfx_run": "SFX {i}/{n}…"
+  "fs.mt.sfx_run": "SFX {i}/{n}…",
+  "mw.seedvr2_install_hint": "Installa con: python scripts/install_seedvr2.py",
+  "mw.flashvsr_soon": "FlashVSR in arrivo: usa SeedVR2 o ESRGAN per ora."
 }
