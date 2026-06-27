@@ -7,7 +7,7 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 3.1 ControlNet IC‑LoRA reale — ICLoraPipeline GGUF-patchata + IC-LoRA canny/depth/pose da disco (no download), firma video_conditioning; full-GPU val in #43
 - [~] 3.2 FLUX.2 t2i — TE è nvfp4 (no fp8): modulo dequant nvfp4→bf16 PRONTO (flux2_te.py, no download 48GB); resta validazione live swizzle su Blackwell → Task #44
 - [ ] 3.3 SeedVR2 nativo — 3B 14.6GB IN DOWNLOAD; integrare pipeline DiT + handler video_upscale opzione seedvr2
-- [ ] 3.4 ReTake + video inpaint/outpaint nativi (RetakePipeline)
+- [x] 3.4 ReTake nativo — RetakePipeline nel worker + ramo GUI _retake_native (sezione [start,end]); full-GPU val #43
 - [ ] 3.5 UI conversione modelli (3 script in Import Models)
 - [ ] 3.6 text→audio (T2AOneStage) + HDR/EXR export
 - [ ] 3.7 Durata‑illimitata multi‑prompt (run_long) [long‑video ≤60s]

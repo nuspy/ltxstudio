@@ -1066,6 +1066,9 @@ class MainWindow(QMainWindow):
                     v2v["v2v_end"] = dur if dur > 0 else v2v.get("v2v_end", 5.0)
                 if _mode == "retake" and not v2v.get("v2v_regen_audio"):
                     self._v2v_keep_audio_src = src
+                # ReTake NATIVO: rigenera la sezione [start,end] del video sorgente col worker LTX-2 (RetakePipeline)
+                if _mode == "retake" and backend.is_native("video"):
+                    return self._retake_native(vals, src, v2v)
                 vals.update(v2v)
 
         # ── STORYBOARD multi-scena: immagini-keyframe a tempo → video senza montaggio ──
@@ -1902,6 +1905,27 @@ class MainWindow(QMainWindow):
         self._ltx2_worker = _NativeLtx2Worker(params)
         self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
         self._ltx2_worker.done.connect(self._on_multitalk_done)   # riusa: face-swap/RIFE/announce
+        self._ltx2_worker.start()
+
+    def _retake_native(self, vals: dict, src: str, v2v: dict):
+        """ReTake NATIVO (#24): rigenera la sezione [start,end] del video sorgente (RetakePipeline LTX-2).
+        Zero ComfyUI."""
+        import time as _t
+        if not src or not os.path.exists(src):
+            QMessageBox.warning(self, tr("mw.source_video_title", "Video"), tr("mw.no_video_msg", "Scegli un video.")); return
+        out = str(OUTPUT_DIR / f"retake_{int(_t.time())}.mp4")
+        params = {
+            "retake": True, "video_path": src, "prompt": vals.get("prompt_positive", ""),
+            "negative": vals.get("prompt_negative", "") or "worst quality, blurry",
+            "start_time": float(v2v.get("v2v_start", 0.0)), "end_time": float(v2v.get("v2v_end", 5.0)),
+            "regenerate_video": True, "regenerate_audio": bool(v2v.get("v2v_regen_audio", False)),
+            "steps": int(self.advanced_tab.steps.value()), "guidance": float(self.advanced_tab.cfg.value()),
+            "seed": int(self.advanced_tab.seed.value()), "offload": "cpu", "output": out,
+        }
+        self._log(f"[nativo] ReTake [{params['start_time']:.1f}–{params['end_time']:.1f}]s su {Path(src).name}…")
+        self._ltx2_worker = _NativeLtx2Worker(params)
+        self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
+        self._ltx2_worker.done.connect(self._on_multitalk_done)
         self._ltx2_worker.start()
 
     def _enhance_video_native(self):
