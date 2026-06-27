@@ -1375,6 +1375,9 @@ class MainWindow(QMainWindow):
 
     # ---------- inpaint / outpaint (genera la foto PRIMA del video) ----------
     def _upload_local(self, path: str) -> str:
+        # NATIVO/no-comfy: gli handler nativi leggono i path LOCALI → niente upload, ritorna il path.
+        if not self.driver.is_up():
+            return path
         r = self.driver.upload_image(path)
         name, sub = r.get("name", ""), r.get("subfolder", "")
         return f"{sub}/{name}" if sub else name
