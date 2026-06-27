@@ -325,6 +325,11 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         pipe = ICLoraPipeline(
             distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
             gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+    elif ptype == "retake":                                  # #24 ReTake: rigenera sezione [start,end] di un video
+        from ltx_pipelines.retake import RetakePipeline
+        pipe = RetakePipeline(
+            checkpoint_path=ckpt, gemma_root=GEMMA, loras=loras,
+            quantization=quant, offload_mode=offload, distilled=True)
     else:
         Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
         pipe = Klass(
@@ -431,7 +436,9 @@ def run_generation(p: dict) -> str:
     t0 = time.time()
     # #24 ControlNet IC-LoRA: se c'è un control_video e il peso IC-LoRA del tipo è su disco → pipeline iclora
     _ic = IC_LORA.get(p.get("control_type", "")) if p.get("control_video") else None
-    if _ic and os.path.exists(_ic):
+    if p.get("retake") and p.get("video_path"):              # #24 ReTake: rigenera sezione di un video
+        ptype = "retake"
+    elif _ic and os.path.exists(_ic):
         ptype = "iclora"
         loras = list(loras) + [LoraPathStrengthAndSDOps(_ic, float(p.get("control_strength", 0.8)),
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
@@ -451,7 +458,8 @@ def run_generation(p: dict) -> str:
             from workers import gguf_native as _GG
         except ModuleNotFoundError:
             import gguf_native as _GG          # eseguito come script: workers/ è già nel sys.path
-        for _st in (getattr(pipe, "stage_1", None), getattr(pipe, "stage_2", None)):
+        for _st in (getattr(pipe, "stage_1", None), getattr(pipe, "stage_2", None),
+                    getattr(pipe, "stage", None)):           # retake usa 'stage' singolo
             if _st is not None:
                 _GG.patch_stage_to_gguf(_st, p["gguf_transformer"], ckpt)
         print(f"[gguf] transformer da {os.path.basename(p['gguf_transformer'])} (dequant on-the-fly)", flush=True)
@@ -474,6 +482,16 @@ def run_generation(p: dict) -> str:
             audio_start_time=float(p.get("audio_start_time", 0.0)),
             audio_max_duration=p.get("audio_max_duration"),
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+    elif ptype == "retake":                                  # #24 ReTake: rigenera [start,end] di un video sorgente
+        print(f"[retake] {p['video_path']} sezione [{p.get('start_time',0)},{p.get('end_time',0)}]s", flush=True)
+        video, audio = pipe(
+            video_path=p["video_path"], prompt=p.get("prompt", ""),
+            start_time=float(p.get("start_time", 0.0)), end_time=float(p.get("end_time", 0.0)),
+            seed=int(p.get("seed", 42)), negative_prompt=p.get("negative", "worst quality, blurry"),
+            num_inference_steps=int(p.get("steps", 40)), video_guider_params=vg,
+            regenerate_video=bool(p.get("regenerate_video", True)),
+            regenerate_audio=bool(p.get("regenerate_audio", True)),
+            tiling_config=TilingConfig.default())
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)

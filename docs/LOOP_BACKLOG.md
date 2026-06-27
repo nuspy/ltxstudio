@@ -6,13 +6,13 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 ## AREA 3 — migrazione no‑ComfyUI
 - [x] 3.1 ControlNet IC‑LoRA reale — ICLoraPipeline GGUF-patchata + IC-LoRA canny/depth/pose da disco (no download), firma video_conditioning; full-GPU val in #43
 - [~] 3.2 FLUX.2 t2i — TE è nvfp4 (no fp8): modulo dequant nvfp4→bf16 PRONTO (flux2_te.py, no download 48GB); resta validazione live swizzle su Blackwell → Task #44
-- [ ] 3.3 SeedVR2 nativo (se ≤15GB, altrimenti DEFERRED)
+- [ ] 3.3 SeedVR2 nativo — 3B 14.6GB IN DOWNLOAD; integrare pipeline DiT + handler video_upscale opzione seedvr2
 - [ ] 3.4 ReTake + video inpaint/outpaint nativi (RetakePipeline)
 - [ ] 3.5 UI conversione modelli (3 script in Import Models)
 - [ ] 3.6 text→audio (T2AOneStage) + HDR/EXR export
 - [ ] 3.7 Durata‑illimitata multi‑prompt (run_long) [long‑video ≤60s]
-- [ ] 3.8 FlashVSR
-- [ ] 3.9 SD3
+- [ ] 3.8 FlashVSR v1.1 (JunhaoZhuang/FlashVSR-v1.1, <15GB) — scaricare + integrare
+- [x] 3.9 SD3 — ABORTITA DEFINITIVAMENTE (verificato: nessuna feature usa il modello SD3; EmptySD3LatentImage/ModelSamplingSD3 sono nodi generici, "sd3" solo voce catalogo)
 - [ ] 3.10 Test LIVE end‑to‑end path nativi (≤10s)
 
 ## AREA 2 — Videomusicale
