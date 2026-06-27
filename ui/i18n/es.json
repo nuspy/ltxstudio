@@ -1478,5 +1478,16 @@
   "fs.assetdlg.variant": "Double-click: asset, then pick the variant",
   "fs.assetdlg.base": "(base) — insert @{n}",
   "fs.mt.audio": "🔊 Generate audio (dialogue+music)",
-  "fs.mt.audio_done": "Audio: {n} lines synthesized"
+  "fs.mt.audio_done": "Audio: {n} lines synthesized",
+  "fs.tab.lora": "LoRA Studio",
+  "fs.lorastudio.info": "Shared LoRA library. Training is done in the app's «Video LoRA» and «Photo LoRA» tabs.",
+  "fs.lorastudio.details": "LoRA details",
+  "fs.lorastudio.trigger": "Trigger",
+  "fs.lorastudio.flavor": "Type",
+  "fs.lorastudio.scope": "Scope",
+  "fs.lorastudio.scope_ep": "Episode",
+  "fs.lorastudio.scope_se": "Series",
+  "fs.lorastudio.asset": "Asset",
+  "fs.lorastudio.saved": "LoRA registered/updated.",
+  "fs.lorastudio.too_many": "Warning: {n} simultaneous LoRAs (>{m}) — consider splitting the shot or Fast path."
 }

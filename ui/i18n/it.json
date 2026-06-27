@@ -1575,5 +1575,16 @@
   "fs.assetdlg.variant": "Doppio click: asset · poi scegli la variante",
   "fs.assetdlg.base": "(base) — inserisci @{n}",
   "fs.mt.audio": "🔊 Genera audio (dialoghi+musica)",
-  "fs.mt.audio_done": "Audio: {n} battute sintetizzate"
+  "fs.mt.audio_done": "Audio: {n} battute sintetizzate",
+  "fs.tab.lora": "LoRA Studio",
+  "fs.lorastudio.info": "Libreria LoRA condivisa. Il training si fa nei tab «LoRA Video» e «LoRA Foto» dell'app.",
+  "fs.lorastudio.details": "Dettagli LoRA",
+  "fs.lorastudio.trigger": "Trigger",
+  "fs.lorastudio.flavor": "Tipo",
+  "fs.lorastudio.scope": "Scope",
+  "fs.lorastudio.scope_ep": "Episodio",
+  "fs.lorastudio.scope_se": "Serie",
+  "fs.lorastudio.asset": "Asset",
+  "fs.lorastudio.saved": "LoRA registrata/aggiornata.",
+  "fs.lorastudio.too_many": "Attenzione: {n} LoRA simultanee (>{m}) — valuta split inquadratura o Percorso Rapido."
 }
