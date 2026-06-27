@@ -74,6 +74,11 @@ def conn() -> sqlite3.Connection:
         _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         _conn.row_factory = sqlite3.Row
         _conn.executescript(_SCHEMA)
+        for tbl, col, ddl in [("shot", "seed", "ALTER TABLE shot ADD COLUMN seed INTEGER DEFAULT 0")]:
+            try:
+                _conn.execute(ddl)                          # migration leggera per DB esistenti
+            except Exception:                               # noqa: BLE001 (colonna già presente)
+                pass
         _conn.commit()
     return _conn
 

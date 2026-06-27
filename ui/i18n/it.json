@@ -1735,5 +1735,10 @@
   "fs.mt.no_kf": "Genera prima i keyframe.",
   "fs.mt.dub": "🌐 Doppia in lingua…",
   "fs.mt.dub_lang": "Lingua di destinazione (es. English, Español):",
-  "fs.mt.dub_done": "Doppiaggio {l}: {n} battute (re-lip-sync rigenerando i video)."
+  "fs.mt.dub_done": "Doppiaggio {l}: {n} battute (re-lip-sync rigenerando i video).",
+  "fs.series": "Serie",
+  "fs.series_new": "＋",
+  "fs.series_none": "— nessuna —",
+  "fs.series_name": "Nome della serie:",
+  "fs.sb.seed": "Seed (0=auto/blocca)"
 }

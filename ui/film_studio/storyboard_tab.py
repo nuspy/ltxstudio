@@ -47,6 +47,13 @@ class StoryboardTab(QWidget):
         ev.addWidget(self.edit)
         from ui.film_studio.asset_dialog import attach as _attach_at
         _attach_at(self.edit)
+        from PySide6.QtWidgets import QSpinBox as _SB
+        sh_seed = QHBoxLayout()
+        sh_seed.addWidget(QLabel(tr("fs.sb.seed", "Seed (0=auto/blocca)")))
+        self.shot_seed = _SB(); self.shot_seed.setRange(0, 2**31 - 1)
+        self.shot_seed.editingFinished.connect(self._save_seed)
+        sh_seed.addWidget(self.shot_seed); sh_seed.addStretch(1)
+        ev.addLayout(sh_seed)
         eh = QHBoxLayout()
         self.btn_save_sel = QPushButton(tr("fs.save", "💾 Salva")); self.btn_save_sel.clicked.connect(self._save_sel)
         self.btn_regen_sel = QPushButton(tr("fs.sb.regen_seg", "↻ Rigenera (LLM)")); self.btn_regen_sel.clicked.connect(self._regen_sel)
@@ -225,9 +232,11 @@ class StoryboardTab(QWidget):
         prompt = refs["clean_text"] + ". " + ct.to_prompt(state)
         outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
         Path(outdir).mkdir(parents=True, exist_ok=True)
+        import random as _r
+        seed = int(sh.get("seed", 0) or 0) or _r.randint(1, 2**31 - 1)   # 0 = auto; >0 = bloccato
         if what == "keyframe":
             out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
-            scheduler.enqueue("image", {"prompt": prompt, "out": out,
+            scheduler.enqueue("image", {"prompt": prompt, "out": out, "seed": seed,
                                         "face_ref": (refs["ref_images"] or [""])[0], "loras": refs["loras"]},
                               owner_kind="shot", owner_id=sh["id"])
         else:
@@ -235,7 +244,7 @@ class StoryboardTab(QWidget):
             kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
             kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
             scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
-                                        "keyframes": kfs, "loras": refs["loras"],
+                                        "keyframes": kfs, "loras": refs["loras"], "seed": seed,
                                         "audio_path": self._shot_dialogue_audio(sh, outdir)},
                               owner_kind="shot", owner_id=sh["id"])
         self.log.appendPlainText(tr("fs.sb.regen_queued", "Rigenerazione {w} in coda per lo shot.").format(w=what))
@@ -267,6 +276,12 @@ class StoryboardTab(QWidget):
         kind, rid = self._sel
         row = db.get(kind, rid)
         self.edit.setPlainText((row or {}).get("description", "") if row else "")
+        if kind == "shot" and row:
+            self.shot_seed.setValue(int(row.get("seed", 0) or 0))
+
+    def _save_seed(self):
+        if self._sel and self._sel[0] == "shot":
+            db.update("shot", self._sel[1], seed=int(self.shot_seed.value()))
 
     def _save_sel(self):
         if not self._sel:

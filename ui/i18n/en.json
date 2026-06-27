@@ -1735,5 +1735,10 @@
   "fs.mt.no_kf": "Generate keyframes first.",
   "fs.mt.dub": "🌐 Dub to language…",
   "fs.mt.dub_lang": "Target language (e.g. English, Español):",
-  "fs.mt.dub_done": "Dub {l}: {n} lines (re-lip-sync by regenerating videos)."
+  "fs.mt.dub_done": "Dub {l}: {n} lines (re-lip-sync by regenerating videos).",
+  "fs.series": "Series",
+  "fs.series_new": "＋",
+  "fs.series_none": "— none —",
+  "fs.series_name": "Series name:",
+  "fs.sb.seed": "Seed (0=auto/lock)"
 }

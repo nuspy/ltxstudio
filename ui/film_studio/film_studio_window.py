@@ -61,6 +61,7 @@ class FilmStudioWindow(QWidget):
         self.tabs.addTab(self.lora_tab, tr("fs.tab.lora", "LoRA Studio"))
         root.addWidget(self.tabs, 1)
         self._refresh_projects()
+        self._refresh_series()
 
     def _get_project(self):
         return self._project_id
@@ -86,6 +87,12 @@ class FilmStudioWindow(QWidget):
         h.addWidget(b)
         b_mng = QPushButton(tr("fs.project_manage", "📂 Progetti")); b_mng.clicked.connect(self._manage_projects)
         h.addWidget(b_mng)
+        # 1.8 Serie: il progetto può appartenere a una Serie (asset/LoRA scope=series condivisi)
+        self.series = QComboBox(); self.series.setMinimumWidth(140)
+        self.series.currentIndexChanged.connect(self._assign_series)
+        h.addWidget(QLabel(tr("fs.series", "Serie"))); h.addWidget(self.series)
+        b_ns = QPushButton(tr("fs.series_new", "＋")); b_ns.setMaximumWidth(32); b_ns.clicked.connect(self._new_series)
+        h.addWidget(b_ns)
         # 1.7 Continuity: elementi vietati/forzati per progetto
         self.forbidden = QLineEdit(); self.forbidden.setPlaceholderText(tr("fs.forbidden", "vietati (negative)"))
         self.required = QLineEdit(); self.required.setPlaceholderText(tr("fs.required", "must-have (sempre)"))
@@ -93,6 +100,29 @@ class FilmStudioWindow(QWidget):
         self.required.editingFinished.connect(self._save_guardrails)
         h.addWidget(self.forbidden); h.addWidget(self.required)
         return w
+
+    def _refresh_series(self):
+        self.series.blockSignals(True); self.series.clear()
+        self.series.addItem(tr("fs.series_none", "— nessuna —"), 0)
+        self._series = db.query("series", order="id DESC")
+        for s in self._series:
+            self.series.addItem(s["name"], s["id"])
+        if self._project_id:
+            sid = (db.get("project", self._project_id) or {}).get("series_id") or 0
+            idx = self.series.findData(sid)
+            self.series.setCurrentIndex(max(0, idx))
+        self.series.blockSignals(False)
+
+    def _new_series(self):
+        from PySide6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, tr("fs.series", "Serie"), tr("fs.series_name", "Nome della serie:"))
+        if ok and name.strip():
+            db.insert("series", name=name.strip(), notes="")
+            self._refresh_series()
+
+    def _assign_series(self, _idx: int):
+        if self._project_id and hasattr(self, "_series"):
+            db.update("project", self._project_id, series_id=int(self.series.currentData() or 0))
 
     def _save_guardrails(self):
         import json
@@ -127,6 +157,7 @@ class FilmStudioWindow(QWidget):
             import json
             guard = json.loads(self._projects[idx].get("config") or "{}")
             self.forbidden.setText(guard.get("forbidden", "")); self.required.setText(guard.get("required", ""))
+            self._refresh_series()
             for t in (self.sb_tab, self.mt_tab):
                 if hasattr(t, "_refresh"):
                     t._refresh()

@@ -35,6 +35,6 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 1.7 Continuity vietati/forzati (forbidden→negative, required→prompt) per progetto
 - [ ] 1.8 Serie/casting UI
 - [x] 1.9 NOTA A — # dopo @Nome apre AssetDialog sulle varianti
-- [ ] 1.10 Seed locking per asset/shot
+- [x] 1.10 Seed locking per shot (campo seed in storyboard, 0=auto, >0 bloccato; migration DB)
 - [ ] 1.11 Completare 13 lingue minori
 - [ ] 1.12 Multi‑GPU + pausa/ripresa coda
