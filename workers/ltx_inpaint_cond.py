@@ -40,12 +40,19 @@ class SpatialRegionMask(ConditioningItem):
         return state
 
 
-def load_mask_tensor(mask_pngs: list[str], height: int, width: int) -> torch.Tensor:
-    """Carica le maschere PNG (SAM2) in un tensore [T,H,W] in [0,1], ridimensionate a (height,width)."""
+def load_mask_tensor(mask_pngs: list[str], height: int, width: int, dilate: int = 0,
+                     blur: float = 0.0) -> torch.Tensor:
+    """Carica le maschere PNG (SAM2) in un tensore [T,H,W] in [0,1], ridimensionate a (height,width).
+    `dilate`>0 espande la maschera (GrowMaskWithBlur del workflow inpaint): dà spazio al nuovo oggetto e
+    la rende più agnostica alla forma di quello vecchio. `blur`>0 sfuma i bordi (transizione morbida)."""
     import numpy as np
-    from PIL import Image
+    from PIL import Image, ImageFilter
     arr = []
     for p in mask_pngs:
         im = Image.open(p).convert("L").resize((width, height))
-        arr.append((np.asarray(im, np.float32) / 255.0))
+        if dilate > 0:
+            im = im.filter(ImageFilter.MaxFilter(dilate if dilate % 2 == 1 else dilate + 1))  # dilatazione
+        if blur > 0:
+            im = im.filter(ImageFilter.GaussianBlur(blur))                                     # bordi morbidi
+        arr.append(np.asarray(im, np.float32) / 255.0)
     return torch.from_numpy(np.stack(arr))    # [T,H,W]

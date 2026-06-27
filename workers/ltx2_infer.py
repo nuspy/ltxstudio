@@ -485,8 +485,8 @@ def run_generation(p: dict) -> str:
     _edit = p.get("edit_lora")
     if _edit and not os.path.isabs(_edit):
         _edit = os.path.join(LORA_DIR, _edit)
-    if p.get("inpaint_masks_dir") and p.get("original_frames_dir") and _edit and os.path.exists(_edit):
-        ptype = "vinpaint"                                   # #59 latent-inpaint vero (mask SAM2 + LoRA inpaint)
+    if p.get("inpaint_masks_dir") and p.get("control_video") and _edit and os.path.exists(_edit):
+        ptype = "vinpaint"                                   # #59 inpaint: guide=video orig + attention_mask + CFG
         loras = list(loras) + [LoraPathStrengthAndSDOps(_edit, float(p.get("control_strength", 1.0)),
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
     elif p.get("retake") and p.get("video_path"):            # #24 ReTake: rigenera sezione di un video
@@ -529,21 +529,19 @@ def run_generation(p: dict) -> str:
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
     tg = time.time()
-    if ptype == "vinpaint":                                  # #59 latent-inpaint VIDEO (mask SAM2 segue l'oggetto)
+    if ptype == "vinpaint":                                  # #59 inpaint: guide=video orig + attention_mask + CFG
         import glob as _glob
         from workers.ltx_inpaint_cond import load_mask_tensor
-        ofr = sorted(_glob.glob(os.path.join(p["original_frames_dir"], "*.png")))
         mks = sorted(_glob.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
-        nf = min(nf, len(ofr), len(mks))
-        masks_t = load_mask_tensor(mks[:nf], int(p.get("height", 320)), int(p.get("width", 512)))
+        nf = min(nf, len(mks))
+        masks_t = load_mask_tensor(mks[:nf], int(p.get("height", 320)), int(p.get("width", 512)),
+                                   dilate=int(p.get("mask_dilate", 0)), blur=float(p.get("mask_blur", 0)))
         video = pipe.inpaint(
-            prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
-            height=int(p.get("height", 320)), width=int(p.get("width", 512)),
-            num_frames=nf, frame_rate=fps, original_frames=ofr[:nf], masks=masks_t,
-            video_conditioning=[(p["control_video"], float(p.get("control_strength", 1.0)))]
-            if p.get("control_video") else [],
-            strength=float(p.get("control_strength", 1.0)),
-            skip_stage_2=bool(p.get("skip_stage_2", True)))
+            prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+            seed=int(p.get("seed", 42)), height=int(p.get("height", 320)), width=int(p.get("width", 512)),
+            num_frames=nf, frame_rate=fps, attention_mask=masks_t,
+            video_conditioning=[(p["control_video"], float(p.get("control_strength", 0.5)))],
+            cfg_scale=float(p.get("cfg_scale", 5.0)), num_steps=int(p.get("num_steps", 30)))
         audio = None
     elif ptype == "a2v":                                     # AUDIO→VIDEO nativo: foto + canzone → canto
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
@@ -569,14 +567,25 @@ def run_generation(p: dict) -> str:
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
-        # ICLoraPipeline.__call__ accetta SOLO prompt/seed/height/width/num_frames/frame_rate/images/
-        # video_conditioning (+ enhance_prompt/tiling/conditioning_attention_strength). NO negative/steps/guider.
+        # #59 INPAINT (meccanismo ufficiale InOutpainting): conditioning_attention_mask = INVERSO della
+        # maschera oggetto → dove mask oggetto=1 l'attention=0 (la IC-LoRA non vincola → genera dal prompt),
+        # fuori attention=1 (preserva il guide=video originale). NIENTE noise injection.
+        cam = None
+        if p.get("attention_mask_dir"):
+            import glob as _g2
+            from workers.ltx_inpaint_cond import load_mask_tensor
+            mks = sorted(_g2.glob(os.path.join(p["attention_mask_dir"], "*.png")))[:nf]
+            mt = load_mask_tensor(mks, int(p.get("height", 512)), int(p.get("width", 768)))  # (T,H,W) 0..1
+            cam = (1.0 - mt)[None, None].to("cuda")          # (1,1,T,H,W) inverso = inpaint
+        # ICLoraPipeline.__call__: prompt/seed/height/width/num_frames/frame_rate/images/video_conditioning
+        # (+ enhance_prompt/tiling/conditioning_attention_strength/conditioning_attention_mask). NO negative/steps.
         video, audio = pipe(
             prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
             height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, images=imgs, video_conditioning=[(cv, cstr)],
             enhance_prompt=bool(p.get("enhance", False)), tiling_config=TilingConfig.default(),
-            conditioning_attention_strength=float(p.get("conditioning_attention", 1.0)))
+            conditioning_attention_strength=float(p.get("conditioning_attention", 1.0)),
+            conditioning_attention_mask=cam)
     else:
         images = []
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
