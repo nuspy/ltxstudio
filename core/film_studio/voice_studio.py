@@ -115,28 +115,23 @@ def voice_for_actor(actor_id: int) -> dict | None:
     return rows[0] if rows else None
 
 
-def synth_dialogue(text: str, voice_row: dict, out_wav: str) -> str:
-    """Sintetizza una battuta con la voce data.
-    Backend PREFERITO: Handy-API (REST :8720) se attivo — TTS Kokoro IT (voci it_*) o voce CLONATA per
-    nome (Chatterbox/ZONOS2); FALLBACK: tts_engine Edge / CosyVoice esistenti (non distruttivo)."""
+def synth_dialogue(text: str, voice_row: dict, out_wav: str, *, engine: str = "") -> str:
+    """Sintetizza una battuta. Il MOTORE è scelto dall'utente (param `engine`, o quello salvato nella
+    voce): 'kokoro'/'handy_clone' = Handy-API; 'edge'/'cosyvoice2'/... = motore predisposto. Nessun
+    automatismo nascosto. `engine` esplicito (dal selettore GUI al momento del Genera) ha precedenza."""
     params = json.loads(voice_row.get("params") or "{}")
-    engine = params.get("engine", "edge")
+    engine = (engine or params.get("engine") or "edge").strip()
     Path(out_wav).parent.mkdir(parents=True, exist_ok=True)
-    # Handy-API preferito (un solo servizio voce: TTS + clone)
-    try:
+    if engine in ("kokoro", "handy_clone"):                 # Handy-API (scelto esplicitamente)
         from core import handy_api
-        if handy_api.available():
-            if voice_row.get("origin") == "cloned" and voice_row.get("name"):
-                # voce clonata: usa il nome come voce Handy (se registrata lì) — best effort
-                r = handy_api.tts(text, voice=voice_row["name"], out_wav=out_wav,
-                                  model="chatterbox-multilingual")
-            else:
-                hv = params.get("handy_voice") or "if_sara"
-                r = handy_api.tts(text, voice=hv, lang=params.get("language", "it")[:2], out_wav=out_wav)
-            if r and Path(out_wav).exists():
-                return out_wav
-    except Exception:                                       # noqa: BLE001
-        pass
+        if engine == "handy_clone" or voice_row.get("origin") == "cloned":
+            r = handy_api.tts(text, voice=voice_row.get("name", ""), out_wav=out_wav, model="chatterbox-multilingual")
+        else:
+            r = handy_api.tts(text, voice=params.get("voice_id") or "if_sara",
+                              lang=params.get("language", "it")[:2], out_wav=out_wav)
+        if r and Path(out_wav).exists():
+            return out_wav
+        raise RuntimeError("Handy-API non disponibile (:8720).")
     if engine == "edge":
         pr = params.get("prosody") or {}
         T.edge_synthesize(text, params.get("voice_id", ""), Path(out_wav),
