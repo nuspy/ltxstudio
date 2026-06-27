@@ -455,6 +455,30 @@ def run_generation(p: dict) -> str:
             audio_start_time=float(p.get("audio_start_time", 0.0)),
             audio_max_duration=p.get("audio_max_duration"),
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+    elif p.get("control_video"):                             # #24 ControlNet: video-guida (canny/depth/pose già preprocessato)
+        cv = p["control_video"]
+        cstr = float(p.get("control_strength", 0.8))
+        print(f"[controlnet] guida '{p.get('control_type','?')}' da {cv} (strength {cstr})", flush=True)
+        try:
+            from ltx_pipelines.ic_lora import ICLoraPipeline  # type: ignore
+            video, audio = pipe(
+                prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+                seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+                num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
+                video_guider_params=vg, control_video=cv, control_strength=cstr,
+                tiling_config=TilingConfig.default())
+        except Exception as _cn:                             # noqa: BLE001
+            print(f"[controlnet] IC-LoRA non disponibile ({_cn}) → i2v dal primo frame del control video", flush=True)
+            import subprocess as _sp
+            f0 = cv + ".f0.png"
+            _sp.run(["ffmpeg", "-v", "error", "-i", cv, "-vframes", "1", f0, "-y"], check=False)
+            images = [ImageConditioningInput(f0, 0, cstr, 33)] if os.path.exists(f0) else []
+            video, audio = pipe(
+                prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
+                seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+                num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
+                video_guider_params=vg, audio_guider_params=ag, images=images,
+                tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
     else:
         images = []
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)

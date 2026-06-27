@@ -1864,6 +1864,21 @@ class MainWindow(QMainWindow):
         # video lungo → chunking memory-bounded (chunk da ~5s)
         if nf > 150:
             params["chunk_frames"] = 121
+        # CONTROLNET (#24): preprocessa il ref-video (canny/depth/pose) e passalo al worker come guida
+        cnet = self.controlnet_tab.get_values()
+        if cnet.get("controlnet_enabled") and cnet.get("controlnet_ref_video"):
+            try:
+                from core import controlnet_preprocess as cnp
+                kind = {0: "canny", 1: "depth", 2: "pose"}.get(int(cnet.get("controlnet_type", 0)), "canny")
+                ctrl_out = str(OUTPUT_DIR / f"_ctrl_{kind}_{int(_t.time())}.mp4")
+                cnp.preprocess_video(cnet["controlnet_ref_video"], kind, ctrl_out, fps=fps)
+                params["control_video"] = ctrl_out
+                params["control_type"] = kind
+                params["control_strength"] = float(cnet.get("controlnet_strength", 0.8) or 0.8)
+                params.pop("image_path", None)
+                self._log(f"[nativo] ControlNet {kind} → guida video preprocessata")
+            except Exception as e:                          # noqa: BLE001
+                self._log(f"[nativo] ControlNet preprocess fallito ({e}) → genero senza guida")
         # STORYBOARD multi-scena → keyframe a tempo (il worker li condiziona a frame diversi)
         sb = vals.get("storyboard")
         if sb:
