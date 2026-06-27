@@ -45,8 +45,9 @@ class MontageTab(QWidget):
         r2 = QHBoxLayout()
         self.btn_audio = QPushButton(tr("fs.mt.audio", "🔊 Genera dialoghi")); self.btn_audio.clicked.connect(self._gen_audio)
         self.btn_music = QPushButton(tr("fs.mt.music", "🎵 Colonna sonora")); self.btn_music.clicked.connect(self._gen_music)
-        self.btn_ambient = QPushButton(tr("fs.mt.ambient", "🌧 Ambient/SFX")); self.btn_ambient.clicked.connect(self._gen_ambient)
-        r2.addWidget(self.btn_music); r2.addWidget(self.btn_ambient)
+        self.btn_ambient = QPushButton(tr("fs.mt.ambient", "🌧 Ambient")); self.btn_ambient.clicked.connect(self._gen_ambient)
+        self.btn_sfx = QPushButton(tr("fs.mt.sfx", "💥 SFX per-azione")); self.btn_sfx.clicked.connect(self._gen_sfx)
+        r2.addWidget(self.btn_music); r2.addWidget(self.btn_ambient); r2.addWidget(self.btn_sfx)
         self.btn_master = QPushButton(tr("fs.mt.master", "🎞 Master (A)")); self.btn_master.clicked.connect(self._master)
         self.btn_export = QPushButton(tr("fs.mt.export", "📦 Export NLE (B)")); self.btn_export.clicked.connect(self._export)
         r2.addWidget(self.btn_audio); r2.addWidget(self.btn_master); r2.addWidget(self.btn_export); r2.addStretch(1)
@@ -305,6 +306,46 @@ class MontageTab(QWidget):
             self.info.setText(tr("fs.mt.ambient_done", "Ambient pronto."))
         else:
             self.info.setText(tr("fs.mt.ambient_fail", "Ambient non generato."))
+
+    def _gen_sfx(self):
+        """#AREA1 SFX puntuali per-azione (§11.2): MMAudio condizionato sul VIDEO di OGNI shot →
+        effetti sincroni all'azione, posizionati al tempo dello shot (in sequenza)."""
+        pid = self._get_project()
+        if not pid:
+            return
+        self._sfx_list = []   # (video, offset_s)
+        off = 0.0
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                f = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}.mp4")
+                if os.path.exists(f):
+                    self._sfx_list.append((f, off))
+                off += float(sh["duration_s"] or 4)
+        if not self._sfx_list:
+            QMessageBox.information(self, tr("fs.mt.sfx", "SFX"), tr("fs.mt.no_clips", "Nessuna clip generata.")); return
+        self._sfx_i = 0; self._audio_tracks = getattr(self, "_audio_tracks", [])
+        self.btn_sfx.setEnabled(False)
+        self._sfx_next()
+
+    def _sfx_next(self):
+        from core import music_service as ms
+        if self._sfx_i >= len(self._sfx_list):
+            self.btn_sfx.setEnabled(True); self._refresh()
+            self.info.setText(tr("fs.mt.sfx_done", "SFX per-azione: {n} effetti.").format(n=len(self._sfx_list))); return
+        video, off = self._sfx_list[self._sfx_i]
+        self.info.setText(tr("fs.mt.sfx_run", "SFX {i}/{n}…").format(i=self._sfx_i + 1, n=len(self._sfx_list)))
+        p = ms.SonifyParams(name=f"fs_sfx_{self._get_project()}_{self._sfx_i}", video_path=video,
+                            prompt=self._film_mood() + ", sound effects for the on-screen action, foley")
+        self._sjob = ms.make_sonify_job(p, on_done=lambda rc, o=off: self._on_sfx(rc, o))
+        self._sjob.start() if hasattr(self._sjob, "start") else self._on_sfx(0, off)
+
+    def _on_sfx(self, rc, off):
+        from core import music_service as ms
+        f = ms.find_latest_audio()
+        if f and os.path.exists(str(f)):
+            self._audio_tracks.append({"path": str(f), "start_s": off, "volume": 0.5, "dur_s": 4})
+        self._sfx_i += 1
+        self._sfx_next()
 
     def _master(self):
         clips = [c["file"] for c in (self._cur_clips or [])]

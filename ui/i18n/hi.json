@@ -1666,5 +1666,8 @@
   "fs.tl.dialoghi": "Dialogue",
   "fs.tl.musica": "Music",
   "fs.tl.ambient": "Ambient",
-  "fs.mt.reordered": "Clip order updated from timeline."
+  "fs.mt.reordered": "Clip order updated from timeline.",
+  "fs.mt.sfx": "💥 Action SFX",
+  "fs.mt.sfx_done": "Action SFX: {n} effects.",
+  "fs.mt.sfx_run": "SFX {i}/{n}…"
 }

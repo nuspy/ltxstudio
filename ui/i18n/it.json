@@ -1763,5 +1763,8 @@
   "fs.tl.dialoghi": "Dialoghi",
   "fs.tl.musica": "Musica",
   "fs.tl.ambient": "Ambient",
-  "fs.mt.reordered": "Ordine clip aggiornato dalla timeline."
+  "fs.mt.reordered": "Ordine clip aggiornato dalla timeline.",
+  "fs.mt.sfx": "💥 SFX per-azione",
+  "fs.mt.sfx_done": "SFX per-azione: {n} effetti.",
+  "fs.mt.sfx_run": "SFX {i}/{n}…"
 }
