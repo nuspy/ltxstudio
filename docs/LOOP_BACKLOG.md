@@ -10,7 +10,7 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 3.4 ReTake nativo — RetakePipeline nel worker + ramo GUI _retake_native (sezione [start,end]); full-GPU val #43
 - [x] 3.5 UI conversione modelli — gruppo Conversione in Import Models (Gemma-3→bf16, TE→HF) via subprocess venv; i18n 15
 - [x] 3.6 text→audio (run_t2a, T2AOneStage audio-only) + helper EXR (core/exr_export); HDR-IC-LoRA pipeline completa → Task (serve embeddings precomputati + val live), HDR LoRA su disco
-- [ ] 3.7 Durata‑illimitata multi‑prompt (run_long) [long‑video ≤60s]
+- [x] 3.7 Durata-illimitata MULTI-PROMPT — _run_chunked usa prompts=[{start_s,prompt}] per finestra temporale (memory-bounded, continuità ultimo-frame); long-video test #43 ≤30-60s
 - [ ] 3.8 FlashVSR v1.1 (JunhaoZhuang/FlashVSR-v1.1, <15GB) — scaricare + integrare
 - [x] 3.9 SD3 — ABORTITA DEFINITIVAMENTE (verificato: nessuna feature usa il modello SD3; EmptySD3LatentImage/ModelSamplingSD3 sono nodi generici, "sd3" solo voce catalogo)
 - [ ] 3.10 Test LIVE end‑to‑end path nativi (≤10s)

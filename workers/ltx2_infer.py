@@ -375,6 +375,15 @@ def _run_chunked(p: dict, chunk: int) -> str:
         cp.pop("chunk_frames", None)
         cp["num_frames"] = cf
         cp["image_path"] = prev_img
+        # #29 durata-illimitata MULTI-PROMPT: prompt diverso per finestra temporale (prompts=[{start_s,prompt}])
+        if p.get("prompts"):
+            t_chunk = i * seg_dur
+            active = p["prompts"][0].get("prompt", cp.get("prompt", ""))
+            for sp in p["prompts"]:
+                if float(sp.get("start_s", 0)) <= t_chunk:
+                    active = sp.get("prompt", active)
+            cp["prompt"] = active
+            cp.pop("prompts", None)
         if p.get("audio_path"):
             cp["audio_start_time"] = round(i * seg_dur, 3)
             cp["audio_max_duration"] = round(seg_dur, 3)
