@@ -116,10 +116,27 @@ def voice_for_actor(actor_id: int) -> dict | None:
 
 
 def synth_dialogue(text: str, voice_row: dict, out_wav: str) -> str:
-    """Sintetizza una battuta con la voce data (Edge preset o clone CosyVoice)."""
+    """Sintetizza una battuta con la voce data.
+    Backend PREFERITO: Handy-API (REST :8720) se attivo — TTS Kokoro IT (voci it_*) o voce CLONATA per
+    nome (Chatterbox/ZONOS2); FALLBACK: tts_engine Edge / CosyVoice esistenti (non distruttivo)."""
     params = json.loads(voice_row.get("params") or "{}")
     engine = params.get("engine", "edge")
     Path(out_wav).parent.mkdir(parents=True, exist_ok=True)
+    # Handy-API preferito (un solo servizio voce: TTS + clone)
+    try:
+        from core import handy_api
+        if handy_api.available():
+            if voice_row.get("origin") == "cloned" and voice_row.get("name"):
+                # voce clonata: usa il nome come voce Handy (se registrata lì) — best effort
+                r = handy_api.tts(text, voice=voice_row["name"], out_wav=out_wav,
+                                  model="chatterbox-multilingual")
+            else:
+                hv = params.get("handy_voice") or "if_sara"
+                r = handy_api.tts(text, voice=hv, lang=params.get("language", "it")[:2], out_wav=out_wav)
+            if r and Path(out_wav).exists():
+                return out_wav
+    except Exception:                                       # noqa: BLE001
+        pass
     if engine == "edge":
         pr = params.get("prosody") or {}
         T.edge_synthesize(text, params.get("voice_id", ""), Path(out_wav),
