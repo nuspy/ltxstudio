@@ -48,8 +48,15 @@ class MontageTab(QWidget):
         bv.addLayout(r2)
         r3 = QHBoxLayout()
         self.btn_animatic = QPushButton(tr("fs.mt.animatic", "🎞 Animatic (anteprima)")); self.btn_animatic.clicked.connect(self._animatic)
-        self.btn_dub = QPushButton(tr("fs.mt.dub", "🌐 Doppia in lingua…")); self.btn_dub.clicked.connect(self._dub)
-        r3.addWidget(self.btn_animatic); r3.addWidget(self.btn_dub); r3.addStretch(1)
+        self.dub_lang = QComboBox(); self.dub_lang.setEditable(True)
+        self.dub_lang.addItems(["English", "Español", "Français", "Deutsch", "Português", "Italiano",
+                                "中文", "日本語", "한국어", "Русский", "العربية", "हिन्दी"])
+        from PySide6.QtWidgets import QCheckBox as _CK
+        self.dub_relip = _CK(tr("fs.mt.relip", "re-lip-sync")); self.dub_relip.setChecked(True)
+        self.btn_dub = QPushButton(tr("fs.mt.dub", "🌐 Doppia")); self.btn_dub.clicked.connect(self._dub)
+        r3.addWidget(self.btn_animatic); r3.addStretch(1)
+        r3.addWidget(QLabel(tr("fs.mt.dub_to", "Lingua"))); r3.addWidget(self.dub_lang)
+        r3.addWidget(self.dub_relip); r3.addWidget(self.btn_dub)
         bv.addLayout(r3)
         self.info = QLabel(""); bv.addWidget(self.info)
         v.addWidget(box)
@@ -84,38 +91,52 @@ class MontageTab(QWidget):
             pass
 
     def _dub(self):
-        """1.5 Multilingua/doppiaggio: LLM traduce i dialoghi nella lingua scelta + risintesi voce legata."""
-        from PySide6.QtWidgets import QInputDialog
+        """#52 Doppiaggio COMPLETO: LLM traduce i dialoghi nella lingua scelta (combo) + risintesi voce
+        legata + RE-LIP-SYNC (riaccoda i video shot con dialogo, a2v sul nuovo audio)."""
+        import json
         from core import llm_service as L
-        from core.film_studio import voice_studio as vs
+        from core.film_studio import voice_studio as vs, gen_service, scheduler, continuity as ct
         pid = self._get_project()
         if not pid:
             return
-        lang, ok = QInputDialog.getText(self, tr("fs.mt.dub", "Doppia"), tr("fs.mt.dub_lang", "Lingua di destinazione (es. English, Español):"))
-        if not ok or not lang.strip():
-            return
-        import json
-        n = 0
+        lang = self.dub_lang.currentText().strip() if hasattr(self, "dub_lang") else "English"
+        relip = self.dub_relip.isChecked() if hasattr(self, "dub_relip") else True
+        n = m = 0
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            state = json.loads(sc.get("continuity") or "{}")
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
-                for di, d in enumerate(json.loads(sh.get("dialogues") or "[]")):
+                dlgs = json.loads(sh.get("dialogues") or "[]")
+                first_wav = ""
+                for di, d in enumerate(dlgs):
                     actor = (d.get("actor") or "").lstrip("@"); text = d.get("text") or ""
                     if not text:
                         continue
                     try:
-                        tr_text = L.complete("Translate to " + lang.strip() + ". Output only the translation.", text, max_tokens=200)
+                        tr_text = L.complete(f"Translate to {lang}. Output only the translation.", text, max_tokens=200)
                     except Exception:                       # noqa: BLE001
                         tr_text = text
                     assets = [a for a in db.find_assets(actor, "actor") if a["name"].lower() == actor.lower()]
                     vrow = vs.voice_for_actor(assets[0]["id"]) if assets else None
                     if not vrow:
                         continue
-                    out = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_d{di}_{lang.strip()[:2]}.wav")
+                    out = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_d{di}_{lang[:2].lower()}.wav")
                     try:
                         vs.synth_dialogue(tr_text, vrow, out); n += 1
+                        first_wav = first_wav or out
                     except Exception:                       # noqa: BLE001
                         pass
-        self.info.setText(tr("fs.mt.dub_done", "Doppiaggio {l}: {n} battute (re-lip-sync rigenerando i video).").format(l=lang.strip(), n=n))
+                # RE-LIP-SYNC: riaccoda il video dello shot con il nuovo audio doppiato (a2v)
+                if relip and first_wav:
+                    kf = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png")
+                    kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
+                    out_v = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_{lang[:2].lower()}.mp4")
+                    scheduler.enqueue("video", {"prompt": (sh.get("description") or "") + ", " + ct.to_prompt(state),
+                                                "out": out_v, "duration_s": sh["duration_s"] or 4,
+                                                "keyframes": kfs, "audio_path": first_wav},
+                                      owner_kind="shot", owner_id=sh["id"])
+                    m += 1
+        self.info.setText(tr("fs.mt.dub_done2", "Doppiaggio {l}: {n} battute; {m} video in re-lip-sync (coda).")
+                          .format(l=lang, n=n, m=m))
 
     def _clips(self) -> list[dict]:
         pid = self._get_project()

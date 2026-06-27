@@ -1743,5 +1743,8 @@
   "fs.sb.seed": "Seed (0=auto/lock)",
   "aud.handy.ready": "Handy-API active (:8720).",
   "aud.handy.install": "Handy-API (Kokoro TTS/clone) not active. Start/install it?",
-  "aud.handy.ok": "Handy-API started."
+  "aud.handy.ok": "Handy-API started.",
+  "fs.mt.relip": "re-lip-sync",
+  "fs.mt.dub_to": "Language",
+  "fs.mt.dub_done2": "Dub {l}: {n} lines; {m} videos re-lip-syncing (queued)."
 }

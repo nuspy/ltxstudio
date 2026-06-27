@@ -1743,5 +1743,8 @@
   "fs.sb.seed": "Seed (0=auto/blocca)",
   "aud.handy.ready": "Handy-API attivo (:8720).",
   "aud.handy.install": "Handy-API (TTS Kokoro/clone) non attivo. Avviarlo/installarlo?",
-  "aud.handy.ok": "Handy-API avviato."
+  "aud.handy.ok": "Handy-API avviato.",
+  "fs.mt.relip": "re-lip-sync",
+  "fs.mt.dub_to": "Lingua",
+  "fs.mt.dub_done2": "Doppiaggio {l}: {n} battute; {m} video in re-lip-sync (coda)."
 }
