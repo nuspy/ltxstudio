@@ -58,9 +58,12 @@ def resolve_refs(text: str, path_mode: str = "fast") -> dict:
 
 # ─────────────── immagini (keyframe / asset sheet) ───────────────
 def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 1024, seed: int = 7,
-              face_ref: str = "", ref_image: str = "", loras: list | None = None, arch: str = "flux") -> str:
-    """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali."""
-    params = {"arch": arch, "prompt": prompt, "negative": NEG, "width": width, "height": height,
+              face_ref: str = "", ref_image: str = "", loras: list | None = None, arch: str = "flux",
+              negative: str = "") -> str:
+    """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali.
+    negative: se dato, sostituisce/estende il negative di default (continuity elementi vietati)."""
+    neg = NEG + (", " + negative if negative else "")
+    params = {"arch": arch, "prompt": prompt, "negative": neg, "width": width, "height": height,
               "steps": 22, "guidance": 3.5, "seed": seed, "output": out_png}
     if face_ref:
         params["pulid_face"] = face_ref; params["pulid_strength"] = 0.85
@@ -82,10 +85,11 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
 # ─────────────── video (shot) ───────────────
 def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int = 512, fps: int = 25,
                    duration_s: float = 4.0, seed: int = 7, keyframes: list | None = None,
-                   loras: list | None = None, audio_path: str = "") -> str:
+                   loras: list | None = None, audio_path: str = "", negative: str = "") -> str:
     """Genera il video di uno shot col worker nativo LTX-2.3 GGUF. keyframes=[{path,frame,strength}]."""
     nf = max(9, int(round(duration_s * fps)) // 8 * 8 + 1)
-    params = {"gguf_transformer": GGUF, "prompt": prompt, "negative": NEG, "width": width,
+    neg = NEG + (", " + negative if negative else "")
+    params = {"gguf_transformer": GGUF, "prompt": prompt, "negative": neg, "width": width,
               "height": height, "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0,
               "seed": seed, "offload": "cpu", "output": out_mp4}
     if keyframes:

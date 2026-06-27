@@ -33,7 +33,9 @@ class StoryboardTab(QWidget):
         self.btn_keys = QPushButton(tr("fs.sb.keyframes", "🖼 Genera keyframe")); self.btn_keys.clicked.connect(lambda: self._gen("keyframe"))
         self.btn_video = QPushButton(tr("fs.sb.videos", "🎥 Genera video")); self.btn_video.clicked.connect(lambda: self._gen("video"))
         self.btn_auto = QPushButton(tr("fs.sb.auto", "🎬 Genera film completo")); self.btn_auto.clicked.connect(self._gen_all)
-        h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video); h.addWidget(self.btn_auto); h.addStretch(1)
+        self.btn_shotlist = QPushButton(tr("fs.sb.shotlist", "📄 Shot-list")); self.btn_shotlist.clicked.connect(self._export_shotlist)
+        h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video)
+        h.addWidget(self.btn_auto); h.addWidget(self.btn_shotlist); h.addStretch(1)
         v.addLayout(h)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
         self.tree.currentItemChanged.connect(self._on_tree_sel)
@@ -132,19 +134,22 @@ class StoryboardTab(QWidget):
             return
         proj = db.get("project", pid)
         pmode = proj.get("path_mode", "fast")
+        guard = json.loads(proj.get("config") or "{}")
+        forbidden, required = guard.get("forbidden", ""), guard.get("required", "")
         n = 0
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
             state = json.loads(sc.get("continuity") or "{}")
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
                 refs = gen_service.resolve_refs(sh["description"], pmode)
-                prompt = refs["clean_text"] + ". " + ct.to_prompt(state)
+                prompt = refs["clean_text"] + ". " + ct.to_prompt(state) + ((", " + required) if required else "")
                 outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
                 Path(outdir).mkdir(parents=True, exist_ok=True)
                 if what == "keyframe":
                     out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
                     scheduler.enqueue("image", {"prompt": prompt, "out": out,
                                                 "face_ref": (refs["ref_images"] or [""])[0],
-                                                "loras": refs["loras"]}, owner_kind="shot", owner_id=sh["id"])
+                                                "loras": refs["loras"], "negative": forbidden},
+                                      owner_kind="shot", owner_id=sh["id"])
                 else:
                     out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
                     kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
@@ -153,8 +158,8 @@ class StoryboardTab(QWidget):
                     # passalo al video (a2v nativo = labiale sincronizzato sul parlato)
                     audio_path = self._shot_dialogue_audio(sh, outdir)
                     scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
-                                                "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path},
-                                      owner_kind="shot", owner_id=sh["id"])
+                                                "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
+                                                "negative": forbidden}, owner_kind="shot", owner_id=sh["id"])
                 n += 1
         self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))
 
@@ -175,6 +180,37 @@ class StoryboardTab(QWidget):
         self._gen("keyframe")
         self._gen("video")
         self.log.appendPlainText(tr("fs.sb.auto_started", "Film completo in coda: keyframe+video. Poi vai a Montaggio → Master."))
+
+    def _export_shotlist(self):
+        """1.6 Esporta la shot-list come documento HTML (scene/shot/durate/dialoghi/keyframe)."""
+        pid = self._get_project()
+        if not pid:
+            return
+        proj = db.get("project", pid)
+        rows = ["<html><head><meta charset='utf-8'><style>body{font-family:sans-serif;margin:24px}"
+                "h2{border-bottom:2px solid #888}table{border-collapse:collapse;width:100%}"
+                "td,th{border:1px solid #ccc;padding:6px;vertical-align:top}img{max-height:90px}</style></head><body>"]
+        rows.append(f"<h1>Shot-list — {proj.get('name','')}</h1><p>Durata {proj.get('duration_s',0):.0f}s · "
+                    f"stile {proj.get('styles','')} · generi {proj.get('genres','')}</p>")
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            rows.append(f"<h2>Scena {sc['ord']} ({sc['duration_s']:.0f}s)</h2><p>{sc.get('description','')}</p>")
+            rows.append("<table><tr><th>#</th><th>Durata</th><th>Descrizione</th><th>Dialoghi</th><th>Keyframe</th></tr>")
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                dlg = "; ".join(f"{d.get('actor','')}: {d.get('text','')}" for d in json.loads(sh.get("dialogues") or "[]"))
+                kf = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png")
+                img = f"<img src='file:///{kf.replace(chr(92),'/')}'>" if Path(kf).exists() else ""
+                rows.append(f"<tr><td>{sh['ord']}</td><td>{sh['duration_s']:.0f}s</td>"
+                            f"<td>{sh.get('description','')}</td><td>{dlg}</td><td>{img}</td></tr>")
+            rows.append("</table>")
+        rows.append("</body></html>")
+        out = str(db.project_dir(pid) / "shotlist.html")
+        open(out, "w", encoding="utf-8").write("\n".join(rows))
+        self.log.appendPlainText(tr("fs.sb.shotlist_done", "Shot-list esportata: {f}").format(f=out))
+        try:
+            import os as _os
+            _os.startfile(out)                              # noqa: S606
+        except Exception:                                   # noqa: BLE001
+            pass
 
     def _regen_shot(self, what: str):
         """1.2 Rigenera SOLO lo shot selezionato (keyframe o video) accodandolo al Job Scheduler."""

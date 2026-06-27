@@ -24,12 +24,14 @@ def _register_scheduler_handlers():
     """Mappa i tipi di job sul Generation Service nativo (idempotente)."""
     def _img(p):
         return gen_service.gen_image(p["prompt"], p["out"], face_ref=p.get("face_ref", ""),
-                                     loras=p.get("loras"))
+                                     loras=p.get("loras"), negative=p.get("negative", ""),
+                                     seed=int(p.get("seed", 7)))
 
     def _vid(p):
         return gen_service.gen_shot_video(p["prompt"], p["out"], duration_s=p.get("duration_s", 4),
                                           keyframes=p.get("keyframes"), loras=p.get("loras"),
-                                          audio_path=p.get("audio_path", "") or "")
+                                          audio_path=p.get("audio_path", "") or "",
+                                          negative=p.get("negative", ""), seed=int(p.get("seed", 7)))
     scheduler.register("image", _img)
     scheduler.register("video", _vid)
 
@@ -84,7 +86,21 @@ class FilmStudioWindow(QWidget):
         h.addWidget(b)
         b_mng = QPushButton(tr("fs.project_manage", "📂 Progetti")); b_mng.clicked.connect(self._manage_projects)
         h.addWidget(b_mng)
+        # 1.7 Continuity: elementi vietati/forzati per progetto
+        self.forbidden = QLineEdit(); self.forbidden.setPlaceholderText(tr("fs.forbidden", "vietati (negative)"))
+        self.required = QLineEdit(); self.required.setPlaceholderText(tr("fs.required", "must-have (sempre)"))
+        self.forbidden.editingFinished.connect(self._save_guardrails)
+        self.required.editingFinished.connect(self._save_guardrails)
+        h.addWidget(self.forbidden); h.addWidget(self.required)
         return w
+
+    def _save_guardrails(self):
+        import json
+        if not self._project_id:
+            return
+        db.update("project", self._project_id,
+                  config=json.dumps({"forbidden": self.forbidden.text().strip(),
+                                     "required": self.required.text().strip()}, ensure_ascii=False))
 
     def _manage_projects(self):
         from ui.film_studio.projects_dialog import FsProjectsDialog
@@ -108,6 +124,9 @@ class FilmStudioWindow(QWidget):
     def _on_pick_project(self, idx: int):
         if 0 <= idx < len(getattr(self, "_projects", [])):
             self._project_id = self._projects[idx]["id"]
+            import json
+            guard = json.loads(self._projects[idx].get("config") or "{}")
+            self.forbidden.setText(guard.get("forbidden", "")); self.required.setText(guard.get("required", ""))
             for t in (self.sb_tab, self.mt_tab):
                 if hasattr(t, "_refresh"):
                     t._refresh()

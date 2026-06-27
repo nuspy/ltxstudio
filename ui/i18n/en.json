@@ -1725,5 +1725,9 @@
   "fs.sb.regen_kf": "🖼 Regenerate keyframe",
   "fs.sb.regen_vid": "🎥 Regenerate video",
   "fs.sb.sel_shot": "Select a shot.",
-  "fs.sb.regen_queued": "{w} regeneration queued for the shot."
+  "fs.sb.regen_queued": "{w} regeneration queued for the shot.",
+  "fs.sb.shotlist": "📄 Shot-list",
+  "fs.sb.shotlist_done": "Shot-list exported: {f}",
+  "fs.forbidden": "forbidden (negative)",
+  "fs.required": "must-have (always)"
 }

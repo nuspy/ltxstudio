@@ -26,13 +26,13 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 2.8 Batch async — _next_batch (un worker/volta, UI responsiva, salvataggio per step)
 
 ## AREA 1 — AI Film Studio
-- [ ] 1.1 Generazione immagini variazioni/abbigliamento
-- [ ] 1.2 Rigenerazione inline singolo shot
+- [x] 1.1 Genera set immagini variazioni/abbigliamento (gen_service)
+- [x] 1.2 Rigenerazione inline shot (keyframe/video) dal pannello storyboard
 - [ ] 1.3 Timeline visuale + transizioni + animatic
 - [ ] 1.4 SFX puntuali per azione
 - [ ] 1.5 Multilingua/doppiaggio
-- [ ] 1.6 Storyboard/shot‑list export (documento)
-- [ ] 1.7 Continuity: elementi vietati/forzati
+- [x] 1.6 Shot-list export HTML (scene/shot/durate/dialoghi/keyframe)
+- [x] 1.7 Continuity vietati/forzati (forbidden→negative, required→prompt) per progetto
 - [ ] 1.8 Serie/casting UI
 - [ ] 1.9 NOTA A: auto‑apertura AssetDialog su #variante
 - [ ] 1.10 Seed locking per asset/shot

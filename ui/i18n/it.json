@@ -1725,5 +1725,9 @@
   "fs.sb.regen_kf": "🖼 Rigenera keyframe",
   "fs.sb.regen_vid": "🎥 Rigenera video",
   "fs.sb.sel_shot": "Seleziona un'inquadratura.",
-  "fs.sb.regen_queued": "Rigenerazione {w} in coda per lo shot."
+  "fs.sb.regen_queued": "Rigenerazione {w} in coda per lo shot.",
+  "fs.sb.shotlist": "📄 Shot-list",
+  "fs.sb.shotlist_done": "Shot-list esportata: {f}",
+  "fs.forbidden": "vietati (negative)",
+  "fs.required": "must-have (sempre)"
 }
