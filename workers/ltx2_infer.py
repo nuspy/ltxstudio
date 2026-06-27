@@ -473,8 +473,17 @@ def run_generation(p: dict) -> str:
     t0 = time.time()
     # #24 ControlNet IC-LoRA: se c'è un control_video e il peso IC-LoRA del tipo è su disco → pipeline iclora
     _ic = IC_LORA.get(p.get("control_type", "")) if p.get("control_video") else None
+    # #59/#60 Edit/Inpaint VIDEO: LoRA editing (ltx23_edit_anything / ltx23_inpaint_masked) + guide video
+    # (sorgente per edit; mask-embedded magenta per inpaint). Riusa la pipeline iclora (video_conditioning).
+    _edit = p.get("edit_lora")
+    if _edit and not os.path.isabs(_edit):
+        _edit = os.path.join(LORA_DIR, _edit)
     if p.get("retake") and p.get("video_path"):              # #24 ReTake: rigenera sezione di un video
         ptype = "retake"
+    elif _edit and os.path.exists(_edit) and p.get("control_video"):
+        ptype = "iclora"
+        loras = list(loras) + [LoraPathStrengthAndSDOps(_edit, float(p.get("control_strength", 1.0)),
+                                                        LTXV_LORA_COMFY_RENAMING_MAP)]
     elif _ic and os.path.exists(_ic):
         ptype = "iclora"
         loras = list(loras) + [LoraPathStrengthAndSDOps(_ic, float(p.get("control_strength", 0.8)),
@@ -533,12 +542,14 @@ def run_generation(p: dict) -> str:
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
+        # ICLoraPipeline.__call__ accetta SOLO prompt/seed/height/width/num_frames/frame_rate/images/
+        # video_conditioning (+ enhance_prompt/tiling/conditioning_attention_strength). NO negative/steps/guider.
         video, audio = pipe(
-            prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
-            seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
-            num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
-            video_guider_params=vg, images=imgs, video_conditioning=[(cv, cstr)],
-            tiling_config=TilingConfig.default())
+            prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
+            height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+            num_frames=nf, frame_rate=fps, images=imgs, video_conditioning=[(cv, cstr)],
+            enhance_prompt=bool(p.get("enhance", False)), tiling_config=TilingConfig.default(),
+            conditioning_attention_strength=float(p.get("conditioning_attention", 1.0)))
     else:
         images = []
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
