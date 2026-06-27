@@ -77,8 +77,10 @@ def prepare_clone_sample(sample_path: str | Path, max_seconds: float = MAX_CLONE
 # Ogni entry: (id, display_name, supports_cloning, supports_emotions, notes)
 # La disponibilità reale è risolta a runtime dalla funzione `available_engines()`.
 ENGINES_META = [
+    ("kokoro",     "Kokoro (Handy-API) — IT nativo, REST",        False, False, "Handy-API :8720, nessun ComfyUI, voci IT (if_sara/im_nicola)"),
+    ("handy_clone", "Voice clone (Handy-API) — Chatterbox/ZONOS2", True,  False, "Handy-API :8720, cloning zero-shot nativo, nessun ComfyUI"),
     ("edge",       "Edge TTS — Microsoft (preset, no cloning)",   False, True,  "Apache compatibile, IT nativo, ~400 voci preset"),
-    ("cosyvoice2", "CosyVoice 2 — Alibaba (consigliato)",          True,  True,  "Apache 2.0, IT nativo, SSML completo, qualità clone alta"),
+    ("cosyvoice2", "CosyVoice 2 — venv nativo / Handy",            True,  True,  "venv standalone o Handy-API (no ComfyUI)"),
     ("f5tts",      "F5-TTS — SOTA qualità (EN nativo, IT FT)",     True,  False, "MIT, in IT solo via fine-tune community"),
     ("xtts2",      "XTTS-v2 — Coqui (CC-BY-NC)",                   True,  True,  "Licenza non commerciale, 17 lingue native"),
     ("fish",       "Fish Speech v1.5 — qualità + Apache 2.0",      True,  True,  "Apache 2.0, codec compatto"),
@@ -96,10 +98,26 @@ def available_engines() -> list[tuple[str, str, bool, bool, bool]]:
 
 
 def _engine_installed(eid: str) -> bool:
+    if eid in ("kokoro", "handy_clone"):                    # nativi via Handy-API (REST :8720)
+        try:
+            from core import handy_api
+            return handy_api.available()
+        except Exception:                                  # noqa: BLE001
+            return False
     if eid == "edge":
         return edge_available()
-    if eid == "cosyvoice2":
-        return _comfy_node_present(("CosyVoiceNode", "CosyVoice2Run", "CosyVoice2_Run", "CosyVoiceRun"))
+    if eid == "cosyvoice2":                                 # nativo: venv standalone OPPURE Handy
+        try:
+            from core import cosyvoice_service
+            if cosyvoice_service.is_installed():
+                return True
+        except Exception:                                  # noqa: BLE001
+            pass
+        try:
+            from core import handy_api
+            return handy_api.available()
+        except Exception:                                  # noqa: BLE001
+            return _comfy_node_present(("CosyVoiceNode", "CosyVoice2Run", "CosyVoice2_Run", "CosyVoiceRun"))
     if eid == "f5tts":
         return _comfy_node_present(("F5TTSCreate", "F5TTSAudio", "F5TTS_Run"))
     if eid == "xtts2":
@@ -515,12 +533,49 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
     import datetime as _dt
     stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     out = output_dir / f"tts_{engine}_{voice.slug()}_{stamp}.mp3"
+    clean = strip_markers(_pauses_to_dots_internal(text))
+    # NATIVI via Handy-API (zero ComfyUI)
+    if engine in ("kokoro", "handy_clone"):
+        from core import handy_api
+        wav = str(out.with_suffix(".wav"))
+        if engine == "handy_clone":                        # voce clonata per nome (registrata in Handy)
+            r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
+        else:
+            r = handy_api.tts(clean, voice=(voice.voice_id or "if_sara"),
+                              lang=(voice.language or "it-IT")[:2], out_wav=wav)
+        if r:
+            return Path(r)
+        raise RuntimeError("Handy-API non disponibile: avvia/installa Handy-API (:8720).")
     if engine == "edge":
         params = derive_edge_params(text)
-        clean = strip_markers(_pauses_to_dots_internal(text))
         return edge_synthesize(clean, voice.voice_id, out, **params)
-    if engine in ("cosyvoice2", "f5tts", "xtts2", "fish", "vibevoice"):
-        return _synthesize_comfy(engine, voice, text, out)
+    if engine == "cosyvoice2":                              # nativo: venv standalone, poi Handy, poi (legacy) comfy
+        try:
+            from core import cosyvoice_service
+            if cosyvoice_service.is_installed() and voice.sample_path:
+                job = cosyvoice_service.make_job(clean, voice.sample_path,
+                                                 prompt_text=voice.sample_transcript, out_name=voice.slug())
+                job.run() if hasattr(job, "run") else None
+                f = find_latest_audio() if "find_latest_audio" in globals() else None
+                if f:
+                    return Path(f)
+        except Exception:                                  # noqa: BLE001
+            pass
+        from core import handy_api
+        if handy_api.available():
+            wav = str(out.with_suffix(".wav"))
+            r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
+            if r:
+                return Path(r)
+        return _synthesize_comfy(engine, voice, text, out)  # ultimo fallback (legacy ComfyUI)
+    if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # cloning: reindirizza a Handy (nativo)
+        from core import handy_api
+        if handy_api.available():
+            wav = str(out.with_suffix(".wav"))
+            r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
+            if r:
+                return Path(r)
+        return _synthesize_comfy(engine, voice, text, out)  # fallback legacy se Handy assente
     raise RuntimeError(f"Engine TTS sconosciuto: {engine}")
 
 
