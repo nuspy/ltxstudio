@@ -457,7 +457,12 @@ def run_generation(p: dict) -> str:
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
     else:
         images = []
-        if p.get("image_path"):                              # i2v: condiziona sul primo frame
+        if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
+            for kf in p["keyframes"]:
+                fr = int(kf.get("frame", 0))
+                fr = max(0, min(nf - 1, fr))
+                images.append(ImageConditioningInput(kf["path"], fr, float(kf.get("strength", 1.0)), 33))
+        elif p.get("image_path"):                            # i2v: condiziona sul primo frame
             images = [ImageConditioningInput(p["image_path"], 0, 1.0, 33)]
         video, audio = pipe(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
