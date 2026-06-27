@@ -154,6 +154,60 @@ class _FlashVSRWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _VideoEditAIWorker(QThread):
+    """#24/#59/#60 editing video AI: (inpaint) SAM2 track→guide magenta nel venv inference_server, poi
+    LTX-2 edit_lora nel venv ltx2; (edit/style) direttamente LTX-2 col video sorgente come guide."""
+    done = Signal(dict)
+    progress = Signal(str)
+    INF_PY = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"
+    LTX2_PY = r"E:\AI\Tools\ltx2_venv\Scripts\python.exe"
+
+    def __init__(self, cfg: dict, out_dir: str):
+        super().__init__()
+        self.cfg = cfg
+        self.out_dir = out_dir
+
+    def run(self):
+        import json as _j, os as _os, subprocess as _sp, time as _t
+        try:
+            cfg = self.cfg
+            src = cfg["video"]
+            base = _os.path.splitext(_os.path.basename(src))[0]
+            stamp = int(_t.time())
+            guide = src
+            if cfg["mode"] == "inpaint":                       # SAM2 track → guide magenta
+                self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
+                gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
+                seg = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+                                    "inference_server", "backends", "video_segment.py")
+                r = _sp.run([self.INF_PY, "-u", seg, src, cfg["object"], gpath],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace")
+                line = next((l for l in (r.stdout or "").splitlines() if l.startswith("GUIDE:")), "")
+                if not line:
+                    self.done.emit({"status": "error", "error": "tracking SAM2 fallito: " + (r.stderr or "")[-300:]}); return
+                guide = line.split("GUIDE:", 1)[1].strip()
+                self.progress.emit(f"[edit] guide pronto: {_os.path.basename(guide)}")
+            out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_{base}_{stamp}.mp4")
+            params = {"prompt": cfg["prompt"], "negative": "worst quality, blurry",
+                      "edit_lora": cfg["edit_lora"], "control_video": guide,
+                      "control_strength": float(cfg.get("strength", 1.0)),
+                      "width": 512, "height": 320, "num_frames": 25, "fps": 25,
+                      "seed": 42, "offload": "cpu", "output": out}
+            jf = _os.path.join(self.out_dir, f"_editp_{stamp}.json")
+            _j.dump(params, open(jf, "w"))
+            worker = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+                                   "workers", "ltx2_infer.py")
+            self.progress.emit("[edit] genero il video (LTX-2)…")
+            r2 = _sp.run([self.LTX2_PY, "-u", worker, jf], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
+            if _os.path.exists(out):
+                self.done.emit({"status": "success", "output": [out]})
+            else:
+                self.done.emit({"status": "error", "error": (r2.stdout or "")[-200:] + (r2.stderr or "")[-300:]})
+        except Exception as e:                              # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class _NativeMultiTalkWorker(QThread):
     """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI; riporta progress e path finale."""
     done = Signal(dict)
@@ -433,6 +487,10 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.video_tab, tr("tab.video"))
         self.tabs.addTab(self.controlnet_tab, tr("tab.controlnet"))
         self.tabs.addTab(self.video_extend_tab, tr("tab.extend_video"))
+        from ui.tabs.video_edit_ai_tab import VideoEditAITab          # #24/#59/#60 editing video AI
+        self.video_edit_ai_tab = VideoEditAITab()
+        self.video_edit_ai_tab.request_edit.connect(self._gen_video_edit_ai)
+        self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
         # «Migliora qualità» = unione di Restauro foto (🖼 Foto) + Definizione video (🎬 Video)
         self.quality_tab = QTabWidget()
         self.quality_tab.addTab(self.restore_tab, tr("tab.quality.photo"))
@@ -1965,6 +2023,22 @@ class MainWindow(QMainWindow):
         self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
         self._ltx2_worker.done.connect(self._on_multitalk_done)
         self._ltx2_worker.start()
+
+    def _gen_video_edit_ai(self, cfg: dict):
+        """#24/#59/#60 Modifica Video AI: edit-anything / inpaint (SAM2 track) / style — worker async."""
+        self.video_edit_ai_tab.log.appendPlainText(tr("vedit.start", "[edit] avvio {m}…").format(m=cfg["mode"]))
+        self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
+        self._edit_ai_worker.progress.connect(self.video_edit_ai_tab.log.appendPlainText)
+        self._edit_ai_worker.done.connect(self._on_video_edit_ai_done)
+        self._edit_ai_worker.start()
+
+    def _on_video_edit_ai_done(self, res: dict):
+        if res.get("status") == "success":
+            out = (res.get("output") or [""])[0]
+            self.video_edit_ai_tab.log.appendPlainText(tr("vedit.done", "✅ Pronto: {o}").format(o=out))
+            self._last_video_path = out
+        else:
+            self.video_edit_ai_tab.log.appendPlainText(tr("vedit.fail", "❌ Errore: {e}").format(e=res.get("error", "")[:300]))
 
     def _enhance_video_native(self):
         """Definizione video NATIVA: super-risoluzione per-frame (ESRGAN/spandrel via inference_server,

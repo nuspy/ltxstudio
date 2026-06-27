@@ -148,3 +148,14 @@ def build_masked_guide(frames: list[str], masks: list[str], out_video: str, *, f
     subprocess.run(["ffmpeg", "-v", "error", "-framerate", str(fps), "-i", os.path.join(tmp, "%05d.png"),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "12", out_video, "-y"], check=True)
     return out_video
+
+
+if __name__ == "__main__":   # CLI: track oggetto + costruisci guide magenta. Stampa "GUIDE:<path>".
+    import sys
+    if len(sys.argv) < 4:
+        print("uso: video_segment.py <video> <text> <out_guide.mp4> [dilate]"); sys.exit(2)
+    video, text, out_guide = sys.argv[1], sys.argv[2], sys.argv[3]
+    dil = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+    r = track_object(video, text=text, dilate=dil, device="cuda")
+    g = build_masked_guide(r["frames"], r["masks"], out_guide, fps=r["fps"])
+    print(f"GUIDE:{g}")
