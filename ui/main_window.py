@@ -174,8 +174,12 @@ class _VideoEditAIWorker(QThread):
             src = cfg["video"]
             base = _os.path.splitext(_os.path.basename(src))[0]
             stamp = int(_t.time())
-            guide = src
-            if cfg["mode"] == "inpaint":                       # SAM2 track → guide magenta
+            out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_{base}_{stamp}.mp4")
+            params = {"prompt": cfg["prompt"], "negative": "worst quality, blurry",
+                      "edit_lora": cfg["edit_lora"], "control_strength": float(cfg.get("strength", 1.0)),
+                      "width": 512, "height": 320, "num_frames": 25, "fps": 25,
+                      "seed": 42, "offload": "cpu", "output": out}
+            if cfg["mode"] == "inpaint":                       # SAM2 track → latent-inpaint (vinpaint)
                 self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
                 seg = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
@@ -185,14 +189,14 @@ class _VideoEditAIWorker(QThread):
                 line = next((l for l in (r.stdout or "").splitlines() if l.startswith("GUIDE:")), "")
                 if not line:
                     self.done.emit({"status": "error", "error": "tracking SAM2 fallito: " + (r.stderr or "")[-300:]}); return
-                guide = line.split("GUIDE:", 1)[1].strip()
-                self.progress.emit(f"[edit] guide pronto: {_os.path.basename(guide)}")
-            out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_{base}_{stamp}.mp4")
-            params = {"prompt": cfg["prompt"], "negative": "worst quality, blurry",
-                      "edit_lora": cfg["edit_lora"], "control_video": guide,
-                      "control_strength": float(cfg.get("strength", 1.0)),
-                      "width": 512, "height": 320, "num_frames": 25, "fps": 25,
-                      "seed": 42, "offload": "cpu", "output": out}
+                # video_segment salva frames e masks accanto al video sorgente in <base>_track/
+                track_dir = _os.path.splitext(src)[0] + "_track"
+                params["original_frames_dir"] = _os.path.join(track_dir, "frames")
+                params["inpaint_masks_dir"] = _os.path.join(track_dir, "masks")
+                params["skip_stage_2"] = False
+                self.progress.emit("[edit] maschera tracciata → latent-inpaint")
+            else:
+                params["control_video"] = src                  # edit/style: video sorgente come guide
             jf = _os.path.join(self.out_dir, f"_editp_{stamp}.json")
             _j.dump(params, open(jf, "w"))
             worker = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
