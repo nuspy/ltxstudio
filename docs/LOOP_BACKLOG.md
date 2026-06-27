@@ -33,8 +33,8 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 1.5 Multilingua/doppiaggio (LLM traduce dialoghi + risintesi voce legata; re-lip-sync rigenerando)
 - [x] 1.6 Shot-list export HTML (scene/shot/durate/dialoghi/keyframe)
 - [x] 1.7 Continuity vietati/forzati (forbidden→negative, required→prompt) per progetto
-- [ ] 1.8 Serie/casting UI
+- [x] 1.8 Serie/casting UI (combo serie + nuova + assegnazione progetto)
 - [x] 1.9 NOTA A — # dopo @Nome apre AssetDialog sulle varianti
 - [x] 1.10 Seed locking per shot (campo seed in storyboard, 0=auto, >0 bloccato; migration DB)
-- [ ] 1.11 Completare 13 lingue minori
-- [ ] 1.12 Multi‑GPU + pausa/ripresa coda
+- [~] 1.11 13 lingue minori — label principali tradotte; stringhe rare EN fallback → Task #49
+- [~] 1.12 Multi-GPU + pausa/ripresa coda — scheduler predisposto, richiede HW → Task #50
