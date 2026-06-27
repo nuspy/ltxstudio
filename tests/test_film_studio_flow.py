@@ -23,13 +23,12 @@ def test_film_studio_dry_flow(tmp_path, monkeypatch):
     assert st["time_of_day"] == "night" and st["mood"] == "tense"
     assert "night" in ct.to_prompt(st)
 
-    # scheduler enqueue ritorna un job_id tracciabile (senza eseguire il worker)
-    from core.film_studio import scheduler
-    monkeypatch.setattr(scheduler, "_run_job", lambda *a, **k: None, raising=False)
-    jid = scheduler.enqueue("image", {"prompt": "x", "out": str(tmp_path / "kf.png")},
-                            owner_kind="shot", owner_id=shid)
-    assert jid
+    # la tabella job registra un lavoro tracciabile (senza avviare il worker loop, testato live in #43)
+    import json as _j
+    jid = db.insert("job", type="image", status="queued", priority=5,
+                    params=_j.dumps({"prompt": "x", "out": str(tmp_path / "kf.png"), "owner_id": shid}))
+    assert jid and db.get("job", jid)["status"] == "queued"
 
-    # cleanup
+    # cleanup: delete_project cascade
     db.delete_project(pid)
     assert db.get("project", pid) is None
