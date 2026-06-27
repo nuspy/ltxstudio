@@ -8,8 +8,11 @@ import subprocess
 from pathlib import Path
 
 
-def render_master(clips: list[str], out_path: str, *, audio: str = "", fps: float = 25.0) -> str:
-    """Concatena le clip in un master unico (re-encode) + opz. traccia audio mixata."""
+def render_master(clips: list[str], out_path: str, *, audio: str = "",
+                  audio_tracks: list[dict] | None = None, fps: float = 25.0) -> str:
+    """Concatena le clip in un master unico (re-encode) + audio.
+    audio_tracks=[{path, start_s, volume}] = mix multitraccia (dialoghi/musica/ambient/SFX) con
+    ducking semplice via volume. `audio` singolo = retro-compat."""
     if not clips:
         raise RuntimeError("nessuna clip da montare")
     work = Path(out_path).with_suffix(".list.txt")
@@ -17,10 +20,24 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "", fps: floa
     silent = str(Path(out_path).with_suffix(".silent.mp4"))
     subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(work),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
-    if audio and os.path.exists(audio):
-        subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", audio, "-map", "0:v", "-map", "1:a",
-                        "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"], check=False)
-    else:
+    tracks = list(audio_tracks or ([] if not audio else [{"path": audio, "start_s": 0, "volume": 1.0}]))
+    tracks = [t for t in tracks if t.get("path") and os.path.exists(t["path"])]
+    if not tracks:
+        os.replace(silent, out_path); return out_path
+    # mix multitraccia: ogni traccia ritardata (adelay) e attenuata (volume) → amix
+    cmd = ["ffmpeg", "-v", "error", "-i", silent]
+    for t in tracks:
+        cmd += ["-i", t["path"]]
+    filt = []
+    for i, t in enumerate(tracks, start=1):
+        delay = int(float(t.get("start_s", 0)) * 1000)
+        filt.append(f"[{i}:a]adelay={delay}|{delay},volume={float(t.get('volume',1.0))}[a{i}]")
+    mix_in = "".join(f"[a{i}]" for i in range(1, len(tracks) + 1))
+    filt.append(f"{mix_in}amix=inputs={len(tracks)}:duration=longest:dropout_transition=0[aout]")
+    cmd += ["-filter_complex", ";".join(filt), "-map", "0:v", "-map", "[aout]",
+            "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"]
+    subprocess.run(cmd, check=False)
+    if not os.path.exists(out_path):
         os.replace(silent, out_path)
     return out_path
 

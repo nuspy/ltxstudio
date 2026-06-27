@@ -38,9 +38,10 @@ class MontageTab(QWidget):
         r1.addWidget(QLabel(tr("fs.mt.nle", "Formato NLE"))); r1.addWidget(self.fmt); r1.addStretch(1)
         bv.addLayout(r1)
         r2 = QHBoxLayout()
+        self.btn_audio = QPushButton(tr("fs.mt.audio", "🔊 Genera audio (dialoghi+musica)")); self.btn_audio.clicked.connect(self._gen_audio)
         self.btn_master = QPushButton(tr("fs.mt.master", "🎞 Master (A)")); self.btn_master.clicked.connect(self._master)
         self.btn_export = QPushButton(tr("fs.mt.export", "📦 Export NLE (B)")); self.btn_export.clicked.connect(self._export)
-        r2.addWidget(self.btn_master); r2.addWidget(self.btn_export); r2.addStretch(1)
+        r2.addWidget(self.btn_audio); r2.addWidget(self.btn_master); r2.addWidget(self.btn_export); r2.addStretch(1)
         bv.addLayout(r2)
         self.info = QLabel(""); bv.addWidget(self.info)
         v.addWidget(box)
@@ -66,6 +67,38 @@ class MontageTab(QWidget):
             self.lst.addItem(f"{c['name']}  ({c['out_s']:.0f}s)  {Path(c['file']).name}")
         self.info.setText(tr("fs.mt.count", "{n} clip in timeline").format(n=len(self._cur_clips)))
 
+    def _gen_audio(self):
+        """Sintetizza i dialoghi (voce legata all'attore) per ogni shot → tracce audio temporizzate."""
+        import json
+        from core.film_studio import voice_studio as vs
+        pid = self._get_project()
+        if not pid:
+            return
+        self._audio_tracks = []
+        t = 0.0
+        n = 0
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                dur = float(sh["duration_s"] or 4)
+                for di, d in enumerate(json.loads(sh.get("dialogues") or "[]")):
+                    actor = (d.get("actor") or "").lstrip("@")
+                    text = d.get("text") or ""
+                    if not text:
+                        continue
+                    assets = [a for a in db.find_assets(actor, "actor") if a["name"].lower() == actor.lower()]
+                    vrow = vs.voice_for_actor(assets[0]["id"]) if assets else None
+                    if not vrow:
+                        continue
+                    out = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_d{di}.wav")
+                    try:
+                        vs.synth_dialogue(text, vrow, out)
+                        self._audio_tracks.append({"path": out, "start_s": t, "volume": 1.0})
+                        n += 1
+                    except Exception:                       # noqa: BLE001
+                        pass
+                t += dur
+        self.info.setText(tr("fs.mt.audio_done", "Audio: {n} battute sintetizzate").format(n=n))
+
     def _master(self):
         clips = [c["file"] for c in (self._cur_clips or [])]
         if not clips:
@@ -73,7 +106,7 @@ class MontageTab(QWidget):
         pid = self._get_project()
         out = str(db.project_dir(pid) / "master.mp4")
         try:
-            otio_export.render_master(clips, out)
+            otio_export.render_master(clips, out, audio_tracks=getattr(self, "_audio_tracks", None))
             self.info.setText(tr("fs.mt.master_done", "Master: {f}").format(f=out))
         except Exception as e:                              # noqa: BLE001
             QMessageBox.critical(self, tr("fs.mt.master", "Master"), str(e)[:600])

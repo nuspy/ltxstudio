@@ -54,6 +54,8 @@ class ScriptTab(QWidget):
             tr("fs.script.input_ph", "Incolla la storia, l'idea o il tema… (@Nome per gli asset)"))
         self.inp.setFixedHeight(120)
         bv.addWidget(self.inp)
+        from ui.film_studio.asset_dialog import attach as _attach_at
+        _attach_at(self.inp)                              # digitando @ si apre l'AssetDialog
         h = QHBoxLayout()
         self.btn_gen = QPushButton(tr("fs.script.gen", "✍️ Genera copione")); self.btn_gen.clicked.connect(self._gen)
         self.btn_regen = QPushButton(tr("fs.script.regen", "↻ Rigenera")); self.btn_regen.clicked.connect(self._regen)

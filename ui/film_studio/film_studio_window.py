@@ -13,6 +13,7 @@ from ui.film_studio.script_tab import ScriptTab
 from ui.film_studio.asset_manager_tab import AssetManagerTab
 from ui.film_studio.storyboard_tab import StoryboardTab
 from ui.film_studio.montage_tab import MontageTab
+from ui.film_studio.voice_tab import VoiceTab
 
 _PATHS = [("fast", "fs.path.fast"), ("lora", "fs.path.lora"), ("mixed", "fs.path.mixed")]
 _RUN = [("supervised", "fs.run.supervised"), ("auto", "fs.run.auto")]
@@ -47,10 +48,12 @@ class FilmStudioWindow(QWidget):
         self.asset_tab = AssetManagerTab()
         self.sb_tab = StoryboardTab(self._get_project)
         self.mt_tab = MontageTab(self._get_project)
+        self.voice_tab = VoiceTab()
         self.tabs.addTab(self.script_tab, tr("fs.tab.script", "Copione"))
         self.tabs.addTab(self.sb_tab, tr("fs.tab.scenografia", "Scenografia"))
         self.tabs.addTab(self.mt_tab, tr("fs.tab.montage", "Montaggio"))
         self.tabs.addTab(self.asset_tab, tr("fs.tab.assets", "Asset Manager"))
+        self.tabs.addTab(self.voice_tab, tr("fs.tab.voice", "Voce"))
         root.addWidget(self.tabs, 1)
         self._refresh_projects()
 
