@@ -13,6 +13,8 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # root repo (import workers.*)
+
 import torch
 
 # Il block-streaming (offload CPU) di LTX salva tensori per autograd → incompatibile con
@@ -320,7 +322,12 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     if qmode == "fp8_scaled_mm" and offload != OffloadMode.NONE and quant is not None:
         import ltx_pipelines.utils.blocks as _blocks
         _blocks.fp8_cast_fuse_rule = quant.fuse_rule
-    if ptype == "iclora":                                    # #24 ControlNet IC-LoRA (canny/depth/pose)
+    if ptype == "vinpaint":                                  # #59 latent-inpaint VIDEO (sottoclasse ic_lora)
+        from workers.ltx_inpaint_pipeline import InpaintPipeline
+        pipe = InpaintPipeline(
+            distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
+            gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+    elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (canny/depth/pose)
         from ltx_pipelines.ic_lora import ICLoraPipeline
         pipe = ICLoraPipeline(
             distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
@@ -478,7 +485,11 @@ def run_generation(p: dict) -> str:
     _edit = p.get("edit_lora")
     if _edit and not os.path.isabs(_edit):
         _edit = os.path.join(LORA_DIR, _edit)
-    if p.get("retake") and p.get("video_path"):              # #24 ReTake: rigenera sezione di un video
+    if p.get("inpaint_masks_dir") and p.get("original_frames_dir") and _edit and os.path.exists(_edit):
+        ptype = "vinpaint"                                   # #59 latent-inpaint vero (mask SAM2 + LoRA inpaint)
+        loras = list(loras) + [LoraPathStrengthAndSDOps(_edit, float(p.get("control_strength", 1.0)),
+                                                        LTXV_LORA_COMFY_RENAMING_MAP)]
+    elif p.get("retake") and p.get("video_path"):            # #24 ReTake: rigenera sezione di un video
         ptype = "retake"
     elif _edit and os.path.exists(_edit) and p.get("control_video"):
         ptype = "iclora"
@@ -518,7 +529,23 @@ def run_generation(p: dict) -> str:
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
     tg = time.time()
-    if ptype == "a2v":                                       # AUDIO→VIDEO nativo: foto + canzone → canto
+    if ptype == "vinpaint":                                  # #59 latent-inpaint VIDEO (mask SAM2 segue l'oggetto)
+        import glob as _glob
+        from workers.ltx_inpaint_cond import load_mask_tensor
+        ofr = sorted(_glob.glob(os.path.join(p["original_frames_dir"], "*.png")))
+        mks = sorted(_glob.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
+        nf = min(nf, len(ofr), len(mks))
+        masks_t = load_mask_tensor(mks[:nf], int(p.get("height", 320)), int(p.get("width", 512)))
+        video = pipe.inpaint(
+            prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
+            height=int(p.get("height", 320)), width=int(p.get("width", 512)),
+            num_frames=nf, frame_rate=fps, original_frames=ofr[:nf], masks=masks_t,
+            video_conditioning=[(p["control_video"], float(p.get("control_strength", 1.0)))]
+            if p.get("control_video") else [],
+            strength=float(p.get("control_strength", 1.0)),
+            skip_stage_2=bool(p.get("skip_stage_2", True)))
+        audio = None
+    elif ptype == "a2v":                                     # AUDIO→VIDEO nativo: foto + canzone → canto
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
         video, audio = pipe(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),

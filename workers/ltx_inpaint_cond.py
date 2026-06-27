@@ -24,25 +24,19 @@ class SpatialRegionMask(ConditioningItem):
     def apply_to(self, latent_state: LatentState, latent_tools: LatentTools) -> LatentState:
         if not isinstance(latent_tools.target_shape, VideoLatentShape):
             return latent_state
+        from ltx_pipelines.iclora_utils import downsample_mask_video_to_latent
         dev = latent_state.denoise_mask.device
-        coords = latent_tools.patchifier.get_patch_grid_bounds(latent_tools.target_shape, device=dev)
-        sf = getattr(latent_tools, "scale_factors", SpatioTemporalScaleFactors.default())
-        px = get_pixel_coords(coords, sf, causal_fix=getattr(latent_tools, "causal_fix", True))  # (B,3,N,2)
-        # centro pixel di ogni patch su ciascun asse
-        t_c = px[:, 0].float().mean(dim=-1)   # (B,N) frame
-        y_c = px[:, 1].float().mean(dim=-1)   # (B,N) height
-        x_c = px[:, 2].float().mean(dim=-1)   # (B,N) width
-        m = self.masks.to(dev).float()
-        T, H, W = m.shape
-        ti = t_c.round().long().clamp(0, T - 1)
-        yi = y_c.round().long().clamp(0, H - 1)
-        xi = x_c.round().long().clamp(0, W - 1)
-        sampled = m[ti, yi, xi]               # (B,N) in [0,1]
+        m5 = self.masks.to(dev).float()[None, None]   # (1,1,T,H,W) pixel-space
+        latent_mask = downsample_mask_video_to_latent(m5, latent_tools.target_shape)  # (1, f*h*w)
         state = latent_state.clone()
-        mask_val = (sampled > 0.5).to(state.denoise_mask.dtype)
-        if state.denoise_mask.dim() == 3 and mask_val.dim() == 2:
-            mask_val = mask_val.unsqueeze(-1)
-        state.denoise_mask.copy_(mask_val.expand_as(state.denoise_mask))
+        flat = (latent_mask > 0.5).to(state.denoise_mask.dtype).flatten()
+        total = state.denoise_mask.numel()
+        if flat.numel() < total:
+            # i token di conditioning (IC-LoRA video) sono appesi DOPO i token video → denoise_mask=0 lì
+            full = torch.zeros(total, dtype=state.denoise_mask.dtype, device=state.denoise_mask.device)
+            full[:flat.numel()] = flat
+            flat = full
+        state.denoise_mask.copy_(flat.reshape(state.denoise_mask.shape))
         return state
 
 
