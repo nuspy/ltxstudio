@@ -1719,5 +1719,11 @@
   "mvs.aligning": "Allineamento al canto…",
   "mvs.aligned": "Riprese allineate al canto.",
   "mvs.align_no_whisper": "faster-whisper non installato. Installa con: pip install faster-whisper",
-  "mvs.planned_first": "Crea prima l'elenco riprese."
+  "mvs.planned_first": "Crea prima l'elenco riprese.",
+  "fs.var.gen": "🎭 Genera set",
+  "fs.var.need_sel": "Seleziona una variazione.",
+  "fs.sb.regen_kf": "🖼 Rigenera keyframe",
+  "fs.sb.regen_vid": "🎥 Rigenera video",
+  "fs.sb.sel_shot": "Seleziona un'inquadratura.",
+  "fs.sb.regen_queued": "Rigenerazione {w} in coda per lo shot."
 }

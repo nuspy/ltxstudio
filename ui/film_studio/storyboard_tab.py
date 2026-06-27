@@ -48,7 +48,10 @@ class StoryboardTab(QWidget):
         eh = QHBoxLayout()
         self.btn_save_sel = QPushButton(tr("fs.save", "💾 Salva")); self.btn_save_sel.clicked.connect(self._save_sel)
         self.btn_regen_sel = QPushButton(tr("fs.sb.regen_seg", "↻ Rigenera (LLM)")); self.btn_regen_sel.clicked.connect(self._regen_sel)
-        eh.addWidget(self.btn_save_sel); eh.addWidget(self.btn_regen_sel); eh.addStretch(1)
+        self.btn_regen_kf = QPushButton(tr("fs.sb.regen_kf", "🖼 Rigenera keyframe")); self.btn_regen_kf.clicked.connect(lambda: self._regen_shot("keyframe"))
+        self.btn_regen_vid = QPushButton(tr("fs.sb.regen_vid", "🎥 Rigenera video")); self.btn_regen_vid.clicked.connect(lambda: self._regen_shot("video"))
+        eh.addWidget(self.btn_save_sel); eh.addWidget(self.btn_regen_sel)
+        eh.addWidget(self.btn_regen_kf); eh.addWidget(self.btn_regen_vid); eh.addStretch(1)
         ev.addLayout(eh)
         v.addWidget(eb)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(80)
@@ -172,6 +175,34 @@ class StoryboardTab(QWidget):
         self._gen("keyframe")
         self._gen("video")
         self.log.appendPlainText(tr("fs.sb.auto_started", "Film completo in coda: keyframe+video. Poi vai a Montaggio → Master."))
+
+    def _regen_shot(self, what: str):
+        """1.2 Rigenera SOLO lo shot selezionato (keyframe o video) accodandolo al Job Scheduler."""
+        if not self._sel or self._sel[0] != "shot":
+            QMessageBox.information(self, tr("fs.sb.regen_kf", "Rigenera"), tr("fs.sb.sel_shot", "Seleziona un'inquadratura.")); return
+        sh = db.get("shot", self._sel[1])
+        sc = db.get("scene", sh["scene_id"])
+        pid = self._get_project()
+        proj = db.get("project", pid)
+        state = json.loads(sc.get("continuity") or "{}")
+        refs = gen_service.resolve_refs(sh["description"], proj.get("path_mode", "fast"))
+        prompt = refs["clean_text"] + ". " + ct.to_prompt(state)
+        outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
+        Path(outdir).mkdir(parents=True, exist_ok=True)
+        if what == "keyframe":
+            out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
+            scheduler.enqueue("image", {"prompt": prompt, "out": out,
+                                        "face_ref": (refs["ref_images"] or [""])[0], "loras": refs["loras"]},
+                              owner_kind="shot", owner_id=sh["id"])
+        else:
+            out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
+            kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
+            kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
+            scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
+                                        "keyframes": kfs, "loras": refs["loras"],
+                                        "audio_path": self._shot_dialogue_audio(sh, outdir)},
+                              owner_kind="shot", owner_id=sh["id"])
+        self.log.appendPlainText(tr("fs.sb.regen_queued", "Rigenerazione {w} in coda per lo shot.").format(w=what))
 
     def _shot_dialogue_audio(self, sh: dict, outdir: str) -> str:
         """Sintetizza il PRIMO dialogo dello shot con la voce legata all'attore parlante → wav per a2v lip-sync."""

@@ -101,7 +101,8 @@ class AssetManagerTab(QWidget):
         self.var_name = QLineEdit(); self.var_name.setPlaceholderText(tr("fs.var.ph", "es. ferito / sporco / Radura interna"))
         b_var = QPushButton(tr("fs.var.add", "➕ Variazione")); b_var.clicked.connect(self._add_var)
         b_vdel = QPushButton(tr("tlora.del", "🗑")); b_vdel.clicked.connect(self._del_var)
-        vh.addWidget(self.var_name, 1); vh.addWidget(b_var); vh.addWidget(b_vdel)
+        b_vgen = QPushButton(tr("fs.var.gen", "🎭 Genera set")); b_vgen.clicked.connect(self._gen_var_sheet)
+        vh.addWidget(self.var_name, 1); vh.addWidget(b_var); vh.addWidget(b_vgen); vh.addWidget(b_vdel)
         f.addRow(vh)
         self.ward_row = QWidget(); wl = QHBoxLayout(self.ward_row); wl.setContentsMargins(0, 0, 0, 0)
         self.ward_name = QLineEdit(); self.ward_name.setPlaceholderText(tr("fs.ward.ph", "abito (es. abito da sera) — solo attori"))
@@ -161,6 +162,34 @@ class AssetManagerTab(QWidget):
             for w in db.query("wardrobe", "variation_id=?", (vid,)):
                 db.delete("wardrobe", w["id"])
             db.delete("asset_variation", vid); self._refresh_vars()
+
+    def _gen_var_sheet(self):
+        """1.1 Genera il set immagini della variazione selezionata (asset + descrizione variazione)."""
+        r = self.var_list.currentRow()
+        if not self._cur or not (0 <= r < len(getattr(self, "_vars", []))):
+            QMessageBox.information(self, tr("fs.var.gen", "Set"), tr("fs.var.need_sel", "Seleziona una variazione.")); return
+        a = dict(db.get("asset", self._cur))
+        var = self._vars[r]
+        a["description"] = (a.get("description") or a["name"]) + ", " + (var.get("description") or var["name"])
+        out_dir = str(db.ROOT / "assets" / f"{a['id']}_{a['name']}_{var['name']}".replace(" ", "_"))
+        from pathlib import Path as _P
+        _P(out_dir).mkdir(parents=True, exist_ok=True)
+        self.b_sheet.setEnabled(False); self.sheet_log.setText(tr("fs.working", "Generazione…"))
+        self._var_for = var["id"]
+        self._worker = _SheetWorker(a, self.e_photo.text().strip(), out_dir)
+        self._worker.progress.connect(lambda s: self.sheet_log.setText(s))
+        self._worker.done.connect(self._on_var_sheet)
+        self._worker.start()
+
+    def _on_var_sheet(self, res: dict):
+        self.b_sheet.setEnabled(True)
+        if res.get("error"):
+            self.sheet_log.setText(""); QMessageBox.critical(self, tr("fs.var.gen", "Set"), str(res["error"])[:500]); return
+        for cid, path in res.get("images", []):
+            db.insert("image", owner_kind="variation", owner_id=getattr(self, "_var_for", 0),
+                      angle=cid, repr=cid, file=path, seed=7, prompt="", version=1)
+        self.sheet_log.setText(tr("fs.asset.sheet_done", "Sheet: {n} immagini").format(n=len(res.get("images", []))))
+        self._refresh_vars()
 
     def _add_wardrobe(self):
         r = self.var_list.currentRow()
