@@ -171,7 +171,13 @@ def _assemble_flux2(Pipe, transformer_path: str):
     vae = AutoencoderKLFlux2.from_config(json.load(open(os.path.join(FLUX2_DIR, "vae", "config.json"))))
     vae.load_state_dict(load_file(FLUX2_VAE), assign=True)
     vae = vae.to(bf16)
-    te = AutoModel.from_pretrained(os.path.join(FLUX2_DIR, "text_encoder"), torch_dtype=bf16)
+    # Text encoder FLUX.2 = Mistral3 nvfp4 (~12GB, file LOCALE) — dequant→bf16 (no repo 48GB, no ComfyUI)
+    te_dir = os.path.join(FLUX2_DIR, "text_encoder")
+    if os.path.exists(os.path.join(te_dir, "model.safetensors")):
+        te = AutoModel.from_pretrained(te_dir, torch_dtype=bf16)      # se già convertito su disco
+    else:
+        from inference_server.backends.flux2_te import load_flux2_text_encoder
+        te = load_flux2_text_encoder(te_dir)                          # dequant nvfp4 dal file locale
     tok = AutoTokenizer.from_pretrained(os.path.join(FLUX2_DIR, "tokenizer"))
     try:
         sched = FlowMatchEulerDiscreteScheduler.from_pretrained(os.path.join(FLUX2_DIR, "scheduler"))
