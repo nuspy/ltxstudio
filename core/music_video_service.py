@@ -131,6 +131,10 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
     except Exception as e:                                  # noqa: BLE001
         log(f"[storyboard] LLM non disponibile ({e}) → scena unica")
         scenes = []
+    try:
+        lyrics_llm.unload()                                # libera Gemma dalla VRAM prima del video GGUF
+    except Exception:                                      # noqa: BLE001
+        pass
     if not scenes:
         base = "cinematic music video coherent with the song, dynamic, atmospheric"
         scenes = [{"prompt": base, "weight": 1}]

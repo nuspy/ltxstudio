@@ -47,6 +47,20 @@ def available() -> bool:
     return _gemma_dir() is not None
 
 
+def unload() -> None:
+    """Libera Gemma dalla VRAM (da chiamare dopo lo storyboard, prima del video GGUF)."""
+    import gc
+    m = _CACHE.pop("model", None)
+    _CACHE.pop("proc", None)
+    del m
+    gc.collect()
+    try:
+        import torch
+        torch.cuda.empty_cache()
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def build_prompt(user_prompt: str, language: str = "it", tags: str = "") -> str:
     """Prompt utente ARRICCHITO con la finalità (mostrabile/loggabile)."""
     lang = LANG_NAMES.get(language, language or "Italian")
@@ -117,21 +131,31 @@ def storyboard(lyrics: str, image_hint: str = "", target_scenes: int | None = No
         {"role": "system", "content": [{"type": "text", "text": _SB_SYSTEM}]},
         {"role": "user", "content": [{"type": "text", "text": user}]},
     ]
+    # scala i token col numero scene richiesto (ogni scena ~70 tok) per non troncare l'array JSON
+    mnt = int(max_new_tokens)
+    if target_scenes:
+        mnt = min(4096, max(mnt, 500 + 80 * int(target_scenes)))
     inputs = proc.apply_chat_template(messages, add_generation_prompt=True, tokenize=True,
                                       return_dict=True, return_tensors="pt").to(model.device)
     n_in = inputs["input_ids"].shape[1]
     with torch.inference_mode():
-        out = model.generate(**inputs, max_new_tokens=int(max_new_tokens),
-                             do_sample=True, temperature=0.8, top_p=0.95)
+        out = model.generate(**inputs, max_new_tokens=mnt, do_sample=True, temperature=0.8, top_p=0.95)
     text = proc.decode(out[0][n_in:], skip_special_tokens=True).strip()
-    m = re.search(r"\[.*\]", text, re.DOTALL)              # estrai l'array JSON anche se circondato da testo
-    if not m:
-        return []
-    try:
-        arr = json.loads(m.group(0))
-    except Exception:                                       # noqa: BLE001
-        return []
     scenes = []
+    m = re.search(r"\[.*\]", text, re.DOTALL)              # array completo se ben chiuso
+    arr = None
+    if m:
+        try:
+            arr = json.loads(m.group(0))
+        except Exception:                                   # noqa: BLE001
+            arr = None
+    if arr is None:                                         # PARSING ROBUSTO: array troncato → estrai i singoli oggetti
+        arr = []
+        for obj in re.findall(r'\{[^{}]*?"prompt"\s*:\s*".*?"[^{}]*?\}', text, re.DOTALL):
+            try:
+                arr.append(json.loads(obj))
+            except Exception:                               # noqa: BLE001
+                pass
     for it in arr:
         if isinstance(it, dict) and it.get("prompt"):
             scenes.append({"prompt": str(it["prompt"]).strip(),
