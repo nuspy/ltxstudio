@@ -49,27 +49,8 @@ class _LyricsWorker(QThread):
             self.failed.emit(str(e))
 
 
-class _MusicVideoWorker(QThread):
-    """Genera SOLO la canzone (poi si apre il Music Video Studio interattivo) fuori dal thread UI."""
-    progress = Signal(str)
-    finished_mv = Signal(dict)
-
-    def __init__(self, lyrics: str, tags: str, image: str, out_video: str, duration: float,
-                 scene_seconds: float = 6.0, video_style: str = ""):
-        super().__init__()
-        self._args = (lyrics, tags, image, out_video, duration, scene_seconds, video_style)
-
-    def run(self):
-        lyrics, tags, image, out_video, duration, scene_seconds, video_style = self._args
-        try:
-            import os as _os
-            from core import music_video_service as mvs
-            song = mvs.generate_song(lyrics=lyrics, tags=tags, out_mp3=_os.path.splitext(out_video)[0] + ".mp3",
-                                     duration_s=duration, progress=self.progress.emit)
-            self.finished_mv.emit({"song": song, "lyrics": lyrics, "image": image,
-                                   "scene_seconds": scene_seconds, "video_style": video_style})
-        except Exception as e:                          # noqa: BLE001
-            self.finished_mv.emit({"error": str(e)})
+# (rimosso _MusicVideoWorker: ora il videomusicale è un PROGETTO persistente gestito dal Music Video
+#  Studio — la canzone si genera/rigenera nella fase Canzone dello Studio stesso.)
 
 
 from core import music_service as ms
@@ -194,8 +175,10 @@ class MusicTab(QWidget):
         self.btn_music_video.setToolTip(tr("music.mv.gen.tt",
             "Crea canzone + video coerente col testo (storyboard LLM + LTX-2.3 nativo). Richiede un'immagine iniziale."))
         self.btn_music_video.clicked.connect(self._gen_music_video)
+        self.btn_mv_projects = QPushButton(tr("music.mv.projects", "📂 Progetti videomusicali"))
+        self.btn_mv_projects.clicked.connect(self._open_mv_projects)
         h.addWidget(self.btn_song_install); h.addStretch(1)
-        h.addWidget(self.btn_song); h.addWidget(self.btn_music_video)
+        h.addWidget(self.btn_song); h.addWidget(self.btn_music_video); h.addWidget(self.btn_mv_projects)
         v.addLayout(h)
         return box
 
@@ -339,45 +322,32 @@ class MusicTab(QWidget):
                                            on_done=self._b.sonify_done.emit), "sonify", None)
 
     def _gen_music_video(self):
-        if getattr(self, "_mv_worker", None) and self._mv_worker.isRunning():
-            return
-        if self._busy():
-            QMessageBox.information(self, tr("music.mv.gen", "Videomusicale"),
-                                   tr("music.busy", "Un'altra generazione è in corso.")); return
+        """Crea un PROGETTO videomusicale (persistente) dai campi correnti e apre il Music Video Studio
+        alla fase Canzone (genera/rigenera, lista canzoni, poi storyboard editabile)."""
         lyrics = self.song_lyrics.toPlainText().strip()
-        tags = self.song_tags.text().strip() or ms.DEFAULT_TAGS
-        image = self.mv_image.text().strip()
         if not lyrics:
             QMessageBox.warning(self, tr("music.mv.gen", "Videomusicale"),
                                tr("music.mv.need_lyrics", "Inserisci le liriche (con sezioni [Verse]/[Chorus]).")); return
-        if not image or not Path(image).exists():
-            QMessageBox.warning(self, tr("music.mv.gen", "Videomusicale"),
-                               tr("music.mv.need_image", "Scegli un'immagine iniziale/sfondo per il video.")); return
-        ms.MUSIC_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        out = str(ms.MUSIC_OUTPUT_DIR / ((self.song_name.text().strip() or "song") + "_video.mp4"))
-        self.btn_music_video.setEnabled(False)
-        self._t0 = time.time()
-        self._log(tr("music.mv.started", "Videomusicale: canzone + storyboard + video (può richiedere parecchi minuti)…"))
-        self._mv_worker = _MusicVideoWorker(lyrics, tags, image, out, float(self.song_dur.value()),
-                                            scene_seconds=float(self.mv_pace.currentData()),
-                                            video_style=self.mv_style.text().strip())
-        self._mv_worker.progress.connect(self._log)
-        self._mv_worker.finished_mv.connect(self._on_mv_done)
-        self._mv_worker.start()
+        from core import mv_projects as mvp
+        image = self.mv_image.text().strip()
+        pid = mvp.create_project(
+            self.song_name.text().strip() or "videomusicale",
+            lyrics=lyrics, tags=self.song_tags.text().strip() or ms.DEFAULT_TAGS,
+            image_hint=("coerente con l'immagine: " + image) if image else "",
+            scene_seconds=float(self.mv_pace.currentData()), video_style=self.mv_style.text().strip(),
+            song_duration=float(self.song_dur.value()))
+        self._open_mv_studio(pid)
 
-    def _on_mv_done(self, res: dict):
-        self.btn_music_video.setEnabled(True)
-        if res.get("error"):
-            self._log(tr("music.mv.fail", "Videomusicale fallito: ") + str(res["error"])[:300])
-            QMessageBox.critical(self, tr("music.mv.gen", "Videomusicale"), str(res["error"])[:1000]); return
-        # canzone pronta → apre il Music Video Studio interattivo (storyboard editabile → immagini → video)
-        song = res.get("song")
-        self._log(tr("music.mv.song_done", "Canzone pronta → apro lo Studio interattivo."))
+    def _open_mv_projects(self):
+        """Apre il dialog CRUD dei progetti videomusicali; all'apertura di uno, lancia lo Studio."""
+        from ui.mv_projects_dialog import MvProjectsDialog
+        dlg = MvProjectsDialog(self.window())
+        if dlg.exec() and dlg.opened_id:
+            self._open_mv_studio(dlg.opened_id)
+
+    def _open_mv_studio(self, pid: int):
         from ui.music_video_studio import MusicVideoStudio
-        self._mv_studio = MusicVideoStudio(
-            song_path=song, lyrics=res.get("lyrics", ""), image_hint="the provided starting photo",
-            scene_seconds=res.get("scene_seconds", 4.0), video_style=res.get("video_style", ""),
-            parent=self.window())
+        self._mv_studio = MusicVideoStudio(pid, parent=self.window())
         self._mv_studio.setWindowFlag(Qt.Window, True)
         self._mv_studio.show(); self._mv_studio.raise_(); self._mv_studio.activateWindow()
 
