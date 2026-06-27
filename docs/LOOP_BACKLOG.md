@@ -17,7 +17,7 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 
 ## AREA 2 — Videomusicale
 - [x] 2.1 Anteprima video inline — thumbnail primo frame (QIcon) nella lista video
-- [ ] 2.2 Allineamento Whisper/forced‑align
+- [x] 2.2 Allineamento Whisper — align_scenes_with_whisper (faster-whisper, fallback proporzionale) + bottone Studio; install faster-whisper = Task
 - [x] 2.3 Ghosting — risolto by-design (clip i2v separate, concat netto) + transizione crossfade opzionale
 - [x] 2.4 Parametri canzone (temperatura/CFG) nella fase Canzone, salvati nel progetto
 - [x] 2.5 Riuso reale immagine fornita → apertura scena 0 (mv_project.base_image)

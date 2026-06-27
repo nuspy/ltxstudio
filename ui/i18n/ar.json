@@ -1617,5 +1617,10 @@
   "mvs.tr_dissolve": "Dissolve",
   "mvs.tr_wipe": "Wipe",
   "mvs.export_nle": "📦 Export NLE",
-  "mvs.export_done": "NLE export: {f}"
+  "mvs.export_done": "NLE export: {f}",
+  "mvs.align": "🎯 Align to vocals",
+  "mvs.aligning": "Aligning to vocals…",
+  "mvs.aligned": "Shots aligned to vocals.",
+  "mvs.align_no_whisper": "faster-whisper not installed. Install with: pip install faster-whisper",
+  "mvs.planned_first": "Create the shot list first."
 }

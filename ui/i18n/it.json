@@ -1714,5 +1714,10 @@
   "mvs.tr_dissolve": "Dissolve",
   "mvs.tr_wipe": "Tendina",
   "mvs.export_nle": "📦 Export NLE",
-  "mvs.export_done": "Export NLE: {f}"
+  "mvs.export_done": "Export NLE: {f}",
+  "mvs.align": "🎯 Allinea al canto",
+  "mvs.aligning": "Allineamento al canto…",
+  "mvs.aligned": "Riprese allineate al canto.",
+  "mvs.align_no_whisper": "faster-whisper non installato. Installa con: pip install faster-whisper",
+  "mvs.planned_first": "Crea prima l'elenco riprese."
 }

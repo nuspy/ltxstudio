@@ -75,6 +75,26 @@ class MusicVideoStudio(QWidget):
         a = mvp.active_song(self.pid)
         return mvs._dur(a["file"]) if a and os.path.exists(a["file"]) else float(self.proj.get("song_duration", 120))
 
+    def _align(self):
+        """2.2 Allinea gli start delle riprese al canto reale (Whisper). Se la lib manca, avvisa."""
+        if not self.scenes:
+            QMessageBox.information(self, tr("mvs.align", "Allinea"), tr("mvs.planned_first", "Crea prima l'elenco riprese.")); return
+        if not mvs.whisper_available():
+            QMessageBox.information(self, tr("mvs.align", "Allinea"),
+                tr("mvs.align_no_whisper", "faster-whisper non installato. Installa con: pip install faster-whisper")); return
+        a = mvp.active_song(self.pid)
+        if not a:
+            return
+        self._busy(True, tr("mvs.aligning", "Allineamento al canto…"))
+        self._worker = _Worker(mvs.align_scenes_with_whisper, a["file"], self.scenes)
+        def _fin(r):
+            self._busy(False)
+            if r.get("error"):
+                QMessageBox.critical(self, tr("mvs.align", "Allinea"), str(r["error"])[:400]); return
+            self.scenes = r["result"]; self._save(); self._refresh_sb()
+            self.status.setText(tr("mvs.aligned", "Riprese allineate al canto."))
+        self._worker.done.connect(_fin); self._worker.start()
+
     def _export_nle(self):
         if not any(s.get("video_path") for s in self.scenes):
             QMessageBox.information(self, tr("mvs.export_nle", "Export"), tr("mvs.no_vids", "Genera prima i video.")); return
@@ -187,8 +207,9 @@ class MusicVideoStudio(QWidget):
         left = QWidget(); lv = QVBoxLayout(left)
         bar = QHBoxLayout()
         self.btn_plan = QPushButton(tr("mvs.plan", "Crea elenco riprese (LLM)")); self.btn_plan.clicked.connect(self._plan)
+        self.btn_align = QPushButton(tr("mvs.align", "🎯 Allinea al canto")); self.btn_align.clicked.connect(self._align)
         self.btn_imgs = QPushButton(tr("mvs.gen_imgs", "Genera immagini")); self.btn_imgs.clicked.connect(self._gen_images)
-        bar.addWidget(self.btn_plan); bar.addWidget(self.btn_imgs)
+        bar.addWidget(self.btn_plan); bar.addWidget(self.btn_align); bar.addWidget(self.btn_imgs)
         lv.addLayout(bar)
         self.sb_list = QListWidget(); self.sb_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.sb_list.currentRowChanged.connect(self._sb_select)

@@ -215,6 +215,46 @@ def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: i
     return out_path
 
 
+def whisper_available() -> bool:
+    try:
+        import faster_whisper  # noqa: F401
+        return True
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def align_scenes_with_whisper(song_path: str, scenes: list[dict], *, model_size: str = "base") -> list[dict]:
+    """#2.2 Allineamento temporale: ASR (faster-whisper) sull'mp3 → timestamp segmenti cantati →
+    ridistribuisce gli start_s delle scene sui confini reali del canto (anziché proporzionali).
+    Se faster-whisper non è installato, ritorna le scene invariate (fallback proporzionale)."""
+    if not whisper_available() or not scenes:
+        return scenes
+    from faster_whisper import WhisperModel
+    model = WhisperModel(model_size, device="cuda" if _has_cuda() else "cpu",
+                         compute_type="int8" if not _has_cuda() else "float16")
+    segments, _info = model.transcribe(song_path, word_timestamps=False)
+    starts = [float(s.start) for s in segments]
+    if not starts:
+        return scenes
+    dur = _dur(song_path)
+    n = len(scenes)
+    # distribuisci le n scene sui tempi dei segmenti (campionamento uniforme degli onset cantati)
+    ordered = sorted(scenes, key=lambda s: s["start_s"])
+    for i, sc in enumerate(ordered):
+        idx = min(len(starts) - 1, round(i * (len(starts) - 1) / max(1, n - 1)))
+        sc["start_s"] = round(starts[idx], 2)
+    recompute_lengths(ordered, dur)
+    return ordered
+
+
+def _has_cuda() -> bool:
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 def export_nle(scenes: list[dict], out_dir: str, *, fmt: str = "fcpxml", name: str = "music_video") -> str:
     """#2.7 Export NLE del videomusicale (FCPXML/AAF/EDL/OTIO) riusando core/film_studio/otio_export."""
     from core.film_studio import otio_export
