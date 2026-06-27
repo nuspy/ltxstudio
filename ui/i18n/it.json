@@ -1768,5 +1768,6 @@
   "fs.mt.sfx_done": "SFX per-azione: {n} effetti.",
   "fs.mt.sfx_run": "SFX {i}/{n}…",
   "mw.seedvr2_install_hint": "Installa con: python scripts/install_seedvr2.py",
-  "mw.flashvsr_soon": "FlashVSR in arrivo: usa SeedVR2 o ESRGAN per ora."
+  "mw.flashvsr_soon": "FlashVSR in arrivo: usa SeedVR2 o ESRGAN per ora.",
+  "mw.flashvsr_install_hint": "Installa con: python scripts/install_flashvsr.py"
 }

@@ -136,6 +136,24 @@ class _SeedVR2Worker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _FlashVSRWorker(QThread):
+    """FlashVSR v1.1 super-risoluzione video x4 (repo diffsynth, venv isolato). Stream log + path."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, src: str, out: str):
+        super().__init__()
+        self.src, self.out = src, out
+
+    def run(self):
+        from core import flashvsr_service as fv
+        try:
+            fv.upscale_video(self.src, self.out, on_log=lambda l: self.progress.emit(l))
+            self.done.emit({"status": "success", "output": [self.out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class _NativeMultiTalkWorker(QThread):
     """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI; riporta progress e path finale."""
     done = Signal(dict)
@@ -1971,9 +1989,19 @@ class MainWindow(QMainWindow):
             self._sv2_worker.done.connect(self._on_multitalk_done)
             self._sv2_worker.start()
             return
-        if engine == "flashvsr":                         # in arrivo (download/integrazione #46)
-            QMessageBox.information(self, "FlashVSR", tr("mw.flashvsr_soon",
-                "FlashVSR in arrivo: usa SeedVR2 o ESRGAN per ora.")); return
+        if engine == "flashvsr":                         # FlashVSR v1.1 nativo (x4 streaming, diffsynth)
+            from core import flashvsr_service as fv
+            errs = fv.preflight()
+            if errs:
+                QMessageBox.warning(self, "FlashVSR", "\n".join(errs) +
+                    "\n\n" + tr("mw.flashvsr_install_hint", "Installa con: python scripts/install_flashvsr.py")); return
+            out = str(OUTPUT_DIR / f"flashvsr_{Path(src).stem}.mp4")
+            self._log(f"[nativo] FlashVSR x4 super-risoluzione su {Path(src).name}…")
+            self._fv_worker = _FlashVSRWorker(src, out)
+            self._fv_worker.progress.connect(self._log)
+            self._fv_worker.done.connect(self._on_multitalk_done)
+            self._fv_worker.start()
+            return
         # esrgan: upscale per-frame nativo (spandrel)
         params = {
             "video": src, "model": cfg.get("esrgan_model"),

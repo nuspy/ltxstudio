@@ -11,7 +11,7 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 3.5 UI conversione modelli — gruppo Conversione in Import Models (Gemma-3→bf16, TE→HF) via subprocess venv; i18n 15
 - [x] 3.6 text→audio (run_t2a, T2AOneStage audio-only) + helper EXR (core/exr_export); HDR-IC-LoRA pipeline completa → Task (serve embeddings precomputati + val live), HDR LoRA su disco
 - [x] 3.7 Durata-illimitata MULTI-PROMPT — _run_chunked usa prompts=[{start_s,prompt}] per finestra temporale (memory-bounded, continuità ultimo-frame); long-video test #43 ≤30-60s
-- [⏳] 3.8 FlashVSR v1.1 (JunhaoZhuang/FlashVSR-v1.1, <15GB) — scaricare + integrare
+- [x] 3.8 FlashVSR v1.1 — pesi scaricati (6.5GB) + repo OpenImagingLab/diffsynth via core/flashvsr_service (subprocess venv) + workers/flashvsr_run.py (runner parametrico) + worker _FlashVSRWorker + ramo GUI engine=flashvsr + installer; test live #43
 - [x] 3.9 SD3 — ABORTITA DEFINITIVAMENTE (verificato: nessuna feature usa il modello SD3; EmptySD3LatentImage/ModelSamplingSD3 sono nodi generici, "sd3" solo voce catalogo)
 - [~] 3.10 Test LIVE end-to-end → sessione #43 (richiede GPU, ≤10s)
 
