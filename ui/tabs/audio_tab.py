@@ -218,6 +218,24 @@ class AudioTab(QWidget):
     def _install_selected_engine(self):
         """Conferma + git clone + pip install dei requirements + refresh stato."""
         eid = self.tts_engine.currentData()
+        # Kokoro/Handy: backend nativo via Handy-API — se non attivo, conferma e avvia/installa
+        if eid in ("kokoro", "handy_clone"):
+            from core import handy_api
+            if handy_api.available():
+                QMessageBox.information(self, "Handy-API", tr("aud.handy.ready", "Handy-API attivo (:8720)."))
+                return
+            ans = QMessageBox.question(self, "Handy-API",
+                tr("aud.handy.install", "Handy-API (TTS Kokoro/clone) non attivo. Avviarlo/installarlo?"),
+                QMessageBox.Yes | QMessageBox.No)
+            if ans != QMessageBox.Yes:
+                return
+            if handy_api.ensure():
+                QMessageBox.information(self, "Handy-API", tr("aud.handy.ok", "Handy-API avviato."))
+                self._populate_engines()
+            else:
+                handy_api.clone_repo()
+                QMessageBox.information(self, "Handy-API", handy_api.install_instructions())
+            return
         if not eid or eid not in ENGINE_REPOS:
             return
         spec = ENGINE_REPOS[eid]
