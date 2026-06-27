@@ -96,6 +96,7 @@ class ImportModelsTab(QWidget):
 
         v.addWidget(self._build_paths_group())
         v.addWidget(self._build_compat_group())
+        v.addWidget(self._build_convert_group())
         v.addWidget(self._build_source_group())
         v.addWidget(self._build_ops_group())
 
@@ -265,6 +266,43 @@ class ImportModelsTab(QWidget):
             self._log(f"[ERR] prompt_unlock: {e}")
 
     # ---- gruppo sorgente / staging ----
+    def _build_convert_group(self) -> QGroupBox:
+        """Conversione modelli ComfyUI → formato nativo (diffusers/HF) — #27. Riusa gli script esistenti."""
+        grp = QGroupBox(tr("imp.convert.group", "Conversione modelli (ComfyUI → nativo)"))
+        v = QVBoxLayout(grp)
+        v.addWidget(QLabel(tr("imp.convert.note",
+            "Converte i modelli ComfyUI (fp8/quantizzati) nel formato del backend nativo. Eseguito una tantum.")))
+        row = QHBoxLayout()
+        b_gemma = QPushButton(tr("imp.convert.gemma", "Gemma-3 → bf16"))
+        b_gemma.clicked.connect(lambda: self._run_convert("scripts/convert_gemma_comfy.py", "Gemma-3"))
+        b_te = QPushButton(tr("imp.convert.te", "Text encoder → HF"))
+        b_te.clicked.connect(lambda: self._run_convert("scripts/convert_te_to_hf.py", "Text encoder"))
+        row.addWidget(b_gemma); row.addWidget(b_te); row.addStretch(1)
+        v.addLayout(row)
+        return grp
+
+    def _run_convert(self, script_rel: str, label: str):
+        """Lancia uno script di conversione nel venv inference_server, in un thread, log live."""
+        import threading
+        import subprocess as _sp
+        from pathlib import Path as _P
+        root = _P(__file__).resolve().parents[2]
+        script = root / script_rel
+        py = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"
+        if not script.exists():
+            QMessageBox.warning(self, tr("imp.convert.group", "Conversione"),
+                                tr("imp.convert.missing", "Script non trovato: {s}").format(s=script)); return
+        self._log(f"\n🔄 Conversione {label} ({script_rel})…")
+
+        def _worker():
+            try:
+                r = _sp.run([py, "-u", str(script)], cwd=str(root), capture_output=True, text=True, timeout=3600)
+                out = (r.stdout or "")[-1500:] + (r.stderr or "")[-500:]
+                self._log(out + (f"\n✓ {label} convertito." if r.returncode == 0 else f"\n[ERR] exit {r.returncode}"))
+            except Exception as e:                          # noqa: BLE001
+                self._log(f"[ERR] conversione {label}: {e}")
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _build_source_group(self) -> QGroupBox:
         grp = QGroupBox(tr("imp.files.group"))
         v = QVBoxLayout(grp)

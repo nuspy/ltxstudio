@@ -1699,5 +1699,10 @@
   "fs.ward.need_var": "Select a variation first.",
   "fs.sb.warn_scene": "Scene {n}: Σshots {a:.0f}s ≠ scene duration {b:.0f}s",
   "fs.sb.warn_film": "Σscenes {a:.0f}s ≠ film duration {b:.0f}s",
-  "fs.sb.dur_ok": "✓ Durations consistent"
+  "fs.sb.dur_ok": "✓ Durations consistent",
+  "imp.convert.group": "Model conversion (ComfyUI → native)",
+  "imp.convert.note": "Converts ComfyUI models (fp8/quantized) to the native backend format. One-time.",
+  "imp.convert.gemma": "Gemma-3 → bf16",
+  "imp.convert.te": "Text encoder → HF",
+  "imp.convert.missing": "Script not found: {s}"
 }

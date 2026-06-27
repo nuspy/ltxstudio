@@ -8,7 +8,7 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [~] 3.2 FLUX.2 t2i — TE è nvfp4 (no fp8): modulo dequant nvfp4→bf16 PRONTO (flux2_te.py, no download 48GB); resta validazione live swizzle su Blackwell → Task #44
 - [ ] 3.3 SeedVR2 nativo — 3B 14.6GB IN DOWNLOAD; integrare pipeline DiT + handler video_upscale opzione seedvr2
 - [x] 3.4 ReTake nativo — RetakePipeline nel worker + ramo GUI _retake_native (sezione [start,end]); full-GPU val #43
-- [ ] 3.5 UI conversione modelli (3 script in Import Models)
+- [x] 3.5 UI conversione modelli — gruppo Conversione in Import Models (Gemma-3→bf16, TE→HF) via subprocess venv; i18n 15
 - [ ] 3.6 text→audio (T2AOneStage) + HDR/EXR export
 - [ ] 3.7 Durata‑illimitata multi‑prompt (run_long) [long‑video ≤60s]
 - [ ] 3.8 FlashVSR v1.1 (JunhaoZhuang/FlashVSR-v1.1, <15GB) — scaricare + integrare
