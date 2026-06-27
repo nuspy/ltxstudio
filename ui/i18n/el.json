@@ -1533,5 +1533,8 @@
   "fs.script.styles": "Στυλ",
   "fs.script.genres": "Είδος",
   "fs.script.styles_tt": "Visual style (comma-separated for multiple)",
-  "fs.script.genres_tt": "Genre(s) (comma-separated for multiple)"
+  "fs.script.genres_tt": "Genre(s) (comma-separated for multiple)",
+  "fs.sb.auto": "🎬 Generate full film",
+  "fs.sb.auto_confirm": "Will generate {s} shots (keyframe+video). Est. ~{m} min. Proceed?",
+  "fs.sb.auto_started": "Full film queued: keyframe+video. Then go to Montage → Master."
 }

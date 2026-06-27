@@ -1630,5 +1630,8 @@
   "fs.script.styles": "Stile",
   "fs.script.genres": "Genere",
   "fs.script.styles_tt": "Stile visivo (più separati da virgola)",
-  "fs.script.genres_tt": "Genere/i (più separati da virgola)"
+  "fs.script.genres_tt": "Genere/i (più separati da virgola)",
+  "fs.sb.auto": "🎬 Genera film completo",
+  "fs.sb.auto_confirm": "Genererò {s} shot (keyframe+video). Stima ~{m} min. Procedere?",
+  "fs.sb.auto_started": "Film completo in coda: keyframe+video. Poi vai a Montaggio → Master."
 }

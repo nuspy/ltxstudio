@@ -29,7 +29,7 @@ def _register_scheduler_handlers():
     def _vid(p):
         return gen_service.gen_shot_video(p["prompt"], p["out"], duration_s=p.get("duration_s", 4),
                                           keyframes=p.get("keyframes"), loras=p.get("loras"),
-                                          audio_path=p.get("audio_path", ""))
+                                          audio_path=p.get("audio_path", "") or "")
     scheduler.register("image", _img)
     scheduler.register("video", _vid)
 

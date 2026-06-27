@@ -32,7 +32,8 @@ class StoryboardTab(QWidget):
         self.btn_break.clicked.connect(self._breakdown)
         self.btn_keys = QPushButton(tr("fs.sb.keyframes", "🖼 Genera keyframe")); self.btn_keys.clicked.connect(lambda: self._gen("keyframe"))
         self.btn_video = QPushButton(tr("fs.sb.videos", "🎥 Genera video")); self.btn_video.clicked.connect(lambda: self._gen("video"))
-        h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video); h.addStretch(1)
+        self.btn_auto = QPushButton(tr("fs.sb.auto", "🎬 Genera film completo")); self.btn_auto.clicked.connect(self._gen_all)
+        h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video); h.addWidget(self.btn_auto); h.addStretch(1)
         v.addLayout(h)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
         self.tree.currentItemChanged.connect(self._on_tree_sel)
@@ -126,11 +127,52 @@ class StoryboardTab(QWidget):
                     out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
                     kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
                     kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
+                    # LIP-SYNC: se lo shot ha un dialogo, sintetizza l'audio con la voce legata e
+                    # passalo al video (a2v nativo = labiale sincronizzato sul parlato)
+                    audio_path = self._shot_dialogue_audio(sh, outdir)
                     scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
-                                                "keyframes": kfs, "loras": refs["loras"]},
+                                                "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path},
                                       owner_kind="shot", owner_id=sh["id"])
                 n += 1
         self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))
+
+    def _gen_all(self):
+        """Modalità Auto (spec §5.6): breakdown (se serve) → keyframe → video in coda. Il master si fa
+        nel tab Montaggio (un click dopo che la coda è finita). Stima costo/tempo prima di lanciare."""
+        pid = self._get_project()
+        if not pid:
+            QMessageBox.information(self, tr("fs.sb.auto", "Auto"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        if not db.query("scene", "project_id=?", (pid,)):
+            self._breakdown()
+        shots = sum(len(db.query("shot", "scene_id=?", (sc["id"],))) for sc in db.query("scene", "project_id=?", (pid,)))
+        est = scheduler.estimate([{"type": "image"}] * shots + [{"type": "video"}] * shots)
+        if QMessageBox.question(self, tr("fs.sb.auto", "Genera film completo"),
+                                tr("fs.sb.auto_confirm", "Genererò {s} shot (keyframe+video). Stima ~{m} min. Procedere?")
+                                .format(s=shots, m=round(est["seconds"] / 60))) != QMessageBox.Yes:
+            return
+        self._gen("keyframe")
+        self._gen("video")
+        self.log.appendPlainText(tr("fs.sb.auto_started", "Film completo in coda: keyframe+video. Poi vai a Montaggio → Master."))
+
+    def _shot_dialogue_audio(self, sh: dict, outdir: str) -> str:
+        """Sintetizza il PRIMO dialogo dello shot con la voce legata all'attore parlante → wav per a2v lip-sync."""
+        try:
+            from core.film_studio import voice_studio as vs
+            dlgs = json.loads(sh.get("dialogues") or "[]")
+            for d in dlgs:
+                actor = (d.get("actor") or "").lstrip("@"); text = d.get("text") or ""
+                if not text:
+                    continue
+                assets = [a for a in db.find_assets(actor, "actor") if a["name"].lower() == actor.lower()]
+                vrow = vs.voice_for_actor(assets[0]["id"]) if assets else None
+                if not vrow:
+                    continue
+                wav = str(Path(outdir) / f"shot_{sh['ord']}_dlg.wav")
+                vs.synth_dialogue(text, vrow, wav)
+                return wav
+        except Exception:                                   # noqa: BLE001
+            pass
+        return ""
 
     def _on_tree_sel(self, cur, _prev):
         self._sel = cur.data(0, Qt.UserRole) if cur else None
