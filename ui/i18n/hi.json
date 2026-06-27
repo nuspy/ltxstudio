@@ -1369,5 +1369,13 @@
   "tlora.started": "शुरू हो रहा है (बहुत समय लग सकता है)…",
   "tlora.done_lora": "LoRA तैयार: {f}",
   "tlora.done_ds": "डेटासेट तैयार: {f}",
-  "feat.cap.lora_video_train": "वीडियो LoRA प्रशिक्षण (LTX-2.3, स्वतः डेटासेट)"
+  "feat.cap.lora_video_train": "वीडियो LoRA प्रशिक्षण (LTX-2.3, स्वतः डेटासेट)",
+  "tab.lora_image": "फ़ोटो LoRA",
+  "ilora.train": "LoRA प्रशिक्षण (FLUX.2)",
+  "ilora.base": "बेस मॉडल",
+  "ilora.res": "रिज़ॉल्यूशन",
+  "ilora.install": "ai-toolkit इंस्टॉल करें",
+  "ilora.gen_train": "🎓 बनाएँ + FLUX.2 LoRA प्रशिक्षित करें",
+  "ilora.started": "FLUX.2 LoRA शुरू हो रहा है (समय लग सकता है)…",
+  "feat.cap.lora_image_train": "फ़ोटो LoRA प्रशिक्षण (FLUX.2, स्वतः डेटासेट)"
 }

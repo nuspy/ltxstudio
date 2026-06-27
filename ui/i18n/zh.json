@@ -1369,5 +1369,13 @@
   "tlora.started": "开始（可能需要较长时间）…",
   "tlora.done_lora": "LoRA 就绪：{f}",
   "tlora.done_ds": "数据集就绪：{f}",
-  "feat.cap.lora_video_train": "训练视频 LoRA（LTX-2.3，自动数据集）"
+  "feat.cap.lora_video_train": "训练视频 LoRA（LTX-2.3，自动数据集）",
+  "tab.lora_image": "照片 LoRA",
+  "ilora.train": "LoRA 训练（FLUX.2）",
+  "ilora.base": "基础模型",
+  "ilora.res": "分辨率",
+  "ilora.install": "安装 ai-toolkit",
+  "ilora.gen_train": "🎓 生成 + 训练 FLUX.2 LoRA",
+  "ilora.started": "启动 FLUX.2 LoRA（可能需要较长时间）…",
+  "feat.cap.lora_image_train": "训练照片 LoRA（FLUX.2，自动数据集）"
 }

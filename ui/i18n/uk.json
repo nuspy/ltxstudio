@@ -1369,5 +1369,13 @@
   "tlora.started": "Запуск (може зайняти багато часу)…",
   "tlora.done_lora": "LoRA готова: {f}",
   "tlora.done_ds": "Датасет готовий: {f}",
-  "feat.cap.lora_video_train": "Навчання відео-LoRA (LTX-2.3, авто-датасет)"
+  "feat.cap.lora_video_train": "Навчання відео-LoRA (LTX-2.3, авто-датасет)",
+  "tab.lora_image": "Фото-LoRA",
+  "ilora.train": "Навчання LoRA (FLUX.2)",
+  "ilora.base": "Базова модель",
+  "ilora.res": "Роздільність",
+  "ilora.install": "Встановити ai-toolkit",
+  "ilora.gen_train": "🎓 Створити + Навчити LoRA FLUX.2",
+  "ilora.started": "Запуск LoRA FLUX.2 (може зайняти багато часу)…",
+  "feat.cap.lora_image_train": "Навчання фото-LoRA (FLUX.2, авто-датасет)"
 }

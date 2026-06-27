@@ -1369,5 +1369,13 @@
   "tlora.started": "מתחיל (עשוי לקחת זמן רב)…",
   "tlora.done_lora": "LoRA מוכן: {f}",
   "tlora.done_ds": "מאגר הנתונים מוכן: {f}",
-  "feat.cap.lora_video_train": "אימון LoRA וידאו (LTX-2.3, מאגר אוטומטי)"
+  "feat.cap.lora_video_train": "אימון LoRA וידאו (LTX-2.3, מאגר אוטומטי)",
+  "tab.lora_image": "LoRA תמונות",
+  "ilora.train": "אימון LoRA (FLUX.2)",
+  "ilora.base": "מודל בסיס",
+  "ilora.res": "רזולוציה",
+  "ilora.install": "התקן ai-toolkit",
+  "ilora.gen_train": "🎓 צור + אמן LoRA FLUX.2",
+  "ilora.started": "מתחיל LoRA FLUX.2 (עשוי לקחת זמן רב)…",
+  "feat.cap.lora_image_train": "אימון LoRA תמונות (FLUX.2, מאגר אוטומטי)"
 }

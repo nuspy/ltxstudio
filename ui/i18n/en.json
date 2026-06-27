@@ -1466,5 +1466,13 @@
   "tlora.started": "Starting (may take a long time)…",
   "tlora.done_lora": "LoRA ready: {f}",
   "tlora.done_ds": "Dataset ready: {f}",
-  "feat.cap.lora_video_train": "Train video LoRA (LTX-2.3, auto dataset)"
+  "feat.cap.lora_video_train": "Train video LoRA (LTX-2.3, auto dataset)",
+  "tab.lora_image": "Photo LoRA",
+  "ilora.train": "LoRA training (FLUX.2)",
+  "ilora.base": "Base model",
+  "ilora.res": "Resolution",
+  "ilora.install": "Install ai-toolkit",
+  "ilora.gen_train": "🎓 Generate + Train FLUX.2 LoRA",
+  "ilora.started": "Starting FLUX.2 LoRA (may take a long time)…",
+  "feat.cap.lora_image_train": "Train photo LoRA (FLUX.2, auto dataset)"
 }

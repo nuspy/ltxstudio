@@ -156,8 +156,11 @@ class LoraVideoTab(QWidget):
         return box
 
     # ── stato/selezione ──
+    def _default_cases(self, stype: str) -> list:
+        return lora_coverage.default_case_ids(stype)   # video: tutti i casi; sovrascritto in immagini
+
     def _blank(self) -> dict:
-        return {"name": "", "type": "person", "photos": [], "case_ids": lora_coverage.default_case_ids("person"),
+        return {"name": "", "type": "person", "photos": [], "case_ids": self._default_cases("person"),
                 "customs": "", "real_media": [], "face_focus": True}
 
     def _add_subject(self):
@@ -216,7 +219,7 @@ class LoraVideoTab(QWidget):
             return
         s = self._subjects[self._cur]
         s["type"] = self.ed_type.currentData()
-        s["case_ids"] = lora_coverage.default_case_ids(s["type"])
+        s["case_ids"] = self._default_cases(s["type"])
         self._rebuild_coverage(s["type"], s["case_ids"])
         self._save_cur()
 

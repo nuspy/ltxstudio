@@ -113,9 +113,16 @@ DEFAULTS = {
 TYPES = ["person", "place", "object", "concept"]
 
 
+# casi che hanno senso SOLO in video (movimento/tempo) → esclusi nel training immagini (FLUX.2)
+VIDEO_ONLY = {"pan", "dolly", "orbit", "turntable", "turn_head", "nod", "talking", "rotation"}
+
+
 def cases_for(subject_type: str) -> list[tuple]:
     return CASES.get(subject_type, [])
 
 
-def default_case_ids(subject_type: str) -> list[str]:
-    return list(DEFAULTS.get(subject_type, []))
+def default_case_ids(subject_type: str, *, image: bool = False) -> list[str]:
+    ids = list(DEFAULTS.get(subject_type, []))
+    if image:
+        ids = [c for c in ids if c not in VIDEO_ONLY]
+    return ids

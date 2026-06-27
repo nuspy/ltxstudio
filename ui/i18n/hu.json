@@ -1369,5 +1369,13 @@
   "tlora.started": "Indítás (sokáig tarthat)…",
   "tlora.done_lora": "LoRA kész: {f}",
   "tlora.done_ds": "Adatkészlet kész: {f}",
-  "feat.cap.lora_video_train": "Videó LoRA tréning (LTX-2.3, automatikus adatkészlet)"
+  "feat.cap.lora_video_train": "Videó LoRA tréning (LTX-2.3, automatikus adatkészlet)",
+  "tab.lora_image": "Fotó LoRA",
+  "ilora.train": "LoRA tréning (FLUX.2)",
+  "ilora.base": "Alapmodell",
+  "ilora.res": "Felbontás",
+  "ilora.install": "ai-toolkit telepítése",
+  "ilora.gen_train": "🎓 Generálás + FLUX.2 LoRA tréning",
+  "ilora.started": "FLUX.2 LoRA indítása (sokáig tarthat)…",
+  "feat.cap.lora_image_train": "Fotó LoRA tréning (FLUX.2, automatikus adatkészlet)"
 }
