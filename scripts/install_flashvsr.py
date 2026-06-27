@@ -26,7 +26,7 @@ def main():
     subprocess.run([str(py), "-m", "pip", "install", "-U", "pip"], check=True)
     print("[flashvsr] installo torch CUDA 12.4 + requirements…")
     subprocess.run([str(py), "-m", "pip", "install", "torch==2.6.0", "torchvision==0.21.0",
-                    "torchaudio==2.6.0", "--index-url", "https://download.pytorch.org/whl/cu124"], check=False)
+                    "torchaudio==2.6.0", "--index-url", "https://download.pytorch.org/whl/cu128"], check=False)
     req = REPO_DIR / "requirements.txt"
     if req.exists():
         subprocess.run([str(py), "-m", "pip", "install", "-r", str(req)], check=False)

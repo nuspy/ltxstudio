@@ -28,7 +28,7 @@ def main():
     subprocess.run([str(py), "-m", "pip", "install", "-U", "pip"], check=True)
     # torch CUDA 12.1 (allineato al resto dell'app); poi i requirements del repo
     subprocess.run([str(py), "-m", "pip", "install", "torch", "torchvision",
-                    "--index-url", "https://download.pytorch.org/whl/cu121"], check=False)
+                    "--index-url", "https://download.pytorch.org/whl/cu128"], check=False)
     req = CLI_DIR / "requirements.txt"
     if req.exists():
         subprocess.run([str(py), "-m", "pip", "install", "-r", str(req)], check=False)
