@@ -1690,5 +1690,14 @@
   "fs.mvp.ph_done": "Completo",
   "fs.project_manage": "📂 Progetti",
   "fs.proj.title": "Progetti — AI Film Studio",
-  "fs.proj.list": "Progetti salvati"
+  "fs.proj.list": "Progetti salvati",
+  "fs.var.title": "Variazioni / Sub-luoghi",
+  "fs.var.ph": "es. ferito / sporco / Radura interna",
+  "fs.var.add": "➕ Variazione",
+  "fs.ward.ph": "abito (es. abito da sera) — solo attori",
+  "fs.ward.add": "👗 Abbigliamento",
+  "fs.ward.need_var": "Seleziona prima una variazione.",
+  "fs.sb.warn_scene": "Scena {n}: Σinquadrature {a:.0f}s ≠ durata scena {b:.0f}s",
+  "fs.sb.warn_film": "Σscene {a:.0f}s ≠ durata film {b:.0f}s",
+  "fs.sb.dur_ok": "✓ Durate coerenti"
 }

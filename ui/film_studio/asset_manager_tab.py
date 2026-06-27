@@ -93,6 +93,21 @@ class AssetManagerTab(QWidget):
         hh.addWidget(b_save); hh.addStretch(1); hh.addWidget(self.b_sheet)
         f.addRow(hh)
         self.sheet_log = QLabel(""); f.addRow(self.sheet_log)
+        # Variazioni (età/pettinatura/condizione…) + Abbigliamento (solo attori) — spec §6.1.1/6.1.2
+        from PySide6.QtWidgets import QListWidget as _QLW
+        f.addRow(QLabel(tr("fs.var.title", "Variazioni / Sub-luoghi")))
+        self.var_list = _QLW(); self.var_list.setMaximumHeight(80); f.addRow(self.var_list)
+        vh = QHBoxLayout()
+        self.var_name = QLineEdit(); self.var_name.setPlaceholderText(tr("fs.var.ph", "es. ferito / sporco / Radura interna"))
+        b_var = QPushButton(tr("fs.var.add", "➕ Variazione")); b_var.clicked.connect(self._add_var)
+        b_vdel = QPushButton(tr("tlora.del", "🗑")); b_vdel.clicked.connect(self._del_var)
+        vh.addWidget(self.var_name, 1); vh.addWidget(b_var); vh.addWidget(b_vdel)
+        f.addRow(vh)
+        self.ward_row = QWidget(); wl = QHBoxLayout(self.ward_row); wl.setContentsMargins(0, 0, 0, 0)
+        self.ward_name = QLineEdit(); self.ward_name.setPlaceholderText(tr("fs.ward.ph", "abito (es. abito da sera) — solo attori"))
+        b_ward = QPushButton(tr("fs.ward.add", "👗 Abbigliamento")); b_ward.clicked.connect(self._add_wardrobe)
+        wl.addWidget(self.ward_name, 1); wl.addWidget(b_ward)
+        f.addRow(self.ward_row)
         root.addWidget(box, 2)
         self._refresh_list()
 
@@ -114,6 +129,48 @@ class AssetManagerTab(QWidget):
         self.e_type.setCurrentIndex([c for c, _ in _TYPES].index(a["type"]) if a["type"] in [c for c, _ in _TYPES] else 0)
         self.e_name.setText(a["name"]); self.e_desc.setPlainText(a.get("description") or "")
         self.e_tags.setText(a.get("tags") or "")
+        self._refresh_vars()
+
+    def _refresh_vars(self):
+        self.var_list.clear()
+        if not self._cur:
+            return
+        self._vars = db.query("asset_variation", "asset_id=?", (self._cur,))
+        for v in self._vars:
+            wards = db.query("wardrobe", "variation_id=?", (v["id"],))
+            wtag = f" · 👗{len(wards)}" if wards else ""
+            self.var_list.addItem(f"[{v['kind']}] {v['name']}{wtag}")
+        is_actor = db.get("asset", self._cur).get("type") == "actor" if self._cur else False
+        self.ward_row.setVisible(is_actor)
+
+    def _add_var(self):
+        if not self._cur:
+            QMessageBox.information(self, tr("fs.var.title", "Variazione"), tr("fs.asset.save_first", "Salva prima l'asset.")); return
+        name = self.var_name.text().strip()
+        if not name:
+            return
+        a = db.get("asset", self._cur)
+        kind = "sublocation" if a["type"] in ("location", "architecture") else "variation"
+        db.insert("asset_variation", asset_id=self._cur, name=name, kind=kind, description=name)
+        self.var_name.clear(); self._refresh_vars()
+
+    def _del_var(self):
+        r = self.var_list.currentRow()
+        if 0 <= r < len(getattr(self, "_vars", [])):
+            vid = self._vars[r]["id"]
+            for w in db.query("wardrobe", "variation_id=?", (vid,)):
+                db.delete("wardrobe", w["id"])
+            db.delete("asset_variation", vid); self._refresh_vars()
+
+    def _add_wardrobe(self):
+        r = self.var_list.currentRow()
+        if not (0 <= r < len(getattr(self, "_vars", []))):
+            QMessageBox.information(self, tr("fs.ward.add", "Abbigliamento"), tr("fs.ward.need_var", "Seleziona prima una variazione.")); return
+        name = self.ward_name.text().strip()
+        if not name:
+            return
+        db.insert("wardrobe", variation_id=self._vars[r]["id"], name=name, description=name, images="")
+        self.ward_name.clear(); self._refresh_vars()
 
     def _pick_photo(self):
         p, _ = QFileDialog.getOpenFileName(self, tr("fs.asset.photo", "Foto base"), "", "Immagini (*.png *.jpg *.jpeg *.webp)")

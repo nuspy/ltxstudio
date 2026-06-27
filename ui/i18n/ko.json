@@ -1593,5 +1593,14 @@
   "fs.mvp.ph_done": "Done",
   "fs.project_manage": "📂 프로젝트",
   "fs.proj.title": "Projects — AI Film Studio",
-  "fs.proj.list": "Saved projects"
+  "fs.proj.list": "Saved projects",
+  "fs.var.title": "Variations / Sub-locations",
+  "fs.var.ph": "e.g. wounded / dirty / Inner clearing",
+  "fs.var.add": "➕ Variation",
+  "fs.ward.ph": "outfit (e.g. evening dress) — actors only",
+  "fs.ward.add": "👗 Wardrobe",
+  "fs.ward.need_var": "Select a variation first.",
+  "fs.sb.warn_scene": "Scene {n}: Σshots {a:.0f}s ≠ scene duration {b:.0f}s",
+  "fs.sb.warn_film": "Σscenes {a:.0f}s ≠ film duration {b:.0f}s",
+  "fs.sb.dur_ok": "✓ Durations consistent"
 }

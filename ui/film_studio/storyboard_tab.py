@@ -38,6 +38,7 @@ class StoryboardTab(QWidget):
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
         self.tree.currentItemChanged.connect(self._on_tree_sel)
         v.addWidget(self.tree, 1)
+        self.dur_warn = QLabel(""); v.addWidget(self.dur_warn)   # validazione durate (§10.1)
         # pannello editing scena/shot selezionato (spec §10.3) con @Reference
         eb = QGroupBox(tr("fs.sb.edit", "Modifica selezione (@Nome per gli asset)")); ev = QVBoxLayout(eb)
         self.edit = QPlainTextEdit(); self.edit.setFixedHeight(80)
@@ -61,14 +62,32 @@ class StoryboardTab(QWidget):
         pid = self._get_project()
         if not pid:
             return
-        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
-            it = QTreeWidgetItem([f"S{sc['ord']}: {(sc['description'] or '')[:60]}", f"{sc['duration_s']:.0f}s"])
+        proj = db.get("project", pid) or {}
+        scenes = db.query("scene", "project_id=?", (pid,), order="ord")
+        warns = []
+        scene_sum = 0.0
+        for sc in scenes:
+            shots = db.query("shot", "scene_id=?", (sc["id"],), order="ord")
+            shot_sum = sum(float(s["duration_s"] or 0) for s in shots)
+            scene_sum += float(sc["duration_s"] or 0)
+            mark = "" if abs(shot_sum - float(sc["duration_s"] or 0)) < 0.6 else " ⚠"
+            it = QTreeWidgetItem([f"S{sc['ord']}: {(sc['description'] or '')[:58]}",
+                                  f"{sc['duration_s']:.0f}s{mark}"])
             it.setData(0, Qt.UserRole, ("scene", sc["id"]))
-            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
-                ci = QTreeWidgetItem([f"  {sh['ord']}. {(sh['description'] or '')[:60]}", f"{sh['duration_s']:.0f}s"])
+            if mark:
+                warns.append(tr("fs.sb.warn_scene", "Scena {n}: Σinquadrature {a:.0f}s ≠ durata scena {b:.0f}s")
+                             .format(n=sc["ord"], a=shot_sum, b=float(sc["duration_s"] or 0)))
+            for sh in shots:
+                ci = QTreeWidgetItem([f"  {sh['ord']}. {(sh['description'] or '')[:58]}", f"{sh['duration_s']:.0f}s"])
                 ci.setData(0, Qt.UserRole, ("shot", sh["id"]))
                 it.addChild(ci)
             self.tree.addTopLevelItem(it); it.setExpanded(True)
+        film = float(proj.get("duration_s") or 0)
+        if scenes and film and abs(scene_sum - film) > 1.0:
+            warns.append(tr("fs.sb.warn_film", "Σscene {a:.0f}s ≠ durata film {b:.0f}s").format(a=scene_sum, b=film))
+        if hasattr(self, "dur_warn"):
+            self.dur_warn.setText(("⚠ " + " · ".join(warns)) if warns else
+                                  tr("fs.sb.dur_ok", "✓ Durate coerenti"))
 
     def _breakdown(self):
         pid = self._get_project()
