@@ -38,7 +38,10 @@ class MontageTab(QWidget):
         r1.addWidget(QLabel(tr("fs.mt.nle", "Formato NLE"))); r1.addWidget(self.fmt); r1.addStretch(1)
         bv.addLayout(r1)
         r2 = QHBoxLayout()
-        self.btn_audio = QPushButton(tr("fs.mt.audio", "🔊 Genera audio (dialoghi+musica)")); self.btn_audio.clicked.connect(self._gen_audio)
+        self.btn_audio = QPushButton(tr("fs.mt.audio", "🔊 Genera dialoghi")); self.btn_audio.clicked.connect(self._gen_audio)
+        self.btn_music = QPushButton(tr("fs.mt.music", "🎵 Colonna sonora")); self.btn_music.clicked.connect(self._gen_music)
+        self.btn_ambient = QPushButton(tr("fs.mt.ambient", "🌧 Ambient/SFX")); self.btn_ambient.clicked.connect(self._gen_ambient)
+        r2.addWidget(self.btn_music); r2.addWidget(self.btn_ambient)
         self.btn_master = QPushButton(tr("fs.mt.master", "🎞 Master (A)")); self.btn_master.clicked.connect(self._master)
         self.btn_export = QPushButton(tr("fs.mt.export", "📦 Export NLE (B)")); self.btn_export.clicked.connect(self._export)
         r2.addWidget(self.btn_audio); r2.addWidget(self.btn_master); r2.addWidget(self.btn_export); r2.addStretch(1)
@@ -99,14 +102,80 @@ class MontageTab(QWidget):
                 t += dur
         self.info.setText(tr("fs.mt.audio_done", "Audio: {n} battute sintetizzate").format(n=n))
 
+    def _film_mood(self) -> str:
+        import json
+        pid = self._get_project()
+        moods = []
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            st = json.loads(sc.get("continuity") or "{}")
+            if st.get("mood"):
+                moods.append(st["mood"])
+        return ", ".join(dict.fromkeys(moods)) or "cinematic, atmospheric"
+
+    def _gen_music(self):
+        """Colonna sonora strumentale (HeartMuLa) col mood del film → traccia musica (volume ridotto = ducking)."""
+        import time as _t
+        from core import music_service as ms
+        pid = self._get_project()
+        if not pid:
+            return
+        total = sum(float(c["out_s"]) for c in (self._cur_clips or [])) or 60.0
+        out = str(db.project_dir(pid) / "music.mp3")
+        p = ms.SongParams(name=f"fs_music_{pid}", lyrics="", tags=f"{self._film_mood()}, instrumental, soundtrack",
+                          duration_s=min(total, 180), instrumental=True)
+        errs = ms.preflight_song(p)
+        if errs:
+            QMessageBox.warning(self, tr("fs.mt.music", "Musica"), "; ".join(errs)); return
+        self.btn_music.setEnabled(False); self.info.setText(tr("fs.working", "Generazione…"))
+        self._mjob = ms.make_song_job(p, on_done=lambda rc: self._on_music(rc, p.out_mp3(), total))
+        self._mjob.start() if hasattr(self._mjob, "start") else None
+
+    def _on_music(self, rc, path, total):
+        self.btn_music.setEnabled(True)
+        if os.path.exists(str(path)):
+            self._extra_tracks = getattr(self, "_extra_tracks", [])
+            self._extra_tracks.append({"path": str(path), "start_s": 0, "volume": 0.3})  # ducking sotto i dialoghi
+            self.info.setText(tr("fs.mt.music_done", "Colonna sonora pronta."))
+        else:
+            self.info.setText(tr("fs.mt.music_fail", "Colonna sonora non generata."))
+
+    def _gen_ambient(self):
+        """Ambient/SFX via MMAudio sul master muto (se generato), come traccia di fondo."""
+        from core import music_service as ms
+        pid = self._get_project()
+        master = str(db.project_dir(pid) / "master.mp4")
+        if not os.path.exists(master):
+            QMessageBox.information(self, tr("fs.mt.ambient", "Ambient"), tr("fs.mt.need_master", "Genera prima il Master (A).")); return
+        out = str(db.project_dir(pid) / "ambient")
+        p = ms.SonifyParams(name=f"fs_amb_{pid}", video_path=master,
+                            prompt=self._film_mood() + ", ambient background, room tone")
+        errs = ms.preflight_sonify(p)
+        if errs:
+            QMessageBox.warning(self, tr("fs.mt.ambient", "Ambient"), "; ".join(errs)); return
+        self.btn_ambient.setEnabled(False); self.info.setText(tr("fs.working", "Generazione…"))
+        self._ajob = ms.make_sonify_job(p, on_done=lambda rc: self._on_ambient(rc))
+        self._ajob.start() if hasattr(self._ajob, "start") else None
+
+    def _on_ambient(self, rc):
+        self.btn_ambient.setEnabled(True)
+        from core import music_service as ms
+        f = ms.find_latest_audio()
+        if f and os.path.exists(str(f)):
+            self._extra_tracks = getattr(self, "_extra_tracks", [])
+            self._extra_tracks.append({"path": str(f), "start_s": 0, "volume": 0.4})
+            self.info.setText(tr("fs.mt.ambient_done", "Ambient pronto."))
+        else:
+            self.info.setText(tr("fs.mt.ambient_fail", "Ambient non generato."))
+
     def _master(self):
         clips = [c["file"] for c in (self._cur_clips or [])]
         if not clips:
             QMessageBox.information(self, tr("fs.mt.master", "Master"), tr("fs.mt.no_clips", "Nessuna clip generata.")); return
         pid = self._get_project()
         out = str(db.project_dir(pid) / "master.mp4")
+        tracks = list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
         try:
-            otio_export.render_master(clips, out, audio_tracks=getattr(self, "_audio_tracks", None))
+            otio_export.render_master(clips, out, audio_tracks=tracks or None)
             self.info.setText(tr("fs.mt.master_done", "Master: {f}").format(f=out))
         except Exception as e:                              # noqa: BLE001
             QMessageBox.critical(self, tr("fs.mt.master", "Master"), str(e)[:600])

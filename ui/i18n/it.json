@@ -1616,5 +1616,15 @@
   "fs.voice.emo_sad": "Triste",
   "fs.voice.emo_angry": "Arrabbiato",
   "fs.voice.emo_whisper": "Sussurro",
-  "fs.voice.emo_calm": "Calmo"
+  "fs.voice.emo_calm": "Calmo",
+  "fs.mt.music": "🎵 Colonna sonora",
+  "fs.mt.ambient": "🌧 Ambient/SFX",
+  "fs.mt.music_done": "Colonna sonora pronta.",
+  "fs.mt.music_fail": "Colonna sonora non generata.",
+  "fs.mt.ambient_done": "Ambient pronto.",
+  "fs.mt.ambient_fail": "Ambient non generato.",
+  "fs.mt.need_master": "Genera prima il Master (A).",
+  "fs.sb.edit": "Modifica selezione (@Nome per gli asset)",
+  "fs.sb.regen_seg": "↻ Rigenera (LLM)",
+  "fs.sb.saved_sel": "Selezione salvata."
 }

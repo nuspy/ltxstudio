@@ -35,9 +35,23 @@ class StoryboardTab(QWidget):
         h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video); h.addStretch(1)
         v.addLayout(h)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
+        self.tree.currentItemChanged.connect(self._on_tree_sel)
         v.addWidget(self.tree, 1)
-        self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(90)
+        # pannello editing scena/shot selezionato (spec §10.3) con @Reference
+        eb = QGroupBox(tr("fs.sb.edit", "Modifica selezione (@Nome per gli asset)")); ev = QVBoxLayout(eb)
+        self.edit = QPlainTextEdit(); self.edit.setFixedHeight(80)
+        ev.addWidget(self.edit)
+        from ui.film_studio.asset_dialog import attach as _attach_at
+        _attach_at(self.edit)
+        eh = QHBoxLayout()
+        self.btn_save_sel = QPushButton(tr("fs.save", "💾 Salva")); self.btn_save_sel.clicked.connect(self._save_sel)
+        self.btn_regen_sel = QPushButton(tr("fs.sb.regen_seg", "↻ Rigenera (LLM)")); self.btn_regen_sel.clicked.connect(self._regen_sel)
+        eh.addWidget(self.btn_save_sel); eh.addWidget(self.btn_regen_sel); eh.addStretch(1)
+        ev.addLayout(eh)
+        v.addWidget(eb)
+        self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(80)
         v.addWidget(self.log)
+        self._sel = None
         scheduler.on_event(self._on_job)
         self._refresh()
 
@@ -117,6 +131,35 @@ class StoryboardTab(QWidget):
                                       owner_kind="shot", owner_id=sh["id"])
                 n += 1
         self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))
+
+    def _on_tree_sel(self, cur, _prev):
+        self._sel = cur.data(0, Qt.UserRole) if cur else None
+        if not self._sel:
+            self.edit.clear(); return
+        kind, rid = self._sel
+        row = db.get(kind, rid)
+        self.edit.setPlainText((row or {}).get("description", "") if row else "")
+
+    def _save_sel(self):
+        if not self._sel:
+            return
+        kind, rid = self._sel
+        db.update(kind, rid, description=self.edit.toPlainText().strip())
+        # propagazione: se cambio la descrizione di scena, gli shot ereditano i nuovi @ref al refresh gen
+        self._refresh()
+        self.log.appendPlainText(tr("fs.sb.saved_sel", "Selezione salvata."))
+
+    def _regen_sel(self):
+        if not self._sel:
+            return
+        try:
+            kind, rid = self._sel
+            sysp = ("Rewrite this film " + ("scene" if kind == "scene" else "shot") +
+                    " description, keeping @Name references. Same language. Output only the text.")
+            new = L.complete(sysp, self.edit.toPlainText().strip(), max_tokens=400)
+            self.edit.setPlainText(new.strip())
+        except Exception as e:                              # noqa: BLE001
+            QMessageBox.critical(self, tr("fs.sb.edit", "Modifica"), str(e)[:400])
 
     def _on_job(self, ev: dict):
         if ev.get("event") in ("done", "error"):
