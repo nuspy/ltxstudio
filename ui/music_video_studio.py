@@ -75,6 +75,16 @@ class MusicVideoStudio(QWidget):
         a = mvp.active_song(self.pid)
         return mvs._dur(a["file"]) if a and os.path.exists(a["file"]) else float(self.proj.get("song_duration", 120))
 
+    def _export_nle(self):
+        if not any(s.get("video_path") for s in self.scenes):
+            QMessageBox.information(self, tr("mvs.export_nle", "Export"), tr("mvs.no_vids", "Genera prima i video.")); return
+        try:
+            p = mvs.export_nle(self.scenes, os.path.join(self.out_dir, "export"),
+                               fmt=self.btn_export.currentData(), name=f"mv_{self.pid}")
+            self.status.setText(tr("mvs.export_done", "Export NLE: {f}").format(f=p))
+        except Exception as e:                              # noqa: BLE001
+            QMessageBox.critical(self, tr("mvs.export_nle", "Export"), str(e)[:500])
+
     def _busy(self, on: bool, msg: str = ""):
         for b in self._all_btns:
             b.setEnabled(not on)
@@ -84,6 +94,16 @@ class MusicVideoStudio(QWidget):
     # ───────────── Fase 0: CANZONE ─────────────
     def _song_tab(self) -> QWidget:
         w = QWidget(); v = QVBoxLayout(w)
+        # parametri canzone (2.4)
+        from PySide6.QtWidgets import QDoubleSpinBox as _DS
+        ph = QHBoxLayout()
+        self.song_temp = _DS(); self.song_temp.setRange(0.1, 2.0); self.song_temp.setSingleStep(0.1)
+        self.song_temp.setValue(float(self.proj.get("song_temperature", 1.0) or 1.0))
+        self.song_cfg = _DS(); self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setSingleStep(0.5)
+        self.song_cfg.setValue(float(self.proj.get("song_cfg", 1.5) or 1.5))
+        ph.addWidget(QLabel(tr("mvs.song_temp", "Temperatura"))); ph.addWidget(self.song_temp)
+        ph.addWidget(QLabel(tr("mvs.song_cfg", "CFG"))); ph.addWidget(self.song_cfg); ph.addStretch(1)
+        v.addLayout(ph)
         v.addWidget(QLabel(tr("mvs.songs", "Canzoni generate per il progetto (seleziona quella attiva)")))
         self.song_list = QListWidget(); self.song_list.currentRowChanged.connect(self._song_select)
         v.addWidget(self.song_list, 1)
@@ -116,9 +136,11 @@ class MusicVideoStudio(QWidget):
         self.proj = mvp.get_project(self.pid)
         out = os.path.join(self.out_dir, f"song_{int(time.time())}.mp3")
         self._busy(True, tr("mvs.song_gen", "Generazione canzone…"))
+        mvp.update_project(self.pid, song_temperature=float(self.song_temp.value()), song_cfg=float(self.song_cfg.value()))
         self._worker = _Worker(mvs.generate_song, lyrics=self.proj.get("lyrics", ""),
                                tags=self.proj.get("tags", "") or "pop", out_mp3=out,
-                               duration_s=float(self.proj.get("song_duration", 120)))
+                               duration_s=float(self.proj.get("song_duration", 120)),
+                               temperature=float(self.song_temp.value()), cfg_scale=float(self.song_cfg.value()))
         self._worker.done.connect(self._on_song)
         self._worker.start()
 
@@ -210,10 +232,21 @@ class MusicVideoStudio(QWidget):
     # ───────────── Fase 2: VIDEO ─────────────
     def _video_tab(self) -> QWidget:
         w = QWidget(); v = QVBoxLayout(w)
+        from PySide6.QtWidgets import QComboBox as _CB
         bar = QHBoxLayout()
         self.btn_vids = QPushButton(tr("mvs.gen_vids", "Genera video")); self.btn_vids.clicked.connect(self._gen_videos)
+        self.transition = _CB()
+        for code, lab in (("cut", "mvs.tr_cut"), ("crossfade", "mvs.tr_xfade"), ("fade", "mvs.tr_fade"),
+                          ("dissolve", "mvs.tr_dissolve"), ("wipeleft", "mvs.tr_wipe")):
+            self.transition.addItem(tr(lab, code), code)
         self.btn_assemble = QPushButton(tr("mvs.assemble", "🎞 Monta + audio")); self.btn_assemble.clicked.connect(self._assemble)
-        bar.addWidget(self.btn_vids); bar.addStretch(1); bar.addWidget(self.btn_assemble)
+        self.btn_export = _CB()
+        for f in ("fcpxml", "otio", "aaf", "edl"):
+            self.btn_export.addItem(f.upper(), f)
+        b_exp = QPushButton(tr("mvs.export_nle", "📦 Export NLE")); b_exp.clicked.connect(self._export_nle)
+        bar.addWidget(self.btn_vids); bar.addStretch(1)
+        bar.addWidget(QLabel(tr("mvs.transition", "Transizione"))); bar.addWidget(self.transition)
+        bar.addWidget(self.btn_assemble); bar.addWidget(self.btn_export); bar.addWidget(b_exp)
         v.addLayout(bar)
         self.vid_list = QListWidget(); v.addWidget(self.vid_list, 1)
         rb = QHBoxLayout()
@@ -248,10 +281,24 @@ class MusicVideoStudio(QWidget):
         self._refresh_vid()
 
     def _refresh_vid(self):
+        from PySide6.QtWidgets import QListWidgetItem
+        from PySide6.QtGui import QIcon
+        from PySide6.QtCore import QSize
+        self.vid_list.setIconSize(QSize(96, 54))
         self.vid_list.clear()
         for s in sorted(self.scenes, key=lambda x: x["order"]):
-            mark = "🎥" if s.get("video_path") and os.path.exists(s["video_path"]) else "·"
-            self.vid_list.addItem(f"{mark} {_mmss(s['start_s'])}  ({s['length_s']:.1f}s)  {s['video_prompt'][:46]}")
+            has = s.get("video_path") and os.path.exists(s["video_path"])
+            mark = "🎥" if has else "·"
+            it = QListWidgetItem(f"{mark} {_mmss(s['start_s'])}  ({s['length_s']:.1f}s)  {s['video_prompt'][:46]}")
+            if has:                                          # thumbnail = primo frame del video (cache .thumb.jpg)
+                thumb = s["video_path"] + ".thumb.jpg"
+                if not os.path.exists(thumb):
+                    import subprocess
+                    subprocess.run(["ffmpeg", "-v", "error", "-i", s["video_path"], "-vframes", "1",
+                                    "-vf", "scale=96:-1", thumb, "-y"], check=False)
+                if os.path.exists(thumb):
+                    it.setIcon(QIcon(thumb))
+            self.vid_list.addItem(it)
 
     def _cur(self):
         r = self.sb_list.currentRow()
@@ -378,7 +425,12 @@ class MusicVideoStudio(QWidget):
         self._busy(False)
         if res.get("error"):
             QMessageBox.critical(self, tr("mvs.plan", "Riprese"), str(res["error"])[:600]); return
-        self.scenes = res["result"]; self._save(); self._refresh_sb()
+        self.scenes = res["result"]
+        # 2.5 riuso reale dell'immagine fornita come apertura della scena 0
+        base_img = self.proj.get("base_image", "")
+        if base_img and os.path.exists(base_img) and self.scenes:
+            self.scenes[0]["image_path"] = base_img
+        self._save(); self._refresh_sb()
         self.status.setText(tr("mvs.planned", "{n} riprese — modifica, poi genera le immagini").format(n=len(self.scenes)))
 
     def _gen_images(self):
@@ -430,7 +482,8 @@ class MusicVideoStudio(QWidget):
             QMessageBox.information(self, tr("mvs.assemble", "Monta"), tr("mvs.no_vids", "Servono canzone attiva e video.")); return
         out = os.path.join(self.out_dir, "music_video.mp4")
         self._busy(True, tr("mvs.assembling", "Montaggio…"))
-        self._worker = _Worker(mvs.assemble_scenes, self.scenes, a["file"], out)
+        self._worker = _Worker(mvs.assemble_scenes, self.scenes, a["file"], out,
+                               transition=self.transition.currentData())
         def _fin(r):
             self._busy(False)
             if r.get("error"):

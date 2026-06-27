@@ -335,7 +335,7 @@ class MusicTab(QWidget):
             lyrics=lyrics, tags=self.song_tags.text().strip() or ms.DEFAULT_TAGS,
             image_hint=("coerente con l'immagine: " + image) if image else "",
             scene_seconds=float(self.mv_pace.currentData()), video_style=self.mv_style.text().strip(),
-            song_duration=float(self.song_dur.value()))
+            song_duration=float(self.song_dur.value()), base_image=image if image and Path(image).exists() else "")
         self._open_mv_studio(pid)
 
     def _open_mv_projects(self):

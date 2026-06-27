@@ -174,21 +174,61 @@ def gen_scene_video(scene: dict, out_mp4: str, *, width: int = 704, height: int 
     return out_mp4
 
 
-def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: int = 25) -> str:
-    """Monta i video delle scene (nell'ordine) + traccia audio della canzone."""
+def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: int = 25,
+                    transition: str = "cut", xfade_s: float = 0.4) -> str:
+    """Monta i video delle scene (nell'ordine) + traccia audio della canzone.
+    transition: 'cut' (stacco netto, default) | 'crossfade'/'fade'/'dissolve'... (xfade ffmpeg).
+    NB il nuovo Studio usa clip i2v SEPARATE → niente ghosting tra clip (lo stacco è netto by-design);
+    la transizione xfade è opzionale per ammorbidire i tagli (#41/#46)."""
     ordered = sorted(scenes, key=lambda s: s["order"])
     clips = [s["video_path"] for s in ordered if s.get("video_path") and os.path.exists(s["video_path"])]
     if not clips:
         raise RuntimeError("nessun video di scena da montare")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    lst = out_path + ".list.txt"
-    open(lst, "w", encoding="utf-8").write("".join(f"file '{c}'\n" for c in clips))
     silent = out_path + ".silent.mp4"
-    subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
+    if transition == "cut" or len(clips) == 1:
+        lst = out_path + ".list.txt"
+        open(lst, "w", encoding="utf-8").write("".join(f"file '{c}'\n" for c in clips))
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
+    else:                                                   # xfade a catena tra clip consecutive
+        xkind = {"crossfade": "fade", "dissolve": "dissolve", "fade": "fade"}.get(transition, transition)
+        cmd = ["ffmpeg", "-v", "error"]
+        for c in clips:
+            cmd += ["-i", c]
+        durs = [_dur(c) for c in clips]
+        fc, prev, offset = [], "[0:v]", 0.0
+        for i in range(1, len(clips)):
+            offset += durs[i - 1] - xfade_s
+            lbl = f"[x{i}]"
+            fc.append(f"{prev}[{i}:v]xfade=transition={xkind}:duration={xfade_s}:offset={max(0,offset):.3f}{lbl}")
+            prev = lbl
+        subprocess.run(cmd + ["-filter_complex", ";".join(fc), "-map", prev,
+                              "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
+        if not os.path.exists(silent):                     # fallback cut se xfade fallisce
+            lst = out_path + ".list.txt"
+            open(lst, "w", encoding="utf-8").write("".join(f"file '{c}'\n" for c in clips))
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
     subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", song_path, "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"], check=False)
     return out_path
+
+
+def export_nle(scenes: list[dict], out_dir: str, *, fmt: str = "fcpxml", name: str = "music_video") -> str:
+    """#2.7 Export NLE del videomusicale (FCPXML/AAF/EDL/OTIO) riusando core/film_studio/otio_export."""
+    from core.film_studio import otio_export
+    ordered = sorted(scenes, key=lambda s: s["order"])
+    clips = [{"file": s["video_path"], "in_s": 0.0, "out_s": float(s.get("length_s", 4)),
+              "name": _mmss_safe(s.get("start_s", 0))}
+             for s in ordered if s.get("video_path") and os.path.exists(s["video_path"])]
+    if not clips:
+        raise RuntimeError("nessun video da esportare")
+    return otio_export.export_nle(clips, out_dir, fmt=fmt, name=name)
+
+
+def _mmss_safe(s) -> str:
+    s = int(s or 0); return f"{s // 60:02d}_{s % 60:02d}"
 
 
 def _valid_nf(seconds: float, fps: int) -> int:

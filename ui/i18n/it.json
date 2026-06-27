@@ -1704,5 +1704,15 @@
   "imp.convert.note": "Converte i modelli ComfyUI (fp8/quantizzati) nel formato del backend nativo. Eseguito una tantum.",
   "imp.convert.gemma": "Gemma-3 → bf16",
   "imp.convert.te": "Text encoder → HF",
-  "imp.convert.missing": "Script non trovato: {s}"
+  "imp.convert.missing": "Script non trovato: {s}",
+  "mvs.song_temp": "Temperatura",
+  "mvs.song_cfg": "CFG",
+  "mvs.transition": "Transizione",
+  "mvs.tr_cut": "Stacco netto",
+  "mvs.tr_xfade": "Dissolvenza incrociata",
+  "mvs.tr_fade": "Dissolvenza",
+  "mvs.tr_dissolve": "Dissolve",
+  "mvs.tr_wipe": "Tendina",
+  "mvs.export_nle": "📦 Export NLE",
+  "mvs.export_done": "Export NLE: {f}"
 }

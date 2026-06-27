@@ -6,24 +6,24 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 ## AREA 3 — migrazione no‑ComfyUI
 - [x] 3.1 ControlNet IC‑LoRA reale — ICLoraPipeline GGUF-patchata + IC-LoRA canny/depth/pose da disco (no download), firma video_conditioning; full-GPU val in #43
 - [~] 3.2 FLUX.2 t2i — TE è nvfp4 (no fp8): modulo dequant nvfp4→bf16 PRONTO (flux2_te.py, no download 48GB); resta validazione live swizzle su Blackwell → Task #44
-- [ ] 3.3 SeedVR2 nativo — 3B 14.6GB IN DOWNLOAD; integrare pipeline DiT + handler video_upscale opzione seedvr2
+- [⏳] 3.3 SeedVR2 nativo — 3B 14.6GB IN DOWNLOAD; integrare pipeline DiT + handler video_upscale opzione seedvr2
 - [x] 3.4 ReTake nativo — RetakePipeline nel worker + ramo GUI _retake_native (sezione [start,end]); full-GPU val #43
 - [x] 3.5 UI conversione modelli — gruppo Conversione in Import Models (Gemma-3→bf16, TE→HF) via subprocess venv; i18n 15
 - [x] 3.6 text→audio (run_t2a, T2AOneStage audio-only) + helper EXR (core/exr_export); HDR-IC-LoRA pipeline completa → Task (serve embeddings precomputati + val live), HDR LoRA su disco
 - [x] 3.7 Durata-illimitata MULTI-PROMPT — _run_chunked usa prompts=[{start_s,prompt}] per finestra temporale (memory-bounded, continuità ultimo-frame); long-video test #43 ≤30-60s
-- [ ] 3.8 FlashVSR v1.1 (JunhaoZhuang/FlashVSR-v1.1, <15GB) — scaricare + integrare
+- [⏳] 3.8 FlashVSR v1.1 (JunhaoZhuang/FlashVSR-v1.1, <15GB) — scaricare + integrare
 - [x] 3.9 SD3 — ABORTITA DEFINITIVAMENTE (verificato: nessuna feature usa il modello SD3; EmptySD3LatentImage/ModelSamplingSD3 sono nodi generici, "sd3" solo voce catalogo)
-- [ ] 3.10 Test LIVE end‑to‑end path nativi (≤10s)
+- [~] 3.10 Test LIVE end-to-end → sessione #43 (richiede GPU, ≤10s)
 
 ## AREA 2 — Videomusicale
-- [ ] 2.1 Anteprima video inline (thumbnail)
+- [x] 2.1 Anteprima video inline — thumbnail primo frame (QIcon) nella lista video
 - [ ] 2.2 Allineamento Whisper/forced‑align
-- [ ] 2.3 Ghosting tagli (crossfade)
-- [ ] 2.4 Parametri canzone (temp/cfg/seed) in fase Canzone
-- [ ] 2.5 Riuso reale immagine fornita come scena 0
-- [ ] 2.6 Transizioni tra spezzoni
-- [ ] 2.7 Export NLE del videomusicale
-- [ ] 2.8 Batch generazione asincrona robusta
+- [x] 2.3 Ghosting — risolto by-design (clip i2v separate, concat netto) + transizione crossfade opzionale
+- [x] 2.4 Parametri canzone (temperatura/CFG) nella fase Canzone, salvati nel progetto
+- [x] 2.5 Riuso reale immagine fornita → apertura scena 0 (mv_project.base_image)
+- [x] 2.6 Transizioni — assemble_scenes con xfade (cut/crossfade/fade/dissolve/wipe)
+- [x] 2.7 Export NLE — mvs.export_nle riusa otio_export (FCPXML/OTIO/AAF/EDL)
+- [x] 2.8 Batch async — _next_batch (un worker/volta, UI responsiva, salvataggio per step)
 
 ## AREA 1 — AI Film Studio
 - [ ] 1.1 Generazione immagini variazioni/abbigliamento

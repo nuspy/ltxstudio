@@ -21,7 +21,8 @@ PHASES = ["song", "storyboard", "video", "done"]
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS mv_project(
   id INTEGER PRIMARY KEY, name TEXT, lyrics TEXT, tags TEXT, image_hint TEXT,
-  scene_seconds REAL, video_style TEXT, song_duration REAL,
+  scene_seconds REAL, video_style TEXT, song_duration REAL, base_image TEXT,
+  song_temperature REAL, song_cfg REAL,
   active_song_id INTEGER, phase TEXT, created REAL, updated REAL);
 CREATE TABLE IF NOT EXISTS mv_song(
   id INTEGER PRIMARY KEY, project_id INTEGER, file TEXT, params TEXT, created REAL);
@@ -50,11 +51,14 @@ def _now() -> float:
 
 # ───────────── progetti ─────────────
 def create_project(name: str, *, lyrics: str = "", tags: str = "", image_hint: str = "",
-                   scene_seconds: float = 4.0, video_style: str = "", song_duration: float = 120.0) -> int:
+                   scene_seconds: float = 4.0, video_style: str = "", song_duration: float = 120.0,
+                   base_image: str = "", song_temperature: float = 1.0, song_cfg: float = 1.5) -> int:
     c = conn().execute(
         "INSERT INTO mv_project(name,lyrics,tags,image_hint,scene_seconds,video_style,song_duration,"
-        "active_song_id,phase,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-        (name, lyrics, tags, image_hint, scene_seconds, video_style, song_duration, 0, "song", _now(), _now()))
+        "base_image,song_temperature,song_cfg,active_song_id,phase,created,updated) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (name, lyrics, tags, image_hint, scene_seconds, video_style, song_duration,
+         base_image, song_temperature, song_cfg, 0, "song", _now(), _now()))
     conn().commit()
     return c.lastrowid
 
