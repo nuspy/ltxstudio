@@ -534,8 +534,10 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
     stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     out = output_dir / f"tts_{engine}_{voice.slug()}_{stamp}.mp3"
     clean = strip_markers(_pauses_to_dots_internal(text))
-    # NATIVI via Handy-API (zero ComfyUI)
-    if engine in ("kokoro", "handy_clone"):
+    # L'UTENTE SCEGLIE il motore: ognuno usa il SUO backend. Kokoro/Handy = opzione nativa aggiuntiva;
+    # gli altri restano come predisposti originariamente (edge nativo; CosyVoice venv; F5/XTTS/Fish/
+    # VibeVoice via i loro nodi). Nessun reindirizzamento forzato.
+    if engine in ("kokoro", "handy_clone"):                 # NATIVI via Handy-API (scelti esplicitamente)
         from core import handy_api
         wav = str(out.with_suffix(".wav"))
         if engine == "handy_clone":                        # voce clonata per nome (registrata in Handy)
@@ -549,7 +551,7 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
     if engine == "edge":
         params = derive_edge_params(text)
         return edge_synthesize(clean, voice.voice_id, out, **params)
-    if engine == "cosyvoice2":                              # nativo: venv standalone, poi Handy, poi (legacy) comfy
+    if engine == "cosyvoice2":                              # come predisposto: venv standalone nativo, poi (legacy) comfy
         try:
             from core import cosyvoice_service
             if cosyvoice_service.is_installed() and voice.sample_path:
@@ -561,21 +563,9 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
                     return Path(f)
         except Exception:                                  # noqa: BLE001
             pass
-        from core import handy_api
-        if handy_api.available():
-            wav = str(out.with_suffix(".wav"))
-            r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
-            if r:
-                return Path(r)
-        return _synthesize_comfy(engine, voice, text, out)  # ultimo fallback (legacy ComfyUI)
-    if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # cloning: reindirizza a Handy (nativo)
-        from core import handy_api
-        if handy_api.available():
-            wav = str(out.with_suffix(".wav"))
-            r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
-            if r:
-                return Path(r)
-        return _synthesize_comfy(engine, voice, text, out)  # fallback legacy se Handy assente
+        return _synthesize_comfy(engine, voice, text, out)  # fallback originale
+    if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # come predisposti originariamente
+        return _synthesize_comfy(engine, voice, text, out)
     raise RuntimeError(f"Engine TTS sconosciuto: {engine}")
 
 
