@@ -38,3 +38,12 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] 1.10 Seed locking per shot (campo seed in storyboard, 0=auto, >0 bloccato; migration DB)
 - [~] 1.11 13 lingue minori — label principali tradotte; stringhe rare EN fallback → Task #49
 - [~] 1.12 Multi-GPU + pausa/ripresa coda — scheduler predisposto, richiede HW → Task #50
+
+
+## RIFINITURE post-audit (27/06)
+- [x] AREA1 Film Studio #52-57 (doppiaggio re-lip-sync, timeline drag&drop, Auto end-to-end, multi-LoRA+@, Continuity UI+animatic audio, matrix granulare+test) + SFX per-azione
+- [x] AREA1 validazione durate Σshot=scena + Σscene=film (già presente)
+- [x] AREA2 Videomusicale: verificato completo (gen/regen song+img+VIDEO, plan, align, assemble+transizioni, export NLE, base_image, progetti persistenti)
+- [x] Handy-API client (STT/TTS/clone) + voce nativa (Kokoro/clone) scelta in GUI
+- [x] FastDownloader multi-connessione (replica SwarmUI)
+- [x] Audit ComfyUI completo (docs/COMFY_AUDIT.md) → Task #51
