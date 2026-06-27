@@ -1,7 +1,7 @@
 {
   "image": "native",
   "video": "native",
-  "enhance": "comfy",
+  "enhance": "native",
   "segment": "native",
-  "face": "comfy"
+  "face": "native"
 }

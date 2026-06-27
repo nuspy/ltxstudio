@@ -1697,6 +1697,9 @@ class MainWindow(QMainWindow):
     def generate_face_restore(self):
         """Restauro volti per-frame (CodeFormer/GFPGAN) sul video del tab Migliora qualità."""
         import shutil
+        cfg0 = self.video_def_tab.get_face_restore_config()
+        if backend.is_native("face"):
+            return self._face_restore_native(cfg0)
         if not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_process_msg")); return
         if self._current_pid or self._inpaint_pid:
@@ -2332,6 +2335,22 @@ class MainWindow(QMainWindow):
             self._log(f"Selezione magnetica ({exp.get('hint')}) inviata…")
         except Exception as e:
             QMessageBox.critical(self, tr("mw.selection_error_title"), str(e)); self._log(f"[ERR] segment region: {e}")
+
+    def _face_restore_native(self, cfg: dict):
+        """Restauro volti NATIVO (CodeFormer/GFPGAN via inference_server, handler 'video_face'). Zero ComfyUI."""
+        import random as _r
+        src = cfg.get("video")
+        if not src or not os.path.exists(src):
+            QMessageBox.warning(self, tr("mw.no_video_title", "Video"), tr("mw.load_or_gen_video_msg", "Carica o genera un video.")); return
+        params = {
+            "image_path": src, "model": cfg.get("model_path") or cfg.get("model"),
+            "fidelity": float(cfg.get("fidelity", 0.5) or 0.5),
+            "detection": cfg.get("detection"), "seed": _r.randint(0, 2**31),
+        }
+        self._log(f"[nativo] restauro volti su {Path(src).name} (fidelity {params['fidelity']:.2f})…")
+        self._native_worker = _NativeImageWorker(params, module="video_face")
+        self._native_worker.done.connect(self._on_multitalk_done)
+        self._native_worker.start()
 
     def _segment_native(self, *, text: str = "", threshold: float = 0.30,
                         region_mask: str = "", image_path: str = ""):
