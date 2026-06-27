@@ -1,0 +1,124 @@
+"""Tab Scenografia (spec §10): breakdown Scene→Shot via LLM (JSON), generazione keyframe + video
+nativi, Continuity Engine. Versione funzionale: breakdown + generazione per scena via Job Scheduler."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
+                               QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
+
+from core import llm_service as L
+from core.film_studio import db, gen_service, continuity as ct, scheduler
+from ui.i18n_manager import tr
+
+_SYS = ("You are a film script supervisor. Break the screenplay into SCENES and SHOTS. "
+        "Output STRICT JSON: {\"scenes\":[{\"description\":str,\"style\":str,\"duration_s\":number,"
+        "\"continuity\":{\"time_of_day\":str,\"weather\":str,\"mood\":str},"
+        "\"shots\":[{\"description\":str,\"duration_s\":number,\"camera\":str,"
+        "\"dialogues\":[{\"actor\":str,\"text\":str}],\"keyframe\":str}]}]}. "
+        "Sum of shot durations = scene duration; sum of scene durations = film duration. "
+        "Keep @Name references. No prose outside JSON.")
+
+
+class StoryboardTab(QWidget):
+    def __init__(self, get_project):
+        super().__init__()
+        self._get_project = get_project
+        v = QVBoxLayout(self)
+        h = QHBoxLayout()
+        self.btn_break = QPushButton(tr("fs.sb.breakdown", "🎬 Breakdown scene/inquadrature (LLM)"))
+        self.btn_break.clicked.connect(self._breakdown)
+        self.btn_keys = QPushButton(tr("fs.sb.keyframes", "🖼 Genera keyframe")); self.btn_keys.clicked.connect(lambda: self._gen("keyframe"))
+        self.btn_video = QPushButton(tr("fs.sb.videos", "🎥 Genera video")); self.btn_video.clicked.connect(lambda: self._gen("video"))
+        h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video); h.addStretch(1)
+        v.addLayout(h)
+        self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
+        v.addWidget(self.tree, 1)
+        self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(90)
+        v.addWidget(self.log)
+        scheduler.on_event(self._on_job)
+        self._refresh()
+
+    def _refresh(self):
+        self.tree.clear()
+        pid = self._get_project()
+        if not pid:
+            return
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            it = QTreeWidgetItem([f"S{sc['ord']}: {(sc['description'] or '')[:60]}", f"{sc['duration_s']:.0f}s"])
+            it.setData(0, Qt.UserRole, ("scene", sc["id"]))
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                ci = QTreeWidgetItem([f"  {sh['ord']}. {(sh['description'] or '')[:60]}", f"{sh['duration_s']:.0f}s"])
+                ci.setData(0, Qt.UserRole, ("shot", sh["id"]))
+                it.addChild(ci)
+            self.tree.addTopLevelItem(it); it.setExpanded(True)
+
+    def _breakdown(self):
+        pid = self._get_project()
+        if not pid:
+            QMessageBox.information(self, tr("fs.sb.breakdown", "Breakdown"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        scripts = db.query("script", "project_id=?", (pid,), order="version")
+        if not scripts:
+            QMessageBox.information(self, tr("fs.sb.breakdown", "Breakdown"), tr("fs.sb.no_script", "Genera prima il copione.")); return
+        proj = db.get("project", pid)
+        try:
+            data = L.complete_json(_SYS, f"Film duration: {proj.get('duration_s',60)}s.\n\n" + scripts[-1]["text"],
+                                   max_tokens=3000)
+        except Exception as e:                              # noqa: BLE001
+            QMessageBox.critical(self, tr("fs.sb.breakdown", "Breakdown"), str(e)[:600]); return
+        # pulisci scene/shot precedenti del progetto
+        for sc in db.query("scene", "project_id=?", (pid,)):
+            for sh in db.query("shot", "scene_id=?", (sc["id"],)):
+                db.delete("shot", sh["id"])
+            db.delete("scene", sc["id"])
+        prev_state = None
+        for i, sc in enumerate(data.get("scenes", []), 1):
+            state = ct.propagate(prev_state, sc.get("continuity"))
+            prev_state = state
+            sid = db.insert("scene", project_id=pid, ord=i, description=sc.get("description", ""),
+                            style=sc.get("style", ""), duration_s=float(sc.get("duration_s", 0) or 0),
+                            continuity=json.dumps(state, ensure_ascii=False), assets="")
+            for j, sh in enumerate(sc.get("shots", []), 1):
+                db.insert("shot", scene_id=sid, ord=j, description=sh.get("description", ""),
+                          duration_s=float(sh.get("duration_s", 0) or 0),
+                          dialogues=json.dumps(sh.get("dialogues", []), ensure_ascii=False),
+                          keyframes=json.dumps([sh.get("keyframe", "")], ensure_ascii=False),
+                          refs="", camera=sh.get("camera", ""), continuity=json.dumps(state, ensure_ascii=False))
+        self._refresh()
+        self.log.appendPlainText(tr("fs.sb.done", "Breakdown: {n} scene").format(n=len(data.get('scenes', []))))
+
+    def _gen(self, what: str):
+        pid = self._get_project()
+        if not pid:
+            return
+        proj = db.get("project", pid)
+        pmode = proj.get("path_mode", "fast")
+        n = 0
+        for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
+            state = json.loads(sc.get("continuity") or "{}")
+            for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                refs = gen_service.resolve_refs(sh["description"], pmode)
+                prompt = refs["clean_text"] + ". " + ct.to_prompt(state)
+                outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
+                Path(outdir).mkdir(parents=True, exist_ok=True)
+                if what == "keyframe":
+                    out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
+                    scheduler.enqueue("image", {"prompt": prompt, "out": out,
+                                                "face_ref": (refs["ref_images"] or [""])[0],
+                                                "loras": refs["loras"]}, owner_kind="shot", owner_id=sh["id"])
+                else:
+                    out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
+                    kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
+                    kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
+                    scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
+                                                "keyframes": kfs, "loras": refs["loras"]},
+                                      owner_kind="shot", owner_id=sh["id"])
+                n += 1
+        self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))
+
+    def _on_job(self, ev: dict):
+        if ev.get("event") in ("done", "error"):
+            self.log.appendPlainText(f"[{ev['event']}] job {ev.get('job_id')} {ev.get('type')} "
+                                     f"{ev.get('error','') or ev.get('output','')}"[:120])

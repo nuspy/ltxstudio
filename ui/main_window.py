@@ -476,6 +476,7 @@ class MainWindow(QMainWindow):
         act_nav = m.addAction(tr("menu.navigator_gallery")); act_nav.triggered.connect(self._open_navigator)
         act_ana = m.addAction(tr("menu.analyzer")); act_ana.triggered.connect(self._open_analyzer)
         act_wfl = m.addAction(tr("menu.workflow")); act_wfl.triggered.connect(self._open_workflow)
+        act_film = m.addAction(tr("menu.film_studio", "🎬 AI Film Studio")); act_film.triggered.connect(self._open_film_studio)
         # ── selettore lingua (sempre visibile nella status bar) ──────────────────────
         self._lang_btn = QToolButton()
         self._lang_btn.setText(f"{LANG_FLAGS.get(i18n.current_lang(), '🌐')} {LANGUAGES.get(i18n.current_lang(), '')}")
@@ -562,6 +563,13 @@ class MainWindow(QMainWindow):
             self._log("✅ Memoria VRAM liberata (modelli scaricati da ComfyUI).")
         else:
             self._log("[!] Impossibile liberare VRAM — ComfyUI offline o endpoint /free non supportato.")
+
+    def _open_film_studio(self):
+        """Apre la finestra AI Film Studio (Text-to-Film, backend nativo)."""
+        from ui.film_studio.film_studio_window import FilmStudioWindow
+        if getattr(self, "_film_win", None) is None:
+            self._film_win = FilmStudioWindow(self)
+        self._film_win.show(); self._film_win.raise_(); self._film_win.activateWindow()
 
     def _open_navigator(self):
         """Apre il Navigator Gallery (Ctrl+G)."""
