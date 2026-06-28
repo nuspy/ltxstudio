@@ -18,10 +18,12 @@ from pydantic import BaseModel
 
 from inference_server.model_manager import ModelManager
 from inference_server.backends import image_flux
-from inference_server.backends import video_ltx
 from inference_server.backends import image_upscale
 from inference_server.backends import image_segment
 from inference_server.backends import video_postprocess
+# NB: il VIDEO gira via workers/ltx2_infer.py (ltx-core ufficiale, subprocess), NON da qui.
+# Il vecchio path diffusers `video_ltx` (modulo "video"/"video_edit"/"video_long") era codice morto
+# (non caricava il fp8 scaled) → rimosso. Qui restano solo i post-process video.
 
 app = FastAPI(title="LTX Studio — Native Inference Server")
 MM = ModelManager()
@@ -31,12 +33,11 @@ _jobs: dict[str, dict] = {}
 _q: "queue.Queue[str]" = queue.Queue()
 
 # dispatch modulo → handler.run(params, mm, output_dir) → {status, output}
-HANDLERS = {"image": image_flux.run, "video": video_ltx.run,
+HANDLERS = {"image": image_flux.run,
             "upscale": image_upscale.run, "segment": image_segment.run,
             "video_upscale": video_postprocess.run,
             "video_face": video_postprocess.run_face,
-            "video_fps": video_postprocess.run_fps,
-            "video_edit": video_ltx.run_condition, "video_long": video_ltx.run_long}
+            "video_fps": video_postprocess.run_fps}
 
 
 class SubmitReq(BaseModel):

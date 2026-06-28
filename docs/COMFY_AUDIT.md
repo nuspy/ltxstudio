@@ -1,3 +1,20 @@
+# ⟫ AGGIORNAMENTO 29/06 — RUNTIME = ZERO COMFYUI (confermato live)
+
+- **Avvio**: `MainWindow` chiama SOLO `_maybe_autostart_native()`; `_maybe_autostart_comfyui()` è
+  definito ma **NON chiamato** (vedi commento ~riga 436). `backend_config.json` = tutto `native`.
+- **Validati live (nessun ComfyUI)**: immagini (gen FLUX, inpaint/outpaint FLUX Fill, integra/Kontext,
+  upscale, segment SAM2), video (t2v/i2v/a2v/ReTake/ControlNet/RIFE/SeedVR2/face-restore via
+  `workers/ltx2_infer.py` + `inference_server`), 3D (TRELLIS.2), voce (F5/XTTS/CosyVoice nativi).
+- **Punto A "voice via comfy" del 27/06 = RISOLTO**: voice cloning ora NATIVO (#69), non più node-based.
+- **Residuo comfy** = solo fallback GUARDATO (mai eseguito in nativo) ancora istanziato in main_window
+  (`ComfyDriver`, `TemplateEngine`, `*_pipeline.py`) + `inference_server/backends/video_ltx.py` (path
+  diffusers video MORTO, GUI usa ltx2_infer) + ramo `tts_engine._synthesize_comfy` + `import_models comfy_compat`.
+- **Raccomandazione**: la rimozione FISICA è un refactor coupled (driver+engine+~12 pipeline istanziati);
+  va fatta come pass dedicato con re-test live di OGNI feature, NON la sera prima della distribuzione.
+  → **#51: obiettivo runtime RAGGIUNTO**; purge fisico pianificato post-lancio.
+
+---
+
 # Audit dipendenze ComfyUI (27/06) — cosa è ancora legato a ComfyUI
 
 Grep `comfy|custom_node|object_info|driver.submit|_comfy_node_present|template_engine|.api.json`:
