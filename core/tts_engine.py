@@ -118,14 +118,13 @@ def _engine_installed(eid: str) -> bool:
             return handy_api.available()
         except Exception:                                  # noqa: BLE001
             return _comfy_node_present(("CosyVoiceNode", "CosyVoice2Run", "CosyVoice2_Run", "CosyVoiceRun"))
-    if eid == "f5tts":
-        return _comfy_node_present(("F5TTSCreate", "F5TTSAudio", "F5TTS_Run"))
-    if eid == "xtts2":
-        return _comfy_node_present(("XTTSGenerate", "XTTS_v2", "XTTS"))
-    if eid == "fish":
-        return _comfy_node_present(("FishSpeechRun", "FishSpeech", "FishSpeech_v15"))
-    if eid == "vibevoice":
-        return _comfy_node_present(("VibeVoiceGenerate", "VibeVoice", "VibeVoiceRun"))
+    if eid in ("f5tts", "xtts2", "fish", "vibevoice"):      # NATIVI (venv isolati, zero ComfyUI)
+        import importlib
+        try:
+            svc = importlib.import_module(_NATIVE_CLONE_SVC[eid])
+            return bool(svc.is_installed())
+        except Exception:                                  # noqa: BLE001 (service non ancora presente)
+            return False
     return False
 
 
@@ -564,9 +563,42 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
         except Exception:                                  # noqa: BLE001
             pass
         return _synthesize_comfy(engine, voice, text, out)  # fallback originale
-    if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # come predisposti originariamente
-        return _synthesize_comfy(engine, voice, text, out)
+    if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # NATIVI (venv isolati, zero ComfyUI)
+        return _synthesize_native_clone(engine, voice, clean, out)
     raise RuntimeError(f"Engine TTS sconosciuto: {engine}")
+
+
+# mappa engine → modulo service nativo (pattern cosyvoice_service: make_job + is_installed + OUT_DIR)
+_NATIVE_CLONE_SVC = {
+    "f5tts": "core.f5tts_service", "xtts2": "core.xtts_service",
+    "fish": "core.fish_service", "vibevoice": "core.vibevoice_service",
+}
+_NATIVE_CLONE_INSTALLER = {
+    "f5tts": "install_f5tts", "xtts2": "install_xtts",
+    "fish": "install_fish", "vibevoice": "install_vibevoice",
+}
+
+
+def _synthesize_native_clone(engine: str, voice: VoicePreset, text: str, out: Path) -> Path:
+    """Cloning NATIVO via venv isolato (F5/XTTS/Fish/VibeVoice), niente ComfyUI. Richiede un campione
+    vocale (voice.sample_path). Pattern identico a CosyVoice (subprocess Job)."""
+    import importlib
+    try:
+        svc = importlib.import_module(_NATIVE_CLONE_SVC[engine])
+    except ImportError as e:
+        raise RuntimeError(f"Motore '{engine}' non disponibile (service mancante): {e}") from e
+    if not svc.is_installed():
+        raise RuntimeError(f"Motore '{engine}' non installato. Installa con: "
+                           f"python scripts/{_NATIVE_CLONE_INSTALLER[engine]}.py")
+    if not voice.sample_path or not Path(voice.sample_path).is_file():
+        raise RuntimeError(f"Il cloning con '{engine}' richiede un campione vocale (WAV) nella voce.")
+    job = svc.make_job(text, voice.sample_path, prompt_text=getattr(voice, "sample_transcript", "") or "",
+                       out_name=voice.slug())
+    job.run()
+    res = svc.OUT_DIR / f"{svc._safe(voice.slug())}.wav"
+    if res.exists():
+        return res
+    raise RuntimeError(f"Sintesi '{engine}' fallita (nessun output).")
 
 
 def _pauses_to_dots_internal(text: str) -> str:
