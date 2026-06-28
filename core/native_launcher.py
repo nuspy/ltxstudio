@@ -27,6 +27,15 @@ def launch() -> tuple[bool, str]:
         env.setdefault("NATIVE_ATTENTION", "auto")          # Sage se disponibile, else SDPA
         env.setdefault("NATIVE_FBCACHE", "1")               # First Block Cache
         env.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+        # Profilo hardware auto: calibra VRAM/RAM (offload, margine, risoluzione max) per la GPU corrente
+        try:
+            from core import hw_profiles
+            prof = hw_profiles.detect_profile()
+            for k, v in prof["env"].items():
+                env.setdefault(k, v)                        # non sovrascrive override manuali utente
+            print(f"[native] profilo HW: {prof['name']} (VRAM {prof['vram_gb']}GB, RAM {prof['ram_gb']}GB)", flush=True)
+        except Exception as e:                              # noqa: BLE001
+            print(f"[native] profilo HW non applicato: {e}", flush=True)
         flags = 0
         if sys.platform == "win32":
             flags = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
