@@ -60,17 +60,6 @@
 | ⬇️ | **Sulphur-2-base** (NSFW) | 9.5GB | bf16/fp8/gguf | NSFW base attivo, T2V+I2V, prompt-enhancer (Civitai 2601098) | aggiungere (alt. eros, più leggero) |
 | ⬇️ | Spatial/Temporal Upscaler x2 | 0.26-1GB | bf16 | qualità+FPS finali | aggiungere |
 
-### Wan / Hunyuan (extra — backend diverso da LTX!)
-| Stato | Modello | Peso | Cosa fa | Decisione |
-|---|---|---|---|---|
-| ✅ | Wan2.2 i2v/t2v/s2v high+low fp8 | 13-15GB | i2v/t2v/audio-to-video MoE | **TIENI** solo se mantieni la pipeline Wan |
-| ✅ | Wan2.1 FusionX i2v/t2v, VACE 1.3B/14B | 13-32GB | i2v/t2v + VACE | **TIENI** se usi Wan2.1 |
-| ✅ | HunyuanVideo 720 fp8 | 12.3GB | t2v | **TIENI**/valuta (HV-1.5 più efficiente) |
-| 🗑️ | duplicati Wan2.1 kijai/SwarmUI (×2, 15.8GB) | — | ridondanti | **CANCELLA** (recupero ~16GB) |
-| ⬇️ | Wan2.2 TI2V-5B fp8 | ~5GB | denso, gira su consumer | aggiungere (fascia bassa) |
-
-> ⚠️ **Decisione strategica Wan**: tutte le LoRA/acceleratori Wan dipendono dal base Wan (diverso da LTX-2.3). Se NON mantieni una pipeline Wan attiva, **tutto lo stack Wan (base+LoRA) è inutilizzabile** → valuta se tenerlo o eliminarlo in blocco.
-
 ---
 
 # 2) LoRA — AUDIT COMPLETO
@@ -120,7 +109,7 @@
 | 🗑️ **CineStyle5, MoXinV1, blindbox** | SD1.5 | stili SD1.5 legacy | **CANCELLA** (fuori stack) |
 | ⚠️ intrinsic_lora (albedo/depth/normal/shading) | SD1.5 | mappe inverse-render | TIENI solo se 3D le usa, altrimenti 🗑️ |
 | 🔧 **gemma-3-12b abliterated_lora** (599MB) | **LTX-2.3 TE** (mal-classificato SDXL) | uncensor del text-encoder Gemma (no "Barbie&Ken" su NSFW) | **TIENI** + riclassifica |
-| ⚠️ NSFW_ZI_V01(871MB), DR34ML4Y_LTXXX(1.1GB) | da verificare (hash) | etichette SDXL sospette (probabile Z-Image / video WAN) | **VERIFICA hash** (skill ai-catalog) |
+| ⚠️ NSFW_ZI_V01(871MB), DR34ML4Y_LTXXX(1.1GB) | da verificare (hash) | etichette SDXL sospette (probabile Z-Image o LoRA video LTX-2.3) | **VERIFICA hash** (skill ai-catalog) |
 
 ## 2.3 VIDEO — LTX-2.3 (quasi tutte TIENI — infrastruttura)
 | Gruppo | LoRA | Decisione |
@@ -132,20 +121,9 @@
 | **NSFW** | Better Female Nudity v2, NSFWMOTION, Penile_Praxis_V4, ltxdeepthroat | **TIENI** se ramo NSFW attivo (molto sovrapposte → tienine poche) |
 | 🗑️ | demopose (doppione di pose-control), fightV3 (niche) | CANCELLA se non usate |
 
-## 2.4 VIDEO — Wan (acceleratori validi + ~60 NSFW + effetti)
-| Gruppo | LoRA | Decisione |
-|---|---|---|
-| **Acceleratori (TIENI)** | CausVid v2 (rank32), Self_Forcing T2V+I2V, FusionX t2v+i2v, lightx2v I2V cfg_step rank64, Seko 4-step (Wan2.2) | **TIENI** (riducono 50→4-8 step) |
-| 🗑️ obsoleti | CausVid **v1** (superata da v2), bidirect2 1.3B (se non usi 1.3B), FastWan 5B (se solo I2V) | CANCELLA |
-| **Effetti SFW (pack Remade-AI)** | squish/cakeify/crush/inflate/deflate/aging/baby/muscle/decay + temi (assassin/bride/princess/samurai/warrior/…), 360_epoch, Spinning, flying_effect, bounceV, detailz-wan | **TIENI** il pack (cancella i temi che non userai) |
-| **NSFW azioni** | facefuck, dr34mj0b, deepthroat, fingering, grinding_pussyjob, masturbation_cumshot, nippleSuck, wan-nsfw-e14, anal-combined, cumshot, T2V-POV_BJ | **TIENI 1 copia** ciascuna se ramo NSFW |
-| 🗑️ **14 DUPLICATI** | suffissi `_(SwarmUI)`/`_(Framepack)`/`_(LoRAs)`/`__from_root` — stesso file | **CANCELLA** (tieni 1 copia) |
-
-## 2.5 VIDEO — altri motori (LoRA)
+## 2.4 VIDEO — altri motori (LoRA)
 | LoRA | Decisione |
 |---|---|
-| Wan2.2 (lightx2v 4step, Seko, FaceNaturalizer, cumshot, DR34MJOB) | TIENI **solo se** mantieni pipeline Wan2.2 |
-| Hunyuan Titfuck_v2 | TIENI se usi Hunyuan, altrimenti 🗑️ |
 | LongCat cfg_step/refinement (5.3GB) | 🗑️ se non usi LongCat (il motore è LTX-2.3) |
 
 ---
@@ -177,7 +155,6 @@
 | Modello | Perché |
 |---|---|
 | **Sulphur-2-base** (LTX-2.3) | NSFW base attivo, più leggero di eros, tutti i formati |
-| WAN General NSFW (NSFW-22 H/L) | "base NSFW" Wan a 2 stadi (se mantieni Wan) |
 
 ---
 
@@ -185,18 +162,16 @@
 
 ### 🗑️ Cancellazioni consigliate (recupero ~40GB+)
 1. **FLUX Reality serie** (~10GB) + MarynAI/OlgAI/Olya + FluxCreative + MysticXXX + underland-alice → LoRA-persona/non-validate.
-2. **14 duplicati Wan** (suffissi SwarmUI/Framepack/LoRAs) → 1 copia.
-3. **2 duplicati checkpoint Wan2.1 kijai/SwarmUI** (~16GB).
-4. **SD1.5 legacy** (CineStyle5, MoXin, blindbox) se non usi SD1.5.
-5. **HiDream** (9GB) se non usato (superato).
-6. **LongCat** (5.3GB) se il motore resta LTX-2.3.
+2. **SD1.5 legacy** (CineStyle5, MoXin, blindbox) se non usi SD1.5.
+3. **HiDream** (9GB) se non usato (superato).
+4. **LongCat** (5.3GB) se il motore resta LTX-2.3.
 
 ### 🔧 Misclassificazioni da correggere (skill `ai-catalog`)
 - `gemma-3-12b abliterated_lora` → è LoRA **text-encoder LTX-2.3**, non SDXL.
 - `DR34ML4Y_LTXXX`, `NSFW_ZI_V01` → verificare arch reale via hash Civitai.
 
 ### Verdetto generale
-L'app ha **già ottima copertura FP8** (LTX/Wan/FLUX/Z-Image) + una **libreria LoRA enorme** (SFW+NSFW, immagini e video). I gap reali sono:
+L'app ha **già ottima copertura FP8** (LTX/FLUX/Z-Image) + una **libreria LoRA enorme** (SFW+NSFW, immagini e video). I gap reali sono:
 1. **FP4/NVFP4** (velocità RTX 5090) — il guadagno maggiore.
 2. **Acceleratori immagine FLUX** (Hyper-SD) + **finetune realismo** (UltraReal/Jib Mix) + LoRA skin.
 3. **Pulizia**: ~40GB recuperabili da duplicati/LoRA-persona inutili.

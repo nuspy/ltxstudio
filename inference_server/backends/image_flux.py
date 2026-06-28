@@ -378,8 +378,9 @@ def run(params: dict, mm, output_dir: str) -> dict:
     else:
         kw["width"] = int(params.get("width", 1024))
         kw["height"] = int(params.get("height", 1024))
-    # i modelli "guidance-distilled" (flux schnell/zimage turbo) ignorano il negative
-    if neg and arch not in ("zimage",):
+    # i modelli "guidance-distilled" (flux schnell/zimage turbo) ignorano il negative;
+    # Flux2Pipeline (flux2) non espone affatto il parametro negative_prompt
+    if neg and arch not in ("zimage", "flux2"):
         kw["negative_prompt"] = neg
 
     try:

@@ -427,11 +427,16 @@ def run_t2a(p: dict) -> str:
     from ltx_pipelines.t2a_one_stage import T2AOneStagePipeline
     from ltx_pipelines.utils.media_io import encode_audio
     ckpt = _resolve_ckpt(p.get("model", CHECKPOINT))
-    qmode = p.get("quant", "fp8_scaled_mm")
+    # Il block-streaming (offload CPU) della T2AOneStagePipeline supporta SOLO bf16/fp8_cast
+    # (fp8_scaled_mm non è ammesso) → default a fp8_cast, che entra nei 32GB col cast on-the-fly.
+    qmode = p.get("quant", "fp8_cast")
     quant = None
     if qmode == "fp8_scaled_mm":
         from ltx_core.quantization import fp8_scaled_mm
         quant = fp8_scaled_mm.build_policy(ckpt)
+    elif qmode == "fp8_cast":
+        from ltx_core.quantization import fp8_cast
+        quant = fp8_cast.build_policy(ckpt)
     pipe = T2AOneStagePipeline(checkpoint_path=ckpt, gemma_root=GEMMA, loras=[], quantization=quant,
                                offload_mode=OffloadMode.CPU)
     fps = float(p.get("fps", 25.0))
@@ -440,7 +445,8 @@ def run_t2a(p: dict) -> str:
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
     t0 = time.time()
     audio = pipe(prompt=p.get("prompt", ""), negative_prompt=p.get("negative", ""),
-                 seed=int(p.get("seed", 42)), num_frames=nf, frame_rate=fps, audio_guider_params=ag)
+                 seed=int(p.get("seed", 42)), num_frames=nf, frame_rate=fps, audio_guider_params=ag,
+                 num_inference_steps=int(p.get("steps", 30)))
     out = p["output"]
     encode_audio(audio=audio, output_path=out)
     print(f"[t2a] {time.time()-t0:.0f}s → {out}", flush=True)
