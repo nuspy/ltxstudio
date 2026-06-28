@@ -64,12 +64,16 @@ FLUX2_TE_FILE = r"E:\AI\Models\TextEncoders\Flux\mistral_3_small_flux2.safetenso
 
 def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
     """Costruisce il text encoder FLUX.2 (Mistral3) dal config + pesi nvfp4 dequantizzati.
-    Ritorna il modello su CPU con sequential offload predisposto (caricato su GPU layer-by-layer).
+    MEMORY-BOUNDED: init su meta (0 RAM) + dequant-and-assign per-tensore in STREAMING (un layer alla
+    volta, liberato subito) → picco ~1 layer invece di ~50GB (il vecchio dict completo + init + copia
+    saturava i 128GB). Ritorna il modello bf16 su CPU, pronto per sequential offload su GPU.
     Shim transformers<5: model_type 'mistral3'→'mistral', sliding_window=full (come Ernie)."""
     import json
     import os
     import torch
     import transformers
+    from accelerate import init_empty_weights
+    from accelerate.utils import set_module_tensor_to_device
     from transformers import Mistral3Model, Mistral3Config, MinistralForCausalLM
     if not hasattr(transformers, "Ministral3ForCausalLM"):
         transformers.Ministral3ForCausalLM = MinistralForCausalLM
@@ -79,22 +83,33 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
         tc["model_type"] = "ministral"
     if tc.get("sliding_window") is None:
         tc["sliding_window"] = tc.get("max_position_embeddings", 262144)
-    te = Mistral3Model(Mistral3Config(**cfg))
-    sd = dequant_nvfp4_file(te_file)
-    # remap model.* → language_model.* se il modello li espone così (come Ernie); prova diretto poi remap
-    info = te.load_state_dict(sd, strict=False)
-    if len(info.missing_keys) > len(sd) // 2:               # mismatch forte → prova remap
-        rem = {("language_model." + k[6:]) if k.startswith("model.") else k: v
-               for k, v in sd.items() if not k.startswith("tekken_model")}
-        te.load_state_dict(rem, strict=False)
-    return te.to(torch.bfloat16)
+    with init_empty_weights():                              # modello su meta device: ZERO RAM all'init
+        te = Mistral3Model(Mistral3Config(**cfg))
+    targets = {n for n, _ in te.named_parameters()} | {n for n, _ in te.named_buffers()}
+
+    def _target_name(k: str) -> str | None:
+        if k in targets:
+            return k
+        rk = ("language_model." + k[6:]) if k.startswith("model.") else k   # remap come Ernie
+        return rk if rk in targets else None
+
+    assigned = 0
+    for k, tensor in _iter_nvfp4_tensors(te_file):         # genera UN tensore bf16 alla volta
+        name = _target_name(k)
+        if name is not None:
+            set_module_tensor_to_device(te, name, "cpu", value=tensor)      # assegna e libera
+            assigned += 1
+        del tensor
+    import logging
+    logging.info("[flux2_te] assegnati %d/%d tensori (streaming, memory-bounded)", assigned, len(targets))
+    return te
 
 
-def dequant_nvfp4_file(path: str) -> dict:
-    """Legge il file nvfp4 e ritorna {name: bf16 tensor} (quantizzati dequantizzati + plain copiati).
-    NB: produce un modello bf16 grande (~2× i param) → scriverlo su disco o caricarlo con offload."""
+def _iter_nvfp4_tensors(path: str):
+    """Generatore: legge il file nvfp4 e produce (name, bf16_tensor) UN tensore alla volta, dequantizzando
+    on-demand (peso nvfp4 → dequant; embed/norm plain → copia). Memory-bounded: non costruisce mai il dict
+    completo (~24GB). Usato dal loader streaming; safe_open legge dal file su disco, non in RAM."""
     from safetensors import safe_open
-    out: dict = {}
     with safe_open(path, framework="pt") as h:
         keys = set(h.keys())
         quant_bases = {k[:-len(".comfy_quant")] for k in keys if k.endswith(".comfy_quant")}
@@ -106,9 +121,12 @@ def dequant_nvfp4_file(path: str) -> dict:
                 packed = h.get_tensor(base + ".weight")
                 bs = h.get_tensor(base + ".weight_scale")
                 g = h.get_tensor(base + ".weight_scale_2")
-                out_f = packed.shape[0]
-                in_f = packed.shape[1] * 2
-                out[k] = dequant_nvfp4_weight(packed, bs, g, out_f, in_f)
+                yield k, dequant_nvfp4_weight(packed, bs, g, packed.shape[0], packed.shape[1] * 2)
             else:                                           # plain (embed/norm) → copia
-                out[k] = h.get_tensor(k).to(torch.bfloat16)
-    return out
+                yield k, h.get_tensor(k).to(torch.bfloat16)
+
+
+def dequant_nvfp4_file(path: str) -> dict:
+    """Come _iter_nvfp4_tensors ma materializza tutto in un dict {name: bf16}. ⚠️ ~24GB in RAM — usare
+    solo per scrivere un TE bf16 su disco, NON nel path caldo (il loader usa lo streaming)."""
+    return {k: v for k, v in _iter_nvfp4_tensors(path)}
