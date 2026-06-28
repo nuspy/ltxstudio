@@ -10,7 +10,7 @@ from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QPushButton,
     QLabel, QProgressBar, QPlainTextEdit, QMessageBox, QProgressDialog, QApplication,
-    QMenu, QToolButton,
+    QMenu, QToolButton, QSplitter,
 )
 
 from ui.i18n_manager import tr, i18n, LANGUAGES, LANG_FLAGS
@@ -542,7 +542,8 @@ class MainWindow(QMainWindow):
 
         # SINISTRA: spazio di lavoro grande = canvas + selezione AI + Genera/Interrompi
         # (niente anteprima: il sistema non la genera). Canvas e selezione vivono qui.
-        work = QVBoxLayout()
+        work_top = QWidget()
+        work = QVBoxLayout(work_top); work.setContentsMargins(0, 0, 0, 0)
         work.addWidget(self.frame1_tab.canvas, 1)        # spazio di lavoro per l'immagine
         work.addWidget(self.frame1_tab.segment_box)      # sistema di selezione con AI, sotto il canvas
         btns = QHBoxLayout()
@@ -563,10 +564,23 @@ class MainWindow(QMainWindow):
         nav_shortcut.activated.connect(self._open_navigator)
         self.progress = QProgressBar(); self.progress.setRange(0, 100); self.progress.setValue(0)
         work.addWidget(self.progress)
-        self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(110)
-        work.addWidget(self.log)
-        root.addLayout(work, 3)             # SINISTRA: spazio di lavoro (grande)
-        root.addWidget(self.tabs, 2)        # DESTRA: tab di controllo (sotto-tab in Prompt/Frame 1)
+        self.log = QPlainTextEdit(); self.log.setReadOnly(True)   # altezza regolabile dallo splitter
+
+        # ── Separatori TRASCINABILI (QSplitter) ──────────────────────────────────────────
+        # Verticale a SINISTRA: area di lavoro (canvas+selezione+pulsanti) ↕ log
+        self.left_splitter = QSplitter(Qt.Vertical)
+        self.left_splitter.addWidget(work_top)
+        self.left_splitter.addWidget(self.log)
+        self.left_splitter.setStretchFactor(0, 6); self.left_splitter.setStretchFactor(1, 1)
+        self.left_splitter.setChildrenCollapsible(False); self.left_splitter.setHandleWidth(6)
+        self.left_splitter.setSizes([620, 110])
+        # Orizzontale PRINCIPALE: area di lavoro ↔ tab dei moduli di controllo
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.addWidget(self.left_splitter)
+        self.main_splitter.addWidget(self.tabs)
+        self.main_splitter.setStretchFactor(0, 3); self.main_splitter.setStretchFactor(1, 2)
+        self.main_splitter.setChildrenCollapsible(False); self.main_splitter.setHandleWidth(6)
+        root.addWidget(self.main_splitter)
 
         self.status_lbl = QLabel("…")
         self.statusBar().addWidget(self.status_lbl)
