@@ -47,3 +47,10 @@ Vincoli: test video ≤10s (long‑video ≤30–60s); no download >15GB; i18n 1
 - [x] Handy-API client (STT/TTS/clone) + voce nativa (Kokoro/clone) scelta in GUI
 - [x] FastDownloader multi-connessione (replica SwarmUI)
 - [x] Audit ComfyUI completo (docs/COMFY_AUDIT.md) → Task #51
+
+
+## TEST LIVE GPU (27/06) — findings
+- Video t2v #6: ✅ OK live — LTX-2.3-22B fp8 auto-GGUF, 165s/1s@512x320, output valido (no crash).
+- FLUX.2 #44: routing OK (entra in _assemble_flux2) ma from_single_file diffusers 0.38 NON mappa le chiavi QK-norm del checkpoint Klein NSFW (KeyError double_blocks.0.img_attn.norm.key_norm). Blocca PRIMA del dequant nvfp4. Fix: estendere FLUX2_TRANSFORMER_DOUBLE_BLOCK_KEY_MAP (monkeypatch, NO update diffusers) o usare checkpoint FLUX.2 base non-Klein. dequant nvfp4 non ancora esercitato.
+
+- FLUX.2 #44 BLOCCO RAM (28/06): _assemble_flux2 dequant nvfp4 TE 12GB->bf16 24GB + transformer fp8 + VAE TUTTO IN RAM satura 128GB e blocca il sistema. Da rifare MEMORY-BOUNDED (dequant su GPU a chunk / non materializzare il TE bf16 intero in RAM). from_single_file della CLASSE funziona (diffusers 0.38, mapping ok da CLI); il fallimento nel server era ambiente stantio. Test FLUX.2 SOSPESO finché dequant non è memory-safe.

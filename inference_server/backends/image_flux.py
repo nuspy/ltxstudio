@@ -166,7 +166,15 @@ def _assemble_flux2(Pipe, transformer_path: str):
     bf16 = torch.bfloat16
     import json
     from safetensors.torch import load_file
-    tr = Flux2Transformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+    # Transformer FLUX.2: loader fp8-aware memory-bounded (applica le weight_scale che from_single_file
+    # ignora → qualità corretta; streaming+assign-and-free → niente picco RAM ~50GB). Fallback a
+    # from_single_file solo se il config transformer non è presente.
+    tr_cfg_dir = os.path.join(FLUX2_DIR, "transformer")
+    if os.path.exists(os.path.join(tr_cfg_dir, "config.json")):
+        from inference_server.backends.flux2_transformer import load_flux2_transformer
+        tr = load_flux2_transformer(transformer_path, tr_cfg_dir)
+    else:
+        tr = Flux2Transformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
     # AutoencoderKLFlux2 NON supporta from_single_file → from_config + load_state_dict (chiavi 1:1)
     vae = AutoencoderKLFlux2.from_config(json.load(open(os.path.join(FLUX2_DIR, "vae", "config.json"))))
     vae.load_state_dict(load_file(FLUX2_VAE), assign=True)
