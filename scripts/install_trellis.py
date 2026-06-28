@@ -38,6 +38,20 @@ def _run(cmd, **k):
     return subprocess.run([str(c) for c in cmd], **k)
 
 
+def _py311() -> str:
+    """Interprete Python 3.11 (i wheel TRELLIS sono cp311 → il venv DEVE essere 3.11, non 3.12)."""
+    import os
+    cands = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Python\Python311\python.exe"),
+        r"C:\Python311\python.exe",
+        r"C:\Program Files\Python311\python.exe",
+    ]
+    for c in cands:
+        if Path(c).is_file():
+            return c
+    raise SystemExit("Python 3.11 non trovato: i wheel TRELLIS sono cp311. Installa Python 3.11.")
+
+
 def main():
     TR.mkdir(parents=True, exist_ok=True)
     # 1) codice MIT → package trellis_nodes (con __init__ vuoto: NON caricare i nodi comfy_api.io)
@@ -51,9 +65,9 @@ def main():
             os.symlink(WEIGHTS_SRC, MODELS_DIR, target_is_directory=True)
         except OSError:
             print("  (symlink fallito — serve admin; copia manuale o junction)")
-    # 3) venv torch 2.9.1 cu130 (i wheel sono per 2.9.1)
+    # 3) venv Python 3.11 (cp311) + torch 2.9.1 cu130 (i wheel sono per 2.9.1/cp311)
     if not VENV.exists():
-        _run([sys.executable, "-m", "venv", str(VENV)], check=True)
+        _run([_py311(), "-m", "venv", str(VENV)], check=True)
     py = VENV / "Scripts" / "python.exe"
     _run([py, "-m", "pip", "install", "-U", "pip", "wheel", "setuptools"], check=True)
     _run([py, "-m", "pip", "install", "torch==2.9.1", "torchvision",
