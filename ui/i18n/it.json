@@ -1796,5 +1796,11 @@
   "vedit.fail": "❌ Errore: {e}",
   "vedit.cfg_lbl": "CFG (aderenza prompt) — inpaint",
   "vedit.guide_lbl": "Forza guide (ancoraggio originale)",
-  "vedit.dilate_lbl": "Dilatazione maschera (px)"
+  "vedit.dilate_lbl": "Dilatazione maschera (px)",
+  "res.op.faceswap": "Face-swap (imponi un volto)",
+  "res.faceswap.group": "Face-swap",
+  "res.faceswap.source_lbl": "Volto sorgente",
+  "res.faceswap.source.btn": "Scegli volto…",
+  "res.faceswap.source.ph": "Foto del volto da imporre",
+  "res.faceswap.need_source": "Seleziona la foto del volto sorgente."
 }

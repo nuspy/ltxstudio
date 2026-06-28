@@ -3067,8 +3067,40 @@ class MainWindow(QMainWindow):
             self._log(f"[ERR] restauro volti automatico: {e} → mostro il video non restaurato.")
             return False
 
+    def _faceswap_photo(self, cfg: dict):
+        """T5: face-swap su FOTO (core/faceswap.swap_image, InsightFace nativo). Zero ComfyUI."""
+        from PySide6.QtWidgets import QMessageBox
+        image_path = cfg.get("image_path", "")
+        if image_path == "<from_canvas>":
+            image_path = self.frame1_tab.image_path or ""
+        src_face = cfg.get("source_face", "")
+        if not image_path or not os.path.exists(image_path):
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.select_image_to_process_msg")); return
+        if not src_face or not os.path.exists(src_face):
+            QMessageBox.warning(self, tr("res.faceswap.group"), tr("res.faceswap.need_source",
+                "Seleziona la foto del volto sorgente.")); return
+        out = str(OUTPUT_DIR / f"faceswap_{Path(image_path).stem}.png")
+
+        class _FSWorker(QThread):
+            done = Signal(dict)
+
+            def run(self):
+                try:
+                    from core import faceswap
+                    r = faceswap.swap_image(image_path, src_face, out)
+                    self.done.emit({"status": "success", "output": [r]})
+                except Exception as e:  # noqa: BLE001
+                    self.done.emit({"status": "error", "error": str(e)})
+
+        self._log(f"[nativo] face-swap foto: {Path(src_face).name} → {Path(image_path).name}…")
+        self._fsphoto_worker = _FSWorker()
+        self._fsphoto_worker.done.connect(self._on_native_image_done)
+        self._fsphoto_worker.start()
+
     def generate_restore(self, cfg: dict):
-        """Restauro / colorazione foto tramite RestorePipeline."""
+        """Restauro / colorazione / face-swap foto."""
+        if cfg.get("operation") == "faceswap":           # T5: face-swap su foto (nativo, no ComfyUI)
+            return self._faceswap_photo(cfg)
         if not self.driver.is_up():
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_process_msg")); return

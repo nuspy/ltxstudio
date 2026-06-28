@@ -68,12 +68,14 @@ class RestoreTab(QWidget):
         self.radio_restore = QRadioButton(tr("res.op.restore"))
         self.radio_colorize = QRadioButton(tr("res.op.colorize"))
         self.radio_both = QRadioButton(tr("res.op.both"))
+        self.radio_faceswap = QRadioButton(tr("res.op.faceswap"))   # T5: face-swap su foto
         self.radio_restore.setChecked(True)
-        for rb in (self.radio_restore, self.radio_colorize, self.radio_both):
+        for rb in (self.radio_restore, self.radio_colorize, self.radio_both, self.radio_faceswap):
             self._op_group.addButton(rb)
             ov.addWidget(rb)
         self.radio_colorize.toggled.connect(self._on_op_changed)
         self.radio_both.toggled.connect(self._on_op_changed)
+        self.radio_faceswap.toggled.connect(self._on_op_changed)
         v.addWidget(op_grp)
 
         # ── Impostazioni restauro ─────────────────────────────────────────
@@ -124,6 +126,21 @@ class RestoreTab(QWidget):
         cf.addRow(tr("res.color.steps_lbl"), self.color_steps)
         v.addWidget(self.color_grp)
 
+        # ── Face-swap (T5): impone un volto sorgente sulla foto target ─────
+        self.faceswap_grp = QGroupBox(tr("res.faceswap.group"))
+        self.faceswap_grp.setEnabled(False)
+        ff = QFormLayout(self.faceswap_grp)
+        ff.setLabelAlignment(Qt.AlignRight)
+        frow = QHBoxLayout()
+        self.fs_source = QLineEdit(); self.fs_source.setReadOnly(True)
+        self.fs_source.setPlaceholderText(tr("res.faceswap.source.ph"))
+        fs_btn = QPushButton(tr("res.faceswap.source.btn"))
+        fs_btn.clicked.connect(self._pick_fs_source)
+        frow.addWidget(self.fs_source, 1); frow.addWidget(fs_btn)
+        _w = QWidget(); _w.setLayout(frow)
+        ff.addRow(tr("res.faceswap.source_lbl"), _w)
+        v.addWidget(self.faceswap_grp)
+
         # ── Note / Avvisi ─────────────────────────────────────────────────
         self.note_lbl = QLabel(tr("res.note.lbl"))
         self.note_lbl.setWordWrap(True)
@@ -142,9 +159,17 @@ class RestoreTab(QWidget):
 
     # ---------- slot ----------
     def _on_op_changed(self, _checked: bool):
+        is_fs = self.radio_faceswap.isChecked()
         needs_color = self.radio_colorize.isChecked() or self.radio_both.isChecked()
-        self.color_grp.setEnabled(needs_color)
-        self.restore_grp.setEnabled(not self.radio_colorize.isChecked())
+        self.color_grp.setEnabled(needs_color and not is_fs)
+        self.restore_grp.setEnabled(not self.radio_colorize.isChecked() and not is_fs)
+        self.faceswap_grp.setEnabled(is_fs)
+
+    def _pick_fs_source(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("res.faceswap.source.btn"), str(Path.home()), tr("res.input.image_filter"))
+        if path:
+            self.fs_source.setText(path)
 
     def _browse_input(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -167,12 +192,15 @@ class RestoreTab(QWidget):
             op = "restore"
         elif self.radio_colorize.isChecked():
             op = "colorize"
+        elif self.radio_faceswap.isChecked():
+            op = "faceswap"
         else:
             op = "restore_and_colorize"
 
         cfg = {
             "operation": op,
             "image_path": self._input_path,
+            "source_face": self.fs_source.text().strip(),
             # restauro
             "upscale_model": self.upscale_model.currentText() or "",
             "target_scale": self.scale_spin.value(),
@@ -217,10 +245,12 @@ class RestoreTab(QWidget):
         """Ritorna la configurazione corrente (per lettura esterna senza cliccare il pulsante)."""
         op = ("restore" if self.radio_restore.isChecked()
               else "colorize" if self.radio_colorize.isChecked()
+              else "faceswap" if self.radio_faceswap.isChecked()
               else "restore_and_colorize")
         return {
             "operation": op,
             "image_path": self._input_path,
+            "source_face": self.fs_source.text().strip(),
             "upscale_model": self.upscale_model.currentText() or "",
             "target_scale": self.scale_spin.value(),
             "denoise": self.denoise_chk.isChecked(),
