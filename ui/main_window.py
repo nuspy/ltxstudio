@@ -3190,10 +3190,56 @@ class MainWindow(QMainWindow):
         self.quality_tab.setCurrentWidget(self.restore_tab)
 
     # ---------- TRELLIS.2 (immagine → modello 3D) ----------
-    def generate_trellis(self, cfg: dict):
-        """Genera un modello 3D dall'immagine selezionata tramite TrellisPipeline."""
+    def _trellis_native(self, cfg: dict, image_path: str):
+        """TRELLIS 3D NATIVO (venv isolato, subprocess) — immagine→GLB. Zero ComfyUI."""
         from PySide6.QtWidgets import QMessageBox
-        if not self.driver.is_up():
+        from core import trellis_service
+        errs = trellis_service.preflight(image_path)
+        if errs:
+            QMessageBox.warning(self, "TRELLIS", "\n".join(errs)); return
+        seed = random.randint(0, 2**31 - 1) if cfg.get("seed_random", True) else int(cfg.get("seed", 0))
+        name = f"trellis_{Path(image_path).stem}_{seed}"
+        steps = int(cfg.get("steps", 12) or 12)
+        job = trellis_service.make_job(
+            image_path, name, seed=seed, ss_steps=steps, slat_steps=steps,
+            simplify=float(cfg.get("simplify", 0.95) or 0.95),
+            texture_size=int(cfg.get("texture_size", 1024) or 1024),
+            on_log=self._log)
+        out_glb = str(trellis_service.glb_path(name))
+        self._log(f"[nativo] TRELLIS 3D su {Path(image_path).name} (res {cfg.get('resolution','')})…")
+
+        class _TrellisWorker(QThread):
+            done = Signal(dict)
+
+            def run(self):
+                try:
+                    job.run()
+                    self.done.emit({"status": "success", "output": [out_glb]})
+                except Exception as e:  # noqa: BLE001
+                    self.done.emit({"status": "error", "error": str(e)})
+
+        self._trellis_worker = _TrellisWorker()
+        self._trellis_worker.done.connect(self._on_trellis_native_done)
+        self._trellis_worker.start()
+
+    def _on_trellis_native_done(self, res: dict):
+        from PySide6.QtWidgets import QMessageBox
+        if res.get("status") != "success":
+            self._log(f"[trellis] errore: {res.get('error', '')[:300]}")
+            QMessageBox.critical(self, "TRELLIS", str(res.get("error", ""))[:1000]); return
+        glb = (res.get("output") or [None])[0]
+        self._log(f"[trellis] mesh 3D pronta: {glb}")
+        try:                                              # carica nel visore 3D del tab se disponibile
+            if glb and hasattr(self, "trellis_tab") and hasattr(self.trellis_tab, "load_model"):
+                self.trellis_tab.load_model(glb)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def generate_trellis(self, cfg: dict):
+        """Genera un modello 3D dall'immagine selezionata (nativo se installato, altrimenti ComfyUI)."""
+        from PySide6.QtWidgets import QMessageBox
+        from core import trellis_service
+        if not trellis_service.is_installed() and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"),
                                 tr("mw.comfy_offline_process_msg")); return
         if self._trellis_pid or self._inpaint_pid:
@@ -3216,6 +3262,14 @@ class MainWindow(QMainWindow):
         if not image_path:
             QMessageBox.warning(self, tr("mw.no_image_title"),
                                 tr("mw.select_image_to_process_msg")); return
+
+        # BACKEND NATIVO (TRELLIS via venv isolato, zero ComfyUI) se installato
+        try:
+            from core import trellis_service
+            if trellis_service.is_installed():
+                return self._trellis_native(cfg, image_path)
+        except Exception:  # noqa: BLE001
+            pass
 
         # Verifica che i nodi TRELLIS.2 siano installati in ComfyUI
         try:
