@@ -247,8 +247,9 @@ def _assemble_ernie():
 
 def _arch_of(params: dict) -> str:
     a = (params.get("task") or params.get("arch") or "flux").lower()
-    if a == "flux" and "flux2" in str(params.get("model", "")).lower():
-        return "flux2"
+    if a == "flux" and any(t in str(params.get("model", "")).lower()
+                           for t in ("flux2", "flux_2", "flux 2", "flux.2")):
+        return "flux2"                                   # FLUX_2_Dev/FLUX.2 → loader flux2 (config+TE diversi)
     return a if a in SPEC else "flux"
 
 
