@@ -54,11 +54,20 @@ def main() -> None:
         sparse_structure_sampler_params={"steps": a.ss_steps, "cfg_strength": 7.5},
         slat_sampler_params={"steps": a.slat_steps, "cfg_strength": 3.0},
     )
-    glb = postprocessing_utils.to_glb(
-        outputs["gaussian"][0], outputs["mesh"][0],
-        simplify=a.simplify, texture_size=a.texture_size)
     out = os.path.join(a.output_dir, "model.glb")
-    glb.export(out)
+    try:
+        glb = postprocessing_utils.to_glb(
+            outputs["gaussian"][0], outputs["mesh"][0],
+            simplify=a.simplify, texture_size=a.texture_size)
+        glb.export(out)
+    except Exception as e:  # noqa: BLE001
+        # texture PBR richiede nvdiffrast (build MSVC su Windows). Fallback: shape-mesh senza texture.
+        print(f"[trellis] texture non disponibile ({type(e).__name__}: {str(e)[:80]}) → export shape-mesh", flush=True)
+        import trimesh
+        m = outputs["mesh"][0]
+        verts = m.vertices.detach().cpu().numpy() if hasattr(m.vertices, "detach") else m.vertices
+        faces = m.faces.detach().cpu().numpy() if hasattr(m.faces, "detach") else m.faces
+        trimesh.Trimesh(vertices=verts, faces=faces).export(out)
     print("OK:" + out, flush=True)
 
 
