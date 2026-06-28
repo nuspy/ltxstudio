@@ -35,12 +35,25 @@ def main():
     # deps base TRELLIS (le CUDA-pesanti separate)
     _run([py, "-m", "pip", "install", "pillow", "imageio", "imageio-ffmpeg", "trimesh", "easydict",
           "opencv-python-headless", "scipy", "einops", "transformers", "huggingface_hub", "safetensors",
-          "rembg", "onnxruntime", "xatlas", "pyvista", "pymeshfix", "igraph", "tqdm"], check=False)
+          "rembg", "onnxruntime", "xatlas", "pyvista", "pymeshfix", "igraph", "tqdm", "open3d", "psutil", "plyfile"], check=False)
     # CUDA-heavy: spconv (sparse conv), flash-attn (usare wheel precompilato sm_120 se disponibile),
     # nvdiffrast + diff-gaussian-rasterization (da git). Possono fallire su Windows → l'app degrada.
     _run([py, "-m", "pip", "install", "spconv-cu126"], check=False)
     _run([py, "-m", "pip", "install", "flash-attn", "--no-build-isolation"], check=False)
     _run([py, "-m", "pip", "install", "git+https://github.com/NVlabs/nvdiffrast.git"], check=False)
+    _run([py, "-m", "pip", "install", "--no-deps",
+          "utils3d @ git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8"], check=False)
+    # kaolin (no wheel torch 2.11): patch opzionale in flexicubes.py (usa solo check_tensor=validazione)
+    fx = REPO_DIR / "trellis" / "representations" / "mesh" / "flexicubes" / "flexicubes.py"
+    if fx.exists():
+        s = fx.read_text(encoding="utf-8")
+        if "except Exception:" not in s.split("check_tensor")[0][-80:]:
+            s = s.replace("from kaolin.utils.testing import check_tensor",
+                "try:
+    from kaolin.utils.testing import check_tensor
+except Exception:
+    def check_tensor(*a, **k): return None")
+            fx.write_text(s, encoding="utf-8")
     # verifica import trellis → scrive il marker solo se OK
     chk = _run([py, "-c", "import sys; sys.path.insert(0, r'%s'); import trellis; print('TRELLIS OK')" % REPO_DIR],
                capture_output=True, text=True)
