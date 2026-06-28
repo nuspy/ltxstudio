@@ -28,12 +28,35 @@ def main():
     # NB: niente pin di versione — su RTX 5090 (sm_120) serve torch >=2.7 cu128; il 2.6 non ha i kernel.
     subprocess.run([str(py), "-m", "pip", "install", "torch", "torchvision", "torchaudio",
                     "--index-url", "https://download.pytorch.org/whl/cu128"], check=False)
-    req = REPO_DIR / "requirements.txt"
-    if req.exists():
-        subprocess.run([str(py), "-m", "pip", "install", "-r", str(req)], check=False)
-    # diffsynth in editable (è nel repo)
-    subprocess.run([str(py), "-m", "pip", "install", "-e", str(REPO_DIR)], check=False)
-    print("[flashvsr] fatto. block_sparse_attn/flash_attn sono opzionali (Windows: fallback standard).")
+    subprocess.run([str(py), "-m", "pip", "install", "setuptools<81", "wheel"], check=False)
+    # diffsynth: --no-deps (il suo pin torch==2.6+cu124 romperebbe il cu128 Blackwell) + transformers 4.46
+    # (diffsynth importa PretrainedConfig, rimosso in transformers 5). Venv ISOLATO → nessun impatto altrove.
+    subprocess.run([str(py), "-m", "pip", "install", "-e", str(REPO_DIR),
+                    "--no-deps", "--no-build-isolation"], check=False)
+    subprocess.run([str(py), "-m", "pip", "install", "transformers==4.46.2", "einops", "imageio",
+                    "imageio-ffmpeg", "modelscope", "sentencepiece", "huggingface_hub", "safetensors",
+                    "opencv-python-headless", "ftfy", "tqdm", "numpy<2.3"], check=False)
+    # PATCH Windows: block_sparse_attn non compila → import opzionale + fallback SDPA in wan_video_dit.py
+    dit = REPO_DIR / "diffsynth" / "models" / "wan_video_dit.py"
+    if dit.exists():
+        t = dit.read_text(encoding="utf-8")
+        if "block_sparse_attn_func = None" not in t:
+            t = t.replace("from block_sparse_attn import block_sparse_attn_func",
+                          "try:\n    from block_sparse_attn import block_sparse_attn_func\n"
+                          "except Exception:\n    block_sparse_attn_func = None")
+            t = t.replace(
+                "    if attention_mask is not None:\n        seqlen = q.shape[1]",
+                "    if attention_mask is not None and block_sparse_attn_func is None:\n"
+                "        import torch.nn.functional as _F\n"
+                "        q = rearrange(q, 'b s (n d) -> b n s d', n=num_heads)\n"
+                "        k = rearrange(k, 'b s (n d) -> b n s d', n=num_heads)\n"
+                "        v = rearrange(v, 'b s (n d) -> b n s d', n=num_heads)\n"
+                "        x = _F.scaled_dot_product_attention(q, k, v)\n"
+                "        x = rearrange(x, 'b n s d -> b s (n d)', n=num_heads)\n"
+                "    elif attention_mask is not None:\n        seqlen = q.shape[1]")
+            dit.write_text(t, encoding="utf-8")
+            print("[flashvsr] patch block_sparse_attn (fallback SDPA) applicata")
+    print("[flashvsr] fatto. Validato: 512x320→2048x1280 in ~22s.")
 
 
 if __name__ == "__main__":
