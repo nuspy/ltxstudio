@@ -125,7 +125,13 @@ def _assemble_flux(Pipe, transformer_path: str):
     from diffusers import FluxTransformer2DModel, AutoencoderKL, FlowMatchEulerDiscreteScheduler
     from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
     bf16 = torch.bfloat16
-    tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+    # config transformer LOCALE (no dipendenza HF a runtime → funziona offline/gated; target 100% locale)
+    _tr_cfg = os.path.join(TE_DIR, "flux_transformer")
+    if os.path.isdir(_tr_cfg):
+        tr = FluxTransformer2DModel.from_single_file(
+            transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True)
+    else:
+        tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
     # config esplicito (VAE FLUX = 16 canali latenti; senza, from_single_file inferisce SD-VAE a 8)
     vae = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)
     te = CLIPTextModel.from_pretrained(os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)
