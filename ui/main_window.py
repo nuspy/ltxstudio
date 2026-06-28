@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.i18n_manager import tr, i18n, LANGUAGES, LANG_FLAGS
+from ui.job_queue import GenerationQueue, JobQueuePanel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.comfy_driver import ComfyDriver           # noqa: E402
@@ -355,6 +356,7 @@ class MainWindow(QMainWindow):
             self.engine = None
             self._engine_err = str(e)
 
+        self.jobs = GenerationQueue(self)       # coda SERIALE delle generazioni (no overlap/cancel reciproci)
         self._current_pid: str | None = None
         self._inpaint_pid: str | None = None
         self._trellis_pid: str | None = None    # job TRELLIS.2 in corso
@@ -582,11 +584,25 @@ class MainWindow(QMainWindow):
         self.main_splitter.setChildrenCollapsible(False); self.main_splitter.setHandleWidth(6)
         root.addWidget(self.main_splitter)
 
+        # Pannello CODA generazioni (dock): lista job + stato + annulla. Vedi ui/job_queue.py
+        from PySide6.QtWidgets import QDockWidget
+        self.queue_dock = QDockWidget(tr("queue.title", "Coda generazioni"), self)
+        self.queue_dock.setObjectName("queue_dock")
+        self.queue_panel = JobQueuePanel(self.jobs, self.queue_dock)
+        self.queue_dock.setWidget(self.queue_panel)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.queue_dock)
+        self.jobs.changed.connect(self._refresh_status)
+
         self.status_lbl = QLabel("…")
         self.statusBar().addWidget(self.status_lbl)
         if self._engine_err:
             self._log(f"[!] Template non caricato: {self._engine_err}")
             self._log("    Cattura il golden prompt (templates/README_capture.md) e riavvia.")
+
+    def _enqueue(self, label, worker, on_done=None, on_progress=None):
+        """Accoda un worker di generazione nella coda seriale (no sovrapposizioni). Vedi ui/job_queue.py.
+        Sostituisce il vecchio pattern worker.done.connect(...)+worker.start() in tutti i punti."""
+        return self.jobs.enqueue(label, worker, on_done=on_done, on_progress=on_progress)
 
     def _build_menu(self):
         m = self.menuBar().addMenu(tr("menu.tools"))
@@ -1953,8 +1969,7 @@ class MainWindow(QMainWindow):
                   "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8)}
         self._log("Generazione immagine (backend NATIVO) inviata…")
         self._native_worker = _NativeImageWorker(params)
-        self._native_worker.done.connect(self._on_native_image_done)
-        self._native_worker.start()
+        self._enqueue(tr("queue.job.image", "Immagine"), self._native_worker, self._on_native_image_done)
 
     def _on_native_image_done(self, res: dict):
         if res.get("status") != "success":
@@ -2034,9 +2049,8 @@ class MainWindow(QMainWindow):
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
         self._ltx2_worker = _NativeLtx2Worker(params)
-        self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
-        self._ltx2_worker.done.connect(self._on_multitalk_done)   # riusa: face-swap/RIFE/announce
-        self._ltx2_worker.start()
+        self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
+                      on_progress=lambda s: self._log("[nativo] " + s))
 
     def _retake_native(self, vals: dict, src: str, v2v: dict):
         """ReTake NATIVO (#24): rigenera la sezione [start,end] del video sorgente (RetakePipeline LTX-2).
@@ -2055,17 +2069,15 @@ class MainWindow(QMainWindow):
         }
         self._log(f"[nativo] ReTake [{params['start_time']:.1f}–{params['end_time']:.1f}]s su {Path(src).name}…")
         self._ltx2_worker = _NativeLtx2Worker(params)
-        self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
-        self._ltx2_worker.done.connect(self._on_multitalk_done)
-        self._ltx2_worker.start()
+        self._enqueue(tr("queue.job.video_retake", "Video ReTake"), self._ltx2_worker, self._on_multitalk_done,
+                      on_progress=lambda s: self._log("[nativo] " + s))
 
     def _gen_video_edit_ai(self, cfg: dict):
         """#24/#59/#60 Modifica Video AI: edit-anything / inpaint (SAM2 track) / style — worker async."""
         self.video_edit_ai_tab.log.appendPlainText(tr("vedit.start", "[edit] avvio {m}…").format(m=cfg["mode"]))
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
-        self._edit_ai_worker.progress.connect(self.video_edit_ai_tab.log.appendPlainText)
-        self._edit_ai_worker.done.connect(self._on_video_edit_ai_done)
-        self._edit_ai_worker.start()
+        self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
+                      self._on_video_edit_ai_done, on_progress=self.video_edit_ai_tab.log.appendPlainText)
 
     def _on_video_edit_ai_done(self, res: dict):
         if res.get("status") == "success":
@@ -2094,9 +2106,8 @@ class MainWindow(QMainWindow):
             self._log(f"[nativo] SeedVR2 super-risoluzione (res {cfg.get('resolution',1080)}) su {Path(src).name}…")
             self._sv2_worker = _SeedVR2Worker(src, out, resolution=int(cfg.get("resolution", 1080) or 1080),
                                               batch_size=int(cfg.get("batch_size", 5) or 5), chunk_size=120)
-            self._sv2_worker.progress.connect(self._log)
-            self._sv2_worker.done.connect(self._on_multitalk_done)
-            self._sv2_worker.start()
+            self._enqueue(tr("queue.job.seedvr2", "Super-risoluzione (SeedVR2)"), self._sv2_worker,
+                          self._on_multitalk_done, on_progress=self._log)
             return
         if engine == "flashvsr":                         # FlashVSR v1.1 nativo (x4 streaming, diffsynth)
             from core import flashvsr_service as fv
@@ -2107,9 +2118,8 @@ class MainWindow(QMainWindow):
             out = str(OUTPUT_DIR / f"flashvsr_{Path(src).stem}.mp4")
             self._log(f"[nativo] FlashVSR x4 super-risoluzione su {Path(src).name}…")
             self._fv_worker = _FlashVSRWorker(src, out)
-            self._fv_worker.progress.connect(self._log)
-            self._fv_worker.done.connect(self._on_multitalk_done)
-            self._fv_worker.start()
+            self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
+                          self._on_multitalk_done, on_progress=self._log)
             return
         # esrgan: upscale per-frame nativo (spandrel)
         params = {
@@ -2118,8 +2128,8 @@ class MainWindow(QMainWindow):
         }
         self._log(f"[nativo] definizione video (upscale per-frame x{params['scale']}) su {Path(src).name}…")
         self._native_worker = _NativeImageWorker(params, module="video_upscale")
-        self._native_worker.done.connect(self._on_multitalk_done)   # annuncia + opz. face/rife
-        self._native_worker.start()
+        self._enqueue(tr("queue.job.video_upscale", "Definizione video (upscale)"), self._native_worker,
+                      self._on_multitalk_done)
 
     def _extend_video_native(self):
         """Prolunga un video NATIVAMENTE (LTX-2.3 GGUF): i2v dall'ULTIMO frame del video sorgente per
@@ -2153,9 +2163,8 @@ class MainWindow(QMainWindow):
             params["chunk_frames"] = 121
         self._log(f"[nativo] prolunga +{add_s:.0f}s ({nf} frame) da {Path(src).name}…")
         self._ltx2_worker = _NativeLtx2Worker(params)
-        self._ltx2_worker.progress.connect(lambda s: self._log("[nativo] " + s))
-        self._ltx2_worker.done.connect(self._on_extend_native_done)
-        self._ltx2_worker.start()
+        self._enqueue(tr("queue.job.video_extend", "Prolunga video"), self._ltx2_worker,
+                      self._on_extend_native_done, on_progress=lambda s: self._log("[nativo] " + s))
 
     def _on_extend_native_done(self, res: dict):
         if res.get("status") != "success":
@@ -2202,9 +2211,8 @@ class MainWindow(QMainWindow):
             nat["chunk_frames"] = 121
         self._log(f"[lip-sync nativo] a2v LTX-2 GGUF — {nf} frame {nat['width']}x{nat['height']}…")
         self._mt_worker = _NativeLtx2Worker(nat)
-        self._mt_worker.progress.connect(lambda s: self._log("[lip-sync] " + s))
-        self._mt_worker.done.connect(self._on_multitalk_done)
-        self._mt_worker.start()
+        self._enqueue(tr("queue.job.lipsync", "Lip-sync"), self._mt_worker, self._on_multitalk_done,
+                      on_progress=lambda s: self._log("[lip-sync] " + s))
 
     def _on_multitalk_done(self, res: dict):
         if res.get("status") != "success":
@@ -2221,9 +2229,8 @@ class MainWindow(QMainWindow):
             swapped = str(_P(out).with_name(_P(out).stem + "_faceswap.mp4"))
             self._log("[Face-swap] applico il volto da foto al video…")
             self._fs_worker = _FaceSwapWorker(out, fs["face"], swapped)
-            self._fs_worker.progress.connect(lambda s: self._log("[Face-swap] " + s))
-            self._fs_worker.done.connect(self._on_faceswap_done)
-            self._fs_worker.start()
+            self._enqueue(tr("queue.job.faceswap", "Face-swap"), self._fs_worker, self._on_faceswap_done,
+                          on_progress=lambda s: self._log("[Face-swap] " + s))
             return
         self._maybe_rife(out)
 
@@ -2245,9 +2252,8 @@ class MainWindow(QMainWindow):
             fluid = str(_P(out).with_name(_P(out).stem + f"_rife{rf['factor']}x.mp4"))
             self._log(f"[RIFE] fluidifico il video (x{rf['factor']})…")
             self._rife_worker = _RifeWorker(out, fluid, int(rf["factor"]))
-            self._rife_worker.progress.connect(lambda s: self._log("[RIFE] " + s))
-            self._rife_worker.done.connect(self._on_rife_done)
-            self._rife_worker.start()
+            self._enqueue(tr("queue.job.rife", "Interpolazione FPS (RIFE)"), self._rife_worker,
+                          self._on_rife_done, on_progress=lambda s: self._log("[RIFE] " + s))
             return
         self._announce_video(out)
 
@@ -2341,8 +2347,8 @@ class MainWindow(QMainWindow):
         self._inpaint_mode = mode
         self._log(f"{mode} (backend NATIVO) inviato (steps={steps}, seed={seed}, guidance={guidance:.1f})…")
         self._native_worker = _NativeImageWorker(params)
-        self._native_worker.done.connect(self._on_native_inpaint_done)
-        self._native_worker.start()
+        self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,
+                      self._on_native_inpaint_done)
 
     def _start_native_kontext(self, exp, model, prompt, negative, steps, seed, guidance):
         """Kontext/integra via backend NATIVO (FluxKontextPipeline) — niente ComfyUI.
@@ -2364,8 +2370,8 @@ class MainWindow(QMainWindow):
         self._inpaint_mode = "integrazione"
         self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._native_worker = _NativeImageWorker(params)
-        self._native_worker.done.connect(self._on_native_inpaint_done)
-        self._native_worker.start()
+        self._enqueue(tr("queue.job.integrate", "Integra (Kontext)"), self._native_worker,
+                      self._on_native_inpaint_done)
 
     def _on_native_inpaint_done(self, res: dict):
         if res.get("status") != "success":
@@ -2397,8 +2403,8 @@ class MainWindow(QMainWindow):
                   "target_scale": float(scale), "seed": 0}
         self._log(f"Upscale (backend NATIVO) inviato (×{scale})…")
         self._native_worker = _NativeImageWorker(params, module="upscale")
-        self._native_worker.done.connect(self._on_native_inpaint_done)
-        self._native_worker.start()
+        self._enqueue(tr("queue.job.upscale", "Upscale immagine"), self._native_worker,
+                      self._on_native_inpaint_done)
 
     def generate_upscale(self):
         """Aumenta la definizione dell'immagine corrente del canvas con un modello AI di super-risoluzione."""
@@ -2587,8 +2593,8 @@ class MainWindow(QMainWindow):
         }
         self._log(f"[nativo] restauro volti su {Path(src).name} (fidelity {params['fidelity']:.2f})…")
         self._native_worker = _NativeImageWorker(params, module="video_face")
-        self._native_worker.done.connect(self._on_multitalk_done)
-        self._native_worker.start()
+        self._enqueue(tr("queue.job.video_face", "Restauro volti video"), self._native_worker,
+                      self._on_multitalk_done)
 
     def _segment_native(self, *, text: str = "", threshold: float = 0.30,
                         region_mask: str = "", image_path: str = ""):
@@ -2604,8 +2610,8 @@ class MainWindow(QMainWindow):
             params["threshold"] = threshold
             self._log(f"[nativo] selezione '{text}' (soglia {threshold:.2f})…")
         self._seg_native_worker = _NativeImageWorker(params, module="segment")
-        self._seg_native_worker.done.connect(self._on_segment_native_done)
-        self._seg_native_worker.start()
+        self._enqueue(tr("queue.job.segment", "Segmentazione"), self._seg_native_worker,
+                      self._on_segment_native_done)
 
     def _on_segment_native_done(self, res: dict):
         if res.get("status") != "success":
@@ -3128,8 +3134,8 @@ class MainWindow(QMainWindow):
 
         self._log(f"[nativo] face-swap foto: {Path(src_face).name} → {Path(image_path).name}…")
         self._fsphoto_worker = _FSWorker()
-        self._fsphoto_worker.done.connect(self._on_native_image_done)
-        self._fsphoto_worker.start()
+        self._enqueue(tr("queue.job.faceswap_photo", "Face-swap foto"), self._fsphoto_worker,
+                      self._on_native_image_done)
 
     def generate_restore(self, cfg: dict):
         """Restauro / colorazione / face-swap foto."""
@@ -3247,8 +3253,8 @@ class MainWindow(QMainWindow):
                     self.done.emit({"status": "error", "error": str(e)})
 
         self._trellis_worker = _TrellisWorker()
-        self._trellis_worker.done.connect(self._on_trellis_native_done)
-        self._trellis_worker.start()
+        self._enqueue(tr("queue.job.trellis", "Modello 3D (TRELLIS)"), self._trellis_worker,
+                      self._on_trellis_native_done)
 
     def _on_trellis_native_done(self, res: dict):
         from PySide6.QtWidgets import QMessageBox
@@ -3413,8 +3419,7 @@ class MainWindow(QMainWindow):
                     self.done.emit({"status": "error", "error": str(e)})
 
         self._rig_worker = _RigWorker()
-        self._rig_worker.done.connect(self._on_trellis_native_done)
-        self._rig_worker.start()
+        self._enqueue(tr("queue.job.rig", "Rig 3D"), self._rig_worker, self._on_trellis_native_done)
 
     def generate_rig(self, cfg: dict):
         """Rigging automatico di una mesh (nativo SkinTokens se installato, altrimenti ComfyUI)."""
