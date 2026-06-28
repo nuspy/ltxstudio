@@ -51,20 +51,25 @@ FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
 
 
 def _place(pipe, vram_mb: int) -> str:
-    """Posizionamento VRAM (sicuro e portabile, default).
+    """Posizionamento VRAM: tieni il modello SU GPU se c'è spazio (resta caricato tra le generazioni
+    → niente reload/offload ripetuto), altrimenti offload CPU. L'eviction quando serve spazio per un
+    ALTRO modello è gestita dal ModelManager (make_room/unload LRU).
 
-    NB Windows: forzare tutto su GPU quando la VRAM è stretta innesca il *system memory fallback*
-    del driver NVIDIA (usa la RAM come VRAM) → lentezza estrema. Quindi DEFAULT =
-    enable_model_cpu_offload (funziona su ogni GPU/VRAM, dalle 5090 alle schede minori).
-    Il "full GPU" è opt-in solo con VRAM molto abbondante (NATIVE_FULL_GPU=1) e margine ampio."""
+    NB Windows: forzare GPU con VRAM stretta innesca il *system memory fallback* del driver NVIDIA
+    (RAM come VRAM → lentissimo). Quindi: GPU solo se free ≥ vram_mb·margine + floor di sistema;
+    sotto quella soglia → enable_model_cpu_offload (portabile, schede piccole). Override:
+    NATIVE_FORCE_OFFLOAD=1 (sempre offload), NATIVE_GPU_MARGIN (default 1.35), NATIVE_GPU_FLOOR_MB."""
     import os
     import torch
-    full = os.environ.get("NATIVE_FULL_GPU") == "1"
-    if full and torch.cuda.is_available():
-        free_mb = torch.cuda.mem_get_info()[0] / 1024**2
-        if free_mb > vram_mb * 2.5:                     # margine ampio per evitare sysmem fallback
-            pipe.to("cuda")
-            return "gpu"
+    if os.environ.get("NATIVE_FORCE_OFFLOAD") == "1" or not torch.cuda.is_available():
+        pipe.enable_model_cpu_offload()
+        return "offload"
+    free_mb = torch.cuda.mem_get_info()[0] / 1024**2
+    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.35"))   # modello + attivazioni
+    floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1500"))  # lascia margine al sistema
+    if free_mb >= vram_mb * margin + floor_mb:
+        pipe.to("cuda")                                 # RESTA su GPU; la cache ModelManager lo riusa
+        return "gpu"
     pipe.enable_model_cpu_offload()
     return "offload"
 
