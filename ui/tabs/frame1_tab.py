@@ -301,6 +301,42 @@ class Frame1Tab(QWidget):
         self._reload_inpaint_loras()
         self._reload_flux_combos()
 
+    def _color_name_combo(self, combo):
+        """Colora le voci di un combo i cui item TESTO sono nomi-file di modelli (verde/giallo/rosso)."""
+        try:
+            from core import model_precision as _mp
+            from PySide6.QtGui import QColor
+            free = _mp.gpu_free_gb()
+            for i in range(combo.count()):
+                info = _mp.classify(combo.itemText(i), free)
+                col = _mp.QT_COLORS.get(info["color"])
+                if col:
+                    combo.setItemData(i, QColor(col), Qt.ForegroundRole)
+                combo.setItemData(i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB", Qt.ToolTipRole)
+        except Exception:                                    # noqa: BLE001
+            pass
+
+    def _color_curated_combo(self, combo, spec: dict, *, key: str = "unet"):
+        """Colora le voci di un combo CURATO (label→dict) per fattibilità VRAM (verde/giallo/rosso),
+        classificando il file modello in spec[label][key]. Usato per inpaint/integra (liste brevi)."""
+        try:
+            from core import model_precision as _mp
+            from PySide6.QtGui import QColor
+            free = _mp.gpu_free_gb()
+            for i in range(combo.count()):
+                label = combo.itemText(i)
+                ent = spec.get(label) or {}
+                fname = ent.get(key)
+                if not fname:
+                    continue
+                info = _mp.classify(fname, free)
+                col = _mp.QT_COLORS.get(info["color"])
+                if col:
+                    combo.setItemData(i, QColor(col), Qt.ForegroundRole)
+                combo.setItemData(i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB", Qt.ToolTipRole)
+        except Exception:                                    # noqa: BLE001
+            pass
+
     def _reload_gen(self, *_):
         arch_lbl = self.gen_arch.currentText()
         _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
@@ -435,6 +471,8 @@ class Frame1Tab(QWidget):
             cur = refine_combo.currentText()
             refine_combo.clear()
             refine_combo.addItems(flux2) if flux2 else refine_combo.addItem(tr("f1.flux2.none"))
+            if flux2:
+                self._color_name_combo(refine_combo)
             if cur in flux2:
                 refine_combo.setCurrentText(cur)
         # integra: liste separate per engine
@@ -454,6 +492,8 @@ class Frame1Tab(QWidget):
                 empty = tr("f1.kontext.none")
             ic.clear()
             ic.addItems(pool) if pool else ic.addItem(empty)
+            if pool:
+                self._color_name_combo(ic)
             if cur in pool:
                 ic.setCurrentText(cur)
         # puzzle_lora è una LoRA FLUX.1 → disabilita in modalità FLUX.2
@@ -514,6 +554,7 @@ class Frame1Tab(QWidget):
         srow.addWidget(self.strength); srow.addWidget(self.strength_lbl)
         sw = QWidget(); sw.setLayout(srow); f.addRow(tr("f1.inpaint.strength_lbl"), sw)
         self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
+        self._color_curated_combo(self.inp_model, INPAINT_MODELS, key="unet")   # colori VRAM (verde/giallo/rosso)
         self.inp_model.currentTextChanged.connect(self._reload_inpaint_loras)
         self.inp_model.currentTextChanged.connect(self._update_inp_star)
         imrow = QHBoxLayout(); imrow.setContentsMargins(0, 0, 0, 0)

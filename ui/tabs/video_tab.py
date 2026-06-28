@@ -120,6 +120,11 @@ class VideoTab(QWidget):
         self.model.currentIndexChanged.connect(self._update_model_star)
         mrow = QHBoxLayout(); mrow.setContentsMargins(0, 0, 0, 0)
         mrow.addWidget(self.model, 1)
+        # filtro precisione (fp16/fp8/fp4/gguf) + colori VRAM sul dropdown modelli video
+        from ui.widgets.precision_combo import make_precision_selector
+        self.precision = make_precision_selector(); self.precision.setMaximumWidth(110)
+        self.precision.currentIndexChanged.connect(lambda *_: self._refilter_models())
+        mrow.addWidget(self.precision)
         self.model_star = QToolButton(); self.model_star.setText("☆")
         self.model_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
         self.model_star.setToolTip(tr("vid.model_star.tt"))
@@ -274,10 +279,18 @@ class VideoTab(QWidget):
         self.model.blockSignals(True)
         self.model.clear()
         self.model.addItem(tr("vid.model.auto"), {"kind": "auto", "key": "auto"})
+        # precisione: filtro + colori VRAM. free_gb calcolato UNA volta (no nvidia-smi per item).
+        from core import model_precision as _mp
+        from PySide6.QtGui import QColor
+        _free_gb = _mp.gpu_free_gb()
+        _pf = self.precision.currentData() if hasattr(self, "precision") else "all"
 
         def add(label: str, kind: str, model: str, is_nsfw: bool, enabled: bool = True):
             if (not nsfw) and is_nsfw:
                 return
+            _info = _mp.classify(model, _free_gb)
+            if _pf and _pf != "all" and _info["precision"] != _pf:
+                return                                       # filtrato per precisione scelta
             badge = "🔞 " if is_nsfw else ""
             fav = "⭐ " if user_prefs.is_fav_model(model) else ""
             key = f"{kind}:{model}"
@@ -294,6 +307,9 @@ class VideoTab(QWidget):
             if _note:
                 _tip_parts.append(tr("vid.model.tip_note").format(note=_note))
             self.model.setItemData(self.model.count() - 1, "\n".join(_tip_parts), Qt.ToolTipRole)
+            _col = _mp.QT_COLORS.get(_info["color"])
+            if _col:
+                self.model.setItemData(self.model.count() - 1, QColor(_col), Qt.ForegroundRole)
             if not enabled:
                 item = self.model.model().item(self.model.count() - 1)
                 if item:
