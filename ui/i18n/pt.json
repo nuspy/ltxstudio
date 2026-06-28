@@ -1843,5 +1843,10 @@
   "mw.video_result_title": "Vídeo gerado",
   "mw.video_no_preview": "Pré-visualização indisponível.",
   "mw.btn_open": "Abrir",
-  "mw.mode_generate": "geração"
+  "mw.mode_generate": "geração",
+  "prec.all": "Todas",
+  "prec.tt": "Filtra por precisão; verde=ótimo, amarelo=offload gerenciável, vermelho=grande demais.",
+  "prec.green": "ótimo na VRAM",
+  "prec.yellow": "offload parcial, gerenciável",
+  "prec.red": "grande demais para a GPU"
 }

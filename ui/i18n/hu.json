@@ -1843,5 +1843,10 @@
   "mw.video_result_title": "Generált videó",
   "mw.video_no_preview": "Az előnézet nem érhető el.",
   "mw.btn_open": "Megnyitás",
-  "mw.mode_generate": "generálás"
+  "mw.mode_generate": "generálás",
+  "prec.all": "Mind",
+  "prec.tt": "Szűrés precizitás szerint; zöld=optimális, sárga=kezelhető offload, piros=túl nagy.",
+  "prec.green": "optimális a VRAM-ban",
+  "prec.yellow": "részleges offload, kezelhető",
+  "prec.red": "túl nagy a GPU-hoz"
 }

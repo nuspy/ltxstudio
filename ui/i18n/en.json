@@ -1843,5 +1843,10 @@
   "mw.video_result_title": "Generated video",
   "mw.video_no_preview": "Preview not available.",
   "mw.btn_open": "Open",
-  "mw.mode_generate": "generation"
+  "mw.mode_generate": "generation",
+  "prec.all": "All",
+  "prec.tt": "Filter models by precision; green=optimal, yellow=manageable offload, red=too large.",
+  "prec.green": "optimal in VRAM",
+  "prec.yellow": "partial offload, manageable",
+  "prec.red": "too large for the GPU"
 }

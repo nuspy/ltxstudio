@@ -1843,5 +1843,10 @@
   "mw.video_result_title": "וידאו שנוצר",
   "mw.video_no_preview": "תצוגה מקדימה לא זמינה.",
   "mw.btn_open": "פתח",
-  "mw.mode_generate": "יצירה"
+  "mw.mode_generate": "יצירה",
+  "prec.all": "הכול",
+  "prec.tt": "סינון לפי דיוק; ירוק=אופטימלי, צהוב=פריקה נסבלת, אדום=גדול מדי.",
+  "prec.green": "אופטימלי ב-VRAM",
+  "prec.yellow": "פריקה חלקית, נסבל",
+  "prec.red": "גדול מדי ל-GPU"
 }

@@ -1843,5 +1843,10 @@
   "mw.video_result_title": "الفيديو المُنشأ",
   "mw.video_no_preview": "المعاينة غير متاحة.",
   "mw.btn_open": "فتح",
-  "mw.mode_generate": "التوليد"
+  "mw.mode_generate": "التوليد",
+  "prec.all": "الكل",
+  "prec.tt": "تصفية حسب الدقة؛ أخضر=مثالي، أصفر=تفريغ مقبول، أحمر=كبير جدًا.",
+  "prec.green": "مثالي في الـVRAM",
+  "prec.yellow": "تفريغ جزئي، مقبول",
+  "prec.red": "كبير جدًا على الـGPU"
 }

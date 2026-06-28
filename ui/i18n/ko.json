@@ -1843,5 +1843,10 @@
   "mw.video_result_title": "생성된 비디오",
   "mw.video_no_preview": "미리보기를 사용할 수 없습니다.",
   "mw.btn_open": "열기",
-  "mw.mode_generate": "생성"
+  "mw.mode_generate": "생성",
+  "prec.all": "전체",
+  "prec.tt": "정밀도로 필터; 초록=최적, 노랑=감당 가능한 오프로드, 빨강=너무 큼.",
+  "prec.green": "VRAM에 최적",
+  "prec.yellow": "부분 오프로드, 감당 가능",
+  "prec.red": "GPU에 너무 큼"
 }

@@ -155,6 +155,12 @@ class Frame1Tab(QWidget):
         self.gen_model.currentIndexChanged.connect(self._refilter_gen_encoder)
         gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
         gmrow.addWidget(self.gen_model, 1)
+        # filtro precisione (fp16/fp8/fp4/gguf) + colori VRAM (verde/giallo/rosso) sul dropdown modelli
+        from ui.widgets.precision_combo import make_precision_selector
+        self.gen_precision = make_precision_selector()
+        self.gen_precision.setMaximumWidth(110)
+        self.gen_precision.currentIndexChanged.connect(lambda *_: self._reload_gen())
+        gmrow.addWidget(self.gen_precision)
         self.gen_star = QToolButton(); self.gen_star.setText("☆")
         self.gen_star.setStyleSheet("QToolButton{border:none;font-size:16px;color:#777;}")
         self.gen_star.setToolTip(tr("f1.gen.star.tt"))
@@ -332,15 +338,18 @@ class Frame1Tab(QWidget):
         # fav-first: i modelli preferiti in cima (i nomi restano i filename reali, nessun prefisso
         # nel testo → currentText() resta valido per get_gen_config)
         models = sorted(models, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
-        self.gen_model.blockSignals(True)
-        self.gen_model.clear()
+        # filtro precisione + colori VRAM (verde/giallo/rosso) via helper riutilizzabile
+        from ui.widgets import precision_combo as _pc
+        prec = self.gen_precision.currentData() if hasattr(self, "gen_precision") else "all"
         if models:
-            self.gen_model.addItem(tr("f1.gen.auto"), "__auto__")   # auto-select: miglior modello dell'arch
-            for m in models:
-                self.gen_model.addItem(m, m)
+            _pc.populate(self.gen_model, models, prec or "all",
+                         prepend=[(tr("f1.gen.auto"), "__auto__")])
+            if self.gen_model.count() <= 1:    # filtro troppo restrittivo → nessun modello di quella precisione
+                self.gen_model.addItem(tr("f1.gen.no_model"), None)
         else:
+            self.gen_model.blockSignals(True); self.gen_model.clear()
             self.gen_model.addItem(tr("f1.gen.no_model"), None)
-        self.gen_model.blockSignals(False)
+            self.gen_model.blockSignals(False)
         self._update_gen_star()
         # Controlla se il golden template è disponibile per questa arch
         arch_key = {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(arch_lbl, "flux")
