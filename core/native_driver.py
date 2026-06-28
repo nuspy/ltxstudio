@@ -24,7 +24,7 @@ def _get(path: str, timeout: int = 15) -> dict:
 
 def is_up() -> bool:
     try:
-        _get("/system_stats", timeout=3); return True
+        _get("/system_stats", timeout=1.5); return True
     except Exception:                                   # noqa: BLE001
         return False
 

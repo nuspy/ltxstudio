@@ -891,8 +891,15 @@ class MainWindow(QMainWindow):
 
     def _refresh_status(self):
         from core import native_driver, offline_inventory
-        up = self.driver.is_up()
-        native_up = native_driver.is_up()
+        # NO-COMFY: se tutti i moduli sono nativi, NON interrogare ComfyUI (spento di proposito) ad ogni
+        # tick → evita la chiamata HTTP bloccante che rallenta la GUI. Durante un job, assumi nativo up
+        # (il polling di completion già conferma) per non bloccare il main thread sul /system_stats occupato.
+        _all_native = all(backend.is_native(m) for m in ("image", "video", "enhance", "segment", "face"))
+        up = False if _all_native else self.driver.is_up()
+        if (self._current_pid or self._inpaint_pid or self._seg_pid) and _all_native:
+            native_up = True
+        else:
+            native_up = native_driver.is_up()
         # NO-COMFY: se ComfyUI è assente ma il nativo è attivo, l'inventario viene dal FILESYSTEM.
         ready = up or native_up
         _conn = tr("mw.status_connected") if up else (
