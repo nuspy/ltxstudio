@@ -9,6 +9,20 @@ API ufficiale (github.com/microsoft/TRELLIS):
 """
 import argparse
 import os
+import sys
+
+# il package `trellis` (repo microsoft/TRELLIS) è usato via sys.path (non pip-installato)
+_REPO = r"E:\AI\Tools\TRELLIS2\TRELLIS"
+if os.path.isdir(_REPO):
+    sys.path.insert(0, _REPO)
+# DLL FFmpeg shared (imageio/torchcodec)
+_FB = r"E:\AI\Tools\ffmpeg-shared\bin"
+if os.path.isdir(_FB):
+    os.environ["PATH"] = _FB + os.pathsep + os.environ.get("PATH", "")
+    try:
+        os.add_dll_directory(_FB)
+    except (AttributeError, OSError):
+        pass
 
 
 def main() -> None:
