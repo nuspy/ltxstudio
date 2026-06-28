@@ -3358,11 +3358,42 @@ class MainWindow(QMainWindow):
             return None
 
     # ---------- Rig 3D (SkinTokens) ----------
+    def _rig_native(self, cfg: dict, mesh_path: str):
+        """Rig SkinTokens NATIVO (venv isolato + Blender headless) — mesh→GLB rigged. Zero ComfyUI."""
+        from PySide6.QtWidgets import QMessageBox
+        from core import rig_service, blender_installer
+        errs = rig_service.preflight(mesh_path)
+        if errs:
+            QMessageBox.warning(self, "SkinTokens", "\n".join(errs)); return
+        if not blender_installer.find_blender():           # Blender richiesto per skinning/export
+            if not self._offer_blender_install():
+                return
+            return
+        name = f"rig_{Path(mesh_path).stem}"
+        out = str(rig_service.OUT_DIR / rig_service._safe(name) / "rigged.glb")
+        job = rig_service.make_job(mesh_path, name, on_log=self._log)
+        self._log(f"[nativo] Rig SkinTokens su {Path(mesh_path).name}…")
+
+        class _RigWorker(QThread):
+            done = Signal(dict)
+
+            def run(self):
+                try:
+                    job.run()
+                    self.done.emit({"status": "success", "output": [out]})
+                except Exception as e:  # noqa: BLE001
+                    self.done.emit({"status": "error", "error": str(e)})
+
+        self._rig_worker = _RigWorker()
+        self._rig_worker.done.connect(self._on_trellis_native_done)
+        self._rig_worker.start()
+
     def generate_rig(self, cfg: dict):
-        """Rigging automatico di una mesh tramite RigPipeline (SkinTokens)."""
+        """Rigging automatico di una mesh (nativo SkinTokens se installato, altrimenti ComfyUI)."""
         import os, shutil
         from PySide6.QtWidgets import QMessageBox
-        if not self.driver.is_up():
+        from core import rig_service
+        if not rig_service.is_installed() and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"),
                                 tr("mw.comfy_offline_process_msg")); return
         if self._rig_pid or self._trellis_pid:
@@ -3372,6 +3403,9 @@ class MainWindow(QMainWindow):
         mesh_path = cfg.get("mesh_path", "")
         if not mesh_path or not Path(mesh_path).exists():
             QMessageBox.warning(self, tr("rig.no_mesh.title"), tr("rig.no_mesh.msg")); return
+
+        if rig_service.is_installed():                     # BACKEND NATIVO (zero ComfyUI)
+            return self._rig_native(cfg, mesh_path)
 
         # Pre-check nodo installato
         try:
