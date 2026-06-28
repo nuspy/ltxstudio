@@ -127,16 +127,23 @@ class MusicTab(QWidget):
         self.song_instr.toggled.connect(lambda on: self.song_lyrics.setDisabled(on))
         self.song_dur = QSpinBox(); self.song_dur.setRange(5, 360); self.song_dur.setValue(120); self.song_dur.setSuffix(" s")
         self.song_ver = QComboBox(); self.song_ver.addItems(["3B", "7B"])
+        # Motore di generazione: HeartMuLa (default) o ACE-Step XL 1.5 (alternativa)
+        self.song_engine = QComboBox(); self.song_engine.addItems(["HeartMuLa", "ACE-Step"])
         self.song_temp = QDoubleSpinBox(); self.song_temp.setRange(0.1, 2.0); self.song_temp.setSingleStep(0.1); self.song_temp.setValue(1.0)
         self.song_cfg = QDoubleSpinBox(); self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setSingleStep(0.5); self.song_cfg.setValue(1.5)
         self.song_lazy = QCheckBox(tr("music.lazy", "Low VRAM (lazy load)"))
         g.addWidget(self.song_instr, 0, 0, 1, 2)
+        g.addWidget(QLabel(tr("music.engine", "Motore")), 0, 2); g.addWidget(self.song_engine, 0, 3)
         g.addWidget(QLabel(tr("music.duration", "Durata")), 1, 0); g.addWidget(self.song_dur, 1, 1)
         g.addWidget(QLabel(tr("music.version", "Modello")), 1, 2); g.addWidget(self.song_ver, 1, 3)
         g.addWidget(QLabel(tr("music.temp", "Temperatura")), 2, 0); g.addWidget(self.song_temp, 2, 1)
         g.addWidget(QLabel(tr("music.cfg", "CFG")), 2, 2); g.addWidget(self.song_cfg, 2, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
         v.addLayout(g)
+        # mostra/nasconde i parametri specifici di HeartMuLa quando si sceglie ACE-Step
+        self.song_engine.currentTextChanged.connect(
+            lambda e: (self.song_ver.setEnabled(e == "HeartMuLa"),
+                       self.song_temp.setEnabled(e == "HeartMuLa")))
         # --- Videomusicale: immagine iniziale/sfondo ---
         mv = QHBoxLayout()
         self.mv_image = QLineEdit()
@@ -295,6 +302,8 @@ class MusicTab(QWidget):
     def _gen_song(self):
         if self._busy():
             return
+        if self.song_engine.currentText() == "ACE-Step":
+            return self._gen_song_acestep()
         p = ms.SongParams(
             name=self.song_name.text().strip() or "song",
             lyrics=self.song_lyrics.toPlainText(), tags=self.song_tags.text().strip(),
@@ -306,6 +315,22 @@ class MusicTab(QWidget):
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         self._start_job(ms.make_song_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                                          on_done=self._b.song_done.emit), "song", p.out_mp3())
+
+    def _gen_song_acestep(self):
+        """Generazione canzone/strumentale con ACE-Step XL 1.5 (alternativa a HeartMuLa)."""
+        from core import acestep_service as ax
+        tags = self.song_tags.text().strip()
+        lyrics = "" if self.song_instr.isChecked() else self.song_lyrics.toPlainText().strip()
+        name = self.song_name.text().strip() or "song"
+        errs = ax.preflight(tags)
+        if errs:
+            QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
+        out = ax.OUT_DIR / f"{ax._safe(name)}.wav"
+        job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
+                          guidance=float(self.song_cfg.value()),
+                          on_log=self._b.log.emit, on_progress=self._b.progress.emit,
+                          on_done=self._b.song_done.emit)
+        self._start_job(job, "song", str(out))
 
     def _gen_sonify(self):
         if self._busy():
