@@ -1839,5 +1839,9 @@
   "fs.project_rename": "प्रोजेक्ट का नाम बदलें",
   "fs.project_dup": "प्रोजेक्ट डुप्लिकेट करें",
   "fs.project_del": "प्रोजेक्ट हटाएँ",
-  "fs.project_del_confirm": "प्रोजेक्ट «{n}» हटाएँ? यह पूर्ववत नहीं होगा।"
+  "fs.project_del_confirm": "प्रोजेक्ट «{n}» हटाएँ? यह पूर्ववत नहीं होगा।",
+  "mw.video_result_title": "जनित वीडियो",
+  "mw.video_no_preview": "पूर्वावलोकन उपलब्ध नहीं।",
+  "mw.btn_open": "खोलें",
+  "mw.mode_generate": "जनरेशन"
 }

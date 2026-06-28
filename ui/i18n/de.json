@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Projekt umbenennen",
   "fs.project_dup": "Projekt duplizieren",
   "fs.project_del": "Projekt löschen",
-  "fs.project_del_confirm": "Projekt „{n}“ löschen? Nicht widerrufbar."
+  "fs.project_del_confirm": "Projekt „{n}“ löschen? Nicht widerrufbar.",
+  "mw.video_result_title": "Erzeugtes Video",
+  "mw.video_no_preview": "Vorschau nicht verfügbar.",
+  "mw.btn_open": "Öffnen",
+  "mw.mode_generate": "Generierung"
 }

@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Renommer le projet",
   "fs.project_dup": "Dupliquer le projet",
   "fs.project_del": "Supprimer le projet",
-  "fs.project_del_confirm": "Supprimer le projet « {n} » ? Action irréversible."
+  "fs.project_del_confirm": "Supprimer le projet « {n} » ? Action irréversible.",
+  "mw.video_result_title": "Vidéo générée",
+  "mw.video_no_preview": "Aperçu indisponible.",
+  "mw.btn_open": "Ouvrir",
+  "mw.mode_generate": "génération"
 }

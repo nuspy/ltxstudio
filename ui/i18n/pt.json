@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Renomear projeto",
   "fs.project_dup": "Duplicar projeto",
   "fs.project_del": "Excluir projeto",
-  "fs.project_del_confirm": "Excluir o projeto «{n}»? Ação irreversível."
+  "fs.project_del_confirm": "Excluir o projeto «{n}»? Ação irreversível.",
+  "mw.video_result_title": "Vídeo gerado",
+  "mw.video_no_preview": "Pré-visualização indisponível.",
+  "mw.btn_open": "Abrir",
+  "mw.mode_generate": "geração"
 }

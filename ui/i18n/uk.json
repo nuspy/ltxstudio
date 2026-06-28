@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Перейменувати проект",
   "fs.project_dup": "Дублювати проект",
   "fs.project_del": "Видалити проект",
-  "fs.project_del_confirm": "Видалити проект «{n}»? Дію не можна скасувати."
+  "fs.project_del_confirm": "Видалити проект «{n}»? Дію не можна скасувати.",
+  "mw.video_result_title": "Згенероване відео",
+  "mw.video_no_preview": "Попередній перегляд недоступний.",
+  "mw.btn_open": "Відкрити",
+  "mw.mode_generate": "генерація"
 }

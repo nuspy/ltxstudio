@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Переименовать проект",
   "fs.project_dup": "Дублировать проект",
   "fs.project_del": "Удалить проект",
-  "fs.project_del_confirm": "Удалить проект «{n}»? Действие необратимо."
+  "fs.project_del_confirm": "Удалить проект «{n}»? Действие необратимо.",
+  "mw.video_result_title": "Сгенерированное видео",
+  "mw.video_no_preview": "Предпросмотр недоступен.",
+  "mw.btn_open": "Открыть",
+  "mw.mode_generate": "генерация"
 }

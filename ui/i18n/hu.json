@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Projekt átnevezése",
   "fs.project_dup": "Projekt másolása",
   "fs.project_del": "Projekt törlése",
-  "fs.project_del_confirm": "Törli a(z) „{n}” projektet? Nem vonható vissza."
+  "fs.project_del_confirm": "Törli a(z) „{n}” projektet? Nem vonható vissza.",
+  "mw.video_result_title": "Generált videó",
+  "mw.video_no_preview": "Az előnézet nem érhető el.",
+  "mw.btn_open": "Megnyitás",
+  "mw.mode_generate": "generálás"
 }

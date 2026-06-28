@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Rinomina progetto",
   "fs.project_dup": "Duplica progetto",
   "fs.project_del": "Elimina progetto",
-  "fs.project_del_confirm": "Eliminare il progetto «{n}»? Operazione irreversibile."
+  "fs.project_del_confirm": "Eliminare il progetto «{n}»? Operazione irreversibile.",
+  "mw.video_result_title": "Video generato",
+  "mw.video_no_preview": "Anteprima non disponibile.",
+  "mw.btn_open": "Apri",
+  "mw.mode_generate": "generazione"
 }

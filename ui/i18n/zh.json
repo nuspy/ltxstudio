@@ -1839,5 +1839,9 @@
   "fs.project_rename": "重命名项目",
   "fs.project_dup": "复制项目",
   "fs.project_del": "删除项目",
-  "fs.project_del_confirm": "删除项目“{n}”？此操作不可撤销。"
+  "fs.project_del_confirm": "删除项目“{n}”？此操作不可撤销。",
+  "mw.video_result_title": "已生成的视频",
+  "mw.video_no_preview": "预览不可用。",
+  "mw.btn_open": "打开",
+  "mw.mode_generate": "生成"
 }

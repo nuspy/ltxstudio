@@ -1839,5 +1839,9 @@
   "fs.project_rename": "إعادة تسمية المشروع",
   "fs.project_dup": "تكرار المشروع",
   "fs.project_del": "حذف المشروع",
-  "fs.project_del_confirm": "حذف المشروع «{n}»؟ لا يمكن التراجع."
+  "fs.project_del_confirm": "حذف المشروع «{n}»؟ لا يمكن التراجع.",
+  "mw.video_result_title": "الفيديو المُنشأ",
+  "mw.video_no_preview": "المعاينة غير متاحة.",
+  "mw.btn_open": "فتح",
+  "mw.mode_generate": "التوليد"
 }

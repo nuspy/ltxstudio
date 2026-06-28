@@ -813,6 +813,13 @@ class MainWindow(QMainWindow):
         """Applica le impostazioni GUI salvate a tutti i tab (best-effort)."""
         try:
             gui_state.restore(self, getattr(self, "_saved_gui_state", None) or {})
+            # dimensioni canvas persistite via video_tab.width/height: ri-sincronizza l'aspetto del
+            # canvas + l'etichetta del menu Proporzioni dopo il restore (i valori sono già ripristinati).
+            try:
+                v = self.video_tab.get_values()
+                self.frame1_tab.set_video_aspect(int(v["width"]), int(v["height"]))
+            except Exception:                            # noqa: BLE001
+                pass
         except Exception as e:
             try:
                 self._log(f"[warn] ripristino impostazioni GUI: {e}")
@@ -1983,18 +1990,11 @@ class MainWindow(QMainWindow):
             return
         out = (res.get("output") or [None])[0]
         self._log(f"[native] immagine generata: {out}")
-        # carica nel canvas se l'API è disponibile; altrimenti notifica col path
-        loaded = False
-        try:
-            cv = getattr(self.frame1_tab, "canvas", None)
-            for m in ("load_image", "set_image", "load"):
-                if cv is not None and hasattr(cv, m):
-                    getattr(cv, m)(out); loaded = True; break
-        except Exception:                               # noqa: BLE001
-            loaded = False
-        if not loaded and out:
-            QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
-                                    tr("mw.native_done_msg", "Generata: {f}").format(f=out))
+        if out:
+            # dialog anteprima + Accetta / Revert (generazione da zero: nessun "prima" da confrontare)
+            self._inpaint_mode = tr("mw.mode_generate", "generazione")
+            self._inpaint_bbox = None
+            self._show_inpaint_result(out)
 
     def _generate_video_native(self, vals: dict, audio: dict, loras: list, use_image: bool):
         """Generazione video NATIVA (LTX-2.3 GGUF, zero ComfyUI) — ramo attivo solo se
@@ -2283,12 +2283,62 @@ class MainWindow(QMainWindow):
         self._announce_video(out)
 
     def _announce_video(self, out):
-        try:
-            self.video_tab.v2v_panel.set_last_generation(out)
-        except Exception:                               # noqa: BLE001
-            pass
-        QMessageBox.information(self, tr("mw.native_done_title", "Video pronto"),
-                                tr("mw.native_done_msg", "Generato: {f}").format(f=out))
+        # Finestra di conferma SEMPRE presente; con anteprima video (player) se QtMultimedia è
+        # disponibile, altrimenti thumbnail del primo frame. Accetta = tieni, Revert = scarta il file.
+        if not out or not os.path.exists(out):
+            QMessageBox.information(self, tr("mw.native_done_title", "Video pronto"),
+                                    tr("mw.native_done_msg", "Generato: {f}").format(f=out))
+            return
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox
+        dlg = QDialog(self); dlg.setWindowTitle(tr("mw.video_result_title", "Video generato"))
+        v = QVBoxLayout(dlg)
+        player = None
+        try:                                             # anteprima video reale (player con loop)
+            from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PySide6.QtMultimediaWidgets import QVideoWidget
+            from PySide6.QtCore import QUrl
+            vw = QVideoWidget(); vw.setMinimumSize(480, 320); v.addWidget(vw)
+            player = QMediaPlayer(dlg); ao = QAudioOutput(dlg)
+            player.setAudioOutput(ao); player.setVideoOutput(vw)
+            player.setSource(QUrl.fromLocalFile(out))
+            player.setLoops(QMediaPlayer.Infinite)
+            player.play()
+        except Exception:                                # noqa: BLE001 — fallback: thumbnail primo frame
+            try:
+                import subprocess, tempfile
+                from inference_server.backends.video_postprocess import _ffmpeg
+                thumb = os.path.join(tempfile.gettempdir(), "ltx_vid_thumb.png")
+                subprocess.run([_ffmpeg(), "-y", "-i", out, "-frames:v", "1", thumb],
+                               capture_output=True, timeout=30)
+                if os.path.exists(thumb):
+                    lbl = QLabel(); lbl.setPixmap(QPixmap(thumb).scaledToWidth(480, Qt.SmoothTransformation))
+                    lbl.setAlignment(Qt.AlignCenter); v.addWidget(lbl)
+            except Exception:                            # noqa: BLE001
+                v.addWidget(QLabel(tr("mw.video_no_preview", "Anteprima non disponibile.")))
+        v.addWidget(QLabel(os.path.basename(out)))
+        bb = QDialogButtonBox()
+        bb.addButton(tr("mw.btn_accept", "Accetta"), QDialogButtonBox.AcceptRole)
+        bb.addButton(tr("mw.btn_revert", "Revert"), QDialogButtonBox.RejectRole)
+        b_open = bb.addButton(tr("mw.btn_open", "Apri"), QDialogButtonBox.ActionRole)
+        b_open.clicked.connect(lambda: os.startfile(out) if hasattr(os, "startfile") else None)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        v.addWidget(bb)
+        keep = bool(dlg.exec())
+        if player is not None:
+            player.stop()
+        if keep:
+            self._last_video_path = out
+            try:
+                self.video_tab.v2v_panel.set_last_generation(out)
+            except Exception:                            # noqa: BLE001
+                pass
+            self._log(f"Video accettato: {out}")
+        else:
+            try:
+                os.remove(out)
+            except Exception:                            # noqa: BLE001
+                pass
+            self._log("Video scartato (revert).")
 
     def _maybe_multitalk(self, vals: dict, v2v: dict, mode: str) -> bool:
         """Instrada Talk/Canta al motore MultiTalk nativo. Ritorna True se gestito (→ on_generate
@@ -2395,17 +2445,8 @@ class MainWindow(QMainWindow):
             return
         out = (res.get("output") or [None])[0]
         self._log(f"[native inpaint] generato: {out}")
-        loaded = False
-        try:
-            cv = getattr(self.frame1_tab, "canvas", None)
-            for m in ("load_image", "set_image", "load"):
-                if cv is not None and hasattr(cv, m):
-                    getattr(cv, m)(out); loaded = True; break
-        except Exception:                               # noqa: BLE001
-            loaded = False
-        if not loaded and out:
-            QMessageBox.information(self, tr("mw.native_done_title", "Immagine pronta"),
-                                    tr("mw.native_done_msg", "Generata: {f}").format(f=out))
+        if out:
+            self._show_inpaint_result(out)   # dialog anteprima prima/dopo + Accetta / Revert
 
     def _start_native_upscale(self, model, scale, image_path=None):
         """Upscale via backend NATIVO (ESRGAN/spandrel) — niente ComfyUI."""

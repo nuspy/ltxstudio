@@ -34,8 +34,11 @@ SPEC = {
     "flux2_kontext": ("Flux2KleinPipeline",        False, True),
     "flux2_inpaint": ("Flux2KleinInpaintPipeline", False, True),
 }
-VRAM_MB = {"flux": 16000, "flux2": 24000, "zimage": 12000, "ernie": 16000,
-           "kontext": 16000, "inpaint": 16000, "flux2_kontext": 24000, "flux2_inpaint": 24000}
+# Stima VRAM realistica (tutto-su-GPU) per decidere GPU vs offload. FLUX.1 dev/Fill/Kontext bf16
+# pesano ~24GB il solo transformer: con TE(T5)+VAE il totale sfora i 32GB → DEVE andare in
+# enable_model_cpu_offload, altrimenti spilla nella shared-RAM di Windows (lentissimo, vedi outpaint).
+VRAM_MB = {"flux": 24000, "flux2": 24000, "zimage": 12000, "ernie": 16000,
+           "kontext": 26000, "inpaint": 26000, "flux2_kontext": 24000, "flux2_inpaint": 24000}
 # archi che richiedono una maschera (inpaint-family)
 _MASK_ARCHS = ("inpaint", "flux2_inpaint")
 

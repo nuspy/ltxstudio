@@ -1839,5 +1839,9 @@
   "fs.project_rename": "שינוי שם הפרויקט",
   "fs.project_dup": "שכפול הפרויקט",
   "fs.project_del": "מחיקת הפרויקט",
-  "fs.project_del_confirm": "למחוק את הפרויקט «{n}»? פעולה בלתי הפיכה."
+  "fs.project_del_confirm": "למחוק את הפרויקט «{n}»? פעולה בלתי הפיכה.",
+  "mw.video_result_title": "וידאו שנוצר",
+  "mw.video_no_preview": "תצוגה מקדימה לא זמינה.",
+  "mw.btn_open": "פתח",
+  "mw.mode_generate": "יצירה"
 }

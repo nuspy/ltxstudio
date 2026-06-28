@@ -1839,5 +1839,9 @@
   "fs.project_rename": "Μετονομασία έργου",
   "fs.project_dup": "Διπλασιασμός έργου",
   "fs.project_del": "Διαγραφή έργου",
-  "fs.project_del_confirm": "Διαγραφή του έργου «{n}»; Μη αναστρέψιμο."
+  "fs.project_del_confirm": "Διαγραφή του έργου «{n}»; Μη αναστρέψιμο.",
+  "mw.video_result_title": "Δημιουργημένο βίντεο",
+  "mw.video_no_preview": "Η προεπισκόπηση δεν είναι διαθέσιμη.",
+  "mw.btn_open": "Άνοιγμα",
+  "mw.mode_generate": "δημιουργία"
 }
