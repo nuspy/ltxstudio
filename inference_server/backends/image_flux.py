@@ -320,8 +320,18 @@ def _load(model_path: str, arch: str):
     # manager dell'hook → "No context is set". Lo applichiamo solo ai t2i puri.
     fb = _apply_fbcache(pipe) if not SPEC.get(arch, ("", False, False))[2] else False
     comp = _maybe_compile(pipe)
-    where = _place(pipe, VRAM_MB.get(arch, 16000))
-    print(f"[image] {arch}: {where}, attention={attn}, fbcache={fb}, compile={comp}", flush=True)
+    # Stima footprint REALE dalla dimensione del file pesi (robusto per fp16/fp8/gguf, ogni arch):
+    # tutto-su-GPU ≈ pesi transformer + TE/VAE/working. Se sovrastima la VRAM, _place sceglie
+    # enable_model_cpu_offload invece di spillare nella shared-RAM (vedi outpaint lento). Vale per
+    # generazione/inpaint/outpaint/integra/kontext con QUALSIASI modello, non solo i preset.
+    try:
+        sz_mb = os.path.getsize(model_path) / 1024**2 if os.path.isfile(model_path) else 0
+    except Exception:                                       # noqa: BLE001
+        sz_mb = 0
+    overhead = 4000 if arch == "zimage" else 11000          # T5/CLIP/Mistral + VAE + working
+    est_mb = max(VRAM_MB.get(arch, 16000), int(sz_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
+    where = _place(pipe, est_mb)
+    print(f"[image] {arch}: {where} (est {est_mb}MB, file {int(sz_mb)}MB), attention={attn}, fbcache={fb}, compile={comp}", flush=True)
     return pipe, VRAM_MB.get(arch, 16000)
 
 

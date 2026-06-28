@@ -28,30 +28,39 @@ def main():
     ap.add_argument("--image", required=True)
     ap.add_argument("--output_dir", required=True)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--texture_size", type=int, default=2048)
-    ap.add_argument("--decimation", type=int, default=1000000)   # target facce
+    # Default SENSATI per velocità: decimation 1M + texture 2048 + remesh = postprocess lentissimo.
+    # 150k facce e texture 1024 danno un GLB ottimo ed esportano in pochi secondi (override da GUI).
+    ap.add_argument("--texture_size", type=int, default=1024)
+    ap.add_argument("--decimation", type=int, default=150000)     # target facce (era 1_000_000)
+    ap.add_argument("--simplify_cap", type=int, default=2000000)  # cap pre-to_glb (era 16.7M = nessuno)
     ap.add_argument("--model", default="microsoft/TRELLIS.2-4B")
     a = ap.parse_args()
 
+    import time
     from PIL import Image
     import torch
     from trellis2.pipelines import Trellis2ImageTo3DPipeline
     import o_voxel
 
+    t0 = time.time()
     pipeline = Trellis2ImageTo3DPipeline.from_pretrained(a.model)
     pipeline.cuda()
+    print(f"[trellis] load {time.time()-t0:.0f}s", flush=True)
 
     image = Image.open(a.image).convert("RGB")
     torch.manual_seed(a.seed)
+    t1 = time.time()
     mesh = pipeline.run(image)[0]
-    mesh.simplify(16777216)                                       # limite nvdiffrast
-
+    print(f"[trellis] diffusion {time.time()-t1:.0f}s", flush=True)
+    t2 = time.time()
+    mesh.simplify(int(a.simplify_cap))                            # cap facce prima del postprocess
     glb = o_voxel.postprocess.to_glb(
         vertices=mesh.vertices, faces=mesh.faces, attr_volume=mesh.attrs,
         coords=mesh.coords, attr_layout=mesh.layout, voxel_size=mesh.voxel_size,
         aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-        decimation_target=a.decimation, texture_size=a.texture_size,
+        decimation_target=int(a.decimation), texture_size=int(a.texture_size),
         remesh=True, remesh_band=1, remesh_project=0, verbose=False)
+    print(f"[trellis] to_glb (dec={a.decimation},tex={a.texture_size}) {time.time()-t2:.0f}s", flush=True)
 
     out = os.path.join(a.output_dir, "model.glb")
     Path(a.output_dir).mkdir(parents=True, exist_ok=True)
