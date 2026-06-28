@@ -1,161 +1,202 @@
-# LTX Studio — Catalogo modelli & LoRA (consigliati, SFW + NSFW)
+# LTX Studio — Catalogo & Audit modelli/LoRA (esaustivo, SFW + NSFW)
 
-> Ricerca community giugno 2026 (Civitai, Reddit, HuggingFace, forum) + inventario locale.
-> **Stato**: ✅ presente in `E:\AI\Models` · ⬇️ consigliato da aggiungere.
-> **Priorità formati**: **FP8** (più usato) · **NVFP4/FP4** (RTX 5090, ~2-3× più veloce) · FP16/BF16 (qualità max) · GGUF (VRAM bassa).
-> Organizzazione: **IMMAGINE / VIDEO → Checkpoint / LoRA → architettura → SFW / NSFW**.
-
----
-
-# 🖼️ IMMAGINE — CHECKPOINT
-
-## FLUX.1 [dev] — SFW
-| Stato | Modello | Peso | Formati | Perché |
-|---|---|---|---|---|
-| ✅ | **FLUX.1 dev** (base) | 22GB | fp16/fp8/gguf | Base 12B di riferimento, ottima aderenza prompt |
-| ✅ | **FLUX.1 Krea dev** | 22GB | fp16 | Estetica foto-realistica, meno "look AI" |
-| ✅ | FLUX.1 Kontext / Fill | 22GB×2 | fp16 | Editing istruito / inpaint |
-| ⬇️ | **Nunchaku SVDQuant fp4** (dev) | ~6GB | **nvfp4** | **Cruciale 5090**: ~3× più veloce di bf16, qualità ≈16-bit, ⅓ VRAM |
-| ⬇️ | UltraReal Fine-Tune v4 | 11-22GB | fp8/fp16/gguf | Realismo affidabile, pelle/luce naturali |
-| ⬇️ | Jib Mix Flux v12 (SRPO) | 11-22GB | fp8/fp16 | Look pulito, top per ritratti |
-
-## FLUX.1 — NSFW
-| Stato | Modello | Peso | Formati | Perché |
-|---|---|---|---|---|
-| ✅ | **fuxCapacity NSFW Porn** | 11GB | fp8 | NSFW esplicito già presente |
-| ✅ | **getphat Reality v23/v30** (Soft/Hardcore) | 11GB×2 | fp8 | Fotoreale soft/hardcore |
-| ⬇️ | Fluxed Up v10.2 | 8-23GB | fp16/gguf | "Standard" NSFW Flux community |
-| ⬇️ | CyberRealistic Flux | 11-22GB | fp8/fp16/gguf | Merge fotoreale NSFW |
-| 💡 | *(tendenza 2026: base dev + LoRA-unlock invece di checkpoint NSFW dedicati)* | | | |
-
-## FLUX.2 [dev]
-| Stato | Modello | Peso | Formati | Perché |
-|---|---|---|---|---|
-| ✅ | **FLUX.2 Dev FP8 Mixed Scaled** | 33GB | fp8 | DiT 32B, top prompt-adherence (in uso nativo) |
-| ⬇️ | **FLUX.2 klein 9B fp8** | ~9GB | fp8/gguf | Distillato veloce, **unica via su 12-16GB**, ottimo per LoRA |
-| ⬇️ | **FLUX.2 dev nvfp4** | ~15GB | **nvfp4** | **5090**: 2-3× più veloce (Tensor Core 5ª gen) |
-| ✅ | miraclein flux2klein NSFW v2 | 8.5GB | fp8 | NSFW klein (in uso per inpaint) |
-
-## Z-Image (Lumina 6B) — SFW + NSFW
-| Stato | Modello | Peso | Formati | Perché |
-|---|---|---|---|---|
-| ✅ | **Z-Image BF16 / Turbo** | 11.5GB×2 | bf16 | DiT 6B, 8-step, base permissiva |
-| ✅ | **zimageTurbo NSFW** | 11.5GB | bf16 | NSFW nativo (in uso) |
-| ⬇️ | Z-Image Turbo int4 (low-VRAM) | 3-4GB | svdq-int4 | Gira su 6-8GB |
-
-## Qwen-Image (DiT 20B) — *architettura NON ancora nel backend*
-| Stato | Modello | Peso | Formati | Perché |
-|---|---|---|---|---|
-| ⬇️ | Qwen-Image base + Edit 2511 | ~19GB | fp8 | Ottima aderenza + testo; ecosistema LoRA maturo |
-| ⬇️ | Jib Mix Qwen v6 | ~19GB | fp8/bf16 | Top realismo (per NSFW pieno + LoRA) |
-
-## Ernie (DiT 8B)
-| Stato | Modello | Peso | Formati | Perché |
-|---|---|---|---|---|
-| ✅ | **ernie-image** (base) | 15GB | bf16 | In uso nativo (text rendering ottimo) |
-| ⬇️ | RedCraft / ERNIE RedMIX | varie | — | Merge NSFW (780+ review); ecosistema giovane |
+> Ricerca community giugno 2026 (Civitai, Reddit, HuggingFace, forum) + audit inventario locale (`E:\AI\Models`).
+> **Stato**: ✅ presente · ⬇️ consigliato da aggiungere · 🗑️ cancellare (duplicato/non valido).
+> **Formati**: **FP8** (più usato) · **NVFP4/FP4** (RTX 5090, ~2-3× più veloce) · FP16/BF16 (qualità max) · GGUF (VRAM bassa).
+> Struttura: CHECKPOINT → LoRA (per arch, SFW/NSFW) → DA AGGIUNGERE → AZIONI OPERATIVE.
 
 ---
 
-# 🖼️ IMMAGINE — LoRA
+# 1) CHECKPOINT
 
-## FLUX.1 — SFW (realismo + acceleratori)
-| Stato | LoRA | Peso | Perché |
-|---|---|---|---|
-| ✅ | FluxCreative, Moody, Photoreal_illux | 18-584MB | stili/realismo presenti |
-| ⬇️ | **Photorealistic Skin – No plastic** | ~250MB | elimina effetto plastica (top community) |
-| ⬇️ | Flux Skin Texture v2 / Beauty Skin | 150-600MB | pori/texture beauty-shot |
-| ⬇️ | **Hyper-SD FLUX 8-step** (ByteDance) | 1.4GB | **acceleratore** standard (scale 0.125) |
-| ⬇️ | FLUX.1-Turbo-Alpha 8-step | ~1GB | acceleratore, dettaglio migliore sotto 8 step |
+## 1.1 IMMAGINE
 
-## FLUX.1 — NSFW
-| Stato | LoRA | Peso | Perché |
-|---|---|---|---|
-| ✅ | NSFW_POV/Handjob, blacked, OiledSkin, RealUnderboob, tan-lines, +molte | 18-584MB | libreria NSFW già ricca |
-| ⬇️ | **aidmaNSFWunlock** | 19MB | "unlock" più affidabile (130k+ DL), str. 0.5-0.7 |
-| ⬇️ | Lustly Uncensored / Flux Anatomy Realism | 150-344MB | anatomia M/F bilanciata |
+### FLUX.1 [dev] e fine-tune
+| Stato | Modello | Peso | Fmt | Cosa fa / Validità | Decisione |
+|---|---|---|---|---|---|
+| ✅ | **FLUX.1 dev** (base) | 22GB | fp16/fp8/gguf | Base 12B di riferimento, aderenza prompt | **TIENI** (base di tutto) |
+| ✅ | **FLUX.1 Krea dev** | 22GB | fp16 | Estetica foto-realistica, meno "look AI" | **TIENI** |
+| ✅ | **FLUX_DEV_Fill** | 22GB | fp16 | Inpaint/outpaint ufficiale BFL, gold standard | **TIENI** |
+| ✅ | FLUX_Kontext_Dev | 22GB | fp16 | Editing istruito | **TIENI** |
+| ✅ | **getphat Reality v23 Soft / v30 Hardcore** | 11GB×2 | fp8 | Fine-tune realismo NSFW di punta (Civitai 861840, top scaricati). NB: le LoRA FLUX-Dev "bruciano" su questo ckpt | **TIENI entrambe** (top realismo NSFW) |
+| ✅ | **fuxCapacity NSFW Porn v20** | 11GB | fp8 | Fine-tune hardcore esplicito (Civitai 679262, 5★/188) | **TIENI** (n.2; ridondante con getphat v30 se serve spazio) |
+| ✅ | **fluxunchained-fill-hyp8 Q5_K_S** | 7.7GB | gguf | Inpaint NSFW accelerato 8-step Hyper, leggero (Civitai 645943) | **TIENI** (fill NSFW low-VRAM) |
 
-## FLUX.2 — LoRA *(ecosistema in crescita, meno maturo di FLUX.1)*
-| Stato | LoRA | Peso | Perché |
-|---|---|---|---|
-| ✅ | Flux_2_Turbo_LoRA | 2.6GB | acceleratore FLUX.2 presente |
-| ⬇️ | aidmaNSFWunlock (F2) + InstaPic UltraReal | 19-200MB | unlock NSFW + realismo social |
+### FLUX.2
+| Stato | Modello | Peso | Fmt | Cosa fa / Validità | Decisione |
+|---|---|---|---|---|---|
+| ✅ | **FLUX.2 Dev FP8 Mixed Scaled** | 33GB | fp8 | DiT 32B, top prompt-adherence (in uso nativo) | **TIENI** |
+| ✅ | **miraclein flux2klein NSFW v2** | 8.5GB | fp8 | Unico NSFW serio su FLUX.2 Klein (Civitai 2453960, 5★/180), gen+edit, già cablato inpaint | **TIENI** |
+| ⬇️ | **FLUX.2 klein 9B fp8** (base) | ~9GB | fp8/gguf | Distillato veloce, unica via su 12-16GB, ottimo per LoRA | aggiungere |
+| ⬇️ | **FLUX.2 dev nvfp4** | ~15GB | **nvfp4** | RTX 5090: 2-3× più veloce | aggiungere (5090) |
 
-## Z-Image / Qwen — LoRA
-| Stato | LoRA | Peso | Perché |
-|---|---|---|---|
-| ✅ | ZITnsfwLoRAv2 (Z-Image), Qwen Lightning 8-step, Qwen_Real_Nud3s | 15MB-1.6GB | NSFW + acceleratore presenti |
-| ⬇️ | Realistic Snapshot v5 / Radiant Realism (Z-Image) | 50-200MB | top realismo ZIT |
+### Z-Image (Lumina 6B)
+| Stato | Modello | Peso | Fmt | Cosa fa / Validità | Decisione |
+|---|---|---|---|---|---|
+| ✅ | **Z_Image BF16** (base) | 11.5GB | bf16 | Base 6B, #1 open-source (Tongyi), hand-built type=lumina2 | **TIENI** |
+| ✅ | **Z_Image Turbo** | 11.5GB | bf16 | 8-step sub-secondo, entra in 16GB | **TIENI** (workhorse) |
+| ✅ | **zimageTurbo NSFW (ZiT)** | 11.5GB | bf16 | Fine-tune NSFW fotoreale (Civitai 2237711) | **TIENI** |
+| ⬇️ | Z-Image Turbo int4 | 3-4GB | svdq-int4 | gira su 6-8GB | aggiungere (fascia bassa) |
 
----
-
-# 🎬 VIDEO — CHECKPOINT
-
-## LTX-2.3 (Lightricks 22B) — motore principale — SFW
-| Stato | Modello | Peso | Formati | Perché |
+### Altre architetture immagine
+| Stato | Modello | Peso | Cosa fa / Validità | Decisione |
 |---|---|---|---|---|
-| ✅ | **LTX-2.3 dev fp8** | 27GB | fp8 | qualità piena, entra in 32GB |
-| ✅ | **LTX-2.3 distilled 1.1 fp8** | 23.5GB | fp8 | veloce (8 step CFG=1) |
-| ✅ | GGUF Q6 / Q4 / Q3 | 10-17GB | gguf | fallback VRAM bassa |
-| ⬇️ | **LTX-2.3 dev nvfp4** (ufficiale) | **21.7GB** | **nvfp4** | **5090**: ~2× fp8 in T2V. ⚠️ I2V perde fedeltà |
-| ⬇️ | Spatial/Temporal Upscaler x2 | 0.26-1GB | bf16 | qualità+FPS finali senza ricomputo |
+| ✅ | **Ernie / ernie-image** (8B) | 15GB | Miglior text-rendering open (Latino+CJK), Apache-2.0, già nativo | **TIENI** (nicchia "testo in immagine") |
+| ✅ | **DreamO** (adapter FLUX.1) | 456MB | Framework identity/style/try-on (ByteDance, SIGGRAPH'25) — non checkpoint | **TIENI** (usa con FLUX.1 + quality LoRA) |
+| ✅ | HiDream-I1 (17B) | 9GB | Qualità SOTA ma ecosistema piccolo, superato (HiDream-O1/FLUX.2) | ⚠️ **VALUTA/CANCELLA** se serve spazio e non usato |
+| ⬇️ | UltraReal / Jib Mix Flux (finetune SFW) | 11-22GB | Realismo affidabile, pelle/luce | aggiungere (SFW realismo) |
+| ⬇️ | Qwen-Image base + Jib Mix Qwen | ~19GB | Ottima aderenza+testo (arch NON ancora nel backend) | aggiungere se si abilita Qwen |
 
-## LTX-2.3 — NSFW
-| Stato | Modello | Peso | Formati | Perché |
+## 1.2 VIDEO
+
+### LTX-2.3 (Lightricks 22B) — motore principale
+| Stato | Modello | Peso | Fmt | Cosa fa | Decisione |
+|---|---|---|---|---|---|
+| ✅ | **LTX-2.3 dev fp8** | 27GB | fp8 | qualità piena, entra in 32GB | **TIENI** |
+| ✅ | **distilled 1.1 fp8** | 23.5GB | fp8 | veloce 8-step CFG=1 | **TIENI** |
+| ✅ | GGUF Q6/Q4/Q3 | 10-17GB | gguf | fallback VRAM | **TIENI** (almeno Q4+Q6) |
+| ✅ | **ltx2310eros_v1** | 27.5GB | bf16 | merge NSFW | **TIENI** (NSFW) |
+| ⬇️ | **LTX-2.3 dev nvfp4** (ufficiale) | **21.7GB** | **nvfp4** | RTX 5090: ~2× fp8 in T2V (⚠️ I2V perde fedeltà) | aggiungere (5090) |
+| ⬇️ | **Sulphur-2-base** (NSFW) | 9.5GB | bf16/fp8/gguf | NSFW base attivo, T2V+I2V, prompt-enhancer (Civitai 2601098) | aggiungere (alt. eros, più leggero) |
+| ⬇️ | Spatial/Temporal Upscaler x2 | 0.26-1GB | bf16 | qualità+FPS finali | aggiungere |
+
+### Wan / Hunyuan (extra — backend diverso da LTX!)
+| Stato | Modello | Peso | Cosa fa | Decisione |
 |---|---|---|---|---|
-| ✅ | **ltx2310eros_v1** | 27.5GB | bf16 | merge NSFW (già presente) |
-| ⬇️ | **Sulphur-2-base** | bf16/fp8/gguf 9.5GB | tutti | NSFW base più attivo, T2V+I2V, prompt-enhancer |
-| ⬇️ | LTX2.3-10Eros (ufficiale TenStrip) | varie | merge | miglior movimento corpo NSFW I2V |
+| ✅ | Wan2.2 i2v/t2v/s2v high+low fp8 | 13-15GB | i2v/t2v/audio-to-video MoE | **TIENI** solo se mantieni la pipeline Wan |
+| ✅ | Wan2.1 FusionX i2v/t2v, VACE 1.3B/14B | 13-32GB | i2v/t2v + VACE | **TIENI** se usi Wan2.1 |
+| ✅ | HunyuanVideo 720 fp8 | 12.3GB | t2v | **TIENI**/valuta (HV-1.5 più efficiente) |
+| 🗑️ | duplicati Wan2.1 kijai/SwarmUI (×2, 15.8GB) | — | ridondanti | **CANCELLA** (recupero ~16GB) |
+| ⬇️ | Wan2.2 TI2V-5B fp8 | ~5GB | denso, gira su consumer | aggiungere (fascia bassa) |
 
-## Wan 2.1/2.2 (extra) — SFW
-| Stato | Modello | Peso | Perché |
-|---|---|---|---|
-| ✅ | Wan2.2 i2v/t2v/s2v high+low fp8, Wan2.1 FusionX, VACE | 13-32GB | i2v/t2v/audio-to-video alternativi |
-| ⬇️ | Wan2.2 TI2V-5B fp8 | ~5GB | denso, gira su consumer, ottimo VRAM/velocità |
-| 🗑️ | *duplicati kijai/SwarmUI Wan2.1* | — | ridondanti, da rimuovere |
-
-## HunyuanVideo (extra)
-| Stato | Modello | Peso | Perché |
-|---|---|---|---|
-| ✅ | HunyuanVideo 720 fp8 | 12.3GB | presente |
-| ⬇️ | HunyuanVideo-1.5 fp8 | ~8GB | SOTA leggero 2026, più efficiente |
+> ⚠️ **Decisione strategica Wan**: tutte le LoRA/acceleratori Wan dipendono dal base Wan (diverso da LTX-2.3). Se NON mantieni una pipeline Wan attiva, **tutto lo stack Wan (base+LoRA) è inutilizzabile** → valuta se tenerlo o eliminarlo in blocco.
 
 ---
 
-# 🎬 VIDEO — LoRA
+# 2) LoRA — AUDIT COMPLETO
 
-## LTX-2.3 — acceleratori + controllo (SFW)
-| Stato | LoRA | Peso | Perché |
-|---|---|---|---|
-| ✅ | **distilled-lora 384/dynamic**, IC-LoRA canny/depth/pose/detailer/outpaint/hdr/lipdub, camera-control, Crisp_Enhance, ID-LoRA | 0.3-7GB | **libreria LTX completissima già presente** |
-| ⬇️ | distilled LoRA rank 159/208 (drbaph) | 4-5GB | acceleratore più leggero, ottimo 5090 |
-| ⬇️ | IC-LoRA Union-Control (canny+depth+pose 1 file) | — | meno VRAM, 1 controllo per volta |
+## 2.1 IMMAGINE — FLUX.1
 
-## LTX-2.3 — NSFW
-| Stato | LoRA | Peso | Perché |
+### SFW / tecnici (TIENI)
+| LoRA | Cosa fa | Validità | Decisione |
 |---|---|---|---|
-| ✅ | **Better Female Nudity v2, NSFWMOTION, Penile_Praxis, ltxdeepthroat** | 1-1.2GB | NSFW motion presente |
-| 💡 | *ecosistema LoRA NSFW LTX limitato → assorbito nei checkpoint NSFW (Sulphur/10Eros)* | | |
+| **hourglassv32** (292MB) | forma corpo a clessidra | "Hourglass\|olaz" 5★/476+ | **TIENI** (top) |
+| **Migration_Lora_cloth** (164MB) | virtual try-on abiti (ttplanet) | Civitai 950736 | **TIENI** |
+| **figures_TTP_Migration** (328MB) | 2D→figurine 3D (ttplanet) | Civitai 966113 | **TIENI** |
+| **OiledSkin** (328MB) | pelle oliata/lucida | molto diffusa | **TIENI** |
+| **sxz-Dark-Fantasy** (19MB) | stile dark fantasy | Civitai 678853 | **TIENI** |
+| **Zombie_Flux** (19MB) | stile horror/zombie | RalFinger | **TIENI** |
+| Moody (292MB) | stile fotografico cupo | export epoch (meglio release) | **TIENI** (cautela) |
+| Photoreal_illux (18MB) | enhancer realismo **Illustrious/SDXL** | — | **TIENI** solo se supporti SDXL, altrimenti 🗑️ |
 
-## Wan — acceleratori (cruciali: 30→4-8 step)
-| Stato | LoRA | Peso | Perché |
-|---|---|---|---|
-| ✅ | **CausVid, Self-Forcing, FusionX t2v/i2v, Seko 4-step (Wan2_2), lightx2v 4-step** | 0.2-1.1GB | **acceleratori presenti** (riducono i passi ~20×) |
-| ⬇️ | LightX2V Wan2.2-Lightning Seko V1 rank64 ultimo | ~2.5GB | acceleratore 4-step di riferimento 2026 |
+### NSFW (TIENI — concept/azioni utili, leggere)
+| LoRA | Cosa fa | Decisione |
+|---|---|---|
+| tan-lines-01(513MB), RealUnderboob(164MB), Mature_Women(18MB), SteepSlopeTiddies(64MB), micro-thong(38MB), est3tic_lingerie(38MB), blacked(19MB) | concept anatomici/abbigliamento | **TIENI** |
+| NSFW_POV_Deepthroat, Nsfw_Handjob, Nsfw_Balls_Sucking (18MB), PoV_Fist(292MB, Civitai 1481174) | azioni esplicite non coperte dal base | **TIENI** (niche) |
+| Sexy_Festival_Goers(584MB) | scene festival sexy | **TIENI con riserva** (pesante) |
+| lips2(18MB) | labbra carnose | ⚠️ bassa priorità (prompt-replaceable) |
 
-## Wan — NSFW + Hunyuan
-| Stato | LoRA | Peso | Perché |
+### 🗑️ CANCELLA (FLUX.1, recupero ~11GB)
+| LoRA | Perché |
+|---|---|
+| **Serie "FLUX Reality"** (almu/apho/blle/caza/dvel/jpav/lfal/lmil/mawi/mnra/mohr/ricc/sgmk/vmor/yanj Soft+Hard/ysch — ~10GB) | LoRA-persona di **individui sconosciuti**, nessun valore per prodotto generico |
+| MarynAI, OlgAI, Olya (16-18MB) | persone sconosciute, non recensite |
+| FluxCreative (584MB) | non verificabile online, origine ignota |
+| MysticXXX-V3 (149MB) | reputazione non confermabile |
+| underland-alice (38MB) | stile fuori tema |
+
+### Acceleratore FLUX.2
+| ✅ **Flux_2_Turbo_LoRA** (2.6GB) | distill DMD2 → 8 step (~6×), qualità ~invariata (fal ufficiale). **TIENI** ⚠️ licenza FLUX non-commerciale |
+
+## 2.2 IMMAGINE — altre arch
+| LoRA | arch | Cosa fa | Decisione |
 |---|---|---|---|
-| ✅ | **~60 LoRA Wan NSFW** (cumshot, deepthroat, anal, nipple, fingering, dr34mj0b, nsfw-e14…) + Hunyuan Titfuck | 150-585MB | **libreria NSFW Wan vastissima già presente** |
-| ⬇️ | WAN General NSFW (NSFW-22 H/L) | 150-300MB | "base NSFW" generalista a 2 stadi |
+| ✅ **Qwen-Image-Lightning 8-step** (1.6GB) | Qwen | acceleratore 12-25× (lightx2v) | **TIENI** se usi Qwen |
+| ✅ Qwen_Real_Nud3s (281MB) | Qwen | NSFW fotoreale | TIENI se NSFW Qwen, altrimenti 🗑️ |
+| ✅ **ZITnsfwLoRAv2** (15MB) | Z-Image | NSFW Z-Image Turbo | **TIENI** (costo zero) |
+| ✅ **DreamO quality_lora pos/neg** | FLUX.1 | anti-plastic (coppia) | **TIENI** (necessarie a DreamO) |
+| ✅ **MagicQuill** (color/edge/local/puzzle/removal) | editing | editing interattivo locale/removal (SOTA) | **TIENI** (set, insieme) |
+| 🗑️ **CineStyle5, MoXinV1, blindbox** | SD1.5 | stili SD1.5 legacy | **CANCELLA** (fuori stack) |
+| ⚠️ intrinsic_lora (albedo/depth/normal/shading) | SD1.5 | mappe inverse-render | TIENI solo se 3D le usa, altrimenti 🗑️ |
+| 🔧 **gemma-3-12b abliterated_lora** (599MB) | **LTX-2.3 TE** (mal-classificato SDXL) | uncensor del text-encoder Gemma (no "Barbie&Ken" su NSFW) | **TIENI** + riclassifica |
+| ⚠️ NSFW_ZI_V01(871MB), DR34ML4Y_LTXXX(1.1GB) | da verificare (hash) | etichette SDXL sospette (probabile Z-Image / video WAN) | **VERIFICA hash** (skill ai-catalog) |
+
+## 2.3 VIDEO — LTX-2.3 (quasi tutte TIENI — infrastruttura)
+| Gruppo | LoRA | Decisione |
+|---|---|---|
+| **Controllo ufficiali** | IC-LoRA canny/depth/pose/union/motion-track/detailer/hdr/uncompress/deinterlace/motiondeblur/refocus/outpaint/lipdub, CameraControls, dolly/static, Cameraman | **TIENI tutte** (controllo/qualità) |
+| **Acceleratori** | distilled-1.1 rank 111/159/208, distilled-dynamic | **TIENI** (rank384 solo per t2v puro, può nuocere con input condizionati) |
+| **Stile/qualità** | ReStyle IC-LoRA, Crisp_Enhance, Fantasy_Realism, edit_anything, inpaint_masked, anime2real/real2anime | **TIENI** |
+| **Identità** | ID-LoRA-TalkVid-3K | **TIENI**; CelebVHQ-3K ridondante → 🗑️ se serve spazio |
+| **NSFW** | Better Female Nudity v2, NSFWMOTION, Penile_Praxis_V4, ltxdeepthroat | **TIENI** se ramo NSFW attivo (molto sovrapposte → tienine poche) |
+| 🗑️ | demopose (doppione di pose-control), fightV3 (niche) | CANCELLA se non usate |
+
+## 2.4 VIDEO — Wan (acceleratori validi + ~60 NSFW + effetti)
+| Gruppo | LoRA | Decisione |
+|---|---|---|
+| **Acceleratori (TIENI)** | CausVid v2 (rank32), Self_Forcing T2V+I2V, FusionX t2v+i2v, lightx2v I2V cfg_step rank64, Seko 4-step (Wan2.2) | **TIENI** (riducono 50→4-8 step) |
+| 🗑️ obsoleti | CausVid **v1** (superata da v2), bidirect2 1.3B (se non usi 1.3B), FastWan 5B (se solo I2V) | CANCELLA |
+| **Effetti SFW (pack Remade-AI)** | squish/cakeify/crush/inflate/deflate/aging/baby/muscle/decay + temi (assassin/bride/princess/samurai/warrior/…), 360_epoch, Spinning, flying_effect, bounceV, detailz-wan | **TIENI** il pack (cancella i temi che non userai) |
+| **NSFW azioni** | facefuck, dr34mj0b, deepthroat, fingering, grinding_pussyjob, masturbation_cumshot, nippleSuck, wan-nsfw-e14, anal-combined, cumshot, T2V-POV_BJ | **TIENI 1 copia** ciascuna se ramo NSFW |
+| 🗑️ **14 DUPLICATI** | suffissi `_(SwarmUI)`/`_(Framepack)`/`_(LoRAs)`/`__from_root` — stesso file | **CANCELLA** (tieni 1 copia) |
+
+## 2.5 VIDEO — altri motori (LoRA)
+| LoRA | Decisione |
+|---|---|
+| Wan2.2 (lightx2v 4step, Seko, FaceNaturalizer, cumshot, DR34MJOB) | TIENI **solo se** mantieni pipeline Wan2.2 |
+| Hunyuan Titfuck_v2 | TIENI se usi Hunyuan, altrimenti 🗑️ |
+| LongCat cfg_step/refinement (5.3GB) | 🗑️ se non usi LongCat (il motore è LTX-2.3) |
 
 ---
 
-## 📌 Priorità download per la distribuzione (focus fp8 + fp4)
-1. **NVFP4 per RTX 5090** (mancano tutti): LTX-2.3 dev-nvfp4 (21.7GB) · FLUX.1 Nunchaku fp4 (6GB) · FLUX.2 dev-nvfp4. → il guadagno di velocità maggiore.
-2. **Acceleratori immagine**: Hyper-SD 8-step FLUX (1.4GB) · aidmaNSFWunlock (19MB).
-3. **Finetune realismo immagine**: UltraReal / Jib Mix · LoRA Photorealistic Skin.
-4. **NSFW video base**: Sulphur-2-base (alternativa a eros, più leggero/attivo).
-5. **Pulizia**: rimuovere i duplicati Wan2.1 kijai/SwarmUI.
+# 3) DA AGGIUNGERE (consigliati, SFW + NSFW)
 
-> Coperture: l'app ha GIÀ ottima copertura FP8 (LTX/Wan/FLUX) + libreria LoRA enorme (SFW+NSFW). Il gap principale è **FP4/NVFP4** (velocità 5090) e qualche **finetune realismo immagine** + **acceleratori FLUX**.
+## Priorità 1 — NVFP4/FP4 (RTX 5090, massimo boost velocità)
+| Modello | Peso | Perché |
+|---|---|---|
+| **LTX-2.3 dev nvfp4** (Lightricks ufficiale) | 21.7GB | ~2× fp8 in T2V su 5090 |
+| **Nunchaku/SVDQuant FLUX.1-dev fp4** | ~6GB | ~3× più veloce di bf16, qualità ≈16-bit, ⅓ VRAM |
+| **FLUX.2 dev nvfp4** | ~15GB | 2-3× su Blackwell |
+
+## Priorità 2 — Acceleratori immagine
+| Modello | Peso | Perché |
+|---|---|---|
+| **Hyper-SD FLUX 8-step** (ByteDance) | 1.4GB | acceleratore standard (scale 0.125) |
+| **aidmaNSFWunlock** | 19MB | "unlock" NSFW più affidabile (130k+ DL) |
+| FLUX.1-Turbo-Alpha 8-step | ~1GB | alternativa, dettaglio sotto 8 step |
+
+## Priorità 3 — Realismo immagine (SFW + NSFW)
+| Modello | Tipo | Perché |
+|---|---|---|
+| UltraReal / Jib Mix Flux | checkpoint SFW | realismo affidabile |
+| **Photorealistic Skin – No plastic**, Flux Skin Texture v2 | LoRA SFW | elimina effetto plastica (top community) |
+| Lustly Uncensored / Flux Anatomy Realism | LoRA NSFW | anatomia M/F bilanciata |
+
+## Priorità 4 — Video NSFW base
+| Modello | Perché |
+|---|---|
+| **Sulphur-2-base** (LTX-2.3) | NSFW base attivo, più leggero di eros, tutti i formati |
+| WAN General NSFW (NSFW-22 H/L) | "base NSFW" Wan a 2 stadi (se mantieni Wan) |
+
+---
+
+# 4) AZIONI OPERATIVE (per la distribuzione)
+
+### 🗑️ Cancellazioni consigliate (recupero ~40GB+)
+1. **FLUX Reality serie** (~10GB) + MarynAI/OlgAI/Olya + FluxCreative + MysticXXX + underland-alice → LoRA-persona/non-validate.
+2. **14 duplicati Wan** (suffissi SwarmUI/Framepack/LoRAs) → 1 copia.
+3. **2 duplicati checkpoint Wan2.1 kijai/SwarmUI** (~16GB).
+4. **SD1.5 legacy** (CineStyle5, MoXin, blindbox) se non usi SD1.5.
+5. **HiDream** (9GB) se non usato (superato).
+6. **LongCat** (5.3GB) se il motore resta LTX-2.3.
+
+### 🔧 Misclassificazioni da correggere (skill `ai-catalog`)
+- `gemma-3-12b abliterated_lora` → è LoRA **text-encoder LTX-2.3**, non SDXL.
+- `DR34ML4Y_LTXXX`, `NSFW_ZI_V01` → verificare arch reale via hash Civitai.
+
+### Verdetto generale
+L'app ha **già ottima copertura FP8** (LTX/Wan/FLUX/Z-Image) + una **libreria LoRA enorme** (SFW+NSFW, immagini e video). I gap reali sono:
+1. **FP4/NVFP4** (velocità RTX 5090) — il guadagno maggiore.
+2. **Acceleratori immagine FLUX** (Hyper-SD) + **finetune realismo** (UltraReal/Jib Mix) + LoRA skin.
+3. **Pulizia**: ~40GB recuperabili da duplicati/LoRA-persona inutili.
