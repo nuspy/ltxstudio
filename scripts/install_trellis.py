@@ -1,26 +1,35 @@
-"""Installer TRELLIS.2 nativo (Windows) — approccio SECourses con WHEEL PRE-COMPILATI (niente build MSVC).
+"""Installer TRELLIS.2 nativo (Windows) — CODICE dal custom node MIT + WHEEL precompilati (asset).
 
-Riferimento: E:\\AI\\ltxstudio\\Trellis (FurkanGozukara/MonsterMMORPG) — requirements_trellis.txt +
-Windows_Install_or_Update.bat. Risolve nvdiffrast/spconv/flash_attn/cumesh via wheel precompilati
-(huggingface MonsterMMORPG/Wan_GGUF) su torch 2.9.1 cu130 (sm_120 Blackwell). Vedi [[trellis-windows-wheels]].
-
-Usa il fork Trellis_2_3D_Generator (TRELLIS.2-4B, pesi già in Comfy_Nexus.bak/models/trellis2) + UniRig.
-Uso: python scripts/install_trellis.py
+Conforme licenze: il codice viene dal custom node `ComfyUI-TRELLIS2` (**MIT**, in Comfy_Nexus.bak), copiato
+come package `trellis_nodes` + nostro shim `comfy` (no ComfyUI). Le deps CUDA difficili usano i WHEEL
+PRECOMPILATI (asset) da MonsterMMORPG/Wan_GGUF (nvdiffrast/spconv/flash_attn/cumesh/...). Pesi TRELLIS.2-4B
+già presenti (9.5GB in Comfy_Nexus.bak/models/trellis2) → symlink. NON copia codice del progetto SECourses
+Patreon (non-open): solo approccio studiato (torch 2.9.1 + wheel). Vedi [[trellis-windows-wheels]] [[third-party-code-licensing]].
 """
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 TR = Path(r"E:\AI\Tools\TRELLIS2")
 VENV = TR / "venv"
-REPO_DIR = TR / "Trellis_2_3D_Generator"
-UNIRIG_DIR = TR / "UniRig"
-FAITHC_DIR = TR / "FaithC"
+NODES_SRC = Path(r"E:\AI\Comfy_Nexus.bak\ComfyUI\custom_nodes\ComfyUI-TRELLIS2\nodes")  # MIT
+NODES_DST = TR / "trellis_nodes"
+WEIGHTS_SRC = Path(r"E:\AI\Comfy_Nexus.bak\ComfyUI\models\trellis2")
+MODELS_DIR = TR / "models" / "trellis2"
 HF = "https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main"
-WHEELS_NODEPS = [          # wheel extra installati con --no-deps (dal Windows_Install.bat SECourses)
-    f"{HF}/flex_gemm-1.0.0-cp311-cp311-win_amd64.whl",
-    f"{HF}/o_voxel-0.0.1-cp311-cp311-win_amd64.whl",
-    f"{HF}/spconv_cu131-2.3.8+torch2.9.1-cp311-cp311-win_amd64.whl",
+WHEELS = [   # wheel precompilati Windows cp311 torch2.9.1 cu131 (asset) — niente build MSVC
+    "flash_attn-2.8.3+torch2.9.1.cuda13.1-cp311-cp311-win_amd64.whl",
+    "sageattention-2.2.0+torch2.9.1.cuda13.1-cp39-abi3-win_amd64.whl",
+    "nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl",
+    "spconv_cu131-2.3.8+torch2.9.1-cp311-cp311-win_amd64.whl",
+    "cumesh-0.0.1+torch291_cu13-cp311-cp311-win_amd64.whl",
+    "cumm_cu_131_cuda_version-0.8.2+torch2.9.1-cp311-cp311-win_amd64.whl",
+    "torch_cluster-1.6.3-cp311-cp311-win_amd64.whl",
+    "torch_scatter-2.1.2+pt291cu13-cp311-cp311-win_amd64.whl",
+    "flex_gemm-1.0.0-cp311-cp311-win_amd64.whl",
+    "o_voxel-0.0.1-cp311-cp311-win_amd64.whl",
 ]
 
 
@@ -31,38 +40,48 @@ def _run(cmd, **k):
 
 def main():
     TR.mkdir(parents=True, exist_ok=True)
-    if not REPO_DIR.exists():
-        _run(["git", "clone", "--recursive", "https://github.com/FurkanGozukara/Trellis_2_3D_Generator",
-              str(REPO_DIR)], check=False)
-    if not UNIRIG_DIR.exists():
-        _run(["git", "clone", "https://github.com/FurkanGozukara/UniRig", str(UNIRIG_DIR)], check=False)
-    if not FAITHC_DIR.exists():
-        _run(["git", "clone", "https://github.com/Luo-Yihao/FaithC.git", str(FAITHC_DIR)], check=False)
+    # 1) codice MIT → package trellis_nodes (con __init__ vuoto: NON caricare i nodi comfy_api.io)
+    if not NODES_DST.exists():
+        shutil.copytree(NODES_SRC, NODES_DST, ignore=shutil.ignore_patterns("__pycache__"))
+    (NODES_DST / "__init__.py").write_text("# trellis_nodes (codice MIT da ComfyUI-TRELLIS2)\n", encoding="utf-8")
+    # 2) pesi (symlink, niente ricopia 9.5GB)
+    MODELS_DIR.parent.mkdir(parents=True, exist_ok=True)
+    if not MODELS_DIR.exists() and WEIGHTS_SRC.exists():
+        try:
+            os.symlink(WEIGHTS_SRC, MODELS_DIR, target_is_directory=True)
+        except OSError:
+            print("  (symlink fallito — serve admin; copia manuale o junction)")
+    # 3) venv torch 2.9.1 cu130 (i wheel sono per 2.9.1)
     if not VENV.exists():
         _run([sys.executable, "-m", "venv", str(VENV)], check=True)
     py = VENV / "Scripts" / "python.exe"
-    _run([py, "-m", "pip", "install", "--upgrade", "pip", "uv"], check=True)
-    # requirements del fork (torch 2.9.1 cu130 + flash_attn/nvdiffrast/spconv/cumesh/... wheel precompilati)
-    req = REPO_DIR / "requirements_trellis.txt"
-    if not req.exists():
-        req = Path(r"E:\AI\ltxstudio\Trellis\requirements_trellis.txt")   # fallback al progetto di riferimento
-    env = {"UV_SKIP_WHEEL_FILENAME_CHECK": "1", "UV_LINK_MODE": "copy"}
-    import os
-    full_env = {**os.environ, **env}
-    _run([py, "-m", "uv", "pip", "install", "-r", str(req)], check=False, env=full_env)
-    for w in WHEELS_NODEPS:
-        _run([py, "-m", "uv", "pip", "install", "--no-deps", w], check=False, env=full_env)
-    if FAITHC_DIR.exists():
-        _run([py, "-m", "uv", "pip", "install", "--no-build-isolation", "--no-deps", "-e", str(FAITHC_DIR)],
-             check=False, env=full_env)
-    # verifica: nvdiffrast + trellis importabili
-    chk = _run([py, "-c", "import sys; sys.path.insert(0, r'%s'); import nvdiffrast.torch, trellis; print('TRELLIS OK')"
-                % REPO_DIR], capture_output=True, text=True)
+    _run([py, "-m", "pip", "install", "-U", "pip", "wheel", "setuptools"], check=True)
+    _run([py, "-m", "pip", "install", "torch==2.9.1", "torchvision",
+          "--index-url", "https://download.pytorch.org/whl/cu130"], check=False)
+    # 4) wheel CUDA precompilati (asset)
+    for w in WHEELS:
+        _run([py, "-m", "pip", "install", "--no-deps", f"{HF}/{w}"], check=False)
+    # 5) deps Python (PyPI open) + utils3d dal commit pinnato
+    _run([py, "-m", "pip", "install", "pillow", "imageio", "imageio-ffmpeg", "trimesh", "easydict",
+          "opencv-python-headless", "scipy", "einops", "transformers", "huggingface_hub", "safetensors",
+          "rembg", "onnxruntime", "xatlas", "pymeshfix", "igraph", "tqdm", "open3d", "psutil", "plyfile"],
+         check=False)
+    _run([py, "-m", "pip", "install", "--no-deps",
+          "utils3d @ git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8"],
+         check=False)
+    # 6) verifica import della catena MIT via shim
+    shim_dir = Path(__file__).resolve().parent
+    chk = _run([py, "-c",
+                "import sys; sys.path.insert(0, r'%s'); sys.path.insert(0, r'%s'); "
+                "from trellis_comfy_shim import install_shim; install_shim(r'%s'); "
+                "from trellis_nodes import stages; import nvdiffrast.torch; print('TRELLIS OK')"
+                % (shim_dir, TR, str(MODELS_DIR.parent))],
+               capture_output=True, text=True)
     if "TRELLIS OK" in (chk.stdout or ""):
         (TR / ".ltx_ready").write_text("ok", encoding="utf-8")
-        print("[trellis] PRONTO (TRELLIS.2 + nvdiffrast wheel). Pesi: HF_model_downloader o models/trellis2.")
+        print("[trellis] PRONTO (codice MIT + wheel precompilati + pesi).")
     else:
-        print("[trellis] verifica fallita:\n", (chk.stderr or "")[-1500:])
+        print("[trellis] verifica fallita:\n", (chk.stderr or "")[-1800:])
 
 
 if __name__ == "__main__":
