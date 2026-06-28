@@ -3045,6 +3045,12 @@ class MainWindow(QMainWindow):
             src = Path(video_path)
             if not src.exists():
                 return False
+            if backend.is_native("face"):                 # auto-chain NATIVO (zero ComfyUI)
+                self._face_restore_native({
+                    "video": str(src), "model": cfg.get("model"),
+                    "model_path": cfg.get("model_path"), "fidelity": cfg.get("fidelity", 0.5),
+                    "detection": cfg.get("detection", "retinaface_resnet50")})
+                return True
             from core.face_restore_pipeline import ensure_model
             ok, msg = ensure_model(cfg["model"], log=self._log)
             if not ok:
