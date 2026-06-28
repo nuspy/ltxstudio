@@ -62,11 +62,40 @@ def dequant_nvfp4_weight(packed: torch.Tensor, block_scale_fp8: torch.Tensor,
 FLUX2_TE_FILE = r"E:\AI\Models\TextEncoders\Flux\mistral_3_small_flux2.safetensors"
 
 
+class Nvfp4Linear(torch.nn.Module):
+    """Linear con peso nvfp4 (packed uint8 + block_scale fp8 + global_scale f32): dequant on-the-fly nel
+    forward. Il TE gira UNA volta per prompt → costo dequant trascurabile; RAM ~1/4 del bf16."""
+
+    def __init__(self, in_features: int, out_features: int, has_bias: bool):
+        super().__init__()
+        self.in_features = in_features; self.out_features = out_features
+        self.register_buffer("packed", None); self.register_buffer("block_scale", None)
+        self.register_buffer("global_scale", None)
+        self.bias = torch.nn.Parameter(torch.empty(out_features, dtype=torch.bfloat16)) if has_bias else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        import torch.nn.functional as F
+        w = dequant_nvfp4_weight(self.packed, self.block_scale, self.global_scale,
+                                 self.out_features, self.in_features)
+        return F.linear(x, w.to(x.dtype), self.bias.to(x.dtype) if self.bias is not None else None)
+
+
+def _set_submodule(root, dotted: str, new):
+    parent = root
+    parts = dotted.split(".")
+    for p in parts[:-1]:
+        parent = parent[int(p)] if p.isdigit() else getattr(parent, p)
+    last = parts[-1]
+    if last.isdigit():
+        parent[int(last)] = new
+    else:
+        setattr(parent, last, new)
+
+
 def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
-    """Costruisce il text encoder FLUX.2 (Mistral3) dal config + pesi nvfp4 dequantizzati.
-    MEMORY-BOUNDED: init su meta (0 RAM) + dequant-and-assign per-tensore in STREAMING (un layer alla
-    volta, liberato subito) → picco ~1 layer invece di ~50GB (il vecchio dict completo + init + copia
-    saturava i 128GB). Ritorna il modello bf16 su CPU, pronto per sequential offload su GPU.
+    """Text encoder FLUX.2 (Mistral3) fp8/nvfp4-FORWARD: i pesi restano quantizzati (nvfp4/fp8, ~11GB) e
+    si dequantizzano on-the-fly nel forward (Nvfp4Linear/Fp8Linear). Niente bf16 intero (~30-46GB) che
+    sommato al transformer fp8 saturava la RAM. init su meta + assign RAW (zero copie bf16).
     Shim transformers<5: model_type 'mistral3'→'mistral', sliding_window=full (come Ernie)."""
     import json
     import os
@@ -74,7 +103,9 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
     import transformers
     from accelerate import init_empty_weights
     from accelerate.utils import set_module_tensor_to_device
+    from safetensors import safe_open
     from transformers import Mistral3Model, Mistral3Config, MinistralForCausalLM
+    from inference_server.backends.flux2_transformer import Fp8Linear
     if not hasattr(transformers, "Ministral3ForCausalLM"):
         transformers.Ministral3ForCausalLM = MinistralForCausalLM
     cfg = json.load(open(os.path.join(config_dir, "config.json")))
@@ -83,25 +114,71 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
         tc["model_type"] = "ministral"
     if tc.get("sliding_window") is None:
         tc["sliding_window"] = tc.get("max_position_embeddings", 262144)
-    with init_empty_weights():                              # modello su meta device: ZERO RAM all'init
+    with init_empty_weights():
         te = Mistral3Model(Mistral3Config(**cfg))
-    targets = {n for n, _ in te.named_parameters()} | {n for n, _ in te.named_buffers()}
+    mods = dict(te.named_modules())
 
-    def _target_name(k: str) -> str | None:
-        if k in targets:
+    def _target(k: str) -> str | None:
+        if k in mods:
             return k
         rk = ("language_model." + k[6:]) if k.startswith("model.") else k   # remap come Ernie
-        return rk if rk in targets else None
+        return rk if rk in mods else None
 
-    assigned = 0
-    for k, tensor in _iter_nvfp4_tensors(te_file):         # genera UN tensore bf16 alla volta
-        name = _target_name(k)
-        if name is not None:
-            set_module_tensor_to_device(te, name, "cpu", value=tensor)      # assegna e libera
-            assigned += 1
-        del tensor
+    with safe_open(te_file, framework="pt") as h:
+        keys = set(h.keys())
+        qbases = {k[:-len(".comfy_quant")] for k in keys if k.endswith(".comfy_quant")}
+        # 1) sostituisci i Linear quantizzati con Nvfp4Linear/Fp8Linear
+        fmt_of: dict[str, str] = {}
+        for base in qbases:
+            mod_name = _target(base)
+            old = mods.get(mod_name) if mod_name else None
+            if not isinstance(old, torch.nn.Linear):
+                continue
+            fmt = json.loads(bytes(h.get_tensor(base + ".comfy_quant").tolist()).decode("utf-8")).get("format")
+            fmt_of[mod_name] = fmt
+            has_b = old.bias is not None
+            new = (Nvfp4Linear(old.in_features, old.out_features, has_b) if fmt == "nvfp4"
+                   else Fp8Linear(old.in_features, old.out_features, has_b))
+            _set_submodule(te, mod_name, new)
+        mods = dict(te.named_modules())
+        params = {n for n, _ in te.named_parameters()} | {n for n, _ in te.named_buffers()}
+        # 2) carica i pesi: quantizzati RAW nei layer custom; il resto bf16 via set_module_tensor
+        assigned = 0
+        for k in keys:
+            if k.endswith((".comfy_quant", ".weight_scale", ".weight_scale_2", ".tekken_model", ".input_scale")):
+                continue
+            base = k[:-len(".weight")] if k.endswith(".weight") else None
+            if base and base in qbases:
+                mod_name = _target(base)
+                m = mods.get(mod_name) if mod_name else None
+                if isinstance(m, Nvfp4Linear):
+                    m.packed = h.get_tensor(base + ".weight")
+                    m.block_scale = h.get_tensor(base + ".weight_scale")
+                    m.global_scale = h.get_tensor(base + ".weight_scale_2").float()
+                    assigned += 1
+                elif isinstance(m, Fp8Linear):
+                    set_module_tensor_to_device(te, mod_name + ".weight", "cpu", value=h.get_tensor(k))
+                    set_module_tensor_to_device(te, mod_name + ".weight_scale", "cpu",
+                                                value=h.get_tensor(base + ".weight_scale").float())
+                    assigned += 1
+                continue
+            name = _target(k)                              # plain (embed/norm) → bf16
+            if name and name in params:
+                set_module_tensor_to_device(te, name, "cpu", value=h.get_tensor(k).to(torch.bfloat16))
+                assigned += 1
+    # Il checkpoint TE FLUX.2 contiene SOLO il language_model: il vision_tower del Mistral3 (multimodale)
+    # resta su meta e non serve per l'encoding del testo. Lo materializzo a zero (inerte) per consentire
+    # .to()/sequential offload senza errori "copy from meta".
+    _pd = dict(te.named_parameters()); _bd = dict(te.named_buffers())
+    metas = [n for n, p in _pd.items() if p.is_meta] + [n for n, b in _bd.items() if b.is_meta]
+    for name in metas:
+        ref = _pd.get(name)
+        if ref is None:
+            ref = _bd.get(name)
+        set_module_tensor_to_device(te, name, "cpu", value=torch.zeros(ref.shape, dtype=ref.dtype))
     import logging
-    logging.info("[flux2_te] assegnati %d/%d tensori (streaming, memory-bounded)", assigned, len(targets))
+    logging.info("[flux2_te] fp8/nvfp4-forward: %d layer quantizzati, %d assegnati, %d meta(vision)→zero",
+                 len(fmt_of), assigned, len(metas))
     return te
 
 
