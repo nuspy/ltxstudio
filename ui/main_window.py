@@ -2018,6 +2018,16 @@ class MainWindow(QMainWindow):
         af = audio.get("audio_file")
         if af and os.path.exists(af):
             params["audio_path"] = af
+            # a2v: il video deve coprire TUTTA la durata dell'audio (altrimenti l'immagine si "congela"
+            # all'ultimo frame mentre la canzone continua). Ricalcola i frame dalla durata dell'audio e
+            # limita l'audio muxato alla durata del video (coerenza durate).
+            adur = self._probe_duration(af) or 0.0
+            if adur > length_s:
+                length_s = adur
+                nf = max(9, int(round(length_s * fps)) // 8 * 8 + 1)
+                params["num_frames"] = nf
+                self._log(f"[nativo] a2v: durata video allineata all'audio ({adur:.1f}s, {nf} frame)")
+            params["audio_max_duration"] = length_s
         # video lungo → chunking memory-bounded (chunk da ~5s)
         if nf > 150:
             params["chunk_frames"] = 121

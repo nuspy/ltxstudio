@@ -121,7 +121,7 @@ def _maybe_compile(pipe) -> bool:
         return False
 
 
-def _assemble_flux(Pipe, transformer_path: str):
+def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
     (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
     (diffusion_models) che non contengono i text encoder."""
@@ -130,8 +130,11 @@ def _assemble_flux(Pipe, transformer_path: str):
     from diffusers import FluxTransformer2DModel, AutoencoderKL, FlowMatchEulerDiscreteScheduler
     from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
     bf16 = torch.bfloat16
-    # config transformer LOCALE (no dipendenza HF a runtime → funziona offline/gated; target 100% locale)
-    _tr_cfg = os.path.join(TE_DIR, "flux_transformer")
+    # config transformer LOCALE (no dipendenza HF a runtime → funziona offline/gated; target 100% locale).
+    # FLUX Fill (inpaint/outpaint) ha in_channels=384 (latente+immagine mascherata concatenati): usa il
+    # config dedicato 'flux_fill_transformer', altrimenti x_embedder mismatch (64 vs 384).
+    _cfg_name = "flux_fill_transformer" if arch == "inpaint" else "flux_transformer"
+    _tr_cfg = os.path.join(TE_DIR, _cfg_name)
     if os.path.isdir(_tr_cfg):
         tr = FluxTransformer2DModel.from_single_file(
             transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True)
@@ -298,7 +301,7 @@ def _load(model_path: str, arch: str):
         except Exception:                               # noqa: BLE001
             # file 'solo transformer' (manca TE/VAE nel checkpoint) → assembla coi componenti locali
             if arch in ("flux", "kontext", "inpaint"):
-                pipe = _assemble_flux(Pipe, model_path)
+                pipe = _assemble_flux(Pipe, model_path, arch=arch)
             elif arch == "zimage":
                 pipe = _assemble_zimage(model_path)
             else:
