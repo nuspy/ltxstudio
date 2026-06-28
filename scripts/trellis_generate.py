@@ -1,5 +1,6 @@
-"""Runner TRELLIS.2 nativo (immagine→mesh GLB) — codice MIT (ComfyUI-TRELLIS2) via shim, niente ComfyUI.
+"""Runner TRELLIS.2 nativo (immagine→mesh GLB) — repo UFFICIALE microsoft/TRELLIS.2 (MIT), ZERO ComfyUI.
 
+API ufficiale: Trellis2ImageTo3DPipeline.run(image) → mesh; o_voxel.postprocess.to_glb → GLB con PBR.
 Chiamato da core/trellis_service.py. Stampa `OK:<glb>` a fine.
 """
 import argparse
@@ -7,9 +8,12 @@ import os
 import sys
 from pathlib import Path
 
-_TR = r"E:\AI\Tools\TRELLIS2"
-sys.path.insert(0, str(Path(__file__).resolve().parent))   # trellis_comfy_shim
-sys.path.insert(0, _TR)                                     # trellis_nodes (codice MIT copiato)
+os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+_REPO = r"E:\AI\Tools\TRELLIS2\TRELLIS2_official"
+if os.path.isdir(_REPO):
+    sys.path.insert(0, _REPO)
 _FB = r"E:\AI\Tools\ffmpeg-shared\bin"
 if os.path.isdir(_FB):
     os.environ["PATH"] = _FB + os.pathsep + os.environ.get("PATH", "")
@@ -24,41 +28,34 @@ def main():
     ap.add_argument("--image", required=True)
     ap.add_argument("--output_dir", required=True)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--ss_steps", type=int, default=12)
-    ap.add_argument("--slat_steps", type=int, default=12)
-    ap.add_argument("--simplify", type=float, default=0.95)
-    ap.add_argument("--texture_size", type=int, default=1024)
-    ap.add_argument("--resolution", default="1024_cascade",
-                    choices=["512", "1024", "1024_cascade", "1536_cascade"])
-    ap.add_argument("--bg", default="black")
+    ap.add_argument("--texture_size", type=int, default=2048)
+    ap.add_argument("--decimation", type=int, default=1000000)   # target facce
+    ap.add_argument("--model", default="microsoft/TRELLIS.2-4B")
     a = ap.parse_args()
 
-    import numpy as np
-    import torch
-    import trimesh
     from PIL import Image
+    import torch
+    from trellis2.pipelines import Trellis2ImageTo3DPipeline
+    import o_voxel
 
-    from trellis_comfy_shim import install_shim
-    install_shim(_TR, "cuda" if torch.cuda.is_available() else "cpu")
-    from trellis_nodes import stages   # codice MIT
+    pipeline = Trellis2ImageTo3DPipeline.from_pretrained(a.model)
+    pipeline.cuda()
 
-    im = Image.open(a.image).convert("RGB")
-    arr = np.asarray(im, np.float32) / 255.0
-    image = torch.from_numpy(arr)[None]                       # [1,H,W,3] formato IMAGE
-    mask = torch.ones((1, arr.shape[0], arr.shape[1]), dtype=torch.float32)
+    image = Image.open(a.image).convert("RGB")
+    torch.manual_seed(a.seed)
+    mesh = pipeline.run(image)[0]
+    mesh.simplify(16777216)                                       # limite nvdiffrast
 
-    model_config = {"resolution": a.resolution, "dtype": torch.bfloat16, "attn_backend": "auto"}
-    include_1024 = a.resolution in ("1024", "1024_cascade", "1536_cascade")
-
-    conditioning, _prep = stages.run_conditioning(model_config, image, mask,
-                                                  include_1024=include_1024, background_color=a.bg)
-    verts, faces, _slat, _subs = stages.run_shape_generation(conditioning, seed=a.seed)
+    glb = o_voxel.postprocess.to_glb(
+        vertices=mesh.vertices, faces=mesh.faces, attr_volume=mesh.attrs,
+        coords=mesh.coords, attr_layout=mesh.layout, voxel_size=mesh.voxel_size,
+        aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+        decimation_target=a.decimation, texture_size=a.texture_size,
+        remesh=True, remesh_band=1, remesh_project=0, verbose=False)
 
     out = os.path.join(a.output_dir, "model.glb")
     Path(a.output_dir).mkdir(parents=True, exist_ok=True)
-    v = verts.detach().cpu().numpy() if hasattr(verts, "detach") else np.asarray(verts)
-    f = faces.detach().cpu().numpy() if hasattr(faces, "detach") else np.asarray(faces)
-    trimesh.Trimesh(vertices=v, faces=f).export(out)
+    glb.export(out, extension_webp=True)
     print("OK:" + out, flush=True)
 
 
