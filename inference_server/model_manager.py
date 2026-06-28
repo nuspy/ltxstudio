@@ -111,6 +111,25 @@ class ModelManager:
         if torch is not None and torch.cuda.is_available():
             torch.cuda.empty_cache()
 
+    @staticmethod
+    def place(pipe, vram_mb: float) -> str:
+        """Posiziona un pipeline: SU GPU se c'è spazio (resta caricato tra le run → niente offload/reload
+        ripetuto), altrimenti enable_model_cpu_offload. L'eviction quando serve spazio per un ALTRO modello
+        è gestita dalla cache LRU (make_room/unload). Anti system-memory-fallback Windows: GPU solo se
+        free ≥ vram·margine + floor. Override: NATIVE_FORCE_OFFLOAD / NATIVE_GPU_MARGIN / NATIVE_GPU_FLOOR_MB."""
+        import os
+        if os.environ.get("NATIVE_FORCE_OFFLOAD") == "1" or torch is None or not torch.cuda.is_available():
+            pipe.enable_model_cpu_offload()
+            return "offload"
+        free_mb = torch.cuda.mem_get_info()[0] / 1024**2
+        margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.35"))
+        floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1500"))
+        if free_mb >= float(vram_mb) * margin + floor_mb:
+            pipe.to("cuda")
+            return "gpu"
+        pipe.enable_model_cpu_offload()
+        return "offload"
+
     # ── LoRA hot-swap (su un pipeline diffusers) ─────────────────────────────
     @staticmethod
     def apply_loras(pipe, loras: list[dict] | None) -> None:

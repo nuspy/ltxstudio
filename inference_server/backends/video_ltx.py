@@ -48,7 +48,11 @@ def _load(_model: str = "", _arch: str = "video"):
         pass
     pipe = LTX2Pipeline(scheduler=sched, vae=vae, audio_vae=avae, text_encoder=te, tokenizer=tok,
                         connectors=conn, transformer=tr, vocoder=voc, processor=proc)
-    pipe.enable_model_cpu_offload()
+    # tieni su GPU se entra (resta caricato tra le generazioni), altrimenti offload (LTX-2.3 22B su 32GB
+    # non entra → offload; su GPU più grandi o modelli fp8/distilled più piccoli → resta su GPU).
+    from inference_server.model_manager import ModelManager
+    where = ModelManager.place(pipe, VRAM_MB)
+    print(f"[video] placement: {where}", flush=True)
     try:
         pipe.vae.enable_tiling()
     except Exception:                                          # noqa: BLE001
