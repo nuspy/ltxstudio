@@ -3246,11 +3246,25 @@ class MainWindow(QMainWindow):
             done = Signal(dict)
 
             def run(self):
+                import os as _os, threading as _th
                 try:
-                    job.run()
-                    self.done.emit({"status": "success", "output": [out_glb]})
+                    ev = _th.Event(); rc = {"v": None}
+                    job.on_done = lambda code: (rc.__setitem__("v", code), ev.set())
+                    job.start()                              # Job è asincrono (subprocess) → attendi on_done
+                    ev.wait()
+                    if rc["v"] == 0 and _os.path.exists(out_glb):
+                        self.done.emit({"status": "success", "output": [out_glb]})
+                    else:
+                        self.done.emit({"status": "error",
+                                        "error": f"TRELLIS terminato (exit {rc['v']}); output mancante: {out_glb}"})
                 except Exception as e:  # noqa: BLE001
                     self.done.emit({"status": "error", "error": str(e)})
+
+            def stop(self):                                  # cancel dalla coda → killa il subprocess
+                try:
+                    job.stop()
+                except Exception:                            # noqa: BLE001
+                    pass
 
         self._trellis_worker = _TrellisWorker()
         self._enqueue(tr("queue.job.trellis", "Modello 3D (TRELLIS)"), self._trellis_worker,
@@ -3412,11 +3426,25 @@ class MainWindow(QMainWindow):
             done = Signal(dict)
 
             def run(self):
+                import os as _os, threading as _th
                 try:
-                    job.run()
-                    self.done.emit({"status": "success", "output": [out]})
+                    ev = _th.Event(); rc = {"v": None}
+                    job.on_done = lambda code: (rc.__setitem__("v", code), ev.set())
+                    job.start()                              # Job asincrono → attendi on_done
+                    ev.wait()
+                    if rc["v"] == 0 and _os.path.exists(out):
+                        self.done.emit({"status": "success", "output": [out]})
+                    else:
+                        self.done.emit({"status": "error",
+                                        "error": f"Rig terminato (exit {rc['v']}); output mancante: {out}"})
                 except Exception as e:  # noqa: BLE001
                     self.done.emit({"status": "error", "error": str(e)})
+
+            def stop(self):
+                try:
+                    job.stop()
+                except Exception:                            # noqa: BLE001
+                    pass
 
         self._rig_worker = _RigWorker()
         self._enqueue(tr("queue.job.rig", "Rig 3D"), self._rig_worker, self._on_trellis_native_done)
