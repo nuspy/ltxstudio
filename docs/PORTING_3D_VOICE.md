@@ -16,6 +16,19 @@ Obiettivo: eliminare le ultime dipendenze ComfyUI runtime. Pattern di riferiment
   4. main_window: `generate_trellis` → branch `_trellis_native()` (worker subprocess) come `_enhance_video_native`. Rimuovere `driver.submit` + `trellis_pipeline`.
   5. Test live: immagine→GLB, verifica mesh nel visore (TrellisTab già pronto).
 - **GUI**: TrellisTab già completa (image picker + format) → solo ricablare il signal al worker nativo.
+- **REVERSE-ENG FATTO (28/06)** — catena e shim precisi per il runner:
+  - shim `comfy` da registrare in sys.modules PRIMA di importare `nodes.stages`: `comfy.model_management`
+    {get_torch_device→cuda, unet_offload_device→cpu, vae_dtype(dev,allowed)→bfloat16, load_models_gpu(
+    [patcher])→patcher.model.to(load_device), soft_empty_cache→torch.cuda.empty_cache,
+    throw_exception_if_processing_interrupted→pass}; `comfy.utils` {ProgressBar(n) stub, load_torch_file→
+    safetensors.load_file}; `comfy.model_patcher.ModelPatcher(model,load_device,offload_device)` wrapper
+    con .model/.load_device/.offload_device/.unpatch_model(device_to=)/.patch_model(); `folder_paths.models_dir`
+    → cartella con `trellis2/ckpts` (i pesi: spostare/symlink da Comfy_Nexus.bak/models/trellis2 → E:\AI\Models).
+  - flusso: `stages.run_conditioning(model_config, image[B,H,W,C], mask, include_1024, bg)` → (conditioning,
+    prep_img); `stages.run_shape_generation(conditioning, seed)` → dict shape/slat; poi decode mesh + export
+    GLB (tracciare `nodes_unwrap.py`/`trellis2.py` per la catena slat→trimesh→.glb; `nodes_export.py` è solo
+    rendering preview, NON l'export GLB). model_config = `nodes_loader.py` Trellis2 loader (resolution mode).
+  - venv: `requirements.txt` del nodo (dinov3, utils3d, trimesh, ...) + torch cu128.
 
 ## 2. Rig 3D (SkinTokens) — `generate_rig`
 - **Codice**: `custom_nodes/ComfyUI-SkinToken/` (SkinTokens; richiede Blender, auto-install winget). Pattern identico.
