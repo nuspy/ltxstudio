@@ -30,6 +30,7 @@ from core.extend_pipeline import ExtendPipeline         # noqa: E402
 from core.face_restore_pipeline import FaceRestorePipeline  # noqa: E402
 from core import gui_state                                # noqa: E402  (persistenza impostazioni GUI)
 from core import features, gating_apply, watermark        # noqa: E402  (feature-gating per edizione)
+from core import backend                                  # noqa: E402  (router backend nativo/ComfyUI)
 from ui.tabs.video_def_tab import VideoDefTab          # noqa: E402
 from ui.tabs.video_extend_tab import VideoExtendTab    # noqa: E402
 from ui.tabs.restore_tab import RestoreTab             # noqa: E402
