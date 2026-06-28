@@ -150,6 +150,38 @@ def build_masked_guide(frames: list[str], masks: list[str], out_video: str, *, f
     return out_video
 
 
+def composite_inpaint(original: str, edited: str, masks: list[str], out_video: str, *, fps: float = 25.0,
+                      feather: int = 6) -> str:
+    """#59 Inpaint per COMPOSITING: out = mask*edited + (1-mask)*original per-frame (feather sui bordi).
+    L'area mascherata (SAM2-tracciata) prende il contenuto del video EDITATO (edit-anything col nuovo
+    soggetto); il resto resta ESATTAMENTE l'originale. Sfondo perfettamente preservato."""
+    import subprocess
+    import cv2
+    import numpy as np
+    from PIL import Image
+    tmpd = str(Path(out_video).with_suffix("")) + "_cf"
+    os.makedirs(tmpd, exist_ok=True)
+    od, ed = tmpd + "_o", tmpd + "_e"
+    for d, v in ((od, original), (ed, edited)):
+        os.makedirs(d, exist_ok=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-i", v, os.path.join(d, "%05d.png"), "-y"], check=True)
+    of = sorted(Path(od).glob("*.png")); ef = sorted(Path(ed).glob("*.png"))
+    n = min(len(of), len(ef), len(masks))
+    for i in range(n):
+        orig = np.asarray(Image.open(of[i]).convert("RGB"), np.float32)
+        edit = np.asarray(Image.open(ef[i]).convert("RGB").resize(orig.shape[1::-1]), np.float32)
+        m = np.asarray(Image.open(masks[i]).convert("L").resize(orig.shape[1::-1]), np.float32) / 255.0
+        if feather > 0:
+            m = cv2.GaussianBlur(m, (0, 0), feather)
+        m = m[..., None]
+        comp = (edit * m + orig * (1 - m)).clip(0, 255).astype(np.uint8)
+        Image.fromarray(comp).save(os.path.join(tmpd, f"{i:05d}.png"))
+    os.makedirs(os.path.dirname(out_video) or ".", exist_ok=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-framerate", str(fps), "-i", os.path.join(tmpd, "%05d.png"),
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "14", out_video, "-y"], check=True)
+    return out_video
+
+
 if __name__ == "__main__":   # CLI: track oggetto + costruisci guide magenta. Stampa "GUIDE:<path>".
     import sys
     if len(sys.argv) < 4:

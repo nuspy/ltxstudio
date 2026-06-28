@@ -24,9 +24,10 @@ def main():
         subprocess.run([sys.executable, "-m", "venv", str(VENV)], check=True)
     py = VENV / "Scripts" / "python.exe"
     subprocess.run([str(py), "-m", "pip", "install", "-U", "pip"], check=True)
-    print("[flashvsr] installo torch CUDA 12.4 + requirements…")
-    subprocess.run([str(py), "-m", "pip", "install", "torch==2.6.0", "torchvision==0.21.0",
-                    "torchaudio==2.6.0", "--index-url", "https://download.pytorch.org/whl/cu128"], check=False)
+    print("[flashvsr] installo torch CUDA 12.8 (Blackwell sm_120, ultimo) + requirements…")
+    # NB: niente pin di versione — su RTX 5090 (sm_120) serve torch >=2.7 cu128; il 2.6 non ha i kernel.
+    subprocess.run([str(py), "-m", "pip", "install", "torch", "torchvision", "torchaudio",
+                    "--index-url", "https://download.pytorch.org/whl/cu128"], check=False)
     req = REPO_DIR / "requirements.txt"
     if req.exists():
         subprocess.run([str(py), "-m", "pip", "install", "-r", str(req)], check=False)

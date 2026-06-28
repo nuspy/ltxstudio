@@ -42,9 +42,23 @@ Lo smoke t2v ha rivelato un **bug reale** (non del test) che rompeva **TUTTA** l
 - Entrambi **auto-disattivanti** (se il template avrà già `clip`, non intervengono).
 **Verifica**: dopo il fix gli errori "missing clip" SPARISCONO (prima su enhancer, poi su PromptRelay → ora nessuno). Gli errori residui dello smoke sono solo **file-esempio baked nel template** (`Cand2B.png`, `FBC.png`, `A-5.mp4`, un `.mp3`) che la GUI pota/sostituisce nel flusso reale; il mio smoke minimale non replica quel pruning.
 
-### Stato funzioni video
-- Pipeline **non modificate** (a parte il fix clip) → nessuna regressione. Tutte cablate: i2v, extend, ReTake, Just_Talk, ControlNet, face-restore, super-res, scaling, RIFE, audio.
-- **DA FARE (tu)**: generare 1 video dalla GUI (t2v + long-video) per confermare il fix end-to-end e valutare la qualità.
+### Video REALI generati dal NOSTRO codice (build_prompt/extend.build → ComfyUI runtime)
+Output in `E:\AI\Comfy_Nexus\Output` (NON in ComfyUI/output — da qui il "non vedo artefatti").
+| Funzione | Esito | File |
+|---|---|---|
+| **t2v** | ✅ 512×512, 2s, +audio | `LTX2_3_00250-audio.mp4` |
+| **t2v (ref_strength=0)** | ✅ primo frame = scena generata, NO keyframe baked | `LTX2_3_00251-audio.mp4` |
+| **prolunga / extend** | ✅ 5.75s (da 2s), 138 frame | `ltxstudio_longvideo_00001.mp4` |
+| **lunghezza infinita** | ✅ (stesso ExtendPipeline a catena) | — |
+
+NB architettura: i **video** sono prodotti dal **nostro codice** (`template_engine`/`extend_pipeline` costruiscono il grafo) eseguito da **ComfyUI runtime**. La migrazione a backend nativo finora copre solo le IMMAGINI.
+
+Note utente chiarite:
+- `LTX2_3_*.png` = anteprima primo-frame salvata da `VHS_VideoCombine` (normale).
+- Immagine `magicquill` all'inizio = keyframe1 baked; appariva solo perché il mio smoke non azzerava `ref_strength` (la GUI sì → non appare).
+
+### Ancora da validare a runtime (condividono il fix clip, setup più complesso)
+- **ReTake** (v2v: video sorgente + maschera), **ControlNet** (video ref + IC-LoRA), **#8 qualità**: face-restore, super-res (SeedVR2), scaling, RIFE. Richiedono il setup moduli (`_prepare_module_inputs`).
 
 ## FLUX.2 / Ernie nativi (#2 / #14 / #1)
 ⏳ download in corso (FLUX.2 TE Mistral è grande → ore). Codice pronto: `_assemble_flux2` (transformer+VAE locali + TE Mistral HF), branch `flux2*` nel loader. Test al completamento del download. NB: il TE FLUX.2 locale era comfy_quant → si scarica il Mistral HF (solo quello).
