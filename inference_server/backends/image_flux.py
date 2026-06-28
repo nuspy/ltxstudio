@@ -245,6 +245,16 @@ def _load(model_path: str, arch: str):
     """Loader per il ModelManager: ritorna (pipe, vram_mb)."""
     import torch
     import diffusers
+    # Risolvi il path RELATIVO (es. "Flux\\FLUX_Krea_Dev.safetensors" dall'inventario filesystem) →
+    # assoluto sotto diffusion_models. Senza, Path.is_file() è False e si cade in from_pretrained che
+    # interpreta il nome come repo_id HF ("Repo id must use alphanumeric..."). Tollera spazi↔underscore.
+    if not Path(model_path).is_file():
+        base = Path(ERNIE_TRANSFORMER).parent.parent            # ...\diffusion_models
+        for cand in (base / model_path,
+                     (base / model_path).with_name(Path(model_path).name.replace(" ", "_"))):
+            if cand.is_file():
+                model_path = str(cand)
+                break
     # AUTO-DEQUANT: se è un checkpoint quantizzato ComfyUI (comfy_quant), convertilo in bf16 (cache).
     try:
         from core.dequant_comfy import ensure_dequantized
