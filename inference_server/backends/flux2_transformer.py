@@ -51,9 +51,32 @@ class Fp8Linear(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         import torch.nn.functional as F
-        w = self.weight.to(x.dtype) * self.weight_scale.to(x.dtype)
-        b = self.bias.to(x.dtype) if self.bias is not None else None
+        # cast-on-forward (block-swap stile ComfyUI): il peso fp8 vive su CPU, qui va su x.device 1 layer
+        # alla volta (dequant→bf16), poi il temporaneo è liberato. Picco VRAM = 1 layer.
+        w = self.weight.to(device=x.device, dtype=x.dtype) * self.weight_scale.to(device=x.device, dtype=x.dtype)
+        b = self.bias.to(device=x.device, dtype=x.dtype) if self.bias is not None else None
         return F.linear(x, w, b)
+
+
+def enable_blockswap(model, compute_device):
+    """Block-swap stile ComfyUI (no accelerate): i pesi quantizzati (grossi) restano su CPU e il loro
+    forward li sposta su GPU 1 layer alla volta; i moduli leggeri (norm/embed/modulation/bias) vanno su
+    GPU stabilmente. Picco VRAM = moduli leggeri + 1 layer pesante. RAM tiene i pesi fp8."""
+    for m in model.modules():
+        is_q = isinstance(m, Fp8Linear) or type(m).__name__ == "Nvfp4Linear"
+        if is_q:
+            if getattr(m, "bias", None) is not None:        # bias piccolo → GPU; weight/packed restano CPU
+                m.bias.data = m.bias.data.to(compute_device)
+        else:                                               # modulo leggero → param/buffer diretti su GPU
+            for p in m.parameters(recurse=False):
+                pd = p.data.to(compute_device)
+                if pd.dtype == torch.float32:               # uniforma a bf16 (evita mat1≠mat2 nel forward)
+                    pd = pd.to(torch.bfloat16)
+                p.data = pd
+            for bn, bv in list(m.named_buffers(recurse=False)):
+                if bv is not None:
+                    m.register_buffer(bn, bv.to(compute_device))
+    return model
 
 
 def _convert_key(key: str):

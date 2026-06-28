@@ -75,9 +75,11 @@ class Nvfp4Linear(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         import torch.nn.functional as F
-        w = dequant_nvfp4_weight(self.packed, self.block_scale, self.global_scale,
-                                 self.out_features, self.in_features)
-        return F.linear(x, w.to(x.dtype), self.bias.to(x.dtype) if self.bias is not None else None)
+        # cast-on-forward (block-swap): packed/scale vivono su CPU, dequant su x.device 1 layer alla volta
+        w = dequant_nvfp4_weight(self.packed.to(x.device), self.block_scale.to(x.device),
+                                 self.global_scale.to(x.device), self.out_features, self.in_features)
+        b = self.bias.to(device=x.device, dtype=x.dtype) if self.bias is not None else None
+        return F.linear(x, w.to(x.dtype), b)
 
 
 def _set_submodule(root, dotted: str, new):
