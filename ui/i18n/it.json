@@ -1802,5 +1802,6 @@
   "res.faceswap.source_lbl": "Volto sorgente",
   "res.faceswap.source.btn": "Scegli volto…",
   "res.faceswap.source.ph": "Foto del volto da imporre",
-  "res.faceswap.need_source": "Seleziona la foto del volto sorgente."
+  "res.faceswap.need_source": "Seleziona la foto del volto sorgente.",
+  "vid.hr_moved.note": "ℹ️ Super-risoluzione e dettaglio: usa il tab «Definizione Video» (SeedVR2/FlashVSR nativi). La risoluzione di generazione si imposta nei preset qui sopra."
 }

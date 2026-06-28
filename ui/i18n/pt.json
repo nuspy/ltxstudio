@@ -1705,5 +1705,6 @@
   "res.faceswap.source_lbl": "Source face",
   "res.faceswap.source.btn": "Choose face…",
   "res.faceswap.source.ph": "Photo of the face to impose",
-  "res.faceswap.need_source": "Select the source face photo."
+  "res.faceswap.need_source": "Select the source face photo.",
+  "vid.hr_moved.note": "ℹ️ Super-resolution and detail: use the «Video Definition» tab (native SeedVR2/FlashVSR). Set the generation resolution in the presets above."
 }

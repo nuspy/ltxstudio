@@ -160,25 +160,16 @@ class VideoTab(QWidget):
         self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
         self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
         form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
-        # Pacchetto risoluzione (ex "veloce" AuthorStorm, ora opzionale).
-        self.downscale_half = QCheckBox(tr("vid.downscale"))
-        self.downscale_half.setToolTip(tr("vid.downscale.tt"))
-        self.upscale_x2 = QCheckBox(tr("vid.upscale"))
-        self.upscale_x2.setToolTip(tr("vid.upscale.tt"))
-        self.refine_hr = QCheckBox(tr("vid.refine_hr"))
-        self.refine_hr.setToolTip(tr("vid.refine_hr.tt"))
-        # Upscale ×2 / Refine HR TEMPORANEAMENTE DISATTIVATI: il ramo super-res del template è
-        # incompatibile col pruning dei moduli (fa ripartire l'enhancer e lascia il controlnet con
-        # video baked inesistente → errore). Restano in GUI ma disabilitati finché non si rifà il ramo.
-        _hr_off = tr("vid.hr_off.tt")
-        # NB: NON disabilitati (setEnabled(False) + ripristino gui_state 'spuntato' = checkbox bloccato).
-        self.upscale_x2.setChecked(False)
-        self.refine_hr.setChecked(False)
-        self.upscale_x2.setToolTip(self.upscale_x2.toolTip() + "\n\n" + _hr_off)
-        self.refine_hr.setToolTip(self.refine_hr.toolTip() + "\n\n" + _hr_off)
-        form.addRow("", self.downscale_half)
-        form.addRow("", self.upscale_x2)
-        form.addRow("", self.refine_hr)
+        # HR upscale/refine RIMOSSI dalla GUI (T3): erano un ramo legacy ComfyUI rotto e ridondante.
+        # Nel flusso nativo la risoluzione si imposta direttamente nei preset; la super-risoluzione e il
+        # dettaglio si fanno nel tab «Definizione Video» (SeedVR2/FlashVSR nativi). Gli attributi restano
+        # (nascosti, default False) per compatibilità con get_values()/gui_state, senza rompere nulla.
+        self.downscale_half = QCheckBox(); self.downscale_half.setChecked(False); self.downscale_half.hide()
+        self.upscale_x2 = QCheckBox(); self.upscale_x2.setChecked(False); self.upscale_x2.hide()
+        self.refine_hr = QCheckBox(); self.refine_hr.setChecked(False); self.refine_hr.hide()
+        hr_note = QLabel(tr("vid.hr_moved.note"))
+        hr_note.setWordWrap(True); hr_note.setStyleSheet("color:#74c0fc;")
+        form.addRow("", hr_note)
         note = QLabel(tr("vid.res.note"))
         note.setWordWrap(True); note.setStyleSheet("color:#888;")
         form.addRow(note)
