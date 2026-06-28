@@ -90,6 +90,24 @@ def pick_sage_url(cuda_tag: str, tver: str) -> str | None:
     return None
 
 
+def _patch_basicsr(venv: Path) -> None:
+    """Fix basicsr↔torchvision recente: `functional_tensor` → `functional` (rgb_to_grayscale).
+    Idempotente. Senza, gfpgan/face-restore non importa."""
+    import glob
+    hits = glob.glob(str(venv / "Lib" / "site-packages" / "basicsr" / "data" / "degradations.py")) + \
+        glob.glob(str(venv / "lib" / "python*" / "site-packages" / "basicsr" / "data" / "degradations.py"))
+    for f in hits:
+        try:
+            s = Path(f).read_text(encoding="utf-8")
+            s2 = s.replace("from torchvision.transforms.functional_tensor import rgb_to_grayscale",
+                           "from torchvision.transforms.functional import rgb_to_grayscale")
+            if s2 != s:
+                Path(f).write_text(s2, encoding="utf-8")
+                print(f"  [patch] basicsr functional_tensor → functional: {f}")
+        except Exception as e:                              # noqa: BLE001
+            print(f"  [patch] basicsr non patchato ({e})")
+
+
 def main() -> int:
     py = find_py()
     cc = gpu_compute_cap()
@@ -115,6 +133,13 @@ def main() -> int:
                 return 1
     if pip("install", *DEPS) != 0:
         return 1
+
+    # Post-process video — restauro VOLTI (GFPGAN, modulo "video_face"). gfpgan dipende da basicsr che
+    # importa `torchvision.transforms.functional_tensor`, RIMOSSO in torchvision ≥0.17 → va patchato,
+    # altrimenti `from gfpgan import GFPGANer` crasha. Il peso GFPGANv1.4.pth si scarica al primo uso.
+    print("=== GFPGAN (restauro volti) ===")
+    pip("install", "gfpgan")
+    _patch_basicsr(VENV)
 
     # SageAttention: solo su GPU sm≥8.9 (40xx/50xx); altrove SDPA (fallback runtime automatico)
     if not os.environ.get("SKIP_SAGE") and cc is not None and cc >= 8.9:
