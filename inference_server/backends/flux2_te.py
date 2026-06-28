@@ -109,6 +109,7 @@ def _iter_nvfp4_tensors(path: str):
     """Generatore: legge il file nvfp4 e produce (name, bf16_tensor) UN tensore alla volta, dequantizzando
     on-demand (peso nvfp4 → dequant; embed/norm plain → copia). Memory-bounded: non costruisce mai il dict
     completo (~24GB). Usato dal loader streaming; safe_open legge dal file su disco, non in RAM."""
+    import json
     from safetensors import safe_open
     with safe_open(path, framework="pt") as h:
         keys = set(h.keys())
@@ -117,11 +118,18 @@ def _iter_nvfp4_tensors(path: str):
             if k.endswith((".comfy_quant", ".weight_scale", ".weight_scale_2", ".tekken_model")):
                 continue
             base = k[:-len(".weight")] if k.endswith(".weight") else None
-            if base and base in quant_bases:                # peso nvfp4 → dequant
-                packed = h.get_tensor(base + ".weight")
-                bs = h.get_tensor(base + ".weight_scale")
-                g = h.get_tensor(base + ".weight_scale_2")
-                yield k, dequant_nvfp4_weight(packed, bs, g, packed.shape[0], packed.shape[1] * 2)
+            if base and base in quant_bases:                # peso quantizzato → dequant secondo il format
+                fmt = json.loads(bytes(h.get_tensor(base + ".comfy_quant").tolist()).decode("utf-8")).get("format")
+                w = h.get_tensor(base + ".weight")
+                if fmt == "nvfp4":                          # U8 packed + block-scale fp8 + global-scale f32
+                    bs = h.get_tensor(base + ".weight_scale")
+                    g = h.get_tensor(base + ".weight_scale_2")
+                    yield k, dequant_nvfp4_weight(w, bs, g, w.shape[0], w.shape[1] * 2)
+                elif fmt == "float8_e4m3fn":                # fp8 + scala globale scalare → w*scale
+                    s = h.get_tensor(base + ".weight_scale").float()
+                    yield k, (w.to(torch.float32) * s).to(torch.bfloat16)
+                else:                                       # formato ignoto → copia best-effort
+                    yield k, w.to(torch.bfloat16)
             else:                                           # plain (embed/norm) → copia
                 yield k, h.get_tensor(k).to(torch.bfloat16)
 
