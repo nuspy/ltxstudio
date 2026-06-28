@@ -540,6 +540,11 @@ class MainWindow(QMainWindow):
         self.video_tab.width.valueChanged.connect(_sync_aspect)
         self.video_tab.height.valueChanged.connect(_sync_aspect)
         self.video_tab.res_preset.currentTextChanged.connect(lambda *_: _sync_aspect())
+        # menu Proporzioni sulla BARRA del canvas → aggiorna la risoluzione (sorgente: video_tab spinbox).
+        def _on_canvas_resolution(w, h):
+            self.video_tab.res_preset.setCurrentText("Personalizzato")   # custom → spinbox abilitati
+            self.video_tab.width.setValue(int(w)); self.video_tab.height.setValue(int(h))
+        self.frame1_tab.canvas.resolution_chosen.connect(_on_canvas_resolution)
         _sync_aspect()
 
         # SINISTRA: spazio di lavoro grande = canvas + selezione AI + Genera/Interrompi

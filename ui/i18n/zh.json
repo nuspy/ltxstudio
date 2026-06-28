@@ -1832,5 +1832,8 @@
   "queue.job.trellis": "3D model (TRELLIS)",
   "queue.job.rig": "3D rig",
   "queue.job.inpaint": "Inpaint/Outpaint",
-  "queue.job.integrate": "Integrate (Kontext)"
+  "queue.job.integrate": "Integrate (Kontext)",
+  "canvas.aspect_btn": "比例 ▾",
+  "canvas.aspect_custom": "自定义…",
+  "canvas.aspect_lock": "保持比例"
 }

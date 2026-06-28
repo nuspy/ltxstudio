@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem,
     QPushButton, QSlider, QLabel, QFileDialog,
     QListWidget, QListWidgetItem, QComboBox, QFrame, QGraphicsOpacityEffect,
+    QToolButton, QMenu, QDialog, QSpinBox, QDialogButtonBox, QFormLayout, QCheckBox,
 )
 
 from core.mask_store import MaskStore
@@ -40,6 +41,24 @@ TOOLS = [
     ("fill",      "▣",  "canvas.tool_fill_title",   "canvas.tool_fill_desc"),
     ("lasso",     "❍",  "canvas.tool_lasso_title",  "canvas.tool_lasso_desc"),
     ("sam_point", "✛",  "canvas.tool_sam_title",    "canvas.tool_sam_desc"),
+]
+
+# Proporzioni standard → sottomenù per ratio, ogni voce è una dimensione concreta (multipli di 32,
+# model-friendly). Lista estesa: quadrato, widescreen, verticale social, foto, cinema, ultrawide.
+ASPECT_GROUPS = [
+    ("1:1 ▪ Quadrato",          [(512, 512), (768, 768), (1024, 1024), (1280, 1280)]),
+    ("16:9 ▪ Widescreen",       [(1024, 576), (1280, 704), (1536, 864), (1920, 1088)]),
+    ("9:16 ▪ Verticale",        [(576, 1024), (704, 1280), (864, 1536), (1088, 1920)]),
+    ("4:3 ▪ Classico",          [(1024, 768), (1280, 960), (1408, 1056)]),
+    ("3:4 ▪ Ritratto",          [(768, 1024), (960, 1280), (1056, 1408)]),
+    ("3:2 ▪ Foto",              [(1152, 768), (1536, 1024)]),
+    ("2:3 ▪ Foto vert.",        [(768, 1152), (1024, 1536)]),
+    ("5:4",                     [(1280, 1024)]),
+    ("4:5 ▪ Instagram",         [(1024, 1280)]),
+    ("2:1 ▪ Panorama",          [(1024, 512), (1280, 640)]),
+    ("21:9 ▪ Ultrawide",        [(1344, 576), (1536, 640)]),
+    ("2.39:1 ▪ Cinemascope",    [(1216, 512), (1536, 640)]),
+    ("1.85:1 ▪ Flat",           [(1024, 544), (1408, 768)]),
 ]
 
 
@@ -176,6 +195,7 @@ class _View(QGraphicsView):
 
 
 class MaskCanvas(QWidget):
+    resolution_chosen = Signal(int, int)   # proporzioni/dimensioni scelte dalla barra canvas (→ video_tab)
     request_inpaint = Signal()
     request_outpaint = Signal()
     request_integrate = Signal()        # integra le immagini posizionate (composito + maschere)
@@ -250,6 +270,71 @@ class MaskCanvas(QWidget):
         self.layer_list.setCurrentRow(self._active)
         self.layer_list.blockSignals(False)
 
+    # ───────────────────────── Proporzioni / dimensioni ─────────────────────────
+    def _build_aspect_menu(self) -> QMenu:
+        m = QMenu(self)
+        for label, sizes in ASPECT_GROUPS:
+            sub = m.addMenu(label)
+            for w, h in sizes:
+                act = sub.addAction(f"{w} × {h}")
+                act.triggered.connect(lambda _=False, ww=w, hh=h: self._set_resolution(ww, hh))
+        m.addSeparator()
+        act_custom = m.addAction(tr("canvas.aspect_custom", "Personalizzato…"))
+        act_custom.triggered.connect(self._open_custom_size)
+        return m
+
+    def _set_resolution(self, w: int, h: int) -> None:
+        """Applica una risoluzione: aggiorna l'aspetto del canvas (che aggiorna l'etichetta) ed emette
+        il segnale (main_window lo propaga a video_tab = sorgente di verità per la generazione)."""
+        w, h = int(w), int(h)
+        self.set_aspect(w, h)
+        self.resolution_chosen.emit(w, h)
+
+    def set_resolution_label(self, w: int, h: int) -> None:
+        if hasattr(self, "aspect_btn"):
+            self.aspect_btn.setText(f"{int(w)}×{int(h)} ▾")
+
+    def _open_custom_size(self) -> None:
+        """Dialog dimensioni personalizzate: modificando una misura, l'altra si adatta per mantenere
+        la proporzione corrente (se il lucchetto è attivo)."""
+        cur_w, cur_h = getattr(self, "aspect_w", 768), getattr(self, "aspect_h", 768)
+        dlg = QDialog(self); dlg.setWindowTitle(tr("canvas.aspect_custom", "Dimensioni personalizzate"))
+        form = QFormLayout(dlg)
+        sp_w = QSpinBox(); sp_w.setRange(256, 4096); sp_w.setSingleStep(32); sp_w.setValue(int(cur_w))
+        sp_h = QSpinBox(); sp_h.setRange(256, 4096); sp_h.setSingleStep(32); sp_h.setValue(int(cur_h))
+        lock = QCheckBox(tr("canvas.aspect_lock", "Mantieni proporzione")); lock.setChecked(True)
+        ratio = {"v": (cur_w / cur_h) if cur_h else 1.0}
+        guard = {"on": False}
+
+        def _snap(v):
+            return max(256, int(round(v / 32.0)) * 32)
+
+        def _on_w(val):
+            if guard["on"] or not lock.isChecked():
+                return
+            guard["on"] = True
+            sp_h.setValue(_snap(val / ratio["v"])); guard["on"] = False
+
+        def _on_h(val):
+            if guard["on"] or not lock.isChecked():
+                return
+            guard["on"] = True
+            sp_w.setValue(_snap(val * ratio["v"])); guard["on"] = False
+
+        def _on_lock(state):
+            if state:                                        # ri-aggancia la proporzione corrente
+                ratio["v"] = sp_w.value() / max(1, sp_h.value())
+
+        sp_w.valueChanged.connect(_on_w); sp_h.valueChanged.connect(_on_h); lock.toggled.connect(_on_lock)
+        form.addRow(tr("vid.w_lbl", "Larghezza"), sp_w)
+        form.addRow(tr("vid.h_lbl", "Altezza"), sp_h)
+        form.addRow(lock)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        form.addRow(bb)
+        if dlg.exec() == QDialog.Accepted:
+            self._set_resolution(sp_w.value(), sp_h.value())
+
     def _build_ui(self):
         lay = QVBoxLayout(self); lay.setContentsMargins(4, 4, 4, 4)
         # ---- top bar: azioni (non strumenti) ----
@@ -262,6 +347,12 @@ class MaskCanvas(QWidget):
         b("📁", self._load_dialog, 40); b("⤢", self._fit, 40)
         b("↶", self.undo, 40); b("↷", self.redo, 40)
         b(tr("canvas.clear_btn"), self.clear_mask); b(tr("canvas.save_btn"), self.save_mask); b(tr("canvas.reset_btn"), self.reset_saved)
+        # ── Menu PROPORZIONI/dimensioni (spostato qui dal tab Video). Sottomenù per ratio + Personalizzato.
+        self.aspect_btn = QToolButton()
+        self.aspect_btn.setText(tr("canvas.aspect_btn", "Proporzioni ▾"))
+        self.aspect_btn.setPopupMode(QToolButton.InstantPopup)
+        self.aspect_btn.setMenu(self._build_aspect_menu())
+        bar.addWidget(self.aspect_btn)
         # Bottone «Integra immagini» spostato nel tab «Inpaint / Outpaint», sezione Integra.
         bar.addStretch(1)
         bar.addWidget(QLabel(tr("canvas.brush_label")))
@@ -518,6 +609,7 @@ class MaskCanvas(QWidget):
         for e in self._entries:        # ridimensiona la maschera di ogni immagine
             e["mask"] = e["mask"].scaled(self.aspect_w, self.aspect_h) if not e["mask"].isNull() else self._new_mask()
         self._refresh_mask(); self._fit()
+        self.set_resolution_label(self.aspect_w, self.aspect_h)   # sincronizza etichetta menu Proporzioni
 
     def _load_dialog(self):
         fn, _ = QFileDialog.getOpenFileName(self, tr("canvas.load_photo_title"), "", tr("canvas.image_filter"))

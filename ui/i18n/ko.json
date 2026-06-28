@@ -1832,5 +1832,8 @@
   "queue.job.trellis": "3D model (TRELLIS)",
   "queue.job.rig": "3D rig",
   "queue.job.inpaint": "Inpaint/Outpaint",
-  "queue.job.integrate": "Integrate (Kontext)"
+  "queue.job.integrate": "Integrate (Kontext)",
+  "canvas.aspect_btn": "비율 ▾",
+  "canvas.aspect_custom": "사용자 지정…",
+  "canvas.aspect_lock": "비율 유지"
 }
