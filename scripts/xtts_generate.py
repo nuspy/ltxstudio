@@ -4,6 +4,16 @@ speaker_wav + text (+ language) → wav nella voce del riferimento. Repo: coqui-
 Licenza modello CC-BY-NC (non commerciale) — uso personale/non-commerciale.
 """
 import argparse
+import os
+
+# DLL FFmpeg shared per torchcodec/torchaudio su Windows (vedi f5tts_generate).
+_FFMPEG_BIN = r"E:\AI\Tools\ffmpeg-shared\bin"
+if os.path.isdir(_FFMPEG_BIN):
+    os.environ["PATH"] = _FFMPEG_BIN + os.pathsep + os.environ.get("PATH", "")
+    try:
+        os.add_dll_directory(_FFMPEG_BIN)
+    except (AttributeError, OSError):
+        pass
 
 
 def main():
