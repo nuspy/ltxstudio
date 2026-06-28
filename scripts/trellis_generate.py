@@ -42,7 +42,6 @@ def main() -> None:
 
     from PIL import Image
     from trellis.pipelines import TrellisImageTo3DPipeline
-    from trellis.utils import postprocessing_utils
 
     pipe = TrellisImageTo3DPipeline.from_pretrained("microsoft/TRELLIS-image-large")
     pipe.cuda()
@@ -56,6 +55,7 @@ def main() -> None:
     )
     out = os.path.join(a.output_dir, "model.glb")
     try:
+        from trellis.utils import postprocessing_utils   # import qui: dipende da nvdiffrast (texture)
         glb = postprocessing_utils.to_glb(
             outputs["gaussian"][0], outputs["mesh"][0],
             simplify=a.simplify, texture_size=a.texture_size)
