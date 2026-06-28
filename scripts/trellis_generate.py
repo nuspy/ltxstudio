@@ -33,7 +33,11 @@ def main():
     ap.add_argument("--texture_size", type=int, default=1024)
     ap.add_argument("--decimation", type=int, default=150000)     # target facce (era 1_000_000)
     ap.add_argument("--simplify_cap", type=int, default=2000000)  # cap pre-to_glb (era 16.7M = nessuno)
-    ap.add_argument("--model", default="microsoft/TRELLIS.2-4B")
+    # Preferisci i pesi LOCALI (scaricati via scripts/download_trellis2_curl.py) → niente cache HF/ridownload.
+    _local = r"E:\AI\Tools\TRELLIS2\models\TRELLIS.2-4B"
+    _default_model = _local if os.path.isdir(_local) and os.path.exists(os.path.join(_local, "pipeline.json")) \
+        else "microsoft/TRELLIS.2-4B"
+    ap.add_argument("--model", default=_default_model)
     a = ap.parse_args()
 
     import time
