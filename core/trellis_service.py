@@ -37,9 +37,11 @@ def make_job(image_path: str, name: str = "model", *, seed: int = 1,
              texture_size: int = 1024, hf_token: str | None = None, **cbs) -> Job:
     out = OUT_DIR / _safe(name)
     out.mkdir(parents=True, exist_ok=True)
+    # NB: trellis_generate.py (API ufficiale microsoft/TRELLIS.2) accetta SOLO questi argomenti.
+    # ss_steps/slat_steps/simplify restano nella firma per compat con la GUI ma non sono passati
+    # (la pipeline ufficiale usa i suoi default); simplify→decimation come target-facce indicativo.
     cmd = [TRELLIS_VENV_PY, "-u", str(GEN_SCRIPT), "--image", image_path, "--output_dir", str(out),
-           "--seed", int(seed), "--ss_steps", int(ss_steps), "--slat_steps", int(slat_steps),
-           "--simplify", float(simplify), "--texture_size", int(texture_size)]
+           "--seed", int(seed), "--texture_size", int(texture_size)]
     env = {"HF_TOKEN": hf_token, "HUGGING_FACE_HUB_TOKEN": hf_token} if hf_token else None
     return Job(cmd, TRELLIS_DIR, env=env, **cbs)
 
