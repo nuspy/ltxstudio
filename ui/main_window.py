@@ -1500,7 +1500,8 @@ class MainWindow(QMainWindow):
     def generate_inpaint(self, mode: str):
         if not self._feature_gate("cap.inpaint"):
             return
-        if not self.driver.is_up():
+        from core import backend
+        if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
@@ -1564,7 +1565,8 @@ class MainWindow(QMainWindow):
         """Integra l'oggetto incollato nella scena con FLUX **Kontext** (o FLUX.2): il composito
         (scena + prop) è dato come RIFERIMENTO + prompt → il modello RIGENERA/armonizza (luce,
         ombre, prospettiva), non incolla l'originale. Prompt opzionale (default auto)."""
-        if not self.driver.is_up():
+        from core import backend
+        if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_base_photo_canvas_msg")); return
@@ -1620,7 +1622,8 @@ class MainWindow(QMainWindow):
         """Componi 2+ foto SEPARATE in un'unica immagine senza incollarle (niente occlusione):
         multi-reference (catena ReferenceLatent) o stitch (affianca). FLUX.1 (Kontext) o FLUX.2.
         Maschere opzionali per-foto (prep_masked) per indicare cosa usare."""
-        if not self.driver.is_up():
+        from core import backend
+        if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
@@ -1686,7 +1689,8 @@ class MainWindow(QMainWindow):
         """Cambia colore (Kontext/FLUX.2 prompt-based): ricolora il soggetto mantenendo texture/luce."""
         if not self._feature_gate("cap.inpaint"):
             return
-        if not self.driver.is_up():
+        from core import backend
+        if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_or_gen_image_canvas_msg")); return
@@ -1856,7 +1860,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, tr("mw.face_restore_error_title"), str(e)); self._log(f"[ERR] face restore: {e}")
 
     def generate_image(self):
-        if not self.driver.is_up():
+        from core import backend
+        if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
@@ -2377,7 +2382,8 @@ class MainWindow(QMainWindow):
         """Aumenta la definizione dell'immagine corrente del canvas con un modello AI di super-risoluzione."""
         if not self._feature_gate("cap.upscale_image"):
             return
-        if not self.driver.is_up():
+        from core import backend
+        if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if not self.frame1_tab.image_path:
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_or_gen_image_canvas_msg")); return
