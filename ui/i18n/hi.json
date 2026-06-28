@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "अनुपात ▾",
   "canvas.aspect_custom": "कस्टम…",
-  "canvas.aspect_lock": "अनुपात बनाए रखें"
+  "canvas.aspect_lock": "अनुपात बनाए रखें",
+  "fs.project_rename": "प्रोजेक्ट का नाम बदलें",
+  "fs.project_dup": "प्रोजेक्ट डुप्लिकेट करें",
+  "fs.project_del": "प्रोजेक्ट हटाएँ",
+  "fs.project_del_confirm": "प्रोजेक्ट «{n}» हटाएँ? यह पूर्ववत नहीं होगा।"
 }

@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "Aspect ▾",
   "canvas.aspect_custom": "Custom…",
-  "canvas.aspect_lock": "Keep aspect ratio"
+  "canvas.aspect_lock": "Keep aspect ratio",
+  "fs.project_rename": "Rename project",
+  "fs.project_dup": "Duplicate project",
+  "fs.project_del": "Delete project",
+  "fs.project_del_confirm": "Delete project “{n}”? This cannot be undone."
 }

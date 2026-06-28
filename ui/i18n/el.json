@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "Αναλογία ▾",
   "canvas.aspect_custom": "Προσαρμογή…",
-  "canvas.aspect_lock": "Διατήρηση αναλογίας"
+  "canvas.aspect_lock": "Διατήρηση αναλογίας",
+  "fs.project_rename": "Μετονομασία έργου",
+  "fs.project_dup": "Διπλασιασμός έργου",
+  "fs.project_del": "Διαγραφή έργου",
+  "fs.project_del_confirm": "Διαγραφή του έργου «{n}»; Μη αναστρέψιμο."
 }

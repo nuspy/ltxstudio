@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "Proporção ▾",
   "canvas.aspect_custom": "Personalizado…",
-  "canvas.aspect_lock": "Manter proporção"
+  "canvas.aspect_lock": "Manter proporção",
+  "fs.project_rename": "Renomear projeto",
+  "fs.project_dup": "Duplicar projeto",
+  "fs.project_del": "Excluir projeto",
+  "fs.project_del_confirm": "Excluir o projeto «{n}»? Ação irreversível."
 }

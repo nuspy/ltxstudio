@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "יחס ▾",
   "canvas.aspect_custom": "מותאם…",
-  "canvas.aspect_lock": "שמור על יחס"
+  "canvas.aspect_lock": "שמור על יחס",
+  "fs.project_rename": "שינוי שם הפרויקט",
+  "fs.project_dup": "שכפול הפרויקט",
+  "fs.project_del": "מחיקת הפרויקט",
+  "fs.project_del_confirm": "למחוק את הפרויקט «{n}»? פעולה בלתי הפיכה."
 }

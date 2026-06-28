@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "Пропорции ▾",
   "canvas.aspect_custom": "Свои…",
-  "canvas.aspect_lock": "Сохранять пропорции"
+  "canvas.aspect_lock": "Сохранять пропорции",
+  "fs.project_rename": "Переименовать проект",
+  "fs.project_dup": "Дублировать проект",
+  "fs.project_del": "Удалить проект",
+  "fs.project_del_confirm": "Удалить проект «{n}»? Действие необратимо."
 }

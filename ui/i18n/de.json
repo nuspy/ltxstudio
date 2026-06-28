@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "Seitenverhältnis ▾",
   "canvas.aspect_custom": "Benutzerdefiniert…",
-  "canvas.aspect_lock": "Seitenverhältnis beibehalten"
+  "canvas.aspect_lock": "Seitenverhältnis beibehalten",
+  "fs.project_rename": "Projekt umbenennen",
+  "fs.project_dup": "Projekt duplizieren",
+  "fs.project_del": "Projekt löschen",
+  "fs.project_del_confirm": "Projekt „{n}“ löschen? Nicht widerrufbar."
 }

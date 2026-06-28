@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integra (Kontext)",
   "canvas.aspect_btn": "Proporzioni ▾",
   "canvas.aspect_custom": "Personalizzato…",
-  "canvas.aspect_lock": "Mantieni proporzione"
+  "canvas.aspect_lock": "Mantieni proporzione",
+  "fs.project_rename": "Rinomina progetto",
+  "fs.project_dup": "Duplica progetto",
+  "fs.project_del": "Elimina progetto",
+  "fs.project_del_confirm": "Eliminare il progetto «{n}»? Operazione irreversibile."
 }

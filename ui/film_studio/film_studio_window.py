@@ -88,6 +88,13 @@ class FilmStudioWindow(QWidget):
         h.addWidget(b)
         b_mng = QPushButton(tr("fs.project_manage", "📂 Progetti")); b_mng.clicked.connect(self._manage_projects)
         h.addWidget(b_mng)
+        # CRUD diretto sul progetto selezionato (oltre al dialog 📂): rinomina / duplica / elimina
+        b_ren = QPushButton("✏️"); b_ren.setToolTip(tr("fs.project_rename", "Rinomina progetto"))
+        b_ren.setMaximumWidth(34); b_ren.clicked.connect(self._rename_project); h.addWidget(b_ren)
+        b_dup = QPushButton("⧉"); b_dup.setToolTip(tr("fs.project_dup", "Duplica progetto"))
+        b_dup.setMaximumWidth(34); b_dup.clicked.connect(self._duplicate_project); h.addWidget(b_dup)
+        b_del = QPushButton("🗑️"); b_del.setToolTip(tr("fs.project_del", "Elimina progetto"))
+        b_del.setMaximumWidth(34); b_del.clicked.connect(self._delete_project); h.addWidget(b_del)
         # 1.8 Serie: il progetto può appartenere a una Serie (asset/LoRA scope=series condivisi)
         self.series = QComboBox(); self.series.setMinimumWidth(140)
         self.series.currentIndexChanged.connect(self._assign_series)
@@ -187,3 +194,43 @@ class FilmStudioWindow(QWidget):
         idx = self.proj_combo.findData(pid)
         if idx >= 0:
             self.proj_combo.setCurrentIndex(idx)
+
+    def _select_project_in_combo(self, pid):
+        idx = self.proj_combo.findData(pid)
+        if idx >= 0:
+            self.proj_combo.setCurrentIndex(idx)
+
+    def _rename_project(self):
+        if not self._project_id:
+            QMessageBox.information(self, tr("fs.project", "Progetto"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        from PySide6.QtWidgets import QInputDialog
+        cur = (db.get("project", self._project_id) or {}).get("name", "")
+        name, ok = QInputDialog.getText(self, tr("fs.project_rename", "Rinomina progetto"),
+                                        tr("fs.project_name", "Nome del progetto:"), text=cur)
+        if ok and name.strip():
+            keep = self._project_id
+            db.update("project", keep, name=name.strip())
+            self._refresh_projects(); self._select_project_in_combo(keep)
+
+    def _duplicate_project(self):
+        if not self._project_id:
+            QMessageBox.information(self, tr("fs.project", "Progetto"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        new_id = db.duplicate_project(self._project_id)
+        self._refresh_projects(); self._select_project_in_combo(new_id)
+
+    def _delete_project(self):
+        if not self._project_id:
+            QMessageBox.information(self, tr("fs.project", "Progetto"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        name = (db.get("project", self._project_id) or {}).get("name", "")
+        if QMessageBox.question(self, tr("fs.project_del", "Elimina progetto"),
+                tr("fs.project_del_confirm", "Eliminare il progetto «{n}»? Operazione irreversibile.").format(n=name)
+                ) != QMessageBox.Yes:
+            return
+        db.delete_project(self._project_id)
+        self._project_id = None
+        self._refresh_projects()
+        if getattr(self, "_projects", []):
+            self.proj_combo.setCurrentIndex(0)
+        for t in (self.sb_tab, self.mt_tab):
+            if hasattr(t, "_refresh"):
+                t._refresh()

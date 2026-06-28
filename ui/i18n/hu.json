@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "Arány ▾",
   "canvas.aspect_custom": "Egyéni…",
-  "canvas.aspect_lock": "Arány megtartása"
+  "canvas.aspect_lock": "Arány megtartása",
+  "fs.project_rename": "Projekt átnevezése",
+  "fs.project_dup": "Projekt másolása",
+  "fs.project_del": "Projekt törlése",
+  "fs.project_del_confirm": "Törli a(z) „{n}” projektet? Nem vonható vissza."
 }

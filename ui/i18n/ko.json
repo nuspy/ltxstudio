@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "비율 ▾",
   "canvas.aspect_custom": "사용자 지정…",
-  "canvas.aspect_lock": "비율 유지"
+  "canvas.aspect_lock": "비율 유지",
+  "fs.project_rename": "프로젝트 이름 변경",
+  "fs.project_dup": "프로젝트 복제",
+  "fs.project_del": "프로젝트 삭제",
+  "fs.project_del_confirm": "프로젝트 “{n}”을(를) 삭제할까요? 되돌릴 수 없습니다."
 }

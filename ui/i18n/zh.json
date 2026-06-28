@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "比例 ▾",
   "canvas.aspect_custom": "自定义…",
-  "canvas.aspect_lock": "保持比例"
+  "canvas.aspect_lock": "保持比例",
+  "fs.project_rename": "重命名项目",
+  "fs.project_dup": "复制项目",
+  "fs.project_del": "删除项目",
+  "fs.project_del_confirm": "删除项目“{n}”？此操作不可撤销。"
 }

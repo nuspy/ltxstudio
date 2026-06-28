@@ -1835,5 +1835,9 @@
   "queue.job.integrate": "Integrate (Kontext)",
   "canvas.aspect_btn": "النسبة ▾",
   "canvas.aspect_custom": "مخصص…",
-  "canvas.aspect_lock": "حافظ على النسبة"
+  "canvas.aspect_lock": "حافظ على النسبة",
+  "fs.project_rename": "إعادة تسمية المشروع",
+  "fs.project_dup": "تكرار المشروع",
+  "fs.project_del": "حذف المشروع",
+  "fs.project_del_confirm": "حذف المشروع «{n}»؟ لا يمكن التراجع."
 }
