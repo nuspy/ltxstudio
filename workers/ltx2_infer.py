@@ -453,6 +453,27 @@ def run_t2a(p: dict) -> str:
     return out
 
 
+def _ensure_stereo(audio_path: str) -> str:
+    """L'audio VAE LTX-2 richiede 2 canali (conv_in groups=1, 2ch). Le registrazioni voce sono spesso
+    MONO → conv2d fallisce ('expected 2 channels, got 1'). Convertiamo a stereo via ffmpeg se serve;
+    ritorna il path (eventualmente convertito in temp). Idempotente: se già stereo, ritorna l'originale."""
+    import subprocess
+    import tempfile
+    try:
+        probe = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0",
+                                "-show_entries", "stream=channels", "-of", "csv=p=0", audio_path],
+                               capture_output=True, text=True, timeout=30)
+        ch = (probe.stdout or "").strip()
+        if ch == "2":
+            return audio_path
+    except Exception:                                          # noqa: BLE001
+        pass                                                  # in dubbio: forziamo la conversione sotto
+    out = os.path.join(tempfile.gettempdir(), "ltx_a2v_stereo.wav")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", audio_path, "-ac", "2", out],
+                   capture_output=True, timeout=120)
+    return out if os.path.exists(out) else audio_path
+
+
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
@@ -555,7 +576,7 @@ def run_generation(p: dict) -> str:
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 30)),
-            video_guider_params=vg, images=imgs, audio_path=p["audio_path"],
+            video_guider_params=vg, images=imgs, audio_path=_ensure_stereo(p["audio_path"]),
             audio_start_time=float(p.get("audio_start_time", 0.0)),
             audio_max_duration=p.get("audio_max_duration"),
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
