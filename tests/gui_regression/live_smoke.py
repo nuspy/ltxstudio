@@ -92,8 +92,12 @@ def main() -> int:
         f = w.frame1_tab
         f.prompt.setPlainText("a photorealistic red apple on a wooden table, studio light")
         # FLUX.2 Dev ORA nativo (block-swap) → incluso; solo Klein/miraclein è escluso (manca Qwen3-8B).
+        # LIVE_SKIP=substr1,substr2 → salta i modelli il cui nome contiene una di quelle sottostringhe
+        # (utile per non ri-eseguire i modelli già validati in una sessione lunga).
+        _skip = [s.strip().lower() for s in os.environ.get("LIVE_SKIP", "").split(",") if s.strip()]
         allm = [(i, t) for i, t in _concrete_image_models(f.gen_model)
-                if "klein" not in t.lower() and "miraclein" not in t.lower()]
+                if "klein" not in t.lower() and "miraclein" not in t.lower()
+                and not any(s in t.lower() for s in _skip)]
         f2 = [(i, t) for i, t in allm if "flux_2" in t.lower() or "flux2" in t.lower()]
         rest = [(i, t) for i, t in allm if (i, t) not in f2]
         models = (rest[:max(0, limit - len(f2))] + f2)[:limit] if limit < 999 else allm
@@ -116,6 +120,45 @@ def main() -> int:
                 results.append((txt, "OK", f"{Path(fpath).name} ({mb:.2f}MB)", dt))
             else:
                 results.append((txt, "TIMEOUT", "nessun file in 240s", dt))
+            print(f"[{results[-1][1]}] {txt} → {results[-1][2]} ({results[-1][3]:.0f}s)", flush=True)
+
+    elif kind == "video":
+        # t2v nativo (LTX-2.3), corto e a bassa risoluzione → VRAM-safe e veloce, 1 modello alla volta.
+        vt = w.video_tab
+        vt.prompt.setPlainText("a calm ocean wave rolling onto a sandy beach, sunny day")
+        vt.length.setValue(2.0)                              # 2 secondi
+        try:
+            vt.res_preset.setCurrentText("Personalizzato")
+            vt.width.setValue(512); vt.height.setValue(320)
+        except Exception:                                    # noqa: BLE001
+            pass
+        # modelli concreti (no 'auto'); preferisci distilled/fp8 (più veloci) in testa
+        cand = []
+        for i in range(vt.model.count()):
+            d = vt.model.itemData(i) or {}; t = vt.model.itemText(i)
+            if d.get("kind") and d.get("kind") != "auto":
+                cand.append((i, t))
+        _skip = [s.strip().lower() for s in os.environ.get("LIVE_SKIP", "").split(",") if s.strip()]
+        cand = [(i, t) for i, t in cand if not any(s in t.lower() for s in _skip)]
+        cand.sort(key=lambda it: (0 if ("distill" in it[1].lower() and "fp8" in it[1].lower())
+                                  else 1 if "fp8" in it[1].lower() else 2))
+        models = cand[:limit] if limit < 999 else cand
+        for idx, txt in models:
+            vt.model.setCurrentIndex(idx)
+            app.processEvents()
+            _free_vram()
+            before = _snapshot(["*.mp4"])
+            t0 = time.time()
+            try:
+                w.on_generate()
+            except Exception as e:                            # noqa: BLE001
+                results.append((txt, "ERR-submit", str(e)[:160], 0)); continue
+            fpath, dt = _wait_new_file(app, ["*.mp4"], before, timeout=900)
+            if fpath:
+                mb = os.path.getsize(fpath) / 1e6
+                results.append((txt, "OK", f"{Path(fpath).name} ({mb:.2f}MB)", dt))
+            else:
+                results.append((txt, "TIMEOUT", "nessun mp4 in 900s", dt))
             print(f"[{results[-1][1]}] {txt} → {results[-1][2]} ({results[-1][3]:.0f}s)", flush=True)
 
     lines = [f"SMOKE LIVE ({kind}) — {sum(1 for r in results if r[1]=='OK')}/{len(results)} OK", ""]

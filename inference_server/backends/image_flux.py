@@ -188,6 +188,45 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
                 text_encoder_2=te2, tokenizer_2=tok2, scheduler=sched)
 
 
+def _normalize_flux_prefix(path: str) -> str:
+    """Normalizza FLUX.1 single-file non standard per from_single_file:
+    - prefisso `model.diffusion_model.` (export SwarmUI) → strip (altrimenti KeyError single_blocks.N);
+    - dtype **fp8 E5M2** (es. fuxCapacity) → upcast a bf16 (il converter diffusers gestisce E4M3 ma non
+      E5M2 → errore di mappatura chiavi).
+    Scrive UNA VOLTA una copia normalizzata (cache su disco). Ritorna il path normalizzato (o l'originale)."""
+    import os
+    import json
+    import struct
+    try:
+        with open(path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            hdr = json.loads(f.read(n))
+        keys = [k for k in hdr if k != "__metadata__"]
+        has_prefix = bool(keys) and all(k.startswith("model.diffusion_model.") for k in keys)
+        has_e5m2 = any(hdr[k].get("dtype") == "F8_E5M2" for k in keys)
+        if not has_prefix and not has_e5m2:
+            return path                                       # già standard → niente da fare
+    except Exception:                                         # noqa: BLE001
+        return path
+    cache = path + ".normalized.safetensors"
+    if os.path.isfile(cache) and os.path.getsize(cache) > 1024:
+        return cache
+    import torch
+    from safetensors.torch import load_file, save_file
+    sd = load_file(path)
+    pref = "model.diffusion_model."
+    out = {}
+    for k, v in sd.items():
+        nk = k[len(pref):] if k.startswith(pref) else k
+        out[nk] = v.to(torch.bfloat16) if v.dtype == torch.float8_e5m2 else v
+    tmp = cache + ".tmp"
+    save_file(out, tmp)
+    os.replace(tmp, cache)
+    import logging
+    logging.info("[flux] normalizzato (prefix=%s, e5m2=%s) → %s", has_prefix, has_e5m2, os.path.basename(cache))
+    return cache
+
+
 def _assemble_zimage(transformer_path: str):
     """Assembla ZImagePipeline da: transformer LOCALE + VAE FLUX LOCALE + Qwen3 convertito."""
     import os
@@ -363,6 +402,13 @@ def _load(model_path: str, arch: str):
         model_path = ensure_dequantized(model_path)
     except Exception:                                       # noqa: BLE001
         pass
+    # FLUX.1 (flux/kontext/inpaint) in formato BFL/SwarmUI col prefisso model.diffusion_model. →
+    # normalizza (strip prefisso, cache) altrimenti from_single_file fallisce. flux2/Klein gestiscono da sé.
+    if arch in ("flux", "kontext", "inpaint") and Path(model_path).is_file():
+        try:
+            model_path = _normalize_flux_prefix(model_path)
+        except Exception:                                  # noqa: BLE001
+            pass
     cls_name, supports_sf, _ = SPEC[arch]
     Pipe = getattr(diffusers, cls_name, None)
     if Pipe is None:
