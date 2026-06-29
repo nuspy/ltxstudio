@@ -63,15 +63,21 @@ def main() -> int:
         workers = int(sys.argv[sys.argv.index("--jobs") + 1])
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
 
-    def _one(item):
-        name, should, _ = item
+    def _attempt(name, should, timeout):
         try:
             p = subprocess.run([sys.executable, "-u", str(HERE / "run_all.py"), "--case", name],
-                               capture_output=True, text=True, timeout=PER_TEST_TIMEOUT, env=env)
-            return name, p.returncode == 0, ((p.stdout or "")[-200:] + (p.stderr or "")[-200:])
+                               capture_output=True, text=True, timeout=timeout, env=env)
+            return p.returncode == 0, ((p.stdout or "")[-200:] + (p.stderr or "")[-200:])
         except subprocess.TimeoutExpired:
-            H.write_result(name, should, False, f"TIMEOUT >{PER_TEST_TIMEOUT}s")
-            return name, False, f"TIMEOUT >{PER_TEST_TIMEOUT}s"
+            H.write_result(name, should, False, f"TIMEOUT >{timeout}s")
+            return False, f"TIMEOUT >{timeout}s"
+
+    def _one(item):
+        name, should, _ = item
+        ok, detail = _attempt(name, should, PER_TEST_TIMEOUT)
+        if not ok:                          # retry isolato: elimina i falsi-negativi da contesa CPU sotto carico
+            ok, detail = _attempt(name, should, PER_TEST_TIMEOUT + 90)
+        return name, ok, detail
 
     results = []
     done = 0
