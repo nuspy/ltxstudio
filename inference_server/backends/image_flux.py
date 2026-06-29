@@ -441,10 +441,20 @@ def _load(model_path: str, arch: str):
                 raise
     else:
         pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)
-    try:
-        pipe.vae.enable_tiling()
-    except Exception:                                   # noqa: BLE001
-        pass
+    # VAE TILING: il decode a tessere lascia GIUNZIONI RETTANGOLARI visibili ("mosaico di rettangoli"),
+    # particolarmente evidenti su inpaint/editing. Le nostre immagini sono ≤1536 (cap canvas) e il decode
+    # del latente FLUX entra comodamente nei 32GB SENZA tiling → di default DISATTIVATO (niente seam).
+    # Riattivabile per immagini enormi con NATIVE_VAE_TILING=1.
+    if os.environ.get("NATIVE_VAE_TILING") == "1":
+        try:
+            pipe.vae.enable_tiling()
+        except Exception:                               # noqa: BLE001
+            pass
+    else:
+        try:
+            pipe.vae.disable_tiling()
+        except Exception:                               # noqa: BLE001
+            pass
     attn = _set_attention(pipe)
     # FBCache rompe gli arch image-conditioned (Kontext/inpaint): la pipeline non entra nel context
     # manager dell'hook → "No context is set". Lo applichiamo solo ai t2i puri.
