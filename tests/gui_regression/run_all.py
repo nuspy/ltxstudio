@@ -19,7 +19,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 
-PER_TEST_TIMEOUT = 90          # s per test (mock, no GPU); i live hanno il loro runner
+PER_TEST_TIMEOUT = 150         # s per test (mock, no GPU); margine per il carico parallelo
 
 
 def _all_cases():

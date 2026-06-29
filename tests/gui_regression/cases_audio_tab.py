@@ -143,12 +143,13 @@ def case_mode_switch_no_crash(w, spy):
     aggiornare la visibilità del box file (solo in 'utente')."""
     _stub_voice_lists()
     t = w.audio_tab
+    w.tabs.setCurrentWidget(w.audio_tab)        # i widget di un tab NON attivo non sono "visible"
     for rb in (t.rb_native, t.rb_user, t.rb_clone, t.rb_mute):
         rb.setChecked(True); t._on_mode()
     # ultima = mute → file_box nascosto
-    assert t.file_box.isVisible() is False
+    assert t.file_box.isVisibleTo(t) is False
     t.rb_user.setChecked(True); t._on_mode()
-    assert t.file_box.isVisible() is True, "in modalità utente il box file deve essere visibile"
+    assert t.file_box.isVisibleTo(t) is True, "in modalità utente il box file deve essere visibile"
 
 
 def case_engine_change_reloads_voices(w, spy):
@@ -332,10 +333,11 @@ def case_install_button_visibility(w, spy):
     """Il bottone Install è nascosto per 'edge' e visibile per i motori che richiedono nodi."""
     _stub_voice_lists()
     t = w.audio_tab
+    w.tabs.setCurrentWidget(w.audio_tab)
     _select_engine(t, "edge"); t._update_install_button()
-    assert t.tts_install_btn.isVisible() is False, "Install non deve comparire per edge"
+    assert t.tts_install_btn.isVisibleTo(t) is False, "Install non deve comparire per edge"
     _select_engine(t, "cosyvoice2"); t._update_install_button()
-    assert t.tts_install_btn.isVisible() is True, "Install deve comparire per cosyvoice2"
+    assert t.tts_install_btn.isVisibleTo(t) is True, "Install deve comparire per cosyvoice2"
 
 
 def case_install_engine_no_crash(w, spy):
