@@ -228,15 +228,29 @@ class RestoreTab(QWidget):
             self.upscale_model.setCurrentIndex(idx)
 
     def set_flux2_models(self, models: list[str]):
-        """Popola il combo modelli FLUX.2 per colorizzazione."""
+        """Popola il combo modelli FLUX.2 per colorizzazione + COLORI VRAM (verde/giallo/rosso),
+        precisione/footprint letti dall'header del file (detector)."""
+        from PySide6.QtGui import QColor
+        from PySide6.QtCore import Qt as _Qt
+        from core import model_precision as mp
         prev = self.flux2_model.currentText()
         self.flux2_model.clear()
         flux2 = [m for m in models if "flux2" in m.lower() or "flux_2" in m.lower() or "flux 2" in m.lower()]
         if not flux2:
             self.flux2_model.addItem(tr("res.color.no_model"))
         else:
+            free = mp.gpu_free_gb()
+            root = Path(r"E:\AI\Models\diffusion_models")
             for m in flux2:
                 self.flux2_model.addItem(m)
+                i = self.flux2_model.count() - 1
+                fp = m if Path(m).is_file() else str(root / m)
+                info = mp.classify(m, free, file_path=fp)
+                col = mp.QT_COLORS.get(info["color"])
+                if col:
+                    self.flux2_model.setItemData(i, QColor(col), _Qt.ForegroundRole)
+                    self.flux2_model.setItemData(
+                        i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB", _Qt.ToolTipRole)
         idx = self.flux2_model.findText(prev)
         if idx >= 0:
             self.flux2_model.setCurrentIndex(idx)

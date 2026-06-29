@@ -43,8 +43,20 @@ def file_gb(path: str) -> float:
         return 0.0
 
 
-def _overhead_gb(name: str) -> float:
-    """Overhead tipico (text-encoder + VAE + working set) oltre ai pesi del transformer, in GB."""
+# overhead per FAMIGLIA rilevata dall'header (più affidabile del nome)
+_OVERHEAD_FAMILY = {
+    "ltxv": 14.0, "wan21": 14.0, "wan22": 14.0, "hunyuan_video": 14.0,   # Gemma/T5 video + VAE video
+    "zimage": 4.0,                                                       # encoder piccolo
+    "flux1": 11.0, "flux2": 11.0, "ernie": 11.0, "qwen_image": 11.0,     # T5/CLIP/Mistral/Qwen + VAE
+    "sd15": 3.0, "sdxl": 4.0, "sd3": 6.0,
+}
+
+
+def _overhead_gb(name: str, family: str | None = None) -> float:
+    """Overhead tipico (text-encoder + VAE + working set) oltre ai pesi del transformer, in GB.
+    Preferisce la FAMIGLIA rilevata dall'header; ricade sull'euristica per nome."""
+    if family and family in _OVERHEAD_FAMILY:
+        return _OVERHEAD_FAMILY[family]
     n = (name or "").lower()
     if "ltx" in n or "wan" in n or "hunyuan" in n:
         return 14.0                                          # Gemma/T5 video + VAE video + working
@@ -55,27 +67,50 @@ def _overhead_gb(name: str) -> float:
     return 9.0
 
 
+def _detect(file_path: str) -> dict:
+    """Detection header cache-aware (precisione+famiglia dall'header). Vuoto se non disponibile."""
+    try:
+        from core import model_detect
+        return model_detect.get(file_path) or {}
+    except Exception:                                        # noqa: BLE001
+        return {}
+
+
 # stima pesi quando il file non è locale (per precisione, su un 12B di riferimento)
 _EST_WEIGHTS_GB = {"fp16": 24.0, "fp8": 12.0, "fp4": 7.0, "gguf": 10.0}
 
 
 def classify(name_or_path: str, free_vram_gb: float, *, file_path: str | None = None) -> dict:
-    """Ritorna {color, footprint_gb, weights_gb, precision}.
-    color ∈ {"green","yellow","red",""}. "" = VRAM ignota (nessuna colorazione)."""
+    """Ritorna {color, footprint_gb, weights_gb, precision, family}.
+    color ∈ {"green","yellow","red",""}. "" = VRAM ignota (nessuna colorazione).
+    Precisione e famiglia sono lette dall'HEADER del file (detector) quando disponibile —
+    più affidabili del nome (es. 'FP8' nel nome che nasconde pesi bf16); fallback al nome."""
     name = os.path.basename(name_or_path or "")
-    prec = detect_precision(name)
     fp = file_path or name_or_path
+    prec = None
+    family = None
+    if fp and os.path.isfile(fp):
+        det = _detect(fp)
+        p = det.get("precision")
+        if p and p != "unknown":
+            prec = p
+        f = det.get("family")
+        if f and f != "unknown":
+            family = f
+    if not prec:
+        prec = detect_precision(name)
     w = file_gb(fp) if (fp and os.path.isfile(fp)) else _EST_WEIGHTS_GB.get(prec, 24.0)
-    footprint = w + _overhead_gb(name)
+    footprint = w + _overhead_gb(name, family)
+    base = {"footprint_gb": round(footprint, 1), "weights_gb": round(w, 1), "precision": prec, "family": family}
     if not free_vram_gb or free_vram_gb <= 0:
-        return {"color": "", "footprint_gb": round(footprint, 1), "weights_gb": round(w, 1), "precision": prec}
+        return {"color": "", **base}
     if footprint <= free_vram_gb * 0.92:
         color = "green"
     elif w <= free_vram_gb * 0.92:                           # il transformer entra → offload TE/VAE ok
         color = "yellow"
     else:
         color = "red"
-    return {"color": color, "footprint_gb": round(footprint, 1), "weights_gb": round(w, 1), "precision": prec}
+    return {"color": color, **base}
 
 
 def gpu_free_gb() -> float:
