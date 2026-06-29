@@ -15,6 +15,15 @@ SAM2_DIR = os.path.join(SEG_DIR, "sam2-hiera-large")
 VRAM_MB = 4000
 
 
+def _mask_to_2d(masks):
+    """SAM2 può restituire maschere con ndim variabile (H,W / 1,H,W / N,H,W / 1,1,H,W).
+    Riduce a una maschera 2D uint8*255 (OR su tutte le dim guida) → niente errori PIL 'cannot handle'."""
+    arr = masks > 0
+    while arr.ndim > 2:
+        arr = arr.any(0)
+    return arr.numpy().astype("uint8") * 255
+
+
 def _load(_model: str = "", _arch: str = "segment"):
     import torch
     from transformers import AutoProcessor, GroundingDinoForObjectDetection
@@ -54,8 +63,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
             with torch.no_grad():
                 sout = smodel(**sin)
             masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
-            m_np = (masks.sum(0) > 0).numpy().astype("uint8") * 255 if masks.ndim == 3 \
-                else (masks[0] > 0).numpy().astype("uint8") * 255
+            m_np = _mask_to_2d(masks)
         else:
             m_np = np.zeros((img.height, img.width), dtype="uint8")
             x0, y0, x1, y1 = (int(v) for v in box)
@@ -73,9 +81,15 @@ def run(params: dict, mm, output_dir: str) -> dict:
     gin = gproc(images=img, text=text, return_tensors="pt").to(dev)
     with torch.no_grad():
         gout = gmodel(**gin)
-    res = gproc.post_process_grounded_object_detection(
-        gout, gin["input_ids"], box_threshold=thr, text_threshold=0.25,
-        target_sizes=[img.size[::-1]])[0]
+    # transformers recenti hanno rinominato box_threshold→threshold in post_process_grounded_object_detection
+    try:
+        res = gproc.post_process_grounded_object_detection(
+            gout, gin["input_ids"], threshold=thr, text_threshold=0.25,
+            target_sizes=[img.size[::-1]])[0]
+    except TypeError:
+        res = gproc.post_process_grounded_object_detection(
+            gout, gin["input_ids"], box_threshold=thr, text_threshold=0.25,
+            target_sizes=[img.size[::-1]])[0]
     boxes = res["boxes"].cpu().tolist()
     if not boxes:
         return {"status": "error", "error": f"nessun oggetto '{text}' trovato (soglia {thr})"}
@@ -85,8 +99,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         with torch.no_grad():
             sout = smodel(**sin)
         masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
-        m_np = (masks.sum(0) > 0).numpy().astype("uint8") * 255 if masks.ndim == 3 \
-            else (masks[0] > 0).numpy().astype("uint8") * 255
+        m_np = _mask_to_2d(masks)
     else:                                                  # fallback: maschera dai box
         m_np = np.zeros((img.height, img.width), dtype="uint8")
         for x0, y0, x1, y1 in boxes:
