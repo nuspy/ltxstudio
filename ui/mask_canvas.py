@@ -620,6 +620,13 @@ class MaskCanvas(QWidget):
         pix = QPixmap(path)
         if pix.isNull():
             return
+        # Il canvas adotta le PROPORZIONI/dimensioni della foto (cap lato lungo 1536, multipli di 16),
+        # così inpaint/outpaint lavorano sulla foto REALE — niente letterbox né distorsione a quadrato.
+        pw, ph = max(1, pix.width()), max(1, pix.height())
+        _sc = min(1.0, 1536.0 / max(pw, ph))
+        tw = max(256, int(round(pw * _sc / 16)) * 16)
+        th = max(256, int(round(ph * _sc / 16)) * 16)
+        self.set_aspect(tw, th)
         self._active = 0; self._rebuild_layer_list()   # la nuova foto è la BASE
         self._image_path = path
         self.img_item.setPixmap(pix)
