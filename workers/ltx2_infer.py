@@ -191,6 +191,38 @@ def _patch_block_offload():
 _patch_block_offload()
 
 
+def _patch_sage_attention():
+    """ACCELERAZIONE: instrada l'attention di ltx-core (SDPAAttention chiama
+    F.scaled_dot_product_attention) su **SageAttention** (attention quantizzata fp8, come ComfyUI) →
+    forward del transformer molto più veloce (taglia i ~90s/step del 22B). Fallback sicuro alla SDPA
+    originale per i casi non supportati (mask presente, head_dim≠64/128, dtype non half). Env LTX_SAGE=0 disattiva."""
+    if os.environ.get("LTX_SAGE", "1") != "1":
+        return
+    try:
+        import torch
+        import torch.nn.functional as F
+        from sageattention import sageattn
+        _orig_sdpa = F.scaled_dot_product_attention
+
+        def _sdpa_sage(q, k, v, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None, **kw):
+            try:
+                if (attn_mask is None and dropout_p == 0.0 and q.dtype in (torch.float16, torch.bfloat16)
+                        and q.dim() == 4 and q.shape[-1] in (64, 128)):
+                    return sageattn(q, k, v, tensor_layout="HND", is_causal=is_causal, sm_scale=scale)
+            except Exception:                                # noqa: BLE001 — qualunque incompatibilità → SDPA
+                pass
+            return _orig_sdpa(q, k, v, attn_mask=attn_mask, dropout_p=dropout_p, is_causal=is_causal,
+                              scale=scale, **kw)
+
+        F.scaled_dot_product_attention = _sdpa_sage
+        print("[sage] SageAttention attiva (SDPA→sageattn, fp8) — fallback SDPA per mask/shape non supportate", flush=True)
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[sage] non attivata: {_e}", flush=True)
+
+
+_patch_sage_attention()
+
+
 def _patch_fe_diag():
     """DIAGNOSTICO: logga la shape degli hidden-states concatenati nel feature_extractor."""
     if os.environ.get("LTX_FE_DIAG") != "1":
