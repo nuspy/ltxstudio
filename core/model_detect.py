@@ -340,14 +340,29 @@ def components_for_path(path: str) -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 # cache su file
 # ──────────────────────────────────────────────────────────────────────────────
+# Memoizzazione IN-MEMORY della cache (loading veloce dei dropdown): il file viene letto da disco
+# UNA volta e riusato; si ricarica solo se il file su disco cambia (mtime). Senza, ogni get() per
+# ogni voce di ogni dropdown rileggeva+parsava l'intero JSON → lentezza al refresh.
+_MEM = {"cache": None, "mtime": None}
+
+
 def _load_cache() -> dict:
+    try:
+        mt = CACHE_PATH.stat().st_mtime_ns if CACHE_PATH.exists() else None
+    except OSError:
+        mt = None
+    if _MEM["cache"] is not None and _MEM["mtime"] == mt:
+        return _MEM["cache"]                              # in-memory valido → niente disco
+    cache = {}
     try:
         if CACHE_PATH.exists():
             d = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
-            return d if isinstance(d, dict) else {}
+            cache = d if isinstance(d, dict) else {}
     except Exception:                                     # noqa: BLE001
-        pass
-    return {}
+        cache = {}
+    _MEM["cache"] = cache
+    _MEM["mtime"] = mt
+    return cache
 
 
 def _save_cache(cache: dict) -> None:
@@ -356,6 +371,12 @@ def _save_cache(cache: dict) -> None:
         tmp = CACHE_PATH.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(cache, indent=1, ensure_ascii=False), encoding="utf-8")
         os.replace(tmp, CACHE_PATH)
+        # aggiorna lo stato in-memory (cache + mtime) → i get() successivi non rileggono il disco
+        _MEM["cache"] = cache
+        try:
+            _MEM["mtime"] = CACHE_PATH.stat().st_mtime_ns
+        except OSError:
+            _MEM["mtime"] = None
     except Exception:                                     # noqa: BLE001
         pass
 

@@ -272,6 +272,20 @@ class VideoTab(QWidget):
         self._refilter_models()      # riselezione istantanea modelli utilizzabili
         self.lora.refresh()          # re-filtro LoRA per NSFW
 
+    def _resolve_model_path(self, name: str) -> str | None:
+        """Risolve il nome relativo del modello video al path assoluto (per la detection header)."""
+        import os
+        if not name:
+            return None
+        if os.path.isfile(name):
+            return name
+        for root in (r"E:\AI\Models\diffusion_models", r"E:\AI\Models\Checkpoints",
+                     r"E:\AI\Models\checkpoints"):
+            p = os.path.join(root, name)
+            if os.path.isfile(p):
+                return p
+        return None
+
     def _refilter_models(self):
         nsfw = self.nsfw.currentText() == "NSFW"
         cur_data = self.model.currentData() or {}
@@ -288,7 +302,7 @@ class VideoTab(QWidget):
         def add(label: str, kind: str, model: str, is_nsfw: bool, enabled: bool = True):
             if (not nsfw) and is_nsfw:
                 return
-            _info = _mp.classify(model, _free_gb)
+            _info = _mp.classify(model, _free_gb, file_path=self._resolve_model_path(model))
             if _pf and _pf != "all" and _info["precision"] != _pf:
                 return                                       # filtrato per precisione scelta
             badge = "🔞 " if is_nsfw else ""
@@ -466,6 +480,41 @@ class VideoTab(QWidget):
         self.sampler_seed.set_suggested_cfg(1.0, note or tr("vid.suggested.cfg"))
         self.sampler_seed.set_suggested_sampler("euler_ancestral_cfg_pp")
         self.sampler_seed.set_suggested_scheduler("karras")
+        # AUTO-COMPONENTI per arch video: rileva la famiglia dall'header → filtra le LoRA per arch
+        # (LTX/Wan/Hunyuan) e imposta l'encoder associato. Come per le immagini, l'utente può cambiare.
+        self._sync_video_arch(model)
+
+    # mappa famiglia rilevata → (arch LoRA, encoder consigliato per la voce 'auto')
+    _VID_FAMILY = {
+        "ltxv": ("LTX", "Gemma/T5 (LTX-2)"),
+        "wan21": ("Wan", "umt5-xxl"), "wan22": ("Wan", "umt5-xxl"),
+        "hunyuan_video": ("Hunyuan", "llava/llama (HunyuanVideo)"),
+    }
+
+    def _sync_video_arch(self, model: str):
+        """Rileva l'architettura del modello video (detector header) e adatta LoRA + encoder."""
+        fp = self._resolve_model_path(model)
+        if not fp:
+            return
+        try:
+            from core import model_detect
+            det = model_detect.components_for_path(fp)
+        except Exception:                                   # noqa: BLE001
+            return
+        fam = det.get("family")
+        arch, enc = self._VID_FAMILY.get(fam, (None, None))
+        if arch and hasattr(self, "lora"):
+            try:
+                if getattr(self.lora, "_arch_label", None) != arch:
+                    self.lora.set_arch(arch)                 # filtra le LoRA per l'arch del modello
+            except Exception:                               # noqa: BLE001
+                pass
+        # encoder associato: se il selettore encoder ha la voce 'auto', annota cosa userà
+        if enc and hasattr(self, "sampler_seed") and hasattr(self.sampler_seed, "set_encoder_hint"):
+            try:
+                self.sampler_seed.set_encoder_hint(enc)
+            except Exception:                               # noqa: BLE001
+                pass
 
     def set_model_inventory(self, diffusion_models: list[str] | None = None,
                             checkpoint_models: list[str] | None = None,
