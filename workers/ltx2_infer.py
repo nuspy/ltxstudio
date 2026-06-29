@@ -360,9 +360,10 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         # → 'none' E si usa il fp8 (NON il GGUF, che con none verrebbe dequantizzato a bf16 ~44GB e
         # sborzerebbe in shared-RAM = glaciale). Se non entra → 'cpu' (+ GGUF Q4 bounded per-blocco).
         msz = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
-        # working set REALE per clip piccoli/medi ~4-5GB (latent LTX compresso 8× temporale + Gemma/VAE
-        # caricati a richiesta). +5 → il fp8 nativo 25GB entra nei 32GB; clip enormi ricadono su 'cpu'.
-        need = msz + 5.0
+        # working set REALE = attivazioni + VAE decode + workspace Sage ~7-10GB (misurato: il 22B fp8 25GB
+        # 'none' sborza in shared-RAM su 32GB). need=size+10 → il 22B su 32GB cade su 'cpu' (block-streaming
+        # bounded ~14GB col GGUF Q4, niente spill), mentre su GPU con più VRAM (40/48GB) usa 'none' (veloce).
+        need = msz + 10.0
         mode = "none" if free_gb >= need else "cpu"
         print(f"[auto-offload] free={free_gb:.0f}GB ckpt_fp8={msz:.0f}GB need~{need:.0f}GB → {mode}", flush=True)
         return mode
