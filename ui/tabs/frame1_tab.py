@@ -349,7 +349,9 @@ class Frame1Tab(QWidget):
         if arch_lbl == "FLUX":
             for m in (self._models or []):
                 ml = m.lower()
-                if "fill" in ml or "kontext" in ml:
+                # Escludi i NON-generativi: Fill (inpaint), Kontext (editing) e Redux (adattatore di
+                # image-variation, 4 chiavi: non è un modello t2i → in gen crasha "list index out of range").
+                if "fill" in ml or "kontext" in ml or "redux" in ml:
                     continue
                 if any(k in ml for k in kws):
                     if not allow and self._mcat.is_nsfw(m):
@@ -358,7 +360,7 @@ class Frame1Tab(QWidget):
             # Checkpoint Flux (lista dinamica dall'inventario ComfyUI)
             for c in (getattr(self, "_gen_checkpoint_models", []) or []):
                 cl = c.lower()
-                if "kontext" in cl or _is_flux2(c):
+                if "kontext" in cl or "redux" in cl or _is_flux2(c):
                     continue
                 if any(k in cl for k in kws):
                     if not allow and self._mcat.is_nsfw(c):

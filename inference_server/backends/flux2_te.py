@@ -120,11 +120,16 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
         te = Mistral3Model(Mistral3Config(**cfg))
     mods = dict(te.named_modules())
 
-    def _target(k: str) -> str | None:
-        if k in mods:
+    def _target(k: str, valid) -> str | None:
+        """Risolve la chiave del checkpoint sul nome valido del modello (modulo O parametro), col remap
+        Mistral3 ``model.`` → ``language_model.`` (come Ernie). `valid` è l'insieme dei nomi ammessi:
+        per i layer quantizzati = nomi di MODULO; per i pesi plain (embed/norm) = nomi di PARAMETRO/BUFFER.
+        BUG storico: si usava sempre l'insieme dei moduli → i pesi plain (es. embed_tokens.weight) non
+        risolvevano mai (sono parametri, non moduli) → restavano a zero → embedding nulli → RUMORE."""
+        if k in valid:
             return k
         rk = ("language_model." + k[6:]) if k.startswith("model.") else k   # remap come Ernie
-        return rk if rk in mods else None
+        return rk if rk in valid else None
 
     with safe_open(te_file, framework="pt") as h:
         keys = set(h.keys())
@@ -132,7 +137,7 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
         # 1) sostituisci i Linear quantizzati con Nvfp4Linear/Fp8Linear
         fmt_of: dict[str, str] = {}
         for base in qbases:
-            mod_name = _target(base)
+            mod_name = _target(base, mods)
             old = mods.get(mod_name) if mod_name else None
             if not isinstance(old, torch.nn.Linear):
                 continue
@@ -151,7 +156,7 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
                 continue
             base = k[:-len(".weight")] if k.endswith(".weight") else None
             if base and base in qbases:
-                mod_name = _target(base)
+                mod_name = _target(base, mods)
                 m = mods.get(mod_name) if mod_name else None
                 if isinstance(m, Nvfp4Linear):
                     m.packed = h.get_tensor(base + ".weight")
@@ -164,9 +169,10 @@ def load_flux2_text_encoder(config_dir: str, te_file: str = FLUX2_TE_FILE):
                                                 value=h.get_tensor(base + ".weight_scale").float())
                     assigned += 1
                 continue
-            name = _target(k)                              # plain (embed/norm) → bf16
+            name = _target(k, params)                      # plain (embed/norm) → bf16 (risolve sui PARAMETRI)
             if name and name in params:
-                set_module_tensor_to_device(te, name, "cpu", value=h.get_tensor(k).to(torch.bfloat16))
+                set_module_tensor_to_device(te, name, "cpu", value=h.get_tensor(k).to(torch.bfloat16),
+                                            dtype=torch.bfloat16)   # dtype esplicito (vedi flux2_transformer)
                 assigned += 1
     # Il checkpoint TE FLUX.2 contiene SOLO il language_model: il vision_tower del Mistral3 (multimodale)
     # resta su meta e non serve per l'encoding del testo. Lo materializzo a zero (inerte) per consentire

@@ -166,7 +166,11 @@ def load_flux2_transformer(ckpt_path: str, config_dir: str):
                     set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())       # resta fp8
                     set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu", value=scale)
                 else:
-                    set_module_tensor_to_device(tr, nk, "cpu", value=t.to(torch.bfloat16))
+                    # dtype=bf16 ESPLICITO: senza, set_module_tensor_to_device ri-casta il valore al dtype
+                    # del modulo (float32 da from_config) → tutti i Linear plain restavano float32 e il
+                    # forward esplodeva "mat1 and mat2 dtype BFloat16 != float" su context_embedder.
+                    set_module_tensor_to_device(tr, nk, "cpu", value=t.to(torch.bfloat16),
+                                                dtype=torch.bfloat16)
                 assigned += 1
     import logging
     logging.info("[flux2_transformer] fp8-forward: %d Fp8Linear, %d tensori assegnati", len(fp8_modules), assigned)

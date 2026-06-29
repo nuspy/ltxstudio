@@ -77,6 +77,34 @@ def _place(pipe, vram_mb: int) -> str:
     return "offload"
 
 
+def _place_flux2_blockswap(pipe) -> str:
+    """Placement memory-bounded per FLUX.2 (~32B): block-swap manuale (no accelerate, che segfaulta coi
+    buffer float8). I Linear quantizzati (Fp8Linear/Nvfp4Linear) tengono i pesi su CPU e li spostano su
+    GPU 1 layer alla volta nel forward; i moduli leggeri restano su GPU. VAE intero su GPU (piccolo).
+    Forza pipe._execution_device='cuda' perché coi pesi fp8 su CPU il device della pipe sarebbe ambiguo."""
+    import torch
+    from inference_server.backends.flux2_transformer import enable_blockswap
+    dev = torch.device("cuda")
+    enable_blockswap(pipe.transformer, dev)
+    te = getattr(pipe, "text_encoder", None)
+    if te is not None:
+        try:
+            enable_blockswap(te, dev)
+        except Exception:                                   # noqa: BLE001
+            te.to(dev)
+    try:
+        pipe.vae.to(dev)
+    except Exception:                                       # noqa: BLE001
+        pass
+    # coi pesi fp8 su CPU, DiffusionPipeline.device (→ _execution_device) può risolvere 'cpu' e rompere la
+    # creazione di latenti/embed. Forziamo cuda sulla classe della pipe (l'app esegue FLUX.2 solo su GPU).
+    try:
+        pipe.__class__._execution_device = property(lambda self: dev)
+    except Exception:                                       # noqa: BLE001
+        pass
+    return "blockswap"
+
+
 def _set_attention(pipe) -> str:
     """Backend di attention configurabile con FALLBACK (per la distribuzione su GPU diverse).
     NATIVE_ATTENTION: auto|sage|sage3|sdpa. 'auto' prova Sage e ricade su SDPA (sempre disponibile)."""
@@ -203,7 +231,14 @@ def _assemble_flux2(Pipe, transformer_path: str):
     else:
         from inference_server.backends.flux2_te import load_flux2_text_encoder
         te = load_flux2_text_encoder(te_dir)                          # dequant nvfp4 dal file locale
-    tok = AutoTokenizer.from_pretrained(os.path.join(FLUX2_DIR, "tokenizer"))
+    # FLUX.2 vuole il PROCESSOR (PixtralProcessor), NON un tokenizer puro: Flux2Pipeline.encode_prompt usa
+    # tokenizer.apply_chat_template col formato multimodale + system message. Con AutoTokenizer
+    # (LlamaTokenizerFast) il chat template/i token speciali sono diversi → embedding sbagliati → RUMORE.
+    from transformers import AutoProcessor
+    try:
+        tok = AutoProcessor.from_pretrained(os.path.join(FLUX2_DIR, "tokenizer"))
+    except Exception:                                   # noqa: BLE001
+        tok = AutoTokenizer.from_pretrained(os.path.join(FLUX2_DIR, "tokenizer"))
     try:
         sched = FlowMatchEulerDiscreteScheduler.from_pretrained(os.path.join(FLUX2_DIR, "scheduler"))
     except Exception:                                   # noqa: BLE001
@@ -336,7 +371,31 @@ def _load(model_path: str, arch: str):
         sz_mb = 0
     overhead = 4000 if arch == "zimage" else 11000          # T5/CLIP/Mistral + VAE + working
     est_mb = max(VRAM_MB.get(arch, 16000), int(sz_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
-    where = _place(pipe, est_mb)
+    # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral): NON entra tutto-su-GPU nei 32GB e nemmeno in
+    # enable_model_cpu_offload (offload a livello-modello = transformer intero su GPU). Serve offload
+    # SEQUENZIALE (granularità per-modulo: un layer alla volta su GPU). Memory-bounded e imposta
+    # correttamente pipe._execution_device=cuda. Override: NATIVE_FLUX2_PLACE=offload|sequential.
+    if arch.startswith("flux2"):
+        # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral nvfp4): NON entra tutto-su-GPU nei 32GB.
+        #  - 'blockswap' (DEFAULT): i pesi fp8/nvfp4 restano su CPU, spostati 1 layer alla volta nel forward
+        #    (Fp8Linear/Nvfp4Linear), i moduli leggeri (norm/embed/modulation/bias) stabilmente su GPU.
+        #    Picco VRAM ≈ moduli leggeri + 1 layer pesante → entra nei 32GB ed è veloce (no spill shared-RAM).
+        #  - 'offload'    : enable_model_cpu_offload (su Windows spilla in shared-RAM → praticamente bloccato).
+        #  - 'sequential' : enable_sequential_cpu_offload (Segmentation fault coi buffer float8).
+        # Override: NATIVE_FLUX2_PLACE=blockswap|offload|sequential.
+        mode = (os.environ.get("NATIVE_FLUX2_PLACE") or "blockswap").lower()
+        if mode == "blockswap":
+            where = _place_flux2_blockswap(pipe)
+        elif mode == "sequential":
+            try:
+                pipe.enable_sequential_cpu_offload(); where = "sequential"
+            except Exception as _e:                         # noqa: BLE001
+                print(f"[image] flux2 sequential offload fallito ({_e}) → blockswap", flush=True)
+                where = _place_flux2_blockswap(pipe)
+        else:
+            pipe.enable_model_cpu_offload(); where = "offload"
+    else:
+        where = _place(pipe, est_mb)
     print(f"[image] {arch}: {where} (est {est_mb}MB, file {int(sz_mb)}MB), attention={attn}, fbcache={fb}, compile={comp}", flush=True)
     return pipe, VRAM_MB.get(arch, 16000)
 
