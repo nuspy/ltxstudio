@@ -312,6 +312,32 @@ def _resolve_ckpt(model: str) -> str:
     return ckpt
 
 
+def _auto_offload(p: dict, ckpt: str) -> str:
+    """Sceglie la modalità offload in base alla VRAM LIBERA (perf): se il transformer EFFETTIVO
+    (GGUF Q4 ~14GB se attivo, altrimenti il checkpoint) entra in VRAM col working-set → 'none'
+    (tutto su GPU = VELOCE, niente streaming-da-CPU né sysmem-fallback glaciale); altrimenti 'cpu'.
+    Rispetta un valore esplicito p['offload'] se fornito."""
+    if p.get("offload"):
+        return p["offload"]
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return "cpu"
+        free_gb = torch.cuda.mem_get_info()[0] / 1e9
+        # Decisione sul CHECKPOINT fp8 NATIVO (fp8_scaled_mm = niente upcast a bf16): se entra su GPU
+        # → 'none' E si usa il fp8 (NON il GGUF, che con none verrebbe dequantizzato a bf16 ~44GB e
+        # sborzerebbe in shared-RAM = glaciale). Se non entra → 'cpu' (+ GGUF Q4 bounded per-blocco).
+        msz = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
+        # working set REALE per clip piccoli/medi ~4-5GB (latent LTX compresso 8× temporale + Gemma/VAE
+        # caricati a richiesta). +5 → il fp8 nativo 25GB entra nei 32GB; clip enormi ricadono su 'cpu'.
+        need = msz + 5.0
+        mode = "none" if free_gb >= need else "cpu"
+        print(f"[auto-offload] free={free_gb:.0f}GB ckpt_fp8={msz:.0f}GB need~{need:.0f}GB → {mode}", flush=True)
+        return mode
+    except Exception:                                        # noqa: BLE001
+        return "cpu"
+
+
 def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two", ptype: str = "ti2v"):
     """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco.
     ptype: 'ti2v' (testo/immagine→video) oppure 'a2v' (audio→video, lip-sync/canto)."""
@@ -541,7 +567,12 @@ def run_generation(p: dict) -> str:
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
     else:
         ptype = "a2v" if p.get("audio_path") else "ti2v"      # audio dato → lip-sync/canto NATIVO
-    pipe = _get_pipe(ckpt, qmode, p.get("offload", "cpu"), loras, ptype=ptype)
+    _off = _auto_offload(p, ckpt)
+    if _off == "none":
+        # fp8 nativo su GPU (22GB, fp8_scaled_mm): NON usare il GGUF (dequant→bf16 sborzerebbe in RAM).
+        if p.pop("gguf_transformer", None):
+            print("[auto-offload] none → uso fp8 nativo su GPU (GGUF disattivato per velocità)", flush=True)
+    pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)
     if torch.cuda.is_available():
         print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "

@@ -269,6 +269,37 @@ def _from_folder(path: str):
 # ──────────────────────────────────────────────────────────────────────────────
 # detection di un singolo file
 # ──────────────────────────────────────────────────────────────────────────────
+def _from_config_file(path: str):
+    """Classifica i modelli MULTI-FILE diffusers (shard 0000X-of-0000Y) leggendo config.json /
+    model_index.json nella stessa cartella: un singolo shard ha chiavi parziali e non si riconosce
+    dai tensori. Mappa _class_name/architectures → famiglia. None se nessuna config utile."""
+    d = Path(path).parent
+    blob = ""
+    for fn in ("config.json", "model_index.json", "../model_index.json"):
+        f = d / fn
+        try:
+            if f.exists():
+                blob += " " + f.read_text(encoding="utf-8", errors="ignore").lower()
+        except Exception:                                    # noqa: BLE001
+            pass
+    if not blob:
+        return None
+    # firme per famiglia (sottostringhe in _class_name/architectures/model_type)
+    sig = [
+        ("flux2", ["flux2", "flux.2"]), ("flux1", ["flux"]),
+        ("ltxv", ["ltx"]), ("wan22", ["wan2.2", "wan22"]), ("wan21", ["wan"]),
+        ("hunyuan_video", ["hunyuanvideo", "hunyuan_video"]), ("qwen_image", ["qwenimage", "qwen_image"]),
+        ("hidream", ["hidream"]), ("sd3", ["sd3", "stablediffusion3"]),
+        ("sdxl", ["xlpipeline", "stablediffusionxl"]), ("zimage", ["zimage", "z-image", "lumina"]),
+        ("ernie", ["ernie"]),
+    ]
+    for fam, keys in sig:
+        if any(k in blob for k in keys):
+            kind = "video" if fam in ("ltxv", "wan21", "wan22", "hunyuan_video") else "image"
+            return (fam, "", "unknown", kind)
+    return None
+
+
 def detect_one(path: str) -> dict:
     path = str(path)
     name = Path(path).name
@@ -282,6 +313,9 @@ def detect_one(path: str) -> dict:
     if res is None:
         res = _from_folder(path)
         source = "folder"
+    if res is None:                                          # shard diffusers / file parziale → config cartella
+        res = _from_config_file(path)
+        source = "config" if res else source
     if res is None:
         res = ("unknown", "", "unknown", "unknown")
         source = "none"
