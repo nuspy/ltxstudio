@@ -107,8 +107,9 @@ def main() -> int:
                 w.generate_image()
             except Exception as e:                                # noqa: BLE001
                 results.append((txt, "ERR-submit", str(e)[:120], 0)); continue
-            # FLUX.2 (block-swap ~13s/step) è lento: timeout ampio. Gli altri finiscono molto prima.
-            _to = 600 if ("flux_2" in txt.lower() or "flux2" in txt.lower()) else 240
+            # FLUX.2 Dev (33GB in block-swap su GPU 32GB) ~22s/step ad alta risoluzione → ~12min/immagine.
+            # Timeout ampio per non dare falsi TIMEOUT (l'immagine ESCE, solo lenta). Gli altri finiscono prima.
+            _to = 1200 if ("flux_2" in txt.lower() or "flux2" in txt.lower()) else 240
             fpath, dt = _wait_new_file(app, ["*.png"], before, timeout=_to)
             if fpath:
                 mb = os.path.getsize(fpath) / 1e6
