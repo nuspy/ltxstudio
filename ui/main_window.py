@@ -2011,9 +2011,9 @@ class MainWindow(QMainWindow):
             "width": int(self.video_tab.width.value()),
             "height": int(self.video_tab.height.value()),
             "num_frames": nf, "fps": fps,
-            "steps": int(self.advanced_tab.steps.value()),
-            "guidance": float(self.advanced_tab.cfg.value()),
-            "seed": int(self.advanced_tab.seed.value()),
+            "steps": int(self.video_tab.sampler_seed.steps.value()),
+            "guidance": float(self.video_tab.sampler_seed.cfg.value()),
+            "seed": int(self.video_tab.sampler_seed.seed.value()),
             "offload": "cpu", "loras": loras, "output": out,
         }
         if use_image and self.frame1_tab.image_path:
@@ -2079,8 +2079,8 @@ class MainWindow(QMainWindow):
             "negative": vals.get("prompt_negative", "") or "worst quality, blurry",
             "start_time": float(v2v.get("v2v_start", 0.0)), "end_time": float(v2v.get("v2v_end", 5.0)),
             "regenerate_video": True, "regenerate_audio": bool(v2v.get("v2v_regen_audio", False)),
-            "steps": int(self.advanced_tab.steps.value()), "guidance": float(self.advanced_tab.cfg.value()),
-            "seed": int(self.advanced_tab.seed.value()), "offload": "cpu", "output": out,
+            "steps": int(self.video_tab.sampler_seed.steps.value()), "guidance": float(self.video_tab.sampler_seed.cfg.value()),
+            "seed": int(self.video_tab.sampler_seed.seed.value()), "offload": "cpu", "output": out,
         }
         self._log(f"[nativo] ReTake [{params['start_time']:.1f}–{params['end_time']:.1f}]s su {Path(src).name}…")
         self._ltx2_worker = _NativeLtx2Worker(params)
@@ -2170,8 +2170,8 @@ class MainWindow(QMainWindow):
             "image_path": lastf, "prompt": cfg["prompt"],
             "negative": v.get("prompt_negative", "") or "worst quality, blurry",
             "width": int(v.get("width", 512)), "height": int(v.get("height", 512)),
-            "num_frames": nf, "fps": fps, "steps": int(self.advanced_tab.steps.value()),
-            "guidance": float(self.advanced_tab.cfg.value()), "seed": int(self.advanced_tab.seed.value()),
+            "num_frames": nf, "fps": fps, "steps": int(self.video_tab.sampler_seed.steps.value()),
+            "guidance": float(self.video_tab.sampler_seed.cfg.value()), "seed": int(self.video_tab.sampler_seed.seed.value()),
             "offload": "cpu", "ref_strength": 1.0, "output": cont,
         }
         if nf > 150:
