@@ -531,6 +531,17 @@ def run(params: dict, mm, output_dir: str) -> dict:
         if not img_p or not Path(img_p).exists():
             return {"status": "error", "error": f"'{arch}' richiede 'image_path' valido."}
         kw["image"] = Image.open(img_p).convert("RGB")
+        # PROPORZIONI: senza width/height espliciti, FluxFill/Kontext default a 1024² (quadrato) →
+        # la foto viene distorta. Deriviamo W/H dalle dimensioni REALI dell'immagine (aspect-correct),
+        # multipli di 16 (richiesti da Flux: vae 8 × patch 2), lato lungo cap 1536 per la VRAM.
+        _iw, _ih = kw["image"].size
+        _cap = int(params.get("max_side", 1536))
+        _s = min(1.0, _cap / max(_iw, _ih))
+        _W = max(256, round(_iw * _s / 16) * 16)
+        _H = max(256, round(_ih * _s / 16) * 16)
+        kw["width"], kw["height"] = _W, _H
+        if (_W, _H) != (_iw, _ih):                           # allinea l'immagine alla griglia /16 + cap
+            kw["image"] = kw["image"].resize((_W, _H), Image.LANCZOS)
         if arch in _MASK_ARCHS:
             mk = params.get("mask_path")
             if not mk or not Path(mk).exists():
@@ -544,7 +555,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
                     mk = mask_utils.invert_mask(mk, inv)
                 except Exception as _e:                      # noqa: BLE001
                     print(f"[inpaint] invert_mask fallito ({_e}); uso maschera originale", flush=True)
-            kw["mask_image"] = Image.open(mk).convert("RGB")
+            _mimg = Image.open(mk).convert("RGB")
+            if _mimg.size != (_W, _H):                       # maschera allineata a width/height
+                _mimg = _mimg.resize((_W, _H), Image.NEAREST)
+            kw["mask_image"] = _mimg
     else:
         kw["width"] = int(params.get("width", 1024))
         kw["height"] = int(params.get("height", 1024))

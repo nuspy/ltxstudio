@@ -70,7 +70,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
             m_np[y0:y1, x0:x1] = 255
         os.makedirs(output_dir, exist_ok=True)
         path = str(Path(output_dir) / "native_segmask_region.png")
-        Image.fromarray(m_np).save(path)
+        _mout = Image.fromarray(m_np)
+        if _mout.size != img.size:                           # la maschera DEVE combaciare con la foto
+            _mout = _mout.resize(img.size, Image.NEAREST)
+        _mout.save(path)
         return {"status": "success", "output": [path]}
 
     text = (params.get("text") or "object").strip()
@@ -107,5 +110,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
 
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / "native_segmask.png")
-    Image.fromarray(m_np).save(path)
+    _mout = Image.fromarray(m_np)
+    if _mout.size != img.size:                               # la maschera DEVE combaciare con la foto
+        _mout = _mout.resize(img.size, Image.NEAREST)
+    _mout.save(path)
     return {"status": "success", "output": [path]}

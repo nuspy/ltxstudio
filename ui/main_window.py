@@ -2669,6 +2669,11 @@ class MainWindow(QMainWindow):
                         region_mask: str = "", image_path: str = ""):
         """Segmentazione NATIVA (GroundingDINO+SAM2 via inference_server, handler 'segment'). Zero ComfyUI.
         Per testo: usa il composite locale; per regione: usa image/region mask locali (no upload)."""
+        # PROPORZIONI: per la selezione a TESTO usa la foto SORGENTE reale (alle sue dimensioni native),
+        # non il composite del canvas — così la maschera non viene distorta a quadrato. Fallback al composite.
+        if not image_path and not region_mask:
+            src = getattr(self.frame1_tab.canvas, "_image_path", None)
+            image_path = src if (src and os.path.exists(src)) else ""
         img = image_path or self.frame1_tab.canvas._composite(OUTPUT_DIR)
         params = {"image_path": img}
         if region_mask:
