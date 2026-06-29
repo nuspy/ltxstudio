@@ -80,6 +80,19 @@ def _materialize_meta(model, device):
                                                                 dtype=torch.float32), persistent=False)
             else:
                 mod.register_buffer(bn, torch.zeros(buf.shape, dtype=buf.dtype, device=device), persistent=False)
+        # PARAMETRI su meta: alcuni checkpoint (es. distilled "transformer_only") non contengono i pesi
+        # del feature_extractor audio/video (video_aggregate_embed/audio_aggregate_embed, usati solo per
+        # i2v/a2v) → restano su meta e il forward esplode ("Tensor on device meta"). Li materializziamo a
+        # zero sul device reale: per il t2v sono inutilizzati (contributo nullo), per i2v/a2v verrebbero
+        # comunque sovrascritti dai pesi del checkpoint se presenti.
+        for pn, p in list(getattr(mod, "_parameters", {}).items()):
+            if p is None or not getattr(p, "is_meta", False):
+                continue
+            # dtype di CALCOLO (bf16): un meta-param float32 (default) andrebbe in conflitto col forward
+            # bf16 → "mat1 and mat2 dtype BFloat16 != Float". Se il param era già non-float32 lo rispettiamo.
+            _pd = p.dtype if p.dtype not in (torch.float32, torch.float64) else torch.bfloat16
+            mod._parameters[pn] = torch.nn.Parameter(
+                torch.zeros(p.shape, dtype=_pd, device=device), requires_grad=False)
 
 
 def _apply_blockwise_offload(model, device):
