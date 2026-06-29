@@ -267,9 +267,15 @@ def _load(model_path: str, arch: str):
     # assoluto sotto diffusion_models. Senza, Path.is_file() è False e si cade in from_pretrained che
     # interpreta il nome come repo_id HF ("Repo id must use alphanumeric..."). Tollera spazi↔underscore.
     if not Path(model_path).is_file():
-        base = Path(ERNIE_TRANSFORMER).parent.parent            # ...\diffusion_models
-        for cand in (base / model_path,
-                     (base / model_path).with_name(Path(model_path).name.replace(" ", "_"))):
+        dm = Path(ERNIE_TRANSFORMER).parent.parent              # ...\Models\diffusion_models
+        # cerca in diffusion_models E in Checkpoints (i checkpoint completi stanno lì, es. flux1-schnell-fp8)
+        bases = [dm, dm.parent / "Checkpoints", dm.parent / "checkpoints", dm.parent]
+        _name = Path(model_path).name
+        cands = []
+        for b in bases:
+            cands += [b / model_path, (b / model_path).with_name(_name.replace(" ", "_")),
+                      b / _name, b / "Flux" / _name]
+        for cand in cands:
             if cand.is_file():
                 model_path = str(cand)
                 break

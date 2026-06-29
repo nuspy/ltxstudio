@@ -157,6 +157,11 @@ def _walk(obj, prefix, state, visited, *, save, loaded=None):
     for name, val in items:
         if name.startswith("_"):
             continue
+        # I combo di PRECISIONE (gen_precision/precision/...) NON vanno persistiti: un valore restrittivo
+        # salvato (es. FP8) nasconderebbe i modelli di altra precisione all'avvio senza che l'utente lo
+        # sappia. Restano sempre su "Tutte" all'apertura.
+        if name == "precision" or name.endswith("_precision"):
+            continue
         key = f"{prefix}.{name}" if prefix else name
         # protocollo custom: widget compositi con stato non standard (es. LoraTab → LoRA selezionate
         # + strength). Hanno gui_get_state()/gui_set_state(); non ricorriamo nei loro figli.
