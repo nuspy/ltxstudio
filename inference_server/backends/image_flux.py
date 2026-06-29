@@ -534,7 +534,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
         # PROPORZIONI: senza width/height espliciti, FluxFill/Kontext default a 1024² (quadrato) →
         # la foto viene distorta. Deriviamo W/H dalle dimensioni REALI dell'immagine (aspect-correct),
         # multipli di 16 (richiesti da Flux: vae 8 × patch 2), lato lungo cap 1536 per la VRAM.
-        _iw, _ih = kw["image"].size
+        _orig_wh = kw["image"].size                          # dimensioni ESATTE originali (per il restore finale)
+        _iw, _ih = _orig_wh
         _cap = int(params.get("max_side", 1536))
         _s = min(1.0, _cap / max(_iw, _ih))
         _W = max(256, round(_iw * _s / 16) * 16)
@@ -575,5 +576,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
             pulid_adapter.detach(_pulid_h)
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_{arch}_{params.get('seed', 0)}.png")
-    out.images[0].save(path)
+    res_img = out.images[0]
+    # genero a dimensioni /16 (richiesto da Flux), ma ripristino le dimensioni ESATTE dell'input → output
+    # combacia 1:1 con la foto/bbox (niente disallineamento in load_inpaint_result, aspetto identico).
+    if needs_image and res_img.size != _orig_wh:
+        res_img = res_img.resize(_orig_wh, Image.LANCZOS)
+    res_img.save(path)
     return {"status": "success", "output": [path]}
