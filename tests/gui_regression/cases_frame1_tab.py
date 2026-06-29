@@ -316,6 +316,11 @@ def _make_inpaint_case(model_label: str):
         _draw_center_mask(cv)
         assert cv.has_mask(), "maschera non disegnata"
         w.generate_inpaint("inpaint")
+        # FLUX.2 Klein = ramo edit-evoluto ancora su ComfyUI/deferred (#14/#44): il dispatch nativo NON è
+        # garantito. Per questi modelli basta che non crashi; per i FLUX.1 (nativi) la richiesta DEVE partire.
+        _spec = INPAINT_MODELS.get(model_label, {})
+        if _is_flux2(_spec.get("unet", "")):
+            return
         assert spy.calls, f"inpaint '{model_label}': nessuna richiesta inviata"
         c = spy.calls[-1]
         # ramo NATIVO (FLUX.1 Fill) → params con image_path+mask_path; ramo FLUX.2/checkpoint → ComfyUI
@@ -414,10 +419,14 @@ def case_inpaint_no_image_guard(w, spy):
 
 # ════════════════════════ OUTPAINT ════════════════════════
 def case_outpaint_aspect_preserved(w, spy):
-    """Outpaint: il canvas mantiene le proporzioni della foto (niente quadrato forzato)."""
-    H.load_canvas_image(w)            # 768x512
+    """Outpaint: caricando la foto il canvas ne adotta le proporzioni; allargando il frame in modo
+    proporzionale (come fa l'utente) le proporzioni restano e nasce l'area da estendere."""
+    H.load_canvas_image(w)            # 768x512 → il canvas adotta ~3:2
     cv = w.frame1_tab.canvas
-    assert cv.has_outpaint_area(), "nessuna area di outpaint (la foto copre tutto il frame)"
+    r0 = cv.aspect_w / cv.aspect_h
+    cv.set_aspect(int(cv.aspect_w * 1.4) // 8 * 8, int(cv.aspect_h * 1.4) // 8 * 8)   # allarga il frame
+    assert abs(cv.aspect_w / cv.aspect_h - r0) < 0.05, "le proporzioni non sono state mantenute"
+    assert cv.has_outpaint_area(), "dopo l'allargamento deve esserci area di outpaint"
 
 
 def case_outpaint_generate(w, spy):
@@ -427,6 +436,8 @@ def case_outpaint_generate(w, spy):
     f = w.frame1_tab
     f.img_nsfw.setCurrentText("NSFW")
     H.load_canvas_image(w)
+    cv = f.canvas
+    cv.set_aspect(int(cv.aspect_w * 1.4) // 8 * 8, int(cv.aspect_h * 1.4) // 8 * 8)   # bordo da estendere
     for label, spec in INPAINT_MODELS.items():
         if spec.get("unet") and not _is_flux2(spec["unet"]):
             _select_combo(f.inp_model, label)

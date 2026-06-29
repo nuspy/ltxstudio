@@ -36,8 +36,18 @@ def case_image_generation(w, spy):
 
 # ───────────────────────── IMMAGINE: inpaint ─────────────────────────
 def case_inpaint(w, spy):
-    """Inpaint: serve image+mask; la GUI deve inviare arch inpaint/flux2_inpaint, image_path, mask_path."""
+    """Inpaint: serve image+mask; la GUI deve inviare arch inpaint, image_path, mask_path (FLUX.1 nativo)."""
+    from core import native_driver, backend
+    native_driver.is_up = lambda *a, **k: True            # _start_native_inpaint fa un check HTTP reale
+    backend.set_backend("image", "native")
     H.load_canvas_image(w)
+    # seleziona un modello FLUX.1 Fill (ramo nativo), non FLUX.2 Klein (deferred)
+    from ui.tabs.frame1_tab import INPAINT_MODELS
+    for i in range(w.frame1_tab.inp_model.count()):
+        lbl = w.frame1_tab.inp_model.itemText(i)
+        spec = INPAINT_MODELS.get(lbl, {})
+        if spec.get("unet") and spec.get("arch") == "Flux":
+            w.frame1_tab.inp_model.setCurrentIndex(i); break
     cv = w.frame1_tab.canvas
     # disegna una maschera centrale (riempi un rettangolo nella mask_image)
     from PySide6.QtGui import QPainter, QColor

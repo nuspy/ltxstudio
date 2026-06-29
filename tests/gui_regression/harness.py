@@ -124,7 +124,9 @@ def build_window():
         _mp.gpu_free_gb = lambda: 32.0
     except Exception:                                          # noqa: BLE001
         pass
-    return MainWindow()
+    w = MainWindow()
+    w.show()        # offscreen: necessario perché isVisible()/isVisibleTo() abbiano senso nei test UI
+    return w
 
 
 # ── helper per preparare precondizioni comuni ───────────────────────────────────

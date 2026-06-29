@@ -29,13 +29,15 @@ DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, defo
                "low quality, blurry, watermark, text")
 
 # inpaint/outpaint: etichetta -> {arch (per LoRA), unet (file modello), steps}
+# NB: il DEFAULT (prima voce) deve essere un modello NATIVO funzionante (FLUX.1 Fill), non FLUX.2 Klein
+# (ramo edit-evoluto ancora su ComfyUI/deferred #14/#44): altrimenti inpaint/outpaint non generano di default.
 INPAINT_MODELS = {
-    "FLUX.2 Klein NSFW (Miraclein, edit-evoluto)":
-        {"arch": "Flux2", "unet": "Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors", "steps": 12},
-    "FLUX Fill GGUF NSFW (Hyper-8, RAM bassa)":
-        {"arch": "Flux", "unet": "Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf", "steps": 8},
     "FLUX Fill (inpaint/outpaint, 22GB)":
         {"arch": "Flux", "unet": "Flux\\FLUX_DEV_Fill.safetensors", "steps": 20},
+    "FLUX Fill GGUF NSFW (Hyper-8, RAM bassa)":
+        {"arch": "Flux", "unet": "Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf", "steps": 8},
+    "FLUX.2 Klein NSFW (Miraclein, edit-evoluto)":
+        {"arch": "Flux2", "unet": "Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors", "steps": 12},
     "Nessuno (solo LTX I2V)": {"arch": None, "unet": None, "steps": 0},
 }
 # generazione: arch -> (architettura catalogo LoRA, keyword per filtrare i modelli in diffusion_models)

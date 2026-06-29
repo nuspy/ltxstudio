@@ -52,21 +52,38 @@ def main() -> int:
 
     import harness as H
     import os
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     CASES = _all_cases()
+    only = None
+    if "--filter" in sys.argv:
+        only = sys.argv[sys.argv.index("--filter") + 1]
+        CASES = [c for c in CASES if only in c[0]]
+    workers = 6
+    if "--jobs" in sys.argv:
+        workers = int(sys.argv[sys.argv.index("--jobs") + 1])
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
-    results = []
-    for name, should, _ in CASES:
+
+    def _one(item):
+        name, should, _ = item
         try:
             p = subprocess.run([sys.executable, "-u", str(HERE / "run_all.py"), "--case", name],
                                capture_output=True, text=True, timeout=PER_TEST_TIMEOUT, env=env)
-            ok = p.returncode == 0
-            detail = (p.stdout or "")[-300:] + (p.stderr or "")[-300:]
+            return name, p.returncode == 0, ((p.stdout or "")[-200:] + (p.stderr or "")[-200:])
         except subprocess.TimeoutExpired:
-            ok = False
-            detail = f"TIMEOUT >{PER_TEST_TIMEOUT}s (handler bloccato)"
-            H.write_result(name, should, False, detail)
-        results.append((name, ok))
-        print(f"[{'PASS' if ok else 'FAIL'}] {name}" + ("" if ok else f"  ({detail.splitlines()[-1] if detail.strip() else '?'})"), flush=True)
+            H.write_result(name, should, False, f"TIMEOUT >{PER_TEST_TIMEOUT}s")
+            return name, False, f"TIMEOUT >{PER_TEST_TIMEOUT}s"
+
+    results = []
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(_one, c): c[0] for c in CASES}
+        for fut in as_completed(futs):
+            name, ok, detail = fut.result()
+            done += 1
+            results.append((name, ok))
+            if not ok:
+                print(f"[FAIL {done}/{len(CASES)}] {name}  ({(detail.strip().splitlines() or ['?'])[-1][:90]})", flush=True)
+    results.sort()
 
     n_ok = sum(1 for _, ok in results if ok)
     lines = [f"REGRESSIONE GUI — {n_ok}/{len(results)} PASS", ""]
