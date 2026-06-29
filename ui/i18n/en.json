@@ -1848,5 +1848,6 @@
   "prec.tt": "Filter models by precision; green=optimal, yellow=manageable offload, red=too large.",
   "prec.green": "optimal in VRAM",
   "prec.yellow": "partial offload, manageable",
-  "prec.red": "too large for the GPU"
+  "prec.red": "too large for the GPU",
+  "f1.gen.auto.detected": "Detected architecture: {fam}. 'auto' will pick the matching VAE/encoder (you can override)."
 }

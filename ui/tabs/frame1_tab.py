@@ -155,6 +155,7 @@ class Frame1Tab(QWidget):
         self.gen_model = QComboBox()
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)
         self.gen_model.currentIndexChanged.connect(self._refilter_gen_encoder)
+        self.gen_model.currentIndexChanged.connect(self._update_auto_components)
         gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
         gmrow.addWidget(self.gen_model, 1)
         # filtro precisione (fp16/fp8/fp4/gguf) + colori VRAM (verde/giallo/rosso) sul dropdown modelli
@@ -875,6 +876,13 @@ class Frame1Tab(QWidget):
         rest = [m for m in models if m not in pref]
         for m in pref + rest:
             self.up_model.addItem(m)
+        try:                                                       # colori VRAM (header-aware)
+            from ui.widgets.precision_combo import color_existing
+            from pathlib import Path as _P
+            _r = _P(r"E:\AI\Models\Upscale")
+            color_existing(self.up_model, name_to_path=lambda n: str(_r / n) if not _P(n).is_file() else n)
+        except Exception:                                          # noqa: BLE001
+            pass
 
     def get_upscale_config(self) -> dict:
         m = self.up_model.currentText() if self.up_model.count() else ""
@@ -955,6 +963,51 @@ class Frame1Tab(QWidget):
         idx = self.gen_encoder.findData(cur) if cur else 0
         self.gen_encoder.setCurrentIndex(idx if idx >= 0 else 0)  # se sparito → «auto»
         self.gen_encoder.blockSignals(False)
+
+    def _update_auto_components(self, *_):
+        """Auto-resolve componenti: rilevata l'ARCHITETTURA del modello scelto (detector header), mostra
+        sulle voci 'auto' di VAE/encoder/CLIP la famiglia + il componente consigliato. L'utente può sempre
+        scegliere un altro valore (override). Niente forzature: aggiorna solo l'etichetta/tooltip di 'auto'."""
+        if not hasattr(self, "gen_vae"):
+            return
+        name = self.gen_model.currentText()
+        det = {}
+        if name and "auto" not in name.lower():
+            import os as _os
+            from pathlib import Path as _P
+            from core import model_detect
+            roots = [_P(r"E:\AI\Models\diffusion_models"), _P(r"E:\AI\Models\Checkpoints"),
+                     _P(r"E:\AI\Models\checkpoints")]
+            fp = name if _os.path.isfile(name) else next(
+                (str(r / name) for r in roots if (r / name).is_file()), None)
+            if fp:
+                try:
+                    det = model_detect.components_for_path(fp)
+                except Exception:                            # noqa: BLE001
+                    det = {}
+        fam = det.get("family")
+        # ripristina le etichette base, poi annota se abbiamo una famiglia
+        base_vae = tr("f1.gen.auto_from_model")
+        base_enc = tr("f1.gen.auto_from_model")
+        if fam:
+            vae = det.get("vae") or "auto"
+            tes = det.get("text_encoders") or []
+            te0 = tes[0] if tes else "auto"
+            hint_v = f"{base_vae} — {fam}: {str(vae).replace(chr(92), '/').split('/')[-1]}"
+            hint_e = f"{base_enc} — {fam}: {te0}"
+            tip = tr("f1.gen.auto.detected", "Architettura rilevata: {fam}. 'auto' userà VAE/encoder adatti."
+                     ).format(fam=fam)
+            if self.gen_vae.count():
+                self.gen_vae.setItemText(0, hint_v); self.gen_vae.setItemData(0, tip, Qt.ToolTipRole)
+            if self.gen_encoder.count():
+                self.gen_encoder.setItemText(0, hint_e); self.gen_encoder.setItemData(0, tip, Qt.ToolTipRole)
+            if self.gen_clip_type.count():
+                self.gen_clip_type.setItemData(0, tip, Qt.ToolTipRole)
+        else:
+            if self.gen_vae.count():
+                self.gen_vae.setItemText(0, base_vae)
+            if self.gen_encoder.count():
+                self.gen_encoder.setItemText(0, base_enc)
 
     # Popola dinamicamente il dropdown Inpaint con TUTTI i modelli FLUX disponibili:
     # - checkpoint Flux (CheckpointLoaderSimple → ramo `checkpoint` del pipeline)

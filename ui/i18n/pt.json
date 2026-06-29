@@ -1848,5 +1848,6 @@
   "prec.tt": "Filtra por precisão; verde=ótimo, amarelo=offload gerenciável, vermelho=grande demais.",
   "prec.green": "ótimo na VRAM",
   "prec.yellow": "offload parcial, gerenciável",
-  "prec.red": "grande demais para a GPU"
+  "prec.red": "grande demais para a GPU",
+  "f1.gen.auto.detected": "Arquitetura detectada: {fam}. 'auto' usará o VAE/encoder adequado (pode alterar)."
 }

@@ -123,6 +123,15 @@ class VideoDefTab(QWidget):
     def set_upscale_models(self, names: list[str]):
         self.esrgan_model.clear()
         self.esrgan_model.addItems(names or [tr("def.no_upscale_model")])
+        # colori VRAM (header-aware) — path risolto sotto Models\Upscale
+        try:
+            from ui.widgets.precision_combo import color_existing
+            from pathlib import Path as _P
+            _root = _P(r"E:\AI\Models\Upscale")
+            color_existing(self.esrgan_model,
+                           name_to_path=lambda n: str(_root / n) if not _P(n).is_file() else n)
+        except Exception:                                    # noqa: BLE001
+            pass
 
     def get_config(self) -> dict:
         return {

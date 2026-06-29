@@ -223,6 +223,13 @@ class RestoreTab(QWidget):
         rest = [m for m in models if m not in preferred]
         for m in preferred + rest:
             self.upscale_model.addItem(m)
+        try:                                                       # colori VRAM (header-aware)
+            from ui.widgets.precision_combo import color_existing
+            _r = Path(r"E:\AI\Models\Upscale")
+            color_existing(self.upscale_model,
+                           name_to_path=lambda n: str(_r / n) if not Path(n).is_file() else n)
+        except Exception:                                          # noqa: BLE001
+            pass
         idx = self.upscale_model.findText(prev)
         if idx >= 0:
             self.upscale_model.setCurrentIndex(idx)

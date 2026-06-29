@@ -1848,5 +1848,6 @@
   "prec.tt": "Szűrés precizitás szerint; zöld=optimális, sárga=kezelhető offload, piros=túl nagy.",
   "prec.green": "optimális a VRAM-ban",
   "prec.yellow": "részleges offload, kezelhető",
-  "prec.red": "túl nagy a GPU-hoz"
+  "prec.red": "túl nagy a GPU-hoz",
+  "f1.gen.auto.detected": "Észlelt architektúra: {fam}. Az 'auto' a megfelelő VAE/kódolót választja (módosítható)."
 }

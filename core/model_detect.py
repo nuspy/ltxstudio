@@ -306,9 +306,14 @@ def compatible_components(det: dict) -> dict:
     """VAE / text-encoder / scheduler consigliati per l'architettura rilevata. Usato dalla voce 'auto':
     l'utente sceglie il modello principale e i componenti vengono impostati di conseguenza (override libero)."""
     fam = det.get("family")
+    var = (det.get("variant") or "").lower()
+    if fam == "flux2":
+        # Dev → encoder Mistral-3; Klein (distillato) → encoder Qwen3 (4B/8B secondo la dim testo).
+        if "klein" in var:
+            return {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["qwen3_8b", "qwen3_4b"]}
+        return {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["mistral_3_small_flux2"]}
     M = {
         "flux1":  {"vae": "Flux/ae.safetensors", "text_encoders": ["clip_l", "t5xxl"]},
-        "flux2":  {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["mistral_3_small_flux2"]},
         "zimage": {"vae": "Flux/ae.safetensors", "text_encoders": ["qwen3_4b"]},
         "ernie":  {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["ministral-3-3b"]},
         "sd15":   {"vae": "built-in", "text_encoders": ["clip_l"]},
@@ -318,6 +323,18 @@ def compatible_components(det: dict) -> dict:
         "wan22":  {"vae": "wan_vae", "text_encoders": ["umt5_xxl"]},
     }
     return M.get(fam, {"vae": "auto", "text_encoders": []})
+
+
+def components_for_path(path: str) -> dict:
+    """Convenience GUI: {family, variant, vae, text_encoders} per un file modello (cache-aware).
+    Usato dai dropdown per mostrare/risolvere la voce 'auto' in base all'architettura del modello scelto."""
+    try:
+        det = get(path) or {}
+    except Exception:                                          # noqa: BLE001
+        det = {}
+    comp = compatible_components(det)
+    return {"family": det.get("family"), "variant": det.get("variant"),
+            "vae": comp.get("vae"), "text_encoders": comp.get("text_encoders", [])}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

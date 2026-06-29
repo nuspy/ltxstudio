@@ -60,6 +60,27 @@ def populate(combo: QComboBox, names: list[str], prec_filter: str = "all", *,
     combo.blockSignals(False)
 
 
+def color_existing(combo: QComboBox, *, name_to_path=None, free_gb: float | None = None) -> None:
+    """Colora le voci GIÀ presenti in `combo` (senza svuotarlo) per fattibilità VRAM, leggendo
+    precisione/footprint dall'header del file. Usata dai dropdown popolati altrove (upscale/video).
+    Se non si risolve un path file reale per una voce, NON la colora (evita colori fuorvianti)."""
+    from PySide6.QtCore import Qt
+    if free_gb is None:
+        free_gb = mp.gpu_free_gb()
+    for i in range(combo.count()):
+        name = combo.itemText(i)
+        fp = name_to_path(name) if name_to_path else (name if name else None)
+        import os
+        if not (fp and os.path.isfile(fp)):
+            continue                                          # niente path reale → niente colore
+        info = mp.classify(name, free_gb, file_path=fp)
+        col = mp.QT_COLORS.get(info["color"])
+        if col:
+            combo.setItemData(i, QColor(col), Qt.ForegroundRole)
+            combo.setItemData(i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB "
+                                 f"({_state_label(info['color'])})", Qt.ToolTipRole)
+
+
 def _state_label(color: str) -> str:
     return {"green": tr("prec.green", "ottimale in VRAM"),
             "yellow": tr("prec.yellow", "offload parziale, gestibile"),

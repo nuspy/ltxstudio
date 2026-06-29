@@ -1848,5 +1848,6 @@
   "prec.tt": "按精度筛选；绿=最佳，黄=可接受的卸载，红=对GPU过大。",
   "prec.green": "显存中最佳",
   "prec.yellow": "部分卸载，可接受",
-  "prec.red": "对GPU过大"
+  "prec.red": "对GPU过大",
+  "f1.gen.auto.detected": "检测到架构：{fam}。“auto”将选择匹配的 VAE/编码器（可手动覆盖）。"
 }

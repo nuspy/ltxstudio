@@ -1848,5 +1848,6 @@
   "prec.tt": "정밀도로 필터; 초록=최적, 노랑=감당 가능한 오프로드, 빨강=너무 큼.",
   "prec.green": "VRAM에 최적",
   "prec.yellow": "부분 오프로드, 감당 가능",
-  "prec.red": "GPU에 너무 큼"
+  "prec.red": "GPU에 너무 큼",
+  "f1.gen.auto.detected": "감지된 아키텍처: {fam}. 'auto'가 적합한 VAE/인코더를 선택합니다(변경 가능)."
 }
