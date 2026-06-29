@@ -2412,8 +2412,14 @@ class MainWindow(QMainWindow):
                    "Avvialo, oppure rimetti il backend 'image' su ComfyUI."))
             return
         model = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
-        guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=False)
-        params = {"model": model, "arch": "inpaint", "prompt": prompt, "negative": negative,
+        # FLUX.2 Klein (miraclein) = arch distillata edit-instruct con encoder Qwen3: instradata a
+        # 'flux2_inpaint' (Flux2KleinInpaintPipeline). FLUX.1 Fill resta 'inpaint'. La guidance per Klein
+        # è bassa (CFG reale ~4), per Fill è alta (~30) → effective_guidance(flux2=...).
+        from core.gen_pipeline import is_flux2
+        _f2 = bool(unet and is_flux2(unet))
+        arch = "flux2_inpaint" if _f2 else "inpaint"
+        guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=_f2)
+        params = {"model": model, "arch": arch, "prompt": prompt, "negative": negative,
                   "image_path": exp["image"], "mask_path": exp["mask"],
                   "steps": steps, "guidance": guidance, "seed": seed}
         self._inpaint_mode = mode

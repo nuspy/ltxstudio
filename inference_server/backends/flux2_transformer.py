@@ -175,3 +175,113 @@ def load_flux2_transformer(ckpt_path: str, config_dir: str):
     import logging
     logging.info("[flux2_transformer] fp8-forward: %d Fp8Linear, %d tensori assegnati", len(fp8_modules), assigned)
     return tr
+
+
+# ---------------------------------------------------------------------------
+# FLUX.2 KLEIN (edit/inpaint) — variante DISTILLATA, fp8 PURO (no weight_scale),
+# prefisso `model.diffusion_model.`, encoder Qwen3 (non Mistral). La config è
+# derivata DINAMICAMENTE dai dim del checkpoint, così funziona sia per la 4B
+# ufficiale (hidden 3072, TE qwen3_4b) sia per la miraclein 8B (hidden 4096,
+# TE qwen3_8b) senza file di config dedicati.
+# ---------------------------------------------------------------------------
+
+def _strip_prefix(k: str) -> str:
+    return k[len("model.diffusion_model."):] if k.startswith("model.diffusion_model.") else k
+
+
+def klein_config_from_header(ckpt_path: str) -> dict:
+    """Ricava la config di Flux2Transformer2DModel misurando i tensori del checkpoint Klein.
+    Robusto a 4B/8B e a futuri tagli: niente valori hardcoded sui dim."""
+    from safetensors import safe_open
+    shapes: dict[str, list[int]] = {}
+    dbl, sgl = set(), set()
+    import re
+    with safe_open(ckpt_path, framework="pt") as h:
+        for k in h.keys():
+            b = _strip_prefix(k)
+            shapes[b] = list(h.get_slice(k).get_shape())
+            m = re.search(r"double_blocks\.(\d+)\.", b)
+            if m:
+                dbl.add(int(m.group(1)))
+            m = re.search(r"single_blocks\.(\d+)\.", b)
+            if m:
+                sgl.add(int(m.group(1)))
+    inner = shapes["img_in.weight"][0]                       # 4096 (8B) / 3072 (4B)
+    in_ch = shapes["img_in.weight"][1]                       # 128
+    jad = shapes["txt_in.weight"][1]                         # 12288 / 7680
+    head_dim = shapes["double_blocks.0.img_attn.norm.query_norm.weight"][0]   # 128
+    mlp_in = shapes["double_blocks.0.img_mlp.0.weight"][0]   # 24576 = 2*mlp_ratio*inner (GEGLU)
+    mlp_ratio = round((mlp_in / 2) / inner, 4)               # → 3.0
+    return {
+        "patch_size": 1, "in_channels": in_ch, "out_channels": None,
+        "num_layers": len(dbl), "num_single_layers": len(sgl),
+        "attention_head_dim": head_dim, "num_attention_heads": inner // head_dim,
+        "joint_attention_dim": jad, "timestep_guidance_channels": 256,
+        "mlp_ratio": mlp_ratio, "axes_dims_rope": [32, 32, 32, 32],
+        "rope_theta": 2000, "eps": 1e-6,
+        "guidance_embeds": ("guidance_in.in_layer.weight" in shapes),
+    }
+
+
+def load_flux2_klein_transformer(ckpt_path: str, cfg: dict | None = None):
+    """Carica il transformer Klein (fp8 puro) come Flux2Transformer2DModel con Fp8Linear (scale=1.0)
+    per TUTTI i Linear fp8 → block-swap memory-bounded come per Dev. Config dedotta dai dim se non data."""
+    from accelerate import init_empty_weights
+    from accelerate.utils import set_module_tensor_to_device
+    from diffusers import Flux2Transformer2DModel
+    from diffusers.loaders.single_file_utils import swap_scale_shift
+    from safetensors import safe_open
+
+    if cfg is None:
+        cfg = klein_config_from_header(ckpt_path)
+    with init_empty_weights():
+        tr = Flux2Transformer2DModel.from_config(cfg)
+
+    with safe_open(ckpt_path, framework="pt") as h:
+        raw_keys = list(h.keys())
+        # mappa base(senza prefisso) → chiave reale nel file
+        base2real = {_strip_prefix(k): k for k in raw_keys}
+        weight_bases = {b for b in base2real if b.endswith(".weight")}
+
+        # 1) quali moduli diffusers diventano Fp8Linear: ogni weight in dtype fp8
+        fp8_modules: set[str] = set()
+        for b in weight_bases:
+            t0 = h.get_slice(base2real[b])
+            if "float8" in str(t0.get_dtype()).lower() or t0.get_dtype() in ("F8_E4M3", "F8_E5M2"):
+                for nk, _ci, _sp in _convert_key(b):
+                    fp8_modules.add(_module_and_attr(nk)[0])
+
+        modules = dict(tr.named_modules())
+        for mod_name in fp8_modules:
+            old = modules.get(mod_name)
+            if not isinstance(old, nn.Linear):
+                continue
+            new = Fp8Linear(old.in_features, old.out_features, bias=old.bias is not None)
+            # moduli top-level (es. proj_out, anch'esso fp8 nella miraclein) non hanno parent → tr
+            parent_name, child = (mod_name.rsplit(".", 1) if "." in mod_name else ("", mod_name))
+            setattr(modules.get(parent_name, tr), child, new)
+        modules = dict(tr.named_modules())
+        targets = {n for n, _ in tr.named_parameters()} | {n for n, _ in tr.named_buffers()}
+
+        # 2) streaming: pesi fp8 ai Fp8Linear (scale 1.0), il resto bf16
+        assigned = 0
+        for b, real in base2real.items():
+            raw = h.get_tensor(real)
+            for nk, ci, sp in _convert_key(b):
+                t = raw if ci is None else torch.chunk(raw, 3, dim=0)[ci]
+                if sp == "swap":
+                    t = swap_scale_shift(t.to(torch.bfloat16), 0)
+                mod, attr = _module_and_attr(nk)
+                if nk not in targets:
+                    continue
+                if isinstance(modules.get(mod), Fp8Linear) and attr == "weight":
+                    set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())   # resta fp8
+                    set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
+                                                value=torch.ones((), dtype=torch.float32))
+                else:
+                    set_module_tensor_to_device(tr, nk, "cpu", value=t.to(torch.bfloat16),
+                                                dtype=torch.bfloat16)
+                assigned += 1
+    import logging
+    logging.info("[flux2_klein] cfg=%s | %d Fp8Linear, %d tensori", cfg, len(fp8_modules), assigned)
+    return tr

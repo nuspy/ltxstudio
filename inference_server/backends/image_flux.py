@@ -51,6 +51,10 @@ ERNIE_TRANSFORMER = r"E:\AI\Models\diffusion_models\Ernie\ernie-image.safetensor
 ERNIE_TE = r"E:\AI\Models\TextEncoders\Ernie\ministral-3-3b.safetensors"
 FLUX2_DIR = r"E:\AI\Models\diffusers\flux2"          # TE Mistral HF + tokenizer + config (gated, scaricati)
 FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
+# FLUX.2 KLEIN (edit/inpaint): encoder Qwen3 (NON Mistral). 4B ufficiale → hidden 2560 (jad 7680),
+# miraclein NSFW 8B → hidden 4096 (jad 12288). Il dir giusto è scelto dal joint_attention_dim del
+# transformer (vedi _assemble_flux2_klein). VAE = lo stesso flux2-vae.
+KLEIN_QWEN_DIRS = {7680: os.path.join(TE_DIR, "qwen3_4b"), 12288: os.path.join(TE_DIR, "qwen3_8b")}
 
 
 def _place(pipe, vram_mb: int) -> str:
@@ -200,12 +204,51 @@ def _assemble_zimage(transformer_path: str):
     return ZImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
+def _assemble_flux2_klein(Pipe, transformer_path: str):
+    """Assembla una pipeline FLUX.2 KLEIN (edit/inpaint/kontext) — variante DISTILLATA, encoder Qwen3
+    (NON Mistral), transformer fp8 puro col prefisso `model.diffusion_model.`. Config transformer
+    DEDOTTA dai dim del file → 4B (jad 7680, qwen3_4b) o miraclein 8B (jad 12288, qwen3_8b). VAE = flux2-vae.
+    Block-swap memory-bounded come Dev. Niente ComfyUI."""
+    import json
+    import torch
+    from diffusers import AutoencoderKLFlux2, FlowMatchEulerDiscreteScheduler
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from safetensors.torch import load_file
+    from inference_server.backends.flux2_transformer import (klein_config_from_header,
+                                                             load_flux2_klein_transformer)
+    bf16 = torch.bfloat16
+    cfg = klein_config_from_header(transformer_path)
+    jad = cfg["joint_attention_dim"]
+    qdir = KLEIN_QWEN_DIRS.get(jad)
+    if not qdir or not os.path.exists(os.path.join(qdir, "model.safetensors")):
+        need = {7680: "Qwen3-4B", 12288: "Qwen3-8B"}.get(jad, f"Qwen3 (jad={jad})")
+        raise RuntimeError(
+            f"FLUX.2 Klein richiede l'encoder {need} in '{qdir}'. Manca su disco: scaricalo "
+            f"col wizard pesi (è l'unico file mancante per Klein nativo).")
+    tr = load_flux2_klein_transformer(transformer_path, cfg)
+    vae = AutoencoderKLFlux2.from_config(json.load(open(os.path.join(FLUX2_DIR, "vae", "config.json"))))
+    vae.load_state_dict(load_file(FLUX2_VAE), assign=True)
+    vae = vae.to(bf16)
+    # Qwen3 (Qwen3ForCausalLM): la pipeline Klein chiama text_encoder(..., output_hidden_states=True) e
+    # concatena i layer [9,18,27]. Caricato in bf16 dai pesi locali (no repo runtime, no ComfyUI).
+    te = AutoModelForCausalLM.from_pretrained(qdir, torch_dtype=bf16)
+    tok = AutoTokenizer.from_pretrained(qdir)
+    try:
+        sched = FlowMatchEulerDiscreteScheduler.from_pretrained(os.path.join(FLUX2_DIR, "scheduler"))
+    except Exception:                                   # noqa: BLE001
+        sched = FlowMatchEulerDiscreteScheduler()
+    return Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
+
+
 def _assemble_flux2(Pipe, transformer_path: str):
     """Assembla una pipeline FLUX.2 (t2i/inpaint/kontext) da: transformer LOCALE (single_file) +
     VAE FLUX.2 LOCALE + TE Mistral HF + tokenizer (scaricati gated, solo questi). Pipe è la
     classe diffusers concreta (Flux2Pipeline, Flux2KleinInpaintPipeline, …)."""
     import os
     import torch
+    # Klein è un'architettura DISTILLATA con encoder Qwen3 (≠ Dev/Mistral): instradata a parte.
+    if "Klein" in getattr(Pipe, "__name__", ""):
+        return _assemble_flux2_klein(Pipe, transformer_path)
     from diffusers import Flux2Transformer2DModel, AutoencoderKLFlux2, FlowMatchEulerDiscreteScheduler
     from transformers import AutoModel, AutoTokenizer
     bf16 = torch.bfloat16
