@@ -65,6 +65,18 @@
       "id": "heartcodec", "module": "Musica (HeartMuLa)", "label": "HeartCodec", "kind": "snapshot",
       "repo_id": "HeartMuLa/HeartCodec-oss-20260123", "type": "audio", "family": "HeartMuLa",
       "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartCodec-oss", "gated": false, "approx_gb": 3, "scan_names": ["HeartCodec"]
+    },
+    {
+      "id": "qwen3-8b-klein-te", "module": "Inpaint", "label": "Qwen3-8B (TE FLUX.2 Klein NSFW/miraclein)", "kind": "snapshot",
+      "repo_id": "Qwen/Qwen3-8B", "type": "diffusers", "family": "_te",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_8b", "gated": false, "approx_gb": 16,
+      "scan_names": ["qwen3_8b", "Qwen3-8B"]
+    },
+    {
+      "id": "qwen3-4b-klein-te", "module": "Inpaint", "label": "Qwen3-4B (TE FLUX.2 Klein-4B SFW)", "kind": "snapshot",
+      "repo_id": "Qwen/Qwen3-4B", "type": "diffusers", "family": "_te",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_4b", "gated": false, "approx_gb": 8,
+      "scan_names": ["qwen3_4b", "Qwen3-4B"]
     }
   ]
 }
