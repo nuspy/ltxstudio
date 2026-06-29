@@ -1,6 +1,7 @@
 """Finestra principale LTX Studio (MVP): tab + preview live + Genera cablato al backend."""
 from __future__ import annotations
 
+import os
 import random
 import sys
 from pathlib import Path
@@ -2016,6 +2017,12 @@ class MainWindow(QMainWindow):
             "seed": int(self.video_tab.sampler_seed.seed.value()),
             "offload": "cpu", "loras": loras, "output": out,
         }
+        # MODELLO scelto nel tab Video → al worker. Senza questo il worker usava SEMPRE il checkpoint
+        # di default → "funziona solo un modello" (qualunque scelta nel dropdown era ignorata).
+        if vals.get("model_kind") == "gguf" and vals.get("model_gguf"):
+            params["gguf_transformer"] = vals["model_gguf"]   # base checkpoint resta default per vae/gemma
+        elif vals.get("model") and vals.get("model") not in ("", "auto"):
+            params["model"] = vals["model"]
         if use_image and self.frame1_tab.image_path:
             params["image_path"] = self.frame1_tab.image_path
             params["ref_strength"] = float(vals.get("ref_strength", 1.0))
