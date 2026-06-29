@@ -108,10 +108,22 @@ class Spy:
 
 
 def build_window():
-    """Costruisce la MainWindow offscreen (con dialog patchati)."""
+    """Costruisce la MainWindow offscreen (dialog patchati, autostart server DISABILITATO nei test)."""
     app()
     patch_dialogs()
     from ui.main_window import MainWindow
+    MainWindow._maybe_autostart_native = lambda self: None    # no spawn server per-test (era lento/blocco)
+    MainWindow._maybe_autostart_comfyui = lambda self: None
+    # neutralizza i check che fanno RETE (download encoder/pesi) → i test verificano l'ISTRUZIONE, non i download
+    MainWindow._ensure_flux2_encoder = lambda self, unet=None: True
+    if hasattr(MainWindow, "_feature_gate"):
+        MainWindow._feature_gate = lambda self, *a, **k: True
+    # evita chiamate nvidia-smi ripetute nei combo precisione (VRAM costante nel test)
+    try:
+        from core import model_precision as _mp
+        _mp.gpu_free_gb = lambda: 32.0
+    except Exception:                                          # noqa: BLE001
+        pass
     return MainWindow()
 
 
