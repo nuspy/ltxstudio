@@ -95,3 +95,14 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - Videomusicale (canzone->storyboard LLM->video coerente+scene+montaggio+audio): REAL_music_video.mp4 (495KB, 284s, 2 scene, video+audio). Pipeline end-to-end su 32GB (ltx2_infer GGUF+offload). Copre video-musicale e video-musicale-con-scene. ✅
 
 - Prolunga/video lungo: REAL_video_extended.mp4 (270KB, 4.1s = base+2 segmenti autoregressivi via worker comfy). Catena memory-bounded (VRAM costante per segmento) → scalabile a 20s+ no-OOM. ✅
+
+## 3D — TRELLIS immagine→mesh ✅ VALIDATO (30/06)
+REAL_trellis_puppy/model.glb (4.2MB, 75171 vert · 140884 facce · texture). load 55s+diffusion 112s+to_glb 16s su 32GB.
+Catena di fix necessari (TRELLIS.2-4B, applicati in E:\AI\Tools\TRELLIS2):
+1. DINOv3 gated (facebook 403) → mirror non-gated `camenduru/dinov3-vitl16-pretrain-lvd1689m` + patch model_name in pipeline.json/texturing_pipeline.json
+2. rembg `briaai/RMBG-2.0` gated → cambiato model_name in `ZhengPeng7/BiRefNet` (non-gated, scaricato)
+3. pip install kornia + timm (richiesti dal codice remoto BiRefNet) nel venv TRELLIS2
+4. BiRefNet.py: input cast al dtype del modello (`.to(next(self.model.parameters()).dtype)`) — fix RuntimeError float vs Half
+5. image_feature_extractor.py: `self.model.layer` → `self.model.model.layer` (transformers DINOv3ViTModel.model=encoder)
+Download 3D: DA-2 1.3GB, DINOv3 mirror 1.2GB, BiRefNet 445MB, WorldGen-LoRA 76MB.
+WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / FP4 6GB). Rig: ⚪ SkinTokens venv non installato.
