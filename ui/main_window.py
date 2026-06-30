@@ -2599,8 +2599,10 @@ class MainWindow(QMainWindow):
         if not cfg.get("text"):
             QMessageBox.warning(self, tr("mw.text_missing_title"), tr("mw.segment_text_missing_msg")); return
         if backend.is_native("segment"):
+            # detector "grounding_dino_only" → solo GroundingDINO (box, no raffinamento SAM2)
             return self._segment_native(text=cfg["text"],
-                                        threshold=float(cfg.get("threshold", cfg.get("clipseg_threshold", 0.30))))
+                                        threshold=float(cfg.get("threshold", cfg.get("clipseg_threshold", 0.30))),
+                                        use_sam=(cfg.get("detector") != "grounding_dino_only"))
         try:
             img = self._upload_local(self.frame1_tab.canvas._composite(OUTPUT_DIR))
             detector = cfg.get("detector", "grounding_dino")
@@ -2672,7 +2674,7 @@ class MainWindow(QMainWindow):
                       self._on_multitalk_done)
 
     def _segment_native(self, *, text: str = "", threshold: float = 0.30,
-                        region_mask: str = "", image_path: str = ""):
+                        region_mask: str = "", image_path: str = "", use_sam: bool = True):
         """Segmentazione NATIVA (GroundingDINO+SAM2 via inference_server, handler 'segment'). Zero ComfyUI.
         Per testo: usa il composite locale; per regione: usa image/region mask locali (no upload)."""
         # PROPORZIONI: per la selezione a TESTO usa la foto SORGENTE reale (alle sue dimensioni native),
@@ -2688,7 +2690,9 @@ class MainWindow(QMainWindow):
         else:
             params["text"] = text
             params["threshold"] = threshold
-            self._log(f"[nativo] selezione '{text}' (soglia {threshold:.2f})…")
+            params["use_sam"] = use_sam
+            _mode = "GroundingDINO+SAM2" if use_sam else "solo GroundingDINO"
+            self._log(f"[nativo] selezione '{text}' ({_mode}, soglia {threshold:.2f})…")
         self._seg_native_worker = _NativeImageWorker(params, module="segment")
         self._enqueue(tr("queue.job.segment", "Segmentazione"), self._seg_native_worker,
                       self._on_segment_native_done)
