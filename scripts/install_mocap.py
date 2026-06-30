@@ -19,7 +19,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VENV = ROOT / "mocap_env"
 PY = VENV / "Scripts" / "python.exe"        # Windows
-BASE_PKGS = ["mediapipe", "opencv-python", "numpy"]
+# mediapipe>=0.10.21 ha RIMOSSO l'API legacy `mp.solutions` (ora tasks-only), che il worker usa
+# (mp.solutions.pose.Pose) → pin a una versione che la include ancora.
+BASE_PKGS = ["mediapipe==0.10.18", "opencv-python", "numpy"]
 
 
 def run(cmd: list) -> None:

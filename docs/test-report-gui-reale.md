@@ -120,3 +120,8 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - Convertitore formati 3D: REAL_trellis_puppy.fbx (5.7MB, GLB->FBX via Blender headless, bl_common). ✅
 - EXR/HDR export: REAL_hdr_*.exr (float32 HDR). FIX bug: OPENCV_IO_ENABLE_OPENEXR ora settato a livello modulo PRIMA di import cv2 (era dopo -> codec disabilitato -> scrittura falliva). ✅
 - Retarget: serve un .bvh (input animazione) -> non testabile senza mocap/webcam. Mocap: richiede webcam (no headless). ⚪
+
+## Animazione/Mocap (30/06) — pipeline completa
+- Mocap DA VIDEO: headsmash.mp4 (1280x720) -> REAL_headsmash_mocap.bvh (225 frame, 19 ossa umanoidi @24fps, 92% detection, 7s). FIX: mediapipe>=0.10.21 ha rimosso mp.solutions -> install_mocap pinna mediapipe==0.10.18. ✅
+- Retarget: BVH + mesh riggata (Mixamo) -> REAL_headsmash_retarget.glb (2 animazioni, 21 channels). FIX: nla.bake only_selected=True (POSE) filtrava le OSSA selezionate (0 selezionate -> bake vuoto) -> only_selected=False. ✅
+- Convertitore 3D (GLB->FBX) + EXR/HDR export gia validati. => 4/4 moduli 3D secondari OK.

@@ -94,7 +94,9 @@ def _retarget(target, source, mapping, fstart, fend) -> None:
         o.select_set(False)
     target.select_set(True)
     bpy.context.view_layer.objects.active = target
-    bpy.ops.nla.bake(frame_start=fstart, frame_end=fend, only_selected=True,
+    # only_selected=False: per bake_types POSE 'only_selected' filtra le OSSA selezionate (non l'oggetto).
+    # Selezionavamo solo l'oggetto target → 0 ossa selezionate → bake vuoto. False = tutte le ossa.
+    bpy.ops.nla.bake(frame_start=fstart, frame_end=fend, only_selected=False,
                      visual_keying=True, clear_constraints=True,
                      use_current_action=True, bake_types={"POSE"})
 
