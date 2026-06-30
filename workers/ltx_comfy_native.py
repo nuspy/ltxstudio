@@ -251,6 +251,17 @@ def run(p: dict) -> str:
         return _save_mp4(images, p["output"], float(p.get("fps", 24.0)),
                          audio=a_out.get("waveform"), audio_sr=int(a_out.get("sample_rate", 44100)))
 
+    # IC-LoRA/guide in-context (controlnet, keyframe, V2V): ritaglia i frame-guida dopo il sampling.
+    # No-op se non ci sono guide nel positive (t2v/i2v semplici). Come i workflow LTX ufficiali.
+    from comfy_extras.nodes_lt import LTXVCropGuides
+    try:
+        _cg = _vals(LTXVCropGuides().execute(pos, neg, denoised))
+        denoised = _cg[2] if not isinstance(_cg[2], dict) or "samples" in _cg[2] else denoised
+        if not isinstance(denoised, dict):
+            denoised = {"samples": getattr(denoised, "samples", denoised)}
+    except Exception as _e:  # noqa: BLE001
+        print(f"[cropguides] saltato: {_e}", flush=True)
+
     images = _unwrap(nodes.VAEDecode().decode(vae, denoised))     # (frames,H,W,3) [0,1]
     return _save_mp4(images, p["output"], float(p.get("fps", 24.0)))
 
