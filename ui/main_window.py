@@ -2444,15 +2444,27 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
                 tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde."))
             return
-        unet = model or KONTEXT_MODEL
-        mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
         if not prompt:
             prompt = ("Seamlessly integrate the added object into the scene: match the lighting, "
                       "shadows, color and perspective so it looks naturally part of the photo.")
-        params = {"model": mp, "arch": "kontext", "prompt": prompt, "negative": negative,
-                  "image_path": exp["image"], "steps": steps, "guidance": guidance, "seed": seed}
+        # INTEGRA MASK-BASED: se il canvas ha esportato la maschera della zona-edit, usa INPAINT
+        # (FLUX Fill) su quella regione → rigenera/fonde l'oggetto nella scena (luce/ombre/bordi)
+        # invece del kontext senza maschera (che preservava l'oggetto = solo posizionato). Vedi
+        # export_integrate (oggetto-seme + alone bianco) + [[video-edit-inpaint-nativo]].
+        mask = exp.get("mask")
+        if mask and os.path.exists(mask):
+            fill = r"E:\AI\Models\diffusion_models\Flux\FLUX_DEV_Fill.safetensors"
+            params = {"model": fill, "arch": "inpaint", "prompt": prompt, "negative": negative,
+                      "image_path": exp["image"], "mask_path": mask,
+                      "steps": max(steps, 20), "guidance": 30.0, "seed": seed}
+            self._log(f"Integra mask-based (FLUX Fill, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
+        else:
+            unet = model or KONTEXT_MODEL
+            mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
+            params = {"model": mp, "arch": "kontext", "prompt": prompt, "negative": negative,
+                      "image_path": exp["image"], "steps": steps, "guidance": guidance, "seed": seed}
+            self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._inpaint_mode = "integrazione"
-        self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._native_worker = _NativeImageWorker(params)
         self._enqueue(tr("queue.job.integrate", "Integra (Kontext)"), self._native_worker,
                       self._on_native_inpaint_done)
