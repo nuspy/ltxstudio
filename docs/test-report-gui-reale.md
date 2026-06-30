@@ -93,3 +93,5 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - V2V — DIAGNOSI DEFINITIVA: pipeline comfy STRUTTURALMENTE CORRETTA = identica al workflow IC-LoRA ufficiale (LTXVAddGuide APPENDE il reference in-context come frame extra in coda, frozen a strength 1.0; LTXVCropGuides tiene i primi F frame=output, rimuove la coda=guida). L'output sono i frame GENERATI, ma col distilled Q4+8step il modello RIPRODUCE il sorgente invece di editare. edit_anything era gia validato su ltx2_infer (#60, modello pieno >=40GB) -> l'effetto-edit serve modello pieno + piu step, NON e un bug di porting comfy. CHIUSA come limite hardware/step su 32GB, non difetto.
 
 - Videomusicale (canzone->storyboard LLM->video coerente+scene+montaggio+audio): REAL_music_video.mp4 (495KB, 284s, 2 scene, video+audio). Pipeline end-to-end su 32GB (ltx2_infer GGUF+offload). Copre video-musicale e video-musicale-con-scene. ✅
+
+- Prolunga/video lungo: REAL_video_extended.mp4 (270KB, 4.1s = base+2 segmenti autoregressivi via worker comfy). Catena memory-bounded (VRAM costante per segmento) → scalabile a 20s+ no-OOM. ✅
