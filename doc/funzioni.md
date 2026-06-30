@@ -487,23 +487,23 @@ Moduli nativi: **`video_upscale`**, **`video_face`**, **`video_fps`**. Tab **Def
 ## 40. TRELLIS.2 — immagine → mesh 3D (PBR/GLB)
 - **Cosa fa**: da una foto crea una mesh 3D con texture PBR.
 - **GUI**: tab **Modello 3D** → *Genera* (`request_trellis`); visore 3D model-viewer.
-- **Backend**: `core/trellis_pipeline.py` (grafo ComfyUI) o `core/trellis_service.make_job(...)` (subprocess venv `E:\AI\Tools\TRELLIS2`). Output `output/3d/<name>/model.glb`.
+- **Backend**: `core/trellis_service.make_job(...)` (NATIVO, subprocess venv `E:\AI\Tools\TRELLIS2` + `scripts/trellis_generate.py`, no ComfyUI). Output `output/3d/<name>/model.glb`.
 - **Parametri** (GUI): `resolution` (512/1024/1024_cascade[def]/1536_cascade), `file_format` (glb/obj/ply/stl), `remove_bg` (true), `detail`/max_tokens (16384–262144, def 49152), `guidance` (6.5), `steps` (12), `faces` (def 500000), `texture` (true), `tex_size` (2048), `seed`, `precision`/`attn`/`bg_color` (avanzate).
-- **Output**: GLB (export FBX/OBJ via Blender). **Note**: pesi ~25GB, ~24GB VRAM consigliati; gated (HF token).
+- **Output**: GLB texturizzato. **Stato**: ✅ VALIDATO nativo su 32GB (model.glb 75k vert+texture, ~3min, tex 512). **Setup pesi** (vedi report): DINOv3 è gated → usare mirror non-gated `camenduru/dinov3-vitl16` + patch config; rembg `briaai/RMBG-2.0` gated → usare `ZhengPeng7/BiRefNet`; serve `pip kornia timm`; 2 micro-patch dtype/encoder-layer nel codice TRELLIS2.
 
 ## 41. Rig 3D (SkinTokens)
 - **Cosa fa**: da una mesh genera scheletro + skinning (auto-rigging).
 - **GUI**: tab **Rig 3D** → *Genera* (`request_rig`).
-- **Backend**: `core/rig_pipeline.py` (ComfyUI) o `core/rig_service.make_job(mesh)` (venv `E:\AI\Tools\SkinTokens`, Blender headless). Output `output/3d/<name>/rigged.glb`.
-- **Parametri**: `skeleton` (Keep names/Mixamo/Unreal Engine 5), `file_format` (glb/fbx), `transfer` (true), `postprocess`, `gpv` (4), `smooth` (55°), + avanzate (num_beams 10, temperature 1.0, top_k 5, top_p 0.95, rep_pen 2.0).
-- **Output**: GLB/FBX riggato. **Note**: ~4GB VRAM (Qwen3-0.6B backbone), richiede Blender 4.0+ (auto-install winget).
+- **Backend**: `core/rig_service.make_job(mesh, template, file_format)` → `scripts/rig_native_skintoken.py` carica il node ComfyUI-SkinToken **come libreria** (no server) nel venv ComfyUI + Blender headless. Output `output/3d/<name>/rigged.glb`.
+- **Parametri**: `skeleton`/template (Keep names/Mixamo/Unreal Engine 5), `file_format` (glb/fbx), `transfer` (true), `postprocess`, `gpv` (4), `smooth` (55°), + avanzate (num_beams, temperature 1.0, top_k 50, top_p 0.95, rep_pen).
+- **Output**: GLB/FBX riggato. **Stato**: ✅ VALIDATO nativo (REAL_rig_puppy.glb, armatura Mixamo 7 ossa + skin weights, inferenza 46s). **Note**: ~4GB pesi (grpo+skin-VAE+Qwen3-0.6B in `Comfy_Nexus.bak/ComfyUI/models/skintoken`), richiede Blender 5.x (auto-install winget). Repo standalone TokenRig morto → uso node-as-library.
 
 ## 42. Mondo 3D (WorldGen)
 - **Cosa fa**: da foto/testo crea una scena 3D (mesh GLB e/o Gaussian-splat .ply).
 - **GUI**: tab **Mondo 3D** → *Genera scena* (`_gen`); player web three.js (orbit/WASD) + visore nativo; export FBX/OBJ.
 - **Backend**: `core/world_service.make_job(WorldParams, mesh=True|False)` (venv `E:\AI\Tools\WorldGen`). Output `output/worlds/<name>/{mesh.glb,splat.ply}`.
 - **Parametri**: `name` (world), `image_path` (vuoto→text-to-scene), `prompt`, `mode` (mesh/splat/both), `resolution` (1600), `low_vram`, `hf` token.
-- **Output**: GLB/PLY. **Note**: usa FLUX.1-dev gated; Windows install non banale.
+- **Output**: GLB/PLY. **Stato**: ⚠️ in lavorazione su Windows. Pesi: DA-2 depth (config.json va scritto a mano, repo non lo include), WorldGen-LoRA `LeoXie/WorldGen`, FLUX-Fill FP4 `mit-han-lab/svdq-fp4-flux.1-fill-dev` (~7GB, ramo low_vram nunchaku — evita i 24GB bf16). **Fix Windows**: nunchaku `utils.py` mangiava il repo-id con backslash → patch `repo_id...replace(chr(92),chr(47))`.
 
 ## 43. Mocap webcam → BVH
 - **Cosa fa**: motion capture da webcam (MediaPipe) → animazione BVH.
