@@ -2102,6 +2102,17 @@ class MainWindow(QMainWindow):
         _engine = _up.get_engine("video", "ltx2_infer")
         _simple = not (params.get("audio_path") or params.get("control_video")
                        or params.get("keyframes") or params.get("chunk_frames"))
+        # AUTO-SWITCH VRAM-aware: il 22B in ltx2_infer non entra sotto ~40GB liberi (model-bound: dequant
+        # → ~44GB, sborda anche a bassa risoluzione). Se è un t2v/i2v SEMPLICE (che comfy copre) e la VRAM
+        # non basta → uso comfy-native (no-OOM) automaticamente. Vedi [[dynamic-vram-tuning]].
+        if _engine != "comfy" and _simple:
+            try:
+                from core import model_precision as _mp
+                if float(_mp.gpu_free_gb()) < 40.0:
+                    _engine = "comfy"
+                    self._log("[motore] VRAM<40GB + t2v/i2v → comfy-native automatico (ltx2_infer 22B non entra)")
+            except Exception:                                   # noqa: BLE001
+                pass
         if _engine == "comfy" and _simple:
             self._log("[motore] comfy-native (VRAM dinamica, no-OOM)")
             self._ltx2_worker = _VideoComfyWorker(params)
