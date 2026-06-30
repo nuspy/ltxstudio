@@ -97,13 +97,16 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if not boxes:
         return {"status": "error", "error": f"nessun oggetto '{text}' trovato (soglia {thr})"}
 
-    if sproc is not None and smodel is not None:           # SAM2: box → maschera precisa
+    # use_sam=False → solo GroundingDINO (maschera rettangolare dai box, niente raffinamento SAM2):
+    # selezionabile dall'utente ("solo groundingdino" vs "groundingdino+sam").
+    _use_sam = params.get("use_sam", True)
+    if _use_sam and sproc is not None and smodel is not None:   # SAM2: box → maschera precisa
         sin = sproc(images=img, input_boxes=[boxes], return_tensors="pt").to(dev)
         with torch.no_grad():
             sout = smodel(**sin)
         masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
         m_np = _mask_to_2d(masks)
-    else:                                                  # fallback: maschera dai box
+    else:                                                  # solo box GroundingDINO (o SAM non disponibile)
         m_np = np.zeros((img.height, img.width), dtype="uint8")
         for x0, y0, x1, y1 in boxes:
             m_np[int(y0):int(y1), int(x0):int(x1)] = 255
