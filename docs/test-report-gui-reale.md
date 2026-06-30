@@ -75,3 +75,5 @@ Pendenti: MMAudio (venv riparato torch/torchaudio 2.11 cpu, demo.py gira su CPU 
 Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server video persistente (no reload/gen).
 
 - LoRA video: REAL_video_lora2.mp4 (108KB, [gen] 24s, [lora] fightV3 applicata via LoraLoaderModelOnly) ✅
+
+- ControlNet video: REAL_video_controlnet.mp4 (430KB, [gen] 14s) — IC-LoRA union-control 22b + guida canny + reference_downscale_factor=2 dai metadata. Pipeline VALIDATA (struttura segue la guida); qualità bassa a 6-step/Q4 (test veloce), pulita su fp8/30-step. ✅
