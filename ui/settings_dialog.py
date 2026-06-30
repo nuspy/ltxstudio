@@ -1,35 +1,99 @@
-"""Settings dialog — override del modello per ciascun nodo loader del template.
+"""Settings dialog — motori di generazione (nativo) + override modello per nodo loader.
 
-Popola le combo dai file realmente disponibili in ComfyUI (GET /models/{folder});
-se ComfyUI è offline usa solo il valore corrente del template. Ritorna overrides
-{node_id: {input: value}} che il template_engine applica al build.
+Due sezioni:
+  1) **Motore di generazione (nativo)** — sceglie COME vengono caricati i modelli:
+     - immagini : comfy-native ↔ diffusers   (consumato da core.img_router)
+     - video    : comfy-native ↔ ltx2 ufficiale (consumato da core.ltx2_service.generate)
+     Persistito in user_prefs (get_engine/set_engine). È il cuore della migrazione nativa.
+  2) **Override modelli (template ComfyUI)** — per il path template legacy: per ogni nodo loader
+     puoi forzare un file diverso. Popolato dai file disponibili (GET /models/{folder}).
+     Ritorna overrides {node_id: {input: value}} che il template_engine applica al build.
 """
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, QLabel, QScrollArea, QWidget,
+    QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, QLabel, QScrollArea,
+    QWidget, QGroupBox,
 )
 
+from core import user_prefs
 from ui.i18n_manager import tr
+
+
+# valore pref → (etichetta i18n). L'ordine è quello mostrato nella combo.
+_IMAGE_ENGINES = [("comfy", "settings.engine.comfy"), ("diffusers", "settings.engine.diffusers")]
+_VIDEO_ENGINES = [("comfy", "settings.engine.comfy"), ("lightricks", "settings.engine.lightricks")]
 
 
 class SettingsDialog(QDialog):
     def __init__(self, engine, driver, current_overrides: dict | None = None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("settings.window_title"))
-        self.resize(640, 560)
+        self.resize(680, 620)
         self.engine = engine
         self.driver = driver
         self._combos: dict[str, tuple[str, QComboBox]] = {}  # node -> (input, combo)
         self._overrides = current_overrides or {}
 
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel(tr("settings.intro")))
+
+        # ── 1) Motore di generazione (nativo) ─────────────────────────────────
+        lay.addWidget(self._build_native_group())
+
+        # ── 2) Override modelli (template) ────────────────────────────────────
+        lay.addWidget(self._build_overrides_group(), 1)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self._on_accept); bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    # ---------- sezione motori nativi ----------
+    def _build_native_group(self) -> QGroupBox:
+        grp = QGroupBox(tr("settings.native_group"))
+        form = QFormLayout(grp)
+
+        hint = QLabel(tr("settings.native_hint"))
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #888; font-size: 11px;")
+        form.addRow(hint)
+
+        self.cb_img_engine = QComboBox()
+        for val, key in _IMAGE_ENGINES:
+            self.cb_img_engine.addItem(tr(key), val)
+        self._select_by_data(self.cb_img_engine, user_prefs.get_engine("image", "comfy"))
+        form.addRow(tr("settings.engine_image"), self.cb_img_engine)
+
+        self.cb_vid_engine = QComboBox()
+        for val, key in _VIDEO_ENGINES:
+            self.cb_vid_engine.addItem(tr(key), val)
+        self._select_by_data(self.cb_vid_engine, user_prefs.get_engine("video", "comfy"))
+        form.addRow(tr("settings.engine_video"), self.cb_vid_engine)
+
+        return grp
+
+    @staticmethod
+    def _select_by_data(combo: QComboBox, value: str):
+        idx = combo.findData((value or "").lower())
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+
+    # ---------- sezione override template ----------
+    def _build_overrides_group(self) -> QGroupBox:
+        grp = QGroupBox(tr("settings.overrides_group"))
+        gv = QVBoxLayout(grp)
+        intro = QLabel(tr("settings.intro")); intro.setWordWrap(True)
+        gv.addWidget(intro)
+
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         inner = QWidget(); form = QFormLayout(inner)
-        # cache liste per folder
         folder_cache: dict[str, list[str]] = {}
-        for ln in self.engine.loader_nodes():
+        try:
+            loaders = self.engine.loader_nodes()
+        except Exception:
+            loaders = []
+        if not loaders:
+            form.addRow(QLabel(tr("settings.no_loaders")))
+        for ln in loaders:
             folder = ln["folder"]
             if folder not in folder_cache:
                 folder_cache[folder] = self.driver.models_in(folder) if self.driver.is_up() else []
@@ -37,25 +101,34 @@ class SettingsDialog(QDialog):
             combo = QComboBox(); combo.setEditable(True)
             opts = sorted(set(files) | {ln["current"]})
             combo.addItems(opts)
-            # valore corrente: override esistente o quello del template
             cur = self._overrides.get(ln["node"], {}).get(ln["input"], ln["current"])
             combo.setCurrentText(cur)
             label = f"{ln['title']} [{ln['node']}] · {folder}"
             form.addRow(label, combo)
             self._combos[ln["node"]] = (ln["input"], combo)
         scroll.setWidget(inner)
-        lay.addWidget(scroll, 1)
+        gv.addWidget(scroll, 1)
+        return grp
 
-        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        bb.accepted.connect(self.accept); bb.rejected.connect(self.reject)
-        lay.addWidget(bb)
+    # ---------- accept ----------
+    def _on_accept(self):
+        """Persiste subito la scelta dei motori nativi, poi chiude (gli override li legge open_settings)."""
+        try:
+            user_prefs.set_engine("image", self.cb_img_engine.currentData())
+            user_prefs.set_engine("video", self.cb_vid_engine.currentData())
+        except Exception:
+            pass
+        self.accept()
 
     def overrides(self) -> dict:
         out: dict[str, dict] = {}
+        try:
+            loaders = self.engine.loader_nodes()
+        except Exception:
+            loaders = []
         for node, (inp, combo) in self._combos.items():
             val = combo.currentText().strip()
-            # registra solo se diverso dal valore originale del template
-            orig = next((l["current"] for l in self.engine.loader_nodes() if l["node"] == node), None)
+            orig = next((l["current"] for l in loaders if l["node"] == node), None)
             if val and val != orig:
                 out[node] = {inp: val}
         return out

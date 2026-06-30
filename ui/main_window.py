@@ -682,13 +682,48 @@ class MainWindow(QMainWindow):
 
     def open_wizard(self):
         wiz = SetupWizard(self)
-        if wiz.exec():
-            r = wiz.result_values()
-            self.frame1_tab.prompt.setPlainText(r.get("prompt_positive", ""))
+        if not wiz.exec():
+            return
+        r = wiz.result_values()
+        cat = r.get("category", "video")
+        prompt = r.get("prompt_positive", "")
+        # Stato condiviso (sempre): modalità contenuto + audio.
+        self.state.update({"nsfw_mode": r.get("nsfw_mode"), "audio_mode": r.get("audio_mode")})
+        nsfw_text = "NSFW" if r.get("nsfw_mode") == "nsfw" else "SFW"
+
+        if cat == "video":
+            self.frame1_tab.prompt.setPlainText(prompt)
             self.video_tab.length.setValue(r.get("length_s", 8))
-            self.video_tab.nsfw.setCurrentText("NSFW" if r.get("nsfw_mode") == "nsfw" else "SFW")
-            self.state.update({"nsfw_mode": r.get("nsfw_mode"), "audio_mode": r.get("audio_mode")})
-            self._log(f"Wizard: obiettivo '{r.get('goal')}' applicato.")
+            try:
+                self.video_tab.nsfw.setCurrentText(nsfw_text)
+            except Exception:
+                pass
+            self.tabs.setCurrentWidget(self.video_tab)
+        elif cat == "image":
+            self.frame1_tab.prompt.setPlainText(prompt)
+            self.tabs.setCurrentWidget(self.frame1_tab)
+        elif cat == "3d":
+            # immagine→3D: nessun prompt, basta portare l'utente alla scheda giusta.
+            self.tabs.setCurrentWidget(self.trellis_tab)
+        elif cat == "music":
+            # il prompt è la descrizione da cui generare il testo della canzone.
+            if prompt and hasattr(self.music_tab, "lyr_prompt"):
+                self.music_tab.lyr_prompt.setText(prompt)
+            self.tabs.setCurrentWidget(self.music_tab)
+        elif cat == "voice":
+            if prompt and hasattr(self.audio_tab, "tts_text"):
+                self.audio_tab.tts_text.setPlainText(prompt)
+            self.tabs.setCurrentWidget(self.audio_tab)
+        elif cat == "film":
+            # AI Film Studio è una finestra separata: la apro col prompt come spunto.
+            self._open_film_studio()
+            win = getattr(self, "_film_win", None)
+            if prompt and win is not None and hasattr(win, "seed_prompt"):
+                try:
+                    win.seed_prompt(prompt)
+                except Exception:
+                    pass
+        self._log(f"Wizard: obiettivo '{r.get('goal_label', r.get('goal'))}' applicato.")
 
     def _wire_ws(self):
         self.driver.on_progress = lambda v, m: self.bridge.progress.emit(v, m)

@@ -150,8 +150,18 @@ def generate(params: dict, timeout: int = 3600) -> dict:
     seed, model, quant, offload, loras=[{name,strength}], output?. Ritorna {status, output:[mp4]}.
 
     DEFAULT = comfy-native (model_management ComfyUI, no OOM su 32GB). LTX_ENGINE=lightricks per il
-    vecchio server persistente ltx-core (sborza sui 32GB)."""
-    if os.environ.get("LTX_ENGINE", "comfy").lower() != "lightricks":
+    vecchio server persistente ltx-core (sborza sui 32GB).
+
+    Selezione motore (in ordine di priorità): env LTX_ENGINE → user_prefs.get_engine('video') →
+    default 'comfy'. Il selettore nel dialog Impostazioni scrive get_engine('video')."""
+    engine = os.environ.get("LTX_ENGINE", "").lower()
+    if not engine:
+        try:
+            from core import user_prefs
+            engine = user_prefs.get_engine("video", "comfy")
+        except Exception:
+            engine = "comfy"
+    if engine != "lightricks":
         return _generate_comfy_native(params, timeout)
     if not ensure_server():
         return {"status": "error", "error": "server video LTX-2 non avviato (venv ltx2 mancante?)"}
