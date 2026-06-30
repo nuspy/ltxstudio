@@ -113,3 +113,5 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - TRELLIS resta l'UNICO modulo 3D validato end-to-end (model.glb reale).
 
 - Rig nativo (mesh->scheletro+skin): REAL_rig_puppy.glb (6MB, 1 armatura, 7 ossa Mixamo mixamorig:Hips/Spine/Neck/Head..., skin weights). Port del node ComfyUI-SkinToken come LIBRERIA (scripts/rig_native_skintoken.py, no ComfyUI server) nel venv ComfyUI + Blender headless. Inferenza 46s. rig_service ricablato (repo TokenRig 404 era morto). 2/3 moduli 3D validati (TRELLIS+Rig). ✅
+
+- WorldGen — fix nunchaku Windows: venv/.../nunchaku/models/transformers/utils.py, le 2 chiamate hf_hub_download usano `repo_id=str(pretrained_model_name_or_path).replace(chr(92),chr(47))` (Path() su Windows trasformava il repo-id mit-han-lab/svdq-fp4-flux.1-fill-dev in backslash -> HFValidationError). FP4 ~7GB non-gated in download; al termine WorldGen testabile (ramo low_vram nunchaku FP4, evita i 24GB bf16). ⏳
