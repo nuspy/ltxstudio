@@ -50,18 +50,28 @@ class MetadataSaver:
         except Exception:
             return None
 
+    # estensioni media mostrate in galleria (immagini, video, audio)
+    _MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp",
+                   ".mp4", ".webm", ".mkv", ".mov", ".gif",
+                   ".mp3", ".wav", ".flac", ".ogg", ".m4a"}
+
     @staticmethod
     def list_outputs_with_sidecar(output_dir: str | Path) -> list[Path]:
-        """Elenca i file di output che hanno un sidecar JSON, ordinati per data (più recente prima)."""
+        """Elenca TUTTI i media di output (immagini/video/audio), RICORSIVO nelle sottocartelle
+        (audio/music/tts), ordinati per data (più recente prima). I file con sidecar JSON mostrano i
+        metadata; gli altri (es. generati da test/backend) appaiono comunque — così l'utente VEDE tutto."""
         d = Path(output_dir)
         if not d.exists():
             return []
         results = []
-        for f in d.iterdir():
-            if f.is_file() and not f.name.endswith(".json"):
-                if MetadataSaver.sidecar_path(f).exists():
-                    results.append(f)
-        # Ordina per data di modifica, più recente prima
+        for f in d.rglob("*"):
+            if not f.is_file():
+                continue
+            n = f.name.lower()
+            if n.endswith(".json") or n.startswith("_") or "/.cache/" in f.as_posix().lower():
+                continue                                    # salta sidecar, temp (_*), cache
+            if f.suffix.lower() in MetadataSaver._MEDIA_EXTS:
+                results.append(f)
         results.sort(key=lambda p: p.stat().st_mtime, reverse=True)
         return results
 

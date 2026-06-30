@@ -279,10 +279,16 @@ class NavigatorDialog(QDialog):
         for f in files:
             it = QListWidgetItem()
             it.setData(Qt.UserRole, f)
-            if f.suffix.lower() in (".mp4", ".webm", ".mkv", ".mov", ".gif"):
+            _sx = f.suffix.lower()
+            if _sx in (".mp4", ".webm", ".mkv", ".mov", ".gif"):
                 pix = _video_icon()
+            elif _sx in (".mp3", ".wav", ".flac", ".ogg", ".m4a"):
+                pix = _video_icon()                          # audio: icona generica (no thumbnail)
             else:
-                pix = _image_thumb(f)
+                try:
+                    pix = _image_thumb(f)
+                except Exception:                            # noqa: BLE001
+                    pix = _video_icon()
             it.setIcon(QIcon(pix))
             dt = datetime.datetime.fromtimestamp(f.stat().st_mtime)
             name_short = f.name if len(f.name) <= 28 else f.name[:25] + "…"
