@@ -13,7 +13,7 @@ import os
 import subprocess
 import sys
 
-COMFY = r"E:\AI\Comfy_Nexus\ComfyUI"
+COMFY = r"E:\AI\Comfy_Nexus.bak\ComfyUI"   # repo allineato al venv attivo (torch 2.8+cu128 + SageAttention)
 sys.path.insert(0, COMFY)
 os.chdir(COMFY)                                          # cwd corretto: import relativi (utils) + extra paths
 
