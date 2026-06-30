@@ -73,15 +73,22 @@ def run(p: dict) -> str:
     pos = _unwrap(enc.encode(clip, p.get("prompt", "")))
     neg = _unwrap(enc.encode(clip, p.get("negative", "worst quality, blurry")))
     W, H, F = int(p.get("width", 768)), int(p.get("height", 512)), int(p.get("num_frames", 97))
+    # Forza immagine: la GUI manda ref_strength (fallback img_strength). 1.0=guida piena.
+    _strength = float(p.get("ref_strength", p.get("img_strength", 1.0)))
     if p.get("image_path"):                              # i2v: condiziona sul primo frame
         import numpy as np
         from PIL import Image
-        from comfy_extras.nodes_lt import LTXVImgToVideo
         im = Image.open(p["image_path"]).convert("RGB")
         img_t = torch.from_numpy(np.asarray(im, dtype="float32") / 255.0)[None]   # [1,H,W,3]
-        v = _vals(LTXVImgToVideo().execute(pos, neg, img_t, vae, W, H, F, 1,
-                                           float(p.get("img_strength", 1.0))))
-        pos, neg, latent = v[0], v[1], v[2]
+        if p.get("i2v_method") == "inplace":            # inplace-SOFT: il modello reinterpreta (noise_mask)
+            from comfy_extras.nodes_lt import LTXVImgToVideoInplace
+            latent = _unwrap(EmptyLTXVLatentVideo().execute(W, H, F))
+            latent = _unwrap(LTXVImgToVideoInplace().execute(vae, img_t, latent, _strength))
+            print("[i2v] metodo inplace-soft", flush=True)
+        else:                                            # addguide: guida piena sul primo frame
+            from comfy_extras.nodes_lt import LTXVImgToVideo
+            v = _vals(LTXVImgToVideo().execute(pos, neg, img_t, vae, W, H, F, 1, _strength))
+            pos, neg, latent = v[0], v[1], v[2]
     else:
         latent = _unwrap(EmptyLTXVLatentVideo().execute(W, H, F))
     if not isinstance(latent, dict):
