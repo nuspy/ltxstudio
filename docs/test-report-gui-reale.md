@@ -125,3 +125,9 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - Mocap DA VIDEO: headsmash.mp4 (1280x720) -> REAL_headsmash_mocap.bvh (225 frame, 19 ossa umanoidi @24fps, 92% detection, 7s). FIX: mediapipe>=0.10.21 ha rimosso mp.solutions -> install_mocap pinna mediapipe==0.10.18. ✅
 - Retarget: BVH + mesh riggata (Mixamo) -> REAL_headsmash_retarget.glb (2 animazioni, 21 channels). FIX: nla.bake only_selected=True (POSE) filtrava le OSSA selezionate (0 selezionate -> bake vuoto) -> only_selected=False. ✅
 - Convertitore 3D (GLB->FBX) + EXR/HDR export gia validati. => 4/4 moduli 3D secondari OK.
+
+## Catena asset videogame su materiali utente (Headbang.png + headsmash.mp4) — 30/06
+- TRELLIS cavaliere: REAL_trellis_knight/model.glb (140742 vert + texture 1024). ✅
+- Rig cavaliere: REAL_knight_rigged.glb (46 ossa Mixamo + skin). ✅
+- Mocap: REAL_headsmash_mocap.bvh (225 frame, asset pulito riutilizzabile). ✅
+- Retarget BVH->cavaliere: REAL_knight_animated.glb (2 anim, 138 ch) — pipeline gira end-to-end MA deformazione CONTORTA (rest-pose mismatch tra BVH mediapipe e auto-rig SkinToken). Per resa pulita: retarget su Mixamo standard o aggiungere rest-pose alignment in retarget.py. ⚠️
