@@ -77,26 +77,37 @@ def _to_dm_relative(model: str) -> str:
 
 
 def _auto_calibrate_video_model(model_rel: str) -> str:
-    """Sceglie il modello LTX per fascia VRAM (distribuibile, niente hardcode): fp8 se VRAM libera alta,
-    GGUF Q4 se bassa. Solo per il 22B fp8 di default; rispetta scelte esplicite di altri modelli/GGUF."""
-    import os as _os
-    if not model_rel or model_rel.lower().endswith(".gguf"):
-        return model_rel                                    # già GGUF o vuoto → non toccare
+    """Sceglie il modello LTX-2.3 22B per FASCIA VRAM (distribuibile, niente hardcode), preferendo il
+    DISTILLED (step veloci) dove entra. Solo se il default è il 22B fp8; rispetta scelte esplicite (GGUF/altro).
+    Fasce: ≥30GB→fp8 distilled (24GB, qualità) · ≥16GB→Q4_K_M distilled (14GB) · <16GB→Q3_K_M dev (~10GB)."""
+    import os as _os, glob
+    if not model_rel or model_rel.lower().endswith(".gguf") or "22b" not in model_rel.lower():
+        return model_rel
     try:
         from core import model_precision as _mp
         free = float(_mp.gpu_free_gb())
     except Exception:                                       # noqa: BLE001
         return model_rel
-    # il fp8 22B (24GB) entra comodo solo con ~28GB+ liberi; sotto → GGUF Q4 (14GB) per non sborzare
-    if "22b" in model_rel.lower() and free < 28.0:
-        gguf = _os.path.join(_DM_ROOT, "LTXVideo", "v2", "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf")
-        if not _os.path.exists(gguf):
-            import glob
-            hits = glob.glob(_os.path.join(_DM_ROOT, "LTXVideo", "**", "*Q4_K_M.gguf"), recursive=True)
-            gguf = hits[0] if hits else ""
-        if gguf and _os.path.exists(gguf):
-            print(f"[auto-calibra] VRAM~{free:.0f}GB<28 → GGUF Q4 (distribuibile)", flush=True)
-            return _to_dm_relative(gguf)
+
+    def _first(*cands):
+        for c in cands:
+            if c and _os.path.exists(c):
+                return c
+        return ""
+    if free >= 30.0:
+        return model_rel                                    # fp8 distilled (24GB) — qualità piena
+    if free >= 16.0:                                        # Q4_K_M distilled (14GB) — veloce, entra su 32GB/24GB
+        g = _first(_os.path.join(_DM_ROOT, "LTXVideo", "LTX-2", "quantstack", "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf"),
+                   *glob.glob(_os.path.join(_DM_ROOT, "**", "*distilled*Q4_K_M.gguf"), recursive=True))
+        if g:
+            print(f"[auto-calibra] VRAM~{free:.0f}GB → Q4 distilled (14GB)", flush=True); return _to_dm_relative(g)
+    # schede piccole → Q3_K_M dev (~10GB)
+    g = _first(_os.path.join(_DM_ROOT, "ltx-2-3-22b-dev-Q3_K_M.gguf"),
+               *glob.glob(_os.path.join(_DM_ROOT, "**", "*Q3_K_M.gguf"), recursive=True),
+               *glob.glob(_os.path.join(_DM_ROOT, "**", "*Q4_K_M.gguf"), recursive=True))
+    if g:
+        print(f"[auto-calibra] VRAM~{free:.0f}GB → GGUF piccolo ({_os.path.basename(g)})", flush=True)
+        return _to_dm_relative(g)
     return model_rel
 
 
