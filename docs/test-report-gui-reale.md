@@ -83,3 +83,5 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - V2V real->anime: REAL_video_v2v_anime.mp4 (183KB, [gen] 13s). Pipeline V2V VALIDATA meccanicamente (sorgente->guida + ReStyle IC-LoRA + genera+output). MA a control_strength=0.7/6-step lo stile anime NON è visibile (output ≈ sorgente realistico) → serve strength più bassa (0.3-0.5) + più step per il restyle effettivo. Wiring OK, resa stile da tarare. ⚠️
 
 - Face-swap foto: REAL_faceswap.png (409KB) — InsightFace inswapper (volto sorgente→ritratto target), CUDAExecutionProvider. ✅
+
+- SeedVR2 super-res video: REAL_seedvr2.mp4 (2.86MB, 49s) — upscale 512x320→720p, service con offload proprio. ✅
