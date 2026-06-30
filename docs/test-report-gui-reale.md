@@ -81,3 +81,5 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - a2v (canta/talk): REAL_video_a2v.mp4 (512x320 h264 + AAC 48kHz stereo) — modello AV congiunto comfy, audio fornito encode+keep+mux. Copre canta/talk/audio-utente. ✅
 
 - V2V real->anime: REAL_video_v2v_anime.mp4 (183KB, [gen] 13s). Pipeline V2V VALIDATA meccanicamente (sorgente->guida + ReStyle IC-LoRA + genera+output). MA a control_strength=0.7/6-step lo stile anime NON è visibile (output ≈ sorgente realistico) → serve strength più bassa (0.3-0.5) + più step per il restyle effettivo. Wiring OK, resa stile da tarare. ⚠️
+
+- Face-swap foto: REAL_faceswap.png (409KB) — InsightFace inswapper (volto sorgente→ritratto target), CUDAExecutionProvider. ✅
