@@ -77,6 +77,57 @@
       "repo_id": "Qwen/Qwen3-4B", "type": "diffusers", "family": "_te",
       "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_4b", "gated": false, "approx_gb": 8,
       "scan_names": ["qwen3_4b", "Qwen3-4B"]
+    },
+    {
+      "id": "trellis2-4b", "module": "Modello 3D (TRELLIS)", "label": "TRELLIS.2-4B (immagine→3D)", "kind": "snapshot",
+      "repo_id": "microsoft/TRELLIS.2-4B", "type": "mesh", "family": "TRELLIS",
+      "tool_dest": "E:\\AI\\Tools\\TRELLIS2\\models\\TRELLIS.2-4B", "gated": false, "approx_gb": 25,
+      "scan_names": ["TRELLIS.2-4B", "trellis2"]
+    },
+    {
+      "id": "dinov3-vitl16", "module": "Modello 3D (TRELLIS)", "label": "DINOv3 ViT-L (encoder, mirror non-gated)", "kind": "snapshot",
+      "repo_id": "camenduru/dinov3-vitl16-pretrain-lvd1689m", "type": "encoder", "family": "DINOv3",
+      "gated": false, "approx_gb": 1.2, "scan_names": ["dinov3-vitl16", "camenduru"],
+      "note": "facebook/dinov3-vitl16 è GATED → si usa il mirror camenduru; patch model_name in pipeline.json"
+    },
+    {
+      "id": "birefnet", "module": "Modello 3D (TRELLIS)", "label": "BiRefNet (rembg)", "kind": "snapshot",
+      "repo_id": "ZhengPeng7/BiRefNet", "type": "segmentation", "family": "BiRefNet",
+      "gated": false, "approx_gb": 0.5, "scan_names": ["BiRefNet"],
+      "note": "rembg per TRELLIS (al posto di briaai/RMBG-2.0 gated). Serve pip kornia+timm nel venv TRELLIS2"
+    },
+    {
+      "id": "svdq-fp4-fluxfill", "module": "Mondo 3D (WorldGen)", "label": "FLUX.1-Fill FP4 (nunchaku, low-VRAM)", "kind": "snapshot",
+      "repo_id": "mit-han-lab/svdq-fp4-flux.1-fill-dev", "type": "diffusers", "family": "FLUX",
+      "gated": false, "approx_gb": 7, "scan_names": ["svdq-fp4-flux", "svdq"],
+      "note": "ramo low_vram di WorldGen; evita i 24GB del FLUX-Fill bf16. Richiede patch nunchaku Windows (backslash repo-id)"
+    },
+    {
+      "id": "worldgen-lora", "module": "Mondo 3D (WorldGen)", "label": "WorldGen img2scene LoRA", "kind": "snapshot",
+      "repo_id": "LeoXie/WorldGen", "type": "lora", "family": "WorldGen",
+      "gated": false, "approx_gb": 0.1, "scan_names": ["WorldGen", "worldgen_img2scene"]
+    },
+    {
+      "id": "acestep-3.5b", "module": "Musica (ACE-Step)", "label": "ACE-Step v1 3.5B", "kind": "snapshot",
+      "repo_id": "ACE-Step/ACE-Step-v1-3.5B", "type": "audio", "family": "ACE-Step",
+      "tool_dest": "C:\\Users\\atain\\.cache\\ace-step\\checkpoints", "gated": false, "approx_gb": 14,
+      "scan_names": ["ACE-Step-v1-3.5B", "acestep"],
+      "note": "file grosso 6.5GB → su connessione instabile usare resume/hf_xet (IncompleteRead)"
+    },
+    {
+      "id": "voice-fish", "module": "Voce (clone)", "label": "Fish/OpenAudio S1-mini", "kind": "snapshot",
+      "repo_id": "fishaudio/openaudio-s1-mini", "type": "tts", "family": "voice",
+      "gated": true, "approx_gb": 3.6, "scan_names": ["openaudio", "fish-speech"]
+    },
+    {
+      "id": "voice-vibevoice", "module": "Voce (clone)", "label": "VibeVoice 1.5B (multi-speaker)", "kind": "snapshot",
+      "repo_id": "microsoft/VibeVoice-1.5B", "type": "tts", "family": "voice",
+      "gated": false, "approx_gb": 5.4, "scan_names": ["VibeVoice"]
+    },
+    {
+      "id": "voice-cosyvoice2", "module": "Voce (clone)", "label": "CosyVoice2 0.5B", "kind": "snapshot",
+      "repo_id": "FunAudioLLM/CosyVoice2-0.5B", "type": "tts", "family": "voice",
+      "gated": false, "approx_gb": 4.9, "scan_names": ["CosyVoice2", "cosyvoice"]
     }
   ]
 }
