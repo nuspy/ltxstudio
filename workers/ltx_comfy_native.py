@@ -35,6 +35,7 @@ if os.environ.get("LTX_SAGE", "1") != "0":
 for _folder, _path in (("diffusion_models", r"E:\AI\Models\diffusion_models"),
                        ("text_encoders", r"E:\AI\Models\TextEncoders"),
                        ("clip", r"E:\AI\Models\TextEncoders"),
+                       ("loras", r"E:\AI\Models\LoRA"),
                        ("vae", r"E:\AI\Models\VAE"),
                        ("checkpoints", r"E:\AI\Models\Checkpoints")):
     try:
@@ -82,6 +83,17 @@ def run(p: dict) -> str:
         p.get("clip1", "gemma_3_12B_it.safetensors"),
         p.get("clip2", "ltx-2.3_text_projection_bf16.safetensors"), "ltxv"))
     vae = _unwrap(nodes.VAELoader().load_vae(p.get("vae", "LTX23_video_vae_bf16.safetensors")))
+    # LoRA video (p['loras']=[{name,strength}]): applicate al modello via LoraLoaderModelOnly (ComfyUI).
+    for _lo in (p.get("loras") or []):
+        _ln = _lo.get("name") if isinstance(_lo, dict) else _lo
+        if not _ln:
+            continue
+        _ls = float(_lo.get("strength", 1.0)) if isinstance(_lo, dict) else 1.0
+        try:
+            model = _unwrap(nodes.LoraLoaderModelOnly().load_lora_model_only(model, _ln.replace("\\", "/"), _ls))
+            print(f"[lora] {os.path.basename(str(_ln))} @ {_ls}", flush=True)
+        except Exception as _e:  # noqa: BLE001
+            print(f"[lora] '{_ln}' non applicata: {_e}", flush=True)
     print(f"[load] {time.time()-t0:.0f}s", flush=True)
     if torch.cuda.is_available():
         print(f"[vram] post-load {torch.cuda.memory_allocated()/1e9:.1f}GB", flush=True)
