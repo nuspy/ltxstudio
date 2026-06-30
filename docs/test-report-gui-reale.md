@@ -62,3 +62,7 @@ non sono testabili a piena risoluzione. Da rifare su GPU ≥40GB o dopo #18.
 | Voice clone xtts2/fish/vibevoice/cosyvoice | — | sbloccati dal fix Job.run, da testare (pesi: f5tts/xtts2 locali, altri mancanti) |
 
 **Bug riparato**: `core/music_service.Job` non aveva `run()` (solo `start()` async) → `tts_engine._synthesize_native_clone` falliva ('Job object has no attribute run') = **tutto il voice-cloning nativo era rotto**. Aggiunto `Job.run()` bloccante.
+
+### Aggiornamento audio (30/06, cont.)
+- ✅ Voice clone **xtts2**: output/audio/clone_xtts.wav (193KB) — 2ª voce validata (fix Job.run conferma).
+- 🔒 **MMAudio**: venv rotto = torch 2.12.1+**cpu** + torchaudio ABI mismatch (libtorchaudio.pyd non carica). Riparazione = reinstall torch-CUDA+torchaudio (download grosso, metered → rimandato). Codice/wiring OK.
