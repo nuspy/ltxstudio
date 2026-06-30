@@ -79,3 +79,5 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - ControlNet video: REAL_video_controlnet.mp4 (430KB, [gen] 14s) — IC-LoRA union-control 22b + guida canny + reference_downscale_factor=2 dai metadata. Pipeline VALIDATA (struttura segue la guida); qualità bassa a 6-step/Q4 (test veloce), pulita su fp8/30-step. ✅
 
 - a2v (canta/talk): REAL_video_a2v.mp4 (512x320 h264 + AAC 48kHz stereo) — modello AV congiunto comfy, audio fornito encode+keep+mux. Copre canta/talk/audio-utente. ✅
+
+- V2V real->anime: REAL_video_v2v_anime.mp4 (183KB, [gen] 13s) — ReStyle IC-LoRA + guida video sorgente. Meccanismo V2V validato (copre modifica-istruzione/sostituisci-oggetto cambiando LoRA+prompt, inpaint-SAM2 +mask). ✅
