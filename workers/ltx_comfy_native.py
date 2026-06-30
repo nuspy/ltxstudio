@@ -111,7 +111,47 @@ def run(p: dict) -> str:
         im = _PILImage.open(path).convert("RGB")
         return torch.from_numpy(np.asarray(im, dtype="float32") / 255.0)[None]      # [1,H,W,3]
 
-    if p.get("keyframes"):                               # storyboard / multi-keyframe: foto a frame diversi
+    def _video_tensor(path, w, h, nmax):
+        """Carica i frame di un video di controllo (canny/depth/pose) → [N,h,w,3] float [0,1]."""
+        import cv2
+        cap = cv2.VideoCapture(path)
+        frames = []
+        while len(frames) < nmax:
+            ok, fr = cap.read()
+            if not ok:
+                break
+            fr = cv2.cvtColor(cv2.resize(fr, (w, h)), cv2.COLOR_BGR2RGB)
+            frames.append(fr)
+        cap.release()
+        if not frames:
+            raise RuntimeError(f"nessun frame nel control_video: {path}")
+        a = np.asarray(frames, dtype="float32") / 255.0                            # [N,h,w,3]
+        return torch.from_numpy(a)
+
+    if p.get("control_video"):                           # ControlNet: IC-LoRA control (in loras) + video-guida
+        from comfy_extras.nodes_lt import LTXVAddGuide
+        latent = _unwrap(EmptyLTXVLatentVideo().execute(W, H, F))
+        ctrl = _video_tensor(p["control_video"], W, H, F)
+        _cs = float(p.get("control_strength", 0.8))
+        # reference_downscale_factor dai metadata della control-LoRA (es. union-control=2): la guida va
+        # ridimensionata di conseguenza, altrimenti LTXVAddGuide produce dimensioni errate.
+        _iclora = None
+        _clora = p.get("control_lora") or (p["loras"][0].get("name") if p.get("loras") else None)
+        if _clora:
+            try:
+                from safetensors import safe_open as _sopen
+                _cp = _clora if os.path.isabs(_clora) else os.path.join(r"E:\AI\Models\LoRA", _clora)
+                with _sopen(_cp.replace("/", "\\"), "pt") as _f:
+                    _fac = max(1, round(float((_f.metadata() or {}).get("reference_downscale_factor", 1))))
+                if _fac > 1:
+                    _iclora = {"reference_downscale_factor": _fac}
+                    print(f"[controlnet] reference_downscale_factor={_fac}", flush=True)
+            except Exception as _e:  # noqa: BLE001
+                print(f"[controlnet] meta factor non letto: {_e}", flush=True)
+        v = _vals(LTXVAddGuide().execute(pos, neg, vae, latent, ctrl, 0, _cs, iclora_parameters=_iclora))
+        pos, neg, latent = v[0], v[1], v[2]
+        print(f"[controlnet] guida da {os.path.basename(p['control_video'])} ({ctrl.shape[0]} frame) @ {_cs}", flush=True)
+    elif p.get("keyframes"):                             # storyboard / multi-keyframe: foto a frame diversi
         from comfy_extras.nodes_lt import LTXVAddGuide
         latent = _unwrap(EmptyLTXVLatentVideo().execute(W, H, F))
         for kf in p["keyframes"]:
