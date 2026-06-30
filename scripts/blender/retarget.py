@@ -65,40 +65,64 @@ def _target_armature(exclude=None):
 
 
 def _retarget(target, source, mapping, fstart, fend) -> None:
-    """Constraint Copy Rotation/Location source→target, poi bake e pulizia."""
-    bpy.context.scene.frame_start = fstart
-    bpy.context.scene.frame_end = fend
+    """Retarget con CORREZIONE DI ORIENTAMENTO REST per-osso (gestisce roll/assi diversi tra
+    scheletri auto-generati, es. BVH mediapipe vs auto-rig SkinToken).
 
-    # identità se mapping vuoto: usa i nomi delle ossa del source presenti nel target
+    Matematica: una rotazione locale R_src dell'osso sorgente, riferita alla sua rest, va trasferita
+    nello spazio-osso del target. In armature-space la rotazione è S·R_src·S⁻¹ (S=rest del source);
+    riportata nello spazio-osso del target (T=rest del target) diventa R_tgt = (T⁻¹S)·R_src·(T⁻¹S)⁻¹.
+    Coniugando per C=T⁻¹·S si compensa la differenza di orientamento delle ossa → niente contorsione.
+    """
+    import mathutils
+    scene = bpy.context.scene
+    scene.frame_start = fstart
+    scene.frame_end = fend
+
     if not mapping:
         mapping = {b.name: b.name for b in source.pose.bones
                    if b.name in target.pose.bones}
 
-    root_done = False
+    # coppie (osso_source, osso_target, correzione C 3x3)
+    pairs = []
+    root_pair = None
     for src_name, tgt_name in mapping.items():
         tb = target.pose.bones.get(tgt_name)
         if tb is None or src_name not in source.pose.bones:
             continue
-        rot = tb.constraints.new("COPY_ROTATION")
-        rot.target = source
-        rot.subtarget = src_name
-        # La sola radice (hips/pelvis) copia anche la posizione, per lo spostamento.
-        if not root_done and ("hip" in tgt_name.lower() or "pelvis" in tgt_name.lower()):
-            loc = tb.constraints.new("COPY_LOCATION")
-            loc.target = source
-            loc.subtarget = src_name
-            root_done = True
+        sb = source.pose.bones[src_name]
+        S = sb.bone.matrix_local.to_3x3()
+        T = tb.bone.matrix_local.to_3x3()
+        C = T.inverted() @ S                       # 3x3: differenza di rest-orientation
+        tb.rotation_mode = "QUATERNION"
+        pairs.append((sb, tb, C, C.inverted()))
+        if root_pair is None and ("hip" in tgt_name.lower() or "pelvis" in tgt_name.lower()):
+            root_pair = (sb, tb)
 
-    # Bake dell'animazione sul target con visual keying, poi rimuovi i constraint.
-    for o in bpy.data.objects:
-        o.select_set(False)
-    target.select_set(True)
-    bpy.context.view_layer.objects.active = target
-    # only_selected=False: per bake_types POSE 'only_selected' filtra le OSSA selezionate (non l'oggetto).
-    # Selezionavamo solo l'oggetto target → 0 ossa selezionate → bake vuoto. False = tutte le ossa.
-    bpy.ops.nla.bake(frame_start=fstart, frame_end=fend, only_selected=False,
-                     visual_keying=True, clear_constraints=True,
-                     use_current_action=True, bake_types={"POSE"})
+    # azione target pulita
+    if target.animation_data is None:
+        target.animation_data_create()
+    act = bpy.data.actions.new("Retarget")
+    target.animation_data.action = act
+
+    # scala traslazione radice = altezza target / altezza source (per il movimento globale)
+    def _h(arm):
+        zs = [arm.matrix_world @ b.head for b in arm.data.bones]
+        return (max(p.z for p in zs) - min(p.z for p in zs)) or 1.0
+    root_scale = (_h(target) / _h(source)) if root_pair else 1.0
+    src_root_rest = root_pair[0].bone.matrix_local.translation if root_pair else None
+
+    for f in range(fstart, fend + 1):
+        scene.frame_set(f)
+        for sb, tb, C, Cinv in pairs:
+            R = sb.matrix_basis.to_3x3()           # rotazione locale (anim relativa alla rest)
+            tb.rotation_quaternion = (C @ R @ Cinv).to_quaternion()
+            tb.keyframe_insert("rotation_quaternion", frame=f)
+        if root_pair:
+            sb, tb = root_pair
+            # traslazione locale della radice (delta dalla rest), scalata
+            d = (sb.matrix_basis.translation) * root_scale
+            tb.location = d
+            tb.keyframe_insert("location", frame=f)
 
 
 def main() -> None:

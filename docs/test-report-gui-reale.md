@@ -131,3 +131,5 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - Rig cavaliere: REAL_knight_rigged.glb (46 ossa Mixamo + skin). ✅
 - Mocap: REAL_headsmash_mocap.bvh (225 frame, asset pulito riutilizzabile). ✅
 - Retarget BVH->cavaliere: REAL_knight_animated.glb (2 anim, 138 ch) — pipeline gira end-to-end MA deformazione CONTORTA (rest-pose mismatch tra BVH mediapipe e auto-rig SkinToken). Per resa pulita: retarget su Mixamo standard o aggiungere rest-pose alignment in retarget.py. ⚠️
+
+- Retarget MIGLIORATO (correzione orientamento rest per-osso, R_tgt=C·R_src·C^-1 con C=T^-1·S): animazione cavaliere ora PULITA (posa di combattimento corretta, no contorsione). Risolve il rest-pose/roll mismatch tra BVH mediapipe e auto-rig SkinToken. REAL_knight_animated.glb. ✅
