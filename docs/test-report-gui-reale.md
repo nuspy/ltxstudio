@@ -32,6 +32,19 @@ La suite `tests/gui_regression/run_all.py` pilota la GUI e verifica che ogni con
 | Video feature avanzate (audio/controlnet/storyboard/lungo) | 🔒/⏳ | Solo ltx2_infer → servono >40GB VRAM o il rewrite memoria (#18) per girare su 32GB. Da testare su HW adeguato o con #18. |
 | Immagini t2i/inpaint/outpaint/kontext/compose/integra/upscale/restauro/segment | ✅ | Validati in sessioni precedenti (backend reale). Integra mask-based ✅. |
 
+### Output REALI prodotti (backend vero, HF_HUB_OFFLINE, pesi locali) — 30/06
+| Feature | File | Esito |
+|---|---|---|
+| Immagine FLUX.1 t2i | `native_flux_123.png` (588KB, cucciolo) | ✅ |
+| Video t2v (motore comfy) | `REAL_video_t2v.mp4` (512×320, 49f, mongolfiera) | ✅ |
+| Upscale ESRGAN 4xNomos8kDAT | `native_upscale_1.png` (8.4MB) | ✅ |
+| Recolor (kontext FLUX.1) | `native_kontext_2.png` (682KB) | ✅ |
+| Segment (GroundingDINO+SAM2) | `native_segmask.png` | ✅ |
+| Audio TTS (edge) | `tts/tts_edge_elsa_*.mp3` (31KB) | ✅ (installato edge-tts) |
+
+NB: i run reali girano con `HF_HUB_OFFLINE=1` per non scaricare nulla sulla metered. Libreria mancante
+`edge-tts` installata (consentito). I `.incomplete` HF erano placeholder vuoti (nessun download mio andato a segno).
+
 ### Nota chiave 32GB
 Sui 32GB il **video 22B in ltx2_infer non è eseguibile** (model-bound). Il selettore + auto-switch instradano
 t2v/i2v su comfy-native (no-OOM). Le **feature video avanzate** (audio→video/canta/talk/retake/controlnet/
