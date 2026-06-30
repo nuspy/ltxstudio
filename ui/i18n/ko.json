@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "비디오 엔진",
   "vid.engine.ltx2": "LTX-2 네이티브 (전체 기능)",
   "vid.engine.comfy": "Comfy (동적 VRAM, t2v/i2v)",
-  "vid.engine.tt": "LTX-2 네이티브: 전체 기능(오디오/키프레임/controlnet). Comfy: 동적 VRAM, t2v/i2v만."
+  "vid.engine.tt": "LTX-2 네이티브: 전체 기능(오디오/키프레임/controlnet). Comfy: 동적 VRAM, t2v/i2v만.",
+  "wf.fill_title": "프롬프트 필드 채우기",
+  "wf.fill_hint": "각 자리표시자에 값을 입력하세요:",
+  "wf.fill_as_is": "그대로 적용"
 }

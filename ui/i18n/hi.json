@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "वीडियो इंजन",
   "vid.engine.ltx2": "LTX-2 नेटिव (सभी सुविधाएँ)",
   "vid.engine.comfy": "Comfy (डायनामिक VRAM, t2v/i2v)",
-  "vid.engine.tt": "LTX-2 नेटिव: सभी सुविधाएँ (ऑडियो/कीफ़्रेम/controlnet)। Comfy: डायनामिक VRAM, केवल t2v/i2v।"
+  "vid.engine.tt": "LTX-2 नेटिव: सभी सुविधाएँ (ऑडियो/कीफ़्रेम/controlnet)। Comfy: डायनामिक VRAM, केवल t2v/i2v।",
+  "wf.fill_title": "प्रॉम्प्ट फ़ील्ड भरें",
+  "wf.fill_hint": "हर प्लेसहोल्डर के लिए मान दर्ज करें:",
+  "wf.fill_as_is": "जैसा है वैसा लागू करें"
 }

@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "视频引擎",
   "vid.engine.ltx2": "LTX-2 原生（全部功能）",
   "vid.engine.comfy": "Comfy（动态显存，t2v/i2v）",
-  "vid.engine.tt": "LTX-2 原生：全部功能（音频/关键帧/controlnet）。Comfy：动态显存，仅 t2v/i2v。"
+  "vid.engine.tt": "LTX-2 原生：全部功能（音频/关键帧/controlnet）。Comfy：动态显存，仅 t2v/i2v。",
+  "wf.fill_title": "填写提示词字段",
+  "wf.fill_hint": "为每个占位符输入一个值：",
+  "wf.fill_as_is": "按原样应用"
 }

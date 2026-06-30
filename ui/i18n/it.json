@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "Motore video",
   "vid.engine.ltx2": "LTX-2 nativo (tutte le funzioni)",
   "vid.engine.comfy": "Comfy (VRAM dinamica, t2v/i2v)",
-  "vid.engine.tt": "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v."
+  "vid.engine.tt": "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v.",
+  "wf.fill_title": "Compila i campi del prompt",
+  "wf.fill_hint": "Inserisci un valore per ogni segnaposto del prompt:",
+  "wf.fill_as_is": "Applica così com'è"
 }

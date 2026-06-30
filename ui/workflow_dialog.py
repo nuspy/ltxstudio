@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPlainTextEdit,
     QGroupBox, QFormLayout, QPushButton, QDialogButtonBox, QCheckBox, QFrame,
+    QLineEdit, QMessageBox,
 )
 
 from core.workflow_templates import WORKFLOW_PRESETS
@@ -27,8 +28,8 @@ class WorkflowDialog(QDialog):
         super().__init__(parent)
         self.apply_callback = apply_callback
         self.setWindowTitle(tr("wf.window_title"))
-        self.setMinimumWidth(680)
-        self.setMinimumHeight(540)
+        self.setMinimumWidth(1040)          # box dettagli ~3x più larghi (erano illeggibili a 680)
+        self.setMinimumHeight(560)
         self._build()
         self._on_workflow_changed(0)
 
@@ -54,19 +55,24 @@ class WorkflowDialog(QDialog):
         df.setLabelAlignment(Qt.AlignRight)
         df.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
 
-        self.note_lbl = QLabel()
-        self.note_lbl.setWordWrap(True)
-        self.note_lbl.setStyleSheet("color: #74c0fc;")
+        # box dettagli: QLabel multi-riga con bordo, larghi e auto-altezza in base al contenuto.
+        def _box(color: str, extra: str = "") -> QLabel:
+            lb = QLabel()
+            lb.setWordWrap(True)                         # → va a capo + cresce in verticale da solo
+            lb.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            lb.setMinimumWidth(740)                      # ~3x rispetto a prima
+            lb.setStyleSheet(
+                f"color: {color}; {extra} padding: 6px 8px; background: #1b1b1b;"
+                "border: 1px solid #333; border-radius: 4px;")
+            return lb
+
+        self.note_lbl = _box("#74c0fc")
         df.addRow(tr("wf.notes_row"), self.note_lbl)
 
-        self.params_lbl = QLabel()
-        self.params_lbl.setWordWrap(True)
-        self.params_lbl.setStyleSheet("font-family: monospace; font-size: 11px;")
+        self.params_lbl = _box("#dddddd", "font-family: monospace; font-size: 11px;")
         df.addRow(tr("wf.params_row"), self.params_lbl)
 
-        self.lora_lbl = QLabel()
-        self.lora_lbl.setWordWrap(True)
-        self.lora_lbl.setStyleSheet("color: #a9e34b; font-size: 11px;")
+        self.lora_lbl = _box("#a9e34b", "font-size: 11px;")
         df.addRow(tr("wf.lora_suggested_row"), self.lora_lbl)
 
         v.addWidget(detail_grp)
@@ -171,6 +177,44 @@ class WorkflowDialog(QDialog):
         else:
             self.placeholder_warn.setVisible(False)
 
+    def _fill_placeholders(self, tmpl: str) -> str | None:
+        """Se il prompt ha placeholder {…}, chiede all'utente di compilarli e li sostituisce.
+        Ritorna il prompt compilato, oppure None se l'utente annulla (→ non applicare)."""
+        names = list(dict.fromkeys(re.findall(r"\{(\w+)\}", tmpl)))
+        if not names:
+            return tmpl
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("wf.fill_title"))
+        dlg.setMinimumWidth(460)
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel(tr("wf.fill_hint")))
+        form = QFormLayout()
+        edits: dict[str, QLineEdit] = {}
+        for n in names:
+            e = QLineEdit()
+            e.setPlaceholderText(n)                       # suggerimento = nome del placeholder
+            form.addRow(f"{{{n}}}", e)
+            edits[n] = e
+        lay.addLayout(form)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        # "Applica così com'è" = applica col placeholder ancora dentro (terzo pulsante)
+        btn_asis = bb.addButton(tr("wf.fill_as_is"), QDialogButtonBox.ActionRole)
+        lay.addWidget(bb)
+        result = {"mode": None}
+        bb.accepted.connect(lambda: (result.update(mode="fill"), dlg.accept()))
+        bb.rejected.connect(dlg.reject)
+        btn_asis.clicked.connect(lambda: (result.update(mode="asis"), dlg.accept()))
+        if dlg.exec() != QDialog.Accepted or result["mode"] is None:
+            return None                                   # annullato → non applicare
+        if result["mode"] == "asis":
+            return tmpl
+        out = tmpl
+        for n, e in edits.items():
+            val = e.text().strip()
+            if val:
+                out = out.replace(f"{{{n}}}", val)
+        return out
+
     def _on_apply(self):
         if not self.apply_callback:
             self.accept()
@@ -188,7 +232,10 @@ class WorkflowDialog(QDialog):
         if self.chk_prompt.isChecked():
             tmpl = self.prompt_txt.toPlainText().strip()
             if tmpl:
-                fields["prompt_positive"] = tmpl
+                filled = self._fill_placeholders(tmpl)   # smart: chiede i {placeholder}
+                if filled is None:
+                    return                                # utente ha annullato → non chiudere
+                fields["prompt_positive"] = filled
 
         if fields:
             self.apply_callback(fields, workflow_name=name)

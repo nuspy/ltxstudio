@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "Video-Engine",
   "vid.engine.ltx2": "LTX-2 nativ (alle Funktionen)",
   "vid.engine.comfy": "Comfy (dynamischer VRAM, t2v/i2v)",
-  "vid.engine.tt": "LTX-2 nativ: alle Funktionen (Audio/Keyframe/ControlNet). Comfy: dynamischer VRAM, nur t2v/i2v."
+  "vid.engine.tt": "LTX-2 nativ: alle Funktionen (Audio/Keyframe/ControlNet). Comfy: dynamischer VRAM, nur t2v/i2v.",
+  "wf.fill_title": "Prompt-Felder ausfüllen",
+  "wf.fill_hint": "Gib für jeden Platzhalter einen Wert ein:",
+  "wf.fill_as_is": "Unverändert anwenden"
 }

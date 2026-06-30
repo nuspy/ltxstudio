@@ -3,6 +3,7 @@ Condivide il runtime dell'app madre; backend 100% NATIVO. Registra gli handler d
 mappandoli sul Generation Service nativo."""
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPushButton, QTabWidget, QVBoxLayout, QWidget)
 
@@ -39,8 +40,16 @@ def _register_scheduler_handlers():
 class FilmStudioWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Finestra top-level INDIPENDENTE: title bar di sistema, spostabile + ridimensionabile,
+        # NON modale (non blocca la finestra madre), sfondo pieno (non widget figlio trasparente).
+        self.setWindowFlags(Qt.Window)
         self.setWindowTitle(tr("fs.title", "🎬 AI Film Studio"))
+        self.setAttribute(Qt.WA_StyledBackground, True)      # rispetta il bg del tema (niente trasparenza)
+        self.setAutoFillBackground(True)
+        self.setStyleSheet("QWidget#FilmStudioRoot { background: #1e1e1e; }")
+        self.setObjectName("FilmStudioRoot")
         self.resize(1100, 760)
+        self.setMinimumSize(800, 560)                        # ridimensionabile entro un minimo sensato
         self._project_id = None
         _register_scheduler_handlers()
         root = QVBoxLayout(self)

@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "Μηχανή βίντεο",
   "vid.engine.ltx2": "LTX-2 εγγενής (όλες οι λειτουργίες)",
   "vid.engine.comfy": "Comfy (δυναμική VRAM, t2v/i2v)",
-  "vid.engine.tt": "LTX-2 εγγενής: όλες οι λειτουργίες (ήχος/keyframe/controlnet). Comfy: δυναμική VRAM, μόνο t2v/i2v."
+  "vid.engine.tt": "LTX-2 εγγενής: όλες οι λειτουργίες (ήχος/keyframe/controlnet). Comfy: δυναμική VRAM, μόνο t2v/i2v.",
+  "wf.fill_title": "Συμπλήρωση πεδίων prompt",
+  "wf.fill_hint": "Εισάγετε τιμή για κάθε placeholder:",
+  "wf.fill_as_is": "Εφαρμογή ως έχει"
 }

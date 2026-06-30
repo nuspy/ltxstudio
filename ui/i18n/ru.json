@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "Видеодвижок",
   "vid.engine.ltx2": "LTX-2 нативный (все функции)",
   "vid.engine.comfy": "Comfy (динамическая VRAM, t2v/i2v)",
-  "vid.engine.tt": "LTX-2 нативный: все функции (аудио/кейфрейм/controlnet). Comfy: динамическая VRAM, только t2v/i2v."
+  "vid.engine.tt": "LTX-2 нативный: все функции (аудио/кейфрейм/controlnet). Comfy: динамическая VRAM, только t2v/i2v.",
+  "wf.fill_title": "Заполните поля промпта",
+  "wf.fill_hint": "Введите значение для каждого placeholder:",
+  "wf.fill_as_is": "Применить как есть"
 }

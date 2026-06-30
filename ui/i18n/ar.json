@@ -1857,5 +1857,8 @@
   "vid.engine_lbl": "محرك الفيديو",
   "vid.engine.ltx2": "LTX-2 أصلي (كل الميزات)",
   "vid.engine.comfy": "Comfy (VRAM ديناميكي، t2v/i2v)",
-  "vid.engine.tt": "LTX-2 أصلي: كل الميزات (صوت/كيفريم/controlnet). Comfy: VRAM ديناميكي، t2v/i2v فقط."
+  "vid.engine.tt": "LTX-2 أصلي: كل الميزات (صوت/كيفريم/controlnet). Comfy: VRAM ديناميكي، t2v/i2v فقط.",
+  "wf.fill_title": "املأ حقول الموجه",
+  "wf.fill_hint": "أدخل قيمة لكل عنصر نائب:",
+  "wf.fill_as_is": "تطبيق كما هو"
 }
