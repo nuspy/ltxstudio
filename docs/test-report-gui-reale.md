@@ -50,3 +50,15 @@ Sui 32GB il **video 22B in ltx2_infer non è eseguibile** (model-bound). Il sele
 t2v/i2v su comfy-native (no-OOM). Le **feature video avanzate** (audio→video/canta/talk/retake/controlnet/
 storyboard/lungo) sono solo su ltx2_infer → richiedono più VRAM o il memory-rewrite #18: su questa macchina
 non sono testabili a piena risoluzione. Da rifare su GPU ≥40GB o dopo #18.
+
+## Audio/Voce/Musica — test reali (30/06)
+| Feature | File | Esito |
+|---|---|---|
+| Voice clone **f5tts** | output/audio/clone_f5.wav (147KB) | ✅ (bug `Job.run` riparato in music_service) |
+| **HeartMuLa** musica | output/music/REAL_heartmula_song.mp3 (149KB) | ✅ |
+| TTS edge (Elsa/Diego) | output/tts/*.mp3 | ✅ |
+| ACE-Step | — | ⏳ funziona ma lento al load (>120s), non bug |
+| MMAudio sonify | — | ⚠️ da ri-testare (campo SonifyParams = video_path/duration_s) |
+| Voice clone xtts2/fish/vibevoice/cosyvoice | — | sbloccati dal fix Job.run, da testare (pesi: f5tts/xtts2 locali, altri mancanti) |
+
+**Bug riparato**: `core/music_service.Job` non aveva `run()` (solo `start()` async) → `tts_engine._synthesize_native_clone` falliva ('Job object has no attribute run') = **tutto il voice-cloning nativo era rotto**. Aggiunto `Job.run()` bloccante.
