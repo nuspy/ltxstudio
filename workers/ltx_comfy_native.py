@@ -57,6 +57,28 @@ def _unwrap(x):
     return _vals(x)[0]
 
 
+def _load_audio_vae(name: str):
+    """Carica l'Audio VAE LTXV (replica LTXVAudioVAELoader: prefix replace + comfy.sd.VAE)."""
+    import comfy.utils
+    import comfy.sd
+    import folder_paths
+    path = name if os.path.isabs(name) else (folder_paths.get_full_path("vae", name) or
+                                             os.path.join(r"E:\AI\Models\VAE", name))
+    sd, metadata = comfy.utils.load_torch_file(path, return_metadata=True)
+    sd = comfy.utils.state_dict_prefix_replace(
+        sd, {"audio_vae.": "autoencoder.", "vocoder.": "vocoder."}, filter_keys=True)
+    vae = comfy.sd.VAE(sd=sd, metadata=metadata)
+    vae.throw_exception_if_invalid()
+    return vae
+
+
+def _load_audio(path: str):
+    """Carica un file audio → dict {waveform:[1,C,N], sample_rate} (formato ComfyUI Audio)."""
+    import torchaudio
+    wav, sr = torchaudio.load(path)            # [C,N]
+    return {"waveform": wav.unsqueeze(0), "sample_rate": int(sr)}
+
+
 async def _init():
     import nodes
     await nodes.init_extra_nodes(init_custom_nodes=True, init_api_nodes=False)
@@ -182,6 +204,26 @@ def run(p: dict) -> str:
         latent = {"samples": getattr(latent, "samples", latent)}
     print(f"[cond] ok, latent={tuple(latent['samples'].shape)}", flush=True)
 
+    # ── a2v (canta/talk): modello AV congiunto. Audio fornito = ENCODE+KEEP (lip-sync), video generato. ──
+    av_mode = False
+    audio_vae = None
+    if p.get("audio_path"):
+        from comfy_extras.nodes_lt import LTXVConcatAVLatent
+        from comfy_extras.nodes_lt_audio import LTXVAudioVAEEncode, LTXVEmptyLatentAudio
+        audio_vae = _load_audio_vae(p.get("audio_vae", "LTX23_audio_vae_bf16.safetensors"))
+        if os.path.isfile(str(p["audio_path"])):         # audio dato → encode e MANTIENI (noise_mask 0)
+            a_in = _load_audio(p["audio_path"])
+            audio_latent = _unwrap(LTXVAudioVAEEncode().execute(a_in, audio_vae))
+            audio_latent = dict(audio_latent)
+            audio_latent["noise_mask"] = torch.zeros_like(audio_latent["samples"])
+            print(f"[a2v] audio encode+keep {os.path.basename(p['audio_path'])}", flush=True)
+        else:                                            # nessun file → genera anche l'audio
+            audio_latent = _unwrap(LTXVEmptyLatentAudio().execute(F, int(p.get("fps", 24)), 1, audio_vae))
+            print("[a2v] audio generato (no input)", flush=True)
+        latent = _unwrap(LTXVConcatAVLatent().execute(latent, audio_latent))
+        av_mode = True
+        print("[a2v] AV latent concatenato", flush=True)
+
     cfg = float(p.get("guidance", 1.0))
     if cfg <= 1.0:
         guider = _unwrap(BasicGuider().get_guider(model, pos))
@@ -198,15 +240,43 @@ def run(p: dict) -> str:
         denoised = {"samples": getattr(denoised, "samples", denoised)}
     print(f"[gen] {time.time()-tg:.0f}s", flush=True)
 
+    if av_mode:                                          # a2v: separa video/audio, decodifica entrambi, muxa
+        from comfy_extras.nodes_lt import LTXVSeparateAVLatent
+        from comfy_extras.nodes_lt_audio import LTXVAudioVAEDecode
+        sep = _vals(LTXVSeparateAVLatent().execute(denoised))
+        vid_lat, aud_lat = sep[0], sep[1]
+        images = _unwrap(nodes.VAEDecode().decode(vae, vid_lat))
+        a_out = _unwrap(LTXVAudioVAEDecode().execute(aud_lat, audio_vae))
+        print("[a2v] decode video+audio ok", flush=True)
+        return _save_mp4(images, p["output"], float(p.get("fps", 24.0)),
+                         audio=a_out.get("waveform"), audio_sr=int(a_out.get("sample_rate", 44100)))
+
     images = _unwrap(nodes.VAEDecode().decode(vae, denoised))     # (frames,H,W,3) [0,1]
     return _save_mp4(images, p["output"], float(p.get("fps", 24.0)))
 
 
-def _save_mp4(images, out_path: str, fps: float) -> str:
+def _save_mp4(images, out_path: str, fps: float, audio=None, audio_sr: int = 44100) -> str:
     import numpy as np
     arr = (images.clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)  # (N,H,W,3)
     n, h, w, _ = arr.shape
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    if audio is not None:                                # a2v: scrivi WAV temporaneo e muxa con l'audio
+        import torchaudio
+        wav = audio[0] if hasattr(audio, "dim") and audio.dim() == 3 else audio   # [C,N]
+        wpath = out_path + ".audio.wav"
+        torchaudio.save(wpath, wav.cpu().float(), audio_sr)
+        proc = subprocess.Popen(
+            ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", str(fps),
+             "-i", "-", "-i", wpath, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+             "-shortest", out_path], stdin=subprocess.PIPE)
+        proc.stdin.write(arr.tobytes())
+        proc.stdin.close()
+        proc.wait()
+        try:
+            os.remove(wpath)
+        except OSError:
+            pass
+        return out_path
     proc = subprocess.Popen(
         ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
          "-r", str(fps), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", out_path],
