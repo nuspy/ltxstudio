@@ -2100,8 +2100,10 @@ class MainWindow(QMainWindow):
         # controlnet/storyboard/lungo ricade su ltx2_infer. Scelta in user_prefs (dropdown video_tab).
         from core import user_prefs as _up
         _engine = _up.get_engine("video", "ltx2_infer")
+        # comfy copre: t2v/i2v/i2v-soft + KEYFRAME/storyboard (LTXVAddGuide). Restano su ltx2_infer solo
+        # audio(a2v)/controlnet/long-chunk finché non portati anch'essi su comfy.
         _simple = not (params.get("audio_path") or params.get("control_video")
-                       or params.get("keyframes") or params.get("chunk_frames"))
+                       or params.get("chunk_frames"))
         # AUTO-SWITCH VRAM-aware: il 22B in ltx2_infer non entra sotto ~40GB liberi (model-bound: dequant
         # → ~44GB, sborda anche a bassa risoluzione). Se è un t2v/i2v SEMPLICE (che comfy copre) e la VRAM
         # non basta → uso comfy-native (no-OOM) automaticamente. Vedi [[dynamic-vram-tuning]].

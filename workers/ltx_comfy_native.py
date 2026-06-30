@@ -81,7 +81,25 @@ def run(p: dict) -> str:
     W, H, F = int(p.get("width", 768)), int(p.get("height", 512)), int(p.get("num_frames", 97))
     # Forza immagine: la GUI manda ref_strength (fallback img_strength). 1.0=guida piena.
     _strength = float(p.get("ref_strength", p.get("img_strength", 1.0)))
-    if p.get("image_path"):                              # i2v: condiziona sul primo frame
+    import numpy as np
+    from PIL import Image as _PILImage
+
+    def _img_tensor(path):
+        im = _PILImage.open(path).convert("RGB")
+        return torch.from_numpy(np.asarray(im, dtype="float32") / 255.0)[None]      # [1,H,W,3]
+
+    if p.get("keyframes"):                               # storyboard / multi-keyframe: foto a frame diversi
+        from comfy_extras.nodes_lt import LTXVAddGuide
+        latent = _unwrap(EmptyLTXVLatentVideo().execute(W, H, F))
+        for kf in p["keyframes"]:
+            if not kf.get("path"):
+                continue
+            fr = max(0, min(F - 1, int(kf.get("frame", 0))))
+            v = _vals(LTXVAddGuide().execute(pos, neg, vae, latent, _img_tensor(kf["path"]),
+                                             fr, float(kf.get("strength", 1.0))))
+            pos, neg, latent = v[0], v[1], v[2]
+        print(f"[keyframes] {len(p['keyframes'])} guide a tempo (storyboard)", flush=True)
+    elif p.get("image_path"):                            # i2v: condiziona sul primo frame
         import numpy as np
         from PIL import Image
         im = Image.open(p["image_path"]).convert("RGB")
