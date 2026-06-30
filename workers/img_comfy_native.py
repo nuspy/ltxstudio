@@ -21,6 +21,17 @@ os.chdir(COMFY)
 import torch  # noqa: E402
 import folder_paths  # noqa: E402
 
+# Opzionale: riserva VRAM (GB) → ComfyUI offloada di più su CPU (bounded) invece di usare shared-RAM.
+# Default = auto di ComfyUI (lascia un piccolo spill in shared se è più VELOCE dell'offload-CPU). Alza
+# COMFY_RESERVE_VRAM_GB solo per limitare lo shared a costo di un po' di velocità.
+_rv = os.environ.get("COMFY_RESERVE_VRAM_GB")
+if _rv:
+    try:
+        import comfy.model_management as _mm
+        _mm.EXTRA_RESERVED_VRAM = int(float(_rv) * 1024 ** 3)
+    except Exception:  # noqa: BLE001
+        pass
+
 for _folder, _path in (("diffusion_models", r"E:\AI\Models\diffusion_models"),
                        ("checkpoints", r"E:\AI\Models\Checkpoints"),
                        ("text_encoders", r"E:\AI\Models\TextEncoders"),
