@@ -66,3 +66,10 @@ non sono testabili a piena risoluzione. Da rifare su GPU ≥40GB o dopo #18.
 ### Aggiornamento audio (30/06, cont.)
 - ✅ Voice clone **xtts2**: output/audio/clone_xtts.wav (193KB) — 2ª voce validata (fix Job.run conferma).
 - 🔒 **MMAudio**: venv rotto = torch 2.12.1+**cpu** + torchaudio ABI mismatch (libtorchaudio.pyd non carica). Riparazione = reinstall torch-CUDA+torchaudio (download grosso, metered → rimandato). Codice/wiring OK.
+
+## Verifica rigorosa PASS/FAIL (orari = oggi, post-avvio test) — 30/06 13:45
+12 PASS con output reale fresco: t2v, i2v, **i2v-inplace** (REAL_i2v_inplace.mp4 13:32), **storyboard/keyframe**
+(REAL_storyboard.mp4 13:45, 25f via LTXVAddGuide comfy), FLUX.1 t2i, recolor, upscale, segment, inpaint,
+voice-clone f5tts+xtts2, TTS edge, HeartMuLa musica.
+Pendenti: MMAudio (venv riparato torch/torchaudio 2.11 cpu, demo.py gira su CPU lento), ACE-Step (load lento).
+Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server video persistente (no reload/gen).
