@@ -628,6 +628,8 @@ Tab **Musica** (`music_tab.py`). Pipeline `core/music_service.py`, `acestep_serv
 
 Modulo **🎬 AI Film Studio** (`ui/film_studio/`): DB SQLite + versioning, `llm_service` (Gemma/LM Studio), `gen_service` nativo, Continuity, Scheduler. Backend 100% nativo (cap. `filmstudio`).
 
+> **COME SI ATTIVA**: NON è una scheda/tab della finestra principale → si apre dalla **barra dei menu in alto → "Strumenti" → "🎬 AI Film Studio"** (`ui/main_window.py:_build_menu` → `_open_film_studio` → `FilmStudioWindow`, finestra separata). Stesso menu "Strumenti" contiene anche Wizard, Impostazioni, Galleria/Navigator, Analyzer, Workflow.
+
 ## 58. Copione (Script)
 - **Cosa fa**: da idea/tema/copione/interattivo genera un trattamento cinematografico via LLM.
 - **GUI**: Film Studio → tab **Copione** → *✍️ Genera copione* (`_gen`), *↻ Rigenera*, *💾 Salva*.
