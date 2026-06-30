@@ -62,6 +62,23 @@ def _norm(name: str | None) -> str:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Motore di generazione (per immagini/video): "comfy" (model_management ComfyUI come libreria,
+# VRAM dinamica, scala 8→48GB) oppure "diffusers" (pipeline diffusers + placement custom).
+# Default "comfy" (vedi [[native-video-engine]]). Override anche via env IMAGE_ENGINE/VIDEO_ENGINE.
+# ────────────────────────────────────────────────────────────────────────────
+def get_engine(kind: str = "image", default: str = "comfy") -> str:
+    env = os.environ.get(f"{kind.upper()}_ENGINE")
+    if env:
+        return env.lower()
+    return str(_load().get(f"{kind}_engine", default)).lower()
+
+
+def set_engine(kind: str, value: str) -> None:
+    _load()[f"{kind}_engine"] = str(value).lower()
+    _save()
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # LoRA preferite + strength default
 # ────────────────────────────────────────────────────────────────────────────
 def is_fav_lora(comfy_name: str) -> bool:
