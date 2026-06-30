@@ -1,0 +1,100 @@
+
+
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.9.1
+torchvision
+torchaudio==2.9.1
+
+flash_attn @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/flash_attn-2.8.3+torch2.9.1.cuda13.1-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+flash_attn @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/flash_attn-2.8.3+torch2.9.1.cuda13.1-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+xformers @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/xformers-0.0.34+41531cee.d20260109-cp39-abi3-win_amd64.whl ; sys_platform == 'win32'
+
+xformers @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/xformers-0.0.34+41531cee.d20260109-cp39-abi3-linux_x86_64.whl ; sys_platform == 'linux'
+
+# deepspeed @ https://files.pythonhosted.org/packages/3d/65/1a6394f5d6dee851e9ea59e385f6d6428e3bfe36f83c06e0336e14dcfd11/deepspeed-0.16.4-cp310-cp310-win_amd64.whl ; sys_platform == 'win32'
+
+# deepspeed ; sys_platform == 'linux'
+
+sageattention @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/sageattention-2.2.0+torch2.9.1.cuda13.1-cp39-abi3-linux_x86_64.whl ; sys_platform == 'linux'
+
+sageattention @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/sageattention-2.2.0+torch2.9.1.cuda13.1-cp39-abi3-win_amd64.whl ; sys_platform == 'win32'
+
+triton<3.6; sys_platform == 'linux'
+triton-windows<3.6; sys_platform == 'win32'
+
+huggingface-hub
+hf_xet
+gradio==6.10.0
+
+numpy
+Pillow
+tqdm
+requests
+
+transformers==5.3.0
+safetensors
+
+opencv-python-headless
+imageio[ffmpeg]
+
+trimesh
+plyfile
+easydict
+zstandard
+kornia
+timm
+meshlib
+python-box
+bpy
+pytorch_lightning
+lightning
+omegaconf
+fast_simplification
+addict
+open3d
+pyrender
+huggingface_hub
+wandb
+einops
+pymeshlab
+diffusers
+scikit-image
+torchdiffeq
+typeguard
+jaxtyping
+wheel
+setuptools
+pymeshfix
+pyvista
+
+torch_cluster @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/torch_cluster-1.6.3-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+torch_cluster @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/torch_cluster-1.6.3-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+git+https://github.com/EasternJournalist/utils3d.git@9a4eb15e4021b67b12c460c7057d642626897ec8
+
+nvdiffrast @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/nvdiffrast-0.4.0-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+cumesh @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/cumesh-0.0.1-1torch2.9.1cuda13allarchs-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+cumesh @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/cumesh-0.0.1+torch291_cu13-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+nvdiffrast @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/nvdiffrast-0.4.0-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+cumm-cu-131-cuda-version @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/cumm_cu_131_cuda_version-0.8.2+torch2.9.1-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+cumm-cu130 @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/cumm_cu130-0.8.2+torch2.9.1-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+torch_scatter @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/torch_scatter-2.1.2+pt291cu13-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+torch_scatter @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/torch_scatter-2.1.2+pt291cu13-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+cubvh @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/cubvh-0.1.2-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+cubvh @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/cubvh-0.1.2-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'
+
+atom3d @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/atom3d-0.1.0+torch291_cu13-cp311-cp311-win_amd64.whl ; sys_platform == 'win32'
+
+atom3d @ https://huggingface.co/MonsterMMORPG/Wan_GGUF/resolve/main/atom3d-0.1.0+torch291_cu13-cp311-cp311-linux_x86_64.whl ; sys_platform == 'linux'

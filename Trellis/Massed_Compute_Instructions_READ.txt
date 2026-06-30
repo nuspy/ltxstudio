@@ -1,0 +1,41 @@
+
+Example tutorial for learn how to install and use Massed Compute
+(Starts at 12:58) : https://youtu.be/KW-MHmoNcqo?si=G1WbG-Qw4ujWvOtG&t=778
+
+Register for Massed Compute using the following link I appreicate that a lot:
+https://vm.massedcompute.com/signup?linkId=lp_034338&sourceId=secourses&tenantId=massed-compute
+
+We have a special coupon for all GPUs : SECourses
+
+If you want to learn more about GPUs and prices read this link : https://www.patreon.com/posts/126671823
+
+Select any GPU but i recommend RTX L40S really fast and good price
+
+Use thinclient or login patreon on Massed Compute to download files on to your Massed Compute
+
+Put everything into a folder in like desktop or downloads
+
+Extract into folder like TripoSR_v1 - dont use special characters or space characters
+
+Open a terminal in the folder where you did put the files
+
+To install run below command
+
+chmod +x Massed_Compute_Install.sh
+./Massed_Compute_Install.sh
+
+After running the app it will download few additional models
+
+Just run the app again if your download fails for any reason
+
+To use after install
+
+Open a new terminal in the folder where you downloaded files and executed
+
+unset LD_LIBRARY_PATH
+export PYTHONWARNINGS=ignore
+cd Trellis_2_3D_Generator
+git reset --hard
+git pull
+source ./venv/bin/activate
+python3 app_premium.py --share

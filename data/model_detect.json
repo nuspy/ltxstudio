@@ -1,0 +1,2358 @@
+{
+ "E:\\AI\\Models\\diffusion_models\\ltx-2-3-22b-dev-Q3_K_M.gguf": {
+  "path": "E:\\AI\\Models\\diffusion_models\\ltx-2-3-22b-dev-Q3_K_M.gguf",
+  "name": "ltx-2-3-22b-dev-Q3_K_M.gguf",
+  "folder": "diffusion_models",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1775609129865000300,
+   11130418496
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\ltx-2-3-22b-dev-Q6_K.gguf": {
+  "path": "E:\\AI\\Models\\diffusion_models\\ltx-2-3-22b-dev-Q6_K.gguf",
+  "name": "ltx-2-3-22b-dev-Q6_K.gguf",
+  "folder": "diffusion_models",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1775160716333932100,
+   17774930240
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\ltx2310eros_v1.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\ltx2310eros_v1.safetensors",
+  "name": "ltx2310eros_v1.safetensors",
+  "folder": "diffusion_models",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779240091130484500,
+   29562341328
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\MelBandRoformer_fp16.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\MelBandRoformer_fp16.safetensors",
+  "name": "MelBandRoformer_fp16.safetensors",
+  "folder": "diffusion_models",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779223045072197500,
+   456479072
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\DreamO\\dreamo.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\DreamO\\dreamo.safetensors",
+  "name": "dreamo.safetensors",
+  "folder": "DreamO",
+  "family": "dreamo",
+  "variant": "base",
+  "role": "edit",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1749160465623100700,
+   478347376
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\DreamO\\dreamo_cfg_distill.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\DreamO\\dreamo_cfg_distill.safetensors",
+  "name": "dreamo_cfg_distill.safetensors",
+  "folder": "DreamO",
+  "family": "dreamo",
+  "variant": "base",
+  "role": "edit",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1749160547228007300,
+   478195080
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Ernie\\ernie-image.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Ernie\\ernie-image.safetensors",
+  "name": "ernie-image.safetensors",
+  "folder": "Ernie",
+  "family": "ernie",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1778252139128468400,
+   16067025480
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf",
+  "name": "fluxunchained-fill-hyp8-Q5_K_S.gguf",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779403914403057000,
+   8278582560
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors",
+  "name": "FLUX_2_Dev_FP8_Mixed_Scaled.safetensors",
+  "folder": "Flux",
+  "family": "flux2",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp8",
+  "arch_meta": "Flux.2-dev",
+  "source": "metadata",
+  "hidden": 6144,
+  "n_double": 8,
+  "n_single": 48,
+  "_sig": [
+   1773016540804050200,
+   35455665662
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Dev.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Dev.safetensors",
+  "name": "FLUX_Dev.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "Flux.1-dev",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1748919369350562300,
+   23802932552
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_DEV_Fill.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_DEV_Fill.safetensors",
+  "name": "FLUX_DEV_Fill.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "fill",
+  "role": "inpaint",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "Flux.1-dev/inpaint",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1756237491772795200,
+   23804924861
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Kontext_Dev.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Kontext_Dev.safetensors",
+  "name": "FLUX_Kontext_Dev.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "kontext",
+  "role": "edit",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "Flux.1-dev/kontext",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1756075860828202900,
+   23802948554
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Krea_Dev.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Krea_Dev.safetensors",
+  "name": "FLUX_Krea_Dev.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "Flux.1-dev",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1756237429805749900,
+   23802964164
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors",
+  "name": "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp8",
+  "arch_meta": "Flux.1-dev",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1756237377315008700,
+   11901588272
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\getphat Flux Reality v23 Softcore FP8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\getphat Flux Reality v23 Softcore FP8.safetensors",
+  "name": "getphat Flux Reality v23 Softcore FP8.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp8",
+  "arch_meta": "Flux.1-dev",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1773321491087509700,
+   11901562826
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\getphat Flux Reality v30 Hardcore FP8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\getphat Flux Reality v30 Hardcore FP8.safetensors",
+  "name": "getphat Flux Reality v30 Hardcore FP8.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp8",
+  "arch_meta": "flux-1-dev",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1781636992000000000,
+   11901497160
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors",
+  "name": "miraclein_flux2klein_nsfw_v2_fp8.safetensors",
+  "folder": "Flux",
+  "family": "flux2",
+  "variant": "klein",
+  "role": "edit",
+  "kind": "image",
+  "precision": "fp8",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": 4096,
+  "n_double": 8,
+  "n_single": 24,
+  "_sig": [
+   1779453700828182400,
+   9078663280
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\HiDream\\diffusion_pytorch_model.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\HiDream\\diffusion_pytorch_model.safetensors",
+  "name": "diffusion_pytorch_model.safetensors",
+  "folder": "HiDream",
+  "family": "hidream",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748570587908987000,
+   9626369259
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\HiDream\\diffusion_pytorch_model_(HiDream).safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\HiDream\\diffusion_pytorch_model_(HiDream).safetensors",
+  "name": "diffusion_pytorch_model_(HiDream).safetensors",
+  "folder": "HiDream",
+  "family": "hidream",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748567895312777000,
+   9626369259
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\HunyuanVideo\\hunyuan_video_720_cfgdistill_fp8_e4m3fn.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\HunyuanVideo\\hunyuan_video_720_cfgdistill_fp8_e4m3fn.safetensors",
+  "name": "hunyuan_video_720_cfgdistill_fp8_e4m3fn.safetensors",
+  "folder": "HunyuanVideo",
+  "family": "hunyuan_video",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 20,
+  "n_single": 40,
+  "_sig": [
+   1774788359444527400,
+   13185035336
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\LTX\\ltx-2.3-22b-dev-fp8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\LTX\\ltx-2.3-22b-dev-fp8.safetensors",
+  "name": "ltx-2.3-22b-dev-fp8.safetensors",
+  "folder": "LTX",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "lightricks-ltx-video-2-3",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779155861381366500,
+   29145501188
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\diffusion_pytorch_model.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\diffusion_pytorch_model.safetensors",
+  "name": "diffusion_pytorch_model.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748463565772724400,
+   5676070424
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\onTHEFLYWanAIWan21VideoModel_kijaiWan21I2V14B480P.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\onTHEFLYWanAIWan21VideoModel_kijaiWan21I2V14B480P.safetensors",
+  "name": "onTHEFLYWanAIWan21VideoModel_kijaiWan21I2V14B480P.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748390851847098700,
+   16993877896
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\onTHEFLYWanAIWan21VideoModel_kijaiWan21I2V14B480P_(SwarmUI).safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\onTHEFLYWanAIWan21VideoModel_kijaiWan21I2V14B480P_(SwarmUI).safetensors",
+  "name": "onTHEFLYWanAIWan21VideoModel_kijaiWan21I2V14B480P_(SwarmUI).safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_1-image2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756075704092511300,
+   16993931992
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\Wan2.1_1.3b_Text_to_Video.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\Wan2.1_1.3b_Text_to_Video.safetensors",
+  "name": "Wan2.1_1.3b_Text_to_Video.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "wan-2_1-text2video-1_3b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756237520350171700,
+   2838314114
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\Wan2.1_14b_FusionX_Image_to_Video_FP8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\Wan2.1_14b_FusionX_Image_to_Video_FP8.safetensors",
+  "name": "Wan2.1_14b_FusionX_Image_to_Video_FP8.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_1-image2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756075898285113500,
+   16397300678
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\Wan2.1_14b_FusionX_Text_to_Video_FP8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\Wan2.1_14b_FusionX_Text_to_Video_FP8.safetensors",
+  "name": "Wan2.1_14b_FusionX_Text_to_Video_FP8.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_1-text2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756237514954903900,
+   14289657124
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\wan2.1_vace_1.3B_fp16.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\wan2.1_vace_1.3B_fp16.safetensors",
+  "name": "wan2.1_vace_1.3B_fp16.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "wan-2_1-vace-1_3b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756075642156569400,
+   4309520077
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.1\\wan2.1_vace_14B_fp16.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.1\\wan2.1_vace_14B_fp16.safetensors",
+  "name": "wan2.1_vace_14B_fp16.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "wan-2_1-vace-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1755992220641705000,
+   34675323930
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+  "name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+  "folder": "Wan2.2",
+  "family": "wan22",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_2-image2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756237394760336100,
+   14294755743
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+  "name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+  "folder": "Wan2.2",
+  "family": "wan22",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_2-image2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756075968268993900,
+   14294755711
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_s2v_14B_fp8_scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_s2v_14B_fp8_scaled.safetensors",
+  "name": "wan2.2_s2v_14B_fp8_scaled.safetensors",
+  "folder": "Wan2.2",
+  "family": "wan22",
+  "variant": "s2v",
+  "role": "s2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756591517120007700,
+   16394832474
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+  "name": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+  "folder": "Wan2.2",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_1-text2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756075932163466600,
+   14293936572
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+  "name": "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+  "folder": "Wan2.2",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "wan-2_1-text2video-14b",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756076071435658600,
+   14293931582
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_text2video_5B_quanto_mbf16_int8.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Wan2.2\\wan2.2_text2video_5B_quanto_mbf16_int8.safetensors",
+  "name": "wan2.2_text2video_5B_quanto_mbf16_int8.safetensors",
+  "folder": "Wan2.2",
+  "family": "wan22",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1755004749696253900,
+   5231471198
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Z-Image\\zimageTurboNSFWBy_2602NSFWBF16.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Z-Image\\zimageTurboNSFWBy_2602NSFWBF16.safetensors",
+  "name": "zimageTurboNSFWBy_2602NSFWBF16.safetensors",
+  "folder": "Z-Image",
+  "family": "zimage",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "z-image",
+  "source": "metadata",
+  "hidden": 3840,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1773284772834182300,
+   12309943155
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Z-Image\\Z_Image_BF16.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Z-Image\\Z_Image_BF16.safetensors",
+  "name": "Z_Image_BF16.safetensors",
+  "folder": "Z-Image",
+  "family": "zimage",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "z-image",
+  "source": "metadata",
+  "hidden": 3840,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772846542820289900,
+   12309932222
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Z-Image\\Z_Image_Turbo_BF16.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Z-Image\\Z_Image_Turbo_BF16.safetensors",
+  "name": "Z_Image_Turbo_BF16.safetensors",
+  "folder": "Z-Image",
+  "family": "zimage",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "z-image",
+  "source": "metadata",
+  "hidden": 3840,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772870558680283700,
+   12309932329
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+  "name": "ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+  "folder": "v2",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779345627666012500,
+   25226571988
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\LTXVideo\\LTX-2\\quantstack\\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf": {
+  "path": "E:\\AI\\Models\\diffusion_models\\LTXVideo\\LTX-2\\quantstack\\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
+  "name": "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
+  "folder": "quantstack",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779354079832754600,
+   14194441248
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\AnimateDiff\\v3_sd15_mm.ckpt": {
+  "path": "E:\\AI\\Models\\Checkpoints\\AnimateDiff\\v3_sd15_mm.ckpt",
+  "name": "v3_sd15_mm.ckpt",
+  "folder": "AnimateDiff",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1774785852156164400,
+   1673262583
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\DreamO\\diffusion_pytorch_model.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\DreamO\\diffusion_pytorch_model.safetensors",
+  "name": "diffusion_pytorch_model.safetensors",
+  "folder": "DreamO",
+  "family": "dreamo",
+  "variant": "base",
+  "role": "edit",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1749160827188149400,
+   694082424
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Flux\\flux1-schnell-fp8.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Flux\\flux1-schnell-fp8.safetensors",
+  "name": "flux1-schnell-fp8.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "schnell",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp8",
+  "arch_meta": "Flux.1-schnell",
+  "source": "metadata",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1756237458206914300,
+   17236331343
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Flux\\FLUX_DEV_Redux.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Flux\\FLUX_DEV_Redux.safetensors",
+  "name": "FLUX_DEV_Redux.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "redux",
+  "role": "adapter",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "Flux.1-redux-dev",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748924604966469700,
+   129063232
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\HiDream\\HiDream_I1_Dev_GGUF_Q8_0.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\HiDream\\HiDream_I1_Dev_GGUF_Q8_0.gguf",
+  "name": "HiDream_I1_Dev_GGUF_Q8_0.gguf",
+  "folder": "HiDream",
+  "family": "hidream",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748982276202484700,
+   18694358720
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3-22b-dev-fp8.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3-22b-dev-fp8.safetensors",
+  "name": "ltx-2.3-22b-dev-fp8.safetensors",
+  "folder": "LTX",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp8",
+  "arch_meta": "lightricks-ltx-video-2-3",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779155861381366500,
+   29145501188
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3-22b-distilled.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3-22b-distilled.safetensors",
+  "name": "ltx-2.3-22b-distilled.safetensors",
+  "folder": "LTX",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1774946113497897100,
+   46149345038
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3_text_projection_bf16.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3_text_projection_bf16.safetensors",
+  "name": "ltx-2.3_text_projection_bf16.safetensors",
+  "folder": "LTX",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1775153717248956900,
+   2312149072
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\cyberrealistic_v80Inpainting.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\cyberrealistic_v80Inpainting.safetensors",
+  "name": "cyberrealistic_v80Inpainting.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756326869371954100,
+   2132679962
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\DreamShaper.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\DreamShaper.safetensors",
+  "name": "DreamShaper.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748470112015154400,
+   2132625894
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\epicrealism_pureEvolutionV5-inpainting.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\epicrealism_pureEvolutionV5-inpainting.safetensors",
+  "name": "epicrealism_pureEvolutionV5-inpainting.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756326903151543800,
+   2132703874
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\ghostmix_v20Bakedvae.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\ghostmix_v20Bakedvae.safetensors",
+  "name": "ghostmix_v20Bakedvae.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748471134410137300,
+   2400065384
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\majicMIX_realistic.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\majicMIX_realistic.safetensors",
+  "name": "majicMIX_realistic.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748471636840383000,
+   2132625894
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\MeinaMix.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\MeinaMix.safetensors",
+  "name": "MeinaMix.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748470639390513600,
+   2132651818
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\MagicQuill\\realisticVisionV60B1_v51VAE.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\MagicQuill\\realisticVisionV60B1_v51VAE.safetensors",
+  "name": "realisticVisionV60B1_v51VAE.safetensors",
+  "folder": "MagicQuill",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748472184609303000,
+   2132625894
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Qwen\\Qwen_Image_Edit_GGUF_Q8_0.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Qwen\\Qwen_Image_Edit_GGUF_Q8_0.gguf",
+  "name": "Qwen_Image_Edit_GGUF_Q8_0.gguf",
+  "folder": "Qwen",
+  "family": "qwen_image",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756002199865886500,
+   21761817120
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Qwen\\Qwen_Image_Q8_0.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Qwen\\Qwen_Image_Q8_0.gguf",
+  "name": "Qwen_Image_Q8_0.gguf",
+  "folder": "Qwen",
+  "family": "qwen_image",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756000718962653600,
+   21761817120
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\SD\\dreamshaper_8.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\SD\\dreamshaper_8.safetensors",
+  "name": "dreamshaper_8.safetensors",
+  "folder": "SD",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "stable-diffusion-v1",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1755992226279711400,
+   2132657430
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\SD\\eroticVision_v4.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\SD\\eroticVision_v4.safetensors",
+  "name": "eroticVision_v4.safetensors",
+  "folder": "SD",
+  "family": "sd15",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779163080980915300,
+   2132626102
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Supir\\Juggernaut-11.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Supir\\Juggernaut-11.safetensors",
+  "name": "Juggernaut-11.safetensors",
+  "folder": "Supir",
+  "family": "sdxl",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "stable-diffusion-xl-v1-base",
+  "source": "metadata",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1758652941226589900,
+   7105350536
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Supir\\Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Supir\\Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+  "name": "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
+  "folder": "Supir",
+  "family": "sdxl",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1758653697715557800,
+   7105348188
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Supir\\RealVisXL_V5.0_fp16.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Supir\\RealVisXL_V5.0_fp16.safetensors",
+  "name": "RealVisXL_V5.0_fp16.safetensors",
+  "folder": "Supir",
+  "family": "sdxl",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1758654384846556400,
+   6938065488
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Supir\\v0F.ckpt": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Supir\\v0F.ckpt",
+  "name": "v0F.ckpt",
+  "folder": "Supir",
+  "family": "sdxl",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1758659367550529700,
+   5329719950
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Supir\\v0Q.ckpt": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Supir\\v0Q.ckpt",
+  "name": "v0Q.ckpt",
+  "folder": "Supir",
+  "family": "sdxl",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1758659841233574700,
+   5329810432
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Supir\\WildCardX_XL_Lightning.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Supir\\WildCardX_XL_Lightning.safetensors",
+  "name": "WildCardX_XL_Lightning.safetensors",
+  "folder": "Supir",
+  "family": "sdxl",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1758655158477566800,
+   6938040706
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Unknown\\ernie-image-prompt-enhancer.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Unknown\\ernie-image-prompt-enhancer.safetensors",
+  "name": "ernie-image-prompt-enhancer.safetensors",
+  "folder": "Unknown",
+  "family": "ernie",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779052782794324700,
+   6877439999
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Unknown\\ernie-image-turbo-BF16.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Unknown\\ernie-image-turbo-BF16.gguf",
+  "name": "ernie-image-turbo-BF16.gguf",
+  "folder": "Unknown",
+  "family": "ernie",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1779055610609492400,
+   16067707584
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan\\WanVideo_2_1_Multitalk_14B_fp32.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan\\WanVideo_2_1_Multitalk_14B_fp32.safetensors",
+  "name": "WanVideo_2_1_Multitalk_14B_fp32.safetensors",
+  "folder": "Wan",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756075622687880500,
+   9947889296
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\fantasy_proj_model.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\fantasy_proj_model.safetensors",
+  "name": "fantasy_proj_model.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1755006074940844200,
+   6308103
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\model.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\model.safetensors",
+  "name": "model.safetensors",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1755004040537918400,
+   377607901
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\wan2.1-i2v-14b-480p-Q8_0.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\wan2.1-i2v-14b-480p-Q8_0.gguf",
+  "name": "wan2.1-i2v-14b-480p-Q8_0.gguf",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748953165644489700,
+   18144640384
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_FusionX_Image_to_Video_GGUF_Q8.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_FusionX_Image_to_Video_GGUF_Q8.gguf",
+  "name": "Wan2.1_14b_FusionX_Image_to_Video_GGUF_Q8.gguf",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756007727586650400,
+   17652508416
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_Image_to_Video_720p_GGUF_Q6_K.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_Image_to_Video_720p_GGUF_Q6_K.gguf",
+  "name": "Wan2.1_14b_Image_to_Video_720p_GGUF_Q6_K.gguf",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748906334629232700,
+   14233779584
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_Image_to_Video_720p_GGUF_Q8.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_Image_to_Video_720p_GGUF_Q8.gguf",
+  "name": "Wan2.1_14b_Image_to_Video_720p_GGUF_Q8.gguf",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756006764677289000,
+   18144640384
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_Text_to_Video_GGUF_Q6_K.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1_14b_Text_to_Video_GGUF_Q6_K.gguf",
+  "name": "Wan2.1_14b_Text_to_Video_GGUF_Q6_K.gguf",
+  "folder": "Wan2.1",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748903243573427900,
+   12476504704
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.2\\wan2.2_i2v_high_noise_14B_Q3_K_S.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.2\\wan2.2_i2v_high_noise_14B_Q3_K_S.gguf",
+  "name": "wan2.2_i2v_high_noise_14B_Q3_K_S.gguf",
+  "folder": "Wan2.2",
+  "family": "wan22",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756591666221283300,
+   6515012096
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.2\\wan2.2_i2v_low_noise_14B_Q3_K_S.gguf": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.2\\wan2.2_i2v_low_noise_14B_Q3_K_S.gguf",
+  "name": "wan2.2_i2v_low_noise_14B_Q3_K_S.gguf",
+  "folder": "Wan2.2",
+  "family": "wan22",
+  "variant": "i2v",
+  "role": "i2v",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756594498823584600,
+   6515012096
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePackI2V_HY\\diffusion_pytorch_model-00001-of-00003.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePackI2V_HY\\diffusion_pytorch_model-00001-of-00003.safetensors",
+  "name": "diffusion_pytorch_model-00001-of-00003.safetensors",
+  "folder": "FramePackI2V_HY",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1747313211251706100,
+   9972080992
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePackI2V_HY\\diffusion_pytorch_model-00002-of-00003.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePackI2V_HY\\diffusion_pytorch_model-00002-of-00003.safetensors",
+  "name": "diffusion_pytorch_model-00002-of-00003.safetensors",
+  "folder": "FramePackI2V_HY",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1747316737116765900,
+   9987115584
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePackI2V_HY\\diffusion_pytorch_model-00003-of-00003.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePackI2V_HY\\diffusion_pytorch_model-00003-of-00003.safetensors",
+  "name": "diffusion_pytorch_model-00003-of-00003.safetensors",
+  "folder": "FramePackI2V_HY",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1747318833027605500,
+   5789584816
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePack_F1_I2V_HY_20250503\\diffusion_pytorch_model-00001-of-00003.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePack_F1_I2V_HY_20250503\\diffusion_pytorch_model-00001-of-00003.safetensors",
+  "name": "diffusion_pytorch_model-00001-of-00003.safetensors",
+  "folder": "FramePack_F1_I2V_HY_20250503",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1747325338977469200,
+   9972080992
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePack_F1_I2V_HY_20250503\\diffusion_pytorch_model-00002-of-00003.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePack_F1_I2V_HY_20250503\\diffusion_pytorch_model-00002-of-00003.safetensors",
+  "name": "diffusion_pytorch_model-00002-of-00003.safetensors",
+  "folder": "FramePack_F1_I2V_HY_20250503",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1747325658705929300,
+   9987115584
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePack_F1_I2V_HY_20250503\\diffusion_pytorch_model-00003-of-00003.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\FramePack_F1_I2V_HY_20250503\\diffusion_pytorch_model-00003-of-00003.safetensors",
+  "name": "diffusion_pytorch_model-00003-of-00003.safetensors",
+  "folder": "FramePack_F1_I2V_HY_20250503",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1747325838163021900,
+   5789584816
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\FramePack\\granite-3.3-2b-instruct\\model-00001-of-00002.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\FramePack\\granite-3.3-2b-instruct\\model-00001-of-00002.safetensors",
+  "name": "model-00001-of-00002.safetensors",
+  "folder": "granite-3.3-2b-instruct",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1773619940951917700,
+   4999999840
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\HiDream\\Meta-Llama-3.1-8B-Instruct-GPTQ-INT4\\model-00001-of-00002.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\HiDream\\Meta-Llama-3.1-8B-Instruct-GPTQ-INT4\\model-00001-of-00002.safetensors",
+  "name": "model-00001-of-00002.safetensors",
+  "folder": "Meta-Llama-3.1-8B-Instruct-GPTQ-INT4",
+  "family": "hidream",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748566473212449000,
+   4971321368
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\HiDream\\HiDream-I1-Dev-nf4\\text_encoder_3\\model-00001-of-00002.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\HiDream\\HiDream-I1-Dev-nf4\\text_encoder_3\\model-00001-of-00002.safetensors",
+  "name": "model-00001-of-00002.safetensors",
+  "folder": "text_encoder_3",
+  "family": "hidream",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748571421132388900,
+   4994582224
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\HiDream\\HiDream-I1-Dev-nf4\\text_encoder_3\\model-00002-of-00002.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\HiDream\\HiDream-I1-Dev-nf4\\text_encoder_3\\model-00002-of-00002.safetensors",
+  "name": "model-00002-of-00002.safetensors",
+  "folder": "text_encoder_3",
+  "family": "hidream",
+  "variant": "base",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748572021473593200,
+   4530066360
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00001-of-00006.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00001-of-00006.safetensors",
+  "name": "diffusion_pytorch_model-00001-of-00006.safetensors",
+  "folder": "dit",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1762231573963061400,
+   9932990440
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00002-of-00006.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00002-of-00006.safetensors",
+  "name": "diffusion_pytorch_model-00002-of-00006.safetensors",
+  "folder": "dit",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1762233271972022600,
+   9976452384
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00003-of-00006.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00003-of-00006.safetensors",
+  "name": "diffusion_pytorch_model-00003-of-00006.safetensors",
+  "folder": "dit",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1762232332715075600,
+   9955430184
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00004-of-00006.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00004-of-00006.safetensors",
+  "name": "diffusion_pytorch_model-00004-of-00006.safetensors",
+  "folder": "dit",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1762233757902059000,
+   9821179488
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00005-of-00006.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00005-of-00006.safetensors",
+  "name": "diffusion_pytorch_model-00005-of-00006.safetensors",
+  "folder": "dit",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1762233699120277500,
+   9925989240
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00006-of-00006.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\LongCat\\LongCat-Video\\dit\\diffusion_pytorch_model-00006-of-00006.safetensors",
+  "name": "diffusion_pytorch_model-00006-of-00006.safetensors",
+  "folder": "dit",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1762230221868172300,
+   4712351112
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00001-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00001-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00001-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748465846870360200,
+   4923621656
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00002-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00002-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00002-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748466540682557700,
+   4898520360
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00003-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00003-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00003-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748467349218933000,
+   4898530856
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00004-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00004-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00004-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748468106841609500,
+   4846081264
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00005-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00005-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00005-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748468966546796000,
+   4846081264
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00006-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00006-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00006-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748471137213973000,
+   4846081264
+  ]
+ },
+ "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00007-of-00007.safetensors": {
+  "path": "E:\\AI\\Models\\Checkpoints\\Wan2.1\\Wan2.1-I2V-14B-480P\\diffusion_pytorch_model-00007-of-00007.safetensors",
+  "name": "diffusion_pytorch_model-00007-of-00007.safetensors",
+  "folder": "Wan2.1-I2V-14B-480P",
+  "family": "wan21",
+  "variant": "t2v",
+  "role": "t2v",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748475090947017900,
+   3530974016
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xNomos8kSCHAT-L.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4xNomos8kSCHAT-L.pth",
+  "name": "4xNomos8kSCHAT-L.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925508023306800,
+   331564661
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_dat2.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_dat2.safetensors",
+  "name": "4xRealWebPhoto_v4_dat2.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850509447757200,
+   139792588
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.safetensors",
+  "name": "4xNomos2_hq_dat2.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850485828471000,
+   139792588
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4x-UltraSharpV2.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\4x-UltraSharpV2.safetensors",
+  "name": "4x-UltraSharpV2.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850461908460300,
+   139792588
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4x-UltraSharp.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\4x-UltraSharp.safetensors",
+  "name": "4x-UltraSharp.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850438014575600,
+   66864028
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\2x-AnimeSharpV4_Fast_RCAN_PU.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\2x-AnimeSharpV4_Fast_RCAN_PU.safetensors",
+  "name": "2x-AnimeSharpV4_Fast_RCAN_PU.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850397774301700,
+   31359158
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\2xLiveActionV1_SPAN_490000.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\2xLiveActionV1_SPAN_490000.pth",
+  "name": "2xLiveActionV1_SPAN_490000.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850403607368800,
+   8947821
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\2xNomosUni_span_multijpg_ldl.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\2xNomosUni_span_multijpg_ldl.pth",
+  "name": "2xNomosUni_span_multijpg_ldl.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850408404615000,
+   8951347
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\2x_AniScale2_Omni_i16_40K.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\2x_AniScale2_Omni_i16_40K.pth",
+  "name": "2x_AniScale2_Omni_i16_40K.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850410507932300,
+   3393786
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\2x_Text2HD_v.1-RealPLKSR.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\2x_Text2HD_v.1-RealPLKSR.pth",
+  "name": "2x_Text2HD_v.1-RealPLKSR.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925093965327900,
+   29580290
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4x-AnimeSharp.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\4x-AnimeSharp.safetensors",
+  "name": "4x-AnimeSharp.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850425832526800,
+   66864025
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xFaceUpDAT.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4xFaceUpDAT.pth",
+  "name": "4xFaceUpDAT.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925256160592600,
+   154685037
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.pth",
+  "name": "4xNomos2_hq_dat2.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925404589104600,
+   140196334
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xNomos2_hq_drct-l.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\4xNomos2_hq_drct-l.safetensors",
+  "name": "4xNomos2_hq_drct-l.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925440373351100,
+   242543780
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xNomos8kDAT.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4xNomos8kDAT.pth",
+  "name": "4xNomos8kDAT.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925482422198200,
+   309317507
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_drct-l.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_drct-l.pth",
+  "name": "4xRealWebPhoto_v4_drct-l.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925345285147600,
+   242789758
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4x_NMKD-Siax_200k.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4x_NMKD-Siax_200k.pth",
+  "name": "4x_NMKD-Siax_200k.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756331195354023600,
+   66957746
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\4x_RealisticRescaler_100000_G.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\4x_RealisticRescaler_100000_G.pth",
+  "name": "4x_RealisticRescaler_100000_G.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925340011675000,
+   134051293
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\HAT-L_SRx4_ImageNet-pretrain.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\HAT-L_SRx4_ImageNet-pretrain.safetensors",
+  "name": "HAT-L_SRx4_ImageNet-pretrain.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850537193821500,
+   165299287
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\LTX\\ltx-2-spatial-upscaler-x2-1.0.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\LTX\\ltx-2-spatial-upscaler-x2-1.0.safetensors",
+  "name": "ltx-2-spatial-upscaler-x2-1.0.safetensors",
+  "folder": "LTX",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772862589583067600,
+   995765578
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\RealESRGAN_x2plus.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x2plus.pth",
+  "name": "RealESRGAN_x2plus.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1756639230719107500,
+   67061725
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.pth": {
+  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.pth",
+  "name": "RealESRGAN_x4plus.pth",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "unknown",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1748925387338755200,
+   67040989
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.safetensors",
+  "name": "RealESRGAN_x4plus.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850561276930400,
+   66857833
+  ]
+ },
+ "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus_anime_6B.safetensors": {
+  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus_anime_6B.safetensors",
+  "name": "RealESRGAN_x4plus_anime_6B.safetensors",
+  "folder": "Upscale",
+  "family": "unknown",
+  "variant": "",
+  "role": "unknown",
+  "kind": "unknown",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "none",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1772850566396322100,
+   17888773
+  ]
+ }
+}

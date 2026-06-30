@@ -1,0 +1,69 @@
+SIMPLEPOD CHEAPER AND FASTER THAN RUNPOD
+
+Now we fully support SimplePod as well please use this link to register : https://simplepod.ai/ref?user=secourses
+
+SimplePod is faster and cheaper than RunPod and works exactly same
+
+Please use this template on SimplePod : https://dash.simplepod.ai/account/explore/100/ref-secourses/
+
+For permanent storage, generate it from Storage tab with any name and size you want and when selecting template with above link, click Edit and Use, select Persistence Volume and change mount point to /workspace
+
+Up-to-date SimplePod tutorial starting from 21:51 : https://youtu.be/yOj9PYq3XYM?si=Z86wZZLBeYzWo1Qo&t=1311
+
+RUNPOD
+
+Please register for RunPod at: https://get.runpod.io/955rkuppqv4h
+
+Example tutorial for learn how to install and use RunPod is below
+
+(starts at 22:03) : https://youtu.be/KW-MHmoNcqo?si=QN8X8Sjn13ZYu-EU&t=1323
+
+RunPod permanent network storage tutorial : https://youtu.be/8Qf4x3-DFf4
+
+Select this template mandatory (based on official Runpod Pytorch template) : https://get.runpod.io/SECourses_CU13
+
+You can edit template and change Volume Disk size. it is by default 200 GB
+
+Upload all files into workspace extract all from zip file or directly upload extracted files
+
+BELOW IS FOR BOTH RUNPOD AND SIMPLEPOD SAME
+
+Edit Template
+
+Make volume disk 50 gb  min
+
+Add expose HTTP ports 7861 to connect via proxy if you want but i recommend Gradio share
+
+It will by defualt start with --share with gradio share as well
+
+Upload everything into workspace folder - you can upload zip file and extract it as well
+
+To install run below command
+
+cd /workspace
+export HF_HOME="/workspace"
+chmod +x RunPod_Install_Trellis.sh
+./RunPod_Install_Trellis.sh
+
+After running the app it will download few additional models
+
+Just run the app again if your download fails for any reason
+
+To use after install
+
+Open a new terminal and run below code to start every time
+
+unset LD_LIBRARY_PATH
+cd /workspace/Trellis_2_3D_Generator
+export HF_HOME="/workspace"
+export PYTHONWARNINGS=ignore
+git reset --hard
+git pull
+source ./venv/bin/activate
+python app_premium.py --share
+
+To kill previously running app without restarting the machine run below command
+
+apt update
+apt install psmisc
+for p in $(seq 7860 8000); do fuser -k ${p}/tcp 2>/dev/null; done
