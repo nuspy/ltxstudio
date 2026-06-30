@@ -1849,5 +1849,9 @@
   "prec.green": "אופטימלי ב-VRAM",
   "prec.yellow": "פריקה חלקית, נסבל",
   "prec.red": "גדול מדי ל-GPU",
-  "f1.gen.auto.detected": "ארכיטקטורה שזוהתה: {fam}. 'auto' יבחר VAE/מקודד מתאים (ניתן לשנות)."
+  "f1.gen.auto.detected": "ארכיטקטורה שזוהתה: {fam}. 'auto' יבחר VAE/מקודד מתאים (ניתן לשנות).",
+  "f1.gen.engine_lbl": "מנוע",
+  "f1.gen.engine.comfy": "Comfy (מהיר, VRAM דינמי)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: ניהול VRAM דינמי (מומלץ, מתאים לכל GPU). Diffusers: פייפליין קלאסי."
 }

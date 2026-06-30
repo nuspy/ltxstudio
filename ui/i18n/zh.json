@@ -1849,5 +1849,9 @@
   "prec.green": "显存中最佳",
   "prec.yellow": "部分卸载，可接受",
   "prec.red": "对GPU过大",
-  "f1.gen.auto.detected": "检测到架构：{fam}。“auto”将选择匹配的 VAE/编码器（可手动覆盖）。"
+  "f1.gen.auto.detected": "检测到架构：{fam}。“auto”将选择匹配的 VAE/编码器（可手动覆盖）。",
+  "f1.gen.engine_lbl": "引擎",
+  "f1.gen.engine.comfy": "Comfy（快速，动态显存）",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy：动态显存管理（推荐，适配各种 GPU）。Diffusers：经典管线。"
 }

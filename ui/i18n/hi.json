@@ -1849,5 +1849,9 @@
   "prec.green": "VRAM में इष्टतम",
   "prec.yellow": "आंशिक ऑफ़लोड, प्रबंधनीय",
   "prec.red": "GPU के लिए बहुत बड़ा",
-  "f1.gen.auto.detected": "पहचानी गई आर्किटेक्चर: {fam}। 'auto' उपयुक्त VAE/एनकोडर चुनेगा (बदल सकते हैं)।"
+  "f1.gen.auto.detected": "पहचानी गई आर्किटेक्चर: {fam}। 'auto' उपयुक्त VAE/एनकोडर चुनेगा (बदल सकते हैं)।",
+  "f1.gen.engine_lbl": "इंजन",
+  "f1.gen.engine.comfy": "Comfy (तेज़, डायनामिक VRAM)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: डायनामिक VRAM प्रबंधन (अनुशंसित, हर GPU पर स्केल)। Diffusers: क्लासिक पाइपलाइन।"
 }

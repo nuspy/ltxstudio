@@ -1849,5 +1849,9 @@
   "prec.green": "optimal im VRAM",
   "prec.yellow": "teilweises Offload, handhabbar",
   "prec.red": "zu groß für die GPU",
-  "f1.gen.auto.detected": "Erkannte Architektur: {fam}. 'auto' wählt passenden VAE/Encoder (überschreibbar)."
+  "f1.gen.auto.detected": "Erkannte Architektur: {fam}. 'auto' wählt passenden VAE/Encoder (überschreibbar).",
+  "f1.gen.engine_lbl": "Engine",
+  "f1.gen.engine.comfy": "Comfy (schnell, dynamischer VRAM)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: dynamisches VRAM-Management (empfohlen, skaliert auf jeder GPU). Diffusers: klassische Pipeline."
 }

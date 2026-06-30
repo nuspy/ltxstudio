@@ -1849,5 +1849,9 @@
   "prec.green": "optimális a VRAM-ban",
   "prec.yellow": "részleges offload, kezelhető",
   "prec.red": "túl nagy a GPU-hoz",
-  "f1.gen.auto.detected": "Észlelt architektúra: {fam}. Az 'auto' a megfelelő VAE/kódolót választja (módosítható)."
+  "f1.gen.auto.detected": "Észlelt architektúra: {fam}. Az 'auto' a megfelelő VAE/kódolót választja (módosítható).",
+  "f1.gen.engine_lbl": "Motor",
+  "f1.gen.engine.comfy": "Comfy (gyors, dinamikus VRAM)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: dinamikus VRAM-kezelés (ajánlott, minden GPU-n skálázódik). Diffusers: klasszikus pipeline."
 }

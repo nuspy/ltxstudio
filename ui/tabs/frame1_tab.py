@@ -152,6 +152,22 @@ class Frame1Tab(QWidget):
         self.gen_arch.currentTextChanged.connect(self._sync_gen_lora_arch)
         self.gen_arch.currentTextChanged.connect(self._apply_arch_defaults)
         f.addRow(tr("f1.gen.arch_lbl"), self.gen_arch)
+        # Selettore MOTORE di generazione: Comfy (model_management ComfyUI, VRAM dinamica, FLUX.2 ~11x più
+        # veloce, scala 8→48GB) vs Diffusers (pipeline diffusers). Persistito in user_prefs.
+        self.gen_engine_sel = QComboBox()
+        self.gen_engine_sel.addItem(tr("f1.gen.engine.comfy", "Comfy (veloce, VRAM dinamica)"), "comfy")
+        self.gen_engine_sel.addItem(tr("f1.gen.engine.diffusers", "Diffusers"), "diffusers")
+        try:
+            from core import user_prefs as _up
+            i = self.gen_engine_sel.findData(_up.get_engine("image"))
+            self.gen_engine_sel.setCurrentIndex(i if i >= 0 else 0)
+            self.gen_engine_sel.currentIndexChanged.connect(
+                lambda *_: _up.set_engine("image", self.gen_engine_sel.currentData()))
+        except Exception:                                       # noqa: BLE001
+            pass
+        self.gen_engine_sel.setToolTip(tr("f1.gen.engine.tt",
+            "Comfy: gestione VRAM dinamica (consigliato, scala su tutte le GPU). Diffusers: pipeline classica."))
+        f.addRow(tr("f1.gen.engine_lbl", "Motore"), self.gen_engine_sel)
         self.gen_model = QComboBox()
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)
         self.gen_model.currentIndexChanged.connect(self._refilter_gen_encoder)

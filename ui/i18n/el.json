@@ -1849,5 +1849,9 @@
   "prec.green": "ιδανικό στη VRAM",
   "prec.yellow": "μερικό offload, διαχειρίσιμο",
   "prec.red": "πολύ μεγάλο για τη GPU",
-  "f1.gen.auto.detected": "Εντοπίστηκε αρχιτεκτονική: {fam}. Το 'auto' θα επιλέξει κατάλληλο VAE/encoder (αλλάζει)."
+  "f1.gen.auto.detected": "Εντοπίστηκε αρχιτεκτονική: {fam}. Το 'auto' θα επιλέξει κατάλληλο VAE/encoder (αλλάζει).",
+  "f1.gen.engine_lbl": "Μηχανή",
+  "f1.gen.engine.comfy": "Comfy (γρήγορο, δυναμική VRAM)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: δυναμική διαχείριση VRAM (συνιστάται, κλιμακώνεται σε κάθε GPU). Diffusers: κλασικό pipeline."
 }

@@ -1849,5 +1849,9 @@
   "prec.green": "VRAM에 최적",
   "prec.yellow": "부분 오프로드, 감당 가능",
   "prec.red": "GPU에 너무 큼",
-  "f1.gen.auto.detected": "감지된 아키텍처: {fam}. 'auto'가 적합한 VAE/인코더를 선택합니다(변경 가능)."
+  "f1.gen.auto.detected": "감지된 아키텍처: {fam}. 'auto'가 적합한 VAE/인코더를 선택합니다(변경 가능).",
+  "f1.gen.engine_lbl": "엔진",
+  "f1.gen.engine.comfy": "Comfy (빠름, 동적 VRAM)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: 동적 VRAM 관리(권장, 모든 GPU 확장). Diffusers: 클래식 파이프라인."
 }

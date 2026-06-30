@@ -111,9 +111,15 @@ class _NativeImageWorker(QThread):
         self.module = module
 
     def run(self):
-        from core import native_driver
         try:
-            res = native_driver.run_and_wait(self.module, self.params, timeout=3600)
+            if self.module == "image":
+                # Router motore: comfy-native (model_management ComfyUI) o diffusers, da user_prefs;
+                # comfy per t2i con fallback automatico a diffusers, il resto su diffusers.
+                from core import img_router
+                res = img_router.generate(self.params, timeout=3600)
+            else:
+                from core import native_driver
+                res = native_driver.run_and_wait(self.module, self.params, timeout=3600)
         except Exception as e:                          # noqa: BLE001
             res = {"status": "error", "error": str(e)}
         self.done.emit(res)

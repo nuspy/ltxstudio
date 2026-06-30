@@ -1849,5 +1849,9 @@
   "prec.green": "оптимально в VRAM",
   "prec.yellow": "частичный офлоад, приемлемо",
   "prec.red": "слишком большой для GPU",
-  "f1.gen.auto.detected": "Обнаружена архитектура: {fam}. 'auto' выберет подходящие VAE/энкодер (можно изменить)."
+  "f1.gen.auto.detected": "Обнаружена архитектура: {fam}. 'auto' выберет подходящие VAE/энкодер (можно изменить).",
+  "f1.gen.engine_lbl": "Движок",
+  "f1.gen.engine.comfy": "Comfy (быстро, динамическая VRAM)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: динамическое управление VRAM (рекомендуется, масштабируется на любой GPU). Diffusers: классический пайплайн."
 }

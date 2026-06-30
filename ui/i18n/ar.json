@@ -1849,5 +1849,9 @@
   "prec.green": "مثالي في الـVRAM",
   "prec.yellow": "تفريغ جزئي، مقبول",
   "prec.red": "كبير جدًا على الـGPU",
-  "f1.gen.auto.detected": "البنية المكتشفة: {fam}. سيختار 'auto' الـ VAE/المُرمِّز المناسب (يمكن تغييره)."
+  "f1.gen.auto.detected": "البنية المكتشفة: {fam}. سيختار 'auto' الـ VAE/المُرمِّز المناسب (يمكن تغييره).",
+  "f1.gen.engine_lbl": "المحرك",
+  "f1.gen.engine.comfy": "Comfy (سريع، VRAM ديناميكي)",
+  "f1.gen.engine.diffusers": "Diffusers",
+  "f1.gen.engine.tt": "Comfy: إدارة VRAM ديناميكية (موصى به، يتوسع على أي GPU). Diffusers: خط أنابيب كلاسيكي."
 }
