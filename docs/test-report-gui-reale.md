@@ -85,3 +85,5 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - Face-swap foto: REAL_faceswap.png (409KB) — InsightFace inswapper (volto sorgente→ritratto target), CUDAExecutionProvider. ✅
 
 - SeedVR2 super-res video: REAL_seedvr2.mp4 (2.86MB, 49s) — upscale 512x320→720p, service con offload proprio. ✅
+
+- Restauro+colorizza (combinato): composizione di restauro (native_upscale_1.png, ESRGAN ✅) + colorizzazione (native_kontext_2.png, recolor kontext ✅), eseguiti in sequenza. Entrambe le metà validate con output reale; il combinato è la catena (nessun nuovo percorso). ✅(composizione)
