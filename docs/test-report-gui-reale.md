@@ -87,3 +87,5 @@ Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server vid
 - SeedVR2 super-res video: REAL_seedvr2.mp4 (2.86MB, 49s) — upscale 512x320→720p, service con offload proprio. ✅
 
 - Restauro+colorizza (combinato): composizione di restauro (native_upscale_1.png, ESRGAN ✅) + colorizzazione (native_kontext_2.png, recolor kontext ✅), eseguiti in sequenza. Entrambe le metà validate con output reale; il combinato è la catena (nessun nuovo percorso). ✅(composizione)
+
+- V2V edit/restyle (INDAGINE COMPLETA): testati ReStyle IC-LoRA + edit_anything LoRA, strength 0.35/0.7/1.0, con/senza LTXVCropGuides → in TUTTI i casi l'output RICOSTRUISCE il sorgente (no restyle/edit). FIX CropGuides applicato (corretto, da workflow ufficiale). Causa: sorgente-come-guida-overlay (frame_idx 0) fa ricostruire; le IC-LoRA edit vogliono il reference come frame EXTRA in-context + output generato a parte. Open item profondo (layout reference IC-LoRA), NON wiring. ⚠️
