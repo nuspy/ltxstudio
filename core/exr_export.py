@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import os
 
+# DEVE stare PRIMA di qualsiasi import di cv2 (OpenCV legge la flag all'import, non a runtime):
+# senza, cv2.imwrite('.exr') fallisce silenziosamente ("OpenEXR codec is disabled").
+os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
+
 
 def save_exr_frames(frames, out_dir: str, prefix: str = "hdr") -> list[str]:
     """frames: array/tensore [f,h,w,c] float lineare → un .exr per frame. Ritorna i path."""
