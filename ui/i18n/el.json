@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "Μηχανή",
   "f1.gen.engine.comfy": "Comfy (γρήγορο, δυναμική VRAM)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: δυναμική διαχείριση VRAM (συνιστάται, κλιμακώνεται σε κάθε GPU). Diffusers: κλασικό pipeline."
+  "f1.gen.engine.tt": "Comfy: δυναμική διαχείριση VRAM (συνιστάται, κλιμακώνεται σε κάθε GPU). Diffusers: κλασικό pipeline.",
+  "vid.engine_lbl": "Μηχανή βίντεο",
+  "vid.engine.ltx2": "LTX-2 εγγενής (όλες οι λειτουργίες)",
+  "vid.engine.comfy": "Comfy (δυναμική VRAM, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 εγγενής: όλες οι λειτουργίες (ήχος/keyframe/controlnet). Comfy: δυναμική VRAM, μόνο t2v/i2v."
 }

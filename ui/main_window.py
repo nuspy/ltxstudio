@@ -125,6 +125,24 @@ class _NativeImageWorker(QThread):
         self.done.emit(res)
 
 
+class _VideoComfyWorker(QThread):
+    """Motore video alternativo COMFY-NATIVE (model_management ComfyUI, VRAM dinamica, no-OOM) per
+    t2v/i2v semplici. Selettore in video_tab; default resta ltx2_infer (copre tutte le feature)."""
+    done = Signal(dict)
+
+    def __init__(self, params: dict):
+        super().__init__()
+        self.params = params
+
+    def run(self):
+        try:
+            from core import ltx2_service
+            res = ltx2_service.generate(self.params, timeout=3600)
+        except Exception as e:                              # noqa: BLE001
+            res = {"status": "error", "error": str(e)}
+        self.done.emit(res)
+
+
 class _SeedVR2Worker(QThread):
     """SeedVR2 super-risoluzione video (CLI standalone, venv isolato). Stream log + path finale."""
     done = Signal(dict)
@@ -2076,6 +2094,20 @@ class MainWindow(QMainWindow):
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
+        # SELETTORE MOTORE VIDEO: default 'ltx2_infer' (tutte le feature). 'comfy' = comfy-native
+        # (model_management ComfyUI, VRAM dinamica/no-OOM) ma SOLO t2v/i2v semplici → per audio/
+        # controlnet/storyboard/lungo ricade su ltx2_infer. Scelta in user_prefs (dropdown video_tab).
+        from core import user_prefs as _up
+        _engine = _up.get_engine("video", "ltx2_infer")
+        _simple = not (params.get("audio_path") or params.get("control_video")
+                       or params.get("keyframes") or params.get("chunk_frames"))
+        if _engine == "comfy" and _simple:
+            self._log("[motore] comfy-native (VRAM dinamica, no-OOM)")
+            self._ltx2_worker = _VideoComfyWorker(params)
+            self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done)
+            return
+        if _engine == "comfy":
+            self._log("[motore] comfy non copre audio/controlnet/storyboard/lungo → uso ltx2_infer")
         self._ltx2_worker = _NativeLtx2Worker(params)
         self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
                       on_progress=lambda s: self._log("[nativo] " + s))

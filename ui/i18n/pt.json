@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "Motor",
   "f1.gen.engine.comfy": "Comfy (rápido, VRAM dinâmica)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: gestão VRAM dinâmica (recomendado, escala em qualquer GPU). Diffusers: pipeline clássica."
+  "f1.gen.engine.tt": "Comfy: gestão VRAM dinâmica (recomendado, escala em qualquer GPU). Diffusers: pipeline clássica.",
+  "vid.engine_lbl": "Motor de vídeo",
+  "vid.engine.ltx2": "LTX-2 nativo (todas as funções)",
+  "vid.engine.comfy": "Comfy (VRAM dinâmica, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 nativo: todas as funções (áudio/keyframe/controlnet). Comfy: VRAM dinâmica, só t2v/i2v."
 }

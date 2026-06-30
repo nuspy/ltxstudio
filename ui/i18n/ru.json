@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "Движок",
   "f1.gen.engine.comfy": "Comfy (быстро, динамическая VRAM)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: динамическое управление VRAM (рекомендуется, масштабируется на любой GPU). Diffusers: классический пайплайн."
+  "f1.gen.engine.tt": "Comfy: динамическое управление VRAM (рекомендуется, масштабируется на любой GPU). Diffusers: классический пайплайн.",
+  "vid.engine_lbl": "Видеодвижок",
+  "vid.engine.ltx2": "LTX-2 нативный (все функции)",
+  "vid.engine.comfy": "Comfy (динамическая VRAM, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 нативный: все функции (аудио/кейфрейм/controlnet). Comfy: динамическая VRAM, только t2v/i2v."
 }

@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "引擎",
   "f1.gen.engine.comfy": "Comfy（快速，动态显存）",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy：动态显存管理（推荐，适配各种 GPU）。Diffusers：经典管线。"
+  "f1.gen.engine.tt": "Comfy：动态显存管理（推荐，适配各种 GPU）。Diffusers：经典管线。",
+  "vid.engine_lbl": "视频引擎",
+  "vid.engine.ltx2": "LTX-2 原生（全部功能）",
+  "vid.engine.comfy": "Comfy（动态显存，t2v/i2v）",
+  "vid.engine.tt": "LTX-2 原生：全部功能（音频/关键帧/controlnet）。Comfy：动态显存，仅 t2v/i2v。"
 }

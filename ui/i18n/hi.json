@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "इंजन",
   "f1.gen.engine.comfy": "Comfy (तेज़, डायनामिक VRAM)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: डायनामिक VRAM प्रबंधन (अनुशंसित, हर GPU पर स्केल)। Diffusers: क्लासिक पाइपलाइन।"
+  "f1.gen.engine.tt": "Comfy: डायनामिक VRAM प्रबंधन (अनुशंसित, हर GPU पर स्केल)। Diffusers: क्लासिक पाइपलाइन।",
+  "vid.engine_lbl": "वीडियो इंजन",
+  "vid.engine.ltx2": "LTX-2 नेटिव (सभी सुविधाएँ)",
+  "vid.engine.comfy": "Comfy (डायनामिक VRAM, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 नेटिव: सभी सुविधाएँ (ऑडियो/कीफ़्रेम/controlnet)। Comfy: डायनामिक VRAM, केवल t2v/i2v।"
 }

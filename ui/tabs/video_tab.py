@@ -165,6 +165,22 @@ class VideoTab(QWidget):
         self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
         self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
         form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
+        # Selettore MOTORE video: ltx2_infer (default, tutte le feature) vs comfy-native (VRAM dinamica,
+        # no-OOM, ma solo t2v/i2v semplici). Persistito in user_prefs; il routing è in _generate_video_native.
+        self.video_engine_sel = QComboBox()
+        self.video_engine_sel.addItem(tr("vid.engine.ltx2", "LTX-2 nativo (tutte le funzioni)"), "ltx2_infer")
+        self.video_engine_sel.addItem(tr("vid.engine.comfy", "Comfy (VRAM dinamica, t2v/i2v)"), "comfy")
+        try:
+            from core import user_prefs as _up
+            _i = self.video_engine_sel.findData(_up.get_engine("video", "ltx2_infer"))
+            self.video_engine_sel.setCurrentIndex(_i if _i >= 0 else 0)
+            self.video_engine_sel.currentIndexChanged.connect(
+                lambda *_: _up.set_engine("video", self.video_engine_sel.currentData()))
+        except Exception:                                       # noqa: BLE001
+            pass
+        self.video_engine_sel.setToolTip(tr("vid.engine.tt",
+            "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v."))
+        form.addRow(tr("vid.engine_lbl", "Motore video"), self.video_engine_sel)
         # HR upscale/refine RIMOSSI dalla GUI (T3): erano un ramo legacy ComfyUI rotto e ridondante.
         # Nel flusso nativo la risoluzione si imposta direttamente nei preset; la super-risoluzione e il
         # dettaglio si fanno nel tab «Definizione Video» (SeedVR2/FlashVSR nativi). Gli attributi restano

@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "Motor",
   "f1.gen.engine.comfy": "Comfy (gyors, dinamikus VRAM)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: dinamikus VRAM-kezelés (ajánlott, minden GPU-n skálázódik). Diffusers: klasszikus pipeline."
+  "f1.gen.engine.tt": "Comfy: dinamikus VRAM-kezelés (ajánlott, minden GPU-n skálázódik). Diffusers: klasszikus pipeline.",
+  "vid.engine_lbl": "Videómotor",
+  "vid.engine.ltx2": "LTX-2 natív (összes funkció)",
+  "vid.engine.comfy": "Comfy (dinamikus VRAM, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 natív: összes funkció (audió/keyframe/controlnet). Comfy: dinamikus VRAM, csak t2v/i2v."
 }

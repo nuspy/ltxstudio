@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "엔진",
   "f1.gen.engine.comfy": "Comfy (빠름, 동적 VRAM)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: 동적 VRAM 관리(권장, 모든 GPU 확장). Diffusers: 클래식 파이프라인."
+  "f1.gen.engine.tt": "Comfy: 동적 VRAM 관리(권장, 모든 GPU 확장). Diffusers: 클래식 파이프라인.",
+  "vid.engine_lbl": "비디오 엔진",
+  "vid.engine.ltx2": "LTX-2 네이티브 (전체 기능)",
+  "vid.engine.comfy": "Comfy (동적 VRAM, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 네이티브: 전체 기능(오디오/키프레임/controlnet). Comfy: 동적 VRAM, t2v/i2v만."
 }

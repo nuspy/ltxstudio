@@ -1853,5 +1853,9 @@
   "f1.gen.engine_lbl": "מנוע",
   "f1.gen.engine.comfy": "Comfy (מהיר, VRAM דינמי)",
   "f1.gen.engine.diffusers": "Diffusers",
-  "f1.gen.engine.tt": "Comfy: ניהול VRAM דינמי (מומלץ, מתאים לכל GPU). Diffusers: פייפליין קלאסי."
+  "f1.gen.engine.tt": "Comfy: ניהול VRAM דינמי (מומלץ, מתאים לכל GPU). Diffusers: פייפליין קלאסי.",
+  "vid.engine_lbl": "מנוע וידאו",
+  "vid.engine.ltx2": "LTX-2 מקורי (כל הפונקציות)",
+  "vid.engine.comfy": "Comfy (VRAM דינמי, t2v/i2v)",
+  "vid.engine.tt": "LTX-2 מקורי: כל הפונקציות (אודיו/קיפריים/controlnet). Comfy: VRAM דינמי, t2v/i2v בלבד."
 }
