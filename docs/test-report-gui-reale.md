@@ -106,3 +106,8 @@ Catena di fix necessari (TRELLIS.2-4B, applicati in E:\AI\Tools\TRELLIS2):
 5. image_feature_extractor.py: `self.model.layer` → `self.model.model.layer` (transformers DINOv3ViTModel.model=encoder)
 Download 3D: DA-2 1.3GB, DINOv3 mirror 1.2GB, BiRefNet 445MB, WorldGen-LoRA 76MB.
 WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / FP4 6GB). Rig: ⚪ SkinTokens venv non installato.
+
+## 3D — Rig (SkinTokens) e WorldGen: BLOCCATI (porting/infra)
+- Rig: install_skintokens.py installa venv+torch cu128 OK, MA git clone del repo sorgente FALLISCE (github VAST-AI-Research/TokenRig = 404). rig_generate.py importa `skin_tokens.inference.auto_rig` (pacchetto assente); il codice SkinTokens funzionante e' vendorizzato nel custom node ComfyUI (ComfyUI-SkinToken/vendor/skintokens + sktn_nodes.py + blender_headless_bridge) con API diversa. => porting nativo INCOMPLETO, richiede adattare rig_generate al pacchetto vendorizzato + Blender bridge. Pesi in ComfyUI/models/skintoken (Qwen3-0.6B+experiments).
+- WorldGen: friction Windows (nunchaku FP4 repo-id backslash bug; FLUX-Fill bf16 24GB o FP4 6GB; DA-2 senza config.json nel repo). Frozen.
+- TRELLIS resta l'UNICO modulo 3D validato end-to-end (model.glb reale).
