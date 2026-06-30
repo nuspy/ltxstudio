@@ -128,6 +128,14 @@ class Job:
         self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
 
+    def run(self) -> int:
+        """Esecuzione BLOCCANTE: avvia e attende la fine (per chiamate sincrone, es. voice-clone tts_engine).
+        Ritorna il returncode."""
+        self.start()
+        if self._thread is not None:
+            self._thread.join()
+        return self._proc.returncode if self._proc is not None else -1
+
     def _emit(self, line: str) -> None:
         line = line.strip()
         if not line:
