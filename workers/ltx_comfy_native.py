@@ -20,6 +20,17 @@ os.chdir(COMFY)                                          # cwd corretto: import 
 import torch  # noqa: E402
 import folder_paths  # noqa: E402
 
+# SAGEATTENTION: acceleratore attention (fp8) — ComfyUI la usa se args.use_sage_attention=True. Senza,
+# l'attention LTX gira lenta. La attiviamo se sageattention è installata (env LTX_SAGE=0 per disattivarla).
+if os.environ.get("LTX_SAGE", "1") != "0":
+    try:
+        import sageattention  # noqa: F401
+        from comfy.cli_args import args as _comfy_args
+        _comfy_args.use_sage_attention = True
+        print("[sage] SageAttention ATTIVA (ComfyUI)", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        print(f"[sage] non attivata: {_e}", flush=True)
+
 # Registra i percorsi modelli reali (E:\AI\Models) oltre ai default di ComfyUI.
 for _folder, _path in (("diffusion_models", r"E:\AI\Models\diffusion_models"),
                        ("text_encoders", r"E:\AI\Models\TextEncoders"),
