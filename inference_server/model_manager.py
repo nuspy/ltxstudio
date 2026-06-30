@@ -92,9 +92,11 @@ class ModelManager:
         e = self._cache.pop(key, None)
         if e is None:
             return
+        # NIENTE .to("cpu"): pullerebbe i pesi (22GB) in RAM prima di cancellarli = picco RAM inutile
+        # e, con due processi attivi, congela il sistema. Cancello e basta → empty_cache libera la VRAM
+        # (i tensori GPU vengono rilasciati col del); gc.collect() libera la RAM.
         try:
-            if hasattr(e.obj, "to"):
-                e.obj.to("cpu")
+            del e.obj
         except Exception:                               # noqa: BLE001
             pass
         del e
