@@ -65,7 +65,7 @@ def _gen_models_for_arch(arch_lbl: str):
                 out.append(m)
         for c in _CHECKPOINTS:
             cl = c.lower()
-            if "kontext" in cl or _is_flux2(c):
+            if "kontext" in cl or "redux" in cl or _is_flux2(c):    # come _reload_gen (frame1_tab:380)
                 continue
             if any(k in cl for k in kws) and c not in out:
                 out.append(c)
