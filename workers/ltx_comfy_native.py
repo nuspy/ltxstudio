@@ -58,9 +58,15 @@ def run(p: dict) -> str:
     from comfy_extras.nodes_lt import EmptyLTXVLatentVideo, LTXVScheduler
 
     t0 = time.time()
-    model = _unwrap(nodes.UNETLoader().load_unet(
-        p.get("model", "LTXVideo/v2/ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors"),
-        "default"))
+    _mname = p.get("model", "LTXVideo/v2/ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors")
+    if str(_mname).lower().endswith(".gguf"):            # GGUF (schede piccole): loader ComfyUI-GGUF
+        _GGUF = nodes.NODE_CLASS_MAPPINGS.get("UnetLoaderGGUF")
+        if _GGUF is None:
+            raise RuntimeError("UnetLoaderGGUF non disponibile (ComfyUI-GGUF non caricato)")
+        model = _unwrap(_GGUF().load_unet(_mname))
+        print(f"[model] GGUF (ComfyUI-GGUF) {os.path.basename(_mname)}", flush=True)
+    else:                                                # safetensors (fp8/bf16): UNETLoader standard
+        model = _unwrap(nodes.UNETLoader().load_unet(_mname, "default"))
     clip = _unwrap(nodes.DualCLIPLoader().load_clip(
         p.get("clip1", "gemma_3_12B_it.safetensors"),
         p.get("clip2", "ltx-2.3_text_projection_bf16.safetensors"), "ltxv"))

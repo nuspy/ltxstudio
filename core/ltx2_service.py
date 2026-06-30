@@ -76,6 +76,30 @@ def _to_dm_relative(model: str) -> str:
     return m.replace("\\", "/")
 
 
+def _auto_calibrate_video_model(model_rel: str) -> str:
+    """Sceglie il modello LTX per fascia VRAM (distribuibile, niente hardcode): fp8 se VRAM libera alta,
+    GGUF Q4 se bassa. Solo per il 22B fp8 di default; rispetta scelte esplicite di altri modelli/GGUF."""
+    import os as _os
+    if not model_rel or model_rel.lower().endswith(".gguf"):
+        return model_rel                                    # già GGUF o vuoto → non toccare
+    try:
+        from core import model_precision as _mp
+        free = float(_mp.gpu_free_gb())
+    except Exception:                                       # noqa: BLE001
+        return model_rel
+    # il fp8 22B (24GB) entra comodo solo con ~28GB+ liberi; sotto → GGUF Q4 (14GB) per non sborzare
+    if "22b" in model_rel.lower() and free < 28.0:
+        gguf = _os.path.join(_DM_ROOT, "LTXVideo", "v2", "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf")
+        if not _os.path.exists(gguf):
+            import glob
+            hits = glob.glob(_os.path.join(_DM_ROOT, "LTXVideo", "**", "*Q4_K_M.gguf"), recursive=True)
+            gguf = hits[0] if hits else ""
+        if gguf and _os.path.exists(gguf):
+            print(f"[auto-calibra] VRAM~{free:.0f}GB<28 → GGUF Q4 (distribuibile)", flush=True)
+            return _to_dm_relative(gguf)
+    return model_rel
+
+
 def _generate_comfy_native(params: dict, timeout: int) -> dict:
     """Genera via workers/ltx_comfy_native.py (model_management ComfyUI = VRAM dinamica, no OOM).
     One-shot subprocess nel venv ComfyUI: GPU pulita ad ogni run (niente server che accumula)."""
@@ -83,6 +107,10 @@ def _generate_comfy_native(params: dict, timeout: int) -> dict:
     _free_gpu_servers()
     p = dict(params)
     p["model"] = _to_dm_relative(p.get("model", ""))
+    # AUTO-CALIBRAZIONE per HARDWARE (distribuibile): fp8 (qualità piena) quando la VRAM basta; su schede
+    # con poca VRAM libera auto-scelta del GGUF Q4 (footprint ridotto). NIENTE hardcode → si adatta a
+    # 4090/5090/8GB/48GB. L'offload fine lo fa comunque il model_management di ComfyUI. Vedi [[dynamic-vram-tuning]].
+    p["model"] = _auto_calibrate_video_model(p["model"])
     p.setdefault("output", os.path.join(OUTPUT_DIR, f"ltx2_{uuid.uuid4().hex[:8]}.mp4"))
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     pj = os.path.join(OUTPUT_DIR, f"_vparams_{uuid.uuid4().hex[:8]}.json")
