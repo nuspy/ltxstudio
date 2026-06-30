@@ -698,7 +698,12 @@ def run_generation(p: dict) -> str:
                 fr = max(0, min(nf - 1, fr))
                 images.append(ImageConditioningInput(kf["path"], fr, float(kf.get("strength", 1.0)), 33))
         elif p.get("image_path"):                            # i2v: condiziona sul primo frame
-            images = [ImageConditioningInput(p["image_path"], 0, 1.0, 33)]
+            # Forza immagine (slider GUI ref_strength): 1.0 = guida piena ("addguide"); valori più bassi =
+            # riferimento "soft/inplace" (l'immagine condiziona meno → il modello reinterpreta di più).
+            _ref_str = float(p.get("ref_strength", 1.0))
+            if p.get("i2v_method") == "inplace":             # inplace-soft: riferimento sempre morbido
+                _ref_str = min(_ref_str, 0.6)
+            images = [ImageConditioningInput(p["image_path"], 0, _ref_str, 33)]
         video, audio = pipe(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),

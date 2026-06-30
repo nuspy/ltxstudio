@@ -2050,6 +2050,7 @@ class MainWindow(QMainWindow):
         if use_image and self.frame1_tab.image_path:
             params["image_path"] = self.frame1_tab.image_path
             params["ref_strength"] = float(vals.get("ref_strength", 1.0))
+            params["i2v_method"] = vals.get("i2v_method", "addguide")   # addguide=guida piena / inplace=soft-ref
         # audio reale → audio→video (canto/lip-sync) nativo
         af = audio.get("audio_file")
         if af and os.path.exists(af):
