@@ -73,3 +73,5 @@ non sono testabili a piena risoluzione. Da rifare su GPU ≥40GB o dopo #18.
 voice-clone f5tts+xtts2, TTS edge, HeartMuLa musica.
 Pendenti: MMAudio (venv riparato torch/torchaudio 2.11 cpu, demo.py gira su CPU lento), ACE-Step (load lento).
 Nota: storyboard/keyframe sui 32GB va a 25f; a 49f+ timeout → serve server video persistente (no reload/gen).
+
+- LoRA video: REAL_video_lora2.mp4 (108KB, [gen] 24s, [lora] fightV3 applicata via LoraLoaderModelOnly) ✅
