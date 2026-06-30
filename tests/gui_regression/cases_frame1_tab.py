@@ -59,7 +59,7 @@ def _gen_models_for_arch(arch_lbl: str):
     if arch_lbl == "FLUX":
         for m in _DIFFUSION:
             ml = m.lower()
-            if "fill" in ml or "kontext" in ml:
+            if "fill" in ml or "kontext" in ml or "redux" in ml:    # adapter/edit: non sono modelli t2i base
                 continue
             if any(k in ml for k in kws):
                 out.append(m)
@@ -470,8 +470,12 @@ def case_integrate_kontext_native(w, spy):
     c = spy.calls[-1]
     if c["via"] == "enqueue":
         p = c["params"]
-        assert p.get("arch") == "kontext", f"arch kontext atteso: {p.get('arch')}"
+        # Integra mask-based: se il canvas esporta la maschera zona-edit → arch=inpaint (FLUX Fill, fonde
+        # l'oggetto); altrimenti kontext (preserva). Entrambi validi.
+        assert p.get("arch") in ("kontext", "inpaint"), f"arch kontext/inpaint atteso: {p.get('arch')}"
         assert p.get("image_path"), f"image_path mancante: {p}"
+        if p.get("arch") == "inpaint":
+            assert p.get("mask_path"), f"integra mask-based senza mask_path: {p}"
 
 
 def case_integrate_guidance_seed(w, spy):
@@ -494,7 +498,10 @@ def case_integrate_guidance_seed(w, spy):
     if c["via"] == "enqueue":
         p = c["params"]
         assert p.get("seed") == 4242, f"seed integrate non propagato: {p.get('seed')}"
-        assert abs(float(p.get("guidance", 0)) - 3.5) < 0.01, f"guidance integrate errata: {p.get('guidance')}"
+        # guidance: ramo kontext usa lo slider (3.5); ramo mask-based (FLUX Fill) usa il regime Fill (~30).
+        g = float(p.get("guidance", 0))
+        ok = abs(g - 3.5) < 0.01 if p.get("arch") == "kontext" else g >= 20.0
+        assert ok, f"guidance integrate errata per arch={p.get('arch')}: {g}"
 
 
 def case_integrate_flux2(w, spy):
