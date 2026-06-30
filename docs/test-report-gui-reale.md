@@ -27,4 +27,13 @@ La suite `tests/gui_regression/run_all.py` pilota la GUI e verifica che ogni con
 ## Matrice test reale (in aggiornamento)
 | Feature | Esito | Note |
 |---|---|---|
-| (in corso) | ⏳ | |
+| Video t2v/i2v — motore **ltx2_infer** (default) | ❌→⚠️ | Test reale: il 22B **OOM/sborda sui 32GB anche a 512×320/25f** (model-bound, dequant ~44GB indip. dalla risoluzione). RIPARATO con auto-switch: t2v/i2v + VRAM<40GB → comfy automatico (commit 70b52e7). |
+| Video t2v/i2v — motore **comfy-native** | ✅ | Validato in sessioni precedenti (768×512 49f, no-OOM). Ora è il path automatico su 32GB per t2v/i2v. |
+| Video feature avanzate (audio/controlnet/storyboard/lungo) | 🔒/⏳ | Solo ltx2_infer → servono >40GB VRAM o il rewrite memoria (#18) per girare su 32GB. Da testare su HW adeguato o con #18. |
+| Immagini t2i/inpaint/outpaint/kontext/compose/integra/upscale/restauro/segment | ✅ | Validati in sessioni precedenti (backend reale). Integra mask-based ✅. |
+
+### Nota chiave 32GB
+Sui 32GB il **video 22B in ltx2_infer non è eseguibile** (model-bound). Il selettore + auto-switch instradano
+t2v/i2v su comfy-native (no-OOM). Le **feature video avanzate** (audio→video/canta/talk/retake/controlnet/
+storyboard/lungo) sono solo su ltx2_infer → richiedono più VRAM o il memory-rewrite #18: su questa macchina
+non sono testabili a piena risoluzione. Da rifare su GPU ≥40GB o dopo #18.
