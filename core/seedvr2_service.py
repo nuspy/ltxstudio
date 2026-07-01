@@ -63,14 +63,17 @@ def preflight() -> list[str]:
 
 def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = "", batch_size: int = 5,
                   chunk_size: int = 0, temporal_overlap: int = 0, color: str = "lab",
-                  cuda_device: str = "0", on_log=None) -> str:
+                  cuda_device: str = "0", block_swap: int = 0, on_log=None) -> str:
     """Super-risolve un video. batch_size deve essere 4n+1 (1,5,9,...). chunk_size>0 = streaming
-    memory-bounded per video lunghi. Ritorna il path di output (mp4)."""
+    memory-bounded per video lunghi. block_swap>0 = override manuale (0 = auto sulla VRAM libera).
+    Ritorna il path di output (mp4)."""
     errs = preflight()
     if errs:
         raise RuntimeError("; ".join(errs))
     model = model or DEFAULT_MODEL
     blocks, offload = _auto_block_swap(model)
+    if block_swap > 0:                       # override manuale dalla GUI (altrimenti resta auto)
+        blocks = block_swap
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     if batch_size % 4 != 1:                # forza 4n+1
         batch_size = (batch_size // 4) * 4 + 1

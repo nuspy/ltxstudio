@@ -148,16 +148,19 @@ class _SeedVR2Worker(QThread):
     done = Signal(dict)
     progress = Signal(str)
 
-    def __init__(self, src: str, out: str, *, resolution: int, batch_size: int, chunk_size: int):
+    def __init__(self, src: str, out: str, *, resolution: int, batch_size: int, chunk_size: int,
+                 model: str = "", block_swap: int = 0):
         super().__init__()
         self.src, self.out = src, out
         self.resolution, self.batch_size, self.chunk_size = resolution, batch_size, chunk_size
+        self.model, self.block_swap = model, block_swap
 
     def run(self):
         from core import seedvr2_service as sv
         try:
             sv.upscale_video(self.src, self.out, resolution=self.resolution, batch_size=self.batch_size,
-                             chunk_size=self.chunk_size, on_log=lambda l: self.progress.emit(l))
+                             chunk_size=self.chunk_size, model=self.model or "", block_swap=self.block_swap,
+                             on_log=lambda l: self.progress.emit(l))
             self.done.emit({"status": "success", "output": [self.out]})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
@@ -204,7 +207,8 @@ class _VideoEditAIWorker(QThread):
             out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_{base}_{stamp}.mp4")
             params = {"prompt": cfg["prompt"], "negative": "worst quality, blurry",
                       "edit_lora": cfg["edit_lora"], "control_strength": float(cfg.get("strength", 1.0)),
-                      "width": 512, "height": 320, "num_frames": 25, "fps": 25,
+                      "width": int(cfg.get("width", 512)), "height": int(cfg.get("height", 320)),
+                      "num_frames": int(cfg.get("num_frames", 25)), "fps": int(cfg.get("fps", 25)),
                       "seed": 42, "offload": "cpu", "output": out}
             if cfg["mode"] == "inpaint":                       # #59 parametri inpaint dalla GUI
                 params["control_strength"] = float(cfg.get("guide", 0.4))
@@ -2183,6 +2187,13 @@ class MainWindow(QMainWindow):
 
     def _gen_video_edit_ai(self, cfg: dict):
         """#24/#59/#60 Modifica Video AI: edit-anything / inpaint (SAM2 track) / style — worker async."""
+        # #7 risoluzione/fps/durata dai controlli del tab Video (erano hard-coded 512×320/25f/25fps).
+        vv = self.video_tab.get_values()
+        _fps = int(vv.get("fps", 25) or 25)
+        cfg.setdefault("width", int(vv.get("width", 512) or 512))
+        cfg.setdefault("height", int(vv.get("height", 320) or 320))
+        cfg.setdefault("fps", _fps)
+        cfg.setdefault("num_frames", max(9, int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
         self.video_edit_ai_tab.log.appendPlainText(tr("vedit.start", "[edit] avvio {m}…").format(m=cfg["mode"]))
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
@@ -2204,6 +2215,9 @@ class MainWindow(QMainWindow):
         src = cfg.get("video")
         if not src or not os.path.exists(src):
             QMessageBox.warning(self, tr("mw.no_video_title", "Video"), tr("mw.no_video_msg", "Scegli un video.")); return
+        # #10 RIFE dal tab Definizione: se attivo, fluidifica DOPO l'upscale (consumato in _maybe_rife).
+        self._pending_def_rife = ({"factor": int(cfg.get("rife_multiplier", 2) or 2)}
+                                  if cfg.get("rife") else None)
         engine = cfg.get("engine", "seedvr2")
         if engine == "seedvr2":                          # SeedVR2 nativo (diffusion VSR, coerenza temporale)
             from core import seedvr2_service as sv
@@ -2214,7 +2228,9 @@ class MainWindow(QMainWindow):
             out = str(OUTPUT_DIR / f"seedvr2_{Path(src).stem}.mp4")
             self._log(f"[nativo] SeedVR2 super-risoluzione (res {cfg.get('resolution',1080)}) su {Path(src).name}…")
             self._sv2_worker = _SeedVR2Worker(src, out, resolution=int(cfg.get("resolution", 1080) or 1080),
-                                              batch_size=int(cfg.get("batch_size", 5) or 5), chunk_size=120)
+                                              batch_size=int(cfg.get("batch_size", 5) or 5), chunk_size=120,
+                                              model=cfg.get("seedvr2_model", "") or "",
+                                              block_swap=int(cfg.get("blocks_to_swap", 0) or 0))
             self._enqueue(tr("queue.job.seedvr2", "Super-risoluzione (SeedVR2)"), self._sv2_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
@@ -2254,6 +2270,8 @@ class MainWindow(QMainWindow):
         fps = int(v.get("fps", 25) or 25)
         add_s = float(cfg.get("add_seconds", 5) or 5)
         nf = max(9, int(add_s * fps) // 8 * 8 + 1)
+        # steps: il controllo del tab Prolunga ha priorità (era ignorato → si usava quello del tab Video)
+        ext_steps = int(cfg.get("steps", 0) or 0) or int(self.video_tab.sampler_seed.steps.value())
         lastf = str(OUTPUT_DIR / f"_ext_last_{int(_t.time())}.png")
         _sp.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", src, "-vframes", "1", lastf, "-y"], check=False)
         if not os.path.exists(lastf):
@@ -2264,12 +2282,16 @@ class MainWindow(QMainWindow):
             "image_path": lastf, "prompt": cfg["prompt"],
             "negative": v.get("prompt_negative", "") or "worst quality, blurry",
             "width": int(v.get("width", 512)), "height": int(v.get("height", 512)),
-            "num_frames": nf, "fps": fps, "steps": int(self.video_tab.sampler_seed.steps.value()),
+            "num_frames": nf, "fps": fps, "steps": ext_steps,
             "guidance": float(self.video_tab.sampler_seed.cfg.value()), "seed": int(self.video_tab.sampler_seed.seed.value()),
             "offload": "cpu", "ref_strength": 1.0, "output": cont,
         }
-        if nf > 150:
-            params["chunk_frames"] = 121
+        # seg_seconds → dimensione del chunk in-process (memory-bounded) per estensioni lunghe;
+        # il worker segmenta quando num_frames > chunk_frames (continuità via ultimo frame).
+        seg_s = float(cfg.get("seg_seconds", 0) or 0)
+        chunk = int(seg_s * fps) // 8 * 8 + 1 if seg_s > 0 else 121
+        if nf > chunk:
+            params["chunk_frames"] = max(9, chunk)
         self._log(f"[nativo] prolunga +{add_s:.0f}s ({nf} frame) da {Path(src).name}…")
         self._ltx2_worker = _NativeLtx2Worker(params)
         self._enqueue(tr("queue.job.video_extend", "Prolunga video"), self._ltx2_worker,
@@ -2354,8 +2376,12 @@ class MainWindow(QMainWindow):
         self._maybe_rife(out)
 
     def _maybe_rife(self, out):
-        """Post-process RIFE (fluidifica) se attivo, altrimenti annuncia il video."""
-        rf = self.video_tab.get_rife_auto() if hasattr(self.video_tab, "get_rife_auto") else None
+        """Post-process RIFE (fluidifica) se attivo, altrimenti annuncia il video.
+        Priorità: richiesta esplicita dal tab Definizione (#10) → auto-RIFE del tab Video."""
+        rf = getattr(self, "_pending_def_rife", None)
+        self._pending_def_rife = None                        # consuma una sola volta
+        if not rf:
+            rf = self.video_tab.get_rife_auto() if hasattr(self.video_tab, "get_rife_auto") else None
         if rf and out:
             from pathlib import Path as _P
             fluid = str(_P(out).with_name(_P(out).stem + f"_rife{rf['factor']}x.mp4"))
