@@ -175,6 +175,8 @@ class MusicTab(QWidget):
         h = QHBoxLayout()
         self.btn_song_install = QPushButton(tr("music.install.heart", "Installa HeartMuLa"))
         self.btn_song_install.clicked.connect(lambda: self._install("--heartmula"))
+        self.btn_acestep_install = QPushButton(tr("music.install.acestep", "Installa ACE-Step"))
+        self.btn_acestep_install.clicked.connect(lambda: self._install("--acestep"))
         self.btn_song = QPushButton(tr("music.song.gen", "Genera musica"))
         self.btn_song.clicked.connect(self._gen_song)
         # Videomusicale automatico: canzone → storyboard LLM → video nativo coerente col testo
@@ -184,7 +186,7 @@ class MusicTab(QWidget):
         self.btn_music_video.clicked.connect(self._gen_music_video)
         self.btn_mv_projects = QPushButton(tr("music.mv.projects", "📂 Progetti videomusicali"))
         self.btn_mv_projects.clicked.connect(self._open_mv_projects)
-        h.addWidget(self.btn_song_install); h.addStretch(1)
+        h.addWidget(self.btn_song_install); h.addWidget(self.btn_acestep_install); h.addStretch(1)
         h.addWidget(self.btn_song); h.addWidget(self.btn_music_video); h.addWidget(self.btn_mv_projects)
         v.addLayout(h)
         return box
@@ -294,6 +296,14 @@ class MusicTab(QWidget):
         self.btn_song_install.setText(tr("music.installed.heart", "HeartMuLa installato ✓") if h else tr("music.install.heart", "Installa HeartMuLa"))
         self.btn_son_install.setEnabled(not m)
         self.btn_son_install.setText(tr("music.installed.mm", "MMAudio installato ✓") if m else tr("music.install.mm", "Installa MMAudio"))
+        try:
+            from core import acestep_service as ax
+            a = ax.is_installed()
+        except Exception:
+            a = False
+        self.btn_acestep_install.setEnabled(not a)
+        self.btn_acestep_install.setText(tr("music.installed.acestep", "ACE-Step installato ✓") if a
+                                         else tr("music.install.acestep", "Installa ACE-Step"))
 
     def _busy(self) -> bool:
         return bool((self._song_job and self._song_job.running) or (self._sonify_job and self._sonify_job.running)
@@ -327,7 +337,7 @@ class MusicTab(QWidget):
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         out = ax.OUT_DIR / f"{ax._safe(name)}.wav"
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
-                          guidance=float(self.song_cfg.value()),
+                          guidance=float(self.song_cfg.value()), lazy=self.song_lazy.isChecked(),
                           on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
@@ -409,15 +419,21 @@ class MusicTab(QWidget):
         if QMessageBox.question(self, tr("music.install.title", "Installa modulo musica"),
                                 tr("music.install.confirm", "Verranno scaricati il motore + PyTorch (cu128) e i pesi (diversi GB). Procedo?")) != QMessageBox.Yes:
             return
-        script = str(Path(__file__).resolve().parents[2] / "scripts" / "install_music.py")
+        scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+        # ACE-Step ha un installer dedicato; HeartMuLa/MMAudio passano dal flag di install_music.py
+        if which == "--acestep":
+            args = ["-u", str(scripts_dir / "install_acestep.py")]
+        else:
+            args = ["-u", str(scripts_dir / "install_music.py"), which]
         self._log(f"[install] {which} …")
         self.btn_song_install.setEnabled(False); self.btn_son_install.setEnabled(False)
+        self.btn_acestep_install.setEnabled(False)
         p = QProcess(self); p.setProcessChannelMode(QProcess.MergedChannels)
         p.readyReadStandardOutput.connect(
             lambda: self._log(bytes(p.readAllStandardOutput()).decode("utf-8", "replace").rstrip()))
         p.finished.connect(self._install_finished)
         self._install_proc = p
-        p.start(sys.executable, ["-u", script, which])
+        p.start(sys.executable, args)
 
     def _install_finished(self, code, _s):
         self._log(f"[install] terminato (codice {code})")

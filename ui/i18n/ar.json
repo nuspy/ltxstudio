@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (خط أنابيب أصلي)",
   "settings.engine.lightricks": "LTX-2 الرسمي (ltx2_infer)",
   "settings.overrides_group": "تجاوزات النموذج (قالب ComfyUI)",
-  "settings.no_loaders": "لا توجد عقدة loader في القالب الحالي."
+  "settings.no_loaders": "لا توجد عقدة loader في القالب الحالي.",
+  "cn.strength_lbl": "شدة التحكم:",
+  "cn.strength_hint": "1.0 = يتبع المرجع بدقة؛ القيم المنخفضة = حرية إبداعية أكبر.",
+  "aud.install.confirm.text2": "تثبيت محرك '{eid}'؟\n\n{note}",
+  "music.install.acestep": "تثبيت ACE-Step",
+  "music.installed.acestep": "تم تثبيت ACE-Step ✓"
 }

@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (natív pipeline)",
   "settings.engine.lightricks": "LTX-2 hivatalos (ltx2_infer)",
   "settings.overrides_group": "Modell felülbírálások (ComfyUI sablon)",
-  "settings.no_loaders": "Nincs loader csomópont a jelenlegi sablonban."
+  "settings.no_loaders": "Nincs loader csomópont a jelenlegi sablonban.",
+  "cn.strength_lbl": "Vezérlés erőssége:",
+  "cn.strength_hint": "1.0 = szigorúan követi a referenciát; alacsonyabb értékek = nagyobb kreatív szabadság.",
+  "aud.install.confirm.text2": "Telepíted a(z) '{eid}' motort?\n\n{note}",
+  "music.install.acestep": "ACE-Step telepítése",
+  "music.installed.acestep": "ACE-Step telepítve ✓"
 }

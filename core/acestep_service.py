@@ -23,12 +23,14 @@ def is_installed() -> bool:
 
 
 def make_job(tags: str, lyrics: str = "", out_name: str = "song", *, duration: float = 60.0,
-             steps: int = 27, guidance: float = 15.0, **cbs) -> Job:
+             steps: int = 27, guidance: float = 15.0, lazy: bool = False, **cbs) -> Job:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / f"{_safe(out_name)}.wav"
     cmd = [AS_VENV_PY, "-u", str(GEN_SCRIPT), "--tags", tags, "--lyrics", lyrics or "",
            "--duration", float(duration), "--steps", int(steps), "--guidance", float(guidance),
            "--output", str(out)]
+    if lazy:                                              # low-VRAM: CPU offload dei componenti
+        cmd.append("--lazy")
     return Job(cmd, AS_DIR, **cbs)
 
 

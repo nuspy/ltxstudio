@@ -22,7 +22,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox, QComboBox, QPushButton, QLabel, QFileDialog,
-    QGroupBox,
+    QGroupBox, QDoubleSpinBox,
 )
 
 from ui.i18n_manager import tr
@@ -63,6 +63,17 @@ class ControlNetTab(QWidget):
         self.type_hint = QLabel(tr(self.TYPES[0][1]))
         self.type_hint.setStyleSheet("color:#888; padding:2px 6px;")
         tv.addWidget(self.type_hint)
+
+        # Intensità del controllo: 1.0 = segue rigidamente il riferimento; valori bassi = più libertà.
+        srow = QHBoxLayout()
+        srow.addWidget(QLabel(tr("cn.strength_lbl")))
+        self.strength = QDoubleSpinBox()
+        self.strength.setRange(0.0, 1.0); self.strength.setSingleStep(0.05); self.strength.setValue(0.8)
+        srow.addWidget(self.strength); srow.addStretch(1)
+        tv.addLayout(srow)
+        shint = QLabel(tr("cn.strength_hint"))
+        shint.setWordWrap(True); shint.setStyleSheet("color:#888; padding:2px 6px;")
+        tv.addWidget(shint)
         lay.addWidget(type_box)
 
         video_box = QGroupBox(tr("cn.video.group"))
@@ -101,4 +112,5 @@ class ControlNetTab(QWidget):
         type_idx = self.type.currentIndex()  # 0 canny, 1 depth, 2 pose
         return {"controlnet_enabled": self.enable.isChecked(),
                 "controlnet_ref_video": self._video,
-                "controlnet_type": type_idx}
+                "controlnet_type": type_idx,
+                "controlnet_strength": float(self.strength.value())}

@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (native Pipeline)",
   "settings.engine.lightricks": "LTX-2 offiziell (ltx2_infer)",
   "settings.overrides_group": "Modell-Overrides (ComfyUI-Vorlage)",
-  "settings.no_loaders": "Kein Loader-Knoten in der aktuellen Vorlage."
+  "settings.no_loaders": "Kein Loader-Knoten in der aktuellen Vorlage.",
+  "cn.strength_lbl": "Kontrollstärke:",
+  "cn.strength_hint": "1.0 = folgt streng der Referenz; niedrige Werte = mehr kreative Freiheit.",
+  "aud.install.confirm.text2": "Engine '{eid}' installieren?\n\n{note}",
+  "music.install.acestep": "ACE-Step installieren",
+  "music.installed.acestep": "ACE-Step installiert ✓"
 }

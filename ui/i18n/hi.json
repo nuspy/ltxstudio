@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (नेटिव पाइपलाइन)",
   "settings.engine.lightricks": "LTX-2 आधिकारिक (ltx2_infer)",
   "settings.overrides_group": "मॉडल ओवरराइड (ComfyUI टेम्पलेट)",
-  "settings.no_loaders": "वर्तमान टेम्पलेट में कोई लोडर नोड नहीं।"
+  "settings.no_loaders": "वर्तमान टेम्पलेट में कोई लोडर नोड नहीं।",
+  "cn.strength_lbl": "नियंत्रण तीव्रता:",
+  "cn.strength_hint": "1.0 = संदर्भ का कड़ाई से अनुसरण; कम मान = अधिक रचनात्मक स्वतंत्रता।",
+  "aud.install.confirm.text2": "'{eid}' इंजन स्थापित करें?\n\n{note}",
+  "music.install.acestep": "ACE-Step स्थापित करें",
+  "music.installed.acestep": "ACE-Step स्थापित ✓"
 }

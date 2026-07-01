@@ -19,6 +19,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
@@ -231,19 +232,65 @@ def venv_python() -> Path | None:
     return None
 
 
-def install_engine(engine_id: str, *, log=print) -> tuple[bool, str]:
-    """Installa il custom node ComfyUI di un engine TTS.
+def _native_installer_script(engine_id: str) -> str | None:
+    """Nome dello script installer NATIVO per l'engine (senza .py), o None se non esiste."""
+    name = _NATIVE_CLONE_INSTALLER.get(engine_id)
+    if name is None and engine_id == "cosyvoice2":
+        name = "install_cosyvoice"
+    if name is None:
+        return None
+    repo = Path(__file__).resolve().parent.parent
+    return name if (repo / "scripts" / f"{name}.py").is_file() else None
 
-    Step:
-    1. Verifica che `git` sia disponibile
-    2. Trova `custom_nodes/` di ComfyUI
-    3. `git clone` del repo (skip se già presente → tenta `git pull`)
-    4. Installa `requirements.txt` se presente nel python del venv di ComfyUI
-    5. Invalida la cache dei NODE_CLASS_MAPPINGS
+
+def has_installer(engine_id: str) -> bool:
+    """True se esiste un installer (nativo o legacy ComfyUI) per l'engine."""
+    return _native_installer_script(engine_id) is not None or engine_id in ENGINE_REPOS
+
+
+def install_note(engine_id: str) -> str:
+    """Nota da mostrare nel dialog di conferma (native-first)."""
+    if _native_installer_script(engine_id):
+        return (f"Installazione NATIVA in venv isolato (E:\\AI\\Tools), zero ComfyUI. "
+                f"Modelli scaricati da HuggingFace al primo uso.")
+    return ENGINE_REPOS.get(engine_id, {}).get("note", "")
+
+
+def _install_native_engine(engine_id: str, script: str, *, log=print) -> tuple[bool, str]:
+    """Esegue lo script installer NATIVO (crea venv isolato + pip). Zero ComfyUI."""
+    import subprocess
+    repo = Path(__file__).resolve().parent.parent
+    script_path = repo / "scripts" / f"{script}.py"
+    lines = [f"📦 Installazione NATIVA '{engine_id}' → scripts/{script}.py (venv isolato, zero ComfyUI)"]
+    if not script_path.is_file():
+        return False, "\n".join(lines + [f"❌ Installer non trovato: {script_path}"])
+    try:
+        res = subprocess.run([sys.executable, str(script_path)],
+                             capture_output=True, text=True, timeout=3600)
+        tail = (res.stdout + res.stderr).strip().splitlines()[-15:]
+        lines.extend(tail)
+        if res.returncode != 0:
+            return False, "\n".join(lines + ["❌ Installer terminato con errore (vedi sopra)."])
+        invalidate_engine_cache()
+        return True, "\n".join(lines + ["", "✅ Installazione nativa completata (nessun riavvio ComfyUI)."])
+    except subprocess.TimeoutExpired:
+        return False, "\n".join(lines + ["❌ Timeout installazione (>1h)."])
+    except Exception as e:                                   # noqa: BLE001
+        return False, "\n".join(lines + [f"❌ Errore: {e}"])
+
+
+def install_engine(engine_id: str, *, log=print) -> tuple[bool, str]:
+    """Installa un engine TTS. NATIVE-FIRST: se esiste un installer nativo (venv isolato, coerente
+    col runtime di sintesi), lo usa; altrimenti ricade sul custom node ComfyUI (legacy).
 
     Ritorna (ok, message). `message` contiene log multilinea adatto al dialog.
     """
     import shutil, subprocess
+    # NATIVO preferito (f5tts/xtts2/fish/vibevoice/cosyvoice2): coerente con _engine_installed/synthesize.
+    _native = _native_installer_script(engine_id)
+    if _native:
+        return _install_native_engine(engine_id, _native, log=log)
+    # ── fallback legacy: custom node ComfyUI ──
     if engine_id not in ENGINE_REPOS:
         return False, f"Nessun installer noto per l'engine '{engine_id}'."
     if shutil.which("git") is None:

@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (네이티브 파이프라인)",
   "settings.engine.lightricks": "LTX-2 공식 (ltx2_infer)",
   "settings.overrides_group": "모델 재정의 (ComfyUI 템플릿)",
-  "settings.no_loaders": "현재 템플릿에 로더 노드가 없습니다."
+  "settings.no_loaders": "현재 템플릿에 로더 노드가 없습니다.",
+  "cn.strength_lbl": "컨트롤 강도:",
+  "cn.strength_hint": "1.0 = 참조를 엄격히 따름; 낮은 값 = 더 많은 창작 자유.",
+  "aud.install.confirm.text2": "'{eid}' 엔진을 설치할까요?\n\n{note}",
+  "music.install.acestep": "ACE-Step 설치",
+  "music.installed.acestep": "ACE-Step 설치됨 ✓"
 }

@@ -14,10 +14,11 @@ def main():
     ap.add_argument("--duration", type=float, default=60.0)
     ap.add_argument("--steps", type=int, default=27)
     ap.add_argument("--guidance", type=float, default=15.0)
+    ap.add_argument("--lazy", action="store_true", help="low-VRAM: CPU offload dei componenti")
     ap.add_argument("--output", required=True)
     a = ap.parse_args()
     from acestep.pipeline_ace_step import ACEStepPipeline
-    pipe = ACEStepPipeline(dtype="bfloat16", torch_compile=False)
+    pipe = ACEStepPipeline(dtype="bfloat16", torch_compile=False, cpu_offload=bool(a.lazy))
     pipe(prompt=a.tags, lyrics=a.lyrics, audio_duration=a.duration,
          infer_step=a.steps, guidance_scale=a.guidance, save_path=a.output)
     print(f"OK:{a.output}", flush=True)

@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (צינור מקורי)",
   "settings.engine.lightricks": "LTX-2 רשמי (ltx2_infer)",
   "settings.overrides_group": "עקיפות מודל (תבנית ComfyUI)",
-  "settings.no_loaders": "אין צומת loader בתבנית הנוכחית."
+  "settings.no_loaders": "אין צומת loader בתבנית הנוכחית.",
+  "cn.strength_lbl": "עוצמת בקרה:",
+  "cn.strength_hint": "1.0 = עוקב בקפדנות אחר ההפניה; ערכים נמוכים = יותר חופש יצירתי.",
+  "aud.install.confirm.text2": "להתקין את המנוע '{eid}'?\n\n{note}",
+  "music.install.acestep": "התקן ACE-Step",
+  "music.installed.acestep": "ACE-Step מותקן ✓"
 }

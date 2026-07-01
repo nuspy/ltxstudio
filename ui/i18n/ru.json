@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (нативный пайплайн)",
   "settings.engine.lightricks": "LTX-2 официальный (ltx2_infer)",
   "settings.overrides_group": "Переопределения моделей (шаблон ComfyUI)",
-  "settings.no_loaders": "В текущем шаблоне нет узла loader."
+  "settings.no_loaders": "В текущем шаблоне нет узла loader.",
+  "cn.strength_lbl": "Сила контроля:",
+  "cn.strength_hint": "1.0 = строго следует референсу; меньшие значения = больше творческой свободы.",
+  "aud.install.confirm.text2": "Установить движок «{eid}»?\n\n{note}",
+  "music.install.acestep": "Установить ACE-Step",
+  "music.installed.acestep": "ACE-Step установлен ✓"
 }

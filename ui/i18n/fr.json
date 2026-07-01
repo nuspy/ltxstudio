@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers (pipeline native)",
   "settings.engine.lightricks": "LTX-2 officiel (ltx2_infer)",
   "settings.overrides_group": "Surcharges de modèle (modèle ComfyUI)",
-  "settings.no_loaders": "Aucun nœud loader dans le modèle actuel."
+  "settings.no_loaders": "Aucun nœud loader dans le modèle actuel.",
+  "cn.strength_lbl": "Intensité du contrôle :",
+  "cn.strength_hint": "1.0 = suit strictement la référence ; valeurs basses = plus de liberté créative.",
+  "aud.install.confirm.text2": "Installer le moteur « {eid} » ?\n\n{note}",
+  "music.install.acestep": "Installer ACE-Step",
+  "music.installed.acestep": "ACE-Step installé ✓"
 }

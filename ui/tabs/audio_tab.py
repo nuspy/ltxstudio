@@ -26,6 +26,7 @@ from core.tts_engine import (
     VoicePreset, edge_available, edge_list_voices, edge_synthesize, derive_edge_params,
     strip_markers, list_user_voices, save_voice, delete_voice,
     available_engines, synthesize, install_engine, invalidate_engine_cache,
+    has_installer, install_note,
     ENGINE_REPOS, OUTPUT_DIR as TTS_OUT_DIR,
 )
 from ui.widgets.tag_palette import install_tag_palette
@@ -236,12 +237,12 @@ class AudioTab(QWidget):
                 handy_api.clone_repo()
                 QMessageBox.information(self, "Handy-API", handy_api.install_instructions())
             return
-        if not eid or eid not in ENGINE_REPOS:
+        if not eid or not has_installer(eid):
             return
-        spec = ENGINE_REPOS[eid]
         ans = QMessageBox.question(
             self, tr("aud.install.confirm.title").format(eid=eid),
-            tr("aud.install.confirm.text").format(url=spec['url'], note=spec['note']),
+            tr("aud.install.confirm.text2", "Installare il motore '{eid}'?\n\n{note}").format(
+                eid=eid, note=install_note(eid)),
             QMessageBox.Yes | QMessageBox.No)
         if ans != QMessageBox.Yes:
             return

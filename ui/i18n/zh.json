@@ -1894,5 +1894,10 @@
   "settings.engine.diffusers": "Diffusers（原生流水线）",
   "settings.engine.lightricks": "LTX-2 官方（ltx2_infer）",
   "settings.overrides_group": "模型覆盖（ComfyUI 模板）",
-  "settings.no_loaders": "当前模板没有加载器节点。"
+  "settings.no_loaders": "当前模板没有加载器节点。",
+  "cn.strength_lbl": "控制强度：",
+  "cn.strength_hint": "1.0 = 严格跟随参考；数值越低 = 创作自由度越高。",
+  "aud.install.confirm.text2": "安装“{eid}”引擎？\n\n{note}",
+  "music.install.acestep": "安装 ACE-Step",
+  "music.installed.acestep": "ACE-Step 已安装 ✓"
 }
