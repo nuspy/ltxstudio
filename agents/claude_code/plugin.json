@@ -1,0 +1,12 @@
+{
+  "name": "ltxstudio",
+  "version": "1.0.0",
+  "description": "Genera/modifica immagini, video, film, musica, 3D/rig/animazioni via LTX Studio (locale).",
+  "api": {
+    "base_url": "http://127.0.0.1:8200",
+    "openapi": "agents/openapi.json",
+    "autostart": "python -m api.autostart"
+  },
+  "target": "Claude Code",
+  "default": false
+}

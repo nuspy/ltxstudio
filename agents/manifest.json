@@ -1,0 +1,1624 @@
+[
+  {
+    "name": "files_upload",
+    "method": "POST",
+    "path": "/files/upload",
+    "group": "infra",
+    "summary": "Files Upload",
+    "params": {},
+    "required": []
+  },
+  {
+    "name": "image_generate",
+    "method": "POST",
+    "path": "/image/generate",
+    "group": "immagini",
+    "summary": "Image Generate",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "model": {
+        "type": "string",
+        "title": "Model",
+        "description": "nome file modello (es. flux1-dev.safetensors)"
+      },
+      "arch": {
+        "type": "string",
+        "title": "Arch",
+        "description": "flux | flux2 | zimage | ernie",
+        "default": "flux"
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 1024
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 1024
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 20
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 3.5
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 0
+      },
+      "loras": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Loras"
+      },
+      "pulid_face": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Pulid Face",
+        "description": "path foto identità (PuLID, solo flux)"
+      },
+      "pulid_strength": {
+        "type": "number",
+        "title": "Pulid Strength",
+        "default": 0.8
+      }
+    },
+    "required": [
+      "prompt",
+      "model"
+    ]
+  },
+  {
+    "name": "image_edit",
+    "method": "POST",
+    "path": "/image/edit",
+    "group": "immagini",
+    "summary": "Image Edit",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "model": {
+        "type": "string",
+        "title": "Model"
+      },
+      "arch": {
+        "type": "string",
+        "title": "Arch",
+        "description": "kontext | flux2_kontext",
+        "default": "kontext"
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 20
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 2.5
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 0
+      },
+      "max_side": {
+        "type": "integer",
+        "title": "Max Side",
+        "default": 1536
+      }
+    },
+    "required": [
+      "prompt",
+      "image_path",
+      "model"
+    ]
+  },
+  {
+    "name": "image_recolor",
+    "method": "POST",
+    "path": "/image/recolor",
+    "group": "immagini",
+    "summary": "Image Recolor",
+    "params": {
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "target": {
+        "type": "string",
+        "title": "Target",
+        "description": "colore/aspetto desiderato, es. 'capelli rossi'"
+      },
+      "subject": {
+        "type": "string",
+        "title": "Subject",
+        "default": ""
+      },
+      "model": {
+        "type": "string",
+        "title": "Model"
+      },
+      "arch": {
+        "type": "string",
+        "title": "Arch",
+        "default": "kontext"
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 20
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 2.5
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 0
+      }
+    },
+    "required": [
+      "image_path",
+      "target",
+      "model"
+    ]
+  },
+  {
+    "name": "image_inpaint",
+    "method": "POST",
+    "path": "/image/inpaint",
+    "group": "immagini",
+    "summary": "Image Inpaint",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "mask_path": {
+        "type": "string",
+        "title": "Mask Path"
+      },
+      "model": {
+        "type": "string",
+        "title": "Model"
+      },
+      "arch": {
+        "type": "string",
+        "title": "Arch",
+        "description": "inpaint | flux2_inpaint",
+        "default": "inpaint"
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 20
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 30.0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 0
+      }
+    },
+    "required": [
+      "prompt",
+      "image_path",
+      "mask_path",
+      "model"
+    ]
+  },
+  {
+    "name": "image_outpaint",
+    "method": "POST",
+    "path": "/image/outpaint",
+    "group": "immagini",
+    "summary": "Image Outpaint",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "mask_path": {
+        "type": "string",
+        "title": "Mask Path"
+      },
+      "model": {
+        "type": "string",
+        "title": "Model"
+      },
+      "arch": {
+        "type": "string",
+        "title": "Arch",
+        "description": "inpaint | flux2_inpaint",
+        "default": "inpaint"
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 20
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 30.0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 0
+      }
+    },
+    "required": [
+      "prompt",
+      "image_path",
+      "mask_path",
+      "model"
+    ]
+  },
+  {
+    "name": "image_upscale",
+    "method": "POST",
+    "path": "/image/upscale",
+    "group": "immagini",
+    "summary": "Image Upscale",
+    "params": {
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "model": {
+        "type": "string",
+        "title": "Model",
+        "description": "upscaler, es. 4x-UltraSharpV2.safetensors"
+      },
+      "target_scale": {
+        "type": "number",
+        "title": "Target Scale",
+        "default": 4.0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 0
+      }
+    },
+    "required": [
+      "image_path",
+      "model"
+    ]
+  },
+  {
+    "name": "image_segment",
+    "method": "POST",
+    "path": "/image/segment",
+    "group": "immagini",
+    "summary": "Image Segment",
+    "params": {
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "text": {
+        "type": "string",
+        "title": "Text",
+        "description": "oggetto da segmentare (es. 'person')"
+      },
+      "threshold": {
+        "type": "number",
+        "title": "Threshold",
+        "default": 0.3
+      },
+      "use_sam": {
+        "type": "boolean",
+        "title": "Use Sam",
+        "default": true
+      }
+    },
+    "required": [
+      "image_path",
+      "text"
+    ]
+  },
+  {
+    "name": "image_faceswap",
+    "method": "POST",
+    "path": "/image/faceswap",
+    "group": "immagini",
+    "summary": "Image Faceswap",
+    "params": {
+      "target_path": {
+        "type": "string",
+        "title": "Target Path",
+        "description": "immagine su cui mettere il volto"
+      },
+      "source_face_path": {
+        "type": "string",
+        "title": "Source Face Path",
+        "description": "foto del volto sorgente"
+      }
+    },
+    "required": [
+      "target_path",
+      "source_face_path"
+    ]
+  },
+  {
+    "name": "video_generate",
+    "method": "POST",
+    "path": "/video/generate",
+    "group": "video",
+    "summary": "Video Generate",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 768
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "length_s": {
+        "type": "number",
+        "title": "Length S",
+        "default": 5.0
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 40
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 3.0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 42
+      },
+      "loras": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Loras"
+      },
+      "image_path": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Image Path",
+        "description": "i2v: foto di partenza"
+      },
+      "ref_strength": {
+        "type": "number",
+        "title": "Ref Strength",
+        "default": 1.0
+      },
+      "i2v_method": {
+        "type": "string",
+        "title": "I2V Method",
+        "description": "addguide | inplace (soft)",
+        "default": "addguide"
+      },
+      "audio_path": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Audio Path",
+        "description": "a2v: audio → video (lip-sync/canto)"
+      },
+      "audio_scale": {
+        "type": "number",
+        "title": "Audio Scale",
+        "default": 3.0
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  },
+  {
+    "name": "video_keyframes",
+    "method": "POST",
+    "path": "/video/keyframes",
+    "group": "video",
+    "summary": "Video Keyframes",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "keyframes": {
+        "items": {},
+        "type": "array",
+        "title": "Keyframes",
+        "description": "[{path, frame:int, strength:float}]"
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 768
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "length_s": {
+        "type": "number",
+        "title": "Length S",
+        "default": 5.0
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 40
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "default": 3.0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 42
+      },
+      "loras": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Loras"
+      }
+    },
+    "required": [
+      "prompt",
+      "keyframes"
+    ]
+  },
+  {
+    "name": "video_extend",
+    "method": "POST",
+    "path": "/video/extend",
+    "group": "video",
+    "summary": "Video Extend",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "video_path": {
+        "type": "string",
+        "title": "Video Path"
+      },
+      "add_seconds": {
+        "type": "number",
+        "title": "Add Seconds",
+        "default": 5.0
+      },
+      "seg_seconds": {
+        "type": "number",
+        "title": "Seg Seconds",
+        "default": 0.0
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 8
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      }
+    },
+    "required": [
+      "prompt",
+      "video_path"
+    ]
+  },
+  {
+    "name": "video_retake",
+    "method": "POST",
+    "path": "/video/retake",
+    "group": "video",
+    "summary": "Video Retake",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "video_path": {
+        "type": "string",
+        "title": "Video Path"
+      },
+      "start_time": {
+        "type": "number",
+        "title": "Start Time",
+        "default": 0.0
+      },
+      "end_time": {
+        "type": "number",
+        "title": "End Time",
+        "default": 0.0
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 768
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 40
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 42
+      }
+    },
+    "required": [
+      "prompt",
+      "video_path"
+    ]
+  },
+  {
+    "name": "video_v2v_edit",
+    "method": "POST",
+    "path": "/video/v2v_edit",
+    "group": "video",
+    "summary": "Video V2V Edit",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "control_video": {
+        "type": "string",
+        "title": "Control Video"
+      },
+      "edit_lora": {
+        "type": "string",
+        "title": "Edit Lora",
+        "description": "LoRA editing, es. ltx23_edit_anything.safetensors"
+      },
+      "control_strength": {
+        "type": "number",
+        "title": "Control Strength",
+        "default": 1.0
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 768
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "length_s": {
+        "type": "number",
+        "title": "Length S",
+        "default": 5.0
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 40
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 42
+      }
+    },
+    "required": [
+      "prompt",
+      "control_video",
+      "edit_lora"
+    ]
+  },
+  {
+    "name": "video_controlnet",
+    "method": "POST",
+    "path": "/video/controlnet",
+    "group": "video",
+    "summary": "Video Controlnet",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "control_video": {
+        "type": "string",
+        "title": "Control Video"
+      },
+      "control_type": {
+        "type": "string",
+        "title": "Control Type",
+        "description": "canny | depth | pose",
+        "default": "canny"
+      },
+      "control_strength": {
+        "type": "number",
+        "title": "Control Strength",
+        "default": 0.8
+      },
+      "image_path": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Image Path"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 768
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "length_s": {
+        "type": "number",
+        "title": "Length S",
+        "default": 5.0
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 40
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 42
+      }
+    },
+    "required": [
+      "prompt",
+      "control_video"
+    ]
+  },
+  {
+    "name": "video_lipsync",
+    "method": "POST",
+    "path": "/video/lipsync",
+    "group": "video",
+    "summary": "Video Lipsync",
+    "params": {
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "audio_path": {
+        "type": "string",
+        "title": "Audio Path"
+      },
+      "prompt": {
+        "type": "string",
+        "title": "Prompt",
+        "default": ""
+      },
+      "negative": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Negative"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 512
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "audio_scale": {
+        "type": "number",
+        "title": "Audio Scale",
+        "default": 3.0
+      },
+      "separate_vocals": {
+        "type": "boolean",
+        "title": "Separate Vocals",
+        "default": false
+      },
+      "talk_region": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Talk Region",
+        "description": "mouth | face (composita solo la regione)"
+      },
+      "talk_mask_offset": {
+        "type": "integer",
+        "title": "Talk Mask Offset",
+        "default": 0
+      }
+    },
+    "required": [
+      "image_path",
+      "audio_path"
+    ]
+  },
+  {
+    "name": "video_enhance",
+    "method": "POST",
+    "path": "/video/enhance",
+    "group": "video",
+    "summary": "Video Enhance",
+    "params": {
+      "video_path": {
+        "type": "string",
+        "title": "Video Path"
+      },
+      "engine": {
+        "type": "string",
+        "title": "Engine",
+        "description": "seedvr2 | flashvsr",
+        "default": "seedvr2"
+      },
+      "seedvr2_model": {
+        "type": "string",
+        "title": "Seedvr2 Model",
+        "default": "seedvr2_ema_3b_fp8_e4m3fn.safetensors"
+      },
+      "resolution": {
+        "type": "integer",
+        "title": "Resolution",
+        "default": 1080
+      },
+      "batch_size": {
+        "type": "integer",
+        "title": "Batch Size",
+        "default": 5
+      },
+      "block_swap": {
+        "type": "integer",
+        "title": "Block Swap",
+        "default": 0
+      },
+      "scale": {
+        "type": "number",
+        "title": "Scale",
+        "default": 4.0
+      }
+    },
+    "required": [
+      "video_path"
+    ]
+  },
+  {
+    "name": "video_rife",
+    "method": "POST",
+    "path": "/video/rife",
+    "group": "video",
+    "summary": "Video Rife",
+    "params": {
+      "video_path": {
+        "type": "string",
+        "title": "Video Path"
+      },
+      "factor": {
+        "type": "integer",
+        "title": "Factor",
+        "default": 2
+      }
+    },
+    "required": [
+      "video_path"
+    ]
+  },
+  {
+    "name": "video_faceswap",
+    "method": "POST",
+    "path": "/video/faceswap",
+    "group": "video",
+    "summary": "Video Faceswap",
+    "params": {
+      "video_path": {
+        "type": "string",
+        "title": "Video Path"
+      },
+      "source_face_path": {
+        "type": "string",
+        "title": "Source Face Path"
+      }
+    },
+    "required": [
+      "video_path",
+      "source_face_path"
+    ]
+  },
+  {
+    "name": "music_song",
+    "method": "POST",
+    "path": "/music/song",
+    "group": "musica",
+    "summary": "Music Song",
+    "params": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "default": "song"
+      },
+      "tags": {
+        "type": "string",
+        "title": "Tags",
+        "description": "stile/genere/strumenti",
+        "default": "pop, upbeat, catchy"
+      },
+      "lyrics": {
+        "type": "string",
+        "title": "Lyrics",
+        "default": ""
+      },
+      "duration_s": {
+        "type": "integer",
+        "title": "Duration S",
+        "default": 120
+      },
+      "instrumental": {
+        "type": "boolean",
+        "title": "Instrumental",
+        "default": false
+      },
+      "engine": {
+        "type": "string",
+        "title": "Engine",
+        "description": "heartmula | acestep",
+        "default": "heartmula"
+      },
+      "version": {
+        "type": "string",
+        "title": "Version",
+        "description": "HeartMuLa: 3B | 7B",
+        "default": "3B"
+      },
+      "temperature": {
+        "type": "number",
+        "title": "Temperature",
+        "default": 1.0
+      },
+      "cfg_scale": {
+        "type": "number",
+        "title": "Cfg Scale",
+        "default": 1.5
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "description": "ACE-Step guidance",
+        "default": 15.0
+      },
+      "lazy_load": {
+        "type": "boolean",
+        "title": "Lazy Load",
+        "default": false
+      }
+    },
+    "required": []
+  },
+  {
+    "name": "music_sonify",
+    "method": "POST",
+    "path": "/music/sonify",
+    "group": "musica",
+    "summary": "Music Sonify",
+    "params": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "default": "sfx"
+      },
+      "video_path": {
+        "type": "string",
+        "title": "Video Path",
+        "description": "video da sonorizzare (vuoto = solo prompt→audio)",
+        "default": ""
+      },
+      "prompt": {
+        "type": "string",
+        "title": "Prompt",
+        "default": ""
+      },
+      "negative_prompt": {
+        "type": "string",
+        "title": "Negative Prompt",
+        "default": ""
+      },
+      "duration_s": {
+        "type": "number",
+        "title": "Duration S",
+        "default": 8.0
+      },
+      "cfg_strength": {
+        "type": "number",
+        "title": "Cfg Strength",
+        "default": 4.5
+      },
+      "num_steps": {
+        "type": "integer",
+        "title": "Num Steps",
+        "default": 25
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 42
+      }
+    },
+    "required": []
+  },
+  {
+    "name": "music_music_video",
+    "method": "POST",
+    "path": "/music/music_video",
+    "group": "musica",
+    "summary": "Music Video",
+    "params": {
+      "lyrics": {
+        "type": "string",
+        "title": "Lyrics"
+      },
+      "song_path": {
+        "type": "string",
+        "title": "Song Path",
+        "description": "canzone già pronta (vuoto = genera prima)",
+        "default": ""
+      },
+      "image_path": {
+        "type": "string",
+        "title": "Image Path",
+        "description": "immagine iniziale/sfondo"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 704
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "scene_seconds": {
+        "type": "number",
+        "title": "Scene Seconds",
+        "default": 6.0
+      },
+      "video_style": {
+        "type": "string",
+        "title": "Video Style",
+        "default": ""
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 8
+      }
+    },
+    "required": [
+      "lyrics",
+      "image_path"
+    ]
+  },
+  {
+    "name": "audio_tts",
+    "method": "POST",
+    "path": "/audio/tts",
+    "group": "musica",
+    "summary": "Audio Tts",
+    "params": {
+      "text": {
+        "type": "string",
+        "title": "Text"
+      },
+      "engine": {
+        "type": "string",
+        "title": "Engine",
+        "description": "edge | kokoro | f5tts | xtts2 | fish | vibevoice | cosyvoice2",
+        "default": "edge"
+      },
+      "voice_id": {
+        "type": "string",
+        "title": "Voice Id",
+        "default": "it-IT-ElsaNeural"
+      },
+      "language": {
+        "type": "string",
+        "title": "Language",
+        "default": "it-IT"
+      },
+      "sample_path": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Sample Path",
+        "description": "campione voce per clone (f5/xtts/fish/vibevoice)"
+      },
+      "sample_transcript": {
+        "type": "string",
+        "title": "Sample Transcript",
+        "default": ""
+      }
+    },
+    "required": [
+      "text"
+    ]
+  },
+  {
+    "name": "audio_separate_vocals",
+    "method": "POST",
+    "path": "/audio/separate_vocals",
+    "group": "musica",
+    "summary": "Audio Separate Vocals",
+    "params": {
+      "audio_path": {
+        "type": "string",
+        "title": "Audio Path"
+      }
+    },
+    "required": [
+      "audio_path"
+    ]
+  },
+  {
+    "name": "audio_transcribe",
+    "method": "POST",
+    "path": "/audio/transcribe",
+    "group": "musica",
+    "summary": "Audio Transcribe",
+    "params": {
+      "audio_path": {
+        "type": "string",
+        "title": "Audio Path"
+      }
+    },
+    "required": [
+      "audio_path"
+    ]
+  },
+  {
+    "name": "threed_image_to_3d",
+    "method": "POST",
+    "path": "/threed/image_to_3d",
+    "group": "3d",
+    "summary": "Image To 3D",
+    "params": {
+      "image_path": {
+        "type": "string",
+        "title": "Image Path"
+      },
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "default": "model"
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 1
+      },
+      "ss_steps": {
+        "type": "integer",
+        "title": "Ss Steps",
+        "default": 12
+      },
+      "slat_steps": {
+        "type": "integer",
+        "title": "Slat Steps",
+        "default": 12
+      },
+      "simplify": {
+        "type": "number",
+        "title": "Simplify",
+        "default": 0.95
+      },
+      "texture_size": {
+        "type": "integer",
+        "title": "Texture Size",
+        "default": 1024
+      },
+      "hf_token": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Hf Token"
+      }
+    },
+    "required": [
+      "image_path"
+    ]
+  },
+  {
+    "name": "threed_rig",
+    "method": "POST",
+    "path": "/threed/rig",
+    "group": "3d",
+    "summary": "Rig",
+    "params": {
+      "mesh_path": {
+        "type": "string",
+        "title": "Mesh Path"
+      },
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "default": "rig"
+      },
+      "template": {
+        "type": "string",
+        "title": "Template",
+        "description": "template scheletro",
+        "default": "Mixamo"
+      },
+      "file_format": {
+        "type": "string",
+        "title": "File Format",
+        "description": "glb | fbx",
+        "default": "glb"
+      }
+    },
+    "required": [
+      "mesh_path"
+    ]
+  },
+  {
+    "name": "threed_world",
+    "method": "POST",
+    "path": "/threed/world",
+    "group": "3d",
+    "summary": "World",
+    "params": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "default": "world"
+      },
+      "image_path": {
+        "type": "string",
+        "title": "Image Path",
+        "description": "foto di partenza (vuoto = testo→scena)",
+        "default": ""
+      },
+      "prompt": {
+        "type": "string",
+        "title": "Prompt",
+        "default": ""
+      },
+      "resolution": {
+        "type": "integer",
+        "title": "Resolution",
+        "default": 1600
+      },
+      "low_vram": {
+        "type": "boolean",
+        "title": "Low Vram",
+        "default": false
+      },
+      "mesh": {
+        "type": "boolean",
+        "title": "Mesh",
+        "description": "True = mesh GLB, False = splat PLY",
+        "default": true
+      },
+      "hf_token": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Hf Token"
+      }
+    },
+    "required": []
+  },
+  {
+    "name": "threed_convert",
+    "method": "POST",
+    "path": "/threed/convert",
+    "group": "3d",
+    "summary": "Convert",
+    "params": {
+      "glb_path": {
+        "type": "string",
+        "title": "Glb Path"
+      },
+      "fmt": {
+        "type": "string",
+        "title": "Fmt",
+        "description": "fbx | obj",
+        "default": "fbx"
+      }
+    },
+    "required": [
+      "glb_path"
+    ]
+  },
+  {
+    "name": "film_script",
+    "method": "POST",
+    "path": "/film/script",
+    "group": "film",
+    "summary": "Film Script",
+    "params": {
+      "subject": {
+        "type": "string",
+        "title": "Subject",
+        "description": "soggetto/logline del film"
+      },
+      "style": {
+        "type": "string",
+        "title": "Style",
+        "default": ""
+      },
+      "max_tokens": {
+        "type": "integer",
+        "title": "Max Tokens",
+        "default": 2000
+      }
+    },
+    "required": [
+      "subject"
+    ]
+  },
+  {
+    "name": "film_asset_image",
+    "method": "POST",
+    "path": "/film/asset_image",
+    "group": "film",
+    "summary": "Film Asset Image",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 1024
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 1024
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 7
+      },
+      "arch": {
+        "type": "string",
+        "title": "Arch",
+        "default": "flux"
+      },
+      "face_ref": {
+        "type": "string",
+        "title": "Face Ref",
+        "description": "foto identità (PuLID)",
+        "default": ""
+      },
+      "ref_image": {
+        "type": "string",
+        "title": "Ref Image",
+        "description": "immagine di riferimento (Kontext)",
+        "default": ""
+      },
+      "loras": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Loras"
+      },
+      "negative": {
+        "type": "string",
+        "title": "Negative",
+        "default": ""
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  },
+  {
+    "name": "film_shot_video",
+    "method": "POST",
+    "path": "/film/shot_video",
+    "group": "film",
+    "summary": "Film Shot Video",
+    "params": {
+      "prompt": {
+        "type": "string",
+        "title": "Prompt"
+      },
+      "width": {
+        "type": "integer",
+        "title": "Width",
+        "default": 768
+      },
+      "height": {
+        "type": "integer",
+        "title": "Height",
+        "default": 512
+      },
+      "fps": {
+        "type": "integer",
+        "title": "Fps",
+        "default": 25
+      },
+      "duration_s": {
+        "type": "number",
+        "title": "Duration S",
+        "default": 4.0
+      },
+      "seed": {
+        "type": "integer",
+        "title": "Seed",
+        "default": 7
+      },
+      "keyframes": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Keyframes"
+      },
+      "loras": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Loras"
+      },
+      "audio_path": {
+        "type": "string",
+        "title": "Audio Path",
+        "default": ""
+      },
+      "negative": {
+        "type": "string",
+        "title": "Negative",
+        "default": ""
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  }
+]

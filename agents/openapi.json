@@ -1,0 +1,2951 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LTX Studio API",
+    "description": "API locale per generazione/modifica di immagini, video, film, musica, modelli 3D, rig/skinning e animazioni. Job asincroni + link di download.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Health",
+        "description": "Stato dell'API e del backend nativo (:8189).",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Job Status",
+        "description": "Stato di un job. A `success` include `files[]` con i link di download.",
+        "operationId": "job_status_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/download": {
+      "get": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Download",
+        "description": "Scarica un file prodotto (solo dentro le cartelle output/upload).",
+        "operationId": "download_download_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "path locale del file da scaricare",
+              "title": "Path"
+            },
+            "description": "path locale del file da scaricare"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/upload": {
+      "post": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Files Upload",
+        "description": "Carica un file (immagine/video/audio/mesh) sul server; ritorna il path da riusare nei job.",
+        "operationId": "files_upload_files_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_files_upload_files_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/generate": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Generate",
+        "operationId": "image_generate_image_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api__handlers__images__GenerateReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/edit": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Edit",
+        "operationId": "image_edit_image_edit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/recolor": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Recolor",
+        "operationId": "image_recolor_image_recolor_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecolorReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/inpaint": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Inpaint",
+        "operationId": "image_inpaint_image_inpaint_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InpaintReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/outpaint": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Outpaint",
+        "operationId": "image_outpaint_image_outpaint_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutpaintReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/upscale": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Upscale",
+        "operationId": "image_upscale_image_upscale_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpscaleReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/segment": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Segment",
+        "operationId": "image_segment_image_segment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/image/faceswap": {
+      "post": {
+        "tags": [
+          "immagini"
+        ],
+        "summary": "Image Faceswap",
+        "operationId": "image_faceswap_image_faceswap_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceSwapReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/generate": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Generate",
+        "operationId": "video_generate_video_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/api__handlers__video__GenerateReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/keyframes": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Keyframes",
+        "operationId": "video_keyframes_video_keyframes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyframesReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/extend": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Extend",
+        "operationId": "video_extend_video_extend_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/retake": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Retake",
+        "operationId": "video_retake_video_retake_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetakeReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/v2v_edit": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video V2V Edit",
+        "operationId": "video_v2v_edit_video_v2v_edit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/V2VEditReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/controlnet": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Controlnet",
+        "operationId": "video_controlnet_video_controlnet_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlNetReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/lipsync": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Lipsync",
+        "operationId": "video_lipsync_video_lipsync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LipsyncReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/enhance": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Enhance",
+        "operationId": "video_enhance_video_enhance_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnhanceReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/rife": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Rife",
+        "operationId": "video_rife_video_rife_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RifeReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/faceswap": {
+      "post": {
+        "tags": [
+          "video"
+        ],
+        "summary": "Video Faceswap",
+        "operationId": "video_faceswap_video_faceswap_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceSwapVideoReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/music/song": {
+      "post": {
+        "tags": [
+          "musica"
+        ],
+        "summary": "Music Song",
+        "operationId": "music_song_music_song_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SongReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/music/sonify": {
+      "post": {
+        "tags": [
+          "musica"
+        ],
+        "summary": "Music Sonify",
+        "operationId": "music_sonify_music_sonify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SonifyReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/music/music_video": {
+      "post": {
+        "tags": [
+          "musica"
+        ],
+        "summary": "Music Video",
+        "operationId": "music_video_music_music_video_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MusicVideoReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audio/tts": {
+      "post": {
+        "tags": [
+          "musica"
+        ],
+        "summary": "Audio Tts",
+        "operationId": "audio_tts_audio_tts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TTSReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audio/separate_vocals": {
+      "post": {
+        "tags": [
+          "musica"
+        ],
+        "summary": "Audio Separate Vocals",
+        "operationId": "audio_separate_vocals_audio_separate_vocals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeparateVocalsReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audio/transcribe": {
+      "post": {
+        "tags": [
+          "musica"
+        ],
+        "summary": "Audio Transcribe",
+        "operationId": "audio_transcribe_audio_transcribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscribeReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threed/image_to_3d": {
+      "post": {
+        "tags": [
+          "3d"
+        ],
+        "summary": "Image To 3D",
+        "operationId": "image_to_3d_threed_image_to_3d_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageTo3DReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threed/rig": {
+      "post": {
+        "tags": [
+          "3d"
+        ],
+        "summary": "Rig",
+        "operationId": "rig_threed_rig_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RigReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threed/world": {
+      "post": {
+        "tags": [
+          "3d"
+        ],
+        "summary": "World",
+        "operationId": "world_threed_world_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorldReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/threed/convert": {
+      "post": {
+        "tags": [
+          "3d"
+        ],
+        "summary": "Convert",
+        "operationId": "convert_threed_convert_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/film/script": {
+      "post": {
+        "tags": [
+          "film"
+        ],
+        "summary": "Film Script",
+        "operationId": "film_script_film_script_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScriptReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/film/asset_image": {
+      "post": {
+        "tags": [
+          "film"
+        ],
+        "summary": "Film Asset Image",
+        "operationId": "film_asset_image_film_asset_image_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetImageReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/film/shot_video": {
+      "post": {
+        "tags": [
+          "film"
+        ],
+        "summary": "Film Shot Video",
+        "operationId": "film_shot_video_film_shot_video_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShotVideoReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssetImageReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 1024
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 1024
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 7
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch",
+            "default": "flux"
+          },
+          "face_ref": {
+            "type": "string",
+            "title": "Face Ref",
+            "description": "foto identità (PuLID)",
+            "default": ""
+          },
+          "ref_image": {
+            "type": "string",
+            "title": "Ref Image",
+            "description": "immagine di riferimento (Kontext)",
+            "default": ""
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loras"
+          },
+          "negative": {
+            "type": "string",
+            "title": "Negative",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "AssetImageReq"
+      },
+      "Body_files_upload_files_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_files_upload_files_upload_post"
+      },
+      "ControlNetReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "control_video": {
+            "type": "string",
+            "title": "Control Video"
+          },
+          "control_type": {
+            "type": "string",
+            "title": "Control Type",
+            "description": "canny | depth | pose",
+            "default": "canny"
+          },
+          "control_strength": {
+            "type": "number",
+            "title": "Control Strength",
+            "default": 0.8
+          },
+          "image_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Path"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 768
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "length_s": {
+            "type": "number",
+            "title": "Length S",
+            "default": 5.0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 40
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "control_video"
+        ],
+        "title": "ControlNetReq"
+      },
+      "ConvertReq": {
+        "properties": {
+          "glb_path": {
+            "type": "string",
+            "title": "Glb Path"
+          },
+          "fmt": {
+            "type": "string",
+            "title": "Fmt",
+            "description": "fbx | obj",
+            "default": "fbx"
+          }
+        },
+        "type": "object",
+        "required": [
+          "glb_path"
+        ],
+        "title": "ConvertReq"
+      },
+      "EditReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch",
+            "description": "kontext | flux2_kontext",
+            "default": "kontext"
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 20
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 2.5
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          },
+          "max_side": {
+            "type": "integer",
+            "title": "Max Side",
+            "default": 1536
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "image_path",
+          "model"
+        ],
+        "title": "EditReq"
+      },
+      "EnhanceReq": {
+        "properties": {
+          "video_path": {
+            "type": "string",
+            "title": "Video Path"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "description": "seedvr2 | flashvsr",
+            "default": "seedvr2"
+          },
+          "seedvr2_model": {
+            "type": "string",
+            "title": "Seedvr2 Model",
+            "default": "seedvr2_ema_3b_fp8_e4m3fn.safetensors"
+          },
+          "resolution": {
+            "type": "integer",
+            "title": "Resolution",
+            "default": 1080
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 5
+          },
+          "block_swap": {
+            "type": "integer",
+            "title": "Block Swap",
+            "default": 0
+          },
+          "scale": {
+            "type": "number",
+            "title": "Scale",
+            "default": 4.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_path"
+        ],
+        "title": "EnhanceReq"
+      },
+      "ExtendReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "video_path": {
+            "type": "string",
+            "title": "Video Path"
+          },
+          "add_seconds": {
+            "type": "number",
+            "title": "Add Seconds",
+            "default": 5.0
+          },
+          "seg_seconds": {
+            "type": "number",
+            "title": "Seg Seconds",
+            "default": 0.0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 8
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "video_path"
+        ],
+        "title": "ExtendReq"
+      },
+      "FaceSwapReq": {
+        "properties": {
+          "target_path": {
+            "type": "string",
+            "title": "Target Path",
+            "description": "immagine su cui mettere il volto"
+          },
+          "source_face_path": {
+            "type": "string",
+            "title": "Source Face Path",
+            "description": "foto del volto sorgente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_path",
+          "source_face_path"
+        ],
+        "title": "FaceSwapReq"
+      },
+      "FaceSwapVideoReq": {
+        "properties": {
+          "video_path": {
+            "type": "string",
+            "title": "Video Path"
+          },
+          "source_face_path": {
+            "type": "string",
+            "title": "Source Face Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_path",
+          "source_face_path"
+        ],
+        "title": "FaceSwapVideoReq"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ImageTo3DReq": {
+        "properties": {
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "model"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 1
+          },
+          "ss_steps": {
+            "type": "integer",
+            "title": "Ss Steps",
+            "default": 12
+          },
+          "slat_steps": {
+            "type": "integer",
+            "title": "Slat Steps",
+            "default": 12
+          },
+          "simplify": {
+            "type": "number",
+            "title": "Simplify",
+            "default": 0.95
+          },
+          "texture_size": {
+            "type": "integer",
+            "title": "Texture Size",
+            "default": 1024
+          },
+          "hf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hf Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_path"
+        ],
+        "title": "ImageTo3DReq"
+      },
+      "InpaintReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "mask_path": {
+            "type": "string",
+            "title": "Mask Path"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch",
+            "description": "inpaint | flux2_inpaint",
+            "default": "inpaint"
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 20
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 30.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "image_path",
+          "mask_path",
+          "model"
+        ],
+        "title": "InpaintReq"
+      },
+      "KeyframesReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "keyframes": {
+            "items": {},
+            "type": "array",
+            "title": "Keyframes",
+            "description": "[{path, frame:int, strength:float}]"
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 768
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "length_s": {
+            "type": "number",
+            "title": "Length S",
+            "default": 5.0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 40
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 3.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loras"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "keyframes"
+        ],
+        "title": "KeyframesReq"
+      },
+      "LipsyncReq": {
+        "properties": {
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "audio_path": {
+            "type": "string",
+            "title": "Audio Path"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": ""
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 512
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "audio_scale": {
+            "type": "number",
+            "title": "Audio Scale",
+            "default": 3.0
+          },
+          "separate_vocals": {
+            "type": "boolean",
+            "title": "Separate Vocals",
+            "default": false
+          },
+          "talk_region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Talk Region",
+            "description": "mouth | face (composita solo la regione)"
+          },
+          "talk_mask_offset": {
+            "type": "integer",
+            "title": "Talk Mask Offset",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_path",
+          "audio_path"
+        ],
+        "title": "LipsyncReq"
+      },
+      "MusicVideoReq": {
+        "properties": {
+          "lyrics": {
+            "type": "string",
+            "title": "Lyrics"
+          },
+          "song_path": {
+            "type": "string",
+            "title": "Song Path",
+            "description": "canzone già pronta (vuoto = genera prima)",
+            "default": ""
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path",
+            "description": "immagine iniziale/sfondo"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 704
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "scene_seconds": {
+            "type": "number",
+            "title": "Scene Seconds",
+            "default": 6.0
+          },
+          "video_style": {
+            "type": "string",
+            "title": "Video Style",
+            "default": ""
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 8
+          }
+        },
+        "type": "object",
+        "required": [
+          "lyrics",
+          "image_path"
+        ],
+        "title": "MusicVideoReq"
+      },
+      "OutpaintReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "mask_path": {
+            "type": "string",
+            "title": "Mask Path"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch",
+            "description": "inpaint | flux2_inpaint",
+            "default": "inpaint"
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 20
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 30.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "image_path",
+          "mask_path",
+          "model"
+        ],
+        "title": "OutpaintReq"
+      },
+      "RecolorReq": {
+        "properties": {
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "description": "colore/aspetto desiderato, es. 'capelli rossi'"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": ""
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch",
+            "default": "kontext"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 20
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 2.5
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_path",
+          "target",
+          "model"
+        ],
+        "title": "RecolorReq"
+      },
+      "RetakeReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "video_path": {
+            "type": "string",
+            "title": "Video Path"
+          },
+          "start_time": {
+            "type": "number",
+            "title": "Start Time",
+            "default": 0.0
+          },
+          "end_time": {
+            "type": "number",
+            "title": "End Time",
+            "default": 0.0
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 768
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 40
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "video_path"
+        ],
+        "title": "RetakeReq"
+      },
+      "RifeReq": {
+        "properties": {
+          "video_path": {
+            "type": "string",
+            "title": "Video Path"
+          },
+          "factor": {
+            "type": "integer",
+            "title": "Factor",
+            "default": 2
+          }
+        },
+        "type": "object",
+        "required": [
+          "video_path"
+        ],
+        "title": "RifeReq"
+      },
+      "RigReq": {
+        "properties": {
+          "mesh_path": {
+            "type": "string",
+            "title": "Mesh Path"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "rig"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "description": "template scheletro",
+            "default": "Mixamo"
+          },
+          "file_format": {
+            "type": "string",
+            "title": "File Format",
+            "description": "glb | fbx",
+            "default": "glb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mesh_path"
+        ],
+        "title": "RigReq"
+      },
+      "ScriptReq": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "soggetto/logline del film"
+          },
+          "style": {
+            "type": "string",
+            "title": "Style",
+            "default": ""
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject"
+        ],
+        "title": "ScriptReq"
+      },
+      "SegmentReq": {
+        "properties": {
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "oggetto da segmentare (es. 'person')"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold",
+            "default": 0.3
+          },
+          "use_sam": {
+            "type": "boolean",
+            "title": "Use Sam",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_path",
+          "text"
+        ],
+        "title": "SegmentReq"
+      },
+      "SeparateVocalsReq": {
+        "properties": {
+          "audio_path": {
+            "type": "string",
+            "title": "Audio Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_path"
+        ],
+        "title": "SeparateVocalsReq"
+      },
+      "ShotVideoReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 768
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S",
+            "default": 4.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 7
+          },
+          "keyframes": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyframes"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loras"
+          },
+          "audio_path": {
+            "type": "string",
+            "title": "Audio Path",
+            "default": ""
+          },
+          "negative": {
+            "type": "string",
+            "title": "Negative",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "ShotVideoReq"
+      },
+      "SongReq": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "song"
+          },
+          "tags": {
+            "type": "string",
+            "title": "Tags",
+            "description": "stile/genere/strumenti",
+            "default": "pop, upbeat, catchy"
+          },
+          "lyrics": {
+            "type": "string",
+            "title": "Lyrics",
+            "default": ""
+          },
+          "duration_s": {
+            "type": "integer",
+            "title": "Duration S",
+            "default": 120
+          },
+          "instrumental": {
+            "type": "boolean",
+            "title": "Instrumental",
+            "default": false
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "description": "heartmula | acestep",
+            "default": "heartmula"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "HeartMuLa: 3B | 7B",
+            "default": "3B"
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "default": 1.0
+          },
+          "cfg_scale": {
+            "type": "number",
+            "title": "Cfg Scale",
+            "default": 1.5
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "description": "ACE-Step guidance",
+            "default": 15.0
+          },
+          "lazy_load": {
+            "type": "boolean",
+            "title": "Lazy Load",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "SongReq"
+      },
+      "SonifyReq": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "sfx"
+          },
+          "video_path": {
+            "type": "string",
+            "title": "Video Path",
+            "description": "video da sonorizzare (vuoto = solo prompt→audio)",
+            "default": ""
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": ""
+          },
+          "negative_prompt": {
+            "type": "string",
+            "title": "Negative Prompt",
+            "default": ""
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S",
+            "default": 8.0
+          },
+          "cfg_strength": {
+            "type": "number",
+            "title": "Cfg Strength",
+            "default": 4.5
+          },
+          "num_steps": {
+            "type": "integer",
+            "title": "Num Steps",
+            "default": 25
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          }
+        },
+        "type": "object",
+        "title": "SonifyReq"
+      },
+      "TTSReq": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "description": "edge | kokoro | f5tts | xtts2 | fish | vibevoice | cosyvoice2",
+            "default": "edge"
+          },
+          "voice_id": {
+            "type": "string",
+            "title": "Voice Id",
+            "default": "it-IT-ElsaNeural"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "it-IT"
+          },
+          "sample_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Path",
+            "description": "campione voce per clone (f5/xtts/fish/vibevoice)"
+          },
+          "sample_transcript": {
+            "type": "string",
+            "title": "Sample Transcript",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TTSReq"
+      },
+      "TranscribeReq": {
+        "properties": {
+          "audio_path": {
+            "type": "string",
+            "title": "Audio Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_path"
+        ],
+        "title": "TranscribeReq"
+      },
+      "UpscaleReq": {
+        "properties": {
+          "image_path": {
+            "type": "string",
+            "title": "Image Path"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "upscaler, es. 4x-UltraSharpV2.safetensors"
+          },
+          "target_scale": {
+            "type": "number",
+            "title": "Target Scale",
+            "default": 4.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "image_path",
+          "model"
+        ],
+        "title": "UpscaleReq"
+      },
+      "V2VEditReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "control_video": {
+            "type": "string",
+            "title": "Control Video"
+          },
+          "edit_lora": {
+            "type": "string",
+            "title": "Edit Lora",
+            "description": "LoRA editing, es. ltx23_edit_anything.safetensors"
+          },
+          "control_strength": {
+            "type": "number",
+            "title": "Control Strength",
+            "default": 1.0
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 768
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "length_s": {
+            "type": "number",
+            "title": "Length S",
+            "default": 5.0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 40
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "control_video",
+          "edit_lora"
+        ],
+        "title": "V2VEditReq"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorldReq": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "world"
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path",
+            "description": "foto di partenza (vuoto = testo→scena)",
+            "default": ""
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": ""
+          },
+          "resolution": {
+            "type": "integer",
+            "title": "Resolution",
+            "default": 1600
+          },
+          "low_vram": {
+            "type": "boolean",
+            "title": "Low Vram",
+            "default": false
+          },
+          "mesh": {
+            "type": "boolean",
+            "title": "Mesh",
+            "description": "True = mesh GLB, False = splat PLY",
+            "default": true
+          },
+          "hf_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hf Token"
+          }
+        },
+        "type": "object",
+        "title": "WorldReq"
+      },
+      "api__handlers__images__GenerateReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "nome file modello (es. flux1-dev.safetensors)"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch",
+            "description": "flux | flux2 | zimage | ernie",
+            "default": "flux"
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 1024
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 1024
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 20
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 3.5
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 0
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loras"
+          },
+          "pulid_face": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pulid Face",
+            "description": "path foto identità (PuLID, solo flux)"
+          },
+          "pulid_strength": {
+            "type": "number",
+            "title": "Pulid Strength",
+            "default": 0.8
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "model"
+        ],
+        "title": "GenerateReq"
+      },
+      "api__handlers__video__GenerateReq": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "negative": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 768
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 512
+          },
+          "fps": {
+            "type": "integer",
+            "title": "Fps",
+            "default": 25
+          },
+          "length_s": {
+            "type": "number",
+            "title": "Length S",
+            "default": 5.0
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 40
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "default": 3.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loras"
+          },
+          "image_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Path",
+            "description": "i2v: foto di partenza"
+          },
+          "ref_strength": {
+            "type": "number",
+            "title": "Ref Strength",
+            "default": 1.0
+          },
+          "i2v_method": {
+            "type": "string",
+            "title": "I2V Method",
+            "description": "addguide | inplace (soft)",
+            "default": "addguide"
+          },
+          "audio_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Path",
+            "description": "a2v: audio → video (lip-sync/canto)"
+          },
+          "audio_scale": {
+            "type": "number",
+            "title": "Audio Scale",
+            "default": 3.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "GenerateReq"
+      }
+    }
+  }
+}
