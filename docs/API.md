@@ -1,117 +1,162 @@
-# LTX Studio — REST API
+# LTX Studio — REST API (nativa)
 
-API REST (FastAPI) che espone **tutte le funzioni della GUI**: generazione/editing immagini e
-video tramite ComfyUI (LTX‑2.3 + FLUX/FLUX.2 + SeedVR2).
+API REST **locale** (FastAPI, `http://127.0.0.1:8200`) che espone **tutte le funzioni native** —
+immagini, video, film/videoclip, musica, modelli 3D, rig/skinning — come **job asincroni** che
+ritornano **link di download**. Backend 100% nativo (FLUX/FLUX.2/Z-Image/Ernie · LTX-2.3 ·
+SeedVR2/FlashVSR · HeartMuLa/ACE-Step/MMAudio · TRELLIS/WorldGen), zero ComfyUI dove possibile.
 
-## Avvio
+> Sostituisce la vecchia API `:8200` che pilotava ComfyUI (sincrona). Nuova semantica: **submit →
+> polling → download**. Codice in `api/`. Contratti macchina + skill agenti in `agents/`.
 
-1. Avvia **ComfyUI** (`run_nvidia.bat`) — deve essere su `http://127.0.0.1:8188`.
-2. Avvia l'API: `server\run_api.bat`  (oppure `python -m uvicorn server.api:app --host 0.0.0.0 --port 8200`).
-3. **Swagger UI** (prova interattiva): <http://localhost:8200/docs>
-   **OpenAPI**: <http://localhost:8200/openapi.json>
+## Avvio automatico e spegnimento
 
-## Convenzioni comuni
+- **Autostart**: `python -m api.autostart` → stampa `READY http://127.0.0.1:8200` quando pronta
+  (avvia il server se giù e attende `/health`). Lo skill degli agenti lo chiama a inizio sessione.
+- **Auto-shutdown**: dopo **30 min** senza richieste **e** senza job in coda/esecuzione il server si
+  spegne da solo (`LTX_API_IDLE_TIMEOUT`, watchdog). Al prossimo uso rilancia l'autostart.
+- Avvio manuale: `python -m api.app`. Swagger: <http://127.0.0.1:8200/docs> · OpenAPI:
+  <http://127.0.0.1:8200/openapi.json>.
+- Env: `LTX_API_HOST` (127.0.0.1), `LTX_API_PORT` (8200), `LTX_API_IDLE_TIMEOUT` (1800),
+  `LTX_API_PYTHON` (python che esegue l'API).
 
-- Tutte le richieste sono **`multipart/form-data`** (campi `Form` + file).
-- Ogni input‑file accetta **due modalità** (alternative):
-  - **upload**: campo file (es. `image`, `mask`, `video`, `audio`).
-  - **path locale del server**: campo stringa `*_path` (es. `image_path=E:\foto\a.png`). Utile se il
-    file è già sul PC del server (nessun upload).
-- **Output**: ogni endpoint risponde JSON con `files` (path locali sul server), `videos`, `images`,
-  `prompt_id`, `node_count`, e `download` (URL pronti per `/download`).
-- **Download**: `GET /download?path=<path locale>` scarica un file dal server.
-- I file generati sono salvati in `E:\AI\ltxstudio\output`.
+## Modello asincrono (sempre)
 
-Esempio risposta:
-```json
-{ "prompt_id":"…", "node_count":13, "files":["E:\\AI\\ltxstudio\\output\\ltxstudio_gen_0001.png"],
-  "images":["…_0001.png"], "videos":[], "download":["/download?path=E:\\AI\\ltxstudio\\output\\…png"] }
-```
+1. Ogni azione è un `POST` (body **JSON**) → `{ "job_id": "...", "status": "pending" }`.
+2. **Polling** `GET /jobs/{job_id}` (backoff 2–5 s) finché `status` = `success` | `error`:
+   - `running` → `progress` (0–1) + `message`; `pending` → `queue_position`.
+   - `success` → `files: [{ path, name, download_url }]`.
+   - `error` → `error` (spesso un prerequisito da installare).
+3. **Download**: `GET /download?path=<path>` (servito solo dentro `output/` e `output/api_uploads/`).
+4. **Coda seriale**: un solo job GPU alla volta. Non lanciare job in parallelo.
 
----
+## File in ingresso + concatenamento
 
-## Utilità
+- Carica un file UNA volta: `POST /files/upload` (**multipart**, campo `file`) → `{ path, download_url }`.
+  Riusa `path` nei campi `*_path` (`image_path`, `video_path`, `audio_path`, `mask_path`, `mesh_path`).
+- L'output di un job (`files[0].path`) è un path locale sul server: passalo come input al passo
+  successivo, senza download/upload intermedi.
 
-| Metodo | Endpoint | Descrizione |
+## Infra
+
+| Metodo | Endpoint | Scopo |
 |---|---|---|
-| GET | `/health` | Stato (ComfyUI attivo?). |
-| GET | `/models?folder=` | Elenco modelli in una cartella ComfyUI (`diffusion_models`, `loras`, `vae`, `upscale_models`…). |
-| GET | `/models/seedvr2` | Modelli SeedVR2 disponibili (etichetta → file). |
-| POST | `/files/upload` | Carica un file sul server → ritorna il `path` (riusabile come `*_path`). |
-| GET | `/download?path=` | Scarica un file dal path locale del server. |
-| POST | `/audio/upload` | Carica audio pre‑registrato (per voce/clone) → ritorna `path`. |
+| GET | `/health` | `{api, native_backend_up}` |
+| POST | `/files/upload` | carica un file (multipart) → `{path, download_url}` |
+| GET | `/jobs/{job_id}` | stato job (+ `files[]` a success) |
+| GET | `/download?path=` | scarica un file prodotto |
 
 ---
 
-## Immagini
+## IMMAGINI (`tags: immagini`) — backend nativo :8189
 
-### POST `/image/generate` — generazione txt2img
-Genera un'immagine da prompt. Campi: `prompt*`, `arch` (`flux`|`z-image`|`ernie`), `model*`,
-`negative`, `width`, `height`, `steps`, `guidance`, `seed`, `loras` (JSON `[{"name","strength"}]`).
+| Endpoint | Parametri principali (default) |
+|---|---|
+| `POST /image/generate` | `prompt*`, `model*`, `arch=flux` (flux/flux2/zimage/ernie), `negative`, `width=1024`, `height=1024`, `steps=20`, `guidance=3.5`, `seed=0`, `loras`, `pulid_face`, `pulid_strength=0.8` |
+| `POST /image/edit` | `prompt*`, `image_path*`, `model*`, `arch=kontext` (kontext/flux2_kontext), `steps=20`, `guidance=2.5`, `seed=0`, `max_side=1536` |
+| `POST /image/recolor` | `image_path*`, `target*`, `subject`, `model*`, `steps=20`, `guidance=2.5`, `seed=0` |
+| `POST /image/inpaint` | `prompt*`, `image_path*`, `mask_path*`, `model*`, `arch=inpaint` (inpaint/flux2_inpaint), `steps=20`, `guidance=30.0`, `seed=0` |
+| `POST /image/outpaint` | come inpaint (maschera della regione da espandere; `outpaint=true` interno) |
+| `POST /image/upscale` | `image_path*`, `model*` (es. `4x-UltraSharpV2.safetensors`), `target_scale=4.0`, `seed=0` |
+| `POST /image/segment` | `image_path*`, `text*` (oggetto), `threshold=0.3`, `use_sam=true` → maschera PNG |
+| `POST /image/faceswap` | `target_path*`, `source_face_path*` (InsightFace) |
 
+Nota: Z-Image usa SDPA (SageAttention non supporta `attn_mask`); per gli arch image-conditioned
+(kontext/inpaint) le dimensioni sono derivate dall'immagine (multipli di 16, lato lungo ≤ `max_side`).
+
+Esempio (t2i con Z-Image):
 ```bash
-curl -F prompt="a cat on the beach" -F arch=flux \
-  -F model="Flux\\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors" -F width=1024 -F height=1024 \
-  http://localhost:8200/image/generate
+curl -s -X POST http://127.0.0.1:8200/image/generate -H "Content-Type: application/json" -d '{
+  "prompt":"a humanized beet chasing a flying winged opossum, storybook",
+  "arch":"zimage","model":"E:/AI/Models/diffusion_models/Z-Image/zimageTurboNSFWBy_2602NSFWBF16.safetensors",
+  "width":1024,"height":768,"steps":10,"guidance":3.5,"seed":42 }'
+# → {"job_id":"...","status":"pending"}  → poi:  curl http://127.0.0.1:8200/jobs/<job_id>
 ```
-
-### POST `/image/edit` — image‑to‑image / integrazione (Kontext)
-L'immagine è il **riferimento**: viene rigenerata/armonizzata secondo il `prompt` (non incolla).
-Per **multi‑immagine → 1** componi prima le immagini (o usa `/image/inpaint`). Campi: `prompt`,
-`image`|`image_path`, `engine` (`kontext`|`flux2`), `model` (se flux2), `negative`, `steps`, `seed`,
-`aux_lora` (es. `MagicQuill\\puzzle_lora.safetensors`).
-
-### POST `/image/inpaint` — inpainting (con maschera)
-Rigenera l'area mascherata. Campi: `prompt*`, `image`|`image_path`, `mask`|`mask_path` (bianco =
-area da rigenerare), `model` (checkpoint Fill), `steps`, `denoise`, `guidance`, `seed`, `negative`.
-
-```bash
-curl -F prompt="red dress" -F image=@photo.png -F mask=@mask.png http://localhost:8200/image/inpaint
-```
-
-### POST `/image/recolor` — cambia colore (Kontext)
-Ricolora mantenendo texture/luce. Campi: `target*` (es. `#cc0000`), `subject` (es. "la maglietta"),
-`image`|`image_path`, `engine`, `model`, `steps`, `seed`.
-
-### POST `/image/upscale` — aumenta definizione immagine
-Modello AI di super‑risoluzione + opzionale rifinitura FLUX. Campi: `image`|`image_path`, `model*`
-(es. `4x-UltraSharpV2.safetensors`), `scale`, `refine`, `refine_model` (FLUX), `refine_steps`,
-`refine_denoise`, `prompt`, `seed`.
-
-### POST `/image/segment` — selezione oggetto (CLIPSeg + SAM)
-Maschera dell'oggetto descritto. Campi: `image`|`image_path`, `text*`, `sam_model`, `threshold`.
 
 ---
 
-## Video
+## VIDEO (`tags: video`) — worker `ltx2_infer` (venv ltx2) + servizi nativi
 
-### POST `/video/generate` — generazione video LTX‑2.3
-T2V o **I2V** (invia `image`). Campi: `prompt*`, `negative`, `width`, `height`, `fps`, `length_s`,
-`steps`, `cfg`, `sampler`, `seed`, `nsfw_mode` (`sfw`|`nsfw`), `audio_mode`
-(`native`|`user`|`clone`|`mute`), `hr_refine` (rifinitura HR), `ref_strength` (forza immagine i2v),
-`image`|`image_path`, `audio`|`audio_path` (per `user`/`clone`), `loras`.
+| Endpoint | Parametri principali (default) |
+|---|---|
+| `POST /video/generate` | `prompt*`, `negative`, `width=768`, `height=512`, `fps=25`, `length_s=5`, `steps=40`, `guidance=3.0`, `seed=42`, `loras`; **i2v**: `image_path` (+`ref_strength=1.0`, `i2v_method=addguide`); **a2v/canto**: `audio_path` (+`audio_scale=3.0`) |
+| `POST /video/keyframes` | `prompt*`, `keyframes*` `[{path,frame,strength}]`, + base |
+| `POST /video/extend` | `prompt*`, `video_path*`, `add_seconds=5`, `seg_seconds=0`, `steps=8` |
+| `POST /video/retake` | `prompt*`, `video_path*`, `start_time`, `end_time`, `steps=40` |
+| `POST /video/v2v_edit` | `prompt*`, `control_video*`, `edit_lora*`, `control_strength=1.0`, `length_s=5` |
+| `POST /video/controlnet` | `prompt*`, `control_video*`, `control_type=canny` (canny/depth/pose), `control_strength=0.8`, `image_path?` |
+| `POST /video/lipsync` | `image_path*`, `audio_path*`, `prompt`, `audio_scale=3.0`, `separate_vocals=false`, `talk_region` (mouth/face), `talk_mask_offset=0` |
+| `POST /video/enhance` | `video_path*`, `engine=seedvr2` (seedvr2/flashvsr), `seedvr2_model`, `resolution=1080`, `batch_size=5`, `block_swap=0`, `scale=4.0` |
+| `POST /video/rife` | `video_path*`, `factor=2` |
+| `POST /video/faceswap` | `video_path*`, `source_face_path*` |
 
+Note: `width`/`height` arrotondate a **multipli di 64** (richiesti da LTX-2); i video >150 frame sono
+**segmentati automaticamente** (chunk memory-bounded, niente OOM su clip lunghe).
+
+Esempio (i2v 10s dall'immagine generata):
 ```bash
-# I2V con audio clonato da file
-curl -F prompt="she smiles and waves" -F image=@frame1.png -F audio_mode=clone \
-  -F audio=@voice.wav -F length_s=8 http://localhost:8200/video/generate
+curl -s -X POST http://127.0.0.1:8200/video/generate -H "Content-Type: application/json" -d '{
+  "prompt":"the beet chases the flying opossum across a meadow, playful chase",
+  "image_path":"E:/AI/ltxstudio/output/native_zimage_42.png",
+  "width":768,"height":576,"fps":16,"length_s":10,"steps":10,"guidance":3.0,"seed":42 }'
 ```
-
-### POST `/video/enhance` — definizione video (restore + super‑risoluzione)
-Campi: `video`|`video_path`, `engine` (`seedvr2`|`esrgan`|`flashvsr`), `seedvr2_model`,
-`resolution`, `blocks_to_swap`, `batch_size`, `esrgan_model`, `target_scale`, `fps`, `rife`
-(aumento FPS), `rife_multiplier`, `rife_ckpt`, `seed`. SeedVR2 scarica il modello al primo uso.
-
-### POST `/video/extend` — prolunga video (LTX‑2.3 nativo)
-Estensione multi‑segmento condizionata sulla coda del video. Campi: `prompt*`, `video`|`video_path`,
-`width`, `height`, `fps`, `add_seconds`, `segments`, `overlap_frames`, `context_frames`, `steps`,
-`seed`, `negative`.
 
 ---
 
-## Note
+## MUSICA / AUDIO (`tags: musica`)
 
-- I tempi: immagini secondi/decine di secondi; video diversi minuti (modello 22GB).
-- Gli endpoint sono **sincroni** (attendono il completamento del job; timeout 20–60 min secondo il tipo).
-- Per riusare lo stesso file in più chiamate senza ricaricarlo: `/files/upload` (o `/audio/upload`)
-  → usa il `path` ottenuto nei campi `*_path`.
+| Endpoint | Parametri principali (default) |
+|---|---|
+| `POST /music/song` | `tags*` (stile), `lyrics`, `name=song`, `engine=heartmula` (heartmula/acestep), `duration_s=120`, `instrumental=false`, `version=3B`, `guidance=15.0` (acestep), `lazy_load=false` |
+| `POST /music/sonify` | `video_path` (vuoto = testo→audio), `prompt`, `duration_s=8`, `cfg_strength=4.5`, `num_steps=25` (MMAudio) |
+| `POST /music/music_video` | `lyrics*`, `image_path*`, `song_path`, `width=704`, `height=512`, `fps=25`, `scene_seconds=6`, `video_style`, `steps=8` |
+| `POST /audio/tts` | `text*`, `engine=edge` (edge/kokoro/f5tts/xtts2/fish/vibevoice/cosyvoice2), `voice_id`, `language`, `sample_path?` (clone), `sample_transcript` |
+| `POST /audio/separate_vocals` | `audio_path*` (demucs → vocals.wav) |
+| `POST /audio/transcribe` | `audio_path*` (Handy/whisper → txt) |
+
+Esempio (canzone ACE-Step):
+```bash
+curl -s -X POST http://127.0.0.1:8200/music/song -H "Content-Type: application/json" -d '{
+  "name":"ballad","engine":"acestep","tags":"medieval ballad, lute, playful, duet",
+  "lyrics":"[verse]\n...","duration_s":180,"guidance":15.0 }'
+```
+
+---
+
+## 3D / RIG / MONDO (`tags: 3d`)
+
+| Endpoint | Parametri principali (default) |
+|---|---|
+| `POST /threed/image_to_3d` | `image_path*`, `name=model`, `seed=1`, `ss_steps=12`, `slat_steps=12`, `simplify=0.95`, `texture_size=1024` (TRELLIS → GLB) |
+| `POST /threed/rig` | `mesh_path*`, `name=rig`, `template=Mixamo`, `file_format=glb` (SkinToken → scheletro+skinning) |
+| `POST /threed/world` | `name=world`, `image_path` (vuoto=testo→scena), `prompt`, `resolution=1600`, `low_vram=false`, `mesh=true` (WorldGen → GLB/PLY) |
+| `POST /threed/convert` | `glb_path*`, `fmt=fbx` (fbx/obj, via Blender) |
+
+> mocap (webcam live) e retarget/animazione Blender restano nella GUI (interattivi), non esposti qui.
+
+---
+
+## FILM (`tags: film`)
+
+| Endpoint | Parametri principali (default) |
+|---|---|
+| `POST /film/script` | `subject*`, `style`, `max_tokens=2000` (LLM → trattamento+scene, .txt) |
+| `POST /film/asset_image` | `prompt*`, `width=1024`, `height=1024`, `seed=7`, `arch=flux`, `face_ref` (PuLID), `ref_image` (Kontext), `loras`, `negative` |
+| `POST /film/shot_video` | `prompt*`, `width=768`, `height=512`, `fps=25`, `duration_s=4`, `seed=7`, `keyframes`, `loras`, `audio_path`, `negative` |
+
+> L'orchestrazione di PROGETTO completa (DB, scheduler, montaggio, doppiaggio, modalità Auto) resta
+> nella GUI Film Studio (stateful). Il videoclip canzone→video è in `/music/music_video`.
+
+---
+
+## Prerequisiti (endpoint "gated")
+
+Alcune funzioni richiedono venv/pesi isolati; se assenti il job torna `error` con l'hint di installazione:
+SeedVR2, FlashVSR, TRELLIS, WorldGen, HeartMuLa, ACE-Step, MMAudio, TTS-clone (f5/xtts/fish/vibevoice),
+face-swap (InsightFace), PuLID → `scripts/install_*.py`.
+
+## Agenti (plugin + skill)
+
+`agents/`: contratti macchina condivisi (`openapi.json`, `tools.openai.json`, `manifest.json`) + pack
+per agente (`hermes` default, `openclaw`, `claude_code`, `antigravity`, `openai_codex`, `generic`),
+ognuno con `SKILL.md` + `plugin.json`. Rigenera con `python -m agents.build_packs`; installa con
+`python -m agents.install_skill [--agent <nome>]`.

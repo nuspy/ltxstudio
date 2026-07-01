@@ -3,6 +3,10 @@
 > Documento triplo-scopo: **(1) manuale utente**, **(2) base per REST API**, **(3) skill per agenti AI**.
 > Tutto ricavato leggendo il codice reale (`inference_server/`, `core/`, `ui/`, `data/`) — nessuna funzione inventata.
 > Dove un parametro non è verificabile con certezza dal codice è marcato `(verificare)`.
+>
+> **REST API pronta all'uso** (endpoint + parametri + esempi curl): vedi **[`docs/API.md`](../docs/API.md)**
+> — API locale async su `http://127.0.0.1:8200` (autostart + auto-shutdown 30 min). Contratti macchina
+> e skill per agenti (Hermes/OpenClaw/Claude Code/Antigravity/Codex/generico) in **`agents/`**.
 
 ---
 
