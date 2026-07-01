@@ -354,6 +354,10 @@ class _NativeLtx2Worker(QThread):
                 self.progress.emit("[canta] separo la voce dalla base (demucs)…")
                 self.params["audio_path"] = _vs.separate_vocals(
                     self.params["audio_path"], on_log=lambda l: self.progress.emit("[demucs] " + l))
+            # #3 talk region: cattura e rimuovi i parametri di compositing PRIMA del dump JSON
+            _talk = {"region": self.params.pop("_talk_region", None),
+                     "src": self.params.pop("_talk_source", None),
+                     "offset": self.params.pop("_talk_offset", 0)}
             jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
             _json.dump(self.params, jf); jf.close()
             env = dict(_os.environ)
@@ -369,6 +373,14 @@ class _NativeLtx2Worker(QThread):
                 if line.startswith("OK:"):
                     out_path = line[3:].strip()
             proc.wait()
+            # #3 talk region: composita solo bocca/volto sul frame sorgente (reimagine=off)
+            if out_path and _os.path.exists(out_path) and _talk["region"] and _talk["src"]:
+                from core import talk_region as _tr
+                self.progress.emit(f"[talk] compositing regione '{_talk['region']}' (solo bocca/volto)…")
+                comp = out_path.rsplit(".", 1)[0] + "_region.mp4"
+                out_path = _tr.composite_talk_region(
+                    out_path, _talk["src"], comp, region=_talk["region"],
+                    mask_offset=int(_talk["offset"] or 0), on_log=lambda l: self.progress.emit("[talk] " + l))
             if out_path and _os.path.exists(out_path):
                 self.done.emit({"status": "success", "output": [out_path]})
             else:
@@ -2349,6 +2361,12 @@ class MainWindow(QMainWindow):
             "_sep_vocals": bool(params.get("separate_vocals", False)),
             "ref_strength": 1.0, "output": params.get("output", str(OUTPUT_DIR / "talk_native.mp4")),
         }
+        # #3 talk region: se c'è una regione e reimagine è OFF, composita solo bocca/volto sul
+        #    frame sorgente statico DOPO l'a2v (post-step nel worker).
+        if params.get("talk_region") and not params.get("talk_reimagine") and img:
+            nat["_talk_region"] = params.get("talk_region")
+            nat["_talk_offset"] = int(params.get("talk_mask_offset", 0) or 0)
+            nat["_talk_source"] = img
         if nf > 150:
             nat["chunk_frames"] = 121
         self._log(f"[lip-sync nativo] a2v LTX-2 GGUF — {nf} frame {nat['width']}x{nat['height']}…")
@@ -2519,6 +2537,9 @@ class MainWindow(QMainWindow):
             "separate_vocals": sep, "audio_scale": ascale, "blocks_to_swap": "auto", "context": True,
             "seg_frames": seg_frames, "overlap_frames": overlap_frames,
             "ref_anchor_strength": ref_anchor, "anchor_every": anchor_every, "resume": resume,
+            # #3 talk region: anima solo bocca/volto (reimagine=off) tenendo fermo il resto
+            "talk_region": v2v.get("talk_region"), "talk_mask_offset": int(v2v.get("talk_mask_offset", 0) or 0),
+            "talk_reimagine": bool(v2v.get("talk_reimagine", False)),
             "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
         }
         self._start_native_multitalk(params)
