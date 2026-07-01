@@ -24,10 +24,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 HOME = Path.home()
 
+# Hermes (Nous Research) carica gli skill da %LOCALAPPDATA%\hermes\skills\
+_LOCALAPPDATA = Path(os.environ.get("LOCALAPPDATA", HOME / "AppData" / "Local"))
+_HERMES_SKILLS = _LOCALAPPDATA / "hermes" / "skills"
+
 # agente → cartella di installazione dello skill (override con --dest)
 TARGETS = {
     "claude_code": HOME / ".claude" / "skills" / "ltxstudio",
-    "hermes":      HOME / ".hermes" / "skills" / "ltxstudio",
+    "hermes":      (_HERMES_SKILLS if _HERMES_SKILLS.parent.exists() else HOME / ".hermes" / "skills") / "ltxstudio",
     "openclaw":    HOME / ".openclaw" / "skills" / "ltxstudio",
     "antigravity": HOME / ".antigravity" / "skills" / "ltxstudio",
     "openai_codex": HOME / ".codex" / "skills" / "ltxstudio",
