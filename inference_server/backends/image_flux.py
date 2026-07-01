@@ -109,10 +109,14 @@ def _place_flux2_blockswap(pipe) -> str:
     return "blockswap"
 
 
-def _set_attention(pipe) -> str:
+def _set_attention(pipe, arch: str = "") -> str:
     """Backend di attention configurabile con FALLBACK (per la distribuzione su GPU diverse).
-    NATIVE_ATTENTION: auto|sage|sage3|sdpa. 'auto' prova Sage e ricade su SDPA (sempre disponibile)."""
+    NATIVE_ATTENTION: auto|sage|sage3|sdpa. 'auto' prova Sage e ricade su SDPA (sempre disponibile).
+    Z-Image usa attention_mask → SageAttention non lo supporta ('attn_mask is not supported for sage
+    attention') → forziamo SDPA per arch 'zimage'."""
     import os
+    if arch == "zimage":
+        return "sdpa"
     want = (os.environ.get("NATIVE_ATTENTION") or "auto").lower()
     if want in ("auto", "sage", "sage3"):
         try:
@@ -455,7 +459,7 @@ def _load(model_path: str, arch: str):
             pipe.vae.disable_tiling()
         except Exception:                               # noqa: BLE001
             pass
-    attn = _set_attention(pipe)
+    attn = _set_attention(pipe, arch)
     # FBCache rompe gli arch image-conditioned (Kontext/inpaint): la pipeline non entra nel context
     # manager dell'hook → "No context is set". Lo applichiamo solo ai t2i puri.
     fb = _apply_fbcache(pipe) if not SPEC.get(arch, ("", False, False))[2] else False

@@ -19,11 +19,18 @@ def _submit(kind, fn):
     return {"job_id": MANAGER.submit(kind, fn), "status": "pending"}
 
 
+def _r64(x: int) -> int:
+    """LTX-2 (pipeline two-stage) richiede lati multipli di 64."""
+    return max(64, int(round(x / 64)) * 64)
+
+
 def _base(req) -> dict:
+    nf = max(9, int(req.length_s * req.fps) // 8 * 8 + 1)
     p = {"prompt": req.prompt, "negative": req.negative or "worst quality, blurry",
-         "width": req.width, "height": req.height, "fps": req.fps, "steps": req.steps,
-         "guidance": req.guidance, "seed": req.seed,
-         "num_frames": max(9, int(req.length_s * req.fps) // 8 * 8 + 1)}
+         "width": _r64(req.width), "height": _r64(req.height), "fps": req.fps, "steps": req.steps,
+         "guidance": req.guidance, "seed": req.seed, "num_frames": nf}
+    if nf > 150:                                          # video lungo → chunk memory-bounded (no OOM)
+        p["chunk_frames"] = 121
     if getattr(req, "loras", None):
         p["loras"] = parse_loras(req.loras)
     return p
