@@ -64,8 +64,9 @@ def register(app: FastAPI):
     def image_to_3d(req: ImageTo3DReq):
         def fn(job):
             from core import trellis_service as ts
-            if ts.preflight():
-                raise RuntimeError("; ".join(ts.preflight()) + " — installa con scripts/install_trellis.py")
+            errs = ts.preflight(req.image_path)
+            if errs:
+                raise RuntimeError("; ".join(errs) + " — installa con scripts/install_trellis.py")
             j = ts.make_job(req.image_path, req.name, seed=req.seed, ss_steps=req.ss_steps,
                             slat_steps=req.slat_steps, simplify=req.simplify,
                             texture_size=req.texture_size, hf_token=req.hf_token, on_log=job.log)
