@@ -347,6 +347,13 @@ class _NativeLtx2Worker(QThread):
             if not _os.path.exists(self.LTX2_PY):
                 self.done.emit({"status": "error", "error": f"venv ltx2 mancante: {self.LTX2_PY}"})
                 return
+            # #4 separazione voce (Canta): isola i vocals dalla canzone PRIMA del lip-sync (in-process,
+            # venv comfy con demucs). Fail-safe: se fallisce, resta l'audio originale.
+            if self.params.pop("_sep_vocals", False) and self.params.get("audio_path"):
+                from core import vocal_separation as _vs
+                self.progress.emit("[canta] separo la voce dalla base (demucs)…")
+                self.params["audio_path"] = _vs.separate_vocals(
+                    self.params["audio_path"], on_log=lambda l: self.progress.emit("[demucs] " + l))
             jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
             _json.dump(self.params, jf); jf.close()
             env = dict(_os.environ)
@@ -2338,6 +2345,8 @@ class MainWindow(QMainWindow):
             "steps": 8, "guidance": 3.0, "seed": 8, "offload": "cpu",
             # #4 forza dell'audio sul video (sing_audio_scale) → modality_scale del guider audio
             "audio_scale": float(params.get("audio_scale", 3.0) or 3.0),
+            # #4 separa la voce dalla base prima del lip-sync (Canta) — gestito nel thread del worker
+            "_sep_vocals": bool(params.get("separate_vocals", False)),
             "ref_strength": 1.0, "output": params.get("output", str(OUTPUT_DIR / "talk_native.mp4")),
         }
         if nf > 150:
