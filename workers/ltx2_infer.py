@@ -629,7 +629,7 @@ def run_generation(p: dict) -> str:
                                 stg_scale=float(p.get("stg", 1.0)),
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
     ag = MultiModalGuiderParams(cfg_scale=7.0, stg_scale=1.0, rescale_scale=0.7,
-                                modality_scale=3.0, stg_blocks=[29])
+                                modality_scale=float(p.get("audio_scale", 3.0)), stg_blocks=[29])
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
     tg = time.time()

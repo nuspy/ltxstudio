@@ -2336,6 +2336,8 @@ class MainWindow(QMainWindow):
             "width": int(params.get("width", 512)), "height": int(params.get("height", 512)),
             "num_frames": nf, "fps": int(params.get("fps", 25)),
             "steps": 8, "guidance": 3.0, "seed": 8, "offload": "cpu",
+            # #4 forza dell'audio sul video (sing_audio_scale) → modality_scale del guider audio
+            "audio_scale": float(params.get("audio_scale", 3.0) or 3.0),
             "ref_strength": 1.0, "output": params.get("output", str(OUTPUT_DIR / "talk_native.mp4")),
         }
         if nf > 150:
@@ -2583,6 +2585,16 @@ class MainWindow(QMainWindow):
             return
         out = (res.get("output") or [None])[0]
         self._log(f"[native inpaint] generato: {out}")
+        # #8 denoise classico post-upscale (restauro nativo) se richiesto dalla GUI
+        dn = getattr(self, "_pending_denoise", None)
+        self._pending_denoise = None                         # consuma una sola volta
+        if out and dn:
+            try:
+                from core.denoise import denoise_image
+                denoise_image(out, out, strength=dn)
+                self._log(f"[native] denoise applicato (forza {dn:.2f}).")
+            except Exception as e:                           # noqa: BLE001
+                self._log(f"[native] denoise saltato: {e}")
         if out:
             self._show_inpaint_result(out)   # dialog anteprima prima/dopo + Accetta / Revert
 
@@ -3364,6 +3376,9 @@ class MainWindow(QMainWindow):
         from core import backend
         if op == "restore" and backend.is_native("image"):
             self._inpaint_before = image_path
+            # #8 denoise (classico Non-Local Means) come post-process dell'upscale nativo.
+            self._pending_denoise = (float(cfg.get("denoise_strength", 0.2))
+                                     if cfg.get("denoise") else None)
             self._start_native_upscale(cfg["upscale_model"], cfg["target_scale"], image_path=image_path)
             return
         try:
