@@ -1,5 +1,6 @@
 ---
 name: ltxstudio
+description: Pilota la REST API LOCALE di LTX Studio per CREARE e MODIFICARE immagini, video, film/videoclip, musica, modelli 3D, rig/skinning e animazioni. Job asincroni che ritornano link di download. Copre testo/immagine/audio->immagine e video (t2v/i2v/a2v, inpaint, kontext, upscale, lip-sync, controlnet, extend), canzoni (HeartMuLa/ACE-Step), TTS/voce, immagine->3D (TRELLIS), rig, mondo 3D, e shot di film. Usa quando l'utente vuole generare/modificare foto, video, musica, film o modelli 3D da QUALSIASI input. L'API si avvia da sola e si spegne dopo 30 min di inattivita.
 target: Generico (OpenAPI)
 ---
 

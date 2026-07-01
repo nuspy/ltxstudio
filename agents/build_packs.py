@@ -72,6 +72,16 @@ def build_openai_tools(caps: list[dict]) -> list[dict]:
     return tools
 
 
+SKILL_DESCRIPTION = (
+    "Pilota la REST API LOCALE di LTX Studio per CREARE e MODIFICARE immagini, video, film/videoclip, "
+    "musica, modelli 3D, rig/skinning e animazioni. Job asincroni che ritornano link di download. "
+    "Copre testo/immagine/audio->immagine e video (t2v/i2v/a2v, inpaint, kontext, upscale, lip-sync, "
+    "controlnet, extend), canzoni (HeartMuLa/ACE-Step), TTS/voce, immagine->3D (TRELLIS), rig, mondo 3D, "
+    "e shot di film. Usa quando l'utente vuole generare/modificare foto, video, musica, film o modelli 3D "
+    "da QUALSIASI input. L'API si avvia da sola e si spegne dopo 30 min di inattivita."
+)
+
+
 SKILL_BODY = """\
 Guidi la generazione/modifica di **immagini, video, film, videoclip, musica, modelli 3D, rig/skinning e
 animazioni** tramite la **REST API locale di LTX Studio** su `{base}` (Swagger `{base}/docs`).
@@ -155,7 +165,9 @@ def main():
         d = HERE / key
         d.mkdir(parents=True, exist_ok=True)
         default_note = " (agente di DEFAULT)" if meta["default"] else ""
-        header = (f"---\nname: ltxstudio\ntarget: {meta['title']}{default_note}\n---\n\n"
+        header = (f"---\nname: ltxstudio\n"
+                  f"description: {SKILL_DESCRIPTION}\n"
+                  f"target: {meta['title']}{default_note}\n---\n\n"
                   f"# LTX Studio — skill per {meta['title']}{default_note}\n\n")
         (d / "SKILL.md").write_text(header + SKILL_BODY.format(base=BASE_URL), encoding="utf-8")
         plugin = dict(PLUGIN_JSON, target=meta["title"], default=meta["default"])
