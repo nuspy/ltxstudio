@@ -144,3 +144,5 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
   inietta su moduli quantizzati custom). FIX: `apply_loras` rileva `Fp8Linear`/`Nvfp4Linear` e fallisce con
   messaggio chiaro/azionabile (usa base bf16 o fondi la LoRA); base bf16 invariata (path PEFT). Supporto
   LoRA nativo su fp8 = lavoro dedicato #17/#78. Commit 2315659. ⚠️ (guardia; feature completa parcheggiata)
+- **FLUX.1 Krea [dev]** (#76): già integrato (detector flux1/dev/t2i; filtro dropdown FLUX include 'krea';
+  pesi su disco). **Validato LIVE**: t2i → `native_flux_76076.png` (728KB, success 63s). ✅
