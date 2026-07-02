@@ -154,3 +154,11 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
   Fix anti-OOM: `_prep_retake_source` ridimensiona il sorgente al target + empty_cache. Ma **marginale su 32GB**:
   su sorgente grande auto-ridotto l'encoder-load resta al limite (OOM flaky). Fix profondo (eviction transformer
   durante load encoder) rimandato. Su hardware >32GB atteso stabile.
+
+## Sessione 03/07 — richieste utente A/B
+- **#88 Preview live per-step immagine**: callback latent2rgb (no VAE→no OOM) → preview_bus → GET /preview →
+  native_driver.preview() → GenProgressDialog (QTimer) in t2i/inpaint/kontext. **Validato LIVE**: 8 preview
+  su 12 step, gen ok. Commit 1c0f9c1. ✅
+- **#89 Audio nel video t2v/i2v**: il motore comfy-native generava audio solo in a2v; ora gate
+  (audio_path OR generate_audio=True) crea l'empty audio latent + concat + mux AAC. **Validato LIVE**:
+  test_audio_t2v.mp4 → stream 0 h264 + stream 1 aac. Commit bc8b290. ✅
