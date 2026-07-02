@@ -204,25 +204,29 @@ def run(p: dict) -> str:
         latent = {"samples": getattr(latent, "samples", latent)}
     print(f"[cond] ok, latent={tuple(latent['samples'].shape)}", flush=True)
 
-    # ── a2v (canta/talk): modello AV congiunto. Audio fornito = ENCODE+KEEP (lip-sync), video generato. ──
+    # ── AUDIO (modello AV congiunto LTX-2.3). L'audio è generato ANCHE per t2v/i2v puri (il modello LTX-2.3
+    # produce audio nativamente): default ON (opt-out con generate_audio=False). Audio fornito = ENCODE+KEEP
+    # (lip-sync/canto), video generato; nessun file = audio GENERATIVO (empty latent). Vedi task #89. ──
     av_mode = False
     audio_vae = None
-    if p.get("audio_path"):
+    _has_audio_file = bool(p.get("audio_path")) and os.path.isfile(str(p.get("audio_path")))
+    _want_audio = bool(p.get("generate_audio", True))    # genera audio anche senza file (t2v/i2v)
+    if _has_audio_file or _want_audio:
         from comfy_extras.nodes_lt import LTXVConcatAVLatent
         from comfy_extras.nodes_lt_audio import LTXVAudioVAEEncode, LTXVEmptyLatentAudio
         audio_vae = _load_audio_vae(p.get("audio_vae", "LTX23_audio_vae_bf16.safetensors"))
-        if os.path.isfile(str(p["audio_path"])):         # audio dato → encode e MANTIENI (noise_mask 0)
+        if _has_audio_file:                              # audio dato → encode e MANTIENI (noise_mask 0)
             a_in = _load_audio(p["audio_path"])
             audio_latent = _unwrap(LTXVAudioVAEEncode().execute(a_in, audio_vae))
             audio_latent = dict(audio_latent)
             audio_latent["noise_mask"] = torch.zeros_like(audio_latent["samples"])
-            print(f"[a2v] audio encode+keep {os.path.basename(p['audio_path'])}", flush=True)
-        else:                                            # nessun file → genera anche l'audio
+            print(f"[av] audio encode+keep {os.path.basename(p['audio_path'])} (lip-sync/canto)", flush=True)
+        else:                                            # nessun file → audio GENERATIVO (t2v/i2v con suono)
             audio_latent = _unwrap(LTXVEmptyLatentAudio().execute(F, int(p.get("fps", 24)), 1, audio_vae))
-            print("[a2v] audio generato (no input)", flush=True)
+            print("[av] audio generativo (empty latent) — t2v/i2v con suono", flush=True)
         latent = _unwrap(LTXVConcatAVLatent().execute(latent, audio_latent))
         av_mode = True
-        print("[a2v] AV latent concatenato", flush=True)
+        print("[av] AV latent concatenato", flush=True)
 
     cfg = float(p.get("guidance", 1.0))
     if cfg <= 1.0:
