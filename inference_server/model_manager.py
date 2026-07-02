@@ -142,6 +142,17 @@ class ModelManager:
             pass
         if not loras:
             return
+        # Base con Linear quantizzati CUSTOM (FLUX.2/Klein fp8: Fp8Linear/Nvfp4Linear): PEFT non sa
+        # iniettare LoRA su questi moduli (→ "Target module Fp8Linear() is not supported"). Invece di
+        # crashare, fallisci con un messaggio chiaro/azionabile. Il supporto LoRA nativo su base fp8
+        # (iniezione manuale nel forward dequant) è un lavoro dedicato — vedi task #17/#78.
+        tr = getattr(pipe, "transformer", None)
+        if tr is not None and any(type(m).__name__ in ("Fp8Linear", "Nvfp4Linear")
+                                  for m in tr.modules()):
+            raise RuntimeError(
+                "LoRA non supportata su base FLUX.2/Klein in fp8 (moduli quantizzati custom): "
+                "usa un modello base bf16 per applicare la LoRA, oppure fondi la LoRA nel checkpoint. "
+                "Il supporto LoRA nativo su fp8 è pianificato (task #17/#78).")
         import os
         names, weights = [], []
         for i, lo in enumerate(loras):
