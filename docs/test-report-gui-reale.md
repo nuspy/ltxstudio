@@ -150,3 +150,7 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - **Segment** (SAM2+GroundingDINO): LIVE → `native_segmask.png` (success 12s). ✅
 - **Upscale** (4x-UltraSharpV2): LIVE → `native_upscale_0.png` (success 17s). ✅
 - **Video ControlNet** (iclora depth, #24): LIVE → `test_cnet_depth.mp4` (25 frame @24fps, gen 91s, IC-LoRA depth 625M). ✅
+- **Video ReTake** (#24, rigenera sezione): LIVE OK su sorgente ≤448x256 → `test_retake.mp4` (17 frame, gen 75s). ⚠️
+  Fix anti-OOM: `_prep_retake_source` ridimensiona il sorgente al target + empty_cache. Ma **marginale su 32GB**:
+  su sorgente grande auto-ridotto l'encoder-load resta al limite (OOM flaky). Fix profondo (eviction transformer
+  durante load encoder) rimandato. Su hardware >32GB atteso stabile.
