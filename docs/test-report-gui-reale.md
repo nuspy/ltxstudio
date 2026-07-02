@@ -133,3 +133,14 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - Retarget BVH->cavaliere: REAL_knight_animated.glb (2 anim, 138 ch) — pipeline gira end-to-end MA deformazione CONTORTA (rest-pose mismatch tra BVH mediapipe e auto-rig SkinToken). Per resa pulita: retarget su Mixamo standard o aggiungere rest-pose alignment in retarget.py. ⚠️
 
 - Retarget MIGLIORATO (correzione orientamento rest per-osso, R_tgt=C·R_src·C^-1 con C=T^-1·S): animazione cavaliere ora PULITA (posa di combattimento corretta, no contorsione). Risolve il rest-pose/roll mismatch tra BVH mediapipe e auto-rig SkinToken. REAL_knight_animated.glb. ✅
+
+## Sessione 02/07 — bug da GUI live (immagini)
+- **Inpaint/Kontext con transformer GGUF** (es. `fluxunchained-fill-hyp8-Q5_K_S.gguf`): prima falliva
+  `Unable to load weights` (from_single_file trattava il .gguf come safetensors). FIX: `_assemble_flux`
+  usa `GGUFQuantizationConfig` sui `.gguf` (diffusers key-map BFL→diffusers, pesi quantizzati in VRAM +
+  dequant on-the-fly); `_load` instrada i .gguf all'assembler. **Validato LIVE**: inpaint reale col
+  modello GGUF Fill → `native_inpaint_12345.png` (838KB, success 58s). Commit 0d4d49f. ✅
+- **LoRA su base FLUX.2/Klein fp8**: prima crashava `Target module Fp8Linear() is not supported` (PEFT non
+  inietta su moduli quantizzati custom). FIX: `apply_loras` rileva `Fp8Linear`/`Nvfp4Linear` e fallisce con
+  messaggio chiaro/azionabile (usa base bf16 o fondi la LoRA); base bf16 invariata (path PEFT). Supporto
+  LoRA nativo su fp8 = lavoro dedicato #17/#78. Commit 2315659. ⚠️ (guardia; feature completa parcheggiata)
