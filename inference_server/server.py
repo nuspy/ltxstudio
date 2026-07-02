@@ -13,9 +13,10 @@ import queue
 import traceback
 import uuid
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import BaseModel
 
+from inference_server import preview_bus
 from inference_server.model_manager import ModelManager
 from inference_server.backends import image_flux
 from inference_server.backends import image_upscale
@@ -52,6 +53,7 @@ def _worker():
         if not job:
             continue
         job["status"] = "running"
+        preview_bus.reset()                                 # azzera l'anteprima del job precedente
         try:
             handler = HANDLERS[job["module"]]
             res = handler(job["params"], MM, OUTPUT_DIR)
@@ -80,6 +82,18 @@ def submit(req: SubmitReq):
 @app.get("/history/{jid}")
 def history(jid: str):
     return _jobs.get(jid, {"status": "unknown"})
+
+
+@app.get("/preview")
+def preview():
+    """Ultima anteprima per-step del job in corso (PNG). 204 se non ancora disponibile.
+    Header X-Preview-Seq/Step/Total per il polling incrementale della GUI."""
+    p = preview_bus.get_preview()
+    if not p.get("png"):
+        return Response(status_code=204)
+    return Response(content=p["png"], media_type="image/png",
+                    headers={"X-Preview-Seq": str(p["seq"]), "X-Preview-Step": str(p["step"]),
+                             "X-Preview-Total": str(p["total"])})
 
 
 @app.get("/system_stats")

@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = 严格跟随参考；数值越低 = 创作自由度越高。",
   "aud.install.confirm.text2": "安装“{eid}”引擎？\n\n{note}",
   "music.install.acestep": "安装 ACE-Step",
-  "music.installed.acestep": "ACE-Step 已安装 ✓"
+  "music.installed.acestep": "ACE-Step 已安装 ✓",
+  "progress.preview_title": "生成预览"
 }

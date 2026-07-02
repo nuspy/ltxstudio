@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = суворо слідує референсу; менші значення = більше творчої свободи.",
   "aud.install.confirm.text2": "Встановити рушій «{eid}»?\n\n{note}",
   "music.install.acestep": "Встановити ACE-Step",
-  "music.installed.acestep": "ACE-Step встановлено ✓"
+  "music.installed.acestep": "ACE-Step встановлено ✓",
+  "progress.preview_title": "Попередній перегляд генерації"
 }

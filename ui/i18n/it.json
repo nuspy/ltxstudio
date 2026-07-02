@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = segue rigidamente il riferimento; valori bassi = più libertà creativa.",
   "aud.install.confirm.text2": "Installare il motore '{eid}'?\n\n{note}",
   "music.install.acestep": "Installa ACE-Step",
-  "music.installed.acestep": "ACE-Step installato ✓"
+  "music.installed.acestep": "ACE-Step installato ✓",
+  "progress.preview_title": "Anteprima generazione"
 }

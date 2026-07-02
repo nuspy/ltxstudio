@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = ακολουθεί αυστηρά την αναφορά· χαμηλές τιμές = περισσότερη δημιουργική ελευθερία.",
   "aud.install.confirm.text2": "Εγκατάσταση της μηχανής '{eid}';\n\n{note}",
   "music.install.acestep": "Εγκατάσταση ACE-Step",
-  "music.installed.acestep": "ACE-Step εγκαταστάθηκε ✓"
+  "music.installed.acestep": "ACE-Step εγκαταστάθηκε ✓",
+  "progress.preview_title": "Προεπισκόπηση δημιουργίας"
 }

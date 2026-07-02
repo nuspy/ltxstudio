@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = folgt streng der Referenz; niedrige Werte = mehr kreative Freiheit.",
   "aud.install.confirm.text2": "Engine '{eid}' installieren?\n\n{note}",
   "music.install.acestep": "ACE-Step installieren",
-  "music.installed.acestep": "ACE-Step installiert ✓"
+  "music.installed.acestep": "ACE-Step installiert ✓",
+  "progress.preview_title": "Generierungsvorschau"
 }

@@ -52,5 +52,24 @@ def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float
     return {"status": "timeout"}
 
 
+def preview() -> dict | None:
+    """Ultima anteprima per-step del job in corso: {png, seq, step, total} o None se non disponibile.
+    `seq` cresce ad ogni nuovo frame (per non ridisegnare lo stesso). Best-effort (non solleva)."""
+    try:
+        req = urllib.request.Request(BASE + "/preview")
+        with urllib.request.urlopen(req, timeout=3) as r:
+            if r.status == 204:
+                return None
+            data = r.read()
+            if not data:
+                return None
+            return {"png": data,
+                    "seq": int(r.headers.get("X-Preview-Seq", "0")),
+                    "step": int(r.headers.get("X-Preview-Step", "0")),
+                    "total": int(r.headers.get("X-Preview-Total", "0"))}
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
 def system_stats() -> dict:
     return _get("/system_stats")

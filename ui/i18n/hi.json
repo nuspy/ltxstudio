@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = संदर्भ का कड़ाई से अनुसरण; कम मान = अधिक रचनात्मक स्वतंत्रता।",
   "aud.install.confirm.text2": "'{eid}' इंजन स्थापित करें?\n\n{note}",
   "music.install.acestep": "ACE-Step स्थापित करें",
-  "music.installed.acestep": "ACE-Step स्थापित ✓"
+  "music.installed.acestep": "ACE-Step स्थापित ✓",
+  "progress.preview_title": "जनरेशन पूर्वावलोकन"
 }

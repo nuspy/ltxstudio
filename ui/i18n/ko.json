@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = 참조를 엄격히 따름; 낮은 값 = 더 많은 창작 자유.",
   "aud.install.confirm.text2": "'{eid}' 엔진을 설치할까요?\n\n{note}",
   "music.install.acestep": "ACE-Step 설치",
-  "music.installed.acestep": "ACE-Step 설치됨 ✓"
+  "music.installed.acestep": "ACE-Step 설치됨 ✓",
+  "progress.preview_title": "생성 미리보기"
 }

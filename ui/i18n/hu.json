@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = szigorúan követi a referenciát; alacsonyabb értékek = nagyobb kreatív szabadság.",
   "aud.install.confirm.text2": "Telepíted a(z) '{eid}' motort?\n\n{note}",
   "music.install.acestep": "ACE-Step telepítése",
-  "music.installed.acestep": "ACE-Step telepítve ✓"
+  "music.installed.acestep": "ACE-Step telepítve ✓",
+  "progress.preview_title": "Generálás előnézete"
 }

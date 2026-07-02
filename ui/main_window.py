@@ -2049,6 +2049,46 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, tr("mw.gen_error_title"), str(e)); self._log(f"[ERR] gen: {e}")
 
+    # ── Preview live per-step (backend nativo) — task #88 ────────────────────────────────────────
+    def _start_native_preview(self, title: str):
+        """Apre la finestra di anteprima LIVE che mostra il latente in evoluzione ad ogni step
+        (polling di GET /preview su :8189), prima del dialog finale di accettazione. Best-effort:
+        se qualcosa va storto NON deve bloccare la generazione."""
+        try:
+            from ui.progress_dialog import GenProgressDialog
+            from PySide6.QtCore import QTimer
+            if getattr(self, "_native_prev_dlg", None) is None:
+                self._native_prev_dlg = GenProgressDialog(self)
+                self._native_prev_timer = QTimer(self)
+                self._native_prev_timer.timeout.connect(self._poll_native_preview)
+            self._native_prev_seq = -1
+            self._native_prev_dlg.start({}, title)         # prompt vuoto: non serve la pesatura nodi comfy
+            self._native_prev_timer.start(250)
+        except Exception as e:                              # noqa: BLE001
+            self._log(f"[preview] non disponibile: {e}")
+
+    def _poll_native_preview(self):
+        try:
+            from core import native_driver
+            p = native_driver.preview()
+            if not p or p.get("seq", 0) == getattr(self, "_native_prev_seq", -1):
+                return
+            self._native_prev_seq = p["seq"]
+            self._native_prev_dlg.on_preview(p["png"])
+            if p.get("total"):
+                self._native_prev_dlg.on_progress(p.get("step", 0), p["total"])
+        except Exception:                                  # noqa: BLE001
+            pass
+
+    def _stop_native_preview(self):
+        try:
+            if getattr(self, "_native_prev_timer", None) is not None:
+                self._native_prev_timer.stop()
+            if getattr(self, "_native_prev_dlg", None) is not None:
+                self._native_prev_dlg.finish()
+        except Exception:                                  # noqa: BLE001
+            pass
+
     def _start_native_image(self, cfg, v, loras, seed, negative):
         """Genera un'immagine via backend nativo (InferenceServer) invece di ComfyUI."""
         from core import native_driver
@@ -2064,9 +2104,11 @@ class MainWindow(QMainWindow):
                   "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8)}
         self._log("Generazione immagine (backend NATIVO) inviata…")
         self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.image", "Immagine"), self._native_worker, self._on_native_image_done)
 
     def _on_native_image_done(self, res: dict):
+        self._stop_native_preview()
         if res.get("status") != "success":
             self._log(f"[native] errore: {res.get('error','')[:300]}")
             QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000])
@@ -2570,6 +2612,7 @@ class MainWindow(QMainWindow):
         self._inpaint_mode = mode
         self._log(f"{mode} (backend NATIVO) inviato (steps={steps}, seed={seed}, guidance={guidance:.1f})…")
         self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,
                       self._on_native_inpaint_done)
 
@@ -2605,10 +2648,12 @@ class MainWindow(QMainWindow):
             self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._inpaint_mode = "integrazione"
         self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.integrate", "Integra (Kontext)"), self._native_worker,
                       self._on_native_inpaint_done)
 
     def _on_native_inpaint_done(self, res: dict):
+        self._stop_native_preview()
         if res.get("status") != "success":
             self._log(f"[native inpaint] errore: {res.get('error','')[:300]}")
             QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000])

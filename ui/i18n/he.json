@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = עוקב בקפדנות אחר ההפניה; ערכים נמוכים = יותר חופש יצירתי.",
   "aud.install.confirm.text2": "להתקין את המנוע '{eid}'?\n\n{note}",
   "music.install.acestep": "התקן ACE-Step",
-  "music.installed.acestep": "ACE-Step מותקן ✓"
+  "music.installed.acestep": "ACE-Step מותקן ✓",
+  "progress.preview_title": "תצוגה מקדימה של היצירה"
 }

@@ -1899,5 +1899,6 @@
   "cn.strength_hint": "1.0 = يتبع المرجع بدقة؛ القيم المنخفضة = حرية إبداعية أكبر.",
   "aud.install.confirm.text2": "تثبيت محرك '{eid}'؟\n\n{note}",
   "music.install.acestep": "تثبيت ACE-Step",
-  "music.installed.acestep": "تم تثبيت ACE-Step ✓"
+  "music.installed.acestep": "تم تثبيت ACE-Step ✓",
+  "progress.preview_title": "معاينة التوليد"
 }

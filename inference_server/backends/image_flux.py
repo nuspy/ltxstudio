@@ -526,6 +526,70 @@ def register(mm, model: str, arch: str) -> str:
     return key
 
 
+# ── Preview live per-step (latent2rgb) ───────────────────────────────────────────────────────────
+# Fattori latent→RGB per FLUX (16 canali), come la preview di ComfyUI: proiezione lineare LEGGERA (no
+# VAE-decode → nessun costo/rischio OOM mid-generazione). Danno un'anteprima cromatica dell'immagine che
+# sta emergendo, aggiornata ad ogni step. Vedi task #88.
+_FLUX_L2RGB = [
+    [-0.0346, 0.0244, 0.0681], [0.0034, 0.0210, 0.0687], [0.0275, -0.0668, -0.0433],
+    [-0.0174, 0.0160, 0.0617], [0.0859, 0.0721, 0.0329], [0.0004, 0.0383, 0.0115],
+    [0.0405, 0.0861, 0.0915], [-0.0236, -0.0185, -0.0259], [-0.0245, 0.0250, 0.1180],
+    [0.1008, 0.0755, -0.0421], [-0.0515, 0.0201, 0.0011], [0.0428, -0.0012, -0.0036],
+    [0.0817, 0.0765, 0.0749], [-0.1264, -0.0522, -0.1103], [-0.0280, -0.0881, -0.0499],
+    [-0.1262, -0.0982, -0.0778]]
+_FLUX_L2RGB_BIAS = [-0.0329, -0.0718, -0.0851]
+
+
+def _latent_to_pil(latent, arch):
+    """Anteprima veloce del latente → PIL, senza VAE. FLUX: latent2rgb con i fattori noti; altri arch:
+    normalizzazione min-max dei primi 3 canali (anteprima cromatica approssimativa). Best-effort."""
+    import torch
+    from PIL import Image
+    x = latent[0].detach().float().cpu()                     # (C,h,w)
+    c = x.shape[0]
+    if arch in ("flux", "kontext", "inpaint") and c == 16:
+        f = torch.tensor(_FLUX_L2RGB, dtype=torch.float32)
+        b = torch.tensor(_FLUX_L2RGB_BIAS, dtype=torch.float32)
+        rgb = torch.einsum("chw,cr->hwr", x, f) + b          # (h,w,3)
+    else:
+        rgb = x[:3].permute(1, 2, 0) if c >= 3 else x[:1].permute(1, 2, 0).repeat(1, 1, 3)
+    lo, hi = rgb.amin(), rgb.amax()
+    rgb = (rgb - lo) / (hi - lo + 1e-6)                       # min-max → [0,1] (sempre visibile)
+    arr = (rgb.clamp(0, 1) * 255).round().to(torch.uint8).numpy()
+    return Image.fromarray(arr, "RGB")
+
+
+def _make_preview_cb(arch, width, height, steps):
+    """Callback diffusers callback_on_step_end: pubblica un'anteprima del latente ogni ~1/8 degli step
+    (e all'ultimo) sul preview_bus. Best-effort: qualsiasi errore NON deve rompere la generazione."""
+    import io
+    import torch
+    every = max(1, int(steps) // 8)
+
+    def _cb(pp, step, timestep, cbk):
+        try:
+            if step % every != 0 and step != int(steps) - 1:
+                return cbk
+            lat = cbk.get("latents")
+            if lat is None:
+                return cbk
+            with torch.no_grad():
+                l = lat
+                if arch in ("flux", "kontext", "inpaint") and hasattr(pp, "_unpack_latents"):
+                    vsf = getattr(pp, "vae_scale_factor", 8)
+                    l = pp._unpack_latents(lat, height, width, vsf)   # (B,16,h,w)
+                img = _latent_to_pil(l, arch)
+                img.thumbnail((384, 384))
+                buf = io.BytesIO(); img.save(buf, "PNG")
+                from inference_server import preview_bus
+                preview_bus.set_preview(buf.getvalue(), step + 1, int(steps))
+        except Exception:                                    # noqa: BLE001
+            pass                                             # preview best-effort
+        return cbk
+
+    return _cb
+
+
 def run(params: dict, mm, output_dir: str) -> dict:
     import torch
     from PIL import Image
@@ -599,8 +663,23 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if neg and arch not in ("zimage", "flux2", "inpaint"):
         kw["negative_prompt"] = neg
 
+    # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
+    # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
+    # (es. alcune pipeline custom), si riprova senza.
+    try:
+        kw["callback_on_step_end"] = _make_preview_cb(arch, int(kw.get("width", 1024)),
+                                                      int(kw.get("height", 1024)), kw["num_inference_steps"])
+        kw["callback_on_step_end_tensor_inputs"] = ["latents"]
+    except Exception:                                       # noqa: BLE001
+        pass
     try:
         out = pipe(**kw)
+    except TypeError as _te:                                # pipeline senza callback_on_step_end
+        if "callback" in str(_te):
+            kw.pop("callback_on_step_end", None); kw.pop("callback_on_step_end_tensor_inputs", None)
+            out = pipe(**kw)
+        else:
+            raise
     finally:
         if _pulid_h:
             from core import pulid_adapter
