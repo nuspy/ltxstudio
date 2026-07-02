@@ -174,11 +174,19 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     # config dedicato 'flux_fill_transformer', altrimenti x_embedder mismatch (64 vs 384).
     _cfg_name = "flux_fill_transformer" if arch == "inpaint" else "flux_transformer"
     _tr_cfg = os.path.join(TE_DIR, _cfg_name)
+    # GGUF (llama.cpp Qn_K): diffusers legge il transformer FLUX quantizzato e lo tiene tale in VRAM,
+    # dequant on-the-fly per-layer (memory-bounded). Serve il pacchetto `gguf`; il key-map BFL→diffusers
+    # è gestito dal single_file loader. Senza questo, from_single_file tratta il .gguf come safetensors
+    # e fallisce ("Unable to load weights"). Vale per flux/kontext/inpaint (Fill hyp8 GGUF, ecc.).
+    _gguf_kw = {}
+    if str(transformer_path).lower().endswith(".gguf"):
+        from diffusers import GGUFQuantizationConfig
+        _gguf_kw = {"quantization_config": GGUFQuantizationConfig(compute_dtype=bf16)}
     if os.path.isdir(_tr_cfg):
         tr = FluxTransformer2DModel.from_single_file(
-            transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True)
+            transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True, **_gguf_kw)
     else:
-        tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+        tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16, **_gguf_kw)
     # config esplicito (VAE FLUX = 16 canali latenti; senza, from_single_file inferisce SD-VAE a 8)
     vae = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)
     te = CLIPTextModel.from_pretrained(os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)
@@ -432,6 +440,15 @@ def _load(model_path: str, arch: str):
         raise RuntimeError(
             f"{cls_name} non supporta from_single_file: per '{arch}' serve un repo diffusers "
             f"(scaricalo col wizard pesi), non il file singolo {Path(model_path).name}.")
+    elif is_file and str(model_path).lower().endswith(".gguf"):
+        # GGUF = SOLO transformer quantizzato (no TE/VAE nel file) → assembla direttamente coi
+        # componenti locali (il transformer è caricato con GGUFQuantizationConfig dentro _assemble_*).
+        if arch in ("flux", "kontext", "inpaint"):
+            pipe = _assemble_flux(Pipe, model_path, arch=arch)
+        elif arch == "zimage":
+            pipe = _assemble_zimage(model_path)
+        else:
+            raise RuntimeError(f"GGUF non supportato per arch '{arch}' (solo flux/kontext/inpaint/zimage).")
     elif is_file:
         try:
             pipe = Pipe.from_single_file(model_path, torch_dtype=torch.bfloat16)
