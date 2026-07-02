@@ -149,3 +149,4 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - **Kontext** (FLUX.1, editing per istruzione, #14 ramo FLUX.1): LIVE → `native_kontext_555.png` (success 96s). ✅
 - **Segment** (SAM2+GroundingDINO): LIVE → `native_segmask.png` (success 12s). ✅
 - **Upscale** (4x-UltraSharpV2): LIVE → `native_upscale_0.png` (success 17s). ✅
+- **Video ControlNet** (iclora depth, #24): LIVE → `test_cnet_depth.mp4` (25 frame @24fps, gen 91s, IC-LoRA depth 625M). ✅
