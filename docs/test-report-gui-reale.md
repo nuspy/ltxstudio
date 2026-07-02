@@ -146,3 +146,6 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
   LoRA nativo su fp8 = lavoro dedicato #17/#78. Commit 2315659. ⚠️ (guardia; feature completa parcheggiata)
 - **FLUX.1 Krea [dev]** (#76): già integrato (detector flux1/dev/t2i; filtro dropdown FLUX include 'krea';
   pesi su disco). **Validato LIVE**: t2i → `native_flux_76076.png` (728KB, success 63s). ✅
+- **Kontext** (FLUX.1, editing per istruzione, #14 ramo FLUX.1): LIVE → `native_kontext_555.png` (success 96s). ✅
+- **Segment** (SAM2+GroundingDINO): LIVE → `native_segmask.png` (success 12s). ✅
+- **Upscale** (4x-UltraSharpV2): LIVE → `native_upscale_0.png` (success 17s). ✅
