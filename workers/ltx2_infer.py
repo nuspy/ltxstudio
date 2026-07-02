@@ -587,6 +587,15 @@ def run_generation(p: dict) -> str:
     import time
     if p.get("t2a"):                                          # #29 text→audio (no video)
         return run_t2a(p)
+    # RISOLUZIONE multipla di 64 (le pipeline two-stage LTX-2 lo richiedono: altrimenti il chunk viene
+    # SALTATO con "Resolution HxW is not divisible by 64" → 0 frame → nessun output). Arrotondiamo al 64
+    # più vicino (min 64) qui, choke point per ogni chiamante (GUI/API), invece di far fallire il chunk.
+    def _r64(x):
+        return max(64, int(round(float(x) / 64.0)) * 64)
+    _ow, _oh = int(p.get("width", 768)), int(p.get("height", 512))
+    p["width"], p["height"] = _r64(_ow), _r64(_oh)
+    if (p["width"], p["height"]) != (_ow, _oh):
+        print(f"[nativo] risoluzione {_ow}x{_oh} → {p['width']}x{p['height']} (multipli di 64 richiesti da LTX-2)", flush=True)
     # Video lungo → chunking in-process (memory-bounded, niente sborzo stage_2). Attiva con
     # chunk_frames>0 (o auto sotto). Ricorsione sicura: i chunk hanno num_frames<=chunk.
     _chunk = int(p.get("chunk_frames", 0))

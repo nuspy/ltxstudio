@@ -2130,11 +2130,14 @@ class MainWindow(QMainWindow):
         length_s = float(self.video_tab.length.value()) if hasattr(self.video_tab, "length") else 5.0
         nf = max(9, int(round(length_s * fps)) // 8 * 8 + 1)
         out = str(OUTPUT_DIR / f"ltx_native_{int(_t.time())}.mp4")
+        # LTX-2 (two-stage) richiede width/height multipli di 64 → arrotonda (min 64) per non far
+        # saltare i chunk ("Resolution ... not divisible by 64" → 0 output). Vale per entrambi i motori.
+        _r64 = lambda x: max(64, int(round(int(x) / 64.0)) * 64)
         params = {
             "prompt": vals.get("prompt_positive", ""),
             "negative": vals.get("prompt_negative", "worst quality, blurry"),
-            "width": int(self.video_tab.width.value()),
-            "height": int(self.video_tab.height.value()),
+            "width": _r64(self.video_tab.width.value()),
+            "height": _r64(self.video_tab.height.value()),
             "num_frames": nf, "fps": fps,
             "steps": int(self.video_tab.sampler_seed.steps.value()),
             "guidance": float(self.video_tab.sampler_seed.cfg.value()),
@@ -2417,13 +2420,15 @@ class MainWindow(QMainWindow):
                       on_progress=lambda s: self._log("[lip-sync] " + s))
 
     def _on_multitalk_done(self, res: dict):
+        # Handler condiviso di TUTTI i video nativi (t2v/i2v/a2v/retake/controlnet), non solo MultiTalk:
+        # etichetta generica "[video]" per non confondere (un t2v fallito non è un errore MultiTalk).
         if res.get("status") != "success":
-            self._log(f"[MultiTalk] errore: {res.get('error','')[:300]}")
+            self._log(f"[video] errore: {res.get('error','')[:300]}")
             QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000])
             return
         out = (res.get("output") or [None])[0]
         self._last_video_path = out
-        self._log(f"[MultiTalk] video pronto: {out}")
+        self._log(f"[video] pronto: {out}")
         # post-process: face-swap automatico se attivo (impone un volto da foto su tutti i frame)
         fs = self.video_tab.get_face_swap_auto() if hasattr(self.video_tab, "get_face_swap_auto") else None
         if fs and fs.get("face") and out:
