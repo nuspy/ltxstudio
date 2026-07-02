@@ -140,12 +140,18 @@ class ModelManager:
             pipe.unload_lora_weights()
         except Exception:                               # noqa: BLE001
             pass
+        # Filtra le voci placeholder/vuote che la GUI può passare (nessuna LoRA realmente selezionata):
+        # {'name': ''}, 'None', 'nessuna', ecc. Se non resta nulla → nessuna LoRA da applicare, esci.
+        def _real(lo):
+            n = (lo.get("name") if isinstance(lo, dict) else lo) or ""
+            return str(n).strip() and str(n).strip().lower() not in ("none", "nessuna", "nessuno", "-")
+        loras = [lo for lo in (loras or []) if _real(lo)]
         if not loras:
             return
         # Base con Linear quantizzati CUSTOM (FLUX.2/Klein fp8: Fp8Linear/Nvfp4Linear): PEFT non sa
         # iniettare LoRA su questi moduli (→ "Target module Fp8Linear() is not supported"). Invece di
-        # crashare, fallisci con un messaggio chiaro/azionabile. Il supporto LoRA nativo su base fp8
-        # (iniezione manuale nel forward dequant) è un lavoro dedicato — vedi task #17/#78.
+        # crashare, fallisci con un messaggio chiaro/azionabile SOLO se c'è davvero una LoRA da applicare.
+        # Il supporto LoRA nativo su base fp8 (iniezione manuale nel forward dequant) è dedicato — #17/#78.
         tr = getattr(pipe, "transformer", None)
         if tr is not None and any(type(m).__name__ in ("Fp8Linear", "Nvfp4Linear")
                                   for m in tr.modules()):
