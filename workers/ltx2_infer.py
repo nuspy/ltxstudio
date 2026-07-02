@@ -546,6 +546,42 @@ def _ensure_stereo(audio_path: str) -> str:
     return out if os.path.exists(out) else audio_path
 
 
+def _prep_retake_source(video_path: str, width, height) -> str:
+    """#24 ReTake OOM-fix: la pipeline retake encoda il sorgente alla sua risoluzione NATIVA (usata come
+    output_shape). Un sorgente grande (es. 704x512+) fa saturare la VRAM nell'image_conditioner (encoder
+    su GPU insieme al transformer) → OOM su 32GB anche con offload. Qui ridimensioniamo il sorgente al
+    TARGET richiesto (multipli di 32) se è più grande; se il target non è dato, cap del lato lungo a 768.
+    Idempotente: se il sorgente è già ≤ target, ritorna l'originale."""
+    import subprocess
+    import tempfile
+    def _r32(x):
+        return max(32, int(round(float(x) / 32.0)) * 32)
+    try:
+        pr = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                             "-show_entries", "stream=width,height", "-of", "csv=p=0", video_path],
+                            capture_output=True, text=True, timeout=30)
+        sw, sh = (int(v) for v in (pr.stdout or "").strip().split(",")[:2])
+    except Exception:                                          # noqa: BLE001
+        return video_path                                      # non probeable → lascia decidere alla pipeline
+    if width and height:
+        tw, th = _r32(width), _r32(height)
+    else:                                                      # nessun target → cap lato lungo a 768
+        cap = 768
+        if max(sw, sh) <= cap:
+            return video_path
+        scale = cap / float(max(sw, sh))
+        tw, th = _r32(sw * scale), _r32(sh * scale)
+    if sw <= tw and sh <= th:
+        return video_path                                      # già abbastanza piccolo
+    out = os.path.join(tempfile.gettempdir(), "ltx_retake_src.mp4")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", video_path, "-vf", f"scale={tw}:{th}",
+                    "-an", out], capture_output=True, timeout=180)
+    if os.path.exists(out):
+        print(f"[retake] sorgente {sw}x{sh} → {tw}x{th} (anti-OOM image_conditioner)", flush=True)
+        return out
+    return video_path
+
+
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
@@ -659,8 +695,14 @@ def run_generation(p: dict) -> str:
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
     elif ptype == "retake":                                  # #24 ReTake: rigenera [start,end] di un video sorgente
         print(f"[retake] {p['video_path']} sezione [{p.get('start_time',0)},{p.get('end_time',0)}]s", flush=True)
+        _rt_src = _prep_retake_source(p["video_path"], p.get("width"), p.get("height"))
+        # #24 anti-OOM 32GB: il retake carica un encoder extra su GPU (image_conditioner) col transformer
+        # già in memoria → picco al limite. Deframmenta prima (expandable_segments + empty_cache) per dare
+        # spazio contiguo all'encoder ed evitare l'OOM flaky al bordo dei 32GB.
+        import gc as _gc
+        _gc.collect(); torch.cuda.empty_cache()
         video, audio = pipe(
-            video_path=p["video_path"], prompt=p.get("prompt", ""),
+            video_path=_rt_src, prompt=p.get("prompt", ""),
             start_time=float(p.get("start_time", 0.0)), end_time=float(p.get("end_time", 0.0)),
             seed=int(p.get("seed", 42)), negative_prompt=p.get("negative", "worst quality, blurry"),
             num_inference_steps=int(p.get("steps", 40)), video_guider_params=vg,
