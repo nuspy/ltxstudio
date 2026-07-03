@@ -162,3 +162,11 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - **#89 Audio nel video t2v/i2v**: il motore comfy-native generava audio solo in a2v; ora gate
   (audio_path OR generate_audio=True) crea l'empty audio latent + concat + mux AAC. **Validato LIVE**:
   test_audio_t2v.mp4 → stream 0 h264 + stream 1 aac. Commit bc8b290. ✅
+
+## Sessione 03/07 — loop #14/#24/#7/#8/#27 (backend reale, GPU pulita)
+- **#14 FLUX.2 Klein inpaint** (flux2_inpaint NSFW): LIVE success 244s (fix check-encoder shardato 7b20f04). kontext funzionale ma memory-bound su 32GB. ✅
+- **#24 video editing**: controlnet 91s · retake 75s · keyframe 87s · extend 67s (5s video). ✅
+- **#7 v2v-edit** (edit-anything LoRA rank128): LIVE 435s. ✅
+- **#8 qualità video**: RIFE fps (24→60) 3s · upscale ESRGAN 68s · restauro volti GFPGAN 4s (installato gfpgan+modello 333MB). ✅
+- **#27**: SD3 abortito, conversione modelli già fatta, prompt-enhance funzionale (available()=True). ✅
+- NOTA PERF: le lentezze osservate (video 10s→1h, keyframe 18min iniziale) erano SEMPRE contesa GPU da worker orfani (worker non ucciso alla chiusura GUI → #91), NON il codice: su GPU pulita tutto è ~1-2 min.
