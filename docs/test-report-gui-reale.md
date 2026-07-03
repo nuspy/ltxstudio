@@ -170,3 +170,9 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - **#8 qualità video**: RIFE fps (24→60) 3s · upscale ESRGAN 68s · restauro volti GFPGAN 4s (installato gfpgan+modello 333MB). ✅
 - **#27**: SD3 abortito, conversione modelli già fatta, prompt-enhance funzionale (available()=True). ✅
 - NOTA PERF: le lentezze osservate (video 10s→1h, keyframe 18min iniziale) erano SEMPRE contesa GPU da worker orfani (worker non ucciso alla chiusura GUI → #91), NON il codice: su GPU pulita tutto è ~1-2 min.
+
+## Sessione 03/07 — loop #83/#51/#91/#90 (wiring + fix)
+- **#83 wiring**: 7/7 casi Spy rappresentativi PASS (audio/music/video/vedit/restore/frame1/controlnet). ✅
+- **#51**: rimossa ultima dipendenza ComfyUI ATTIVA (cosyvoice2 fallback → errore nativo). Runtime zero-comfy. Purge fisico dead-code deferito post-lancio. ✅(runtime)
+- **#91**: kill worker/subprocesso alla chiusura GUI (taskkill /T albero) — validato: uccide padre+figlio venv-shim. ✅
+- **#90 preview video**: LIVE — FASI ('Caricamento componenti…'→'Generazione…'→'Decodifica…') ✅ + barra credibile (step 1..16) ✅. Preview-IMMAGINE: OK per foto; per VIDEO bloccata dal latent format LTXAV (audio-video, rgb_factors=None) → enhancement separata (patch tentata rompeva la gen, revocata). ✅(fasi+barra) ⚠️(immagine video)
