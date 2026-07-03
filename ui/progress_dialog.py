@@ -147,6 +147,11 @@ class GenProgressDialog(QDialog):
                                               Qt.KeepAspectRatio,
                                               Qt.SmoothTransformation))
 
+    def on_native_message(self, msg: str):
+        """Fase corrente del backend nativo (es. 'Caricamento componenti…', 'Generazione…')."""
+        if msg:
+            self.status_lbl.setText(msg)
+
     def on_native_step(self, step: int, total: int):
         """Progresso per il backend NATIVO (immagini/video): step/total REALI del denoising → barra
         credibile (entrambe le barre = step/total), senza dipendere dai pesi-nodo ComfyUI. Il totale

@@ -12,7 +12,13 @@ from __future__ import annotations
 import threading
 
 _lock = threading.Lock()
-_latest = {"step": 0, "total": 0, "png_seq": 0, "png": b""}
+_latest = {"step": 0, "total": 0, "png_seq": 0, "png": b"", "msg": ""}
+
+
+def set_message(msg: str) -> None:
+    """Fase corrente (es. 'Caricamento componenti…', 'Generazione…', 'Decodifica…')."""
+    with _lock:
+        _latest["msg"] = str(msg or "")
 
 
 def set_progress(step: int, total: int) -> None:
@@ -41,4 +47,4 @@ def get_preview() -> dict:
 def reset() -> None:
     """Azzera all'inizio di un nuovo job (niente anteprima/progresso del job precedente)."""
     with _lock:
-        _latest.update(step=0, total=0, png_seq=0, png=b"")
+        _latest.update(step=0, total=0, png_seq=0, png=b"", msg="")

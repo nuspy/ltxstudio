@@ -54,6 +54,7 @@ def _worker():
             continue
         job["status"] = "running"
         preview_bus.reset()                                 # azzera l'anteprima del job precedente
+        preview_bus.set_message("Caricamento componenti…")  # fase iniziale (finché il backend non aggiorna)
         try:
             handler = HANDLERS[job["module"]]
             res = handler(job["params"], MM, OUTPUT_DIR)
@@ -89,10 +90,12 @@ def preview():
     """Progresso + ultima anteprima per-step del job in corso. Header X-Preview-Step/Total (SEMPRE,
     barra credibile) + X-Preview-PngSeq (cresce quando c'è un nuovo PNG). Body = PNG (vuoto se non
     ancora disponibile ma il progresso è comunque negli header → 200 con body vuoto)."""
+    import urllib.parse
     p = preview_bus.get_preview()
     return Response(content=p.get("png") or b"", media_type="image/png",
                     headers={"X-Preview-PngSeq": str(p["png_seq"]), "X-Preview-Step": str(p["step"]),
-                             "X-Preview-Total": str(p["total"])})
+                             "X-Preview-Total": str(p["total"]),
+                             "X-Preview-Msg": urllib.parse.quote(p.get("msg", ""))})
 
 
 @app.get("/system_stats")

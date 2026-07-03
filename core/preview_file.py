@@ -40,12 +40,7 @@ def _read_meta() -> dict:
         return {}
 
 
-def write_progress(step: int, total: int) -> None:
-    """Aggiorna solo il progresso (ogni step)."""
-    _ensure()
-    m = _read_meta()
-    m.update(step=int(step), total=int(total))
-    m.setdefault("png_seq", 0)
+def _write_meta(m: dict) -> None:
     try:
         tmp = _META + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
@@ -53,6 +48,24 @@ def write_progress(step: int, total: int) -> None:
         os.replace(tmp, _META)
     except OSError:
         pass
+
+
+def write_message(msg: str) -> None:
+    """Fase corrente (es. 'Caricamento componenti…', 'Generazione…')."""
+    _ensure()
+    m = _read_meta()
+    m["msg"] = str(msg or "")
+    m.setdefault("png_seq", 0)
+    _write_meta(m)
+
+
+def write_progress(step: int, total: int) -> None:
+    """Aggiorna solo il progresso (ogni step)."""
+    _ensure()
+    m = _read_meta()
+    m.update(step=int(step), total=int(total))
+    m.setdefault("png_seq", 0)
+    _write_meta(m)
 
 
 def write_preview(png: bytes, step: int, total: int) -> None:

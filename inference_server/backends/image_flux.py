@@ -599,11 +599,14 @@ def _make_preview_cb(arch, width, height, steps):
 def run(params: dict, mm, output_dir: str) -> dict:
     import torch
     from PIL import Image
+    from inference_server import preview_bus
     arch = _arch_of(params)
     model = params["model"]
     key = register(mm, model, arch)
+    preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
     pipe = mm.ensure(key, need_mb=VRAM_MB.get(arch, 16000))
     mm.apply_loras(pipe, params.get("loras"))
+    preview_bus.set_message("Generazione…")
 
     # Face adapter PuLID (identità del volto da una foto) — FLUX/kontext
     _pulid_h = None
@@ -690,6 +693,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         if _pulid_h:
             from core import pulid_adapter
             pulid_adapter.detach(_pulid_h)
+    preview_bus.set_message("Decodifica e salvataggio…")
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_{arch}_{params.get('seed', 0)}.png")
     res_img = out.images[0]

@@ -133,6 +133,7 @@ def run(p: dict) -> str:
         try:
             from core import preview_file
             preview_file.reset()
+            preview_file.write_message("Caricamento componenti…")
             _setup_preview_hook()
         except Exception:                                   # noqa: BLE001
             pass
@@ -282,12 +283,22 @@ def run(p: dict) -> str:
     sigmas = _unwrap(LTXVScheduler().execute(int(p.get("steps", 30)), 2.05, 0.95, True, 0.1, latent))
     noise = _unwrap(RandomNoise().execute(int(p.get("seed", 42))))
 
+    try:
+        from core import preview_file as _pf
+        _pf.write_message("Generazione…")
+    except Exception:                                       # noqa: BLE001
+        _pf = None
     tg = time.time()
     out = SamplerCustomAdvanced().execute(noise, guider, sampler, sigmas, latent)
     denoised = out[1] if isinstance(out, tuple) and len(out) > 1 else _unwrap(out)
     if not isinstance(denoised, dict):
         denoised = {"samples": getattr(denoised, "samples", denoised)}
     print(f"[gen] {time.time()-tg:.0f}s", flush=True)
+    if _pf is not None:
+        try:
+            _pf.write_message("Decodifica e salvataggio…")
+        except Exception:                                   # noqa: BLE001
+            pass
 
     if av_mode:                                          # a2v: separa video/audio, decodifica entrambi, muxa
         from comfy_extras.nodes_lt import LTXVSeparateAVLatent

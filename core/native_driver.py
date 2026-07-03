@@ -60,10 +60,12 @@ def preview() -> dict | None:
         req = urllib.request.Request(BASE + "/preview")
         with urllib.request.urlopen(req, timeout=3) as r:
             data = r.read()
+            import urllib.parse
             return {"png": data,
                     "png_seq": int(r.headers.get("X-Preview-PngSeq", "0")),
                     "step": int(r.headers.get("X-Preview-Step", "0")),
-                    "total": int(r.headers.get("X-Preview-Total", "0"))}
+                    "total": int(r.headers.get("X-Preview-Total", "0")),
+                    "msg": urllib.parse.unquote(r.headers.get("X-Preview-Msg", ""))}
     except Exception:                                       # noqa: BLE001
         return None
 

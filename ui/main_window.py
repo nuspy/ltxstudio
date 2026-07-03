@@ -2065,7 +2065,12 @@ class MainWindow(QMainWindow):
             self._native_prev_src = source
             self._native_prev_dlg.start({}, title)         # prompt vuoto: non serve la pesatura nodi comfy
             self._native_prev_dlg.cur_bar.setRange(0, 0)   # "busy" finché non arriva il primo step
+            self._native_prev_dlg.on_native_message(tr("progress.step_load_model", "Caricamento componenti…"))
             self._native_prev_timer.start(250)
+            # forza il RENDER IMMEDIATO della finestra (altrimenti l'event loop la disegna in ritardo,
+            # dando l'impressione che "appaia alla fine")
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
         except Exception as e:                              # noqa: BLE001
             self._log(f"[preview] non disponibile: {e}")
 
@@ -2077,8 +2082,11 @@ class MainWindow(QMainWindow):
                 m = preview_file.read()
                 if not m:
                     return
-                if m.get("total"):
-                    self._native_prev_dlg.on_native_step(m.get("step", 0), m["total"])
+                # fase (caricamento/generazione) finché non parte il sampling; poi step X/Y
+                if m.get("step", 0) and m.get("total"):
+                    self._native_prev_dlg.on_native_step(m["step"], m["total"])
+                elif m.get("msg"):
+                    self._native_prev_dlg.on_native_message(m["msg"])
                 if m.get("png_seq", 0) != getattr(self, "_native_prev_seq", -1):
                     png = preview_file.read_png()
                     if png:
@@ -2089,9 +2097,11 @@ class MainWindow(QMainWindow):
             p = native_driver.preview()
             if not p:
                 return
-            # barra credibile: aggiorna il progresso ad ogni poll (step/total reali)
-            if p.get("total"):
-                self._native_prev_dlg.on_native_step(p.get("step", 0), p["total"])
+            # fase (caricamento…) finché step==0; poi barra credibile step/total
+            if p.get("step", 0) and p.get("total"):
+                self._native_prev_dlg.on_native_step(p["step"], p["total"])
+            elif p.get("msg"):
+                self._native_prev_dlg.on_native_message(p["msg"])
             # ridisegna l'anteprima solo quando c'è un PNG nuovo
             if p.get("png") and p.get("png_seq", 0) != getattr(self, "_native_prev_seq", -1):
                 self._native_prev_seq = p["png_seq"]
