@@ -79,8 +79,9 @@ def register(app: FastAPI):
     def rig(req: RigReq):
         def fn(job):
             from core import rig_service as rs
-            if rs.preflight():
-                raise RuntimeError("; ".join(rs.preflight()))
+            _errs = rs.preflight(req.mesh_path)             # preflight richiede il mesh_path
+            if _errs:
+                raise RuntimeError("; ".join(_errs))
             j = rs.make_job(req.mesh_path, req.name, template=req.template,
                             file_format=req.file_format, on_log=job.log)
             j.run()
