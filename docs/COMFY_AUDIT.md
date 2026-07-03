@@ -58,3 +58,14 @@ Con backend_config tutto "native" NON sono nel percorso runtime, ma restano nel 
 ## Task generati
 - Rendere nativo il voice cloning (A1) → in corso (Handy + scelta GUI).
 - Pulizia finale rami/moduli comfy legacy (B/C) dopo validazione live #43 → Task dedicato.
+
+---
+# AGGIORNAMENTO 03/07 — A1 RISOLTO: zero dipendenze ComfyUI ATTIVE
+- **tts_engine (A1)**: cosyvoice2 NON ricade più su ComfyUI (`_synthesize_comfy`). Se il nativo non è
+  installato → errore chiaro con hint, invece del fallback comfy. `_synthesize_comfy` ora è DEAD CODE
+  (0 chiamanti). Gli altri motori cloning (f5tts/xtts2/fish/vibevoice) erano già 100% nativi (#69).
+- **Stato**: nessuna chiamata ComfyUI nel percorso runtime (backend tutto-native). Confermato via grep.
+- **Residuo = solo DEAD CODE** (B/C dell'audit: template_engine, *_pipeline.py, comfy_driver, video_ltx,
+  _synthesize_comfy) raggiungibile SOLO se backend.is_native()=False (mai, con backend_config native).
+- **Purge fisico**: refactor accoppiato (driver+engine+~12 pipeline+rami else in main_window) → da fare
+  come PASS DEDICATO post-lancio con re-test live di ogni feature, NON nel loop autonomo. Rischio alto.

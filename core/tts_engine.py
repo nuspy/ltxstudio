@@ -607,9 +607,14 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
                 f = find_latest_audio() if "find_latest_audio" in globals() else None
                 if f:
                     return Path(f)
-        except Exception:                                  # noqa: BLE001
-            pass
-        return _synthesize_comfy(engine, voice, text, out)  # fallback originale
+        except Exception as _e:                            # noqa: BLE001
+            raise RuntimeError(f"CosyVoice2 nativo ha fallito: {_e}") from _e
+        # #51 zero-ComfyUI: niente più fallback a ComfyUI. Se il nativo non è installato/non produce
+        # output → errore chiaro con hint d'installazione (invece del vecchio _synthesize_comfy).
+        raise RuntimeError(
+            "CosyVoice2 nativo non installato o senza campione voce: installalo "
+            "(scripts/install_cosyvoice*.py) e fornisci un sample_path, oppure usa un altro motore voce "
+            "(f5tts/xtts2/fish/vibevoice/edge/kokoro).")
     if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # NATIVI (venv isolati, zero ComfyUI)
         return _synthesize_native_clone(engine, voice, clean, out)
     raise RuntimeError(f"Engine TTS sconosciuto: {engine}")
