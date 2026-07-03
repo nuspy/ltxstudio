@@ -271,7 +271,11 @@ def _assemble_flux2_klein(Pipe, transformer_path: str):
     cfg = klein_config_from_header(transformer_path)
     jad = cfg["joint_attention_dim"]
     qdir = KLEIN_QWEN_DIRS.get(jad)
-    if not qdir or not os.path.exists(os.path.join(qdir, "model.safetensors")):
+    # l'encoder può essere single-file (model.safetensors) O SHARDATO (model.safetensors.index.json +
+    # model-0000X-of-0000N.safetensors) — Qwen3-8B è shardato. from_pretrained gestisce entrambi.
+    _te_present = bool(qdir) and (os.path.exists(os.path.join(qdir, "model.safetensors"))
+                                  or os.path.exists(os.path.join(qdir, "model.safetensors.index.json")))
+    if not _te_present:
         need = {7680: "Qwen3-4B", 12288: "Qwen3-8B"}.get(jad, f"Qwen3 (jad={jad})")
         raise RuntimeError(
             f"FLUX.2 Klein richiede l'encoder {need} in '{qdir}'. Manca su disco: scaricalo "
