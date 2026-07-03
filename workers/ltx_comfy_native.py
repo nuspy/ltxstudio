@@ -1,4 +1,4 @@
-"""Motore video LTX-2.3 che usa il LOADER + MEMORY-MANAGEMENT di ComfyUI come LIBRERIA (no server/UI).
+r"""Motore video LTX-2.3 che usa il LOADER + MEMORY-MANAGEMENT di ComfyUI come LIBRERIA (no server/UI).
 
 Il memory-management di ComfyUI regola la VRAM DINAMICAMENTE: su 32GB tiene il transformer in VRAM
 (massima velocità + qualità), offloada per-blocco solo se necessario. fp8-native, niente upcast.
@@ -42,6 +42,42 @@ for _folder, _path in (("diffusion_models", r"E:\AI\Models\diffusion_models"),
         folder_paths.add_model_folder_path(_folder, _path)
     except Exception:  # noqa: BLE001
         pass
+
+# repo LTX Studio in sys.path → import di core.preview_file (canale anteprima video su file)
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO not in sys.path:
+    sys.path.append(_REPO)
+
+
+def _setup_preview_hook():
+    """PREVIEW LIVE per-step (task #90): abilita il previewer latent2rgb di ComfyUI e aggancia l'hook
+    globale del ProgressBar → scrive progresso (ogni step) + anteprima (PNG) su core.preview_file, che
+    la GUI polla. Best-effort: qualunque errore NON deve rompere la generazione."""
+    try:
+        import io
+        import comfy.utils
+        from comfy.cli_args import args as _ca, LatentPreviewMethod
+        from core import preview_file
+        # abilita il calcolo dell'anteprima (latent2rgb: leggero, built-in, nessun modello extra)
+        try:
+            _ca.preview_method = LatentPreviewMethod.Latent2RGB
+        except Exception:                                   # noqa: BLE001
+            pass
+
+        def _hook(current, total, preview=None, node_id=None):
+            try:
+                if preview is not None:
+                    # ComfyUI passa ("JPEG", PIL.Image, max_size) oppure una PIL.Image
+                    img = preview[1] if isinstance(preview, (list, tuple)) and len(preview) > 1 else preview
+                    if hasattr(img, "save"):
+                        buf = io.BytesIO(); img.save(buf, "PNG")
+                        preview_file.write_preview(buf.getvalue(), current, total); return
+                preview_file.write_progress(current, total)
+            except Exception:                               # noqa: BLE001
+                pass
+        comfy.utils.set_progress_bar_global_hook(_hook)
+    except Exception as _e:                                 # noqa: BLE001
+        print(f"[preview] hook non attivato: {_e}", flush=True)
 
 
 def _vals(x):
@@ -91,6 +127,15 @@ def run(p: dict) -> str:
         BasicGuider, CFGGuider, KSamplerSelect, RandomNoise, SamplerCustomAdvanced)
     from comfy_extras.nodes_lt import EmptyLTXVLatentVideo, LTXVScheduler
 
+    # PREVIEW LIVE per-step (task #90): azzera lo stato e aggancia l'hook (progresso + anteprima → file
+    # che la GUI polla). Disattivabile con preview=False. Best-effort.
+    if p.get("preview", True):
+        try:
+            from core import preview_file
+            preview_file.reset()
+            _setup_preview_hook()
+        except Exception:                                   # noqa: BLE001
+            pass
     t0 = time.time()
     _mname = p.get("model", "LTXVideo/v2/ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors")
     if str(_mname).lower().endswith(".gguf"):            # GGUF (schede piccole): loader ComfyUI-GGUF

@@ -567,7 +567,14 @@ def _make_preview_cb(arch, width, height, steps):
     every = max(1, int(steps) // 8)
 
     def _cb(pp, step, timestep, cbk):
+        from inference_server import preview_bus
+        # progresso ad OGNI step (leggerissimo) → barra credibile
         try:
+            preview_bus.set_progress(step + 1, int(steps))
+        except Exception:                                    # noqa: BLE001
+            pass
+        try:
+            # anteprima (decode latent2rgb) ogni ~1/8 degli step e all'ultimo
             if step % every != 0 and step != int(steps) - 1:
                 return cbk
             lat = cbk.get("latents")
@@ -581,7 +588,6 @@ def _make_preview_cb(arch, width, height, steps):
                 img = _latent_to_pil(l, arch)
                 img.thumbnail((384, 384))
                 buf = io.BytesIO(); img.save(buf, "PNG")
-                from inference_server import preview_bus
                 preview_bus.set_preview(buf.getvalue(), step + 1, int(steps))
         except Exception:                                    # noqa: BLE001
             pass                                             # preview best-effort

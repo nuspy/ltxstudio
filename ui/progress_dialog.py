@@ -147,6 +147,19 @@ class GenProgressDialog(QDialog):
                                               Qt.KeepAspectRatio,
                                               Qt.SmoothTransformation))
 
+    def on_native_step(self, step: int, total: int):
+        """Progresso per il backend NATIVO (immagini/video): step/total REALI del denoising → barra
+        credibile (entrambe le barre = step/total), senza dipendere dai pesi-nodo ComfyUI. Il totale
+        avanza monotòno; a step==total resta a 99 finché arriva finish() (decode/salvataggio)."""
+        if total <= 0:
+            return
+        step = max(0, min(int(step), int(total)))
+        self.cur_bar.setRange(0, total); self.cur_bar.setValue(step)
+        pct = int(100 * step / total)
+        self.tot_bar.setValue(max(self.tot_bar.value(), min(99, pct)))
+        self.status_lbl.setText(tr("progress.step_sampling") +
+                                tr("progress.step_counter").format(value=step, maximum=total))
+
     def resizeEvent(self, event):
         # Mantieni l'anteprima nitida quando l'utente ridimensiona il dialog.
         super().resizeEvent(event)

@@ -2050,10 +2050,10 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, tr("mw.gen_error_title"), str(e)); self._log(f"[ERR] gen: {e}")
 
     # ── Preview live per-step (backend nativo) — task #88 ────────────────────────────────────────
-    def _start_native_preview(self, title: str):
-        """Apre la finestra di anteprima LIVE che mostra il latente in evoluzione ad ogni step
-        (polling di GET /preview su :8189), prima del dialog finale di accettazione. Best-effort:
-        se qualcosa va storto NON deve bloccare la generazione."""
+    def _start_native_preview(self, title: str, source: str = "image"):
+        """Apre SUBITO la finestra di anteprima LIVE (progresso per-step + immagine del passo appena
+        completato), prima del dialog finale. source='image' → polling HTTP /preview (:8189);
+        'video' → polling del file core.preview_file (i worker video sono sottoprocessi). Best-effort."""
         try:
             from ui.progress_dialog import GenProgressDialog
             from PySide6.QtCore import QTimer
@@ -2062,21 +2062,40 @@ class MainWindow(QMainWindow):
                 self._native_prev_timer = QTimer(self)
                 self._native_prev_timer.timeout.connect(self._poll_native_preview)
             self._native_prev_seq = -1
+            self._native_prev_src = source
             self._native_prev_dlg.start({}, title)         # prompt vuoto: non serve la pesatura nodi comfy
+            self._native_prev_dlg.cur_bar.setRange(0, 0)   # "busy" finché non arriva il primo step
             self._native_prev_timer.start(250)
         except Exception as e:                              # noqa: BLE001
             self._log(f"[preview] non disponibile: {e}")
 
     def _poll_native_preview(self):
         try:
+            src = getattr(self, "_native_prev_src", "image")
+            if src == "video":
+                from core import preview_file
+                m = preview_file.read()
+                if not m:
+                    return
+                if m.get("total"):
+                    self._native_prev_dlg.on_native_step(m.get("step", 0), m["total"])
+                if m.get("png_seq", 0) != getattr(self, "_native_prev_seq", -1):
+                    png = preview_file.read_png()
+                    if png:
+                        self._native_prev_seq = m["png_seq"]
+                        self._native_prev_dlg.on_preview(png)
+                return
             from core import native_driver
             p = native_driver.preview()
-            if not p or p.get("seq", 0) == getattr(self, "_native_prev_seq", -1):
+            if not p:
                 return
-            self._native_prev_seq = p["seq"]
-            self._native_prev_dlg.on_preview(p["png"])
+            # barra credibile: aggiorna il progresso ad ogni poll (step/total reali)
             if p.get("total"):
-                self._native_prev_dlg.on_progress(p.get("step", 0), p["total"])
+                self._native_prev_dlg.on_native_step(p.get("step", 0), p["total"])
+            # ridisegna l'anteprima solo quando c'è un PNG nuovo
+            if p.get("png") and p.get("png_seq", 0) != getattr(self, "_native_prev_seq", -1):
+                self._native_prev_seq = p["png_seq"]
+                self._native_prev_dlg.on_preview(p["png"])
         except Exception:                                  # noqa: BLE001
             pass
 
@@ -2221,6 +2240,7 @@ class MainWindow(QMainWindow):
         if _engine == "comfy" and _simple:
             self._log("[motore] comfy-native (VRAM dinamica, no-OOM)")
             self._ltx2_worker = _VideoComfyWorker(params)
+            self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
             self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done)
             return
         if _engine == "comfy":
@@ -2420,6 +2440,7 @@ class MainWindow(QMainWindow):
                       on_progress=lambda s: self._log("[lip-sync] " + s))
 
     def _on_multitalk_done(self, res: dict):
+        self._stop_native_preview()
         # Handler condiviso di TUTTI i video nativi (t2v/i2v/a2v/retake/controlnet), non solo MultiTalk:
         # etichetta generica "[video]" per non confondere (un t2v fallito non è un errore MultiTalk).
         if res.get("status") != "success":

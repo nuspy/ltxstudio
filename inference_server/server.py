@@ -86,13 +86,12 @@ def history(jid: str):
 
 @app.get("/preview")
 def preview():
-    """Ultima anteprima per-step del job in corso (PNG). 204 se non ancora disponibile.
-    Header X-Preview-Seq/Step/Total per il polling incrementale della GUI."""
+    """Progresso + ultima anteprima per-step del job in corso. Header X-Preview-Step/Total (SEMPRE,
+    barra credibile) + X-Preview-PngSeq (cresce quando c'è un nuovo PNG). Body = PNG (vuoto se non
+    ancora disponibile ma il progresso è comunque negli header → 200 con body vuoto)."""
     p = preview_bus.get_preview()
-    if not p.get("png"):
-        return Response(status_code=204)
-    return Response(content=p["png"], media_type="image/png",
-                    headers={"X-Preview-Seq": str(p["seq"]), "X-Preview-Step": str(p["step"]),
+    return Response(content=p.get("png") or b"", media_type="image/png",
+                    headers={"X-Preview-PngSeq": str(p["png_seq"]), "X-Preview-Step": str(p["step"]),
                              "X-Preview-Total": str(p["total"])})
 
 
