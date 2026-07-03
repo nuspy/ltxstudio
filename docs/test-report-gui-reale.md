@@ -176,3 +176,7 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 - **#51**: rimossa ultima dipendenza ComfyUI ATTIVA (cosyvoice2 fallback → errore nativo). Runtime zero-comfy. Purge fisico dead-code deferito post-lancio. ✅(runtime)
 - **#91**: kill worker/subprocesso alla chiusura GUI (taskkill /T albero) — validato: uccide padre+figlio venv-shim. ✅
 - **#90 preview video**: LIVE — FASI ('Caricamento componenti…'→'Generazione…'→'Decodifica…') ✅ + barra credibile (step 1..16) ✅. Preview-IMMAGINE: OK per foto; per VIDEO bloccata dal latent format LTXAV (audio-video, rgb_factors=None) → enhancement separata (patch tentata rompeva la gen, revocata). ✅(fasi+barra) ⚠️(immagine video)
+
+## Sessione 04/07 — #90 (video) + #87 (API endpoint)
+- **#90 video preview**: fasi+barra LIVE ok; preview-IMMAGINE video BLOCCATA (latente LTX-2.3 tokenizzato, previewer LTXV crasha 45312x1 vs 128x3, rompe la gen) → revert sicuro bd151cf, decode custom = task #92.
+- **#87 API :8200**: health/segment/rife/tts(edge)/film-script/rig ✅ (fix rig preflight 3f17d86). world: API ok, WorldGen non produce output → task #93. sonify/MMAudio non installato 🔒.
