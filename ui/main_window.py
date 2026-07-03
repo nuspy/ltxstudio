@@ -101,6 +101,33 @@ class ComfyBridge(QObject):
     executing = Signal(str)
 
 
+def _kill_proc_tree(proc):
+    """#91: termina un subprocess Popen E I SUOI FIGLI (anti-orfano VRAM). Necessario perché i worker
+    video (ltx2_infer/comfy) lanciano un python-venv che è padre dell'interprete reale: terminare solo
+    il padre lascerebbe il figlio a calcolare e a tenere la VRAM. Windows → taskkill /T /F (albero)."""
+    if proc is None:
+        return
+    try:
+        if proc.poll() is not None:                         # già terminato
+            return
+    except Exception:                                       # noqa: BLE001
+        return
+    import sys as _sys, subprocess as _sp
+    if _sys.platform == "win32":
+        try:
+            _sp.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, timeout=10)
+            return
+        except Exception:                                   # noqa: BLE001
+            pass
+    try:
+        proc.terminate(); proc.wait(timeout=5)
+    except Exception:                                       # noqa: BLE001
+        try:
+            proc.kill()
+        except Exception:                                   # noqa: BLE001
+            pass
+
+
 class _NativeImageWorker(QThread):
     """Esegue una generazione immagine sul backend NATIVO (InferenceServer) fuori dal thread UI."""
     done = Signal(dict)
@@ -133,6 +160,10 @@ class _VideoComfyWorker(QThread):
     def __init__(self, params: dict):
         super().__init__()
         self.params = params
+        self.proc = None                                    # #91: subprocess, per terminarlo alla chiusura
+
+    def stop(self):
+        _kill_proc_tree(getattr(self, "proc", None))
 
     def run(self):
         try:
@@ -266,6 +297,7 @@ class _NativeMultiTalkWorker(QThread):
             _json.dump(self.params, jf); jf.close()
             proc = _sp.Popen([self.COMFY_PY, "-u", worker, jf.name],
                              stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
+            self.proc = proc                                # #91: esposto per stop() alla chiusura
             out_path = None
             for line in proc.stdout:
                 line = line.rstrip()
@@ -339,6 +371,11 @@ class _NativeLtx2Worker(QThread):
     def __init__(self, params: dict):
         super().__init__()
         self.params = params
+        self.proc = None                                    # #91: subprocess, per terminarlo alla chiusura
+
+    def stop(self):
+        """#91: termina il subprocess del worker (anti-orfano VRAM). Windows: kill dell'albero."""
+        _kill_proc_tree(getattr(self, "proc", None))
 
     def run(self):
         import json as _json, os as _os, subprocess as _sp, tempfile as _tf
@@ -365,6 +402,7 @@ class _NativeLtx2Worker(QThread):
             env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
             proc = _sp.Popen([self.LTX2_PY, "-u", worker, jf.name], env=env,
                              stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
+            self.proc = proc                                # #91: esposto per stop() alla chiusura
             out_path = None
             for line in proc.stdout:
                 line = line.rstrip()
@@ -909,9 +947,39 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+    def _stop_all_workers(self):
+        """#91: alla chiusura, TERMINA i worker di generazione e i loro sottoprocessi video, altrimenti
+        restano ORFANI a calcolare e a tenere la VRAM (bug osservato: GPU al 100% a finestra chiusa)."""
+        # worker video con subprocess (ltx2_infer / comfy-native)
+        seen = set()
+        cands = [getattr(self, "_ltx2_worker", None), getattr(self, "_native_worker", None)]
+        try:                                                # worker attualmente in coda
+            run = getattr(getattr(self, "jobs", None), "_running", None)
+            if run is not None:
+                cands.append(getattr(run, "worker", None))
+        except Exception:                                   # noqa: BLE001
+            pass
+        for w in cands:
+            if w is None or id(w) in seen:
+                continue
+            seen.add(id(w))
+            try:
+                if hasattr(w, "stop"):
+                    w.stop()                                # termina il subprocess (albero)
+            except Exception:                               # noqa: BLE001
+                pass
+            try:
+                if hasattr(w, "isRunning") and w.isRunning():
+                    w.wait(3000)
+            except Exception:                               # noqa: BLE001
+                pass
+
     def closeEvent(self, event):
-        """Salva lo stato di tutti i controlli GUI alla chiusura (così al riavvio si ritrova
-        com'era). Generico: copre automaticamente i campi nuovi senza manutenzione."""
+        """Salva lo stato dei controlli GUI + TERMINA i worker/sottoprocessi (anti-orfano VRAM, #91)."""
+        try:
+            self._stop_all_workers()
+        except Exception:                                   # noqa: BLE001
+            pass
         try:
             gui_state.store(self)
         except Exception:
