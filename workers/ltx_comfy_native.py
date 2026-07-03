@@ -63,10 +63,11 @@ def _setup_preview_hook():
             _ca.preview_method = LatentPreviewMethod.Latent2RGB
         except Exception:                                   # noqa: BLE001
             pass
-        # NB: LTX-2.3 usa il latent format LTXAV (audio-video) con latent_rgb_factors=None → il previewer
-        # ComfyUI non produce l'IMMAGINE d'anteprima (il latente AV combinato non è direttamente
-        # latent2rgb-abile). Fasi e barra di progresso funzionano comunque via l'hook. L'anteprima-immagine
-        # per il video (estrarre i canali video dall'AV latent) è un'enhancement separata.
+        # NB: NON abilitare il previewer latent2rgb di ComfyUI per LTX-2.3: il suo latente è TOKENIZZATO
+        # (patchificato, non (C,T,H,W) a 128 canali) → il previewer LTXV va in errore
+        # (mat 45312x1 vs 128x3) e ROMPE la generazione. L'anteprima-immagine per video richiede un decode
+        # custom del latente-token (unpatchify + latent2rgb/VAE). Fasi e barra restano attive via l'hook.
+        _ = LatentPreviewMethod  # (import mantenuto)
 
         def _hook(current, total, preview=None, node_id=None):
             try:
