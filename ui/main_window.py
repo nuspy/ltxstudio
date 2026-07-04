@@ -602,12 +602,12 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.convert_tab, tr("tab.convert"))
         # Animazione / Mocap (FreeMoCap single-camera + retarget) — tab separato
         self.tabs.addTab(self.anim_tab, tr("tab.anim"))
-        # Allena LoRA (FLUX.1/FLUX.2 via ai-toolkit) — tab separato
-        self.tabs.addTab(self.train_tab, tr("tab.train", "Allena LoRA"))
-        # LoRA Video LTX-2.3 (dataset auto-generato: personaggi/oggetti/luoghi) — tab separato
-        self.tabs.addTab(self.lora_video_tab, tr("tab.lora_video", "LoRA Video"))
-        # LoRA Foto FLUX.2 (dataset immagini auto-generato) — tab separato
-        self.tabs.addTab(self.lora_image_tab, tr("tab.lora_image", "LoRA Foto"))
+        # LoRA Train Img. — dataset MANUALE (immagini + caption) FLUX.1/FLUX.2 via ai-toolkit
+        self.tabs.addTab(self.train_tab, tr("tab.train", "LoRA Train Img."))
+        # LoRA Wizard Vid. — dataset AUTO-generato da soggetti (LTX-2.3)
+        self.tabs.addTab(self.lora_video_tab, tr("tab.lora_video", "LoRA Wizard Vid."))
+        # LoRA Wizard Img. — dataset AUTO-generato da soggetti (FLUX.2)
+        self.tabs.addTab(self.lora_image_tab, tr("tab.lora_image", "LoRA Wizard Img."))
         # Musica (HeartMuLa canzoni/strumentale + MMAudio sonorizzazione) — tab separato
         self.tabs.addTab(self.music_tab, tr("tab.music", "Musica"))
         # Mondo 3D (WorldGen: scena/ambiente da foto, mesh+splat, player) — tab separato
