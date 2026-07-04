@@ -107,6 +107,14 @@ class MusicTaskPanel(QGroupBox):
     def set_engine(self, engine: str):
         self._content.setEnabled(engine == "ACE-Step")
 
+    def reset_defaults(self):
+        """Reimposta il task a generazione normale + parametri ai default."""
+        self.task.setCurrentIndex(0)                         # text2music
+        self.src.setPath(""); self.variance.setValue(0.5)
+        self.r_start.setValue(0.0); self.r_end.setValue(0.0)
+        self.e_prompt.clear(); self.e_lyrics.clear(); self.strength.setValue(0.5)
+        self.setChecked(False)
+
     def get_task(self) -> dict:
         """dict per make_job(adv=...). Vuoto se generazione normale."""
         t = self.task.currentData()

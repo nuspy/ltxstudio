@@ -154,6 +154,16 @@ class MusicAdvanced(QGroupBox):
         self._content.setEnabled(is_ace)
         self.note.setVisible(not is_ace)
 
+    def reset_defaults(self):
+        """Reimposta tutti i controlli avanzati ai valori ottimali."""
+        self.scheduler.setCurrentText("euler"); self.cfg_type.setCurrentText("apg")
+        self.omega.setValue(10.0); self.g_interval.setValue(0.5); self.g_decay.setValue(0.0); self.min_g.setValue(3.0)
+        self.erg_tag.setChecked(True); self.erg_lyric.setChecked(True); self.erg_diff.setChecked(True)
+        self.fmt.setCurrentText("wav"); self.seed.clear(); self.batch.setValue(1)
+        self.quantized.setChecked(False); self.overlap.setChecked(False); self.compile.setChecked(False)
+        self.lora.setPath(""); self.lora_w.setValue(1.0)
+        self.setChecked(False)                               # richiudi la sezione
+
     def get_adv(self) -> dict:
         """Dizionario opzioni per acestep_service.make_job(adv=...). Solo i valori diversi dal default."""
         adv = {

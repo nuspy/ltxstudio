@@ -159,6 +159,13 @@ class MusicTab(QWidget):
         g.addWidget(self.lbl_adherence, 3, 2); g.addWidget(self.song_adherence, 3, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
         v.addLayout(g)
+        # ↺ Reset ai valori ottimali del modello selezionato
+        _rr = QHBoxLayout(); _rr.addStretch(1)
+        self.btn_reset = QPushButton(tr("music.reset", "↺ Reset default"))
+        self.btn_reset.setToolTip(tr("music.reset.tt", "Reimposta tutti i parametri ai valori ottimali del modello selezionato."))
+        self.btn_reset.setCursor(Qt.PointingHandCursor); self.btn_reset.clicked.connect(self._reset_defaults)
+        _rr.addWidget(self.btn_reset)
+        v.addLayout(_rr)
         # #98 F2: sezione Avanzate ACE-Step (collassabile, disabilitata con HeartMuLa)
         from ui.widgets.music_advanced import MusicAdvanced
         self.song_adv = MusicAdvanced()
@@ -384,6 +391,17 @@ class MusicTab(QWidget):
         job = tx.make_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "train", str(tx.WORK_ROOT / tx._safe(p.exp_name)))
+
+    def _reset_defaults(self):
+        """Reimposta tutti i parametri del tab ai valori ottimali del modello selezionato."""
+        e = self.song_engine.currentText()
+        self.song_dur.setValue(120); self.song_instr.setChecked(False)
+        self.song_temp.setValue(1.0); self.song_lazy.setChecked(False)
+        self.song_adherence.setValue(3.0)
+        self._on_song_engine(e)                              # cfg/adherence/ranges + gating pannelli per engine
+        self.song_adv.reset_defaults(); self.song_task.reset_defaults()
+        self.song_adv.set_engine(e); self.song_task.set_engine(e)   # ri-applica il gating dopo il reset
+        self.status.setText(tr("music.reset.done", "Parametri reimpostati ai default di {e}").format(e=e))
 
     def _on_song_engine(self, e: str):
         """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""
