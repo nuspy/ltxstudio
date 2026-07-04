@@ -22,7 +22,7 @@ class MusicTrainerPanel(QGroupBox):
     train_requested = Signal(dict)
 
     def __init__(self):
-        super().__init__(tr("music.train.title", "🎓  Allena LoRA (ACE-Step)"))
+        super().__init__(tr("music.train.title", "🎓  Allena LoRA Musica (ACE-Step)"))
         self.setCheckable(True); self.setChecked(False)
         self._build()
 
