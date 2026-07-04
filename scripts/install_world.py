@@ -90,6 +90,31 @@ def setup_da2() -> None:
     print("[da2] submodule init + path aggiunto al venv")
 
 
+def patch_nunchaku() -> None:
+    """Il wheel Windows di nunchaku 1.0.0 ha 2 bug nel loader legacy (path Windows):
+      1) in _build_model_legacy l'argomento `filename=...` di hf_hub_download è finito DENTRO il
+         commento '# Windows backslash fix' → hf_hub_download() manca 'filename';
+      2) load_config riceve il repo id come Path con backslash → non lo riconosce come repo HF.
+    Applica entrambi i fix in modo idempotente (necessario per WorldGen low_vram = nunchaku fp4)."""
+    import glob
+    hits = glob.glob(str(SITE / "nunchaku" / "models" / "transformers" / "utils.py"))
+    if not hits:
+        print("[nunchaku] utils.py non trovato: patch saltata"); return
+    fp = Path(hits[0]); src = fp.read_text(encoding="utf-8"); orig = src
+    for fn in ("unquantized_layers.safetensors", "transformer_blocks.safetensors"):
+        bad = f'(chr(92), chr(47)),  # Windows backslash fix filename="{fn}", **download_kwargs'
+        good = f'(chr(92), chr(47)),  # Windows backslash fix\n                filename="{fn}", **download_kwargs'
+        src = src.replace(bad, good)
+    # load_config: passa il repo id come stringa slash
+    src = src.replace(
+        "config, _, _ = cls.load_config(\n            pretrained_model_name_or_path,",
+        "config, _, _ = cls.load_config(\n            str(pretrained_model_name_or_path).replace(chr(92), chr(47)),")
+    if src != orig:
+        fp.write_text(src, encoding="utf-8"); print("[nunchaku] patch loader legacy applicata")
+    else:
+        print("[nunchaku] già patchato (o pattern non trovato)")
+
+
 def main() -> int:
     py = find_py()
     if not py:
@@ -121,6 +146,8 @@ def main() -> int:
     if pip("install", NUNCHAKU_WHEEL) != 0:
         print("[!] wheel nunchaku non installato: imposta NUNCHAKU_WHEEL all'URL corretto "
               "(vedi github nunchaku-tech/nunchaku releases, cp312 win_amd64).")
+    else:
+        patch_nunchaku()                                    # fix loader legacy (path Windows)
     print("=== dipendenze WorldGen (no nunchaku/pytorch3d/xformers) ===")
     if pip("install", *DEPS) != 0:
         print("[!] alcune dipendenze non installate (vedi log).");
