@@ -153,11 +153,11 @@ class FilmStudioWindow(QWidget):
         """#54 Auto end-to-end: i video sono pronti → genera dialoghi+musica+ambient e il master."""
         self.mt_tab._refresh()
         try:
-            self.mt_tab._gen_audio()                        # dialoghi (voce legata)
-            self.mt_tab._gen_music()                        # colonna sonora (mood)
+            self.mt_tab._gen_audio()                        # dialoghi (voce legata) — sincrono
+            # #95: la musica è ASINCRONA → il master deve partire DOPO (era chiamato subito = master senza musica)
+            self.mt_tab._gen_music(then=self.mt_tab._master)
         except Exception:                                   # noqa: BLE001
-            pass
-        self.mt_tab._master()                              # master ffmpeg (video + audio multitraccia)
+            self.mt_tab._master()                          # fallback: master comunque
         self.tabs.setCurrentWidget(self.mt_tab)
 
     def _manage_projects(self):

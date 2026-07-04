@@ -253,32 +253,46 @@ class MontageTab(QWidget):
                 moods.append(st["mood"])
         return ", ".join(dict.fromkeys(moods)) or "cinematic, atmospheric"
 
-    def _gen_music(self):
-        """Colonna sonora strumentale (HeartMuLa) col mood del film → traccia musica (volume ridotto = ducking)."""
-        import time as _t
+    def _gen_music(self, then=None):
+        """Colonna sonora strumentale (HeartMuLa) col mood del film → traccia musica (volume ridotto = ducking).
+        `then`: callback opzionale eseguito DOPO che la musica è pronta (usato dall'Auto per il master)."""
         from core import music_service as ms
         pid = self._get_project()
         if not pid:
+            if then:
+                then()                                       # niente progetto: non bloccare la catena Auto
             return
         total = sum(float(c["out_s"]) for c in (self._cur_clips or [])) or 60.0
-        out = str(db.project_dir(pid) / "music.mp3")
+        dest = str(db.project_dir(pid) / "music.mp3")        # #95: copia nella cartella progetto (self-contained)
         p = ms.SongParams(name=f"fs_music_{pid}", lyrics="", tags=f"{self._film_mood()}, instrumental, soundtrack",
                           duration_s=min(total, 180), instrumental=True)
         errs = ms.preflight_song(p)
         if errs:
-            QMessageBox.warning(self, tr("fs.mt.music", "Musica"), "; ".join(errs)); return
+            QMessageBox.warning(self, tr("fs.mt.music", "Musica"), "; ".join(errs))
+            if then:
+                then()
+            return
         self.btn_music.setEnabled(False); self.info.setText(tr("fs.working", "Generazione…"))
-        self._mjob = ms.make_song_job(p, on_done=lambda rc: self._on_music(rc, p.out_mp3(), total))
+        self._mjob = ms.make_song_job(p, on_done=lambda rc: self._on_music(rc, p.out_mp3(), total, dest, then))
         self._mjob.start() if hasattr(self._mjob, "start") else None
 
-    def _on_music(self, rc, path, total):
+    def _on_music(self, rc, path, total, dest=None, then=None):
         self.btn_music.setEnabled(True)
         if os.path.exists(str(path)):
+            use = str(path)
+            if dest and str(dest) != str(path):              # #95: copia nella cartella progetto
+                try:
+                    import shutil
+                    shutil.copy2(str(path), str(dest)); use = str(dest)
+                except Exception:                            # noqa: BLE001
+                    pass
             self._extra_tracks = getattr(self, "_extra_tracks", [])
-            self._extra_tracks.append({"path": str(path), "start_s": 0, "volume": 0.3})  # ducking sotto i dialoghi
+            self._extra_tracks.append({"path": use, "start_s": 0, "volume": 0.3})  # ducking sotto i dialoghi
             self.info.setText(tr("fs.mt.music_done", "Colonna sonora pronta."))
         else:
             self.info.setText(tr("fs.mt.music_fail", "Colonna sonora non generata."))
+        if then:                                             # #95 Auto: il master parte SOLO ora (musica pronta)
+            then()
 
     def _gen_ambient(self):
         """Ambient/SFX via MMAudio sul master muto (se generato), come traccia di fondo."""

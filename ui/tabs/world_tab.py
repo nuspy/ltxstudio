@@ -223,9 +223,17 @@ class WorldTab(QWidget):
         except Exception as e:                          # noqa: BLE001
             self._log(f"[web] copia player fallita: {e}")
         # avvia un server http locale nella cartella (file:// blocca i fetch nel browser)
+        proj_str = str(proj)
+        if self._http_proc is not None and getattr(self, "_http_dir", None) != proj_str:
+            try:                                            # #95: progetto cambiato → riavvia il server sulla nuova cartella
+                self._http_proc.kill(); self._http_proc.waitForFinished(2000)
+            except Exception:                               # noqa: BLE001
+                pass
+            self._http_proc = None
         if self._http_proc is None:
             self._http_proc = QProcess(self)
-            self._http_proc.start(sys.executable, ["-m", "http.server", "8765", "--directory", str(proj)])
+            self._http_proc.start(sys.executable, ["-m", "http.server", "8765", "--directory", proj_str])
+            self._http_dir = proj_str
         target = self._cur.glb() if self._cur.glb().exists() else self._cur.splat()
         typ = "splat" if target.suffix.lower() == ".ply" else "glb"
         webbrowser.open(f"http://localhost:8765/index.html?src={target.name}&type={typ}")
