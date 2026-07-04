@@ -56,6 +56,17 @@ def is_installed_heartmula() -> bool:
     return HEARTLIB_RUN.exists() and HEARTLIB_VENV_PY.exists() and HEARTLIB_CKPT.exists()
 
 
+def available_heartmula_versions() -> list[str]:
+    """Versioni HeartMuLa (es. 3B, 7B) REALMENTE scaricate in ckpt (cartelle HeartMuLa-oss-<ver>)."""
+    if not HEARTLIB_CKPT.exists():
+        return []
+    vers = []
+    for d in sorted(HEARTLIB_CKPT.glob("HeartMuLa-oss-*")):
+        if d.is_dir() and any(d.iterdir()):
+            vers.append(d.name.replace("HeartMuLa-oss-", ""))
+    return vers
+
+
 def is_installed_mmaudio() -> bool:
     return MMAUDIO_DEMO.exists() and MMAUDIO_VENV_PY.exists()
 
@@ -240,6 +251,11 @@ def preflight_song(p: SongParams) -> list[str]:
     errs = []
     if not is_installed_heartmula():
         errs.append("HeartMuLa non installato: usa il pulsante d'installazione.")
+    else:
+        avail = available_heartmula_versions()
+        if avail and p.version not in avail:                # checkpoint della versione scelta assente
+            errs.append(f"Il modello HeartMuLa {p.version} non è scaricato (presenti: {', '.join(avail) or 'nessuno'}). "
+                        f"Scegli una versione disponibile o scarica {p.version} (cartella ckpt\\HeartMuLa-oss-{p.version}).")
     if not p.instrumental and not (p.lyrics or "").strip():
         errs.append("Inserisci le liriche, oppure attiva la modalità strumentale.")
     return errs

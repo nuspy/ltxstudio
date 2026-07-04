@@ -18,7 +18,7 @@ from PySide6.QtCore import QObject, Qt, Signal, QProcess, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QPushButton, QLineEdit, QCheckBox,
-    QFileDialog, QScrollArea, QPlainTextEdit, QProgressBar, QMessageBox,
+    QFileDialog, QScrollArea, QPlainTextEdit, QProgressBar, QMessageBox, QToolButton,
 )
 
 from ui.i18n_manager import tr
@@ -98,7 +98,13 @@ class MusicTab(QWidget):
         f.addRow(tr("music.name", "Nome"), self.song_name)
         self.song_tags = QLineEdit(ms.DEFAULT_TAGS)
         self.song_tags.setPlaceholderText(tr("music.tags.hint", "stile, separati da virgola: pop, allegro, voce femminile…"))
-        f.addRow(tr("music.tags", "Tag di stile"), self.song_tags)
+        _tags_row = QWidget(); _trl = QHBoxLayout(_tags_row); _trl.setContentsMargins(0, 0, 0, 0); _trl.setSpacing(4)
+        _trl.addWidget(self.song_tags, 1)
+        self.btn_tagpick = QToolButton(); self.btn_tagpick.setText("🎨")
+        self.btn_tagpick.setToolTip(tr("music.tagpicker.btn.tt", "Scegli i tag di stile dalla palette"))
+        self.btn_tagpick.setCursor(Qt.PointingHandCursor); self.btn_tagpick.clicked.connect(self._pick_tags)
+        _trl.addWidget(self.btn_tagpick)
+        f.addRow(tr("music.tags", "Tag di stile"), _tags_row)
         v.addLayout(f)
         v.addWidget(QLabel(tr("music.lyrics", "Liriche (usa sezioni [Verse], [Chorus]…)")))
         self.song_lyrics = QPlainTextEdit()
@@ -126,7 +132,7 @@ class MusicTab(QWidget):
         self.song_instr = QCheckBox(tr("music.instrumental", "Strumentale (senza voce)"))
         self.song_instr.toggled.connect(lambda on: self.song_lyrics.setDisabled(on))
         self.song_dur = QSpinBox(); self.song_dur.setRange(5, 360); self.song_dur.setValue(120); self.song_dur.setSuffix(" s")
-        self.song_ver = QComboBox(); self.song_ver.addItems(["3B", "7B"])
+        self.song_ver = QComboBox(); self.song_ver.addItems(ms.available_heartmula_versions() or ["3B"])
         # Motore di generazione: HeartMuLa (default) o ACE-Step XL 1.5 (alternativa)
         self.song_engine = QComboBox(); self.song_engine.addItems(["HeartMuLa", "ACE-Step"])
         self.song_temp = QDoubleSpinBox(); self.song_temp.setRange(0.1, 2.0); self.song_temp.setSingleStep(0.1); self.song_temp.setValue(1.0)
@@ -328,6 +334,13 @@ class MusicTab(QWidget):
                            "temperature": p.temperature, "cfg": p.cfg_scale}   # #97 sidecar
         self._start_job(ms.make_song_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                                          on_done=self._b.song_done.emit), "song", p.out_mp3())
+
+    def _pick_tags(self):
+        """Apre la palette grafica dei tag di stile e applica la selezione al campo (punto 3)."""
+        from ui.widgets.music_tags import MusicTagDialog
+        dlg = MusicTagDialog(self.song_tags.text(), engine=self.song_engine.currentText(), parent=self)
+        if dlg.exec():
+            self.song_tags.setText(dlg.result_tags())
 
     def _on_song_engine(self, e: str):
         """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""
