@@ -300,3 +300,13 @@ erano falsi positivi (verificati sul codice); ne sono emersi di **nuovi e più g
 - **trellis bg/risoluzione/precisione** — lo script nativo `trellis_generate.py` accetta SOLO seed/texture_size/decimation → gli altri richiedono di estendere lo script (o disabilitare i controlli in nativo).
 - **I4 flux2-inpaint nativo** — ramo morto: FLUX.2 Klein inpaint resta su ComfyUI (deferral intenzionale #14/#44).
 - **storyboard `_on_job` cross-thread (DA VERIFICARE)** — il callback dello scheduler muta widget Qt: confermare che lo scheduler marshalli sull'UI thread, altrimenti è HIGH.
+
+## ✅ RESIDUI ORA CHIUSI (#95 loop finale)
+- storyboard `_on_job` **cross-thread** (era HIGH) → marshalling su UI via segnale. (99f1b18)
+- world web player **server stantìo** → kill+restart per progetto. (d17b223)
+- Film Studio **music→cartella progetto** + Auto **master DOPO la musica** async. (d17b223)
+- `script_ready` connesso; train **name con timestamp** (no collisioni); `rife_ckpt` disabilitato+tooltip (native=Practical-RIFE unico). (d0fd18f)
+- V4 voice-clone senza testo → **avviso** invece di no-op silenzioso; I3 recolor **valida arch FLUX.2**; I4 **FLUX.2 Klein inpaint NATIVO** (ramo abilitato). (cdf6620)
+- trellis bg/risoluzione/precisione = **limite API TRELLIS.2 ufficiale** (script espone solo seed/texture/facce; input mascherato già senza sfondo) → confine di capacità, non wiring.
+
+**Nessun bug aperto.** Tutti i fix: smoke GUI 14/14 verde ad ogni passo.
