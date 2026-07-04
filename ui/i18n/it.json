@@ -1979,5 +1979,17 @@
   "cn.enable.tt": "Attiva il ControlNet: il video generato seguirà il movimento del video di riferimento.",
   "cn.type.tt": "Tipo di controllo: Canny (contorni), Depth (profondità 3D) o Pose (scheletro umano).",
   "cn.strength.tt": "Intensità del controllo: 1.0 segue rigidamente il riferimento, valori bassi lasciano più libertà.",
-  "cn.video.pick.tt": "Scegli il video di riferimento da cui copiare il movimento."
+  "cn.video.pick.tt": "Scegli il video di riferimento da cui copiare il movimento.",
+  "aud.rb_native.tt": "L'audio del parlato viene generato nativamente dal modello LTX a partire dal prompt.",
+  "aud.rb_user.tt": "Usa una traccia audio fornita da te: caricata da file o registrata dal microfono.",
+  "aud.rb_mute.tt": "Genera il video senza alcun audio.",
+  "aud.no_sing.tt": "Evita che il modello faccia cantare i personaggi: mantiene il parlato normale.",
+  "aud.file.pick.tt": "Scegli un file audio dal disco da usare come traccia.",
+  "aud.rec.tt": "Registra una traccia audio dal microfono.",
+  "aud.tts.engine.tt": "Motore di sintesi vocale (TTS) da usare: Edge (preset) o motori con clonazione/emozioni.",
+  "aud.tts.voice.tt": "Voce da usare per la sintesi: preset di sistema o una tua voce clonabile.",
+  "aud.tts.text.tt": "Testo da convertire in voce. Puoi inserire marker SSML per pause ed emozioni.",
+  "aud.tts.gen.tt": "Genera l'audio parlato dal testo con la voce e il motore selezionati.",
+  "aud.tts.play.tt": "Ascolta l'ultimo audio TTS generato.",
+  "aud.tts.use.tt": "Usa l'audio TTS appena generato come traccia audio del video."
 }

@@ -1979,5 +1979,17 @@
   "cn.enable.tt": "启用 ControlNet：生成的视频将跟随参考视频的运动。",
   "cn.type.tt": "控制类型：Canny（轮廓）、Depth（3D 深度）或 Pose（人体骨架）。",
   "cn.strength.tt": "控制强度：1.0 严格跟随参考，低值给予更多自由。",
-  "cn.video.pick.tt": "选择要从中复制运动的参考视频。"
+  "cn.video.pick.tt": "选择要从中复制运动的参考视频。",
+  "aud.rb_native.tt": "语音音频由 LTX 模型根据提示词原生生成。",
+  "aud.rb_user.tt": "使用你提供的音轨：从文件加载或用麦克风录制。",
+  "aud.rb_mute.tt": "生成无任何音频的视频。",
+  "aud.no_sing.tt": "防止模型让角色歌唱：保持正常说话。",
+  "aud.file.pick.tt": "从磁盘选择一个音频文件作为音轨。",
+  "aud.rec.tt": "用麦克风录制音轨。",
+  "aud.tts.engine.tt": "要使用的语音合成（TTS）引擎：Edge（预设）或带克隆/情感的引擎。",
+  "aud.tts.voice.tt": "用于合成的语音：系统预设或你的可克隆语音之一。",
+  "aud.tts.text.tt": "要转换为语音的文本。可插入 SSML 标记以设置停顿和情感。",
+  "aud.tts.gen.tt": "使用所选语音和引擎从文本生成语音音频。",
+  "aud.tts.play.tt": "试听最近生成的 TTS 音频。",
+  "aud.tts.use.tt": "将刚生成的 TTS 音频用作视频的音轨。"
 }

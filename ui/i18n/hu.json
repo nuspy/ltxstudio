@@ -1979,5 +1979,17 @@
   "cn.enable.tt": "ControlNet bekapcsolása: a generált videó a referenciavideó mozgását követi.",
   "cn.type.tt": "Vezérlés típusa: Canny (körvonalak), Depth (3D mélység) vagy Pose (emberi csontváz).",
   "cn.strength.tt": "Vezérlés erőssége: 1,0 szigorúan követi a referenciát, alacsony érték több szabadságot ad.",
-  "cn.video.pick.tt": "Válaszd ki a referenciavideót, amelyről a mozgást másolod."
+  "cn.video.pick.tt": "Válaszd ki a referenciavideót, amelyről a mozgást másolod.",
+  "aud.rb_native.tt": "A beszédhangot az LTX modell natívan generálja a promptból.",
+  "aud.rb_user.tt": "Használj általad megadott hangsávot: fájlból betöltve vagy mikrofonnal felvéve.",
+  "aud.rb_mute.tt": "A videó generálása hang nélkül.",
+  "aud.no_sing.tt": "Megakadályozza, hogy a modell énekeltesse a szereplőket: megtartja a normál beszédet.",
+  "aud.file.pick.tt": "Válassz egy hangfájlt a lemezről hangsávnak.",
+  "aud.rec.tt": "Vegyél fel egy hangsávot a mikrofonnal.",
+  "aud.tts.engine.tt": "Használandó szövegfelolvasó (TTS) motor: Edge (előbeállítások) vagy klónozást/érzelmeket támogató motorok.",
+  "aud.tts.voice.tt": "A szintézishez használt hang: rendszer-előbeállítás vagy egy klónozható saját hangod.",
+  "aud.tts.text.tt": "Beszéddé alakítandó szöveg. SSML-jelölőket illeszthetsz be szünetekhez és érzelmekhez.",
+  "aud.tts.gen.tt": "Beszédhang generálása a szövegből a kiválasztott hanggal és motorral.",
+  "aud.tts.play.tt": "Hallgasd meg a legutóbb generált TTS hangot.",
+  "aud.tts.use.tt": "Az imént generált TTS hang használata a videó hangsávjaként."
 }

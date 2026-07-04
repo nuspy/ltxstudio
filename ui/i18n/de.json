@@ -1979,5 +1979,17 @@
   "cn.enable.tt": "ControlNet aktivieren: Das generierte Video folgt der Bewegung des Referenzvideos.",
   "cn.type.tt": "Steuerungstyp: Canny (Kanten), Depth (3D-Tiefe) oder Pose (menschliches Skelett).",
   "cn.strength.tt": "Steuerungsstärke: 1.0 folgt streng der Referenz, niedrige Werte lassen mehr Freiheit.",
-  "cn.video.pick.tt": "Wähle das Referenzvideo, von dem die Bewegung kopiert wird."
+  "cn.video.pick.tt": "Wähle das Referenzvideo, von dem die Bewegung kopiert wird.",
+  "aud.rb_native.tt": "Der gesprochene Ton wird nativ vom LTX-Modell aus dem Prompt generiert.",
+  "aud.rb_user.tt": "Verwende eine von dir bereitgestellte Tonspur: aus einer Datei geladen oder über das Mikrofon aufgenommen.",
+  "aud.rb_mute.tt": "Erzeuge das Video ohne jeglichen Ton.",
+  "aud.no_sing.tt": "Verhindert, dass das Modell Figuren singen lässt: behält normales Sprechen bei.",
+  "aud.file.pick.tt": "Wähle eine Audiodatei von der Festplatte als Tonspur.",
+  "aud.rec.tt": "Nimm eine Tonspur über das Mikrofon auf.",
+  "aud.tts.engine.tt": "Zu verwendende Text-zu-Sprache-Engine (TTS): Edge (Presets) oder Engines mit Klonen/Emotionen.",
+  "aud.tts.voice.tt": "Stimme für die Synthese: ein System-Preset oder eine deiner klonbaren Stimmen.",
+  "aud.tts.text.tt": "Text, der in Sprache umgewandelt wird. Du kannst SSML-Marker für Pausen und Emotionen einfügen.",
+  "aud.tts.gen.tt": "Erzeuge gesprochenen Ton aus dem Text mit der gewählten Stimme und Engine.",
+  "aud.tts.play.tt": "Höre den zuletzt generierten TTS-Ton an.",
+  "aud.tts.use.tt": "Verwende den soeben generierten TTS-Ton als Tonspur des Videos."
 }

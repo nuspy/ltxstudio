@@ -1979,5 +1979,17 @@
   "cn.enable.tt": "Enable ControlNet: the generated video will follow the motion of the reference video.",
   "cn.type.tt": "Control type: Canny (edges), Depth (3D depth) or Pose (human skeleton).",
   "cn.strength.tt": "Control strength: 1.0 strictly follows the reference, low values allow more freedom.",
-  "cn.video.pick.tt": "Choose the reference video from which to copy the motion."
+  "cn.video.pick.tt": "Choose the reference video from which to copy the motion.",
+  "aud.rb_native.tt": "The spoken audio is generated natively by the LTX model from the prompt.",
+  "aud.rb_user.tt": "Use an audio track you provide: loaded from a file or recorded from the microphone.",
+  "aud.rb_mute.tt": "Generate the video without any audio.",
+  "aud.no_sing.tt": "Prevent the model from making characters sing: keeps normal speech.",
+  "aud.file.pick.tt": "Choose an audio file from disk to use as the track.",
+  "aud.rec.tt": "Record an audio track from the microphone.",
+  "aud.tts.engine.tt": "Text-to-speech (TTS) engine to use: Edge (presets) or engines with cloning/emotions.",
+  "aud.tts.voice.tt": "Voice to use for synthesis: a system preset or one of your clonable voices.",
+  "aud.tts.text.tt": "Text to convert into speech. You can insert SSML markers for pauses and emotions.",
+  "aud.tts.gen.tt": "Generate spoken audio from the text with the selected voice and engine.",
+  "aud.tts.play.tt": "Listen to the last generated TTS audio.",
+  "aud.tts.use.tt": "Use the just-generated TTS audio as the video's audio track."
 }
