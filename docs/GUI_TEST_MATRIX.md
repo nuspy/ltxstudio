@@ -265,3 +265,38 @@ Trovati durante la lettura del codice (da confermare/prioritizzare). I test-cont
 4. I **bug in appendice** diventano test-contratto che falliscono finché non corretti (o `xfail` documentati).
 
 Stima ordine di grandezza: ~250–400 casi (dominati da "1 caso per OGNI modello/LoRA/formato/lingua").
+
+---
+
+# STATO CORREZIONI (#95) — aggiornato
+
+I bug sono stati verificati con revisione adversariale (2 agenti su tutti i path). Alcuni dei "15" iniziali
+erano falsi positivi (verificati sul codice); ne sono emersi di **nuovi e più gravi**. Stato:
+
+## ✅ CORRETTI
+- **CRITICO V1** — seed random scartato in TUTTI i path video nativi (t2v/i2v/retake/extend/multitalk) → video identici ad ogni run. Ora `vals[seed]`/`wants_fixed_seed`. (commit 7b8b131)
+- **CRITICO I1** — gen immagine nativa scartava sampler/scheduler/encoder/clip_type/vae/enhance/nsfw. Ora inoltrati. (7b8b131)
+- **I2** — restauro foto bloccato con ComfyUI offline nonostante il nativo. Guardia corretta. (7b8b131)
+- **V2** — extend/edit-AI/multitalk saltavano l'arrotondamento ×64 → 0 frame su preset ×32. Ora `_r64`. (7b8b131)
+- **HIGH rig** — `_rig_native` scartava TUTTA la config del tab. `make_job` esteso (template/format/top_k/top_p/temperature/rep_pen/num_beams/group_per_vertex) + output col formato scelto. (7b8b131)
+- **V3** — multitalk seed=8 hardcoded → threading seed (re-roll) + steps/guidance overridabili. (7b8b131)
+- **CRITICO montage** — `os` non importato a livello modulo → NameError su musica/ambient/SFX. (6079551)
+- **trellis/rig visore** — `show_result` (era `load_model` inesistente) + `_on_rig_native_done` dedicato con handoff `anim_tab.set_last_rig`. (6079551)
+- **colorize placeholder** — non invia più il placeholder come modello reale + guard modello vuoto. (6079551)
+- **son_name** — derivato dal prompt (no overwrite "sfx") + tooltip videomusicale corretto. (6079551)
+- **trellis facce** — `target_faces`→`--decimation` (era ignorato) + parità Trellis→Rig `set_last_mesh`. (2ddc406)
+- **I5 inpaint** — `denoise` passato al nativo (da retention), non solo guidance. (2ddc406)
+- **ambient** — `_ambient_tracks` popolato (corsia dedicata) + incluso nel master. (2ddc406)
+
+## ⏭️ RESIDUI (documentati, richiedono modifiche più grandi o sono deferral intenzionali)
+- **I3 (MEDIUM)** recolor FLUX.2 legge il modello dal tab Integra → arch sbagliata se Integra è su Kontext. Serve un combo FLUX.2 proprio per il recolor (modifica UI).
+- **V4 (MEDIUM)** voice-clone senza testo scartato nell'a2v nativo → serve plumbing del `voice_sample` come clone-reference (o warning).
+- **Film Studio Auto (MEDIUM)** `_on_auto_complete` fa `_master()` PRIMA che il job musica async finisca → master senza musica. Serve concatenare `_master` all'`on_done` della musica (orchestrazione, da testare live).
+- **world web player (MEDIUM)** riusa il server http fisso :8765 per il 2° progetto (guard `is None`) → scena sbagliata. Serve kill+restart per-progetto.
+- **V5 (LOW)** `rife_ckpt` scartato in nativo → serve estendere `_RifeWorker` (accetta solo factor).
+- **music→project folder (LOW)** `out` calcolato ma non passato a SongParams → la canzone non finisce nella cartella progetto.
+- **script_ready (LOW)** segnale emesso ma non connesso (il breakdown legge il DB direttamente → impatto minimo).
+- **train name (LOW)** collisione run = trigger+dataset dir → sovrascrittura LoRA omonime.
+- **trellis bg/risoluzione/precisione** — lo script nativo `trellis_generate.py` accetta SOLO seed/texture_size/decimation → gli altri richiedono di estendere lo script (o disabilitare i controlli in nativo).
+- **I4 flux2-inpaint nativo** — ramo morto: FLUX.2 Klein inpaint resta su ComfyUI (deferral intenzionale #14/#44).
+- **storyboard `_on_job` cross-thread (DA VERIFICARE)** — il callback dello scheduler muta widget Qt: confermare che lo scheduler marshalli sull'UI thread, altrimenti è HIGH.
