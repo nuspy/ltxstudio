@@ -41,7 +41,7 @@ MMAUDIO_DIR = TOOLS / "MMAudio"
 MMAUDIO_VENV_PY = MMAUDIO_DIR / "venv" / "Scripts" / "python.exe"
 MMAUDIO_DEMO = MMAUDIO_DIR / "demo.py"
 
-MUSIC_OUTPUT_DIR = Path(r"E:\AI\ltxstudio\output\music")
+MUSIC_OUTPUT_DIR = Path(r"E:\AI\ltxstudio\output")     # #97: musica/sonify in output\ (root), non in sottocartella
 
 # Default per i prompt di stile (HeartMuLa usa tag separati da virgola)
 DEFAULT_TAGS = "pop, upbeat, female vocals, synth, catchy"

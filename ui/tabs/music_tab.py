@@ -323,6 +323,9 @@ class MusicTab(QWidget):
         errs = ms.preflight_song(p)
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
+        self._song_meta = {"label": "Musica", "engine": "HeartMuLa", "tags": p.tags, "lyrics": p.lyrics,
+                           "duration_s": p.duration_s, "instrumental": p.instrumental, "version": p.version,
+                           "temperature": p.temperature, "cfg": p.cfg_scale}   # #97 sidecar
         self._start_job(ms.make_song_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                                          on_done=self._b.song_done.emit), "song", p.out_mp3())
 
@@ -350,6 +353,10 @@ class MusicTab(QWidget):
         # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa. Il selettore engine imposta
         # song_cfg al default corretto (~15) quando ACE-Step è attivo (_on_song_engine); passare 1.5
         # (default HeartMuLa) sotto-condizionerebbe il modello → RUMORE grigio. 60 step = più pulito.
+        self._song_meta = {"label": "Musica", "engine": "ACE-Step", "tags": tags, "lyrics": lyrics,
+                           "duration_s": float(self.song_dur.value()), "steps": 60,
+                           "cfg": float(self.song_cfg.value()),
+                           "instrumental": self.song_instr.isChecked()}   # #97 sidecar
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
                           steps=60, guidance=float(self.song_cfg.value()), lazy=self.song_lazy.isChecked(),
                           on_log=self._b.log.emit, on_progress=self._b.progress.emit,
@@ -484,6 +491,11 @@ class MusicTab(QWidget):
             self.btn_play.setEnabled(True)
             self.status.setText(tr("music.done", "Pronto: {f}").format(f=Path(out).name))
             self._log(f"[music] output: {out}")
+            try:                                             # #97: sidecar (params riutilizzabili nel Navigator)
+                from core.metadata_saver import MetadataSaver
+                MetadataSaver.save_sidecar(out, getattr(self, "_song_meta", {"label": "Musica"}))
+            except Exception:                                # noqa: BLE001
+                pass
             self.music_ready.emit(out)
         else:
             self.status.setText(tr("music.done.nofile", "Completato (file non individuato)"))

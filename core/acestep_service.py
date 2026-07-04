@@ -11,7 +11,7 @@ TOOLS = Path(r"E:\AI\Tools")
 AS_DIR = TOOLS / "ACE-Step"
 AS_VENV_PY = AS_DIR / "venv" / "Scripts" / "python.exe"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "acestep_generate.py"
-OUT_DIR = Path(r"E:\AI\ltxstudio\output\audio")
+OUT_DIR = Path(r"E:\AI\ltxstudio\output")             # #97: canzoni ACE-Step in output\ (root)
 # cache HF dei pesi ACE-Step (dove li scarichiamo). Serve a verificare che il download sia COMPLETO.
 ACE_CACHE = Path.home() / ".cache" / "ace-step" / "checkpoints"
 ACE_REPO_DIR = ACE_CACHE / "models--ACE-Step--ACE-Step-v1-3.5B"

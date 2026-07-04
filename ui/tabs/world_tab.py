@@ -279,3 +279,10 @@ class WorldTab(QWidget):
             if tgt.exists():
                 self._log(f"[world] output: {tgt}")
                 self._load_in_viewer(tgt)
+                try:                                         # #97: sidecar (params riutilizzabili nel Navigator)
+                    from core.metadata_saver import MetadataSaver
+                    _p = self._cur
+                    MetadataSaver.save_sidecar(str(tgt), {"label": "Mondo 3D", "prompt": _p.prompt,
+                        "image_path": _p.image_path, "resolution": _p.resolution, "low_vram": _p.low_vram})
+                except Exception:                            # noqa: BLE001
+                    pass
