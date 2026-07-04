@@ -617,6 +617,21 @@ class MainWindow(QMainWindow):
         # Import Models diventa un sotto-tab di Avanzate
         self.advanced_tab.attach_models(self.models_tab)
         self.tabs.addTab(self.advanced_tab, tr("tab.advanced"))
+        # #96.4: icona-emoji distintiva per ogni tab (language-independent, idempotente)
+        _tab_emoji = {
+            id(self.frame1_tab): "🖼️", id(self.audio_tab): "🎙️", id(self.video_tab): "🎬",
+            id(self.controlnet_tab): "🎛️", id(self.video_extend_tab): "⏩",
+            id(self.video_edit_ai_tab): "✨", id(self.quality_tab): "💎",
+            id(self.trellis_tab): "🧊", id(self.rig_tab): "🦴", id(self.convert_tab): "🔄",
+            id(self.anim_tab): "🕺", id(self.train_tab): "🎓", id(self.lora_video_tab): "🎞️",
+            id(self.lora_image_tab): "🖌️", id(self.music_tab): "🎵", id(self.world_tab): "🌍",
+            id(self.weights_tab): "📦", id(self.advanced_tab): "⚙️",
+        }
+        for _i in range(self.tabs.count()):
+            _em = _tab_emoji.get(id(self.tabs.widget(_i)))
+            _txt = self.tabs.tabText(_i)
+            if _em and not _txt.startswith(_em):
+                self.tabs.setTabText(_i, f"{_em} {_txt.lstrip('✨ ').strip()}" if _txt.startswith("✨") else f"{_em} {_txt}")
         # NB: i tab (immagine di editing) vengono aggiunti DOPO il pannello anteprima,
         #     così l'anteprima sta a SINISTRA e l'editing a DESTRA (posizioni invertite).
 
