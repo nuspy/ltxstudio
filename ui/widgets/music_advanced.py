@@ -55,6 +55,11 @@ class MusicAdvanced(QGroupBox):
         # ── Qualità & aderenza ──
         gq = QGroupBox(tr("music.adv.quality", "Qualità & aderenza"))
         fq = QFormLayout(gq); fq.setLabelAlignment(Qt.AlignRight)
+        self.steps = QSpinBox(); self.steps.setRange(20, 200); self.steps.setValue(60)
+        self.steps.setToolTip(tr("music.adv.steps.tt",
+            "Passi di denoising. Più passi = più dettaglio e audio più pulito (ma più lento). "
+            "60 è un buon compromesso; sotto ~30 può comparire rumore grigio."))
+        fq.addRow(tr("music.adv.steps", "Step di sampling"), self.steps)
         self.scheduler = QComboBox(); self.scheduler.addItems(["euler", "heun", "pingpong"])
         self.scheduler.setToolTip(tr("music.adv.scheduler.tt",
             "Campionatore.\n• pingpong (SDE): migliore coerenza e allineamento di stile/liriche (consigliato per aderenza)\n"
@@ -156,6 +161,7 @@ class MusicAdvanced(QGroupBox):
 
     def reset_defaults(self):
         """Reimposta tutti i controlli avanzati ai valori ottimali."""
+        self.steps.setValue(60)
         self.scheduler.setCurrentText("euler"); self.cfg_type.setCurrentText("apg")
         self.omega.setValue(10.0); self.g_interval.setValue(0.5); self.g_decay.setValue(0.0); self.min_g.setValue(3.0)
         self.erg_tag.setChecked(True); self.erg_lyric.setChecked(True); self.erg_diff.setChecked(True)
@@ -167,6 +173,7 @@ class MusicAdvanced(QGroupBox):
     def get_adv(self) -> dict:
         """Dizionario opzioni per acestep_service.make_job(adv=...). Solo i valori diversi dal default."""
         adv = {
+            "steps": self.steps.value(),
             "scheduler": self.scheduler.currentText(),
             "cfg_type": self.cfg_type.currentText(),
             "omega": self.omega.value(),

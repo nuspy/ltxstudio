@@ -158,6 +158,16 @@ class MusicTab(QWidget):
         self.lbl_adherence = QLabel(tr("music.adherence", "Aderenza stile"))
         g.addWidget(self.lbl_adherence, 3, 2); g.addWidget(self.song_adherence, 3, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
+        # ACE-Step: aderenza alle LIRICHE (guidance_scale_lyric). La Double Condition Guidance si attiva
+        # solo se SIA 'Aderenza stile' SIA 'Aderenza parole' sono >1.0 → con 0 lo stile-slider non ha effetto.
+        self.song_gs_lyric = QDoubleSpinBox(); self.song_gs_lyric.setRange(0.0, 10.0)
+        self.song_gs_lyric.setSingleStep(0.5); self.song_gs_lyric.setValue(3.0)
+        self.song_gs_lyric.setToolTip(tr("music.gs_lyric.tt",
+            "Aderenza alle LIRICHE (ACE-Step, Double Condition Guidance). Insieme a 'Aderenza stile' attiva "
+            "la doppia guida: ENTRAMBE devono essere >1.0 perché faccia effetto. 3-5 = testo più fedele. "
+            "0 = disattiva la doppia guida (torna alla sola CFG)."))
+        self.lbl_gs_lyric = QLabel(tr("music.gs_lyric", "Aderenza parole"))
+        g.addWidget(self.lbl_gs_lyric, 4, 2); g.addWidget(self.song_gs_lyric, 4, 3)
         v.addLayout(g)
         # ↺ Reset ai valori ottimali del modello selezionato
         _rr = QHBoxLayout(); _rr.addStretch(1)
@@ -166,6 +176,10 @@ class MusicTab(QWidget):
         self.btn_reset.setCursor(Qt.PointingHandCursor); self.btn_reset.clicked.connect(self._reset_defaults)
         _rr.addWidget(self.btn_reset)
         v.addLayout(_rr)
+        # F-A: Metadata musicali strutturati (BPM/tonalità/metro/lingua) — accodati ai tag come fa ACE-Step 1.5.
+        from ui.widgets.music_metadata import MusicMetadata
+        self.song_meta = MusicMetadata()
+        v.addWidget(self.song_meta)
         # #98 F2: sezione Avanzate ACE-Step (collassabile, disabilitata con HeartMuLa)
         from ui.widgets.music_advanced import MusicAdvanced
         self.song_adv = MusicAdvanced()
@@ -352,7 +366,8 @@ class MusicTab(QWidget):
             return self._gen_song_acestep()
         p = ms.SongParams(
             name=self.song_name.text().strip() or "song",
-            lyrics=self.song_lyrics.toPlainText(), tags=self.song_tags.text().strip(),
+            lyrics=self.song_lyrics.toPlainText(),
+            tags=self.song_meta.compose(self.song_tags.text().strip()),   # F-A: accoda i metadata musicali
             duration_s=self.song_dur.value(), instrumental=self.song_instr.isChecked(),
             version=self.song_ver.currentText(), temperature=self.song_temp.value(),
             cfg_scale=self.song_cfg.value(), lazy_load=self.song_lazy.isChecked())
@@ -397,7 +412,8 @@ class MusicTab(QWidget):
         e = self.song_engine.currentText()
         self.song_dur.setValue(120); self.song_instr.setChecked(False)
         self.song_temp.setValue(1.0); self.song_lazy.setChecked(False)
-        self.song_adherence.setValue(3.0)
+        self.song_adherence.setValue(3.0); self.song_gs_lyric.setValue(3.0)
+        self.song_meta.reset_defaults()                      # F-A: metadata musicali → (auto)
         self._on_song_engine(e)                              # cfg/adherence/ranges + gating pannelli per engine
         self.song_adv.reset_defaults(); self.song_task.reset_defaults()
         self.song_adv.set_engine(e); self.song_task.set_engine(e)   # ri-applica il gating dopo il reset
@@ -410,6 +426,9 @@ class MusicTab(QWidget):
         self.song_temp.setEnabled(is_hm)                     # temperatura solo HeartMuLa
         self.song_adherence.setVisible(not is_hm)            # aderenza stile solo ACE-Step
         self.lbl_adherence.setVisible(not is_hm)
+        if hasattr(self, "song_gs_lyric"):                   # aderenza parole (doppia guida) solo ACE-Step
+            self.song_gs_lyric.setVisible(not is_hm)
+            self.lbl_gs_lyric.setVisible(not is_hm)
         if hasattr(self, "song_adv"):
             self.song_adv.set_engine(e)                      # avanzate: abilitate solo per ACE-Step
         if hasattr(self, "song_task"):
@@ -431,26 +450,35 @@ class MusicTab(QWidget):
     def _gen_song_acestep(self):
         """Generazione canzone/strumentale con ACE-Step XL 1.5 (alternativa a HeartMuLa)."""
         from core import acestep_service as ax
-        tags = self.song_tags.text().strip()
-        lyrics = "" if self.song_instr.isChecked() else self.song_lyrics.toPlainText().strip()
+        raw_tags = self.song_tags.text().strip()
+        instrumental = self.song_instr.isChecked()
+        lyrics = "" if instrumental else self.song_lyrics.toPlainText().strip()
         name = self.song_name.text().strip() or "song"
-        errs = ax.preflight(tags)
+        errs = ax.preflight(raw_tags)
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
-        adv = self.song_adv.get_adv()                        # #98: tutti i param avanzati ACE-Step
+        # F-A: accoda i metadata strutturati (BPM/tonalità/metro/lingua) ai tag di stile, come ACE-Step 1.5.
+        tags = self.song_meta.compose(raw_tags)
+        adv = self.song_adv.get_adv()                        # #98: tutti i param avanzati ACE-Step (incl. steps)
         adv.update(self.song_task.get_task())                # #98 F3: task editing (retake/repaint/edit/…)
+        steps = int(adv.get("steps", 60))                    # F-A: step ora regolabile (era hardcoded 60)
+        # F-A: aderenza alle LIRICHE (Double Condition Guidance). Attiva SOLO se sia gs_text sia gs_lyric >1.
+        # Con liriche vuote (strumentale) la disattiviamo (nessuna lirica da seguire).
+        gs_lyric = 0.0 if (instrumental or not lyrics) else float(self.song_gs_lyric.value())
         ext = adv.get("format") or "wav"
         out = ax.OUT_DIR / f"{ax._safe(name)}.{ext}"
         # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa. Il selettore engine imposta
         # song_cfg al default corretto (~15) quando ACE-Step è attivo (_on_song_engine); passare 1.5
-        # (default HeartMuLa) sotto-condizionerebbe il modello → RUMORE grigio. 60 step = più pulito.
+        # (default HeartMuLa) sotto-condizionerebbe il modello → RUMORE grigio.
         self._song_meta = {"label": "Musica", "engine": "ACE-Step", "tags": tags, "lyrics": lyrics,
-                           "duration_s": float(self.song_dur.value()), "steps": 60,
+                           "duration_s": float(self.song_dur.value()), "steps": steps,
                            "cfg": float(self.song_cfg.value()), "gs_text": float(self.song_adherence.value()),
-                           "instrumental": self.song_instr.isChecked(), **adv}   # #97 sidecar
+                           "gs_lyric": gs_lyric, "instrumental": instrumental,
+                           **self.song_meta.get_meta(), **adv}   # #97 sidecar
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
-                          steps=60, guidance=float(self.song_cfg.value()),
-                          gs_text=float(self.song_adherence.value()), lazy=self.song_lazy.isChecked(),
+                          steps=steps, guidance=float(self.song_cfg.value()),
+                          gs_text=float(self.song_adherence.value()), gs_lyric=gs_lyric,
+                          lazy=self.song_lazy.isChecked(),
                           adv=adv, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
