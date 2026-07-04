@@ -42,17 +42,43 @@ def is_installed() -> bool:
     return _tool_ready() and _weights_ready()
 
 
+# opzioni avanzate/task: chiave adv → (flag CLI). I valori vuoti/None sono ignorati.
+_ADV_VALUE_FLAGS = {
+    "scheduler": "--scheduler", "cfg_type": "--cfg-type", "omega": "--omega",
+    "guidance_interval": "--guidance-interval", "guidance_interval_decay": "--guidance-interval-decay",
+    "min_guidance": "--min-guidance", "seeds": "--seeds", "batch": "--batch",
+    "lora_path": "--lora-path", "lora_weight": "--lora-weight", "task": "--task",
+    "src_audio": "--src-audio", "retake_variance": "--retake-variance",
+    "repaint_start": "--repaint-start", "repaint_end": "--repaint-end",
+    "edit_target_prompt": "--edit-target-prompt", "edit_target_lyrics": "--edit-target-lyrics",
+    "ref_audio": "--ref-audio", "ref_strength": "--ref-strength",
+}
+_ADV_BOOL_FLAGS = {
+    "quantized": "--quantized", "overlapped_decode": "--overlapped-decode",
+    "torch_compile": "--torch-compile", "no_erg_tag": "--no-erg-tag",
+    "no_erg_lyric": "--no-erg-lyric", "no_erg_diffusion": "--no-erg-diffusion",
+}
+
+
 def make_job(tags: str, lyrics: str = "", out_name: str = "song", *, duration: float = 60.0,
-             steps: int = 27, guidance: float = 15.0, gs_text: float = 0.0, gs_lyric: float = 0.0,
-             lazy: bool = False, **cbs) -> Job:
+             steps: int = 60, guidance: float = 15.0, gs_text: float = 0.0, gs_lyric: float = 0.0,
+             lazy: bool = False, adv: dict | None = None, **cbs) -> Job:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / f"{_safe(out_name)}.wav"
+    a = adv or {}
+    ext = a.get("format") or "wav"
+    out = OUT_DIR / f"{_safe(out_name)}.{ext}"
     cmd = [AS_VENV_PY, "-u", str(GEN_SCRIPT), "--tags", tags, "--lyrics", lyrics or "",
            "--duration", float(duration), "--steps", int(steps), "--guidance", float(guidance),
            "--gs-text", float(gs_text), "--gs-lyric", float(gs_lyric),  # Double Condition Guidance (aderenza)
-           "--output", str(out)]
+           "--format", ext, "--output", str(out)]
     if lazy:                                              # low-VRAM: CPU offload dei componenti
         cmd.append("--lazy")
+    for key, flag in _ADV_VALUE_FLAGS.items():            # opzioni avanzate/task con valore
+        if a.get(key) not in (None, ""):
+            cmd += [flag, a[key]]
+    for key, flag in _ADV_BOOL_FLAGS.items():             # toggle booleani
+        if a.get(key):
+            cmd.append(flag)
     return Job(cmd, AS_DIR, **cbs)
 
 
