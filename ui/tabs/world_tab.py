@@ -144,6 +144,21 @@ class WorldTab(QWidget):
     def _gen(self):
         if self._job and self._job.running:
             return
+        # #96.5: se l'immagine non è impostata, usa quella del canvas (tab Immagine)
+        if not self.image.text().strip():
+            getter = getattr(self, "get_canvas_image", None)
+            canvas_img = (getter() if callable(getter) else "") or ""
+            if canvas_img:
+                self.image.setText(canvas_img)
+                self._log(f"[mondo] uso l'immagine del canvas: {canvas_img}")
+            elif not self.prompt.text().strip():
+                QMessageBox.warning(
+                    self, tr("world.no_input_title", "Serve un'immagine o un prompt"),
+                    tr("world.no_input_msg",
+                       "Nessuna immagine impostata e il canvas (tab Immagine) è vuoto.\n\n"
+                       "Imposta un'immagine di partenza, oppure carica/genera un'immagine nel canvas, "
+                       "oppure scrivi un prompt testuale per generare la scena da testo."))
+                return
         p = self._params(); errs = ws.preflight(p)
         if errs:
             QMessageBox.warning(self, tr("world.err", "Impossibile generare"), "\n".join(errs)); return

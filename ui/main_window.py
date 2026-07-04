@@ -576,6 +576,7 @@ class MainWindow(QMainWindow):
         self.train_tab.lora_ready.connect(lambda _p: self._refresh_status())
         self.music_tab = MusicTab()
         self.world_tab = WorldTab()
+        self.world_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")   # #96.5: fallback immagine dal canvas
         self.weights_tab = WeightsTab()
         self.mocap = MocapService(self)
         self.models_tab = ImportModelsTab()
