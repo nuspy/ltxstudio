@@ -74,7 +74,8 @@ class MusicTagDialog(QDialog):
     def _build(self):
         v = QVBoxLayout(self)
         hint = QLabel(tr("music.tagpicker.hint",
-                         "Clicca i tag per aggiungerli/rimuoverli. I tag scritti a mano restano invariati."))
+                         "Clicca i tag per aggiungerli/rimuoverli. I tag scritti a mano restano invariati. "
+                         "Suggerimento: metti il GENERE per primo — su HeartMuLa ha peso maggiore."))
         hint.setWordWrap(True); hint.setStyleSheet("color:#8a93a6; padding:2px 2px 6px;")
         v.addWidget(hint)
 

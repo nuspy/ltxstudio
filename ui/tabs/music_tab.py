@@ -138,12 +138,19 @@ class MusicTab(QWidget):
         self.song_temp = QDoubleSpinBox(); self.song_temp.setRange(0.1, 2.0); self.song_temp.setSingleStep(0.1); self.song_temp.setValue(1.0)
         self.song_cfg = QDoubleSpinBox(); self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setSingleStep(0.5); self.song_cfg.setValue(1.5)
         self.song_lazy = QCheckBox(tr("music.lazy", "Low VRAM (lazy load)"))
+        # ACE-Step: aderenza stile via Double Condition Guidance (guidance_scale_text). 0 = off (usa solo CFG).
+        self.song_adherence = QDoubleSpinBox(); self.song_adherence.setRange(0.0, 10.0)
+        self.song_adherence.setSingleStep(0.5); self.song_adherence.setValue(0.0)
+        self.song_adherence.setToolTip(tr("music.adherence.tt",
+            "Aderenza ai tag di stile (ACE-Step). 0=off; 3-5 = i tag pesano di più (peso separato del testo)."))
         g.addWidget(self.song_instr, 0, 0, 1, 2)
         g.addWidget(QLabel(tr("music.engine", "Motore")), 0, 2); g.addWidget(self.song_engine, 0, 3)
         g.addWidget(QLabel(tr("music.duration", "Durata")), 1, 0); g.addWidget(self.song_dur, 1, 1)
         g.addWidget(QLabel(tr("music.version", "Modello")), 1, 2); g.addWidget(self.song_ver, 1, 3)
         g.addWidget(QLabel(tr("music.temp", "Temperatura")), 2, 0); g.addWidget(self.song_temp, 2, 1)
         g.addWidget(QLabel(tr("music.cfg", "CFG")), 2, 2); g.addWidget(self.song_cfg, 2, 3)
+        self.lbl_adherence = QLabel(tr("music.adherence", "Aderenza stile"))
+        g.addWidget(self.lbl_adherence, 3, 2); g.addWidget(self.song_adherence, 3, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
         v.addLayout(g)
         # #96/4: default dei parametri per MODELLO selezionato (apertura + cambio) — le due scale di CFG
@@ -347,6 +354,8 @@ class MusicTab(QWidget):
         is_hm = (e == "HeartMuLa")
         self.song_ver.setEnabled(is_hm)                      # 3B/7B solo HeartMuLa
         self.song_temp.setEnabled(is_hm)                     # temperatura solo HeartMuLa
+        self.song_adherence.setVisible(not is_hm)            # aderenza stile solo ACE-Step
+        self.lbl_adherence.setVisible(not is_hm)
         # CFG: HeartMuLa ~1.5 (scala 1-10) · ACE-Step ~15 (apg, scala 1-30)
         if is_hm:
             self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.5)
@@ -368,10 +377,11 @@ class MusicTab(QWidget):
         # (default HeartMuLa) sotto-condizionerebbe il modello → RUMORE grigio. 60 step = più pulito.
         self._song_meta = {"label": "Musica", "engine": "ACE-Step", "tags": tags, "lyrics": lyrics,
                            "duration_s": float(self.song_dur.value()), "steps": 60,
-                           "cfg": float(self.song_cfg.value()),
+                           "cfg": float(self.song_cfg.value()), "gs_text": float(self.song_adherence.value()),
                            "instrumental": self.song_instr.isChecked()}   # #97 sidecar
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
-                          steps=60, guidance=float(self.song_cfg.value()), lazy=self.song_lazy.isChecked(),
+                          steps=60, guidance=float(self.song_cfg.value()),
+                          gs_text=float(self.song_adherence.value()), lazy=self.song_lazy.isChecked(),
                           on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
