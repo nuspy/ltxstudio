@@ -428,11 +428,11 @@ class NavigatorDialog(QDialog):
         if resp != QMessageBox.Yes:
             return
         try:
-            sidecar = MetadataSaver.sidecar_path(path)
             if path.exists():
                 path.unlink()
-            if sidecar.exists():
-                sidecar.unlink()
+            for sidecar in (MetadataSaver.sidecar_path(path), MetadataSaver._legacy_sidecar(path)):
+                if sidecar.exists():                         # #97: rimuovi sidecar in output/sidecars/ + eventuale legacy adiacente
+                    sidecar.unlink()
         except Exception as e:
             QMessageBox.warning(self, tr("nav.delete_error_title"), str(e))
             return
