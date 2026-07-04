@@ -73,6 +73,10 @@ class VideoDefTab(QWidget):
         self.rife_mult = QComboBox(); self.rife_mult.addItems(["2×", "3×", "4×"])
         rf.addRow(tr("def.rife_mult_lbl"), self.rife_mult)
         self.rife_ckpt = QComboBox(); self.rife_ckpt.addItems(["rife47.pth", "rife48.pth", "rife46.pth"])
+        # #95: il RIFE nativo usa Practical-RIFE (modello unico) → la scelta ckpt non è onorata → disabilitata
+        self.rife_ckpt.setEnabled(False)
+        self.rife_ckpt.setToolTip(tr("def.rife_ckpt.tt",
+            "Il RIFE nativo usa Practical-RIFE (modello unico). La selezione checkpoint era per ComfyUI."))
         rf.addRow(tr("def.rife_ckpt_lbl"), self.rife_ckpt)
         root.addWidget(rbox)
 

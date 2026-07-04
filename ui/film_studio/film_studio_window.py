@@ -61,6 +61,7 @@ class FilmStudioWindow(QWidget):
         self.sb_tab = StoryboardTab(self._get_project)
         self.mt_tab = MontageTab(self._get_project)
         self.sb_tab.auto_complete.connect(self._on_auto_complete)   # #54: Auto → montaggio automatico
+        self.script_tab.script_ready.connect(lambda *_: self.sb_tab._refresh())   # #95: copione salvato → aggiorna Scenografia
         self.voice_tab = VoiceTab()
         self.lora_tab = LoraStudioTab()
         self.tabs.addTab(self.script_tab, tr("fs.tab.script", "Copione"))

@@ -209,8 +209,10 @@ class TrainTab(QWidget):
         except ValueError:
             lr = 1e-4
         prompts = [l.strip() for l in self.prompts.toPlainText().splitlines() if l.strip()]
+        import time as _time                                # #95: suffisso timestamp → niente collisioni/sovrascritture tra run
         return ts.TrainParams(
-            name=(self.trigger.text().strip() or "lora") + "_" + Path(self.ds_path.text().strip() or "dataset").name,
+            name=((self.trigger.text().strip() or "lora") + "_"
+                  + Path(self.ds_path.text().strip() or "dataset").name + "_" + _time.strftime("%m%d_%H%M%S")),
             dataset_path=self.ds_path.text().strip(),
             base_model=self.model.currentData(),
             model_path=self.model_path.text().strip(),
