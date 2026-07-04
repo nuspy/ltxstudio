@@ -336,8 +336,11 @@ class MusicTab(QWidget):
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         out = ax.OUT_DIR / f"{ax._safe(name)}.wav"
+        # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa: il suo sweet-spot è ~15 (apg CFG),
+        # mentre song_cfg (default 1.5) è tarato per HeartMuLa. Passare 1.5 sotto-condiziona il modello →
+        # RUMORE grigio di fondo. Usiamo i parametri nativi di ACE-Step (guidance 15, più step = più pulito).
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
-                          guidance=float(self.song_cfg.value()), lazy=self.song_lazy.isChecked(),
+                          steps=60, guidance=15.0, lazy=self.song_lazy.isChecked(),
                           on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
