@@ -24,6 +24,7 @@ _SYS = ("You are a film script supervisor. Break the screenplay into SCENES and 
 
 class StoryboardTab(QWidget):
     auto_complete = Signal(int)        # #54: project_id quando l'Auto ha finito i video → montaggio
+    _job_event = Signal(dict)          # #95: marshalling eventi scheduler (worker thread) → thread UI
 
     def __init__(self, get_project):
         super().__init__()
@@ -82,7 +83,9 @@ class StoryboardTab(QWidget):
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(80)
         v.addWidget(self.log)
         self._sel = None
-        scheduler.on_event(self._on_job)
+        # lo scheduler emette da un thread worker → marshalla su UI via segnale (connessione queued auto)
+        self._job_event.connect(self._on_job)
+        scheduler.on_event(lambda ev: self._job_event.emit(dict(ev)))
         self._refresh()
 
     def _refresh(self):
