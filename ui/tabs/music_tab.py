@@ -140,9 +140,10 @@ class MusicTab(QWidget):
         self.song_lazy = QCheckBox(tr("music.lazy", "Low VRAM (lazy load)"))
         # ACE-Step: aderenza stile via Double Condition Guidance (guidance_scale_text). 0 = off (usa solo CFG).
         self.song_adherence = QDoubleSpinBox(); self.song_adherence.setRange(0.0, 10.0)
-        self.song_adherence.setSingleStep(0.5); self.song_adherence.setValue(0.0)
+        self.song_adherence.setSingleStep(0.5); self.song_adherence.setValue(3.0)
         self.song_adherence.setToolTip(tr("music.adherence.tt",
-            "Aderenza ai tag di stile (ACE-Step). 0=off; 3-5 = i tag pesano di più (peso separato del testo)."))
+            "Aderenza ai tag di stile (ACE-Step, Double Condition Guidance). Si attiva solo se >1.0; "
+            "3-5 = i tag di stile pesano di più. 0/≤1 = off (solo CFG combinata)."))
         g.addWidget(self.song_instr, 0, 0, 1, 2)
         g.addWidget(QLabel(tr("music.engine", "Motore")), 0, 2); g.addWidget(self.song_engine, 0, 3)
         g.addWidget(QLabel(tr("music.duration", "Durata")), 1, 0); g.addWidget(self.song_dur, 1, 1)
