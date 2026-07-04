@@ -134,6 +134,20 @@ class MusicAdvanced(QGroupBox):
             fp.addWidget(c)
         cv.addWidget(gp)
 
+        # ── LoRA (applica una LoRA allenata in generazione) ──
+        from ui.widgets.drop_widgets import DropLineEdit
+        gl = QGroupBox(tr("music.adv.lora", "LoRA"))
+        fl = QFormLayout(gl); fl.setLabelAlignment(Qt.AlignRight)
+        self.lora = DropLineEdit(tr("music.adv.lora.ph", "LoRA .safetensors (opzionale)"),
+                                 "LoRA (*.safetensors *.ckpt *.pt)")
+        self.lora.setToolTip(tr("music.adv.lora.tt",
+            "Applica una LoRA allenata (es. quella prodotta dal trainer qui sotto) alla generazione."))
+        fl.addRow(tr("music.adv.lora_file", "File"), self.lora)
+        self.lora_w = _spin(0.0, 2.0, 1.0, 0.05, 2)
+        self.lora_w.setToolTip(tr("music.adv.lora_w.tt", "Intensità della LoRA (1.0 = piena)."))
+        fl.addRow(tr("music.adv.lora_weight", "Peso"), self.lora_w)
+        cv.addWidget(gl)
+
     def set_engine(self, engine: str):
         """Abilita i controlli solo per ACE-Step; con HeartMuLa disabilita + mostra la nota del PERCHÉ."""
         is_ace = (engine == "ACE-Step")
@@ -156,6 +170,8 @@ class MusicAdvanced(QGroupBox):
             "overlapped_decode": self.overlap.isChecked(),
             "torch_compile": self.compile.isChecked(),
         }
+        if self.lora.path():                                 # LoRA allenata applicata alla generazione
+            adv["lora_path"] = self.lora.path(); adv["lora_weight"] = self.lora_w.value()
         if not self.erg_tag.isChecked():
             adv["no_erg_tag"] = True
         if not self.erg_lyric.isChecked():

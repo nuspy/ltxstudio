@@ -162,6 +162,11 @@ class MusicTab(QWidget):
         from ui.widgets.music_tasks import MusicTaskPanel
         self.song_task = MusicTaskPanel()
         v.addWidget(self.song_task)
+        # #98 F4: trainer LoRA ACE-Step (drag&drop file + cartelle) — solo ACE-Step
+        from ui.widgets.music_trainer import MusicTrainerPanel
+        self.song_trainer = MusicTrainerPanel()
+        self.song_trainer.train_requested.connect(self._train_lora)
+        v.addWidget(self.song_trainer)
         # #96/4: default dei parametri per MODELLO selezionato (apertura + cambio) — le due scale di CFG
         # sono DIVERSE: HeartMuLa ~1.5 (1-10), ACE-Step ~15 (apg, 1-30). Applica anche i controlli HM-only.
         self.song_engine.currentTextChanged.connect(self._on_song_engine)
@@ -358,6 +363,26 @@ class MusicTab(QWidget):
         if dlg.exec():
             self.song_tags.setText(dlg.result_tags())
 
+    def _train_lora(self, params: dict):
+        """#98 F4: avvia il training di una LoRA ACE-Step dal dataset trascinato."""
+        if self._busy():
+            return
+        from core import acestep_train_service as tx
+        p = tx.TrainParams(**params)
+        errs = tx.preflight(p)
+        if errs:
+            QMessageBox.warning(self, tr("music.train.err", "Impossibile allenare"), "\n".join(errs)); return
+        n = len([a for a in p.audio_paths if Path(a).suffix.lower() in tx.AUDIO_EXTS])
+        if QMessageBox.question(
+                self, tr("music.train.confirm.t", "Avviare il training?"),
+                tr("music.train.confirm.m", "Alleno la LoRA '{name}' su {n} file per {s} passi. "
+                   "Può richiedere molto tempo. Continuare?").format(name=p.exp_name, n=n, s=p.max_steps)
+                ) != QMessageBox.Yes:
+            return
+        job = tx.make_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
+                          on_done=self._b.song_done.emit)
+        self._start_job(job, "train", str(tx.WORK_ROOT / tx._safe(p.exp_name)))
+
     def _on_song_engine(self, e: str):
         """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""
         is_hm = (e == "HeartMuLa")
@@ -369,6 +394,8 @@ class MusicTab(QWidget):
             self.song_adv.set_engine(e)                      # avanzate: abilitate solo per ACE-Step
         if hasattr(self, "song_task"):
             self.song_task.set_engine(e)                     # operazione/task: solo ACE-Step
+        if hasattr(self, "song_trainer"):
+            self.song_trainer.set_engine(e)                  # trainer LoRA: solo ACE-Step
         # CFG: HeartMuLa ~1.5 (scala 1-10) · ACE-Step ~15 (apg, scala 1-30)
         if is_hm:
             self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.5)
@@ -521,6 +548,9 @@ class MusicTab(QWidget):
         self.btn_song.setEnabled(True); self.btn_son.setEnabled(True); self.btn_stop.setEnabled(False)
         if code != 0:
             self.status.setText(tr("music.failed", "Generazione fallita (codice {c})").format(c=code)); return
+        if kind == "train":                                  # #98 F4: il training non produce audio
+            self.status.setText(tr("music.train.done", "LoRA allenata ✓ ({p})").format(p=self._expected_out))
+            self._log(f"[train] LoRA in: {self._expected_out}"); return
         out = self._expected_out if (self._expected_out and Path(self._expected_out).exists()) else None
         if not out:
             found = ms.find_latest_audio(after=self._t0 - 1)
