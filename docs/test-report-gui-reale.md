@@ -180,3 +180,7 @@ WorldGen: 🔴 Windows friction (nunchaku FP4 path bug + FLUX-Fill bf16 24GB / F
 ## Sessione 04/07 — #90 (video) + #87 (API endpoint)
 - **#90 video preview**: fasi+barra LIVE ok; preview-IMMAGINE video BLOCCATA (latente LTX-2.3 tokenizzato, previewer LTXV crasha 45312x1 vs 128x3, rompe la gen) → revert sicuro bd151cf, decode custom = task #92.
 - **#87 API :8200**: health/segment/rife/tts(edge)/film-script/rig ✅ (fix rig preflight 3f17d86). world: API ok, WorldGen non produce output → task #93. sonify/MMAudio non installato 🔒.
+
+## Sessione 04/07 — #92 + #93 (loop "fino a verde")
+- **#92 preview-immagine video**: FATTO+live. Decode del latente-token LTX-2.3 nel callback (fattori is_23=True KJNodes estratti, unpack video, F.linear+sigmoid). 7-8 anteprime/gen. Commit 61a0f03.
+- **#93 WorldGen**: VERDE. 3 bug reali corretti (2 nunchaku loader legacy path-Windows + 1 pano_depth device str), resi persistenti nell'installer (patch_nunchaku/patch_worldgen_src). Cache HF su E: (HF_HOME). Pesi: FLUX.1-dev diffusers (23GB) + nunchaku fp4 + DA-2 + LoRA. Validato: worker diretto → mesh.glb 8MB; API :8200 /threed/world → success + download_url. Commit 76e2cfa/32240bc/b44c47d.
