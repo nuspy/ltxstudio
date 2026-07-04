@@ -140,10 +140,10 @@ class MusicTab(QWidget):
         g.addWidget(QLabel(tr("music.cfg", "CFG")), 2, 2); g.addWidget(self.song_cfg, 2, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
         v.addLayout(g)
-        # mostra/nasconde i parametri specifici di HeartMuLa quando si sceglie ACE-Step
-        self.song_engine.currentTextChanged.connect(
-            lambda e: (self.song_ver.setEnabled(e == "HeartMuLa"),
-                       self.song_temp.setEnabled(e == "HeartMuLa")))
+        # #96/4: default dei parametri per MODELLO selezionato (apertura + cambio) — le due scale di CFG
+        # sono DIVERSE: HeartMuLa ~1.5 (1-10), ACE-Step ~15 (apg, 1-30). Applica anche i controlli HM-only.
+        self.song_engine.currentTextChanged.connect(self._on_song_engine)
+        self._on_song_engine(self.song_engine.currentText())   # applica subito per l'engine già selezionato
         # --- Videomusicale: immagine iniziale/sfondo ---
         mv = QHBoxLayout()
         self.mv_image = QLineEdit()
@@ -326,6 +326,17 @@ class MusicTab(QWidget):
         self._start_job(ms.make_song_job(p, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                                          on_done=self._b.song_done.emit), "song", p.out_mp3())
 
+    def _on_song_engine(self, e: str):
+        """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""
+        is_hm = (e == "HeartMuLa")
+        self.song_ver.setEnabled(is_hm)                      # 3B/7B solo HeartMuLa
+        self.song_temp.setEnabled(is_hm)                     # temperatura solo HeartMuLa
+        # CFG: HeartMuLa ~1.5 (scala 1-10) · ACE-Step ~15 (apg, scala 1-30)
+        if is_hm:
+            self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.5)
+        else:
+            self.song_cfg.setRange(1.0, 30.0); self.song_cfg.setValue(15.0)
+
     def _gen_song_acestep(self):
         """Generazione canzone/strumentale con ACE-Step XL 1.5 (alternativa a HeartMuLa)."""
         from core import acestep_service as ax
@@ -336,11 +347,11 @@ class MusicTab(QWidget):
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         out = ax.OUT_DIR / f"{ax._safe(name)}.wav"
-        # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa: il suo sweet-spot è ~15 (apg CFG),
-        # mentre song_cfg (default 1.5) è tarato per HeartMuLa. Passare 1.5 sotto-condiziona il modello →
-        # RUMORE grigio di fondo. Usiamo i parametri nativi di ACE-Step (guidance 15, più step = più pulito).
+        # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa. Il selettore engine imposta
+        # song_cfg al default corretto (~15) quando ACE-Step è attivo (_on_song_engine); passare 1.5
+        # (default HeartMuLa) sotto-condizionerebbe il modello → RUMORE grigio. 60 step = più pulito.
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
-                          steps=60, guidance=15.0, lazy=self.song_lazy.isChecked(),
+                          steps=60, guidance=float(self.song_cfg.value()), lazy=self.song_lazy.isChecked(),
                           on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
