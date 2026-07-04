@@ -10,6 +10,8 @@ sono inoltrati alla UI via Qt Signal. L'installazione dei moduli è lanciata da 
 from __future__ import annotations
 
 import os
+import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -30,6 +32,50 @@ _LYRIC_LANGS = [
     ("zh", "中文"), ("ko", "한국어"), ("ar", "العربية"), ("he", "עברית"),
     ("hi", "हिन्दी"), ("el", "Ελληνικά"), ("hu", "Magyar"),
 ]
+
+
+# Sezioni struttura per i "chip" liriche (inseriscono il tag al cursore).
+_LYRIC_SECTIONS = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Bridge", "Instrumental", "Guitar Solo", "Outro"]
+
+# Esempi creativi per il pulsante 🎲 (stili sempre diversi: mai banali). tags/lyrics/bpm/tonalità.
+_SONG_EXAMPLES = [
+    {"tags": "dark cinematic orchestral, epic choir, war drums, ominous, powerful",
+     "lyrics": "[Intro]\n[Verse]\nAsh on the wind, the towers fall\n[Chorus]\nWe rise, we rise beyond the wall\n[Outro]",
+     "bpm": 90, "key": "D minor"},
+    {"tags": "80s synthwave, neon, driving bassline, retro, nostalgic, female vocals",
+     "lyrics": "[Verse]\nMidnight chrome on the empty road\n[Chorus]\nDrive into the electric glow\n[Bridge]\n[Outro]",
+     "bpm": 118, "key": "A minor"},
+    {"tags": "gregorian chant, sacred, cathedral reverb, male choir, slow, solemn",
+     "lyrics": "[Intro]\n[Verse]\nLux aeterna in the stone\n[Chorus]\nVoices carry us alone\n[Outro]",
+     "bpm": 60, "key": "E minor"},
+    {"tags": "upbeat reggaeton, tropical, dembow, catchy, party, spanish",
+     "lyrics": "[Verse]\nBajo el sol la fiesta empieza\n[Chorus]\nBaila, baila, sin pereza\n[Verse 2]\n[Outro]",
+     "bpm": 96, "key": "C minor"},
+    {"tags": "lo-fi hip hop, dusty vinyl, mellow piano, rainy, chill, instrumental",
+     "lyrics": "", "bpm": 84, "key": "F major"},
+    {"tags": "aggressive industrial metal, distorted guitars, glitch, pounding, intense",
+     "lyrics": "[Intro]\n[Verse]\nSteel and static in my veins\n[Chorus]\nBreak the circuit, break the chains\n[Outro]",
+     "bpm": 150, "key": "E minor"},
+    {"tags": "warm acoustic folk, fingerpicked guitar, intimate, storytelling, male vocals",
+     "lyrics": "[Verse]\nOld river knows my father's name\n[Chorus]\nCarry me home again the same\n[Bridge]\n[Outro]",
+     "bpm": 76, "key": "G major"},
+]
+
+
+def _expand_wildcards(text: str) -> str:
+    """Risolve i wildcard {a|b|c} scegliendo un'opzione a caso (single-level). Preserva [tag] struttura."""
+    if not text or "{" not in text:
+        return text
+    def _pick(m):
+        opts = [o.strip() for o in m.group(1).split("|")]
+        return random.choice(opts) if opts else ""
+    # più passate per gestire wildcard multipli sulla stessa riga
+    for _ in range(8):
+        new = re.sub(r"\{([^{}]*)\}", _pick, text)
+        if new == text:
+            break
+        text = new
+    return text
 
 
 class _LyricsWorker(QThread):
@@ -109,6 +155,11 @@ class MusicTab(QWidget):
         self.btn_tagpick.setToolTip(tr("music.tagpicker.btn.tt", "Scegli i tag di stile dalla palette"))
         self.btn_tagpick.setCursor(Qt.PointingHandCursor); self.btn_tagpick.clicked.connect(self._pick_tags)
         _trl.addWidget(self.btn_tagpick)
+        self.btn_example = QToolButton(); self.btn_example.setText("🎲")
+        self.btn_example.setToolTip(tr("music.example.tt",
+            "Riempie tag, liriche e metadata con un esempio di stile casuale (sempre diverso)."))
+        self.btn_example.setCursor(Qt.PointingHandCursor); self.btn_example.clicked.connect(self._random_example)
+        _trl.addWidget(self.btn_example)
         f.addRow(tr("music.tags", "Tag di stile"), _tags_row)
         v.addLayout(f)
         v.addWidget(QLabel(tr("music.lyrics", "Liriche (usa sezioni [Verse], [Chorus]…)")))
@@ -116,6 +167,16 @@ class MusicTab(QWidget):
         self.song_lyrics.setPlaceholderText("[Verse]\n…\n[Chorus]\n…")
         self.song_lyrics.setFixedHeight(140)
         v.addWidget(self.song_lyrics)
+        # Chip sezioni: inseriscono il tag struttura al cursore (niente sintassi a mano)
+        chips = QHBoxLayout(); chips.setSpacing(3)
+        chips.addWidget(QLabel(tr("music.sections", "Sezioni:")))
+        for _sec in _LYRIC_SECTIONS:
+            b = QToolButton(); b.setText(_sec); b.setCursor(Qt.PointingHandCursor)
+            b.setToolTip(tr("music.sections.tt", "Inserisce [{s}] al punto del cursore nelle liriche.").format(s=_sec))
+            b.clicked.connect(lambda _=False, s=_sec: self._insert_section(s))
+            chips.addWidget(b)
+        chips.addStretch(1)
+        v.addLayout(chips)
         # --- Genera il testo con l'AI (LLM locale Gemma-3) ---
         ai = QHBoxLayout()
         self.lyr_prompt = QLineEdit()
@@ -366,8 +427,8 @@ class MusicTab(QWidget):
             return self._gen_song_acestep()
         p = ms.SongParams(
             name=self.song_name.text().strip() or "song",
-            lyrics=self.song_lyrics.toPlainText(),
-            tags=self.song_meta.compose(self.song_tags.text().strip()),   # F-A: accoda i metadata musicali
+            lyrics=_expand_wildcards(self.song_lyrics.toPlainText()),      # wildcards {a|b|c}
+            tags=self.song_meta.compose(_expand_wildcards(self.song_tags.text().strip())),   # F-A: metadata + wildcards
             duration_s=self.song_dur.value(), instrumental=self.song_instr.isChecked(),
             version=self.song_ver.currentText(), temperature=self.song_temp.value(),
             cfg_scale=self.song_cfg.value(), lazy_load=self.song_lazy.isChecked())
@@ -386,6 +447,26 @@ class MusicTab(QWidget):
         dlg = MusicTagDialog(self.song_tags.text(), engine=self.song_engine.currentText(), parent=self)
         if dlg.exec():
             self.song_tags.setText(dlg.result_tags())
+
+    def _insert_section(self, sec: str):
+        """Inserisce il tag di sezione [sec] al cursore delle liriche (con a-capo)."""
+        if self.song_lyrics.isEnabled():
+            self.song_lyrics.insertPlainText(f"[{sec}]\n")
+            self.song_lyrics.setFocus()
+
+    def _random_example(self):
+        """Riempie tag/liriche/metadata con un esempio di stile casuale (sempre diverso)."""
+        ex = random.choice(_SONG_EXAMPLES)
+        self.song_tags.setText(ex["tags"])
+        instr = not ex.get("lyrics")
+        self.song_instr.setChecked(instr)
+        if not instr:
+            self.song_lyrics.setPlainText(ex["lyrics"])
+        self.song_meta.bpm.setValue(int(ex.get("bpm", 0)))
+        if ex.get("key"):
+            self.song_meta.key.setCurrentText(ex["key"])
+        self.song_meta.setChecked(True)                      # apri il pannello metadata per mostrarli
+        self.status.setText(tr("music.example.done", "Esempio caricato — modifica pure e genera."))
 
     def _train_lora(self, params: dict):
         """#98 F4: avvia il training di una LoRA ACE-Step dal dataset trascinato."""
@@ -450,9 +531,9 @@ class MusicTab(QWidget):
     def _gen_song_acestep(self):
         """Generazione canzone/strumentale con ACE-Step XL 1.5 (alternativa a HeartMuLa)."""
         from core import acestep_service as ax
-        raw_tags = self.song_tags.text().strip()
+        raw_tags = _expand_wildcards(self.song_tags.text().strip())        # wildcards {a|b|c}
         instrumental = self.song_instr.isChecked()
-        lyrics = "" if instrumental else self.song_lyrics.toPlainText().strip()
+        lyrics = "" if instrumental else _expand_wildcards(self.song_lyrics.toPlainText().strip())
         name = self.song_name.text().strip() or "song"
         errs = ax.preflight(raw_tags)
         if errs:
