@@ -121,6 +121,8 @@ class Job:
             env.update(self.env)
         env.setdefault("PYTHONUNBUFFERED", "1")
         env.setdefault("PYTHONIOENCODING", "utf-8")
+        if sys.platform == "win32" and "expandable_segments" in env.get("PYTORCH_CUDA_ALLOC_CONF", ""):
+            env.pop("PYTORCH_CUDA_ALLOC_CONF", None)          # #96/2: non supportato su Windows → evita il UserWarning
         flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
         self._proc = subprocess.Popen(
             self.cmd, cwd=str(self.cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
