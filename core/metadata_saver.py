@@ -9,31 +9,39 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+# Tutti i sidecar in UNA cartella dedicata (accoppiati per NOME all'output), indipendente da dove sta l'output.
+OUTPUT_ROOT = Path(r"E:\AI\ltxstudio\output")
+SIDECAR_DIR = OUTPUT_ROOT / "sidecars"
+
 
 class MetadataSaver:
-    """Salva e carica sidecar JSON per i file generati."""
+    """Salva e carica sidecar JSON per i file generati (in output/sidecars/)."""
 
     @staticmethod
     def sidecar_path(output_path: str | Path) -> Path:
-        """Ritorna il path del file sidecar (.json) per un dato output."""
+        """Path del sidecar (.json) per un dato output — in output/sidecars/<nome_output>.json.
+        Retro-compat: se esiste il vecchio sidecar adiacente (<output>.json) lo si continua a leggere."""
+        return SIDECAR_DIR / (Path(output_path).name + ".json")
+
+    @staticmethod
+    def _legacy_sidecar(output_path: str | Path) -> Path:
         return Path(str(output_path) + ".json")
 
     @staticmethod
     def save_sidecar(output_path: str | Path, meta: dict) -> Path:
-        """Salva il sidecar JSON accanto al file generato.
+        """Salva il sidecar JSON in output/sidecars/ (accoppiato per nome all'output).
 
         Args:
-            output_path: path completo del file generato (mp4, png, webm, …)
-            meta: dizionario con i parametri di generazione
-
-        Returns:
-            path del file .json creato
+            output_path: path completo del file generato (mp4, png, wav, glb, …)
+            meta: dizionario con i parametri di generazione (riutilizzabili nel Navigator)
         """
+        SIDECAR_DIR.mkdir(parents=True, exist_ok=True)
         sp = MetadataSaver.sidecar_path(output_path)
         payload = {
             "ltxstudio_version": "1.0",
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "output_file": str(Path(output_path).name),
+            "output_path": str(output_path),
             **meta,
         }
         sp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -41,14 +49,14 @@ class MetadataSaver:
 
     @staticmethod
     def load_sidecar(output_path: str | Path) -> dict | None:
-        """Carica il sidecar JSON se esiste; ritorna None altrimenti."""
-        sp = MetadataSaver.sidecar_path(output_path)
-        if not sp.exists():
-            return None
-        try:
-            return json.loads(sp.read_text(encoding="utf-8"))
-        except Exception:
-            return None
+        """Carica il sidecar JSON (output/sidecars/) se esiste; fallback al vecchio adiacente. None se assente."""
+        for sp in (MetadataSaver.sidecar_path(output_path), MetadataSaver._legacy_sidecar(output_path)):
+            if sp.exists():
+                try:
+                    return json.loads(sp.read_text(encoding="utf-8"))
+                except Exception:                            # noqa: BLE001
+                    continue
+        return None
 
     # estensioni media mostrate in galleria (immagini, video, audio)
     _MEDIA_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp",

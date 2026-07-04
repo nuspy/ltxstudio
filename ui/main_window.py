@@ -740,8 +740,39 @@ class MainWindow(QMainWindow):
 
     def _enqueue(self, label, worker, on_done=None, on_progress=None):
         """Accoda un worker di generazione nella coda seriale (no sovrapposizioni). Vedi ui/job_queue.py.
-        Sostituisce il vecchio pattern worker.done.connect(...)+worker.start() in tutti i punti."""
-        return self.jobs.enqueue(label, worker, on_done=on_done, on_progress=on_progress)
+        Sostituisce il vecchio pattern worker.done.connect(...)+worker.start() in tutti i punti.
+        #97: scrive automaticamente un sidecar (output/sidecars/) coi params del worker ad ogni output."""
+        def _wrapped(res):
+            try:
+                self._auto_sidecar(worker, res, label)
+            except Exception:                                # noqa: BLE001
+                pass
+            if on_done:
+                on_done(res)
+        return self.jobs.enqueue(label, worker, on_done=_wrapped, on_progress=on_progress)
+
+    def _auto_sidecar(self, worker, res, label):
+        """#97: sidecar universale — dai params del worker + output del risultato. Best-effort (mai rompe)."""
+        if not isinstance(res, dict) or res.get("status") not in (None, "success"):
+            return
+        outs = res.get("output") or []
+        out = outs[0] if isinstance(outs, (list, tuple)) and outs else (outs if isinstance(outs, str) else None)
+        params = getattr(worker, "params", None)
+        if not out and isinstance(params, dict):
+            out = params.get("output")
+        if not out or not isinstance(out, str) or not os.path.exists(out):
+            return
+        meta = {"label": str(label), "output_kind": Path(out).suffix.lstrip(".").lower()}
+        if isinstance(params, dict):                         # solo valori JSON-safe (niente tensori/oggetti)
+            for k, v in params.items():
+                if k == "output":
+                    continue
+                if isinstance(v, (str, int, float, bool)) or v is None:
+                    meta[k] = v
+                elif isinstance(v, (list, tuple)) and all(isinstance(x, (str, int, float, bool, dict)) for x in v):
+                    meta[k] = list(v)
+        from core.metadata_saver import MetadataSaver
+        MetadataSaver.save_sidecar(out, meta)
 
     def _build_menu(self):
         m = self.menuBar().addMenu(tr("menu.tools"))
