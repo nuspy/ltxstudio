@@ -396,11 +396,17 @@ class MusicTab(QWidget):
             self.song_task.set_engine(e)                     # operazione/task: solo ACE-Step
         if hasattr(self, "song_trainer"):
             self.song_trainer.set_engine(e)                  # trainer LoRA: solo ACE-Step
-        # CFG: HeartMuLa ~1.5 (scala 1-10) · ACE-Step ~15 (apg, scala 1-30)
+        # CFG = aderenza al prompt. HeartMuLa (LM-CFG): 2.5 default, scala 1-8 (oltre → artefatti/ripetizioni).
+        # ACE-Step (apg): ~15, scala 1-30. È l'UNICA leva di aderenza per HeartMuLa (non ha guidance_scale_text).
         if is_hm:
-            self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.5)
+            self.song_cfg.setRange(1.0, 8.0); self.song_cfg.setValue(2.5)
+            self.song_cfg.setToolTip(tr("music.cfg.hm.tt",
+                "CFG = aderenza ai tag/liriche (unica leva di HeartMuLa). Più alto = più aderente; oltre ~4-5 "
+                "rischia artefatti/ripetizioni. Per l'aderenza migliore usa il checkpoint RL."))
         else:
             self.song_cfg.setRange(1.0, 30.0); self.song_cfg.setValue(15.0)
+            self.song_cfg.setToolTip(tr("music.cfg.ace.tt",
+                "CFG (apg) di ACE-Step. ~15 è lo sweet-spot. Per l'aderenza ai TAG usa anche 'Aderenza stile'."))
 
     def _gen_song_acestep(self):
         """Generazione canzone/strumentale con ACE-Step XL 1.5 (alternativa a HeartMuLa)."""
