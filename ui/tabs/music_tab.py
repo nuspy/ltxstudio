@@ -158,6 +158,10 @@ class MusicTab(QWidget):
         from ui.widgets.music_advanced import MusicAdvanced
         self.song_adv = MusicAdvanced()
         v.addWidget(self.song_adv)
+        # #98 F3: pannello Operazione (retake/repaint/edit/extend/audio2audio) — solo ACE-Step
+        from ui.widgets.music_tasks import MusicTaskPanel
+        self.song_task = MusicTaskPanel()
+        v.addWidget(self.song_task)
         # #96/4: default dei parametri per MODELLO selezionato (apertura + cambio) — le due scale di CFG
         # sono DIVERSE: HeartMuLa ~1.5 (1-10), ACE-Step ~15 (apg, 1-30). Applica anche i controlli HM-only.
         self.song_engine.currentTextChanged.connect(self._on_song_engine)
@@ -363,6 +367,8 @@ class MusicTab(QWidget):
         self.lbl_adherence.setVisible(not is_hm)
         if hasattr(self, "song_adv"):
             self.song_adv.set_engine(e)                      # avanzate: abilitate solo per ACE-Step
+        if hasattr(self, "song_task"):
+            self.song_task.set_engine(e)                     # operazione/task: solo ACE-Step
         # CFG: HeartMuLa ~1.5 (scala 1-10) · ACE-Step ~15 (apg, scala 1-30)
         if is_hm:
             self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.5)
@@ -379,6 +385,7 @@ class MusicTab(QWidget):
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         adv = self.song_adv.get_adv()                        # #98: tutti i param avanzati ACE-Step
+        adv.update(self.song_task.get_task())                # #98 F3: task editing (retake/repaint/edit/…)
         ext = adv.get("format") or "wav"
         out = ax.OUT_DIR / f"{ax._safe(name)}.{ext}"
         # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa. Il selettore engine imposta
