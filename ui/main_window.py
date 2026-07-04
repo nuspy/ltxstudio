@@ -3560,6 +3560,11 @@ class MainWindow(QMainWindow):
                                      if cfg.get("denoise") else None)
             self._start_native_upscale(cfg["upscale_model"], cfg["target_scale"], image_path=image_path)
             return
+        if op in ("colorize", "restore_and_colorize") and not cfg.get("flux2_model"):
+            from PySide6.QtWidgets import QMessageBox            # nessun modello FLUX.2 reale: non inviare il placeholder
+            QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
+                                tr("mw.flux2_model_missing_integrate_msg"))
+            return
         try:
             img_name = self._upload_local(image_path)
             self._inpaint_before = image_path
@@ -3674,9 +3679,28 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "TRELLIS", str(res.get("error", ""))[:1000]); return
         glb = (res.get("output") or [None])[0]
         self._log(f"[trellis] mesh 3D pronta: {glb}")
-        try:                                              # carica nel visore 3D del tab se disponibile
-            if glb and hasattr(self, "trellis_tab") and hasattr(self.trellis_tab, "load_model"):
-                self.trellis_tab.load_model(glb)
+        try:                                              # carica nel visore 3D del tab (show_result, NON load_model che è del viewer)
+            if glb and hasattr(self, "trellis_tab") and hasattr(self.trellis_tab, "show_result"):
+                self.trellis_tab.show_result(glb)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_rig_native_done(self, res: dict):
+        """Done handler del rig NATIVO: mostra nel visore Rig + handoff al tab Animazione (come il ramo Comfy)."""
+        from PySide6.QtWidgets import QMessageBox
+        if res.get("status") != "success":
+            self._log(f"[rig] errore: {res.get('error', '')[:300]}")
+            QMessageBox.critical(self, "Rig 3D", str(res.get("error", ""))[:1000]); return
+        glb = (res.get("output") or [None])[0]
+        self._log(f"[rig] modello riggato pronto: {glb}")
+        try:                                              # visore del tab Rig
+            if glb and hasattr(self, "rig_tab") and hasattr(self.rig_tab, "show_result"):
+                self.rig_tab.show_result(glb)
+        except Exception:  # noqa: BLE001
+            pass
+        try:                                              # handoff al tab Animazione (parità col ramo ComfyUI)
+            if glb and hasattr(self, "anim_tab") and hasattr(self.anim_tab, "set_last_rig"):
+                self.anim_tab.set_last_rig(glb)
         except Exception:  # noqa: BLE001
             pass
 
@@ -3844,7 +3868,7 @@ class MainWindow(QMainWindow):
                     pass
 
         self._rig_worker = _RigWorker()
-        self._enqueue(tr("queue.job.rig", "Rig 3D"), self._rig_worker, self._on_trellis_native_done)
+        self._enqueue(tr("queue.job.rig", "Rig 3D"), self._rig_worker, self._on_rig_native_done)
 
     def generate_rig(self, cfg: dict):
         """Rigging automatico di una mesh (nativo SkinTokens se installato, altrimenti ComfyUI)."""

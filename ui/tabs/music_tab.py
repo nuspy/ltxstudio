@@ -182,7 +182,7 @@ class MusicTab(QWidget):
         # Videomusicale automatico: canzone → storyboard LLM → video nativo coerente col testo
         self.btn_music_video = QPushButton(tr("music.mv.gen", "🎬 Genera videomusicale"))
         self.btn_music_video.setToolTip(tr("music.mv.gen.tt",
-            "Crea canzone + video coerente col testo (storyboard LLM + LTX-2.3 nativo). Richiede un'immagine iniziale."))
+            "Crea canzone + video coerente col testo (storyboard LLM + LTX-2.3 nativo). Un'immagine iniziale è opzionale."))
         self.btn_music_video.clicked.connect(self._gen_music_video)
         self.btn_mv_projects = QPushButton(tr("music.mv.projects", "📂 Progetti videomusicali"))
         self.btn_mv_projects.clicked.connect(self._open_mv_projects)
@@ -388,7 +388,12 @@ class MusicTab(QWidget):
 
     def son_name(self) -> str:
         v = self.son_video.text().strip()
-        return Path(v).stem if v else "sfx"
+        if v:
+            return Path(v).stem
+        # text-to-audio (nessun video): nome derivato dal prompt per non sovrascrivere "sfx" ad ogni run
+        import re
+        slug = re.sub(r"[^\w]+", "_", (self.son_prompt.text() or "").strip()).strip("_")[:40]
+        return slug or "sfx"
 
     def _start_job(self, job: ms.Job, kind: str, expected_out):
         self.logview.clear(); self.bar.setValue(0); self._t0 = time.time()

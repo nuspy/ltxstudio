@@ -187,6 +187,11 @@ class RestoreTab(QWidget):
         self._input_path = "<from_canvas>"
         self.path_edit.setText(tr("res.input.canvas.selected"))
 
+    def _flux2_value(self) -> str:
+        """Modello FLUX.2 selezionato, "" se è il placeholder 'nessun modello' (non inviarlo come nome reale)."""
+        v = self.flux2_model.currentText() or ""
+        return "" if v == tr("res.color.no_model") else v
+
     def _on_process(self):
         if self.radio_restore.isChecked():
             op = "restore"
@@ -207,7 +212,7 @@ class RestoreTab(QWidget):
             "denoise": self.denoise_chk.isChecked(),
             "denoise_strength": self.denoise_str.value(),
             # colorizzazione
-            "flux2_model": self.flux2_model.currentText() or "",
+            "flux2_model": self._flux2_value(),
             "subject": self.subject_edit.text().strip(),
             "style": self.style_edit.text().strip() or "natural realistic colors",
             "color_steps": self.color_steps.value(),
@@ -276,7 +281,7 @@ class RestoreTab(QWidget):
             "target_scale": self.scale_spin.value(),
             "denoise": self.denoise_chk.isChecked(),
             "denoise_strength": self.denoise_str.value(),
-            "flux2_model": self.flux2_model.currentText() or "",
+            "flux2_model": self._flux2_value(),
             "subject": self.subject_edit.text().strip(),
             "style": self.style_edit.text().strip() or "natural realistic colors",
             "color_steps": self.color_steps.value(),

@@ -2,6 +2,7 @@
 Versione funzionale: raccoglie i video degli shot in ordine, render master e/o export OTIO."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Signal
