@@ -1490,6 +1490,13 @@ class MainWindow(QMainWindow):
                       "Scegli/crea nel tab Audio una voce con campione per il voice cloning.")
             audio["audio_mode"] = "native"; audio["audio_clone"] = False
             audio["audio_native"] = True
+        # #95 (V4): clone SENZA testo = riferimento-voce (LTXVReferenceAudio) → NON supportato dal worker video
+        # nativo (leggeva solo audio_file) → era un no-op silenzioso. Avvisa e procede senza voce.
+        if audio.get("audio_mode") == "clone" and not (audio.get("tts_text") or "").strip():
+            self._log("[warn] clone senza testo (riferimento voce) non è supportato dal motore video nativo: "
+                      "inserisci un testo nel tab Audio (verrà sintetizzato) o carica un audio. Procedo senza voce.")
+            audio["audio_mode"] = "native"; audio["audio_clone"] = False
+            audio["audio_native"] = True
         # ── VIDEO LUNGO + voce: la voce (TTS/file) è UNA traccia lunga → affettala per segmento ──
         # Ogni spezzone usa la sua FINESTRA temporale della voce (il dialogo è già tolto dal prompt
         # degli extend; LTX fa solo visivo+ambiente). Risolve "5 minuti di parlato nei 10s della base".
@@ -1734,13 +1741,11 @@ class MainWindow(QMainWindow):
             seed = cfg["seed"] if cfg.get("seed") is not None else random.randint(0, 2**31)
             steps = cfg.get("steps") or 20
             negative = cfg.get("negative") or self.frame1_tab.get_values().get("prompt_negative", "")
-            # ── BACKEND NATIVO (FLUX.1 Fill): niente ComfyUI. FLUX.2 Klein e i checkpoint
-            #    restano su ComfyUI finché non migrati (vedi docs/zero_comfy.md Fase A).
+            # ── BACKEND NATIVO: FLUX.1 Fill ('inpaint') E FLUX.2 Klein ('flux2_inpaint',
+            #    Flux2KleinInpaintPipeline — #14/#78 completati). Solo i checkpoint restano su ComfyUI.
             from core import backend
-            from core.gen_pipeline import is_flux2
             _unet = cfg.get("unet") or ""
-            if (backend.is_native("image") and not cfg.get("checkpoint")
-                    and _unet and not is_flux2(_unet)):
+            if backend.is_native("image") and not cfg.get("checkpoint") and _unet:   # #95 I4: flux2 ora nativo
                 self._start_native_inpaint(exp, _unet, ptxt, negative, steps, seed, retention, mode)
                 return
             img_name = self._upload_local(exp["image"])
@@ -1903,10 +1908,16 @@ class MainWindow(QMainWindow):
                                 tr("mw.color_missing_msg")); return
         engine = cc["engine"]; model = None
         if engine == "flux2":
+            from core.gen_pipeline import is_flux2           # (non è in scope a livello modulo)
             model = self.frame1_tab.get_inpaint_config().get("integrate_model")
             if not model:
                 QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
                                     tr("mw.flux2_model_missing_inpaint_tab_msg")); return
+            if not is_flux2(model):                          # #95 I3: il combo Integra può mostrare un modello Kontext (FLUX.1)
+                QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
+                    tr("mw.recolor_flux2_wrong_arch_msg",
+                       "Il modello scelto non è FLUX.2. Imposta il motore della sezione Integra su FLUX.2 e "
+                       "seleziona un modello FLUX.2, oppure usa il motore Kontext per il recolor.")); return
         # ── BACKEND NATIVO (recolor Kontext FLUX.1): niente ComfyUI. FLUX.2 → ComfyUI.
         from core import backend
         if backend.is_native("image") and engine == "kontext":
