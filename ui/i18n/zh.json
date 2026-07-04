@@ -1975,5 +1975,9 @@
   "f1.upscale.mode.tt": "模式：“快速”仅放大；“精修”增加一次 FLUX 处理以获得更多细节。",
   "f1.upscale.refine_model.tt": "放大后用于 AI 精修的 FLUX.2 模型。",
   "f1.upscale.refine_str.tt": "AI 精修强度：高则重绘更多，低则保留原图。",
-  "f1.upscale.run.tt": "开始提升当前图像的清晰度。"
+  "f1.upscale.run.tt": "开始提升当前图像的清晰度。",
+  "cn.enable.tt": "启用 ControlNet：生成的视频将跟随参考视频的运动。",
+  "cn.type.tt": "控制类型：Canny（轮廓）、Depth（3D 深度）或 Pose（人体骨架）。",
+  "cn.strength.tt": "控制强度：1.0 严格跟随参考，低值给予更多自由。",
+  "cn.video.pick.tt": "选择要从中复制运动的参考视频。"
 }

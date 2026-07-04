@@ -1975,5 +1975,9 @@
   "f1.upscale.mode.tt": "Mód: 'gyors' csak felskálázó; 'finomítás' egy FLUX menetet ad hozzá a részletekért.",
   "f1.upscale.refine_model.tt": "A felskálázás utáni MI-finomításhoz használt FLUX.2 modell.",
   "f1.upscale.refine_str.tt": "MI-finomítás erőssége: magas többet rajzol újra, alacsony megőrzi az eredetit.",
-  "f1.upscale.run.tt": "Indítsd el az aktuális kép élességének növelését."
+  "f1.upscale.run.tt": "Indítsd el az aktuális kép élességének növelését.",
+  "cn.enable.tt": "ControlNet bekapcsolása: a generált videó a referenciavideó mozgását követi.",
+  "cn.type.tt": "Vezérlés típusa: Canny (körvonalak), Depth (3D mélység) vagy Pose (emberi csontváz).",
+  "cn.strength.tt": "Vezérlés erőssége: 1,0 szigorúan követi a referenciát, alacsony érték több szabadságot ad.",
+  "cn.video.pick.tt": "Válaszd ki a referenciavideót, amelyről a mozgást másolod."
 }

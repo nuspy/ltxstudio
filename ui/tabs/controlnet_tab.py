@@ -48,6 +48,7 @@ class ControlNetTab(QWidget):
         lay.addWidget(intro)
 
         self.enable = QCheckBox(tr("cn.enable"))
+        self.enable.setToolTip(tr("cn.enable.tt", "Attiva il ControlNet: il video generato seguirà il movimento del video di riferimento."))
         lay.addWidget(self.enable)
 
         type_box = QGroupBox(tr("cn.type.group"))
@@ -57,6 +58,7 @@ class ControlNetTab(QWidget):
         self.type = QComboBox()
         for label_key, _ in self.TYPES:
             self.type.addItem(tr(label_key))
+        self.type.setToolTip(tr("cn.type.tt", "Tipo di controllo: Canny (contorni), Depth (profondità 3D) o Pose (scheletro umano)."))
         self.type.currentIndexChanged.connect(self._on_type_changed)
         row.addWidget(self.type); row.addStretch(1)
         tv.addLayout(row)
@@ -69,6 +71,7 @@ class ControlNetTab(QWidget):
         srow.addWidget(QLabel(tr("cn.strength_lbl")))
         self.strength = QDoubleSpinBox()
         self.strength.setRange(0.0, 1.0); self.strength.setSingleStep(0.05); self.strength.setValue(0.8)
+        self.strength.setToolTip(tr("cn.strength.tt", "Intensità del controllo: 1.0 segue rigidamente il riferimento, valori bassi lasciano più libertà."))
         srow.addWidget(self.strength); srow.addStretch(1)
         tv.addLayout(srow)
         shint = QLabel(tr("cn.strength_hint"))
@@ -80,6 +83,7 @@ class ControlNetTab(QWidget):
         vb = QVBoxLayout(video_box)
         row2 = QHBoxLayout()
         self.pick = QPushButton(tr("cn.video.pick.btn")); self.pick.clicked.connect(self._pick)
+        self.pick.setToolTip(tr("cn.video.pick.tt", "Scegli il video di riferimento da cui copiare il movimento."))
         self.lbl = QLabel(tr("cn.video.none.lbl"))
         row2.addWidget(self.pick); row2.addWidget(self.lbl, 1)
         vb.addLayout(row2)

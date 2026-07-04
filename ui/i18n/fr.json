@@ -1975,5 +1975,9 @@
   "f1.upscale.mode.tt": "Mode : « rapide » upscaler seul ; « raffinement » ajoute une passe FLUX pour plus de détails.",
   "f1.upscale.refine_model.tt": "Modèle FLUX.2 utilisé pour le raffinement IA après l'upscale.",
   "f1.upscale.refine_str.tt": "Intensité du raffinement IA : élevée redessine davantage, faible préserve l'original.",
-  "f1.upscale.run.tt": "Lancer l'augmentation de définition de l'image actuelle."
+  "f1.upscale.run.tt": "Lancer l'augmentation de définition de l'image actuelle.",
+  "cn.enable.tt": "Activer le ControlNet : la vidéo générée suivra le mouvement de la vidéo de référence.",
+  "cn.type.tt": "Type de contrôle : Canny (contours), Depth (profondeur 3D) ou Pose (squelette humain).",
+  "cn.strength.tt": "Intensité du contrôle : 1,0 suit strictement la référence, les valeurs basses laissent plus de liberté.",
+  "cn.video.pick.tt": "Choisissez la vidéo de référence dont copier le mouvement."
 }

@@ -1975,5 +1975,9 @@
   "f1.upscale.mode.tt": "Mode: 'fast' upscaler only; 'refine' adds a FLUX pass for more detail.",
   "f1.upscale.refine_model.tt": "FLUX.2 model used for AI refinement after upscaling.",
   "f1.upscale.refine_str.tt": "AI refinement strength: high redraws more, low preserves the original.",
-  "f1.upscale.run.tt": "Start the definition increase of the current image."
+  "f1.upscale.run.tt": "Start the definition increase of the current image.",
+  "cn.enable.tt": "Enable ControlNet: the generated video will follow the motion of the reference video.",
+  "cn.type.tt": "Control type: Canny (edges), Depth (3D depth) or Pose (human skeleton).",
+  "cn.strength.tt": "Control strength: 1.0 strictly follows the reference, low values allow more freedom.",
+  "cn.video.pick.tt": "Choose the reference video from which to copy the motion."
 }

@@ -1975,5 +1975,9 @@
   "f1.upscale.mode.tt": "Modus: 'schnell' nur Upscaler; 'Verfeinerung' fügt einen FLUX-Durchlauf für mehr Details hinzu.",
   "f1.upscale.refine_model.tt": "FLUX.2-Modell für die KI-Verfeinerung nach dem Hochskalieren.",
   "f1.upscale.refine_str.tt": "Stärke der KI-Verfeinerung: hoch zeichnet mehr neu, niedrig erhält das Original.",
-  "f1.upscale.run.tt": "Starte die Erhöhung der Bildschärfe des aktuellen Bildes."
+  "f1.upscale.run.tt": "Starte die Erhöhung der Bildschärfe des aktuellen Bildes.",
+  "cn.enable.tt": "ControlNet aktivieren: Das generierte Video folgt der Bewegung des Referenzvideos.",
+  "cn.type.tt": "Steuerungstyp: Canny (Kanten), Depth (3D-Tiefe) oder Pose (menschliches Skelett).",
+  "cn.strength.tt": "Steuerungsstärke: 1.0 folgt streng der Referenz, niedrige Werte lassen mehr Freiheit.",
+  "cn.video.pick.tt": "Wähle das Referenzvideo, von dem die Bewegung kopiert wird."
 }
