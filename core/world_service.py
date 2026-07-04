@@ -27,6 +27,7 @@ WORLDGEN_VENV_PY = WORLDGEN_DIR / "venv" / "Scripts" / "python.exe"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "worldgen_generate.py"
 WORLD_OUTPUT_DIR = Path(r"E:\AI\ltxstudio\output\worlds")
 PLAYER_DIR = Path(__file__).resolve().parents[1] / "assets" / "world_player"
+HF_CACHE_DIR = Path(r"E:\hf_cache")             # cache HF su E: (C: piccolo): FLUX.1-dev + nunchaku fp4 + DA-2
 
 
 @dataclass
@@ -73,7 +74,12 @@ def make_job(p: WorldParams, *, mesh: bool, hf_token: str | None = None, **cbs) 
         cmd += ["--low_vram"]
     if p.use_sharp:
         cmd += ["--use_sharp"]
-    env = {"HF_TOKEN": hf_token, "HUGGING_FACE_HUB_TOKEN": hf_token} if hf_token else None
+    # WorldGen carica FLUX.1-dev + nunchaku fp4 + DA-2 via HF cache: la teniamo su E: (C: piccolo).
+    # xet disabilitato (fallisce su spazio/rete instabile) → download HTTP normale.
+    env = {"HF_HOME": str(HF_CACHE_DIR), "HF_HUB_CACHE": str(HF_CACHE_DIR / "hub"),
+           "HF_HUB_DISABLE_XET": "1"}
+    if hf_token:
+        env.update(HF_TOKEN=hf_token, HUGGING_FACE_HUB_TOKEN=hf_token)
     return Job(cmd, WORLDGEN_DIR, env=env, **cbs)
 
 
