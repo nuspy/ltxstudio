@@ -686,7 +686,29 @@ class MainWindow(QMainWindow):
         # Orizzontale PRINCIPALE: area di lavoro ↔ tab dei moduli di controllo
         self.main_splitter = QSplitter(Qt.Horizontal)
         self.main_splitter.addWidget(self.left_splitter)
-        self.main_splitter.addWidget(self.tabs)
+        # #96.1: barra tab MULTI-RIGA — la QTabBar nativa scorre in orizzontale; la nascondo e la
+        # sostituisco con pulsanti in FlowLayout che vanno a capo → tutti i moduli visibili senza scroll.
+        from ui.widgets.flow_layout import FlowLayout
+        from PySide6.QtWidgets import QButtonGroup, QVBoxLayout as _QVBox
+        self.tabs.tabBar().hide()
+        _navw = QWidget(); self._tab_nav_layout = FlowLayout(_navw, margin=2, spacing=3)
+        self._tab_nav_group = QButtonGroup(self); self._tab_nav_group.setExclusive(True)
+        self._tab_nav_btns = []
+        for _i in range(self.tabs.count()):
+            _b = QToolButton(); _b.setText(self.tabs.tabText(_i)); _b.setCheckable(True)
+            _b.setToolButtonStyle(Qt.ToolButtonTextOnly); _b.setCursor(Qt.PointingHandCursor)
+            _b.setStyleSheet("QToolButton{border:1px solid #444;border-radius:6px;padding:3px 9px;}"
+                             "QToolButton:hover{border-color:#6aa;}"
+                             "QToolButton:checked{background:#3a6ea5;color:white;border-color:#3a6ea5;}")
+            _b.setChecked(_i == self.tabs.currentIndex())
+            _b.clicked.connect(lambda _c=False, _idx=_i: self.tabs.setCurrentIndex(_idx))
+            self._tab_nav_group.addButton(_b, _i); self._tab_nav_layout.addWidget(_b); self._tab_nav_btns.append(_b)
+        self.tabs.currentChanged.connect(
+            lambda i: self._tab_nav_btns[i].setChecked(True) if 0 <= i < len(self._tab_nav_btns) else None)
+        _tabs_container = QWidget(); _tcv = _QVBox(_tabs_container)
+        _tcv.setContentsMargins(0, 0, 0, 0); _tcv.setSpacing(2)
+        _tcv.addWidget(_navw); _tcv.addWidget(self.tabs, 1)
+        self.main_splitter.addWidget(_tabs_container)
         self.main_splitter.setStretchFactor(0, 3); self.main_splitter.setStretchFactor(1, 2)
         self.main_splitter.setChildrenCollapsible(False); self.main_splitter.setHandleWidth(6)
         root.addWidget(self.main_splitter)
@@ -700,15 +722,14 @@ class MainWindow(QMainWindow):
         self.queue_dock.setFeatures(QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetMovable
                                     | QDockWidget.DockWidgetFloatable)   # #96.3: chiudibile → si NASCONDE (non elimina)
         self.addDockWidget(Qt.RightDockWidgetArea, self.queue_dock)
-        # #96.3: mini-icona nell'angolo dei tab per ri-mostrare la coda quando è nascosta
-        from PySide6.QtWidgets import QToolButton
+        # #96.3: mini-icona nella nav-bar per ri-mostrare la coda quando è nascosta (QToolButton già importato)
         self._queue_btn = QToolButton(self)
         self._queue_btn.setText("📋"); self._queue_btn.setCheckable(True); self._queue_btn.setChecked(True)
         self._queue_btn.setToolTip(tr("queue.toggle.tt", "Mostra/nascondi la coda generazioni"))
         self._queue_btn.setStyleSheet("QToolButton{border:none;font-size:16px;padding:2px 6px;}")
         self._queue_btn.clicked.connect(lambda: self.queue_dock.setVisible(not self.queue_dock.isVisible()))
         self.queue_dock.visibilityChanged.connect(self._queue_btn.setChecked)
-        self.tabs.setCornerWidget(self._queue_btn, Qt.TopRightCorner)
+        self._tab_nav_layout.addWidget(self._queue_btn)   # #96.1/3: nella nav-bar (la tabBar nativa è nascosta)
         self.jobs.changed.connect(self._refresh_status)
 
         self.status_lbl = QLabel("…")
