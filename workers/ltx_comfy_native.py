@@ -49,38 +49,100 @@ if _REPO not in sys.path:
     sys.path.append(_REPO)
 
 
-def _setup_preview_hook():
-    """PREVIEW LIVE per-step (task #90): abilita il previewer latent2rgb di ComfyUI e aggancia l'hook
-    globale del ProgressBar → scrive progresso (ogni step) + anteprima (PNG) su core.preview_file, che
-    la GUI polla. Best-effort: qualunque errore NON deve rompere la generazione."""
+_LTX_RGB_W = None                                           # tensore fattori (3,128) memoizzato
+_LTX_RGB_B = None                                           # tensore bias (3,)
+_LTX_VIDEO_SHAPE = None                                     # shape latente VIDEO (B,C,T,H,W) per spacchettare x0
+
+
+def _decode_ltx_preview(x0, step, total):
+    """#92: anteprima-immagine del latente denoised LTX-2.3 (tokenizzato + AV NestedTensor). Replica
+    WrappedPreviewer.decode_latent_to_preview di ComfyUI-KJNodes coi fattori corretti a 128 canali
+    (is_23=True): F.linear(movedim(1,-1))+sigmoid. Niente import di KJNodes (che rompe su 'server').
+    COMPLETAMENTE guardato: qualunque errore NON deve rompere la generazione."""
+    global _LTX_RGB_W, _LTX_RGB_B
+    import io
+    import torch
+    import torch.nn.functional as F
+    from PIL import Image
+    from core import preview_file
+    if _LTX_RGB_W is None:
+        from workers._ltx_rgb_factors import LTX23_RGB_FACTORS, LTX23_RGB_BIAS
+        _LTX_RGB_W = torch.tensor(LTX23_RGB_FACTORS).transpose(0, 1)   # (3,128)
+        _LTX_RGB_B = torch.tensor(LTX23_RGB_BIAS)                      # (3,)
+    lat = x0
+    # AV NestedTensor(video,audio) → estrai il latente VIDEO
     try:
-        import io
+        from comfy.nested_tensor import NestedTensor
+        if isinstance(lat, NestedTensor):
+            lat = lat.unbind()[0]
+    except Exception:                                       # noqa: BLE001
+        pass
+    with torch.no_grad():
+        # x0 packed (B,1,seq): il video+audio è una sequenza piatta. Prendo la parte VIDEO (primi
+        # prod(shape[1:]) elementi) e la reshape a (B,C,T,H,W) usando la shape del latente video.
+        if getattr(lat, "ndim", 0) == 3 and _LTX_VIDEO_SHAPE is not None:
+            import math
+            vs = _LTX_VIDEO_SHAPE
+            cut = int(math.prod(vs[1:]))
+            lat = lat[:, :, :cut].reshape((lat.shape[0],) + tuple(vs[1:]))
+        # 5D (B,C,T,H,W) → (frames, C, H, W) come WrappedPreviewer.decode_latent_to_preview_image.
+        # NB: due statement separati (come KJNodes): dopo movedim shape[-3:] deve essere (C,H,W).
+        if getattr(lat, "ndim", 0) == 5:
+            lat = lat.movedim(2, 1)                          # (B,T,C,H,W)
+            lat = lat.reshape((-1,) + lat.shape[-3:])        # (B*T, C, H, W)
+        W = _LTX_RGB_W.to(dtype=lat.dtype, device=lat.device)
+        B = _LTX_RGB_B.to(dtype=lat.dtype, device=lat.device)
+        img = torch.sigmoid(F.linear(lat.movedim(1, -1), W, bias=B))   # (N,H,W,3) [0,1]
+        frame = img[0] if img.ndim == 4 else img
+        a = (frame.clamp(0, 1).mul(255)).to("cpu", torch.uint8).numpy()
+        pim = Image.fromarray(a, "RGB"); pim.thumbnail((384, 384))
+        buf = io.BytesIO(); pim.save(buf, "PNG")
+        preview_file.write_preview(buf.getvalue(), step, total)
+
+
+def _setup_preview_hook():
+    """PREVIEW LIVE per-step (#90/#92): barra via hook globale ProgressBar + anteprima-IMMAGINE video
+    decodificata col WrappedPreviewer di KJNodes (fattori LTX-2.3 corretti). Il previewer core di ComfyUI
+    è incompatibile col latente-token LTX-2.3 → disattivato. Best-effort: NON può MAI rompere la gen."""
+    try:
         import comfy.utils
         from comfy.cli_args import args as _ca, LatentPreviewMethod
         from core import preview_file
-        # abilita il calcolo dell'anteprima (latent2rgb: leggero, built-in, nessun modello extra)
         try:
-            _ca.preview_method = LatentPreviewMethod.Latent2RGB
+            _ca.preview_method = LatentPreviewMethod.NoPreviews   # niente previewer core (crasha su LTX-2.3)
         except Exception:                                   # noqa: BLE001
             pass
-        # NB: NON abilitare il previewer latent2rgb di ComfyUI per LTX-2.3: il suo latente è TOKENIZZATO
-        # (patchificato, non (C,T,H,W) a 128 canali) → il previewer LTXV va in errore
-        # (mat 45312x1 vs 128x3) e ROMPE la generazione. L'anteprima-immagine per video richiede un decode
-        # custom del latente-token (unpatchify + latent2rgb/VAE). Fasi e barra restano attive via l'hook.
-        _ = LatentPreviewMethod  # (import mantenuto)
 
         def _hook(current, total, preview=None, node_id=None):
             try:
-                if preview is not None:
-                    # ComfyUI passa ("JPEG", PIL.Image, max_size) oppure una PIL.Image
-                    img = preview[1] if isinstance(preview, (list, tuple)) and len(preview) > 1 else preview
-                    if hasattr(img, "save"):
-                        buf = io.BytesIO(); img.save(buf, "PNG")
-                        preview_file.write_preview(buf.getvalue(), current, total); return
                 preview_file.write_progress(current, total)
             except Exception:                               # noqa: BLE001
                 pass
         comfy.utils.set_progress_bar_global_hook(_hook)
+
+        # anteprima-immagine: wrap di prepare_callback (usato da SamplerCustomAdvanced) per il latente x0
+        import latent_preview
+        if not getattr(latent_preview, "_ltx_prev_wrapped", False):
+            _orig_prep = latent_preview.prepare_callback
+
+            def _wrap(model, steps, x0_output_dict=None, _orig=_orig_prep):
+                base = _orig(model, steps, x0_output_dict)
+                every = max(1, int(steps) // 6)
+
+                def cb(step, x0, x, total_steps):
+                    try:
+                        base(step, x0, x, total_steps)      # progress (best-effort)
+                    except Exception:                       # noqa: BLE001
+                        pass
+                    try:
+                        if step % every == 0 or step == int(total_steps) - 1:
+                            _decode_ltx_preview(x0, step + 1, total_steps)
+                    except Exception:                       # noqa: BLE001
+                        pass
+                return cb
+
+            latent_preview.prepare_callback = _wrap
+            latent_preview._ltx_prev_wrapped = True
     except Exception as _e:                                 # noqa: BLE001
         print(f"[preview] hook non attivato: {_e}", flush=True)
 
@@ -275,6 +337,11 @@ def run(p: dict) -> str:
         else:                                            # nessun file → audio GENERATIVO (t2v/i2v con suono)
             audio_latent = _unwrap(LTXVEmptyLatentAudio().execute(F, int(p.get("fps", 24)), 1, audio_vae))
             print("[av] audio generativo (empty latent) — t2v/i2v con suono", flush=True)
+        global _LTX_VIDEO_SHAPE                          # #92: shape del latente VIDEO (pre-concat) per l'anteprima
+        try:
+            _LTX_VIDEO_SHAPE = tuple(latent["samples"].shape)
+        except Exception:                                # noqa: BLE001
+            pass
         latent = _unwrap(LTXVConcatAVLatent().execute(latent, audio_latent))
         av_mode = True
         print("[av] AV latent concatenato", flush=True)
@@ -293,6 +360,11 @@ def run(p: dict) -> str:
         _pf.write_message("Generazione…")
     except Exception:                                       # noqa: BLE001
         _pf = None
+    if not av_mode:                                      # #92: senza audio il latente è già solo-video
+        try:
+            globals()["_LTX_VIDEO_SHAPE"] = tuple(latent["samples"].shape)
+        except Exception:                                # noqa: BLE001
+            pass
     tg = time.time()
     out = SamplerCustomAdvanced().execute(noise, guider, sampler, sigmas, latent)
     denoised = out[1] if isinstance(out, tuple) and len(out) > 1 else _unwrap(out)
