@@ -111,6 +111,9 @@ class AnimTab(QWidget):
         split.addWidget(scroll); split.addWidget(self.viewer)
         split.setStretchFactor(0, 0); split.setStretchFactor(1, 1)
         split.setSizes([440, 600])
+        split.setChildrenCollapsible(True)                  # #96.2: separatore libero, senza magnet né limiti
+        split.setHandleWidth(8)
+        scroll.setMinimumWidth(0); self.viewer.setMinimumWidth(0)
         root.addWidget(split, 1)
 
         self.apply_btn = QPushButton(tr("anim.apply"))
