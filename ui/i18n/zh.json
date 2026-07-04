@@ -1911,5 +1911,17 @@
   "vid.height.tt": "视频高度（像素，32 的倍数）。",
   "vid.fps.tt": "帧率。24 = 电影感，30 = 电视标准，60 = 流畅。",
   "vid.length.tt": "视频时长（秒）。",
-  "vid.face.model.tt": "生成后用于人脸修复的 AI 模型。"
+  "vid.face.model.tt": "生成后用于人脸修复的 AI 模型。",
+  "def.pick.tt": "从磁盘加载视频以提升其清晰度。",
+  "def.engine.tt": "超分辨率引擎：SeedVR2（AI 视频），ESRGAN（逐帧加速），FlashVSR。",
+  "def.seedvr2_model.tt": "SeedVR2 视频超分辨率模型变体。",
+  "def.resolution.tt": "SeedVR2 目标垂直分辨率（如 1080 = FullHD）。",
+  "def.esrgan_model.tt": "用于逐帧超分辨率的 ESRGAN 模型。",
+  "def.scale.tt": "ESRGAN 缩放系数：2× 分辨率翻倍，4× 翻四倍。",
+  "def.rife.tt": "启用 RIFE 通过帧插值提高视频帧率。",
+  "def.rife_mult.tt": "FPS 倍增系数：2× 翻倍，4× 翻四倍。",
+  "def.run.tt": "使用所选引擎启动视频清晰度增强。",
+  "def.face.model.tt": "人脸修复 AI 模型：CodeFormer（质量）或 GFPGAN（速度）。",
+  "def.face.detection.tt": "修复前用于定位视频中人脸的检测器。",
+  "def.face.run.tt": "对已加载的视频执行人脸修复。"
 }

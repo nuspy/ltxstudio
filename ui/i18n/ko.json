@@ -1911,5 +1911,17 @@
   "vid.height.tt": "비디오 높이 (픽셀, 32의 배수).",
   "vid.fps.tt": "초당 프레임. 24 = 영화, 30 = TV, 60 = 유동적.",
   "vid.length.tt": "비디오 길이(초).",
-  "vid.face.model.tt": "생성 후 얼굴 복원을 위한 AI 모델."
+  "vid.face.model.tt": "생성 후 얼굴 복원을 위한 AI 모델.",
+  "def.pick.tt": "화질 향상을 위해 디스크에서 비디오를 불러옵니다.",
+  "def.engine.tt": "슈퍼해상도 엔진: SeedVR2(AI 비디오), ESRGAN(빠른 프레임별), FlashVSR.",
+  "def.seedvr2_model.tt": "비디오 슈퍼해상도용 SeedVR2 모델 변형.",
+  "def.resolution.tt": "SeedVR2 목표 수직 해상도 (예: 1080 = FullHD).",
+  "def.esrgan_model.tt": "프레임별 업스케일링을 위한 ESRGAN 모델.",
+  "def.scale.tt": "ESRGAN 배율: 2× 해상도 두 배, 4× 네 배.",
+  "def.rife.tt": "RIFE를 활성화하여 프레임 보간으로 비디오 FPS를 높입니다.",
+  "def.rife_mult.tt": "FPS 배율: 2× 두 배, 4× 네 배.",
+  "def.run.tt": "선택한 엔진으로 비디오 화질 향상을 시작합니다.",
+  "def.face.model.tt": "얼굴 복원 AI 모델: CodeFormer(품질) 또는 GFPGAN(속도).",
+  "def.face.detection.tt": "복원 전 비디오에서 얼굴을 찾기 위한 검출기.",
+  "def.face.run.tt": "로드된 비디오에서 얼굴 복원을 실행합니다."
 }

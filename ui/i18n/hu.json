@@ -1911,5 +1911,17 @@
   "vid.height.tt": "Videó magassága pixelben (32 többszöröse).",
   "vid.fps.tt": "Képkocka per másodperc. 24 = mozis, 30 = TV, 60 = folyékony.",
   "vid.length.tt": "Videó hossza másodpercben.",
-  "vid.face.model.tt": "AI modell az arcok helyreállítására generálás után."
+  "vid.face.model.tt": "AI modell az arcok helyreállítására generálás után.",
+  "def.pick.tt": "Videó betöltése a lemezről a felbontás javításához.",
+  "def.engine.tt": "Szuper-felbontás motor: SeedVR2 (AI videó), ESRGAN (gyors keretenkénti), FlashVSR.",
+  "def.seedvr2_model.tt": "SeedVR2 modellváltozat videó szuper-felbontáshoz.",
+  "def.resolution.tt": "Cél függőleges felbontás SeedVR2-höz (pl. 1080 = FullHD).",
+  "def.esrgan_model.tt": "ESRGAN modell képkockánkénti felskálázáshoz.",
+  "def.scale.tt": "ESRGAN skálafaktor: 2× duplázza, 4× négyszerezi a felbontást.",
+  "def.rife.tt": "RIFE engedélyezése a videó FPS növeléséhez képkocka-interpolációval.",
+  "def.rife_mult.tt": "FPS szorzó: 2× duplázza, 4× négyszerezi.",
+  "def.run.tt": "Videódefiníció-javítás indítása a kiválasztott motorral.",
+  "def.face.model.tt": "AI modell arc-helyreállításhoz: CodeFormer (minőség) vagy GFPGAN (sebesség).",
+  "def.face.detection.tt": "Detektor az arcok megtalálásához a videóban a helyreállítás előtt.",
+  "def.face.run.tt": "Archelyreállítás futtatása a betöltött videón."
 }

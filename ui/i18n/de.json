@@ -1911,5 +1911,17 @@
   "vid.height.tt": "Videohöhe in Pixel (Vielfaches von 32).",
   "vid.fps.tt": "Bilder pro Sekunde. 24 = Kino, 30 = TV, 60 = flüssig.",
   "vid.length.tt": "Videodauer in Sekunden.",
-  "vid.face.model.tt": "KI-Modell zur Gesichtswiederherstellung nach der Generierung."
+  "vid.face.model.tt": "KI-Modell zur Gesichtswiederherstellung nach der Generierung.",
+  "def.pick.tt": "Video vom Datenträger laden, um die Auflösung zu verbessern.",
+  "def.engine.tt": "Super-Resolution-Engine: SeedVR2 (KI-Video), ESRGAN (schnell je Frame), FlashVSR.",
+  "def.seedvr2_model.tt": "SeedVR2-Modellvariante für Video-Super-Resolution.",
+  "def.resolution.tt": "Zielauflösung (vertikal) für SeedVR2 (z.B. 1080 = FullHD).",
+  "def.esrgan_model.tt": "ESRGAN-Modell für frameweises Upscaling.",
+  "def.scale.tt": "ESRGAN-Skalierungsfaktor: 2× verdoppelt, 4× vervierfacht die Auflösung.",
+  "def.rife.tt": "RIFE aktivieren, um die FPS per Frame-Interpolation zu erhöhen.",
+  "def.rife_mult.tt": "FPS-Multiplikator: 2× verdoppelt, 4× vervierfacht.",
+  "def.run.tt": "Videodefinitionsverbesserung mit dem ausgewählten Motor starten.",
+  "def.face.model.tt": "KI-Modell zur Gesichtswiederherstellung: CodeFormer (Qualität) oder GFPGAN (Geschwindigkeit).",
+  "def.face.detection.tt": "Detektor zum Auffinden von Gesichtern im Video vor der Restaurierung.",
+  "def.face.run.tt": "Gesichtswiederherstellung auf dem geladenen Video starten."
 }

@@ -1911,5 +1911,17 @@
   "vid.height.tt": "Altura do vídeo em pixels (múltiplo de 32).",
   "vid.fps.tt": "Quadros por segundo. 24 = cinematográfico, 30 = TV, 60 = fluido.",
   "vid.length.tt": "Duração do vídeo em segundos.",
-  "vid.face.model.tt": "Modelo de IA para restauração de rostos após a geração."
+  "vid.face.model.tt": "Modelo de IA para restauração de rostos após a geração.",
+  "def.pick.tt": "Carrega um vídeo do disco para melhorar a definição.",
+  "def.engine.tt": "Motor de super-resolução: SeedVR2 (IA vídeo), ESRGAN (rápido por frame), FlashVSR.",
+  "def.seedvr2_model.tt": "Variante do modelo SeedVR2 para super-resolução de vídeo.",
+  "def.resolution.tt": "Resolução vertical alvo para SeedVR2 (ex. 1080 = FullHD).",
+  "def.esrgan_model.tt": "Modelo ESRGAN para upscaling por fotograma.",
+  "def.scale.tt": "Fator de escala ESRGAN: 2× duplica, 4× quadruplica a resolução.",
+  "def.rife.tt": "Ativa RIFE para aumentar os FPS do vídeo por interpolação.",
+  "def.rife_mult.tt": "Multiplicador de FPS: 2× duplica, 4× quadruplica.",
+  "def.run.tt": "Inicia a melhoria da definição do vídeo com o motor selecionado.",
+  "def.face.model.tt": "Modelo IA para restauração facial: CodeFormer (qualidade) ou GFPGAN (velocidade).",
+  "def.face.detection.tt": "Detector para localizar rostos no vídeo antes da restauração.",
+  "def.face.run.tt": "Inicia a restauração de rostos no vídeo carregado."
 }
