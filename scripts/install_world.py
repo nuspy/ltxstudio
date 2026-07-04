@@ -115,6 +115,21 @@ def patch_nunchaku() -> None:
         print("[nunchaku] già patchato (o pattern non trovato)")
 
 
+def patch_worldgen_src() -> None:
+    """Fix nel sorgente WorldGen (src/): pano_depth usa model.device.type ma il depth model DA-2 espone
+    .device come STRINGA ('cuda') → AttributeError. Avvolge in torch.device(...). Idempotente."""
+    fp = WORLDGEN / "src" / "worldgen" / "pano_depth.py"
+    if not fp.exists():
+        print("[worldgen-src] pano_depth.py non trovato: patch saltata"); return
+    src = fp.read_text(encoding="utf-8")
+    new = src.replace("torch.autocast(model.device.type)",
+                      "torch.autocast(torch.device(model.device).type)")
+    if new != src:
+        fp.write_text(new, encoding="utf-8"); print("[worldgen-src] patch pano_depth (device str) applicata")
+    else:
+        print("[worldgen-src] pano_depth già patchato")
+
+
 def main() -> int:
     py = find_py()
     if not py:
@@ -153,6 +168,7 @@ def main() -> int:
         print("[!] alcune dipendenze non installate (vedi log).");
     print("=== package worldgen (editable, --no-deps) ===")
     run([VENV_PY, "-m", "pip", "install", "-e", ".", "--no-deps"], cwd=WORLDGEN)
+    patch_worldgen_src()                                    # fix pano_depth (device str)
     install_pt3d_shim()
     setup_da2()
 
