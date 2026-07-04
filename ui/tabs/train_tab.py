@@ -87,10 +87,40 @@ class TrainTab(QWidget):
         self.btn_caption = QPushButton(tr("train.caption", "Genera caption (Florence-2)"))
         self.btn_caption.clicked.connect(self._caption_dataset)
         self.cap_overwrite = QCheckBox(tr("train.caption.overwrite", "Sovrascrivi esistenti"))
-        crow.addWidget(self.btn_caption); crow.addWidget(self.cap_overwrite); crow.addStretch(1)
+        self.btn_review = QPushButton(tr("train.review", "📝 Review caption"))
+        self.btn_review.setToolTip(tr("train.review.tt", "Rivedi/sovrascrivi la caption di ogni immagine (finestra non bloccante, auto-salvataggio)."))
+        self.btn_review.clicked.connect(self._review_captions)
+        crow.addWidget(self.btn_caption); crow.addWidget(self.cap_overwrite)
+        crow.addWidget(self.btn_review); crow.addStretch(1)
         cw = QWidget(); cw.setLayout(crow)
         g.addRow(tr("train.caption.row", "Caption automatiche"), cw)
         return box
+
+    def _review_captions(self):
+        """Dialog non-modale: rivede le caption .txt omonime delle immagini nella cartella dataset."""
+        import os
+        from PySide6.QtWidgets import QMessageBox
+        folder = self.ds_path.text().strip()
+        if not folder or not os.path.isdir(folder):
+            QMessageBox.information(self, tr("train.review", "📝 Review caption"),
+                                    tr("train.review.nofolder", "Seleziona prima una cartella dataset valida.")); return
+        exts = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+        imgs = sorted(f for f in os.listdir(folder) if os.path.splitext(f)[1].lower() in exts)
+        if not imgs:
+            QMessageBox.information(self, tr("train.review", "📝 Review caption"),
+                                    tr("train.review.noimg", "Nessuna immagine nella cartella dataset.")); return
+        items = []
+        for f in imgs:
+            p = os.path.join(folder, f)
+            txt = os.path.splitext(p)[0] + ".txt"
+            cap = open(txt, encoding="utf-8").read().strip() if os.path.exists(txt) else ""
+            items.append({"path": p, "caption": cap})
+
+        def _save(_i, path, cap):                            # scrive la caption nel .txt omonimo
+            open(os.path.splitext(path)[0] + ".txt", "w", encoding="utf-8").write(cap)
+        from ui.widgets.caption_review import CaptionReviewDialog
+        self._cap_dialog = CaptionReviewDialog(items, _save, is_video=False, parent=self)
+        self._cap_dialog.show()
 
     def _model_box(self) -> QGroupBox:
         box = QGroupBox(tr("train.model.title", "Modello base"))

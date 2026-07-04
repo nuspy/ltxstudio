@@ -64,7 +64,12 @@ class TrainLoraVideoTab(QWidget):
         self.global_cap.setPlaceholderText(tr("tclip.gcap.ph", "caption globale per i clip senza caption (es. mytoken, cinematic, slow motion)"))
         self.global_cap.setToolTip(tr("tclip.gcap.tt",
             "Applicata ai clip che non hanno una caption propria né un file .txt gemello."))
-        dv.addWidget(self.global_cap)
+        crow = QHBoxLayout(); crow.addWidget(self.global_cap, 1)
+        self.btn_review = QPushButton(tr("tclip.review", "📝 Review caption"))
+        self.btn_review.setToolTip(tr("tclip.review.tt", "Rivedi/sovrascrivi la caption di ogni clip (finestra non bloccante, auto-salvataggio)."))
+        self.btn_review.setCursor(Qt.PointingHandCursor); self.btn_review.clicked.connect(self._review_captions)
+        crow.addWidget(self.btn_review)
+        dv.addLayout(crow)
         root.addWidget(gd)
 
         # configurazione (progressive disclosure: gruppo dedicato)
@@ -104,6 +109,21 @@ class TrainLoraVideoTab(QWidget):
         root.addWidget(self.status)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(150)
         root.addWidget(self.log)
+
+    def _review_captions(self):
+        """Apre il dialog non-modale di revisione caption; scrive le modifiche nella tabella clip."""
+        clips = self.clips.get_clips()
+        if not clips:
+            QMessageBox.information(self, tr("tclip.review", "📝 Review caption"),
+                                    tr("tclip.review.empty", "Aggiungi prima degli spezzoni video.")); return
+        from ui.widgets.caption_review import CaptionReviewDialog
+
+        def _save(idx, _path, cap):                          # scrive la caption nella riga della tabella
+            item = self.clips.table.item(idx, 1)
+            if item:
+                item.setText(cap)
+        self._cap_dialog = CaptionReviewDialog(clips, _save, is_video=True, parent=self)
+        self._cap_dialog.show()                              # non-modale: non blocca la finestra
 
     def _start(self):
         if self._worker and self._worker.isRunning():
