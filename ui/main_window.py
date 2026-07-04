@@ -697,7 +697,18 @@ class MainWindow(QMainWindow):
         self.queue_dock.setObjectName("queue_dock")
         self.queue_panel = JobQueuePanel(self.jobs, self.queue_dock)
         self.queue_dock.setWidget(self.queue_panel)
+        self.queue_dock.setFeatures(QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetMovable
+                                    | QDockWidget.DockWidgetFloatable)   # #96.3: chiudibile → si NASCONDE (non elimina)
         self.addDockWidget(Qt.RightDockWidgetArea, self.queue_dock)
+        # #96.3: mini-icona nell'angolo dei tab per ri-mostrare la coda quando è nascosta
+        from PySide6.QtWidgets import QToolButton
+        self._queue_btn = QToolButton(self)
+        self._queue_btn.setText("📋"); self._queue_btn.setCheckable(True); self._queue_btn.setChecked(True)
+        self._queue_btn.setToolTip(tr("queue.toggle.tt", "Mostra/nascondi la coda generazioni"))
+        self._queue_btn.setStyleSheet("QToolButton{border:none;font-size:16px;padding:2px 6px;}")
+        self._queue_btn.clicked.connect(lambda: self.queue_dock.setVisible(not self.queue_dock.isVisible()))
+        self.queue_dock.visibilityChanged.connect(self._queue_btn.setChecked)
+        self.tabs.setCornerWidget(self._queue_btn, Qt.TopRightCorner)
         self.jobs.changed.connect(self._refresh_status)
 
         self.status_lbl = QLabel("…")
