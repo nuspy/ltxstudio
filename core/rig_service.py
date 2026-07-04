@@ -31,13 +31,18 @@ def is_installed() -> bool:
 
 
 def make_job(mesh_path: str, name: str = "rig", *, template: str = "Mixamo",
-             file_format: str = "glb", **cbs) -> Job:
+             file_format: str = "glb", top_k: int = 50, top_p: float = 0.95,
+             temperature: float = 1.0, repetition_penalty: float = 1.0,
+             num_beams: int = 1, group_per_vertex: int = 4, **cbs) -> Job:
     """mesh GLB/OBJ → GLB/FBX rigged (scheletro + skin weights) via SkinToken-as-library."""
     out = OUT_DIR / _safe(name)
     out.mkdir(parents=True, exist_ok=True)
     rigged = out / f"rigged.{file_format}"
     cmd = [COMFY_VENV_PY, "-u", str(GEN_SCRIPT), "--mesh", mesh_path, "--output", str(rigged),
-           "--template", template, "--format", file_format]
+           "--template", template, "--format", file_format,
+           "--top_k", str(int(top_k)), "--top_p", str(float(top_p)),
+           "--temperature", str(float(temperature)), "--repetition_penalty", str(float(repetition_penalty)),
+           "--num_beams", str(int(num_beams)), "--group_per_vertex", str(int(group_per_vertex))]
     return Job(cmd, GEN_SCRIPT.parent, **cbs)
 
 

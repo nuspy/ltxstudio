@@ -2198,6 +2198,10 @@ class MainWindow(QMainWindow):
                   "negative": negative, "width": v["width"], "height": v["height"],
                   "steps": cfg["steps"], "guidance": cfg.get("cfg") or 3.5,
                   "seed": seed, "loras": loras,
+                  # #95 I1: componenti scelti dall'utente (erano scartati → il backend usava i default)
+                  "sampler": cfg.get("sampler"), "scheduler": cfg.get("scheduler"),
+                  "encoder": cfg.get("encoder"), "clip_type": cfg.get("clip_type"), "vae": cfg.get("vae"),
+                  "enhance": cfg.get("enhance"), "nsfw": cfg.get("nsfw"),
                   "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8)}
         self._log("Generazione immagine (backend NATIVO) inviata…")
         self._native_worker = _NativeImageWorker(params)
@@ -2238,7 +2242,7 @@ class MainWindow(QMainWindow):
             "num_frames": nf, "fps": fps,
             "steps": int(self.video_tab.sampler_seed.steps.value()),
             "guidance": float(self.video_tab.sampler_seed.cfg.value()),
-            "seed": int(self.video_tab.sampler_seed.seed.value()),
+            "seed": int(vals.get("seed", self.video_tab.sampler_seed.seed.value())),   # #95 V1: usa il seed randomizzato da on_generate
             "offload": "cpu", "loras": loras, "output": out,
         }
         # MODELLO scelto nel tab Video → al worker. Senza questo il worker usava SEMPRE il checkpoint
@@ -2340,7 +2344,8 @@ class MainWindow(QMainWindow):
             "start_time": float(v2v.get("v2v_start", 0.0)), "end_time": float(v2v.get("v2v_end", 5.0)),
             "regenerate_video": True, "regenerate_audio": bool(v2v.get("v2v_regen_audio", False)),
             "steps": int(self.video_tab.sampler_seed.steps.value()), "guidance": float(self.video_tab.sampler_seed.cfg.value()),
-            "seed": int(self.video_tab.sampler_seed.seed.value()), "offload": "cpu", "output": out,
+            "seed": int(vals.get("seed", self.video_tab.sampler_seed.seed.value())),   # #95 V1: seed randomizzato
+            "offload": "cpu", "output": out,
         }
         self._log(f"[nativo] ReTake [{params['start_time']:.1f}–{params['end_time']:.1f}]s su {Path(src).name}…")
         self._ltx2_worker = _NativeLtx2Worker(params)
@@ -2352,8 +2357,9 @@ class MainWindow(QMainWindow):
         # #7 risoluzione/fps/durata dai controlli del tab Video (erano hard-coded 512×320/25f/25fps).
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
-        cfg.setdefault("width", int(vv.get("width", 512) or 512))
-        cfg.setdefault("height", int(vv.get("height", 320) or 320))
+        _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64
+        cfg.setdefault("width", _r64e(vv.get("width", 512) or 512))
+        cfg.setdefault("height", _r64e(vv.get("height", 320) or 320))
         cfg.setdefault("fps", _fps)
         cfg.setdefault("num_frames", max(9, int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
         self.video_edit_ai_tab.log.appendPlainText(tr("vedit.start", "[edit] avvio {m}…").format(m=cfg["mode"]))
@@ -2440,12 +2446,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.extend_video_error_title", "Prolunga"), "Impossibile estrarre l'ultimo frame."); return
         cont = str(OUTPUT_DIR / f"_ext_cont_{int(_t.time())}.mp4")
         self._ext_src = src
+        _r64x = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64
+        _seed = (int(self.video_tab.sampler_seed.seed.value()) if self.video_tab.wants_fixed_seed()
+                 else random.randint(0, 2**31))              # #95 V1: seed random se non fissato
         params = {
             "image_path": lastf, "prompt": cfg["prompt"],
             "negative": v.get("prompt_negative", "") or "worst quality, blurry",
-            "width": int(v.get("width", 512)), "height": int(v.get("height", 512)),
+            "width": _r64x(v.get("width", 512)), "height": _r64x(v.get("height", 512)),
             "num_frames": nf, "fps": fps, "steps": ext_steps,
-            "guidance": float(self.video_tab.sampler_seed.cfg.value()), "seed": int(self.video_tab.sampler_seed.seed.value()),
+            "guidance": float(self.video_tab.sampler_seed.cfg.value()), "seed": _seed,
             "offload": "cpu", "ref_strength": 1.0, "output": cont,
         }
         # seg_seconds → dimensione del chunk in-process (memory-bounded) per estensioni lunghe;
@@ -2491,13 +2500,17 @@ class MainWindow(QMainWindow):
             img = str(OUTPUT_DIR / f"_talk_src_{int(_t.time())}.png")
             _sp.run(["ffmpeg", "-v", "error", "-i", src, "-vframes", "1", img, "-y"], check=False)
         nf = int(params.get("num_frames", 121))
+        _r64m = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: dimensioni multiple di 64
+        _mt_seed = params.get("seed")                        # #95 V3: seed dal chiamante (re-roll possibile), altrimenti random
+        _mt_seed = int(_mt_seed) if _mt_seed is not None else random.randint(0, 2**31)
         nat = {
             "image_path": img, "audio_path": params.get("audio_path"),
             "prompt": params.get("prompt", ""),
             "negative": params.get("negative", "") or "worst quality, blurry",
-            "width": int(params.get("width", 512)), "height": int(params.get("height", 512)),
+            "width": _r64m(params.get("width", 512)), "height": _r64m(params.get("height", 512)),
             "num_frames": nf, "fps": int(params.get("fps", 25)),
-            "steps": 8, "guidance": 3.0, "seed": 8, "offload": "cpu",
+            "steps": int(params.get("steps", 8)), "guidance": float(params.get("guidance", 3.0)),
+            "seed": _mt_seed, "offload": "cpu",
             # #4 forza dell'audio sul video (sing_audio_scale) → modality_scale del guider audio
             "audio_scale": float(params.get("audio_scale", 3.0) or 3.0),
             # #4 separa la voce dalla base prima del lip-sync (Canta) — gestito nel thread del worker
@@ -3535,7 +3548,9 @@ class MainWindow(QMainWindow):
         """Restauro / colorazione / face-swap foto."""
         if cfg.get("operation") == "faceswap":           # T5: face-swap su foto (nativo, no ComfyUI)
             return self._faceswap_photo(cfg)
-        if not self.driver.is_up():
+        from core import backend as _backend              # #95 I2: il restauro gira nativo → non richiede ComfyUI up
+        _restore_native = (cfg.get("operation") == "restore" and _backend.is_native("image"))
+        if not _restore_native and not self.driver.is_up():
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_process_msg")); return
         if self._inpaint_pid:
@@ -3839,8 +3854,16 @@ class MainWindow(QMainWindow):
                 return
             return
         name = f"rig_{Path(mesh_path).stem}"
-        out = str(rig_service.OUT_DIR / rig_service._safe(name) / "rigged.glb")
-        job = rig_service.make_job(mesh_path, name, on_log=self._log)
+        _fmt = cfg.get("file_format", "glb")
+        out = str(rig_service.OUT_DIR / rig_service._safe(name) / f"rigged.{_fmt}")
+        job = rig_service.make_job(                          # #95: inoltra la config del tab Rig (era ignorata)
+            mesh_path, name,
+            template=cfg.get("skeleton_template", "Mixamo"), file_format=_fmt,
+            top_k=int(cfg.get("top_k", 50)), top_p=float(cfg.get("top_p", 0.95)),
+            temperature=float(cfg.get("temperature", 1.0)),
+            repetition_penalty=float(cfg.get("repetition_penalty", 1.0)),
+            num_beams=int(cfg.get("num_beams", 1)),
+            group_per_vertex=int(cfg.get("group_per_vertex", 4)), on_log=self._log)
         self._log(f"[nativo] Rig SkinTokens su {Path(mesh_path).name}…")
 
         class _RigWorker(QThread):
