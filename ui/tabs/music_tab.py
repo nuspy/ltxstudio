@@ -154,6 +154,10 @@ class MusicTab(QWidget):
         g.addWidget(self.lbl_adherence, 3, 2); g.addWidget(self.song_adherence, 3, 3)
         g.addWidget(self.song_lazy, 3, 0, 1, 2)
         v.addLayout(g)
+        # #98 F2: sezione Avanzate ACE-Step (collassabile, disabilitata con HeartMuLa)
+        from ui.widgets.music_advanced import MusicAdvanced
+        self.song_adv = MusicAdvanced()
+        v.addWidget(self.song_adv)
         # #96/4: default dei parametri per MODELLO selezionato (apertura + cambio) — le due scale di CFG
         # sono DIVERSE: HeartMuLa ~1.5 (1-10), ACE-Step ~15 (apg, 1-30). Applica anche i controlli HM-only.
         self.song_engine.currentTextChanged.connect(self._on_song_engine)
@@ -357,6 +361,8 @@ class MusicTab(QWidget):
         self.song_temp.setEnabled(is_hm)                     # temperatura solo HeartMuLa
         self.song_adherence.setVisible(not is_hm)            # aderenza stile solo ACE-Step
         self.lbl_adherence.setVisible(not is_hm)
+        if hasattr(self, "song_adv"):
+            self.song_adv.set_engine(e)                      # avanzate: abilitate solo per ACE-Step
         # CFG: HeartMuLa ~1.5 (scala 1-10) · ACE-Step ~15 (apg, scala 1-30)
         if is_hm:
             self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.5)
@@ -372,18 +378,20 @@ class MusicTab(QWidget):
         errs = ax.preflight(tags)
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
-        out = ax.OUT_DIR / f"{ax._safe(name)}.wav"
+        adv = self.song_adv.get_adv()                        # #98: tutti i param avanzati ACE-Step
+        ext = adv.get("format") or "wav"
+        out = ax.OUT_DIR / f"{ax._safe(name)}.{ext}"
         # NB: ACE-Step usa una scala di guidance DIVERSA da HeartMuLa. Il selettore engine imposta
         # song_cfg al default corretto (~15) quando ACE-Step è attivo (_on_song_engine); passare 1.5
         # (default HeartMuLa) sotto-condizionerebbe il modello → RUMORE grigio. 60 step = più pulito.
         self._song_meta = {"label": "Musica", "engine": "ACE-Step", "tags": tags, "lyrics": lyrics,
                            "duration_s": float(self.song_dur.value()), "steps": 60,
                            "cfg": float(self.song_cfg.value()), "gs_text": float(self.song_adherence.value()),
-                           "instrumental": self.song_instr.isChecked()}   # #97 sidecar
+                           "instrumental": self.song_instr.isChecked(), **adv}   # #97 sidecar
         job = ax.make_job(tags, lyrics, name, duration=float(self.song_dur.value()),
                           steps=60, guidance=float(self.song_cfg.value()),
                           gs_text=float(self.song_adherence.value()), lazy=self.song_lazy.isChecked(),
-                          on_log=self._b.log.emit, on_progress=self._b.progress.emit,
+                          adv=adv, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
 
