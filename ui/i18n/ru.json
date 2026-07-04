@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "Установить движок «{eid}»?\n\n{note}",
   "music.install.acestep": "Установить ACE-Step",
   "music.installed.acestep": "ACE-Step установлен ✓",
-  "progress.preview_title": "Предпросмотр генерации"
+  "progress.preview_title": "Предпросмотр генерации",
+  "tab.train_lora_video": "Train LoRA Video"
 }

@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "Installare il motore '{eid}'?\n\n{note}",
   "music.install.acestep": "Installa ACE-Step",
   "music.installed.acestep": "ACE-Step installato ✓",
-  "progress.preview_title": "Anteprima generazione"
+  "progress.preview_title": "Anteprima generazione",
+  "tab.train_lora_video": "Train LoRA Video"
 }

@@ -380,6 +380,71 @@ def train(preprocessed_dir: str, out_lora: str, *, trigger: str = "", rank: int 
     return out_lora
 
 
+import re as _re
+_FFMPEG = r"E:\AI\Tools\ffmpeg-shared\bin\ffmpeg.exe"
+
+
+def _safe_stem(s: str) -> str:
+    s = _re.sub(r"[^0-9A-Za-z_.-]+", "_", s).strip("_.")
+    return s or "clip"
+
+
+def build_clip_dataset(clips: list[dict], dataset_dir: str, *, global_caption: str = "",
+                       progress=None) -> dict:
+    """Prepara il dataset da CLIP ESISTENTI. clips: [{path, caption?, start?, end?}].
+    Ogni clip → <stem>.mp4 (trim+normalizzato h264) + <stem>.txt (caption: per-clip · sibling _*.txt · globale)."""
+    def log(m):
+        if progress:
+            progress(m)
+    os.makedirs(dataset_dir, exist_ok=True)
+    n = 0
+    for i, c in enumerate(clips):
+        src = c.get("path", "")
+        if not src or not os.path.isfile(src):
+            continue
+        stem = _safe_stem(os.path.splitext(os.path.basename(src))[0]) or f"clip{i:03d}"
+        dst = os.path.join(dataset_dir, f"{stem}.mp4")
+        start = float(c.get("start") or 0.0); end = float(c.get("end") or 0.0)
+        cmd = [_FFMPEG, "-y"]
+        if start > 0:
+            cmd += ["-ss", str(start)]
+        cmd += ["-i", src]
+        if end > 0 and end > start:
+            cmd += ["-t", str(end - start)]
+        cmd += ["-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", dst]
+        log(f"Clip {i + 1}/{len(clips)}: {stem}")
+        subprocess.run(cmd, capture_output=True, text=True)
+        if not os.path.exists(dst):
+            log(f"⚠️ ffmpeg non ha prodotto {stem}.mp4 (clip saltato)"); continue
+        # caption: per-clip → sibling <name>_prompt.txt/.txt → globale
+        cap = (c.get("caption") or "").strip()
+        if not cap:
+            for sib in (os.path.splitext(src)[0] + ".txt", os.path.splitext(src)[0] + "_prompt.txt"):
+                if os.path.exists(sib):
+                    cap = open(sib, encoding="utf-8").read().strip(); break
+        cap = cap or global_caption or ""
+        open(os.path.join(dataset_dir, f"{stem}.txt"), "w", encoding="utf-8").write(cap)
+        n += 1
+    return {"dir": dataset_dir, "clips": n}
+
+
+def make_lora_from_clips(clips: list[dict], name: str, out_dir: str, *, global_caption: str = "",
+                         trigger: str = "", rank: int = 16, steps: int = 2000,
+                         width: int = 768, height: int = 512, clip_seconds: float = 3.0,
+                         low_vram: bool = True, progress=None) -> dict:
+    """Pipeline da CLIP esistenti: build dataset → preprocess → train. Ritorna {dataset, lora, clips}."""
+    nf = int(round(clip_seconds * 25) // 8 * 8 + 1)
+    work = os.path.join(out_dir, name)
+    ds = os.path.join(work, "dataset")
+    info = build_clip_dataset(clips, ds, global_caption=global_caption, progress=progress)
+    if info["clips"] < 1:
+        raise RuntimeError("Nessun clip valido nel dataset (controlla i file audio/video).")
+    pre = preprocess(ds, work, width=width, height=height, num_frames=nf, trigger=trigger, progress=progress)
+    lora = os.path.join(work, name + ".safetensors")
+    train(pre, lora, trigger=trigger, rank=rank, steps=steps, low_vram=low_vram, progress=progress)
+    return {"dataset": ds, "lora": lora, "clips": info["clips"]}
+
+
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, rank: int = 16, steps: int = 2000,
               clip_seconds: float = 3.0, use_pulid: bool = True, low_vram: bool = True, progress=None) -> dict:
     """Pipeline COMPLETA: dataset → preprocess → train. Ritorna {dataset, lora}."""

@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "'{eid}' इंजन स्थापित करें?\n\n{note}",
   "music.install.acestep": "ACE-Step स्थापित करें",
   "music.installed.acestep": "ACE-Step स्थापित ✓",
-  "progress.preview_title": "जनरेशन पूर्वावलोकन"
+  "progress.preview_title": "जनरेशन पूर्वावलोकन",
+  "tab.train_lora_video": "Train LoRA Video"
 }

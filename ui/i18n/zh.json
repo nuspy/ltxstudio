@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "安装“{eid}”引擎？\n\n{note}",
   "music.install.acestep": "安装 ACE-Step",
   "music.installed.acestep": "ACE-Step 已安装 ✓",
-  "progress.preview_title": "生成预览"
+  "progress.preview_title": "生成预览",
+  "tab.train_lora_video": "Train LoRA Video"
 }

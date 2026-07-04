@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "Εγκατάσταση της μηχανής '{eid}';\n\n{note}",
   "music.install.acestep": "Εγκατάσταση ACE-Step",
   "music.installed.acestep": "ACE-Step εγκαταστάθηκε ✓",
-  "progress.preview_title": "Προεπισκόπηση δημιουργίας"
+  "progress.preview_title": "Προεπισκόπηση δημιουργίας",
+  "tab.train_lora_video": "Train LoRA Video"
 }

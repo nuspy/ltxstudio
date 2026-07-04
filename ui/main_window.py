@@ -44,6 +44,7 @@ from ui.tabs.anim_tab import AnimTab                   # noqa: E402
 from ui.tabs.train_tab import TrainTab                 # noqa: E402
 from ui.tabs.lora_video_tab import LoraVideoTab        # noqa: E402
 from ui.tabs.lora_image_tab import LoraImageTab        # noqa: E402
+from ui.tabs.train_lora_video_tab import TrainLoraVideoTab  # noqa: E402
 from ui.tabs.music_tab import MusicTab                 # noqa: E402
 from ui.tabs.world_tab import WorldTab                 # noqa: E402
 from ui.tabs.weights_tab import WeightsTab             # noqa: E402
@@ -573,6 +574,7 @@ class MainWindow(QMainWindow):
         self.train_tab = TrainTab()
         self.lora_video_tab = LoraVideoTab()
         self.lora_image_tab = LoraImageTab()
+        self.train_lora_video_tab = TrainLoraVideoTab()
         self.train_tab.lora_ready.connect(lambda _p: self._refresh_status())
         self.music_tab = MusicTab()
         self.world_tab = WorldTab()
@@ -608,6 +610,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.lora_video_tab, tr("tab.lora_video", "LoRA Wizard Vid."))
         # LoRA Wizard Img. — dataset AUTO-generato da soggetti (FLUX.2)
         self.tabs.addTab(self.lora_image_tab, tr("tab.lora_image", "LoRA Wizard Img."))
+        # Train LoRA Video — dataset MANUALE da spezzoni video esistenti (LTX-2.3)
+        self.tabs.addTab(self.train_lora_video_tab, tr("tab.train_lora_video", "Train LoRA Video"))
         # Musica (HeartMuLa canzoni/strumentale + MMAudio sonorizzazione) — tab separato
         self.tabs.addTab(self.music_tab, tr("tab.music", "Musica"))
         # Mondo 3D (WorldGen: scena/ambiente da foto, mesh+splat, player) — tab separato

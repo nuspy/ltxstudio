@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "'{eid}' 엔진을 설치할까요?\n\n{note}",
   "music.install.acestep": "ACE-Step 설치",
   "music.installed.acestep": "ACE-Step 설치됨 ✓",
-  "progress.preview_title": "생성 미리보기"
+  "progress.preview_title": "생성 미리보기",
+  "tab.train_lora_video": "Train LoRA Video"
 }

@@ -1900,5 +1900,6 @@
   "aud.install.confirm.text2": "Встановити рушій «{eid}»?\n\n{note}",
   "music.install.acestep": "Встановити ACE-Step",
   "music.installed.acestep": "ACE-Step встановлено ✓",
-  "progress.preview_title": "Попередній перегляд генерації"
+  "progress.preview_title": "Попередній перегляд генерації",
+  "tab.train_lora_video": "Train LoRA Video"
 }
