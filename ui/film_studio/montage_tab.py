@@ -302,8 +302,8 @@ class MontageTab(QWidget):
         from core import music_service as ms
         f = ms.find_latest_audio()
         if f and os.path.exists(str(f)):
-            self._extra_tracks = getattr(self, "_extra_tracks", [])
-            self._extra_tracks.append({"path": str(f), "start_s": 0, "volume": 0.4})
+            self._ambient_tracks = getattr(self, "_ambient_tracks", [])   # #95: corsia ambient dedicata (era in "musica")
+            self._ambient_tracks.append({"path": str(f), "start_s": 0, "volume": 0.4})
             self.info.setText(tr("fs.mt.ambient_done", "Ambient pronto."))
         else:
             self.info.setText(tr("fs.mt.ambient_fail", "Ambient non generato."))
@@ -354,7 +354,8 @@ class MontageTab(QWidget):
             QMessageBox.information(self, tr("fs.mt.master", "Master"), tr("fs.mt.no_clips", "Nessuna clip generata.")); return
         pid = self._get_project()
         out = str(db.project_dir(pid) / "master.mp4")
-        tracks = list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
+        tracks = (list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
+                  + list(getattr(self, "_ambient_tracks", []) or []))   # #95: includi l'ambient nel master
         try:
             otio_export.render_master(clips, out, audio_tracks=tracks or None)
             self.info.setText(tr("fs.mt.master_done", "Master: {f}").format(f=out))

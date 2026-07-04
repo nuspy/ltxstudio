@@ -2723,9 +2723,11 @@ class MainWindow(QMainWindow):
         _f2 = bool(unet and is_flux2(unet))
         arch = "flux2_inpaint" if _f2 else "inpaint"
         guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=_f2)
+        # #95 I5: forza (strength) → denoise, non solo guidance (outpaint=1.0, inpaint scala con retention)
+        denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * float(retention)))
         params = {"model": model, "arch": arch, "prompt": prompt, "negative": negative,
                   "image_path": exp["image"], "mask_path": exp["mask"],
-                  "steps": steps, "guidance": guidance, "seed": seed}
+                  "steps": steps, "guidance": guidance, "seed": seed, "denoise": denoise}
         self._inpaint_mode = mode
         self._log(f"{mode} (backend NATIVO) inviato (steps={steps}, seed={seed}, guidance={guidance:.1f})…")
         self._native_worker = _NativeImageWorker(params)
@@ -3655,6 +3657,7 @@ class MainWindow(QMainWindow):
             image_path, name, seed=seed, ss_steps=steps, slat_steps=steps,
             simplify=float(cfg.get("simplify", 0.95) or 0.95),
             texture_size=int(cfg.get("texture_size", 1024) or 1024),
+            target_faces=int(cfg.get("target_face_count", 0) or 0),   # #95: facce target dal tab (era ignorato)
             on_log=self._log)
         out_glb = str(trellis_service.glb_path(name))
         self._log(f"[nativo] TRELLIS 3D su {Path(image_path).name} (res {cfg.get('resolution','')})…")
@@ -3697,6 +3700,11 @@ class MainWindow(QMainWindow):
         try:                                              # carica nel visore 3D del tab (show_result, NON load_model che è del viewer)
             if glb and hasattr(self, "trellis_tab") and hasattr(self.trellis_tab, "show_result"):
                 self.trellis_tab.show_result(glb)
+        except Exception:  # noqa: BLE001
+            pass
+        try:                                              # #95: parità col ramo Comfy → offri la mesh al tab Rig
+            if glb and hasattr(self, "rig_tab") and hasattr(self.rig_tab, "set_last_mesh"):
+                self.rig_tab.set_last_mesh(glb)
         except Exception:  # noqa: BLE001
             pass
 

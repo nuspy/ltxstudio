@@ -34,14 +34,17 @@ def glb_path(name: str) -> Path:
 
 def make_job(image_path: str, name: str = "model", *, seed: int = 1,
              ss_steps: int = 12, slat_steps: int = 12, simplify: float = 0.95,
-             texture_size: int = 1024, hf_token: str | None = None, **cbs) -> Job:
+             texture_size: int = 1024, target_faces: int | None = None,
+             hf_token: str | None = None, **cbs) -> Job:
     out = OUT_DIR / _safe(name)
     out.mkdir(parents=True, exist_ok=True)
     # NB: trellis_generate.py (API ufficiale microsoft/TRELLIS.2) accetta SOLO questi argomenti.
     # ss_steps/slat_steps/simplify restano nella firma per compat con la GUI ma non sono passati
-    # (la pipeline ufficiale usa i suoi default); simplify→decimation come target-facce indicativo.
+    # (la pipeline ufficiale usa i suoi default). target_faces → --decimation (facce target del GUI).
     cmd = [TRELLIS_VENV_PY, "-u", str(GEN_SCRIPT), "--image", image_path, "--output_dir", str(out),
            "--seed", int(seed), "--texture_size", int(texture_size)]
+    if target_faces:
+        cmd += ["--decimation", int(target_faces)]
     env = {"HF_TOKEN": hf_token, "HUGGING_FACE_HUB_TOKEN": hf_token} if hf_token else None
     return Job(cmd, TRELLIS_DIR, env=env, **cbs)
 
