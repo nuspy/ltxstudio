@@ -1901,5 +1901,15 @@
   "music.install.acestep": "ACE-Step 설치",
   "music.installed.acestep": "ACE-Step 설치됨 ✓",
   "progress.preview_title": "생성 미리보기",
-  "tab.train_lora_video": "Train LoRA Video"
+  "tab.train_lora_video": "Train LoRA Video",
+  "vid.prompt.tt": "비디오를 설명하세요. \\를 입력하면 태그 팔레트(일시정지, 감정, 속도)가 열립니다.",
+  "vid.neg.tt": "모델이 비디오에서 피해야 할 것들 (아티팩트, 원하지 않는 스타일).",
+  "vid.preset_combo.tt": "비디오 설정 프리셋 적용: 해상도, FPS, 스텝, LoRA.",
+  "vid.nsfw.tt": "SFW: 안전한 모델만. NSFW: 성인 콘텐츠 모델 추가.",
+  "vid.res_preset.tt": "비디오 화면비 및 해상도. '사용자 정의'는 수동 W/H를 활성화합니다.",
+  "vid.width.tt": "비디오 너비 (픽셀, 32의 배수).",
+  "vid.height.tt": "비디오 높이 (픽셀, 32의 배수).",
+  "vid.fps.tt": "초당 프레임. 24 = 영화, 30 = TV, 60 = 유동적.",
+  "vid.length.tt": "비디오 길이(초).",
+  "vid.face.model.tt": "생성 후 얼굴 복원을 위한 AI 모델."
 }

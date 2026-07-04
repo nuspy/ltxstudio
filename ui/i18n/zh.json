@@ -1901,5 +1901,15 @@
   "music.install.acestep": "安装 ACE-Step",
   "music.installed.acestep": "ACE-Step 已安装 ✓",
   "progress.preview_title": "生成预览",
-  "tab.train_lora_video": "Train LoRA Video"
+  "tab.train_lora_video": "Train LoRA Video",
+  "vid.prompt.tt": "描述视频内容。输入 \\ 打开标签调色板（停顿、情绪、速度）。",
+  "vid.neg.tt": "模型应在视频中避免的内容（伪影、不需要的风格）。",
+  "vid.preset_combo.tt": "应用视频设置预设：分辨率、FPS、步数、LoRA。",
+  "vid.nsfw.tt": "SFW：仅安全模型。NSFW：添加成人内容模型。",
+  "vid.res_preset.tt": "视频宽高比和分辨率。“自定义”可手动输入宽/高。",
+  "vid.width.tt": "视频宽度（像素，32 的倍数）。",
+  "vid.height.tt": "视频高度（像素，32 的倍数）。",
+  "vid.fps.tt": "帧率。24 = 电影感，30 = 电视标准，60 = 流畅。",
+  "vid.length.tt": "视频时长（秒）。",
+  "vid.face.model.tt": "生成后用于人脸修复的 AI 模型。"
 }

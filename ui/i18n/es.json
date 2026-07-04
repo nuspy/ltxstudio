@@ -1901,5 +1901,15 @@
   "music.install.acestep": "Instalar ACE-Step",
   "music.installed.acestep": "ACE-Step instalado ✓",
   "progress.preview_title": "Vista previa de generación",
-  "tab.train_lora_video": "Train LoRA Video"
+  "tab.train_lora_video": "Train LoRA Video",
+  "vid.prompt.tt": "Describe el video. Escribe \\ para la paleta de etiquetas (pausas, emociones, velocidad).",
+  "vid.neg.tt": "Lo que el modelo debe evitar en el video (artefactos, estilos no deseados).",
+  "vid.preset_combo.tt": "Aplica un preset de configuración de video: resolución, FPS, pasos, LoRA.",
+  "vid.nsfw.tt": "SFW: solo modelos seguros. NSFW: agrega modelos de contenido adulto.",
+  "vid.res_preset.tt": "Relación de aspecto y resolución del video. 'Personalizado' habilita W/H manual.",
+  "vid.width.tt": "Ancho del video en píxeles (múltiplo de 32).",
+  "vid.height.tt": "Altura del video en píxeles (múltiplo de 32).",
+  "vid.fps.tt": "Fotogramas por segundo. 24 = cinematográfico, 30 = TV, 60 = fluido.",
+  "vid.length.tt": "Duración del video en segundos.",
+  "vid.face.model.tt": "Modelo de IA para la restauración de rostros después de la generación."
 }

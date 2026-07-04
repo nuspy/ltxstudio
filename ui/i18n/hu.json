@@ -1901,5 +1901,15 @@
   "music.install.acestep": "ACE-Step telepítése",
   "music.installed.acestep": "ACE-Step telepítve ✓",
   "progress.preview_title": "Generálás előnézete",
-  "tab.train_lora_video": "Train LoRA Video"
+  "tab.train_lora_video": "Train LoRA Video",
+  "vid.prompt.tt": "Írd le a videót. Írd be \\-t a tag-palettához (szünetek, érzelmek, sebesség).",
+  "vid.neg.tt": "Amit a modellnek kerülnie kell a videóban (artefaktok, nemkívánatos stílusok).",
+  "vid.preset_combo.tt": "Videóbeállítás-preset alkalmazása: felbontás, FPS, lépések, LoRA.",
+  "vid.nsfw.tt": "SFW: csak biztonságos modellek. NSFW: felnőtt tartalmú modelleket is hozzáad.",
+  "vid.res_preset.tt": "Videó képarány és felbontás. 'Egyéni' lehetővé teszi a kézi W/H beállítást.",
+  "vid.width.tt": "Videó szélessége pixelben (32 többszöröse).",
+  "vid.height.tt": "Videó magassága pixelben (32 többszöröse).",
+  "vid.fps.tt": "Képkocka per másodperc. 24 = mozis, 30 = TV, 60 = folyékony.",
+  "vid.length.tt": "Videó hossza másodpercben.",
+  "vid.face.model.tt": "AI modell az arcok helyreállítására generálás után."
 }

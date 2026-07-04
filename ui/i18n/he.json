@@ -1901,5 +1901,15 @@
   "music.install.acestep": "התקן ACE-Step",
   "music.installed.acestep": "ACE-Step מותקן ✓",
   "progress.preview_title": "תצוגה מקדימה של היצירה",
-  "tab.train_lora_video": "Train LoRA Video"
+  "tab.train_lora_video": "Train LoRA Video",
+  "vid.prompt.tt": "תאר את הסרטון. הקלד \\ לפלטת תגיות (הפסקות, רגשות, מהירות).",
+  "vid.neg.tt": "מה שהמודל צריך להימנע ממנו בסרטון (ארטיפקטים, סגנונות לא רצויים).",
+  "vid.preset_combo.tt": "החל הגדרות מוגדרות מראש לוידאו: רזולוציה, FPS, צעדים, LoRA.",
+  "vid.nsfw.tt": "SFW: רק מודלים בטוחים. NSFW: מוסיף מודלים לתוכן למבוגרים.",
+  "vid.res_preset.tt": "יחס גובה-רוחב ורזולוציה של הסרטון. 'מותאם אישית' מאפשר הגדרה ידנית.",
+  "vid.width.tt": "רוחב הסרטון בפיקסלים (כפולה של 32).",
+  "vid.height.tt": "גובה הסרטון בפיקסלים (כפולה של 32).",
+  "vid.fps.tt": "פריימים לשנייה. 24 = קולנועי, 30 = טלוויזיה, 60 = זורם.",
+  "vid.length.tt": "משך הסרטון בשניות.",
+  "vid.face.model.tt": "מודל AI לשחזור פנים לאחר יצירה."
 }
