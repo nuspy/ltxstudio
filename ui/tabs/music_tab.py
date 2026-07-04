@@ -382,9 +382,27 @@ class MusicTab(QWidget):
         bar2.addWidget(self.btn_play); bar2.addWidget(self.btn_folder); bar2.addStretch(1); bar2.addWidget(self.btn_stop)
         self.logview = QPlainTextEdit(); self.logview.setReadOnly(True); self.logview.setFixedHeight(150)
         self.logview.setStyleSheet("font-family:Consolas,monospace;font-size:11px;")
-        v.addWidget(self.bar); v.addWidget(self.status); v.addLayout(bar2); v.addWidget(self.logview)
+        v.addWidget(self.bar); v.addWidget(self.status); v.addLayout(bar2)
+        # Player con forma d'onda + selezione regione (trim) — caricato a fine generazione
+        self.wave_player = None
+        try:
+            from ui.widgets.waveform import WaveformPlayer
+            self.wave_player = WaveformPlayer()
+            self.wave_player.use_region.connect(self._use_region_as_task)
+            v.addWidget(self.wave_player)
+        except Exception:                                    # noqa: BLE001 — QtMultimedia assente: player opzionale
+            self.wave_player = None
+        v.addWidget(self.logview)
         self._last_audio = ""
         return box
+
+    def _use_region_as_task(self, start: float, end: float):
+        """Regione selezionata sul waveform → task Repaint (ACE-Step) su quell'intervallo."""
+        if self.song_engine.currentText() != "ACE-Step":
+            self.song_engine.setCurrentText("ACE-Step")
+        self.song_task.set_repaint(self._last_audio, start, end)
+        self.status.setText(tr("music.region.set",
+            "Regione [{a:.1f}–{b:.1f}s] impostata su Repaint (rigenera solo quella parte).").format(a=start, b=end))
 
     # ── Helpers / slot ──────────────────────────────────────────────────────────
     def _pick_video(self):
@@ -693,6 +711,8 @@ class MusicTab(QWidget):
         if out:
             self._last_audio = out
             self.btn_play.setEnabled(True)
+            if self.wave_player and Path(out).suffix.lower() in (".wav", ".mp3", ".flac", ".ogg"):
+                self.wave_player.load(out)                   # forma d'onda + player in-app
             self.status.setText(tr("music.done", "Pronto: {f}").format(f=Path(out).name))
             self._log(f"[music] output: {out}")
             try:                                             # #97: sidecar (params riutilizzabili nel Navigator)

@@ -107,6 +107,16 @@ class MusicTaskPanel(QGroupBox):
     def set_engine(self, engine: str):
         self._content.setEnabled(engine == "ACE-Step")
 
+    def set_repaint(self, src_path: str, start: float, end: float):
+        """Configura il task su 'repaint' con sorgente + intervallo (usato dal trim del waveform)."""
+        idx = self.task.findData("repaint")
+        if idx >= 0:
+            self.task.setCurrentIndex(idx)
+        if src_path:
+            self.src.setPath(src_path)
+        self.r_start.setValue(float(start)); self.r_end.setValue(float(end))
+        self.setChecked(True); self._sync()
+
     def reset_defaults(self):
         """Reimposta il task a generazione normale + parametri ai default."""
         self.task.setCurrentIndex(0)                         # text2music
