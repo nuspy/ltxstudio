@@ -1126,7 +1126,7 @@
   "feat.cap.node_overrides": "Перевизначення моделі для вузла",
   "feat.api.rest": "REST API (автоматизація)",
   "tab.music": "Музика",
-  "music.song.title": "Пісня / Інструментал (HeartMuLa)",
+  "music.song.title": "Пісня / Інструментал",
   "music.name": "Назва",
   "music.tags.hint": "стиль, через кому: pop, бадьора, жіночий вокал…",
   "music.tags": "Теги стилю",

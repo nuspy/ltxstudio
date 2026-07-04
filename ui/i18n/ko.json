@@ -1126,7 +1126,7 @@
   "feat.cap.node_overrides": "노드별 모델 재정의",
   "feat.api.rest": "REST API (자동화)",
   "tab.music": "음악",
-  "music.song.title": "노래 / 연주곡 (HeartMuLa)",
+  "music.song.title": "노래 / 연주곡",
   "music.name": "이름",
   "music.tags.hint": "스타일, 쉼표로 구분: pop, 경쾌함, 여성 보컬…",
   "music.tags": "스타일 태그",

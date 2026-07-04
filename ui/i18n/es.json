@@ -1126,7 +1126,7 @@
   "feat.cap.node_overrides": "Anulación de modelo por nodo",
   "feat.api.rest": "API REST (automatización)",
   "tab.music": "Música",
-  "music.song.title": "Canción / Instrumental (HeartMuLa)",
+  "music.song.title": "Canción / Instrumental",
   "music.name": "Nombre",
   "music.tags.hint": "estilo, separados por comas: pop, alegre, voz femenina…",
   "music.tags": "Etiquetas de estilo",

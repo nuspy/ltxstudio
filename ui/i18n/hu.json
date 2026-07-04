@@ -1126,7 +1126,7 @@
   "feat.cap.node_overrides": "Csomópontonkénti modell-felülírás",
   "feat.api.rest": "REST API (automatizálás)",
   "tab.music": "Zene",
-  "music.song.title": "Dal / Hangszeres (HeartMuLa)",
+  "music.song.title": "Dal / Hangszeres",
   "music.name": "Név",
   "music.tags.hint": "stílus, vesszővel elválasztva: pop, vidám, női ének…",
   "music.tags": "Stíluscímkék",

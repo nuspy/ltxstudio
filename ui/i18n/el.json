@@ -1126,7 +1126,7 @@
   "feat.cap.node_overrides": "Παράκαμψη μοντέλου ανά κόμβο",
   "feat.api.rest": "API REST (αυτοματισμός)",
   "tab.music": "Μουσική",
-  "music.song.title": "Τραγούδι / Ορχηστρικό (HeartMuLa)",
+  "music.song.title": "Τραγούδι / Ορχηστρικό",
   "music.name": "Όνομα",
   "music.tags.hint": "στιλ, χωρισμένα με κόμμα: pop, χαρούμενο, γυναικεία φωνή…",
   "music.tags": "Ετικέτες στιλ",

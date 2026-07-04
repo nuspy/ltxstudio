@@ -1126,7 +1126,7 @@
   "feat.cap.node_overrides": "按节点覆盖模型",
   "feat.api.rest": "REST API（自动化）",
   "tab.music": "音乐",
-  "music.song.title": "歌曲 / 器乐 (HeartMuLa)",
+  "music.song.title": "歌曲 / 器乐",
   "music.name": "名称",
   "music.tags.hint": "风格，用逗号分隔：pop、欢快、女声…",
   "music.tags": "风格标签",

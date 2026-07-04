@@ -1223,7 +1223,7 @@
   "feat.cap.node_overrides": "Per-node model override",
   "feat.api.rest": "REST API (automation)",
   "tab.music": "Music",
-  "music.song.title": "Song / Instrumental (HeartMuLa)",
+  "music.song.title": "Song / Instrumental",
   "music.name": "Name",
   "music.tags.hint": "style, comma-separated: pop, upbeat, female vocals…",
   "music.tags": "Style tags",

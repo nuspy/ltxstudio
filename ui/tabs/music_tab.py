@@ -83,15 +83,20 @@ class MusicTab(QWidget):
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         inner = QWidget(); form = QVBoxLayout(inner); scroll.setWidget(inner)
         root.addWidget(scroll, 1)
+        # trainer LoRA musica creato PRIMA (referenziato da _on_song_engine dentro _song_box)
+        from ui.widgets.music_trainer import MusicTrainerPanel
+        self.song_trainer = MusicTrainerPanel()
+        self.song_trainer.train_requested.connect(self._train_lora)
         form.addWidget(self._song_box())
         form.addWidget(self._sonify_box())
+        form.addWidget(self.song_trainer)          # standalone: tra Sonorizza Video e Progresso
         form.addWidget(self._progress_box())
         form.addStretch(1)
         self._refresh_install_state()
 
     # ── Canzone / Strumentale (HeartMuLa) ──────────────────────────────────────
     def _song_box(self) -> QGroupBox:
-        box = QGroupBox(tr("music.song.title", "Canzone / Strumentale (HeartMuLa)"))
+        box = QGroupBox(tr("music.song.title", "Canzone / Strumentale"))
         v = QVBoxLayout(box)
         f = QFormLayout()
         self.song_name = QLineEdit("song")
@@ -162,11 +167,8 @@ class MusicTab(QWidget):
         from ui.widgets.music_tasks import MusicTaskPanel
         self.song_task = MusicTaskPanel()
         v.addWidget(self.song_task)
-        # #98 F4: trainer LoRA ACE-Step (drag&drop file + cartelle) — solo ACE-Step
-        from ui.widgets.music_trainer import MusicTrainerPanel
-        self.song_trainer = MusicTrainerPanel()
-        self.song_trainer.train_requested.connect(self._train_lora)
-        v.addWidget(self.song_trainer)
+        # NB: 'Allena LoRA Musica' NON è qui dentro — è una sezione standalone (creata in _build, tra
+        # Sonorizza Video e Progresso), perché è un'operazione a sé (non legata alla generazione canzone).
         # #96/4: default dei parametri per MODELLO selezionato (apertura + cambio) — le due scale di CFG
         # sono DIVERSE: HeartMuLa ~1.5 (1-10), ACE-Step ~15 (apg, 1-30). Applica anche i controlli HM-only.
         self.song_engine.currentTextChanged.connect(self._on_song_engine)
