@@ -1923,5 +1923,14 @@
   "def.run.tt": "Videodefinitionsverbesserung mit dem ausgewählten Motor starten.",
   "def.face.model.tt": "KI-Modell zur Gesichtswiederherstellung: CodeFormer (Qualität) oder GFPGAN (Geschwindigkeit).",
   "def.face.detection.tt": "Detektor zum Auffinden von Gesichtern im Video vor der Restaurierung.",
-  "def.face.run.tt": "Gesichtswiederherstellung auf dem geladenen Video starten."
+  "def.face.run.tt": "Gesichtswiederherstellung auf dem geladenen Video starten.",
+  "res.input.browse.tt": "Wähle ein Bild vom Datenträger zum Restaurieren oder Kolorieren.",
+  "res.restore.model.tt": "ESRGAN-Modell für die Bild-Super-Resolution.",
+  "res.restore.scale.tt": "Vergrößerungsfaktor: 2× verdoppelt, 4× vervierfacht die Auflösung.",
+  "res.restore.denoise_str.tt": "Entrauschungsstärke vor dem Hochskalieren (0.05–0.50).",
+  "res.color.model.tt": "FLUX.2-Modell für die KI-Kolorierung des Schwarz-Weiß-Fotos.",
+  "res.color.subject.tt": "Hauptmotiv des Fotos (z.B. 'Mann in Uniform', 'Berglandschaft').",
+  "res.color.style.tt": "Gewünschter Stil und Farbpalette für die KI-Kolorierung.",
+  "res.color.steps.tt": "Diffusionsschritte für die Kolorierung: mehr Schritte = mehr Qualität (und langsamer).",
+  "res.run.tt": "Starte den ausgewählten Vorgang (Restaurieren, Kolorieren oder Face-Swap)."
 }

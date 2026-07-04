@@ -1923,5 +1923,14 @@
   "def.run.tt": "Avvia il miglioramento definizione video con il motore selezionato.",
   "def.face.model.tt": "Modello AI per il restauro volti: CodeFormer (qualità) o GFPGAN (velocità).",
   "def.face.detection.tt": "Detector per localizzare i volti nel video prima del restauro.",
-  "def.face.run.tt": "Avvia il restauro volti sul video caricato."
+  "def.face.run.tt": "Avvia il restauro volti sul video caricato.",
+  "res.input.browse.tt": "Seleziona un'immagine da disco da restaurare o colorare.",
+  "res.restore.model.tt": "Modello ESRGAN per la super-risoluzione dell'immagine.",
+  "res.restore.scale.tt": "Fattore di ingrandimento: 2× raddoppia, 4× quadruplica la risoluzione.",
+  "res.restore.denoise_str.tt": "Intensità del denoising prima dell'upscale (0.05–0.50).",
+  "res.color.model.tt": "Modello FLUX.2 per la colorazione AI della foto in bianco e nero.",
+  "res.color.subject.tt": "Soggetto principale della foto (es. 'uomo in divisa', 'paesaggio montano').",
+  "res.color.style.tt": "Stile e palette cromatica desiderata per la colorazione AI.",
+  "res.color.steps.tt": "Step di diffusione per la colorazione: più step = più qualità (e più lento).",
+  "res.run.tt": "Avvia l'operazione selezionata (restauro, colorazione o face-swap)."
 }

@@ -1923,5 +1923,14 @@
   "def.run.tt": "Start video definition enhancement with the selected engine.",
   "def.face.model.tt": "AI model for face restoration: CodeFormer (quality) or GFPGAN (speed).",
   "def.face.detection.tt": "Detector to locate faces in the video before restoration.",
-  "def.face.run.tt": "Run face restoration on the loaded video."
+  "def.face.run.tt": "Run face restoration on the loaded video.",
+  "res.input.browse.tt": "Select an image from disk to restore or colorize.",
+  "res.restore.model.tt": "ESRGAN model for image super-resolution.",
+  "res.restore.scale.tt": "Upscale factor: 2× doubles, 4× quadruples the resolution.",
+  "res.restore.denoise_str.tt": "Denoising strength before upscaling (0.05–0.50).",
+  "res.color.model.tt": "FLUX.2 model for AI colorization of the black-and-white photo.",
+  "res.color.subject.tt": "Main subject of the photo (e.g. 'man in uniform', 'mountain landscape').",
+  "res.color.style.tt": "Desired style and color palette for AI colorization.",
+  "res.color.steps.tt": "Diffusion steps for colorization: more steps = more quality (and slower).",
+  "res.run.tt": "Start the selected operation (restore, colorize or face-swap)."
 }

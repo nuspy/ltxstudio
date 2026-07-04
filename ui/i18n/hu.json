@@ -1923,5 +1923,14 @@
   "def.run.tt": "Videódefiníció-javítás indítása a kiválasztott motorral.",
   "def.face.model.tt": "AI modell arc-helyreállításhoz: CodeFormer (minőség) vagy GFPGAN (sebesség).",
   "def.face.detection.tt": "Detektor az arcok megtalálásához a videóban a helyreállítás előtt.",
-  "def.face.run.tt": "Archelyreállítás futtatása a betöltött videón."
+  "def.face.run.tt": "Archelyreállítás futtatása a betöltött videón.",
+  "res.input.browse.tt": "Válassz egy képet a lemezről helyreállításhoz vagy színezéshez.",
+  "res.restore.model.tt": "ESRGAN modell a kép szuper-felbontásához.",
+  "res.restore.scale.tt": "Nagyítási faktor: 2× duplázza, 4× négyszerezi a felbontást.",
+  "res.restore.denoise_str.tt": "Zajszűrés erőssége felskálázás előtt (0.05–0.50).",
+  "res.color.model.tt": "FLUX.2 modell a fekete-fehér fotó AI-színezéséhez.",
+  "res.color.subject.tt": "A fotó fő témája (pl. 'egyenruhás férfi', 'hegyi táj').",
+  "res.color.style.tt": "Kívánt stílus és színpaletta az AI-színezéshez.",
+  "res.color.steps.tt": "Diffúziós lépések a színezéshez: több lépés = jobb minőség (és lassabb).",
+  "res.run.tt": "A kiválasztott művelet indítása (helyreállítás, színezés vagy face-swap)."
 }

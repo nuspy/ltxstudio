@@ -1923,5 +1923,14 @@
   "def.run.tt": "使用所选引擎启动视频清晰度增强。",
   "def.face.model.tt": "人脸修复 AI 模型：CodeFormer（质量）或 GFPGAN（速度）。",
   "def.face.detection.tt": "修复前用于定位视频中人脸的检测器。",
-  "def.face.run.tt": "对已加载的视频执行人脸修复。"
+  "def.face.run.tt": "对已加载的视频执行人脸修复。",
+  "res.input.browse.tt": "从磁盘选择要修复或上色的图像。",
+  "res.restore.model.tt": "用于图像超分辨率的 ESRGAN 模型。",
+  "res.restore.scale.tt": "放大系数：2× 分辨率翻倍，4× 翻四倍。",
+  "res.restore.denoise_str.tt": "放大前的去噪强度（0.05–0.50）。",
+  "res.color.model.tt": "用于黑白照片 AI 上色的 FLUX.2 模型。",
+  "res.color.subject.tt": "照片的主要主体（如「穿制服的男人」、「山地景观」）。",
+  "res.color.style.tt": "AI 上色所需的风格和调色板。",
+  "res.color.steps.tt": "上色的扩散步数：步数越多质量越高（且更慢）。",
+  "res.run.tt": "启动所选操作（修复、上色或换脸）。"
 }
