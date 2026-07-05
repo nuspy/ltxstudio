@@ -597,6 +597,11 @@ class Frame1Tab(QWidget):
         self.inpaint_prompt.setPlaceholderText(tr("f1.inpaint.prompt.ph"))
         self.inpaint_prompt.setToolTip(tr("f1.inpaint.prompt.tt", "Descrivi cosa disegnare nell'area mascherata (inpaint)."))
         f.addRow(tr("f1.inpaint.prompt_lbl"), self.inpaint_prompt)
+        self.edit_enhance = QCheckBox(tr("f1.edit.enhance", "✨ Arricchisci prompt (AI)"))
+        self.edit_enhance.setToolTip(tr("f1.edit.enhance.tt",
+            "Prima di elaborare, un LLM locale arricchisce il prompt di modifica (inpaint/outpaint/integra). "
+            "Invisibile, opzionale."))
+        f.addRow("", self.edit_enhance)
         self.outpaint_prompt = QPlainTextEdit(); self.outpaint_prompt.setMaximumHeight(36)
         self.outpaint_prompt.setPlaceholderText(tr("f1.outpaint.prompt.ph"))
         self.outpaint_prompt.setToolTip(tr("f1.outpaint.prompt.tt", "Descrivi cosa generare nell'area estesa oltre i bordi (outpaint)."))
@@ -1226,6 +1231,7 @@ class Frame1Tab(QWidget):
             "seed": None if self.inp_seed_rand.isChecked() else self.inp_seed.value(),
             "lora": self.inp_lora.currentData(),
             "available": available,
+            "enhance": self.edit_enhance.isChecked() if hasattr(self, "edit_enhance") else False,
         }
 
     # ---------- composizione multi-foto (multi-reference / stitch) ----------

@@ -1808,6 +1808,13 @@ class MainWindow(QMainWindow):
             return
         ptxt = (cfg["inpaint_prompt"] if mode == "inpaint" else cfg["outpaint_prompt"]) \
             or self.frame1_tab.get_values().get("prompt_positive", "")
+        if cfg.get("enhance") and (ptxt or "").strip():         # arricchimento prompt invisibile (opzionale)
+            try:
+                from core import prompt_enhance as pe
+                if pe.available():
+                    ptxt = pe.enhance(ptxt, kind="image", nsfw=bool(self.frame1_tab.get_values().get("nsfw"))) or ptxt
+            except Exception:                                    # noqa: BLE001
+                pass
         retention = cfg.get("strength", 0.75)
         denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * retention))
         # guard: serve un'area da rigenerare, altrimenti il modello non fa nulla
@@ -1877,6 +1884,13 @@ class MainWindow(QMainWindow):
         if not self._ensure_flux2_encoder(model):
             return
         ptxt = cfg.get("integrate_prompt") or ""        # opzionale: default auto in KontextPipeline
+        if cfg.get("enhance") and ptxt.strip():             # arricchimento prompt invisibile (opzionale)
+            try:
+                from core import prompt_enhance as pe
+                if pe.available():
+                    ptxt = pe.enhance(ptxt, kind="image", nsfw=bool(self.frame1_tab.get_values().get("nsfw"))) or ptxt
+            except Exception:                                # noqa: BLE001
+                pass
         try:
             exp = self.frame1_tab.canvas.export_integrate(OUTPUT_DIR)
             if not exp.get("has_region"):
