@@ -19,6 +19,11 @@ SRC_DIR = r"E:\AI\Tools\ACE-Step\ACE-Step-1.5-src"
 CKPT_DIR = r"E:\AI\Tools\ACE-Step\Ace-Step1.5"
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
+# CRITICO (connessione metered): indica al handler dove sono i pesi LOCALI, così NON prova ad auto-scaricare
+# da HuggingFace (init_service_catalog.py rispetta ACESTEP_CHECKPOINTS_DIR). + offline mode di sicurezza.
+os.environ.setdefault("ACESTEP_CHECKPOINTS_DIR", CKPT_DIR)
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
 
 def main():
