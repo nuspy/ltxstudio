@@ -19,7 +19,8 @@ from core.music_service import Job
 
 TOOLS = Path(r"E:\AI\Tools")
 AS_DIR = TOOLS / "ACE-Step"
-VENV15_PY = AS_DIR / "venv15" / "Scripts" / "python.exe"
+_CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
+VENV15_PY = _CONS if _CONS.exists() else AS_DIR / "venv15" / "Scripts" / "python.exe"
 SRC15_DIR = AS_DIR / "ACE-Step-1.5-src"
 CKPT15_DIR = AS_DIR / "Ace-Step1.5"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "acestep15_generate.py"

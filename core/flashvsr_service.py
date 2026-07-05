@@ -17,7 +17,8 @@ from pathlib import Path
 
 REPO_DIR = Path(r"E:\AI\Tools\FlashVSR")
 WANVSR_DIR = REPO_DIR / "examples" / "WanVSR"
-VENV_PY = REPO_DIR / "venv" / "Scripts" / "python.exe"
+_CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
+VENV_PY = _CONS if _CONS.exists() else REPO_DIR / "venv" / "Scripts" / "python.exe"
 MODEL_DIR = Path(r"E:\AI\Models\FlashVSR\FlashVSR-v1.1")
 RUNNER = Path(__file__).resolve().parents[1] / "workers" / "flashvsr_run.py"
 REPO = "https://github.com/OpenImagingLab/FlashVSR"

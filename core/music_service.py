@@ -30,7 +30,8 @@ from pathlib import Path
 # ── Percorsi (layout E:\AI\Tools come il modulo training) ────────────────────
 TOOLS = Path(r"E:\AI\Tools")
 HEARTLIB_DIR = TOOLS / "heartlib"
-HEARTLIB_VENV_PY = HEARTLIB_DIR / "venv" / "Scripts" / "python.exe"
+_CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
+HEARTLIB_VENV_PY = _CONS if _CONS.exists() else HEARTLIB_DIR / "venv" / "Scripts" / "python.exe"
 HEARTLIB_CKPT = HEARTLIB_DIR / "ckpt"
 HEARTLIB_RUN = HEARTLIB_DIR / "examples" / "run_music_generation.py"
 # Wrapper NOSTRO: monkey-patcha torchaudio.save → soundfile prima di lanciare HeartMuLa

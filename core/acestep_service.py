@@ -9,7 +9,8 @@ from core.music_service import Job
 
 TOOLS = Path(r"E:\AI\Tools")
 AS_DIR = TOOLS / "ACE-Step"
-AS_VENV_PY = AS_DIR / "venv" / "Scripts" / "python.exe"
+_CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
+AS_VENV_PY = _CONS if _CONS.exists() else AS_DIR / "venv" / "Scripts" / "python.exe"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "acestep_generate.py"
 OUT_DIR = Path(r"E:\AI\ltxstudio\output")             # #97: canzoni ACE-Step in output\ (root)
 # cache HF dei pesi ACE-Step (dove li scarichiamo). Serve a verificare che il download sia COMPLETO.

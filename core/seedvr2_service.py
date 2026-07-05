@@ -18,7 +18,8 @@ import subprocess
 from pathlib import Path
 
 CLI_DIR = Path(r"E:\AI\Tools\SeedVR2")
-VENV_PY = CLI_DIR / "venv" / "Scripts" / "python.exe"
+_CONS = Path(r"E:\AI\Tools\F5-TTS\venv\Scripts\python.exe")   # venv consolidato (#61, gruppo transformers-5 con F5-TTS)
+VENV_PY = _CONS if _CONS.exists() else CLI_DIR / "venv" / "Scripts" / "python.exe"
 CLI = CLI_DIR / "inference_cli.py"
 MODEL_DIR = Path(r"E:\AI\Models\SeedVR2")
 DEFAULT_MODEL = "seedvr2_ema_3b_fp8_e4m3fn.safetensors"   # ~3GB, qualità buona, entra largo su 32GB
