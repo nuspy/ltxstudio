@@ -262,6 +262,17 @@ class _VideoEditAIWorker(QThread):
                 params["inpaint_masks_dir"] = _os.path.join(track_dir, "masks")
                 params["skip_stage_2"] = False
                 self.progress.emit("[edit] maschera tracciata → latent-inpaint")
+            elif cfg["mode"] == "replace_char":                # #102 Sostituisci personaggio (union-control-ref)
+                from core import controlnet_preprocess as _cp
+                canny_v = _os.path.join(self.out_dir, f"_canny_{base}_{stamp}.mp4")
+                self.progress.emit("[replace] canny del video sorgente (guida struttura)…")
+                _cp.preprocess_video(src, "canny", canny_v)    # struttura/movimento preservati
+                params["control_video"] = canny_v
+                params["image_path"] = cfg.get("ref_image")    # immagine sostitutiva = riferimento (frame 0)
+                params["control_strength"] = 0.6               # union-control-ref (ricetta SECourses)
+                params["loras"] = [{"path": r"E:\AI\Models\LoRA\LTX-2\LTX2.3_Crisp_Enhance.safetensors",
+                                    "strength": 1.0}]          # enhance nitidezza
+                params["_mux_audio_from"] = src                # preserva l'audio originale
             else:
                 params["control_video"] = src                  # edit/style: video sorgente come guide
             jf = _os.path.join(self.out_dir, f"_editp_{stamp}.json")
@@ -272,6 +283,17 @@ class _VideoEditAIWorker(QThread):
             r2 = _sp.run([self.LTX2_PY, "-u", worker, jf], capture_output=True, text=True,
                          encoding="utf-8", errors="replace")
             if _os.path.exists(out):
+                _mux = params.get("_mux_audio_from")           # #102 rimetti l'audio originale sul video rigenerato
+                if _mux and _os.path.exists(_mux):
+                    muxed = out[:-4] + "_audio.mp4"
+                    try:
+                        _sp.run(["ffmpeg", "-y", "-i", out, "-i", _mux, "-c:v", "copy",
+                                 "-map", "0:v:0", "-map", "1:a:0?", "-shortest", muxed],
+                                capture_output=True, text=True)
+                        if _os.path.exists(muxed):
+                            out = muxed
+                    except Exception:                          # noqa: BLE001
+                        pass
                 self.done.emit({"status": "success", "output": [out]})
             else:
                 self.done.emit({"status": "error", "error": (r2.stdout or "")[-200:] + (r2.stderr or "")[-300:]})

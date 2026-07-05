@@ -25,6 +25,9 @@ MODES = [
     ("inpaint", "vedit.mode.inpaint", "LTX-2/ltx23_inpaint_masked_t2v_rank128_v1_10000steps.safetensors"),
     ("anime2real", "vedit.mode.anime2real", "LTX-2/ltx23_anime2real_rank64_v1_4500.safetensors"),
     ("real2anime", "vedit.mode.real2anime", "LTX-2/ltx23_real2anime_rank64_v1_5000.safetensors"),
+    # Sostituisci personaggio: IC-LoRA union-control-ref (canny dal video + immagine di riferimento) —
+    # rimpiazza il personaggio mantenendo scena/movimento/audio (ricetta SECourses LTX 2.3, pesi già locali).
+    ("replace_char", "vedit.mode.replace_char", "LTX-2/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"),
 ]
 
 
@@ -50,6 +53,15 @@ class VideoEditAITab(QWidget):
 
         self.obj = QLineEdit(); self.obj.setPlaceholderText(tr("vedit.obj_ph", "oggetto da selezionare (es. car, person) — per Inpaint"))
         f.addRow(tr("vedit.obj_lbl", "Oggetto (a parole)"), self.obj)
+
+        # Sostituisci personaggio: immagine di riferimento = primo frame del video con SOLO il personaggio cambiato.
+        rrow = QHBoxLayout()
+        self.ref_img = QLineEdit(); self.ref_img.setPlaceholderText(
+            tr("vedit.ref.ph", "immagine sostitutiva: = primo frame del video ma con l'altro personaggio"))
+        self.ref_btn = QPushButton(tr("vedit.ref.browse", "Sfoglia…")); self.ref_btn.clicked.connect(self._pick_ref)
+        rrow.addWidget(self.ref_img, 1); rrow.addWidget(self.ref_btn)
+        self.ref_row_lbl = QLabel(tr("vedit.ref_lbl", "Immagine sostitutiva (personaggio)"))
+        f.addRow(self.ref_row_lbl, self._wrap_ref(rrow))
 
         self.prompt = QPlainTextEdit(); self.prompt.setFixedHeight(70)
         self.prompt.setPlaceholderText(tr("vedit.prompt_ph", "cosa generare/cambiare (es. a blue motorcycle / snowy winter)"))
@@ -82,6 +94,17 @@ class VideoEditAITab(QWidget):
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); v.addWidget(self.log, 1)
         self._on_mode()
 
+    def _wrap_ref(self, layout):
+        from PySide6.QtWidgets import QWidget as _QW
+        w = _QW(); w.setLayout(layout); return w
+
+    def _pick_ref(self):
+        from PySide6.QtWidgets import QFileDialog
+        p, _ = QFileDialog.getOpenFileName(self, tr("vedit.ref.browse", "Sfoglia…"), "",
+                                           "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
+        if p:
+            self.ref_img.setText(p)
+
     def _pick(self):
         p, _ = QFileDialog.getOpenFileName(self, tr("vedit.pick", "Scegli video"), "",
                                            "Video (*.mp4 *.mov *.avi *.mkv *.webm)")
@@ -92,11 +115,19 @@ class VideoEditAITab(QWidget):
     def _on_mode(self, *_):
         key = self.mode.currentData()
         self.obj.setEnabled(key == "inpaint")
+        is_rc = (key == "replace_char")
+        for w in (self.ref_img, self.ref_btn, self.ref_row_lbl):
+            w.setEnabled(is_rc)
         if key == "inpaint":
             self.note.setText(tr("vedit.note_inpaint",
                 "⚠ Inpaint sperimentale: SAM2 traccia l'oggetto su tutto il clip e ne rigenera l'area."))
         elif key in ("anime2real", "real2anime"):
             self.note.setText(tr("vedit.note_style", "Trasferimento di stile sull'intero video."))
+        elif is_rc:
+            self.note.setText(tr("vedit.note_replace_char",
+                "Sostituisci personaggio: carica un'immagine = primo frame del video ma con SOLO il personaggio "
+                "cambiato. Il canny del video preserva scena/movimento; l'audio originale è mantenuto. "
+                "Video lunghi elaborati a segmenti."))
         else:
             self.note.setText(tr("vedit.note_edit", "Modifica globale del video da istruzione testuale."))
 
@@ -115,10 +146,14 @@ class VideoEditAITab(QWidget):
                "strength": float(self.strength.currentData()),
                "cfg_scale": float(self.cfg.value()), "guide": float(self.guide.value()),
                "mask_dilate": int(self.dilate.value()),
-               "enhance": self.vedit_enhance.isChecked()}
+               "enhance": self.vedit_enhance.isChecked(),
+               "ref_image": self.ref_img.text().strip()}
         if key == "inpaint" and not cfg["object"]:
             self.log.appendPlainText(tr("vedit.err_no_obj", "Inpaint: indica l'oggetto da selezionare (a parole).")); return
-        if not cfg["prompt"]:
+        if key == "replace_char" and not cfg["ref_image"]:
+            self.log.appendPlainText(tr("vedit.err_no_ref",
+                "Sostituisci personaggio: scegli l'immagine sostitutiva del personaggio.")); return
+        if not cfg["prompt"] and key != "replace_char":     # replace_char: il personaggio viene dall'immagine
             self.log.appendPlainText(tr("vedit.err_no_prompt", "Inserisci un prompt.")); return
         self.log.appendPlainText(tr("vedit.queued", "In elaborazione: {m}…").format(m=key))
         self.request_edit.emit(cfg)
