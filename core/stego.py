@@ -61,6 +61,18 @@ def _carrier(nonce: int, tile_idx: int) -> np.ndarray:
     return (rng.integers(0, 2, _N_COEFF) * 2 - 1).astype(np.float32)
 
 
+_CMAT: dict[int, np.ndarray] = {}
+
+
+def _carrier_matrix(tile_idx: int) -> np.ndarray:
+    """Matrice (NONCE_BANK × N_COEFF) di tutti i carrier del tile — cache (dipende solo dalla chiave)."""
+    m = _CMAT.get(tile_idx)
+    if m is None:
+        m = np.stack([_carrier(n, tile_idx) for n in range(NONCE_BANK)])
+        _CMAT[tile_idx] = m
+    return m
+
+
 def _tiles(h: int, w: int):
     """Confini dei tile GxG (interi, coprono tutta l'immagine)."""
     ys = np.linspace(0, h, GRID + 1).astype(int)
@@ -100,11 +112,9 @@ def sign_image(bgr, nonce: int | None = None):
     return cv2.cvtColor(np.clip(ycc, 0, 255).astype(np.uint8), cv2.COLOR_YCrCb2BGR)
 
 
-def detect_image(bgr) -> tuple[bool, float, int]:
-    """Rilevamento cieco: prova la banca di nonce, correla la banda medio-freq, ritorna il max z-score."""
+def _detect_Y(Y) -> tuple[float, int]:
+    """Correlazione cieca sulla luminanza Y → (z-score max, nonce). Cuore condiviso dal rilevamento."""
     import cv2
-    _, Y = _to_y(bgr)
-    # accumula, per ogni nonce, la correlazione somma(D[mask]*carrier) e l'energia, su tutti i tile
     corr = np.zeros(NONCE_BANK, np.float64)
     energy = 0.0
     ncoef = 0
@@ -113,18 +123,54 @@ def detect_image(bgr) -> tuple[bool, float, int]:
         if tile.shape[0] < 8 or tile.shape[1] < 8:
             continue
         t = cv2.resize(tile, (CANON, CANON), interpolation=cv2.INTER_LINEAR).astype(np.float32)
-        D = cv2.dct(t)[_MASK]                                # coeff banda medio-freq
+        D = cv2.dct(t)[_MASK]
         D = D - D.mean()
         energy += float(np.dot(D, D))
         ncoef += D.size
-        for n in range(NONCE_BANK):
-            corr[n] += float(np.dot(D, _carrier(n, idx)))
+        corr += _carrier_matrix(idx) @ D                     # tutti i nonce in un matmul (veloce)
     if ncoef == 0 or energy <= 0:
-        return False, 0.0, -1
-    sigma = np.sqrt(energy / ncoef)                          # dev std del coeff sotto ipotesi nulla
-    z = corr / (sigma * np.sqrt(ncoef))                      # z-score per nonce
+        return 0.0, -1
+    sigma = np.sqrt(energy / ncoef)
+    z = corr / (sigma * np.sqrt(ncoef))
     best = int(np.argmax(z))
-    return bool(z[best] >= _Z_THRESH), float(z[best]), best
+    return float(z[best]), best
+
+
+def detect_image(bgr) -> tuple[bool, float, int]:
+    """Rilevamento CIECO veloce (no resync geometrico) — per il check interno rapido dell'app."""
+    _, Y = _to_y(bgr)
+    z, n = _detect_Y(Y)
+    return bool(z >= _Z_THRESH), z, n
+
+
+_Z_THRESH_ROBUST = 6.5   # soglia più alta: la ricerca geometrica (molti warp) gonfia il max sotto ipotesi nulla
+
+
+def detect_image_robust(bgr, max_angle: float = 15.0) -> tuple[bool, float, int]:
+    """Rilevamento ROBUSTO con resync geometrico (foto-schermo storta/prospettiva lieve).
+    Ricerca UNIFORME a passo 1° (il picco di correlazione è stretto ±1°, un passo grezzo lo mancherebbe)
+    su rotazione × scala; il warp riallinea il grid e lo z sale. Lavora su una versione RIDOTTA (lato max
+    512px) per velocità: il rilevamento normalizza comunque i tile a 64px, quindi non perde segnale.
+    Soglia più alta per compensare l'inflazione del max dovuta alla ricerca."""
+    import cv2
+    _, Y0 = _to_y(bgr)
+    h, w = Y0.shape
+    s = 512.0 / max(h, w)
+    if s < 1.0:                                              # riduci per accelerare la ricerca
+        Y0 = cv2.resize(Y0, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
+    hh, ww = Y0.shape
+    cx, cy = ww / 2.0, hh / 2.0
+    best_z, best_n = _detect_Y(Y0)
+    for ang in np.arange(-max_angle, max_angle + 0.1, 1.0):
+        for sc in (0.90, 0.95, 1.0, 1.05, 1.10):            # scala fine: assorbe foreshortening prospettico lieve
+            if abs(ang) < 1e-6 and abs(sc - 1.0) < 1e-6:
+                continue
+            M = cv2.getRotationMatrix2D((cx, cy), float(ang), float(sc))
+            Yw = cv2.warpAffine(Y0, M, (ww, hh), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+            z, n = _detect_Y(Yw)
+            if z > best_z:
+                best_z, best_n = z, n
+    return bool(best_z >= _Z_THRESH_ROBUST), float(best_z), best_n
 
 
 # ---------------- file helpers ----------------
@@ -202,16 +248,16 @@ def detect_file(path: str) -> tuple[bool, float, int]:
     ext = os.path.splitext(path)[1].lower()
     if ext in _IMG_EXT:
         img = cv2.imread(path)
-        return detect_image(img) if img is not None else (False, 0.0, -1)
+        return detect_image_robust(img) if img is not None else (False, 0.0, -1)   # resync geometrico
     if ext in _VID_EXT:
         cap = cv2.VideoCapture(path)
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         best = (False, 0.0, -1)
-        for fi in np.linspace(0, max(n - 1, 0), min(8, max(n, 1))).astype(int):
+        for fi in np.linspace(0, max(n - 1, 0), min(5, max(n, 1))).astype(int):
             cap.set(cv2.CAP_PROP_POS_FRAMES, int(fi))
             ok, fr = cap.read()
             if ok:
-                r = detect_image(fr)
+                r = detect_image_robust(fr)                  # ogni frame campionato: resync completo
                 if r[1] > best[1]:
                     best = r
         cap.release()
