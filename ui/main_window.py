@@ -1391,14 +1391,20 @@ class MainWindow(QMainWindow):
 
     # ---------- gating per edizione (helper) ----------
     def _feature_gate(self, fid: str) -> bool:
-        """True se la feature è disponibile nell'edizione; altrimenti mostra un
-        messaggio di upsell e ritorna False."""
+        """True se la feature è disponibile nell'edizione; altrimenti mostra l'upsell
+        (tier minimo + prezzo + link Patreon) e ritorna False. Fallback: messaggio generico."""
         if features.is_enabled(fid):
             return True
+        self._log(f"[gating] funzione '{fid}' non disponibile in '{features.edition()}'.")
+        from core import upsell as _up
+        if _up.info(fid):                                    # sbloccabile → vetrina con CTA Patreon
+            from ui.widgets.upsell import UpsellDialog
+            info = features.manifest().get("features", {}).get(fid, {})
+            UpsellDialog(fid, info.get("i18n_key", ""), self).exec()
+            return False
         from PySide6.QtWidgets import QMessageBox
         QMessageBox.information(self, tr("gate.locked.title"),
                                 tr("gate.locked.msg").format(edition=features.edition()))
-        self._log(f"[gating] funzione '{fid}' non disponibile in '{features.edition()}'.")
         return False
 
     def _gen_limit_ok(self) -> bool:

@@ -30,10 +30,14 @@ def _resolve_path(window, dotted: str):
 
 
 def apply(window) -> dict:
-    """Applica il gating. Ritorna un piccolo report {removed_tabs, hidden}."""
+    """Applica il gating. Ritorna un piccolo report {removed_tabs, upsell_tabs, hidden}.
+
+    UPSELL (marketing): un tab bloccato ma sbloccabile in un tier superiore NON viene rimosso —
+    resta visibile col 🔒 e il suo contenuto è sostituito da un UpsellPanel ("Available on <tier>"
+    + link Patreon). Viene rimosso solo se non è sbloccabile in nessun tier (upsell assente)."""
     feats = features.manifest().get("features", {})
     tabs = getattr(window, "tabs", None)
-    report = {"edition": features.edition(), "removed_tabs": [], "hidden": []}
+    report = {"edition": features.edition(), "removed_tabs": [], "upsell_tabs": [], "hidden": []}
 
     for fid, info in feats.items():
         if info.get("enabled", True):
@@ -45,8 +49,18 @@ def apply(window) -> dict:
             if w is not None:
                 idx = tabs.indexOf(w)
                 if idx >= 0:
+                    title = tabs.tabText(idx)
                     tabs.removeTab(idx)
-                    report["removed_tabs"].append(fid)
+                    if info.get("upsell"):                   # sbloccabile → vetrina al posto del contenuto
+                        try:
+                            from ui.widgets.upsell import UpsellPanel
+                            tabs.insertTab(idx, UpsellPanel(fid, info.get("i18n_key", "")),
+                                           "🔒 " + title)
+                            report["upsell_tabs"].append(fid)
+                        except Exception:
+                            report["removed_tabs"].append(fid)
+                    else:                                    # non esiste in nessun tier → sparisce
+                        report["removed_tabs"].append(fid)
         elif kind == "widget":
             w = _resolve_path(window, loc.get("path", ""))
             if w is not None:
