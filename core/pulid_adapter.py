@@ -64,36 +64,50 @@ def load(transformer, device="cuda", dtype=None):
     return pulid
 
 
-def extract_id(pulid, face_image_path: str):
-    """id_embedding dal volto (antelopev2 + eva-clip + pulid_encoder)."""
+def extract_id(pulid, face_image_path):
+    """id_embedding dal volto (antelopev2 + eva-clip + pulid_encoder). Accetta UNA foto o una LISTA:
+    con più foto dello stesso volto ne fa la MEDIA degli embedding → identità più robusta/stabile."""
     import cv2
-    img = cv2.imread(face_image_path)
-    if img is None:
-        raise FileNotFoundError(face_image_path)
-    id_emb, _ = pulid.get_id_embedding(img, cal_uncond=False)
-    return id_emb
+    import torch
+    paths = list(face_image_path) if isinstance(face_image_path, (list, tuple)) else [face_image_path]
+    embs = []
+    for p in paths:
+        if not p:
+            continue
+        img = cv2.imread(str(p))
+        if img is None:
+            continue
+        e, _ = pulid.get_id_embedding(img, cal_uncond=False)
+        embs.append(e)
+    if not embs:
+        raise FileNotFoundError(str(face_image_path))
+    return embs[0] if len(embs) == 1 else torch.stack(embs, dim=0).mean(dim=0)
 
 
-def attach(transformer, pulid, id_emb, strength: float = 0.8):
+def attach(transformer, pulid, id_emb, strength: float = 0.8, start_step: int = 0):
     """Hook sui blocchi del FluxTransformer2DModel diffusers: replica il forward di PuLID-FLUX
     (flux/model.py) — `hid = hid + strength * pulid_ca[ca_idx](id, hid)` ogni `double_interval`
     double-block e ogni `single_interval` single-block, con ca_idx CONDIVISO double→single e
-    AZZERATO a ogni forward del transformer (ogni step di denoising)."""
+    AZZERATO a ogni forward del transformer (ogni step di denoising).
+    start_step: inietta l'ID SOLO dai step >= start_step (0 = da subito) — così la composizione/posa
+    si forma prima e l'identità entra dopo (migliore aderenza al prompt), come il parametro ufficiale."""
     ca = pulid.pulid_ca
     di = int(getattr(transformer, "pulid_double_interval", 2) or 2)
     si = int(getattr(transformer, "pulid_single_interval", 4) or 4)
     handles = []
     idx = [0]
+    step = [0]
 
     # CRITICO: azzera il contatore ca_idx all'inizio di OGNI forward del transformer (per-step),
     # altrimenti accumula tra gli step e dopo ~2 step esaurisce i pulid_ca → effetto nullo.
     def _reset(_m, _inp):
         idx[0] = 0
+        step[0] += 1                                          # conta gli step (1 forward/step in distilled)
     handles.append(transformer.register_forward_pre_hook(_reset))
 
     def _ca_hook(_m, _inp, out):
         # FluxTransformerBlock / FluxSingleTransformerBlock → (encoder_hidden_states, hidden_states)
-        if idx[0] >= len(ca):
+        if idx[0] >= len(ca) or (step[0] - 1) < start_step:  # gating start_step (salta i primi step)
             return out
         enc, hid = out if isinstance(out, tuple) else (None, out)
         hid = hid + strength * ca[idx[0]](id_emb, hid)

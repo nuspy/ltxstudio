@@ -617,11 +617,17 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if params.get("pulid_face") and arch in ("flux", "kontext"):
         try:
             from core import pulid_adapter
+            _faces = params["pulid_face"]                     # str singola, lista, o "a|b|c" (multi-foto → media)
+            if isinstance(_faces, str) and "|" in _faces:
+                _faces = [f for f in _faces.split("|") if f.strip()]
             _pl = pulid_adapter.load(pipe.transformer)
-            _emb = pulid_adapter.extract_id(_pl, params["pulid_face"])
+            _emb = pulid_adapter.extract_id(_pl, _faces)
             _pulid_h = pulid_adapter.attach(pipe.transformer, _pl, _emb,
-                                            float(params.get("pulid_strength", 0.8)))
-            print(f"[pulid] attivo ({len(_pulid_h)} hook, strength={params.get('pulid_strength', 0.8)})", flush=True)
+                                            float(params.get("pulid_strength", 0.8)),
+                                            start_step=int(params.get("pulid_start_step", 0)))
+            _nf = len(_faces) if isinstance(_faces, list) else 1
+            print(f"[pulid] attivo ({len(_pulid_h)} hook, {_nf} foto, strength={params.get('pulid_strength', 0.8)}, "
+                  f"start_step={params.get('pulid_start_step', 0)})", flush=True)
         except Exception as _e:                          # noqa: BLE001
             print(f"[pulid] disattivato (errore): {_e}", flush=True)
             _pulid_h = None
@@ -632,6 +638,16 @@ def run(params: dict, mm, output_dir: str) -> dict:
               guidance_scale=float(params.get("guidance", 3.5)),
               generator=g)
     neg = params.get("negative")
+    # PuLID true CFG: migliora l'aderenza al prompt / bilancia identità (solo se la pipeline lo supporta).
+    _tcfg = float(params.get("pulid_true_cfg", 1.0) or 1.0)
+    if _tcfg > 1.0 and params.get("pulid_face"):
+        try:
+            import inspect
+            if "true_cfg_scale" in inspect.signature(pipe.__call__).parameters:
+                kw["true_cfg_scale"] = _tcfg
+                kw["negative_prompt"] = neg or "bad quality, worst quality, low quality, blurry"
+        except Exception:                                    # noqa: BLE001
+            pass
     # immagine/maschera per kontext e inpaint
     _, _, needs_image = SPEC[arch]
     if needs_image:
