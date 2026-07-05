@@ -13,11 +13,17 @@ from core import llm_service as L
 from core.film_studio import db, gen_service, continuity as ct, scheduler
 from ui.i18n_manager import tr
 
+# Schema INTERNO (invisibile all'utente): shot arricchito con camera+lighting per prompt di generazione più
+# coerenti e cinematografici. camera = inquadratura+angolo (es. "wide shot, low angle"); lighting = luce/mood.
 _SYS = ("You are a film script supervisor. Break the screenplay into SCENES and SHOTS. "
         "Output STRICT JSON: {\"scenes\":[{\"description\":str,\"style\":str,\"duration_s\":number,"
         "\"continuity\":{\"time_of_day\":str,\"weather\":str,\"mood\":str},"
-        "\"shots\":[{\"description\":str,\"duration_s\":number,\"camera\":str,"
+        "\"shots\":[{\"description\":str,\"duration_s\":number,"
+        "\"camera\":str,\"lighting\":str,"
         "\"dialogues\":[{\"actor\":str,\"text\":str}],\"keyframe\":str}]}]}. "
+        "camera = concrete shot type + angle (e.g. 'wide shot, low angle', 'close-up'). "
+        "lighting = light + mood (e.g. 'soft golden hour', 'harsh neon'). "
+        "description = the visual content of the shot (subject + action + setting). "
         "Sum of shot durations = scene duration; sum of scene durations = film duration. "
         "Keep @Name references. No prose outside JSON.")
 
@@ -146,11 +152,12 @@ class StoryboardTab(QWidget):
                             style=sc.get("style", ""), duration_s=float(sc.get("duration_s", 0) or 0),
                             continuity=json.dumps(state, ensure_ascii=False), assets="")
             for j, sh in enumerate(sc.get("shots", []), 1):
+                cam = ", ".join(x for x in (sh.get("camera", ""), sh.get("lighting", "")) if x)  # camera+luce
                 db.insert("shot", scene_id=sid, ord=j, description=sh.get("description", ""),
                           duration_s=float(sh.get("duration_s", 0) or 0),
                           dialogues=json.dumps(sh.get("dialogues", []), ensure_ascii=False),
                           keyframes=json.dumps([sh.get("keyframe", "")], ensure_ascii=False),
-                          refs="", camera=sh.get("camera", ""), continuity=json.dumps(state, ensure_ascii=False))
+                          refs="", camera=cam, continuity=json.dumps(state, ensure_ascii=False))
         self._refresh()
         self.log.appendPlainText(tr("fs.sb.done", "Breakdown: {n} scene").format(n=len(data.get('scenes', []))))
 
@@ -172,7 +179,9 @@ class StoryboardTab(QWidget):
                     self.log.appendPlainText(tr("fs.sb.too_many_lora",
                         "⚠ Scena {s} shot {h}: {n} LoRA simultanee (>3) — rischio interferenza, valuta split.")
                         .format(s=sc["ord"], h=sh["ord"], n=len(refs["loras"])))
-                prompt = refs["clean_text"] + ". " + ct.to_prompt(state) + ((", " + required) if required else "")
+                cam = (sh.get("camera") or "").strip()      # camera+luce dallo schema shot (prima ignorati)
+                prompt = (refs["clean_text"] + ". " + (cam + ". " if cam else "")
+                          + ct.to_prompt(state) + ((", " + required) if required else ""))
                 outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
                 Path(outdir).mkdir(parents=True, exist_ok=True)
                 if what == "keyframe":
