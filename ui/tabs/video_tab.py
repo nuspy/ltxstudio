@@ -3,7 +3,7 @@
 Il selettore NSFW/SFW del video re-filtra istantaneamente modelli e LoRA."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox, QComboBox,
     QHBoxLayout, QLabel, QGroupBox, QSlider, QCheckBox, QPushButton,
@@ -54,6 +54,8 @@ def round32(v: int) -> int:
 
 
 class VideoTab(QWidget):
+    request_pulid_keyframe = Signal(str, str)   # (foto|foto|…, prompt) → genera il primo frame col volto (PuLID)
+
     def __init__(self):
         super().__init__()
         self._mcat = ModelCatalog()
@@ -174,6 +176,20 @@ class VideoTab(QWidget):
         self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
         self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
         form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
+        # One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → poi l'i2v lo anima.
+        # PuLID è FLUX-only, il video è LTX: keyframe→i2v è il modo corretto per l'identità sul video.
+        prow = QHBoxLayout()
+        self.pulid_kf_face = QLineEdit(); self.pulid_kf_face.setPlaceholderText(
+            tr("vid.pulid_kf.ph", "foto volto (una o più, separate) → primo frame con l'identità"))
+        self.pulid_kf_browse = QPushButton(tr("vid.pulid_kf.browse", "Sfoglia…"))
+        self.pulid_kf_browse.clicked.connect(self._pick_pulid_kf)
+        self.pulid_kf_gen = QPushButton(tr("vid.pulid_kf.gen", "🧑 Primo frame dal volto"))
+        self.pulid_kf_gen.setToolTip(tr("vid.pulid_kf.gen.tt",
+            "Genera il primo frame con l'identità del volto (PuLID-FLUX), poi usalo come start per l'i2v."))
+        self.pulid_kf_gen.clicked.connect(
+            lambda: self.request_pulid_keyframe.emit(self.pulid_kf_face.text().strip(), ""))
+        prow.addWidget(self.pulid_kf_face, 1); prow.addWidget(self.pulid_kf_browse); prow.addWidget(self.pulid_kf_gen)
+        form.addRow(tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"), self._wrap(prow))
         # Selettore MOTORE video: ltx2_infer (default, tutte le feature) vs comfy-native (VRAM dinamica,
         # no-OOM, ma solo t2v/i2v semplici). Persistito in user_prefs; il routing è in _generate_video_native.
         self.video_engine_sel = QComboBox()
@@ -684,6 +700,14 @@ class VideoTab(QWidget):
         i = self.fr_auto_model.findText(cur)
         self.fr_auto_model.setCurrentIndex(i if i >= 0 else 0)
         self.fr_auto_model.blockSignals(False)
+
+    def _pick_pulid_kf(self):
+        """Selettore foto volto (multiplo) per il primo frame PuLID → i2v."""
+        from PySide6.QtWidgets import QFileDialog
+        paths, _ = QFileDialog.getOpenFileNames(self, tr("vid.pulid_kf.browse", "Sfoglia…"), "",
+                                                "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
+        if paths:
+            self.pulid_kf_face.setText("|".join(paths))
 
     def get_values(self) -> dict:
         v = {

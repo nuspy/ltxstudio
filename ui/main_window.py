@@ -553,6 +553,7 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.video_tab = VideoTab()
         self.frame1_tab = Frame1Tab()
+        self.video_tab.request_pulid_keyframe.connect(self._gen_pulid_keyframe_for_video)
         # I widget Prompt globale / Prompt negativo sono stati spostati nel tab Video.
         # Aliasiamo i nomi `frame1_tab.prompt` / `frame1_tab.neg` ai widget reali in
         # video_tab così tutte le call-site esistenti (get_values, restore, ecc.) continuano
@@ -1909,7 +1910,10 @@ class MainWindow(QMainWindow):
             # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. FLUX.2 e puzzle_lora → ComfyUI.
             from core import backend
             if backend.is_native("image") and engine == "kontext" and not aux:
-                self._start_native_kontext(exp, model, ptxt, negative, steps, seed, guidance)
+                _gc = self.frame1_tab.get_gen_config()      # riusa il box PuLID (se attivo) anche sull'integra
+                _pl = {k: _gc.get(k) for k in ("pulid_face", "pulid_strength", "pulid_start_step",
+                                               "pulid_true_cfg")} if _gc.get("pulid_face") else None
+                self._start_native_kontext(exp, model, ptxt, negative, steps, seed, guidance, pulid=_pl)
                 return
             prompt = self.kontext.integrate(img_name, ptxt, engine=engine, model=model,
                                             negative=negative, seed=seed, steps=steps,
@@ -2851,7 +2855,7 @@ class MainWindow(QMainWindow):
         self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,
                       self._on_native_inpaint_done)
 
-    def _start_native_kontext(self, exp, model, prompt, negative, steps, seed, guidance):
+    def _start_native_kontext(self, exp, model, prompt, negative, steps, seed, guidance, pulid=None):
         """Kontext/integra via backend NATIVO (FluxKontextPipeline) — niente ComfyUI.
         Il composito (scena+oggetto) è il riferimento; il modello rigenera/armonizza."""
         import os
@@ -2880,12 +2884,63 @@ class MainWindow(QMainWindow):
             mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
             params = {"model": mp, "arch": "kontext", "prompt": prompt, "negative": negative,
                       "image_path": exp["image"], "steps": steps, "guidance": guidance, "seed": seed}
+            if pulid and pulid.get("pulid_face"):             # identità volto (PuLID) anche sull'integra kontext
+                params.update({k: pulid[k] for k in ("pulid_face", "pulid_strength",
+                                                      "pulid_start_step", "pulid_true_cfg") if k in pulid})
+                self._log("Integra Kontext + PuLID (identità volto) attivo")
             self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._inpaint_mode = "integrazione"
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.integrate", "Integra (Kontext)"), self._native_worker,
                       self._on_native_inpaint_done)
+
+    def _gen_pulid_keyframe_for_video(self, faces: str, _prompt: str):
+        """One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → lo carica in Frame1
+        come start dell'i2v. PuLID è FLUX-only, il video è LTX: keyframe→i2v porta l'identità sul video."""
+        faces = (faces or "").strip()
+        if not faces:
+            QMessageBox.information(self, tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"),
+                                    tr("vid.pulid_kf.no_face", "Scegli prima una o più foto del volto.")); return
+        from core import native_driver
+        if not native_driver.is_up():
+            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
+                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde.")); return
+        vals = self.video_tab.get_values()
+        gc = self.frame1_tab.get_gen_config()
+        model = gc.get("model") if gc.get("arch") == "flux" else None   # riusa il modello FLUX di Frame1
+        prompt = (_prompt or vals.get("prompt") or "").strip() or "a person, portrait, natural lighting, high detail"
+        _r64 = lambda x: max(256, round(int(x) / 64) * 64)
+        params = {"arch": "flux", "prompt": prompt, "pulid_face": faces, "pulid_strength": 0.85,
+                  "pulid_start_step": int(gc.get("pulid_start_step", 0)),
+                  "pulid_true_cfg": float(gc.get("pulid_true_cfg", 1.0)),
+                  "width": _r64(vals.get("width", 768)), "height": _r64(vals.get("height", 512)),
+                  "steps": 22, "guidance": 3.5, "seed": random.randint(0, 2**31)}
+        if model:
+            params["model"] = model
+        self._log(f"Primo frame dal volto (PuLID) — {faces.count('|') + 1} foto…")
+        self._pulid_kf_worker = _NativeImageWorker(params, module="image")
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.pulid_kf", "Primo frame (PuLID)"), self._pulid_kf_worker,
+                      self._on_pulid_keyframe_done)
+
+    def _on_pulid_keyframe_done(self, res: dict):
+        self._stop_native_preview()
+        if res.get("status") != "success":
+            self._log(f"[pulid keyframe] errore: {res.get('error', '')[:300]}")
+            QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1000]); return
+        out = (res.get("output") or [None])[0]
+        if not out:
+            return
+        self.frame1_tab.image_path = out                     # diventa lo start dell'i2v
+        try:
+            self.frame1_tab.canvas.load_image(out)
+        except Exception:                                    # noqa: BLE001
+            pass
+        self._log(f"[pulid keyframe] primo frame pronto: {out} — ora genera il video (i2v).")
+        QMessageBox.information(self, tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"),
+            tr("vid.pulid_kf.ready", "Primo frame con l'identità pronto e caricato. Ora premi Genera video: "
+               "l'i2v lo animerà mantenendo il volto."))
 
     def _on_native_inpaint_done(self, res: dict):
         self._stop_native_preview()
