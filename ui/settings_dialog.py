@@ -82,7 +82,7 @@ class SettingsDialog(QDialog):
 
     # ---------- sezione override template ----------
     def _build_privacy_group(self) -> QGroupBox:
-        from PySide6.QtWidgets import QCheckBox
+        from PySide6.QtWidgets import QCheckBox, QLineEdit
         grp = QGroupBox(tr("settings.privacy_group", "Provenienza"))
         form = QFormLayout(grp)
         self.cb_stego = QCheckBox(tr("settings.stego", "Firma invisibile di provenienza (consigliata)"))
@@ -92,6 +92,15 @@ class SettingsDialog(QDialog):
             "verificare (con lo strumento ATF Detector) che il contenuto è stato creato con questo software. "
             "Non altera visibilmente l'immagine. Attiva di default."))
         form.addRow(self.cb_stego)
+        # Testo custom OPZIONALE nella firma invisibile (max 5 caratteri: limite robusto a screenshot).
+        self.ed_stego_text = QLineEdit(str(user_prefs.get("stego_text", "") or ""))
+        self.ed_stego_text.setMaxLength(5)
+        self.ed_stego_text.setPlaceholderText(tr("settings.stego_text.ph", "vuoto = firma senza testo"))
+        self.ed_stego_text.setToolTip(tr("settings.stego_text.tt",
+            "Testo custom (max 5 caratteri, es. un tuo codice/handle) impresso invisibilmente e leggibile dal "
+            "Detector. Vuoto = firma valida senza testo. Limite di 5 caratteri per resistere a screenshot/"
+            "compressione; per testo più lungo usare i metadati del file."))
+        form.addRow(tr("settings.stego_text", "Testo firma (max 5)"), self.ed_stego_text)
         return grp
 
     def _build_overrides_group(self) -> QGroupBox:
@@ -134,6 +143,7 @@ class SettingsDialog(QDialog):
             user_prefs.set_engine("video", self.cb_vid_engine.currentData())
             if hasattr(self, "cb_stego"):
                 user_prefs.set("stego_watermark", self.cb_stego.isChecked())
+                user_prefs.set("stego_text", self.ed_stego_text.text().strip())
         except Exception:
             pass
         self.accept()

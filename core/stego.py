@@ -17,9 +17,13 @@ robustezza forte a rimozione casuale, averaging e screenshot; ma chi estrae la C
 ricava statisticamente) può attaccarlo. Mitigazione: chiave nel binario compilato (Nuitka, offuscata) e/o
 Detector lato-server. La foto-di-schermo con prospettiva/moiré è il caso più duro (resync geometrico = fase 2).
 
+PAYLOAD testo custom OPZIONALE (5 char): impresso con carrier indipendenti dal presence, letto dal Detector.
+Limite fisico del watermark invisibile screenshot-robusto → 5 caratteri (0 errori dopo JPEG/screenshot);
+sotto rotazione forte il presence tiene ma il testo può perdersi. Vuoto = firma senza testo (comunque valida).
+
 API:
-  sign_image(bgr, nonce=None) -> bgr           # marchia (nonce casuale se None → salvato per frame video)
-  detect_image(bgr) -> (found: bool, score: float, nonce: int)
+  sign_image(bgr, nonce=None, text=None) -> bgr       # text None → dalle preferenze; "" → senza payload
+  detect_image(bgr) / detect_image_robust(bgr) -> (found, z, nonce, testo|None)
   sign_file(path) / detect_file(path)
 """
 from __future__ import annotations
@@ -32,11 +36,17 @@ import numpy as np
 # Chiave segreta di provenienza (nel prodotto = bakeata/offuscata da Nuitka). Override test via env.
 _KEY = os.environ.get("ATF_STEGO_KEY", "AIToolsForge::provenance::v1::do-not-share").encode()
 
-GRID = 6              # 6x6 = 36 tile (ridondanza vs crop)
-CANON = 64           # dimensione canonica del tile per la DCT (robustezza a resize)
+GRID = 8              # 8x8 = 64 tile (più siti d'impressione: presence più forte + capacità payload)
+CANON = 80           # dimensione canonica del tile per la DCT (robustezza a resize)
 NONCE_BANK = 24      # nonce provati dal detector (periodo del carrier per-frame)
-_ALPHA = 20.0        # ampiezza segnale in unità DCT (invisibile ~PSNR 37, rilevabile z~8); scalata per energia locale
+_ALPHA = 20.0        # ampiezza segnale PRESENCE in unità DCT (invisibile, rilevabile z~10)
 _Z_THRESH = 5.0      # soglia z-score di rilevamento (falsi positivi ~ 1e-6 a coda gaussiana)
+# PAYLOAD testo custom OPZIONALE — limite fisico del watermark invisibile screenshot-robusto = pochi byte.
+# 5 byte testo + 1 CRC8 = 48 bit (0 errori misurati dopo JPEG55 + screenshot 0.6x). Vuoto = solo presence
+# (firma comunque valida). Testo più lungo NON è robusto: 5 char = codice/handle/ID corto.
+PAYLOAD_TEXT_BYTES = 5
+PAYLOAD_BITS = (PAYLOAD_TEXT_BYTES + 1) * 8
+_BETA = 2.8          # ampiezza per-bit del payload (a 48 bit dà BER 0 dopo compressione/screenshot)
 
 
 def _midband_mask() -> np.ndarray:
@@ -44,7 +54,7 @@ def _midband_mask() -> np.ndarray:
     u = np.arange(CANON)[:, None]
     v = np.arange(CANON)[None, :]
     r = u + v
-    m = (r >= 4) & (r <= 16)                                 # banda medio-bassa: sopravvive a resize/JPEG/screenshot
+    m = (r >= 4) & (r <= 26)                                 # banda medio-bassa: sopravvive a resize/JPEG/screenshot
     m[:2, :2] = False                                        # niente DC/quasi-DC
     return m
 
@@ -73,6 +83,60 @@ def _carrier_matrix(tile_idx: int) -> np.ndarray:
     return m
 
 
+# ---------------- payload testo (CRC8 + carrier indipendenti dal presence) ----------------
+def _crc8(data: bytes) -> int:
+    c = 0
+    for b in data:
+        c ^= b
+        for _ in range(8):
+            c = ((c << 1) ^ 0x07) & 0xFF if (c & 0x80) else (c << 1) & 0xFF
+    return c
+
+
+def _text_to_bits(text: str) -> np.ndarray | None:
+    """Testo → 5 byte (utf-8 troncato/paddato) + CRC8 → segni ±1 (len PAYLOAD_BITS). None se vuoto."""
+    if not text:
+        return None
+    raw = text.encode("utf-8")[:PAYLOAD_TEXT_BYTES].ljust(PAYLOAD_TEXT_BYTES, b"\x00")
+    bits = np.unpackbits(np.frombuffer(raw + bytes([_crc8(raw)]), dtype=np.uint8))
+    return bits.astype(np.float32) * 2 - 1                   # 0→-1, 1→+1
+
+
+def _bits_to_text(signs: np.ndarray) -> str | None:
+    """Segni decodificati → testo se il CRC8 combacia, altrimenti None."""
+    b = np.packbits((signs > 0).astype(np.uint8)).tobytes()
+    if len(b) < PAYLOAD_TEXT_BYTES + 1 or _crc8(b[:PAYLOAD_TEXT_BYTES]) != b[PAYLOAD_TEXT_BYTES]:
+        return None
+    try:
+        return b[:PAYLOAD_TEXT_BYTES].rstrip(b"\x00").decode("utf-8")
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+_PMAT: dict[tuple, np.ndarray] = {}
+
+
+def _payload_matrix(nonce: int, tile_idx: int) -> np.ndarray:
+    """Matrice (PAYLOAD_BITS × N_COEFF) di carrier ±1 del payload — indipendenti dal presence, cache."""
+    k = (nonce, tile_idx)
+    m = _PMAT.get(k)
+    if m is None:
+        seed = int.from_bytes(hashlib.sha256(_KEY + b"PAYLOAD" + nonce.to_bytes(4, "big")
+                                             + tile_idx.to_bytes(2, "big")).digest()[:8], "big")
+        m = (np.random.default_rng(seed).integers(0, 2, (PAYLOAD_BITS, _N_COEFF)) * 2 - 1).astype(np.float32)
+        _PMAT[k] = m
+    return m
+
+
+def _pref_text() -> str:
+    """Testo custom della firma dalle preferenze utente (vuoto = nessun payload)."""
+    try:
+        from core import user_prefs
+        return str(user_prefs.get("stego_text", "") or "")[:PAYLOAD_TEXT_BYTES]
+    except Exception:                                        # noqa: BLE001
+        return ""
+
+
 def _tiles(h: int, w: int):
     """Confini dei tile GxG (interi, coprono tutta l'immagine)."""
     ys = np.linspace(0, h, GRID + 1).astype(int)
@@ -90,11 +154,15 @@ def _to_y(bgr):
     return ycc, ycc[:, :, 0]
 
 
-def sign_image(bgr, nonce: int | None = None):
-    """Inietta la firma. nonce None → casuale (0..NONCE_BANK-1). Ritorna (bgr_firmato)."""
+def sign_image(bgr, nonce: int | None = None, text: str | None = None):
+    """Inietta la firma. nonce None → casuale. text opzionale → payload custom (vuoto/None = solo presence,
+    dalle preferenze se None). Ritorna (bgr_firmato)."""
     import cv2
     if nonce is None:
         nonce = int.from_bytes(os.urandom(2), "big") % NONCE_BANK
+    if text is None:
+        text = _pref_text()
+    pbits = _text_to_bits(text)                              # None se testo vuoto
     ycc, Y = _to_y(bgr)
     for idx, y0, y1, x0, x1 in _tiles(*Y.shape):
         tile = Y[y0:y1, x0:x1]
@@ -102,14 +170,30 @@ def sign_image(bgr, nonce: int | None = None):
         if th < 8 or tw < 8:
             continue
         # segnale nel dominio canonico → spaziale → riscalato al tile (robusto a resize)
+        coeffs = _ALPHA * _carrier(nonce, idx)               # presence
+        if pbits is not None:
+            coeffs = coeffs + _BETA * (pbits @ _payload_matrix(nonce, idx))   # + payload testo
         S = np.zeros((CANON, CANON), np.float32)
-        S[_MASK] = _ALPHA * _carrier(nonce, idx)
+        S[_MASK] = coeffs
         spat = cv2.idct(S)
         spat = cv2.resize(spat, (tw, th), interpolation=cv2.INTER_LINEAR)
         spat *= (0.6 + 0.4 * min(1.0, tile.std() / 32.0))    # meno segnale nelle zone piatte (invisibilità)
         Y[y0:y1, x0:x1] = np.clip(tile + spat, 0, 255)
     ycc[:, :, 0] = Y
     return cv2.cvtColor(np.clip(ycc, 0, 255).astype(np.uint8), cv2.COLOR_YCrCb2BGR)
+
+
+def _decode_Y(Y, nonce: int) -> str | None:
+    """Decodifica il payload testo alla luminanza Y per un dato nonce (dopo aver trovato il presence)."""
+    import cv2
+    corr = np.zeros(PAYLOAD_BITS, np.float64)
+    for idx, y0, y1, x0, x1 in _tiles(*Y.shape):
+        tile = Y[y0:y1, x0:x1]
+        if tile.shape[0] < 8 or tile.shape[1] < 8:
+            continue
+        D = cv2.dct(cv2.resize(tile, (CANON, CANON)).astype(np.float32))[_MASK]
+        corr += _payload_matrix(nonce, idx) @ (D - D.mean())
+    return _bits_to_text(corr)
 
 
 def _detect_Y(Y) -> tuple[float, int]:
@@ -136,17 +220,18 @@ def _detect_Y(Y) -> tuple[float, int]:
     return float(z[best]), best
 
 
-def detect_image(bgr) -> tuple[bool, float, int]:
-    """Rilevamento CIECO veloce (no resync geometrico) — per il check interno rapido dell'app."""
+def detect_image(bgr) -> tuple[bool, float, int, str | None]:
+    """Rilevamento CIECO veloce (no resync geometrico) → (found, z, nonce, testo|None)."""
     _, Y = _to_y(bgr)
     z, n = _detect_Y(Y)
-    return bool(z >= _Z_THRESH), z, n
+    found = bool(z >= _Z_THRESH)
+    return found, z, n, (_decode_Y(Y, n) if found else None)
 
 
 _Z_THRESH_ROBUST = 6.5   # soglia più alta: la ricerca geometrica (molti warp) gonfia il max sotto ipotesi nulla
 
 
-def detect_image_robust(bgr, max_angle: float = 15.0) -> tuple[bool, float, int]:
+def detect_image_robust(bgr, max_angle: float = 15.0) -> tuple[bool, float, int, str | None]:
     """Rilevamento ROBUSTO con resync geometrico (foto-schermo storta/prospettiva lieve).
     Ricerca UNIFORME a passo 1° (il picco di correlazione è stretto ±1°, un passo grezzo lo mancherebbe)
     su rotazione × scala; il warp riallinea il grid e lo z sale. Lavora su una versione RIDOTTA (lato max
@@ -160,7 +245,7 @@ def detect_image_robust(bgr, max_angle: float = 15.0) -> tuple[bool, float, int]
         Y0 = cv2.resize(Y0, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
     hh, ww = Y0.shape
     cx, cy = ww / 2.0, hh / 2.0
-    best_z, best_n = _detect_Y(Y0)
+    best_z, best_n, best_Y = _detect_Y(Y0) + (Y0,)
     for ang in np.arange(-max_angle, max_angle + 0.1, 1.0):
         for sc in (0.90, 0.95, 1.0, 1.05, 1.10):            # scala fine: assorbe foreshortening prospettico lieve
             if abs(ang) < 1e-6 and abs(sc - 1.0) < 1e-6:
@@ -169,8 +254,9 @@ def detect_image_robust(bgr, max_angle: float = 15.0) -> tuple[bool, float, int]
             Yw = cv2.warpAffine(Y0, M, (ww, hh), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
             z, n = _detect_Y(Yw)
             if z > best_z:
-                best_z, best_n = z, n
-    return bool(best_z >= _Z_THRESH_ROBUST), float(best_z), best_n
+                best_z, best_n, best_Y = z, n, Yw
+    found = bool(best_z >= _Z_THRESH_ROBUST)
+    return found, float(best_z), best_n, (_decode_Y(best_Y, best_n) if found else None)
 
 
 # ---------------- file helpers ----------------
@@ -242,24 +328,24 @@ def _sign_video(path: str) -> None:
                 except Exception: pass                       # noqa: BLE001
 
 
-def detect_file(path: str) -> tuple[bool, float, int]:
-    """Detector su file: immagine → 1 test; video → campiona alcuni frame e vota."""
+def detect_file(path: str) -> tuple[bool, float, int, str | None]:
+    """Detector su file → (found, z, nonce, testo|None): immagine → 1 test; video → campiona alcuni frame."""
     import cv2
     ext = os.path.splitext(path)[1].lower()
     if ext in _IMG_EXT:
         img = cv2.imread(path)
-        return detect_image_robust(img) if img is not None else (False, 0.0, -1)   # resync geometrico
+        return detect_image_robust(img) if img is not None else (False, 0.0, -1, None)   # resync geometrico
     if ext in _VID_EXT:
         cap = cv2.VideoCapture(path)
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        best = (False, 0.0, -1)
+        best = (False, 0.0, -1, None)
         for fi in np.linspace(0, max(n - 1, 0), min(5, max(n, 1))).astype(int):
             cap.set(cv2.CAP_PROP_POS_FRAMES, int(fi))
             ok, fr = cap.read()
             if ok:
                 r = detect_image_robust(fr)                  # ogni frame campionato: resync completo
-                if r[1] > best[1]:
+                if r[1] > best[1] or (r[3] and not best[3]):
                     best = r
         cap.release()
         return best
-    return False, 0.0, -1
+    return False, 0.0, -1, None

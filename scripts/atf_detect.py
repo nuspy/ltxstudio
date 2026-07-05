@@ -22,9 +22,10 @@ from core import stego  # noqa: E402
 
 
 def _one(path: str) -> dict:
-    found, score, nonce = stego.detect_file(path)
+    found, score, nonce, text = stego.detect_file(path)
     return {"file": path, "generated_by_atf": bool(found),
-            "confidence_z": round(float(score), 2), "signal_id": int(nonce)}
+            "confidence_z": round(float(score), 2), "signal_id": int(nonce),
+            "custom_text": text}
 
 
 def main() -> int:
@@ -51,7 +52,8 @@ def main() -> int:
     else:
         for r in results:
             mark = "✅ GENERATO con AI Tools Forge" if r["generated_by_atf"] else "❌ nessuna firma"
-            print(f"{mark}  (z={r['confidence_z']}, id={r['signal_id']})  {r['file']}")
+            txt = f'  testo: "{r["custom_text"]}"' if r.get("custom_text") else ""
+            print(f"{mark}  (z={r['confidence_z']}, id={r['signal_id']})  {r['file']}{txt}")
     any_found = any(r["generated_by_atf"] for r in results)
     return 0 if any_found else 1
 
