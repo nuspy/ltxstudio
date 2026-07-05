@@ -189,6 +189,11 @@ class MusicTab(QWidget):
             "Riempie tag, liriche e metadata con un esempio di stile casuale (sempre diverso)."))
         self.btn_example.setCursor(Qt.PointingHandCursor); self.btn_example.clicked.connect(self._random_example)
         _trl.addWidget(self.btn_example)
+        self.song_enhance = QCheckBox(tr("music.enhance", "✨ Arricchisci stile (AI)"))
+        self.song_enhance.setToolTip(tr("music.enhance.tt",
+            "Prima di generare, un LLM locale trasforma i tag in una descrizione di stile ricca (genere, "
+            "strumenti, voce, mood, produzione) — come la caption di ACE-Step 1.5. Invisibile, opzionale."))
+        _trl.addWidget(self.song_enhance)
         f.addRow(tr("music.tags", "Tag di stile"), _tags_row)
         v.addLayout(f)
         v.addWidget(QLabel(tr("music.lyrics", "Liriche (usa sezioni [Verse], [Chorus]…)")))
@@ -621,7 +626,7 @@ class MusicTab(QWidget):
         p = ms.SongParams(
             name=self.song_name.text().strip() or "song",
             lyrics=_expand_wildcards(self.song_lyrics.toPlainText()),      # wildcards {a|b|c}
-            tags=self.song_meta.compose(_expand_wildcards(self.song_tags.text().strip())),   # F-A: metadata + wildcards
+            tags=self.song_meta.compose(self._style_tags(self.song_tags.text())),   # F-A: metadata + wildcards + enhance
             duration_s=self.song_dur.value(), instrumental=self.song_instr.isChecked(),
             version=self.song_ver.currentText(), temperature=self.song_temp.value(),
             cfg_scale=self.song_cfg.value(), lazy_load=self.song_lazy.isChecked())
@@ -640,6 +645,19 @@ class MusicTab(QWidget):
         dlg = MusicTagDialog(self.song_tags.text(), engine=self.song_engine.currentText(), parent=self)
         if dlg.exec():
             self.song_tags.setText(dlg.result_tags())
+
+    def _style_tags(self, raw: str) -> str:
+        """Espande i wildcard e, se 'Arricchisci stile' è attivo, trasforma i tag in caption ricca via LLM."""
+        t = _expand_wildcards((raw or "").strip())
+        if getattr(self, "song_enhance", None) and self.song_enhance.isChecked() and t:
+            try:
+                from core import prompt_enhance as pe
+                if pe.available():
+                    self.status.setText(tr("music.enhance.run", "Arricchimento stile (AI)…"))
+                    t = pe.enhance(t, kind="music") or t
+            except Exception:                                # noqa: BLE001
+                pass
+        return t
 
     def _insert_section(self, sec: str):
         """Inserisce il tag di sezione [sec] al cursore delle liriche (con a-capo)."""
@@ -877,7 +895,7 @@ class MusicTab(QWidget):
     def _gen_song_acestep(self):
         """Generazione canzone/strumentale con ACE-Step XL 1.5 (alternativa a HeartMuLa)."""
         from core import acestep_service as ax
-        raw_tags = _expand_wildcards(self.song_tags.text().strip())        # wildcards {a|b|c}
+        raw_tags = self._style_tags(self.song_tags.text())        # wildcards {a|b|c} + enhance opzionale
         instrumental = self.song_instr.isChecked()
         lyrics = "" if instrumental else _expand_wildcards(self.song_lyrics.toPlainText().strip())
         name = self.song_name.text().strip() or "song"
@@ -914,7 +932,7 @@ class MusicTab(QWidget):
         """Generazione con ACE-Step 1.5 (DiT turbo 4B + planner 5Hz). Metadata come parametri STRUTTURATI
         (non accodati alla caption, come nel v1) — è la separazione caption/lyrics/metadata della 1.5."""
         from core import acestep15_service as ax15
-        caption = _expand_wildcards(self.song_tags.text().strip())
+        caption = self._style_tags(self.song_tags.text())
         instrumental = self.song_instr.isChecked()
         lyrics = "" if instrumental else _expand_wildcards(self.song_lyrics.toPlainText().strip())
         name = self.song_name.text().strip() or "song"

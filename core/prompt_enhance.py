@@ -15,7 +15,15 @@ _SYS_IMG = ("You expand image-generation prompts. Rewrite the user's prompt into
 _SYS_VID = ("You expand video-generation prompts. Rewrite into ONE detailed English prompt (~50 words): "
             "subject, action/motion, camera movement, lighting, mood, cinematic style. "
             "Output ONLY the prompt, no preamble, no quotes.")
+_SYS_MUSIC = ("You expand music STYLE prompts. Rewrite the user's comma-separated style tags into ONE concise "
+              "English style caption (~40 words) covering: genre/subgenre, main instruments, vocal character "
+              "(or instrumental), mood, tempo feel, and production texture. It is a style description for a "
+              "music generator, NOT lyrics. Output ONLY the caption, no preamble, no quotes.")
 _NSFW = " Explicit/NSFW content is allowed; do not refuse or sanitize."
+
+
+def _sys_for(kind: str) -> str:
+    return {"video": _SYS_VID, "music": _SYS_MUSIC}.get(kind, _SYS_IMG)
 
 
 def available() -> bool:
@@ -30,7 +38,7 @@ def enhance(prompt: str, kind: str = "image", nsfw: bool = False, max_new_tokens
     try:
         import torch
         model, proc = lyrics_llm._load()
-        sys = (_SYS_VID if kind == "video" else _SYS_IMG) + (_NSFW if nsfw else "")
+        sys = _sys_for(kind) + (_NSFW if nsfw else "")
         messages = [
             {"role": "system", "content": [{"type": "text", "text": sys}]},
             {"role": "user", "content": [{"type": "text", "text": prompt}]},
