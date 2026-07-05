@@ -18,7 +18,7 @@ import subprocess
 from pathlib import Path
 
 CLI_DIR = Path(r"E:\AI\Tools\SeedVR2")
-_CONS = Path(r"E:\AI\Tools\F5-TTS\venv\Scripts\python.exe")   # venv consolidato (#61, gruppo transformers-5 con F5-TTS)
+_CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61 — f5_tts/seedvr2 validati su transformers 4.57 del host)
 VENV_PY = _CONS if _CONS.exists() else CLI_DIR / "venv" / "Scripts" / "python.exe"
 CLI = CLI_DIR / "inference_cli.py"
 MODEL_DIR = Path(r"E:\AI\Models\SeedVR2")

@@ -39,7 +39,8 @@ HEARTLIB_RUN = HEARTLIB_DIR / "examples" / "run_music_generation.py"
 HEARTLIB_WRAPPER = Path(__file__).resolve().parent.parent / "workers" / "heartmula_run.py"
 
 MMAUDIO_DIR = TOOLS / "MMAudio"
-MMAUDIO_VENV_PY = MMAUDIO_DIR / "venv" / "Scripts" / "python.exe"
+_CONS_MM = Path(r"E:\AI\Tools\ltx2_venv\Scripts\python.exe")   # venv consolidato (#61, stesso py3.10)
+MMAUDIO_VENV_PY = _CONS_MM if _CONS_MM.exists() else MMAUDIO_DIR / "venv" / "Scripts" / "python.exe"
 MMAUDIO_DEMO = MMAUDIO_DIR / "demo.py"
 
 MUSIC_OUTPUT_DIR = Path(r"E:\AI\ltxstudio\output")     # #97: musica/sonify in output\ (root), non in sottocartella

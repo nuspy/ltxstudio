@@ -12,7 +12,8 @@ from core.music_service import Job
 
 TOOLS = Path(r"E:\AI\Tools")
 F5_DIR = TOOLS / "F5-TTS"
-F5_VENV_PY = F5_DIR / "venv" / "Scripts" / "python.exe"
+_CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
+F5_VENV_PY = _CONS if _CONS.exists() else F5_DIR / "venv" / "Scripts" / "python.exe"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "f5tts_generate.py"
 OUT_DIR = Path(r"E:\AI\ltxstudio\output\audio")
 
