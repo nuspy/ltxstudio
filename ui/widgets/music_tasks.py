@@ -30,6 +30,21 @@ TASKS = [
      tr("music.task.a2a.tt", "Genera guidato da un audio di RIFERIMENTO (style-transfer). La 'forza' regola quanto seguirlo.")),
 ]
 
+# Modalità della pipeline ACE-Step 1.5 non ancora disponibili (richiedono la fondazione 1.5 — download).
+# Mostrate BLOCCATE (🔒) per esporre la roadmap senza rompere il motore v1 attuale.
+_LOCKED_15 = [
+    ("extract", tr("music.task.extract", "Extract (isola traccia)"),
+     tr("music.task.extract.tt", "Isola una traccia (voce/batteria/basso…) da un mix. Richiede la fondazione ACE-Step 1.5.")),
+    ("lego", tr("music.task.lego", "Lego (aggiungi strumento)"),
+     tr("music.task.lego.tt", "Sovrappone una singola traccia strumentale a un audio esistente. Richiede ACE-Step 1.5.")),
+    ("complete", tr("music.task.complete", "Complete (completa arrangiamento)"),
+     tr("music.task.complete.tt", "Riempie gli strumenti mancanti di una traccia parziale. Richiede ACE-Step 1.5.")),
+    ("cover", tr("music.task.cover", "Cover (nuovo stile)"),
+     tr("music.task.cover.tt", "Ricanta una canzone in un nuovo stile. Richiede ACE-Step 1.5.")),
+    ("remix", tr("music.task.remix", "Remix (da audio-guida)"),
+     tr("music.task.remix.tt", "Rigenera struttura/stile da un audio-guida. Richiede ACE-Step 1.5.")),
+]
+
 
 class MusicTaskPanel(QGroupBox):
     """Selettore task + parametri condizionali + audio sorgente drag&drop. get_task()→dict per make_job(adv)."""
@@ -48,7 +63,11 @@ class MusicTaskPanel(QGroupBox):
         self.task = QComboBox()
         for key, label, tt in TASKS:
             self.task.addItem(label, key)
-        self.task.setToolTip(tr("music.task.sel.tt", "Tipo di operazione ACE-Step."))
+        for key, label, tt in _LOCKED_15:                    # modalità 1.5 bloccate (roadmap)
+            self.task.addItem("🔒 " + label, key)
+            it = self.task.model().item(self.task.count() - 1)
+            it.setEnabled(False); it.setToolTip(tt)
+        self.task.setToolTip(tr("music.task.sel.tt", "Tipo di operazione ACE-Step. Le voci 🔒 richiedono la fondazione 1.5."))
         self.task.currentIndexChanged.connect(self._sync)
         f.addRow(tr("music.task.op", "Operazione"), self.task)
 
