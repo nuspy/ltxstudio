@@ -152,6 +152,12 @@ class MusicTab(QWidget):
         self.song_trainer.train_requested.connect(self._train_lora)
         form.addWidget(self._song_box())
         form.addWidget(self._sonify_box())
+        # Post-produzione audio (ffmpeg): normalizza/trim/fade/converti — tra Sonorizza e Trainer
+        from ui.widgets.music_post import MusicPostPanel
+        self.song_post = MusicPostPanel()
+        self.song_post.want_last.connect(lambda: self.song_post.set_src(self._last_audio))
+        self.song_post.process_requested.connect(self._process_audio)
+        form.addWidget(self.song_post)
         form.addWidget(self.song_trainer)          # standalone: tra Sonorizza Video e Progresso
         form.addWidget(self._progress_box())
         form.addStretch(1)
@@ -929,6 +935,24 @@ class MusicTab(QWidget):
     def _open_folder(self):
         ms.MUSIC_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(str(ms.MUSIC_OUTPUT_DIR))
+
+    def _process_audio(self):
+        """Post-produzione audio (ffmpeg) sull'ultimo brano o su un file scelto."""
+        if self._busy():
+            return
+        from core import audio_post as ap
+        src = self.song_post.get_src() or self._last_audio
+        opts = self.song_post.get_opts()
+        errs = ap.preflight(src, opts)
+        if errs:
+            QMessageBox.warning(self, tr("post.err", "Impossibile elaborare"), "\n".join(errs)); return
+        name = self.song_name.text().strip() or "song"
+        fmt = opts.get("format") or Path(src).suffix.lstrip(".")
+        out = ap.out_path(name, fmt)
+        self._song_meta = {"label": "Audio post", "source": Path(src).name, **opts}   # #97 sidecar
+        job = ap.make_job(src, name, opts, on_log=self._b.log.emit,
+                          on_progress=self._b.progress.emit, on_done=self._b.song_done.emit)
+        self._start_job(job, "song", str(out))
 
     def _open_spectro(self):
         """Apre il confronto spettrogramma A/B (A = ultimo brano generato, se presente)."""
