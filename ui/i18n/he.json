@@ -1881,6 +1881,8 @@
   "vid.engine.ltx2": "LTX-2 מקורי (כל הפונקציות)",
   "vid.engine.comfy": "Comfy (VRAM דינמי, t2v/i2v)",
   "vid.engine.tt": "LTX-2 מקורי: כל הפונקציות (אודיו/קיפריים/controlnet). Comfy: VRAM דינמי, t2v/i2v בלבד.",
+  "vid.teacache_lbl": "מטמון מהיר (TeaCache)",
+  "vid.teacache.tt": "TeaCache: מאיץ על ידי דילוג על שלבי ניקוי-רעש כמעט זהים (0 = כבוי). נסה 0.03 (~1.6×) או 0.05 (~2.1×). שימושי עם צעדים רבים (HQ/Pro); ערך גבוה מדי פוגע באיכות. דורש כוונון.",
   "wf.fill_title": "Fill in the prompt fields",
   "wf.fill_hint": "Enter a value for each prompt placeholder:",
   "wf.fill_as_is": "Apply as-is",

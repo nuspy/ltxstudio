@@ -1881,6 +1881,8 @@
   "vid.engine.ltx2": "LTX-2 nativo (todas as funções)",
   "vid.engine.comfy": "Comfy (VRAM dinâmica, t2v/i2v)",
   "vid.engine.tt": "LTX-2 nativo: todas as funções (áudio/keyframe/controlnet). Comfy: VRAM dinâmica, só t2v/i2v.",
+  "vid.teacache_lbl": "Cache rápido (TeaCache)",
+  "vid.teacache.tt": "TeaCache: acelera pulando os passos de denoising quase idênticos (0 = desativado). Experimente 0.03 (~1.6×) ou 0.05 (~2.1×). Útil com muitos passos (HQ/Pro); alto demais degrada a qualidade. A ajustar.",
   "wf.fill_title": "Preencher os campos do prompt",
   "wf.fill_hint": "Insira um valor para cada espaço reservado:",
   "wf.fill_as_is": "Aplicar como está",

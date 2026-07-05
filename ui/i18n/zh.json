@@ -1881,6 +1881,8 @@
   "vid.engine.ltx2": "LTX-2 原生（全部功能）",
   "vid.engine.comfy": "Comfy（动态显存，t2v/i2v）",
   "vid.engine.tt": "LTX-2 原生：全部功能（音频/关键帧/controlnet）。Comfy：动态显存，仅 t2v/i2v。",
+  "vid.teacache_lbl": "快速缓存 (TeaCache)",
+  "vid.teacache.tt": "TeaCache：通过跳过几乎相同的去噪步骤来加速（0 = 关闭）。尝试 0.03 (~1.6×) 或 0.05 (~2.1×)。步数多时有用（HQ/Pro）；过高会降低质量。需要调校。",
   "wf.fill_title": "填写提示词字段",
   "wf.fill_hint": "为每个占位符输入一个值：",
   "wf.fill_as_is": "按原样应用",

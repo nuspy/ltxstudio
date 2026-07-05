@@ -1881,6 +1881,8 @@
   "vid.engine.ltx2": "LTX-2 нативний (усі функції)",
   "vid.engine.comfy": "Comfy (динамічна VRAM, t2v/i2v)",
   "vid.engine.tt": "LTX-2 нативний: усі функції (аудіо/кейфрейм/controlnet). Comfy: динамічна VRAM, лише t2v/i2v.",
+  "vid.teacache_lbl": "Швидкий кеш (TeaCache)",
+  "vid.teacache.tt": "TeaCache: прискорює, пропускаючи майже однакові кроки усунення шуму (0 = вимк.). Спробуйте 0.03 (~1.6×) або 0.05 (~2.1×). Корисно за багатьох кроків (HQ/Pro); надто високе значення погіршує якість. Потребує налаштування.",
   "wf.fill_title": "Fill in the prompt fields",
   "wf.fill_hint": "Enter a value for each prompt placeholder:",
   "wf.fill_as_is": "Apply as-is",

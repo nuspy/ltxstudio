@@ -1881,6 +1881,8 @@
   "vid.engine.ltx2": "LTX-2 εγγενής (όλες οι λειτουργίες)",
   "vid.engine.comfy": "Comfy (δυναμική VRAM, t2v/i2v)",
   "vid.engine.tt": "LTX-2 εγγενής: όλες οι λειτουργίες (ήχος/keyframe/controlnet). Comfy: δυναμική VRAM, μόνο t2v/i2v.",
+  "vid.teacache_lbl": "Γρήγορη κρυφή μνήμη (TeaCache)",
+  "vid.teacache.tt": "TeaCache: επιταχύνει παραλείποντας τα σχεδόν ταυτόσημα βήματα denoising (0 = απενεργοποιημένο). Δοκιμάστε 0.03 (~1.6×) ή 0.05 (~2.1×). Χρήσιμο με πολλά βήματα (HQ/Pro)· πολύ υψηλό υποβαθμίζει την ποιότητα. Χρειάζεται ρύθμιση.",
   "wf.fill_title": "Συμπλήρωση πεδίων prompt",
   "wf.fill_hint": "Εισάγετε τιμή για κάθε placeholder:",
   "wf.fill_as_is": "Εφαρμογή ως έχει",
