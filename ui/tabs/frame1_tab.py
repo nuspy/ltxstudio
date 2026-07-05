@@ -279,7 +279,7 @@ class Frame1Tab(QWidget):
         self.gen_warn_lbl.setVisible(False)
         f.addRow(self.gen_warn_lbl)
         # --- Face adapter PuLID: imprime l'identità di un volto da una foto (solo FLUX) ---
-        pulid_group = QGroupBox(tr("f1.pulid.group"))
+        pulid_group = QGroupBox(tr("f1.pulid.group")); self._pulid_group = pulid_group
         pf = QFormLayout(pulid_group)
         self.gen_pulid_enable = QCheckBox(tr("f1.pulid.enable"))
         self.gen_pulid_enable.setToolTip(tr("f1.pulid.enable.tt"))
@@ -332,6 +332,11 @@ class Frame1Tab(QWidget):
     }
 
     def _apply_arch_defaults(self, arch_lbl: str):
+        if hasattr(self, "_pulid_group"):                    # PuLID è solo FLUX: disabilita su Z-Image/Ernie
+            is_flux = (arch_lbl == "FLUX")
+            self._pulid_group.setEnabled(is_flux)
+            self._pulid_group.setToolTip("" if is_flux else tr("f1.pulid.only_flux",
+                "PuLID (face adapter) funziona solo con l'architettura FLUX."))
         d = self._ARCH_DEFAULTS.get(arch_lbl)
         if not d:
             return
