@@ -2470,6 +2470,13 @@ class MainWindow(QMainWindow):
         cfg.setdefault("height", _r64e(vv.get("height", 320) or 320))
         cfg.setdefault("fps", _fps)
         cfg.setdefault("num_frames", max(9, int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
+        if cfg.get("enhance") and (cfg.get("prompt") or "").strip():   # arricchimento prompt invisibile (opzionale)
+            try:
+                from core import prompt_enhance as pe
+                if pe.available():
+                    cfg["prompt"] = pe.enhance(cfg["prompt"], kind="video", nsfw=bool(vv.get("nsfw"))) or cfg["prompt"]
+            except Exception:                                          # noqa: BLE001
+                pass
         self.video_edit_ai_tab.log.appendPlainText(tr("vedit.start", "[edit] avvio {m}…").format(m=cfg["mode"]))
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,

@@ -54,6 +54,11 @@ class VideoEditAITab(QWidget):
         self.prompt = QPlainTextEdit(); self.prompt.setFixedHeight(70)
         self.prompt.setPlaceholderText(tr("vedit.prompt_ph", "cosa generare/cambiare (es. a blue motorcycle / snowy winter)"))
         f.addRow(tr("vedit.prompt_lbl", "Prompt"), self.prompt)
+        from PySide6.QtWidgets import QCheckBox as _CBX
+        self.vedit_enhance = _CBX(tr("vedit.enhance", "✨ Arricchisci prompt (AI)"))
+        self.vedit_enhance.setToolTip(tr("vedit.enhance.tt",
+            "Un LLM locale arricchisce il prompt di modifica prima di elaborare. Invisibile, opzionale."))
+        f.addRow("", self.vedit_enhance)
 
         self.strength = QComboBox()
         for s in ("0.6", "0.8", "1.0"):
@@ -109,7 +114,8 @@ class VideoEditAITab(QWidget):
                "object": self.obj.text().strip(), "prompt": self.prompt.toPlainText().strip(),
                "strength": float(self.strength.currentData()),
                "cfg_scale": float(self.cfg.value()), "guide": float(self.guide.value()),
-               "mask_dilate": int(self.dilate.value())}
+               "mask_dilate": int(self.dilate.value()),
+               "enhance": self.vedit_enhance.isChecked()}
         if key == "inpaint" and not cfg["object"]:
             self.log.appendPlainText(tr("vedit.err_no_obj", "Inpaint: indica l'oggetto da selezionare (a parole).")); return
         if not cfg["prompt"]:
