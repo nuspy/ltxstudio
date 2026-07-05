@@ -247,8 +247,24 @@ class MusicTab(QWidget):
         self.lbl_gs_lyric = QLabel(tr("music.gs_lyric", "Aderenza parole"))
         g.addWidget(self.lbl_gs_lyric, 4, 2); g.addWidget(self.song_gs_lyric, 4, 3)
         v.addLayout(g)
-        # ↺ Reset ai valori ottimali del modello selezionato
-        _rr = QHBoxLayout(); _rr.addStretch(1)
+        # Preset (salva/carica configurazione) + ↺ Reset
+        _rr = QHBoxLayout()
+        _rr.addWidget(QLabel(tr("music.preset", "Preset:")))
+        self.preset_combo = QComboBox(); self.preset_combo.setMinimumWidth(150)
+        self.preset_combo.setToolTip(tr("music.preset.tt", "Configurazioni di stile salvate. Seleziona per caricare."))
+        self.preset_combo.activated.connect(self._load_preset)
+        _rr.addWidget(self.preset_combo)
+        self.btn_preset_save = QToolButton(); self.btn_preset_save.setText("💾")
+        self.btn_preset_save.setToolTip(tr("music.preset.save.tt", "Salva i parametri correnti come nuovo preset."))
+        self.btn_preset_save.clicked.connect(self._save_preset); _rr.addWidget(self.btn_preset_save)
+        self.btn_preset_del = QToolButton(); self.btn_preset_del.setText("🗑")
+        self.btn_preset_del.setToolTip(tr("music.preset.del.tt", "Elimina il preset selezionato."))
+        self.btn_preset_del.clicked.connect(self._del_preset); _rr.addWidget(self.btn_preset_del)
+        self.btn_preset_song = QToolButton(); self.btn_preset_song.setText(tr("music.preset.song", "Da brano…"))
+        self.btn_preset_song.setToolTip(tr("music.preset.song.tt",
+            "Recupera i parametri da un brano generato in precedenza (legge il suo sidecar)."))
+        self.btn_preset_song.clicked.connect(self._load_from_song); _rr.addWidget(self.btn_preset_song)
+        _rr.addStretch(1)
         self.btn_reset = QPushButton(tr("music.reset", "↺ Reset default"))
         self.btn_reset.setToolTip(tr("music.reset.tt", "Reimposta tutti i parametri ai valori ottimali del modello selezionato."))
         self.btn_reset.setCursor(Qt.PointingHandCursor); self.btn_reset.clicked.connect(self._reset_defaults)
@@ -330,6 +346,7 @@ class MusicTab(QWidget):
                      self.song_ver.currentTextChanged):
             _sig.connect(self._update_estimate)
         self._update_estimate()
+        self._refresh_presets()
         return box
 
     def _update_estimate(self, *_):
@@ -582,6 +599,122 @@ class MusicTab(QWidget):
         self.song_adv.reset_defaults(); self.song_task.reset_defaults()
         self.song_adv.set_engine(e); self.song_task.set_engine(e)   # ri-applica il gating dopo il reset
         self.status.setText(tr("music.reset.done", "Parametri reimpostati ai default di {e}").format(e=e))
+
+    # ── Preset (salva/carica configurazione di stile) ────────────────────────────
+    def _presets_path(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "data" / "music_presets.json"
+
+    def _presets_load(self) -> dict:
+        import json
+        p = self._presets_path()
+        try:
+            return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        except Exception:                                    # noqa: BLE001
+            return {}
+
+    def _presets_save(self, d: dict):
+        import json
+        p = self._presets_path(); p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _refresh_presets(self, select: str = ""):
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.clear()
+        self.preset_combo.addItem(tr("music.preset.none", "— preset —"), "")
+        for name in sorted(self._presets_load()):
+            self.preset_combo.addItem(name, name)
+        if select:
+            i = self.preset_combo.findData(select)
+            if i >= 0:
+                self.preset_combo.setCurrentIndex(i)
+        self.preset_combo.blockSignals(False)
+
+    def _get_config(self) -> dict:
+        """Snapshot dei parametri di stile correnti (per preset/sidecar)."""
+        return {
+            "engine": self.song_engine.currentText(),
+            "tags": self.song_tags.text(), "lyrics": self.song_lyrics.toPlainText(),
+            "instrumental": self.song_instr.isChecked(), "duration": self.song_dur.value(),
+            "version": self.song_ver.currentText(), "temp": self.song_temp.value(),
+            "cfg": self.song_cfg.value(), "adherence": self.song_adherence.value(),
+            "gs_lyric": self.song_gs_lyric.value(),
+            "meta": self.song_meta.get_meta(), "adv": self.song_adv.get_adv(),
+        }
+
+    def _apply_config(self, cfg: dict):
+        """Applica una configurazione ai controlli (da preset o sidecar). Robusto a chiavi mancanti."""
+        if not cfg:
+            return
+        if cfg.get("engine"):
+            self.song_engine.setCurrentText(cfg["engine"])   # _on_song_engine reimposta cfg/adherence/gs_lyric…
+        self.song_tags.setText(cfg.get("tags", "") or "")
+        self.song_lyrics.setPlainText(cfg.get("lyrics", "") or "")
+        self.song_instr.setChecked(bool(cfg.get("instrumental")))
+        if cfg.get("duration"):
+            self.song_dur.setValue(int(cfg["duration"]))
+        if cfg.get("version"):
+            self.song_ver.setCurrentText(str(cfg["version"]))
+        self.song_temp.setValue(float(cfg.get("temp", 1.0)))
+        for key, w in (("cfg", self.song_cfg), ("adherence", self.song_adherence), ("gs_lyric", self.song_gs_lyric)):
+            if cfg.get(key) is not None:
+                w.setValue(float(cfg[key]))
+        self.song_meta.set_meta(cfg.get("meta", {}))
+        self.song_adv.set_config(cfg.get("adv", {}))
+        self._update_estimate()
+
+    def _save_preset(self):
+        from PySide6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, tr("music.preset.save", "Salva preset"),
+                                        tr("music.preset.name", "Nome del preset:"))
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        d = self._presets_load(); d[name] = self._get_config(); self._presets_save(d)
+        self._refresh_presets(select=name)
+        self.status.setText(tr("music.preset.saved", "Preset '{n}' salvato.").format(n=name))
+
+    def _load_preset(self, *_):
+        name = self.preset_combo.currentData()
+        if not name:
+            return
+        self._apply_config(self._presets_load().get(name, {}))
+        self.status.setText(tr("music.preset.loaded", "Preset '{n}' caricato.").format(n=name))
+
+    def _del_preset(self):
+        name = self.preset_combo.currentData()
+        if not name:
+            return
+        d = self._presets_load(); d.pop(name, None); self._presets_save(d)
+        self._refresh_presets()
+        self.status.setText(tr("music.preset.deleted", "Preset '{n}' eliminato.").format(n=name))
+
+    def _load_from_song(self):
+        """Recupera i parametri dal sidecar di un brano già generato."""
+        p, _ = QFileDialog.getOpenFileName(self, tr("music.preset.song", "Da brano…"), str(ms.MUSIC_OUTPUT_DIR),
+                                           "Audio (*.wav *.mp3 *.flac *.ogg)")
+        if not p:
+            return
+        try:
+            from core.metadata_saver import MetadataSaver
+            sc = MetadataSaver.load_sidecar(p) or {}
+        except Exception:                                    # noqa: BLE001
+            sc = {}
+        if not sc:
+            QMessageBox.information(self, tr("music.preset.song", "Da brano…"),
+                                    tr("music.preset.nosc", "Nessun parametro trovato per questo brano.")); return
+        _adv_keys = ("steps", "scheduler", "cfg_type", "omega", "guidance_interval",
+                     "guidance_interval_decay", "min_guidance", "format", "seeds", "batch",
+                     "quantized", "overlapped_decode", "torch_compile",
+                     "no_erg_tag", "no_erg_lyric", "no_erg_diffusion")
+        cfg = {
+            "engine": sc.get("engine"), "tags": sc.get("tags"), "lyrics": sc.get("lyrics"),
+            "instrumental": sc.get("instrumental"), "duration": sc.get("duration_s"),
+            "cfg": sc.get("cfg"), "adherence": sc.get("gs_text"), "gs_lyric": sc.get("gs_lyric"),
+            "meta": {k: sc[k] for k in ("bpm", "keyscale", "timesignature", "vocal_language") if k in sc},
+            "adv": {k: sc[k] for k in _adv_keys if k in sc},
+        }
+        self._apply_config(cfg)
+        self.status.setText(tr("music.preset.fromsong", "Parametri caricati da {f}.").format(f=Path(p).name))
 
     def _on_song_engine(self, e: str):
         """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""

@@ -102,6 +102,18 @@ class MusicMetadata(QGroupBox):
             d["vocal_language"] = self.lang.currentData()
         return d
 
+    def set_meta(self, d: dict):
+        """Applica un dict di metadata (chiavi come get_meta) ai controlli. Assenti → (auto)."""
+        d = d or {}
+        self.bpm.setValue(int(d.get("bpm", 0) or 0))
+        self.key.setCurrentText(d.get("keyscale", _AUTO) or _AUTO)
+        self.timesig.setCurrentText(d.get("timesignature", _AUTO) or _AUTO)
+        lang = d.get("vocal_language")
+        idx = self.lang.findData(lang) if lang else 0
+        self.lang.setCurrentIndex(idx if idx >= 0 else 0)
+        if any(d.get(k) for k in ("bpm", "keyscale", "timesignature", "vocal_language")):
+            self.setChecked(True)
+
     def reset_defaults(self):
         """Reimposta tutti i metadata su (auto)."""
         self.bpm.setValue(0)

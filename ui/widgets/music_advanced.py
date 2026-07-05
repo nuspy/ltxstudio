@@ -170,6 +170,33 @@ class MusicAdvanced(QGroupBox):
         self.lora.setPath(""); self.lora_w.setValue(1.0)
         self.setChecked(False)                               # richiudi la sezione
 
+    def set_config(self, d: dict):
+        """Applica (best-effort) un dict di parametri avanzati ai controlli (per i preset)."""
+        d = d or {}
+        if "steps" in d:
+            self.steps.setValue(int(d["steps"]))
+        if "scheduler" in d:
+            self.scheduler.setCurrentText(str(d["scheduler"]))
+        if "cfg_type" in d:
+            self.cfg_type.setCurrentText(str(d["cfg_type"]))
+        for key, w in (("omega", self.omega), ("guidance_interval", self.g_interval),
+                       ("guidance_interval_decay", self.g_decay), ("min_guidance", self.min_g)):
+            if key in d:
+                w.setValue(float(d[key]))
+        if "format" in d:
+            self.fmt.setCurrentText(str(d["format"]))
+        if "seeds" in d:
+            self.seed.setText(str(d["seeds"]))
+        if "batch" in d:
+            self.batch.setValue(int(d["batch"]))
+        for key, w in (("quantized", self.quantized), ("overlapped_decode", self.overlap),
+                       ("torch_compile", self.compile)):
+            if key in d:
+                w.setChecked(bool(d[key]))
+        self.erg_tag.setChecked(not d.get("no_erg_tag", False))
+        self.erg_lyric.setChecked(not d.get("no_erg_lyric", False))
+        self.erg_diff.setChecked(not d.get("no_erg_diffusion", False))
+
     def get_adv(self) -> dict:
         """Dizionario opzioni per acestep_service.make_job(adv=...). Solo i valori diversi dal default."""
         adv = {
