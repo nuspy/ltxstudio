@@ -50,11 +50,20 @@ def is_installed() -> bool:
     return VENV15_PY.exists() and SRC15_DIR.exists() and (SRC15_DIR / "acestep").exists() and _weights_ready()
 
 
+# mappa chiave task → flag CLI (valori non vuoti). task = dict prodotto dalla GUI per le modalità editing 1.5.
+_TASK_FLAGS = {
+    "task": "--task", "src_audio": "--src-audio", "ref_audio": "--ref-audio",
+    "repaint_start": "--repaint-start", "repaint_end": "--repaint-end",
+    "cover_strength": "--cover-strength", "global_caption": "--global-caption",
+}
+
+
 def make_job(caption: str, lyrics: str = "", out_name: str = "song", *, instrumental: bool = False,
              bpm: int = 0, keyscale: str = "", timesignature: str = "", language: str = "unknown",
              duration: float = -1.0, steps: int = 8, guidance: float = 1.0, seed: int = -1,
-             think: bool = True, fmt: str = "wav", batch: int = 1, **cbs) -> Job:
-    """Costruisce il Job subprocess per la generazione ACE-Step 1.5. save_dir = output/ (root)."""
+             think: bool = True, fmt: str = "wav", batch: int = 1, task: dict | None = None, **cbs) -> Job:
+    """Costruisce il Job subprocess per la generazione ACE-Step 1.5. save_dir = output/ (root).
+    task = dict opzionale per le modalità editing (cover/repaint/lego/extract/complete)."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     cmd = [VENV15_PY, "-u", str(GEN_SCRIPT),
            "--caption", caption, "--lyrics", lyrics or "",
@@ -65,6 +74,9 @@ def make_job(caption: str, lyrics: str = "", out_name: str = "song", *, instrume
            "--lm-model", _LM_SUB, "--dit-config", _DIT_SUB, "--output", str(OUT_DIR)]
     if instrumental:
         cmd.append("--instrumental")
+    for key, flag in _TASK_FLAGS.items():                    # modalità editing 1.5
+        if (task or {}).get(key) not in (None, ""):
+            cmd += [flag, task[key]]
     return Job(cmd, SRC15_DIR, **cbs)
 
 

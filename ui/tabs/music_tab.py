@@ -922,18 +922,19 @@ class MusicTab(QWidget):
         if errs:
             QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
         meta = self.song_meta.get_meta()                     # bpm/keyscale/timesignature/vocal_language separati
+        task = self.song_task.get_task()                     # modalità editing 1.5 (cover/repaint/lego/extract/complete)
         fmt = self.song_adv.fmt.currentText() or "wav"
         job = ax15.make_job(
             caption, lyrics, name, instrumental=instrumental,
             bpm=int(meta.get("bpm", 0) or 0), keyscale=meta.get("keyscale", ""),
             timesignature=meta.get("timesignature", ""), language=meta.get("vocal_language", "unknown"),
             duration=float(self.song_dur.value()), steps=8, guidance=float(self.song_cfg.value()),
-            seed=-1, think=self.song_think.isChecked(), fmt=fmt, batch=1,
+            seed=-1, think=self.song_think.isChecked(), fmt=fmt, batch=1, task=task,
             on_log=self._b.log.emit, on_progress=self._b.progress.emit, on_done=self._b.song_done.emit)
         self._song_meta = {"label": "Musica", "engine": "ACE-Step 1.5", "tags": caption, "lyrics": lyrics,
                            "duration_s": float(self.song_dur.value()), "steps": 8,
                            "cfg": float(self.song_cfg.value()), "think": self.song_think.isChecked(),
-                           "instrumental": instrumental, **meta}   # #97 sidecar
+                           "instrumental": instrumental, **meta, **task}   # #97 sidecar
         out = ax15.OUT_DIR / f"{ax15._safe(name)}.{fmt}"
         self._start_job(job, "song", str(out))
 

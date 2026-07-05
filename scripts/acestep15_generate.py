@@ -44,6 +44,15 @@ def main():
     ap.add_argument("--dit-config", dest="dit_config", default="acestep-v15-turbo")
     ap.add_argument("--format", default="wav")
     ap.add_argument("--batch", type=int, default=1)
+    # Task di editing 1.5 (text2music default). cover=remix/style-transfer; repaint/lego usano la regione.
+    ap.add_argument("--task", default="text2music",
+                    choices=["text2music", "cover", "repaint", "lego", "extract", "complete"])
+    ap.add_argument("--src-audio", dest="src_audio", default="")     # audio sorgente (repaint/lego/extract/complete/cover)
+    ap.add_argument("--ref-audio", dest="ref_audio", default="")     # riferimento di stile (cover)
+    ap.add_argument("--repaint-start", dest="repaint_start", type=float, default=0.0)
+    ap.add_argument("--repaint-end", dest="repaint_end", type=float, default=-1.0)
+    ap.add_argument("--cover-strength", dest="cover_strength", type=float, default=1.0)  # 0.2≈style, 1.0≈fedele
+    ap.add_argument("--global-caption", dest="global_caption", default="")  # lego (SFT-stems)
     ap.add_argument("--output", required=True)               # cartella di salvataggio
     a = ap.parse_args()
 
@@ -70,12 +79,24 @@ def main():
         print(f"ERR: LLM init: {msg}", flush=True); sys.exit(1)
 
     params = GenerationParams(
-        task_type="text2music", thinking=(str(a.think).lower() == "true"),
+        task_type=a.task, thinking=(str(a.think).lower() == "true"),
         caption=a.caption, lyrics=("" if a.instrumental else a.lyrics), instrumental=a.instrumental,
         bpm=(a.bpm or None), keyscale=a.keyscale, timesignature=a.timesignature,
         vocal_language=a.language or "unknown", duration=a.duration,
         inference_steps=a.steps, guidance_scale=a.guidance, seed=a.seed,
     )
+    # parametri specifici del task di editing (solo se valorizzati)
+    if a.task != "text2music":
+        if a.src_audio:
+            params.src_audio = a.src_audio
+        if a.ref_audio:
+            params.reference_audio = a.ref_audio
+        if a.task in ("repaint", "lego"):
+            params.repainting_start = a.repaint_start; params.repainting_end = a.repaint_end
+        if a.task in ("cover",):
+            params.audio_cover_strength = a.cover_strength
+        if a.task == "lego" and a.global_caption:
+            params.global_caption = a.global_caption
     config = GenerationConfig(batch_size=max(1, a.batch), audio_format=a.format)
 
     os.makedirs(a.output, exist_ok=True)

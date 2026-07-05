@@ -61,15 +61,15 @@ class MusicTaskPanel(QGroupBox):
 
         f = QFormLayout(); f.setLabelAlignment(Qt.AlignRight)
         self.task = QComboBox()
-        for key, label, tt in TASKS:
+        self._labels: dict[str, str] = {}                    # key → etichetta base (senza 🔒)
+        for key, label, tt in (TASKS + _LOCKED_15):
             self.task.addItem(label, key)
-        for key, label, tt in _LOCKED_15:                    # modalità 1.5 bloccate (roadmap)
-            self.task.addItem("🔒 " + label, key)
-            it = self.task.model().item(self.task.count() - 1)
-            it.setEnabled(False); it.setToolTip(tt)
-        self.task.setToolTip(tr("music.task.sel.tt", "Tipo di operazione ACE-Step. Le voci 🔒 richiedono la fondazione 1.5."))
+            self.task.model().item(self.task.count() - 1).setToolTip(tt)
+            self._labels[key] = label
+        self.task.setToolTip(tr("music.task.sel.tt", "Tipo di operazione. Le voci 🔒 non sono disponibili col motore selezionato."))
         self.task.currentIndexChanged.connect(self._sync)
         f.addRow(tr("music.task.op", "Operazione"), self.task)
+        self._engine = "ACE-Step"
 
         # audio sorgente (repaint/edit/extend/audio2audio)
         self.src = DropLineEdit(tr("music.task.src.ph", "audio sorgente (trascina o Sfoglia)"))
@@ -114,17 +114,37 @@ class MusicTaskPanel(QGroupBox):
 
     def _sync(self):
         t = self.task.currentData()
-        self.task.setToolTip(dict((k, tt) for k, _, tt in TASKS).get(t, ""))
-        self._show(self.row_src, t in ("repaint", "edit", "extend", "audio2audio"))
+        # audio sorgente: quasi tutte le operazioni di editing (v1 e 1.5)
+        self._show(self.row_src, t in ("repaint", "edit", "extend", "audio2audio",
+                                       "lego", "extract", "complete", "cover"))
         self._show(self.row_var, t == "retake")
-        self._show(self.row_rstart, t in ("repaint", "extend"))
-        self._show(self.row_rend, t in ("repaint", "extend"))
+        # regione temporale: repaint/extend (v1) + repaint/lego (1.5)
+        self._show(self.row_rstart, t in ("repaint", "extend", "lego"))
+        self._show(self.row_rend, t in ("repaint", "extend", "lego"))
         self._show(self.row_eprompt, t == "edit")
         self._show(self.row_elyrics, t == "edit")
-        self._show(self.row_str, t == "audio2audio")
+        # forza riferimento: audio2audio (v1) + cover (1.5, cover_strength)
+        self._show(self.row_str, t in ("audio2audio", "cover"))
+
+    # chiavi task valide per motore
+    _V1_KEYS = {"text2music", "retake", "repaint", "edit", "extend", "audio2audio"}
+    _KEYS_15 = {"text2music", "repaint", "cover", "lego", "extract", "complete"}
 
     def set_engine(self, engine: str):
-        self._content.setEnabled(engine == "ACE-Step")
+        """Abilita il pannello per ACE-Step (v1) o ACE-Step 1.5, sbloccando le rispettive modalità."""
+        self._engine = engine
+        is_v1 = engine == "ACE-Step"
+        is_15 = engine == "ACE-Step 1.5"
+        self._content.setEnabled(is_v1 or is_15)
+        allowed = self._V1_KEYS if is_v1 else (self._KEYS_15 if is_15 else set())
+        for i in range(self.task.count()):
+            key = self.task.itemData(i)
+            en = key in allowed
+            self.task.model().item(i).setEnabled(en)
+            self.task.setItemText(i, self._labels[key] if en else "🔒 " + self._labels[key])
+        if self.task.currentData() not in allowed:           # selezione non valida col nuovo motore → reset
+            self.task.setCurrentIndex(0)
+        self._sync()
 
     def set_repaint(self, src_path: str, start: float, end: float):
         """Configura il task su 'repaint' con sorgente + intervallo (usato dal trim del waveform)."""
@@ -145,10 +165,12 @@ class MusicTaskPanel(QGroupBox):
         self.setChecked(False)
 
     def get_task(self) -> dict:
-        """dict per make_job(adv=...). Vuoto se generazione normale."""
+        """dict per make_job. Vuoto se generazione normale. Le chiavi differiscono tra v1 e 1.5."""
         t = self.task.currentData()
         if t == "text2music":
             return {}
+        if self._engine == "ACE-Step 1.5":
+            return self._get_task_15(t)
         d = {"task": t}
         if t in ("repaint", "edit", "extend", "audio2audio"):
             src = self.src.path()
@@ -163,4 +185,13 @@ class MusicTaskPanel(QGroupBox):
         if t == "edit":
             d["edit_target_prompt"] = self.e_prompt.text().strip()
             d["edit_target_lyrics"] = self.e_lyrics.text().strip()
+        return d
+
+    def _get_task_15(self, t: str) -> dict:
+        """dict per acestep15_service.make_job(task=...) — modalità cover/repaint/lego/extract/complete."""
+        d = {"task": t, "src_audio": self.src.path()}
+        if t in ("repaint", "lego"):
+            d["repaint_start"] = self.r_start.value(); d["repaint_end"] = self.r_end.value()
+        if t == "cover":
+            d["cover_strength"] = self.strength.value()
         return d
