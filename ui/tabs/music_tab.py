@@ -483,9 +483,74 @@ class MusicTab(QWidget):
             v.addWidget(self.wave_player)
         except Exception:                                    # noqa: BLE001 — QtMultimedia assente: player opzionale
             self.wave_player = None
+        # Sezione Risultati ricca: riepilogo metadata + qualità (centroide) + LRC/karaoke
+        rrow = QHBoxLayout()
+        self.result_info = QLabel(""); self.result_info.setTextFormat(Qt.RichText); self.result_info.setWordWrap(True)
+        self.result_info.setStyleSheet("color:#9aa1b0;")
+        self.btn_lrc = QPushButton(tr("music.lrc", "📝 Genera LRC"))
+        self.btn_lrc.setToolTip(tr("music.lrc.tt",
+            "Genera un file .lrc con le liriche sincronizzate (karaoke) trascrivendo l'audio (Whisper, CPU)."))
+        self.btn_lrc.setEnabled(False); self.btn_lrc.clicked.connect(self._gen_lrc)
+        rrow.addWidget(self.result_info, 1); rrow.addWidget(self.btn_lrc)
+        v.addLayout(rrow)
         v.addWidget(self.logview)
-        self._last_audio = ""
+        self._last_audio = ""; self._lrc_worker = None
         return box
+
+    def _update_result_info(self, path: str):
+        """Aggiorna il riepilogo Risultati: metadata + qualità (centroide spettrale)."""
+        m = getattr(self, "_song_meta", {}) or {}
+        parts = []
+        if m.get("engine"):
+            parts.append(str(m["engine"]))
+        if m.get("duration_s"):
+            parts.append(f"{float(m['duration_s']):.0f}s")
+        for k, lab in (("bpm", ""), ("keyscale", ""), ("gs_text", "gs_txt "), ("gs_lyric", "gs_lyr ")):
+            if m.get(k):
+                parts.append(f"{lab}{m[k]}")
+        cent = 0.0
+        try:
+            from ui.widgets.spectrogram import compute_spectrogram
+            _img, _sr, cent = compute_spectrogram(path)
+        except Exception:                                    # noqa: BLE001
+            cent = 0.0
+        qual = ""
+        if cent > 0:
+            tag = (tr("music.q.clean", "pulito") if cent < 2500 else
+                   tr("music.q.bright", "brillante") if cent < 3500 else
+                   tr("music.q.noisy", "molto brillante/rumoroso"))
+            qual = f" · <span style='color:#74c0fc;'>{tr('music.q.centroid', 'centroide')} {cent:.0f} Hz ({tag})</span>"
+        self.result_info.setText(" · ".join(parts) + qual)
+        self.btn_lrc.setEnabled(bool(path) and not m.get("instrumental"))
+
+    def _gen_lrc(self):
+        """Genera il file LRC (karaoke) dall'ultimo brano, in un worker (Whisper CPU)."""
+        if self._busy() or not self._last_audio:
+            return
+        if self._lrc_worker and self._lrc_worker.isRunning():
+            return
+        self.btn_lrc.setEnabled(False)
+        self.status.setText(tr("music.lrc.run", "Genero le liriche sincronizzate (LRC)…"))
+
+        class _LrcWorker(QThread):
+            done = Signal(str); failed = Signal(str)
+
+            def __init__(self, path):
+                super().__init__(); self._p = path
+
+            def run(self):
+                try:
+                    from core import lrc_service
+                    self.done.emit(lrc_service.transcribe_to_lrc(self._p))
+                except Exception as e:                        # noqa: BLE001
+                    self.failed.emit(str(e))
+
+        self._lrc_worker = _LrcWorker(self._last_audio)
+        self._lrc_worker.done.connect(lambda p: (self.status.setText(
+            tr("music.lrc.done", "LRC salvato: {f}").format(f=Path(p).name)), self.btn_lrc.setEnabled(True)))
+        self._lrc_worker.failed.connect(lambda e: (self.status.setText(
+            tr("music.lrc.err", "LRC non riuscito: {e}").format(e=e)), self.btn_lrc.setEnabled(True)))
+        self._lrc_worker.start()
 
     def _use_region_as_task(self, start: float, end: float):
         """Regione selezionata sul waveform → task Repaint (ACE-Step) su quell'intervallo."""
@@ -746,6 +811,12 @@ class MusicTab(QWidget):
         self.btn_play.setEnabled(True)
         if self.wave_player and Path(path).suffix.lower() in (".wav", ".mp3", ".flac", ".ogg"):
             self.wave_player.load(path)
+        try:                                                 # info-only: NON applica i parametri ai controlli
+            from core.metadata_saver import MetadataSaver
+            self._song_meta = MetadataSaver.load_sidecar(path) or {"label": "Musica"}
+        except Exception:                                    # noqa: BLE001
+            self._song_meta = {"label": "Musica"}
+        self._update_result_info(path)
         self.status.setText(tr("music.done", "Pronto: {f}").format(f=Path(path).name))
 
     def _on_song_engine(self, e: str):
@@ -943,6 +1014,7 @@ class MusicTab(QWidget):
             self.btn_play.setEnabled(True)
             if self.wave_player and Path(out).suffix.lower() in (".wav", ".mp3", ".flac", ".ogg"):
                 self.wave_player.load(out)                   # forma d'onda + player in-app
+            self._update_result_info(out)                    # riepilogo + qualità + abilita LRC
             self.status.setText(tr("music.done", "Pronto: {f}").format(f=Path(out).name))
             self._log(f"[music] output: {out}")
             try:                                             # #97: sidecar (params riutilizzabili nel Navigator)
