@@ -82,11 +82,30 @@ class TrainTab(QWidget):
         self.trigger = QLineEdit(); self.trigger.setPlaceholderText(
             tr("train.trigger.hint", "es. ohwx — token attivatore opzionale"))
         g.addRow(tr("train.trigger", "Trigger word"), self.trigger)
-        # Auto-captioning (Florence-2)
+        # Auto-captioning (motore selezionabile: JoyCaption consigliato, Florence-2 fallback)
         crow = QHBoxLayout()
-        self.btn_caption = QPushButton(tr("train.caption", "Genera caption (Florence-2)"))
+        from PySide6.QtWidgets import QComboBox
+        from core import caption_service as cs
+        self.cap_engine = QComboBox()
+        _eng_labels = {"joycaption": tr("train.cap.joy", "JoyCaption"), "florence2": tr("train.cap.flo", "Florence-2")}
+        for e in (cs.available_engines() or ["florence2"]):   # solo motori con venv+pesi presenti
+            self.cap_engine.addItem(_eng_labels.get(e, e), e)
+        self.cap_engine.setToolTip(tr("train.cap.engine.tt",
+            "Modello di captioning. JoyCaption = migliore per training (non censurato, tag/descrittivo); "
+            "Florence-2 = leggero e veloce."))
+        self.cap_mode = QComboBox()
+        for m, lab in (("descriptive", tr("train.cap.m.desc", "Descrittiva")),
+                       ("tags", tr("train.cap.m.tags", "Tag booru")),
+                       ("sd-prompt", tr("train.cap.m.sd", "Prompt SD"))):
+            self.cap_mode.addItem(lab, m)
+        self.cap_mode.setToolTip(tr("train.cap.mode.tt", "Stile della caption JoyCaption (ignorato da Florence-2)."))
+        self.cap_engine.currentIndexChanged.connect(
+            lambda: self.cap_mode.setEnabled(self.cap_engine.currentData() == "joycaption"))
+        self.cap_mode.setEnabled(self.cap_engine.currentData() == "joycaption")
+        self.btn_caption = QPushButton(tr("train.caption", "Genera caption"))
         self.btn_caption.clicked.connect(self._caption_dataset)
         self.cap_overwrite = QCheckBox(tr("train.caption.overwrite", "Sovrascrivi esistenti"))
+        crow.addWidget(self.cap_engine); crow.addWidget(self.cap_mode)
         self.btn_review = QPushButton(tr("train.review", "📝 Review caption"))
         self.btn_review.setToolTip(tr("train.review.tt", "Rivedi/sovrascrivi la caption di ogni immagine (finestra non bloccante, auto-salvataggio)."))
         self.btn_review.clicked.connect(self._review_captions)
@@ -299,18 +318,17 @@ class TrainTab(QWidget):
         if not ds.is_dir():
             QMessageBox.warning(self, tr("train.caption", "Genera caption"),
                                 tr("train.ds.missing", "Cartella non valida")); return
-        if not ts.is_installed():
-            QMessageBox.warning(self, tr("train.caption", "Genera caption"),
-                                tr("train.caption.needinstall",
-                                   "Installa prima il modulo training (serve il suo ambiente).")); return
-        script = str(Path(__file__).resolve().parents[2] / "scripts" / "caption_dataset.py")
-        cmd = ["-u", script, "--dir", str(ds)]
-        tw = self.trigger.text().strip()
-        if tw:
-            cmd += ["--trigger", tw]
-        if self.cap_overwrite.isChecked():
-            cmd += ["--overwrite"]
-        self._append_log("[caption] avvio (Florence-2, scarica ~1.5GB al primo uso)…")
+        from core import caption_service as cs
+        engine = self.cap_engine.currentData() or "florence2"
+        mode = self.cap_mode.currentData() or "descriptive"
+        py, cmd = cs.python_and_args(str(ds), engine=engine, mode=mode,
+                                     trigger=self.trigger.text().strip(), overwrite=self.cap_overwrite.isChecked())
+        if py is None:                                       # venv del motore mancante
+            msg = (tr("train.caption.needjoy", "JoyCaption non pronto: manca il venv15 o i pesi (E:\\AI\\Models\\JoyCaption).")
+                   if engine == "joycaption"
+                   else tr("train.caption.needinstall", "Installa prima il modulo training (serve il suo ambiente)."))
+            QMessageBox.warning(self, tr("train.caption", "Genera caption"), msg); return
+        self._append_log(f"[caption] avvio ({engine}/{mode})…")
         self.btn_caption.setEnabled(False)
         p = QProcess(self)
         p.setProcessChannelMode(QProcess.MergedChannels)
@@ -318,7 +336,7 @@ class TrainTab(QWidget):
             lambda: self._append_log(bytes(p.readAllStandardOutput()).decode("utf-8", "replace").rstrip()))
         p.finished.connect(self._caption_finished)
         self._caption_proc = p
-        p.start(str(ts.VENV_PYTHON), cmd)
+        p.start(py, cmd)
 
     def _caption_finished(self, code, _status):
         self._append_log(f"[caption] terminato (codice {code}).")
