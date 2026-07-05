@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 1.6cm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1c2230; font-size: 10.5pt; line-height: 1.5; }
+  h1 { color: #6f3ff5; font-size: 22pt; margin: 0 0 2px; }
+  h2 { color: #6f3ff5; font-size: 16pt; border-bottom: 2px solid #e6ddff; padding-bottom: 3px; margin-top: 22px; }
+  h3 { color: #3a2a6b; font-size: 12.5pt; margin-top: 14px; }
+  .sub { color: #6b7280; font-size: 11pt; margin: 0 0 10px; }
+  .lead { font-size: 11.5pt; }
+  .media { background: #f4f0ff; border: 1px dashed #b9a6f5; border-radius: 6px; padding: 7px 10px; margin: 8px 0; color: #5b3ea8; font-size: 9pt; }
+  .tier { background: #faf9ff; border: 1px solid #e6ddff; border-radius: 6px; padding: 8px 12px; margin: 6px 0; }
+  .price { color: #6f3ff5; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9pt; }
+  th { background: #6f3ff5; color: #fff; text-align: left; padding: 5px 7px; }
+  td { border-bottom: 1px solid #e6e6ee; padding: 5px 7px; vertical-align: top; }
+  .pill { display: inline-block; background: #ece5ff; color: #5b3ea8; border-radius: 10px; padding: 1px 8px; font-size: 8.5pt; }
+  .pagebreak { page-break-before: always; }
+  .cta { background: #6f3ff5; color: #fff; padding: 10px 14px; border-radius: 6px; font-weight: bold; }
+  ul { margin: 4px 0 8px; padding-left: 18px; }
+  li { margin: 2px 0; }
+  .small { color: #6b7280; font-size: 8.5pt; }
+  code { background: #f0eefb; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ============ POST 0 — MAIN / PILLAR ============ -->
+<h1>One Studio. Every Model. Zero Node Spaghetti.</h1>
+<p class="sub">The all-in-one local generative suite — images, video, music, voice, 3D, film &amp; training — that just works.</p>
+
+<div class="media">📷 HERO IMAGE — <b>hero_banner.png</b> — a bold 1920&times;1080 banner: the app window on the left, a montage of a generated portrait → animated video → 3D model → LoRA grid flowing across the right. Place at the very top.</div>
+
+<p class="lead"><b>You know the drill.</b> You open ComfyUI. You drag in forty nodes. You wire them. One connection is wrong, so nothing runs. You fix it, tweak a scheduler, run — out of memory. You downscale, run again. Twenty minutes later you finally have <i>one image</i>.</p>
+
+<p>Now you want to animate it. Different workflow. Re-learn it. Then add music — that's a <i>different app</i> entirely. Then extend the clip — load <i>another</i> ComfyUI graph. Then upscale — yet another. Every step is an export, a re-import, a new tool, a new tutorial, a new way to break.</p>
+
+<p><b>That's not creating. That's plumbing.</b></p>
+
+<h3>Imagine instead:</h3>
+<p>You generate an image. You like it — so you <b>edit it in place</b>. You turn it into a <b>video</b> with one click (the image is <i>already there</i>, no re-import). You make a <b>3D model</b> from that same image. You extend the video to any length. You add a <b>generated soundtrack</b>. You restore an old family photo, colorize a black-and-white film, swap a character in a clip, clone a voice. And when you want a recurring character, you <b>train a LoRA from a single photo</b> — the app generates the coherent dataset for you.</p>
+
+<p><b>All in one window. Every artifact instantly reusable by every other function. Out of the box, with best-practice settings already dialed in.</b></p>
+
+<p>This is <b>LTX Studio</b> — a 100% local platform that gathers the generative power of the <b>newest, most capable open models</b> into a single coherent GUI, and grows every week with new features, architectures and models. No cloud. No accounts. No spaghetti. Your files never leave your machine.</p>
+
+<div class="media">🎬 VIDEO — <b>intro_flow_60s.mp4</b> — a 60s screen recording (no talking needed): generate image → edit → image-to-video → 3D from image → add music → extend clip. One continuous take showing artifacts flowing between tabs. This is the single most important asset.</div>
+
+<h2>Why it's different</h2>
+<table>
+<tr><th>The old way (nodes + separate apps)</th><th>LTX Studio</th></tr>
+<tr><td>40-node graphs, manual wiring, cryptic errors</td><td>Clean GUI, sensible defaults, one button</td></tr>
+<tr><td>Export → re-import between every step</td><td>Artifacts shared live across every function</td></tr>
+<tr><td>A different app for images, video, music, 3D</td><td>All of it in one place</td></tr>
+<tr><td>Re-learn a new workflow for each task</td><td>One consistent interface for everything</td></tr>
+<tr><td>OOM crashes, manual VRAM juggling</td><td>Auto VRAM tuning for 8&nbsp;GB → 128&nbsp;GB</td></tr>
+<tr><td>You fight the tool</td><td>You focus on the creative process</td></tr>
+</table>
+
+<p><b>Attention to detail everywhere:</b> a quiet checkbox that silently restructures your prompt into a clean JSON blueprint before generating. Auto-selection of the right encoder for your intent. Dropdowns that read the model header and configure themselves, color-coded by VRAM. Little things that mean you don't have to be an engineer to get great results.</p>
+
+<h2>Membership tiers</h2>
+<div class="tier"><span class="price">Free — $0.</span> Taste the full engine. A capped number of generations per day, watermarked output. Perfect to see what's possible.</div>
+<div class="tier"><span class="price">☕ Supporter — $5.</span> Almost every feature unlocked. Output carries a small watermark. The easiest way to support development and create daily.</div>
+<div class="tier"><span class="price">Creator — $14.</span> Full features, <b>no watermark</b>, tuned for clean, brand-safe, presentable creations.</div>
+<div class="tier"><span class="price">Unlimited — $19.</span> Full creative freedom — <b>no artificial content filters</b>. You decide what you make; the tool never says no.</div>
+<div class="tier"><span class="price">🎬 Studio — $25.</span> Everything above <b>plus the pro toolbox</b>: train your own LoRAs (image / video / music), import your own models, AI Film Studio, 3D &amp; mocap. For creators who ship.</div>
+<p class="small">All tiers run 100% locally on your own GPU. Watermarking &amp; invisible provenance signing are on the near-term roadmap.</p>
+
+<h2>What's inside (the short list)</h2>
+<p><span class="pill">Images</span> <span class="pill">Video</span> <span class="pill">Music &amp; voice</span> <span class="pill">Videoclips</span> <span class="pill">LoRA training</span> <span class="pill">AI Film Studio</span> <span class="pill">Import models</span> <span class="pill">3D models</span> <span class="pill">Rigging &amp; mocap</span> <span class="pill">Virtual worlds</span> <span class="pill">Public API + agent packs</span></p>
+<p>Multiple state-of-the-art models in <b>every</b> category — always your choice, never locked to one. The detailed breakdown is in the posts that follow.</p>
+
+<p class="cta">👉 Pick a tier, download the app, and make something in the next 10 minutes — not after your fourth OOM crash. New features drop almost every week.</p>
+
+<div class="media">📷 IMAGE — <b>tiers_table.png</b> — a clean pricing comparison graphic (optional, reinforces the tier table).</div>
+
+
+<!-- ============ POST 1 — IMAGES ============ -->
+<div class="pagebreak"></div>
+<h1>Post 1 — Images: a full darkroom, not a single button</h1>
+<p class="sub">Generate, edit, restore, compose, and lock a face — with the best open image models, all in one tab.</p>
+
+<div class="media">📷 IMAGE — <b>images_hero_grid.png</b> — a 3&times;2 grid: photoreal portrait, cinematic scene, anime, product shot, restored old photo, colorized B&amp;W. Shows range.</div>
+
+<h3>Generate with the models that matter — your pick</h3>
+<ul>
+<li><b>FLUX.2</b>, <b>FLUX.1</b> &amp; <b>FLUX.1 Krea</b> (photoreal aesthetic), <b>Z-Image</b>, <b>Ernie</b>, <b>Qwen-Image</b>, <b>SD3</b> — native (diffusers), no ComfyUI.</li>
+<li><b>Auto-detection</b> reads the model header and configures components for you; dropdowns are <b>color-coded by VRAM</b> (green/yellow/red) so you never guess.</li>
+<li>Live <b>per-step preview</b> — watch the image form.</li>
+</ul>
+
+<h3>Edit anything, in place</h3>
+<ul>
+<li><b>Inpaint / Outpaint</b> natively (FLUX.1 Fill, FLUX.2 Klein) — extend a canvas or repaint a region.</li>
+<li><b>Kontext instruction edit</b> — tell it what to change in words.</li>
+<li><b>Compose 2+ photos</b> without cut-and-paste seams (multi-reference / stitch, optional masks).</li>
+<li><b>Prompt Builder (JSON)</b> and an <b>invisible "structure my prompt"</b> checkbox that quietly turns free text into a clean blueprint before generating.</li>
+</ul>
+
+<h3>Faces &amp; restoration — the details people notice</h3>
+<ul>
+<li><b>PuLID face adapter</b>: lock a person's identity from photos. <b>Upload one or several</b> shots — it averages them for a rock-solid likeness — with advanced controls (identity strength, when to inject, prompt-adherence).</li>
+<li><b>Face-swap</b> (InsightFace) on any image.</li>
+<li><b>Restore</b> damaged photos and <b>colorize</b> black-and-white with the most advanced models.</li>
+<li><b>Upscale / super-resolution</b>, <b>segmentation</b> (SAM2 + GroundingDINO) for precise selections.</li>
+<li><b>Storyboard</b> multiple scenes as timed keyframes.</li>
+</ul>
+
+<div class="media">🎬 VIDEO — <b>images_edit_demo.mp4</b> — 30s: generate a portrait → inpaint a hat → outpaint the scene → PuLID same face in a new setting. Show it never leaving the tab.</div>
+<p class="small">And the killer detail: the image you just made is <b>already the starting frame</b> for video, the input for a 3D model, or a face reference for a LoRA. No export. No re-import.</p>
+
+
+<!-- ============ POST 2 — VIDEO ============ -->
+<div class="pagebreak"></div>
+<h1>Post 2 — Video: from one image to any length, with audio</h1>
+<p class="sub">Text-to-video, image-to-video, editing, character replacement, restoration — powered by LTX-2.3, native.</p>
+
+<div class="media">🎬 VIDEO — <b>video_hero_reel.mp4</b> — a 45s highlight reel: t2v shot, i2v from a still, a character swap, a style change (real→anime), an upscaled clip. Fast cuts, music.</div>
+
+<h3>Create</h3>
+<ul>
+<li><b>Text-to-video</b> and <b>image-to-video</b> (your generated image becomes the first frame automatically).</li>
+<li><b>Audio in the generation</b>: sing / lip-sync to real audio, text-to-audio, HDR/EXR output.</li>
+<li><b>Unlimited length</b>: a memory-bounded autoregressive chain extends clips to any duration — with <b>crash-resume</b> and <b>anti-drift</b> face/identity re-anchoring.</li>
+<li><b>Fast / Pro / HQ</b> modes; new <b>TeaCache</b> speed toggle for many-step renders.</li>
+<li><b>Keyframe interpolation</b> and multi-scene <b>storyboard → one continuous video, no editing.</b></li>
+</ul>
+
+<h3>Edit &amp; direct</h3>
+<ul>
+<li><b>Copy the motion</b> of any video (ControlNet: canny / depth / pose).</li>
+<li><b>Instruction editing</b> ("make it snowy winter"), <b>masked inpaint</b> where the mask <b>tracks the object</b> across frames (SAM2), <b>style transfer</b> (real↔anime), <b>ReTake</b> a section, <b>lip-sync a talking head</b>.</li>
+<li><b>Character replacement</b>: swap the person in a clip while keeping the scene, motion and original audio intact — one replacement image is enough.</li>
+<li><b>MultiTalk</b> lip-sync to real audio, even for long videos.</li>
+</ul>
+
+<h3>Finish &amp; restore</h3>
+<ul>
+<li><b>Super-resolution</b> (SeedVR2, FlashVSR), <b>frame interpolation</b> for higher FPS (RIFE), <b>per-frame face restoration</b>.</li>
+<li><b>Restore &amp; colorize old film</b> with the latest models.</li>
+<li>Real <b>per-step video preview</b> and a credible progress bar.</li>
+</ul>
+
+<div class="media">🎬 VIDEO — <b>video_character_replace.mp4</b> — a clear before/after: original clip, then the same clip with a new character, scene &amp; audio preserved. Strongest single video proof point.</div>
+
+
+<!-- ============ POST 3 — MUSIC & VIDEOCLIPS ============ -->
+<div class="pagebreak"></div>
+<h1>Post 3 — Music, Voice &amp; Videoclips</h1>
+<p class="sub">Write a song, score a video, clone a voice — then turn the song into a finished music video, automatically.</p>
+
+<div class="media">🎬 VIDEO — <b>music_videoclip_demo.mp4</b> — 40s: type a theme → song generates (show waveform) → auto-storyboard from the lyrics → coherent music video with scene cuts on the beat.</div>
+
+<h3>Music</h3>
+<ul>
+<li><b>Songs &amp; instrumentals</b> with multiple engines: HeartMuLa, <b>ACE-Step</b> and <b>ACE-Step 1.5</b> (a 5&nbsp;Hz language-model planner that reasons about structure before generating).</li>
+<li><b>Score your video</b> automatically (MMAudio) — sound effects &amp; ambience matched to the footage.</li>
+<li>Structured <b>metadata</b> (BPM / key / time signature / language) and an optional <b>AI style enrichment</b> that turns a few tags into a rich style caption.</li>
+<li>Built-in <b>waveform player</b>, <b>spectrogram</b>, and a <b>library</b> of your creations.</li>
+</ul>
+
+<h3>Voice</h3>
+<ul>
+<li><b>Text-to-speech &amp; voice cloning</b>, native: F5-TTS, XTTS-2, Fish, VibeVoice, CosyVoice, Kokoro — one shared voice library.</li>
+<li>Clone from a sample, then speak any text — or use the voice as a reference for singing.</li>
+</ul>
+
+<h3>Videoclips — the standout</h3>
+<ul>
+<li><b>"Generate music video"</b>: a song becomes a <b>coherent video that follows the lyrics</b> — the LLM writes a storyboard, camera directions are <b>auto-generated but fully editable</b>, and scene cuts land on the rhythm.</li>
+<li>Precise <b>lyric-to-video timing</b> (forced alignment), no ghosting on scene cuts, <b>automatic montage</b>.</li>
+<li>Drop in your own scenes for a hybrid clip.</li>
+</ul>
+
+
+<!-- ============ POST 4 — STUDIO ============ -->
+<div class="pagebreak"></div>
+<h1>Post 4 — Studio: train, direct a whole film, bring your own models, automate</h1>
+<p class="sub">The pro toolbox. Where a single photo becomes a trained character, and a paragraph becomes a movie.</p>
+
+<div class="media">🎬 VIDEO — <b>studio_lora_from_one_photo.mp4</b> — the magic trick: start with ONE photo → app generates coherent images of that character → makes videos from them → trains an image &amp; video LoRA. Show the pipeline end to end.</div>
+
+<h3>Train your own LoRAs — even from a single photo</h3>
+<ul>
+<li><b>Image LoRA</b> (FLUX.1 / FLUX.2) and <b>Video LoRA</b> (LTX-2.3), plus <b>music LoRAs</b>.</li>
+<li><b>One-or-few-photo character LoRA</b>: the app first generates <b>coherent images</b> of your character, then <b>videos</b> from those, then trains image and video LoRAs from the result — an auto-built dataset with subject coverage and face focus.</li>
+<li>Train a <b>video LoRA from your own existing clips</b> (import, auto-caption, trim, train).</li>
+<li>Uncensored, purpose-built <b>captioner (JoyCaption)</b> for training-grade descriptions.</li>
+</ul>
+
+<h3>AI Film Studio — a paragraph → a finished film</h3>
+<ul>
+<li>Text → <b>screenplay → assets → sets → storyboard → montage</b>, with a project database and versioning.</li>
+<li><b>Full dubbing</b> pipeline (translate → synthesize → re-lip-sync), visual <b>drag &amp; drop timeline</b> with tracks, continuity control per scene, and a <b>one-click Auto mode</b> (text → master).</li>
+<li>Multi-LoRA composition in the storyboard, character consistency across shots.</li>
+</ul>
+
+<h3>Bring your own models &amp; automate</h3>
+<ul>
+<li><b>Import your own models</b> and configure paths — your fine-tunes, your checkpoints.</li>
+<li><b>Public local API</b> (async) exposing every function with download links + auto-start / auto-shutdown.</li>
+<li><b>Agent packs / skills</b> so assistants can drive the studio: <b>Hermes, OpenClaw, Claude Code, Antigravity, OpenAI Codex</b> and more.</li>
+</ul>
+
+<div class="media">📷 IMAGE — <b>studio_filmstudio_ui.png</b> — a screenshot of the AI Film Studio window (screenplay + storyboard + timeline). Shows depth.</div>
+
+
+<!-- ============ POST 5 — 3D, ANIMATION, RIGGING, WORLDS ============ -->
+<div class="pagebreak"></div>
+<h1>Post 5 — 3D, Rigging, Mocap &amp; Virtual Worlds</h1>
+<p class="sub">From a flat image to a rigged, animatable 3D asset — and whole explorable scenes — fast but complete.</p>
+
+<div class="media">🎬 VIDEO — <b>3d_turntable_demo.mp4</b> — 30s: a generated image → 3D mesh turntable (PBR) → auto-rig skeleton → a walk animation. Then a quick fly-through of a generated 3D world.</div>
+
+<h3>3D models</h3>
+<ul>
+<li><b>Image → 3D mesh</b> with PBR materials / GLB export (TRELLIS.2), viewed in a native 3D viewer.</li>
+<li>Use the image you <b>just generated</b> — the whole chain (generate → edit → 3D) is one flow.</li>
+</ul>
+
+<h3>Rigging &amp; animation</h3>
+<ul>
+<li><b>Auto-rig</b>: mesh → skeleton + skinning (SkinTokens), ready to animate.</li>
+<li><b>Motion capture</b> from video to drive your characters.</li>
+</ul>
+
+<h3>Virtual worlds</h3>
+<ul>
+<li><b>Photo → 3D scene</b> (WorldGen): mesh (GLB) + splats, exportable to FBX/OBJ, explorable in a web player (orbit + WASD) and a native viewer.</li>
+</ul>
+
+<p class="small">Integrated end-to-end example: generate an image → edit it → image-to-video → 3D model from that same image → mocap from a video → all in one app, out of the box, with best practices baked in.</p>
+
+
+<!-- ============ POST 6 — FAQ ============ -->
+<div class="pagebreak"></div>
+<h1>FAQ</h1>
+
+<h3>Is it really all local?</h3>
+<p>Yes — 100% on your own GPU. No cloud calls at runtime, no accounts, your files never leave your machine. (An optional token is only ever used for a one-time download of gated model weights.)</p>
+
+<h3>Do I need to know ComfyUI or node graphs?</h3>
+<p>No. That's the whole point. Clean GUI, best-practice defaults, one button. If you've ever rage-quit a 40-node graph, this is for you.</p>
+
+<h3>What GPU do I need?</h3>
+<p>It auto-tunes for cards from <b>8&nbsp;GB to 128&nbsp;GB</b> (dynamic VRAM management, block-swap, quantized model options). More VRAM = faster and higher-res, but small cards are supported.</p>
+
+<h3>What's the difference between the tiers?</h3>
+<p>Free and Supporter ($5) include a watermark; Creator ($14) removes it; Unlimited ($19) removes content restrictions; Studio ($25) adds training, model import, AI Film Studio and 3D/mocap. All are local.</p>
+
+<h3>Can I train a character with just a photo?</h3>
+<p>Yes. The app generates a coherent dataset (images, then videos) from your photo(s) and trains image &amp; video LoRAs automatically.</p>
+
+<h3>Can I use my own models?</h3>
+<p>Yes, on the Studio tier — import checkpoints and fine-tunes and point the app at your paths.</p>
+
+<h3>How often is it updated?</h3>
+<p>Frequently — expect new features, models and architectures on a roughly <b>weekly</b> cadence. This is an actively growing platform, not a frozen release.</p>
+
+<h3>Can other tools / agents drive it?</h3>
+<p>Yes — a local API plus agent packs (Hermes, OpenClaw, Claude Code, Antigravity, Codex) expose every function programmatically.</p>
+
+
+<!-- ============ REDDIT VARIANTS ============ -->
+<div class="pagebreak"></div>
+<h1>Reddit posts (value-first, 90/10)</h1>
+<p class="sub">Publish-ready. Lead with value, mention the tool honestly, invite discussion. Check each sub's self-promo rules and flair first.</p>
+
+<h3>r/StableDiffusion — [Discussion]</h3>
+<p><b>Title:</b> I got tired of exporting between ComfyUI, a music app, and three upscale graphs — so everything now lives in one local GUI</p>
+<p><b>Body:</b> The thing that kills my flow isn't generation quality, it's the plumbing: generate an image here, re-import it there to animate, open another app for audio, load a different graph to extend the clip. Every step is an export/import and a new workflow to remember.<br>
+I've been building a single local app where the artifacts are shared across functions — the image you generate is already the first frame for video, the input for a 3D model, and a face reference for a LoRA. No re-import. Auto VRAM tuning so I stop OOM-ing. Curious how others here handle the multi-tool shuffle — do you batch by tool, or push through per-project? <span class="small">(Honest note: it's a paid app with a free tier; happy to answer anything in comments.)</span></p>
+
+<h3>r/aivideo — [Discussion]</h3>
+<p><b>Title:</b> Character replacement that keeps the scene, motion AND original audio — one reference image (LTX-2.3)</p>
+<p><b>Body:</b> Swapping a character in a clip usually means the background drifts or the audio's gone. Approach that's working for me: canny structure from the source video + a single replacement first-frame + an in-context LoRA, original audio muxed back. Keeps motion and scene, changes the person. What's everyone using for identity consistency across a whole clip — LoRA, face adapter, or per-frame swap?</p>
+
+<h3>r/singularity or r/LocalLLaMA — [Project]</h3>
+<p><b>Title:</b> Train a character LoRA from a single photo — the app builds the dataset itself (images → videos → LoRA)</p>
+<p><b>Body:</b> The dataset is the bottleneck for a consistent character. Pipeline I landed on: from one photo, generate coherent images of the same identity → make short videos from those → train image + video LoRAs on that auto-built set. Runs fully local. Would love feedback on how you all handle coverage/face-focus in auto-datasets.</p>
+
+<div class="media">📷 IMAGE — <b>reddit_thumb.png</b> — a single striking before/after (character replacement or restore) for the Reddit image slot.</div>
+
+
+<!-- ============ MEDIA CHECKLIST ============ -->
+<div class="pagebreak"></div>
+<h1>📋 Media checklist — what to create &amp; where</h1>
+<p class="sub">Put all files in <code>docs\media\</code>. Referenced by exact filename above. Generate with LTX Studio when the GPU is free — the app can make every one of these.</p>
+<table>
+<tr><th>File</th><th>Type</th><th>Used in</th><th>What it shows</th></tr>
+<tr><td>hero_banner.png</td><td>Image 1920&times;1080</td><td>Main post (top)</td><td>App + montage image→video→3D→LoRA</td></tr>
+<tr><td>intro_flow_60s.mp4</td><td>Video 60s</td><td>Main post</td><td>One-take flow across tabs (MOST IMPORTANT)</td></tr>
+<tr><td>tiers_table.png</td><td>Image</td><td>Main post</td><td>Pricing comparison graphic (optional)</td></tr>
+<tr><td>images_hero_grid.png</td><td>Image</td><td>Post 1 (Images)</td><td>3&times;2 range grid</td></tr>
+<tr><td>images_edit_demo.mp4</td><td>Video 30s</td><td>Post 1</td><td>Generate → inpaint → outpaint → PuLID</td></tr>
+<tr><td>video_hero_reel.mp4</td><td>Video 45s</td><td>Post 2 (Video)</td><td>t2v/i2v/swap/style/upscale reel</td></tr>
+<tr><td>video_character_replace.mp4</td><td>Video</td><td>Post 2</td><td>Character replacement before/after</td></tr>
+<tr><td>music_videoclip_demo.mp4</td><td>Video 40s</td><td>Post 3 (Music)</td><td>Song → storyboard → music video</td></tr>
+<tr><td>studio_lora_from_one_photo.mp4</td><td>Video</td><td>Post 4 (Studio)</td><td>1 photo → images → videos → LoRA</td></tr>
+<tr><td>studio_filmstudio_ui.png</td><td>Image (screenshot)</td><td>Post 4</td><td>AI Film Studio window</td></tr>
+<tr><td>3d_turntable_demo.mp4</td><td>Video 30s</td><td>Post 5 (3D)</td><td>Image→mesh→rig→animation + world fly-through</td></tr>
+<tr><td>reddit_thumb.png</td><td>Image</td><td>Reddit</td><td>Striking before/after thumbnail</td></tr>
+</table>
+<p class="small">Suggested creative prompts (per house rule: always fun &amp; varied — never cats/dogs): a neon-lit alchemist brewing storms, an astronaut DJ on a floating reef, a Victorian robot painting the northern lights, a dragon barista in a cyberpunk café. Keep the samples eye-catching and diverse.</p>
+
+</body>
+</html>
