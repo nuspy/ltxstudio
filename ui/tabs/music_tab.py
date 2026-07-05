@@ -62,6 +62,23 @@ _SONG_EXAMPLES = [
 ]
 
 
+_TOTAL_VRAM_GB = None                                     # cache: VRAM totale (query una-tantum via nvidia-smi)
+
+
+def _total_vram_gb() -> float:
+    """VRAM totale della GPU in GB (nvidia-smi, cache). 0 se non rilevabile → badge senza colore."""
+    global _TOTAL_VRAM_GB
+    if _TOTAL_VRAM_GB is None:
+        try:
+            import subprocess
+            out = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                                 capture_output=True, text=True, timeout=3)
+            _TOTAL_VRAM_GB = float(out.stdout.strip().splitlines()[0]) / 1024.0
+        except Exception:                                  # noqa: BLE001
+            _TOTAL_VRAM_GB = 0.0
+    return _TOTAL_VRAM_GB
+
+
 def _expand_wildcards(text: str) -> str:
     """Risolve i wildcard {a|b|c} scegliendo un'opzione a caso (single-level). Preserva [tag] struttura."""
     if not text or "{" not in text:
@@ -283,6 +300,12 @@ class MusicTab(QWidget):
         mv2.addWidget(QLabel(tr("music.mv.pace", "Ritmo cambi scena")))
         mv2.addWidget(self.mv_pace)
         v.addLayout(mv2)
+        # Badge stima carico VRAM (verde/giallo/rosso) + indicatore coda
+        self.est_badge = QLabel(""); self.est_badge.setTextFormat(Qt.RichText)
+        self.est_badge.setToolTip(tr("music.est.tt",
+            "Stima del carico VRAM in base a durata × batch × step × quantizzazione (verde ok, giallo al limite, "
+            "rosso rischio offload/OOM). La stima del tempo è indicativa e dipende dalla GPU."))
+        v.addWidget(self.est_badge)
         h = QHBoxLayout()
         self.btn_song_install = QPushButton(tr("music.install.heart", "Installa HeartMuLa"))
         self.btn_song_install.clicked.connect(lambda: self._install("--heartmula"))
@@ -300,7 +323,44 @@ class MusicTab(QWidget):
         h.addWidget(self.btn_song_install); h.addWidget(self.btn_acestep_install); h.addStretch(1)
         h.addWidget(self.btn_song); h.addWidget(self.btn_music_video); h.addWidget(self.btn_mv_projects)
         v.addLayout(h)
+        # aggiorna il badge quando cambiano i parametri che influenzano il carico
+        for _sig in (self.song_dur.valueChanged, self.song_adv.batch.valueChanged,
+                     self.song_adv.steps.valueChanged, self.song_lazy.toggled,
+                     self.song_adv.quantized.toggled, self.song_engine.currentTextChanged,
+                     self.song_ver.currentTextChanged):
+            _sig.connect(self._update_estimate)
+        self._update_estimate()
         return box
+
+    def _update_estimate(self, *_):
+        """Aggiorna il badge di stima carico VRAM/tempo in base ai parametri correnti."""
+        is_hm = self.song_engine.currentText() == "HeartMuLa"
+        dur = self.song_dur.value()
+        batch = self.song_adv.batch.value() if not is_hm else 1
+        steps = self.song_adv.steps.value() if not is_hm else 60
+        quant = self.song_adv.quantized.isChecked()
+        lazy = self.song_lazy.isChecked()
+        if is_hm:                                            # HeartMuLa: modello 3B/RL3B più grande
+            base = 20.0 if "RL" in self.song_ver.currentText() else 15.0
+        else:
+            base = 5.0 if quant else 8.0
+        est = base + 0.03 * dur + 1.5 * max(0, batch - 1)
+        if lazy:
+            est = min(est, 6.0 + 0.02 * dur)                 # offload su CPU: molta meno VRAM (più lento)
+        total = _total_vram_gb()
+        # colore in base al rapporto stima/totale (o soglie assolute se totale ignoto)
+        ref = total if total > 0 else 24.0
+        frac = est / ref
+        color = "#2f9e44" if frac < 0.6 else ("#e0a458" if frac < 0.9 else "#e03131")
+        load = (tr("music.est.light", "leggero") if steps * dur * batch < 4000 else
+                tr("music.est.heavy", "pesante") if steps * dur * batch > 15000 else
+                tr("music.est.medium", "medio"))
+        tot_txt = f" / {total:.0f}" if total > 0 else ""
+        self.est_badge.setText(
+            f"<span style='color:{color};'>●</span> " +
+            tr("music.est", "VRAM stimata ~{gb:.0f}{tot} GB · carico {load}").format(
+                gb=est, tot=tot_txt, load=load) +
+            (f" · <span style='color:#e0a458;'>{tr('music.est.lazy', 'offload CPU attivo')}</span>" if lazy else ""))
 
     def _pick_mv_image(self):
         from PySide6.QtWidgets import QFileDialog
