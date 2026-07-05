@@ -378,8 +378,13 @@ class MusicTab(QWidget):
         bar2 = QHBoxLayout()
         self.btn_play = QPushButton(tr("music.play", "Riproduci")); self.btn_play.clicked.connect(self._play); self.btn_play.setEnabled(False)
         self.btn_folder = QPushButton(tr("music.folder", "Apri cartella")); self.btn_folder.clicked.connect(self._open_folder)
+        self.btn_spectro = QPushButton(tr("music.spectro", "📊 Spettro / A-B"))
+        self.btn_spectro.setToolTip(tr("music.spectro.tt",
+            "Apre lo spettrogramma dell'ultimo brano e permette di confrontarlo con un altro (centroide spettrale)."))
+        self.btn_spectro.clicked.connect(self._open_spectro)
         self.btn_stop = QPushButton(tr("music.stop", "Stop")); self.btn_stop.clicked.connect(self._stop); self.btn_stop.setEnabled(False)
-        bar2.addWidget(self.btn_play); bar2.addWidget(self.btn_folder); bar2.addStretch(1); bar2.addWidget(self.btn_stop)
+        bar2.addWidget(self.btn_play); bar2.addWidget(self.btn_folder); bar2.addWidget(self.btn_spectro)
+        bar2.addStretch(1); bar2.addWidget(self.btn_stop)
         self.logview = QPlainTextEdit(); self.logview.setReadOnly(True); self.logview.setFixedHeight(150)
         self.logview.setStyleSheet("font-family:Consolas,monospace;font-size:11px;")
         v.addWidget(self.bar); v.addWidget(self.status); v.addLayout(bar2)
@@ -731,3 +736,10 @@ class MusicTab(QWidget):
     def _open_folder(self):
         ms.MUSIC_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(str(ms.MUSIC_OUTPUT_DIR))
+
+    def _open_spectro(self):
+        """Apre il confronto spettrogramma A/B (A = ultimo brano generato, se presente)."""
+        from ui.widgets.spectrogram import SpectrogramCompare
+        a = self._last_audio if (self._last_audio and os.path.exists(self._last_audio)) else ""
+        self._spectro_dlg = SpectrogramCompare(a, parent=self)     # non-modale
+        self._spectro_dlg.show()
