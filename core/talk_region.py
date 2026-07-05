@@ -76,6 +76,12 @@ def composite_talk_region(generated: str, source_image: str, out: str, *,
             os.remove(tmp)
         except OSError:
             pass
+        try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+            from core import stego
+            if os.path.exists(out) and stego.enabled():
+                stego.sign_file(out)
+        except Exception:                                    # noqa: BLE001
+            pass
         # #106 watermark obbligatorio: il composite ricostruisce lo sfondo dalla FOTO sorgente (non
         # marchiata) → la banda del video a2v generato andrebbe persa; si marchia QUI l'output
         # finale consegnato (GUI Talk + REST /video/lipsync). Se forced e non applicabile,

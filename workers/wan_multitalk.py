@@ -387,6 +387,15 @@ def run(p: dict) -> str:
     if resume and F > SEG and not p.get("keep_chunks"):
         import shutil
         shutil.rmtree(cdir, ignore_errors=True)
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(p["output"])
+    except Exception as _se:                             # noqa: BLE001
+        print(f"[stego] {_se}", flush=True)
     # #106 watermark obbligatorio (gated feature_matrix): MultiTalk scrive il suo mp4 SENZA passare
     # da ltx2_infer → si marchia qui, sul file finale dopo il mux audio. Il repo root va aggiunto a
     # sys.path (il worker gira nel venv ComfyUI con cwd=COMFY). RuntimeError → errore del job

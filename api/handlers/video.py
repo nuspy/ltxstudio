@@ -279,6 +279,12 @@ def register(app: FastAPI):
                 raise RuntimeError("Practical-RIFE non installato.")
             out = out_path("rife")
             out = rife.interpolate_video(req.video_path, out, factor=req.factor)
+            try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark, video esterno
+                from core import stego
+                if stego.enabled():
+                    stego.sign_file(out)
+            except Exception:                               # noqa: BLE001
+                pass
             # #106 watermark obbligatorio: core/rife.py NON marchia di suo (nelle catene GUI
             # gen→RIFE / enhance→RIFE l'input è GIÀ marchiato alla fonte → marcarlo lì sarebbe un
             # doppio watermark). Questo endpoint standalone lavora su video esterni → si marchia

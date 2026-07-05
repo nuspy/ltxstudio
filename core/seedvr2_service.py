@@ -95,6 +95,12 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
     proc.wait()
     if proc.returncode != 0 or not os.path.exists(out):
         raise RuntimeError(f"SeedVR2 fallito (exit {proc.returncode}).")
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out)
+    except Exception:                                        # noqa: BLE001
+        pass
     # #106 watermark obbligatorio: applicato QUI (fine del job SeedVR2 = file consegnato da GUI e
     # REST /video/enhance) e UNA sola volta per catena — se la GUI accoda RIFE dopo, core/rife.py
     # NON ri-marchia (la banda resta baked nei frame interpolati). RuntimeError → errore del job.

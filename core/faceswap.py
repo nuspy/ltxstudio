@@ -89,6 +89,12 @@ def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
         img = sw.get(img, f, src, paste_back=True)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     cv2.imwrite(out_path, img)
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out_path)
+    except Exception:                                   # noqa: BLE001
+        pass
     # #106 watermark obbligatorio (gated feature_matrix): il face-swap è un post-process FINALE e
     # questo è l'UNICO punto che scrive la foto consegnata (GUI tab Restauro + REST /image/faceswap)
     # → si marchia qui, una sola volta. RuntimeError (forced non applicabile) → errore del job.
@@ -133,6 +139,12 @@ def swap_video(video_path: str, source_face_path: str, out_path: str, progress=N
     try:
         os.remove(tmp)
     except OSError:
+        pass
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out_path)
+    except Exception:                                   # noqa: BLE001
         pass
     # #106 watermark obbligatorio: punto finale del face-swap video (GUI + REST /video/faceswap).
     # Se l'input era un video generato (già marchiato da ltx2_infer) la banda è baked nei frame e

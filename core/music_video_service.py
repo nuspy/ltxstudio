@@ -212,6 +212,12 @@ def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: i
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
     subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", song_path, "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"], check=False)
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out_path)
+    except Exception:                                       # noqa: BLE001
+        pass
     # #106 watermark obbligatorio sull'MP4 FINALE del montaggio (workflow interattivo). Punto scelto:
     # dopo il mux, UNA sola volta a fine catena — NON dentro gen_scene_video (le clip di scena sono
     # intermedi e possono venire da cache/riusi non marchiati, quindi la banda dei chunk NON è
@@ -399,6 +405,12 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", song_path, "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"])
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out_path)
+    except Exception:                                       # noqa: BLE001
+        pass
     # #106 watermark obbligatorio sull'MP4 FINALE consegnato (workflow automatico). Punto scelto:
     # dopo il mux finale, UNA sola volta a fine catena — NON sui chunk (intermedi, riusati da cache:
     # la marchiatura alla fonte via ltx2_infer non è garantita per chunk pre-esistenti).

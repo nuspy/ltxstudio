@@ -83,6 +83,12 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
         os.makedirs(output_dir, exist_ok=True)
         out_path = str(Path(output_dir) / f"native_faces_{params.get('seed', 0)}.mp4")
         _reassemble(outd, fps, video, out_path)
+        try:                                                 # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark
+            from core import stego
+            if stego.enabled():
+                stego.sign_file(out_path)
+        except Exception:                                    # noqa: BLE001
+            pass
         try:                                                 # #106 watermark obbligatorio (gated feature_matrix)
             from core import watermark
             out_path = watermark.apply_to_file(out_path)     # unica applicazione: output finale del job
@@ -109,6 +115,12 @@ def run_fps(params: dict, mm, output_dir: str) -> dict:
                         "-c:a", "copy", out_path], capture_output=True, timeout=1800)
     if not os.path.exists(out_path):
         return {"status": "error", "error": f"ffmpeg minterpolate fallito: {r.stderr[-400:]!r}"}
+    try:                                                     # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out_path)
+    except Exception:                                        # noqa: BLE001
+        pass
     try:                                                     # #106 watermark obbligatorio (gated feature_matrix)
         from core import watermark
         out_path = watermark.apply_to_file(out_path)         # unica applicazione: output finale del job
@@ -163,6 +175,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
                         "-i", video, "-map", "0:v:0", "-map", "1:a:0?", "-c:v", "libx264",
                         "-pix_fmt", "yuv420p", "-c:a", "copy", "-shortest", path],
                        capture_output=True, timeout=900)
+    try:                                                     # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(path)
+    except Exception:                                        # noqa: BLE001
+        pass
     try:                                                     # #106 watermark obbligatorio (gated feature_matrix)
         from core import watermark
         path = watermark.apply_to_file(path)                 # unica applicazione: output finale del job

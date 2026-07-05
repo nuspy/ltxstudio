@@ -77,6 +77,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_upscale_{params.get('seed', 0)}.png")
     res.save(path)
+    try:                                                     # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(path)
+    except Exception:                                        # noqa: BLE001
+        pass
     try:                                                     # #106 watermark obbligatorio (gated feature_matrix)
         from core import watermark
         path = watermark.apply_to_file(path)                 # forced → fail-closed (rimuove se non applicabile)

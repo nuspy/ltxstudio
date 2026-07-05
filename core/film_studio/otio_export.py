@@ -13,6 +13,12 @@ def _watermark_master(path: str) -> str:
     Studio (gli shot sorgente sono intermedi e possono provenire da cache/riusi non marchiati →
     la marchiatura autoritativa è qui, UNA volta a fine catena, mai dentro gen_service).
     RuntimeError (forced non applicabile) → errore del job, non nascosto."""
+    try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(path)
+    except Exception:                                       # noqa: BLE001
+        pass
     try:
         from core import watermark
         return watermark.apply_to_file(path)
