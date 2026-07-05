@@ -158,6 +158,12 @@ class MusicTab(QWidget):
         self.song_post.want_last.connect(lambda: self.song_post.set_src(self._last_audio))
         self.song_post.process_requested.connect(self._process_audio)
         form.addWidget(self.song_post)
+        # Correzione intonazione voce (DiffPitcher) — scaffold, test live pendente
+        from ui.widgets.pitch_panel import PitchPanel
+        self.pitch_panel = PitchPanel()
+        self.pitch_panel.want_last.connect(lambda: self.pitch_panel.set_src(self._last_audio))
+        self.pitch_panel.process_requested.connect(self._process_pitch)
+        form.addWidget(self.pitch_panel)
         form.addWidget(self.song_trainer)          # standalone: tra Sonorizza Video e Progresso
         form.addWidget(self._progress_box())
         form.addStretch(1)
@@ -1098,6 +1104,23 @@ class MusicTab(QWidget):
         self._song_meta = {"label": "Audio post", "source": Path(src).name, **opts}   # #97 sidecar
         job = ap.make_job(src, name, opts, on_log=self._b.log.emit,
                           on_progress=self._b.progress.emit, on_done=self._b.song_done.emit)
+        self._start_job(job, "song", str(out))
+
+    def _process_pitch(self):
+        """Correzione intonazione voce (DiffPitcher). Scaffold: da validare live."""
+        if self._busy():
+            return
+        from core import diffpitcher_service as dp
+        p = self.pitch_panel.get()
+        errs = dp.preflight(p["source"], p["pitch_ref"])
+        if errs:
+            QMessageBox.warning(self, tr("pitch.err", "Impossibile correggere"), "\n".join(errs)); return
+        name = self.song_name.text().strip() or "vocal"
+        out = dp.out_path(name)
+        self._song_meta = {"label": "Intonazione", "source": Path(p["source"]).name,
+                           "pitch_ref": Path(p["pitch_ref"]).name, "steps": p["steps"], "shift_semi": p["shift_semi"]}
+        job = dp.make_job(p["source"], p["pitch_ref"], name, steps=p["steps"], shift_semi=p["shift_semi"],
+                          on_log=self._b.log.emit, on_progress=self._b.progress.emit, on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
 
     def _open_spectro(self):
