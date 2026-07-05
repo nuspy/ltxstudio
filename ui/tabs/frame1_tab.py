@@ -244,7 +244,13 @@ class Frame1Tab(QWidget):
         self.gen_prompt = QPlainTextEdit(); self.gen_prompt.setMaximumHeight(40)
         self.gen_prompt.setPlaceholderText(tr("f1.gen.prompt.ph"))
         self.gen_prompt.setToolTip(tr("f1.gen.prompt.tt", "Prompt positivo dedicato all'immagine di partenza (se vuoto usa quello globale)."))
-        f.addRow(tr("f1.gen.prompt_lbl"), self.gen_prompt)
+        from PySide6.QtWidgets import QWidget as _QW, QHBoxLayout as _QH
+        _pbb = QToolButton(); _pbb.setText("🧱"); _pbb.setCursor(Qt.PointingHandCursor)
+        _pbb.setToolTip(tr("f1.gen.builder.tt", "Costruttore di prompt strutturato (campi → prompt)."))
+        _pbb.clicked.connect(lambda: self._open_prompt_builder())
+        _pw = _QW(); _pl = _QH(_pw); _pl.setContentsMargins(0, 0, 0, 0); _pl.setSpacing(4)
+        _pl.addWidget(self.gen_prompt, 1); _pl.addWidget(_pbb)
+        f.addRow(tr("f1.gen.prompt_lbl"), _pw)
         self.gen_neg = QPlainTextEdit(DEFAULT_NEG); self.gen_neg.setMaximumHeight(40)
         self.gen_neg.setPlaceholderText(tr("f1.gen.neg.ph"))
         self.gen_neg.setToolTip(tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))
@@ -252,6 +258,20 @@ class Frame1Tab(QWidget):
         self.gen_btn = QPushButton(tr("f1.gen.btn"))
         self.gen_btn.setToolTip(tr("f1.gen.btn.tt", "Genera l'immagine di partenza con i parametri impostati."))
         self.gen_btn.clicked.connect(lambda: self.request_generate.emit())
+
+        def _open_prompt_builder(_self=self):
+            from ui.widgets.prompt_builder import PromptBuilderDialog
+            _self._pb_dlg = PromptBuilderDialog(_self)
+            _self._pb_dlg.applied.connect(_self._apply_built_prompt)
+            _self._pb_dlg.show()
+
+        def _apply_built_prompt(p, n, _self=self):
+            if p:
+                _self.gen_prompt.setPlainText(p)
+            if n:
+                _self.gen_neg.setPlainText(n)
+        self._open_prompt_builder = _open_prompt_builder
+        self._apply_built_prompt = _apply_built_prompt
         f.addRow(self.gen_btn)
         self.gen_warn_lbl = QLabel("")
         self.gen_warn_lbl.setWordWrap(True)
