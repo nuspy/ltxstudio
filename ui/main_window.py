@@ -2310,7 +2310,8 @@ class MainWindow(QMainWindow):
                   "sampler": cfg.get("sampler"), "scheduler": cfg.get("scheduler"),
                   "encoder": cfg.get("encoder"), "clip_type": cfg.get("clip_type"), "vae": cfg.get("vae"),
                   "enhance": cfg.get("enhance"), "nsfw": cfg.get("nsfw"),
-                  "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8)}
+                  "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8),
+                  "pulid_start_step": cfg.get("pulid_start_step", 0), "pulid_true_cfg": cfg.get("pulid_true_cfg", 1.0)}
         self._log("Generazione immagine (backend NATIVO) inviata…")
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))

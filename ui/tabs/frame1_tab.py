@@ -293,23 +293,35 @@ class Frame1Tab(QWidget):
         prow.addWidget(self.gen_pulid_face, 1); prow.addWidget(self.gen_pulid_face_btn)
         pf.addRow(tr("f1.pulid.face_lbl"), self._wrapw(prow))
         self.gen_pulid_strength = QDoubleSpinBox()
-        self.gen_pulid_strength.setRange(0.0, 1.0); self.gen_pulid_strength.setSingleStep(0.05)
+        self.gen_pulid_strength.setRange(0.0, 3.0); self.gen_pulid_strength.setSingleStep(0.05)
         self.gen_pulid_strength.setValue(0.8)
         self.gen_pulid_strength.setToolTip(tr("f1.pulid.strength.tt"))
         pf.addRow(tr("f1.pulid.strength_lbl"), self.gen_pulid_strength)
+        # Parametri avanzati PuLID-FLUX ufficiali (prima inutilizzati)
+        self.gen_pulid_start = QSpinBox(); self.gen_pulid_start.setRange(0, 10); self.gen_pulid_start.setValue(0)
+        self.gen_pulid_start.setToolTip(tr("f1.pulid.start.tt",
+            "Da quale step iniziare a iniettare l'identità (0 = subito). Valori 1-4 lasciano formare prima la "
+            "posa/composizione dal prompt, poi applicano il volto → pose e prompt più fedeli."))
+        pf.addRow(tr("f1.pulid.start_lbl", "Start step"), self.gen_pulid_start)
+        self.gen_pulid_truecfg = QDoubleSpinBox(); self.gen_pulid_truecfg.setRange(1.0, 10.0)
+        self.gen_pulid_truecfg.setSingleStep(0.5); self.gen_pulid_truecfg.setValue(1.0)
+        self.gen_pulid_truecfg.setToolTip(tr("f1.pulid.truecfg.tt",
+            "True CFG (1.0 = veloce/off). >1 migliora l'aderenza al prompt e riduce il dominio dell'identità "
+            "(più lento). Attivo solo se la pipeline lo supporta."))
+        pf.addRow(tr("f1.pulid.truecfg_lbl", "True CFG"), self.gen_pulid_truecfg)
         f.addRow(pulid_group)
         # Default coerenti con l'architettura iniziale
         self._apply_arch_defaults(self.gen_arch.currentText())
         return box
 
     def _pick_pulid_face(self):
-        """Selettore della foto del volto per PuLID."""
+        """Selettore foto volto per PuLID — accetta PIÙ foto (media embedding = identità più robusta)."""
         from PySide6.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(
+        paths, _ = QFileDialog.getOpenFileNames(
             self, tr("f1.pulid.face.btn"), "",
             "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
-        if path:
-            self.gen_pulid_face.setText(path)
+        if paths:
+            self.gen_pulid_face.setText("|".join(paths))     # più foto separate da | → media in PuLID
 
     # Default per architettura (sampler/scheduler/steps/cfg/clip_type) — applicati a ogni
     # cambio di architettura. Allineati ai workflow ufficiali Comfy-Org.
@@ -1284,10 +1296,12 @@ class Frame1Tab(QWidget):
         pulid_face = None
         if getattr(self, "gen_pulid_enable", None) and self.gen_pulid_enable.isChecked():
             _f = self.gen_pulid_face.text().strip()
-            pulid_face = _f or None
+            pulid_face = _f or None                          # può contenere più path separati da | (media)
         return {
             "pulid_face": pulid_face,
             "pulid_strength": (self.gen_pulid_strength.value() if hasattr(self, "gen_pulid_strength") else 0.8),
+            "pulid_start_step": (self.gen_pulid_start.value() if hasattr(self, "gen_pulid_start") else 0),
+            "pulid_true_cfg": (self.gen_pulid_truecfg.value() if hasattr(self, "gen_pulid_truecfg") else 1.0),
             "arch": {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
             "model": self._gen_model_name(),
             "loras": self.gen_lora_tab.selected_loras(),
