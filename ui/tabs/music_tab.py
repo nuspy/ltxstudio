@@ -222,8 +222,8 @@ class MusicTab(QWidget):
         self.song_instr.toggled.connect(lambda on: self.song_lyrics.setDisabled(on))
         self.song_dur = QSpinBox(); self.song_dur.setRange(5, 360); self.song_dur.setValue(120); self.song_dur.setSuffix(" s")
         self.song_ver = QComboBox(); self.song_ver.addItems(ms.available_heartmula_versions() or ["3B"])
-        # Motore di generazione: HeartMuLa (default) o ACE-Step XL 1.5 (alternativa)
-        self.song_engine = QComboBox(); self.song_engine.addItems(["HeartMuLa", "ACE-Step"])
+        # Motore di generazione: HeartMuLa (default) · ACE-Step v1 · ACE-Step 1.5 (DiT 4B + planner 5Hz)
+        self.song_engine = QComboBox(); self.song_engine.addItems(["HeartMuLa", "ACE-Step", "ACE-Step 1.5"])
         self.song_temp = QDoubleSpinBox(); self.song_temp.setRange(0.1, 2.0); self.song_temp.setSingleStep(0.1); self.song_temp.setValue(1.0)
         self.song_cfg = QDoubleSpinBox(); self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setSingleStep(0.5); self.song_cfg.setValue(1.5)
         self.song_lazy = QCheckBox(tr("music.lazy", "Low VRAM (lazy load)"))
@@ -252,6 +252,12 @@ class MusicTab(QWidget):
             "0 = disattiva la doppia guida (torna alla sola CFG)."))
         self.lbl_gs_lyric = QLabel(tr("music.gs_lyric", "Aderenza parole"))
         g.addWidget(self.lbl_gs_lyric, 4, 2); g.addWidget(self.song_gs_lyric, 4, 3)
+        # ACE-Step 1.5: planner 5Hz LM (Chain-of-Thought) che pianifica metadata/struttura prima del DiT.
+        self.song_think = QCheckBox(tr("music.think", "Planner 5Hz (think)")); self.song_think.setChecked(True)
+        self.song_think.setToolTip(tr("music.think.tt",
+            "ACE-Step 1.5: attiva il language-model planner che ragiona su metadata e struttura prima di generare "
+            "(migliora coerenza/aderenza). Disattivalo per generare direttamente dalla caption."))
+        g.addWidget(self.song_think, 4, 0, 1, 2)
         v.addLayout(g)
         # Preset (salva/carica configurazione) + ↺ Reset
         _rr = QHBoxLayout()
@@ -357,14 +363,18 @@ class MusicTab(QWidget):
 
     def _update_estimate(self, *_):
         """Aggiorna il badge di stima carico VRAM/tempo in base ai parametri correnti."""
-        is_hm = self.song_engine.currentText() == "HeartMuLa"
+        eng = self.song_engine.currentText()
+        is_hm = eng == "HeartMuLa"
+        is_15 = eng == "ACE-Step 1.5"
         dur = self.song_dur.value()
-        batch = self.song_adv.batch.value() if not is_hm else 1
-        steps = self.song_adv.steps.value() if not is_hm else 60
+        batch = 1 if (is_hm or is_15) else self.song_adv.batch.value()
+        steps = 8 if is_15 else (60 if is_hm else self.song_adv.steps.value())
         quant = self.song_adv.quantized.isChecked()
         lazy = self.song_lazy.isChecked()
         if is_hm:                                            # HeartMuLa: modello 3B/RL3B più grande
             base = 20.0 if "RL" in self.song_ver.currentText() else 15.0
+        elif is_15:                                          # 1.5: DiT turbo 4B + planner 5Hz LM 1.7B
+            base = 12.0
         else:
             base = 5.0 if quant else 8.0
         est = base + 0.03 * dur + 1.5 * max(0, batch - 1)
@@ -597,8 +607,11 @@ class MusicTab(QWidget):
     def _gen_song(self):
         if self._busy():
             return
-        if self.song_engine.currentText() == "ACE-Step":
+        eng = self.song_engine.currentText()
+        if eng == "ACE-Step":
             return self._gen_song_acestep()
+        if eng == "ACE-Step 1.5":
+            return self._gen_song_ace15()
         p = ms.SongParams(
             name=self.song_name.text().strip() or "song",
             lyrics=_expand_wildcards(self.song_lyrics.toPlainText()),      # wildcards {a|b|c}
@@ -822,13 +835,16 @@ class MusicTab(QWidget):
     def _on_song_engine(self, e: str):
         """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""
         is_hm = (e == "HeartMuLa")
+        is_v1 = (e == "ACE-Step")
+        is_15 = (e == "ACE-Step 1.5")
         self.song_ver.setEnabled(is_hm)                      # 3B/7B solo HeartMuLa
         self.song_temp.setEnabled(is_hm)                     # temperatura solo HeartMuLa
-        self.song_adherence.setVisible(not is_hm)            # aderenza stile solo ACE-Step
-        self.lbl_adherence.setVisible(not is_hm)
-        if hasattr(self, "song_gs_lyric"):                   # aderenza parole (doppia guida) solo ACE-Step
-            self.song_gs_lyric.setVisible(not is_hm)
-            self.lbl_gs_lyric.setVisible(not is_hm)
+        # Doppia guida (gs_text/gs_lyric): solo ACE-Step v1. 1.5 usa dcw + planner (think), non queste leve.
+        self.song_adherence.setVisible(is_v1); self.lbl_adherence.setVisible(is_v1)
+        if hasattr(self, "song_gs_lyric"):
+            self.song_gs_lyric.setVisible(is_v1); self.lbl_gs_lyric.setVisible(is_v1)
+        if hasattr(self, "song_think"):                      # planner 5Hz (think): solo 1.5
+            self.song_think.setVisible(is_15)
         if hasattr(self, "song_adv"):
             self.song_adv.set_engine(e)                      # avanzate: abilitate solo per ACE-Step
         if hasattr(self, "song_task"):
@@ -842,6 +858,11 @@ class MusicTab(QWidget):
             self.song_cfg.setToolTip(tr("music.cfg.hm.tt",
                 "CFG = aderenza ai tag/liriche (unica leva di HeartMuLa). Più alto = più aderente; oltre ~4-5 "
                 "rischia artefatti/ripetizioni. Per l'aderenza migliore usa il checkpoint RL."))
+        elif is_15:
+            self.song_cfg.setRange(1.0, 10.0); self.song_cfg.setValue(1.0)
+            self.song_cfg.setToolTip(tr("music.cfg.15.tt",
+                "ACE-Step 1.5 (turbo): guidance ~1.0 (il modello turbo lavora quasi senza CFG). "
+                "L'aderenza viene soprattutto dal planner 5Hz (think) e da caption+metadata strutturati."))
         else:
             self.song_cfg.setRange(1.0, 30.0); self.song_cfg.setValue(15.0)
             self.song_cfg.setToolTip(tr("music.cfg.ace.tt",
@@ -881,6 +902,33 @@ class MusicTab(QWidget):
                           lazy=self.song_lazy.isChecked(),
                           adv=adv, on_log=self._b.log.emit, on_progress=self._b.progress.emit,
                           on_done=self._b.song_done.emit)
+        self._start_job(job, "song", str(out))
+
+    def _gen_song_ace15(self):
+        """Generazione con ACE-Step 1.5 (DiT turbo 4B + planner 5Hz). Metadata come parametri STRUTTURATI
+        (non accodati alla caption, come nel v1) — è la separazione caption/lyrics/metadata della 1.5."""
+        from core import acestep15_service as ax15
+        caption = _expand_wildcards(self.song_tags.text().strip())
+        instrumental = self.song_instr.isChecked()
+        lyrics = "" if instrumental else _expand_wildcards(self.song_lyrics.toPlainText().strip())
+        name = self.song_name.text().strip() or "song"
+        errs = ax15.preflight(caption)
+        if errs:
+            QMessageBox.warning(self, tr("music.err", "Impossibile generare"), "\n".join(errs)); return
+        meta = self.song_meta.get_meta()                     # bpm/keyscale/timesignature/vocal_language separati
+        fmt = self.song_adv.fmt.currentText() or "wav"
+        job = ax15.make_job(
+            caption, lyrics, name, instrumental=instrumental,
+            bpm=int(meta.get("bpm", 0) or 0), keyscale=meta.get("keyscale", ""),
+            timesignature=meta.get("timesignature", ""), language=meta.get("vocal_language", "unknown"),
+            duration=float(self.song_dur.value()), steps=8, guidance=float(self.song_cfg.value()),
+            seed=-1, think=self.song_think.isChecked(), fmt=fmt, batch=1,
+            on_log=self._b.log.emit, on_progress=self._b.progress.emit, on_done=self._b.song_done.emit)
+        self._song_meta = {"label": "Musica", "engine": "ACE-Step 1.5", "tags": caption, "lyrics": lyrics,
+                           "duration_s": float(self.song_dur.value()), "steps": 8,
+                           "cfg": float(self.song_cfg.value()), "think": self.song_think.isChecked(),
+                           "instrumental": instrumental, **meta}   # #97 sidecar
+        out = ax15.OUT_DIR / f"{ax15._safe(name)}.{fmt}"
         self._start_job(job, "song", str(out))
 
     def _gen_sonify(self):
