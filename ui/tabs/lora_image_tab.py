@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout)
+                               QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
 from core import lora_coverage
 from ui.i18n_manager import tr
@@ -38,7 +38,10 @@ class _LoraImageWorker(QThread):
                 import os
                 ds = os.path.join(out_dir, name, "dataset")
                 svc.generate_dataset(subjects, ds, width=opts.get("width", 1024),
-                                     height=opts.get("height", 1024), progress=self.progress.emit)
+                                     height=opts.get("height", 1024),
+                                     caption_engine=opts.get("caption_engine", "procedural"),
+                                     caption_mode=opts.get("caption_mode", "descriptive"),
+                                     progress=self.progress.emit)
                 res = {"dataset": ds}
             self.finished_lora.emit(res)
         except Exception as e:                          # noqa: BLE001
@@ -63,11 +66,28 @@ class LoraImageTab(LoraVideoTab):
         self.lora_rank = QSpinBox(); self.lora_rank.setRange(4, 128); self.lora_rank.setValue(16)
         self.lora_steps = QSpinBox(); self.lora_steps.setRange(200, 20000); self.lora_steps.setValue(2000); self.lora_steps.setSingleStep(200)
         self.img_res = QComboBox(); self.img_res.addItems(["768", "1024", "1280"]); self.img_res.setCurrentText("1024")
+        # Captioner del dataset: procedurale (trigger+tag) o VLM (JoyCaption consigliato / Florence-2)
+        from core import caption_service as cs
+        self.cap_engine = QComboBox()
+        self.cap_engine.addItem(tr("ilora.cap.proc", "Procedurale (trigger+tag)"), "procedural")
+        _lbl = {"joycaption": tr("train.cap.joy", "JoyCaption"), "florence2": tr("train.cap.flo", "Florence-2")}
+        for e in cs.available_engines():
+            self.cap_engine.addItem(_lbl.get(e, e), e)
+        self.cap_engine.setToolTip(tr("ilora.cap.tt",
+            "Come descrivere le immagini del dataset. JoyCaption = caption VLM realistiche (migliori per il "
+            "training, non censurato); Procedurale = trigger + tag generati (nessun modello)."))
+        self.cap_mode = QComboBox()
+        for m, lab in (("descriptive", tr("train.cap.m.desc", "Descrittiva")),
+                       ("tags", tr("train.cap.m.tags", "Tag booru")), ("sd-prompt", tr("train.cap.m.sd", "Prompt SD"))):
+            self.cap_mode.addItem(lab, m)
         g.addWidget(QLabel(tr("tlora.lora_name", "Nome LoRA")), 0, 0); g.addWidget(self.lora_name, 0, 1)
         g.addWidget(QLabel(tr("ilora.base", "Modello base")), 0, 2); g.addWidget(self.base_model, 0, 3)
         g.addWidget(QLabel(tr("tlora.rank", "Rank")), 1, 0); g.addWidget(self.lora_rank, 1, 1)
         g.addWidget(QLabel(tr("tlora.steps", "Step")), 1, 2); g.addWidget(self.lora_steps, 1, 3)
         g.addWidget(QLabel(tr("ilora.res", "Risoluzione")), 2, 0); g.addWidget(self.img_res, 2, 1)
+        g.addWidget(QLabel(tr("ilora.cap", "Captioner")), 2, 2)
+        _cw = QHBoxLayout(); _cw.setContentsMargins(0, 0, 0, 0); _cw.addWidget(self.cap_engine, 1); _cw.addWidget(self.cap_mode)
+        _cwrap = QWidget(); _cwrap.setLayout(_cw); g.addWidget(_cwrap, 2, 3)
         v.addLayout(g)
         h = QHBoxLayout()
         self.btn_install = QPushButton(tr("ilora.install", "Installa ai-toolkit")); self.btn_install.clicked.connect(self._install)
@@ -104,7 +124,9 @@ class LoraImageTab(LoraVideoTab):
         os.makedirs(out_dir, exist_ok=True)
         res = int(self.img_res.currentText())
         opts = {"base": self.base_model.currentData(), "rank": self.lora_rank.value(),
-                "steps": self.lora_steps.value(), "width": res, "height": res}
+                "steps": self.lora_steps.value(), "width": res, "height": res,
+                "caption_engine": self.cap_engine.currentData() or "procedural",
+                "caption_mode": self.cap_mode.currentData() or "descriptive"}
         self.btn_dataset.setEnabled(False); self.btn_full.setEnabled(False)
         self._log(tr("ilora.started", "Avvio LoRA FLUX.2 (può richiedere molto tempo)…"))
         self._worker = _LoraImageWorker(subjects, self.lora_name.text().strip() or "my_flux_lora", out_dir, opts, full)

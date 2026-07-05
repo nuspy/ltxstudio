@@ -72,8 +72,10 @@ def _face_crop_image(png: str, margin: float = 2.4) -> None:
 
 
 def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 1024, height: int = 1024,
+                     caption_engine: str = "procedural", caption_mode: str = "descriptive",
                      progress=None) -> dict:
-    """Genera le IMMAGINI (+ caption .txt) in un'unica cartella (formato ai-toolkit)."""
+    """Genera le IMMAGINI (+ caption .txt) in un'unica cartella (formato ai-toolkit).
+    caption_engine: 'procedural' (trigger+tag) | 'joycaption' | 'florence2' — se VLM, ricaptiona con quello."""
     def log(m):
         if progress:
             progress(m)
@@ -114,6 +116,14 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
                 open(os.path.splitext(dst)[0] + ".txt", "w", encoding="utf-8").write(f"{s.trig()}. {_subj_desc(s)}.")
                 n += 1
                 log(f"Reale {n}/{total}: {stem}")
+    # Ricaptioning VLM opzionale: sostituisce le caption procedurali con caption reali (JoyCaption/Florence-2)
+    if caption_engine and caption_engine != "procedural" and n > 0:
+        from core import caption_service as cs
+        trig = subjects[0].trig() if len(subjects) == 1 else ""
+        log(f"Ricaptioning con {caption_engine} ({caption_mode})…")
+        rc = cs.run_blocking(dataset_dir, engine=caption_engine, mode=caption_mode,
+                             trigger=trig, overwrite=True, on_log=log)
+        log(f"Ricaptioning {caption_engine}: {'OK' if rc == 0 else 'fallito/saltato (uso caption procedurali)'}")
     return {"dir": dataset_dir, "images": n}
 
 
@@ -147,10 +157,12 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
 
 
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, base: str = "flux2-dev",
-              rank: int = 16, steps: int = 2000, width: int = 1024, height: int = 1024, progress=None) -> dict:
+              rank: int = 16, steps: int = 2000, width: int = 1024, height: int = 1024,
+              caption_engine: str = "procedural", caption_mode: str = "descriptive", progress=None) -> dict:
     """Pipeline COMPLETA immagini: dataset → train (ai-toolkit FLUX.2). Ritorna {dataset, lora}."""
     ds = os.path.join(out_dir, name, "dataset")
-    generate_dataset(subjects, ds, width=width, height=height, progress=progress)
+    generate_dataset(subjects, ds, width=width, height=height,
+                     caption_engine=caption_engine, caption_mode=caption_mode, progress=progress)
     trig = ", ".join(sorted({s.trig() for s in subjects}))
     lora = train(ds, name, out_dir, base=base, trigger=trig, rank=rank, steps=steps, progress=progress)
     return {"dataset": ds, "lora": lora}
