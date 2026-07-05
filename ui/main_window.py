@@ -2379,6 +2379,7 @@ class MainWindow(QMainWindow):
             "guidance": float(self.video_tab.sampler_seed.cfg.value()),
             "seed": int(vals.get("seed", self.video_tab.sampler_seed.seed.value())),   # #95 V1: usa il seed randomizzato da on_generate
             "offload": "cpu", "loras": loras, "output": out,
+            "teacache_thresh": float(vals.get("teacache_thresh", 0.0) or 0.0),   # #104 cache velocità (0=off)
         }
         # MODELLO scelto nel tab Video → al worker. Senza questo il worker usava SEMPRE il checkpoint
         # di default → "funziona solo un modello" (qualunque scelta nel dropdown era ignorata).

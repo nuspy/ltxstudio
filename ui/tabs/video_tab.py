@@ -206,6 +206,15 @@ class VideoTab(QWidget):
         self.video_engine_sel.setToolTip(tr("vid.engine.tt",
             "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v."))
         form.addRow(tr("vid.engine_lbl", "Motore video"), self.video_engine_sel)
+        # #104 TeaCache: cache che salta gli step di denoising quasi-invariati (velocità). 0=off.
+        # Conviene con MOLTI step (HQ/Pro); soglia più alta = più veloce ma più perdita qualità.
+        self.teacache = QDoubleSpinBox()
+        self.teacache.setRange(0.0, 0.15); self.teacache.setSingleStep(0.01); self.teacache.setValue(0.0)
+        self.teacache.setDecimals(2)
+        self.teacache.setToolTip(tr("vid.teacache.tt",
+            "TeaCache: accelera saltando gli step di denoising quasi identici (0 = off). Prova 0.03 (~1.6×) o "
+            "0.05 (~2.1×). Utile con molti step (HQ/Pro); troppo alto degrada la qualità. Da tarare."))
+        form.addRow(tr("vid.teacache_lbl", "Cache veloce (TeaCache)"), self.teacache)
         # HR upscale/refine RIMOSSI dalla GUI (T3): erano un ramo legacy ComfyUI rotto e ridondante.
         # Nel flusso nativo la risoluzione si imposta direttamente nei preset; la super-risoluzione e il
         # dettaglio si fanno nel tab «Definizione Video» (SeedVR2/FlashVSR nativi). Gli attributi restano
@@ -723,6 +732,7 @@ class VideoTab(QWidget):
             "upscale_x2": self.upscale_x2.isChecked(),
             "refine_hr": self.refine_hr.isChecked(),
             "i2v_method": self.i2v_method.currentData() or "addguide",
+            "teacache_thresh": float(self.teacache.value()) if hasattr(self, "teacache") else 0.0,
         }
         sel_data = self.model.currentData() or {"kind": "auto"}
         kind = sel_data.get("kind")

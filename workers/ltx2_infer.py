@@ -670,6 +670,20 @@ def run_generation(p: dict) -> str:
                 _GG.patch_stage_to_gguf(_st, p["gguf_transformer"], ckpt)
         print(f"[gguf] transformer da {os.path.basename(p['gguf_transformer'])} (dequant on-the-fly)", flush=True)
 
+    # #104 TeaCache: cache training-free del velocity-model (salta forward su step quasi-invariati). thresh>0
+    # attiva; conviene sulle modalità a molti step (HQ/Pro). Soglia da calibrare live. Subprocess per-job → no disable.
+    _tc_thresh = float(p.get("teacache_thresh", 0) or 0)
+    if _tc_thresh > 0:
+        try:
+            from workers import teacache as _TC
+        except ModuleNotFoundError:
+            import teacache as _TC
+        _n = 0
+        for _st in (getattr(pipe, "stage_1", None), getattr(pipe, "stage_2", None), getattr(pipe, "stage", None)):
+            if _TC.enable(_st, _tc_thresh) is not None:
+                _n += 1
+        print(f"[teacache] attivo thresh={_tc_thresh} su {_n} stage", flush=True)
+
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)),
                                 stg_scale=float(p.get("stg", 1.0)),
                                 rescale_scale=0.7, modality_scale=3.0, stg_blocks=[29])
