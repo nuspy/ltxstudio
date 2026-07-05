@@ -70,7 +70,16 @@ class BuildGUI(QWidget):
             self.os_checks[o] = cb; ol.addWidget(cb)
         root.addWidget(os_grp)
 
-        # ── Matrice funzioni × edizione (sola lettura) ───────────────────────
+        # ── Matrice funzioni × edizione (sola lettura) + apertura editor ──────
+        edit_row = QHBoxLayout()
+        edit_row.addStretch(1)
+        self.btn_edit_matrix = QPushButton(tr("build.edit_matrix", "✏️ Modifica matrice / Link tier (upsell)…"))
+        self.btn_edit_matrix.setToolTip(tr("build.edit_matrix.tt",
+            "Apre l'editor della matrice: abilita/disabilita funzioni per edizione e imposta i link Patreon "
+            "per-tier (bottone 'Link tier'). Le modifiche vanno salvate e sono usate al build."))
+        self.btn_edit_matrix.clicked.connect(self._open_matrix_editor)
+        edit_row.addWidget(self.btn_edit_matrix)
+        root.addLayout(edit_row)
         mx = self._matrix_box()
         if mx is not None:
             root.addWidget(mx, 1)
@@ -134,6 +143,17 @@ class BuildGUI(QWidget):
         v.addWidget(table)
         v.addWidget(QLabel(tr("build.legend", "Legenda: ✓ inclusa · ✗ esclusa · · = regola di default")))
         return box
+
+    def _open_matrix_editor(self):
+        """Lancia l'editor della matrice (feature_matrix), da cui si impostano anche i link Patreon per-tier."""
+        import subprocess
+        import sys
+        try:
+            subprocess.Popen([sys.executable, "-m", "feature_matrix.editor", DEFAULT_PROJECT],
+                             cwd=r"C:\Projects\feature_matrix")
+            self.log.appendPlainText("Editor matrice avviato — salva le modifiche prima di ricompilare.")
+        except Exception as e:                               # noqa: BLE001
+            self.log.appendPlainText(f"Impossibile avviare l'editor matrice: {e}")
 
     def _pick(self, edit):
         path, _ = QFileDialog.getOpenFileName(self, tr("build.pick", "Scegli file"))
