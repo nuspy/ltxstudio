@@ -42,7 +42,10 @@ class _LoraWorker(QThread):
                 import os
                 ds = os.path.join(out_dir, name, "dataset")
                 svc.generate_dataset(subjects, ds, clip_seconds=opts.get("clip_seconds", 3.0),
-                                     use_pulid=opts.get("use_pulid", True), progress=self.progress.emit)
+                                     use_pulid=opts.get("use_pulid", True),
+                                     caption_engine=opts.get("caption_engine", "procedural"),
+                                     caption_mode=opts.get("caption_mode", "descriptive"),
+                                     progress=self.progress.emit)
                 res = {"dataset": ds}
             self.finished_lora.emit(res)
         except Exception as e:                          # noqa: BLE001
@@ -144,6 +147,9 @@ class LoraVideoTab(QWidget):
         g.addWidget(QLabel(tr("tlora.steps", "Step")), 1, 0); g.addWidget(self.lora_steps, 1, 1)
         g.addWidget(QLabel(tr("tlora.cliplen", "Durata clip")), 1, 2); g.addWidget(self.lora_clip, 1, 3)
         g.addWidget(self.lora_pulid, 2, 0, 1, 2); g.addWidget(self.lora_lowvram, 2, 2, 1, 2)
+        from ui.widgets.caption_picker import CaptionPicker
+        self.cap_picker = CaptionPicker()                    # captioner VLM (frame/clip) opzionale
+        g.addWidget(QLabel(tr("ilora.cap", "Captioner")), 3, 0); g.addWidget(self.cap_picker, 3, 1, 1, 3)
         v.addLayout(g)
         h = QHBoxLayout()
         self.btn_install = QPushButton(tr("tlora.install", "Installa trainer")); self.btn_install.clicked.connect(self._install)
@@ -298,7 +304,7 @@ class LoraVideoTab(QWidget):
         os.makedirs(out_dir, exist_ok=True)
         opts = {"rank": self.lora_rank.value(), "steps": self.lora_steps.value(),
                 "clip_seconds": self.lora_clip.value(), "use_pulid": self.lora_pulid.isChecked(),
-                "low_vram": self.lora_lowvram.isChecked()}
+                "low_vram": self.lora_lowvram.isChecked(), **self.cap_picker.get()}
         self.btn_dataset.setEnabled(False); self.btn_full.setEnabled(False)
         self._log(tr("tlora.started", "Avvio (può richiedere molto tempo)…"))
         self._worker = _LoraWorker(subjects, self.lora_name.text().strip() or "my_lora", out_dir, opts, full)

@@ -98,6 +98,9 @@ class TrainLoraVideoTab(QWidget):
         self.low_vram = QCheckBox(tr("tclip.lowvram", "Low-VRAM")); self.low_vram.setChecked(True)
         self.low_vram.setToolTip(tr("tclip.lowvram.tt", "Config a basso consumo di VRAM (consigliata)."))
         f.addRow("", self.low_vram)
+        from ui.widgets.caption_picker import CaptionPicker
+        self.cap_picker = CaptionPicker()                    # captioner VLM per i clip senza caption
+        f.addRow(tr("ilora.cap", "Captioner"), self.cap_picker)
         root.addWidget(gc)
 
         self.btn = QPushButton(tr("tclip.run", "🎓 Allena LoRA Video"))
@@ -146,7 +149,8 @@ class TrainLoraVideoTab(QWidget):
         w, h = (int(x) for x in self.res.currentText().split("x"))
         opts = dict(global_caption=self.global_cap.text().strip(), trigger=self.trigger.text().strip(),
                     rank=self.rank.value(), steps=self.steps.value(), width=w, height=h,
-                    clip_seconds=float(self.secs.value()), low_vram=self.low_vram.isChecked())
+                    clip_seconds=float(self.secs.value()), low_vram=self.low_vram.isChecked(),
+                    **self.cap_picker.get())
         self.log.clear(); self.status.setText(tr("tclip.running", "Training in corso…")); self.btn.setEnabled(False)
         self._worker = _ClipTrainWorker(clips, name, opts)
         self._worker.progress.connect(lambda m: self.log.appendPlainText(m))

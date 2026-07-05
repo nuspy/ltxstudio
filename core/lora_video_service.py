@@ -247,10 +247,44 @@ def _face_app():
     return _FACE_APP["app"]
 
 
+_VID_EXT = (".mp4", ".mov", ".webm", ".mkv", ".avi")
+
+
+def _recaption_clips(dataset_dir: str, engine: str, mode: str, trigger: str, log, only_stems=None) -> int:
+    """Ricaptioning VLM dei clip: estrae 1 frame rappresentativo per clip → JoyCaption/Florence-2 →
+    sovrascrive il .txt del clip. only_stems: se dato, limita a quegli stem (per riempire solo i vuoti)."""
+    from core import caption_service as cs
+    mp4s = [f for f in os.listdir(dataset_dir) if f.lower().endswith(_VID_EXT)]
+    if only_stems is not None:
+        _s = set(only_stems)
+        mp4s = [f for f in mp4s if os.path.splitext(f)[0] in _s]
+    if not mp4s:
+        return 0
+    tmp = os.path.join(dataset_dir, "_capframes")
+    os.makedirs(tmp, exist_ok=True)
+    for f in mp4s:                                            # frame a ~1s (clip corti) come rappresentante
+        png = os.path.join(tmp, os.path.splitext(f)[0] + ".png")
+        if not os.path.exists(png):
+            subprocess.run(["ffmpeg", "-v", "error", "-ss", "1", "-i", os.path.join(dataset_dir, f),
+                            "-vframes", "1", png, "-y"])
+    log(f"Ricaptioning clip con {engine} ({mode})…")
+    rc = cs.run_blocking(tmp, engine=engine, mode=mode, trigger=trigger, overwrite=True, on_log=log)
+    if rc == 0:                                               # copia le caption sul .txt del clip
+        for f in mp4s:
+            stem = os.path.splitext(f)[0]
+            cap_txt = os.path.join(tmp, stem + ".txt")
+            if os.path.exists(cap_txt):
+                shutil.copyfile(cap_txt, os.path.join(dataset_dir, stem + ".txt"))
+    shutil.rmtree(tmp, ignore_errors=True)
+    return rc
+
+
 def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 768, height: int = 512,
-                     clip_seconds: float = 3.0, fps: int = 25, use_pulid: bool = True, progress=None) -> dict:
+                     clip_seconds: float = 3.0, fps: int = 25, use_pulid: bool = True,
+                     caption_engine: str = "procedural", caption_mode: str = "descriptive",
+                     progress=None) -> dict:
     """Genera i clip (con caption .txt) per tutti i soggetti + include il materiale reale.
-    Ritorna {clips, captions, dir}."""
+    caption_engine: 'procedural' | 'joycaption' | 'florence2' (VLM → ricaptiona via frame). Ritorna {dir, clips}."""
     def log(m):
         if progress:
             progress(m)
@@ -306,6 +340,9 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
             open(os.path.splitext(dst)[0] + ".txt", "w", encoding="utf-8").write(cap)
             n_done += 1
             log(f"Reale {n_done}/{total}: {stem}")
+    if caption_engine and caption_engine != "procedural" and n_done > 0:
+        trig = subjects[0].trig() if len(subjects) == 1 else ""
+        _recaption_clips(dataset_dir, caption_engine, caption_mode, trig, log)
     return {"dir": dataset_dir, "clips": n_done}
 
 
@@ -390,14 +427,17 @@ def _safe_stem(s: str) -> str:
 
 
 def build_clip_dataset(clips: list[dict], dataset_dir: str, *, global_caption: str = "",
+                       caption_engine: str = "procedural", caption_mode: str = "descriptive",
                        progress=None) -> dict:
     """Prepara il dataset da CLIP ESISTENTI. clips: [{path, caption?, start?, end?}].
-    Ogni clip → <stem>.mp4 (trim+normalizzato h264) + <stem>.txt (caption: per-clip · sibling _*.txt · globale)."""
+    Ogni clip → <stem>.mp4 (trim+normalizzato h264) + <stem>.txt (caption: per-clip · sibling _*.txt · globale).
+    caption_engine VLM: riempie SOLO i clip senza caption (rispetta quelle manuali)."""
     def log(m):
         if progress:
             progress(m)
     os.makedirs(dataset_dir, exist_ok=True)
     n = 0
+    empty_stems = []                                         # clip senza caption → candidati al VLM
     for i, c in enumerate(clips):
         src = c.get("path", "")
         if not src or not os.path.isfile(src):
@@ -424,19 +464,26 @@ def build_clip_dataset(clips: list[dict], dataset_dir: str, *, global_caption: s
                     cap = open(sib, encoding="utf-8").read().strip(); break
         cap = cap or global_caption or ""
         open(os.path.join(dataset_dir, f"{stem}.txt"), "w", encoding="utf-8").write(cap)
+        if not cap:
+            empty_stems.append(stem)
         n += 1
+    if caption_engine and caption_engine != "procedural" and empty_stems:
+        log(f"Ricaptioning VLM di {len(empty_stems)} clip senza caption…")
+        _recaption_clips(dataset_dir, caption_engine, caption_mode, "", log, only_stems=empty_stems)
     return {"dir": dataset_dir, "clips": n}
 
 
 def make_lora_from_clips(clips: list[dict], name: str, out_dir: str, *, global_caption: str = "",
                          trigger: str = "", rank: int = 16, steps: int = 2000,
                          width: int = 768, height: int = 512, clip_seconds: float = 3.0,
+                         caption_engine: str = "procedural", caption_mode: str = "descriptive",
                          low_vram: bool = True, progress=None) -> dict:
     """Pipeline da CLIP esistenti: build dataset → preprocess → train. Ritorna {dataset, lora, clips}."""
     nf = int(round(clip_seconds * 25) // 8 * 8 + 1)
     work = os.path.join(out_dir, name)
     ds = os.path.join(work, "dataset")
-    info = build_clip_dataset(clips, ds, global_caption=global_caption, progress=progress)
+    info = build_clip_dataset(clips, ds, global_caption=global_caption,
+                              caption_engine=caption_engine, caption_mode=caption_mode, progress=progress)
     if info["clips"] < 1:
         raise RuntimeError("Nessun clip valido nel dataset (controlla i file audio/video).")
     pre = preprocess(ds, work, width=width, height=height, num_frames=nf, trigger=trigger, progress=progress)
@@ -446,14 +493,16 @@ def make_lora_from_clips(clips: list[dict], name: str, out_dir: str, *, global_c
 
 
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, rank: int = 16, steps: int = 2000,
-              clip_seconds: float = 3.0, use_pulid: bool = True, low_vram: bool = True, progress=None) -> dict:
+              clip_seconds: float = 3.0, use_pulid: bool = True,
+              caption_engine: str = "procedural", caption_mode: str = "descriptive",
+              low_vram: bool = True, progress=None) -> dict:
     """Pipeline COMPLETA: dataset → preprocess → train. Ritorna {dataset, lora}."""
     W, H, FPS = 768, 512, 25
     nf = int(round(clip_seconds * FPS) // 8 * 8 + 1)
     work = os.path.join(out_dir, name)
     ds = os.path.join(work, "dataset")
-    generate_dataset(subjects, ds, width=W, height=H, clip_seconds=clip_seconds,
-                     use_pulid=use_pulid, progress=progress)
+    generate_dataset(subjects, ds, width=W, height=H, clip_seconds=clip_seconds, use_pulid=use_pulid,
+                     caption_engine=caption_engine, caption_mode=caption_mode, progress=progress)
     trig = ", ".join(sorted({s.trig() for s in subjects}))
     pre = preprocess(ds, work, width=W, height=H, num_frames=nf, trigger=trig, progress=progress)
     lora = os.path.join(work, name + ".safetensors")
