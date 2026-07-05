@@ -89,6 +89,16 @@ def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
         img = sw.get(img, f, src, paste_back=True)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     cv2.imwrite(out_path, img)
+    # #106 watermark obbligatorio (gated feature_matrix): il face-swap è un post-process FINALE e
+    # questo è l'UNICO punto che scrive la foto consegnata (GUI tab Restauro + REST /image/faceswap)
+    # → si marchia qui, una sola volta. RuntimeError (forced non applicabile) → errore del job.
+    try:
+        from core import watermark
+        out_path = watermark.apply_to_file(out_path)
+    except RuntimeError:
+        raise
+    except Exception:                                   # noqa: BLE001
+        pass
     return out_path
 
 
@@ -123,5 +133,15 @@ def swap_video(video_path: str, source_face_path: str, out_path: str, progress=N
     try:
         os.remove(tmp)
     except OSError:
+        pass
+    # #106 watermark obbligatorio: punto finale del face-swap video (GUI + REST /video/faceswap).
+    # Se l'input era un video generato (già marchiato da ltx2_infer) la banda è baked nei frame e
+    # questa è comunque l'unica applicazione a livello di QUESTO job. RuntimeError → errore del job.
+    try:
+        from core import watermark
+        out_path = watermark.apply_to_file(out_path)
+    except RuntimeError:
+        raise
+    except Exception:                                   # noqa: BLE001
         pass
     return out_path

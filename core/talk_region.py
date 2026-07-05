@@ -76,6 +76,14 @@ def composite_talk_region(generated: str, source_image: str, out: str, *,
             os.remove(tmp)
         except OSError:
             pass
+        # #106 watermark obbligatorio: il composite ricostruisce lo sfondo dalla FOTO sorgente (non
+        # marchiata) → la banda del video a2v generato andrebbe persa; si marchia QUI l'output
+        # finale consegnato (GUI Talk + REST /video/lipsync). Se forced e non applicabile,
+        # apply_to_file rimuove `out` e solleva → il fail-safe esterno ritorna `generated`
+        # (già marchiato da ltx2_infer): mai un output non marchiato.
+        if os.path.exists(out):
+            from core import watermark
+            out = watermark.apply_to_file(out)
         return out if os.path.exists(out) else generated
     except Exception:                                        # noqa: BLE001 — fail-safe totale
         return generated

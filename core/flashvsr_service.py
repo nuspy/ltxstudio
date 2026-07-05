@@ -76,4 +76,14 @@ def upscale_video(inp: str, out: str, *, scale: float = 4.0, seed: int = 0, spar
         os.remove(tmp)
     except Exception:                                      # noqa: BLE001
         pass
+    # #106 watermark obbligatorio: fine del job FlashVSR (file consegnato da GUI e REST
+    # /video/enhance), UNA volta per catena — l'eventuale RIFE a valle NON ri-marchia (banda
+    # baked nei frame). RuntimeError (forced non applicabile) → errore del job.
+    try:
+        from core import watermark
+        res = watermark.apply_to_file(res)
+    except RuntimeError:
+        raise
+    except Exception:                                      # noqa: BLE001
+        pass
     return res

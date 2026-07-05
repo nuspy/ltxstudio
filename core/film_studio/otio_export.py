@@ -8,6 +8,20 @@ import subprocess
 from pathlib import Path
 
 
+def _watermark_master(path: str) -> str:
+    """#106 watermark obbligatorio sul MASTER consegnato: unico punto post-montaggio del Film
+    Studio (gli shot sorgente sono intermedi e possono provenire da cache/riusi non marchiati →
+    la marchiatura autoritativa è qui, UNA volta a fine catena, mai dentro gen_service).
+    RuntimeError (forced non applicabile) → errore del job, non nascosto."""
+    try:
+        from core import watermark
+        return watermark.apply_to_file(path)
+    except RuntimeError:
+        raise
+    except Exception:                                       # noqa: BLE001
+        return path
+
+
 def render_master(clips: list[str], out_path: str, *, audio: str = "",
                   audio_tracks: list[dict] | None = None, fps: float = 25.0) -> str:
     """Concatena le clip in un master unico (re-encode) + audio.
@@ -23,7 +37,7 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "",
     tracks = list(audio_tracks or ([] if not audio else [{"path": audio, "start_s": 0, "volume": 1.0}]))
     tracks = [t for t in tracks if t.get("path") and os.path.exists(t["path"])]
     if not tracks:
-        os.replace(silent, out_path); return out_path
+        os.replace(silent, out_path); return _watermark_master(out_path)
     # mix multitraccia: ogni traccia ritardata (adelay) e attenuata (volume) → amix
     cmd = ["ffmpeg", "-v", "error", "-i", silent]
     for t in tracks:
@@ -39,7 +53,7 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "",
     subprocess.run(cmd, check=False)
     if not os.path.exists(out_path):
         os.replace(silent, out_path)
-    return out_path
+    return _watermark_master(out_path)
 
 
 def export_nle(clips: list[dict], out_dir: str, *, fmt: str = "fcpxml", fps: float = 25.0,

@@ -278,7 +278,19 @@ def register(app: FastAPI):
             if not rife.available():
                 raise RuntimeError("Practical-RIFE non installato.")
             out = out_path("rife")
-            return [rife.interpolate_video(req.video_path, out, factor=req.factor)]
+            out = rife.interpolate_video(req.video_path, out, factor=req.factor)
+            # #106 watermark obbligatorio: core/rife.py NON marchia di suo (nelle catene GUI
+            # gen→RIFE / enhance→RIFE l'input è GIÀ marchiato alla fonte → marcarlo lì sarebbe un
+            # doppio watermark). Questo endpoint standalone lavora su video esterni → si marchia
+            # QUI l'output consegnato. RuntimeError → errore del job (fail-closed).
+            try:
+                from core import watermark
+                out = watermark.apply_to_file(out)
+            except RuntimeError:
+                raise
+            except Exception:                               # noqa: BLE001
+                pass
+            return [out]
         return _submit("video.rife", fn)
 
     @app.post("/video/faceswap", tags=["video"])

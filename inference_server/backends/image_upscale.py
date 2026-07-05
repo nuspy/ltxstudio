@@ -77,6 +77,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_upscale_{params.get('seed', 0)}.png")
     res.save(path)
+    try:                                                     # #106 watermark obbligatorio (gated feature_matrix)
+        from core import watermark
+        path = watermark.apply_to_file(path)                 # forced → fail-closed (rimuove se non applicabile)
+    except RuntimeError:
+        return {"status": "error", "error": "watermark obbligatorio non applicabile"}
+    except Exception:                                        # noqa: BLE001
+        pass
     return {"status": "success", "output": [path]}
 
 

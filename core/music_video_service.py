@@ -212,6 +212,17 @@ def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: i
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
     subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", song_path, "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"], check=False)
+    # #106 watermark obbligatorio sull'MP4 FINALE del montaggio (workflow interattivo). Punto scelto:
+    # dopo il mux, UNA sola volta a fine catena — NON dentro gen_scene_video (le clip di scena sono
+    # intermedi e possono venire da cache/riusi non marchiati, quindi la banda dei chunk NON è
+    # garantita alla fonte). RuntimeError (forced non applicabile) → errore del job.
+    try:
+        from core import watermark
+        out_path = watermark.apply_to_file(out_path)
+    except RuntimeError:
+        raise
+    except Exception:                                       # noqa: BLE001
+        pass
     return out_path
 
 
@@ -388,5 +399,16 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     subprocess.run(["ffmpeg", "-v", "error", "-i", silent, "-i", song_path, "-map", "0:v", "-map", "1:a",
                     "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"])
+    # #106 watermark obbligatorio sull'MP4 FINALE consegnato (workflow automatico). Punto scelto:
+    # dopo il mux finale, UNA sola volta a fine catena — NON sui chunk (intermedi, riusati da cache:
+    # la marchiatura alla fonte via ltx2_infer non è garantita per chunk pre-esistenti).
+    # RuntimeError (forced non applicabile) → errore del job, non nascosto.
+    try:
+        from core import watermark
+        out_path = watermark.apply_to_file(out_path)
+    except RuntimeError:
+        raise
+    except Exception:                                       # noqa: BLE001
+        pass
     log(f"Fatto: {out_path}")
     return out_path
