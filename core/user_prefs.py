@@ -61,6 +61,17 @@ def _norm(name: str | None) -> str:
     return (name or "").replace("/", "\\").strip().lower()
 
 
+def get(key: str, default=None):
+    """Lettura generica di una preferenza (persistita in data/user_prefs.json)."""
+    return _load().get(key, default)
+
+
+def set(key: str, value) -> None:
+    """Scrittura generica di una preferenza (persistente, inter-sessione)."""
+    _load()[key] = value
+    _save()
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # Motore di generazione (per immagini/video): "comfy" (model_management ComfyUI come libreria,
 # VRAM dinamica, scala 8→48GB) oppure "diffusers" (pipeline diffusers + placement custom).

@@ -722,6 +722,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if needs_image and res_img.size != _orig_wh:
         res_img = res_img.resize(_orig_wh, Image.LANCZOS)
     res_img.save(path)
+    try:                                                     # #107 firma invisibile di provenienza (default ON, tutte le edizioni)
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(path)
+    except Exception:                                        # noqa: BLE001
+        pass
     try:                                                     # #106 watermark obbligatorio (gated feature_matrix)
         from core import watermark
         path = watermark.apply_to_file(path)                 # forced → fail-closed (rimuove se non applicabile)

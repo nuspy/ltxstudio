@@ -779,6 +779,12 @@ def run_generation(p: dict) -> str:
     out = p["output"]
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
+    try:                                                     # #107 firma invisibile di provenienza (default ON)
+        from core import stego
+        if stego.enabled():
+            stego.sign_file(out)
+    except Exception as _se:                                 # noqa: BLE001
+        print(f"[stego] {_se}", flush=True)
     try:                                                     # #106 watermark obbligatorio (gated feature_matrix)
         from core import watermark
         out = watermark.apply_to_file(out)

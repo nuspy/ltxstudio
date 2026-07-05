@@ -40,7 +40,10 @@ class SettingsDialog(QDialog):
         # ── 1) Motore di generazione (nativo) ─────────────────────────────────
         lay.addWidget(self._build_native_group())
 
-        # ── 2) Override modelli (template) ────────────────────────────────────
+        # ── 2) Privacy / provenienza ──────────────────────────────────────────
+        lay.addWidget(self._build_privacy_group())
+
+        # ── 3) Override modelli (template) ────────────────────────────────────
         lay.addWidget(self._build_overrides_group(), 1)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -78,6 +81,19 @@ class SettingsDialog(QDialog):
             combo.setCurrentIndex(idx)
 
     # ---------- sezione override template ----------
+    def _build_privacy_group(self) -> QGroupBox:
+        from PySide6.QtWidgets import QCheckBox
+        grp = QGroupBox(tr("settings.privacy_group", "Provenienza"))
+        form = QFormLayout(grp)
+        self.cb_stego = QCheckBox(tr("settings.stego", "Firma invisibile di provenienza (consigliata)"))
+        self.cb_stego.setChecked(bool(user_prefs.get("stego_watermark", True)))
+        self.cb_stego.setToolTip(tr("settings.stego.tt",
+            "Inserisce una firma invisibile e impercettibile in ogni foto/video generato, che permette di "
+            "verificare (con lo strumento ATF Detector) che il contenuto è stato creato con questo software. "
+            "Non altera visibilmente l'immagine. Attiva di default."))
+        form.addRow(self.cb_stego)
+        return grp
+
     def _build_overrides_group(self) -> QGroupBox:
         grp = QGroupBox(tr("settings.overrides_group"))
         gv = QVBoxLayout(grp)
@@ -116,6 +132,8 @@ class SettingsDialog(QDialog):
         try:
             user_prefs.set_engine("image", self.cb_img_engine.currentData())
             user_prefs.set_engine("video", self.cb_vid_engine.currentData())
+            if hasattr(self, "cb_stego"):
+                user_prefs.set("stego_watermark", self.cb_stego.isChecked())
         except Exception:
             pass
         self.accept()
