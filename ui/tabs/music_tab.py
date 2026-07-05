@@ -465,9 +465,12 @@ class MusicTab(QWidget):
         self.btn_spectro.setToolTip(tr("music.spectro.tt",
             "Apre lo spettrogramma dell'ultimo brano e permette di confrontarlo con un altro (centroide spettrale)."))
         self.btn_spectro.clicked.connect(self._open_spectro)
+        self.btn_library = QPushButton(tr("music.library", "📚 Libreria"))
+        self.btn_library.setToolTip(tr("music.library.tt", "Cronologia delle generazioni: riproduci, riusa i parametri, elimina."))
+        self.btn_library.clicked.connect(self._open_library)
         self.btn_stop = QPushButton(tr("music.stop", "Stop")); self.btn_stop.clicked.connect(self._stop); self.btn_stop.setEnabled(False)
         bar2.addWidget(self.btn_play); bar2.addWidget(self.btn_folder); bar2.addWidget(self.btn_spectro)
-        bar2.addStretch(1); bar2.addWidget(self.btn_stop)
+        bar2.addWidget(self.btn_library); bar2.addStretch(1); bar2.addWidget(self.btn_stop)
         self.logview = QPlainTextEdit(); self.logview.setReadOnly(True); self.logview.setFixedHeight(150)
         self.logview.setStyleSheet("font-family:Consolas,monospace;font-size:11px;")
         v.addWidget(self.bar); v.addWidget(self.status); v.addLayout(bar2)
@@ -694,20 +697,15 @@ class MusicTab(QWidget):
         self._refresh_presets()
         self.status.setText(tr("music.preset.deleted", "Preset '{n}' eliminato.").format(n=name))
 
-    def _load_from_song(self):
-        """Recupera i parametri dal sidecar di un brano già generato."""
-        p, _ = QFileDialog.getOpenFileName(self, tr("music.preset.song", "Da brano…"), str(ms.MUSIC_OUTPUT_DIR),
-                                           "Audio (*.wav *.mp3 *.flac *.ogg)")
-        if not p:
-            return
+    def _apply_sidecar(self, p: str) -> bool:
+        """Legge il sidecar del brano e applica i parametri ai controlli. True se qualcosa è stato applicato."""
         try:
             from core.metadata_saver import MetadataSaver
             sc = MetadataSaver.load_sidecar(p) or {}
         except Exception:                                    # noqa: BLE001
             sc = {}
         if not sc:
-            QMessageBox.information(self, tr("music.preset.song", "Da brano…"),
-                                    tr("music.preset.nosc", "Nessun parametro trovato per questo brano.")); return
+            return False
         _adv_keys = ("steps", "scheduler", "cfg_type", "omega", "guidance_interval",
                      "guidance_interval_decay", "min_guidance", "format", "seeds", "batch",
                      "quantized", "overlapped_decode", "torch_compile",
@@ -720,7 +718,35 @@ class MusicTab(QWidget):
             "adv": {k: sc[k] for k in _adv_keys if k in sc},
         }
         self._apply_config(cfg)
-        self.status.setText(tr("music.preset.fromsong", "Parametri caricati da {f}.").format(f=Path(p).name))
+        return True
+
+    def _load_from_song(self):
+        """Recupera i parametri dal sidecar di un brano già generato (dialog Sfoglia)."""
+        p, _ = QFileDialog.getOpenFileName(self, tr("music.preset.song", "Da brano…"), str(ms.MUSIC_OUTPUT_DIR),
+                                           "Audio (*.wav *.mp3 *.flac *.ogg)")
+        if not p:
+            return
+        if self._apply_sidecar(p):
+            self.status.setText(tr("music.preset.fromsong", "Parametri caricati da {f}.").format(f=Path(p).name))
+        else:
+            QMessageBox.information(self, tr("music.preset.song", "Da brano…"),
+                                    tr("music.preset.nosc", "Nessun parametro trovato per questo brano."))
+
+    def _open_library(self):
+        """Apre la libreria/cronologia; collega play → player e riuso → applica sidecar."""
+        from ui.widgets.music_library import MusicLibraryDialog
+        self._lib_dlg = MusicLibraryDialog(ms.MUSIC_OUTPUT_DIR, parent=self)   # non-modale
+        self._lib_dlg.play_requested.connect(self._library_play)
+        self._lib_dlg.reuse_requested.connect(self._apply_sidecar)
+        self._lib_dlg.show()
+
+    def _library_play(self, path: str):
+        """Carica un brano scelto dalla libreria nel player della tab."""
+        self._last_audio = path
+        self.btn_play.setEnabled(True)
+        if self.wave_player and Path(path).suffix.lower() in (".wav", ".mp3", ".flac", ".ogg"):
+            self.wave_player.load(path)
+        self.status.setText(tr("music.done", "Pronto: {f}").format(f=Path(path).name))
 
     def _on_song_engine(self, e: str):
         """Applica i default dei parametri per il MODELLO selezionato (apertura + cambio selezione)."""
