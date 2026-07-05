@@ -71,9 +71,73 @@ class UpsellPanel(QWidget):
         sub.setAlignment(Qt.AlignCenter); sub.setWordWrap(True)
         sub.setStyleSheet("color:#9aa0b4; font-size:13px;")
         v.addWidget(sub)
+        # Teaser visivo opzionale: la cella matrix può indicare params.teaser_image (path relativo
+        # ad assets/ o assoluto) — un'anteprima di cosa si ottiene converte più del solo testo.
+        try:
+            from pathlib import Path as _P
+            from core import features as _F
+            _t = (_F.manifest().get("features", {}).get(fid, {}).get("params", {}) or {}).get("teaser_image")
+            if _t:
+                _p = _P(_t)
+                if not _p.is_absolute():
+                    _p = _P(__file__).resolve().parents[2] / "assets" / _t
+                if _p.exists():
+                    from PySide6.QtGui import QPixmap
+                    pic = QLabel(); pic.setAlignment(Qt.AlignCenter)
+                    pm = QPixmap(str(_p))
+                    if not pm.isNull():
+                        pic.setPixmap(pm.scaledToWidth(min(520, pm.width()), Qt.SmoothTransformation))
+                        v.addSpacing(6); v.addWidget(pic)
+        except Exception:                                    # noqa: BLE001
+            pass
         v.addSpacing(8)
         v.addWidget(_unlock_row(fid, up))
         v.addStretch(3)
+
+
+class UpsellStrip(QWidget):
+    """Striscia compatta per una SEZIONE bloccata dentro un tab condiviso: sostituisce l'intero
+    gruppo di widget della feature con UNA riga '🔒 <nome> — Disponibile nel piano <tier>' cliccabile.
+    Evita decine di label ripetute quando una feature è fatta di molti componenti sparsi."""
+
+    def __init__(self, fid: str, i18n_key: str = "", parent=None):
+        super().__init__(parent)
+        self._fid = fid
+        self._i18n = i18n_key
+        up = upsell.info(fid) or {}
+        tier = up.get("tier_name") or up.get("tier", "")
+        h = QHBoxLayout(self); h.setContentsMargins(8, 6, 8, 6)
+        lab = QLabel(tr("upsell.strip", "🔒 {name} — Disponibile nel piano {tier}")
+                     .format(name=_title_for(fid, i18n_key), tier=tier))
+        lab.setStyleSheet(f"color:{_ACCENT}; font-weight:bold;")
+        h.addWidget(lab); h.addStretch(1)
+        btn = QPushButton(tr("upsell.strip_btn", "Sblocca →"))
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(f"QPushButton {{ color:{_ACCENT}; border:1px solid {_ACCENT};"
+                          " border-radius:6px; padding:3px 12px; background:transparent; }")
+        btn.clicked.connect(self._open)
+        h.addWidget(btn)
+        self.setStyleSheet(f"UpsellStrip {{ background:rgba(142,107,255,0.08);"
+                           f" border:1px dashed {_ACCENT}; border-radius:8px; }}")
+
+    def _open(self):
+        UpsellDialog(self._fid, self._i18n, self).exec()
+
+
+def lock_inline_item(combo, index: int, fid: str) -> None:
+    """Lock-mode INLINE: disabilita una voce di QComboBox aggiungendo il badge '🔒 <tier>'.
+    La voce resta VISIBILE (l'utente scopre che esiste) ma non selezionabile; tooltip con upsell."""
+    up = upsell.info(fid)
+    if not up:
+        return
+    from PySide6.QtCore import Qt as _Qt
+    tier = up.get("tier_name") or up.get("tier", "")
+    combo.setItemText(index, f"🔒 {combo.itemText(index)}  ({tier})")
+    item = combo.model().item(index) if hasattr(combo.model(), "item") else None
+    if item is not None:
+        item.setFlags(item.flags() & ~_Qt.ItemIsEnabled)      # non selezionabile
+    combo.setItemData(index, tr("upsell.available_on", "Disponibile nel piano {tier}").format(tier=tier),
+                      _Qt.ToolTipRole)
 
 
 class UpsellDialog(QDialog):

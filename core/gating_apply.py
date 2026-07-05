@@ -61,10 +61,24 @@ def apply(window) -> dict:
                             report["removed_tabs"].append(fid)
                     else:                                    # non esiste in nessun tier → sparisce
                         report["removed_tabs"].append(fid)
-        elif kind == "widget":
+        elif kind in ("widget", "section"):
             w = _resolve_path(window, loc.get("path", ""))
             if w is not None:
                 try:
+                    # SECTION: il contenitore della feature collassa in UNA striscia upsell
+                    # (🔒 nome — Disponibile nel piano X →) al suo posto nel layout. WIDGET senza
+                    # upsell (o fallimento): semplice hide come prima.
+                    if kind == "section" and info.get("upsell"):
+                        from ui.widgets.upsell import UpsellStrip
+                        parent = w.parentWidget()
+                        lay = parent.layout() if parent is not None else None
+                        w.setVisible(False)
+                        if lay is not None:
+                            idx = lay.indexOf(w)
+                            strip = UpsellStrip(fid, info.get("i18n_key", ""), parent)
+                            lay.insertWidget(max(idx, 0), strip)
+                            report.setdefault("sections", []).append(fid)
+                            continue
                     w.setVisible(False)
                     report["hidden"].append(fid)
                 except Exception:
