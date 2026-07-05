@@ -1050,6 +1050,8 @@
   "upsell.title": "תכונה לשחרור נעילה",
   "upsell.dialog_msg": "תכונה זו אינה כלולה בתוכנית הנוכחית שלך. היא כבר מותקנת ומוכנה: עברו לתוכנית המצוינת כדי להשתמש בה מיד.",
   "upsell.later": "מאוחר יותר",
+  "upsell.strip": "🔒 {name} — זמין בתוכנית {tier}",
+  "upsell.strip_btn": "שחרור נעילה →",
   "tab.train": "LoRA Train Img.",
   "train.dataset.title": "מערך נתונים",
   "train.dataset.hint": "תיקייה עם תמונות + קובצי כיתוב .txt בעלי שם זהה",

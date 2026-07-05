@@ -1044,6 +1044,8 @@
   "upsell.title": "Funzione da sbloccare",
   "upsell.dialog_msg": "Questa funzione non è inclusa nel tuo piano attuale. È già installata e pronta: passa al piano indicato per usarla immediatamente.",
   "upsell.later": "Più tardi",
+  "upsell.strip": "🔒 {name} — Disponibile nel piano {tier}",
+  "upsell.strip_btn": "Sblocca →",
   "convert.input.group": "File 3D di partenza",
   "convert.input.ph": "Nessun file selezionato",
   "convert.input.browse": "Sfoglia…",

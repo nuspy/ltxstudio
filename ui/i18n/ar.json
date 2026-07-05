@@ -1050,6 +1050,8 @@
   "upsell.title": "ميزة تحتاج إلى فتح القفل",
   "upsell.dialog_msg": "هذه الميزة غير مضمّنة في خطتك الحالية. إنها مثبّتة وجاهزة بالفعل: انتقل إلى الخطة المحددة لاستخدامها فورًا.",
   "upsell.later": "لاحقًا",
+  "upsell.strip": "🔒 {name} — متاح في خطة {tier}",
+  "upsell.strip_btn": "افتح القفل →",
   "tab.train": "LoRA Train Img.",
   "train.dataset.title": "مجموعة البيانات",
   "train.dataset.hint": "مجلد يحتوي على صور + ملفات وصف .txt بأسماء مطابقة",

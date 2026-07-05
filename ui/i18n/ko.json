@@ -1050,6 +1050,8 @@
   "upsell.title": "잠금 해제할 기능",
   "upsell.dialog_msg": "이 기능은 현재 플랜에 포함되어 있지 않습니다. 이미 설치되어 준비된 상태이니, 표시된 플랜으로 전환하면 즉시 사용할 수 있습니다.",
   "upsell.later": "나중에",
+  "upsell.strip": "🔒 {name} — {tier} 플랜에서 사용 가능",
+  "upsell.strip_btn": "잠금 해제 →",
   "tab.train": "LoRA Train Img.",
   "train.dataset.title": "데이터셋",
   "train.dataset.hint": "이미지 + 같은 이름의 .txt 캡션 파일이 있는 폴더",

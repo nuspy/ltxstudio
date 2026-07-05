@@ -1050,6 +1050,8 @@
   "upsell.title": "Fonction à débloquer",
   "upsell.dialog_msg": "Cette fonction n'est pas incluse dans votre plan actuel. Elle est déjà installée et prête : passez au plan indiqué pour l'utiliser immédiatement.",
   "upsell.later": "Plus tard",
+  "upsell.strip": "🔒 {name} — Disponible dans le plan {tier}",
+  "upsell.strip_btn": "Débloquer →",
   "tab.train": "LoRA Train Img.",
   "train.dataset.title": "Jeu de données",
   "train.dataset.hint": "Dossier avec images + fichiers .txt de légendes homonymes",

@@ -1044,6 +1044,8 @@
   "upsell.title": "Feature to unlock",
   "upsell.dialog_msg": "This feature is not included in your current plan. It is already installed and ready: switch to the indicated plan to use it immediately.",
   "upsell.later": "Later",
+  "upsell.strip": "🔒 {name} — Available in the {tier} plan",
+  "upsell.strip_btn": "Unlock →",
   "convert.input.group": "Source 3D file",
   "convert.input.ph": "No file selected",
   "convert.input.browse": "Browse…",

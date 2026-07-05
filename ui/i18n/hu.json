@@ -1050,6 +1050,8 @@
   "upsell.title": "Feloldandó funkció",
   "upsell.dialog_msg": "Ez a funkció nem része a jelenlegi csomagodnak. Már telepítve van és készen áll: válts a megjelölt csomagra, hogy azonnal használhasd.",
   "upsell.later": "Később",
+  "upsell.strip": "🔒 {name} — Elérhető a(z) {tier} csomagban",
+  "upsell.strip_btn": "Feloldás →",
   "tab.train": "LoRA Train Img.",
   "train.dataset.title": "Adathalmaz",
   "train.dataset.hint": "Mappa képekkel + azonos nevű .txt feliratfájlokkal",

@@ -1050,6 +1050,8 @@
   "upsell.title": "Freizuschaltende Funktion",
   "upsell.dialog_msg": "Diese Funktion ist nicht in deinem aktuellen Tarif enthalten. Sie ist bereits installiert und bereit: Wechsle zum angegebenen Tarif, um sie sofort zu nutzen.",
   "upsell.later": "Später",
+  "upsell.strip": "🔒 {name} — Verfügbar im Tarif {tier}",
+  "upsell.strip_btn": "Freischalten →",
   "tab.train": "LoRA Train Img.",
   "train.dataset.title": "Datensatz",
   "train.dataset.hint": "Ordner mit Bildern + gleichnamigen .txt-Caption-Dateien",
