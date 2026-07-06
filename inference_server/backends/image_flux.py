@@ -89,19 +89,15 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.10"))
     floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1200"))  # lascia margine al sistema
     if free_mb >= vram_mb * margin + floor_mb:
-        pipe.to("cuda")                                 # RESTA su GPU; la cache ModelManager lo riusa
+        pipe.to("cuda")                                 # tutto residente su GPU; la cache ModelManager lo riusa
         return "gpu"
-    # PREFERISCI GPU-RESIDENT quando il TRANSFORMER (il pezzo usato ad OGNI step) entra in VRAM con un po' di
-    # headroom per le attivazioni: resta CACHED sulla GPU → nessun ri-trasferimento CPU→GPU ad ogni generazione
-    # (model_cpu_offload ritrasferisce ~22GB ogni run = LENTISSIMO). L'eventuale sforo di T5/attivazioni va in
-    # shared-VRAM (poco). Override NATIVE_GPU_ACT_HEADROOM_MB. Cachato dal ModelManager → i run successivi volano.
-    act_headroom = float(os.environ.get("NATIVE_GPU_ACT_HEADROOM_MB", "5000"))
-    if resident_mb and free_mb >= float(resident_mb) + act_headroom:
-        pipe.to("cuda")
-        return "gpu"
-    # Solo se NEMMENO il transformer entra → model_cpu_offload (un componente alla volta; il transformer viene
-    # streammato, lento ma stabile). NB niente enable_sequential_cpu_offload automatico (segfault fp8 su Windows,
-    # crashava il server → WinError 10061). Sequenziale solo esplicito (NATIVE_FORCE_OFFLOAD=seq, in cima).
+    # Se il FULL-STACK non entra tutto-su-GPU → model_cpu_offload: il transformer resta su GPU per TUTTO il
+    # denoise loop (veloce), mentre T5/VAE vengono onload/offloadati intorno (encode/decode una volta ciascuno).
+    # NB: `pipe.to("cuda")` metterebbe ANCHE il T5 (9.5GB) sulla GPU → su un transformer da 22GB su 32GB sfora
+    # SEMPRE in shared-RAM (era il "base lentissimo": 31.5GB su 32GB → spill delle attivazioni). model_cpu_offload
+    # tiene su GPU solo ~22GB (transformer) + attivazioni → ENTRA e va veloce (~step nativi). L'onload del
+    # transformer è UNA volta per generazione (non per-step). NB niente sequential auto (segfault fp8 su Windows).
+    _ = resident_mb  # (non più usato per forzare gpu: to('cuda') includerebbe il T5 → spill garantito su 32GB)
     pipe.enable_model_cpu_offload()
     return "offload"
 
@@ -582,8 +578,11 @@ def _load(model_path: str, arch: str):
         sz_mb = os.path.getsize(model_path) / 1024**2 if os.path.isfile(model_path) else 0
     except Exception:                                       # noqa: BLE001
         sz_mb = 0
+    # fp8 → diffusers UPCASTA a bf16 in memoria (2× il file): il getphat fp8 da 11GB diventa 22GB → senza
+    # correzione _place sottostima e sceglie 'gpu' (tutto residente = 31GB → sfora/lento). Usa la dim EFFETTIVA.
+    _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in os.path.basename(model_path).lower()) else sz_mb
     overhead = 4000 if arch == "zimage" else 11000          # T5/CLIP/Mistral + VAE + working
-    est_mb = max(VRAM_MB.get(arch, 16000), int(sz_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
+    est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
     # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral): NON entra tutto-su-GPU nei 32GB e nemmeno in
     # enable_model_cpu_offload (offload a livello-modello = transformer intero su GPU). Serve offload
     # SEQUENZIALE (granularità per-modulo: un layer alla volta su GPU). Memory-bounded e imposta
@@ -610,7 +609,7 @@ def _load(model_path: str, arch: str):
     else:
         # resident_mb ≈ transformer (componente più grande tenuto su GPU sotto model_cpu_offload). Per i
         # file bf16 ≈ dimensione file; per fp8/gguf resta più piccolo → offload a componenti (veloce).
-        where = _place(pipe, est_mb, resident_mb=int(sz_mb) or None)
+        where = _place(pipe, est_mb, resident_mb=int(_eff_mb) or None)
     print(f"[image] {arch}: {where} (est {est_mb}MB, file {int(sz_mb)}MB), attention={attn}, fbcache={fb}, compile={comp}", flush=True)
     return pipe, VRAM_MB.get(arch, 16000)
 
