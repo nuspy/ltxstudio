@@ -36,6 +36,10 @@ class ModelManager:
     budget_frac: float = 0.90                           # quota di VRAM totale utilizzabile
     _cache: dict[str, _Entry] = field(default_factory=dict)
     _loaders: dict[str, Callable[[], tuple[object, float]]] = field(default_factory=dict)
+    # CPU-RAM cache dei modelli MONOLITICI sfrattati (zimage/ernie/checkpoint completi): invece di
+    # distruggerli, .to("cpu") → il prossimo ensure li ripristina da RAM (10× più veloce dell'SSD).
+    # I componenti CONDIVISI (flux family) hanno la loro cpu-cache DENTRO il ComponentStore.
+    _cpu_cache: dict[str, _Entry] = field(default_factory=dict)
 
     # ── registrazione loader ────────────────────────────────────────────────
     def register(self, key: str, loader: Callable[[], tuple[object, float]]) -> None:
@@ -64,6 +68,16 @@ class ModelManager:
         if e is not None:
             e.last_used = _now()
             return e.obj
+        # RESTORE da CPU-RAM cache (monolitiche sfrattate con demote): niente loader/SSD; il device-move
+        # su cuda lo fa il placement per-job (_ensure_placement: l'epoch è stale dopo il demote).
+        ce = self._cpu_cache.pop(key, None)
+        if ce is not None:
+            if need_mb:
+                self.make_room(need_mb)
+            ce.last_used = _now()
+            self._cache[key] = ce
+            print(f"[mm] restore da RAM: {key}", flush=True)
+            return ce.obj
         if key not in self._loaders:
             raise KeyError(f"nessun loader registrato per '{key}'")
         # libera spazio se necessario PRIMA di caricare un modello DIVERSO: sfratta i meno usati (LRU) finché
@@ -105,13 +119,13 @@ class ModelManager:
         except Exception:                               # noqa: BLE001
             pass
 
-    def unload(self, key: str) -> None:
+    def unload(self, key: str, *, allow_cpu: bool = True) -> None:
         e = self._cache.pop(key, None)
         if e is None:
             return
         # Shell con componenti condivisi: release (refcount--) PRIMA di distruggere l'oggetto — così
         # T5/CLIP/VAE/transformer sopravvivono nello store (riusabili dalla prossima pipeline o demote/evict
-        # da make_room). La shell in sé è leggera (tokenizer/scheduler/oggetto pipe, ~50MB).
+        # da make_room). La shell in sé è leggera (~50MB): si distrugge, ricrearla costa ~1s.
         if e.component_keys:
             try:
                 from inference_server.component_store import STORE
@@ -119,8 +133,26 @@ class ModelManager:
                     STORE.release(ck)
             except Exception:                           # noqa: BLE001
                 pass
-        # NIENTE .to("cpu") della pipeline intera: pullerebbe i pesi in RAM prima di cancellarli = picco
-        # RAM inutile. Cancello e basta → empty_cache libera la VRAM dei tensori NON referenziati altrove.
+        elif allow_cpu and hasattr(e.obj, "to") and not getattr(e.obj, "_ls_no_rebind", False):
+            # MONOLITICA (zimage/ernie/checkpoint completo) → demote su CPU se il budget RAM lo consente:
+            # il prossimo ensure la ripristina da RAM (10× più veloce dell'SSD). Esclusa la flux2 blockswap
+            # (_ls_no_rebind: pesi già su CPU by design → si distrugge come prima). Il .to("cpu") copia
+            # param-per-param (picco RAM ≈ size, picco VRAM nullo) — ok con 128GB + floor psutil.
+            try:
+                from inference_server.component_store import STORE
+                if STORE._ram_ok(e.vram_mb):
+                    try:
+                        e.obj.remove_all_hooks()
+                    except Exception:                   # noqa: BLE001
+                        pass
+                    e.obj.to("cpu")
+                    self._cpu_cache[key] = e
+                    STORE.bump_epoch()                  # device cambiati → rebind al restore
+                    print(f"[mm] demote→RAM: {key} ({e.vram_mb:.0f}MB)", flush=True)
+                    self.flush()
+                    return
+            except Exception:                           # noqa: BLE001 — fallback: distruggi
+                pass
         try:
             del e.obj
         except Exception:                               # noqa: BLE001
@@ -129,9 +161,29 @@ class ModelManager:
         self.flush()
 
     def clear(self, include_sticky: bool = False) -> None:
+        """Svuota TUTTO (endpoint /free, chiamato dal worker video prima di partire): shell, CPU-cache e
+        componenti dello store — il video ha bisogno di VRAM *e* RAM (block-streaming Q4 legge dalla RAM)."""
         for k in list(self._cache):
             if include_sticky or not self._cache[k].sticky:
-                self.unload(k)
+                self.unload(k, allow_cpu=False)         # /free = libera davvero, niente demote
+        for k, e in list(self._cpu_cache.items()):
+            try:
+                del e.obj
+            except Exception:                           # noqa: BLE001
+                pass
+            self._cpu_cache.pop(k, None)
+        try:
+            from inference_server.component_store import STORE
+            for k in list(STORE._items):
+                ent = STORE._items.pop(k)
+                try:
+                    del ent.obj
+                except Exception:                       # noqa: BLE001
+                    pass
+            STORE.bump_epoch()
+        except Exception:                               # noqa: BLE001
+            pass
+        self.flush()
 
     @staticmethod
     def flush() -> None:
