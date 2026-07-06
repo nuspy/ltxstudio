@@ -33,7 +33,7 @@ DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, defo
 # (ramo edit-evoluto ancora su ComfyUI/deferred #14/#44): altrimenti inpaint/outpaint non generano di default.
 INPAINT_MODELS = {
     "FLUX Fill (inpaint/outpaint, 22GB)":
-        {"arch": "Flux", "unet": "Flux\\FLUX_DEV_Fill.safetensors", "steps": 20},
+        {"arch": "Flux", "unet": "Flux\\FLUX_DEV_Fill.safetensors", "steps": 40},
     "FLUX Fill GGUF NSFW (Hyper-8, RAM bassa)":
         {"arch": "Flux", "unet": "Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf", "steps": 8},
     "FLUX.2 Klein NSFW (Miraclein, edit-evoluto)":

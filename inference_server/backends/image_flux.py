@@ -404,6 +404,22 @@ def _assemble_ernie():
     return ErnieImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
+def _auto_settings(arch: str, model: str) -> tuple[int, float, bool]:
+    """Step + guidance OTTIMALI AUTOMATICI per (arch, modello), per generazione/inpaint/outpaint/integra.
+    Evita il RUMORE da sotto-denoising (FLUX.1 Fill vuole ~40 step, non 20) e il 'piatto' dei distillati
+    (hyper/turbo/lightning: pochi step, guidance bassa). La guidance fine dell'inpaint resta pilotata da
+    InpaintPipeline.effective_guidance (retention-aware); qui il default per chi non la fornisce."""
+    name = str(model).lower()
+    hyper = any(k in name for k in ("hyp", "turbo", "lightning", "lcm", "distill", "schnell", "lightn"))
+    steps = {"inpaint": 40, "kontext": 28, "flux": 28, "flux2": 28, "flux2_inpaint": 28,
+             "flux2_kontext": 28, "zimage": 8, "ernie": 28}.get(arch, 28)
+    guid = {"inpaint": 30.0, "kontext": 2.5, "flux": 3.5, "flux2": 4.0, "flux2_inpaint": 4.0,
+            "flux2_kontext": 4.0, "zimage": 3.5, "ernie": 4.5}.get(arch, 3.5)
+    if hyper:
+        steps, guid = 8, min(guid, 3.5)
+    return steps, guid, hyper
+
+
 def _arch_of(params: dict) -> str:
     a = (params.get("task") or params.get("arch") or "flux").lower()
     if a == "flux" and any(t in str(params.get("model", "")).lower()
@@ -667,9 +683,18 @@ def run(params: dict, mm, output_dir: str) -> dict:
             _pulid_h = None
 
     g = torch.Generator(device="cuda").manual_seed(int(params.get("seed", 0)))
+    # SETTINGS AUTOMATICI per modello/arch (step+guidance): default sensati per QUALSIASI modello.
+    _ast, _agd, _hyp = _auto_settings(arch, model)
+    _steps = int(params.get("steps") or 0) or _ast
+    # anti-RUMORE: FLUX.1 Fill (inpaint/outpaint) sotto-denoizza con pochi step → alza al minimo consigliato
+    # (solo modelli non-distillati; gli hyper/turbo vogliono davvero pochi step).
+    if arch in _MASK_ARCHS and not _hyp and _steps < _ast:
+        print(f"[auto] {arch}: {_steps} step insufficienti → {_ast} (anti-rumore Fill).", flush=True)
+        _steps = _ast
+    _guid = float(params["guidance"]) if params.get("guidance") is not None else _agd
     kw = dict(prompt=params.get("prompt", ""),
-              num_inference_steps=int(params.get("steps", 20)),
-              guidance_scale=float(params.get("guidance", 3.5)),
+              num_inference_steps=_steps,
+              guidance_scale=_guid,
               generator=g)
     neg = params.get("negative")
     # PuLID true CFG: migliora l'aderenza al prompt / bilancia identità (solo se la pipeline lo supporta).
