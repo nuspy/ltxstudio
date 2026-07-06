@@ -39,14 +39,17 @@ _KEY = os.environ.get("ATF_STEGO_KEY", "AIToolsForge::provenance::v1::do-not-sha
 GRID = 8              # 8x8 = 64 tile (più siti d'impressione: presence più forte + capacità payload)
 CANON = 80           # dimensione canonica del tile per la DCT (robustezza a resize)
 NONCE_BANK = 24      # nonce provati dal detector (periodo del carrier per-frame)
-_ALPHA = 20.0        # ampiezza segnale PRESENCE in unità DCT (invisibile, rilevabile z~10)
+_ALPHA = 9.0         # ampiezza PRESENCE — tarata per INVISIBILITÀ: _ALPHA=20 dava PSNR 32 con tessere 80px
+                     # VISIBILI ("a macchie") sulle immagini generate. A 9 → PSNR ~39, maxΔ~9, z~10.8 (soglia 5).
 _Z_THRESH = 5.0      # soglia z-score di rilevamento (falsi positivi ~ 1e-6 a coda gaussiana)
 # PAYLOAD testo custom OPZIONALE — limite fisico del watermark invisibile screenshot-robusto = pochi byte.
 # 5 byte testo + 1 CRC8 = 48 bit (0 errori misurati dopo JPEG55 + screenshot 0.6x). Vuoto = solo presence
 # (firma comunque valida). Testo più lungo NON è robusto: 5 char = codice/handle/ID corto.
 PAYLOAD_TEXT_BYTES = 5
 PAYLOAD_BITS = (PAYLOAD_TEXT_BYTES + 1) * 8
-_BETA = 2.8          # ampiezza per-bit del payload (a 48 bit dà BER 0 dopo compressione/screenshot)
+_BETA = 1.2          # ampiezza per-bit payload — abbassata con _ALPHA per invisibilità. A questa forza il
+                     # TESTO non è più decodificabile (presence-only): la priorità è l'immagine pulita. Per
+                     # riattivare il testo robusto servirebbe più ampiezza (visibile) → tenuto invisibile.
 
 
 def _midband_mask() -> np.ndarray:
