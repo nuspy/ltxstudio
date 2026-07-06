@@ -11,7 +11,7 @@ import os
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit, QSpinBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QLabel, QLineEdit, QSpinBox,
     QComboBox, QPushButton, QPlainTextEdit, QMessageBox, QCheckBox,
 )
 
