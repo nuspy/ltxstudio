@@ -57,18 +57,29 @@ FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
 KLEIN_QWEN_DIRS = {7680: os.path.join(TE_DIR, "qwen3_4b"), 12288: os.path.join(TE_DIR, "qwen3_8b")}
 
 
-def _place(pipe, vram_mb: int) -> str:
-    """Posizionamento VRAM: tieni il modello SU GPU se c'è spazio (resta caricato tra le generazioni
-    → niente reload/offload ripetuto), altrimenti offload CPU. L'eviction quando serve spazio per un
-    ALTRO modello è gestita dal ModelManager (make_room/unload LRU).
+def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
+    """Posizionamento VRAM a TRE livelli (carica→usa→libera i componenti; l'inutilizzato esce dalla VRAM):
 
-    NB Windows: forzare GPU con VRAM stretta innesca il *system memory fallback* del driver NVIDIA
-    (RAM come VRAM → lentissimo). Quindi: GPU solo se free ≥ vram_mb·margine + floor di sistema;
-    sotto quella soglia → enable_model_cpu_offload (portabile, schede piccole). Override:
-    NATIVE_FORCE_OFFLOAD=1 (sempre offload), NATIVE_GPU_MARGIN (default 1.35), NATIVE_GPU_FLOOR_MB."""
+    1. **gpu**        : tutto residente, se free ≥ vram_mb·margine + floor (nessun offload, il più veloce).
+    2. **offload**    : `enable_model_cpu_offload` — un COMPONENTE alla volta su GPU (tokenizer→T5→transformer
+                        →VAE, ognuno caricato/usato/scaricato). Tiene però il transformer INTERO su GPU nel denoise.
+    3. **sequential** : `enable_sequential_cpu_offload` — granularità per-MODULO (un blocco alla volta su GPU,
+                        caricato/usato/liberato). Picco VRAM minimo → entra SEMPRE, niente spill nella shared-RAM
+                        (più lento). Si attiva quando nemmeno il transformer intero + attivazioni ci sta.
+
+    `resident_mb` = footprint del componente più grande tenuto residente sotto model_cpu_offload (≈ transformer).
+    NB Windows: forzare GPU con VRAM stretta innesca il *system memory fallback* del driver (RAM come VRAM,
+    lentissimo). Override: NATIVE_FORCE_OFFLOAD=1|seq, NATIVE_GPU_MARGIN (1.35), NATIVE_GPU_FLOOR_MB,
+    NATIVE_ACT_HEADROOM_MB (9000)."""
     import os
     import torch
-    if os.environ.get("NATIVE_FORCE_OFFLOAD") == "1" or not torch.cuda.is_available():
+    _forced = os.environ.get("NATIVE_FORCE_OFFLOAD", "")
+    if _forced in ("seq", "sequential"):
+        try:
+            pipe.enable_sequential_cpu_offload(); return "sequential"
+        except Exception:                               # noqa: BLE001
+            pipe.enable_model_cpu_offload(); return "offload"
+    if _forced == "1" or not torch.cuda.is_available():
         pipe.enable_model_cpu_offload()
         return "offload"
     free_mb = torch.cuda.mem_get_info()[0] / 1024**2
@@ -77,6 +88,15 @@ def _place(pipe, vram_mb: int) -> str:
     if free_mb >= vram_mb * margin + floor_mb:
         pipe.to("cuda")                                 # RESTA su GPU; la cache ModelManager lo riusa
         return "gpu"
+    # model_cpu_offload tiene il TRANSFORMER intero residente nel denoise: se + attivazioni non ci sta comodo,
+    # scala all'offload SEQUENZIALE (per-modulo) → evita lo spill in shared-RAM (30 dedicati + 11 shared).
+    act_headroom = float(os.environ.get("NATIVE_ACT_HEADROOM_MB", "9000"))
+    if resident_mb and free_mb < float(resident_mb) + act_headroom:
+        try:
+            pipe.enable_sequential_cpu_offload()
+            return "sequential"
+        except Exception as _e:                         # noqa: BLE001
+            print(f"[image] sequential offload non disponibile ({_e}) → model offload", flush=True)
     pipe.enable_model_cpu_offload()
     return "offload"
 
@@ -569,7 +589,9 @@ def _load(model_path: str, arch: str):
         else:
             pipe.enable_model_cpu_offload(); where = "offload"
     else:
-        where = _place(pipe, est_mb)
+        # resident_mb ≈ transformer (componente più grande tenuto su GPU sotto model_cpu_offload). Per i
+        # file bf16 ≈ dimensione file; per fp8/gguf resta più piccolo → offload a componenti (veloce).
+        where = _place(pipe, est_mb, resident_mb=int(sz_mb) or None)
     print(f"[image] {arch}: {where} (est {est_mb}MB, file {int(sz_mb)}MB), attention={attn}, fbcache={fb}, compile={comp}", flush=True)
     return pipe, VRAM_MB.get(arch, 16000)
 
