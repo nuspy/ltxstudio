@@ -342,6 +342,17 @@ class AdvancedTab(QWidget):
         """Inserisce il tab Import Models come sotto-tab di Avanzate."""
         self._models_host.layout().addWidget(widget)
 
+    def swap_models(self, widget: QWidget):
+        """Sostituisce a caldo la tab Modelli (switch Classica↔Pro) nel medesimo host."""
+        lay = self._models_host.layout()
+        while lay.count():
+            it = lay.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        lay.addWidget(widget)
+
     def long_video_config(self) -> dict:
         return {
             "auto": self.lv_auto.isChecked(),

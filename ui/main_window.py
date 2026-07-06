@@ -32,6 +32,7 @@ from core.extend_pipeline import ExtendPipeline         # noqa: E402
 from core.face_restore_pipeline import FaceRestorePipeline  # noqa: E402
 from core import gui_state                                # noqa: E402  (persistenza impostazioni GUI)
 from core import features, gating_apply, watermark        # noqa: E402  (feature-gating per edizione)
+from core import user_prefs                                # noqa: E402  (varianti UI Classica/Pro + preferenze)
 from core import backend                                  # noqa: E402  (router backend nativo/ComfyUI)
 from ui.tabs.video_def_tab import VideoDefTab          # noqa: E402
 from ui.tabs.video_extend_tab import VideoExtendTab    # noqa: E402
@@ -604,7 +605,7 @@ class MainWindow(QMainWindow):
         self.world_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")   # #96.5: fallback immagine dal canvas
         self.weights_tab = WeightsTab()
         self.mocap = MocapService(self)
-        self.models_tab = ImportModelsTab()
+        self.models_tab = self._make_models_tab()           # Classica o Pro (variante utente)
         self.tabs.addTab(self.frame1_tab, tr("tab.images"))
         self.tabs.addTab(self.audio_tab, tr("tab.audio_voice"))
         self.tabs.addTab(self.video_tab, tr("tab.video"))
@@ -809,6 +810,24 @@ class MainWindow(QMainWindow):
         act_ana = m.addAction(tr("menu.analyzer")); act_ana.triggered.connect(self._open_analyzer)
         act_wfl = m.addAction(tr("menu.workflow")); act_wfl.triggered.connect(self._open_workflow)
         act_film = m.addAction(tr("menu.film_studio", "🎬 AI Film Studio")); act_film.triggered.connect(self._open_film_studio)
+        # ── Interfaccia: versione Classica / Pro dei moduli (persistita) ─────────────
+        from PySide6.QtGui import QActionGroup
+        m.addSeparator()
+        ui_menu = m.addMenu(tr("menu.ui_variant", "🎨 Interfaccia"))
+        _variants = (("classic", tr("menu.variant.classic", "Classica")),
+                     ("pro", tr("menu.variant.pro", "Pro ✨")))
+        mod_menu = ui_menu.addMenu(tr("menu.ui_variant.models", "Tab Modelli"))
+        self._grp_models = QActionGroup(self); self._grp_models.setExclusive(True)
+        fs_menu = ui_menu.addMenu(tr("menu.ui_variant.filmstudio", "AI Film Studio"))
+        self._grp_fs = QActionGroup(self); self._grp_fs.setExclusive(True)
+        for grp, submenu, pref in ((self._grp_models, mod_menu, "ui_variant.models"),
+                                   (self._grp_fs, fs_menu, "ui_variant.filmstudio")):
+            for key, label in _variants:
+                a = submenu.addAction(label); a.setCheckable(True); a.setData(key)
+                a.setChecked(str(user_prefs.get(pref, "classic")) == key)
+                grp.addAction(a)
+        self._grp_models.triggered.connect(lambda a: self._set_models_variant(a.data()))
+        self._grp_fs.triggered.connect(lambda a: self._set_filmstudio_variant(a.data()))
         # ── selettore lingua (sempre visibile nella status bar) ──────────────────────
         self._lang_btn = QToolButton()
         self._lang_btn.setText(f"{LANG_FLAGS.get(i18n.current_lang(), '🌐')} {LANGUAGES.get(i18n.current_lang(), '')}")
@@ -932,11 +951,53 @@ class MainWindow(QMainWindow):
             self._log("[!] Impossibile liberare VRAM — ComfyUI offline o endpoint /free non supportato.")
 
     def _open_film_studio(self):
-        """Apre la finestra AI Film Studio (Text-to-Film, backend nativo)."""
+        """Apre la finestra AI Film Studio (Text-to-Film, backend nativo). Variante Classica/Pro."""
         from ui.film_studio.film_studio_window import FilmStudioWindow
         if getattr(self, "_film_win", None) is None:
-            self._film_win = FilmStudioWindow(self)
+            cls = FilmStudioWindow
+            if str(user_prefs.get("ui_variant.filmstudio", "classic")) == "pro":
+                try:
+                    from ui.film_studio.film_studio_window_pro import FilmStudioWindowPro
+                    cls = FilmStudioWindowPro
+                except Exception:                            # noqa: BLE001 — Pro assente → Classica
+                    cls = FilmStudioWindow
+            self._film_win = cls(self)
         self._film_win.show(); self._film_win.raise_(); self._film_win.activateWindow()
+
+    # ---- varianti UI Classica / Pro (switch da menu Interfaccia) ----
+    def _make_models_tab(self):
+        """Istanzia la tab Modelli nella variante scelta (Pro → fallback Classica se assente)."""
+        if str(user_prefs.get("ui_variant.models", "classic")) == "pro":
+            try:
+                from ui.tabs.import_models_tab_pro import ImportModelsTabPro
+                return ImportModelsTabPro()
+            except Exception:                                # noqa: BLE001
+                pass
+        return ImportModelsTab()
+
+    def _set_models_variant(self, key: str):
+        if key not in ("classic", "pro") or str(user_prefs.get("ui_variant.models", "classic")) == key:
+            return
+        user_prefs.set("ui_variant.models", key)
+        new = self._make_models_tab()                        # hot-swap dentro Avanzate
+        try:
+            new.catalog_updated.connect(self._on_catalog_updated)
+        except Exception:                                    # noqa: BLE001
+            pass
+        self.advanced_tab.swap_models(new)
+        self.models_tab = new
+
+    def _set_filmstudio_variant(self, key: str):
+        if key not in ("classic", "pro") or str(user_prefs.get("ui_variant.filmstudio", "classic")) == key:
+            return
+        user_prefs.set("ui_variant.filmstudio", key)
+        win = getattr(self, "_film_win", None)               # riaprirà con la nuova classe
+        if win is not None:
+            try:
+                win.close()
+            except Exception:                                # noqa: BLE001
+                pass
+            self._film_win = None
 
     def _open_navigator(self):
         """Apre il Navigator Gallery (Ctrl+G)."""
