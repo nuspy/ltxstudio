@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "file vide",
   "fs.pro.queue.busy": "{r} en cours · {w} en attente",
   "fs.pro.master.confirm.title": "Générer le Master",
-  "fs.pro.master.confirm": "Lancer le rendu du Master ? L'opération peut prendre du temps."
+  "fs.pro.master.confirm": "Lancer le rendu du Master ? L'opération peut prendre du temps.",
+  "fs.pro.script.hint": "①  Écrivez une idée ou collez un scénario, puis «✍️ Générer». Utilisez @ pour citer les assets.",
+  "fs.pro.sb.empty": "②  Aucune scène.\nEnregistrez le scénario et cliquez sur «Breakdown» pour générer scènes et plans.",
+  "fs.pro.mt.empty": "③  Aucun clip.\nGénérez les vidéos des plans dans «Décors» pour remplir la timeline.",
+  "fs.pro.asset.empty": "Aucun asset.\nCréez votre premier acteur, lieu ou objet avec «Nouveau».",
+  "fs.pro.voice.empty": "Aucune voix.\nAjoutez-en une : à partir d'une description, de paramètres ou clonée.",
+  "fs.pro.lora.empty": "Aucune LoRA.\nEntraînez-en une depuis les onglets «LoRA» de l'app : elle apparaîtra ici."
 }

@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "üres sor",
   "fs.pro.queue.busy": "{r} folyamatban · {w} várakozik",
   "fs.pro.master.confirm.title": "Master létrehozása",
-  "fs.pro.master.confirm": "Elindítod a Master renderelését? A művelet eltarthat egy ideig."
+  "fs.pro.master.confirm": "Elindítod a Master renderelését? A művelet eltarthat egy ideig.",
+  "fs.pro.script.hint": "①  Írj egy ötletet vagy illessz be egy forgatókönyvet, majd «✍️ Generálás». Az @ jellel hivatkozhatsz az assetekre.",
+  "fs.pro.sb.empty": "②  Nincsenek jelenetek.\nMentsd a forgatókönyvet, és kattints a «Breakdown» gombra a jelenetek és beállítások létrehozásához.",
+  "fs.pro.mt.empty": "③  Nincsenek klipek.\nGeneráld a beállítások videóit a «Díszlet» fülön a timeline feltöltéséhez.",
+  "fs.pro.asset.empty": "Nincsenek assetek.\nHozd létre az első szereplőt, helyszínt vagy tárgyat az «Új» gombbal.",
+  "fs.pro.voice.empty": "Nincsenek hangok.\nAdj hozzá egyet: leírásból, paraméterekből vagy klónozva.",
+  "fs.pro.lora.empty": "Nincs LoRA.\nTaníts be egyet az app «LoRA» füleiről: itt fog megjelenni."
 }

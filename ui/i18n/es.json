@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "cola vacía",
   "fs.pro.queue.busy": "{r} en curso · {w} en espera",
   "fs.pro.master.confirm.title": "Generar Master",
-  "fs.pro.master.confirm": "¿Iniciar el render del Master? La operación puede tardar."
+  "fs.pro.master.confirm": "¿Iniciar el render del Master? La operación puede tardar.",
+  "fs.pro.script.hint": "①  Escribe una idea o pega un guión, luego «✍️ Generar». Usa @ para mencionar los recursos.",
+  "fs.pro.sb.empty": "②  Sin escenas.\nGuarda el guión y pulsa «Breakdown» para generar escenas y planos.",
+  "fs.pro.mt.empty": "③  Sin clips.\nGenera los vídeos de los planos en «Escenografía» para llenar la timeline.",
+  "fs.pro.asset.empty": "Sin recursos.\nCrea tu primer actor, lugar u objeto con «Nuevo».",
+  "fs.pro.voice.empty": "Sin voces.\nAñade una: desde una descripción, desde parámetros o clonada.",
+  "fs.pro.lora.empty": "Sin LoRA.\nEntrena una desde las pestañas «LoRA» de la app: aparecerá aquí."
 }

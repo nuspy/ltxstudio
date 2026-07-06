@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "队列为空",
   "fs.pro.queue.busy": "{r} 进行中 · {w} 等待中",
   "fs.pro.master.confirm.title": "生成 Master",
-  "fs.pro.master.confirm": "开始渲染 Master？此操作可能需要一些时间。"
+  "fs.pro.master.confirm": "开始渲染 Master？此操作可能需要一些时间。",
+  "fs.pro.script.hint": "①  写下一个创意或粘贴剧本，然后点击«✍️ 生成»。用 @ 引用素材。",
+  "fs.pro.sb.empty": "②  暂无场景。\n保存剧本并点击«Breakdown»以生成场景和镜头。",
+  "fs.pro.mt.empty": "③  暂无片段。\n在«布景»中生成镜头视频以填充 timeline。",
+  "fs.pro.asset.empty": "暂无素材。\n用«新建»创建你的第一个角色、场景或物件。",
+  "fs.pro.voice.empty": "暂无语音。\n添加一个：来自描述、来自参数或克隆。",
+  "fs.pro.lora.empty": "暂无 LoRA。\n在应用的«LoRA»标签页中训练一个：它会显示在这里。"
 }

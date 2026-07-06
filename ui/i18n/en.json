@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "empty queue",
   "fs.pro.queue.busy": "{r} running · {w} waiting",
   "fs.pro.master.confirm.title": "Generate Master",
-  "fs.pro.master.confirm": "Start the Master render? This may take a while."
+  "fs.pro.master.confirm": "Start the Master render? This may take a while.",
+  "fs.pro.script.hint": "①  Write an idea or paste a script, then «✍️ Generate». Use @ to reference assets.",
+  "fs.pro.sb.empty": "②  No scenes.\nSave the script and press «Breakdown» to generate scenes and shots.",
+  "fs.pro.mt.empty": "③  No clips.\nGenerate the shot videos in «Set design» to fill the timeline.",
+  "fs.pro.asset.empty": "No assets.\nCreate your first actor, location or object with «New».",
+  "fs.pro.voice.empty": "No voices.\nAdd one: from a description, from parameters, or cloned.",
+  "fs.pro.lora.empty": "No LoRAs.\nTrain one from the app's «LoRA» tabs: it will appear here."
 }

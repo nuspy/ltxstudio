@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "coda vuota",
   "fs.pro.queue.busy": "{r} in corso · {w} in attesa",
   "fs.pro.master.confirm.title": "Genera Master",
-  "fs.pro.master.confirm": "Avviare il render del Master? L'operazione può richiedere tempo."
+  "fs.pro.master.confirm": "Avviare il render del Master? L'operazione può richiedere tempo.",
+  "fs.pro.script.hint": "①  Scrivi un'idea o incolla un copione, poi «✍️ Genera». Usa @ per citare gli asset.",
+  "fs.pro.sb.empty": "②  Nessuna scena.\nSalva il copione e premi «Breakdown» per generare scene e inquadrature.",
+  "fs.pro.mt.empty": "③  Nessuna clip.\nGenera i video degli shot nella «Scenografia» per popolare la timeline.",
+  "fs.pro.asset.empty": "Nessun asset.\nCrea il tuo primo attore, luogo o oggetto con «Nuovo».",
+  "fs.pro.voice.empty": "Nessuna voce.\nAggiungine una: da descrizione, da parametri o clonata.",
+  "fs.pro.lora.empty": "Nessuna LoRA.\nAllenane una dai tab «LoRA» dell'app: comparirà qui."
 }

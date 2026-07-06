@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "Warteschlange leer",
   "fs.pro.queue.busy": "{r} laufend · {w} wartend",
   "fs.pro.master.confirm.title": "Master erstellen",
-  "fs.pro.master.confirm": "Master-Render starten? Der Vorgang kann einige Zeit dauern."
+  "fs.pro.master.confirm": "Master-Render starten? Der Vorgang kann einige Zeit dauern.",
+  "fs.pro.script.hint": "①  Schreibe eine Idee oder füge ein Drehbuch ein, dann «✍️ Generieren». Mit @ verweist du auf Assets.",
+  "fs.pro.sb.empty": "②  Keine Szenen.\nSpeichere das Drehbuch und klicke auf «Breakdown», um Szenen und Einstellungen zu erzeugen.",
+  "fs.pro.mt.empty": "③  Keine Clips.\nErzeuge die Shot-Videos im «Szenenbild», um die Timeline zu füllen.",
+  "fs.pro.asset.empty": "Keine Assets.\nErstelle deinen ersten Darsteller, Ort oder Gegenstand mit «Neu».",
+  "fs.pro.voice.empty": "Keine Stimmen.\nFüge eine hinzu: aus einer Beschreibung, aus Parametern oder geklont.",
+  "fs.pro.lora.empty": "Keine LoRA.\nTrainiere eine über die «LoRA»-Tabs der App: sie erscheint dann hier."
 }

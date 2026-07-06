@@ -2390,5 +2390,11 @@
   "fs.pro.queue.idle": "대기열 비어 있음",
   "fs.pro.queue.busy": "{r} 진행 중 · {w} 대기 중",
   "fs.pro.master.confirm.title": "Master 생성",
-  "fs.pro.master.confirm": "Master 렌더링을 시작할까요? 시간이 걸릴 수 있습니다."
+  "fs.pro.master.confirm": "Master 렌더링을 시작할까요? 시간이 걸릴 수 있습니다.",
+  "fs.pro.script.hint": "①  아이디어를 쓰거나 대본을 붙여넣은 뒤 «✍️ 생성»을 누르세요. @로 에셋을 참조할 수 있습니다.",
+  "fs.pro.sb.empty": "②  장면이 없습니다.\n대본을 저장하고 «Breakdown»을 눌러 장면과 샷을 생성하세요.",
+  "fs.pro.mt.empty": "③  클립이 없습니다.\n«세트 디자인»에서 샷 영상을 생성해 timeline을 채우세요.",
+  "fs.pro.asset.empty": "에셋이 없습니다.\n«새로 만들기»로 첫 배우, 장소 또는 오브젝트를 만드세요.",
+  "fs.pro.voice.empty": "음성이 없습니다.\n하나 추가하세요: 설명으로, 매개변수로 또는 복제로.",
+  "fs.pro.lora.empty": "LoRA가 없습니다.\n앱의 «LoRA» 탭에서 학습하면 여기에 표시됩니다."
 }
