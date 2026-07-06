@@ -3193,7 +3193,9 @@ class MainWindow(QMainWindow):
     def _segment_preconds(self) -> bool:
         if not self._feature_gate("cap.sam"):
             return False
-        if not self.driver.is_up():
+        # Segmentazione NATIVA (GroundingDINO+SAM2 sul server nativo) → NON serve ComfyUI. Il requisito comfy
+        # vale solo in modalità comfy. Copre sia "selezione testo" sia "seleziona oggetto" (stessa precond).
+        if not backend.is_native("segment") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_segment_msg")); return False
         if not self.frame1_tab.image_path:
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return False
