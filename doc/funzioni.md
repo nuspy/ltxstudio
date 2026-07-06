@@ -866,6 +866,17 @@ default NSFW. In modalità SFW i modelli NSFW sono **nascosti** dai dropdown (`_
 Civitai gated da `cap.civitai_import` (edizione studio). Core: `core/civitai_client.py`,
 `core/nsfw_classifier.py`, `core/model_importer.py`; UI `ui/tabs/import_models_tab.py`, `ui/widgets/model_card.py`.
 
+### Varianti interfaccia Classica / Pro
+Menu **Strumenti → 🎨 Interfaccia**: per la tab **Modelli** e per **AI Film Studio** si può scegliere
+**Classica** (la versione base) o **Pro ✨** (stessa funzione, UX/UI rifinita). La scelta è persistita
+(`user_prefs ui_variant.*`); Modelli cambia **a caldo**, il Film Studio alla riapertura.
+- **Modelli Pro** (`import_models_tab_pro.py`): gating in-regione (upsell al posto del contenuto quando la
+  capability è off), ricerca/URL Civitai in «Scopri» e «Importa» solo locale, badge 🔒, log contestuale,
+  anteprime on-demand, lock NSFW, gruppi «Avanzate» collassabili, azioni rapide in Libreria.
+- **Film Studio Pro** (`film_studio_window_pro.py`): barra progetto collassabile, banner-flusso, vista coda
+  Job Scheduler, gating `cap.filmstudio`, conferma prima del Master.
+Le V1 (Classica) restano invariate; le Pro sono sottoclassi che le riusano.
+
 ---
 
 **Riepilogo**: documentate **72 funzioni** in **12 sezioni** (IMMAGINI, SEGMENTAZIONE, RESTAURO/UPSCALE, VIDEO, EDITING VIDEO, POST-PROCESS/QUALITÀ VIDEO, 3D, VOCE/TTS, MUSICA, FILM STUDIO, LORA TRAINING, IMPORT/MODELLI/DETECTION) + tabella riassuntiva finale e note skill per agenti AI.
