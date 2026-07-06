@@ -70,11 +70,11 @@ class InpaintPipeline:
             return round(2.0 + r * 4.0, 2)        # [2 .. 6]
         if hyper:
             return round(1.0 + r * 2.5, 2)        # [1 .. 3.5] — distillati: alta guidance = piatto
-        # FLUX Fill: guidance alta (30) = OVER-GUIDANCE → artefatti bruciati, macchie irregolari sparse
-        # ("tipo ghepardo") nella regione rigenerata. Range abbassato a [4..20] (sweet-spot Fill dev, pulito).
-        # Override per casi limite: NATIVE_FILL_GUIDANCE_MAX.
+        # FLUX Fill: guidance alta = modifica FORTE (segue il prompt). Le macchie "ghepardo" erano SageAttention
+        # (INT8), risolte con SDPA per l'inpaint → si può tenere la guidance alta senza artefatti. Ceiling 30
+        # (raccomandato Fill dev); se dovessero ricomparire artefatti, abbassa con NATIVE_FILL_GUIDANCE_MAX.
         import os
-        _gmax = float(os.environ.get("NATIVE_FILL_GUIDANCE_MAX", "20.0"))
+        _gmax = float(os.environ.get("NATIVE_FILL_GUIDANCE_MAX", "30.0"))
         return round(4.0 + r * (_gmax - 4.0), 2)  # [4 .. _gmax] — FLUX Fill standard
 
     def build(self, image_file: str, prompt: str, *, mode: str = "inpaint",

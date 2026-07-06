@@ -8,6 +8,9 @@ from __future__ import annotations
 import json
 import time
 import urllib.request
+import urllib.parse    # NB: DEVE stare qui in cima. Se importato DENTRO preview(), `urllib` diventa una
+                       # variabile LOCALE dell'intera funzione → la 1ª riga urllib.request.Request(...) dà
+                       # UnboundLocalError → preview() tornava sempre None (progress/anteprima mai aggiornati).
 
 BASE = "http://127.0.0.1:8189"
 
@@ -60,7 +63,6 @@ def preview() -> dict | None:
         req = urllib.request.Request(BASE + "/preview")
         with urllib.request.urlopen(req, timeout=3) as r:
             data = r.read()
-            import urllib.parse
             return {"png": data,
                     "png_seq": int(r.headers.get("X-Preview-PngSeq", "0")),
                     "step": int(r.headers.get("X-Preview-Step", "0")),
