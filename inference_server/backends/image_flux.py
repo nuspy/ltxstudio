@@ -835,8 +835,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
         try:
             from PIL import ImageFilter
             _orig = Image.open(params["image_path"]).convert("RGB").resize(res_img.size, Image.LANCZOS)
-            _feather = max(2, int(round(min(res_img.size) / 256)))   # bordo morbido proporzionale
-            _m = _mask_pil.convert("L").resize(res_img.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(_feather))
+            _feather = max(2, min(8, int(round(min(res_img.size) / 256))))   # bordo morbido proporzionale
+            _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)
+            # DILATA la regione GENERATA (bianca) prima di sfumare: così la sfumatura cade sul CONTENUTO reale,
+            # non sul bordo NERO della tela (outpaint) → niente linea scura di giunzione. Vale anche per inpaint
+            # (evita il seam netto). Poi feather gaussiano.
+            _m = _m.filter(ImageFilter.MaxFilter(_feather * 2 + 1)).filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
             print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
