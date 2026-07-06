@@ -56,14 +56,21 @@ class BuildGUI(QWidget):
     def _build(self):
         root = QVBoxLayout(self)
 
-        ed_grp = QGroupBox(tr("build.editions", "Edizioni")); el = QHBoxLayout(ed_grp)
+        ed_grp = QGroupBox(tr("build.profiles", "Profili")); el = QHBoxLayout(ed_grp)
         self.ed_checks = {}
         for e in self.desc["editions"]:
             cb = QCheckBox(f"{e['id']} ({e['public_name']})"); cb.setChecked(True)
             self.ed_checks[e["id"]] = cb; el.addWidget(cb)
         root.addWidget(ed_grp)
 
-        os_grp = QGroupBox(tr("build.os", "Sistemi operativi")); ol = QHBoxLayout(os_grp)
+        # Target: app desktop (.exe) e/o Android (.apk) — ciascuno con la sua checkbox.
+        tg_grp = QGroupBox(tr("build.targets", "Piattaforme")); tl = QHBoxLayout(tg_grp)
+        self.tgt_desktop = QCheckBox(tr("build.tgt.desktop", "Desktop (.exe)")); self.tgt_desktop.setChecked(True)
+        self.tgt_android = QCheckBox(tr("build.tgt.android", "Android (.apk)")); self.tgt_android.setChecked(False)
+        tl.addWidget(self.tgt_desktop); tl.addWidget(self.tgt_android); tl.addStretch(1)
+        root.addWidget(tg_grp)
+
+        os_grp = QGroupBox(tr("build.os", "Sistemi operativi (desktop)")); ol = QHBoxLayout(os_grp)
         self.os_checks = {}
         for o in self.desc.get("os_targets", ["windows"]):
             cb = QCheckBox(o); cb.setChecked(o == "windows")
@@ -165,11 +172,21 @@ class BuildGUI(QWidget):
             return
         editions = [e for e, cb in self.ed_checks.items() if cb.isChecked()]
         oses = [o for o, cb in self.os_checks.items() if cb.isChecked()]
-        if not editions or not oses:
-            self.log.appendPlainText(tr("build.need_selection", "Seleziona almeno un'edizione e un OS.")); return
+        targets = []
+        if self.tgt_desktop.isChecked():
+            targets.append("desktop")
+        if self.tgt_android.isChecked():
+            targets.append("android")
+        if not editions or not targets:
+            self.log.appendPlainText(tr("build.need_selection2",
+                "Seleziona almeno un profilo e una piattaforma (Desktop/Android).")); return
+        if "desktop" in targets and not oses:
+            self.log.appendPlainText(tr("build.need_os", "Per il Desktop seleziona almeno un OS.")); return
         args = [BUILD_PY, "--project", self.project]
         for e in editions:
             args += ["--edition", e]
+        for t in targets:
+            args += ["--target", t]
         for o in oses:
             args += ["--os", o]
         if self.major.value() > 0:

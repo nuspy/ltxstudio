@@ -7,9 +7,28 @@ dalle finestre di licenza dell'eventuale layer anti-pirateria).
 from __future__ import annotations
 
 import json
+import random
+import re
+import string
 from pathlib import Path
 
 VERSIONS = Path(__file__).resolve().parent / "versions.json"
+
+
+def rand6() -> str:
+    """6 caratteri alfanumerici casuali (maiuscoli+cifre), diversi a ogni chiamata."""
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
+def _clean(s: str) -> str:
+    """Componente-nome sicuro: sequenze non alfanumeriche → '-'."""
+    return re.sub(r"[^A-Za-z0-9]+", "-", str(s)).strip("-") or "app"
+
+
+def artifact_name(app_name: str, profile: str, build_number: int, ext: str) -> str:
+    """Nome file release: <App>_<Profilo>_v<NNNNN>_<RAND6>.<ext>, separatori '_'.
+    Esempio: AI-Creative-Center_Uncensored_v00010_AB12E5.apk"""
+    return f"{_clean(app_name)}_{_clean(profile)}_v{int(build_number):05d}_{rand6()}.{ext.lstrip('.')}"
 
 
 def _load() -> dict:
