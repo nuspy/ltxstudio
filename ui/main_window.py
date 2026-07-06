@@ -1929,6 +1929,7 @@ class MainWindow(QMainWindow):
             except Exception:                                    # noqa: BLE001
                 pass
         retention = cfg.get("strength", 0.75)
+        guidance_ui = cfg.get("guidance")                    # CFG esplicita dalla GUI (se impostata)
         denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * retention))
         # guard: serve un'area da rigenerare, altrimenti il modello non fa nulla
         if mode == "outpaint" and not self.frame1_tab.canvas.has_outpaint_area():
@@ -1949,7 +1950,8 @@ class MainWindow(QMainWindow):
             from core import backend
             _unet = cfg.get("unet") or ""
             if backend.is_native("image") and not cfg.get("checkpoint") and _unet:   # #95 I4: flux2 ora nativo
-                self._start_native_inpaint(exp, _unet, ptxt, negative, steps, seed, retention, mode)
+                self._start_native_inpaint(exp, _unet, ptxt, negative, steps, seed, retention, mode,
+                                           guidance_override=guidance_ui)
                 return
             img_name = self._upload_local(exp["image"])
             mask_name = self._upload_local(exp["mask"])
@@ -2974,7 +2976,8 @@ class MainWindow(QMainWindow):
         self._start_native_multitalk(params)
         return True
 
-    def _start_native_inpaint(self, exp, unet, prompt, negative, steps, seed, retention, mode):
+    def _start_native_inpaint(self, exp, unet, prompt, negative, steps, seed, retention, mode,
+                              guidance_override=None):
         """Inpaint/outpaint via backend NATIVO (FluxFillPipeline) — niente ComfyUI.
         Passa i path LOCALI di immagine+maschera (image_flux li apre con PIL)."""
         import os
@@ -2992,7 +2995,12 @@ class MainWindow(QMainWindow):
         from core.gen_pipeline import is_flux2
         _f2 = bool(unet and is_flux2(unet))
         arch = "flux2_inpaint" if _f2 else "inpaint"
-        guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=_f2)
+        # Guidance ESPLICITA dalla GUI se impostata (per Klein la si clampa al range basso); altrimenti la
+        # deriva da "Forza mantenimento" (retention) come prima.
+        if guidance_override:
+            guidance = min(float(guidance_override), 6.0) if _f2 else float(guidance_override)
+        else:
+            guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=_f2)
         # #95 I5: forza (strength) → denoise, non solo guidance (outpaint=1.0, inpaint scala con retention)
         denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * float(retention)))
         params = {"model": model, "arch": arch, "prompt": prompt, "negative": negative,

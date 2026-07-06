@@ -2410,5 +2410,7 @@
   "mem.vram_shared": "Shared VRAM",
   "mem.gpu": "GPU (CUDA)",
   "mw.video_vram_title": "Not enough VRAM for video",
-  "mw.video_vram_gguf_msg": "The 22B video model does not fit in available VRAM and ComfyUI is not running.\n\nPick/download an LTX GGUF model (Q3/Q4/Q6) in the Video tab: it runs NATIVELY with on-the-fly dequantization, no ComfyUI."
+  "mw.video_vram_gguf_msg": "The 22B video model does not fit in available VRAM and ComfyUI is not running.\n\nPick/download an LTX GGUF model (Q3/Q4/Q6) in the Video tab: it runs NATIVELY with on-the-fly dequantization, no ComfyUI.",
+  "f1.inpaint.guidance_lbl": "Guidance (prompt adherence)",
+  "f1.inpaint.guidance.tt": "Guidance (CFG): how strongly the edit FOLLOWS the prompt. High (≈30) = strong/faithful; low = softer. Different from «Retention» (how much of the original is kept)."
 }

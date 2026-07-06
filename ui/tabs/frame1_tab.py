@@ -634,6 +634,13 @@ class Frame1Tab(QWidget):
         self.strength.valueChanged.connect(lambda v: self.strength_lbl.setText(f"{v/100:.2f}"))
         srow.addWidget(self.strength); srow.addWidget(self.strength_lbl)
         sw = QWidget(); sw.setLayout(srow); f.addRow(tr("f1.inpaint.strength_lbl"), sw)
+        # GUIDANCE (CFG) esplicita — distinta dalla "Forza": quanto la modifica segue il PROMPT (alta=decisa).
+        self.inp_guidance = QDoubleSpinBox(); self.inp_guidance.setRange(1.0, 30.0); self.inp_guidance.setSingleStep(0.5)
+        self.inp_guidance.setValue(30.0)
+        self.inp_guidance.setToolTip(tr("f1.inpaint.guidance.tt",
+            "Guidance (CFG): quanto la modifica SEGUE il prompt. Alta (≈30) = modifica decisa e aderente; "
+            "bassa = più morbida/creativa. Diverso dalla «Forza mantenimento» (quanto preserva l'originale)."))
+        f.addRow(tr("f1.inpaint.guidance_lbl", "Guidance (aderenza prompt)"), self.inp_guidance)
         self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
         self.inp_model.setToolTip(tr("f1.inpaint.model.tt", "Modello usato per inpaint/outpaint (FLUX Fill o checkpoint compatibile)."))
         self._color_curated_combo(self.inp_model, INPAINT_MODELS, key="unet")   # colori VRAM (verde/giallo/rosso)
@@ -1241,6 +1248,7 @@ class Frame1Tab(QWidget):
             # Campi inpaint/outpaint
             "negative": self.inp_neg.toPlainText().strip(),
             "strength": self.strength.value() / 100.0,
+            "guidance": float(self.inp_guidance.value()),   # CFG esplicita dalla GUI (aderenza al prompt)
             "model": label,
             "unet": unet,
             "checkpoint": ckpt,

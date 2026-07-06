@@ -2410,5 +2410,7 @@
   "mem.vram_shared": "VRAM shared",
   "mem.gpu": "GPU (CUDA)",
   "mw.video_vram_title": "VRAM insufficiente per il video",
-  "mw.video_vram_gguf_msg": "Il modello video 22B non entra nella VRAM disponibile e ComfyUI non è attivo.\n\nScegli/scarica un modello LTX GGUF (Q3/Q4/Q6) nel tab Video: gira NATIVO con dequantizzazione al volo, senza ComfyUI."
+  "mw.video_vram_gguf_msg": "Il modello video 22B non entra nella VRAM disponibile e ComfyUI non è attivo.\n\nScegli/scarica un modello LTX GGUF (Q3/Q4/Q6) nel tab Video: gira NATIVO con dequantizzazione al volo, senza ComfyUI.",
+  "f1.inpaint.guidance_lbl": "Guidance (aderenza prompt)",
+  "f1.inpaint.guidance.tt": "Guidance (CFG): quanto la modifica SEGUE il prompt. Alta (≈30) = decisa e aderente; bassa = più morbida. Diverso dalla «Forza mantenimento» (quanto preserva l'originale)."
 }
