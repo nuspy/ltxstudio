@@ -500,6 +500,10 @@ class ImportModelsTab(QWidget):
             return
         self.search_scroll.setWidget(flow_grid(cards, columns=4))
         self._search_cards = cards
+        self._start_thumbs(thumb_jobs)
+
+    def _start_thumbs(self, thumb_jobs):
+        """Avvia il download progressivo delle anteprime (override in Pro per lazy/on-demand)."""
         tw = _ThumbWorker(thumb_jobs, str(Path(catalog_paths.APP_ROOT) / "data" / "thumb_cache"))
         tw.ready.connect(lambda i, p: self._search_cards[i].set_thumb(p) if i < len(self._search_cards) else None)
         self._workers.append(tw)
