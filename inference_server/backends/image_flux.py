@@ -83,16 +83,25 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
         pipe.enable_model_cpu_offload()
         return "offload"
     free_mb = torch.cuda.mem_get_info()[0] / 1024**2
-    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.35"))   # modello + attivazioni
-    floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1500"))  # lascia margine al sistema
+    # margine 1.10 (era 1.35, troppo prudente): un modello che ENTRA (o quasi) resta SU GPU — molto più veloce
+    # che offload su RAM. Lo sforo delle attivazioni va in shared-VRAM (poco, tollerabile) invece di streammare
+    # i pesi dalla RAM ad ogni run. Override NATIVE_GPU_MARGIN. Solo se NON ci sta proprio → model_cpu_offload.
+    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.10"))
+    floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1200"))  # lascia margine al sistema
     if free_mb >= vram_mb * margin + floor_mb:
         pipe.to("cuda")                                 # RESTA su GPU; la cache ModelManager lo riusa
         return "gpu"
-    # DEFAULT: model_cpu_offload (un componente alla volta su GPU, transformer intero nel denoise = step veloci).
-    # NB: NON si passa automaticamente a enable_sequential_cpu_offload — su Windows coi buffer fp8 SEGFAULTA e
-    # CRASHA il server (→ WinError 10061 dal client). Il sequenziale è solo ESPLICITO (NATIVE_FORCE_OFFLOAD=seq),
-    # gestito in cima. Se la VRAM è stretta si accetta lo spill occasionale in shared-RAM (lento ma STABILE).
-    _ = resident_mb
+    # PREFERISCI GPU-RESIDENT quando il TRANSFORMER (il pezzo usato ad OGNI step) entra in VRAM con un po' di
+    # headroom per le attivazioni: resta CACHED sulla GPU → nessun ri-trasferimento CPU→GPU ad ogni generazione
+    # (model_cpu_offload ritrasferisce ~22GB ogni run = LENTISSIMO). L'eventuale sforo di T5/attivazioni va in
+    # shared-VRAM (poco). Override NATIVE_GPU_ACT_HEADROOM_MB. Cachato dal ModelManager → i run successivi volano.
+    act_headroom = float(os.environ.get("NATIVE_GPU_ACT_HEADROOM_MB", "5000"))
+    if resident_mb and free_mb >= float(resident_mb) + act_headroom:
+        pipe.to("cuda")
+        return "gpu"
+    # Solo se NEMMENO il transformer entra → model_cpu_offload (un componente alla volta; il transformer viene
+    # streammato, lento ma stabile). NB niente enable_sequential_cpu_offload automatico (segfault fp8 su Windows,
+    # crashava il server → WinError 10061). Sequenziale solo esplicito (NATIVE_FORCE_OFFLOAD=seq, in cima).
     pipe.enable_model_cpu_offload()
     return "offload"
 
@@ -151,11 +160,12 @@ def _set_attention(pipe, arch: str = "") -> str:
 
 
 def _apply_fbcache(pipe) -> bool:
-    """First Block Cache (come WaveSpeed di ComfyUI): salta i blocchi DiT quando il residuo
-    cambia poco → ~2x sui modelli multi-step. Env NATIVE_FBCACHE=0|1 (default 1),
-    NATIVE_FBCACHE_THRESHOLD (default 0.12: più alto = più veloce, meno fedele)."""
+    """First Block Cache (come WaveSpeed di ComfyUI): salta i blocchi DiT quando il residuo cambia poco →
+    ~2x più veloce ma PERDITA DI QUALITÀ visibile. DEFAULT OFF (qualità prima, parità con ComfyUI): la
+    generazione nativa saltava blocchi solo sul t2i → immagini più povere di ComfyUI. Opt-in velocità:
+    NATIVE_FBCACHE=1 (soglia NATIVE_FBCACHE_THRESHOLD, default 0.12: più alto = più veloce, meno fedele)."""
     import os
-    if os.environ.get("NATIVE_FBCACHE", "1") != "1":
+    if os.environ.get("NATIVE_FBCACHE", "0") != "1":
         return False
     try:
         from diffusers import FirstBlockCacheConfig            # cache NATIVO diffusers (compatibile)
@@ -625,7 +635,8 @@ _FLUX_L2RGB = [
 _FLUX_L2RGB_BIAS = [-0.0329, -0.0718, -0.0851]
 
 
-_PREVIEW_WARNED = False   # logga UNA sola volta la causa del mancato decode anteprima (no spam per-step)
+_PREVIEW_WARNED = False    # logga UNA sola volta la causa del mancato decode anteprima (no spam per-step)
+_PREVIEW_CB_LOGGED = False  # logga UNA volta che il callback preview è attaccato (+ forma latente)
 
 
 def _latent_to_pil(latent, arch):
@@ -656,6 +667,15 @@ def _make_preview_cb(arch, width, height, steps):
 
     def _cb(pp, step, timestep, cbk):
         from inference_server import preview_bus
+        global _PREVIEW_CB_LOGGED
+        if not _PREVIEW_CB_LOGGED:                            # log UNA volta: callback attaccato + forma latente
+            _PREVIEW_CB_LOGGED = True
+            try:
+                _lat = cbk.get("latents")
+                _sh = tuple(_lat.shape) if _lat is not None else None
+                print(f"[preview] callback attivo (arch={arch}, latents={_sh}, every={every})", flush=True)
+            except Exception:                                # noqa: BLE001
+                pass
         # progresso ad OGNI step (leggerissimo) → barra credibile
         try:
             preview_bus.set_progress(step + 1, int(steps))

@@ -101,7 +101,10 @@ def generate(params: dict, timeout: int = 1800) -> dict:
     diffusers; inpaint/kontext/integra/altri → diffusers (il worker comfy copre per ora solo t2i)."""
     arch = (params.get("task") or params.get("arch") or "flux").lower()
     is_t2i = not params.get("image_path") and arch in ("flux", "flux2", "zimage", "ernie")
-    if user_prefs.get_engine("image") == "comfy" and is_t2i:
+    # DEFAULT 'diffusers' (nativo): ComfyUI è il ramo legacy/rotto e il suo /free svuotava la VRAM del server
+    # nativo ad ogni t2i → ricaricava lo STESSO modello. Col nativo il ModelManager lo tiene in cache (nessun
+    # reload per la medesima pipeline). Comfy solo se scelto ESPLICITAMENTE in Impostazioni.
+    if user_prefs.get_engine("image", "diffusers") == "comfy" and is_t2i:
         res = _comfy_t2i(params, timeout)
         if res.get("status") == "success":
             return res
