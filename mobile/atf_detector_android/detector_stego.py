@@ -34,10 +34,19 @@ _MASK = _midband_mask()
 _N_COEFF = int(_MASK.sum())
 
 
+def _sha_bits(key_material, n):
+    need = (n + 7) // 8
+    buf = bytearray()
+    counter = 0
+    while len(buf) < need:
+        buf += hashlib.sha256(key_material + counter.to_bytes(4, "big")).digest()
+        counter += 1
+    bits = np.unpackbits(np.frombuffer(bytes(buf[:need]), dtype=np.uint8))[:n]
+    return bits.astype(np.float32) * 2 - 1
+
+
 def _carrier(nonce, tile_idx):
-    seed = int.from_bytes(hashlib.sha256(_KEY + nonce.to_bytes(4, "big") + tile_idx.to_bytes(2, "big"))
-                          .digest()[:8], "big")
-    return (np.random.default_rng(seed).integers(0, 2, _N_COEFF) * 2 - 1).astype(np.float32)
+    return _sha_bits(_KEY + b"C" + nonce.to_bytes(4, "big") + tile_idx.to_bytes(2, "big"), _N_COEFF)
 
 
 _CMAT = {}
@@ -58,9 +67,8 @@ def _payload_matrix(nonce, tile_idx):
     k = (nonce, tile_idx)
     m = _PMAT.get(k)
     if m is None:
-        seed = int.from_bytes(hashlib.sha256(_KEY + b"PAYLOAD" + nonce.to_bytes(4, "big")
-                                             + tile_idx.to_bytes(2, "big")).digest()[:8], "big")
-        m = (np.random.default_rng(seed).integers(0, 2, (PAYLOAD_BITS, _N_COEFF)) * 2 - 1).astype(np.float32)
+        km = _KEY + b"P" + nonce.to_bytes(4, "big") + tile_idx.to_bytes(2, "big")
+        m = _sha_bits(km, PAYLOAD_BITS * _N_COEFF).reshape(PAYLOAD_BITS, _N_COEFF)
         _PMAT[k] = m
     return m
 
