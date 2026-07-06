@@ -504,6 +504,13 @@ def _load(model_path: str, arch: str):
         except Exception:                                  # noqa: BLE001
             pass
     cls_name, supports_sf, _ = SPEC[arch]
+    # INPAINT: la pipeline dipende dai CANALI del modello. FluxFillPipeline vuole un transformer a 384 canali
+    # (FLUX.1 Fill); un modello FLUX STANDARD (64) darebbe "mat1 4624x384 · mat2 64x3072". Per i modelli a 64
+    # canali usa FluxInpaintPipeline (inpaint base mascherato, con strength) → funziona con qualsiasi FLUX.1.
+    if arch == "inpaint" and Path(model_path).is_file() and _flux_in_channels(model_path) == 64:
+        cls_name = "FluxInpaintPipeline"
+        print("[flux] modello FLUX standard (64 canali) per inpaint → FluxInpaintPipeline (base). "
+              "Per il Fill dedicato scegli FLUX.1 Fill (384 canali).", flush=True)
     Pipe = getattr(diffusers, cls_name, None)
     if Pipe is None:
         # es. Flux2KontextPipeline non esiste in diffusers 0.38 → messaggio chiaro + suggerimento
@@ -624,6 +631,9 @@ _FLUX_L2RGB = [
 _FLUX_L2RGB_BIAS = [-0.0329, -0.0718, -0.0851]
 
 
+_PREVIEW_WARNED = False   # logga UNA sola volta la causa del mancato decode anteprima (no spam per-step)
+
+
 def _latent_to_pil(latent, arch):
     """Anteprima veloce del latente → PIL, senza VAE. FLUX: latent2rgb con i fattori noti; altri arch:
     normalizzazione min-max dei primi 3 canali (anteprima cromatica approssimativa). Best-effort."""
@@ -666,15 +676,20 @@ def _make_preview_cb(arch, width, height, steps):
                 return cbk
             with torch.no_grad():
                 l = lat
-                if arch in ("flux", "kontext", "inpaint") and hasattr(pp, "_unpack_latents"):
+                # latente FLUX-family PACKED (B, tokens, 64) → unpack a (B,16,h,w). Vale anche per Fill/Klein.
+                if l.dim() == 3 and hasattr(pp, "_unpack_latents"):
                     vsf = getattr(pp, "vae_scale_factor", 8)
-                    l = pp._unpack_latents(lat, height, width, vsf)   # (B,16,h,w)
+                    l = pp._unpack_latents(lat, height, width, vsf)
                 img = _latent_to_pil(l, arch)
                 img.thumbnail((384, 384))
                 buf = io.BytesIO(); img.save(buf, "PNG")
                 preview_bus.set_preview(buf.getvalue(), step + 1, int(steps))
-        except Exception:                                    # noqa: BLE001
-            pass                                             # preview best-effort
+        except Exception as _pe:                             # noqa: BLE001
+            global _PREVIEW_WARNED
+            if not _PREVIEW_WARNED:                           # logga la CAUSA una sola volta (no spam)
+                _PREVIEW_WARNED = True
+                print(f"[preview] anteprima per-step non disponibile (arch={arch}): "
+                      f"{type(_pe).__name__}: {_pe}", flush=True)
         return cbk
 
     return _cb
@@ -773,12 +788,19 @@ def run(params: dict, mm, output_dir: str) -> dict:
     else:
         kw["width"] = int(params.get("width", 1024))
         kw["height"] = int(params.get("height", 1024))
-    # i modelli "guidance-distilled" ignorano/non espongono il negative_prompt:
-    # zimage turbo, Flux2Pipeline (flux2) e FluxFillPipeline (inpaint/outpaint).
-    # negative_prompt NON supportato dai guidance-distilled: zimage turbo, FluxFill (inpaint) e TUTTI i
-    # FLUX.2/Klein (flux2, flux2_inpaint, flux2_kontext) → altrimenti "unexpected keyword argument".
-    if neg and arch not in ("zimage", "inpaint") and not str(arch).startswith("flux2"):
-        kw["negative_prompt"] = neg
+    # negative_prompt: passalo SOLO se la pipeline lo espone davvero (introspezione firma) → bulletproof
+    # contro "unexpected keyword argument 'negative_prompt'" su FluxFill/Klein/zimage (guidance-distilled).
+    if neg:
+        try:
+            import inspect
+            if "negative_prompt" in inspect.signature(pipe.__call__).parameters:
+                kw["negative_prompt"] = neg
+        except Exception:                                   # noqa: BLE001
+            pass
+    # FluxInpaintPipeline (inpaint BASE, modelli 64ch) usa 'strength' = quanto rigenerare la regione mascherata
+    # (FluxFillPipeline invece fa denoise pieno, niente strength). Default alto per un inpaint deciso.
+    if type(pipe).__name__ == "FluxInpaintPipeline":
+        kw["strength"] = float(params.get("denoise") or 0.9)
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
