@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -102,6 +103,26 @@ def build_one_desktop(desc: dict, fm_root: Path, project: str, edition: str, os_
     return True
 
 
+def _patch_android_toolchain(android: Path) -> None:
+    """Rende il progetto Capacitor compatibile con JDK 21 (verificato su questo PC): Gradle 8.7 + AGP 8.5.2,
+    + local.properties con sdk.dir (forward-slash). I file android/ sono rigenerati da `cap add`, quindi il
+    patch va riapplicato ad ogni build."""
+    import os
+    wrp = android / "gradle" / "wrapper" / "gradle-wrapper.properties"
+    if wrp.exists():
+        t = wrp.read_text("utf-8")
+        t = re.sub(r"gradle-[\d.]+-(all|bin)\.zip", "gradle-8.7-all.zip", t)
+        wrp.write_text(t, "utf-8")
+    bg = android / "build.gradle"
+    if bg.exists():
+        t = bg.read_text("utf-8")
+        t = re.sub(r"com\.android\.tools\.build:gradle:[\d.]+", "com.android.tools.build:gradle:8.5.2", t)
+        bg.write_text(t, "utf-8")
+    sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") \
+        or str(Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk")
+    (android / "local.properties").write_text("sdk.dir=" + sdk.replace("\\", "/") + "\n", "utf-8")
+
+
 def build_one_android(desc: dict, fm_root: Path, project: str, edition: str,
                       python: str, major: int | None, dry: bool) -> bool:
     """Build APK edition-aware: bake src/edition.json (manifest dell'edizione) → npm build → cap → gradle."""
@@ -127,21 +148,22 @@ def build_one_android(desc: dict, fm_root: Path, project: str, edition: str,
         except Exception as e:                               # noqa: BLE001
             print(f"  [ERR] bake edition.json: {e}"); return False
 
-    # 2) npm build → capacitor sync → gradle assembleRelease (toolchain già sul PC)
+    # 2) npm build → capacitor add/sync → PATCH toolchain → gradle assembleDebug
     npm = "npm.cmd" if sys.platform.startswith("win") else "npm"
     npx = "npx.cmd" if sys.platform.startswith("win") else "npx"
     gradlew = "gradlew.bat" if sys.platform.startswith("win") else "./gradlew"
-    steps = [
-        ([npm, "run", "build"], str(mobile)),
-        ([npx, "cap", "sync", "android"], str(mobile)),
-        ([gradlew, "assembleRelease"], str(mobile / "android")),
-    ]
-    for cmd, cwd in steps:
+    android = mobile / "android"
+    cap_cmd = ([npx, "cap", "add", "android"] if not android.exists() else [npx, "cap", "sync", "android"])
+    for cmd, cwd in (([npm, "run", "build"], str(mobile)), (cap_cmd, str(mobile))):
         if run(cmd, cwd=cwd, dry=dry) != 0:
             print(f"  [ERR] step android fallito: {' '.join(cmd)}"); return False
+    if not dry:
+        _patch_android_toolchain(android)   # JDK 21 → Gradle 8.7 + AGP 8.5.2 + local.properties (verificato su questo PC)
+    if run([gradlew, "assembleDebug"], cwd=str(android), dry=dry) != 0:
+        print("  [ERR] gradle assembleDebug fallito"); return False
 
     # 3) rinomina l'APK prodotto
-    apk_dir = str(mobile / "android" / "app" / "build" / "outputs" / "apk" / "release")
+    apk_dir = str(mobile / "android" / "app" / "build" / "outputs" / "apk" / "debug")
     Path(out_dir).mkdir(parents=True, exist_ok=True) if not dry else None
     _rename_output(apk_dir if not dry else out_dir, "apk", _app_name(desc),
                    _profile_name(desc, edition), v["build_number"], dry)
