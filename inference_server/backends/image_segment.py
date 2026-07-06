@@ -15,11 +15,21 @@ SAM2_DIR = os.path.join(SEG_DIR, "sam2-hiera-large")
 VRAM_MB = 4000
 
 
-def _mask_to_2d(masks):
-    """SAM2 può restituire maschere con ndim variabile (H,W / 1,H,W / N,H,W / 1,1,H,W).
-    Riduce a una maschera 2D uint8*255 (OR su tutte le dim guida) → niente errori PIL 'cannot handle'."""
+def _mask_to_2d(masks, scores=None):
+    """SAM2 → maschera 2D uint8*255. SAM2 restituisce 3 maschere per box (multimask: oggetto / sotto-parte /
+    grezza≈box): unirle TUTTE (any) includerebbe la grezza → "quadrato". Con `scores` (iou_scores) si sceglie
+    la MIGLIORE per box, poi unione TRA i box → contorno preciso dell'oggetto. Senza scores: fallback OR."""
     arr = masks > 0
-    while arr.ndim > 2:
+    if arr.ndim == 4 and scores is not None:               # (n_box, n_mask, H, W) + scores (n_box, n_mask)
+        out = None
+        for b in range(arr.shape[0]):
+            sb = scores[b]
+            bi = int(sb.argmax()) if getattr(sb, "ndim", 0) >= 1 and int(arr.shape[1]) > 1 else 0
+            mb = arr[b, bi]
+            out = mb if out is None else (out | mb)
+        if out is not None:
+            return out.numpy().astype("uint8") * 255
+    while arr.ndim > 2:                                     # ndim variabile (H,W / 1,H,W / …) → OR
         arr = arr.any(0)
     return arr.numpy().astype("uint8") * 255
 
@@ -63,7 +73,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
             with torch.no_grad():
                 sout = smodel(**sin)
             masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
-            m_np = _mask_to_2d(masks)
+            m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, "iou_scores") else None)
         else:
             m_np = np.zeros((img.height, img.width), dtype="uint8")
             x0, y0, x1, y1 = (int(v) for v in box)
@@ -105,7 +115,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         with torch.no_grad():
             sout = smodel(**sin)
         masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
-        m_np = _mask_to_2d(masks)
+        m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, 'iou_scores') else None)
     else:                                                  # solo box GroundingDINO (o SAM non disponibile)
         m_np = np.zeros((img.height, img.width), dtype="uint8")
         for x0, y0, x1, y1 in boxes:
