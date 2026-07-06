@@ -811,10 +811,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 kw["negative_prompt"] = neg
         except Exception:                                   # noqa: BLE001
             pass
-    # FluxInpaintPipeline (inpaint BASE, modelli 64ch) usa 'strength' = quanto rigenerare la regione mascherata
-    # (FluxFillPipeline invece fa denoise pieno, niente strength). Default alto per un inpaint deciso.
+    # FluxInpaintPipeline (inpaint BASE, modelli 64ch, SEGUE il prompt) usa 'strength' = quanto rigenerare la
+    # regione mascherata (FluxFillPipeline invece fa denoise pieno, niente strength). Default alto = sostituzione
+    # decisa. NB: il FLUX base ha guidance EMBEDDED BASSA (~3.5) come nel t2i — a 30 si BRUCIA (≠ Fill dev che
+    # vuole 30). Clampo la guidance al range base.
     if type(pipe).__name__ == "FluxInpaintPipeline":
         kw["strength"] = float(params.get("denoise") or 0.9)
+        kw["guidance_scale"] = min(float(kw.get("guidance_scale", 3.5)), 5.0)
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end

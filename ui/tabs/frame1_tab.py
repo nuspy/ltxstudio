@@ -36,6 +36,12 @@ INPAINT_MODELS = {
         {"arch": "Flux", "unet": "Flux\\FLUX_DEV_Fill.safetensors", "steps": 40},
     "FLUX Fill GGUF NSFW (Hyper-8, RAM bassa)":
         {"arch": "Flux", "unet": "Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf", "steps": 8},
+    # FLUX BASE (64 canali) → FluxInpaintPipeline: SEGUE il prompt (sostituisci/aggiungi ciò che descrivi).
+    # Usa la "Forza mantenimento" bassa per una sostituzione decisa. Guidance ~3.5 (auto-clampata dal backend).
+    "FLUX base — sostituzione da prompt (NSFW)":
+        {"arch": "Flux", "unet": "Flux\\getphat Flux Reality v30 Hardcore FP8.safetensors", "steps": 28},
+    "FLUX base — sostituzione da prompt (Krea, foto)":
+        {"arch": "Flux", "unet": "Flux\\FLUX_Krea_Dev.safetensors", "steps": 28},
     "FLUX.2 Klein NSFW (Miraclein, edit-evoluto)":
         {"arch": "Flux2", "unet": "Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors", "steps": 12},
     "Nessuno (solo LTX I2V)": {"arch": None, "unet": None, "steps": 0},
@@ -646,6 +652,7 @@ class Frame1Tab(QWidget):
         self._color_curated_combo(self.inp_model, INPAINT_MODELS, key="unet")   # colori VRAM (verde/giallo/rosso)
         self.inp_model.currentTextChanged.connect(self._reload_inpaint_loras)
         self.inp_model.currentTextChanged.connect(self._update_inp_star)
+        self.inp_model.currentTextChanged.connect(self._auto_inp_guidance)
         imrow = QHBoxLayout(); imrow.setContentsMargins(0, 0, 0, 0)
         imrow.addWidget(self.inp_model, 1)
         self.inp_star = QToolButton(); self.inp_star.setText("☆")
@@ -1212,6 +1219,22 @@ class Frame1Tab(QWidget):
             "prompt_positive": self.prompt.toPlainText().strip(),
             "prompt_negative": self.neg.toPlainText().strip(),
         }
+
+    def _auto_inp_guidance(self, label: str):
+        """Auto-imposta la Guidance secondo il modello inpaint: Fill dev=alta (30), distillato/Hyper=bassa (2.5),
+        FLUX base=media (3.5), Klein=bassa (4). Guida l'utente al valore giusto (poi può cambiarlo)."""
+        if not hasattr(self, "inp_guidance"):
+            return
+        l = (label or "").lower()
+        if "hyper" in l or "hyp8" in l or "hyp-8" in l or "distill" in l or "turbo" in l:
+            g = 2.5
+        elif "klein" in l or "flux.2" in l or "flux2" in l:
+            g = 4.0
+        elif "base" in l:                       # FLUX base 64ch → FluxInpaintPipeline (segue il prompt)
+            g = 3.5
+        else:                                   # FLUX Fill dev (context-fill, guidance alta)
+            g = 30.0
+        self.inp_guidance.setValue(g)
 
     def get_inpaint_config(self) -> dict:
         label = self.inp_model.currentText().split("  ⛔")[0]
