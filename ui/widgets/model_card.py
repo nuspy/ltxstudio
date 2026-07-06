@@ -30,11 +30,7 @@ def badge(text: str, kind: str = "muted") -> QLabel:
     return lab
 
 
-def _thumb_label(thumb, size: int) -> QLabel:
-    lab = QLabel()
-    lab.setFixedSize(size, size)
-    lab.setAlignment(Qt.AlignCenter)
-    lab.setStyleSheet("background:#111; border:1px solid #333; border-radius:6px; color:#555;")
+def _set_pixmap(lab: QLabel, thumb, size: int) -> None:
     pm = None
     if isinstance(thumb, QPixmap) and not thumb.isNull():
         pm = thumb
@@ -45,6 +41,14 @@ def _thumb_label(thumb, size: int) -> QLabel:
         lab.setPixmap(pm.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
     else:
         lab.setText("🖼")
+
+
+def _thumb_label(thumb, size: int) -> QLabel:
+    lab = QLabel()
+    lab.setFixedSize(size, size)
+    lab.setAlignment(Qt.AlignCenter)
+    lab.setStyleSheet("background:#111; border:1px solid #333; border-radius:6px; color:#555;")
+    _set_pixmap(lab, thumb, size)
     return lab
 
 
@@ -70,7 +74,9 @@ class ModelCard(QFrame):
         h = QHBoxLayout(self)
         h.setContentsMargins(8, 6, 8, 6)
         h.setSpacing(8)
-        h.addWidget(_thumb_label(thumb, 40))
+        self._thumb_size = 40
+        self._thumb_lab = _thumb_label(thumb, 40)
+        h.addWidget(self._thumb_lab)
         col = QVBoxLayout()
         col.setSpacing(2)
         t = QLabel(title)
@@ -104,7 +110,9 @@ class ModelCard(QFrame):
         v = QVBoxLayout(self)
         v.setContentsMargins(8, 8, 8, 8)
         v.setSpacing(6)
-        v.addWidget(_thumb_label(thumb, 160), alignment=Qt.AlignCenter)
+        self._thumb_size = 160
+        self._thumb_lab = _thumb_label(thumb, 160)
+        v.addWidget(self._thumb_lab, alignment=Qt.AlignCenter)
         t = QLabel(title)
         t.setWordWrap(True)
         t.setStyleSheet("font-weight:600; font-size:12px;")
@@ -125,6 +133,11 @@ class ModelCard(QFrame):
             if cb:
                 b.clicked.connect(cb)
             v.addWidget(b)
+
+    def set_thumb(self, thumb):
+        lab = getattr(self, "_thumb_lab", None)
+        if lab is not None:
+            _set_pixmap(lab, thumb, getattr(self, "_thumb_size", 160))
 
     def set_status(self, text: str, kind: str = "status"):
         if self._status_lab is not None:

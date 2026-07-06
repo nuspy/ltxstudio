@@ -130,6 +130,50 @@ class _ResolveWorker(QThread):
             self.failed.emit(str(e))
 
 
+class _SearchWorker(QThread):
+    """Ricerca Civitai (rete) fuori dal thread GUI."""
+    results = Signal(list)
+    failed = Signal(str)
+
+    def __init__(self, query, types, base_models, nsfw):
+        super().__init__()
+        self._q, self._types, self._bm, self._nsfw = query, types, base_models, nsfw
+
+    def run(self):
+        try:
+            data = model_importer.civitai_client.search(
+                self._q, types=self._types, base_models=self._bm, nsfw=self._nsfw)
+            self.results.emit(data.get("items", []))
+        except Exception as e:                               # noqa: BLE001
+            self.failed.emit(str(e))
+
+
+class _ThumbWorker(QThread):
+    """Scarica le anteprime (piccole) delle card, in cache, progressivamente."""
+    ready = Signal(int, str)
+
+    def __init__(self, jobs: list, cache_dir: str):
+        super().__init__()
+        self._jobs = jobs                                    # list[(idx, url)]
+        self._cache = Path(cache_dir)
+
+    def run(self):
+        import hashlib as _h
+        import re as _re
+        self._cache.mkdir(parents=True, exist_ok=True)
+        for idx, url in self._jobs:
+            if not url:
+                continue
+            try:
+                small = _re.sub(r"/width=\d+/", "/width=200/", url)
+                dest = self._cache / (_h.md5(small.encode()).hexdigest() + ".img")
+                if not dest.exists():
+                    model_importer.civitai_client.download(small, dest, timeout=30)
+                self.ready.emit(idx, str(dest))
+            except Exception:                                # noqa: BLE001
+                continue
+
+
 class ImportModelsTab(QWidget):
     """Importa e cataloga modelli AI tramite gli strumenti del dizionario."""
 
@@ -294,16 +338,124 @@ class ImportModelsTab(QWidget):
         v.addLayout(arow)
         return w
 
-    # ---- pagine Scopri / Libreria (riempite in F3/F4) ----
+    # ---- pagina Scopri: ricerca Civitai + griglia card ----
+    _SEARCH_TYPES = [("imp2.type.all", "Tutti", None), ("imp2.type.lora", "LoRA", "LORA"),
+                     ("imp2.type.ckpt", "Checkpoint", "Checkpoint"), ("imp2.type.vae", "VAE", "VAE"),
+                     ("imp2.type.emb", "Embedding", "TextualInversion"),
+                     ("imp2.type.cn", "ControlNet", "Controlnet")]
+    _SEARCH_BASE = ["", "Flux.1 D", "SDXL 1.0", "Pony", "Illustrious", "SD 1.5", "SD 3.5"]
+
     def _page_scopri(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
-        lab = QLabel(tr("imp2.discover.soon", "🔍 Ricerca Civitai in-app — in arrivo."))
-        lab.setAlignment(Qt.AlignCenter)
-        lab.setStyleSheet("color:#888; padding:30px;")
-        v.addWidget(lab)
+        v.setSpacing(8)
+        row = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText(tr("imp2.search.ph", "Cerca su Civitai…"))
+        self.search_edit.returnPressed.connect(self._do_search)
+        self.search_type = QComboBox()
+        for i18n_key, default, _api in self._SEARCH_TYPES:
+            self.search_type.addItem(tr(i18n_key, default))
+        self.search_base = QComboBox()
+        self.search_base.addItem(tr("imp2.base.all", "Tutte le basi"))
+        for bm in self._SEARCH_BASE[1:]:
+            self.search_base.addItem(bm)
+        self.search_nsfw = QCheckBox(tr("imp2.search.nsfw", "NSFW"))
+        b_go = QPushButton(tr("imp2.search.btn", "Cerca"))
+        b_go.clicked.connect(self._do_search)
+        row.addWidget(self.search_edit, 1)
+        row.addWidget(self.search_type)
+        row.addWidget(self.search_base)
+        row.addWidget(self.search_nsfw)
+        row.addWidget(b_go)
+        v.addLayout(row)
+
+        self.search_scroll = QScrollArea()
+        self.search_scroll.setWidgetResizable(True)
+        self.search_scroll.setFrameShape(QScrollArea.NoFrame)
+        hint = QLabel(tr("imp2.search.hint", "Cerca modelli e aggiungili alla coda di importazione."))
+        hint.setAlignment(Qt.AlignCenter)
+        hint.setStyleSheet("color:#666; padding:30px;")
+        self.search_scroll.setWidget(hint)
+        v.addWidget(self.search_scroll, 1)
         return w
 
+    def _do_search(self):
+        nsfw = self.search_nsfw.isChecked()
+        if nsfw and not model_importer.adult_enabled():
+            self.search_nsfw.setChecked(False)
+            nsfw = False
+            QMessageBox.information(self, tr("imp2.gate.title", "Contenuto adulto"),
+                tr("imp2.search.nsfw.off", "La ricerca NSFW richiede la funzione contenuti adulti (non attiva)."))
+        typ = self._SEARCH_TYPES[self.search_type.currentIndex()][2]
+        bi = self.search_base.currentIndex()
+        base = [self._SEARCH_BASE[bi]] if bi > 0 else None
+        self._log(tr("imp2.searching", "\n🔍 Cerco su Civitai…"))
+        w = _SearchWorker(self.search_edit.text().strip(), [typ] if typ else None, base, nsfw)
+        w.results.connect(self._populate_search)
+        w.failed.connect(lambda e: self._log(tr("imp2.search.err", "[ERR] ricerca: {e}").format(e=e)))
+        self._workers.append(w)
+        w.start()
+
+    def _populate_search(self, items: list):
+        adult = model_importer.adult_enabled()
+        cards, thumb_jobs = [], []
+        shown = 0
+        for model in items:
+            it = self._item_from_search(model)
+            if it.nsfw and not adult:                        # nascondi NSFW se funzione non attiva
+                continue
+            card = ModelCard(
+                title=model.get("name", it.name),
+                subtitle=(it.family if it.family != "Unknown" else ""),
+                badges=self._item_badges(it), compact=False,
+                actions=[(tr("imp2.add", "＋ Aggiungi"), lambda m=model: self._add_search_result(m))])
+            cards.append(card)
+            thumb_jobs.append((shown, self._search_preview_url(model)))
+            shown += 1
+        if not cards:
+            empty = QLabel(tr("imp2.search.none", "Nessun risultato."))
+            empty.setAlignment(Qt.AlignCenter)
+            empty.setStyleSheet("color:#666; padding:30px;")
+            self.search_scroll.setWidget(empty)
+            return
+        self.search_scroll.setWidget(flow_grid(cards, columns=4))
+        self._search_cards = cards
+        tw = _ThumbWorker(thumb_jobs, str(Path(catalog_paths.APP_ROOT) / "data" / "thumb_cache"))
+        tw.ready.connect(lambda i, p: self._search_cards[i].set_thumb(p) if i < len(self._search_cards) else None)
+        self._workers.append(tw)
+        tw.start()
+
+    @staticmethod
+    def _search_preview_url(model: dict) -> str | None:
+        for ver in model.get("modelVersions") or []:
+            for img in ver.get("images") or []:
+                if img.get("url"):
+                    return img["url"]
+        return None
+
+    def _item_from_search(self, model: dict):
+        ver = (model.get("modelVersions") or [{}])[0]
+        f = model_importer.civitai_client.pick_primary_file(ver)
+        lvl = int(ver.get("nsfwLevel") or 0)
+        nsfw = bool(model.get("nsfw")) or bool(lvl & ~model_importer.civitai_client.SFW_MASK)
+        family = model_importer._CIVITAI_BASEMODEL_MAP.get(ver.get("baseModel"), "Unknown")
+        typ = model_importer._CIVITAI_TYPE_MAP.get(model.get("type"), model.get("type") or "Unknown")
+        it = model_importer.ImportItem(
+            path="", name=(f or {}).get("name") or (model.get("name", "civitai") + ".safetensors"),
+            type=typ, family=family, nsfw=nsfw, nsfw_source="civitai", source="civitai",
+            triggers=list(ver.get("trainedWords") or []))
+        it.dest_subfolder = model_importer._dest_subfolder(typ, family)
+        it.civitai = {"download_url": (f or {}).get("downloadUrl")}
+        return it
+
+    def _add_search_result(self, model: dict):
+        it = self._item_from_search(model)
+        self._add_item_to_queue(it)
+        self._log(tr("imp2.added", "＋ Aggiunto alla coda: {n}").format(n=it.name))
+        self._select_mode(1)                                 # porta alla coda Importa
+
+    # ---- pagina Libreria (riempita in F4) ----
     def _page_libreria(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
