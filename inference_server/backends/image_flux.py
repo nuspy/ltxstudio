@@ -139,6 +139,12 @@ def _set_attention(pipe, arch: str = "") -> str:
     import os
     if arch == "zimage":
         return "sdpa"
+    # Gli arch IMAGE-CONDITIONED (inpaint/Fill, kontext, edit, Klein) sono sensibili all'errore INT8 di
+    # SageAttention → RUMORE visibile sul blending della regione mascherata. Usa SDPA full-precision
+    # (reference-correct). Sage resta per il t2i puro e il video. Override esplicito: NATIVE_ATTENTION=sage.
+    if (os.environ.get("NATIVE_ATTENTION") or "").lower() not in ("sage", "sage3"):
+        if arch in ("inpaint", "kontext") or str(arch).startswith("flux2_"):
+            return "sdpa"
     want = (os.environ.get("NATIVE_ATTENTION") or "auto").lower()
     if want in ("auto", "sage", "sage3"):
         try:
