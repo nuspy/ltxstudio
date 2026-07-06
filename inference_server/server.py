@@ -34,6 +34,17 @@ def _tee_log() -> None:
                 for s in self._s:
                     try: s.flush()
                     except Exception: pass
+            def isatty(self):                              # uvicorn chiama sys.stdout.isatty() → NON è un tty
+                return False
+            def fileno(self):
+                for s in self._s:
+                    try: return s.fileno()
+                    except Exception: pass
+                raise OSError("no fileno")
+            def __getattr__(self, name):                   # delega encoding/errors/… al primo stream reale
+                for s in self._s:
+                    if hasattr(s, name): return getattr(s, name)
+                raise AttributeError(name)
         sys.stdout = _Tee(sys.__stdout__, f)
         sys.stderr = _Tee(sys.__stderr__, f)
         print(f"[server] log su {os.path.join(logdir, 'server.log')}", flush=True)
