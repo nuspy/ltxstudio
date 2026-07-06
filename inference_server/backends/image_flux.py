@@ -86,9 +86,12 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     # margine 1.10 (era 1.35, troppo prudente): un modello che ENTRA (o quasi) resta SU GPU — molto più veloce
     # che offload su RAM. Lo sforo delle attivazioni va in shared-VRAM (poco, tollerabile) invece di streammare
     # i pesi dalla RAM ad ogni run. Override NATIVE_GPU_MARGIN. Solo se NON ci sta proprio → model_cpu_offload.
-    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.10"))
+    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.12"))
     floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1200"))  # lascia margine al sistema
-    if free_mb >= vram_mb * margin + floor_mb:
+    _need = vram_mb * margin + floor_mb
+    print(f"[place] free={free_mb:.0f}MB est={vram_mb}MB margin={margin} need={_need:.0f}MB "
+          f"→ {'gpu' if free_mb >= _need else 'offload'}", flush=True)
+    if free_mb >= _need:
         pipe.to("cuda")                                 # tutto residente su GPU; la cache ModelManager lo riusa
         return "gpu"
     # Se il FULL-STACK non entra tutto-su-GPU → model_cpu_offload: il transformer resta su GPU per TUTTO il
@@ -578,11 +581,17 @@ def _load(model_path: str, arch: str):
         sz_mb = os.path.getsize(model_path) / 1024**2 if os.path.isfile(model_path) else 0
     except Exception:                                       # noqa: BLE001
         sz_mb = 0
-    # fp8 → diffusers UPCASTA a bf16 in memoria (2× il file): il getphat fp8 da 11GB diventa 22GB → senza
-    # correzione _place sottostima e sceglie 'gpu' (tutto residente = 31GB → sfora/lento). Usa la dim EFFETTIVA.
-    _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in os.path.basename(model_path).lower()) else sz_mb
+    # Dim EFFETTIVA in memoria (≠ file): fp8 → diffusers UPCASTA a bf16 (2× il file: getphat 11GB→22GB);
+    # GGUF → resta QUANTIZZATO (dequant per-layer on-the-fly) ≈ dim file. Senza correzioni _place sbaglia
+    # il placement (fp8 sottostimato → 'gpu' che sfora; GGUF gonfiato dal floor → 'offload' inutile).
+    _base = os.path.basename(model_path).lower()
+    _is_gguf = _base.endswith(".gguf")
+    _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf) else sz_mb
     overhead = 4000 if arch == "zimage" else 11000          # T5/CLIP/Mistral + VAE + working
-    est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
+    if _is_gguf and sz_mb:
+        est_mb = int(_eff_mb + overhead)                    # NIENTE floor VRAM_MB: il Q4/Q5 è davvero piccolo
+    else:
+        est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
     # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral): NON entra tutto-su-GPU nei 32GB e nemmeno in
     # enable_model_cpu_offload (offload a livello-modello = transformer intero su GPU). Serve offload
     # SEQUENZIALE (granularità per-modulo: un layer alla volta su GPU). Memory-bounded e imposta

@@ -134,8 +134,11 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
         if progress:
             progress(m)
     from core import training_service as ts
+    # low_vram per TUTTA la famiglia FLUX.2 (dev E Klein): senza offload il Klein può sforare i 32GB in
+    # training (transformer+TE); il costo su modelli che entrerebbero è minimo rispetto a un OOM a metà run.
     p = ts.TrainParams(name=name, base_model=base, dataset_path=dataset_dir, rank=rank, alpha=rank,
-                       steps=steps, trigger_word=trigger, low_vram=(base == "flux2-dev"))
+                       steps=steps, trigger_word=trigger,
+                       low_vram=(base == "flux2-dev" or "klein" in (base or "").lower()))
     errs = ts.preflight(p)
     if errs:
         raise RuntimeError("; ".join(errs))

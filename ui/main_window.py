@@ -1936,8 +1936,26 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("mw.nothing_to_extend_title"),
                                     tr("mw.nothing_to_extend_msg")); return
         if mode == "inpaint" and not self.frame1_tab.canvas.has_mask():
-            QMessageBox.information(self, tr("mw.no_mask_title"),
-                                    tr("mw.no_mask_msg")); return
+            # SENZA maschera → NON rifiutare più: modifica dell'INTERA foto secondo la descrizione
+            # (Kontext edit-instruct, guidance bassa ~2.5). Il prompt dice COSA cambiare in tutta la foto.
+            if not (ptxt or "").strip():
+                QMessageBox.information(self, tr("mw.no_mask_title"),
+                    tr("mw.no_mask_edit_msg", "Nessuna maschera disegnata: scrivi nel prompt COSA "
+                       "modificare e verrà applicato all'INTERA foto (edit globale Kontext).")); return
+            try:
+                exp = self.frame1_tab.canvas.export_inpaint(OUTPUT_DIR, mode)
+                self._inpaint_bbox = exp.get("bbox")
+                self._inpaint_before = exp.get("image")
+                seed = cfg["seed"] if cfg.get("seed") is not None else random.randint(0, 2**31)
+                steps = cfg.get("steps") or 28
+                negative = cfg.get("negative") or ""
+                self._log(tr("mw.no_mask_kontext_log",
+                             "Nessuna maschera → modifica dell'INTERA foto secondo la descrizione (Kontext)"))
+                # exp SENZA 'mask' → _start_native_kontext prende il ramo kontext puro (no Fill)
+                self._start_native_kontext({"image": exp["image"]}, None, ptxt, negative, steps, seed, 2.5)
+            except Exception as e:                               # noqa: BLE001
+                QMessageBox.warning(self, tr("mw.error_title", "Errore"), str(e))
+            return
         try:
             exp = self.frame1_tab.canvas.export_inpaint(OUTPUT_DIR, mode)
             self._inpaint_bbox = exp.get("bbox")    # per rimettere l'inpaint al suo posto

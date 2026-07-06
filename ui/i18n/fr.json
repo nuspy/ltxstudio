@@ -2412,5 +2412,7 @@
   "mw.video_vram_title": "Not enough VRAM for video",
   "mw.video_vram_gguf_msg": "The 22B video model does not fit in available VRAM and ComfyUI is not running.\n\nPick/download an LTX GGUF model (Q3/Q4/Q6) in the Video tab: it runs NATIVELY with on-the-fly dequantization, no ComfyUI.",
   "f1.inpaint.guidance_lbl": "Guidance (prompt adherence)",
-  "f1.inpaint.guidance.tt": "Guidance (CFG): how strongly the edit FOLLOWS the prompt. High (≈30) = strong/faithful; low = softer. Different from «Retention» (how much of the original is kept)."
+  "f1.inpaint.guidance.tt": "Guidance (CFG): how strongly the edit FOLLOWS the prompt. High (≈30) = strong/faithful; low = softer. Different from «Retention» (how much of the original is kept).",
+  "mw.no_mask_edit_msg": "No mask drawn: write WHAT to change in the prompt and it will be applied to the WHOLE photo (global Kontext edit).",
+  "mw.no_mask_kontext_log": "No mask → editing the WHOLE photo according to the description (Kontext)"
 }

@@ -793,9 +793,25 @@ def run_generation(p: dict) -> str:
     return out
 
 
+def _free_image_server() -> None:
+    """Libera la VRAM del server immagini (:8189) PRIMA di calcolare l'offload video: senza questo, un
+    modello immagine cachato (es. FLUX 22GB) resta in VRAM mentre il video ne chiede 25-33 → _auto_offload
+    vede 10GB liberi e sceglie 'cpu' (lento) o peggio sborda in shared-RAM/OOM. Single-GPU: un pesante alla
+    volta; il ModelManager del server ricaricherà il suo modello alla prossima richiesta immagine."""
+    try:
+        import urllib.request
+        urllib.request.urlopen(urllib.request.Request(
+            "http://127.0.0.1:8189/free", data=b"{}", headers={"Content-Type": "application/json"}),
+            timeout=20).read()
+        print("[worker] VRAM server immagini liberata (/free)", flush=True)
+    except Exception:                                        # noqa: BLE001  (server giù = niente da liberare)
+        pass
+
+
 def main() -> None:
     with open(sys.argv[1], encoding="utf-8") as fh:
         p = json.load(fh)
+    _free_image_server()
     print("OK:" + run_generation(p), flush=True)
 
 
