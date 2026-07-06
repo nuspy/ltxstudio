@@ -88,9 +88,11 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     if free_mb >= vram_mb * margin + floor_mb:
         pipe.to("cuda")                                 # RESTA su GPU; la cache ModelManager lo riusa
         return "gpu"
-    # model_cpu_offload tiene il TRANSFORMER intero residente nel denoise: se + attivazioni non ci sta comodo,
-    # scala all'offload SEQUENZIALE (per-modulo) → evita lo spill in shared-RAM (30 dedicati + 11 shared).
-    act_headroom = float(os.environ.get("NATIVE_ACT_HEADROOM_MB", "9000"))
+    # model_cpu_offload tiene il TRANSFORMER intero su GPU nel denoise (step VELOCI). Passa al sequenziale
+    # (per-modulo, MOLTO più lento: ~10s/step) SOLO se il transformer stesso NON entra in VRAM — non per
+    # risparmiare sulle attivazioni (meglio uno spill occasionale ad alta risoluzione che 20× di lentezza).
+    # Es. FLUX.1 Fill 22.7GB su 32GB → model_cpu_offload (veloce); FLUX.2 32B → sequenziale.
+    act_headroom = float(os.environ.get("NATIVE_ACT_HEADROOM_MB", "1500"))
     if resident_mb and free_mb < float(resident_mb) + act_headroom:
         try:
             pipe.enable_sequential_cpu_offload()
@@ -705,14 +707,11 @@ def run(params: dict, mm, output_dir: str) -> dict:
             _pulid_h = None
 
     g = torch.Generator(device="cuda").manual_seed(int(params.get("seed", 0)))
-    # SETTINGS AUTOMATICI per modello/arch (step+guidance): default sensati per QUALSIASI modello.
+    # SETTINGS: il valore ESPLICITO (dal GUI) va SEMPRE rispettato — niente override lato pipeline.
+    # _auto_settings serve SOLO come default quando il parametro NON è fornito (es. API/mobile senza GUI).
+    # L'ottimizzazione dei parametri pre-compila i WIDGET del GUI (vedi optimal_settings), non forza qui.
     _ast, _agd, _hyp = _auto_settings(arch, model)
     _steps = int(params.get("steps") or 0) or _ast
-    # anti-RUMORE: FLUX.1 Fill (inpaint/outpaint) sotto-denoizza con pochi step → alza al minimo consigliato
-    # (solo modelli non-distillati; gli hyper/turbo vogliono davvero pochi step).
-    if arch in _MASK_ARCHS and not _hyp and _steps < _ast:
-        print(f"[auto] {arch}: {_steps} step insufficienti → {_ast} (anti-rumore Fill).", flush=True)
-        _steps = _ast
     _guid = float(params["guidance"]) if params.get("guidance") is not None else _agd
     kw = dict(prompt=params.get("prompt", ""),
               num_inference_steps=_steps,
@@ -770,7 +769,9 @@ def run(params: dict, mm, output_dir: str) -> dict:
         kw["height"] = int(params.get("height", 1024))
     # i modelli "guidance-distilled" ignorano/non espongono il negative_prompt:
     # zimage turbo, Flux2Pipeline (flux2) e FluxFillPipeline (inpaint/outpaint).
-    if neg and arch not in ("zimage", "flux2", "inpaint"):
+    # negative_prompt NON supportato dai guidance-distilled: zimage turbo, FluxFill (inpaint) e TUTTI i
+    # FLUX.2/Klein (flux2, flux2_inpaint, flux2_kontext) → altrimenti "unexpected keyword argument".
+    if neg and arch not in ("zimage", "inpaint") and not str(arch).startswith("flux2"):
         kw["negative_prompt"] = neg
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
