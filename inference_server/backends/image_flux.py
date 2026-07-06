@@ -438,6 +438,20 @@ def _load(model_path: str, arch: str):
         model_path = ensure_dequantized(model_path)
     except Exception:                                       # noqa: BLE001
         pass
+    # GUARD FAMIGLIA: se l'arch (dal detector/GUI) contraddice i CANALI REALI del checkpoint, correggila —
+    # altrimenti un FLUX.1 finisce nell'assembler FLUX.2 (KeyError 'double_blocks…') e viceversa.
+    # x_embedder/img_in: 64|384 = FLUX.1 (base|Fill) · 128 = FLUX.2.
+    if Path(model_path).is_file() and (arch in ("flux", "kontext", "inpaint") or str(arch).startswith("flux2")):
+        _ich = _flux_in_channels(model_path)
+        if str(arch).startswith("flux2") and _ich in (64, 384):
+            _new = {"flux2": "flux", "flux2_inpaint": "inpaint", "flux2_kontext": "kontext"}.get(arch, "flux")
+            print(f"[flux] arch '{arch}' richiesto ma il checkpoint è FLUX.1 ({_ich} canali) → uso '{_new}'.")
+            arch = _new
+        elif arch in ("flux", "kontext", "inpaint") and _ich == 128:
+            _new = {"flux": "flux2", "inpaint": "flux2_inpaint", "kontext": "flux2_kontext"}.get(arch, "flux2")
+            print(f"[flux] arch '{arch}' richiesto ma il checkpoint è FLUX.2 (128 canali) → uso '{_new}'.")
+            arch = _new
+
     # FLUX.1 (flux/kontext/inpaint) in formato BFL/SwarmUI col prefisso model.diffusion_model. →
     # normalizza (strip prefisso, cache) altrimenti from_single_file fallisce. flux2/Klein gestiscono da sé.
     if arch in ("flux", "kontext", "inpaint") and Path(model_path).is_file():
