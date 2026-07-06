@@ -15,17 +15,20 @@ import shutil
 from pathlib import Path
 from threading import Thread
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QPlainTextEdit, QProgressBar, QFileDialog, QSplitter,
-    QGroupBox, QScrollArea, QFrame, QMessageBox, QToolButton, QCheckBox,
+    QGroupBox, QScrollArea, QFrame, QMessageBox, QToolButton, QCheckBox, QButtonGroup,
+    QStackedWidget, QComboBox,
 )
 from ui.i18n_manager import tr
 
 from core import catalog_paths
 from core import comfy_compat
+from core import model_importer
 from core.catalog_tooling import CatalogTooling
+from ui.widgets.model_card import ModelCard, flow_grid
 
 
 class _DropArea(QLabel):
@@ -59,6 +62,74 @@ class _DropArea(QLabel):
         e.acceptProposedAction()
 
 
+class _AnalyzeWorker(QThread):
+    """Analizza file locali (tipo/arch/nsfw) fuori dal thread GUI. Emette un ImportItem per file."""
+    analyzed = Signal(object)                                # ImportItem
+    done = Signal()
+
+    def __init__(self, paths: list[str]):
+        super().__init__()
+        self._paths = paths
+
+    def run(self):
+        for p in self._paths:
+            try:
+                item = model_importer.analyze(p, fetch_civitai=True)
+            except Exception as e:                           # noqa: BLE001
+                item = model_importer.ImportItem(path=p, note=f"errore analisi: {e}")
+            self.analyzed.emit(item)
+        self.done.emit()
+
+
+class _StageWorker(QThread):
+    """Copia/scarica gli item ammessi nell'inbox (serializzato — connessione metered)."""
+    progress = Signal(int, str)                              # (indice, stato)
+    done = Signal(int, int)                                  # (ok, errori)
+
+    def __init__(self, items: list, inbox: str):
+        super().__init__()
+        self._items = items                                  # list[ImportItem] già gate-filtrati
+        self._inbox = Path(inbox)
+
+    def run(self):
+        import shutil
+        ok = err = 0
+        self._inbox.mkdir(parents=True, exist_ok=True)
+        for i, it in enumerate(self._items):
+            try:
+                if it.source == "civitai" and getattr(it, "civitai", None):
+                    self.progress.emit(i, tr("imp2.state.downloading", "scarico…"))
+                    url = it.civitai.get("download_url")
+                    dest = self._inbox / it.name
+                    model_importer.civitai_client.download(
+                        url, dest, api_key=model_importer.civitai_client.api_key_from_prefs())
+                else:
+                    self.progress.emit(i, tr("imp2.state.staging", "copio…"))
+                    shutil.copy2(it.path, self._inbox / Path(it.path).name)
+                self.progress.emit(i, tr("imp2.state.staged", "pronto"))
+                ok += 1
+            except Exception as e:                           # noqa: BLE001
+                self.progress.emit(i, tr("imp2.state.error", "errore: {e}").format(e=e))
+                err += 1
+        self.done.emit(ok, err)
+
+
+class _ResolveWorker(QThread):
+    """Risolve un URL/ID Civitai (rete) fuori dal thread GUI."""
+    resolved = Signal(dict)
+    failed = Signal(str)
+
+    def __init__(self, url_or_id: str):
+        super().__init__()
+        self._ref = url_or_id
+
+    def run(self):
+        try:
+            self.resolved.emit(model_importer.resolve_civitai(self._ref))
+        except Exception as e:                               # noqa: BLE001
+            self.failed.emit(str(e))
+
+
 class ImportModelsTab(QWidget):
     """Importa e cataloga modelli AI tramite gli strumenti del dizionario."""
 
@@ -69,58 +140,314 @@ class ImportModelsTab(QWidget):
         self._pending: list[str] = []
         self._tooling: CatalogTooling | None = None
         self._path_edits: dict[str, QLineEdit] = {}
+        self._queue: list = []                               # list[ImportItem] della coda Importa
+        self._queue_cards: list = []                         # ModelCard paralleli
+        self._workers: list = []                             # QThread vivi (evita GC)
         self._build()
         self._load_paths_into_ui()
         self._check_tools()
         self._refresh_compat_status()
 
-    # ============================================================ build
+    # ============================================================ build (UX pro-max, segmentata)
+    _MODES = [("scopri", "🔍", "imp2.mode.discover", "Scopri"),
+              ("importa", "⬇", "imp2.mode.import", "Importa"),
+              ("libreria", "🗂", "imp2.mode.library", "Libreria"),
+              ("avanzate", "⚙", "imp2.mode.advanced", "Avanzate")]
+
     def _build(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)
+        outer.setSpacing(6)
 
-        split = QSplitter(Qt.Vertical)
+        # --- barra segmentata ---
+        seg = QHBoxLayout()
+        seg.setSpacing(4)
+        self._seg_group = QButtonGroup(self)
+        self._seg_group.setExclusive(True)
+        for i, (key, icon, i18n_key, default) in enumerate(self._MODES):
+            b = QToolButton()
+            b.setText(f"{icon}  {tr(i18n_key, default)}")
+            b.setCheckable(True)
+            b.setMinimumHeight(34)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setStyleSheet(
+                "QToolButton { border:1px solid #333; border-radius:8px; padding:4px 14px; color:#bbb; }"
+                "QToolButton:checked { background:#1f2b3d; border-color:#74c0fc; color:#e8f0ff; font-weight:600; }")
+            b.clicked.connect(lambda _=False, idx=i: self._select_mode(idx))
+            self._seg_group.addButton(b, i)
+            seg.addWidget(b)
+        seg.addStretch(1)
+        outer.addLayout(seg)
 
-        # --- parte alta: controlli scrollabili -------------------------------
+        # --- stack delle modalità ---
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._page_scopri())           # 0
+        self._stack.addWidget(self._page_importa())          # 1
+        self._stack.addWidget(self._page_libreria())         # 2
+        self._stack.addWidget(self._page_avanzate())         # 3
+        outer.addWidget(self._stack, 1)
+
+        # --- log + progress CONDIVISI (sempre in basso) ---
+        outer.addWidget(self._build_log())
+
+        self._select_mode(1)                                 # default: Importa
+
+    def _select_mode(self, idx: int):
+        self._stack.setCurrentIndex(idx)
+        btn = self._seg_group.button(idx)
+        if btn and not btn.isChecked():
+            btn.setChecked(True)
+
+    def _build_log(self) -> QWidget:
+        log_w = QWidget()
+        lv = QVBoxLayout(log_w)
+        lv.setContentsMargins(0, 2, 0, 0)
+        lv.setSpacing(2)
+        lv.addWidget(QLabel(tr("imp.output_lbl")))
+        self.log_txt = QPlainTextEdit()
+        self.log_txt.setReadOnly(True)
+        self.log_txt.setMaximumHeight(150)
+        self.log_txt.setStyleSheet("font-family: Consolas, monospace; font-size:11px;")
+        lv.addWidget(self.log_txt)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setVisible(False)
+        lv.addWidget(self.progress)
+        return log_w
+
+    # ---- pagina Avanzate: TUTTO il power-user esistente (nulla si perde) ----
+    def _page_avanzate(self) -> QWidget:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.NoFrame)
         host = QWidget()
         v = QVBoxLayout(host)
         v.setSpacing(8)
-
         intro = QLabel(tr("imp.intro.lbl"))
         intro.setWordWrap(True)
         intro.setStyleSheet("color:#bbb; padding:2px;")
         v.addWidget(intro)
-
         v.addWidget(self._build_paths_group())
         v.addWidget(self._build_compat_group())
         v.addWidget(self._build_convert_group())
         v.addWidget(self._build_source_group())
         v.addWidget(self._build_ops_group())
-
-        host.setLayout(v)
+        v.addStretch(1)
         scroll.setWidget(host)
-        split.addWidget(scroll)
+        return scroll
 
-        # --- parte bassa: log + progress ------------------------------------
-        log_w = QWidget()
-        lv = QVBoxLayout(log_w)
-        lv.setContentsMargins(0, 4, 0, 0)
-        lv.addWidget(QLabel(tr("imp.output_lbl")))
-        self.log_txt = QPlainTextEdit()
-        self.log_txt.setReadOnly(True)
-        self.log_txt.setStyleSheet("font-family: Consolas, monospace; font-size:11px;")
-        lv.addWidget(self.log_txt, 1)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 0)         # indeterminato durante un run
-        self.progress.setVisible(False)
-        lv.addWidget(self.progress)
-        split.addWidget(log_w)
+    # ---- pagina Importa: flusso guidato (URL/ID + drag-drop + coda) ----
+    def _page_importa(self) -> QWidget:
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setSpacing(10)
+        intro = QLabel(tr("imp2.import.intro",
+            "Incolla un link o ID Civitai, oppure trascina qui file/cartelle. I modelli vengono "
+            "riconosciuti, categorizzati e spostati nella cartella giusta, pronti all'uso."))
+        intro.setWordWrap(True)
+        intro.setStyleSheet("color:#bbb;")
+        v.addWidget(intro)
 
-        split.setSizes([520, 240])
-        outer.addWidget(split)
+        urow = QHBoxLayout()
+        self.url_edit = QLineEdit()
+        self.url_edit.setPlaceholderText(tr("imp2.url.ph", "https://civitai.com/models/…  oppure  ID"))
+        self.url_edit.returnPressed.connect(self._import_url)
+        b_url = QPushButton(tr("imp2.url.btn", "Aggiungi da Civitai"))
+        b_url.clicked.connect(self._import_url)
+        urow.addWidget(self.url_edit, 1)
+        urow.addWidget(b_url)
+        v.addLayout(urow)
+
+        self.imp_drop = _DropArea()
+        self.imp_drop.files_dropped.connect(self._analyze_and_queue)
+        v.addWidget(self.imp_drop)
+        badd = QHBoxLayout()
+        b_files = QPushButton(tr("imp2.addfiles.btn", "Scegli file…"))
+        b_files.clicked.connect(self._pick_files_to_queue)
+        b_dir = QPushButton(tr("imp2.adddir.btn", "Scegli cartella…"))
+        b_dir.clicked.connect(self._pick_dir_to_queue)
+        badd.addWidget(b_files)
+        badd.addWidget(b_dir)
+        badd.addStretch(1)
+        v.addLayout(badd)
+
+        v.addWidget(QLabel(tr("imp2.queue.lbl", "Coda di importazione:")))
+        self.queue_list = QListWidget()
+        self.queue_list.setStyleSheet("QListWidget { background:transparent; border:none; }")
+        self.queue_list.setSpacing(3)
+        v.addWidget(self.queue_list, 1)
+
+        self._queue_empty = QLabel(tr("imp2.queue.empty", "La coda è vuota — aggiungi modelli sopra."))
+        self._queue_empty.setAlignment(Qt.AlignCenter)
+        self._queue_empty.setStyleSheet("color:#666; padding:16px;")
+        v.addWidget(self._queue_empty)
+
+        arow = QHBoxLayout()
+        self.b_import_all = QPushButton(tr("imp2.importall.btn", "⬇  Importa tutto"))
+        self.b_import_all.setObjectName("generate")
+        self.b_import_all.setMinimumHeight(40)
+        self.b_import_all.clicked.connect(self._import_all)
+        b_clear_q = QPushButton(tr("imp2.queue.clear", "Svuota coda"))
+        b_clear_q.clicked.connect(self._clear_queue)
+        arow.addWidget(self.b_import_all, 1)
+        arow.addWidget(b_clear_q)
+        v.addLayout(arow)
+        return w
+
+    # ---- pagine Scopri / Libreria (riempite in F3/F4) ----
+    def _page_scopri(self) -> QWidget:
+        w = QWidget()
+        v = QVBoxLayout(w)
+        lab = QLabel(tr("imp2.discover.soon", "🔍 Ricerca Civitai in-app — in arrivo."))
+        lab.setAlignment(Qt.AlignCenter)
+        lab.setStyleSheet("color:#888; padding:30px;")
+        v.addWidget(lab)
+        return w
+
+    def _page_libreria(self) -> QWidget:
+        w = QWidget()
+        v = QVBoxLayout(w)
+        lab = QLabel(tr("imp2.library.soon", "🗂 Libreria modelli catalogati — in arrivo."))
+        lab.setAlignment(Qt.AlignCenter)
+        lab.setStyleSheet("color:#888; padding:30px;")
+        v.addWidget(lab)
+        return w
+
+    # ============================================================ coda Importa
+    _MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf")
+
+    def _pick_files_to_queue(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, tr("imp.files.pick.dlg"), self._path_edits["models"].text().strip() or "",
+            tr("imp.model_filter"))
+        if paths:
+            self._analyze_and_queue(paths)
+
+    def _pick_dir_to_queue(self):
+        d = QFileDialog.getExistingDirectory(self, tr("imp.files.pick_dir.dlg"))
+        if d:
+            self._analyze_and_queue([d])
+
+    def _analyze_and_queue(self, paths: list[str]):
+        """Espande cartelle → analizza i file modello in un thread → li mette in coda con badge."""
+        files: list[str] = []
+        for p in paths:
+            pp = Path(p)
+            if pp.is_dir():
+                files += [str(f) for f in pp.rglob("*") if f.suffix.lower() in self._MODEL_EXTS]
+            elif pp.suffix.lower() in self._MODEL_EXTS:
+                files.append(str(pp))
+        if not files:
+            self._log(tr("imp2.nofiles", "[warn] Nessun file modello riconosciuto (.safetensors/.ckpt/…)."))
+            return
+        self._log(tr("imp2.analyzing", "\n🔎 Analizzo {n} file…").format(n=len(files)))
+        w = _AnalyzeWorker(files)
+        w.analyzed.connect(self._add_item_to_queue)
+        w.done.connect(lambda: self._log(tr("imp2.analyzed", "✓ Analisi completata.")))
+        self._workers.append(w)
+        w.start()
+
+    def _import_url(self):
+        text = self.url_edit.text().strip()
+        if not text:
+            return
+        self._log(tr("imp2.resolving", "\n🔗 Risolvo {u}…").format(u=text))
+        w = _ResolveWorker(text)
+        w.resolved.connect(self._on_url_resolved)
+        w.failed.connect(lambda e: self._log(tr("imp2.resolve.err", "[ERR] {e}").format(e=e)))
+        self._workers.append(w)
+        w.start()
+        self.url_edit.clear()
+
+    def _on_url_resolved(self, info: dict):
+        it = model_importer.ImportItem(
+            path="", name=info.get("name", "civitai"),
+            type=model_importer._CIVITAI_TYPE_MAP.get(info.get("type"), info.get("type") or "Unknown"),
+            family=model_importer._CIVITAI_BASEMODEL_MAP.get(info.get("base_model"), "Unknown"),
+            triggers=info.get("triggers", []), preview_url=info.get("preview_url"),
+            nsfw=bool(info.get("nsfw")), nsfw_source=info.get("nsfw_source", "civitai"), source="civitai")
+        it.dest_subfolder = model_importer._dest_subfolder(it.type, it.family)
+        it.civitai = {"download_url": info.get("download_url"), "version": info.get("version")}
+        self._add_item_to_queue(it)
+
+    def _item_badges(self, item):
+        b = []
+        if item.type and item.type != "Unknown":
+            b.append((item.type, "type"))
+        if item.family and item.family != "Unknown":
+            b.append((item.family, "arch"))
+        b.append(("🔞 NSFW", "nsfw") if item.nsfw else ("SFW", "sfw"))
+        return b
+
+    def _add_item_to_queue(self, item):
+        self._queue.append(item)
+        sub = tr("imp2.dest", "→ {d}").format(d=item.dest_subfolder or "?")
+        card = ModelCard(title=item.name, subtitle=sub, badges=self._item_badges(item),
+                         compact=True,
+                         actions=[(tr("imp2.remove", "✕"), lambda it=item: self._remove_queue_item(it))])
+        li = QListWidgetItem(self.queue_list)
+        li.setSizeHint(card.sizeHint())
+        self.queue_list.setItemWidget(li, card)
+        self._queue_cards.append(card)
+        self._refresh_queue_empty()
+
+    def _remove_queue_item(self, item):
+        if item not in self._queue:
+            return
+        i = self._queue.index(item)
+        self._queue.pop(i)
+        self._queue_cards.pop(i)
+        self.queue_list.takeItem(i)
+        self._refresh_queue_empty()
+
+    def _clear_queue(self):
+        self._queue.clear()
+        self._queue_cards.clear()
+        self.queue_list.clear()
+        self._refresh_queue_empty()
+
+    def _refresh_queue_empty(self):
+        self._queue_empty.setVisible(not self._queue)
+
+    def _import_all(self):
+        if not self._queue:
+            self._log(tr("imp2.noqueue", "[warn] Coda vuota."))
+            return
+        allowed, skipped = [], []
+        for it in self._queue:
+            (allowed if model_importer.gate_ok(it.nsfw) else skipped).append(it)
+        for it in skipped:
+            self._log(tr("imp2.skip.nsfw",
+                         "⏭  Saltato (contenuto adulto, funzione non attiva): {n}").format(n=it.name))
+            self._queue_cards[self._queue.index(it)].set_status(tr("imp2.state.skipped", "saltato"), "nsfw")
+        if not allowed:
+            QMessageBox.information(self, tr("imp2.gate.title", "Contenuto adulto"),
+                tr("imp2.gate.text", "Tutti gli elementi sono NSFW e la funzione contenuti adulti non è attiva."))
+            return
+        inbox = self._path_edits["inbox"].text().strip() or catalog_paths.DEFAULTS["inbox"]
+        self._set_busy(True)
+        self.progress.setVisible(True)
+        self._log(tr("imp2.staging.start", "\n📥 Preparo {n} modelli…").format(n=len(allowed)))
+        w = _StageWorker(allowed, inbox)
+        w.progress.connect(lambda i, s: self._on_stage_progress(allowed, i, s))
+        w.done.connect(lambda ok, err: self._on_stage_done(inbox, ok, err))
+        self._workers.append(w)
+        w.start()
+
+    def _on_stage_progress(self, allowed, i, status):
+        it = allowed[i]
+        if it in self._queue:
+            self._queue_cards[self._queue.index(it)].set_status(status)
+
+    def _on_stage_done(self, inbox: str, ok: int, err: int):
+        self._log(tr("imp2.staging.done",
+                     "✅ Preparati {ok} (errori {err}). Catalogazione in corso…").format(ok=ok, err=err))
+        self.source_edit.setText(inbox)
+        if ok:
+            self._start("Ingest completo").full_ingest(inbox)   # place→scan→enrich→build (+catalog_updated)
+        else:
+            self._set_busy(False)
+            self.progress.setVisible(False)
 
     # ---- gruppo configurazione percorsi ----
     def _build_paths_group(self) -> QGroupBox:
@@ -574,8 +901,11 @@ class ImportModelsTab(QWidget):
 
     # ============================================================ stato UI
     def _all_buttons(self):
-        return (self.btn_analyze, self.btn_place, self.btn_scan, self.btn_enrich,
-                self.btn_overrides, self.btn_build, self.btn_ingest, self.b_to_inbox)
+        btns = [self.btn_analyze, self.btn_place, self.btn_scan, self.btn_enrich,
+                self.btn_overrides, self.btn_build, self.btn_ingest, self.b_to_inbox]
+        if hasattr(self, "b_import_all"):
+            btns.append(self.b_import_all)
+        return tuple(btns)
 
     def _set_busy(self, busy: bool):
         for b in self._all_buttons():
