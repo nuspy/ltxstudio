@@ -27,6 +27,31 @@ from ui.film_studio.film_studio_window import FilmStudioWindow
 
 
 class FilmStudioWindowPro(FilmStudioWindow):
+    # ---- tab figli in variante Pro (empty-state guidati + rifiniture) ----
+    def _make_script_tab(self):
+        from ui.film_studio.pro_tabs import ScriptTabPro
+        return ScriptTabPro(self._get_project)
+
+    def _make_asset_tab(self):
+        from ui.film_studio.pro_tabs import AssetManagerTabPro
+        return AssetManagerTabPro()
+
+    def _make_sb_tab(self):
+        from ui.film_studio.pro_tabs import StoryboardTabPro
+        return StoryboardTabPro(self._get_project)
+
+    def _make_mt_tab(self):
+        from ui.film_studio.pro_tabs import MontageTabPro
+        return MontageTabPro(self._get_project)
+
+    def _make_voice_tab(self):
+        from ui.film_studio.pro_tabs import VoiceTabPro
+        return VoiceTabPro()
+
+    def _make_lora_tab(self):
+        from ui.film_studio.pro_tabs import LoraStudioTabPro
+        return LoraStudioTabPro()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("fs.title.pro", "🎬 AI Film Studio — Pro ✨"))

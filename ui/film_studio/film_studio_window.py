@@ -56,14 +56,15 @@ class FilmStudioWindow(QWidget):
         root.addWidget(self._project_bar())
         root.addWidget(LlmSettings())
         self.tabs = QTabWidget()
-        self.script_tab = ScriptTab(self._get_project)
-        self.asset_tab = AssetManagerTab()
-        self.sb_tab = StoryboardTab(self._get_project)
-        self.mt_tab = MontageTab(self._get_project)
+        # factory dei tab figli (override in FilmStudioWindowPro per le varianti Pro)
+        self.script_tab = self._make_script_tab()
+        self.asset_tab = self._make_asset_tab()
+        self.sb_tab = self._make_sb_tab()
+        self.mt_tab = self._make_mt_tab()
         self.sb_tab.auto_complete.connect(self._on_auto_complete)   # #54: Auto → montaggio automatico
         self.script_tab.script_ready.connect(lambda *_: self.sb_tab._refresh())   # #95: copione salvato → aggiorna Scenografia
-        self.voice_tab = VoiceTab()
-        self.lora_tab = LoraStudioTab()
+        self.voice_tab = self._make_voice_tab()
+        self.lora_tab = self._make_lora_tab()
         self.tabs.addTab(self.script_tab, tr("fs.tab.script", "Copione"))
         self.tabs.addTab(self.sb_tab, tr("fs.tab.scenografia", "Scenografia"))
         self.tabs.addTab(self.mt_tab, tr("fs.tab.montage", "Montaggio"))
@@ -76,6 +77,25 @@ class FilmStudioWindow(QWidget):
 
     def _get_project(self):
         return self._project_id
+
+    # ---- factory dei tab figli (Classica; override nella variante Pro) ----
+    def _make_script_tab(self):
+        return ScriptTab(self._get_project)
+
+    def _make_asset_tab(self):
+        return AssetManagerTab()
+
+    def _make_sb_tab(self):
+        return StoryboardTab(self._get_project)
+
+    def _make_mt_tab(self):
+        return MontageTab(self._get_project)
+
+    def _make_voice_tab(self):
+        return VoiceTab()
+
+    def _make_lora_tab(self):
+        return LoraStudioTab()
 
     def _project_bar(self) -> QWidget:
         w = QWidget(); h = QHBoxLayout(w); h.setContentsMargins(0, 0, 0, 0)
