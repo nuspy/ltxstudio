@@ -160,6 +160,20 @@ def _maybe_compile(pipe) -> bool:
         return False
 
 
+def _flux_in_channels(transformer_path: str) -> int | None:
+    """Canali in ingresso del transformer FLUX (x_embedder/img_in) dal solo header safetensors.
+    64 = FLUX standard; 384 = FLUX.1 Fill (inpaint/outpaint). None se non-safetensors/gguf o chiave assente."""
+    try:
+        from core.model_detect import read_header, _shape
+        tensors, _ = read_header(transformer_path)
+        shp = _shape(tensors, "x_embedder.weight", "img_in.weight")
+        if shp and len(shp) >= 2:
+            return int(shp[1])
+    except Exception:                                        # noqa: BLE001
+        pass
+    return None
+
+
 def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
     (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
@@ -170,9 +184,15 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
     bf16 = torch.bfloat16
     # config transformer LOCALE (no dipendenza HF a runtime → funziona offline/gated; target 100% locale).
-    # FLUX Fill (inpaint/outpaint) ha in_channels=384 (latente+immagine mascherata concatenati): usa il
-    # config dedicato 'flux_fill_transformer', altrimenti x_embedder mismatch (64 vs 384).
-    _cfg_name = "flux_fill_transformer" if arch == "inpaint" else "flux_transformer"
+    # FLUX Fill (inpaint/outpaint) ha in_channels=384 (latente+immagine mascherata concatenati) vs 64 standard.
+    # Scegliamo il config in base ai CANALI REALI del checkpoint (x_embedder/img_in), NON solo dall'arch:
+    # così qualsiasi modello si carica senza mismatch (es. arch=inpaint ma file FLUX standard a 64 canali).
+    _in_ch = _flux_in_channels(transformer_path)
+    _is_fill = (_in_ch == 384) or (_in_ch is None and arch == "inpaint")
+    if arch == "inpaint" and _in_ch == 64:
+        print("[flux] Modello FLUX STANDARD (64 canali) selezionato per l'inpaint: per il Fill nativo di "
+              "qualità usa il modello 'FLUX.1 Fill' (384 canali). Procedo col config standard.")
+    _cfg_name = "flux_fill_transformer" if _is_fill else "flux_transformer"
     _tr_cfg = os.path.join(TE_DIR, _cfg_name)
     # GGUF (llama.cpp Qn_K): diffusers legge il transformer FLUX quantizzato e lo tiene tale in VRAM,
     # dequant on-the-fly per-layer (memory-bounded). Serve il pacchetto `gguf`; il key-map BFL→diffusers
