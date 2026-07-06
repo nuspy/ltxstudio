@@ -65,9 +65,11 @@ class ModelManager:
             return e.obj
         if key not in self._loaders:
             raise KeyError(f"nessun loader registrato per '{key}'")
-        # libera spazio se necessario PRIMA di caricare
+        # libera spazio se necessario PRIMA di caricare un modello DIVERSO: sfratta i meno usati (LRU) finché
+        # c'è spazio → il nuovo modello entra in VRAM (GPU-resident, veloce) invece di finire in offload su RAM
+        # (era 249s/step!). Lo STESSO modello NON arriva qui (ensure ritorna la cache sopra) → nessun reload.
         if need_mb:
-            self.make_room(need_mb, keep=set(self._cache))   # non scaricare nulla di già usato ora
+            self.make_room(need_mb)
         obj, vram = self._loaders[key]()
         self._cache[key] = _Entry(obj=obj, vram_mb=float(vram or 0.0), last_used=_now(), sticky=sticky)
         return obj

@@ -869,6 +869,15 @@ def run(params: dict, mm, output_dir: str) -> dict:
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
             print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
+    # DITHER anti-BANDING: i gradienti morbidi (pelle, cielo) a 8-bit fanno "scalini" di posterizzazione,
+    # peggio coi modelli quantizzati (Q5/fp8). Un rumore ±1.7 livelli IMPERCETTIBILE li rompe. Env NATIVE_DITHER=0.
+    if os.environ.get("NATIVE_DITHER", "1") == "1":
+        try:
+            import numpy as _np
+            _a = _np.asarray(res_img).astype(_np.float32) + _np.random.uniform(-1.7, 1.7, (res_img.height, res_img.width, 1))
+            res_img = Image.fromarray(_np.clip(_a, 0, 255).astype("uint8"))
+        except Exception:                                            # noqa: BLE001
+            pass
     res_img.save(path)
     try:                                                     # #107 firma invisibile di provenienza (default ON, tutte le edizioni)
         from core import stego
