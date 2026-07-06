@@ -105,6 +105,42 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     return "offload"
 
 
+def _ensure_placement(pipe, mm=None, self_key: str | None = None) -> str:
+    """Placement per-JOB (coda seriale → un solo pipe attivo alla volta). Con i componenti CONDIVISI
+    (ComponentStore) lo stato device/hook è GLOBALE: un'altra pipeline può aver attaccato hook di offload
+    al T5 condiviso o averlo demotato su CPU. A inizio job: se l'epoch del proprio ultimo placement è
+    ancora quello dello store → no-op (caso comune, stesso pipe riusato). Altrimenti: strip di TUTTI gli
+    hook accelerate sui propri moduli (anche se attaccati da un'ALTRA shell — mai due catene di offload
+    vive), make_room per il fabbisogno mancante (i componenti PROPRI sono refcountati → protetti), e
+    _place con la VRAM di ADESSO. Ping-pong gpu↔offload ≈ 1-2s di PCIe vs 30-90s di reload da SSD."""
+    from inference_server.component_store import STORE
+    if getattr(pipe, "_ls_no_rebind", False):            # flux2 blockswap: pesi su CPU by design, MAI ri-piazzare
+        return getattr(pipe, "_ls_place_mode", "blockswap")
+    if getattr(pipe, "_ls_place_epoch", -1) == STORE.placement_epoch:
+        return getattr(pipe, "_ls_place_mode", "gpu")
+    try:
+        pipe.remove_all_hooks()                          # solo _hf_hook accelerate; i _diffusers_hook
+    except Exception:                                    # noqa: BLE001   (layerwise fp8) sopravvivono
+        pass
+    import torch
+    keys = getattr(pipe, "_ls_component_keys", ()) or ()
+    est = int(getattr(pipe, "_ls_est_mb", VRAM_MB.get("flux", 24000)))
+    est_missing = max(est - int(STORE.resident_of(keys)), 2000)   # spazio dei residenti già pagato
+    if mm is not None:
+        try:                                             # sfratta le ALTRE shell/orfani per far posto
+            total_mb = torch.cuda.mem_get_info()[1] / 1024**2 if torch.cuda.is_available() else 0
+            mm.make_room(min(est_missing * 1.12, max(total_mb - 2000, 0)),
+                         keep={self_key} if self_key else set())
+        except Exception:                                # noqa: BLE001
+            pass
+    mode = _place(pipe, est_missing)
+    for k in keys:
+        STORE.note_device(k, "cuda" if mode == "gpu" else "cpu")
+    pipe._ls_place_mode = mode
+    pipe._ls_place_epoch = STORE.bump_epoch()            # invalida l'epoch delle ALTRE pipe → loro rebind
+    return mode
+
+
 def _place_flux2_blockswap(pipe) -> str:
     """Placement memory-bounded per FLUX.2 (~32B): block-swap manuale (no accelerate, che segfaulta coi
     buffer float8). I Linear quantizzati (Fp8Linear/Nvfp4Linear) tengono i pesi su CPU e li spostano su
@@ -205,30 +241,18 @@ def _flux_in_channels(transformer_path: str) -> int | None:
     return None
 
 
-def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
-    """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
-    (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
-    (diffusion_models) che non contengono i text encoder."""
+def _load_flux_tr(transformer_path: str, arch: str = "flux"):
+    """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
+    Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dalla FASE C (fp8)."""
     import os
     import torch
-    from diffusers import FluxTransformer2DModel, AutoencoderKL, FlowMatchEulerDiscreteScheduler
-    from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
+    from diffusers import FluxTransformer2DModel
     bf16 = torch.bfloat16
-    # config transformer LOCALE (no dipendenza HF a runtime → funziona offline/gated; target 100% locale).
-    # FLUX Fill (inpaint/outpaint) ha in_channels=384 (latente+immagine mascherata concatenati) vs 64 standard.
-    # Scegliamo il config in base ai CANALI REALI del checkpoint (x_embedder/img_in), NON solo dall'arch:
-    # così qualsiasi modello si carica senza mismatch (es. arch=inpaint ma file FLUX standard a 64 canali).
     _in_ch = _flux_in_channels(transformer_path)
     _is_fill = (_in_ch == 384) or (_in_ch is None and arch == "inpaint")
-    if arch == "inpaint" and _in_ch == 64:
-        print("[flux] Modello FLUX STANDARD (64 canali) selezionato per l'inpaint: per il Fill nativo di "
-              "qualità usa il modello 'FLUX.1 Fill' (384 canali). Procedo col config standard.")
     _cfg_name = "flux_fill_transformer" if _is_fill else "flux_transformer"
     _tr_cfg = os.path.join(TE_DIR, _cfg_name)
-    # GGUF (llama.cpp Qn_K): diffusers legge il transformer FLUX quantizzato e lo tiene tale in VRAM,
-    # dequant on-the-fly per-layer (memory-bounded). Serve il pacchetto `gguf`; il key-map BFL→diffusers
-    # è gestito dal single_file loader. Senza questo, from_single_file tratta il .gguf come safetensors
-    # e fallisce ("Unable to load weights"). Vale per flux/kontext/inpaint (Fill hyp8 GGUF, ecc.).
+    # GGUF (llama.cpp Qn_K): transformer quantizzato tenuto tale in VRAM, dequant per-layer on-the-fly.
     _gguf_kw = {}
     if str(transformer_path).lower().endswith(".gguf"):
         from diffusers import GGUFQuantizationConfig
@@ -238,17 +262,54 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
             transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True, **_gguf_kw)
     else:
         tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16, **_gguf_kw)
-    # config esplicito (VAE FLUX = 16 canali latenti; senza, from_single_file inferisce SD-VAE a 8)
-    vae = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)
-    te = CLIPTextModel.from_pretrained(os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)
+    return tr, _cfg_name
+
+
+def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
+    """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
+    (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
+    (diffusion_models) che non contengono i text encoder.
+
+    COMPONENT STORE: T5/CLIP/VAE (identici per TUTTI i FLUX.1) e il transformer (per-file) vengono presi
+    dallo store con refcount → mai ricaricati finché vivono lì; la pipeline è una "shell" leggera che li
+    referenzia (pipe._ls_component_keys). Rollback dei refcount se l'assemblaggio fallisce a metà."""
+    import os
+    import torch
+    from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler
+    from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
+    from inference_server.component_store import STORE
+    bf16 = torch.bfloat16
+    _in_ch = _flux_in_channels(transformer_path)
+    if arch == "inpaint" and _in_ch == 64:
+        print("[flux] Modello FLUX STANDARD (64 canali) selezionato per l'inpaint: per il Fill nativo di "
+              "qualità usa il modello 'FLUX.1 Fill' (384 canali). Procedo col config standard.")
+    _cfg_name = "flux_fill_transformer" if (_in_ch == 384 or (_in_ch is None and arch == "inpaint")) \
+        else "flux_transformer"
+    tr_key = f"flux_tr:{os.path.normpath(transformer_path).lower()}:{_cfg_name}"
+    got: list[str] = []                                  # rollback anti refcount-leak
+    try:
+        tr = STORE.acquire(tr_key, lambda: _load_flux_tr(transformer_path, arch)[0]); got.append(tr_key)
+        vae = STORE.acquire("vae_flux", lambda: AutoencoderKL.from_single_file(
+            AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)); got.append("vae_flux")
+        te = STORE.acquire("clip_l", lambda: CLIPTextModel.from_pretrained(
+            os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)); got.append("clip_l")
+        te2 = STORE.acquire("t5xxl", lambda: T5EncoderModel.from_pretrained(
+            os.path.join(TE_DIR, "t5xxl"), torch_dtype=bf16)); got.append("t5xxl")
+    except Exception:
+        for k in got:
+            STORE.release(k)
+        raise
+    # tokenizer/scheduler: leggeri, ricreati ogni volta — MAI nello store
     tok = CLIPTokenizer.from_pretrained(os.path.join(TE_DIR, "clip_l"))
-    te2 = T5EncoderModel.from_pretrained(os.path.join(TE_DIR, "t5xxl"), torch_dtype=bf16)
     tok2 = T5TokenizerFast.from_pretrained(os.path.join(TE_DIR, "t5xxl"))
     sched = FlowMatchEulerDiscreteScheduler(
         num_train_timesteps=1000, shift=3.0, use_dynamic_shifting=True,
         base_shift=0.5, max_shift=1.15, base_image_seq_len=256, max_image_seq_len=4096)
-    return Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok,
+    pipe = Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok,
                 text_encoder_2=te2, tokenizer_2=tok2, scheduler=sched)
+    pipe._ls_component_keys = (tr_key, "vae_flux", "clip_l", "t5xxl")
+    pipe._ls_shared = True
+    return pipe
 
 
 def _normalize_flux_prefix(path: str) -> str:
@@ -459,10 +520,28 @@ def _arch_of(params: dict) -> str:
     return a if a in SPEC else "flux"
 
 
-def _load(model_path: str, arch: str):
+_SIBLING_ARCHS = ("flux", "kontext", "inpaint")          # arch FLUX.1 che condividono gli stessi componenti
+
+
+def _sibling_pipe(mm, model_raw: str, arch: str):
+    """Se in cache c'è una pipeline SORELLA (stesso file modello, arch diverso della famiglia FLUX.1,
+    shell condivisa) → ritornala: la nuova pipeline si costruisce con from_pipe (ZERO load da disco)."""
+    if mm is None:
+        return None
+    for a in _SIBLING_ARCHS:
+        if a == arch:
+            continue
+        e = mm._cache.get(f"{a}:{model_raw}")
+        if e is not None and getattr(e.obj, "_ls_shared", False):
+            return e.obj
+    return None
+
+
+def _load(model_path: str, arch: str, mm=None):
     """Loader per il ModelManager: ritorna (pipe, vram_mb)."""
     import torch
     import diffusers
+    _model_raw = model_path                              # chiave cache originale (per il lookup sorelle)
     # Risolvi il path RELATIVO (es. "Flux\\FLUX_Krea_Dev.safetensors" dall'inventario filesystem) →
     # assoluto sotto diffusion_models. Senza, Path.is_file() è False e si cade in from_pretrained che
     # interpreta il nome come repo_id HF ("Repo id must use alphanumeric..."). Tollera spazi↔underscore.
@@ -523,6 +602,30 @@ def _load(model_path: str, arch: str):
             f"{diffusers.__version__}." + (f" Usa '{alt}' per questa funzione." if alt else
             " Aggiorna diffusers o scegli un'altra pipeline."))
     is_file = Path(model_path).is_file()
+    # RIUSO SORELLA (from_pipe): stesso FILE modello già caricato con un altro arch FLUX.1 (es. t2i→kontext)
+    # → costruisci la nuova pipeline dagli STESSI componenti (zero load da disco, ~1s). Solo 64ch: il Fill
+    # (384ch) ha un transformer incompatibile e non arriva mai qui con lo stesso file.
+    if (arch in _SIBLING_ARCHS and is_file and _flux_in_channels(model_path) == 64):
+        _src = _sibling_pipe(mm, _model_raw, arch)
+        if _src is not None:
+            try:
+                from inference_server.component_store import STORE as _ST
+                try:
+                    _src.remove_all_hooks()               # from_pipe NON gestisce gli hook → sanifica PRIMA
+                except Exception:                         # noqa: BLE001
+                    pass
+                _ST.bump_epoch()                          # stato toccato → tutte le pipe faranno rebind
+                pipe = Pipe.from_pipe(_src)
+                pipe._ls_component_keys = _src._ls_component_keys
+                for _ck in pipe._ls_component_keys:
+                    _ST.retain(_ck)                       # la nuova shell referenzia gli stessi componenti
+                pipe._ls_shared = True
+                pipe._ls_est_mb = getattr(_src, "_ls_est_mb", VRAM_MB.get(arch, 24000))
+                _set_attention(pipe, arch)
+                print(f"[flux] from_pipe: riuso componenti della sorella per '{arch}' (zero load)", flush=True)
+                return pipe, 50
+            except Exception as _e:                       # noqa: BLE001 — fallback: load normale
+                print(f"[flux] from_pipe fallito ({_e}) → load completo", flush=True)
     if arch == "ernie":
         pipe = _assemble_ernie()                            # assemblaggio locale (shim transformers <5)
     elif arch.startswith("flux2") and is_file:
@@ -615,17 +718,24 @@ def _load(model_path: str, arch: str):
                 where = _place_flux2_blockswap(pipe)
         else:
             pipe.enable_model_cpu_offload(); where = "offload"
+        # blockswap/offload flux2: pesi fp8 su CPU by design → MAI ri-piazzare (rebind lo salta)
+        pipe._ls_no_rebind = True
+        pipe._ls_place_mode = where
     else:
-        # resident_mb ≈ transformer (componente più grande tenuto su GPU sotto model_cpu_offload). Per i
-        # file bf16 ≈ dimensione file; per fp8/gguf resta più piccolo → offload a componenti (veloce).
-        where = _place(pipe, est_mb, resident_mb=int(_eff_mb) or None)
+        # PLACEMENT RINVIATO a inizio job (_ensure_placement in run()): con componenti CONDIVISI lo stato
+        # device/hook è globale e può cambiare tra un job e l'altro (altra shell in offload, demote su CPU)
+        # → la decisione gpu|offload va presa con la VRAM di ADESSO, non a load-time. _load carica su CPU.
+        pipe._ls_est_mb = est_mb
+        where = "deferred"
     print(f"[image] {arch}: {where} (est {est_mb}MB, file {int(sz_mb)}MB), attention={attn}, fbcache={fb}, compile={comp}", flush=True)
-    return pipe, VRAM_MB.get(arch, 16000)
+    # Le shell condivise pesano ~50MB proprie (tokenizer/scheduler): i GB veri sono nel ComponentStore
+    # (contati lì, una volta sola per componente). Le monolitiche mantengono la stima piena.
+    return pipe, (50 if getattr(pipe, "_ls_shared", False) else VRAM_MB.get(arch, 16000))
 
 
 def register(mm, model: str, arch: str) -> str:
     key = f"{arch}:{model}"
-    mm.register(key, lambda: _load(model, arch))
+    mm.register(key, lambda: _load(model, arch, mm))
     return key
 
 
@@ -725,7 +835,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
     model = params["model"]
     key = register(mm, model, arch)
     preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
-    pipe = mm.ensure(key, need_mb=VRAM_MB.get(arch, 16000))
+    # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
+    # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
+    # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
+    pipe = mm.ensure(key)
+    where = _ensure_placement(pipe, mm, key)                # placement per-JOB (gpu|offload con VRAM attuale)
+    _set_attention(pipe, arch)                              # per-job: il transformer CONDIVISO può avere il
+    print(f"[image] job {arch}: placement={where}", flush=True)  # processor dell'arch precedente (sage↔sdpa)
     mm.apply_loras(pipe, params.get("loras"))
     preview_bus.set_message("Generazione…")
 

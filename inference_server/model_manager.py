@@ -28,6 +28,7 @@ class _Entry:
     vram_mb: float
     last_used: float
     sticky: bool = False                                # non scaricare con LRU (es. VAE condivisa)
+    component_keys: tuple = ()                          # componenti nel ComponentStore referenziati (refcount)
 
 
 @dataclass
@@ -71,7 +72,11 @@ class ModelManager:
         if need_mb:
             self.make_room(need_mb)
         obj, vram = self._loaders[key]()
-        self._cache[key] = _Entry(obj=obj, vram_mb=float(vram or 0.0), last_used=_now(), sticky=sticky)
+        # Le pipeline "shell" (componenti condivisi nel ComponentStore) dichiarano le chiavi referenziate
+        # in _ls_component_keys: l'unload della shell fa release() (refcount--) SENZA distruggere T5/VAE/…
+        ckeys = tuple(getattr(obj, "_ls_component_keys", ()) or ())
+        self._cache[key] = _Entry(obj=obj, vram_mb=float(vram or 0.0), last_used=_now(), sticky=sticky,
+                                  component_keys=ckeys)
         return obj
 
     def make_room(self, need_mb: float, keep: set[str] | None = None) -> None:
@@ -88,15 +93,34 @@ class ModelManager:
             self.unload(k)
             _, free = self._vram_total_free_mb()
             if free >= need_mb:
-                break
+                return
+        # ULTIMA risorsa: dopo le shell, tocca i COMPONENTI orfani del ComponentStore (refcount==0, LRU).
+        # Demote su CPU se il budget RAM lo consente, altrimenti destroy (vedi component_store.evict_unused).
+        try:
+            from inference_server.component_store import STORE
+            _, free = self._vram_total_free_mb()
+            if free < need_mb:
+                STORE.evict_unused(need_mb - free)
+                self.flush()
+        except Exception:                               # noqa: BLE001
+            pass
 
     def unload(self, key: str) -> None:
         e = self._cache.pop(key, None)
         if e is None:
             return
-        # NIENTE .to("cpu"): pullerebbe i pesi (22GB) in RAM prima di cancellarli = picco RAM inutile
-        # e, con due processi attivi, congela il sistema. Cancello e basta → empty_cache libera la VRAM
-        # (i tensori GPU vengono rilasciati col del); gc.collect() libera la RAM.
+        # Shell con componenti condivisi: release (refcount--) PRIMA di distruggere l'oggetto — così
+        # T5/CLIP/VAE/transformer sopravvivono nello store (riusabili dalla prossima pipeline o demote/evict
+        # da make_room). La shell in sé è leggera (tokenizer/scheduler/oggetto pipe, ~50MB).
+        if e.component_keys:
+            try:
+                from inference_server.component_store import STORE
+                for ck in e.component_keys:
+                    STORE.release(ck)
+            except Exception:                           # noqa: BLE001
+                pass
+        # NIENTE .to("cpu") della pipeline intera: pullerebbe i pesi in RAM prima di cancellarli = picco
+        # RAM inutile. Cancello e basta → empty_cache libera la VRAM dei tensori NON referenziati altrove.
         try:
             del e.obj
         except Exception:                               # noqa: BLE001
@@ -180,9 +204,15 @@ class ModelManager:
 
     def status(self) -> dict:
         total, free = self._vram_total_free_mb()
-        return {"vram_total_mb": round(total), "vram_free_mb": round(free),
-                "budget_mb": round(self._budget_mb()), "tracked_mb": round(self._used_mb()),
-                "loaded": list(self._cache)}
+        st = {"vram_total_mb": round(total), "vram_free_mb": round(free),
+              "budget_mb": round(self._budget_mb()), "tracked_mb": round(self._used_mb()),
+              "loaded": list(self._cache)}
+        try:
+            from inference_server.component_store import STORE
+            st["store"] = STORE.status()
+        except Exception:                               # noqa: BLE001
+            pass
+        return st
 
 
 def _now() -> float:
