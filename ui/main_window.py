@@ -252,7 +252,10 @@ class _VideoEditAIWorker(QThread):
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
                 seg = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
                                     "inference_server", "backends", "video_segment.py")
-                r = _sp.run([self.INF_PY, "-u", seg, src, cfg["object"], gpath],
+                # passa il dilate della GUI anche al TRACKING (le maschere del guide devono combaciare
+                # con quelle che il worker userà — prima il CLI girava con dilate=0 fisso)
+                r = _sp.run([self.INF_PY, "-u", seg, src, cfg["object"], gpath,
+                             str(int(cfg.get("mask_dilate", 24)))],
                             capture_output=True, text=True, encoding="utf-8", errors="replace")
                 line = next((l for l in (r.stdout or "").splitlines() if l.startswith("GUIDE:")), "")
                 if not line:
