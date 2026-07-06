@@ -219,6 +219,9 @@ def _maybe_compile(pipe) -> bool:
     import torch
     if os.environ.get("NATIVE_COMPILE", "0") != "1":
         return False
+    if getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False):
+        print("[image] compile saltato: transformer con layerwise fp8 (hook incompatibili)", flush=True)
+        return False
     try:
         pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead", fullgraph=False)
         return True
@@ -241,9 +244,30 @@ def _flux_in_channels(transformer_path: str) -> int | None:
     return None
 
 
+def _flux_fp8_e4m3(path: str) -> bool:
+    """True se il checkpoint FLUX.1 è nativamente F8_E4M3 (dall'HEADER safetensors, non dal nome file):
+    maggioranza dei .weight dei blocchi in fp8. E5M2 non arriva qui (già upcastato a bf16 da
+    _normalize_flux_prefix); i GGUF sono esclusi a monte dal chiamante."""
+    try:
+        from core.model_detect import read_header
+        tensors, _ = read_header(path)
+        ds = [t.get("dtype") for k, t in tensors.items()
+              if k.endswith(".weight") and ("double_blocks" in k or "transformer_blocks" in k
+                                            or "single_blocks" in k)]
+        return bool(ds) and sum(d == "F8_E4M3" for d in ds) > len(ds) // 2
+    except Exception:                                    # noqa: BLE001
+        return False
+
+
 def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
-    Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dalla FASE C (fp8)."""
+    Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dal ramo fp8.
+
+    FP8 SENZA UPCAST (FASE C review): un checkpoint nativo F8_E4M3 (getphat 11GB) veniva upcastato a bf16
+    (22GB) → full-stack 33GB → offload. Con enable_layerwise_casting (storage fp8 / compute bf16, nativo
+    diffusers 0.38) il transformer occupa 11GB → full-stack ~24GB → TUTTO GPU-resident sui 32GB. Roundtrip
+    LOSSLESS (E4M3 senza scale → bf16 → fp8 = valori identici); nn.Linear intatti → LoRA/PEFT funziona.
+    Off: NATIVE_FLUX1_FP8=0 (fallback = upcast bf16 identico a prima)."""
     import os
     import torch
     from diffusers import FluxTransformer2DModel
@@ -254,7 +278,8 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     _tr_cfg = os.path.join(TE_DIR, _cfg_name)
     # GGUF (llama.cpp Qn_K): transformer quantizzato tenuto tale in VRAM, dequant per-layer on-the-fly.
     _gguf_kw = {}
-    if str(transformer_path).lower().endswith(".gguf"):
+    _is_gguf = str(transformer_path).lower().endswith(".gguf")
+    if _is_gguf:
         from diffusers import GGUFQuantizationConfig
         _gguf_kw = {"quantization_config": GGUFQuantizationConfig(compute_dtype=bf16)}
     if os.path.isdir(_tr_cfg):
@@ -262,6 +287,16 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
             transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True, **_gguf_kw)
     else:
         tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16, **_gguf_kw)
+    if (os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf
+            and _flux_fp8_e4m3(transformer_path)):
+        try:
+            tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn,
+                                        compute_dtype=bf16)   # skip default: norm/embed restano bf16
+            tr._ls_fp8_storage = True
+            print("[flux] transformer fp8 STORAGE (layerwise casting): ~metà VRAM, niente offload",
+                  flush=True)
+        except Exception as e:                           # noqa: BLE001
+            print(f"[flux] layerwise fp8 non applicato ({e}) → bf16 (fallback)", flush=True)
     return tr, _cfg_name
 
 
@@ -689,7 +724,10 @@ def _load(model_path: str, arch: str, mm=None):
     # il placement (fp8 sottostimato → 'gpu' che sfora; GGUF gonfiato dal floor → 'offload' inutile).
     _base = os.path.basename(model_path).lower()
     _is_gguf = _base.endswith(".gguf")
-    _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf) else sz_mb
+    # fp8 con layerwise casting (storage fp8) → RESTA ~dim file in memoria (niente upcast ×2) → il
+    # full-stack entra GPU-resident. Senza casting (fallback) l'upcast a bf16 raddoppia come prima.
+    _fp8_storage = bool(getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False))
+    _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf and not _fp8_storage) else sz_mb
     overhead = 4000 if arch == "zimage" else 11000          # T5/CLIP/Mistral + VAE + working
     if _is_gguf and sz_mb:
         est_mb = int(_eff_mb + overhead)                    # NIENTE floor VRAM_MB: il Q4/Q5 è davvero piccolo

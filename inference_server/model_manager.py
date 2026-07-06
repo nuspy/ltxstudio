@@ -247,7 +247,14 @@ class ModelManager:
                 cand = os.path.join(r"E:\AI\Models\LoRA", name)
                 if os.path.exists(cand):
                     name = cand
-            pipe.load_lora_weights(name, adapter_name=adapter)
+            try:
+                pipe.load_lora_weights(name, adapter_name=adapter)
+            except Exception as _e:                     # noqa: BLE001
+                if getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False):
+                    raise RuntimeError(
+                        "LoRA non caricabile sul base con storage fp8 (layerwise casting): riavvia il "
+                        f"server con NATIVE_FLUX1_FP8=0 per usare questa LoRA in bf16. ({_e})") from _e
+                raise
             names.append(adapter); weights.append(float(lo.get("strength", 1.0)))
         try:
             pipe.set_adapters(names, adapter_weights=weights)
