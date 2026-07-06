@@ -20,15 +20,16 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QPlainTextEdit, QProgressBar, QFileDialog, QSplitter,
     QGroupBox, QScrollArea, QFrame, QMessageBox, QToolButton, QCheckBox, QButtonGroup,
-    QStackedWidget, QComboBox,
+    QStackedWidget, QComboBox, QDialog, QTextEdit, QDialogButtonBox,
 )
 from ui.i18n_manager import tr
 
 from core import catalog_paths
 from core import comfy_compat
 from core import model_importer
+from core import user_prefs
 from core.catalog_tooling import CatalogTooling
-from ui.widgets.model_card import ModelCard, flow_grid
+from ui.widgets.model_card import ModelCard, badge, flow_grid
 
 
 class _DropArea(QLabel):
@@ -174,6 +175,81 @@ class _ThumbWorker(QThread):
                 continue
 
 
+class _LibraryDetailDialog(QDialog):
+    """Model card di dettaglio: mostra e MODIFICA i metadati (→ manual_enrichment.json)."""
+
+    def __init__(self, entry: dict, parent=None):
+        super().__init__(parent)
+        self._entry = entry
+        self.changed = False
+        self.setWindowTitle(entry.get("filename", "modello"))
+        self.setMinimumWidth(440)
+        v = QVBoxLayout(self)
+
+        title = QLabel(entry.get("filename", "?"))
+        title.setStyleSheet("font-weight:600; font-size:14px;")
+        title.setWordWrap(True)
+        v.addWidget(title)
+
+        brow = QHBoxLayout()
+        for text, kind in ((entry.get("type", ""), "type"), (entry.get("architecture", ""), "arch")):
+            if text:
+                brow.addWidget(badge(text, kind))
+        brow.addStretch(1)
+        v.addLayout(brow)
+
+        civ = entry.get("civitai") or {}
+        url = civ.get("model_url") or entry.get("civitai_url")
+        if url:
+            link = QLabel(f'<a href="{url}" style="color:#74c0fc;">{tr("imp2.detail.civitai", "Pagina Civitai")}</a>')
+            link.setOpenExternalLinks(True)
+            v.addWidget(link)
+
+        v.addWidget(QLabel(tr("imp2.detail.triggers", "Trigger words (separate da virgola):")))
+        trigs = entry.get("trigger_words") or civ.get("trigger_words") or []
+        self.ed_trig = QLineEdit(", ".join(trigs))
+        v.addWidget(self.ed_trig)
+
+        v.addWidget(QLabel(tr("imp2.detail.desc", "Descrizione / note:")))
+        self.ed_desc = QTextEdit()
+        self.ed_desc.setPlainText(entry.get("user_notes") or entry.get("instructions") or "")
+        self.ed_desc.setMaximumHeight(120)
+        v.addWidget(self.ed_desc)
+
+        self.cb_nsfw = QCheckBox(tr("imp2.detail.nsfw", "Contenuto NSFW"))
+        self.cb_nsfw.setChecked(bool(entry.get("nsfw")))
+        v.addWidget(self.cb_nsfw)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self._save)
+        bb.rejected.connect(self.reject)
+        v.addWidget(bb)
+
+    def _save(self):
+        import json
+        fn = self._entry.get("filename")
+        if not fn:
+            self.reject(); return
+        p = Path(catalog_paths.load()["dict_root"]) / "data" / "manual_enrichment.json"
+        try:
+            data = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        except Exception:                                    # noqa: BLE001
+            data = {}
+        rec = data.get(fn) or {}
+        rec["trigger_words"] = [t.strip() for t in self.ed_trig.text().split(",") if t.strip()]
+        rec["instructions"] = self.ed_desc.toPlainText().strip()
+        rec["nsfw"] = self.cb_nsfw.isChecked()
+        data[fn] = rec
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            self.changed = True
+        except Exception as e:                               # noqa: BLE001
+            QMessageBox.critical(self, tr("imp2.detail.err", "Errore"), str(e))
+            return
+        self.accept()
+
+
 class ImportModelsTab(QWidget):
     """Importa e cataloga modelli AI tramite gli strumenti del dizionario."""
 
@@ -241,6 +317,9 @@ class ImportModelsTab(QWidget):
         btn = self._seg_group.button(idx)
         if btn and not btn.isChecked():
             btn.setChecked(True)
+        if idx == 2 and not getattr(self, "_lib_loaded", True):   # Libreria: carica alla prima apertura
+            self._lib_loaded = True
+            self._load_library()
 
     def _build_log(self) -> QWidget:
         log_w = QWidget()
@@ -455,15 +534,111 @@ class ImportModelsTab(QWidget):
         self._log(tr("imp2.added", "＋ Aggiunto alla coda: {n}").format(n=it.name))
         self._select_mode(1)                                 # porta alla coda Importa
 
-    # ---- pagina Libreria (riempita in F4) ----
+    # ---- pagina Libreria: griglia dei modelli catalogati ----
     def _page_libreria(self) -> QWidget:
         w = QWidget()
         v = QVBoxLayout(w)
-        lab = QLabel(tr("imp2.library.soon", "🗂 Libreria modelli catalogati — in arrivo."))
-        lab.setAlignment(Qt.AlignCenter)
-        lab.setStyleSheet("color:#888; padding:30px;")
-        v.addWidget(lab)
+        v.setSpacing(8)
+        row = QHBoxLayout()
+        self.lib_search = QLineEdit()
+        self.lib_search.setPlaceholderText(tr("imp2.lib.search", "Filtra la libreria…"))
+        self.lib_search.textChanged.connect(self._load_library)
+        self.lib_type = QComboBox()
+        for i18n_key, default, _api in self._SEARCH_TYPES:
+            self.lib_type.addItem(tr(i18n_key, default))
+        self.lib_type.currentIndexChanged.connect(self._load_library)
+        self.lib_arch = QComboBox()
+        self.lib_arch.addItem(tr("imp2.arch.all", "Tutte le arch"))
+        self.lib_arch.currentIndexChanged.connect(self._load_library)
+        self.lib_nsfw = QCheckBox(tr("imp2.search.nsfw", "NSFW"))
+        self.lib_nsfw.toggled.connect(self._load_library)
+        b_ref = QPushButton(tr("imp2.lib.refresh", "↻"))
+        b_ref.setToolTip(tr("imp2.lib.refresh.tt", "Ricarica la libreria"))
+        b_ref.clicked.connect(lambda: self._load_library(force=True))
+        row.addWidget(self.lib_search, 1)
+        row.addWidget(self.lib_type)
+        row.addWidget(self.lib_arch)
+        row.addWidget(self.lib_nsfw)
+        row.addWidget(b_ref)
+        v.addLayout(row)
+
+        self.lib_scroll = QScrollArea()
+        self.lib_scroll.setWidgetResizable(True)
+        self.lib_scroll.setFrameShape(QScrollArea.NoFrame)
+        v.addWidget(self.lib_scroll, 1)
+        self._lib_loaded = False
+        self.catalog_updated.connect(lambda: self._load_library(force=True))
         return w
+
+    def _library_entries(self) -> list:
+        import json
+        p = Path(catalog_paths.load()["dict_root"]) / "data" / "catalog.json"
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:                                    # noqa: BLE001
+            return []
+        return list((data.get("entries") or {}).values())
+
+    def _load_library(self, force: bool = False):
+        entries = self._library_entries()
+        # popola il combo arch una volta (dai dati)
+        if self.lib_arch.count() <= 1 or force:
+            archs = sorted({e.get("architecture", "") for e in entries if e.get("architecture")})
+            cur = self.lib_arch.currentText()
+            self.lib_arch.blockSignals(True)
+            self.lib_arch.clear()
+            self.lib_arch.addItem(tr("imp2.arch.all", "Tutte le arch"))
+            for a in archs:
+                self.lib_arch.addItem(a)
+            idx = max(0, self.lib_arch.findText(cur))
+            self.lib_arch.setCurrentIndex(idx)
+            self.lib_arch.blockSignals(False)
+        adult = model_importer.adult_enabled()
+        want_nsfw = self.lib_nsfw.isChecked() and adult
+        q = self.lib_search.text().strip().lower()
+        ftype = self._SEARCH_TYPES[self.lib_type.currentIndex()][1]
+        farch = self.lib_arch.currentText() if self.lib_arch.currentIndex() > 0 else None
+        cards = []
+        for e in entries:
+            if e.get("nsfw") and not want_nsfw:              # NSFW visibile solo se adulti + checkbox attiva
+                continue
+            if self.lib_type.currentIndex() > 0 and (e.get("type") or "") != ftype:
+                continue
+            if farch and (e.get("architecture") or "") != farch:
+                continue
+            if q and q not in (e.get("filename", "").lower()):
+                continue
+            cards.append(self._library_card(e))
+        host = flow_grid(cards, columns=4) if cards else QLabel(
+            tr("imp2.lib.empty", "Nessun modello in libreria (importane qualcuno)."))
+        if isinstance(host, QLabel):
+            host.setAlignment(Qt.AlignCenter)
+            host.setStyleSheet("color:#666; padding:30px;")
+        self.lib_scroll.setWidget(host)
+
+    def _library_card(self, entry: dict) -> ModelCard:
+        name = entry.get("filename", "?")
+        typ = entry.get("type", "")
+        arch = entry.get("architecture", "")
+        badges = []
+        if typ:
+            badges.append((typ, "type"))
+        if arch:
+            badges.append((arch, "arch"))
+        badges.append(("🔞 NSFW", "nsfw") if entry.get("nsfw") else ("SFW", "sfw"))
+        fav = user_prefs.is_fav_model(name)
+        card = ModelCard(title=name, subtitle=arch, badges=badges, compact=False,
+                         actions=[(tr("imp2.lib.details", "Dettagli"),
+                                   lambda e=entry: self._open_detail(e))])
+        card.clicked.connect(lambda e=entry: self._open_detail(e))
+        return card
+
+    def _open_detail(self, entry: dict):
+        dlg = _LibraryDetailDialog(entry, self)
+        if dlg.exec() == QDialog.Accepted and dlg.changed:
+            self._start(tr("imp2.lib.applying", "Applico modifiche")).apply_overrides()
+
+    # legacy: lo stub è stato sostituito dalla libreria reale.
 
     # ============================================================ coda Importa
     _MODEL_EXTS = (".safetensors", ".ckpt", ".pt", ".pth", ".gguf")
