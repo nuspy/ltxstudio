@@ -2993,7 +2993,7 @@ class MainWindow(QMainWindow):
             fill = r"E:\AI\Models\diffusion_models\Flux\FLUX_DEV_Fill.safetensors"
             params = {"model": fill, "arch": "inpaint", "prompt": prompt, "negative": negative,
                       "image_path": exp["image"], "mask_path": mask,
-                      "steps": max(steps, 20), "guidance": 30.0, "seed": seed}
+                      "steps": max(steps, 20), "guidance": 18.0, "seed": seed}   # 30→18: evita over-guidance ("ghepardo")
             self._log(f"Integra mask-based (FLUX Fill, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
         else:
             unet = model or KONTEXT_MODEL
