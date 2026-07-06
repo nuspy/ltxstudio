@@ -2554,6 +2554,9 @@ class MainWindow(QMainWindow):
         if _engine == "comfy":
             self._log("[motore] comfy non copre audio/controlnet/storyboard/lungo → uso ltx2_infer")
         self._ltx2_worker = _NativeLtx2Worker(params)
+        # il motore nativo LTX-2 scrive la preview per-step su preview_file (#92) → mostra il dialog anteprima
+        # anche qui (prima appariva solo sul ramo comfy-native).
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
         self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
                       on_progress=lambda s: self._log("[nativo] " + s))
 
