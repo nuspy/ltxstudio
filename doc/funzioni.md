@@ -845,4 +845,27 @@ Modulo **🎬 AI Film Studio** (`ui/film_studio/`): DB SQLite + versioning, `llm
 
 ---
 
+## Tab «Modelli» — importer LoRA/checkpoint (#17)
+
+Redesign UX pro-max della tab (ex «Import Models») a **modalità segmentate** in alto + log/progress condivisi:
+
+- **🔍 Scopri**: ricerca **Civitai in-app** (query + filtro tipo + base-model + toggle NSFW gated) → griglia
+  di card con anteprima, badge tipo/arch/SFW-NSFW; «＋ Aggiungi» mette in coda.
+- **⬇ Importa**: incolla **URL/ID Civitai** oppure **trascina file/cartelle**. Ogni modello è riconosciuto
+  (tipo LoRA/Checkpoint/VAE/TE via `place_files.classify_safetensors`, arch via `model_detect`),
+  categorizzato SFW/NSFW e mostrato in coda con la **cartella di destinazione**. «Importa tutto» = one-click
+  (place→scan→enrich→build) nella cartella giusta, pronto all'uso nei dropdown.
+- **🗂 Libreria**: griglia dei modelli catalogati (da `catalog.json`) con filtri tipo/arch/ricerca + preferiti;
+  click → **model card** editabile (trigger, note, override NSFW → `manual_enrichment.json`).
+- **⚙ Avanzate**: tutto il power-user esistente (percorsi, patch compat ComfyUI, conversione modelli, staging
+  inbox, operazioni granulari analyze/place/scan/enrich/overrides/build/ingest).
+
+**SFW/NSFW**: cascata Civitai (`nsfwLevel`) → euristica nome/tag → classificatore Falconsai su preview →
+default NSFW. In modalità SFW i modelli NSFW sono **nascosti** dai dropdown (`_mcat.is_nsfw`). **Gate**: con
+`cap.adult_mode` OFF l'import NSFW è **bloccato** (item saltati con log, gli SFW passano). Ricerca/import
+Civitai gated da `cap.civitai_import` (edizione studio). Core: `core/civitai_client.py`,
+`core/nsfw_classifier.py`, `core/model_importer.py`; UI `ui/tabs/import_models_tab.py`, `ui/widgets/model_card.py`.
+
+---
+
 **Riepilogo**: documentate **72 funzioni** in **12 sezioni** (IMMAGINI, SEGMENTAZIONE, RESTAURO/UPSCALE, VIDEO, EDITING VIDEO, POST-PROCESS/QUALITÀ VIDEO, 3D, VOCE/TTS, MUSICA, FILM STUDIO, LORA TRAINING, IMPORT/MODELLI/DETECTION) + tabella riassuntiva finale e note skill per agenti AI.
