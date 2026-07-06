@@ -2408,5 +2408,7 @@
   "mem.ram": "RAM",
   "mem.vram_ded": "VRAM dedicata",
   "mem.vram_shared": "VRAM shared",
-  "mem.gpu": "GPU (CUDA)"
+  "mem.gpu": "GPU (CUDA)",
+  "mw.video_vram_title": "VRAM insufficiente per il video",
+  "mw.video_vram_gguf_msg": "Il modello video 22B non entra nella VRAM disponibile e ComfyUI non è attivo.\n\nScegli/scarica un modello LTX GGUF (Q3/Q4/Q6) nel tab Video: gira NATIVO con dequantizzazione al volo, senza ComfyUI."
 }

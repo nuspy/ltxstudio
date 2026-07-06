@@ -8,10 +8,40 @@ Avvio:  <venv>/python -m inference_server.server   (porta 8189)
 """
 from __future__ import annotations
 
+import os
+import sys
 import threading
 import queue
 import traceback
 import uuid
+
+
+def _tee_log() -> None:
+    """Duplica stdout/stderr del server su output/server.log (oltre alla console) → c'è SEMPRE un log da
+    consultare anche quando il server gira in background/detached e l'utente non vede la console."""
+    try:
+        logdir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
+        os.makedirs(logdir, exist_ok=True)
+        f = open(os.path.join(logdir, "server.log"), "a", buffering=1, encoding="utf-8", errors="replace")
+
+        class _Tee:
+            def __init__(self, *streams): self._s = [s for s in streams if s]
+            def write(self, d):
+                for s in self._s:
+                    try: s.write(d)
+                    except Exception: pass
+            def flush(self):
+                for s in self._s:
+                    try: s.flush()
+                    except Exception: pass
+        sys.stdout = _Tee(sys.__stdout__, f)
+        sys.stderr = _Tee(sys.__stderr__, f)
+        print(f"[server] log su {os.path.join(logdir, 'server.log')}", flush=True)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
+_tee_log()
 
 from fastapi import FastAPI, Response
 from pydantic import BaseModel

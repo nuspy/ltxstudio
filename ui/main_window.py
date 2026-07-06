@@ -2447,6 +2447,26 @@ class MainWindow(QMainWindow):
             self._inpaint_bbox = None
             self._show_inpaint_result(out)
 
+    def _auto_pick_ltx_gguf(self, free_gb: float) -> str | None:
+        """Sceglie un transformer LTX GGUF che ENTRA nella VRAM libera (la Q più alta possibile → miglior
+        qualità). None se non ce ne sono. Budget = free - ~8GB (VAE/gemma/attivazioni)."""
+        import glob
+        root = r"E:\AI\Models\diffusion_models"
+        cands = sorted({p for pat in ("*ltx*.gguf", "*LTX*.gguf")
+                        for p in glob.glob(os.path.join(root, "**", pat), recursive=True)})
+        if not cands:
+            return None
+        budget = max(0.0, float(free_gb) - 8.0) * 1024 ** 3
+        best, best_sz = None, -1
+        for c in cands:
+            try:
+                sz = os.path.getsize(c)
+            except OSError:
+                continue
+            if sz <= budget and sz > best_sz:                  # il più grande che entra = miglior qualità
+                best, best_sz = c, sz
+        return best or min(cands, key=lambda c: os.path.getsize(c))   # se nessuno entra, il più piccolo
+
     def _generate_video_native(self, vals: dict, audio: dict, loras: list, use_image: bool):
         """Generazione video NATIVA (LTX-2.3 GGUF, zero ComfyUI) — ramo attivo solo se
         backend_config video=native. Costruisce i params dal tab Video/Avanzate e lancia il worker
@@ -2534,17 +2554,31 @@ class MainWindow(QMainWindow):
         # audio(a2v)/controlnet/long-chunk finché non portati anch'essi su comfy.
         _simple = not (params.get("audio_path") or params.get("control_video")
                        or params.get("chunk_frames"))
-        # AUTO-SWITCH VRAM-aware: il 22B in ltx2_infer non entra sotto ~40GB liberi (model-bound: dequant
-        # → ~44GB, sborda anche a bassa risoluzione). Se è un t2v/i2v SEMPLICE (che comfy copre) e la VRAM
-        # non basta → uso comfy-native (no-OOM) automaticamente. Vedi [[dynamic-vram-tuning]].
-        if _engine != "comfy" and _simple:
+        # AUTO-CALIBRAZIONE VRAM: il 22B bf16 non entra sotto ~40GB liberi (dequant → ~44GB). Se t2v/i2v
+        # SEMPLICE e VRAM insufficiente: 1) auto-seleziona un LTX GGUF (dequant al volo, entra nei 32GB) →
+        # resta NATIVO; 2) fallback comfy SOLO se davvero disponibile; 3) altrimenti avvisa (no output muto).
+        if _engine != "comfy" and _simple and not params.get("gguf_transformer"):
             try:
                 from core import model_precision as _mp
-                if float(_mp.gpu_free_gb()) < 40.0:
-                    _engine = "comfy"
-                    self._log("[motore] VRAM<40GB + t2v/i2v → comfy-native automatico (ltx2_infer 22B non entra)")
+                _free = float(_mp.gpu_free_gb())
             except Exception:                                   # noqa: BLE001
-                pass
+                _free = 999.0
+            if _free < 40.0:
+                _gguf = self._auto_pick_ltx_gguf(_free)
+                if _gguf:
+                    params["gguf_transformer"] = _gguf
+                    self._log(f"[motore] VRAM {_free:.0f}GB<40 → LTX GGUF nativo: {Path(_gguf).name} (no comfy)")
+                elif self.driver.is_up():
+                    _engine = "comfy"
+                    self._log("[motore] VRAM<40GB, nessun GGUF → comfy-native (block-swap)")
+                else:
+                    QMessageBox.warning(self, tr("mw.video_vram_title", "VRAM insufficiente per il video"),
+                        tr("mw.video_vram_gguf_msg",
+                           "Il modello video 22B non entra nella VRAM disponibile e ComfyUI non è attivo.\n\n"
+                           "Scegli/scarica un modello LTX GGUF (Q3/Q4/Q6) nel tab Video: gira NATIVO con "
+                           "dequantizzazione al volo, senza ComfyUI."))
+                    self._log("[motore] STOP: VRAM<40, nessun GGUF, comfy giù → serve un LTX GGUF")
+                    return
         if _engine == "comfy" and _simple:
             self._log("[motore] comfy-native (VRAM dinamica, no-OOM)")
             self._ltx2_worker = _VideoComfyWorker(params)
