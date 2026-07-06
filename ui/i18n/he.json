@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  אין קליפים.\nצור את סרטוני הצילומים ב«תפאורה» כדי למלא את ה-timeline.",
   "fs.pro.asset.empty": "אין נכסים.\nצור את השחקן, המקום או החפץ הראשון שלך עם «חדש».",
   "fs.pro.voice.empty": "אין קולות.\nהוסף אחד: מתיאור, מפרמטרים או משוכפל.",
-  "fs.pro.lora.empty": "אין LoRA.\nאמן אחת מלשוניות «LoRA» של האפליקציה: היא תופיע כאן."
+  "fs.pro.lora.empty": "אין LoRA.\nאמן אחת מלשוניות «LoRA» של האפליקציה: היא תופיע כאן.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

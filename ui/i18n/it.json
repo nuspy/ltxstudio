@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Nessuna clip.\nGenera i video degli shot nella «Scenografia» per popolare la timeline.",
   "fs.pro.asset.empty": "Nessun asset.\nCrea il tuo primo attore, luogo o oggetto con «Nuovo».",
   "fs.pro.voice.empty": "Nessuna voce.\nAggiungine una: da descrizione, da parametri o clonata.",
-  "fs.pro.lora.empty": "Nessuna LoRA.\nAllenane una dai tab «LoRA» dell'app: comparirà qui."
+  "fs.pro.lora.empty": "Nessuna LoRA.\nAllenane una dai tab «LoRA» dell'app: comparirà qui.",
+  "mem.title": "Monitor memoria",
+  "mem.toggle.tt": "Monitor memoria (RAM/VRAM dedicata/shared/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "VRAM dedicata",
+  "mem.vram_shared": "VRAM shared",
+  "mem.gpu": "GPU (CUDA)"
 }

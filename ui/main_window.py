@@ -758,6 +758,14 @@ class MainWindow(QMainWindow):
         self._queue_btn.clicked.connect(lambda: self.queue_dock.setVisible(not self.queue_dock.isVisible()))
         self.queue_dock.visibilityChanged.connect(self._queue_btn.setChecked)
         self._tab_nav_layout.addWidget(self._queue_btn)   # #96.1/3: nella nav-bar (la tabBar nativa è nascosta)
+        # Monitor memoria (RAM/VRAM dedicata/shared/GPU%) — finestra non-modale, toggle accanto alla coda
+        self._mem_monitor = None
+        self._mem_btn = QToolButton(self)
+        self._mem_btn.setText("📊"); self._mem_btn.setCheckable(True)
+        self._mem_btn.setToolTip(tr("mem.toggle.tt", "Monitor memoria (RAM/VRAM dedicata/shared/GPU)"))
+        self._mem_btn.setStyleSheet("QToolButton{border:none;font-size:16px;padding:2px 6px;}")
+        self._mem_btn.clicked.connect(self._toggle_mem_monitor)
+        self._tab_nav_layout.addWidget(self._mem_btn)
         self.jobs.changed.connect(self._refresh_status)
 
         self.status_lbl = QLabel("…")
@@ -857,6 +865,21 @@ class MainWindow(QMainWindow):
             tr("lang.changed.title"),
             tr("lang.changed.msg"),
         )
+
+    def _toggle_mem_monitor(self):
+        """Apri/chiudi la finestra non-modale del monitor memoria (RAM/VRAM/GPU)."""
+        if self._mem_monitor is None:
+            from ui.memory_monitor import MemoryMonitor
+            self._mem_monitor = MemoryMonitor(self)
+            self._mem_monitor.finished.connect(lambda *_: self._mem_btn.setChecked(False))
+        if self._mem_monitor.isVisible():
+            self._mem_monitor.hide()
+            self._mem_btn.setChecked(False)
+        else:
+            self._mem_monitor.show()
+            self._mem_monitor.raise_()
+            self._mem_monitor.activateWindow()
+            self._mem_btn.setChecked(True)
 
     def open_settings(self):
         if not self.engine:

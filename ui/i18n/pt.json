@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Nenhum clipe.\nGere os vídeos dos planos na «Cenografia» para preencher a timeline.",
   "fs.pro.asset.empty": "Nenhum asset.\nCrie seu primeiro ator, local ou objeto com «Novo».",
   "fs.pro.voice.empty": "Nenhuma voz.\nAdicione uma: a partir de uma descrição, de parâmetros ou clonada.",
-  "fs.pro.lora.empty": "Nenhuma LoRA.\nTreine uma nas abas «LoRA» do app: ela aparecerá aqui."
+  "fs.pro.lora.empty": "Nenhuma LoRA.\nTreine uma nas abas «LoRA» do app: ela aparecerá aqui.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

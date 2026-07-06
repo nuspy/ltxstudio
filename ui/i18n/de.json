@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Keine Clips.\nErzeuge die Shot-Videos im «Szenenbild», um die Timeline zu füllen.",
   "fs.pro.asset.empty": "Keine Assets.\nErstelle deinen ersten Darsteller, Ort oder Gegenstand mit «Neu».",
   "fs.pro.voice.empty": "Keine Stimmen.\nFüge eine hinzu: aus einer Beschreibung, aus Parametern oder geklont.",
-  "fs.pro.lora.empty": "Keine LoRA.\nTrainiere eine über die «LoRA»-Tabs der App: sie erscheint dann hier."
+  "fs.pro.lora.empty": "Keine LoRA.\nTrainiere eine über die «LoRA»-Tabs der App: sie erscheint dann hier.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

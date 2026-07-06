@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  클립이 없습니다.\n«세트 디자인»에서 샷 영상을 생성해 timeline을 채우세요.",
   "fs.pro.asset.empty": "에셋이 없습니다.\n«새로 만들기»로 첫 배우, 장소 또는 오브젝트를 만드세요.",
   "fs.pro.voice.empty": "음성이 없습니다.\n하나 추가하세요: 설명으로, 매개변수로 또는 복제로.",
-  "fs.pro.lora.empty": "LoRA가 없습니다.\n앱의 «LoRA» 탭에서 학습하면 여기에 표시됩니다."
+  "fs.pro.lora.empty": "LoRA가 없습니다.\n앱의 «LoRA» 탭에서 학습하면 여기에 표시됩니다.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  कोई क्लिप नहीं।\ntimeline भरने के लिए «सेट डिज़ाइन» में शॉट वीडियो जनरेट करें।",
   "fs.pro.asset.empty": "कोई एसेट नहीं।\n«नया» से अपना पहला अभिनेता, स्थान या वस्तु बनाएँ।",
   "fs.pro.voice.empty": "कोई आवाज़ नहीं।\nएक जोड़ें: विवरण से, पैरामीटर से या क्लोन की गई।",
-  "fs.pro.lora.empty": "कोई LoRA नहीं।\nऐप के «LoRA» टैब से एक प्रशिक्षित करें: यह यहाँ दिखाई देगी।"
+  "fs.pro.lora.empty": "कोई LoRA नहीं।\nऐप के «LoRA» टैब से एक प्रशिक्षित करें: यह यहाँ दिखाई देगी।",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

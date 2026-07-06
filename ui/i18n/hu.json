@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Nincsenek klipek.\nGeneráld a beállítások videóit a «Díszlet» fülön a timeline feltöltéséhez.",
   "fs.pro.asset.empty": "Nincsenek assetek.\nHozd létre az első szereplőt, helyszínt vagy tárgyat az «Új» gombbal.",
   "fs.pro.voice.empty": "Nincsenek hangok.\nAdj hozzá egyet: leírásból, paraméterekből vagy klónozva.",
-  "fs.pro.lora.empty": "Nincs LoRA.\nTaníts be egyet az app «LoRA» füleiről: itt fog megjelenni."
+  "fs.pro.lora.empty": "Nincs LoRA.\nTaníts be egyet az app «LoRA» füleiről: itt fog megjelenni.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

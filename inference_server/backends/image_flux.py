@@ -88,17 +88,11 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     if free_mb >= vram_mb * margin + floor_mb:
         pipe.to("cuda")                                 # RESTA su GPU; la cache ModelManager lo riusa
         return "gpu"
-    # model_cpu_offload tiene il TRANSFORMER intero su GPU nel denoise (step VELOCI). Passa al sequenziale
-    # (per-modulo, MOLTO più lento: ~10s/step) SOLO se il transformer stesso NON entra in VRAM — non per
-    # risparmiare sulle attivazioni (meglio uno spill occasionale ad alta risoluzione che 20× di lentezza).
-    # Es. FLUX.1 Fill 22.7GB su 32GB → model_cpu_offload (veloce); FLUX.2 32B → sequenziale.
-    act_headroom = float(os.environ.get("NATIVE_ACT_HEADROOM_MB", "1500"))
-    if resident_mb and free_mb < float(resident_mb) + act_headroom:
-        try:
-            pipe.enable_sequential_cpu_offload()
-            return "sequential"
-        except Exception as _e:                         # noqa: BLE001
-            print(f"[image] sequential offload non disponibile ({_e}) → model offload", flush=True)
+    # DEFAULT: model_cpu_offload (un componente alla volta su GPU, transformer intero nel denoise = step veloci).
+    # NB: NON si passa automaticamente a enable_sequential_cpu_offload — su Windows coi buffer fp8 SEGFAULTA e
+    # CRASHA il server (→ WinError 10061 dal client). Il sequenziale è solo ESPLICITO (NATIVE_FORCE_OFFLOAD=seq),
+    # gestito in cima. Se la VRAM è stretta si accetta lo spill occasionale in shared-RAM (lento ma STABILE).
+    _ = resident_mb
     pipe.enable_model_cpu_offload()
     return "offload"
 

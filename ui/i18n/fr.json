@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Aucun clip.\nGénérez les vidéos des plans dans «Décors» pour remplir la timeline.",
   "fs.pro.asset.empty": "Aucun asset.\nCréez votre premier acteur, lieu ou objet avec «Nouveau».",
   "fs.pro.voice.empty": "Aucune voix.\nAjoutez-en une : à partir d'une description, de paramètres ou clonée.",
-  "fs.pro.lora.empty": "Aucune LoRA.\nEntraînez-en une depuis les onglets «LoRA» de l'app : elle apparaîtra ici."
+  "fs.pro.lora.empty": "Aucune LoRA.\nEntraînez-en une depuis les onglets «LoRA» de l'app : elle apparaîtra ici.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

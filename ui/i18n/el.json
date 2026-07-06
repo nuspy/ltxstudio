@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Κανένα κλιπ.\nΔημιούργησε τα βίντεο των πλάνων στα «Σκηνικά» για να γεμίσεις το timeline.",
   "fs.pro.asset.empty": "Κανένα asset.\nΔημιούργησε τον πρώτο σου ηθοποιό, τόπο ή αντικείμενο με «Νέο».",
   "fs.pro.voice.empty": "Καμία φωνή.\nΠρόσθεσε μία: από περιγραφή, από παραμέτρους ή κλωνοποιημένη.",
-  "fs.pro.lora.empty": "Κανένα LoRA.\nΕκπαίδευσε ένα από τις καρτέλες «LoRA» της εφαρμογής: θα εμφανιστεί εδώ."
+  "fs.pro.lora.empty": "Κανένα LoRA.\nΕκπαίδευσε ένα από τις καρτέλες «LoRA» της εφαρμογής: θα εμφανιστεί εδώ.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }

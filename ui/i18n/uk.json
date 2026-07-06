@@ -2402,5 +2402,11 @@
   "fs.pro.mt.empty": "③  Немає кліпів.\nЗгенеруйте відео кадрів у «Декорації», щоб заповнити timeline.",
   "fs.pro.asset.empty": "Немає асетів.\nСтворіть першого актора, локацію або об'єкт кнопкою «Новий».",
   "fs.pro.voice.empty": "Немає голосів.\nДодайте: з опису, з параметрів або клонований.",
-  "fs.pro.lora.empty": "Немає LoRA.\nНавчіть її у вкладках «LoRA» застосунку — вона з'явиться тут."
+  "fs.pro.lora.empty": "Немає LoRA.\nНавчіть її у вкладках «LoRA» застосунку — вона з'явиться тут.",
+  "mem.title": "Memory monitor",
+  "mem.toggle.tt": "Memory monitor (RAM/dedicated & shared VRAM/GPU)",
+  "mem.ram": "RAM",
+  "mem.vram_ded": "Dedicated VRAM",
+  "mem.vram_shared": "Shared VRAM",
+  "mem.gpu": "GPU (CUDA)"
 }
