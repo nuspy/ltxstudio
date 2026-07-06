@@ -14,7 +14,26 @@ REPO = Path(__file__).resolve().parent.parent
 # Porta pubblica dell'API (l'InferenceServer interno resta su :8189).
 HOST = os.environ.get("LTX_API_HOST", "127.0.0.1")
 PORT = int(os.environ.get("LTX_API_PORT", "8200"))
-BASE_URL = f"http://{HOST}:{PORT}"
+BASE_URL = os.environ.get("LTX_API_BASE_URL", f"http://{HOST}:{PORT}")
+
+# Token opzionale: se il bind NON è locale (accesso da telefono/rete) e LTX_API_TOKEN è impostato,
+# le richieste devono portare `Authorization: Bearer <token>` (eccetto /health e /docs).
+API_TOKEN = os.environ.get("LTX_API_TOKEN", "").strip()
+_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", ""}
+
+
+def auth_required() -> bool:
+    """True se va verificato il bearer token (bind non-locale + token impostato)."""
+    return bool(API_TOKEN) and HOST not in _LOCAL_HOSTS
+
+
+def token_ok(header: str | None) -> bool:
+    if not auth_required():
+        return True
+    if not header:
+        return False
+    parts = header.split(" ", 1)
+    return len(parts) == 2 and parts[0].lower() == "bearer" and parts[1] == API_TOKEN
 
 # Cartelle: output dei job e upload dei file portati dall'utente.
 OUTPUT_DIR = Path(os.environ.get("LTX_OUTPUT_DIR", str(REPO / "output")))

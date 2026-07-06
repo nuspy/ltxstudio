@@ -44,6 +44,14 @@ def _touch_activity():
 @app.middleware("http")
 async def _activity_mw(request: Request, call_next):
     _touch_activity()
+    # Auth bearer opzionale (solo se bind non-locale + token impostato). /health e /docs sempre liberi.
+    from api.config import token_ok, auth_required
+    if auth_required():
+        path = request.url.path
+        if not (path in ("/health", "/openapi.json") or path.startswith("/docs") or path.startswith("/redoc")):
+            if not token_ok(request.headers.get("authorization")):
+                from fastapi.responses import JSONResponse
+                return JSONResponse({"error": "unauthorized"}, status_code=401)
     return await call_next(request)
 
 
@@ -106,8 +114,8 @@ async def files_upload(file: UploadFile):
 
 # ─────────────────────────── capability routers ───────────────────────────
 # Ogni gruppo registra i propri endpoint POST (creano job) su questo `app`.
-from api.handlers import images, video, music, threed, film   # noqa: E402
-for _mod in (images, video, music, threed, film):
+from api.handlers import images, video, music, threed, film, catalog, train   # noqa: E402
+for _mod in (images, video, music, threed, film, catalog, train):
     if hasattr(_mod, "register"):
         _mod.register(app)
 
