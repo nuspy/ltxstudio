@@ -2995,10 +2995,14 @@ class MainWindow(QMainWindow):
         from core.gen_pipeline import is_flux2
         _f2 = bool(unet and is_flux2(unet))
         arch = "flux2_inpaint" if _f2 else "inpaint"
-        # Guidance ESPLICITA dalla GUI se impostata (per Klein la si clampa al range basso); altrimenti la
-        # deriva da "Forza mantenimento" (retention) come prima.
+        # Guidance ESPLICITA dalla GUI se impostata, ma CLAMPATA al modello: i distillati (Hyper/Turbo/8-step)
+        # e Klein vanno a guidance BASSA — a 30 si BRUCIANO (macchie "come se mancassero step"). Fill dev = alta.
+        from core.inpaint_pipeline import _is_hyper
         if guidance_override:
-            guidance = min(float(guidance_override), 6.0) if _f2 else float(guidance_override)
+            g = float(guidance_override)
+            guidance = min(g, 6.0) if _f2 else (min(g, 3.5) if _is_hyper(unet) else g)
+            if guidance != g:
+                self._log(f"[inpaint] modello distillato → guidance {g:.0f} clampata a {guidance:.1f} (evita macchie)")
         else:
             guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=_f2)
         # #95 I5: forza (strength) → denoise, non solo guidance (outpaint=1.0, inpaint scala con retention)
