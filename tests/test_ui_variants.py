@@ -44,3 +44,19 @@ def test_log_contextual():
     t._select_mode(0); assert t._log_host.isHidden() is True     # Scopri → log nascosto
     t._select_mode(1); assert t._log_host.isHidden() is False    # Importa → log visibile
     t._select_mode(2); assert t._log_host.isHidden() is True     # Libreria → nascosto
+
+
+def test_filmstudio_pro_child_tabs():
+    from ui.film_studio import pro_tabs
+    from ui.film_studio.script_tab import ScriptTab
+    from ui.film_studio.storyboard_tab import StoryboardTab
+    from ui.film_studio.montage_tab import MontageTab
+    from ui.film_studio.asset_manager_tab import AssetManagerTab
+    from ui.film_studio.voice_tab import VoiceTab
+    from ui.film_studio.lora_studio_tab import LoraStudioTab
+    assert issubclass(pro_tabs.ScriptTabPro, ScriptTab)
+    assert issubclass(pro_tabs.StoryboardTabPro, StoryboardTab)
+    assert issubclass(pro_tabs.MontageTabPro, MontageTab)
+    assert issubclass(pro_tabs.AssetManagerTabPro, AssetManagerTab)
+    assert issubclass(pro_tabs.VoiceTabPro, VoiceTab)
+    assert issubclass(pro_tabs.LoraStudioTabPro, LoraStudioTab)
