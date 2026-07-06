@@ -831,6 +831,21 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # combacia 1:1 con la foto/bbox (niente disallineamento in load_inpaint_result, aspetto identico).
     if needs_image and res_img.size != _orig_wh:
         res_img = res_img.resize(_orig_wh, Image.LANCZOS)
+    # INPAINT/OUTPAINT: FluxFill/inpaint rigenera TUTTA l'immagine (VAE encode→decode dell'intera foto) → le
+    # zone FUORI dalla maschera prendono artefatti del VAE ("quadrettatura"/macchie sulle parti intatte).
+    # Ricompone i PIXEL ORIGINALI dove la maschera è nera (feather sui bordi) → solo la regione mascherata è
+    # rigenerata, il resto resta identico all'input. Env NATIVE_INPAINT_KEEP=0 per disattivare (rigenera tutto).
+    _mask_pil = kw.get("mask_image")
+    if arch in _MASK_ARCHS and _mask_pil is not None and params.get("image_path") \
+            and os.environ.get("NATIVE_INPAINT_KEEP", "1") == "1":
+        try:
+            from PIL import ImageFilter
+            _orig = Image.open(params["image_path"]).convert("RGB").resize(res_img.size, Image.LANCZOS)
+            _feather = max(2, int(round(min(res_img.size) / 256)))   # bordo morbido proporzionale
+            _m = _mask_pil.convert("L").resize(res_img.size, Image.LANCZOS).filter(ImageFilter.GaussianBlur(_feather))
+            res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
+        except Exception as _e:                                      # noqa: BLE001
+            print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
     res_img.save(path)
     try:                                                     # #107 firma invisibile di provenienza (default ON, tutte le edizioni)
         from core import stego
