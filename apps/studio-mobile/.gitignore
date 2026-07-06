@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-android/
+android/
+ios/
+.vite/
+*.local
+.DS_Store
