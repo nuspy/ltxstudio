@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushB
                                QTableWidget, QTableWidgetItem, QProgressBar, QMessageBox, QHeaderView)
 
 from core import vram_calibration as _cal
-from ui.i18n import tr
+from ui.i18n_manager import tr
 
 
 def _free_gpu_mb() -> int:
