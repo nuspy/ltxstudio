@@ -247,10 +247,16 @@ class AdvancedTab(QWidget):
     open_workflow   = Signal()   # apre WorkflowDialog
     open_analyzer   = Signal()   # apre SettingsAnalyzerDialog
     open_navigator  = Signal()   # apre NavigatorDialog
+    open_vram_cal   = Signal()   # apre VramCalibrationDialog
 
     def __init__(self):
         super().__init__()
         self._build()
+        self.open_vram_cal.connect(self._open_vram_calibration)   # gestito internamente (nessuno stato MW)
+
+    def _open_vram_calibration(self):
+        from ui.vram_calibration_dialog import VramCalibrationDialog
+        VramCalibrationDialog(self).exec()
 
     def _build(self):
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
@@ -286,6 +292,16 @@ class AdvancedTab(QWidget):
 
         # ── Video lunghi (auto-extend) ──
         root.addWidget(self._build_longvideo_group())
+
+        # ── Calibrazione VRAM (immagini + video) ──
+        vram_grp = QGroupBox(tr("adv.vram.group", "Gestione memoria VRAM")); vv = QVBoxLayout(vram_grp)
+        vv.addWidget(self._big_btn(
+            tr("adv.vram.btn", "Calibra modelli VRAM…"),
+            tr("adv.vram.tt", "Analizza tutti i modelli locali (immagini + video), salva in cache il footprint "
+               "VRAM reale e lo riusa per decidere cosa tenere in GPU e cosa offloadare. Incrementale + "
+               "invalidazione."),
+            self.open_vram_cal))
+        root.addWidget(vram_grp)
 
         # ── Nota impostazioni sampler ──
         sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setStyleSheet("color: #333;")
