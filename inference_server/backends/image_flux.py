@@ -1188,6 +1188,16 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # combacia 1:1 con la foto/bbox (niente disallineamento in load_inpaint_result, aspetto identico).
     if needs_image and res_img.size != _orig_wh:
         res_img = res_img.resize(_orig_wh, Image.LANCZOS)
+    # DITHER anti-BANDING sul GENERATO — PRIMA della ricomposizione, così tocca SOLO la regione rigenerata e
+    # NON i pixel originali fuori maschera (il dither DOPO la composite sporcava di puntini le parti intatte:
+    # era la causa delle "macchie/puntini fuori dalla maschera"). ±1.7 livelli, impercettibile. Env NATIVE_DITHER=0.
+    if os.environ.get("NATIVE_DITHER", "1") == "1":
+        try:
+            import numpy as _np
+            _a = _np.asarray(res_img).astype(_np.float32) + _np.random.uniform(-1.7, 1.7, (res_img.height, res_img.width, 1))
+            res_img = Image.fromarray(_np.clip(_a, 0, 255).astype("uint8"))
+        except Exception:                                            # noqa: BLE001
+            pass
     # INPAINT/OUTPAINT: FluxFill/inpaint rigenera TUTTA l'immagine (VAE encode→decode dell'intera foto) → le
     # zone FUORI dalla maschera prendono artefatti del VAE ("quadrettatura"/macchie sulle parti intatte).
     # Ricompone i PIXEL ORIGINALI dove la maschera è nera (feather sui bordi) → solo la regione mascherata è
@@ -1210,15 +1220,6 @@ def run(params: dict, mm, output_dir: str) -> dict:
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
             print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
-    # DITHER anti-BANDING: i gradienti morbidi (pelle, cielo) a 8-bit fanno "scalini" di posterizzazione,
-    # peggio coi modelli quantizzati (Q5/fp8). Un rumore ±1.7 livelli IMPERCETTIBILE li rompe. Env NATIVE_DITHER=0.
-    if os.environ.get("NATIVE_DITHER", "1") == "1":
-        try:
-            import numpy as _np
-            _a = _np.asarray(res_img).astype(_np.float32) + _np.random.uniform(-1.7, 1.7, (res_img.height, res_img.width, 1))
-            res_img = Image.fromarray(_np.clip(_a, 0, 255).astype("uint8"))
-        except Exception:                                            # noqa: BLE001
-            pass
     res_img.save(path)
     try:                                                     # #107 firma invisibile di provenienza (default ON, tutte le edizioni)
         from core import stego
