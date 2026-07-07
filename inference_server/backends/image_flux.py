@@ -83,6 +83,15 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
         pipe.enable_model_cpu_offload()
         return "offload"
     free_mb = torch.cuda.mem_get_info()[0] / 1024**2
+    # GGUF: MAI model_cpu_offload → i pesi quantizzati (GGMLTensor) finiscono su CPU e il dequant+matmul
+    # avviene su CPU = 166 s/step (spill), invece dei ~0.4 s/step gpu-resident. Il GGUF è piccolo (dequant
+    # per-layer al volo su GPU) → to("cuda") sempre; l'eventuale sforo attivazioni va in shared-VRAM (poco),
+    # infinitamente meglio dell'offload rotto. make_room ha già liberato le altre shell.
+    _gguf_tr = getattr(getattr(pipe, "transformer", None), "_ls_is_gguf", False)
+    if _gguf_tr:
+        pipe.to("cuda")
+        print(f"[place] GGUF → gpu-resident FORZATO (free={free_mb:.0f}MB, offload rotto sui GGUF)", flush=True)
+        return "gpu"
     # margine 1.10 (era 1.35, troppo prudente): un modello che ENTRA (o quasi) resta SU GPU — molto più veloce
     # che offload su RAM. Lo sforo delle attivazioni va in shared-VRAM (poco, tollerabile) invece di streammare
     # i pesi dalla RAM ad ogni run. Override NATIVE_GPU_MARGIN. Solo se NON ci sta proprio → model_cpu_offload.
@@ -391,6 +400,9 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
             transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True, **_gguf_kw)
     else:
         tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16, **_gguf_kw)
+    if _is_gguf:
+        tr._ls_is_gguf = True    # il GGUF NON tollera model_cpu_offload (pesi quantizzati→CPU = calcolo su CPU,
+        #                          166s/step): _place lo terrà SEMPRE gpu-resident (vedi _place).
     if (os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf
             and _flux_fp8_e4m3(transformer_path)):
         try:
