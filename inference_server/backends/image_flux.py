@@ -1281,20 +1281,18 @@ def run(params: dict, mm, output_dir: str) -> dict:
         try:
             from PIL import ImageFilter
             _orig = Image.open(params["image_path"]).convert("RGB").resize(res_img.size, Image.LANCZOS)
-            # feather: dalla GUI se impostato (>0), altrimenti proporzionale automatico. Range ALZATO (la cucitura
-            # era ancora visibile): ~min_lato/64, tra 6 e 28 px (prima 2-8, troppo netto). L'OUTPAINT usa una
-            # sfumatura più ampia (×1.6) perché il bordo foto→estensione è il punto più critico.
-            _auto = max(10, min(48, int(round(min(res_img.size) / 40))))
-            _feather = int(params.get("feather") or 0) or _auto
             _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)
-            # OUTPAINT: dilata la regione generata prima di sfumare, così la sfumatura NON tocca il bordo NERO
-            # della tela (niente linea scura). INPAINT: NIENTE dilatazione → l'originale è preservato fino al
-            # bordo della maschera (anello di modifica sottile, meno "degradazione" attorno all'edit).
+            # Feather DIFFERENZIATO per modalità (l'inpaint andava bene "prima", solo l'outpaint aveva la linea):
+            #  • INPAINT → anello SOTTILE (auto ~min_lato/128, 4–14 px): niente degradazione attorno all'edit.
+            #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione, per rendere invisibile la
+            #    cucitura foto→estensione. Override dalla GUI via params['feather'] (>0) in entrambi i casi.
             if params.get("outpaint"):
-                _fo = int(round(_feather * 1.9))                         # cucitura foto→estensione più invisibile
-                _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))
+                _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
+                _fo = int(round(_feather * 1.9))                         # dilata la regione generata prima di sfumare
+                _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))       # → la sfumatura NON tocca il bordo tela
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
             else:
+                _feather = int(params.get("feather") or 0) or max(4, min(14, int(round(min(res_img.size) / 128))))
                 _m = _m.filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
