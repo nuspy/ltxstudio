@@ -37,6 +37,18 @@ def plan_coverage(dialogues: list, total_dur: float) -> list[dict]:
     return units
 
 
+_WARD_ANGLES = ["front full-body", "three-quarter left", "three-quarter right", "profile side",
+                "back view", "outfit detail close-up"]
+
+
+def wardrobe_prompts(char_desc: str, wardrobe_desc: str, n: int = 6) -> list[tuple[str, str]]:
+    """[(angle_id, prompt)] per generare il personaggio con un abbigliamento da N angoli (turnaround outfit).
+    Prima l'abbigliamento era solo un metadato: qui diventa un set di immagini coerenti."""
+    base = f"{(char_desc or 'the character').strip()} wearing {(wardrobe_desc or 'the outfit').strip()}"
+    return [(a.replace(" ", "_"), f"{base}, {a}, full outfit visible, neutral studio background, consistent look")
+            for a in _WARD_ANGLES[:max(1, n)]]
+
+
 def expand_shot_to_coverage(shot_id: int) -> list[int]:
     """Espande uno shot-dialogo in N inquadrature di copertura (campo/controcampo). Il primo shot riusa
     l'originale; i successivi vengono inseriti dopo, spostando in avanti gli shot seguenti. Ritorna gli id."""

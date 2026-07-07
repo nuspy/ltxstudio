@@ -2524,5 +2524,6 @@
   "fs.sb.takes_restore": "Restore",
   "fs.sb.takes_done": "Take v{v} restored as current.",
   "fs.script.gen_narr": "📖 Generate Story",
-  "fs.script.racconto": "Cinematic story (prose, editable)"
+  "fs.script.racconto": "Cinematic story (prose, editable)",
+  "fs.ward.done": "Wardrobe: {n} angles generated"
 }

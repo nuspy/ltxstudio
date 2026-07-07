@@ -44,6 +44,30 @@ class _SheetWorker(QThread):
             self.done.emit({"error": str(e)})
 
 
+class _WardrobeWorker(QThread):
+    """Genera il turnaround (6 angoli) del personaggio con un dato abbigliamento."""
+    progress = Signal(str)
+    done = Signal(dict)
+
+    def __init__(self, char_desc: str, wardrobe_desc: str, face_ref: str, out_dir: str):
+        super().__init__()
+        self.char_desc, self.ward, self.face, self.out_dir = char_desc, wardrobe_desc, face_ref, out_dir
+
+    def run(self):
+        try:
+            from core.film_studio.coverage import wardrobe_prompts
+            made = []
+            prompts = wardrobe_prompts(self.char_desc, self.ward)
+            for i, (aid, prompt) in enumerate(prompts):
+                out = str(Path(self.out_dir) / f"ward_{aid}.png".replace(" ", "_"))
+                self.progress.emit(f"{i+1}/{len(prompts)}: {aid}")
+                gen_service.gen_image(prompt, out, face_ref=self.face, seed=7 + i)
+                made.append((aid, out))
+            self.done.emit({"images": made})
+        except Exception as e:                              # noqa: BLE001
+            self.done.emit({"error": str(e)})
+
+
 class AssetManagerTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -200,8 +224,31 @@ class AssetManagerTab(QWidget):
         name = self.ward_name.text().strip()
         if not name:
             return
-        db.insert("wardrobe", variation_id=self._vars[r]["id"], name=name, description=name, images="")
+        wid = db.insert("wardrobe", variation_id=self._vars[r]["id"], name=name, description=name, images="")
         self.ward_name.clear(); self._refresh_vars()
+        # genera il turnaround 6-angoli del personaggio con questo abbigliamento (prima solo metadato)
+        asset = db.get("asset", self._cur) if self._cur else None
+        if asset:
+            imgs = db.query("image", "owner_kind='asset' AND owner_id=?", (self._cur,))
+            face = next((i["file"] for i in imgs if i.get("file")), self.e_photo.text().strip())
+            out_dir = str(db.ROOT / "assets" / f"{asset['id']}_{asset['name']}".replace(" ", "_") / f"ward_{wid}")
+            Path(out_dir).mkdir(parents=True, exist_ok=True)
+            self.sheet_log.setText(tr("fs.working", "Generazione…"))
+            self._ward_worker = _WardrobeWorker(asset.get("description") or asset["name"], name, face, out_dir)
+            self._ward_worker.progress.connect(lambda s: self.sheet_log.setText(s))
+            self._ward_worker.done.connect(lambda res, _w=wid: self._on_wardrobe(res, _w))
+            self._ward_worker.start()
+
+    def _on_wardrobe(self, res: dict, wid: int):
+        if res.get("error"):
+            self.sheet_log.setText(""); QMessageBox.critical(self, tr("fs.ward.add", "Abbigliamento"), str(res["error"])[:600]); return
+        files = []
+        for aid, path in res.get("images", []):
+            db.insert("image", owner_kind="wardrobe", owner_id=wid, angle=aid, repr=aid, file=path, seed=7, prompt="", version=1)
+            files.append(path)
+        db.update("wardrobe", wid, images="|".join(files))
+        self._refresh_vars()
+        self.sheet_log.setText(tr("fs.ward.done", "Abbigliamento: {n} angoli generati").format(n=len(files)))
 
     def _pick_photo(self):
         p, _ = QFileDialog.getOpenFileName(self, tr("fs.asset.photo", "Foto base"), "", "Immagini (*.png *.jpg *.jpeg *.webp)")

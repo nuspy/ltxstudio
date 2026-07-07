@@ -2524,5 +2524,6 @@
   "fs.sb.takes_restore": "Ripristina",
   "fs.sb.takes_done": "Take v{v} ripristinato come corrente.",
   "fs.script.gen_narr": "📖 Genera Racconto",
-  "fs.script.racconto": "Racconto cinematografico (prosa, editabile)"
+  "fs.script.racconto": "Racconto cinematografico (prosa, editabile)",
+  "fs.ward.done": "Abbigliamento: {n} angoli generati"
 }

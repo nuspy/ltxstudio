@@ -48,6 +48,15 @@ def test_expand_crea_shot_e_sposta_i_successivi():
     db.delete_project(pid)
 
 
+def test_wardrobe_prompts():
+    ps = coverage.wardrobe_prompts("Marco, 30s detective", "trench coat insanguinato", n=6)
+    assert len(ps) == 6
+    for angle_id, prompt in ps:
+        assert "trench coat insanguinato" in prompt and "Marco" in prompt
+    assert ps[0][0] != ps[1][0]                              # angoli distinti
+    assert coverage.wardrobe_prompts("x", "y", n=3) and len(coverage.wardrobe_prompts("x", "y", n=3)) == 3
+
+
 def test_expand_noop_su_shot_singola_battuta():
     pid, sid = _mk_scene()
     sh = db.insert("shot", scene_id=sid, ord=1, description="x",
