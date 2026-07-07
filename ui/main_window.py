@@ -985,11 +985,33 @@ class MainWindow(QMainWindow):
         self._log("Generazione annullata dall'utente.")
 
     def _on_free_vram(self):
-        ok = self.driver.free_memory()
-        if ok:
-            self._log("✅ Memoria VRAM liberata (modelli scaricati da ComfyUI).")
+        """Libera la VRAM dei server GPU NATIVI (immagini :8189, API :8200) — /free svuota shell, cache CPU e
+        ComponentStore. Prima liberava solo ComfyUI (offline → 'impossibile'). Comfy resta come extra."""
+        import urllib.request
+
+        def _hit(port: int) -> bool:
+            try:
+                r = urllib.request.urlopen(urllib.request.Request(
+                    f"http://127.0.0.1:{port}/free", data=b"{}",
+                    headers={"Content-Type": "application/json"}), timeout=25).read()
+                return b"ok" in (r or b"")
+            except Exception:                                # noqa: BLE001 (server giù = niente da liberare)
+                return False
+        freed = [n for p, n in ((8189, "immagini"), (8200, "API")) if _hit(p)]
+        try:
+            if self.driver.free_memory():                    # ComfyUI, se davvero attivo (extra)
+                freed.append("comfy")
+        except Exception:                                    # noqa: BLE001
+            pass
+        try:                                                 # mostra la VRAM libera dopo (feedback reale)
+            import torch
+            _free_gb = torch.cuda.mem_get_info()[0] / 1e9 if torch.cuda.is_available() else 0
+        except Exception:                                    # noqa: BLE001
+            _free_gb = 0
+        if freed:
+            self._log(f"✅ VRAM liberata: {', '.join(freed)} — ora liberi {_free_gb:.1f} GB.")
         else:
-            self._log("[!] Impossibile liberare VRAM — ComfyUI offline o endpoint /free non supportato.")
+            self._log("[!] Nessun server GPU attivo da liberare (immagini :8189 / API :8200 offline).")
 
     def _open_film_studio(self):
         """Apre la finestra AI Film Studio (Text-to-Film, backend nativo). Variante Classica/Pro."""
