@@ -10,7 +10,9 @@ import copy
 
 DEFAULT_STATE = {
     "time_of_day": "day", "weather": "clear", "light": "natural soft",
-    "color_grade": "neutral", "mood": "neutral", "assets": {},   # name -> {variation, wardrobe, condition, emotion}
+    "color_grade": "neutral", "mood": "neutral",
+    "lens": "", "film_look": "",           # continuità fotografica: lente/ottica + resa pellicola/LUT (persistono)
+    "assets": {},                          # name -> {variation, wardrobe, condition, emotion}
 }
 
 
@@ -39,6 +41,10 @@ def to_prompt(state: dict) -> str:
     parts = [f"{state.get('time_of_day','day')}", f"{state.get('weather','clear')} weather",
              f"{state.get('light','natural')} lighting", f"{state.get('color_grade','neutral')} color grade",
              f"{state.get('mood','neutral')} mood"]
+    if state.get("lens"):
+        parts.append(f"shot on {state['lens']} lens")        # continuità ottica (persiste tra scene)
+    if state.get("film_look"):
+        parts.append(state["film_look"])                     # resa pellicola/LUT
     for name, st in (state.get("assets") or {}).items():
         bits = [b for b in (st.get("condition"), st.get("emotion"), st.get("wardrobe")) if b]
         if bits:

@@ -96,7 +96,10 @@ class StoryboardTab(QWidget):
         self.ct_weather = _CB(); self.ct_weather.addItems(["clear", "cloudy", "rain", "snow", "fog", "storm"])
         self.ct_light = _CB(); self.ct_light.addItems(["natural soft", "hard sun", "low key", "high key", "candlelight", "neon"])
         self.ct_mood = _CB(); self.ct_mood.addItems(["neutral", "tense", "joyful", "melancholic", "epic", "romantic", "scary"])
-        for lbl, w in [("⏱", self.ct_time), ("☁", self.ct_weather), ("💡", self.ct_light), ("🎭", self.ct_mood)]:
+        self.ct_lens = _CB(); self.ct_lens.addItems(["", "24mm wide", "35mm", "50mm", "85mm portrait", "anamorphic"])
+        self.ct_film = _CB(); self.ct_film.addItems(["", "warm cinematic", "cool teal-orange", "bleach bypass", "vintage film grain", "high contrast noir", "pastel"])
+        for lbl, w in [("⏱", self.ct_time), ("☁", self.ct_weather), ("💡", self.ct_light), ("🎭", self.ct_mood),
+                       ("🎯", self.ct_lens), ("🎞", self.ct_film)]:
             cg.addWidget(QLabel(lbl)); cg.addWidget(w)
         self.btn_ct = QPushButton(tr("fs.sb.ct_apply", "Applica + propaga")); self.btn_ct.clicked.connect(self._save_continuity)
         self.btn_ct_chars = QPushButton(tr("fs.sb.ct_chars", "👤 Stato personaggi…")); self.btn_ct_chars.clicked.connect(self._edit_char_continuity)
@@ -475,7 +478,8 @@ class StoryboardTab(QWidget):
             import json
             st = json.loads(row.get("continuity") or "{}")
             for w, k, d in [(self.ct_time, "time_of_day", "day"), (self.ct_weather, "weather", "clear"),
-                            (self.ct_light, "light", "natural soft"), (self.ct_mood, "mood", "neutral")]:
+                            (self.ct_light, "light", "natural soft"), (self.ct_mood, "mood", "neutral"),
+                            (self.ct_lens, "lens", ""), (self.ct_film, "film_look", "")]:
                 i = w.findText(str(st.get(k, d)))
                 w.setCurrentIndex(max(0, i))
 
@@ -542,7 +546,8 @@ class StoryboardTab(QWidget):
         sc = db.get("scene", rid)
         st = json.loads(sc.get("continuity") or "{}")
         st.update({"time_of_day": self.ct_time.currentText(), "weather": self.ct_weather.currentText(),
-                   "light": self.ct_light.currentText(), "mood": self.ct_mood.currentText()})
+                   "light": self.ct_light.currentText(), "mood": self.ct_mood.currentText(),
+                   "lens": self.ct_lens.currentText(), "film_look": self.ct_film.currentText()})
         db.update("scene", rid, continuity=json.dumps(st, ensure_ascii=False))
         # propaga in avanti: ogni scena successiva eredita lo stato (override mantenuti dove già impostati)
         prev = st
