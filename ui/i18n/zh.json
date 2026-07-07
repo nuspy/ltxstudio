@@ -2309,7 +2309,7 @@
   "f1.inpaint.prompt.tt": "描述在遮罩区域内要绘制的内容（内补绘）。",
   "f1.outpaint.prompt.tt": "描述在超出边缘的扩展区域内要生成的内容（外补绘）。",
   "f1.neg.tt": "重新生成区域中要避免的元素。",
-  "f1.inpaint.strength.tt": "遮罩区域被重新生成的程度：1.00＝完全，低值保留原图。",
+  "f1.inpaint.strength.tt": "Retention strength: how much of the ORIGINAL is preserved in the masked area. Internally: denoise = 1 − 0.4×strength (min 0.5) — strength 1.00 → denoise 0.60 (keeps a lot), 0 → denoise 1.00 (regenerates fully).",
   "f1.inpaint.model.tt": "用于内/外补绘的模型（FLUX Fill 或兼容的检查点）。",
   "f1.inpaint.lora.tt": "在内/外补绘时应用的可选 LoRA，用于风格或主体。",
   "f1.inpaint.run.tt": "填充遮罩区域，同时保持图像其余部分不变。",
@@ -2431,5 +2431,8 @@
   "vedit.blur.tt": "Feather of the mask edges (gaussian, px): 0 = hard edge, 6-12 = smooth transition between regenerated area and original video.",
   "vedit.dilate.tt": "How much to GROW the tracked mask (px): more room for the new object, less tight borders.",
   "cn.attn_lbl": "Guide attention",
-  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion."
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion.",
+  "f1.inpaint.feather_lbl": "Edge feather (px)",
+  "f1.inpaint.feather.auto": "Auto",
+  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring."
 }

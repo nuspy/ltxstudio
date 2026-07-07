@@ -2309,7 +2309,7 @@
   "f1.inpaint.prompt.tt": "תאר מה לצייר באזור הממוסך (inpaint).",
   "f1.outpaint.prompt.tt": "תאר מה ליצור באזור המורחב מעבר לקצוות (outpaint).",
   "f1.neg.tt": "אלמנטים שיש להימנע מהם באזור שנוצר מחדש.",
-  "f1.inpaint.strength.tt": "כמה האזור הממוסך נוצר מחדש: 1.00 = מלא, ערכים נמוכים שומרים על המקור.",
+  "f1.inpaint.strength.tt": "Retention strength: how much of the ORIGINAL is preserved in the masked area. Internally: denoise = 1 − 0.4×strength (min 0.5) — strength 1.00 → denoise 0.60 (keeps a lot), 0 → denoise 1.00 (regenerates fully).",
   "f1.inpaint.model.tt": "המודל לשימוש ב-inpaint/outpaint (FLUX Fill או checkpoint תואם).",
   "f1.inpaint.lora.tt": "LoRA אופציונלי המיושם במהלך inpaint/outpaint לסגנון או נושא.",
   "f1.inpaint.run.tt": "מלא את האזור הממוסך תוך שמירה על שאר התמונה.",
@@ -2431,5 +2431,8 @@
   "vedit.blur.tt": "Feather of the mask edges (gaussian, px): 0 = hard edge, 6-12 = smooth transition between regenerated area and original video.",
   "vedit.dilate.tt": "How much to GROW the tracked mask (px): more room for the new object, less tight borders.",
   "cn.attn_lbl": "Guide attention",
-  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion."
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion.",
+  "f1.inpaint.feather_lbl": "Edge feather (px)",
+  "f1.inpaint.feather.auto": "Auto",
+  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring."
 }

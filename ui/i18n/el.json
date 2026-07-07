@@ -2309,7 +2309,7 @@
   "f1.inpaint.prompt.tt": "Περίγραψε τι να σχεδιαστεί στη μασκαρισμένη περιοχή (inpaint).",
   "f1.outpaint.prompt.tt": "Περίγραψε τι να δημιουργηθεί στην περιοχή που εκτείνεται πέρα από τα άκρα (outpaint).",
   "f1.neg.tt": "Στοιχεία προς αποφυγή στην αναδημιουργημένη περιοχή.",
-  "f1.inpaint.strength.tt": "Πόσο αναδημιουργείται η μασκαρισμένη περιοχή: 1.00 = πλήρως, χαμηλές τιμές διατηρούν το πρωτότυπο.",
+  "f1.inpaint.strength.tt": "Retention strength: how much of the ORIGINAL is preserved in the masked area. Internally: denoise = 1 − 0.4×strength (min 0.5) — strength 1.00 → denoise 0.60 (keeps a lot), 0 → denoise 1.00 (regenerates fully).",
   "f1.inpaint.model.tt": "Μοντέλο για inpaint/outpaint (FLUX Fill ή συμβατό checkpoint).",
   "f1.inpaint.lora.tt": "Προαιρετικό LoRA που εφαρμόζεται στο inpaint/outpaint για στυλ ή θέμα.",
   "f1.inpaint.run.tt": "Γέμισε τη μασκαρισμένη περιοχή διατηρώντας ανέπαφο το υπόλοιπο της εικόνας.",
@@ -2431,5 +2431,8 @@
   "vedit.blur.tt": "Feather of the mask edges (gaussian, px): 0 = hard edge, 6-12 = smooth transition between regenerated area and original video.",
   "vedit.dilate.tt": "How much to GROW the tracked mask (px): more room for the new object, less tight borders.",
   "cn.attn_lbl": "Guide attention",
-  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion."
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion.",
+  "f1.inpaint.feather_lbl": "Edge feather (px)",
+  "f1.inpaint.feather.auto": "Auto",
+  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring."
 }

@@ -2309,7 +2309,7 @@
   "f1.inpaint.prompt.tt": "Décrivez ce qu'il faut dessiner dans la zone masquée (inpaint).",
   "f1.outpaint.prompt.tt": "Décrivez ce qu'il faut générer dans la zone étendue au-delà des bords (outpaint).",
   "f1.neg.tt": "Éléments à éviter dans la zone régénérée.",
-  "f1.inpaint.strength.tt": "À quel point la zone masquée est régénérée : 1,00 = total, valeurs basses préservent l'original.",
+  "f1.inpaint.strength.tt": "Retention strength: how much of the ORIGINAL is preserved in the masked area. Internally: denoise = 1 − 0.4×strength (min 0.5) — strength 1.00 → denoise 0.60 (keeps a lot), 0 → denoise 1.00 (regenerates fully).",
   "f1.inpaint.model.tt": "Modèle utilisé pour l'inpaint/outpaint (FLUX Fill ou un checkpoint compatible).",
   "f1.inpaint.lora.tt": "LoRA optionnelle appliquée lors de l'inpaint/outpaint pour le style ou le sujet.",
   "f1.inpaint.run.tt": "Remplir la zone masquée en gardant le reste de l'image intact.",
@@ -2431,5 +2431,8 @@
   "vedit.blur.tt": "Feather of the mask edges (gaussian, px): 0 = hard edge, 6-12 = smooth transition between regenerated area and original video.",
   "vedit.dilate.tt": "How much to GROW the tracked mask (px): more room for the new object, less tight borders.",
   "cn.attn_lbl": "Guide attention",
-  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion."
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion.",
+  "f1.inpaint.feather_lbl": "Edge feather (px)",
+  "f1.inpaint.feather.auto": "Auto",
+  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring."
 }

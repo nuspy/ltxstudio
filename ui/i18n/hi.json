@@ -2309,7 +2309,7 @@
   "f1.inpaint.prompt.tt": "मास्क किए गए क्षेत्र में क्या बनाना है, इसका वर्णन करें (inpaint)।",
   "f1.outpaint.prompt.tt": "किनारों से आगे विस्तारित क्षेत्र में क्या उत्पन्न करना है, इसका वर्णन करें (outpaint)।",
   "f1.neg.tt": "पुनः उत्पन्न क्षेत्र में जिन तत्वों से बचना है।",
-  "f1.inpaint.strength.tt": "मास्क किया गया क्षेत्र कितना पुनः उत्पन्न होता है: 1.00 = पूर्ण, कम मान मूल को संरक्षित करते हैं।",
+  "f1.inpaint.strength.tt": "Retention strength: how much of the ORIGINAL is preserved in the masked area. Internally: denoise = 1 − 0.4×strength (min 0.5) — strength 1.00 → denoise 0.60 (keeps a lot), 0 → denoise 1.00 (regenerates fully).",
   "f1.inpaint.model.tt": "inpaint/outpaint के लिए उपयोग किया गया मॉडल (FLUX Fill या संगत चेकपॉइंट)।",
   "f1.inpaint.lora.tt": "शैली या विषय के लिए inpaint/outpaint के दौरान लागू वैकल्पिक LoRA।",
   "f1.inpaint.run.tt": "छवि के बाकी हिस्से को बरकरार रखते हुए मास्क किए गए क्षेत्र को भरें।",
@@ -2431,5 +2431,8 @@
   "vedit.blur.tt": "Feather of the mask edges (gaussian, px): 0 = hard edge, 6-12 = smooth transition between regenerated area and original video.",
   "vedit.dilate.tt": "How much to GROW the tracked mask (px): more room for the new object, less tight borders.",
   "cn.attn_lbl": "Guide attention",
-  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion."
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion.",
+  "f1.inpaint.feather_lbl": "Edge feather (px)",
+  "f1.inpaint.feather.auto": "Auto",
+  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring."
 }

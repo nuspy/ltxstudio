@@ -2490,7 +2490,11 @@ class MainWindow(QMainWindow):
                   "enhance": cfg.get("enhance"), "nsfw": cfg.get("nsfw"),
                   "pulid_face": cfg.get("pulid_face"), "pulid_strength": cfg.get("pulid_strength", 0.8),
                   "pulid_start_step": cfg.get("pulid_start_step", 0), "pulid_true_cfg": cfg.get("pulid_true_cfg", 1.0)}
-        self._log("Generazione immagine (backend NATIVO) inviata…")
+        # log dei settaggi EFFETTIVI (visibilità su cosa è auto e cosa è scelto dall'utente)
+        self._log(f"Generazione immagine (NATIVO): modello={os.path.basename(str(cfg['model']))} · "
+                  f"arch={cfg['arch']} · {v['width']}×{v['height']} · steps={cfg['steps']} · "
+                  f"cfg={cfg.get('cfg') or 3.5} · sampler={cfg.get('sampler') or 'auto'} · "
+                  f"encoder={os.path.basename(str(cfg.get('encoder') or 'auto'))} · seed={seed}")
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.image", "Immagine"), self._native_worker, self._on_native_image_done)
@@ -3070,9 +3074,13 @@ class MainWindow(QMainWindow):
         denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * float(retention)))
         params = {"model": model, "arch": arch, "prompt": prompt, "negative": negative,
                   "image_path": exp["image"], "mask_path": exp["mask"],
-                  "steps": steps, "guidance": guidance, "seed": seed, "denoise": denoise}
+                  "steps": steps, "guidance": guidance, "seed": seed, "denoise": denoise,
+                  "feather": int(self.frame1_tab.get_inpaint_config().get("feather", 0)),
+                  "outpaint": mode == "outpaint"}
         self._inpaint_mode = mode
-        self._log(f"{mode} (backend NATIVO) inviato (steps={steps}, seed={seed}, guidance={guidance:.1f})…")
+        # log componenti/settaggi EFFETTIVI (visibilità: cosa è stato auto-selezionato davvero)
+        self._log(f"{mode} (backend NATIVO): modello={os.path.basename(model)} · pipeline={arch} · "
+                  f"steps={steps} · guidance={guidance:.1f} · denoise={denoise:.2f} · seed={seed}")
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,

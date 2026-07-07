@@ -971,6 +971,11 @@ def run(params: dict, mm, output_dir: str) -> dict:
             import inspect
             if "negative_prompt" in inspect.signature(pipe.__call__).parameters:
                 kw["negative_prompt"] = neg
+            else:
+                # visibilità per l'utente (dialog anteprima): il negative è stato IGNORATO dall'arch
+                print(f"[image] negative_prompt IGNORATO: {type(pipe).__name__} non lo supporta "
+                      f"(guidance-distilled)", flush=True)
+                preview_bus.set_message(f"Nota: negative ignorato ({arch} non lo supporta)")
         except Exception:                                   # noqa: BLE001
             pass
     # FluxInpaintPipeline (inpaint BASE, modelli 64ch, SEGUE il prompt) usa 'strength' = quanto rigenerare la
@@ -1020,7 +1025,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
         try:
             from PIL import ImageFilter
             _orig = Image.open(params["image_path"]).convert("RGB").resize(res_img.size, Image.LANCZOS)
-            _feather = max(2, min(8, int(round(min(res_img.size) / 256))))   # bordo morbido proporzionale
+            # feather: dalla GUI se impostato (>0), altrimenti proporzionale automatico
+            _feather = int(params.get("feather") or 0) or max(2, min(8, int(round(min(res_img.size) / 256))))
             _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)
             # OUTPAINT: dilata la regione generata prima di sfumare, così la sfumatura NON tocca il bordo NERO
             # della tela (niente linea scura). INPAINT: NIENTE dilatazione → l'originale è preservato fino al

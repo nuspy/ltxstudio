@@ -13,6 +13,14 @@ from pathlib import Path
 
 CATALOG_PATH = Path(r"E:\AI\dictionary\data\catalog.json")
 
+# Default GUI per ARCHITETTURA (sampler/scheduler/steps/cfg/clip_type) — fonte UNICA (review FASE G):
+# prima vivevano hardcoded in frame1_tab._ARCH_DEFAULTS. Allineati ai workflow ufficiali Comfy-Org.
+ARCH_DEFAULTS = {
+    "FLUX":    {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 3.5, "clip_type": "flux"},
+    "Z-Image": {"sampler": "res_multistep", "scheduler": "simple", "steps": 8, "cfg": 1.0, "clip_type": "lumina2"},
+    "Ernie":   {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 4.0, "clip_type": "flux2"},
+}
+
 # Valori consigliati hardcoded per i modelli più comuni (con nota "supposed" se non da Civitai)
 _RECOMMENDED: dict[str, dict] = {
     "ltx-2.3-22b-distilled": {"steps": 8, "cfg": 0.9, "note": "distilled"},

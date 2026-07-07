@@ -2309,7 +2309,7 @@
   "f1.inpaint.prompt.tt": "Descrivi cosa disegnare nell'area mascherata (inpaint).",
   "f1.outpaint.prompt.tt": "Descrivi cosa generare nell'area estesa oltre i bordi (outpaint).",
   "f1.neg.tt": "Elementi da evitare nell'area rigenerata.",
-  "f1.inpaint.strength.tt": "Quanto l'area mascherata viene rigenerata: 1.00 = totale, valori bassi preservano l'originale.",
+  "f1.inpaint.strength.tt": "Forza mantenimento: quanto PRESERVA l'originale nell'area mascherata. Internamente: denoise = 1 − 0.4×forza (min 0.5) — forza 1.00 → denoise 0.60 (conserva molto), forza 0 → denoise 1.00 (rigenera tutto).",
   "f1.inpaint.model.tt": "Modello usato per inpaint/outpaint (FLUX Fill o checkpoint compatibile).",
   "f1.inpaint.lora.tt": "LoRA opzionale applicata durante inpaint/outpaint per stile o soggetto.",
   "f1.inpaint.run.tt": "Riempi l'area mascherata mantenendo intatto il resto dell'immagine.",
@@ -2431,5 +2431,8 @@
   "vedit.blur.tt": "Sfumatura dei bordi della maschera (gaussiana, px): 0 = bordo netto, 6-12 = transizione morbida tra area rigenerata e video originale.",
   "vedit.dilate.tt": "Quanto ALLARGARE la maschera tracciata (px): più spazio per il nuovo oggetto, bordi meno stretti.",
   "cn.attn_lbl": "Attenzione guida",
-  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attenzione strettamente vincolata al video-guida; valori più bassi (0.5-0.8) lasciano più libertà creativa preservando il movimento."
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attenzione strettamente vincolata al video-guida; valori più bassi (0.5-0.8) lasciano più libertà creativa preservando il movimento.",
+  "f1.inpaint.feather_lbl": "Sfumatura bordo (px)",
+  "f1.inpaint.feather.auto": "Auto",
+  "f1.inpaint.feather.tt": "Sfumatura del bordo tra area rigenerata e originale (px): Auto = proporzionale alla foto; valori alti = transizione più morbida ma anello di modifica più largo."
 }

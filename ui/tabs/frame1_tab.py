@@ -329,13 +329,9 @@ class Frame1Tab(QWidget):
         if paths:
             self.gen_pulid_face.setText("|".join(paths))     # più foto separate da | → media in PuLID
 
-    # Default per architettura (sampler/scheduler/steps/cfg/clip_type) — applicati a ogni
-    # cambio di architettura. Allineati ai workflow ufficiali Comfy-Org.
-    _ARCH_DEFAULTS = {
-        "FLUX":    {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 3.5, "clip_type": "flux"},
-        "Z-Image": {"sampler": "res_multistep", "scheduler": "simple", "steps": 8, "cfg": 1.0, "clip_type": "lumina2"},
-        "Ernie":   {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 4.0, "clip_type": "flux2"},
-    }
+    # Default per architettura: CENTRALIZZATI in core/model_catalog.ARCH_DEFAULTS (review FASE G) —
+    # un solo posto da aggiornare quando cambia un'arch, GUI e backend leggono la stessa fonte.
+    from core.model_catalog import ARCH_DEFAULTS as _ARCH_DEFAULTS
 
     def _apply_arch_defaults(self, arch_lbl: str):
         if hasattr(self, "_pulid_group"):                    # PuLID è solo FLUX: disabilita su Z-Image/Ernie
@@ -647,6 +643,13 @@ class Frame1Tab(QWidget):
             "Guidance (CFG): quanto la modifica SEGUE il prompt. Alta (≈30) = modifica decisa e aderente; "
             "bassa = più morbida/creativa. Diverso dalla «Forza mantenimento» (quanto preserva l'originale)."))
         f.addRow(tr("f1.inpaint.guidance_lbl", "Guidance (aderenza prompt)"), self.inp_guidance)
+        # feather della ricomposizione fuori-maschera: 0 = automatico (proporzionale), 2-16 = manuale
+        self.inp_feather = QSpinBox(); self.inp_feather.setRange(0, 16); self.inp_feather.setValue(0)
+        self.inp_feather.setSpecialValueText(tr("f1.inpaint.feather.auto", "Auto"))
+        self.inp_feather.setToolTip(tr("f1.inpaint.feather.tt",
+            "Sfumatura del bordo tra area rigenerata e originale (px): Auto = proporzionale alla foto; "
+            "valori alti = transizione più morbida ma anello di modifica più largo."))
+        f.addRow(tr("f1.inpaint.feather_lbl", "Sfumatura bordo (px)"), self.inp_feather)
         self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
         self.inp_model.setToolTip(tr("f1.inpaint.model.tt", "Modello usato per inpaint/outpaint (FLUX Fill o checkpoint compatibile)."))
         self._color_curated_combo(self.inp_model, INPAINT_MODELS, key="unet")   # colori VRAM (verde/giallo/rosso)
@@ -1272,6 +1275,7 @@ class Frame1Tab(QWidget):
             "negative": self.inp_neg.toPlainText().strip(),
             "strength": self.strength.value() / 100.0,
             "guidance": float(self.inp_guidance.value()),   # CFG esplicita dalla GUI (aderenza al prompt)
+            "feather": int(self.inp_feather.value()),       # 0 = auto proporzionale
             "model": label,
             "unet": unet,
             "checkpoint": ckpt,
