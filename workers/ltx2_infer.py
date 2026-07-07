@@ -429,7 +429,9 @@ def _auto_gguf() -> str | None:
         for pat in pats:
             hits = glob.glob(os.path.join(b, pat), recursive=True)
             if hits:
+                print(f"[auto-gguf] selezionato: {hits[0]}", flush=True)
                 return hits[0]
+    print("[auto-gguf] nessun .gguf LTX trovato → checkpoint pieno", flush=True)
     return None
 
 

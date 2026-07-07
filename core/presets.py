@@ -14,20 +14,22 @@ VIDEO_PRESETS: dict[str, dict] = {
     # ── Modalità ESPLICITE Fast/Pro/HQ (review 07/07): tre livelli chiari, stessa risoluzione di
     # lavoro 1280×704 (cambia solo il compromesso velocità/qualità). I preset SCRIVONO nei controlli
     # GUI (regola: l'ottimizzazione imposta i controlli, non il pipeline direttamente).
+    # teacache (audit acceleratori 07/07): FAST usa la cache aggressiva (bozza, +2× velocità), PRO
+    # moderata (drift impercettibile a 24 step), HQ 0.0 (purezza assoluta, nessuna scorciatoia).
     "⚡ FAST (bozza ~1 min)": {
         "steps": 8, "cfg": 1.0, "sampler": "euler", "scheduler": _SCHED,
-        "width": 704, "height": 384, "fps": 16, "length_s": 4.0,
-        "description": "Modalità FAST: 8 step, risoluzione ridotta — bozza per validare l'idea",
+        "width": 704, "height": 384, "fps": 16, "length_s": 4.0, "teacache": 0.05,
+        "description": "Modalità FAST: 8 step, risoluzione ridotta, TeaCache — bozza per validare l'idea",
     },
     "🎯 PRO (equilibrato)": {
         "steps": 24, "cfg": 1.0, "sampler": _SAMPLER, "scheduler": _SCHED,
-        "width": 1280, "height": 704, "fps": 24, "length_s": 6.0,
-        "description": "Modalità PRO: 24 step full-res — il miglior compromesso qualità/tempo",
+        "width": 1280, "height": 704, "fps": 24, "length_s": 6.0, "teacache": 0.03,
+        "description": "Modalità PRO: 24 step full-res, TeaCache moderata — miglior compromesso",
     },
     "💎 HQ (massima qualità)": {
         "steps": 44, "cfg": 1.0, "sampler": _SAMPLER, "scheduler": _SCHED,
-        "width": 1280, "height": 704, "fps": 24, "length_s": 8.0,
-        "description": "Modalità HQ: 44 step full-res — massima qualità, il più lento",
+        "width": 1280, "height": 704, "fps": 24, "length_s": 8.0, "teacache": 0.0,
+        "description": "Modalità HQ: 44 step full-res, nessuna cache — massima qualità, il più lento",
     },
     "🎯 Migliore qualità": {
         "steps": 40, "cfg": 1.0, "sampler": _SAMPLER, "scheduler": _SCHED,

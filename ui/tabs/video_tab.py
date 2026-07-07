@@ -601,6 +601,8 @@ class VideoTab(QWidget):
             self.sampler_seed.steps.setValue(cfg["steps"])
         if cfg.get("cfg") is not None:
             self.sampler_seed.cfg.setValue(cfg["cfg"])
+        if cfg.get("teacache") is not None and hasattr(self, "teacache"):
+            self.teacache.setValue(float(cfg["teacache"]))   # scritto NEL controllo (regola: preset→GUI)
         if cfg.get("sampler"):
             i = self.sampler_seed.sampler.findText(cfg["sampler"])
             if i >= 0:
