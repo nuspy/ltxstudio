@@ -698,6 +698,22 @@ def _load(model_path: str, arch: str, mm=None):
                 raise
     else:
         pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)
+    # fp8 LAYERWISE sul transformer del CHECKPOINT COMPLETO (from_single_file, es. flux1-schnell-fp8 16GB):
+    # from_single_file lo upcasta a bf16 (~32GB) → NON entra nei 32GB → offload lento. ComfyUI lo tiene fp8
+    # (16GB) → gpu-resident → veloce. Ripristina lo storage fp8 sul transformer (l'assemble path lo fa già in
+    # _load_flux_tr). Solo FLUX.1 (flux/kontext/inpaint), file fp8 e4m3, non GGUF. Off: NATIVE_FLUX1_FP8=0.
+    _tr0 = getattr(pipe, "transformer", None)
+    if (_tr0 is not None and not getattr(_tr0, "_ls_fp8_storage", False)
+            and os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and arch in ("flux", "kontext", "inpaint")
+            and Path(model_path).is_file() and not str(model_path).lower().endswith(".gguf")
+            and _flux_fp8_e4m3(model_path)):
+        try:
+            _tr0.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+            _tr0._ls_fp8_storage = True
+            print("[flux] checkpoint fp8 → transformer storage fp8 (layerwise): entra in VRAM, niente offload",
+                  flush=True)
+        except Exception as _e:                             # noqa: BLE001
+            print(f"[flux] layerwise fp8 su checkpoint non applicato ({_e}) → bf16", flush=True)
     # VAE TILING: il decode a tessere lascia GIUNZIONI RETTANGOLARI visibili ("mosaico di rettangoli"),
     # particolarmente evidenti su inpaint/editing. Le nostre immagini sono ≤1536 (cap canvas) e il decode
     # del latente FLUX entra comodamente nei 32GB SENZA tiling → di default DISATTIVATO (niente seam).
@@ -734,9 +750,14 @@ def _load(model_path: str, arch: str, mm=None):
     # full-stack entra GPU-resident. Senza casting (fallback) l'upcast a bf16 raddoppia come prima.
     _fp8_storage = bool(getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False))
     _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf and not _fp8_storage) else sz_mb
-    overhead = 4000 if arch == "zimage" else 11000          # T5/CLIP/Mistral + VAE + working
+    # overhead: T5/CLIP/VAE + working. Con storage fp8 il transformer resta PICCOLO (non raddoppia) e nei
+    # checkpoint COMPLETI il file include già gli encoder → overhead ridotto, altrimenti la stima gonfiata
+    # forza un offload inutile (schnell-fp8 16GB → est 27GB → offload, invece entra in VRAM ed è veloce).
+    overhead = 4000 if arch == "zimage" else (6000 if _fp8_storage else 11000)
     if _is_gguf and sz_mb:
         est_mb = int(_eff_mb + overhead)                    # NIENTE floor VRAM_MB: il Q4/Q5 è davvero piccolo
+    elif _fp8_storage and sz_mb:
+        est_mb = int(_eff_mb + overhead)                    # fp8-storage: niente floor 24GB (entra sui 32GB)
     else:
         est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
     # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral): NON entra tutto-su-GPU nei 32GB e nemmeno in
