@@ -432,9 +432,15 @@ class _NativeLtx2Worker(QThread):
                              stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
             self.proc = proc                                # #91: esposto per stop() alla chiusura
             out_path = None
+            _tail = []                                      # ring-buffer dell'output per l'errore VERO
             for line in proc.stdout:
                 line = line.rstrip()
-                if line.startswith("[") or line.startswith("OK:") or "Error" in line or "error" in line:
+                if line:
+                    _tail.append(line)
+                    if len(_tail) > 40:
+                        _tail.pop(0)
+                if line.startswith("[") or line.startswith("OK:") or "Error" in line or "error" in line \
+                        or "Traceback" in line:
                     self.progress.emit(line)
                 if line.startswith("OK:"):
                     out_path = line[3:].strip()
@@ -450,7 +456,11 @@ class _NativeLtx2Worker(QThread):
             if out_path and _os.path.exists(out_path):
                 self.done.emit({"status": "success", "output": [out_path]})
             else:
-                self.done.emit({"status": "error", "error": "LTX-2 nativo: nessun output prodotto"})
+                # NON più "nessun output" e basta: mostra il MOTIVO reale (tail dell'output del worker,
+                # dove sta il traceback/OOM/checkpoint mancante) + il codice di uscita.
+                _why = "\n".join(_tail[-18:]) or "(nessun output dal worker)"
+                self.done.emit({"status": "error",
+                                "error": f"LTX-2 nativo: nessun output (exit {proc.returncode}).\n{_why}"})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
 
@@ -2420,6 +2430,12 @@ class MainWindow(QMainWindow):
                 self._native_prev_timer.timeout.connect(self._poll_native_preview)
             self._native_prev_seq = -1
             self._native_prev_src = source
+            if source == "video":                          # azzera lo stato del job PRECEDENTE (era il
+                try:                                       # "15/30" che appariva subito, residuo vecchio)
+                    from core import preview_file
+                    preview_file.reset()
+                except Exception:                          # noqa: BLE001
+                    pass
             self._native_prev_dlg.start({}, title)         # prompt vuoto: non serve la pesatura nodi comfy
             self._native_prev_dlg.cur_bar.setRange(0, 0)   # "busy" finché non arriva il primo step
             self._native_prev_dlg.on_native_message(tr("progress.step_load_model", "Caricamento componenti…"))
