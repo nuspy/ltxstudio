@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
+from PySide6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
                                QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from core import llm_service as L
@@ -47,6 +47,26 @@ class StoryboardTab(QWidget):
         h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video)
         h.addWidget(self.btn_auto); h.addWidget(self.btn_shotlist); h.addStretch(1)
         v.addLayout(h)
+        # B5: selettori modello immagine/video del progetto (salvati in config; niente più hardcode flux)
+        mrow = QHBoxLayout()
+        self.mdl_img = QComboBox(); self.mdl_vid = QComboBox()
+        self.mdl_img.setMinimumWidth(220); self.mdl_vid.setMinimumWidth(220)
+        try:
+            from core import model_selection as _ms
+            self.mdl_img.addItem(tr("fs.sb.mdl_default", "(auto)"), None)
+            for lbl, path, arch in _ms.list_image_models():
+                self.mdl_img.addItem(lbl, {"path": path, "arch": arch})
+            self.mdl_vid.addItem(tr("fs.sb.mdl_default", "(auto)"), None)
+            for lbl, path in _ms.list_video_gguf():
+                self.mdl_vid.addItem(lbl, {"path": path})
+        except Exception:                                    # noqa: BLE001
+            pass
+        self.mdl_img.currentIndexChanged.connect(self._save_models)
+        self.mdl_vid.currentIndexChanged.connect(self._save_models)
+        mrow.addWidget(QLabel(tr("fs.sb.mdl_img", "Modello immagine:"))); mrow.addWidget(self.mdl_img)
+        mrow.addWidget(QLabel(tr("fs.sb.mdl_vid", "Modello video:"))); mrow.addWidget(self.mdl_vid)
+        mrow.addStretch(1)
+        v.addLayout(mrow)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
         self.tree.currentItemChanged.connect(self._on_tree_sel)
         v.addWidget(self.tree, 1)
@@ -99,6 +119,10 @@ class StoryboardTab(QWidget):
         pid = self._get_project()
         if not pid:
             return
+        try:
+            self._load_models()                              # B5: riflette il modello salvato nei dropdown
+        except Exception:                                    # noqa: BLE001
+            pass
         proj = db.get("project", pid) or {}
         scenes = db.query("scene", "project_id=?", (pid,), order="ord")
         warns = []
@@ -160,6 +184,37 @@ class StoryboardTab(QWidget):
                           refs="", camera=cam, continuity=json.dumps(state, ensure_ascii=False))
         self._refresh()
         self.log.appendPlainText(tr("fs.sb.done", "Breakdown: {n} scene").format(n=len(data.get('scenes', []))))
+
+    def _save_models(self, *_):
+        """B5: salva la scelta modello immagine/video nella config del progetto (letta da _gen)."""
+        pid = self._get_project()
+        if not pid:
+            return
+        proj = db.get("project", pid)
+        cfg = json.loads(proj.get("config") or "{}")
+        im = self.mdl_img.currentData()
+        vd = self.mdl_vid.currentData()
+        cfg["img_arch"] = (im or {}).get("arch", "flux") if im else "flux"
+        cfg["img_model"] = (im or {}).get("path", "") if im else ""
+        cfg["vid_gguf"] = (vd or {}).get("path", "") if vd else ""
+        db.update("project", pid, config=json.dumps(cfg, ensure_ascii=False))
+
+    def _load_models(self):
+        """Riflette la scelta salvata nei dropdown all'apertura del progetto."""
+        pid = self._get_project()
+        if not pid:
+            return
+        cfg = json.loads((db.get("project", pid) or {}).get("config") or "{}")
+        for combo, key in ((self.mdl_img, "img_model"), (self.mdl_vid, "vid_gguf")):
+            want = cfg.get(key, "")
+            combo.blockSignals(True)
+            idx = 0
+            for i in range(combo.count()):
+                d = combo.itemData(i)
+                if d and d.get("path") == want:
+                    idx = i; break
+            combo.setCurrentIndex(idx)
+            combo.blockSignals(False)
 
     def _gen(self, what: str):
         pid = self._get_project()

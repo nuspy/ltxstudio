@@ -2479,5 +2479,8 @@
   "mvs.mem.auto": "Auto",
   "mvs.mem.sticky": "Sticky (fast batch)",
   "mvs.mem.tt": "Sticky-transformer: keeps the model in VRAM for the whole image batch instead of reloading it per photo — much faster with large models. Does not affect videos.",
-  "fs.mt.audio_overflow": "⚠ {k} shot(s): dialogue longer than shot duration (extend the shot or trim the text)"
+  "fs.mt.audio_overflow": "⚠ {k} shot(s): dialogue longer than shot duration (extend the shot or trim the text)",
+  "fs.sb.mdl_default": "(auto)",
+  "fs.sb.mdl_img": "Image model:",
+  "fs.sb.mdl_vid": "Video model:"
 }
