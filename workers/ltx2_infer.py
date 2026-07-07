@@ -523,10 +523,18 @@ def _run_chunked(p: dict, chunk: int) -> str:
         try:
             run_generation(cp)                               # pipe in cache dal 2° chunk → veloce
         except Exception as _e:                              # es. ultimo chunk con audio più corto dei frame
-            print(f"[chunk] {i} saltato ({type(_e).__name__}: {_e})", flush=True)
-            if i == 0:                                       # il PRIMO chunk fallito = nessun output: NON
-                raise                                        # inghiottire, propaga il vero errore all'utente
-            break                                            # un chunk finale corto è tollerabile (tieni i precedenti)
+            print(f"[chunk] {i} fallito ({type(_e).__name__}: {_e}) → 1 RETRY dopo pulizia VRAM", flush=True)
+            import gc as _gc2
+            _gc2.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            try:
+                run_generation(cp)                           # RETRY: recupera la durata piena (era troncata muta)
+            except Exception as _e2:                         # noqa: BLE001
+                print(f"[chunk] {i} fallito anche al retry ({type(_e2).__name__}: {_e2})", flush=True)
+                if i == 0:                                   # il PRIMO chunk fallito = nessun output: NON
+                    raise                                    # inghiottire, propaga il vero errore all'utente
+                break                                        # chunk successivo perso → durata ridotta (avvisata sotto)
         import gc as _gc
         _gc.collect()
         if torch.cuda.is_available():
@@ -543,7 +551,18 @@ def _run_chunked(p: dict, chunk: int) -> str:
             fh.write(f"file '{pt}'\n")
     subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
                     "-c", "copy", p["output"], "-y"], check=False)
-    print(f"[chunk] concat → {p['output']} ({len(parts)} chunk)", flush=True)
+    # DURATA REALE vs richiesta: se qualche chunk è fallito, la durata è RIDOTTA. NON silenzioso (l'utente
+    # vedeva "10s→5s" senza spiegazione): avvisa con i secondi effettivi prodotti. Il primo chunk (i==0) fa
+    # già raise; qui gestiamo i chunk SUCCESSIVI persi.
+    _fps = float(p.get("fps", 25.0))
+    _frames_done = sum(min(chunk, total - k * chunk) for k in range(len(parts)))
+    if len(parts) < n:
+        _sr, _st = _frames_done / max(_fps, 1), total / max(_fps, 1)
+        _stage(f"⚠ Video RIDOTTO: {len(parts)}/{n} segmenti → {_sr:.1f}s invece di {_st:.1f}s "
+               f"(un segmento è fallito — vedi log sopra).")
+        print(f"[chunk] ATTENZIONE: durata {_sr:.1f}s invece di {_st:.1f}s ({len(parts)}/{n} chunk riusciti)",
+              flush=True)
+    print(f"[chunk] concat → {p['output']} ({len(parts)}/{n} chunk, ~{_frames_done / max(_fps,1):.1f}s)", flush=True)
     return p["output"]
 
 

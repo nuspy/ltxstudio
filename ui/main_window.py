@@ -2634,9 +2634,12 @@ class MainWindow(QMainWindow):
                 params["num_frames"] = nf
                 self._log(f"[nativo] a2v: durata video allineata all'audio ({adur:.1f}s, {nf} frame)")
             params["audio_max_duration"] = length_s
-        # video lungo → chunking memory-bounded (chunk da ~5s)
-        if nf > 150:
-            params["chunk_frames"] = 121
+        # Chunking SOLO per video davvero lunghi: LTX-2.3 regge ~20s in singolo shot sui 32GB. Spezzare a 5s
+        # era troppo conservativo (introduceva chunk-boundary che potevano fallire → durata dimezzata muta).
+        # Ora: ≤20s = singolo shot (durata piena garantita); >20s = chunk da ~20s memory-bounded.
+        _single_max = int(20 * fps) // 8 * 8 + 1             # ~481 frame @24fps
+        if nf > _single_max:
+            params["chunk_frames"] = _single_max
         # CONTROLNET (#24): preprocessa il ref-video (canny/depth/pose) e passalo al worker come guida
         cnet = self.controlnet_tab.get_values()
         if cnet.get("controlnet_enabled") and cnet.get("controlnet_ref_video"):
@@ -2922,8 +2925,9 @@ class MainWindow(QMainWindow):
             nat["_talk_region"] = params.get("talk_region")
             nat["_talk_offset"] = int(params.get("talk_mask_offset", 0) or 0)
             nat["_talk_source"] = img
-        if nf > 150:
-            nat["chunk_frames"] = 121
+        _single_max = int(20 * fps) // 8 * 8 + 1             # ≤20s = singolo shot (LTX-2.3 regge)
+        if nf > _single_max:
+            nat["chunk_frames"] = _single_max
         self._log(f"[lip-sync nativo] a2v LTX-2 GGUF — {nf} frame {nat['width']}x{nat['height']}…")
         self._mt_worker = _NativeLtx2Worker(nat)
         self._enqueue(tr("queue.job.lipsync", "Lip-sync"), self._mt_worker, self._on_multitalk_done,
