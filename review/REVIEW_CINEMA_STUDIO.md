@@ -169,16 +169,20 @@ triade *tieni / varia / dirigi* su ogni artefatto.
   **B9** stato-personaggi per scena (wardrobe/condition/emotion → continuity engine completo); **@-completer
   INLINE** non-modale (sostituisce il dialog bloccante).
 
-**⏳ Rimane** (feature grandi, richiedono validazione live — training/rendering — o rework UI su 2 varianti):
-- **Copertura dialoghi** shot-reverse-shot (shot→N inquadrature) — il singolo intervento «cinema» maggiore.
-- **Galleria set attore** (Accetta/rigen-angolo) + abbigliamento 6-angoli; **rigen non-distruttiva** (strip varianti).
-- **Worker video persistente** (elimina subprocess-per-shot); **timeline pro** (trim/ripple/marker/waveform);
-  **camera/lighting continuity** avanzata (lente/focale/LUT); **stadio Racconto** + co-scrittura interattiva;
-  **riallineamento Classica/Pro** (oggi INVERTITE); storyboard→`add_version()` (storia take).
+- **Secondo lotto (validazione backend, test 22/22)**: **copertura dialoghi** shot-reverse-shot
+  (`coverage.py`), **storia take non-distruttiva** (`takes.py` + galleria ripristino), **continuità fotografica**
+  (lente+LUT persistono), **trim montaggio** (in/out per-shot al master+NLE, testato ffmpeg), **stadio Racconto**
+  (`script.kind` narrative + prosa che contestualizza il breakdown), **abbigliamento 6-angoli**
+  (`coverage.wardrobe_prompts`), **riallineamento Classica/Pro** (guida→Classica, Pro lean, testato), **worker
+  video persistente** (`gen_shot_video` usa il server :8190 se attivo → no reload LTX 22B/shot).
+
+**⏳ Rimane** (solo pezzi che richiedono GPU/uso reale o giudizio-utente):
+- **Rigen non-distruttiva estesa a strip-varianti visibili nel tree** (oggi c'è la storia-take con galleria).
+- **Co-scrittura interattiva vera** (oggi il Racconto è generato+editabile; manca il tavolo a bivi/beat).
+- **Timeline pro completa** (ripple/marker/waveform; oggi c'è trim in/out + riordino).
 - **Moonshot** (virtual script supervisor, DoP-agente, montaggio a ritmo emotivo, «secondo sguardo», ecc.).
-- **feature_matrix**: aggiungere le nuove sotto-capability (style_bible, lora_pipeline, model-select,
-  transizioni, grammar) al seed esterno con i18n_key — oggi funzionano perché dentro `cap.filmstudio` (già
-  gated) e dev è permissivo.
+- **feature_matrix**: aggiungere le nuove sotto-capability al seed esterno con i18n_key (oggi funzionano perché
+  dentro `cap.filmstudio` già gated e dev è permissivo).
 
 ## 5. Sintesi finale del panel
 Avete un'**officina** eccellente; manca il **teatro**. Tre atti riportano l'anima — **intenzione persistente**
