@@ -155,6 +155,29 @@ triade *tieni / varia / dirigi* su ogni artefatto.
 
 ---
 
+## 4-bis. Stato implementazione (branch `feature/cinema-studio-review`)
+**✅ Fatto e committato** (compila + smoke test 14/14; B1/B6 verificati con test DB):
+- **P0**: B1 (#Variante→variante), B2 (LoRA flavor), B4 (seed per-shot), B5 (modello da config + `core/
+  model_selection.py` + dropdown storyboard), B10 (cascade+WAL+`recover()`+lora.weight/base_arch).
+- **P1**: B3 (dialoghi in sequenza+overflow), B7 (aspect master letterbox), B8 (continuity warnings attivi),
+  B11 (thumbnail keyframe nel tree), B12 (undo `@Nome#` via QTextCursor), context-menu «Rigenera segmento»
+  (Copione+Scenografia).
+- **Medio**: orchestratore LoRA img→video (`lora_orchestrator.py` + tabella `lora_pipeline` + `register_lora`
+  chiude B6) con **driver GUI nel LoRA Studio** (gate galleria-foto); **Style Bible** (logline/palette/look/
+  registi iniettata in ogni prompt).
+
+**⏳ Rimane** (feature grandi, richiedono validazione live — training/rendering — o rework UI su 2 varianti):
+- **B9** popolare continuity per-asset (wardrobe/condition/emotion dalla UI).
+- **Copertura dialoghi** shot-reverse-shot (shot→N inquadrature) — il singolo intervento «cinema» maggiore.
+- **Galleria set attore** (Accetta/rigen-angolo) + abbigliamento 6-angoli; **rigen non-distruttiva** (strip varianti).
+- **@-completer inline** non-modale (oggi resta il dialog; l'undo però è già corretto, B12).
+- **Worker video persistente** (elimina subprocess-per-shot); **transizioni** (campo+`xfade`); **timeline pro**
+  (trim/ripple/marker); **camera/lighting continuity** (lente/LUT); **stadio Racconto** + co-scrittura;
+  **riallineamento Classica/Pro**; storyboard→`add_version()`.
+- **Moonshot** (virtual script supervisor, DoP-agente, montaggio a ritmo emotivo, «secondo sguardo», ecc.).
+- **feature_matrix**: aggiungere le nuove sotto-capability (style_bible, lora_pipeline, model-select) al seed
+  esterno con i18n_key — oggi funzionano perché dentro `cap.filmstudio` (già gated) e dev è permissivo.
+
 ## 5. Sintesi finale del panel
 Avete un'**officina** eccellente; manca il **teatro**. Tre atti riportano l'anima — **intenzione persistente**
 (Style Bible + logline che perseguitano ogni prompt), **curatela** (vedere/scegliere/scartare senza distruggere),
