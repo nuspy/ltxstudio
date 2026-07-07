@@ -4077,12 +4077,19 @@ class MainWindow(QMainWindow):
         seed = random.randint(0, 2**31 - 1) if cfg.get("seed_random", True) else int(cfg.get("seed", 0))
         name = f"trellis_{Path(image_path).stem}_{seed}"
         steps = int(cfg.get("steps", 12) or 12)
+        _trellis_tail = []                                   # ring-buffer per l'errore VERO del subprocess
+        def _tlog(line):
+            self._log(line)
+            if line:
+                _trellis_tail.append(str(line))
+                if len(_trellis_tail) > 30:
+                    _trellis_tail.pop(0)
         job = trellis_service.make_job(
             image_path, name, seed=seed, ss_steps=steps, slat_steps=steps,
             simplify=float(cfg.get("simplify", 0.95) or 0.95),
             texture_size=int(cfg.get("texture_size", 1024) or 1024),
             target_faces=int(cfg.get("target_face_count", 0) or 0),   # #95: facce target dal tab (era ignorato)
-            on_log=self._log)
+            on_log=_tlog)
         out_glb = str(trellis_service.glb_path(name))
         self._log(f"[nativo] TRELLIS 3D su {Path(image_path).name} (res {cfg.get('resolution','')})…")
 
@@ -4099,8 +4106,9 @@ class MainWindow(QMainWindow):
                     if rc["v"] == 0 and _os.path.exists(out_glb):
                         self.done.emit({"status": "success", "output": [out_glb]})
                     else:
+                        _why = "\n".join(_trellis_tail[-14:]) or "(nessun log)"
                         self.done.emit({"status": "error",
-                                        "error": f"TRELLIS terminato (exit {rc['v']}); output mancante: {out_glb}"})
+                                        "error": f"TRELLIS terminato (exit {rc['v']}), output mancante.\n{_why}"})
                 except Exception as e:  # noqa: BLE001
                     self.done.emit({"status": "error", "error": str(e)})
 

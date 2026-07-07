@@ -213,15 +213,15 @@ def _apply_fbcache(pipe) -> bool:
 
 
 def _maybe_compile(pipe) -> bool:
-    """torch.compile del transformer (+~1.5x). Warm-up lungo, ma il server è persistente.
-    Env NATIVE_COMPILE=0|1 (default 0: opt-in, può fallire su alcuni checkpoint fp8)."""
+    """torch.compile del transformer. Env NATIVE_COMPILE (default 0: OPT-IN).
+
+    NB il default è tornato OFF (07/07): con mode='reduce-overhead' (CUDA graphs) il buffer di OUTPUT del
+    grafo veniva riusato tra generazioni consecutive → "accessing tensor output of CUDAGraphs that has been
+    overwritten by a subsequent run" sui batch (es. Music Video Studio, 39 immagini). Quando attivo si usa
+    mode='default' (niente CUDA graphs → nessun riuso di buffer) — guadagno minore ma sicuro."""
     import os
     import torch
-    # DEFAULT ON (audit acceleratori 07/07): ~1.5× sul denoise. Il warm-up (~5-10s al 1° job) è
-    # ammortizzato dal server persistente. SICUREZZA: suppress_errors=True → qualsiasi errore di
-    # compilazione/grafo (anche a runtime, tipico su Windows+triton) fa FALLBACK EAGER silenzioso
-    # invece di uccidere il job. Off: NATIVE_COMPILE=0.
-    if os.environ.get("NATIVE_COMPILE", "1") != "1":
+    if os.environ.get("NATIVE_COMPILE", "0") != "1":
         return False
     if getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False):
         print("[image] compile saltato: transformer con layerwise fp8 (hook incompatibili)", flush=True)
@@ -229,7 +229,7 @@ def _maybe_compile(pipe) -> bool:
     try:
         import torch._dynamo
         torch._dynamo.config.suppress_errors = True      # errori di grafo → eager, mai job-killed
-        pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead", fullgraph=False)
+        pipe.transformer = torch.compile(pipe.transformer, mode="default", fullgraph=False)   # no CUDA graphs
         return True
     except Exception as e:                              # noqa: BLE001
         print(f"[image] compile non applicato: {e}", flush=True)

@@ -484,10 +484,15 @@ class MusicVideoStudio(QWidget):
                 self.status.setText(tr("mvs.batch_done", "Generazione completata."))
             return
         s = self._queue.pop(0)
+        # nome UNIVOCO con 'order' (prima solo start_s → 2 scene ravvicinate potevano collidere e
+        # sovrascriversi). L'immagine è assegnata alla scena da gen_scene_image (scene['image_path']=out)
+        # e il progetto è salvato dopo OGNI item (_on_batch_item→_save) → resume dai non generati.
         if self._kind == "image":
-            out = os.path.join(self.out_dir, f"img_{int(s['start_s']*100)}.png"); fn, args = mvs.gen_scene_image, (s, out)
+            out = os.path.join(self.out_dir, f"img_{s['order']}_{int(s['start_s']*100)}.png")
+            fn, args = mvs.gen_scene_image, (s, out)
         else:
-            out = os.path.join(self.out_dir, f"vid_{s['order']}_{int(s['start_s']*100)}.mp4"); fn, args = mvs.gen_scene_video, (s, out)
+            out = os.path.join(self.out_dir, f"vid_{s['order']}_{int(s['start_s']*100)}.mp4")
+            fn, args = mvs.gen_scene_video, (s, out)
         done_n = getattr(self, "_batch_total", 0) - len(self._queue)
         self.status.setText(f"{self._kind} {done_n}/{getattr(self, '_batch_total', '?')} @ {_mmss(s['start_s'])}…")
         self._worker = _Worker(fn, *args)

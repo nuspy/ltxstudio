@@ -355,6 +355,30 @@ def _resolve_ckpt(model: str) -> str:
     return CHECKPOINT
 
 
+def _resolve_gguf(g: str) -> str:
+    """Path ASSOLUTO del GGUF transformer (la GUI passa relativi → np.memmap fallisce). Cerca in
+    diffusion_models/Checkpoints; se il file non esiste, ripiega sull'auto-GGUF esistente (mai un path
+    fantasma che crasha). Ritorna "" se davvero non c'è (→ il worker userà il checkpoint fp8 base)."""
+    if not g:
+        return g
+    if os.path.isabs(g) and os.path.exists(g):
+        return g
+    import glob
+    for base in (r"E:\AI\Models\diffusion_models", r"E:\AI\Models\Checkpoints"):
+        cand = os.path.join(base, g)
+        if os.path.exists(cand):
+            return cand
+    hits = glob.glob(os.path.join(r"E:\AI\Models\diffusion_models", "**", os.path.basename(g)), recursive=True)
+    if hits:
+        return hits[0]
+    ag = _auto_gguf()
+    if ag:
+        print(f"[gguf] '{g}' non trovato → auto {os.path.basename(ag)}", flush=True)
+        return ag
+    print(f"[gguf] '{g}' non trovato e nessun GGUF disponibile → uso il checkpoint fp8 base", flush=True)
+    return ""
+
+
 def _auto_offload(p: dict, ckpt: str) -> str:
     """Sceglie la modalità offload in base alla VRAM LIBERA (perf): se il transformer EFFETTIVO
     (GGUF Q4 ~14GB se attivo, altrimenti il checkpoint) entra in VRAM col working-set → 'none'
@@ -629,6 +653,11 @@ def run_generation(p: dict) -> str:
         if g:
             print("[auto-gguf] nessun modello scelto → GGUF Q4 di default", flush=True)
             p["gguf_transformer"] = g
+    # RISOLVI il GGUF a path ASSOLUTO: la GUI passa un path RELATIVO (es. "LTXVideo\\LTX-2\\…Q4.gguf") e
+    # np.memmap NON lo trova rispetto alla cwd → "cannot mmap" / FileNotFoundError su ogni chunk. Resolve in
+    # diffusion_models; se manca del tutto, ripiega sull'auto-GGUF esistente.
+    if p.get("gguf_transformer"):
+        p["gguf_transformer"] = _resolve_gguf(p["gguf_transformer"])
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
     # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)
