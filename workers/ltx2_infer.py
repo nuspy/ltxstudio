@@ -395,20 +395,24 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         free_gb = torch.cuda.mem_get_info()[0] / 1e9
         _gguf = p.get("gguf_transformer")
         if _gguf and os.path.exists(_gguf):
-            tr_gb = os.path.getsize(_gguf) / 1e9            # GGUF: resta quantizzato → footprint ≈ dim file
-            _how = f"gguf {os.path.basename(_gguf)[:24]}"
-        else:
-            try:
-                from core import vram_estimate as _ve
-                _mb, _src = _ve.estimate_mb(ckpt, fp8_storage=True, working_mb=0)
-                tr_gb = (_mb / 1024.0) if _mb else (os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0)
-                _how = _src if _mb else "file"
-            except Exception:                                # noqa: BLE001
-                tr_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
-                _how = "file"
-        _ENC_GB = 10.0                                       # gemma text-encoder (~9) + vae + vocoder
-        _WORK_GB = 8.0                                       # attivazioni temporali (picco denoise/decode)
-        need = tr_gb + _ENC_GB + _WORK_GB                    # full-stack residente
+            # GGUF → SEMPRE 'cpu' (percorso TESTATO): gli encoder (gemma/vae) su CPU, il transformer resta
+            # comunque RESIDENTE e quantizzato (patch_stage_to_gguf forza OffloadMode.NONE → NON viene
+            # streamato → non è questo a rallentare; la lentezza del GGUF è il dequant per-layer). offload
+            # 'none' col GGUF dà latenti DEGENERI (video VERDE): mai usarlo. Vale per Q3/Q4/Q6 e ogni modello.
+            print(f"[auto-offload] GGUF {os.path.basename(_gguf)[:24]} → cpu "
+                  f"(transformer residente, encoder su CPU — percorso testato)", flush=True)
+            return "cpu"
+        try:
+            from core import vram_estimate as _ve
+            _mb, _src = _ve.estimate_mb(ckpt, fp8_storage=True, working_mb=0)
+            tr_gb = (_mb / 1024.0) if _mb else (os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0)
+            _how = _src if _mb else "file"
+        except Exception:                                    # noqa: BLE001
+            tr_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
+            _how = "file"
+        _ENC_GB = 10.0                                        # gemma text-encoder (~9) + vae + vocoder
+        _WORK_GB = 8.0                                        # attivazioni temporali (picco denoise/decode)
+        need = tr_gb + _ENC_GB + _WORK_GB                     # full-stack residente (solo fp8, no GGUF)
         mode = "none" if free_gb >= need else "cpu"
         print(f"[auto-offload] free={free_gb:.0f}GB tr={tr_gb:.0f}({_how})+enc{_ENC_GB:.0f}+work{_WORK_GB:.0f}"
               f"=need{need:.0f} → {mode}", flush=True)
@@ -745,13 +749,7 @@ def run_generation(p: dict) -> str:
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
     else:
         ptype = "a2v" if p.get("audio_path") else "ti2v"      # audio dato → lip-sync/canto NATIVO
-    _off = _auto_offload(p, ckpt)
-    if _off == "none" and p.get("_gguf_auto"):
-        # SOLO se il GGUF era AUTO (nessuna scelta): con 'none' il fp8 nativo entra su GPU → più veloce del
-        # dequant GGUF. Un GGUF ESPLICITO (scelto dall'utente) NON si scarta: resta residente quantizzato
-        # (patch_stage_to_gguf forza OffloadMode.NONE, per-layer dequant) e gli encoder stanno pure in GPU.
-        if p.pop("gguf_transformer", None):
-            print("[auto-offload] none → fp8 nativo su GPU (GGUF auto disattivato per velocità)", flush=True)
+    _off = _auto_offload(p, ckpt)                            # GGUF→cpu sempre; fp8→none se c'entra tutto in GPU
     _stage(f"Caricamento modello ({os.path.basename(ckpt)[:28]}, offload={_off})…")
     pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)
