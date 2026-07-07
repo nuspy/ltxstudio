@@ -31,18 +31,19 @@ DEFAULT_NEG = ("pc game, console game, video game, cartoon, childish, ugly, defo
 # inpaint/outpaint: etichetta -> {arch (per LoRA), unet (file modello), steps}
 # NB: il DEFAULT (prima voce) deve essere un modello NATIVO funzionante (FLUX.1 Fill), non FLUX.2 Klein
 # (ramo edit-evoluto ancora su ComfyUI/deferred #14/#44): altrimenti inpaint/outpaint non generano di default.
+# NB (regola utente): le label mostrano SEMPRE il file reale — «ciò che scegli è ciò che gira», nessun modello
+# nascosto dietro un nome generico. Nessuna sostituzione automatica del checkpoint.
 INPAINT_MODELS = {
-    "FLUX Fill (inpaint/outpaint, 22GB)":
+    "FLUX_DEV_Fill  (Fill inpaint/outpaint, 22GB)":
         {"arch": "Flux", "unet": "Flux\\FLUX_DEV_Fill.safetensors", "steps": 40},
-    "FLUX Fill GGUF NSFW (Hyper-8, RAM bassa)":
+    "fluxunchained-fill-hyp8-Q5  (Fill GGUF, RAM bassa)":
         {"arch": "Flux", "unet": "Flux\\fluxunchained-fill-hyp8-Q5_K_S.gguf", "steps": 8},
     # FLUX BASE (64 canali) → FluxInpaintPipeline: SEGUE il prompt (sostituisci/aggiungi ciò che descrivi).
-    # Usa la "Forza mantenimento" bassa per una sostituzione decisa. Guidance ~3.5 (auto-clampata dal backend).
-    "FLUX base — sostituzione da prompt (NSFW)":
+    "getphat Flux Reality v30 Hardcore FP8  (base, NSFW)":
         {"arch": "Flux", "unet": "Flux\\getphat Flux Reality v30 Hardcore FP8.safetensors", "steps": 28},
-    "FLUX base — sostituzione da prompt (Krea, foto)":
+    "FLUX_Krea_Dev  (base, foto)":
         {"arch": "Flux", "unet": "Flux\\FLUX_Krea_Dev.safetensors", "steps": 28},
-    "FLUX.2 Klein NSFW (Miraclein, edit-evoluto)":
+    "miraclein_flux2klein_nsfw_v2  (FLUX.2 Klein, edit)":
         {"arch": "Flux2", "unet": "Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors", "steps": 12},
     "Nessuno (solo LTX I2V)": {"arch": None, "unet": None, "steps": 0},
 }
