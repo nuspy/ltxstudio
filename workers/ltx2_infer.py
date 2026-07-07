@@ -380,10 +380,12 @@ def _resolve_gguf(g: str) -> str:
 
 
 def _auto_offload(p: dict, ckpt: str) -> str:
-    """Sceglie la modalità offload in base alla VRAM LIBERA (perf): se il transformer EFFETTIVO
-    (GGUF Q4 ~14GB se attivo, altrimenti il checkpoint) entra in VRAM col working-set → 'none'
-    (tutto su GPU = VELOCE, niente streaming-da-CPU né sysmem-fallback glaciale); altrimenti 'cpu'.
-    Rispetta un valore esplicito p['offload'] se fornito."""
+    """Modalità offload sulla VRAM LIBERA, stimando dal transformer EFFETTIVO:
+      - GGUF esplicito → resta QUANTIZZATO e residente (~dim file, es. Q3 10GB / Q4 14GB), NON il fp8 base.
+      - altrimenti il checkpoint fp8 (fp8_scaled_mm, niente upcast).
+    'none' = TUTTO residente su GPU (transformer + gemma/vae) = massima velocità e ZERO offload → si sfrutta
+    la VRAM libera invece di offloadare a vuoto (richiesta utente: coi 15GB liberi del Q3 tieni gli encoder in
+    GPU). 'cpu' solo se non c'entra il full-stack. Rispetta p['offload'] esplicito."""
     if p.get("offload"):
         return p["offload"]
     try:
@@ -391,19 +393,25 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         if not torch.cuda.is_available():
             return "cpu"
         free_gb = torch.cuda.mem_get_info()[0] / 1e9
-        # STIMA PRECISA condivisa (byte reali dell'header + cache footprint, come le immagini): il CHECKPOINT
-        # fp8 nativo (fp8_scaled_mm = niente upcast) su GPU → 'none' (VELOCE); se non entra → 'cpu' (block-
-        # streaming bounded col GGUF Q4). working-set VIDEO ~9GB (attivazioni temporali su molti frame).
-        try:
-            from core import vram_estimate as _ve
-            _est_mb, _src = _ve.estimate_mb(ckpt, fp8_storage=True, working_mb=9000)
-            need = (_est_mb / 1024.0) if _est_mb else (os.path.getsize(ckpt) / 1e9 + 10.0)
-            _how = _src if _est_mb else "file"
-        except Exception:                                    # noqa: BLE001
-            need = (os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0) + 10.0
-            _how = "file"
+        _gguf = p.get("gguf_transformer")
+        if _gguf and os.path.exists(_gguf):
+            tr_gb = os.path.getsize(_gguf) / 1e9            # GGUF: resta quantizzato → footprint ≈ dim file
+            _how = f"gguf {os.path.basename(_gguf)[:24]}"
+        else:
+            try:
+                from core import vram_estimate as _ve
+                _mb, _src = _ve.estimate_mb(ckpt, fp8_storage=True, working_mb=0)
+                tr_gb = (_mb / 1024.0) if _mb else (os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0)
+                _how = _src if _mb else "file"
+            except Exception:                                # noqa: BLE001
+                tr_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
+                _how = "file"
+        _ENC_GB = 10.0                                       # gemma text-encoder (~9) + vae + vocoder
+        _WORK_GB = 8.0                                       # attivazioni temporali (picco denoise/decode)
+        need = tr_gb + _ENC_GB + _WORK_GB                    # full-stack residente
         mode = "none" if free_gb >= need else "cpu"
-        print(f"[auto-offload] free={free_gb:.0f}GB need~{need:.0f}GB ({_how}) → {mode}", flush=True)
+        print(f"[auto-offload] free={free_gb:.0f}GB tr={tr_gb:.0f}({_how})+enc{_ENC_GB:.0f}+work{_WORK_GB:.0f}"
+              f"=need{need:.0f} → {mode}", flush=True)
         return mode
     except Exception:                                        # noqa: BLE001
         return "cpu"
@@ -624,9 +632,46 @@ def _prep_retake_source(video_path: str, width, height) -> str:
     return video_path
 
 
+def _stage(msg: str) -> None:
+    """Scrive la FASE corrente della pipeline su core.preview_file → il dialog anteprima la mostra (richiesta
+    utente: sapere cosa sta facendo la GPU). Anche su stdout per i log. Best-effort (mai rompe la gen)."""
+    print(f"[stage] {msg}", flush=True)
+    try:
+        from core import preview_file as _pf
+        _pf.write_message(msg)
+    except Exception:                                          # noqa: BLE001
+        pass
+
+
+def _install_step_progress() -> None:
+    """Intercetta il tqdm del sampler LTX (ltx_pipelines.utils.samplers) per emettere lo STEP del denoise su
+    core.preview_file → barra 'step n/N' nel dialog anteprima. Best-effort, una volta per processo."""
+    try:
+        import ltx_pipelines.utils.samplers as _S
+        if getattr(_S, "_ltx_tqdm_patched", False):
+            return
+        from tqdm import tqdm as _BT
+        from core import preview_file as _pf
+
+        class _PTqdm(_BT):
+            def update(self, n=1):
+                r = super().update(n)
+                try:
+                    _pf.write_progress(int(self.n), int(self.total or self.n))
+                except Exception:                              # noqa: BLE001
+                    pass
+                return r
+        _S.tqdm = _PTqdm
+        _S._ltx_tqdm_patched = True
+        print("[stage] progresso per-step attivo (denoise → dialog anteprima)", flush=True)
+    except Exception as _e:                                    # noqa: BLE001
+        print(f"[stage] progresso per-step non attivo: {_e}", flush=True)
+
+
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
     import time
+    _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)
         return run_t2a(p)
     # RISOLUZIONE multipla di 64 (le pipeline two-stage LTX-2 lo richiedono: altrimenti il chunk viene
@@ -656,6 +701,7 @@ def run_generation(p: dict) -> str:
         if g:
             print("[auto-gguf] nessun modello scelto → GGUF Q4 di default", flush=True)
             p["gguf_transformer"] = g
+            p["_gguf_auto"] = True                          # AUTO (non scelto): scartabile se il fp8 entra su GPU
     # RISOLVI il GGUF a path ASSOLUTO: la GUI passa un path RELATIVO (es. "LTXVideo\\LTX-2\\…Q4.gguf") e
     # np.memmap NON lo trova rispetto alla cwd → "cannot mmap" / FileNotFoundError su ogni chunk. Resolve in
     # diffusion_models; se manca del tutto, ripiega sull'auto-GGUF esistente.
@@ -700,10 +746,13 @@ def run_generation(p: dict) -> str:
     else:
         ptype = "a2v" if p.get("audio_path") else "ti2v"      # audio dato → lip-sync/canto NATIVO
     _off = _auto_offload(p, ckpt)
-    if _off == "none":
-        # fp8 nativo su GPU (22GB, fp8_scaled_mm): NON usare il GGUF (dequant→bf16 sborzerebbe in RAM).
+    if _off == "none" and p.get("_gguf_auto"):
+        # SOLO se il GGUF era AUTO (nessuna scelta): con 'none' il fp8 nativo entra su GPU → più veloce del
+        # dequant GGUF. Un GGUF ESPLICITO (scelto dall'utente) NON si scarta: resta residente quantizzato
+        # (patch_stage_to_gguf forza OffloadMode.NONE, per-layer dequant) e gli encoder stanno pure in GPU.
         if p.pop("gguf_transformer", None):
-            print("[auto-offload] none → uso fp8 nativo su GPU (GGUF disattivato per velocità)", flush=True)
+            print("[auto-offload] none → fp8 nativo su GPU (GGUF auto disattivato per velocità)", flush=True)
+    _stage(f"Caricamento modello ({os.path.basename(ckpt)[:28]}, offload={_off})…")
     pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)
     if torch.cuda.is_available():
@@ -746,6 +795,7 @@ def run_generation(p: dict) -> str:
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
     tg = time.time()
+    _stage(f"Generazione video — {int(p.get('steps', 30))} step (encode prompt + denoise)…")
     if ptype == "vinpaint":                                  # #59 inpaint: guide=video orig + attention_mask + CFG
         import glob as _glob
         from workers.ltx_inpaint_cond import load_mask_tensor
@@ -831,6 +881,7 @@ def run_generation(p: dict) -> str:
             tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
     print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video, {ptype})", flush=True)
     out = p["output"]
+    _stage("Decodifica VAE e salvataggio video…")
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
     try:                                                     # #107 firma invisibile di provenienza (default ON)
