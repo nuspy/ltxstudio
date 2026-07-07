@@ -992,6 +992,9 @@ class MaskCanvas(QWidget):
         per rimettere il risultato esattamente al suo posto."""
         out_dir = Path(out_dir)
         if mode == "outpaint":
+            # OUTPAINT ignora SEMPRE la maschera disegnata dall'utente (anche se presente): l'area da generare
+            # è per definizione SOLO l'estensione (la cornice non coperta dalla foto) = _border_mask (geometrica),
+            # mai il disegno interno alla foto.
             image = self._composite(out_dir)
             mpath = out_dir / "frame1_mask.png"; self._border_mask().save(str(mpath))
             return {"image": image, "mask": str(mpath), "mode": mode, "bbox": None}
