@@ -131,7 +131,11 @@ class Job:
     def start(self) -> None:
         env = os.environ.copy()
         if self.env:
-            env.update(self.env)
+            for _k, _v in self.env.items():
+                if _v is None:
+                    env.pop(_k, None)          # None = RIMUOVI la variabile (isolamento venv figlio)
+                else:
+                    env[_k] = _v
         env.setdefault("PYTHONUNBUFFERED", "1")
         env.setdefault("PYTHONIOENCODING", "utf-8")
         if sys.platform == "win32" and "expandable_segments" in env.get("PYTORCH_CUDA_ALLOC_CONF", ""):

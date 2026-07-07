@@ -45,7 +45,18 @@ def make_job(image_path: str, name: str = "model", *, seed: int = 1,
            "--seed", int(seed), "--texture_size", int(texture_size)]
     if target_faces:
         cmd += ["--decimation", int(target_faces)]
-    env = {"HF_TOKEN": hf_token, "HUGGING_FACE_HUB_TOKEN": hf_token} if hf_token else None
+    # ISOLAMENTO dal venv PADRE (app = ComfyUI venv): il subprocess gira nel venv TRELLIS ma erediterebbe
+    # l'ambiente dell'app → può caricare torch/CUDA DLL SBAGLIATE = crash nativo intermittente (il backend da
+    # solo funziona, dall'app muore). Rimuoviamo PYTHONPATH/PYTHONHOME/PYTHONSTARTUP e togliamo dal PATH le
+    # cartelle di ComfyUI, così TRELLIS usa ESCLUSIVAMENTE le proprie librerie. (Job: valore None = rimuovi.)
+    import os as _os
+    _clean_path = _os.pathsep.join(
+        p for p in _os.environ.get("PATH", "").split(_os.pathsep)
+        if p and "comfy" not in p.lower())
+    env: dict = {"PYTHONPATH": None, "PYTHONHOME": None, "PYTHONSTARTUP": None, "PATH": _clean_path}
+    if hf_token:
+        env["HF_TOKEN"] = hf_token
+        env["HUGGING_FACE_HUB_TOKEN"] = hf_token
     return Job(cmd, TRELLIS_DIR, env=env, **cbs)
 
 
