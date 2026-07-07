@@ -28,6 +28,14 @@ except Exception:  # pragma: no cover - dipende dall'installazione PySide6
     _HAS_WEBENGINE = False
 
 
+def _no_webgl() -> bool:
+    """True se il visore WebEngine va EVITATO (LTX_NO_WEBGL=1). Su alcune GPU/driver (es. RTX 5090/Blackwell)
+    il processo GPU di Chromium fallisce (kFatalFailure) e **crasha l'intera app** durante la generazione 3D —
+    mentre il subprocess che genera il GLB sta benissimo. In quel caso si usa il visore semplice (pulsanti
+    Apri/Salva), niente WebEngine → l'app non crasha e il modello viene generato lo stesso."""
+    return os.environ.get("LTX_NO_WEBGL") == "1"
+
+
 class _Model3DViewer(QWidget):
     """Visore 3D GLB basato su <model-viewer> (Google) dentro QWebEngineView."""
 
@@ -36,7 +44,7 @@ class _Model3DViewer(QWidget):
         self._glb_path: str = ""
         v = QVBoxLayout(self); v.setContentsMargins(0, 0, 0, 0)
 
-        if _HAS_WEBENGINE:
+        if _HAS_WEBENGINE and not _no_webgl():
             self.view = QWebEngineView()
             s = self.view.settings()
             # consenti al contenuto locale di raggiungere il file .glb e la CDN del viewer
