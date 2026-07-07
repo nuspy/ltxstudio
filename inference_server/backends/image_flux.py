@@ -27,8 +27,8 @@ SPEC = {
     "inpaint": ("FluxFillPipeline",    True,  True),
     # #14 — FLUX.2 per editing/inpaint/outpaint/kontext (assemblati via _assemble_flux2; assemblaggio
     # locale = supports_sf irrilevante, gestito da arch.startswith('flux2') in _load). I nomi delle
-    # classi diffusers vanno VALIDATI su GPU (diffusers evolve): qui le best-guess attuali. L'outpaint
-    # riusa flux2_inpaint con maschera INVERTITA (core.mask_utils.invert_mask).
+    # classi diffusers vanno VALIDATI su GPU (diffusers evolve): qui le best-guess attuali. Inpaint E
+    # outpaint condividono flux2_inpaint con la STESSA convenzione maschera (bianco=genera): niente inversione.
     # FLUX.2 editing per istruzione (no maschera) = Klein (Flux2KontextPipeline NON esiste in diffusers
     # 0.38; l'editing FLUX.2 è la famiglia Klein). API da validare su GPU.
     "flux2_kontext": ("Flux2KleinPipeline",        False, True),
@@ -1173,15 +1173,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
             mk = params.get("mask_path")
             if not mk or not Path(mk).exists():
                 return {"status": "error", "error": f"'{arch}' richiede 'mask_path' valido."}
-            # OUTPAINT = inpaint della regione COMPLEMENTARE → maschera invertita (riusa mask_utils)
-            if params.get("outpaint"):
-                try:
-                    from core import mask_utils
-                    inv = str(Path(output_dir) / "_outpaint_mask.png")
-                    os.makedirs(output_dir, exist_ok=True)
-                    mk = mask_utils.invert_mask(mk, inv)
-                except Exception as _e:                      # noqa: BLE001
-                    print(f"[inpaint] invert_mask fallito ({_e}); uso maschera originale", flush=True)
+            # Convenzione UNICA per inpaint E outpaint: la maschera arriva già col BIANCO = regione da
+            # (ri)generare, NERO = pixel da mantenere. Inpaint: bianco = area disegnata. Outpaint: bianco =
+            # estensione (bordo) da riempire, nero = foto (vedi mask_canvas._border_mask). NIENTE inversione:
+            # invertirla faceva rigenerare la FOTO e lasciava NERA l'estensione (bug outpaint).
             _mimg = Image.open(mk).convert("RGB")
             if _mimg.size != (_W, _H):                       # maschera allineata a width/height
                 _mimg = _mimg.resize((_W, _H), Image.NEAREST)
