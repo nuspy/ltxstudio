@@ -23,6 +23,31 @@ if os.path.isdir(_FB):
         pass
 
 
+def _patch_preprocess(pipeline):
+    """Rende preprocess_image a prova di crash SENZA perdere la rimozione-sfondo per le immagini vere.
+    Il preprocess ufficiale (riga 153) fa `np.min(bbox…)` su un array VUOTO quando il rembg non trova alcun
+    soggetto (immagini piatte / alpha vuota) → `ValueError: zero-size array`. Qui si mantiene il percorso rembg
+    normale e, SOLO se fallisce/non trova soggetto, si ripiega passando l'INTERA immagine come soggetto
+    (alpha 254 → has_alpha=True → bbox = tutta l'immagine)."""
+    import numpy as np
+    from PIL import Image
+    _orig = pipeline.preprocess_image
+
+    def _full_frame(img):
+        rgb = img.convert("RGB")
+        arr = np.dstack([np.array(rgb), np.full(rgb.size[::-1], 254, np.uint8)])
+        return Image.fromarray(arr, "RGBA")
+
+    def _safe(img):
+        try:
+            return _orig(img)                                # rembg: soggetto isolato (immagini normali)
+        except Exception as e:                               # noqa: BLE001  (bbox vuoto o rembg ko)
+            print(f"[trellis] soggetto non rilevato ({type(e).__name__}) → uso l'intera immagine", flush=True)
+            return _orig(_full_frame(img))                   # fallback: tutta l'immagine come soggetto
+
+    pipeline.preprocess_image = _safe
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", required=True)
@@ -63,6 +88,7 @@ def main():
     pipeline.cuda()
     print(f"[trellis] load {time.time()-t0:.0f}s", flush=True)
 
+    _patch_preprocess(pipeline)                              # preprocess a prova di crash (bbox vuoto)
     image = Image.open(a.image).convert("RGB")
     torch.manual_seed(a.seed)
     t1 = time.time()
