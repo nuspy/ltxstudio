@@ -106,6 +106,45 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
     return out_png
 
 
+LTX2_SERVER = os.environ.get("LTX2_SERVER", "http://127.0.0.1:8190")   # worker video persistente (opzionale)
+
+
+def _ltx2_server_up() -> bool:
+    """True se il server video persistente risponde (modello già caricato in VRAM)."""
+    import json as _j
+    import urllib.request as _u
+    try:
+        with _u.urlopen(LTX2_SERVER + "/system_stats", timeout=1.5) as r:
+            return bool(_j.loads(r.read()).get("up", False))
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
+def _submit_persistent(params: dict, out_mp4: str, timeout: int = 1800) -> str:
+    """Invia il job al server persistente e attende l'output (poll /history). Il modello resta caricato."""
+    import json as _j
+    import time as _t
+    import urllib.request as _u
+    data = _j.dumps({"params": params}).encode()
+    req = _u.Request(LTX2_SERVER + "/submit", data=data, headers={"Content-Type": "application/json"})
+    jid = _j.loads(_u.urlopen(req, timeout=30).read())["prompt_id"]
+    t0 = _t.time()
+    while _t.time() - t0 < timeout:
+        with _u.urlopen(LTX2_SERVER + f"/history/{jid}", timeout=10) as r:
+            h = _j.loads(r.read())
+        st = h.get("status")
+        if st == "success":
+            out = (h.get("output") or [out_mp4])[0]
+            if out and os.path.exists(out) and out != out_mp4:
+                import shutil
+                shutil.copyfile(out, out_mp4)
+            return out_mp4
+        if st == "error":
+            raise RuntimeError(str(h.get("error", "ltx2 server error"))[:500])
+        _t.sleep(1.0)
+    raise TimeoutError("ltx2 server: timeout")
+
+
 # ─────────────── video (shot) ───────────────
 def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int = 512, fps: int = 25,
                    duration_s: float = 4.0, seed: int = 7, keyframes: list | None = None,
@@ -126,6 +165,10 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
         params["audio_path"] = audio_path
     if nf > 150:
         params["chunk_frames"] = 121
+    # Worker VIDEO PERSISTENTE (server :8190, modello già caricato) se attivo → niente reload di LTX ~22B ad
+    # ogni shot (era il collo di bottiglia di «Genera Tutti»). Altrimenti fallback al subprocess.
+    if _ltx2_server_up():
+        return _submit_persistent(params, out_mp4)
     jf = out_mp4 + ".json"
     with open(jf, "w") as _f:                        # fix: handle non chiuso (leak FD nei loop)
         json.dump(params, _f)
