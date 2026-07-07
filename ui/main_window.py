@@ -2552,6 +2552,39 @@ class MainWindow(QMainWindow):
                 best, best_sz = c, sz
         return best or min(cands, key=lambda c: os.path.getsize(c))   # se nessuno entra, il più piccolo
 
+    def _confirm_model_swap(self, original: str, proposed: str, reason: str) -> str:
+        """Chiede all'utente se ACCETTARE la riassegnazione automatica del modello (per VRAM/fallback) o
+        MANTENERE la scelta originale. Ritorna il modello da usare. Preferenza salvabile (chiedi/accetta/
+        mantieni) in user_prefs 'model_swap_policy'. Nel guscio condiviso → vale per Classica e Pro."""
+        from pathlib import Path as _P
+        try:
+            from core import user_prefs as _up
+            pol = str(_up.get("model_swap_policy", "ask"))
+        except Exception:                                    # noqa: BLE001
+            _up, pol = None, "ask"
+        if pol == "accept":
+            return proposed
+        if pol == "keep":
+            return original
+        from PySide6.QtWidgets import QMessageBox, QCheckBox
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle(tr("mw.model_swap.title", "Cambio modello automatico"))
+        box.setText(tr("mw.model_swap.msg",
+            "Il modello scelto «{orig}» {reason}.\nProposta automatica: «{prop}».\n\n"
+            "Usare il modello proposto oppure MANTENERE il tuo (verrà caricato con offload dinamico)?").format(
+            orig=(_P(original).name if original else "(automatico)"), prop=_P(proposed).name, reason=reason))
+        b_use = box.addButton(tr("mw.model_swap.use", "Usa il proposto"), QMessageBox.AcceptRole)
+        box.addButton(tr("mw.model_swap.keep", "Mantieni il mio"), QMessageBox.RejectRole)
+        cb = QCheckBox(tr("mw.model_swap.remember", "Ricorda la scelta (ripristinabile in Impostazioni)"))
+        box.setCheckBox(cb)
+        box.exec()
+        chose_proposed = box.clickedButton() is b_use
+        if cb.isChecked() and _up is not None:
+            _up.set("model_swap_policy", "accept" if chose_proposed else "keep")
+        self._log(f"[modello] riassegnazione {'accettata' if chose_proposed else 'rifiutata (mantengo il mio)'}")
+        return proposed if chose_proposed else original
+
     def _generate_video_native(self, vals: dict, audio: dict, loras: list, use_image: bool):
         """Generazione video NATIVA (LTX-2.3 GGUF, zero ComfyUI) — ramo attivo solo se
         backend_config video=native. Costruisce i params dal tab Video/Avanzate e lancia il worker
@@ -2653,8 +2686,17 @@ class MainWindow(QMainWindow):
             if _free < 40.0:
                 _gguf = self._auto_pick_ltx_gguf(_free)
                 if _gguf:
-                    params["gguf_transformer"] = _gguf
-                    self._log(f"[motore] VRAM {_free:.0f}GB<40 → LTX GGUF nativo: {Path(_gguf).name} (no comfy)")
+                    # NON riassegnare in silenzio: CHIEDI (richiesta utente). Se mantiene il suo modello,
+                    # niente swap → caricato con offload dinamico per-blocco (block-swap, come ComfyUI).
+                    _orig = params.get("model") or ""
+                    _choice = self._confirm_model_swap(_orig, _gguf,
+                        tr("mw.swap.reason_vram", "non entra nella VRAM disponibile (~{f:.0f}GB liberi)").format(f=_free))
+                    if _choice == _gguf:
+                        params["gguf_transformer"] = _gguf
+                        params.pop("model", None)
+                        self._log(f"[motore] VRAM {_free:.0f}GB<40 → LTX GGUF nativo: {Path(_gguf).name} (no comfy)")
+                    else:
+                        self._log("[motore] mantengo il modello scelto → offload dinamico per-blocco")
                 elif self.driver.is_up():
                     _engine = "comfy"
                     self._log("[motore] VRAM<40GB, nessun GGUF → comfy-native (block-swap)")

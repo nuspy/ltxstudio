@@ -2442,5 +2442,11 @@
   "music.busy.install": "installazione moduli in corso",
   "music.busy.job": "un'altra generazione è in corso",
   "mvs.batch_errs": "{n} elementi falliti:\n{e}",
-  "mvs.batch_done_err": "Completato con {n} errori."
+  "mvs.batch_done_err": "Completato con {n} errori.",
+  "mw.model_swap.title": "Cambio modello automatico",
+  "mw.model_swap.msg": "Il modello scelto «{orig}» {reason}.\nProposta automatica: «{prop}».\n\nUsare il modello proposto oppure MANTENERE il tuo (verrà caricato con offload dinamico)?",
+  "mw.model_swap.use": "Usa il proposto",
+  "mw.model_swap.keep": "Mantieni il mio",
+  "mw.model_swap.remember": "Ricorda la scelta (ripristinabile in Impostazioni)",
+  "mw.swap.reason_vram": "non entra nella VRAM disponibile (~{f:.0f}GB liberi)"
 }

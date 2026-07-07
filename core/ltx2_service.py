@@ -83,6 +83,11 @@ def _auto_calibrate_video_model(model_rel: str) -> str:
     import os as _os, glob
     if not model_rel or model_rel.lower().endswith(".gguf") or "22b" not in model_rel.lower():
         return model_rel
+    # RISPETTA la scelta esplicita: declassa per VRAM SOLO se è il default (nessuna scelta consapevole).
+    # La conferma interattiva del cambio avviene in GUI (_confirm_model_swap); qui non si sostituisce a
+    # sorpresa un modello scelto dall'utente. Override forzato: NATIVE_VIDEO_AUTOCALIBRATE=1.
+    if _os.environ.get("NATIVE_VIDEO_AUTOCALIBRATE", "0") != "1" and "dev-fp8" not in model_rel.lower():
+        return model_rel
     try:
         from core import model_precision as _mp
         free = float(_mp.gpu_free_gb())
