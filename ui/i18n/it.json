@@ -2505,5 +2505,12 @@
   "fs.sb.bible_look": "Look (grana/ottica/luce)",
   "fs.sb.bible_dir": "Registi/DoP di riferimento",
   "fs.sb.bible_saved": "Style Bible salvata — iniettata in ogni prompt.",
-  "fs.mt.trans": "Transizione"
+  "fs.mt.trans": "Transizione",
+  "fs.sb.ct_chars": "👤 Stato personaggi…",
+  "fs.sb.sel_scene": "Seleziona una scena.",
+  "fs.sb.no_chars": "Nessun @personaggio negli shot della scena.",
+  "fs.sb.ct_wardrobe": "Abbigliamento",
+  "fs.sb.ct_condition": "Condizione (es. ferito, bagnato)",
+  "fs.sb.ct_emotion": "Emozione",
+  "fs.sb.ct_chars_done": "Stato personaggi salvato e propagato."
 }

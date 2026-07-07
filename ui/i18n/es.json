@@ -2505,5 +2505,12 @@
   "fs.sb.bible_look": "Look (grain/optics/light)",
   "fs.sb.bible_dir": "Reference directors/DoP",
   "fs.sb.bible_saved": "Style Bible saved — injected into every prompt.",
-  "fs.mt.trans": "Transition"
+  "fs.mt.trans": "Transition",
+  "fs.sb.ct_chars": "👤 Character state…",
+  "fs.sb.sel_scene": "Select a scene.",
+  "fs.sb.no_chars": "No @character in the scene's shots.",
+  "fs.sb.ct_wardrobe": "Wardrobe",
+  "fs.sb.ct_condition": "Condition (e.g. wounded, wet)",
+  "fs.sb.ct_emotion": "Emotion",
+  "fs.sb.ct_chars_done": "Character state saved and propagated."
 }

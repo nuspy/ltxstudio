@@ -99,7 +99,8 @@ class StoryboardTab(QWidget):
         for lbl, w in [("⏱", self.ct_time), ("☁", self.ct_weather), ("💡", self.ct_light), ("🎭", self.ct_mood)]:
             cg.addWidget(QLabel(lbl)); cg.addWidget(w)
         self.btn_ct = QPushButton(tr("fs.sb.ct_apply", "Applica + propaga")); self.btn_ct.clicked.connect(self._save_continuity)
-        cg.addWidget(self.btn_ct); cg.addStretch(1)
+        self.btn_ct_chars = QPushButton(tr("fs.sb.ct_chars", "👤 Stato personaggi…")); self.btn_ct_chars.clicked.connect(self._edit_char_continuity)
+        cg.addWidget(self.btn_ct); cg.addWidget(self.btn_ct_chars); cg.addStretch(1)
         self.ct_box.setVisible(False)
         ev.addWidget(self.ct_box)
         eh = QHBoxLayout()
@@ -471,6 +472,52 @@ class StoryboardTab(QWidget):
         self.log.appendPlainText(tr("fs.sb.ct_done", "Continuity applicata e propagata alle scene successive."))
         for w in _warns:                                     # segnala i salti di raccordo (luce/tempo/condizioni)
             self.log.appendPlainText("⚠ " + w)
+
+    def _edit_char_continuity(self):
+        """B9: stato per-personaggio della scena (abbigliamento/condizione/emozione) — la metà del continuity
+        engine che la UI non popolava. Gli @Nome si raccolgono dagli shot della scena."""
+        if not self._sel or self._sel[0] != "scene":
+            QMessageBox.information(self, tr("fs.sb.ct_chars", "Stato personaggi"), tr("fs.sb.sel_scene", "Seleziona una scena.")); return
+        import re
+        sc = db.get("scene", self._sel[1])
+        names = []
+        for sh in db.query("shot", "scene_id=?", (sc["id"],)):
+            for m in re.finditer(r"@([A-Za-z0-9_]+)", sh.get("description") or ""):
+                if m.group(1) not in names:
+                    names.append(m.group(1))
+        if not names:
+            QMessageBox.information(self, tr("fs.sb.ct_chars", "Stato personaggi"), tr("fs.sb.no_chars", "Nessun @personaggio negli shot della scena.")); return
+        st = json.loads(sc.get("continuity") or "{}")
+        assets = st.get("assets") or {}
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLineEdit as _LE, QGroupBox as _GB, QVBoxLayout as _VB
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.sb.ct_chars", "👤 Stato personaggi")); outer = _VB(dlg)
+        rows = {}
+        for n in names:
+            a = assets.get(n) or {}
+            gb = _GB("@" + n); ff = QFormLayout(gb)
+            e_w = _LE(a.get("wardrobe", "")); e_c = _LE(a.get("condition", "")); e_e = _LE(a.get("emotion", ""))
+            ff.addRow(tr("fs.sb.ct_wardrobe", "Abbigliamento"), e_w)
+            ff.addRow(tr("fs.sb.ct_condition", "Condizione (es. ferito, bagnato)"), e_c)
+            ff.addRow(tr("fs.sb.ct_emotion", "Emozione"), e_e)
+            outer.addWidget(gb); rows[n] = (e_w, e_c, e_e)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject); outer.addWidget(bb)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        new_assets = {}
+        for n, (e_w, e_c, e_e) in rows.items():
+            d = {k: v for k, v in (("wardrobe", e_w.text().strip()), ("condition", e_c.text().strip()),
+                                   ("emotion", e_e.text().strip())) if v}
+            if d:
+                new_assets[n] = d
+        st["assets"] = new_assets
+        db.update("scene", sc["id"], continuity=json.dumps(st, ensure_ascii=False))
+        # propaga in avanti (le condizioni persistono nelle scene successive)
+        prev = st
+        for nx in db.query("scene", "project_id=? AND ord>?", (sc["project_id"], sc["ord"]), order="ord"):
+            nst = ct.propagate(prev, json.loads(nx.get("continuity") or "{}"))
+            db.update("scene", nx["id"], continuity=json.dumps(nst, ensure_ascii=False)); prev = nst
+        self.log.appendPlainText(tr("fs.sb.ct_chars_done", "Stato personaggi salvato e propagato."))
 
     def _save_sel(self):
         if not self._sel:
