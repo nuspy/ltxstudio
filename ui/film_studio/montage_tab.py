@@ -399,8 +399,14 @@ class MontageTab(QWidget):
         out = str(db.project_dir(pid) / "master.mp4")
         tracks = (list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
                   + list(getattr(self, "_ambient_tracks", []) or []))   # #95: includi l'ambient nel master
-        ttype = self.trans.currentData() or ""              # transizione di default tra le clip
-        trans = ([{"type": ttype, "dur": self.trans_dur.value()}] * (len(clips) - 1)) if ttype else None
+        default_t = self.trans.currentData() or ""          # transizione: per-shot (shot.transition) o default
+        dur = self.trans_dur.value()
+        per = []
+        for c in (self._cur_clips or [])[:-1]:
+            sh = db.get("shot", c.get("shot_id")) or {}
+            t = sh.get("transition") or default_t
+            per.append({"type": t, "dur": dur} if t else {"type": "", "dur": 0})
+        trans = per if any(p["type"] for p in per) else None
         try:
             otio_export.render_master(clips, out, audio_tracks=tracks or None,
                                       aspect=self.aspect.currentData() or "",   # B7: aspect ora applicato

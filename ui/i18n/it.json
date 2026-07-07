@@ -2513,5 +2513,6 @@
   "fs.sb.ct_condition": "Condizione (es. ferito, bagnato)",
   "fs.sb.ct_emotion": "Emozione",
   "fs.sb.ct_chars_done": "Stato personaggi salvato e propagato.",
-  "fs.sb.grammar": "Grammatica ripresa"
+  "fs.sb.grammar": "Grammatica ripresa",
+  "fs.sb.tr_cut": "stacco →"
 }
