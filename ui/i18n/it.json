@@ -2498,5 +2498,11 @@
   "fs.lorastudio.pipe_sel": "{n} foto scelte → training video…",
   "fs.lorastudio.pipe_done": "Pipeline: stato «{s}»",
   "fs.lorastudio.pipe_gate": "Scegli le foto buone",
-  "fs.lorastudio.pipe_gate_h": "Seleziona le foto che rappresentano bene il personaggio:"
+  "fs.lorastudio.pipe_gate_h": "Seleziona le foto che rappresentano bene il personaggio:",
+  "fs.sb.bible": "🎨 Style Bible",
+  "fs.sb.bible_logline": "Logline emotiva",
+  "fs.sb.bible_palette": "Palette colori",
+  "fs.sb.bible_look": "Look (grana/ottica/luce)",
+  "fs.sb.bible_dir": "Registi/DoP di riferimento",
+  "fs.sb.bible_saved": "Style Bible salvata — iniettata in ogni prompt."
 }

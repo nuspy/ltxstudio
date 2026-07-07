@@ -44,8 +44,9 @@ class StoryboardTab(QWidget):
         self.btn_video = QPushButton(tr("fs.sb.videos", "🎥 Genera video")); self.btn_video.clicked.connect(lambda: self._gen("video"))
         self.btn_auto = QPushButton(tr("fs.sb.auto", "🎬 Genera film completo")); self.btn_auto.clicked.connect(self._gen_all)
         self.btn_shotlist = QPushButton(tr("fs.sb.shotlist", "📄 Shot-list")); self.btn_shotlist.clicked.connect(self._export_shotlist)
+        self.btn_bible = QPushButton(tr("fs.sb.bible", "🎨 Style Bible")); self.btn_bible.clicked.connect(self._edit_style_bible)
         h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video)
-        h.addWidget(self.btn_auto); h.addWidget(self.btn_shotlist); h.addStretch(1)
+        h.addWidget(self.btn_auto); h.addWidget(self.btn_shotlist); h.addWidget(self.btn_bible); h.addStretch(1)
         v.addLayout(h)
         # B5: selettori modello immagine/video del progetto (salvati in config; niente più hardcode flux)
         mrow = QHBoxLayout()
@@ -193,6 +194,44 @@ class StoryboardTab(QWidget):
         self._refresh()
         self.log.appendPlainText(tr("fs.sb.done", "Breakdown: {n} scene").format(n=len(data.get('scenes', []))))
 
+    def _style_suffix(self, cfg: dict) -> str:
+        """Style Bible del progetto → coda iniettata in OGNI prompt (l'intenzione persistente dell'autore:
+        logline emotiva + palette + look + registi-faro). Vuoto se non impostata."""
+        sb = cfg.get("style_bible") or {}
+        bits = []
+        if sb.get("look"):
+            bits.append(sb["look"])
+        if sb.get("palette"):
+            bits.append("color palette: " + sb["palette"])
+        if sb.get("directors"):
+            bits.append("in the visual style of " + sb["directors"])
+        if sb.get("logline"):
+            bits.append("overall tone: " + sb["logline"])
+        return (", " + ", ".join(bits)) if bits else ""
+
+    def _edit_style_bible(self):
+        """Editor Style Bible (logline/palette/look/registi) salvato in project.config."""
+        pid = self._get_project()
+        if not pid:
+            QMessageBox.information(self, tr("fs.sb.bible", "Style Bible"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLineEdit as _LE
+        cfg = json.loads((db.get("project", pid) or {}).get("config") or "{}")
+        sb = cfg.get("style_bible") or {}
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.sb.bible", "🎨 Style Bible")); f = QFormLayout(dlg)
+        e_log = _LE(sb.get("logline", "")); e_pal = _LE(sb.get("palette", ""))
+        e_look = _LE(sb.get("look", "")); e_dir = _LE(sb.get("directors", ""))
+        f.addRow(tr("fs.sb.bible_logline", "Logline emotiva"), e_log)
+        f.addRow(tr("fs.sb.bible_palette", "Palette colori"), e_pal)
+        f.addRow(tr("fs.sb.bible_look", "Look (grana/ottica/luce)"), e_look)
+        f.addRow(tr("fs.sb.bible_dir", "Registi/DoP di riferimento"), e_dir)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject); f.addRow(bb)
+        if dlg.exec() == QDialog.Accepted:
+            cfg["style_bible"] = {"logline": e_log.text().strip(), "palette": e_pal.text().strip(),
+                                  "look": e_look.text().strip(), "directors": e_dir.text().strip()}
+            db.update("project", pid, config=json.dumps(cfg, ensure_ascii=False))
+            self.log.appendPlainText(tr("fs.sb.bible_saved", "Style Bible salvata — iniettata in ogni prompt."))
+
     def _save_models(self, *_):
         """B5: salva la scelta modello immagine/video nella config del progetto (letta da _gen)."""
         pid = self._get_project()
@@ -252,7 +291,8 @@ class StoryboardTab(QWidget):
                         .format(s=sc["ord"], h=sh["ord"], n=len(refs["loras"])))
                 cam = (sh.get("camera") or "").strip()      # camera+luce dallo schema shot (prima ignorati)
                 prompt = (refs["clean_text"] + ". " + (cam + ". " if cam else "")
-                          + ct.to_prompt(state) + ((", " + required) if required else ""))
+                          + ct.to_prompt(state) + ((", " + required) if required else "")
+                          + self._style_suffix(guard))       # Style Bible iniettata in ogni prompt
                 outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
                 Path(outdir).mkdir(parents=True, exist_ok=True)
                 if what == "keyframe":
@@ -341,7 +381,7 @@ class StoryboardTab(QWidget):
         _cfg = json.loads(proj.get("config") or "{}")                    # B5: modello dal progetto
         _flavor = "image" if what == "keyframe" else "video"             # B2: LoRA del flavor giusto
         refs = gen_service.resolve_refs(sh["description"], proj.get("path_mode", "fast"), flavor=_flavor)
-        prompt = refs["clean_text"] + ". " + ct.to_prompt(state)
+        prompt = refs["clean_text"] + ". " + ct.to_prompt(state) + self._style_suffix(_cfg)
         outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
         Path(outdir).mkdir(parents=True, exist_ok=True)
         import random as _r
