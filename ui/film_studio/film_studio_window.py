@@ -25,13 +25,15 @@ def _register_scheduler_handlers():
     """Mappa i tipi di job sul Generation Service nativo (idempotente)."""
     def _img(p):
         return gen_service.gen_image(p["prompt"], p["out"], face_ref=p.get("face_ref", ""),
-                                     loras=p.get("loras"), negative=p.get("negative", ""),
-                                     seed=int(p.get("seed", 7)))
+                                     ref_images=p.get("ref_images"), loras=p.get("loras"),
+                                     arch=p.get("arch", "flux"), model=p.get("model", ""),
+                                     negative=p.get("negative", ""), seed=int(p.get("seed", 7)))
 
     def _vid(p):
         return gen_service.gen_shot_video(p["prompt"], p["out"], duration_s=p.get("duration_s", 4),
                                           keyframes=p.get("keyframes"), loras=p.get("loras"),
                                           audio_path=p.get("audio_path", "") or "",
+                                          model_gguf=p.get("model_gguf", ""),
                                           negative=p.get("negative", ""), seed=int(p.get("seed", 7)))
     scheduler.register("image", _img)
     scheduler.register("video", _vid)
@@ -52,6 +54,12 @@ class FilmStudioWindow(QWidget):
         self.setMinimumSize(800, 560)                        # ridimensionabile entro un minimo sensato
         self._project_id = None
         _register_scheduler_handlers()
+        try:
+            n = scheduler.recover()                          # B10: riprende i job orfani (running post-crash)
+            if n:
+                print(f"[film-studio] recovery: {n} job ripresi dopo crash", flush=True)
+        except Exception:                                    # noqa: BLE001
+            pass
         root = QVBoxLayout(self)
         root.addWidget(self._project_bar())
         root.addWidget(LlmSettings())

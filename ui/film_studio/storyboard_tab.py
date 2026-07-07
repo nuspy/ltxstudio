@@ -169,12 +169,20 @@ class StoryboardTab(QWidget):
         pmode = proj.get("path_mode", "fast")
         guard = json.loads(proj.get("config") or "{}")
         forbidden, required = guard.get("forbidden", ""), guard.get("required", "")
+        # B5: modello immagine/video scelto nel progetto (config), non più hardcoded flux
+        img_arch = guard.get("img_arch", "flux")
+        img_model = guard.get("img_model", "")
+        vid_gguf = guard.get("vid_gguf", "")
         n = 0
         jids = []
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
             state = json.loads(sc.get("continuity") or "{}")
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
-                refs = gen_service.resolve_refs(sh["description"], pmode)
+                _flavor = "image" if what == "keyframe" else "video"   # B2: LoRA del flavor giusto
+                refs = gen_service.resolve_refs(sh["description"], pmode, flavor=_flavor)
+                # B4: seed per-shot — bloccato (>0) o stabile-per-shot (varia tra shot, riproducibile) invece
+                # del default fisso 7 per tutti. Congela l'identità/inquadratura di QUESTO shot.
+                _seed = int(sh.get("seed", 0) or 0) or (int(sh["id"]) * 2654435761 % (2**31 - 1))
                 if len(refs.get("loras") or []) > 3:        # #55 warning composizione multi-LoRA (concept bleed)
                     self.log.appendPlainText(tr("fs.sb.too_many_lora",
                         "⚠ Scena {s} shot {h}: {n} LoRA simultanee (>3) — rischio interferenza, valuta split.")
@@ -188,7 +196,9 @@ class StoryboardTab(QWidget):
                     out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
                     jid = scheduler.enqueue("image", {"prompt": prompt, "out": out,
                                                 "face_ref": (refs["ref_images"] or [""])[0],
-                                                "loras": refs["loras"], "negative": forbidden},
+                                                "ref_images": refs["ref_images"], "loras": refs["loras"],
+                                                "arch": img_arch, "model": img_model,
+                                                "seed": _seed, "negative": forbidden},
                                       owner_kind="shot", owner_id=sh["id"])
                 else:
                     out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
@@ -197,7 +207,8 @@ class StoryboardTab(QWidget):
                     audio_path = self._shot_dialogue_audio(sh, outdir)
                     jid = scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
                                                 "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
-                                                "negative": forbidden}, owner_kind="shot", owner_id=sh["id"])
+                                                "model_gguf": vid_gguf, "seed": _seed, "negative": forbidden},
+                                      owner_kind="shot", owner_id=sh["id"])
                 n += 1
                 jids.append(jid)
         self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))
@@ -264,7 +275,9 @@ class StoryboardTab(QWidget):
         pid = self._get_project()
         proj = db.get("project", pid)
         state = json.loads(sc.get("continuity") or "{}")
-        refs = gen_service.resolve_refs(sh["description"], proj.get("path_mode", "fast"))
+        _cfg = json.loads(proj.get("config") or "{}")                    # B5: modello dal progetto
+        _flavor = "image" if what == "keyframe" else "video"             # B2: LoRA del flavor giusto
+        refs = gen_service.resolve_refs(sh["description"], proj.get("path_mode", "fast"), flavor=_flavor)
         prompt = refs["clean_text"] + ". " + ct.to_prompt(state)
         outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
         Path(outdir).mkdir(parents=True, exist_ok=True)
@@ -273,7 +286,9 @@ class StoryboardTab(QWidget):
         if what == "keyframe":
             out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
             scheduler.enqueue("image", {"prompt": prompt, "out": out, "seed": seed,
-                                        "face_ref": (refs["ref_images"] or [""])[0], "loras": refs["loras"]},
+                                        "face_ref": (refs["ref_images"] or [""])[0], "ref_images": refs["ref_images"],
+                                        "loras": refs["loras"], "arch": _cfg.get("img_arch", "flux"),
+                                        "model": _cfg.get("img_model", "")},
                               owner_kind="shot", owner_id=sh["id"])
         else:
             out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
@@ -281,6 +296,7 @@ class StoryboardTab(QWidget):
             kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
             scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
                                         "keyframes": kfs, "loras": refs["loras"], "seed": seed,
+                                        "model_gguf": _cfg.get("vid_gguf", ""),
                                         "audio_path": self._shot_dialogue_audio(sh, outdir)},
                               owner_kind="shot", owner_id=sh["id"])
         self.log.appendPlainText(tr("fs.sb.regen_queued", "Rigenerazione {w} in coda per lo shot.").format(w=what))

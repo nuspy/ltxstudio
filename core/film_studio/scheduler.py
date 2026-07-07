@@ -103,6 +103,21 @@ def retry(jid: int) -> None:
         _ensure_worker()
 
 
+def recover() -> int:
+    """RECOVERY post-crash (B10): i job rimasti 'running' (processo morto durante l'esecuzione) vengono
+    ri-accodati come 'pending'; i 'pending'/'retry' persistiti vengono ri-messi in coda. Da chiamare all'avvio
+    del Film Studio. Ritorna il numero di job recuperati."""
+    n = 0
+    for j in db.query("job", "status IN ('running','pending','retry')", order="priority"):
+        db.update("job", j["id"], status="pending", updated=time.time())
+        _q.put((j.get("priority", 5), j["id"]))
+        n += 1
+    if n:
+        _emit({"event": "recovered", "count": n})
+        _ensure_worker()
+    return n
+
+
 def pending() -> list[dict]:
     return db.query("job", "status IN ('pending','running','retry')", order="priority")
 

@@ -28,9 +28,13 @@ _REF_RE = re.compile(r"@([A-Za-z0-9_]+)(?:#([A-Za-z0-9_]+))?")
 
 
 # ─────────────── @Reference resolver ───────────────
-def resolve_refs(text: str, path_mode: str = "fast") -> dict:
+def resolve_refs(text: str, path_mode: str = "fast", flavor: str = "image") -> dict:
     """Estrae gli @Nome[#Variante] dal testo e li risolve in {ref_images, loras, trigger_map, clean_text}.
-    path_mode: 'fast' (immagini+PuLID) | 'lora' (LoRA+trigger) | 'mixed' (per-asset)."""
+    path_mode: 'fast' (immagini+PuLID) | 'lora' (LoRA+trigger) | 'mixed' (per-asset).
+    flavor: 'image' (keyframe) | 'video' (shot) → sceglie la LoRA del flavor giusto (B2: prima si caricava
+    sempre flavor='image' anche per gli shot video → LoRA video mai usate).
+    #Variante ora è ONORATA (B1): immagini+LoRA della VARIAZIONE (es. @Marco#insanguinato), con fallback
+    all'asset se la variante non ha propri asset."""
     refs, ref_images, loras, trigger_map = [], [], [], {}
     for m in _REF_RE.finditer(text or ""):
         name, variant = m.group(1), m.group(2)
@@ -38,18 +42,31 @@ def resolve_refs(text: str, path_mode: str = "fast") -> dict:
         asset = next((a for a in assets if a["name"].lower() == name.lower()), assets[0] if assets else None)
         if not asset:
             continue
+        var = None                                           # risolvi la variante citata (#Variante)
+        if variant:
+            vrows = db.query("asset_variation", "asset_id=? AND name=?", (asset["id"], variant))
+            var = vrows[0] if vrows else None
         refs.append((asset, variant))
         mode = path_mode
         if path_mode == "mixed":
             mode = (json.loads(asset.get("fields") or "{}").get("path_mode")) or "fast"
         if mode == "lora":
-            lr = db.query("lora", "asset_id=? AND flavor='image'", (asset["id"],), order="version")
+            lr = []
+            if var:                                          # LoRA della VARIAZIONE (flavor giusto), poi fallback asset
+                lr = db.query("lora", "variation_id=? AND flavor=?", (var["id"], flavor), order="version")
+            if not lr:
+                lr = db.query("lora", "asset_id=? AND flavor=?", (asset["id"], flavor), order="version")
             if lr:
-                loras.append({"file": lr[-1]["file"], "trigger": lr[-1]["trigger"], "weight": 0.9})
+                _w = float(lr[-1].get("weight") or 0.9)      # peso dalla LoRA (col opz.), default 0.9
+                loras.append({"file": lr[-1]["file"], "trigger": lr[-1]["trigger"], "weight": _w})
                 trigger_map[name] = lr[-1]["trigger"]
                 continue
-        # Rapido (o LoRA assente): usa le immagini di riferimento dell'asset/variante
-        imgs = db.query("image", "owner_kind='asset' AND owner_id=?", (asset["id"],))
+        # Rapido (o LoRA assente): immagini di riferimento della VARIAZIONE se citata, altrimenti dell'asset
+        imgs = []
+        if var:
+            imgs = db.query("image", "owner_kind='variation' AND owner_id=?", (var["id"],))
+        if not imgs:
+            imgs = db.query("image", "owner_kind='asset' AND owner_id=?", (asset["id"],))
         ref_images += [i["file"] for i in imgs[:4] if i.get("file")]
     clean = _REF_RE.sub(lambda m: trigger_map.get(m.group(1), m.group(1)), text or "")
     return {"refs": refs, "ref_images": ref_images, "loras": loras,
@@ -58,17 +75,24 @@ def resolve_refs(text: str, path_mode: str = "fast") -> dict:
 
 # ─────────────── immagini (keyframe / asset sheet) ───────────────
 def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 1024, seed: int = 7,
-              face_ref: str = "", ref_image: str = "", loras: list | None = None, arch: str = "flux",
-              negative: str = "") -> str:
+              face_ref: str = "", ref_image: str = "", ref_images: list | None = None,
+              loras: list | None = None, arch: str = "flux", model: str = "", negative: str = "") -> str:
     """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali.
-    negative: se dato, sostituisce/estende il negative di default (continuity elementi vietati)."""
+    arch/model: architettura+checkpoint scelti nel progetto (B5: prima hardcoded flux). negative: estende il
+    negative di default (continuity elementi vietati)."""
     neg = NEG + (", " + negative if negative else "")
     params = {"arch": arch, "prompt": prompt, "negative": neg, "width": width, "height": height,
               "steps": 22, "guidance": 3.5, "seed": seed, "output": out_png}
+    if model:                                                # checkpoint esplicito (altrimenti default del server)
+        params["model"] = model
     if face_ref:
         params["pulid_face"] = face_ref; params["pulid_strength"] = 0.85
-    if ref_image:
-        params["arch"] = "kontext"; params["image_path"] = ref_image
+    # Kontext/multi-ref SOLO se non c'è un volto PuLID (attori→PuLID; props/luoghi/architetture→Kontext ref).
+    _refs = [r for r in ([ref_image] + list(ref_images or [])) if r]
+    if _refs and not face_ref:
+        params["arch"] = "kontext"; params["image_path"] = _refs[0]
+        if len(_refs) > 1:
+            params["ref_images"] = _refs                     # multi-reference (composizione senza incollaggio)
     if loras:
         params["loras"] = loras
     res = native_driver.run_and_wait("image", params, timeout=900)
@@ -85,11 +109,13 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
 # ─────────────── video (shot) ───────────────
 def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int = 512, fps: int = 25,
                    duration_s: float = 4.0, seed: int = 7, keyframes: list | None = None,
-                   loras: list | None = None, audio_path: str = "", negative: str = "") -> str:
-    """Genera il video di uno shot col worker nativo LTX-2.3 GGUF. keyframes=[{path,frame,strength}]."""
+                   loras: list | None = None, audio_path: str = "", model_gguf: str = "",
+                   negative: str = "") -> str:
+    """Genera il video di uno shot col worker nativo LTX-2.3 GGUF. keyframes=[{path,frame,strength}].
+    model_gguf: transformer scelto nel progetto (B5), altrimenti il distilled Q4 di default."""
     nf = max(9, int(round(duration_s * fps)) // 8 * 8 + 1)
     neg = NEG + (", " + negative if negative else "")
-    params = {"gguf_transformer": GGUF, "prompt": prompt, "negative": neg, "width": width,
+    params = {"gguf_transformer": model_gguf or GGUF, "prompt": prompt, "negative": neg, "width": width,
               "height": height, "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0,
               "seed": seed, "offload": "cpu", "output": out_mp4}
     if keyframes:

@@ -73,8 +73,15 @@ def conn() -> sqlite3.Connection:
         ROOT.mkdir(parents=True, exist_ok=True)
         _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         _conn.row_factory = sqlite3.Row
+        try:
+            _conn.execute("PRAGMA journal_mode=WAL")        # WAL: letture concorrenti (UI+scheduler thread)
+            _conn.execute("PRAGMA synchronous=NORMAL")
+        except Exception:                                   # noqa: BLE001
+            pass
         _conn.executescript(_SCHEMA)
-        for tbl, col, ddl in [("shot", "seed", "ALTER TABLE shot ADD COLUMN seed INTEGER DEFAULT 0")]:
+        for ddl in ["ALTER TABLE shot ADD COLUMN seed INTEGER DEFAULT 0",
+                    "ALTER TABLE lora ADD COLUMN weight REAL DEFAULT 0.9",    # B6: peso composizione
+                    "ALTER TABLE lora ADD COLUMN base_arch TEXT"]:           # arch compatibile (flux/ltx2)
             try:
                 _conn.execute(ddl)                          # migration leggera per DB esistenti
             except Exception:                               # noqa: BLE001 (colonna già presente)
@@ -160,11 +167,23 @@ def project_dir(project_id: int) -> Path:
     return d
 
 
+def _delete_owned(owner_kind: str, owner_id: int) -> None:
+    """Elimina gli artefatti/audio posseduti da uno shot (evita righe orfane — B10)."""
+    for art in query("artifact", "owner_kind=? AND owner_id=?", (owner_kind, owner_id)):
+        for av in query("artifact_version", "artifact_id=?", (art["id"],)):
+            delete("artifact_version", av["id"])
+        delete("artifact", art["id"])
+    for ac in query("audioclip", "owner_kind=? AND owner_id=?", (owner_kind, owner_id)):
+        delete("audioclip", ac["id"])
+
+
 def delete_project(project_id: int) -> None:
-    """Elimina il progetto e tutte le entità collegate (scene/shot/script/montage)."""
-    scenes = query("scene", "project_id=?", (project_id,))
-    for sc in scenes:
+    """Elimina il progetto e TUTTE le entità collegate: scene/shot + artifact/artifact_version/audioclip degli
+    shot + script/montage. NB asset/lora/voice NON si toccano: sono condivisi (per-serie/globali), non
+    per-progetto (B10: prima restavano righe orfane di artifact/audioclip)."""
+    for sc in query("scene", "project_id=?", (project_id,)):
         for sh in query("shot", "scene_id=?", (sc["id"],)):
+            _delete_owned("shot", sh["id"])
             delete("shot", sh["id"])
         delete("scene", sc["id"])
     for t in ("script", "montage"):
@@ -191,4 +210,7 @@ def duplicate_project(project_id: int) -> int:
     for s in query("script", "project_id=?", (project_id,)):
         s.pop("id", None); s["project_id"] = nid
         insert("script", **s)
+    for mt in query("montage", "project_id=?", (project_id,)):    # B10: copia anche il montaggio
+        mt.pop("id", None); mt["project_id"] = nid
+        insert("montage", **mt)
     return nid
