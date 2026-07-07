@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS audioclip(
 CREATE TABLE IF NOT EXISTS montage(
   id INTEGER PRIMARY KEY, project_id INTEGER, timeline TEXT, audio_tracks TEXT,
   fps REAL, aspect TEXT, target TEXT, created REAL);
+CREATE TABLE IF NOT EXISTS lora_pipeline(
+  id INTEGER PRIMARY KEY, asset_id INTEGER, variation_id INTEGER, name TEXT, state TEXT,
+  mode TEXT, spec TEXT, img_lora TEXT, img_dataset TEXT, review_photos TEXT, selected_photos TEXT,
+  vid_lora TEXT, vid_dataset TEXT, error TEXT, created REAL, updated REAL);
 """
 
 _conn: sqlite3.Connection | None = None
