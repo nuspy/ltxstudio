@@ -2414,5 +2414,17 @@
   "f1.inpaint.guidance_lbl": "Guidance (prompt adherence)",
   "f1.inpaint.guidance.tt": "Guidance (CFG): how strongly the edit FOLLOWS the prompt. High (≈30) = strong/faithful; low = softer. Different from «Retention» (how much of the original is kept).",
   "mw.no_mask_edit_msg": "No mask drawn: write WHAT to change in the prompt and it will be applied to the WHOLE photo (global Kontext edit).",
-  "mw.no_mask_kontext_log": "No mask → editing the WHOLE photo according to the description (Kontext)"
+  "mw.no_mask_kontext_log": "No mask → editing the WHOLE photo according to the description (Kontext)",
+  "def.exr.group": "HDR / EXR export (VFX)",
+  "def.exr.linear": "Linearize (de-gamma BT.709 → linear light)",
+  "def.exr.linear.tt": "ON (compositing standard): converts to LINEAR light (zscale transfer=linear). OFF: display-referred (gamma) values. For TRUE HDR, generate the video with the HDR IC-LoRA (LTX-2) in the Video tab first, then export here.",
+  "def.exr.run": "Export EXR frames",
+  "def.exr.run.tt": "Exports ALL video frames as OpenEXR float32 (<video>_exr folder) — VFX pipeline (Nuke/Resolve/Blender).",
+  "def.exr.start": "EXR export started ({m})…",
+  "def.exr.done": "✅ EXR frames in: {o}",
+  "def.exr.fail": "❌ EXR export: {e}",
+  "queue.job.exr": "EXR export (VFX)",
+  "def.no_video.pick_msg": "Load a video in the Definition tab first.",
+  "upsell.exr.msg": "HDR/EXR export is not included in this edition.",
+  "feat.cap.exr_export": "HDR/EXR video frame export (VFX)"
 }

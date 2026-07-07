@@ -25,6 +25,7 @@ _ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr"}
 class VideoDefTab(QWidget):
     request_enhance = Signal()
     request_face_restore = Signal()
+    request_exr = Signal()
 
     def __init__(self):
         super().__init__()
@@ -87,6 +88,22 @@ class VideoDefTab(QWidget):
             "Il RIFE nativo usa Practical-RIFE (modello unico). La selezione checkpoint era per ComfyUI."))
         rf.addRow(tr("def.rife_ckpt_lbl"), self.rife_ckpt)
         root.addWidget(rbox)
+
+        # ── Export HDR/EXR (VFX) — frame OpenEXR float32 per Nuke/Resolve/Blender ──
+        ebox = QGroupBox(tr("def.exr.group", "Export HDR / EXR (VFX)")); ef = QFormLayout(ebox)
+        self.exr_linear = QCheckBox(tr("def.exr.linear", "Linearizza (de-gamma BT.709 → luce lineare)"))
+        self.exr_linear.setChecked(True)
+        self.exr_linear.setToolTip(tr("def.exr.linear.tt",
+            "ON (standard compositing): converte in luce LINEARE (zscale transfer=linear). "
+            "OFF: valori display-referred (gamma). Per un video HDR VERO generalo prima con la "
+            "IC-LoRA HDR (LTX-2) nel tab Video, poi esporta da qui."))
+        ef.addRow(self.exr_linear)
+        self.exr_btn = QPushButton(tr("def.exr.run", "Esporta frame EXR"))
+        self.exr_btn.clicked.connect(lambda: self.request_exr.emit())
+        self.exr_btn.setToolTip(tr("def.exr.run.tt",
+            "Esporta TUTTI i frame del video in OpenEXR float32 (cartella <video>_exr) — pipeline VFX."))
+        ef.addRow(self.exr_btn)
+        root.addWidget(ebox)
 
         self.run_btn = QPushButton(tr("def.run.btn"))
         self.run_btn.setObjectName("generate"); self.run_btn.clicked.connect(lambda: self.request_enhance.emit())

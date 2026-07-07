@@ -49,3 +49,40 @@ def tonemap_reinhard(frame):
     import numpy as np
     x = np.asarray(frame, dtype="float32")
     return x / (1.0 + x)
+
+
+def video_to_exr(video: str, out_dir: str | None = None, *, linear: bool = True,
+                 progress=None) -> str:
+    """Esporta TUTTI i frame di un video in OpenEXR float32 (pipeline VFX: Nuke/Resolve/Blender).
+    linear=True: de-gamma BT.709 → luce LINEARE (zscale transfer=linear, lo standard per il compositing);
+    linear=False: i valori restano display-referred (gamma). Per un video HDR VERO, generarlo prima con
+    la IC-LoRA HDR (LTX-2\\ltx-2.3-22b-ic-lora-hdr) nel tab Video, poi esportare da qui.
+    Ritorna la cartella coi .exr. Richiede l'encoder exr di ffmpeg (verificato: ffmpeg 8.x full build)."""
+    import subprocess
+    if not os.path.isfile(video):
+        raise FileNotFoundError(video)
+    out_dir = out_dir or os.path.splitext(video)[0] + "_exr"
+    os.makedirs(out_dir, exist_ok=True)
+    vf = ["-vf", "zscale=transfer=linear:npl=100"] if linear else []
+    if progress:
+        progress(f"[exr] estrazione frame EXR ({'lineare' if linear else 'gamma'})…")
+    r = subprocess.run(["ffmpeg", "-v", "error", "-i", video, *vf,
+                        "-pix_fmt", "gbrpf32le", "-c:v", "exr",
+                        os.path.join(out_dir, "frame_%05d.exr"), "-y"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        # fallback: senza zscale (build ffmpeg senza filtro) → EXR comunque float, non linearizzato
+        r2 = subprocess.run(["ffmpeg", "-v", "error", "-i", video,
+                             "-pix_fmt", "gbrpf32le", "-c:v", "exr",
+                             os.path.join(out_dir, "frame_%05d.exr"), "-y"],
+                            capture_output=True, text=True)
+        if r2.returncode != 0:
+            raise RuntimeError(f"export EXR fallito: {(r.stderr or r2.stderr or '')[-400:]}")
+        if progress:
+            progress("[exr] nota: zscale assente → EXR non linearizzati (gamma display)")
+    n = len([f for f in os.listdir(out_dir) if f.endswith(".exr")])
+    if progress:
+        progress(f"[exr] {n} frame EXR in {out_dir}")
+    if not n:
+        raise RuntimeError("export EXR: nessun frame prodotto")
+    return out_dir

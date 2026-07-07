@@ -517,6 +517,7 @@ class MainWindow(QMainWindow):
         self.frame1_tab.canvas.request_segment_region.connect(self.segment_by_region)
         self.video_def_tab.request_enhance.connect(self.generate_video_enhance)
         self.video_def_tab.request_face_restore.connect(self.generate_face_restore)
+        self.video_def_tab.request_exr.connect(self.generate_exr_export)
         self.video_extend_tab.request_extend.connect(self.generate_video_extend)
         self.restore_tab.request_restore.connect(self.generate_restore)
         self.trellis_tab.request_trellis.connect(self.generate_trellis)
@@ -2268,6 +2269,43 @@ class MainWindow(QMainWindow):
                       f"({len(prompt)} nodi).")
         except Exception as e:
             QMessageBox.critical(self, tr("mw.extend_video_error_title"), str(e)); self._log(f"[ERR] extend: {e}")
+
+    def generate_exr_export(self):
+        """Export frame EXR float32 (VFX) del video nel tab Definizione — cap.exr_export, no GPU (ffmpeg)."""
+        from core import features
+        if not features.is_enabled("cap.exr_export"):
+            self._show_upsell("cap.exr_export") if hasattr(self, "_show_upsell") else QMessageBox.information(
+                self, tr("upsell.title", "Funzione non inclusa"),
+                tr("upsell.exr.msg", "L'export HDR/EXR non è incluso in questa edizione."))
+            return
+        video = getattr(self.video_def_tab, "_video", None)
+        if not video:
+            QMessageBox.information(self, tr("def.no_video.title", "Nessun video"),
+                                    tr("def.no_video.pick_msg", "Carica prima un video nel tab Definizione."))
+            return
+        linear = self.video_def_tab.exr_linear.isChecked()
+
+        class _ExrWorker(QThread):
+            done = Signal(dict)
+            progress = Signal(str)
+
+            def run(self):
+                try:
+                    from core.exr_export import video_to_exr
+                    out = video_to_exr(video, linear=linear, progress=self.progress.emit)
+                    self.done.emit({"status": "success", "output": [out]})
+                except Exception as e:                       # noqa: BLE001
+                    self.done.emit({"status": "error", "error": str(e)})
+
+        self._exr_worker = _ExrWorker()
+        self._log(tr("def.exr.start", "Export EXR avviato ({m})…").format(
+            m="lineare" if linear else "gamma"))
+        self._enqueue(tr("queue.job.exr", "Export EXR (VFX)"), self._exr_worker,
+                      lambda res: self._log(
+                          tr("def.exr.done", "✅ Frame EXR in: {o}").format(o=res.get("output", ["?"])[0])
+                          if res.get("status") == "success" else
+                          tr("def.exr.fail", "❌ Export EXR: {e}").format(e=res.get("error", "")[:300])),
+                      on_progress=self._log)
 
     def generate_face_restore(self):
         """Restauro volti per-frame (CodeFormer/GFPGAN) sul video del tab Migliora qualità."""
