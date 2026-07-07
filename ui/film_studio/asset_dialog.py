@@ -85,7 +85,10 @@ class AtReferenceFilter(QObject):
         editor.installEventFilter(self)
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.KeyPress and event.text() == "@":
+        # '@' apre il popup solo se NON c'è il completer inline (QLineEdit); sui QPlainTextEdit il completer
+        # inline (_MentionCompleter) gestisce la menzione mentre si digita, non-modale.
+        if (event.type() == QEvent.KeyPress and event.text() == "@"
+                and not getattr(self.editor, "_mention_completer", None)):
             dlg = AssetDialog(self.editor)
             if dlg.exec() and dlg.result_ref:
                 self.editor.insertPlainText(dlg.result_ref)
@@ -118,6 +121,56 @@ class AtReferenceFilter(QObject):
         return False
 
 
-def attach(editor) -> AtReferenceFilter:
-    """Aggancia il comportamento @Reference a un QPlainTextEdit/QLineEdit."""
+class _MentionCompleter(QObject):
+    """Completer INLINE non-modale per le @menzioni in un QPlainTextEdit (stile Notion/Slack): digitando '@'
+    e le lettere del nome compare un popup filtrato; Invio/click inserisce l'@Nome. Undo preservato
+    (QTextCursor.insertText). Il gesto più frequente diventa fluido invece che un dialog bloccante."""
+    def __init__(self, editor):
+        super().__init__(editor)
+        from PySide6.QtWidgets import QCompleter
+        from PySide6.QtCore import QStringListModel
+        self.editor = editor
+        self.model = QStringListModel(self)
+        self.comp = QCompleter(self.model, editor)
+        self.comp.setWidget(editor)
+        self.comp.setCompletionMode(QCompleter.PopupCompletion)
+        self.comp.setCaseSensitivity(Qt.CaseInsensitive)
+        self.comp.activated[str].connect(self._insert)
+        editor.textChanged.connect(self._on_text)
+
+    def _match(self):
+        import re
+        cur = self.editor.textCursor()
+        before = self.editor.toPlainText()[:cur.position()]
+        return re.search(r"@([A-Za-z0-9_]*)$", before)       # @ + prefisso (anche vuoto) fino al cursore
+
+    def _on_text(self):
+        m = self._match()
+        if m is None:
+            self.comp.popup().hide(); return
+        self.model.setStringList([a["name"] for a in db.find_assets()])  # asset correnti (aggiornati)
+        self.comp.setCompletionPrefix(m.group(1))
+        if self.comp.completionCount() == 0:
+            self.comp.popup().hide(); return
+        cr = self.editor.cursorRect()
+        cr.setWidth(self.comp.popup().sizeHintForColumn(0) + self.comp.popup().verticalScrollBar().sizeHint().width() + 20)
+        self.comp.complete(cr)
+
+    def _insert(self, name: str):
+        from PySide6.QtGui import QTextCursor
+        m = self._match()
+        if m is None:
+            return
+        cur = self.editor.textCursor()                       # sostituisci il prefisso digitato col nome pieno
+        cur.setPosition(cur.position() - len(m.group(1)), QTextCursor.KeepAnchor)
+        cur.removeSelectedText()
+        cur.insertText(name)
+        self.comp.popup().hide()
+
+
+def attach(editor):
+    """Aggancia il comportamento @Reference a un QPlainTextEdit/QLineEdit.
+    QPlainTextEdit → completer INLINE non-modale per @menzioni + '#' apre le varianti; QLineEdit → dialog @."""
+    if hasattr(editor, "toPlainText"):
+        editor._mention_completer = _MentionCompleter(editor)
     return AtReferenceFilter(editor)
