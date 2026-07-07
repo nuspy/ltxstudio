@@ -27,6 +27,37 @@ if os.environ.get("TRELLIS_DEBUG", "1") != "0":
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     os.environ["TORCH_SHOW_CPP_STACKTRACES"] = "1"
 
+# LOG PROPRIO del subprocess, INDIPENDENTE dal pump dell'app. Se l'APP crasha/freeza, il suo pump smette di
+# leggere lo stdout e trellis_last.log si tronca — ma NON perché il subprocess è morto. Questo file invece lo
+# scrive il subprocess stesso (Tee su stdout+file, con flush): se arriva a `OK:` mentre l'app è morta, il
+# colpevole del crash è l'APP, non il subprocess. Cattura anche il pipe rotto (app morta) senza morire.
+class _Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, s):
+        for st in self.streams:
+            try:
+                st.write(s); st.flush()
+            except Exception:  # noqa: BLE001  (pipe rotto = app morta → si continua sul file)
+                pass
+
+    def flush(self):
+        for st in self.streams:
+            try:
+                st.flush()
+            except Exception:  # noqa: BLE001
+                pass
+
+try:
+    Path(r"E:\AI\ltxstudio\output\3d").mkdir(parents=True, exist_ok=True)
+    _own_log = open(r"E:\AI\ltxstudio\output\3d\trellis_subprocess.log", "w", encoding="utf-8", buffering=1)
+    sys.stdout = _Tee(sys.__stdout__, _own_log)
+    sys.stderr = _Tee(sys.__stderr__, _own_log)
+    print("[trellis] log PROPRIO del subprocess attivo (indipendente dall'app)", flush=True)
+except Exception:  # noqa: BLE001
+    pass
+
 _REPO = r"E:\AI\Tools\TRELLIS2\TRELLIS2_official"
 if os.path.isdir(_REPO):
     sys.path.insert(0, _REPO)
