@@ -391,16 +391,19 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         if not torch.cuda.is_available():
             return "cpu"
         free_gb = torch.cuda.mem_get_info()[0] / 1e9
-        # Decisione sul CHECKPOINT fp8 NATIVO (fp8_scaled_mm = niente upcast a bf16): se entra su GPU
-        # → 'none' E si usa il fp8 (NON il GGUF, che con none verrebbe dequantizzato a bf16 ~44GB e
-        # sborzerebbe in shared-RAM = glaciale). Se non entra → 'cpu' (+ GGUF Q4 bounded per-blocco).
-        msz = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
-        # working set REALE = attivazioni + VAE decode + workspace Sage ~7-10GB (misurato: il 22B fp8 25GB
-        # 'none' sborza in shared-RAM su 32GB). need=size+10 → il 22B su 32GB cade su 'cpu' (block-streaming
-        # bounded ~14GB col GGUF Q4, niente spill), mentre su GPU con più VRAM (40/48GB) usa 'none' (veloce).
-        need = msz + 10.0
+        # STIMA PRECISA condivisa (byte reali dell'header + cache footprint, come le immagini): il CHECKPOINT
+        # fp8 nativo (fp8_scaled_mm = niente upcast) su GPU → 'none' (VELOCE); se non entra → 'cpu' (block-
+        # streaming bounded col GGUF Q4). working-set VIDEO ~9GB (attivazioni temporali su molti frame).
+        try:
+            from core import vram_estimate as _ve
+            _est_mb, _src = _ve.estimate_mb(ckpt, fp8_storage=True, working_mb=9000)
+            need = (_est_mb / 1024.0) if _est_mb else (os.path.getsize(ckpt) / 1e9 + 10.0)
+            _how = _src if _est_mb else "file"
+        except Exception:                                    # noqa: BLE001
+            need = (os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0) + 10.0
+            _how = "file"
         mode = "none" if free_gb >= need else "cpu"
-        print(f"[auto-offload] free={free_gb:.0f}GB ckpt_fp8={msz:.0f}GB need~{need:.0f}GB → {mode}", flush=True)
+        print(f"[auto-offload] free={free_gb:.0f}GB need~{need:.0f}GB ({_how}) → {mode}", flush=True)
         return mode
     except Exception:                                        # noqa: BLE001
         return "cpu"
