@@ -1255,15 +1255,21 @@ def run(params: dict, mm, output_dir: str) -> dict:
         try:
             from PIL import ImageFilter
             _orig = Image.open(params["image_path"]).convert("RGB").resize(res_img.size, Image.LANCZOS)
-            # feather: dalla GUI se impostato (>0), altrimenti proporzionale automatico
-            _feather = int(params.get("feather") or 0) or max(2, min(8, int(round(min(res_img.size) / 256))))
+            # feather: dalla GUI se impostato (>0), altrimenti proporzionale automatico. Range ALZATO (la cucitura
+            # era ancora visibile): ~min_lato/64, tra 6 e 28 px (prima 2-8, troppo netto). L'OUTPAINT usa una
+            # sfumatura più ampia (×1.6) perché il bordo foto→estensione è il punto più critico.
+            _auto = max(6, min(28, int(round(min(res_img.size) / 64))))
+            _feather = int(params.get("feather") or 0) or _auto
             _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)
             # OUTPAINT: dilata la regione generata prima di sfumare, così la sfumatura NON tocca il bordo NERO
             # della tela (niente linea scura). INPAINT: NIENTE dilatazione → l'originale è preservato fino al
             # bordo della maschera (anello di modifica sottile, meno "degradazione" attorno all'edit).
             if params.get("outpaint"):
-                _m = _m.filter(ImageFilter.MaxFilter(_feather * 2 + 1))
-            _m = _m.filter(ImageFilter.GaussianBlur(_feather))
+                _fo = int(round(_feather * 1.6))                         # cucitura foto→estensione più invisibile
+                _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))
+                _m = _m.filter(ImageFilter.GaussianBlur(_fo))
+            else:
+                _m = _m.filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
             print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
