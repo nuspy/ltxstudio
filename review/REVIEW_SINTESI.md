@@ -17,7 +17,24 @@
 - "Chiave cache → usare stessa chiave per arch diversi": NAIVE — pipeline class diverse (FluxPipeline vs Fill);
   la soluzione vera è la condivisione componenti (vedi MAJOR-1), eventualmente via Pipe.from_pipe.
 
-## 🔶 PROPOSTE MAJOR (attendono OK utente)
+## ✅✅ AGGIORNAMENTO 07/07 sera — TUTTO IMPLEMENTATO (MAJOR 1-5 + minor F/G/H, commit per fase)
+- FASE A: ComponentStore refcount + placement per-job (epoch) + from_pipe sorelle — T5 caricato UNA volta.
+- FASE B: cache CPU-RAM (componenti nello store, monolitiche nel MM; budget 40GB; /free svuota tutto).
+- FASE C: FLUX.1 fp8 layerwise casting (11GB, GPU-resident, LoRA ok, NATIVE_FLUX1_FP8=0 per off).
+- FASE D: SAM2 tracking VERIFICATO LIVE (48 frame @10it/s) — orchestrazione esisteva; fix dilate GUI→CLI.
+- FASE E: export EXR end-to-end (video_to_exr, GUI Definizione, cap.exr_export nel matrix, 48 EXR testati).
+- FASE F: mask_blur GUI, conditioning_attention GUI, preset ⚡FAST/🎯PRO/💎HQ, tooltip.
+- FASE G: log negative ignorato (anche in preview), feather GUI, FIX flag outpaint mai passato (dilate
+  anti-linea-nera era spento), tooltip denoise, log settaggi effettivi, ARCH_DEFAULTS centralizzato.
+- FASE H: sample preview training, gating UpsellPanel cap.lora_*, auto-registrazione LoRA in libreria,
+  log 600 char, JoyCaption disabilitato-con-spiegazione.
+Unit test nuovi: component_store (7), mm_component_keys (2), mm_cpu_cache (4), flux_fp8_detect (4) = 17;
+totale suite 31 passed. Altri falsi positivi reviewer scartati: _compose_mask implementato, warning >30
+chunk esistente, orchestrazione SAM2 esistente.
+Resta da fare LIVE (serve riavvio server): sequenza t2i→kontext→Fill (refcount/from_pipe), demote/restore
+RAM, getphat fp8 A/B stessa seed.
+
+## 🔶 PROPOSTE MAJOR originali (per riferimento storico — ORA IMPLEMENTATE)
 - **MAJOR-1 Component Store (ROI massimo)**: cache con refcount per T5-XXL 9.5GB + CLIP-L 1.2GB + VAE 0.5GB
   condivisi tra TUTTE le pipeline FLUX.1 (base/Fill/Kontext/Krea/getphat) + riuso pipeline via from_pipe per lo
   stesso file modello con arch diverso. Risparmio: ~11GB di I/O per switch, −30-50s per cambio task. 2-4h.
