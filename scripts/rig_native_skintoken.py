@@ -41,7 +41,15 @@ def main():
     ap.add_argument("--repetition_penalty", type=float, default=1.0)
     ap.add_argument("--num_beams", type=int, default=1)
     ap.add_argument("--group_per_vertex", type=int, default=4)
+    ap.add_argument("--parent-pid", type=int, default=0)          # watchdog: se l'app muore, ci autodistruggiamo
     a = ap.parse_args()
+
+    try:                                                          # anti-orfano (vedi scripts/_watchdog.py)
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _watchdog import start_watchdog
+        start_watchdog(a.parent_pid)
+    except Exception:                                             # noqa: BLE001
+        pass
 
     # LIBERA la VRAM dei server GPU (immagini :8189, api :8200) prima di caricare i pesi 3D — evita l'OOM
     # "crash all'avvio" quando il ModelManager tiene i modelli residenti dopo una generazione immagine.

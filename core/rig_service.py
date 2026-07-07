@@ -38,11 +38,15 @@ def make_job(mesh_path: str, name: str = "rig", *, template: str = "Mixamo",
     out = OUT_DIR / _safe(name)
     out.mkdir(parents=True, exist_ok=True)
     rigged = out / f"rigged.{file_format}"
+    import os as _os
+    from core.proc_utils import kill_orphans
+    kill_orphans("rig_native_skintoken")                        # niente DUE istanze: pulisci orfani da crash
     cmd = [COMFY_VENV_PY, "-u", str(GEN_SCRIPT), "--mesh", mesh_path, "--output", str(rigged),
            "--template", template, "--format", file_format,
            "--top_k", str(int(top_k)), "--top_p", str(float(top_p)),
            "--temperature", str(float(temperature)), "--repetition_penalty", str(float(repetition_penalty)),
-           "--num_beams", str(int(num_beams)), "--group_per_vertex", str(int(group_per_vertex))]
+           "--num_beams", str(int(num_beams)), "--group_per_vertex", str(int(group_per_vertex)),
+           "--parent-pid", str(_os.getpid())]                   # watchdog: se l'app muore, il subprocess muore
     return Job(cmd, GEN_SCRIPT.parent, **cbs)
 
 

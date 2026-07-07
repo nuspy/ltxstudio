@@ -25,7 +25,16 @@ def main() -> int:
     ap.add_argument("--resolution", type=int, default=1600)
     ap.add_argument("--low_vram", action="store_true")
     ap.add_argument("--use_sharp", action="store_true")
+    ap.add_argument("--parent-pid", type=int, default=0)          # watchdog: se l'app muore, ci autodistruggiamo
     args = ap.parse_args()
+
+    try:                                                          # anti-orfano (vedi scripts/_watchdog.py)
+        import sys as _sys, os as _os
+        _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+        from _watchdog import start_watchdog
+        start_watchdog(args.parent_pid)
+    except Exception:                                             # noqa: BLE001
+        pass
 
     # LIBERA la VRAM dei server GPU (immagini :8189, api :8200) prima di caricare i pesi 3D — evita l'OOM
     # "crash all'avvio" quando il ModelManager tiene i modelli residenti dopo una generazione immagine.

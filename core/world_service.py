@@ -64,8 +64,12 @@ def is_installed() -> bool:
 def make_job(p: WorldParams, *, mesh: bool, hf_token: str | None = None, **cbs) -> Job:
     """Crea il Job di generazione (mesh=True → GLB, mesh=False → splat .ply)."""
     out = p.project_dir(); out.mkdir(parents=True, exist_ok=True)
+    import os as _os
+    from core.proc_utils import kill_orphans
+    kill_orphans("worldgen_generate")                           # niente DUE istanze: pulisci orfani da crash
     cmd = [WORLDGEN_VENV_PY, "-u", GEN_SCRIPT, "--output_dir", out,
-           "--prompt", p.prompt or "", "--resolution", int(p.resolution)]
+           "--prompt", p.prompt or "", "--resolution", int(p.resolution),
+           "--parent-pid", str(_os.getpid())]                   # watchdog: se l'app muore, il subprocess muore
     if p.image_path:
         cmd += ["--image", p.image_path]
     if mesh:

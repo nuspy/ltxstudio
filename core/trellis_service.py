@@ -16,23 +16,9 @@ TOOLS = Path(r"E:\AI\Tools")
 
 
 def kill_orphans() -> int:
-    """Killa eventuali subprocess trellis_generate.py ancora vivi (orfani da un crash precedente dell'app).
-    La coda è SERIALE (una generazione 3D per volta), quindi prima di lanciarne una nuova non deve esserci
-    nessun TRELLIS attivo: quelli che trova sono orfani → li termina, così non ci sono DUE istanze che
-    competono sulla GPU. Best-effort (Windows), stdlib-only."""
-    import subprocess as _sp
-    n = 0
-    try:
-        cmd = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-               "Where-Object { $_.CommandLine -like '*trellis_generate*' } | "
-               "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; 'k' }")
-        out = _sp.run(["powershell", "-NoProfile", "-Command", cmd],
-                      capture_output=True, text=True, timeout=15,
-                      creationflags=getattr(_sp, "CREATE_NO_WINDOW", 0))
-        n = out.stdout.count("k")
-    except Exception:  # noqa: BLE001
-        pass
-    return n
+    """Killa eventuali subprocess trellis_generate.py orfani (crash precedente dell'app). Vedi core.proc_utils."""
+    from core.proc_utils import kill_orphans as _ko
+    return _ko("trellis_generate")
 TRELLIS_DIR = TOOLS / "TRELLIS2"
 TRELLIS_VENV_PY = TRELLIS_DIR / "venv" / "Scripts" / "python.exe"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "trellis_generate.py"
