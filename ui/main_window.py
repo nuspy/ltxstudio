@@ -608,6 +608,9 @@ class MainWindow(QMainWindow):
         self.music_tab = MusicTab()
         self.world_tab = WorldTab()
         self.world_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")   # #96.5: fallback immagine dal canvas
+        # PONTE catena 3D (review): la scena WorldGen non era collegata al resto — ora il GLB entra nel
+        # tab Rig come "ultima mesh" (stesso pattern Trellis→Rig→Anim).
+        self.world_tab.mesh_ready.connect(lambda g: self.rig_tab.set_last_mesh(g))
         self.weights_tab = WeightsTab()
         self.mocap = MocapService(self)
         self.models_tab = self._make_models_tab()           # Classica o Pro (variante utente)

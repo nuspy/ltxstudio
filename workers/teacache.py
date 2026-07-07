@@ -68,6 +68,62 @@ def enable(stage, thresh: float = 0.05, rescale=None):
     return vm
 
 
+def enable_class(thresh: float):
+    """Patch di CLASSE su X0Model.forward — FIX calibrazione 07/07: il transformer LTX-2 è costruito
+    LAZY dentro la run (DiffusionStage._build_transformer) → il patch per-istanza sugli stage non lo
+    trovava MAI ("[teacache] attivo su 0 stage" → output bit-identici, zero skip). Il patch di classe
+    prende OGNI X0Model creato (stage_1 e stage_2), stato per-istanza su self._tc_state.
+    Skip corretto da paper: riusa la VELOCITY dell'ultimo forward reale e ricalcola il denoised sui
+    latenti/sigma CORRENTI (to_denoised) — non riusa il denoised stantio. Reversibile (disable_class)."""
+    if not thresh or thresh <= 0:
+        return None
+    from ltx_core.model.transformer.model import X0Model
+    from ltx_core.utils import to_denoised
+    if getattr(X0Model, "_teacache_orig", None) is not None:
+        return X0Model                                       # già attivo
+    orig = X0Model.forward
+
+    def patched(self, video, audio, perturbations):
+        st = getattr(self, "_tc_state", None)
+        if st is None:
+            st = {"prev_in": None, "vx": None, "ax": None, "acc": 0.0, "hits": 0, "runs": 0}
+            self._tc_state = st
+        cur = None
+        if video is not None and getattr(video, "latent", None) is not None:
+            cur = video.latent
+        elif audio is not None and getattr(audio, "latent", None) is not None:
+            cur = audio.latent
+        if cur is not None and st["prev_in"] is not None and cur.shape == st["prev_in"].shape:
+            st["acc"] += _rel_l1(cur, st["prev_in"])
+            if st["acc"] < thresh and (st["vx"] is not None or st["ax"] is not None):
+                st["hits"] += 1
+                st["prev_in"] = cur.detach()
+                dv = to_denoised(video.latent, st["vx"], video.timesteps) \
+                    if (st["vx"] is not None and video is not None) else None
+                da = to_denoised(audio.latent, st["ax"], audio.timesteps) \
+                    if (st["ax"] is not None and audio is not None) else None
+                return dv, da
+        vx, ax = self.velocity_model(video, audio, perturbations)
+        st.update(prev_in=(cur.detach() if cur is not None else None), vx=vx, ax=ax, acc=0.0)
+        st["runs"] += 1
+        dv = to_denoised(video.latent, vx, video.timesteps) if vx is not None else None
+        da = to_denoised(audio.latent, ax, audio.timesteps) if ax is not None else None
+        return dv, da
+
+    X0Model.forward = patched
+    X0Model._teacache_orig = orig
+    return X0Model
+
+
+def class_stats() -> dict:
+    """Statistiche aggregate del patch di classe (somma su tutte le istanze viste)."""
+    try:
+        from ltx_core.model.transformer.model import X0Model
+        return getattr(X0Model, "_teacache_totals", {})
+    except Exception:                                        # noqa: BLE001
+        return {}
+
+
 def disable(vm):
     """Rimuove il patch e ritorna le statistiche {hits, runs} (skip vs forward reali)."""
     if vm is not None and getattr(vm, "_teacache_orig", None) is not None:

@@ -101,7 +101,8 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
     if nf > 150:
         params["chunk_frames"] = 121
     jf = out_mp4 + ".json"
-    json.dump(params, open(jf, "w"))
+    with open(jf, "w") as _f:                        # fix: handle non chiuso (leak FD nei loop)
+        json.dump(params, _f)
     env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
     if not os.path.exists(out_mp4):

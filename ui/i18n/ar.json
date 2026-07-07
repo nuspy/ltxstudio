@@ -1405,7 +1405,7 @@
   "music.mv.started": "فيديو موسيقي: أغنية + لوحة قصة + فيديو (قد يستغرق عدة دقائق)…",
   "music.mv.done": "الفيديو الموسيقي جاهز: {f}",
   "music.mv.fail": "فشل الفيديو الموسيقي: ",
-  "music.busy": "هناك عملية إنشاء أخرى قيد التشغيل.",
+  "music.busy": "Busy: {w}. Wait or press Stop.",
   "feat.cap.music_video": "فيديو موسيقي (أغنية + فيديو)",
   "feat.cap.model3d": "نموذج ثلاثي الأبعاد (صورة→شبكة)",
   "feat.cap.rig3d": "تجهيز ثلاثي الأبعاد (هيكل + كسوة)",
@@ -2438,5 +2438,9 @@
   "tlora.sample.none": "— training samples will appear here —",
   "tlora.registered": "LoRA registered in library: {f}",
   "train.cap.joy_missing": "JoyCaption (not installed)",
-  "train.cap.joy_missing.tt": "Requires the ACE-Step venv (venv15) + weights in E:\\AI\\Models\\JoyCaption. Install ACE-Step 1.5 from the Music tab to enable VLM captions."
+  "train.cap.joy_missing.tt": "Requires the ACE-Step venv (venv15) + weights in E:\\AI\\Models\\JoyCaption. Install ACE-Step 1.5 from the Music tab to enable VLM captions.",
+  "music.busy.install": "module installation in progress",
+  "music.busy.job": "another generation is running",
+  "mvs.batch_errs": "{n} items failed:\n{e}",
+  "mvs.batch_done_err": "Completed with {n} errors."
 }

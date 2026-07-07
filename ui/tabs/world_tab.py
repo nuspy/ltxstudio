@@ -39,6 +39,8 @@ class _Bridge(QObject):
 
 
 class WorldTab(QWidget):
+    mesh_ready = Signal(str)               # GLB scena pronta → ponte verso il tab Rig (catena 3D)
+
     def __init__(self):
         super().__init__()
         self._job: ws.Job | None = None
@@ -279,6 +281,10 @@ class WorldTab(QWidget):
             if tgt.exists():
                 self._log(f"[world] output: {tgt}")
                 self._load_in_viewer(tgt)
+                # PONTE col resto della catena 3D (review: WorldGen era un'ISOLA): la mesh GLB della
+                # scena diventa disponibile nel tab Rig ("Usa ultimo") come Trellis → Rig → Anim.
+                if str(tgt).lower().endswith(".glb"):
+                    self.mesh_ready.emit(str(tgt))
                 try:                                         # #97: sidecar (params riutilizzabili nel Navigator)
                     from core.metadata_saver import MetadataSaver
                     _p = self._cur

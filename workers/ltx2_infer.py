@@ -680,11 +680,11 @@ def run_generation(p: dict) -> str:
             from workers import teacache as _TC
         except ModuleNotFoundError:
             import teacache as _TC
-        _n = 0
-        for _st in (getattr(pipe, "stage_1", None), getattr(pipe, "stage_2", None), getattr(pipe, "stage", None)):
-            if _TC.enable(_st, _tc_thresh) is not None:
-                _n += 1
-        print(f"[teacache] attivo thresh={_tc_thresh} su {_n} stage", flush=True)
+        # PATCH DI CLASSE (fix calibrazione 07/07): il transformer è costruito LAZY dentro la run →
+        # il vecchio patch sugli stage non lo trovava mai ("attivo su 0 stage" = zero skip reali).
+        _ok = _TC.enable_class(_tc_thresh)
+        print(f"[teacache] patch classe X0Model {'ATTIVO' if _ok is not None else 'NON attivo'} "
+              f"thresh={_tc_thresh}", flush=True)
 
     vg = MultiModalGuiderParams(cfg_scale=float(p.get("guidance", 3.0)),
                                 stg_scale=float(p.get("stg", 1.0)),

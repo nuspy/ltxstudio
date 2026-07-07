@@ -617,6 +617,12 @@ class MusicTab(QWidget):
 
     def _gen_song(self):
         if self._busy():
+            # MAI silenzioso (bug "genera non fa nulla"): dì PERCHÉ non parte. Un _install_proc stantio
+            # (installer mai finito/fallito in avvio) bloccava ogni Genera senza alcun feedback.
+            why = tr("music.busy.install", "installazione moduli in corso") if self._install_proc is not None \
+                else tr("music.busy.job", "un'altra generazione è in corso")
+            self.status.setText(tr("music.busy", "Occupato: {w}. Attendi o premi Stop.").format(w=why))
+            self._log(f"[music] Genera ignorato: {why}")
             return
         eng = self.song_engine.currentText()
         if eng == "ACE-Step":
@@ -1051,6 +1057,10 @@ class MusicTab(QWidget):
         p.readyReadStandardOutput.connect(
             lambda: self._log(bytes(p.readAllStandardOutput()).decode("utf-8", "replace").rstrip()))
         p.finished.connect(self._install_finished)
+        # se il processo NON parte (eseguibile bloccato/percorso), finished non scatta MAI e _install_proc
+        # resterebbe settato per sempre → _busy() True → ogni "Genera" ignorato in silenzio (bug B1).
+        p.errorOccurred.connect(lambda _e: (self._log(f"[install] errore avvio: {p.errorString()}"),
+                                            self._install_finished(-1, None)))
         self._install_proc = p
         p.start(sys.executable, args)
 

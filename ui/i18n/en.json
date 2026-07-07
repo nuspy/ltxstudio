@@ -1502,7 +1502,7 @@
   "music.mv.started": "Music video: song + storyboard + video (may take several minutes)…",
   "music.mv.done": "Music video ready: {f}",
   "music.mv.fail": "Music video failed: ",
-  "music.busy": "Another generation is in progress.",
+  "music.busy": "Busy: {w}. Wait or press Stop.",
   "feat.cap.music_video": "Music video (song + video)",
   "feat.cap.model3d": "3D model (photo→mesh)",
   "feat.cap.rig3d": "3D rig (skeleton + skinning)",
@@ -2438,5 +2438,9 @@
   "tlora.sample.none": "— training samples will appear here —",
   "tlora.registered": "LoRA registered in library: {f}",
   "train.cap.joy_missing": "JoyCaption (not installed)",
-  "train.cap.joy_missing.tt": "Requires the ACE-Step venv (venv15) + weights in E:\\AI\\Models\\JoyCaption. Install ACE-Step 1.5 from the Music tab to enable VLM captions."
+  "train.cap.joy_missing.tt": "Requires the ACE-Step venv (venv15) + weights in E:\\AI\\Models\\JoyCaption. Install ACE-Step 1.5 from the Music tab to enable VLM captions.",
+  "music.busy.install": "module installation in progress",
+  "music.busy.job": "another generation is running",
+  "mvs.batch_errs": "{n} items failed:\n{e}",
+  "mvs.batch_done_err": "Completed with {n} errors."
 }

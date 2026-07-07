@@ -468,21 +468,38 @@ class MusicVideoStudio(QWidget):
 
     def _batch(self, todo, kind):
         self._queue = list(todo); self._kind = kind
+        self._batch_total = len(todo); self._batch_errs = []
         self._busy(True, f"{kind} 0/{len(todo)}"); self._next_batch()
 
     def _next_batch(self):
         if not self._queue:
             self._save(); self._busy(False); self._refresh_sb()
-            self.status.setText(tr("mvs.batch_done", "Generazione completata.")); return
+            if getattr(self, "_batch_errs", None):       # errori raccolti → VISIBILI, non più inghiottiti
+                QMessageBox.warning(self, tr("mvs.title", "Studio"),
+                    tr("mvs.batch_errs", "{n} elementi falliti:\n{e}").format(
+                        n=len(self._batch_errs), e="\n".join(self._batch_errs[:6])[:800]))
+                self.status.setText(tr("mvs.batch_done_err", "Completato con {n} errori.").format(
+                    n=len(self._batch_errs)))
+            else:
+                self.status.setText(tr("mvs.batch_done", "Generazione completata."))
+            return
         s = self._queue.pop(0)
         if self._kind == "image":
             out = os.path.join(self.out_dir, f"img_{int(s['start_s']*100)}.png"); fn, args = mvs.gen_scene_image, (s, out)
         else:
             out = os.path.join(self.out_dir, f"vid_{s['order']}_{int(s['start_s']*100)}.mp4"); fn, args = mvs.gen_scene_video, (s, out)
-        self.status.setText(f"{self._kind} @ {_mmss(s['start_s'])}…")
+        done_n = getattr(self, "_batch_total", 0) - len(self._queue)
+        self.status.setText(f"{self._kind} {done_n}/{getattr(self, '_batch_total', '?')} @ {_mmss(s['start_s'])}…")
         self._worker = _Worker(fn, *args)
-        self._worker.done.connect(lambda r: (self._save(), self._refresh_sb(), self._next_batch()))
+        self._worker.done.connect(self._on_batch_item)
         self._worker.start()
+
+    def _on_batch_item(self, res: dict):
+        """Un elemento del batch è finito: raccogli l'ERRORE se c'è (bug B2: il batch proseguiva in
+        silenzio anche a immagini mai generate) e prosegui col prossimo."""
+        if res.get("error"):
+            self._batch_errs.append(str(res["error"])[:160])
+        self._save(); self._refresh_sb(); self._next_batch()
 
     def _run(self, fn, *args):
         self._busy(True, tr("mvs.working", "Generazione…"))
