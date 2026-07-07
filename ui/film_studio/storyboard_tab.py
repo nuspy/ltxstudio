@@ -68,6 +68,8 @@ class StoryboardTab(QWidget):
         mrow.addStretch(1)
         v.addLayout(mrow)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
+        from PySide6.QtCore import QSize as _QSize
+        self.tree.setIconSize(_QSize(72, 40))                # thumbnail keyframe visibili (B11)
         self.tree.currentItemChanged.connect(self._on_tree_sel)
         v.addWidget(self.tree, 1)
         self.dur_warn = QLabel(""); v.addWidget(self.dur_warn)   # validazione durate (§10.1)
@@ -143,6 +145,10 @@ class StoryboardTab(QWidget):
             for sh in shots:
                 ci = QTreeWidgetItem([f"  {sh['ord']}. {(sh['description'] or '')[:58]}", f"{sh['duration_s']:.0f}s"])
                 ci.setData(0, Qt.UserRole, ("shot", sh["id"]))
+                _kf = db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png"
+                if _kf.exists():                             # B11: il keyframe FINALMENTE visibile nel tree
+                    from PySide6.QtGui import QIcon
+                    ci.setIcon(0, QIcon(str(_kf)))
                 it.addChild(ci)
             self.tree.addTopLevelItem(it); it.setExpanded(True)
         film = float(proj.get("duration_s") or 0)
