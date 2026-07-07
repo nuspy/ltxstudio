@@ -1957,7 +1957,7 @@
   "vid.engine.comfy": "Comfy (dinamikus VRAM, t2v/i2v)",
   "vid.engine.tt": "LTX-2 natív: összes funkció (audió/keyframe/controlnet). Comfy: dinamikus VRAM, csak t2v/i2v.",
   "vid.teacache_lbl": "Gyors gyorsítótár (TeaCache)",
-  "vid.teacache.tt": "TeaCache: gyorsít a szinte azonos zajtalanítási lépések kihagyásával (0 = ki). Próbáld a 0.03 (~1.6×) vagy 0.05 (~2.1×) értéket. Sok lépésnél hasznos (HQ/Pro); túl magas rontja a minőséget. Hangolni kell.",
+  "vid.teacache.tt": "⚠️ EXPERIMENTAL — live calibration 07/07: on LTX 2.3 (distilled Q4 pipeline) ANY threshold >0 severely degrades the video (PSNR ~12dB even at 0.005, despite 1.7-3× speedup). Keep 0 = OFF. For experiments only.",
   "wf.fill_title": "Fill in the prompt fields",
   "wf.fill_hint": "Enter a value for each prompt placeholder:",
   "wf.fill_as_is": "Apply as-is",

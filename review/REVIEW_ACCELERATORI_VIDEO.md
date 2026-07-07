@@ -33,3 +33,18 @@ inference_server_venv 2.11+cu128; ACE-Step venv15 2.11+cu128.
 ## Prossimi (quando si vuole)
 - Calibrare i coefficienti TeaCache per LTX 2.3 (il paper usa 0.9) — 2h di A/B live.
 - #103 migrazione CUDA 13.1 + py311 → sblocca flash_attn (+10-15%) [MAJOR].
+
+## CALIBRAZIONE LIVE TeaCache (07/07 notte) — VERDETTO FINALE
+Clip identica (seed 4242, 24 step, 768×512, 73f, distilled Q4 auto-GGUF), confronto PSNR vs baseline 189s:
+| thresh | tempo | PSNR | esito |
+|---|---|---|---|
+| 0.03 | 64s (3.0×) | 12.9 dB | ❌ distrutto |
+| 0.05 | 67s (2.8×) | 12.4 dB | ❌ distrutto |
+| 0.01 | 72s (2.6×) | 12.6 dB | ❌ distrutto |
+| 0.005 | 110s (1.7×) | 12.5 dB | ❌ distrutto |
+NB: il 1° giro aveva scoperto che l'hook NON scattava mai (transformer lazy → "0 stage", output bit-identici)
+→ riscritto come patch di CLASSE su X0Model (riuso velocity + to_denoised, da paper). Col patch attivo, la
+qualità crolla a QUALSIASI soglia: sul percorso DISTILLATO ogni step conta troppo (e servirebbero i
+coefficienti di rescaling LTX 2.3 + stato per-ramo CFG). VERDETTO: non praticabile in questa forma → preset
+0.0, slider marcato ⚠️ sperimentale. Eventuale ripresa futura: solo modello full (non distillato) HQ 40+ step
+con coefficienti calibrati (#104 chiuso con esito negativo motivato).

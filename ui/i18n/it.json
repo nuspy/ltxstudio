@@ -1957,7 +1957,7 @@
   "vid.engine.comfy": "Comfy (VRAM dinamica, t2v/i2v)",
   "vid.engine.tt": "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v.",
   "vid.teacache_lbl": "Cache veloce (TeaCache)",
-  "vid.teacache.tt": "TeaCache: accelera saltando gli step di denoising quasi identici (0 = off). Prova 0.03 (~1.6×) o 0.05 (~2.1×). Utile con molti step (HQ/Pro); troppo alto degrada la qualità. Da tarare.",
+  "vid.teacache.tt": "⚠️ SPERIMENTALE — calibrazione live 07/07: su LTX 2.3 (pipeline distillata Q4) QUALSIASI soglia >0 degrada gravemente il video (PSNR ~12dB anche a 0.005, pur 1.7-3× più veloce). Lasciare 0 = OFF. Utile solo per esperimenti.",
   "wf.fill_title": "Compila i campi del prompt",
   "wf.fill_hint": "Inserisci un valore per ogni segnaposto del prompt:",
   "wf.fill_as_is": "Applica così com'è",

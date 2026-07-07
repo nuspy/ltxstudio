@@ -1957,7 +1957,7 @@
   "vid.engine.comfy": "Comfy (동적 VRAM, t2v/i2v)",
   "vid.engine.tt": "LTX-2 네이티브: 전체 기능(오디오/키프레임/controlnet). Comfy: 동적 VRAM, t2v/i2v만.",
   "vid.teacache_lbl": "빠른 캐시 (TeaCache)",
-  "vid.teacache.tt": "TeaCache: 거의 동일한 디노이징 단계를 건너뛰어 가속합니다 (0 = 꺼짐). 0.03 (~1.6×) 또는 0.05 (~2.1×)를 시도하세요. 단계가 많을 때 유용 (HQ/Pro); 너무 높으면 품질이 저하됩니다. 조정 필요.",
+  "vid.teacache.tt": "⚠️ EXPERIMENTAL — live calibration 07/07: on LTX 2.3 (distilled Q4 pipeline) ANY threshold >0 severely degrades the video (PSNR ~12dB even at 0.005, despite 1.7-3× speedup). Keep 0 = OFF. For experiments only.",
   "wf.fill_title": "프롬프트 필드 채우기",
   "wf.fill_hint": "각 자리표시자에 값을 입력하세요:",
   "wf.fill_as_is": "그대로 적용",
