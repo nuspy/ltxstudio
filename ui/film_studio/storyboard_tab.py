@@ -197,12 +197,14 @@ class StoryboardTab(QWidget):
         pid = self._get_project()
         if not pid:
             QMessageBox.information(self, tr("fs.sb.breakdown", "Breakdown"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
-        scripts = db.query("script", "project_id=?", (pid,), order="version")
-        if not scripts:
+        copione = db.latest_script(pid, "script") or db.latest_script(pid, "narrative")  # copione, poi Racconto
+        if not copione:
             QMessageBox.information(self, tr("fs.sb.breakdown", "Breakdown"), tr("fs.sb.no_script", "Genera prima il copione.")); return
         proj = db.get("project", pid)
+        racconto = db.latest_script(pid, "narrative")        # se c'è, il Racconto contestualizza il breakdown
+        ctx = ("Cinematic treatment:\n" + racconto["text"] + "\n\n") if racconto else ""
         try:
-            data = L.complete_json(_SYS, f"Film duration: {proj.get('duration_s',60)}s.\n\n" + scripts[-1]["text"],
+            data = L.complete_json(_SYS, f"Film duration: {proj.get('duration_s',60)}s.\n\n{ctx}" + copione["text"],
                                    max_tokens=3000)
         except Exception as e:                              # noqa: BLE001
             QMessageBox.critical(self, tr("fs.sb.breakdown", "Breakdown"), str(e)[:600]); return

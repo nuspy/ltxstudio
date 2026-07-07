@@ -87,6 +87,7 @@ def conn() -> sqlite3.Connection:
                     "ALTER TABLE shot ADD COLUMN transition TEXT",           # transizione verso lo shot dopo
                     "ALTER TABLE shot ADD COLUMN in_s REAL DEFAULT 0",       # trim montaggio (in/out)
                     "ALTER TABLE shot ADD COLUMN out_s REAL DEFAULT 0",
+                    "ALTER TABLE script ADD COLUMN kind TEXT DEFAULT 'script'",  # 'script'|'narrative' (Racconto)
                     "ALTER TABLE lora ADD COLUMN weight REAL DEFAULT 0.9",    # B6: peso composizione
                     "ALTER TABLE lora ADD COLUMN base_arch TEXT"]:           # arch compatibile (flux/ltx2)
             try:
@@ -156,6 +157,19 @@ def versions(artifact_id: int) -> list[dict]:
 def current_file(artifact_id: int) -> str | None:
     vs = versions(artifact_id)
     return vs[-1]["file"] if vs else None
+
+
+def save_script(project_id: int, text: str, summary: str = "", kind: str = "script") -> int:
+    """Salva una nuova versione di copione ('script') o Racconto cinematografico ('narrative')."""
+    n = len([s for s in query("script", "project_id=?", (project_id,)) if (s.get("kind") or "script") == kind]) + 1
+    return insert("script", project_id=project_id, text=text, summary=summary, version=n, kind=kind)
+
+
+def latest_script(project_id: int, kind: str = "script") -> dict | None:
+    """Ultima versione del copione o del Racconto del progetto."""
+    rows = [s for s in query("script", "project_id=?", (project_id,), order="version")
+            if (s.get("kind") or "script") == kind]
+    return rows[-1] if rows else None
 
 
 # ─────────── helper @Reference ───────────

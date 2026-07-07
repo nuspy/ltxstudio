@@ -2522,5 +2522,7 @@
   "fs.sb.takes_none": "No takes: generate the keyframe at least once.",
   "fs.sb.takes_h": "Pick a take and Restore (attempts are not lost):",
   "fs.sb.takes_restore": "Restore",
-  "fs.sb.takes_done": "Take v{v} restored as current."
+  "fs.sb.takes_done": "Take v{v} restored as current.",
+  "fs.script.gen_narr": "📖 Generate Story",
+  "fs.script.racconto": "Cinematic story (prose, editable)"
 }

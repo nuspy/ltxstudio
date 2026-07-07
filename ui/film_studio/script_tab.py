@@ -17,6 +17,11 @@ _SYS = ("You are a screenwriter. Turn the user's input into a cinematic treatmen
         "as the input. Start with a 2-3 line PLOT SUMMARY, then the structured treatment in scenes. "
         "Respect the requested duration and genres. Keep @Name references intact if present.")
 
+# Stadio «Racconto cinematografico»: prosa narrativa PRIMA del breakdown tecnico (voce, tono, atmosfera).
+_SYS_NARRATIVE = ("You are a narrative film writer. From the user's idea write a short CINEMATIC PROSE treatment "
+                  "(a 'racconto') in the SAME language: evocative prose describing what we SEE and FEEL, the "
+                  "tone and atmosphere, NOT a technical scene list. Keep @Name references intact. 1-3 paragraphs.")
+
 
 class _LlmWorker(QThread):
     done = Signal(str)
@@ -69,11 +74,17 @@ class ScriptTab(QWidget):
         from ui.film_studio.asset_dialog import attach as _attach_at
         _attach_at(self.inp)                              # digitando @ si apre l'AssetDialog
         h = QHBoxLayout()
+        self.btn_racconto = QPushButton(tr("fs.script.gen_narr", "📖 Genera Racconto")); self.btn_racconto.clicked.connect(self._gen_racconto)
         self.btn_gen = QPushButton(tr("fs.script.gen", "✍️ Genera copione")); self.btn_gen.clicked.connect(self._gen)
         self.btn_regen = QPushButton(tr("fs.script.regen", "↻ Rigenera")); self.btn_regen.clicked.connect(self._regen)
-        h.addWidget(self.btn_gen); h.addWidget(self.btn_regen); h.addStretch(1)
+        h.addWidget(self.btn_racconto); h.addWidget(self.btn_gen); h.addWidget(self.btn_regen); h.addStretch(1)
         bv.addLayout(h)
         v.addWidget(box)
+        v.addWidget(QLabel(tr("fs.script.racconto", "Racconto cinematografico (prosa, editabile)")))
+        self.racconto = QPlainTextEdit(); self.racconto.setFixedHeight(90)
+        from ui.film_studio.regen_menu import attach_regen_menu as _arm
+        _arm(self.racconto); _attach_at(self.racconto)
+        v.addWidget(self.racconto)
         v.addWidget(QLabel(tr("fs.script.summary", "Riassunto trama")))
         self.summary = QPlainTextEdit(); self.summary.setFixedHeight(60)
         v.addWidget(self.summary)
@@ -94,7 +105,9 @@ class ScriptTab(QWidget):
         if proj:
             meta = f"\n\nTarget duration: {proj.get('duration_s',60)}s. Genres: {proj.get('genres','')}. " \
                    f"Styles: {proj.get('styles','')}."
-        return f"[{self.kind.currentData()}] " + self.inp.toPlainText().strip() + meta
+        narr = self.racconto.toPlainText().strip() if hasattr(self, "racconto") else ""
+        narr = f"\n\nRacconto cinematografico:\n{narr}" if narr and narr != tr("fs.working", "Generazione…") else ""
+        return f"[{self.kind.currentData()}] " + self.inp.toPlainText().strip() + narr + meta
 
     def _gen(self):
         if not self.inp.toPlainText().strip():
@@ -113,6 +126,29 @@ class ScriptTab(QWidget):
         self.inp.setPlainText(self.inp.toPlainText() + "\n(varia con un seed diverso, alternativa)")
         self._gen()
 
+    def _gen_racconto(self):
+        """Stadio Racconto: genera la prosa cinematografica dall'idea (prima del copione tecnico)."""
+        if not self.inp.toPlainText().strip():
+            QMessageBox.information(self, tr("fs.script.gen_narr", "Racconto"), tr("fs.script.need_input", "Inserisci un input.")); return
+        if not L.available():
+            QMessageBox.warning(self, tr("fs.script.gen_narr", "Racconto"), tr("fs.llm.unavailable", "LLM non disponibile.")); return
+        self.btn_racconto.setEnabled(False)
+        self.racconto.setPlainText(tr("fs.working", "Generazione…"))
+        self._narr_worker = _LlmWorker(_SYS_NARRATIVE, self._build_user())
+        self._narr_worker.done.connect(self._on_racconto); self._narr_worker.failed.connect(self._on_racconto_fail)
+        self._narr_worker.start()
+
+    def _on_racconto(self, txt: str):
+        self.btn_racconto.setEnabled(True)
+        self.racconto.setPlainText(txt.strip())
+        pid = self._get_project()
+        if pid:                                              # salva subito come Racconto (kind='narrative')
+            db.save_script(pid, txt.strip(), summary="racconto", kind="narrative")
+
+    def _on_racconto_fail(self, err: str):
+        self.btn_racconto.setEnabled(True)
+        QMessageBox.critical(self, tr("fs.script.gen_narr", "Racconto"), str(err)[:600])
+
     def _on_done(self, txt: str):
         self.btn_gen.setEnabled(True); self.btn_regen.setEnabled(True)
         lines = txt.strip().split("\n\n", 1)
@@ -129,8 +165,9 @@ class ScriptTab(QWidget):
         if not pid:
             QMessageBox.information(self, tr("fs.save", "Salva"), tr("fs.no_project", "Crea/seleziona un progetto.")); return
         db.update("project", pid, styles=self.styles.currentText().strip(), genres=self.genres.currentText().strip())
-        n = len(db.query("script", "project_id=?", (pid,))) + 1
-        db.insert("script", project_id=pid, text=self.text.toPlainText(),
-                  summary=self.summary.toPlainText(), version=n)
+        if self.racconto.toPlainText().strip():              # salva anche il Racconto se presente
+            db.save_script(pid, self.racconto.toPlainText().strip(), summary="racconto", kind="narrative")
+        rid = db.save_script(pid, self.text.toPlainText(), summary=self.summary.toPlainText(), kind="script")
+        n = (db.get("script", rid) or {}).get("version", 1)
         self.script_ready.emit(pid)
         QMessageBox.information(self, tr("fs.save", "Salva"), tr("fs.script.saved", "Copione salvato (v{n}).").format(n=n))
