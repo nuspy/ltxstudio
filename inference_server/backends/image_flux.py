@@ -1275,14 +1275,14 @@ def run(params: dict, mm, output_dir: str) -> dict:
             # feather: dalla GUI se impostato (>0), altrimenti proporzionale automatico. Range ALZATO (la cucitura
             # era ancora visibile): ~min_lato/64, tra 6 e 28 px (prima 2-8, troppo netto). L'OUTPAINT usa una
             # sfumatura più ampia (×1.6) perché il bordo foto→estensione è il punto più critico.
-            _auto = max(6, min(28, int(round(min(res_img.size) / 64))))
+            _auto = max(10, min(48, int(round(min(res_img.size) / 40))))
             _feather = int(params.get("feather") or 0) or _auto
             _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)
             # OUTPAINT: dilata la regione generata prima di sfumare, così la sfumatura NON tocca il bordo NERO
             # della tela (niente linea scura). INPAINT: NIENTE dilatazione → l'originale è preservato fino al
             # bordo della maschera (anello di modifica sottile, meno "degradazione" attorno all'edit).
             if params.get("outpaint"):
-                _fo = int(round(_feather * 1.6))                         # cucitura foto→estensione più invisibile
+                _fo = int(round(_feather * 1.9))                         # cucitura foto→estensione più invisibile
                 _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
             else:
