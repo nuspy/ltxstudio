@@ -15,9 +15,14 @@ from ui.theme import apply_theme            # noqa: E402
 
 
 def main():
-    # QtWebEngine (visore 3D three.js/WebGL) RICHIEDE il contesto OpenGL condiviso impostato PRIMA di creare la
-    # QApplication; senza, su Windows il processo GPU di Chromium crasha silenziosamente al rendering del modello
-    # → l'app si chiude senza log («modello 3D crasha dopo l'avvio»). Deve stare QUI, prima di tutto.
+    # WebEngine (visore 3D) in RENDERING SOFTWARE: il processo GPU di Chromium NON deve competere con il
+    # subprocess CUDA della generazione 3D (TRELLIS). Con entrambi sulla stessa GPU il driver andava in
+    # TDR/reset → app E subprocess morivano insieme a metà sampling (log tagliato di netto, senza errore).
+    # SwiftShader (CPU) rende comunque la mesh nel visore. Solo i 3 tab 3D usano WebEngine; immagini/video/musica
+    # NON lo usano → inalterati. Override: QTWEBENGINE_CHROMIUM_FLAGS per rimettere la GPU se non serve il 3D.
+    import os as _os
+    _os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
+    # QtWebEngine richiede comunque il contesto OpenGL condiviso impostato PRIMA della QApplication.
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
     app.setApplicationName("LTX Studio")
