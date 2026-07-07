@@ -131,7 +131,7 @@ class TemplateEngine:
         # FIX (stesso aggiornamento ComfyUI): PromptRelayEncode* e i CLIPTextEncode del ramo LTX
         # ora richiedono un 'clip' esterno (prima caricavano il TE internamente). Colleghiamo il
         # CLIP LTX-2.3 = DualCLIPLoader(gemma_3_12B_it + ltx text projection, type 'ltxv').
-        self._ensure_ltx_clip(prompt)
+        self._ensure_ltx_clip(prompt, values)
         # QUALITÀ (A): inietta un LTXVScheduler dinamico e ci ricabla le sigmas del
         # SamplerCustomAdvanced (sostituisce le 9 sigmas hardcoded del preset distillato
         # 8-step). Lo scheduler LTX-specifico con N step configurabili è ciò che, come nel
@@ -240,11 +240,13 @@ class TemplateEngine:
     LTX_CLIP = ("gemma_3_12B_it.safetensors", "ltx-2.3_text_projection_bf16.safetensors")
     _LTX_CLIP_NODE = "9777"
 
-    def _ensure_ltx_clip(self, prompt: dict) -> int:
+    def _ensure_ltx_clip(self, prompt: dict, values: dict | None = None) -> int:
         """Collega un CLIP LTX-2.3 ai nodi che lo richiedono ma ne sono privi (aggiornamento
         ComfyUI: PromptRelayEncode/Timeline e CLIPTextEncode del ramo LTX ora vogliono 'clip'
         esterno). Crea un solo DualCLIPLoader 'ltxv' (Gemma + text projection) e lo cabla.
-        Si auto-disattiva se i nodi hanno già un clip collegato (link)."""
+        Si auto-disattiva se i nodi hanno già un clip collegato (link).
+        RISPETTA l'encoder ESPLICITO dell'utente (values['encoder']): se ne ha scelto uno, si usa quello anche
+        per il loader auto-creato — nessuna preferenza-utente sui componenti viene scavalcata."""
         consumers = ("PromptRelayEncodeTimeline", "PromptRelayEncode", "PromptRelayEncodeSimple")
         need = []
         for nid, n in prompt.items():
@@ -258,12 +260,15 @@ class TemplateEngine:
                 need.append(nid)
         if not need:
             return 0
+        enc = (values or {}).get("encoder") or self.LTX_CLIP[0]   # encoder scelto dall'utente, altrimenti default
         cid = self._LTX_CLIP_NODE
         if cid not in prompt:
             prompt[cid] = {"class_type": "DualCLIPLoader",
-                           "inputs": {"clip_name1": self.LTX_CLIP[0], "clip_name2": self.LTX_CLIP[1],
+                           "inputs": {"clip_name1": enc, "clip_name2": self.LTX_CLIP[1],
                                       "type": "ltxv", "device": "default"},
-                           "_meta": {"title": "LTX-2.3 CLIP (auto)"}}
+                           "_meta": {"title": "LTX-2.3 CLIP"}}
+        elif (values or {}).get("encoder"):                      # nodo già presente + scelta esplicita → onorala
+            prompt[cid].setdefault("inputs", {})["clip_name1"] = enc
         for nid in need:
             prompt[nid]["inputs"]["clip"] = [cid, 0]
         return len(need)
