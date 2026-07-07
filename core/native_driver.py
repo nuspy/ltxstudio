@@ -47,8 +47,17 @@ def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float
     """Submit + polling fino a success/error. Ritorna l'entry job (con 'output')."""
     pid = submit(module, params)
     t0 = time.monotonic()
+    _misses = 0
     while time.monotonic() - t0 < timeout:
-        h = history(pid)
+        try:
+            h = history(pid)                              # GET /history: può andare in timeout mentre il worker
+            _misses = 0                                  # è nel decode/postprocess finale (server occupato)
+        except Exception:                                # noqa: BLE001  — NON abortire per un singolo polling
+            _misses += 1
+            if _misses > 30:                             # ~30 polling falliti di fila = server davvero morto
+                return {"status": "error", "error": "server nativo non risponde al polling /history"}
+            time.sleep(poll)
+            continue
         if h.get("status") in ("success", "error"):
             return h
         time.sleep(poll)

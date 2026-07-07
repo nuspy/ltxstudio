@@ -221,31 +221,15 @@ def _set_attention(pipe, arch: str = "") -> str:
     Z-Image usa attention_mask → SageAttention non lo supporta ('attn_mask is not supported for sage
     attention') → forziamo SDPA per arch 'zimage'."""
     import os
-
-    def _sdpa() -> str:
-        # APPLICA DAVVERO SDPA/native al transformer, non solo ritornare la stringa. Il transformer FLUX.1 è
-        # CONDIVISO tra flux/kontext/inpaint (from_pipe, pipe SORELLE): se una generazione t2i ha impostato
-        # 'sage' sul transformer, l'inpaint successivo lo riuserebbe con sage ANCORA attiva → SageAttention INT8
-        # → RUMORE/GRANA sul blending. Qui resettiamo esplicitamente al backend di default (native = torch SDPA).
-        tr = getattr(pipe, "transformer", None)
-        if tr is not None:
-            try:
-                tr.reset_attention_backend()               # → default 'native' (SDPA), cancella una sage residua
-            except Exception:                              # noqa: BLE001
-                try:
-                    tr.set_attention_backend("native")
-                except Exception:                          # noqa: BLE001
-                    pass
-        return "sdpa"
-
     if arch == "zimage":
-        return _sdpa()
-    # Gli arch IMAGE-CONDITIONED (inpaint/Fill, kontext, edit, Klein) sono sensibili all'errore INT8 di
-    # SageAttention → RUMORE visibile sul blending della regione mascherata. Usa SDPA full-precision
-    # (reference-correct). Sage resta per il t2i puro e il video. Override esplicito: NATIVE_ATTENTION=sage.
-    if (os.environ.get("NATIVE_ATTENTION") or "").lower() not in ("sage", "sage3"):
+        return "sdpa"
+    # Gli arch IMAGE-CONDITIONED (inpaint/Fill, kontext, edit, Klein) preferirebbero SDPA (reference-correct),
+    # ma forzare il RESET del backend a ogni job rallenta molto (SDPA ~2× più lento di Sage) → di default NON
+    # forziamo (l'inpaint eredita il backend = velocità di Sage). La grana "a quadrati" è il VAE tiling, non la
+    # sage. Per l'inpaint reference-correct puro: NATIVE_ATTENTION=sdpa (più lento, senza errore INT8 sul blend).
+    if (os.environ.get("NATIVE_ATTENTION") or "").lower() == "sdpa":
         if arch in ("inpaint", "kontext") or str(arch).startswith("flux2_"):
-            return _sdpa()
+            return "sdpa"
     want = (os.environ.get("NATIVE_ATTENTION") or "auto").lower()
     if want in ("auto", "sage", "sage3"):
         try:
@@ -254,7 +238,7 @@ def _set_attention(pipe, arch: str = "") -> str:
         except Exception:                               # noqa: BLE001
             if want in ("sage", "sage3"):
                 print("[image] Sage non disponibile su questa GPU → SDPA", flush=True)
-    return _sdpa()                                       # default torch (sempre presente)
+    return "sdpa"                                       # default torch (sempre presente)
 
 
 def _apply_fbcache(pipe) -> bool:
