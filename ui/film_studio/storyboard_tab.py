@@ -103,6 +103,22 @@ class StoryboardTab(QWidget):
         cg.addWidget(self.btn_ct); cg.addWidget(self.btn_ct_chars); cg.addStretch(1)
         self.ct_box.setVisible(False)
         ev.addWidget(self.ct_box)
+        # Grammatica di ripresa per-shot (SHOT_TYPES/CAMERA_MOVES: prima costanti morte) → shot.camera
+        from core.film_studio.style_catalog import SHOT_TYPES, CAMERA_MOVES
+        self.cam_box = QGroupBox(tr("fs.sb.grammar", "Grammatica ripresa")); cgl = QHBoxLayout(self.cam_box)
+        self.sh_type = _CB(); self.sh_type.addItem(tr("fs.sb.auto", "(auto)"), "")
+        for x in SHOT_TYPES:
+            self.sh_type.addItem(x, x)
+        self.sh_move = _CB(); self.sh_move.addItem(tr("fs.sb.auto", "(auto)"), "")
+        for x in CAMERA_MOVES:
+            self.sh_move.addItem(x, x)
+        for lbl, w in [("🎬", self.sh_type), ("🎥", self.sh_move)]:
+            cgl.addWidget(QLabel(lbl)); cgl.addWidget(w)
+        cgl.addStretch(1)
+        self.sh_type.currentIndexChanged.connect(self._save_shot_grammar)
+        self.sh_move.currentIndexChanged.connect(self._save_shot_grammar)
+        self.cam_box.setVisible(False)
+        ev.addWidget(self.cam_box)
         eh = QHBoxLayout()
         self.btn_save_sel = QPushButton(tr("fs.save", "💾 Salva")); self.btn_save_sel.clicked.connect(self._save_sel)
         self.btn_regen_sel = QPushButton(tr("fs.sb.regen_seg", "↻ Rigenera (LLM)")); self.btn_regen_sel.clicked.connect(self._regen_sel)
@@ -432,8 +448,16 @@ class StoryboardTab(QWidget):
         kind, rid = self._sel
         row = db.get(kind, rid)
         self.edit.setPlainText((row or {}).get("description", "") if row else "")
+        self.cam_box.setVisible(kind == "shot")
         if kind == "shot" and row:
             self.shot_seed.setValue(int(row.get("seed", 0) or 0))
+            cam = (row.get("camera") or "").lower()          # popola i combo dai tag già presenti nel camera
+            for w in (self.sh_type, self.sh_move):
+                w.blockSignals(True); w.setCurrentIndex(0)
+                for i in range(1, w.count()):
+                    if w.itemData(i) and w.itemData(i).lower() in cam:
+                        w.setCurrentIndex(i); break
+                w.blockSignals(False)
         # #56 mostra/popola l'editor Continuity solo per le SCENE
         self.ct_box.setVisible(kind == "scene")
         if kind == "scene" and row:
@@ -447,6 +471,13 @@ class StoryboardTab(QWidget):
     def _save_seed(self):
         if self._sel and self._sel[0] == "shot":
             db.update("shot", self._sel[1], seed=int(self.shot_seed.value()))
+
+    def _save_shot_grammar(self, *_):
+        """Compone shot.camera dai combo tipo-inquadratura + movimento (iniettato nel prompt in _gen)."""
+        if not self._sel or self._sel[0] != "shot":
+            return
+        cam = ", ".join(x for x in (self.sh_type.currentData(), self.sh_move.currentData()) if x)
+        db.update("shot", self._sel[1], camera=cam)
 
     def _save_continuity(self):
         """#56 Salva il Continuity State della scena selezionata e lo PROPAGA alle scene successive."""

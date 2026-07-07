@@ -2512,5 +2512,6 @@
   "fs.sb.ct_wardrobe": "Wardrobe",
   "fs.sb.ct_condition": "Condition (e.g. wounded, wet)",
   "fs.sb.ct_emotion": "Emotion",
-  "fs.sb.ct_chars_done": "Character state saved and propagated."
+  "fs.sb.ct_chars_done": "Character state saved and propagated.",
+  "fs.sb.grammar": "Shot grammar"
 }
