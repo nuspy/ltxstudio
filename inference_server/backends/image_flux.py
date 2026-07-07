@@ -871,12 +871,32 @@ def _make_preview_cb(arch, width, height, steps):
     return _cb
 
 
+def _default_model(arch: str) -> str:
+    """Modello di default quando il chiamante non lo specifica (music-video, LoRA dataset, API…):
+    KeyError 'model' uccideva il job. Preferenze note, poi primo FLUX.1 disponibile su disco."""
+    import glob
+    dm = r"E:\AI\Models\diffusion_models"
+    prefs = [os.path.join(dm, "Flux", "FLUX_Dev.safetensors"),
+             os.path.join(dm, "Flux", "FLUX_Krea_Dev.safetensors")]
+    if arch == "inpaint":
+        prefs.insert(0, os.path.join(dm, "Flux", "FLUX_DEV_Fill.safetensors"))
+    for p in prefs:
+        if os.path.isfile(p):
+            return p
+    hits = sorted(glob.glob(os.path.join(dm, "**", "*flux*.safetensors"), recursive=True))
+    if hits:
+        return hits[0]
+    raise RuntimeError("nessun modello specificato e nessun FLUX trovato in diffusion_models")
+
+
 def run(params: dict, mm, output_dir: str) -> dict:
     import torch
     from PIL import Image
     from inference_server import preview_bus
     arch = _arch_of(params)
-    model = params["model"]
+    model = params.get("model") or _default_model(arch)   # fix KeyError 'model' (music-video/LoRA/API)
+    if not params.get("model"):
+        print(f"[image] modello non specificato → default {os.path.basename(model)}", flush=True)
     key = register(mm, model, arch)
     preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
