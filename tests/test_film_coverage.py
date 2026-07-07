@@ -71,6 +71,8 @@ def test_accept_immagine_db():
     db.update("image", i1, accepted=1)                        # curatela: accetta la 1ª
     accepted = [r for r in db.query("image", "owner_kind='asset' AND owner_id=?", (aid,)) if r.get("accepted")]
     assert len(accepted) == 1 and accepted[0]["angle"] == "front"
+    for im in db.query("image", "owner_kind='asset' AND owner_id=?", (aid,)):  # cleanup immagini
+        db.delete("image", im["id"])
     db.delete("asset", aid); db.delete_project(pid)
 
 
