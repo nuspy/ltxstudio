@@ -40,6 +40,18 @@ def main():
     ap.add_argument("--model", default=_default_model)
     a = ap.parse_args()
 
+    # LIBERA la VRAM dei server GPU (immagini :8189, api :8200) PRIMA di caricare TRELLIS-4B: col
+    # ModelManager che ora tiene i modelli residenti, una generazione 3D dopo un'immagine trovava la VRAM
+    # piena → OOM al load = "crash all'avvio". stdlib-only (il venv TRELLIS non ha `core`).
+    import urllib.request as _u
+    for _port in (8189, 8200):
+        try:
+            _u.urlopen(_u.Request(f"http://127.0.0.1:{_port}/free", data=b"{}",
+                                  headers={"Content-Type": "application/json"}), timeout=15).read()
+            print(f"[trellis] VRAM server :{_port} liberata", flush=True)
+        except Exception:                                    # noqa: BLE001 (server giù = niente da liberare)
+            pass
+
     import time
     from PIL import Image
     import torch
