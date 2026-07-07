@@ -130,8 +130,10 @@ class StoryboardTab(QWidget):
         self.btn_regen_kf = QPushButton(tr("fs.sb.regen_kf", "🖼 Rigenera keyframe")); self.btn_regen_kf.clicked.connect(lambda: self._regen_shot("keyframe"))
         self.btn_regen_vid = QPushButton(tr("fs.sb.regen_vid", "🎥 Rigenera video")); self.btn_regen_vid.clicked.connect(lambda: self._regen_shot("video"))
         self.btn_coverage = QPushButton(tr("fs.sb.coverage", "🎬 Espandi copertura dialoghi")); self.btn_coverage.clicked.connect(self._expand_coverage)
+        self.btn_takes = QPushButton(tr("fs.sb.takes", "🎞 Storia take…")); self.btn_takes.clicked.connect(self._browse_takes)
         eh.addWidget(self.btn_save_sel); eh.addWidget(self.btn_regen_sel)
-        eh.addWidget(self.btn_regen_kf); eh.addWidget(self.btn_regen_vid); eh.addWidget(self.btn_coverage); eh.addStretch(1)
+        eh.addWidget(self.btn_regen_kf); eh.addWidget(self.btn_regen_vid)
+        eh.addWidget(self.btn_coverage); eh.addWidget(self.btn_takes); eh.addStretch(1)
         ev.addLayout(eh)
         v.addWidget(eb)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(80)
@@ -481,6 +483,36 @@ class StoryboardTab(QWidget):
         if self._sel and self._sel[0] == "shot":
             db.update("shot", self._sel[1], seed=int(self.shot_seed.value()))
 
+    def _browse_takes(self):
+        """Storia dei take del keyframe dello shot selezionato: galleria + ripristino non-distruttivo."""
+        if not self._sel or self._sel[0] != "shot":
+            QMessageBox.information(self, tr("fs.sb.takes", "Take"), tr("fs.sb.sel_shot", "Seleziona un'inquadratura.")); return
+        from core.film_studio import takes
+        sid = self._sel[1]
+        tk = takes.list_takes("shot", sid, "keyframe")
+        if not tk:
+            QMessageBox.information(self, tr("fs.sb.takes", "Take"), tr("fs.sb.takes_none", "Nessun take: genera il keyframe almeno una volta.")); return
+        sh = db.get("shot", sid); sc = db.get("scene", sh["scene_id"]); pid = self._get_project()
+        canon = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png")
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QListWidget, QListWidgetItem, QVBoxLayout
+        from PySide6.QtGui import QIcon
+        from PySide6.QtCore import QSize as _QS
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.sb.takes", "🎞 Storia take")); lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel(tr("fs.sb.takes_h", "Scegli un take e Ripristina (i tentativi non si perdono):")))
+        lst = QListWidget(); lst.setIconSize(_QS(128, 72)); lst.setViewMode(QListWidget.IconMode); lst.setResizeMode(QListWidget.Adjust)
+        for t in tk:
+            it = QListWidgetItem(QIcon(t["file"]), f"v{t['version']}"); it.setData(Qt.UserRole, t["version"])
+            lst.addItem(it)
+        lay.addWidget(lst, 1)
+        bb = QDialogButtonBox(); btn_r = bb.addButton(tr("fs.sb.takes_restore", "Ripristina"), QDialogButtonBox.AcceptRole)
+        bb.addButton(QDialogButtonBox.Close); bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        if dlg.exec() == QDialog.Accepted and lst.currentItem():
+            ver = lst.currentItem().data(Qt.UserRole)
+            if takes.restore_take("shot", sid, "keyframe", ver, canon):
+                self._refresh()
+                self.log.appendPlainText(tr("fs.sb.takes_done", "Take v{v} ripristinato come corrente.").format(v=ver))
+
     def _expand_coverage(self):
         """Espande lo shot-dialogo selezionato in copertura campo/controcampo (una inquadratura per battuta)."""
         if not self._sel or self._sel[0] != "shot":
@@ -596,6 +628,16 @@ class StoryboardTab(QWidget):
         if ev.get("event") in ("done", "error"):
             self.log.appendPlainText(f"[{ev['event']}] job {ev.get('job_id')} {ev.get('type')} "
                                      f"{ev.get('error','') or ev.get('output','')}"[:120])
+            if ev.get("event") == "done":                    # snapshot NON-distruttivo del take prodotto
+                try:
+                    from core.film_studio import takes
+                    job = db.get("job", ev.get("job_id")) or {}
+                    p = json.loads(job.get("params") or "{}")
+                    if p.get("_owner_kind") == "shot" and p.get("out"):
+                        kind = "keyframe" if job.get("type") == "image" else "video"
+                        takes.record_take("shot", int(p["_owner_id"]), kind, p["out"])
+                except Exception:                            # noqa: BLE001
+                    pass
             # #54 orchestrazione Auto a fasi: keyframe → video → montaggio
             auto = getattr(self, "_auto", None)
             if auto and ev.get("job_id") in auto["pending"]:

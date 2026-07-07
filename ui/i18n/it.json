@@ -2517,5 +2517,10 @@
   "fs.sb.tr_cut": "stacco →",
   "fs.sb.coverage": "🎬 Espandi copertura dialoghi",
   "fs.sb.cov_none": "Servono ≥2 battute di dialogo per la copertura.",
-  "fs.sb.cov_done": "Copertura: {n} inquadrature (campo/controcampo)."
+  "fs.sb.cov_done": "Copertura: {n} inquadrature (campo/controcampo).",
+  "fs.sb.takes": "🎞 Storia take…",
+  "fs.sb.takes_none": "Nessun take: genera il keyframe almeno una volta.",
+  "fs.sb.takes_h": "Scegli un take e Ripristina (i tentativi non si perdono):",
+  "fs.sb.takes_restore": "Ripristina",
+  "fs.sb.takes_done": "Take v{v} ripristinato come corrente."
 }

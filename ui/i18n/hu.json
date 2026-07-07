@@ -2517,5 +2517,10 @@
   "fs.sb.tr_cut": "cut →",
   "fs.sb.coverage": "🎬 Expand dialogue coverage",
   "fs.sb.cov_none": "Need ≥2 dialogue lines for coverage.",
-  "fs.sb.cov_done": "Coverage: {n} shots (shot-reverse-shot)."
+  "fs.sb.cov_done": "Coverage: {n} shots (shot-reverse-shot).",
+  "fs.sb.takes": "🎞 Take history…",
+  "fs.sb.takes_none": "No takes: generate the keyframe at least once.",
+  "fs.sb.takes_h": "Pick a take and Restore (attempts are not lost):",
+  "fs.sb.takes_restore": "Restore",
+  "fs.sb.takes_done": "Take v{v} restored as current."
 }

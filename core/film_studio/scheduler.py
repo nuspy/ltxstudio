@@ -50,8 +50,10 @@ def estimate(jobs: list[dict]) -> dict:
 
 
 def enqueue(job_type: str, params: dict, *, priority: int = 5, owner_kind: str = "", owner_id: int = 0) -> int:
+    p = dict(params)
+    p["_owner_kind"], p["_owner_id"] = owner_kind, owner_id   # tracciati per lo snapshot dei take a fine job
     jid = db.insert("job", type=job_type, status="pending", priority=priority, gpu=0,
-                    params=json.dumps(params, ensure_ascii=False), est=json.dumps({}),
+                    params=json.dumps(p, ensure_ascii=False), est=json.dumps({}),
                     artifact_id=0, log="", updated=time.time())
     _q.put((priority, jid))
     _emit({"event": "enqueued", "job_id": jid, "type": job_type})
