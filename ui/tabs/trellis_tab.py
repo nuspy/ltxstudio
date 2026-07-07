@@ -55,7 +55,15 @@ class _Model3DViewer(QWidget):
             self._show_placeholder()
         else:
             self.view = None
-            lbl = QLabel(tr("trellis.viewer.no_webengine"))
+            # Distingui i due casi: WebEngine davvero assente vs disattivato a mano (LTX_NO_WEBGL=1) — così non
+            # sembra un errore quando è una scelta/residuo di sessione.
+            if _HAS_WEBENGINE and _no_webgl():
+                msg = tr("trellis.viewer.webgl_off",
+                         "Visore WebGL disattivato (LTX_NO_WEBGL=1). Riavvia SENZA quella variabile "
+                         "d'ambiente per il visore 3D interattivo. Intanto usa i pulsanti qui sotto.")
+            else:
+                msg = tr("trellis.viewer.no_webengine")
+            lbl = QLabel(msg)
             lbl.setWordWrap(True); lbl.setAlignment(Qt.AlignCenter)
             lbl.setStyleSheet("color:#9aa1b0; padding:24px;")
             v.addWidget(lbl, 1)
