@@ -2514,5 +2514,8 @@
   "fs.sb.ct_emotion": "Emotion",
   "fs.sb.ct_chars_done": "Character state saved and propagated.",
   "fs.sb.grammar": "Shot grammar",
-  "fs.sb.tr_cut": "cut →"
+  "fs.sb.tr_cut": "cut →",
+  "fs.sb.coverage": "🎬 Expand dialogue coverage",
+  "fs.sb.cov_none": "Need ≥2 dialogue lines for coverage.",
+  "fs.sb.cov_done": "Coverage: {n} shots (shot-reverse-shot)."
 }

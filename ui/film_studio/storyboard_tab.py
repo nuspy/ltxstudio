@@ -129,8 +129,9 @@ class StoryboardTab(QWidget):
         self.btn_regen_sel = QPushButton(tr("fs.sb.regen_seg", "↻ Rigenera (LLM)")); self.btn_regen_sel.clicked.connect(self._regen_sel)
         self.btn_regen_kf = QPushButton(tr("fs.sb.regen_kf", "🖼 Rigenera keyframe")); self.btn_regen_kf.clicked.connect(lambda: self._regen_shot("keyframe"))
         self.btn_regen_vid = QPushButton(tr("fs.sb.regen_vid", "🎥 Rigenera video")); self.btn_regen_vid.clicked.connect(lambda: self._regen_shot("video"))
+        self.btn_coverage = QPushButton(tr("fs.sb.coverage", "🎬 Espandi copertura dialoghi")); self.btn_coverage.clicked.connect(self._expand_coverage)
         eh.addWidget(self.btn_save_sel); eh.addWidget(self.btn_regen_sel)
-        eh.addWidget(self.btn_regen_kf); eh.addWidget(self.btn_regen_vid); eh.addStretch(1)
+        eh.addWidget(self.btn_regen_kf); eh.addWidget(self.btn_regen_vid); eh.addWidget(self.btn_coverage); eh.addStretch(1)
         ev.addLayout(eh)
         v.addWidget(eb)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(80)
@@ -479,6 +480,18 @@ class StoryboardTab(QWidget):
     def _save_seed(self):
         if self._sel and self._sel[0] == "shot":
             db.update("shot", self._sel[1], seed=int(self.shot_seed.value()))
+
+    def _expand_coverage(self):
+        """Espande lo shot-dialogo selezionato in copertura campo/controcampo (una inquadratura per battuta)."""
+        if not self._sel or self._sel[0] != "shot":
+            QMessageBox.information(self, tr("fs.sb.coverage", "Copertura"), tr("fs.sb.sel_shot", "Seleziona un'inquadratura.")); return
+        from core.film_studio import coverage
+        ids = coverage.expand_shot_to_coverage(self._sel[1])
+        if not ids:
+            QMessageBox.information(self, tr("fs.sb.coverage", "Copertura"),
+                                   tr("fs.sb.cov_none", "Servono ≥2 battute di dialogo per la copertura.")); return
+        self._refresh()
+        self.log.appendPlainText(tr("fs.sb.cov_done", "Copertura: {n} inquadrature (campo/controcampo).").format(n=len(ids)))
 
     def _save_shot_grammar(self, *_):
         """Compone shot.camera dai combo tipo-inquadratura + movimento (iniettato nel prompt in _gen)."""

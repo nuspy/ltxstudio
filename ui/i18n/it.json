@@ -2514,5 +2514,8 @@
   "fs.sb.ct_emotion": "Emozione",
   "fs.sb.ct_chars_done": "Stato personaggi salvato e propagato.",
   "fs.sb.grammar": "Grammatica ripresa",
-  "fs.sb.tr_cut": "stacco →"
+  "fs.sb.tr_cut": "stacco →",
+  "fs.sb.coverage": "🎬 Espandi copertura dialoghi",
+  "fs.sb.cov_none": "Servono ≥2 battute di dialogo per la copertura.",
+  "fs.sb.cov_done": "Copertura: {n} inquadrature (campo/controcampo)."
 }
