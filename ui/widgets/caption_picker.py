@@ -18,8 +18,23 @@ class CaptionPicker(QWidget):
         self.engine = QComboBox()
         self.engine.addItem(tr("ilora.cap.proc", "Procedurale (trigger+tag)"), "procedural")
         _lbl = {"joycaption": tr("train.cap.joy", "JoyCaption"), "florence2": tr("train.cap.flo", "Florence-2")}
-        for e in cs.available_engines():
+        _avail = list(cs.available_engines())
+        for e in _avail:
             self.engine.addItem(_lbl.get(e, e), e)
+        if "joycaption" not in _avail:
+            # visibile ma disabilitato, con la SPIEGAZIONE del requisito (prima spariva e basta):
+            # niente download automatico (rete metered) — solo istruzioni chiare.
+            i = self.engine.count()
+            self.engine.addItem(tr("train.cap.joy_missing", "JoyCaption (non installato)"), None)
+            try:
+                from PySide6.QtCore import Qt as _Qt
+                item = self.engine.model().item(i)
+                item.setEnabled(False)
+                item.setToolTip(tr("train.cap.joy_missing.tt",
+                    "Richiede il venv ACE-Step (venv15) + pesi in E:\\AI\\Models\\JoyCaption. "
+                    "Installa ACE-Step 1.5 dal tab Musica per abilitare le caption VLM."))
+            except Exception:                            # noqa: BLE001
+                pass
         self.engine.setToolTip(tr("ilora.cap.tt",
             "Come descrivere il dataset. JoyCaption = caption VLM realistiche (migliori per il training, "
             "non censurato); Procedurale = trigger + tag generati (nessun modello). Per i video: 1 frame/clip."))

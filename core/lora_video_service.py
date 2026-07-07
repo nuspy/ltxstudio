@@ -410,7 +410,7 @@ def train(preprocessed_dir: str, out_lora: str, *, trigger: str = "", rank: int 
     for line in proc.stdout:                     # progress live
         line = line.rstrip()
         if line and ("step" in line.lower() or "loss" in line.lower() or "error" in line.lower()):
-            log(line[-160:])
+            log(line[-600:])
     proc.wait()
     if not os.path.exists(out_lora):
         raise RuntimeError("training fallito (LoRA non prodotta) — vedi log")

@@ -7,6 +7,7 @@ rotazione multi-keyframe) → preprocess + training col trainer ufficiale LTX-2.
 """
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
@@ -53,12 +54,25 @@ class _LoraWorker(QThread):
 
 
 class LoraVideoTab(QWidget):
+    _CAP = "cap.lora_video_train"                       # capability feature_matrix (override in LoraImageTab)
+
     def __init__(self):
         super().__init__()
         self._subjects: list[dict] = []
         self._cur = -1
         self._worker = None
         root = QVBoxLayout(self)
+        # GATING feature_matrix (review FASE H): come le altre feature, tab bloccato → UpsellPanel
+        # al posto del contenuto (prima il gate esisteva SOLO nell'API :8200, zero GUI).
+        try:
+            from core import features
+            if not features.is_enabled(self._CAP):
+                from ui.widgets.upsell import UpsellPanel
+                info = features.manifest().get("features", {}).get(self._CAP, {})
+                root.addWidget(UpsellPanel(self._CAP, info.get("i18n_key", "")), 1)
+                return
+        except Exception:                               # noqa: BLE001 — dev/fallback: tab normale
+            pass
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
         inner = QWidget(); form = QVBoxLayout(inner); scroll.setWidget(inner)
         root.addWidget(scroll, 1)
@@ -159,7 +173,51 @@ class LoraVideoTab(QWidget):
         v.addLayout(h)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(110)
         v.addWidget(self.log)
+        self._build_sample_preview(v)
         return box
+
+    def _build_sample_preview(self, v):
+        """SAMPLE PREVIEW (review FASE H): il trainer genera immagini di sample ogni N step (samples/) —
+        prima venivano scritte su disco ma MAI mostrate. QTimer 5s durante il training → ultima immagine.
+        Condiviso: chiamato dal _train_box video E da quello immagini (override)."""
+        self.sample_preview = QLabel(tr("tlora.sample.none", "— i sample del training appariranno qui —"))
+        self.sample_preview.setAlignment(Qt.AlignCenter)
+        self.sample_preview.setMinimumHeight(160)
+        self.sample_preview.setStyleSheet("color:#777; border:1px dashed #444; border-radius:6px;")
+        v.addWidget(self.sample_preview)
+        from PySide6.QtCore import QTimer
+        self._sample_timer = QTimer(self); self._sample_timer.setInterval(5000)
+        self._sample_timer.timeout.connect(self._poll_samples)
+        self._sample_dir = ""
+        self._sample_last = ""
+
+    def _watch_samples(self, out_dir: str, name: str):
+        """Avvia l'osservazione della cartella del run (chiamato dai _start di entrambe le varianti)."""
+        if not hasattr(self, "_sample_timer"):
+            return
+        self._sample_dir = os.path.join(out_dir, name)
+        self._sample_last = ""
+        self._sample_timer.start()
+
+    def _poll_samples(self):
+        """Mostra l'ULTIMO sample generato dal trainer (best-effort, nessun errore visibile)."""
+        try:
+            import glob as _g
+            if not self._sample_dir:
+                return
+            pics = sorted(_g.glob(os.path.join(self._sample_dir, "**", "*.jpg"), recursive=True)
+                          + _g.glob(os.path.join(self._sample_dir, "**", "*.png"), recursive=True),
+                          key=os.path.getmtime)
+            if pics and pics[-1] != self._sample_last:
+                self._sample_last = pics[-1]
+                from PySide6.QtGui import QPixmap
+                pm = QPixmap(pics[-1])
+                if not pm.isNull():
+                    self.sample_preview.setPixmap(pm.scaledToHeight(
+                        220, __import__("PySide6.QtCore", fromlist=["Qt"]).Qt.SmoothTransformation))
+                    self.sample_preview.setToolTip(pics[-1])
+        except Exception:                               # noqa: BLE001
+            pass
 
     # ── stato/selezione ──
     def _default_cases(self, stype: str) -> list:
@@ -307,18 +365,40 @@ class LoraVideoTab(QWidget):
                 "low_vram": self.lora_lowvram.isChecked(), **self.cap_picker.get()}
         self.btn_dataset.setEnabled(False); self.btn_full.setEnabled(False)
         self._log(tr("tlora.started", "Avvio (può richiedere molto tempo)…"))
-        self._worker = _LoraWorker(subjects, self.lora_name.text().strip() or "my_lora", out_dir, opts, full)
+        _name = self.lora_name.text().strip() or "my_lora"
+        self._worker = _LoraWorker(subjects, _name, out_dir, opts, full)
         self._worker.progress.connect(self._log)
         self._worker.finished_lora.connect(self._done)
+        if full:
+            self._watch_samples(out_dir, _name)           # sample preview durante il training
         self._worker.start()
 
     def _done(self, res: dict):
         self.btn_dataset.setEnabled(True); self.btn_full.setEnabled(True)
+        try:
+            if hasattr(self, "_sample_timer"):
+                self._sample_timer.stop()
+                self._poll_samples()                      # ultimo aggiornamento del sample
+        except Exception:                                 # noqa: BLE001
+            pass
         if res.get("error"):
-            self._log("ERRORE: " + str(res["error"])[:300])
+            self._log("ERRORE: " + str(res["error"])[:600])
             QMessageBox.critical(self, tr("tlora.train", "LoRA"), str(res["error"])[:1000]); return
         if res.get("lora"):
             self._log(tr("tlora.done_lora", "LoRA pronta: {f}").format(f=res["lora"]))
+            # AUTO-REGISTRAZIONE in libreria (review FASE H): copia nel folder LoRA dell'app così i
+            # dropdown (fav-first, filtro arch) la vedono SUBITO, senza scan manuale da LoRA Studio.
+            try:
+                import shutil
+                _dst_dir = r"E:\AI\Models\LoRA\LTX-2" if "video" in type(self).__name__.lower() \
+                    else r"E:\AI\Models\LoRA\Flux"
+                os.makedirs(_dst_dir, exist_ok=True)
+                _dst = os.path.join(_dst_dir, os.path.basename(str(res["lora"])))
+                if not os.path.exists(_dst):
+                    shutil.copy2(str(res["lora"]), _dst)
+                self._log(tr("tlora.registered", "LoRA registrata in libreria: {f}").format(f=_dst))
+            except Exception as _e:                       # noqa: BLE001
+                self._log(f"(registrazione libreria non riuscita: {_e})")
         else:
             self._log(tr("tlora.done_ds", "Dataset pronto: {f}").format(f=res.get("dataset", "")))
 

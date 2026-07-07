@@ -50,6 +50,7 @@ class _LoraImageWorker(QThread):
 
 class LoraImageTab(LoraVideoTab):
     IMAGE_MODE = True
+    _CAP = "cap.lora_image_train"                    # gating feature_matrix (override della base video)
 
     def _default_cases(self, stype: str) -> list:
         return lora_coverage.default_case_ids(stype, image=True)   # esclude i casi solo-video
@@ -97,6 +98,7 @@ class LoraImageTab(LoraVideoTab):
         v.addLayout(h)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(110)
         v.addWidget(self.log)
+        self._build_sample_preview(v)                    # sample del training visibili anche qui
         return box
 
     def _install(self):
@@ -129,7 +131,10 @@ class LoraImageTab(LoraVideoTab):
                 "caption_mode": self.cap_mode.currentData() or "descriptive"}
         self.btn_dataset.setEnabled(False); self.btn_full.setEnabled(False)
         self._log(tr("ilora.started", "Avvio LoRA FLUX.2 (può richiedere molto tempo)…"))
-        self._worker = _LoraImageWorker(subjects, self.lora_name.text().strip() or "my_flux_lora", out_dir, opts, full)
+        _name = self.lora_name.text().strip() or "my_flux_lora"
+        self._worker = _LoraImageWorker(subjects, _name, out_dir, opts, full)
         self._worker.progress.connect(self._log)
         self._worker.finished_lora.connect(self._done)
+        if full:
+            self._watch_samples(out_dir, _name)          # sample preview durante il training
         self._worker.start()

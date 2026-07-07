@@ -150,7 +150,7 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
     for line in proc.stdout:
         line = line.rstrip()
         if line and ("step" in line.lower() or "loss" in line.lower() or "error" in line.lower()):
-            log(line[-160:])
+            log(line[-600:])
     proc.wait()
     safet = list((p.project_dir()).rglob("*.safetensors"))
     if not safet:

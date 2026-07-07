@@ -2434,5 +2434,9 @@
   "cn.attn.tt": "conditioning_attention_strength: 1.0 = attenzione strettamente vincolata al video-guida; valori più bassi (0.5-0.8) lasciano più libertà creativa preservando il movimento.",
   "f1.inpaint.feather_lbl": "Sfumatura bordo (px)",
   "f1.inpaint.feather.auto": "Auto",
-  "f1.inpaint.feather.tt": "Sfumatura del bordo tra area rigenerata e originale (px): Auto = proporzionale alla foto; valori alti = transizione più morbida ma anello di modifica più largo."
+  "f1.inpaint.feather.tt": "Sfumatura del bordo tra area rigenerata e originale (px): Auto = proporzionale alla foto; valori alti = transizione più morbida ma anello di modifica più largo.",
+  "tlora.sample.none": "— i sample del training appariranno qui —",
+  "tlora.registered": "LoRA registrata in libreria: {f}",
+  "train.cap.joy_missing": "JoyCaption (non installato)",
+  "train.cap.joy_missing.tt": "Richiede il venv ACE-Step (venv15) + pesi in E:\\AI\\Models\\JoyCaption. Installa ACE-Step 1.5 dal tab Musica per abilitare le caption VLM."
 }

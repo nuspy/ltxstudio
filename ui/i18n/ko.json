@@ -2434,5 +2434,9 @@
   "cn.attn.tt": "conditioning_attention_strength: 1.0 = attention strictly bound to the guide video; lower values (0.5-0.8) allow more creative freedom while preserving motion.",
   "f1.inpaint.feather_lbl": "Edge feather (px)",
   "f1.inpaint.feather.auto": "Auto",
-  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring."
+  "f1.inpaint.feather.tt": "Feather of the edge between regenerated area and original (px): Auto = proportional to the photo; higher = softer transition but wider edit ring.",
+  "tlora.sample.none": "— training samples will appear here —",
+  "tlora.registered": "LoRA registered in library: {f}",
+  "train.cap.joy_missing": "JoyCaption (not installed)",
+  "train.cap.joy_missing.tt": "Requires the ACE-Step venv (venv15) + weights in E:\\AI\\Models\\JoyCaption. Install ACE-Step 1.5 from the Music tab to enable VLM captions."
 }
