@@ -12,13 +12,13 @@ from ui.i18n_manager import tr
 
 
 def _free_gpu_mb() -> int:
+    # NVML/nvidia-smi: NON crea un contesto CUDA nel processo app (torch.cuda.* lo farebbe → in conflitto
+    # col subprocess CUDA della generazione 3D = crash nativo su Blackwell).
     try:
-        import torch
-        if torch.cuda.is_available():
-            return int(torch.cuda.mem_get_info()[0] / 1024 / 1024)
+        from core.gpu_mem import free_vram_mb
+        return free_vram_mb()
     except Exception:                                        # noqa: BLE001
-        pass
-    return 0
+        return 0
 
 
 class _CalWorker(QThread):

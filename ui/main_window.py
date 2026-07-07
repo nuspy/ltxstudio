@@ -1004,8 +1004,8 @@ class MainWindow(QMainWindow):
         except Exception:                                    # noqa: BLE001
             pass
         try:                                                 # mostra la VRAM libera dopo (feedback reale)
-            import torch
-            _free_gb = torch.cuda.mem_get_info()[0] / 1e9 if torch.cuda.is_available() else 0
+            from core.gpu_mem import free_vram_gb              # NVML/nvidia-smi: NIENTE contesto CUDA nell'app
+            _free_gb = free_vram_gb()                          # (torch.cuda.* creerebbe un contesto → crash 3D)
         except Exception:                                    # noqa: BLE001
             _free_gb = 0
         if freed:
