@@ -66,6 +66,11 @@ class StoryboardTab(QWidget):
         self.mdl_vid.currentIndexChanged.connect(self._save_models)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_img", "Modello immagine:"))); mrow.addWidget(self.mdl_img)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_vid", "Modello video:"))); mrow.addWidget(self.mdl_vid)
+        from PySide6.QtWidgets import QCheckBox as _CkB
+        self.chk_chain = _CkB(tr("fs.sb.chain", "🔗 Raccordo continuo"))
+        self.chk_chain.setToolTip(tr("fs.sb.chain_tt", "Usa l'ultimo frame dello shot precedente come aggancio "
+                                     "del successivo (nella stessa scena) → tagli senza scarto brusco."))
+        mrow.addWidget(self.chk_chain)
         mrow.addStretch(1)
         v.addLayout(mrow)
         self.tree = QTreeWidget(); self.tree.setHeaderLabels([tr("fs.sb.col", "Scene / Inquadrature"), tr("fs.sb.dur", "Durata")])
@@ -313,8 +318,10 @@ class StoryboardTab(QWidget):
         vid_gguf = guard.get("vid_gguf", "")
         n = 0
         jids = []
+        chain = self.chk_chain.isChecked()                   # raccordo visivo tra shot consecutivi (stessa scena)
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
             state = json.loads(sc.get("continuity") or "{}")
+            _prev_vid = None                                 # ultimo shot-video della scena (per il raccordo)
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
                 _flavor = "image" if what == "keyframe" else "video"   # B2: LoRA del flavor giusto
                 refs = gen_service.resolve_refs(sh["description"], pmode, flavor=_flavor)
@@ -344,10 +351,13 @@ class StoryboardTab(QWidget):
                     kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
                     kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
                     audio_path = self._shot_dialogue_audio(sh, outdir)
-                    jid = scheduler.enqueue("video", {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
-                                                "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
-                                                "model_gguf": vid_gguf, "seed": _seed, "negative": forbidden},
-                                      owner_kind="shot", owner_id=sh["id"])
+                    _job = {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
+                            "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
+                            "model_gguf": vid_gguf, "seed": _seed, "negative": forbidden}
+                    if chain and _prev_vid and not kfs:       # raccordo: aggancia all'ultimo frame del video prima
+                        _job["chain_from"] = _prev_vid        # estratto a runtime (il precedente sarà già pronto)
+                    jid = scheduler.enqueue("video", _job, owner_kind="shot", owner_id=sh["id"])
+                    _prev_vid = out
                 n += 1
                 jids.append(jid)
         self.log.appendPlainText(tr("fs.sb.queued", "{n} job '{w}' in coda").format(n=n, w=what))

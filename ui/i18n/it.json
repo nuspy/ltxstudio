@@ -2531,5 +2531,7 @@
   "fs.asset.accept": "✓ Accetta/Rimuovi",
   "fs.asset.regen_angle": "↻ Rigenera questo angolo",
   "fs.asset.accept_done": "Curatela aggiornata.",
-  "fs.asset.angle_done": "Angolo rigenerato (il precedente è nella storia take)."
+  "fs.asset.angle_done": "Angolo rigenerato (il precedente è nella storia take).",
+  "fs.sb.chain": "🔗 Raccordo continuo",
+  "fs.sb.chain_tt": "Usa l'ultimo frame dello shot precedente come aggancio del successivo (nella stessa scena) → tagli senza scarto brusco."
 }

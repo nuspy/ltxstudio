@@ -2531,5 +2531,7 @@
   "fs.asset.accept": "✓ Accept/Remove",
   "fs.asset.regen_angle": "↻ Regenerate this angle",
   "fs.asset.accept_done": "Curation updated.",
-  "fs.asset.angle_done": "Angle regenerated (previous one is in take history)."
+  "fs.asset.angle_done": "Angle regenerated (previous one is in take history).",
+  "fs.sb.chain": "🔗 Continuous match",
+  "fs.sb.chain_tt": "Use the previous shot's last frame to anchor the next one (same scene) → cuts without a hard jump."
 }
