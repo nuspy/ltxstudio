@@ -9,7 +9,18 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+# expandable_segments NON è supportato su Windows: forzarlo lascia l'allocatore CUDA in uno stato ibrido che,
+# sotto i contesti CUDA dei server ancora vivi, può fare FAULT NATIVO alla prima allocazione grande (il crash
+# avveniva esattamente a `.to()` dopo il warning "expandable_segments not supported"). Su Windows lo RIMUOVIAMO.
+if sys.platform == "win32":
+    _pac = os.environ.get("PYTORCH_CUDA_ALLOC_CONF", "")
+    _pac = ",".join(x for x in _pac.split(",") if x and "expandable_segments" not in x)
+    if _pac:
+        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = _pac
+    else:
+        os.environ.pop("PYTORCH_CUDA_ALLOC_CONF", None)
+else:
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 # DIAGNOSTICA (togliere TRELLIS_DEBUG=0 per disattivare): errori CUDA SINCRONI → il traceback punta all'op
 # esatta invece di un crash asincrono altrove; + stack C++ di torch. Rallenta ~2× ma rivela l'errore vero.
 if os.environ.get("TRELLIS_DEBUG", "1") != "0":
