@@ -27,30 +27,48 @@ class _Spark(QWidget):
         self._c = QColor(color)
 
     def push(self, frac: float):
-        self._vals.append(max(0.0, min(1.0, float(frac))))
+        # SANITIZZAZIONE CRITICA: NaN/inf NON vanno mai messi in _vals — un QPointF con coordinata NaN passato a
+        # QPolygonF fa ACCESS VIOLATION in Qt6Gui.dll (crash nativo dell'app, visto nel log eventi Windows).
+        # Il clamp Python NON basta: `min(1.0, nan)` restituisce nan. Durante il 3D il /free cambia la VRAM di
+        # colpo e una lettura PDH transitoria può dare un valore non-finito → qui lo azzeriamo.
+        try:
+            import math
+            f = float(frac)
+            if not math.isfinite(f):
+                f = 0.0
+        except Exception:  # noqa: BLE001
+            f = 0.0
+        self._vals.append(max(0.0, min(1.0, f)))
         self.update()
 
     def paintEvent(self, _e):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        w, h = self.width(), self.height()
-        p.fillRect(self.rect(), QColor(18, 18, 24))
-        p.setPen(QPen(QColor(46, 46, 58), 1))
-        for i in range(1, 4):
-            p.drawLine(0, h * i // 4, w, h * i // 4)
-        n = len(self._vals)
-        if n < 2:
-            return
-        pts = [QPointF(x * w / (n - 1), h - v * h) for x, v in enumerate(self._vals)]
-        grad = QLinearGradient(0, 0, 0, h)
-        grad.setColorAt(0.0, QColor(self._c.red(), self._c.green(), self._c.blue(), 150))
-        grad.setColorAt(1.0, QColor(self._c.red(), self._c.green(), self._c.blue(), 18))
-        p.setBrush(grad)
-        p.setPen(Qt.NoPen)
-        p.drawPolygon(QPolygonF(pts + [QPointF(w, h), QPointF(0.0, h)]))
-        p.setBrush(Qt.NoBrush)
-        p.setPen(QPen(self._c, 2))
-        p.drawPolyline(QPolygonF(pts))
+        try:
+            p = QPainter(self)
+            p.setRenderHint(QPainter.Antialiasing)
+            w, h = self.width(), self.height()
+            p.fillRect(self.rect(), QColor(18, 18, 24))
+            p.setPen(QPen(QColor(46, 46, 58), 1))
+            for i in range(1, 4):
+                p.drawLine(0, h * i // 4, w, h * i // 4)
+            n = len(self._vals)
+            if n < 2:
+                return
+            import math
+            pts = [QPointF(x * w / (n - 1), h - v * h)
+                   for x, v in enumerate(self._vals) if math.isfinite(v)]   # solo punti finiti (extra difesa)
+            if len(pts) < 2:
+                return
+            grad = QLinearGradient(0, 0, 0, h)
+            grad.setColorAt(0.0, QColor(self._c.red(), self._c.green(), self._c.blue(), 150))
+            grad.setColorAt(1.0, QColor(self._c.red(), self._c.green(), self._c.blue(), 18))
+            p.setBrush(grad)
+            p.setPen(Qt.NoPen)
+            p.drawPolygon(QPolygonF(pts + [QPointF(w, h), QPointF(0.0, h)]))
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(self._c, 2))
+            p.drawPolyline(QPolygonF(pts))
+        except Exception:  # noqa: BLE001  (un paintEvent non deve MAI propagare: rischio crash nativo)
+            pass
 
 
 class MemoryMonitor(QDialog):
