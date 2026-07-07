@@ -8,22 +8,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from PySide6.QtCore import Qt                # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 from ui.main_window import MainWindow       # noqa: E402
 from ui.theme import apply_theme            # noqa: E402
 
 
 def main():
-    # WebEngine (visore 3D) in RENDERING SOFTWARE: il processo GPU di Chromium NON deve competere con il
-    # subprocess CUDA della generazione 3D (TRELLIS). Con entrambi sulla stessa GPU il driver andava in
-    # TDR/reset → app E subprocess morivano insieme a metà sampling (log tagliato di netto, senza errore).
-    # SwiftShader (CPU) rende comunque la mesh nel visore. Solo i 3 tab 3D usano WebEngine; immagini/video/musica
-    # NON lo usano → inalterati. Override: QTWEBENGINE_CHROMIUM_FLAGS per rimettere la GPU se non serve il 3D.
-    import os as _os
-    _os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu")
-    # QtWebEngine richiede comunque il contesto OpenGL condiviso impostato PRIMA della QApplication.
-    QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+    # NB: NON disabilitiamo la GPU e NON forziamo AA_ShareOpenGLContexts — su RTX 5090/Blackwell quel flag
+    # causava "Failed to create shared context for virtualization" (kFatalFailure). La GPU serve piena alla
+    # generazione ed era ampiamente libera. Il crash 3D era il subprocess CUDA (attention backend), non il visore.
     app = QApplication(sys.argv)
     app.setApplicationName("LTX Studio")
     apply_theme(app)
