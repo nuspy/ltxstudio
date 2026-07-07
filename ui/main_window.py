@@ -3197,11 +3197,13 @@ class MainWindow(QMainWindow):
         # export_integrate (oggetto-seme + alone bianco) + [[video-edit-inpaint-nativo]].
         mask = exp.get("mask")
         if mask and os.path.exists(mask):
-            fill = r"E:\AI\Models\diffusion_models\Flux\FLUX_DEV_Fill.safetensors"
+            # Usa il MODELLO SCELTO dall'utente (dropdown integra); FLUX_DEV_Fill solo se non ne ha scelto uno.
+            _fill = model or r"Flux\FLUX_DEV_Fill.safetensors"
+            fill = _fill if os.path.isabs(_fill) else os.path.join(r"E:\AI\Models\diffusion_models", _fill)
             params = {"model": fill, "arch": "inpaint", "prompt": prompt, "negative": negative,
                       "image_path": exp["image"], "mask_path": mask,
                       "steps": max(steps, 20), "guidance": 18.0, "seed": seed}   # 30→18: evita over-guidance ("ghepardo")
-            self._log(f"Integra mask-based (FLUX Fill, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
+            self._log(f"Integra mask-based (modello={os.path.basename(fill)}, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
         else:
             unet = model or KONTEXT_MODEL
             mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
