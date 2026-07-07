@@ -1265,13 +1265,36 @@ def run(params: dict, mm, output_dir: str) -> dict:
         try:
             from PIL import ImageFilter
             _orig = Image.open(params["image_path"]).convert("RGB").resize(res_img.size, Image.LANCZOS)
-            _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)
+            _m = _mask_pil.convert("L").resize(res_img.size, Image.NEAREST)   # RAW: bianco=genera, nero=originale
             # Feather DIFFERENZIATO per modalità (l'inpaint andava bene "prima", solo l'outpaint aveva la linea):
             #  • INPAINT → anello SOTTILE (auto ~min_lato/128, 4–14 px): niente degradazione attorno all'edit.
-            #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione, per rendere invisibile la
-            #    cucitura foto→estensione. Override dalla GUI via params['feather'] (>0) in entrambi i casi.
+            #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione + COLOR-MATCH al bordo.
             if params.get("outpaint"):
                 _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
+                # COLOR-MATCH: la linea di stacco residua è un salto di TONO (l'estensione ha luminosità/colore un
+                # filo diversi dalla foto). Portiamo la tonalità dell'estensione a quella della foto sui pixel di
+                # CONFINE, con correzione forte al bordo che sfuma verso l'interno dell'estensione (distance transf).
+                # Env NATIVE_OUTPAINT_COLORMATCH=0 per disattivare.
+                if os.environ.get("NATIVE_OUTPAINT_COLORMATCH", "1") == "1":
+                    try:
+                        import numpy as _np, cv2 as _cv2
+                        _mk = (_np.asarray(_m, dtype=_np.uint8) > 127)       # True = estensione (generata)
+                        _ext = _mk.astype(_np.uint8); _pho = (~_mk).astype(_np.uint8)
+                        _D = max(6, int(_feather))
+                        _ker = _np.ones((_D, _D), _np.uint8)
+                        _seam_pho = (_pho > 0) & (_cv2.dilate(_ext, _ker) > 0)   # foto adiacente al bordo
+                        _seam_gen = (_ext > 0) & (_cv2.dilate(_pho, _ker) > 0)   # estensione adiacente al bordo
+                        if _seam_pho.sum() > 50 and _seam_gen.sum() > 50:
+                            _g = _np.asarray(res_img, dtype=_np.float32)
+                            _o = _np.asarray(_orig, dtype=_np.float32)
+                            _off = _np.clip(_o[_seam_pho].mean(0) - _g[_seam_gen].mean(0), -45, 45)  # per-canale
+                            _dist = _cv2.distanceTransform(_ext, _cv2.DIST_L2, 3)   # 0 al bordo → cresce dentro
+                            _tau = max(24.0, _feather * 3.0)
+                            _w = _np.exp(-_dist / _tau)[:, :, None] * _mk[:, :, None]  # forte al bordo, sfuma; solo estensione
+                            _g = _g + _off[None, None, :] * _w
+                            res_img = Image.fromarray(_np.clip(_g, 0, 255).astype("uint8"))
+                    except Exception as _ce:                                 # noqa: BLE001
+                        print(f"[outpaint] color-match saltato ({_ce})", flush=True)
                 _fo = int(round(_feather * 1.9))                         # dilata la regione generata prima di sfumare
                 _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))       # → la sfumatura NON tocca il bordo tela
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
