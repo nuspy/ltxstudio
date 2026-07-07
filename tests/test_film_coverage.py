@@ -57,6 +57,23 @@ def test_wardrobe_prompts():
     assert coverage.wardrobe_prompts("x", "y", n=3) and len(coverage.wardrobe_prompts("x", "y", n=3)) == 3
 
 
+def test_turnaround_prompt_mantiene_angolo():
+    p = coverage.turnaround_prompt("Marco detective", "left")
+    assert "Marco detective" in p and "left profile" in p
+    assert coverage.turnaround_prompt("x", "back").count("back view") == 1
+
+
+def test_accept_immagine_db():
+    pid = db.insert("project", name="acc", kind="short", config="{}", updated=0)
+    aid = db.insert("asset", type="actor", name="A", description="x", fields="{}", tags="", scope="project", series_id=0)
+    i1 = db.insert("image", owner_kind="asset", owner_id=aid, angle="front", repr="front", file="a.png", seed=1, prompt="", version=1)
+    db.insert("image", owner_kind="asset", owner_id=aid, angle="back", repr="back", file="b.png", seed=1, prompt="", version=1)
+    db.update("image", i1, accepted=1)                        # curatela: accetta la 1ª
+    accepted = [r for r in db.query("image", "owner_kind='asset' AND owner_id=?", (aid,)) if r.get("accepted")]
+    assert len(accepted) == 1 and accepted[0]["angle"] == "front"
+    db.delete("asset", aid); db.delete_project(pid)
+
+
 def test_expand_noop_su_shot_singola_battuta():
     pid, sid = _mk_scene()
     sh = db.insert("shot", scene_id=sid, ord=1, description="x",

@@ -49,6 +49,18 @@ def wardrobe_prompts(char_desc: str, wardrobe_desc: str, n: int = 6) -> list[tup
             for a in _WARD_ANGLES[:max(1, n)]]
 
 
+_SHEET_ANGLES = {"front": "front view, facing camera", "back": "back view",
+                 "left": "left profile side view", "right": "right profile side view",
+                 "three_quarter": "three-quarter view", "closeup": "face close-up portrait",
+                 "full": "full-body shot", "detail": "detail close-up"}
+
+
+def turnaround_prompt(subj_desc: str, angle_id: str) -> str:
+    """Prompt per RIGENERARE UN SINGOLO angolo del character/asset sheet mantenendo l'angolo (curatela)."""
+    a = _SHEET_ANGLES.get(angle_id, angle_id.replace("_", " "))
+    return f"{(subj_desc or 'the subject').strip()}, {a}, neutral studio background, consistent design"
+
+
 def expand_shot_to_coverage(shot_id: int) -> list[int]:
     """Espande uno shot-dialogo in N inquadrature di copertura (campo/controcampo). Il primo shot riusa
     l'originale; i successivi vengono inseriti dopo, spostando in avanti gli shot seguenti. Ritorna gli id."""

@@ -119,6 +119,23 @@ class AssetManagerTab(QWidget):
         hh.addWidget(b_save); hh.addStretch(1); hh.addWidget(self.b_sheet)
         f.addRow(hh)
         self.sheet_log = QLabel(""); f.addRow(self.sheet_log)
+        # Galleria curatela del set: accetta i buoni ✓ / rigenera SOLO un angolo (non distruttivo)
+        from PySide6.QtCore import QSize as _QSize
+        from PySide6.QtWidgets import QListWidget as _GLW
+        self.gallery = _GLW(); self.gallery.setViewMode(_GLW.IconMode); self.gallery.setIconSize(_QSize(96, 96))
+        self.gallery.setResizeMode(_GLW.Adjust); self.gallery.setMaximumHeight(140); self.gallery.setSpacing(6)
+        self.gallery.setStyleSheet("QListWidget::item:selected{border:2px solid #4a90d9;}")
+        f.addRow(self.gallery)
+        self.gallery_empty = QLabel(tr("fs.asset.gallery_empty", "Nessuna immagine — genera il Character Sheet per curarne gli angoli."))
+        self.gallery_empty.setStyleSheet("color:#8a93a0; font-style:italic; padding:6px;")
+        f.addRow(self.gallery_empty)
+        gh = QHBoxLayout()
+        self.b_accept = QPushButton(tr("fs.asset.accept", "✓ Accetta/Rimuovi")); self.b_accept.clicked.connect(self._toggle_accept)
+        self.b_regen_angle = QPushButton(tr("fs.asset.regen_angle", "↻ Rigenera questo angolo")); self.b_regen_angle.clicked.connect(self._regen_angle)
+        self.b_accept.setEnabled(False); self.b_regen_angle.setEnabled(False)
+        self.gallery.currentRowChanged.connect(lambda r: (self.b_accept.setEnabled(r >= 0), self.b_regen_angle.setEnabled(r >= 0)))
+        gh.addWidget(self.b_accept); gh.addWidget(self.b_regen_angle); gh.addStretch(1)
+        f.addRow(gh)
         # Variazioni (età/pettinatura/condizione…) + Abbigliamento (solo attori) — spec §6.1.1/6.1.2
         from PySide6.QtWidgets import QListWidget as _QLW
         f.addRow(QLabel(tr("fs.var.title", "Variazioni / Sub-luoghi")))
@@ -145,9 +162,86 @@ class AssetManagerTab(QWidget):
         for a in items:
             self.lst.addItem(f"[{a['type']}] {a['name']}")
 
+    def _refresh_gallery(self):
+        """Mostra le immagini dell'asset corrente; accettate = spunta ✓ + sfondo tenue."""
+        from PySide6.QtGui import QIcon, QColor
+        from PySide6.QtCore import Qt as _Qt
+        from PySide6.QtWidgets import QListWidgetItem as _Item
+        self.gallery.clear()
+        imgs = db.query("image", "owner_kind='asset' AND owner_id=?", (self._cur,)) if self._cur else []
+        for im in imgs:
+            if not im.get("file"):
+                continue
+            acc = bool(im.get("accepted"))
+            it = _Item(QIcon(im["file"]), ("✓ " if acc else "") + (im.get("angle") or "?"))
+            it.setData(_Qt.UserRole, im["id"])
+            if acc:
+                it.setBackground(QColor(30, 70, 40))
+            self.gallery.addItem(it)
+        has = self.gallery.count() > 0
+        self.gallery.setVisible(has); self.gallery_empty.setVisible(not has)
+
+    def _sel_image(self):
+        from PySide6.QtCore import Qt as _Qt
+        it = self.gallery.currentItem()
+        return (it.data(_Qt.UserRole) if it else None), it
+
+    def _toggle_accept(self):
+        iid, _ = self._sel_image()
+        if not iid:
+            return
+        im = db.get("image", iid) or {}
+        db.update("image", iid, accepted=0 if im.get("accepted") else 1)
+        self._refresh_gallery()
+        self.sheet_log.setText(tr("fs.asset.accept_done", "Curatela aggiornata."))
+
+    def _regen_angle(self):
+        """Rigenera SOLO l'angolo selezionato (mantiene l'angolo), non-distruttivo (snapshot del vecchio)."""
+        iid, _ = self._sel_image()
+        if not (iid and self._cur):
+            return
+        im = db.get("image", iid); asset = db.get("asset", self._cur)
+        out = im.get("file")
+        if not out:
+            return
+        from core.film_studio import takes
+        takes.record_take("asset", self._cur, "sheet", out)   # conserva il tentativo precedente
+        from core.film_studio.coverage import turnaround_prompt
+        prompt = turnaround_prompt(asset.get("description") or asset["name"], im.get("angle") or "front")
+        face = self._face_ref(); seed = int(im.get("seed", 7) or 7)
+        self.b_regen_angle.setEnabled(False)
+        self.sheet_log.setText(tr("fs.working", "Generazione…"))
+
+        class _AngleWorker(QThread):
+            done = Signal(dict)
+
+            def run(self):
+                try:
+                    gen_service.gen_image(prompt, out, face_ref=face, seed=seed)
+                    self.done.emit({"ok": True})
+                except Exception as e:                        # noqa: BLE001
+                    self.done.emit({"error": str(e)})
+
+        self._angle_worker = _AngleWorker(self)
+        self._angle_worker.done.connect(self._on_angle)
+        self._angle_worker.start()
+
+    def _face_ref(self) -> str:
+        imgs = db.query("image", "owner_kind='asset' AND owner_id=?", (self._cur,)) if self._cur else []
+        return next((i["file"] for i in imgs if i.get("file")), self.e_photo.text().strip())
+
+    def _on_angle(self, res: dict):
+        self.b_regen_angle.setEnabled(True)
+        if res.get("error"):
+            self.sheet_log.setText(""); QMessageBox.critical(self, tr("fs.asset.regen_angle", "Rigenera"), str(res["error"])[:500]); return
+        self._refresh_gallery()
+        self.sheet_log.setText(tr("fs.asset.angle_done", "Angolo rigenerato (il precedente è nella storia take)."))
+
     def _new(self):
         self._cur = None
         self.e_name.clear(); self.e_desc.clear(); self.e_tags.clear(); self.e_photo.clear()
+        if hasattr(self, "gallery"):
+            self._refresh_gallery()
 
     def _select(self, row: int):
         if not (0 <= row < len(getattr(self, "_items", []))):
@@ -157,6 +251,7 @@ class AssetManagerTab(QWidget):
         self.e_name.setText(a["name"]); self.e_desc.setPlainText(a.get("description") or "")
         self.e_tags.setText(a.get("tags") or "")
         self._refresh_vars()
+        self._refresh_gallery()
 
     def _refresh_vars(self):
         self.var_list.clear()
@@ -291,4 +386,5 @@ class AssetManagerTab(QWidget):
         for cid, path in res.get("images", []):
             db.insert("image", owner_kind="asset", owner_id=self._cur, angle=cid, repr=cid,
                       file=path, seed=7, prompt="", version=1)
-        self.sheet_log.setText(tr("fs.asset.sheet_done", "Sheet: {n} immagini").format(n=len(res.get("images", []))))
+        self._refresh_gallery()
+        self.sheet_log.setText(tr("fs.asset.sheet_done", "Sheet: {n} immagini — curala qui sotto (Accetta/Rigenera angolo).").format(n=len(res.get("images", []))))

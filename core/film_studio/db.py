@@ -88,6 +88,7 @@ def conn() -> sqlite3.Connection:
                     "ALTER TABLE shot ADD COLUMN in_s REAL DEFAULT 0",       # trim montaggio (in/out)
                     "ALTER TABLE shot ADD COLUMN out_s REAL DEFAULT 0",
                     "ALTER TABLE script ADD COLUMN kind TEXT DEFAULT 'script'",  # 'script'|'narrative' (Racconto)
+                    "ALTER TABLE image ADD COLUMN accepted INTEGER DEFAULT 0",   # curatela: immagine accettata
                     "ALTER TABLE lora ADD COLUMN weight REAL DEFAULT 0.9",    # B6: peso composizione
                     "ALTER TABLE lora ADD COLUMN base_arch TEXT"]:           # arch compatibile (flux/ltx2)
             try:

@@ -2526,5 +2526,10 @@
   "fs.script.gen_narr": "📖 Generate Story",
   "fs.script.racconto": "Cinematic story (prose, editable)",
   "fs.ward.done": "Wardrobe: {n} angles generated",
-  "fs.flow": "Flow:  ① Script (idea → Story → screenplay)  →  ② Storyboard (keyframe → video)  →  ③ Editing.   Use @Name for asset consistency."
+  "fs.flow": "Flow:  ① Script (idea → Story → screenplay)  →  ② Storyboard (keyframe → video)  →  ③ Editing.   Use @Name for asset consistency.",
+  "fs.asset.gallery_empty": "No images — generate the Character Sheet to curate its angles.",
+  "fs.asset.accept": "✓ Accept/Remove",
+  "fs.asset.regen_angle": "↻ Regenerate this angle",
+  "fs.asset.accept_done": "Curation updated.",
+  "fs.asset.angle_done": "Angle regenerated (previous one is in take history)."
 }

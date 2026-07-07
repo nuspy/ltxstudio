@@ -2526,5 +2526,10 @@
   "fs.script.gen_narr": "📖 Genera Racconto",
   "fs.script.racconto": "Racconto cinematografico (prosa, editabile)",
   "fs.ward.done": "Abbigliamento: {n} angoli generati",
-  "fs.flow": "Flusso:  ① Copione (idea → Racconto → copione)  →  ② Scenografia (keyframe → video)  →  ③ Montaggio.   Usa @Nome per la coerenza degli asset."
+  "fs.flow": "Flusso:  ① Copione (idea → Racconto → copione)  →  ② Scenografia (keyframe → video)  →  ③ Montaggio.   Usa @Nome per la coerenza degli asset.",
+  "fs.asset.gallery_empty": "Nessuna immagine — genera il Character Sheet per curarne gli angoli.",
+  "fs.asset.accept": "✓ Accetta/Rimuovi",
+  "fs.asset.regen_angle": "↻ Rigenera questo angolo",
+  "fs.asset.accept_done": "Curatela aggiornata.",
+  "fs.asset.angle_done": "Angolo rigenerato (il precedente è nella storia take)."
 }
