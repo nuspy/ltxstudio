@@ -164,19 +164,21 @@ triade *tieni / varia / dirigi* su ogni artefatto.
   (Copione+Scenografia).
 - **Medio**: orchestratore LoRA img→video (`lora_orchestrator.py` + tabella `lora_pipeline` + `register_lora`
   chiude B6) con **driver GUI nel LoRA Studio** (gate galleria-foto); **Style Bible** (logline/palette/look/
-  registi iniettata in ogni prompt).
+  registi iniettata in ogni prompt); **transizioni reali** (xfade nel master, testato con clip reali + combo
+  montaggio + per-shot); **grammatica di ripresa** per-shot (SHOT_TYPES/CAMERA_MOVES esposti → shot.camera);
+  **B9** stato-personaggi per scena (wardrobe/condition/emotion → continuity engine completo); **@-completer
+  INLINE** non-modale (sostituisce il dialog bloccante).
 
 **⏳ Rimane** (feature grandi, richiedono validazione live — training/rendering — o rework UI su 2 varianti):
-- **B9** popolare continuity per-asset (wardrobe/condition/emotion dalla UI).
 - **Copertura dialoghi** shot-reverse-shot (shot→N inquadrature) — il singolo intervento «cinema» maggiore.
 - **Galleria set attore** (Accetta/rigen-angolo) + abbigliamento 6-angoli; **rigen non-distruttiva** (strip varianti).
-- **@-completer inline** non-modale (oggi resta il dialog; l'undo però è già corretto, B12).
-- **Worker video persistente** (elimina subprocess-per-shot); **transizioni** (campo+`xfade`); **timeline pro**
-  (trim/ripple/marker); **camera/lighting continuity** (lente/LUT); **stadio Racconto** + co-scrittura;
-  **riallineamento Classica/Pro**; storyboard→`add_version()`.
+- **Worker video persistente** (elimina subprocess-per-shot); **timeline pro** (trim/ripple/marker/waveform);
+  **camera/lighting continuity** avanzata (lente/focale/LUT); **stadio Racconto** + co-scrittura interattiva;
+  **riallineamento Classica/Pro** (oggi INVERTITE); storyboard→`add_version()` (storia take).
 - **Moonshot** (virtual script supervisor, DoP-agente, montaggio a ritmo emotivo, «secondo sguardo», ecc.).
-- **feature_matrix**: aggiungere le nuove sotto-capability (style_bible, lora_pipeline, model-select) al seed
-  esterno con i18n_key — oggi funzionano perché dentro `cap.filmstudio` (già gated) e dev è permissivo.
+- **feature_matrix**: aggiungere le nuove sotto-capability (style_bible, lora_pipeline, model-select,
+  transizioni, grammar) al seed esterno con i18n_key — oggi funzionano perché dentro `cap.filmstudio` (già
+  gated) e dev è permissivo.
 
 ## 5. Sintesi finale del panel
 Avete un'**officina** eccellente; manca il **teatro**. Tre atti riportano l'anima — **intenzione persistente**
