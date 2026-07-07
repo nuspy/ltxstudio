@@ -358,11 +358,16 @@ class StoryboardTab(QWidget):
         db.update("scene", rid, continuity=json.dumps(st, ensure_ascii=False))
         # propaga in avanti: ogni scena successiva eredita lo stato (override mantenuti dove già impostati)
         prev = st
+        _warns = []
         for nx in db.query("scene", "project_id=? AND ord>?", (sc["project_id"], sc["ord"]), order="ord"):
             nst = ct.propagate(prev, json.loads(nx.get("continuity") or "{}"))
+            for w in (ct.warnings(prev, nst) or []):         # B8: script-supervisor anti-salto (prima morto)
+                _warns.append(f"scena {nx['ord']}: {w}")
             db.update("scene", nx["id"], continuity=json.dumps(nst, ensure_ascii=False))
             prev = nst
         self.log.appendPlainText(tr("fs.sb.ct_done", "Continuity applicata e propagata alle scene successive."))
+        for w in _warns:                                     # segnala i salti di raccordo (luce/tempo/condizioni)
+            self.log.appendPlainText("⚠ " + w)
 
     def _save_sel(self):
         if not self._sel:

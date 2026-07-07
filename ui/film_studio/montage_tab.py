@@ -17,6 +17,16 @@ _FMT = [("fcpxml", "FCPXML (Filmora/Resolve)"), ("otio", "OpenTimelineIO"),
 _ASPECT = [("16:9", "16:9"), ("2.39:1", "2.39:1 Cinemascope"), ("9:16", "9:16 Vertical"), ("1:1", "1:1")]
 
 
+def _wav_dur(path: str) -> float:
+    """Durata reale di un wav (per sfasare le battute nello shot). Fallback 1.5s se illeggibile."""
+    try:
+        import wave
+        with wave.open(path, "rb") as w:
+            return w.getnframes() / float(w.getframerate() or 1)
+    except Exception:                                       # noqa: BLE001
+        return 1.5
+
+
 class MontageTab(QWidget):
     def __init__(self, get_project):
         super().__init__()
@@ -221,10 +231,12 @@ class MontageTab(QWidget):
         self._audio_tracks = []
         t = 0.0
         n = 0
+        _overflow = 0
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
                 dur = float(sh["duration_s"] or 4)
-                for di, d in enumerate(json.loads(sh.get("dialogues") or "[]")):
+                local = 0.0                                   # B3: le battute dello shot si SUSSEGUONO (prima
+                for di, d in enumerate(json.loads(sh.get("dialogues") or "[]")):  # partivano tutte allo stesso t)
                     actor = (d.get("actor") or "").lstrip("@")
                     text = d.get("text") or ""
                     if not text:
@@ -236,12 +248,18 @@ class MontageTab(QWidget):
                     out = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_d{di}.wav")
                     try:
                         vs.synth_dialogue(text, vrow, out)
-                        self._audio_tracks.append({"path": out, "start_s": t, "volume": 1.0})
+                        self._audio_tracks.append({"path": out, "start_s": t + local, "volume": 1.0})
+                        local += _wav_dur(out) + 0.15         # durata reale + pausa tra battute
                         n += 1
                     except Exception:                       # noqa: BLE001
                         pass
+                if local > dur + 0.1:                          # le battute eccedono la durata dello shot
+                    _overflow += 1
                 t += dur
-        self.info.setText(tr("fs.mt.audio_done", "Audio: {n} battute sintetizzate").format(n=n))
+        _msg = tr("fs.mt.audio_done", "Audio: {n} battute sintetizzate").format(n=n)
+        if _overflow:
+            _msg += " · " + tr("fs.mt.audio_overflow", "⚠ {k} shot: dialoghi più lunghi della durata (allunga l'inquadratura o taglia il testo)").format(k=_overflow)
+        self.info.setText(_msg)
 
     def _film_mood(self) -> str:
         import json
@@ -371,7 +389,8 @@ class MontageTab(QWidget):
         tracks = (list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
                   + list(getattr(self, "_ambient_tracks", []) or []))   # #95: includi l'ambient nel master
         try:
-            otio_export.render_master(clips, out, audio_tracks=tracks or None)
+            otio_export.render_master(clips, out, audio_tracks=tracks or None,
+                                      aspect=self.aspect.currentData() or "")   # B7: aspect ora applicato
             self.info.setText(tr("fs.mt.master_done", "Master: {f}").format(f=out))
         except Exception as e:                              # noqa: BLE001
             QMessageBox.critical(self, tr("fs.mt.master", "Master"), str(e)[:600])

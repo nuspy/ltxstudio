@@ -28,17 +28,28 @@ def _watermark_master(path: str) -> str:
         return path
 
 
+def _aspect_filter(aspect: str) -> str:
+    """Filtro ffmpeg per letterbox/pillarbox all'aspetto scelto SENZA crop (B7: prima l'aspect era ignorato)."""
+    R = {"16:9": 16 / 9, "2.39:1": 2.39, "9:16": 9 / 16, "1:1": 1.0}.get(aspect or "")
+    if not R:
+        return ""
+    return (f"pad=w=ceil(max(iw\\,ih*{R:.5f})/2)*2:h=ceil(max(ih\\,iw/{R:.5f})/2)*2:"
+            f"(ow-iw)/2:(oh-ih)/2:color=black")
+
+
 def render_master(clips: list[str], out_path: str, *, audio: str = "",
-                  audio_tracks: list[dict] | None = None, fps: float = 25.0) -> str:
+                  audio_tracks: list[dict] | None = None, fps: float = 25.0, aspect: str = "") -> str:
     """Concatena le clip in un master unico (re-encode) + audio.
     audio_tracks=[{path, start_s, volume}] = mix multitraccia (dialoghi/musica/ambient/SFX) con
-    ducking semplice via volume. `audio` singolo = retro-compat."""
+    ducking semplice via volume. `audio` singolo = retro-compat. aspect: 16:9/2.39:1/9:16/1:1 (letterbox)."""
     if not clips:
         raise RuntimeError("nessuna clip da montare")
     work = Path(out_path).with_suffix(".list.txt")
     work.write_text("".join(f"file '{c}'\n" for c in clips if os.path.exists(c)), "utf-8")
     silent = str(Path(out_path).with_suffix(".silent.mp4"))
+    _vf = _aspect_filter(aspect)
     subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(work),
+                    *(["-vf", _vf] if _vf else []),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
     tracks = list(audio_tracks or ([] if not audio else [{"path": audio, "start_s": 0, "volume": 1.0}]))
     tracks = [t for t in tracks if t.get("path") and os.path.exists(t["path"])]
