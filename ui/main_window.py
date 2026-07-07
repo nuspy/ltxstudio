@@ -4152,12 +4152,31 @@ class MainWindow(QMainWindow):
         name = f"trellis_{Path(image_path).stem}_{seed}"
         steps = int(cfg.get("steps", 12) or 12)
         _trellis_tail = []                                   # ring-buffer per l'errore VERO del subprocess
+        # LOG SU FILE (sopravvive a un eventuale crash dell'app): ogni riga del subprocess TRELLIS viene
+        # scritta subito e FLUSHATA su output/3d/trellis_last.log → così vediamo l'errore reale anche se
+        # l'app muore. (write+flush per riga: nessuna perdita al crash.)
+        _tlog_path = Path(OUTPUT_DIR) / "3d" / "trellis_last.log"
+        try:
+            _tlog_path.parent.mkdir(parents=True, exist_ok=True)
+            _tlog_fh = open(_tlog_path, "w", encoding="utf-8", buffering=1)
+            _tlog_fh.write(f"[trellis] img={image_path} seed={seed} steps={steps} "
+                           f"tex={cfg.get('texture_size')} faces={cfg.get('target_face_count')}\n"); _tlog_fh.flush()
+        except Exception:                                    # noqa: BLE001
+            _tlog_fh = None
+        self._log(f"[trellis] log completo del subprocess in: {_tlog_path}")
+
         def _tlog(line):
             self._log(line)
             if line:
                 _trellis_tail.append(str(line))
                 if len(_trellis_tail) > 30:
                     _trellis_tail.pop(0)
+                if _tlog_fh is not None:
+                    try:
+                        _tlog_fh.write(str(line) + "\n"); _tlog_fh.flush()
+                        os.fsync(_tlog_fh.fileno())          # forza su disco: sopravvive al crash GPU/app
+                    except Exception:                        # noqa: BLE001
+                        pass
         job = trellis_service.make_job(
             image_path, name, seed=seed, ss_steps=steps, slat_steps=steps,
             simplify=float(cfg.get("simplify", 0.95) or 0.95),
