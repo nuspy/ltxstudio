@@ -2485,5 +2485,18 @@
   "fs.sb.mdl_vid": "Modello video:",
   "fs.regen.similar": "↻ Rigenera segmento (simile)",
   "fs.regen.change": "↻ Rigenera segmento (cosa cambiare…)",
-  "fs.regen.prompt": "Cosa cambiare / cosa deve avvenire:"
+  "fs.regen.prompt": "Cosa cambiare / cosa deve avvenire:",
+  "fs.lorastudio.pipe": "🎬 Pipeline personaggio (immagine → video)",
+  "fs.lorastudio.pipe_photos": "cartella foto (vuoto = usa i riferimenti dell'asset)",
+  "fs.lorastudio.pipe_sup": "Supervisionata (gate)",
+  "fs.lorastudio.pipe_auto": "Automatica",
+  "fs.lorastudio.pipe_run": "▶ Avvia pipeline",
+  "fs.lorastudio.pipe_noasset": "Seleziona un asset.",
+  "fs.lorastudio.pipe_nophoto": "Nessuna foto (cartella o riferimenti asset).",
+  "fs.lorastudio.pipe_start": "Pipeline avviata: {n} foto",
+  "fs.lorastudio.pipe_cancel": "Gate annullato — pipeline in pausa.",
+  "fs.lorastudio.pipe_sel": "{n} foto scelte → training video…",
+  "fs.lorastudio.pipe_done": "Pipeline: stato «{s}»",
+  "fs.lorastudio.pipe_gate": "Scegli le foto buone",
+  "fs.lorastudio.pipe_gate_h": "Seleziona le foto che rappresentano bene il personaggio:"
 }

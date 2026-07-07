@@ -2485,5 +2485,18 @@
   "fs.sb.mdl_vid": "Video model:",
   "fs.regen.similar": "↻ Regenerate segment (similar)",
   "fs.regen.change": "↻ Regenerate segment (what to change…)",
-  "fs.regen.prompt": "What to change / what should happen:"
+  "fs.regen.prompt": "What to change / what should happen:",
+  "fs.lorastudio.pipe": "🎬 Character pipeline (image → video)",
+  "fs.lorastudio.pipe_photos": "photos folder (empty = use asset references)",
+  "fs.lorastudio.pipe_sup": "Supervised (gate)",
+  "fs.lorastudio.pipe_auto": "Automatic",
+  "fs.lorastudio.pipe_run": "▶ Start pipeline",
+  "fs.lorastudio.pipe_noasset": "Select an asset.",
+  "fs.lorastudio.pipe_nophoto": "No photos (folder or asset references).",
+  "fs.lorastudio.pipe_start": "Pipeline started: {n} photos",
+  "fs.lorastudio.pipe_cancel": "Gate cancelled — pipeline paused.",
+  "fs.lorastudio.pipe_sel": "{n} photos chosen → video training…",
+  "fs.lorastudio.pipe_done": "Pipeline: state «{s}»",
+  "fs.lorastudio.pipe_gate": "Pick the good photos",
+  "fs.lorastudio.pipe_gate_h": "Select the photos that represent the character well:"
 }
