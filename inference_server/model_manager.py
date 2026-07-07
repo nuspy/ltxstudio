@@ -162,6 +162,20 @@ class ModelManager:
         del e
         self.flush()
 
+    def evict_others(self, keep_key: str) -> int:
+        """AUTO-EVICT al cambio modello: scarica TUTTE le shell tranne keep_key (non-sticky) → rilascia i loro
+        componenti. Il transformer del modello PRECEDENTE diventa orfano (refcount 0) e verrà liberato/demotato
+        dallo STORE (evict_unused); i componenti CONDIVISI usati da keep_key restano (refcount>0). Ritorna il
+        numero di shell scaricate. Così cambiando modello la VRAM del precedente si libera SUBITO (non attende
+        la pressione di make_room). Disattivabile con NATIVE_AUTOEVICT=0."""
+        others = [k for k, e in self._cache.items() if k != keep_key and not e.sticky]
+        for k in others:
+            self.unload(k, allow_cpu=False)             # la shell è leggera; l'orfano lo gestisce lo STORE
+        if others:
+            print(f"[mm] auto-evict: {len(others)} shell del modello precedente scaricate (keep={keep_key})",
+                  flush=True)
+        return len(others)
+
     def _trim_cpu_cache(self) -> None:
         """LRU della cache-RAM monolitica: distrugge i modelli MENO recenti finché il totale rientra nel budget
         (NATIVE_CPU_CACHE_MB) E resta il floor di RAM libera (NATIVE_RAM_FLOOR_MB). Senza questo la RAM cresceva

@@ -1049,7 +1049,19 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
     # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
-    pipe = mm.ensure(key)
+    pipe = mm.ensure(key)                                   # carica il NUOVO modello (CPU) + acquire componenti
+    # AUTO-EVICT del modello PRECEDENTE (richiesta utente): PRIMA di piazzare il nuovo, scarica le shell di
+    # altri modelli e libera dalla VRAM il loro transformer orfano → il nuovo modello trova VRAM PULITA
+    # (gpu-resident, niente offload/spill). I componenti CONDIVISI (T5/CLIP/VAE) usati dal nuovo restano.
+    if os.environ.get("NATIVE_AUTOEVICT", "1") == "1":
+        try:
+            from inference_server.component_store import STORE
+            if mm.evict_others(key):
+                _tot = torch.cuda.mem_get_info()[1] if torch.cuda.is_available() else 0
+                STORE.evict_unused(_tot)                    # demota/libera i transformer orfani → VRAM libera
+                mm.flush()
+        except Exception as _e:                             # noqa: BLE001
+            print(f"[image] auto-evict saltato ({_e})", flush=True)
     where = _ensure_placement(pipe, mm, key)                # placement per-JOB (gpu|offload con VRAM attuale)
     _set_attention(pipe, arch)                              # per-job: il transformer CONDIVISO può avere il
     print(f"[image] job {arch}: placement={where}", flush=True)  # processor dell'arch precedente (sage↔sdpa)
