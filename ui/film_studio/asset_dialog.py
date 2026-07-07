@@ -92,18 +92,28 @@ class AtReferenceFilter(QObject):
                 return True                                 # consuma l'evento (il @ è già nel ref)
         # NOTA A: '#' dopo un @Nome → apre direttamente la sezione VARIANTI di quell'asset
         if event.type() == QEvent.KeyPress and event.text() == "#":
-            txt = self.editor.toPlainText() if hasattr(self.editor, "toPlainText") else self.editor.text()
+            is_pte = hasattr(self.editor, "toPlainText")
+            if is_pte:                                        # QPlainTextEdit: usa il testo FINO al cursore
+                cur = self.editor.textCursor()
+                pos = cur.position()
+                before = self.editor.toPlainText()[:pos]
+            else:                                             # QLineEdit
+                before = self.editor.text()
             import re
-            m = re.search(r"@([A-Za-z0-9_]+)$", txt)
+            m = re.search(r"@([A-Za-z0-9_]+)$", before)
             if m:
                 dlg = AssetDialog(self.editor, start_variant_of=m.group(1))
                 if dlg.exec() and dlg.result_ref:
-                    # sostituisci l'@Nome appena scritto col riferimento completo @Nome#Variante
-                    new = txt[:m.start()] + dlg.result_ref
-                    if hasattr(self.editor, "setPlainText"):
-                        self.editor.setPlainText(new)
+                    # B12: sostituisci SOLO l'@Nome col riferimento completo @Nome#Variante — via QTextCursor
+                    # (undo/cursore preservati), niente più setPlainText che azzerava tutta la cronologia
+                    if is_pte:
+                        from PySide6.QtGui import QTextCursor
+                        c = self.editor.textCursor()
+                        c.setPosition(m.start())
+                        c.setPosition(pos, QTextCursor.KeepAnchor)
+                        c.insertText(dlg.result_ref)
                     else:
-                        self.editor.setText(new)
+                        self.editor.setText(before[:m.start()] + dlg.result_ref + self.editor.text()[len(before):])
                     return True
         return False
 
