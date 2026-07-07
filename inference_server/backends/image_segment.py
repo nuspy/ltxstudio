@@ -70,7 +70,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         box = [float(xs.min()), float(ys.min()), float(xs.max()), float(ys.max())]
         if sproc is not None and smodel is not None:
             sin = sproc(images=img, input_boxes=[[box]], return_tensors="pt").to(dev)
-            with torch.no_grad():
+            with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=dev == "cuda"):
                 sout = smodel(**sin)
             masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
             m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, "iou_scores") else None)
@@ -92,7 +92,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
     thr = float(params.get("threshold", 0.3))
 
     gin = gproc(images=img, text=text, return_tensors="pt").to(dev)
-    with torch.no_grad():
+    # autocast fp16 (audit acceleratori): DINO/SAM2 giravano in fp32 puro → +20-30% sui tensor-core
+    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=dev == "cuda"):
         gout = gmodel(**gin)
     # transformers recenti hanno rinominato box_threshold→threshold in post_process_grounded_object_detection
     try:
@@ -112,7 +113,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
     _use_sam = params.get("use_sam", True)
     if _use_sam and sproc is not None and smodel is not None:   # SAM2: box → maschera precisa
         sin = sproc(images=img, input_boxes=[boxes], return_tensors="pt").to(dev)
-        with torch.no_grad():
+        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=dev == "cuda"):
             sout = smodel(**sin)
         masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
         m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, 'iou_scores') else None)

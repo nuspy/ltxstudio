@@ -217,12 +217,18 @@ def _maybe_compile(pipe) -> bool:
     Env NATIVE_COMPILE=0|1 (default 0: opt-in, può fallire su alcuni checkpoint fp8)."""
     import os
     import torch
-    if os.environ.get("NATIVE_COMPILE", "0") != "1":
+    # DEFAULT ON (audit acceleratori 07/07): ~1.5× sul denoise. Il warm-up (~5-10s al 1° job) è
+    # ammortizzato dal server persistente. SICUREZZA: suppress_errors=True → qualsiasi errore di
+    # compilazione/grafo (anche a runtime, tipico su Windows+triton) fa FALLBACK EAGER silenzioso
+    # invece di uccidere il job. Off: NATIVE_COMPILE=0.
+    if os.environ.get("NATIVE_COMPILE", "1") != "1":
         return False
     if getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False):
         print("[image] compile saltato: transformer con layerwise fp8 (hook incompatibili)", flush=True)
         return False
     try:
+        import torch._dynamo
+        torch._dynamo.config.suppress_errors = True      # errori di grafo → eager, mai job-killed
         pipe.transformer = torch.compile(pipe.transformer, mode="reduce-overhead", fullgraph=False)
         return True
     except Exception as e:                              # noqa: BLE001

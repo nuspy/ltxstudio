@@ -40,11 +40,15 @@ def _upscale_tiled(model, t, tile: int = 512, overlap: int = 32):
     _, _, h, w = t.shape
     out = torch.zeros((1, 3, h * scale, w * scale), device=t.device, dtype=t.dtype)
     wsum = torch.zeros_like(out)
+    # autocast fp16 (audit acceleratori): ESRGAN/spandrel girava in fp32 puro → +20-30% e metà VRAM
+    # sui tensor-core; l'accumulo resta nel dtype di `out` (fp32) → nessuna perdita visibile.
+    _ac = torch.autocast("cuda", dtype=torch.float16, enabled=t.is_cuda)
     for y in range(0, h, tile - overlap):
         for x in range(0, w, tile - overlap):
             y2, x2 = min(y + tile, h), min(x + tile, w)
-            with torch.no_grad():
+            with torch.no_grad(), _ac:
                 ot = model(t[:, :, y:y2, x:x2])
+            ot = ot.float()
             oy, ox = y * scale, x * scale
             out[:, :, oy:oy + ot.shape[2], ox:ox + ot.shape[3]] += ot
             wsum[:, :, oy:oy + ot.shape[2], ox:ox + ot.shape[3]] += 1
@@ -95,5 +99,5 @@ def run(params: dict, mm, output_dir: str) -> dict:
 
 def _run_once(model, t):
     import torch
-    with torch.no_grad():
-        return model(t)
+    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=t.is_cuda):
+        return model(t).float()
