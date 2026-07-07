@@ -146,9 +146,11 @@ class ModelManager:
                     except Exception:                   # noqa: BLE001
                         pass
                     e.obj.to("cpu")
+                    e.last_used = _now()
                     self._cpu_cache[key] = e
                     STORE.bump_epoch()                  # device cambiati → rebind al restore
                     print(f"[mm] demote→RAM: {key} ({e.vram_mb:.0f}MB)", flush=True)
+                    self._trim_cpu_cache()              # LRU: non accumulare oltre budget/floor RAM
                     self.flush()
                     return
             except Exception:                           # noqa: BLE001 — fallback: distruggi
@@ -158,6 +160,35 @@ class ModelManager:
         except Exception:                               # noqa: BLE001
             pass
         del e
+        self.flush()
+
+    def _trim_cpu_cache(self) -> None:
+        """LRU della cache-RAM monolitica: distrugge i modelli MENO recenti finché il totale rientra nel budget
+        (NATIVE_CPU_CACHE_MB) E resta il floor di RAM libera (NATIVE_RAM_FLOOR_MB). Senza questo la RAM cresceva
+        fino al tetto cambiando modello di continuo, senza mai scendere."""
+        import os
+        budget = float(os.environ.get("NATIVE_CPU_CACHE_MB", "40960"))
+        floor = float(os.environ.get("NATIVE_RAM_FLOOR_MB", "16384"))
+
+        def _avail_mb() -> float:
+            try:
+                import psutil
+                return psutil.virtual_memory().available / 2**20
+            except Exception:                           # noqa: BLE001
+                return 1e9
+
+        def _total_mb() -> float:
+            return sum(getattr(e, "vram_mb", 0) for e in self._cpu_cache.values())
+
+        while self._cpu_cache and (_total_mb() > budget or _avail_mb() < floor):
+            k = min(self._cpu_cache, key=lambda kk: self._cpu_cache[kk].last_used)
+            e = self._cpu_cache.pop(k)
+            try:
+                del e.obj
+            except Exception:                           # noqa: BLE001
+                pass
+            print(f"[mm] LRU cache-RAM: distrutto {k} ({getattr(e, 'vram_mb', 0):.0f}MB) "
+                  f"— RAM libera {_avail_mb():.0f}MB", flush=True)
         self.flush()
 
     def clear(self, include_sticky: bool = False) -> None:
