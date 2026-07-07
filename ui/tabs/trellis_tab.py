@@ -123,7 +123,11 @@ class _Model3DViewer(QWidget):
 
 def make_viewer():
     """Restituisce il visore 3D interattivo (selezione/cancellazione/separazione)
-    se disponibile, altrimenti il visore storico di sola visualizzazione."""
+    se disponibile, altrimenti il visore storico di sola visualizzazione.
+    Paracadute: LTX_NO_WEBGL=1 forza il visore semplice se WebGL/Chromium crasha su una certa GPU/driver."""
+    import os as _os
+    if _os.environ.get("LTX_NO_WEBGL") == "1":
+        return _Model3DViewer()
     try:
         from ui.widgets.model3d_viewer import InteractiveModel3DViewer
         return InteractiveModel3DViewer()
