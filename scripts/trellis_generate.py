@@ -110,7 +110,26 @@ def main():
     _default_model = _local if os.path.isdir(_local) and os.path.exists(os.path.join(_local, "pipeline.json")) \
         else "microsoft/TRELLIS.2-4B"
     ap.add_argument("--model", default=_default_model)
+    ap.add_argument("--parent-pid", type=int, default=0)          # PID dell'app: se muore, ci autodistruggiamo
     a = ap.parse_args()
+
+    # WATCHDOG anti-orfano: se l'APP (padre) muore — anche per CRASH — questo subprocess deve morire, altrimenti
+    # resta a occupare GPU/VRAM e una nuova generazione troverebbe DUE istanze TRELLIS che competono. Su Windows
+    # apriamo un handle al processo padre e blocchiamo in attesa della sua morte, poi usciamo. Zero polling.
+    if a.parent_pid and sys.platform == "win32":
+        import ctypes as _ct
+        import threading as _th
+
+        def _watch(ppid: int):
+            SYNCHRONIZE = 0x00100000
+            h = _ct.windll.kernel32.OpenProcess(SYNCHRONIZE, False, ppid)
+            if not h:
+                return                                           # padre già morto o non accessibile
+            _ct.windll.kernel32.WaitForSingleObject(h, 0xFFFFFFFF)   # blocca finché il padre è vivo
+            print("[trellis] APP padre terminata → esco (anti-orfano)", flush=True)
+            os._exit(1)
+
+        _th.Thread(target=_watch, args=(a.parent_pid,), daemon=True).start()
 
     # LIBERA la VRAM dei server GPU (immagini :8189, api :8200) PRIMA di caricare TRELLIS-4B: col
     # ModelManager che ora tiene i modelli residenti, una generazione 3D dopo un'immagine trovava la VRAM

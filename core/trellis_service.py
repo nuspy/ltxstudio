@@ -13,6 +13,26 @@ from pathlib import Path
 from core.music_service import Job          # job subprocess generico (riuso)
 
 TOOLS = Path(r"E:\AI\Tools")
+
+
+def kill_orphans() -> int:
+    """Killa eventuali subprocess trellis_generate.py ancora vivi (orfani da un crash precedente dell'app).
+    La coda è SERIALE (una generazione 3D per volta), quindi prima di lanciarne una nuova non deve esserci
+    nessun TRELLIS attivo: quelli che trova sono orfani → li termina, così non ci sono DUE istanze che
+    competono sulla GPU. Best-effort (Windows), stdlib-only."""
+    import subprocess as _sp
+    n = 0
+    try:
+        cmd = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+               "Where-Object { $_.CommandLine -like '*trellis_generate*' } | "
+               "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; 'k' }")
+        out = _sp.run(["powershell", "-NoProfile", "-Command", cmd],
+                      capture_output=True, text=True, timeout=15,
+                      creationflags=getattr(_sp, "CREATE_NO_WINDOW", 0))
+        n = out.stdout.count("k")
+    except Exception:  # noqa: BLE001
+        pass
+    return n
 TRELLIS_DIR = TOOLS / "TRELLIS2"
 TRELLIS_VENV_PY = TRELLIS_DIR / "venv" / "Scripts" / "python.exe"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "trellis_generate.py"
@@ -41,8 +61,11 @@ def make_job(image_path: str, name: str = "model", *, seed: int = 1,
     # NB: trellis_generate.py (API ufficiale microsoft/TRELLIS.2) accetta SOLO questi argomenti.
     # ss_steps/slat_steps/simplify restano nella firma per compat con la GUI ma non sono passati
     # (la pipeline ufficiale usa i suoi default). target_faces → --decimation (facce target del GUI).
+    import os as _os
+    kill_orphans()                                               # niente DUE istanze: pulisci orfani da crash precedenti
     cmd = [TRELLIS_VENV_PY, "-u", str(GEN_SCRIPT), "--image", image_path, "--output_dir", str(out),
-           "--seed", int(seed), "--texture_size", int(texture_size)]
+           "--seed", int(seed), "--texture_size", int(texture_size),
+           "--parent-pid", int(_os.getpid())]                    # watchdog: se l'app muore, il subprocess muore
     if target_faces:
         cmd += ["--decimation", int(target_faces)]
     # ISOLAMENTO dal venv PADRE (app = ComfyUI venv): il subprocess gira nel venv TRELLIS ma erediterebbe
