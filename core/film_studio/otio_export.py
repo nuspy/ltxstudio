@@ -34,23 +34,66 @@ def _aspect_filter(aspect: str) -> str:
     if not R:
         return ""
     return (f"pad=w=ceil(max(iw\\,ih*{R:.5f})/2)*2:h=ceil(max(ih\\,iw/{R:.5f})/2)*2:"
-            f"(ow-iw)/2:(oh-ih)/2:color=black")
+            f"x=(ow-iw)/2:y=(oh-ih)/2:color=black")
+
+
+def _probe_dur(path: str) -> float:
+    """Durata (s) di una clip via ffprobe (per calcolare gli offset delle transizioni)."""
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                            "-of", "default=nk=1:nw=1", path], capture_output=True, text=True)
+        return float((r.stdout or "0").strip() or 0)
+    except Exception:                                       # noqa: BLE001
+        return 0.0
+
+
+def _build_silent_xfade(clips: list[str], transitions: list, silent: str, fps: float, vf: str) -> bool:
+    """Master con TRANSIZIONI reali (xfade) invece di stacchi netti. transitions[i] = {type,dur} tra clip i e i+1
+    (None/dur=0 = stacco). Ritorna True se ha prodotto il file."""
+    durs = [_probe_dur(c) for c in clips]
+    if any(d <= 0 for d in durs):
+        return False                                        # durata ignota → ricadi sul concat
+    inp = []
+    for c in clips:
+        inp += ["-i", c]
+    filt = []
+    for i in range(len(clips)):                             # normalizza ogni input (aspect+fps+formato)
+        chain = (vf + "," if vf else "") + f"fps={fps},format=yuv420p,setsar=1"
+        filt.append(f"[{i}:v]{chain}[n{i}]")
+    prev, total = "[n0]", durs[0]
+    for i in range(1, len(clips)):
+        tr = transitions[i - 1] or {}
+        d = float(tr.get("dur", 0.0) or 0.0)
+        ttype = tr.get("type") or "fade"
+        d = max(0.05, min(d, durs[i] - 0.05, total - 0.05)) if d > 0 else 0.05
+        off = max(0.0, total - d)
+        out_lbl = f"[x{i}]"
+        filt.append(f"{prev}[n{i}]xfade=transition={ttype}:duration={d:.3f}:offset={off:.3f}{out_lbl}")
+        prev, total = out_lbl, off + durs[i]
+    r = subprocess.run(["ffmpeg", "-v", "error", *inp, "-filter_complex", ";".join(filt),
+                        "-map", prev, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps),
+                        silent, "-y"], check=False)
+    return r.returncode == 0 and os.path.exists(silent)
 
 
 def render_master(clips: list[str], out_path: str, *, audio: str = "",
-                  audio_tracks: list[dict] | None = None, fps: float = 25.0, aspect: str = "") -> str:
+                  audio_tracks: list[dict] | None = None, fps: float = 25.0, aspect: str = "",
+                  transitions: list | None = None) -> str:
     """Concatena le clip in un master unico (re-encode) + audio.
     audio_tracks=[{path, start_s, volume}] = mix multitraccia (dialoghi/musica/ambient/SFX) con
-    ducking semplice via volume. `audio` singolo = retro-compat. aspect: 16:9/2.39:1/9:16/1:1 (letterbox)."""
+    ducking semplice via volume. `audio` singolo = retro-compat. aspect: 16:9/2.39:1/9:16/1:1 (letterbox).
+    transitions=[{type,dur}] tra clip consecutive → dissolvenze reali (xfade); vuoto = stacchi netti (concat)."""
     if not clips:
         raise RuntimeError("nessuna clip da montare")
-    work = Path(out_path).with_suffix(".list.txt")
-    work.write_text("".join(f"file '{c}'\n" for c in clips if os.path.exists(c)), "utf-8")
     silent = str(Path(out_path).with_suffix(".silent.mp4"))
     _vf = _aspect_filter(aspect)
-    subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(work),
-                    *(["-vf", _vf] if _vf else []),
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
+    _has_tr = bool(transitions) and any((t or {}).get("dur", 0) for t in transitions)
+    if not (_has_tr and _build_silent_xfade(clips, transitions, silent, fps, _vf)):
+        work = Path(out_path).with_suffix(".list.txt")      # stacchi netti (veloce) o fallback da xfade
+        work.write_text("".join(f"file '{c}'\n" for c in clips if os.path.exists(c)), "utf-8")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(work),
+                        *(["-vf", _vf] if _vf else []),
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
     tracks = list(audio_tracks or ([] if not audio else [{"path": audio, "start_s": 0, "volume": 1.0}]))
     tracks = [t for t in tracks if t.get("path") and os.path.exists(t["path"])]
     if not tracks:

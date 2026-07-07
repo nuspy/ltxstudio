@@ -15,6 +15,9 @@ from ui.i18n_manager import tr
 _FMT = [("fcpxml", "FCPXML (Filmora/Resolve)"), ("otio", "OpenTimelineIO"),
         ("aaf", "AAF (Premiere/Avid)"), ("edl", "EDL")]
 _ASPECT = [("16:9", "16:9"), ("2.39:1", "2.39:1 Cinemascope"), ("9:16", "9:16 Vertical"), ("1:1", "1:1")]
+_TRANS = [("", "Stacco netto"), ("fade", "Dissolvenza"), ("fadeblack", "Dissolvenza in nero"),
+          ("dissolve", "Dissolve"), ("wipeleft", "Tendina ←"), ("slideright", "Scorri →"),
+          ("circleopen", "Cerchio")]
 
 
 def _wav_dur(path: str) -> float:
@@ -48,6 +51,14 @@ class MontageTab(QWidget):
         for code, lab in _ASPECT:
             self.aspect.addItem(lab, code)
         r1.addWidget(QLabel(tr("fs.mt.aspect", "Aspetto"))); r1.addWidget(self.aspect)
+        self.trans = QComboBox()                             # transizione di default tra le clip
+        for code, lab in _TRANS:
+            self.trans.addItem(lab, code)
+        r1.addWidget(QLabel(tr("fs.mt.trans", "Transizione"))); r1.addWidget(self.trans)
+        from PySide6.QtWidgets import QDoubleSpinBox as _DSB
+        self.trans_dur = _DSB(); self.trans_dur.setRange(0.1, 3.0); self.trans_dur.setSingleStep(0.1)
+        self.trans_dur.setValue(0.5); self.trans_dur.setSuffix(" s")
+        r1.addWidget(self.trans_dur)
         self.fmt = QComboBox()
         for code, lab in _FMT:
             self.fmt.addItem(lab, code)
@@ -388,9 +399,12 @@ class MontageTab(QWidget):
         out = str(db.project_dir(pid) / "master.mp4")
         tracks = (list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
                   + list(getattr(self, "_ambient_tracks", []) or []))   # #95: includi l'ambient nel master
+        ttype = self.trans.currentData() or ""              # transizione di default tra le clip
+        trans = ([{"type": ttype, "dur": self.trans_dur.value()}] * (len(clips) - 1)) if ttype else None
         try:
             otio_export.render_master(clips, out, audio_tracks=tracks or None,
-                                      aspect=self.aspect.currentData() or "")   # B7: aspect ora applicato
+                                      aspect=self.aspect.currentData() or "",   # B7: aspect ora applicato
+                                      transitions=trans)                        # transizioni reali (xfade)
             self.info.setText(tr("fs.mt.master_done", "Master: {f}").format(f=out))
         except Exception as e:                              # noqa: BLE001
             QMessageBox.critical(self, tr("fs.mt.master", "Master"), str(e)[:600])

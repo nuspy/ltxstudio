@@ -2504,5 +2504,6 @@
   "fs.sb.bible_palette": "Palette colori",
   "fs.sb.bible_look": "Look (grana/ottica/luce)",
   "fs.sb.bible_dir": "Registi/DoP di riferimento",
-  "fs.sb.bible_saved": "Style Bible salvata — iniettata in ogni prompt."
+  "fs.sb.bible_saved": "Style Bible salvata — iniettata in ogni prompt.",
+  "fs.mt.trans": "Transizione"
 }

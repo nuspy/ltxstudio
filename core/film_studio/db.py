@@ -84,6 +84,7 @@ def conn() -> sqlite3.Connection:
             pass
         _conn.executescript(_SCHEMA)
         for ddl in ["ALTER TABLE shot ADD COLUMN seed INTEGER DEFAULT 0",
+                    "ALTER TABLE shot ADD COLUMN transition TEXT",           # transizione verso lo shot dopo
                     "ALTER TABLE lora ADD COLUMN weight REAL DEFAULT 0.9",    # B6: peso composizione
                     "ALTER TABLE lora ADD COLUMN base_arch TEXT"]:           # arch compatibile (flux/ltx2)
             try:
