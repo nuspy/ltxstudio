@@ -247,6 +247,7 @@ class _VideoEditAIWorker(QThread):
                 params["control_strength"] = float(cfg.get("guide", 0.4))
                 params["cfg_scale"] = float(cfg.get("cfg_scale", 6.0))
                 params["mask_dilate"] = int(cfg.get("mask_dilate", 24))
+                params["mask_blur"] = float(cfg.get("mask_blur", 6.0))
             if cfg["mode"] == "inpaint":                       # SAM2 track → latent-inpaint (vinpaint)
                 self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
@@ -2590,6 +2591,7 @@ class MainWindow(QMainWindow):
                 params["control_video"] = ctrl_out
                 params["control_type"] = kind
                 params["control_strength"] = float(cnet.get("controlnet_strength", 0.8) or 0.8)
+                params["conditioning_attention"] = float(cnet.get("conditioning_attention", 1.0) or 1.0)
                 params.pop("image_path", None)
                 self._log(f"[nativo] ControlNet {kind} → guida video preprocessata")
             except Exception as e:                          # noqa: BLE001

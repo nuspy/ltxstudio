@@ -636,7 +636,7 @@
   "vid.refine_hr.tt": "Passata di RIFINITURA del dettaglio (ramo tiled LTXVAddGuide), SENZA cambiare risoluzione.\nIndipendente dall'Upscale: puoi applicarla da sola (refine sul latente nativo) o insieme\nall'Upscale ×2 (refine sull'immagine ingrandita). Più nitidezza/micro-dettaglio.",
   "vid.hr_off.tt": "⚠ Temporaneamente SENZA EFFETTO: il ramo super-res del template è incompatibile col pruning (va rifatto). Spuntarlo non cambia nulla — la generazione resta NATIVA a piena risoluzione. Lasciati abilitati (non disabilitati) per non bloccare la GUI.",
   "vid.face.auto.tt": "Dopo aver generato (ed eventualmente esteso) il video, applica automaticamente un restauro volti per-fotogramma che corregge l'aspetto «plastico» e la deriva d'identità di LTX, PRESERVANDO l'identità (non ri-genera col diffusion). Aggiunge un secondo passaggio: il video finale è quello coi volti restaurati.",
-  "vid.face.fidelity.tt": "1.0 preserva di più l'originale; 0.0 ricostruisce di più (più nitido, può scostarsi). ~0.7 consigliato.",
+  "vid.face.fidelity.tt": "Bilanciamento fedeltà/qualità del restauro volti: 0 = nessun restauro visibile, 0.5 = restauro forte (può cambiare i tratti), 0.7 (consigliato) = naturale, 1.0 = massima fedeltà al volto originale.",
   "vid.model.auto": "Auto (da NSFW/SFW)",
   "vid.model.tip_type": "Tipo: {kind}",
   "vid.model.tip_steps": "Steps consigliati: {steps}",
@@ -1441,7 +1441,7 @@
   "v2v.sing_isolate_vocals": "Isola la voce (consigliato)",
   "v2v.sing_isolate_vocals.tt": "Separa la voce dalla musica (demucs) per un lip-sync più preciso.",
   "v2v.sing_audio_scale": "Forza sincronia",
-  "v2v.sing_audio_scale.tt": "Quanto l'audio guida labbra e movimento: più alto = sincronia più marcata.",
+  "v2v.sing_audio_scale.tt": "Forza del sync labiale sull'audio: 1.5-3.0 consigliato (1.0 = debole, >3 = movimenti esagerati).",
   "v2v.sing_note": "Usa la foto del Frame 1 come volto. Il movimento segue il ritmo; la sincronia fine dita-strumento resta approssimativa (limite dei modelli attuali).",
   "v2v.err_no_sing_audio": "Modalità Canta: seleziona una canzone (audio).",
   "mw.multitalk_need_audio_title": "Audio mancante",
@@ -2426,5 +2426,10 @@
   "queue.job.exr": "Export EXR (VFX)",
   "def.no_video.pick_msg": "Carica prima un video nel tab Definizione.",
   "upsell.exr.msg": "L'export HDR/EXR non è incluso in questa edizione.",
-  "feat.cap.exr_export": "Export HDR/EXR frame video (VFX)"
+  "feat.cap.exr_export": "Export HDR/EXR frame video (VFX)",
+  "vedit.blur_lbl": "Sfumatura maschera (px)",
+  "vedit.blur.tt": "Sfumatura dei bordi della maschera (gaussiana, px): 0 = bordo netto, 6-12 = transizione morbida tra area rigenerata e video originale.",
+  "vedit.dilate.tt": "Quanto ALLARGARE la maschera tracciata (px): più spazio per il nuovo oggetto, bordi meno stretti.",
+  "cn.attn_lbl": "Attenzione guida",
+  "cn.attn.tt": "conditioning_attention_strength: 1.0 = attenzione strettamente vincolata al video-guida; valori più bassi (0.5-0.8) lasciano più libertà creativa preservando il movimento."
 }

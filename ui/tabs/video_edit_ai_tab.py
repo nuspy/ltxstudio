@@ -85,7 +85,15 @@ class VideoEditAITab(QWidget):
         self.guide = _DSB(); self.guide.setRange(0.1, 1.0); self.guide.setSingleStep(0.1); self.guide.setValue(0.4)
         f.addRow(tr("vedit.guide_lbl", "Forza guide (ancoraggio originale)"), self.guide)
         self.dilate = _SB(); self.dilate.setRange(0, 64); self.dilate.setValue(24)
+        self.dilate.setToolTip(tr("vedit.dilate.tt",
+            "Quanto ALLARGARE la maschera tracciata (px): più spazio per il nuovo oggetto, bordi meno stretti."))
         f.addRow(tr("vedit.dilate_lbl", "Dilatazione maschera (px)"), self.dilate)
+        # blur maschera: era supportato dal worker (mask_blur) ma NON esposto → hardcoded 0. Sfumatura
+        # dei BORDI della maschera → transizione morbida tra area rigenerata e video originale.
+        self.blur = _DSB(); self.blur.setRange(0.0, 30.0); self.blur.setSingleStep(1.0); self.blur.setValue(6.0)
+        self.blur.setToolTip(tr("vedit.blur.tt",
+            "Sfumatura dei bordi della maschera (gaussian, px): 0 = bordo netto, 6-12 = transizione morbida."))
+        f.addRow(tr("vedit.blur_lbl", "Sfumatura maschera (px)"), self.blur)
         v.addLayout(f)
 
         self.note = QLabel(""); self.note.setWordWrap(True); v.addWidget(self.note)
@@ -145,7 +153,7 @@ class VideoEditAITab(QWidget):
                "object": self.obj.text().strip(), "prompt": self.prompt.toPlainText().strip(),
                "strength": float(self.strength.currentData()),
                "cfg_scale": float(self.cfg.value()), "guide": float(self.guide.value()),
-               "mask_dilate": int(self.dilate.value()),
+               "mask_dilate": int(self.dilate.value()), "mask_blur": float(self.blur.value()),
                "enhance": self.vedit_enhance.isChecked(),
                "ref_image": self.ref_img.text().strip()}
         if key == "inpaint" and not cfg["object"]:

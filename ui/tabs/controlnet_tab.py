@@ -72,7 +72,18 @@ class ControlNetTab(QWidget):
         self.strength = QDoubleSpinBox()
         self.strength.setRange(0.0, 1.0); self.strength.setSingleStep(0.05); self.strength.setValue(0.8)
         self.strength.setToolTip(tr("cn.strength.tt", "Intensità del controllo: 1.0 segue rigidamente il riferimento, valori bassi lasciano più libertà."))
-        srow.addWidget(self.strength); srow.addStretch(1)
+        srow.addWidget(self.strength)
+        # conditioning_attention_strength: era supportato dal worker IC-LoRA ma NON esposto (fisso 1.0).
+        # Quanto l'ATTENTION resta vincolata al video-guida: 1.0 = strettissima, più basso = più libertà
+        # creativa mantenendo il movimento di massima.
+        srow.addWidget(QLabel(tr("cn.attn_lbl", "Attenzione guida")))
+        self.cond_attention = QDoubleSpinBox()
+        self.cond_attention.setRange(0.1, 1.0); self.cond_attention.setSingleStep(0.05)
+        self.cond_attention.setValue(1.0)
+        self.cond_attention.setToolTip(tr("cn.attn.tt",
+            "conditioning_attention_strength: 1.0 = attenzione strettamente vincolata al video-guida; "
+            "valori più bassi (0.5-0.8) lasciano più libertà creativa preservando il movimento."))
+        srow.addWidget(self.cond_attention); srow.addStretch(1)
         tv.addLayout(srow)
         shint = QLabel(tr("cn.strength_hint"))
         shint.setWordWrap(True); shint.setStyleSheet("color:#888; padding:2px 6px;")
@@ -117,4 +128,5 @@ class ControlNetTab(QWidget):
         return {"controlnet_enabled": self.enable.isChecked(),
                 "controlnet_ref_video": self._video,
                 "controlnet_type": type_idx,
-                "controlnet_strength": float(self.strength.value())}
+                "controlnet_strength": float(self.strength.value()),
+                "conditioning_attention": float(self.cond_attention.value())}
