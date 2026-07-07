@@ -2672,7 +2672,11 @@ class MainWindow(QMainWindow):
         # (model_management ComfyUI, VRAM dinamica/no-OOM) ma SOLO t2v/i2v semplici → per audio/
         # controlnet/storyboard/lungo ricade su ltx2_infer. Scelta in user_prefs (dropdown video_tab).
         from core import user_prefs as _up
-        _engine = _up.get_engine("video", "ltx2_infer")
+        # DEFAULT = comfy-native (block-swap dinamico del fp8, come ComfyUI): sui 32GB tiene il 22B in VRAM e
+        # sposta solo i blocchi in eccesso → veloce, niente dequant GGUF per-layer. Il motore ltx2_infer
+        # (nativo puro) ha una gestione memoria più rudimentale sul 22B → resta come opzione (audio/controlnet/
+        # lungo lo usano comunque). Cambiabile dal dropdown motore video in Impostazioni.
+        _engine = _up.get_engine("video", "comfy")
         # comfy copre: t2v/i2v/i2v-soft + KEYFRAME/storyboard (LTXVAddGuide). Restano su ltx2_infer solo
         # audio(a2v)/controlnet/long-chunk finché non portati anch'essi su comfy.
         _simple = not (params.get("audio_path") or params.get("control_video")
