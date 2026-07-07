@@ -112,8 +112,9 @@ class WorldTab(QWidget):
         return box
 
     def _viewer_box(self) -> QWidget:
+        import os as _os
         box = QGroupBox(tr("world.viewer", "Visore (orbita / 🚶 WASD)")); v = QVBoxLayout(box)
-        if _HAS_WEB:
+        if _HAS_WEB and _os.environ.get("LTX_NO_WEBGL") != "1":   # paracadute coerente col visore 3D
             self.view = QWebEngineView()
             s = self.view.settings()
             s.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
