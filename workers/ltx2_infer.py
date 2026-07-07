@@ -336,12 +336,23 @@ _PIPE_CACHE: dict = {}
 
 def _resolve_ckpt(model: str) -> str:
     ckpt = model or CHECKPOINT
+    if os.path.isabs(ckpt) and os.path.exists(ckpt):
+        return ckpt
     if not os.path.isabs(ckpt):
-        for base in (r"E:\AI\Models\diffusion_models\LTX", r"E:\AI\Models\Checkpoints\LTX"):
+        for base in (r"E:\AI\Models\diffusion_models\LTX", r"E:\AI\Models\Checkpoints\LTX",
+                     r"E:\AI\Models\diffusion_models", r"E:\AI\Models\Checkpoints"):
             cand = os.path.join(base, ckpt)
             if os.path.exists(cand):
                 return cand
-    return ckpt
+        import glob
+        hits = glob.glob(os.path.join(r"E:\AI\Models\diffusion_models", "**", os.path.basename(ckpt)),
+                         recursive=True)
+        if hits:
+            return hits[0]
+    # NON trovato: invece di restituire un path fantasma (→ FileNotFoundError su OGNI chunk = 0 output),
+    # ripiega sul checkpoint di default e AVVISA. Il modello scelto era inesistente/spostato.
+    print(f"[ckpt] '{ckpt}' non trovato → uso il default {os.path.basename(CHECKPOINT)}", flush=True)
+    return CHECKPOINT
 
 
 def _auto_offload(p: dict, ckpt: str) -> str:
@@ -474,7 +485,9 @@ def _run_chunked(p: dict, chunk: int) -> str:
             run_generation(cp)                               # pipe in cache dal 2° chunk → veloce
         except Exception as _e:                              # es. ultimo chunk con audio più corto dei frame
             print(f"[chunk] {i} saltato ({type(_e).__name__}: {_e})", flush=True)
-            break
+            if i == 0:                                       # il PRIMO chunk fallito = nessun output: NON
+                raise                                        # inghiottire, propaga il vero errore all'utente
+            break                                            # un chunk finale corto è tollerabile (tieni i precedenti)
         import gc as _gc
         _gc.collect()
         if torch.cuda.is_available():
@@ -603,11 +616,18 @@ def run_generation(p: dict) -> str:
     _chunk = int(p.get("chunk_frames", 0))
     if _chunk and int(p.get("num_frames", 0)) > _chunk:
         return _run_chunked(p, _chunk)
-    # Auto-GGUF: se non specificato, usa il GGUF Q4 (dequant on-the-fly) così il 22B entra nei 32GB.
-    # Disattivabile passando esplicitamente gguf_transformer="".
-    if "gguf_transformer" not in p:
+    # Un GGUF è transformer-only (niente vae/gemma): se arriva come 'model', spostalo su gguf_transformer
+    # (il checkpoint base di default fornisce i componenti mancanti).
+    if str(p.get("model", "")).lower().endswith(".gguf") and "gguf_transformer" not in p:
+        p["gguf_transformer"] = p.pop("model")
+    # Auto-GGUF: SOLO se l'utente NON ha scelto un modello (auto). Con un modello ESPLICITO (es. il 22B fp8)
+    # lo RISPETTIAMO e lo facciamo entrare con l'offload dinamico per-blocco (come ComfyUI) — niente più
+    # sostituzione a forza con un GGUF più piccolo (era un downgrade non richiesto della qualità, e nel caso
+    # limite puntava a un file inesistente → 0 output). Forzabile con gguf_transformer esplicito.
+    if "gguf_transformer" not in p and not p.get("model"):
         g = _auto_gguf()
         if g:
+            print("[auto-gguf] nessun modello scelto → GGUF Q4 di default", flush=True)
             p["gguf_transformer"] = g
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).

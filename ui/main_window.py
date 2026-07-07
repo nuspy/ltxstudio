@@ -2573,7 +2573,8 @@ class MainWindow(QMainWindow):
             "steps": int(self.video_tab.sampler_seed.steps.value()),
             "guidance": float(self.video_tab.sampler_seed.cfg.value()),
             "seed": int(vals.get("seed", self.video_tab.sampler_seed.seed.value())),   # #95 V1: usa il seed randomizzato da on_generate
-            "offload": "cpu", "loras": loras, "output": out,
+            "offload": "", "loras": loras, "output": out,   # "" = AUTO: il worker decide (none se ci sta,
+            #                                                block-swap per-blocco se serve — come ComfyUI)
             "teacache_thresh": float(vals.get("teacache_thresh", 0.0) or 0.0),   # #104 cache velocità (0=off)
         }
         # MODELLO scelto nel tab Video → al worker. Senza questo il worker usava SEMPRE il checkpoint
