@@ -1446,7 +1446,15 @@ class MainWindow(QMainWindow):
         return out
 
     def _log(self, msg: str):
-        self.log.appendPlainText(msg)
+        # THREAD-SAFE: appendPlainText tocca un QWidget → deve girare SOLO sul thread GUI. I job a subprocess
+        # (3D TRELLIS, musica, world) chiamano _log dal loro thread PUMP (non-GUI): toccare il widget da lì è
+        # comportamento indefinito → access violation NATIVA in Qt6Core/Qt6Gui (crash visto nel log eventi). Se
+        # non siamo sul thread GUI, marshalliamo la chiamata con QMetaObject.invokeMethod (coda → thread GUI).
+        from PySide6.QtCore import QThread, QMetaObject, Qt as _Qt, Q_ARG
+        if QThread.currentThread() is self.thread():
+            self.log.appendPlainText(msg)
+        else:
+            QMetaObject.invokeMethod(self.log, "appendPlainText", _Qt.QueuedConnection, Q_ARG(str, str(msg)))
 
     def _open_analyzer(self):
         """Analizza le impostazioni correnti e mostra il dialog con i risultati."""
