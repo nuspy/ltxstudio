@@ -3235,7 +3235,7 @@ class MainWindow(QMainWindow):
             return
         self.frame1_tab.image_path = out                     # diventa lo start dell'i2v
         try:
-            self.frame1_tab.canvas.load_image(out)
+            self.frame1_tab.canvas.load_image(out, fit_mode="canvas")   # programmatico: niente dialog
         except Exception:                                    # noqa: BLE001
             pass
         self._log(f"[pulid keyframe] primo frame pronto: {out} — ora genera il video (i2v).")

@@ -2468,5 +2468,11 @@
   "cal.calibrating": "Calibro {i}/{n}: {name} = {mb} MB",
   "cal.done": "Fatto: {c} calibrati, {s} già in cache, {t} totali.",
   "cal.invalidate.confirm": "Svuotare tutta la cache dei footprint VRAM?",
-  "cal.invalidated": "{n} voci rimosse dalla cache."
+  "cal.invalidated": "{n} voci rimosse dalla cache.",
+  "canvas.fit.title": "Inserimento foto",
+  "canvas.fit.msg": "Come inserire la foto nel canvas ({cw}×{ch})?",
+  "canvas.fit.canvas": "Canvas = dimensioni foto",
+  "canvas.fit.contain": "Adatta la foto (contain)",
+  "canvas.fit.native": "Foto a dimensione reale",
+  "canvas.fit.remember": "Ricorda la scelta (ripristinabile in Impostazioni)"
 }

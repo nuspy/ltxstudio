@@ -616,21 +616,65 @@ class MaskCanvas(QWidget):
         if fn:
             self.load_image(fn)
 
-    def load_image(self, path: str):
+    def _ask_fit_mode(self) -> str:
+        """Chiede come inserire la foto nel canvas (richiesta utente): 'canvas' = il canvas prende le
+        dimensioni della foto (default, ideale inpaint/outpaint); 'native' = mantiene il canvas, foto a
+        dimensione REALE (pixel 1:1, può debordare); 'contain' = mantiene il canvas, adatta la foto (un asse
+        100%, l'altro ≤). Preferenza ricordabile in user_prefs 'canvas_fit_mode'."""
+        try:
+            from core import user_prefs as _up
+            pol = str(_up.get("canvas_fit_mode", "ask"))
+        except Exception:                                    # noqa: BLE001
+            _up, pol = None, "ask"
+        if pol in ("canvas", "native", "contain"):
+            return pol
+        from PySide6.QtWidgets import QMessageBox, QCheckBox
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle(tr("canvas.fit.title", "Inserimento foto"))
+        box.setText(tr("canvas.fit.msg", "Come inserire la foto nel canvas ({cw}×{ch})?").format(
+            cw=int(self.aspect_w), ch=int(self.aspect_h)))
+        b_canvas = box.addButton(tr("canvas.fit.canvas", "Canvas = dimensioni foto"), QMessageBox.AcceptRole)
+        box.addButton(tr("canvas.fit.contain", "Adatta la foto (contain)"), QMessageBox.ActionRole)
+        box.addButton(tr("canvas.fit.native", "Foto a dimensione reale"), QMessageBox.ActionRole)
+        cb = QCheckBox(tr("canvas.fit.remember", "Ricorda la scelta (ripristinabile in Impostazioni)"))
+        box.setCheckBox(cb)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is b_canvas:
+            mode = "canvas"
+        elif clicked is not None and clicked.text() == tr("canvas.fit.native", "Foto a dimensione reale"):
+            mode = "native"
+        else:
+            mode = "contain"
+        if cb.isChecked() and _up is not None:
+            _up.set("canvas_fit_mode", mode)
+        return mode
+
+    def load_image(self, path: str, fit_mode: str | None = None):
         pix = QPixmap(path)
         if pix.isNull():
             return
-        # Il canvas adotta le PROPORZIONI/dimensioni della foto (cap lato lungo 1536, multipli di 16),
-        # così inpaint/outpaint lavorano sulla foto REALE — niente letterbox né distorsione a quadrato.
         pw, ph = max(1, pix.width()), max(1, pix.height())
-        _sc = min(1.0, 1536.0 / max(pw, ph))
-        tw = max(256, int(round(pw * _sc / 16)) * 16)
-        th = max(256, int(round(ph * _sc / 16)) * 16)
-        self.set_aspect(tw, th)
+        # Modalità inserimento: se il canvas ha già una dimensione utile, CHIEDI (canvas/native/contain);
+        # al primo caricamento (nessun canvas) usa 'canvas' (adotta la foto) senza chiedere.
+        has_canvas = int(getattr(self, "aspect_w", 0)) >= 64 and int(getattr(self, "aspect_h", 0)) >= 64
+        if fit_mode is None:
+            fit_mode = self._ask_fit_mode() if has_canvas else "canvas"
+        if fit_mode == "canvas" or not has_canvas:
+            # Il canvas adotta le dimensioni della foto (cap lato lungo 1536, multipli di 16) — inpaint/
+            # outpaint sulla foto REALE. Le modalità native/contain NON toccano aspect_w/h (canvas fisso).
+            _sc = min(1.0, 1536.0 / max(pw, ph))
+            tw = max(256, int(round(pw * _sc / 16)) * 16)
+            th = max(256, int(round(ph * _sc / 16)) * 16)
+            self.set_aspect(tw, th)
         self._active = 0; self._rebuild_layer_list()   # la nuova foto è la BASE
         self._image_path = path
         self.img_item.setPixmap(pix)
-        s = min(self.aspect_w / pix.width(), self.aspect_h / pix.height())
+        if fit_mode == "native":
+            s = 1.0                                     # dimensione REALE (pixel 1:1), può debordare dal canvas
+        else:                                           # 'canvas'/'contain' → contain (un asse 100%, l'altro ≤)
+            s = min(self.aspect_w / pix.width(), self.aspect_h / pix.height())
         self.img_item.setScale(s)
         self.img_item.setPos((self.aspect_w - pix.width()*s)/2, (self.aspect_h - pix.height()*s)/2)
         self.clear_mask(silent=True)
