@@ -46,10 +46,13 @@ class _Worker(QThread):
 
 
 class MusicVideoStudio(QWidget):
-    def __init__(self, project_id: int, parent=None):
+    def __init__(self, project_id: int, parent=None, media_cfg: dict | None = None):
         super().__init__(parent)
         self.pid = project_id
         self.proj = mvp.get_project(project_id) or {}
+        # Config EREDITATA dai tab Foto/Video all'apertura: modello immagine + modello/risoluzione video.
+        # {image_model, video_model, video_gguf, width, height}. Vuoto → default del servizio.
+        self.media_cfg = media_cfg or {}
         self.setWindowTitle(tr("mvs.title", "🎬 Music Video Studio") + f" — {self.proj.get('name','')}")
         self.resize(1080, 780)
         self.out_dir = str(mvp.project_dir(project_id))
@@ -210,6 +213,20 @@ class MusicVideoStudio(QWidget):
         self.btn_align = QPushButton(tr("mvs.align", "🎯 Allinea al canto")); self.btn_align.clicked.connect(self._align)
         self.btn_imgs = QPushButton(tr("mvs.gen_imgs", "Genera immagini")); self.btn_imgs.clicked.connect(self._gen_images)
         bar.addWidget(self.btn_plan); bar.addWidget(self.btn_align); bar.addWidget(self.btn_imgs)
+        bar.addStretch(1)
+        # Memoria batch (sticky-transformer): tiene il transformer RESIDENTE in VRAM per tutto il batch →
+        # niente dente-di-sega (ricarico per-foto). Default = Sticky (scelta utente), persistito in user_prefs.
+        from PySide6.QtWidgets import QRadioButton, QButtonGroup
+        bar.addWidget(QLabel(tr("mvs.mem.lbl", "Memoria batch:")))
+        self._mem_auto = QRadioButton(tr("mvs.mem.auto", "Auto"))
+        self._mem_sticky = QRadioButton(tr("mvs.mem.sticky", "Sticky (batch veloce)"))
+        self._mem_sticky.setToolTip(tr("mvs.mem.tt",
+            "Sticky-transformer: tiene il modello in VRAM per tutto il batch di immagini invece di "
+            "ricaricarlo ad ogni foto — molto più veloce coi modelli grandi. Non tocca i video."))
+        self._mem_grp = QButtonGroup(w); self._mem_grp.addButton(self._mem_auto); self._mem_grp.addButton(self._mem_sticky)
+        (self._mem_sticky if self._sticky_mode() else self._mem_auto).setChecked(True)
+        self._mem_auto.toggled.connect(self._on_mem_mode)
+        bar.addWidget(self._mem_auto); bar.addWidget(self._mem_sticky)
         lv.addLayout(bar)
         self.sb_list = QListWidget(); self.sb_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.sb_list.currentRowChanged.connect(self._sb_select)
@@ -392,7 +409,7 @@ class MusicVideoStudio(QWidget):
             return
         s["img_prompt"] = self.img_prompt.toPlainText().strip()
         out = os.path.join(self.out_dir, f"img_{int(s['start_s']*100)}.png")
-        self._run(mvs.gen_scene_image, s, out)
+        self._run(mvs.gen_scene_image, s, out, **self._img_kw())
 
     def _replace_image(self):
         s = self._cur()
@@ -428,7 +445,7 @@ class MusicVideoStudio(QWidget):
         if not s.get("image_path"):
             QMessageBox.information(self, tr("mvs.regen_vid", "Video"), tr("mvs.need_img", "Genera prima l'immagine.")); return
         out = os.path.join(self.out_dir, f"vid_{s['order']}_{int(s['start_s']*100)}.mp4")
-        self._run(mvs.gen_scene_video, s, out)
+        self._run(mvs.gen_scene_video, s, out, **self._vid_kw())
 
     # ───────────── batch + single (background) ─────────────
     def _plan(self):
@@ -489,13 +506,13 @@ class MusicVideoStudio(QWidget):
         # e il progetto è salvato dopo OGNI item (_on_batch_item→_save) → resume dai non generati.
         if self._kind == "image":
             out = os.path.join(self.out_dir, f"img_{s['order']}_{int(s['start_s']*100)}.png")
-            fn, args = mvs.gen_scene_image, (s, out)
+            fn, args, kw = mvs.gen_scene_image, (s, out), self._img_kw()
         else:
             out = os.path.join(self.out_dir, f"vid_{s['order']}_{int(s['start_s']*100)}.mp4")
-            fn, args = mvs.gen_scene_video, (s, out)
+            fn, args, kw = mvs.gen_scene_video, (s, out), self._vid_kw()
         done_n = getattr(self, "_batch_total", 0) - len(self._queue)
         self.status.setText(f"{self._kind} {done_n}/{getattr(self, '_batch_total', '?')} @ {_mmss(s['start_s'])}…")
-        self._worker = _Worker(fn, *args)
+        self._worker = _Worker(fn, *args, **kw)
         self._worker.done.connect(self._on_batch_item)
         self._worker.start()
 
@@ -506,9 +523,55 @@ class MusicVideoStudio(QWidget):
             self._batch_errs.append(str(res["error"])[:160])
         self._save(); self._refresh_sb(); self._next_batch()
 
-    def _run(self, fn, *args):
+    # ───────────── config ereditata (modello/risoluzione) + modalità memoria ─────────────
+    def _sticky_mode(self) -> bool:
+        """True se il batch immagini deve usare lo sticky-transformer (residente). Default per il MVS = sticky
+        (scelta utente), persistito in user_prefs; il radio nel tab Video lo cambia."""
+        try:
+            from core import user_prefs
+            return str(user_prefs.get("mvs_placement_mode", "sticky")) == "sticky"
+        except Exception:                                    # noqa: BLE001
+            return True
+
+    def _on_mem_mode(self, *_):
+        """Salva la scelta memoria batch (Auto/Sticky) in user_prefs → letta da _sticky_mode/_img_kw."""
+        try:
+            from core import user_prefs
+            user_prefs.set("mvs_placement_mode", "auto" if self._mem_auto.isChecked() else "sticky")
+        except Exception:                                    # noqa: BLE001
+            pass
+
+    def _img_kw(self) -> dict:
+        """kwargs per gen_scene_image: modello (dal tab Foto) + risoluzione (dal tab Video) + sticky."""
+        c = self.media_cfg
+        kw: dict = {}
+        if c.get("image_model"):
+            kw["model"] = c["image_model"]
+        if c.get("width"):
+            kw["width"] = int(c["width"])
+        if c.get("height"):
+            kw["height"] = int(c["height"])
+        if self._sticky_mode():
+            kw["placement_mode"] = "sticky"
+        return kw
+
+    def _vid_kw(self) -> dict:
+        """kwargs per gen_scene_video: modello/GGUF + risoluzione (dal tab Video)."""
+        c = self.media_cfg
+        kw: dict = {}
+        if c.get("video_gguf"):
+            kw["model_gguf"] = c["video_gguf"]
+        if c.get("video_model"):
+            kw["model"] = c["video_model"]
+        if c.get("width"):
+            kw["width"] = int(c["width"])
+        if c.get("height"):
+            kw["height"] = int(c["height"])
+        return kw
+
+    def _run(self, fn, *args, **kw):
         self._busy(True, tr("mvs.working", "Generazione…"))
-        self._worker = _Worker(fn, *args)
+        self._worker = _Worker(fn, *args, **kw)
         self._worker.done.connect(self._on_single); self._worker.start()
 
     def _on_single(self, res: dict):

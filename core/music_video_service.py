@@ -139,13 +139,21 @@ def recompute_lengths(scenes: list[dict], song_dur: float) -> None:
         s["length_s"] = round(max(0.5, nxt - s["start_s"]), 2)
 
 
-def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int = 512) -> str:
-    """Genera l'immagine di apertura della scena (modulo immagini nativo, FLUX)."""
+def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int = 512,
+                    model: str | None = None, placement_mode: str | None = None) -> str:
+    """Genera l'immagine di apertura della scena (modulo immagini nativo, FLUX).
+    model: modello scelto nel tab Foto (se None → default del server). placement_mode: 'sticky' per tenere il
+    transformer residente durante il batch (niente ricarico per-foto)."""
     from core import native_driver
-    res = native_driver.run_and_wait("image", {
+    _p = {
         "arch": "flux", "prompt": scene["img_prompt"], "negative": NEG,
         "width": width, "height": height, "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png,
-    }, timeout=600)
+    }
+    if model:                                            # eredita il modello del tab Foto (altrimenti default srv)
+        _p["model"] = model
+    if placement_mode:                                   # 'sticky' → transformer residente per il batch
+        _p["placement_mode"] = placement_mode
+    res = native_driver.run_and_wait("image", _p, timeout=600)
     p = res.get("output") or out_png
     p = p[0] if isinstance(p, list) else p
     if p and os.path.exists(p) and p != out_png:
@@ -157,13 +165,18 @@ def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int 
     return out_png
 
 
-def gen_scene_video(scene: dict, out_mp4: str, *, width: int = 704, height: int = 512, fps: int = 25) -> str:
-    """Genera lo spezzone video della scena (i2v dall'immagine di apertura, durata = length_s)."""
+def gen_scene_video(scene: dict, out_mp4: str, *, width: int = 704, height: int = 512, fps: int = 25,
+                    model: str | None = None, model_gguf: str | None = None) -> str:
+    """Genera lo spezzone video della scena (i2v dall'immagine di apertura, durata = length_s).
+    model_gguf/model: transformer scelto nel tab Video (se None → GGUF distilled di default)."""
     nf = _valid_nf(min(float(scene["length_s"]), 6.7), fps)
-    params = {"image_path": scene.get("image_path", ""), "gguf_transformer": GGUF,
+    _gguf = model_gguf or (model if str(model or "").lower().endswith(".gguf") else None) or GGUF
+    params = {"image_path": scene.get("image_path", ""), "gguf_transformer": _gguf,
               "prompt": scene["video_prompt"], "negative": NEG, "width": width, "height": height,
               "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0, "seed": 8,
               "offload": "cpu", "ref_strength": 1.0, "output": out_mp4}
+    if model and not str(model).lower().endswith(".gguf"):   # modello non-GGUF esplicito (fp8/bf16)
+        params["model"] = model
     jf = out_mp4 + ".json"
     json.dump(params, open(jf, "w"))
     env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"

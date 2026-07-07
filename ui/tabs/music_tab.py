@@ -1000,9 +1000,39 @@ class MusicTab(QWidget):
         if dlg.exec() and dlg.opened_id:
             self._open_mv_studio(dlg.opened_id)
 
+    def _mv_media_cfg(self) -> dict:
+        """Snapshot del MODELLO (tab Foto) + MODELLO/RISOLUZIONE (tab Video) da ereditare nel Music Video
+        Studio, invece degli hardcoded (bf16 22GB / 704×512). Best-effort: se un tab manca → chiave assente
+        (il servizio usa i default). Vedi core/music_video_service.gen_scene_*."""
+        cfg: dict = {}
+        mw = self.window()
+        try:                                                 # modello immagine t2i dal tab Foto
+            f1 = getattr(mw, "frame1_tab", None)
+            if f1 is not None and hasattr(f1, "_gen_model_name"):
+                m = f1._gen_model_name()
+                if m:
+                    cfg["image_model"] = m
+        except Exception:                                    # noqa: BLE001
+            pass
+        try:                                                 # modello + risoluzione dal tab Video
+            vt = getattr(mw, "video_tab", None)
+            if vt is not None and hasattr(vt, "get_values"):
+                vv = vt.get_values()
+                if vv.get("model_gguf"):
+                    cfg["video_gguf"] = vv["model_gguf"]
+                elif vv.get("model"):
+                    cfg["video_model"] = vv["model"]
+                if vv.get("width"):
+                    cfg["width"] = int(vv["width"])
+                if vv.get("height"):
+                    cfg["height"] = int(vv["height"])
+        except Exception:                                    # noqa: BLE001
+            pass
+        return cfg
+
     def _open_mv_studio(self, pid: int):
         from ui.music_video_studio import MusicVideoStudio
-        self._mv_studio = MusicVideoStudio(pid, parent=self.window())
+        self._mv_studio = MusicVideoStudio(pid, parent=self.window(), media_cfg=self._mv_media_cfg())
         self._mv_studio.setWindowFlag(Qt.Window, True)
         self._mv_studio.show(); self._mv_studio.raise_(); self._mv_studio.activateWindow()
 

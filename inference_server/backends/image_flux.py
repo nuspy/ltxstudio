@@ -114,6 +114,37 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     return "offload"
 
 
+def _place_sticky(pipe) -> str:
+    """STICKY-TRANSFORMER (batch): transformer + VAE RESIDENTI su GPU per TUTTO il batch; solo i text-encoder
+    (CLIP-L + T5) offloadati con cpu_offload_with_hook (onload per l'encode a inizio foto, offload dopo). Evita
+    il 'dente-di-sega' (ricarico del transformer per ogni item) dei batch di immagini con modelli grandi.
+    Fallback sicuro: se fallisce → enable_model_cpu_offload normale (niente crash)."""
+    import torch
+    try:
+        from accelerate import cpu_offload_with_hook
+        pipe.transformer.to("cuda")
+        if getattr(pipe, "vae", None) is not None:
+            pipe.vae.to("cuda")
+        hook = None
+        for _name in ("text_encoder", "text_encoder_2"):     # CLIP-L + T5: on/offload per encode
+            m = getattr(pipe, _name, None)
+            if m is not None:
+                _, hook = cpu_offload_with_hook(m, "cuda", prev_module_hook=hook)
+        pipe._ls_sticky_hook = hook
+        pipe._execution_device = torch.device("cuda")        # coi text-encoder hooked, forza il device
+        free_mb = torch.cuda.mem_get_info()[0] / 1024**2 if torch.cuda.is_available() else 0
+        print(f"[place] STICKY: transformer+vae residenti, T5/CLIP offload-with-hook (free {free_mb:.0f}MB)",
+              flush=True)
+        return "sticky"
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[place] sticky fallito ({_e}) → offload normale", flush=True)
+        try:
+            pipe.enable_model_cpu_offload()
+        except Exception:                                    # noqa: BLE001
+            pass
+        return "offload"
+
+
 def _ensure_placement(pipe, mm=None, self_key: str | None = None) -> str:
     """Placement per-JOB (coda seriale → un solo pipe attivo alla volta). Con i componenti CONDIVISI
     (ComponentStore) lo stato device/hook è GLOBALE: un'altra pipeline può aver attaccato hook di offload
@@ -125,7 +156,12 @@ def _ensure_placement(pipe, mm=None, self_key: str | None = None) -> str:
     from inference_server.component_store import STORE
     if getattr(pipe, "_ls_no_rebind", False):            # flux2 blockswap: pesi su CPU by design, MAI ri-piazzare
         return getattr(pipe, "_ls_place_mode", "blockswap")
-    if getattr(pipe, "_ls_place_epoch", -1) == STORE.placement_epoch:
+    _want_sticky = bool(getattr(pipe, "_ls_want_sticky", False))
+    # No-op se l'epoch combacia E la modalità corrente è già quella voluta (sticky↔non-sticky). Così un batch
+    # sticky NON ri-piazza tra le foto (transformer RESTA residente = il guadagno), ma passare da/a sticky forza
+    # il re-placement anche a epoch invariato.
+    if getattr(pipe, "_ls_place_epoch", -1) == STORE.placement_epoch \
+            and (getattr(pipe, "_ls_place_mode", "gpu") == "sticky") == _want_sticky:
         return getattr(pipe, "_ls_place_mode", "gpu")
     try:
         pipe.remove_all_hooks()                          # solo _hf_hook accelerate; i _diffusers_hook
@@ -142,8 +178,9 @@ def _ensure_placement(pipe, mm=None, self_key: str | None = None) -> str:
                          keep={self_key} if self_key else set())
         except Exception:                                # noqa: BLE001
             pass
-    mode = _place(pipe, est_missing)
+    mode = _place_sticky(pipe) if _want_sticky else _place(pipe, est_missing)
     for k in keys:
+        # sticky: transformer+vae su cuda, T5/CLIP hooked (device 'misto') → non marcare i componenti 'cuda'
         STORE.note_device(k, "cuda" if mode == "gpu" else "cpu")
     pipe._ls_place_mode = mode
     pipe._ls_place_epoch = STORE.bump_epoch()            # invalida l'epoch delle ALTRE pipe → loro rebind
@@ -1050,6 +1087,9 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
     # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
     pipe = mm.ensure(key)                                   # carica il NUOVO modello (CPU) + acquire componenti
+    # STICKY-TRANSFORMER (batch, es. Music Video Studio): transformer+vae residenti per tutto il batch, solo
+    # T5/CLIP a rotazione → niente dente-di-sega. Attivato dai params (placement_mode='sticky').
+    pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky")
     # AUTO-EVICT del modello PRECEDENTE (richiesta utente): PRIMA di piazzare il nuovo, scarica le shell di
     # altri modelli e libera dalla VRAM il loro transformer orfano → il nuovo modello trova VRAM PULITA
     # (gpu-resident, niente offload/spill). I componenti CONDIVISI (T5/CLIP/VAE) usati dal nuovo restano.

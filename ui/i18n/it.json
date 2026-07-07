@@ -2474,5 +2474,9 @@
   "canvas.fit.canvas": "Canvas = dimensioni foto",
   "canvas.fit.contain": "Adatta la foto (contain)",
   "canvas.fit.native": "Foto a dimensione reale",
-  "canvas.fit.remember": "Ricorda la scelta (ripristinabile in Impostazioni)"
+  "canvas.fit.remember": "Ricorda la scelta (ripristinabile in Impostazioni)",
+  "mvs.mem.lbl": "Memoria batch:",
+  "mvs.mem.auto": "Auto",
+  "mvs.mem.sticky": "Sticky (batch veloce)",
+  "mvs.mem.tt": "Sticky-transformer: tiene il modello in VRAM per tutto il batch di immagini invece di ricaricarlo ad ogni foto — molto più veloce coi modelli grandi. Non tocca i video."
 }
