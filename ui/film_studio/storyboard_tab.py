@@ -119,12 +119,18 @@ class StoryboardTab(QWidget):
         for code, lab in [("", tr("fs.sb.tr_cut", "stacco →")), ("fade", "dissolvenza →"),
                           ("fadeblack", "in nero →"), ("dissolve", "dissolve →"), ("wipeleft", "tendina →")]:
             self.sh_trans.addItem(lab, code)
-        for lbl, w in [("🎬", self.sh_type), ("🎥", self.sh_move), ("↦", self.sh_trans)]:
+        from PySide6.QtWidgets import QDoubleSpinBox as _DSB
+        self.sh_in = _DSB(); self.sh_in.setRange(0, 3600); self.sh_in.setSingleStep(0.1); self.sh_in.setSuffix(" s")
+        self.sh_out = _DSB(); self.sh_out.setRange(0, 3600); self.sh_out.setSingleStep(0.1); self.sh_out.setSuffix(" s")
+        for lbl, w in [("🎬", self.sh_type), ("🎥", self.sh_move), ("↦", self.sh_trans),
+                       ("⇥in", self.sh_in), ("out⇤", self.sh_out)]:
             cgl.addWidget(QLabel(lbl)); cgl.addWidget(w)
         cgl.addStretch(1)
         self.sh_type.currentIndexChanged.connect(self._save_shot_grammar)
         self.sh_move.currentIndexChanged.connect(self._save_shot_grammar)
         self.sh_trans.currentIndexChanged.connect(self._save_shot_grammar)
+        self.sh_in.editingFinished.connect(self._save_shot_grammar)
+        self.sh_out.editingFinished.connect(self._save_shot_grammar)
         self.cam_box.setVisible(False)
         ev.addWidget(self.cam_box)
         eh = QHBoxLayout()
@@ -472,6 +478,8 @@ class StoryboardTab(QWidget):
             self.sh_trans.blockSignals(True)                 # transizione salvata
             self.sh_trans.setCurrentIndex(max(0, self.sh_trans.findData(row.get("transition") or "")))
             self.sh_trans.blockSignals(False)
+            for w, k in ((self.sh_in, "in_s"), (self.sh_out, "out_s")):   # trim salvato
+                w.blockSignals(True); w.setValue(float(row.get(k, 0) or 0)); w.blockSignals(False)
         # #56 mostra/popola l'editor Continuity solo per le SCENE
         self.ct_box.setVisible(kind == "scene")
         if kind == "scene" and row:
@@ -534,7 +542,8 @@ class StoryboardTab(QWidget):
         if not self._sel or self._sel[0] != "shot":
             return
         cam = ", ".join(x for x in (self.sh_type.currentData(), self.sh_move.currentData()) if x)
-        db.update("shot", self._sel[1], camera=cam, transition=self.sh_trans.currentData() or "")
+        db.update("shot", self._sel[1], camera=cam, transition=self.sh_trans.currentData() or "",
+                  in_s=float(self.sh_in.value()), out_s=float(self.sh_out.value()))
 
     def _save_continuity(self):
         """#56 Salva il Continuity State della scena selezionata e lo PROPAGA alle scene successive."""

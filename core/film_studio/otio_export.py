@@ -76,15 +76,36 @@ def _build_silent_xfade(clips: list[str], transitions: list, silent: str, fps: f
     return r.returncode == 0 and os.path.exists(silent)
 
 
+def _apply_trims(clips: list[str], trims: list | None, out_path: str, fps: float) -> list[str]:
+    """Pre-taglia le clip con in_s/out_s (trim=montaggio). Ritorna la lista clip effettiva (tagliate dove
+    richiesto, passthrough altrove). trims[i] = {in_s, out_s} o None."""
+    if not trims:
+        return clips
+    res = []
+    for i, c in enumerate(clips):
+        t = trims[i] if i < len(trims) else None
+        a = float((t or {}).get("in_s", 0) or 0)
+        b = float((t or {}).get("out_s", 0) or 0)
+        if t and b > a:
+            dst = str(Path(out_path).with_suffix(f".trim{i}.mp4"))
+            subprocess.run(["ffmpeg", "-v", "error", "-i", c, "-ss", f"{a:.3f}", "-to", f"{b:.3f}",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), dst, "-y"], check=False)
+            res.append(dst if os.path.exists(dst) else c)
+        else:
+            res.append(c)
+    return res
+
+
 def render_master(clips: list[str], out_path: str, *, audio: str = "",
                   audio_tracks: list[dict] | None = None, fps: float = 25.0, aspect: str = "",
-                  transitions: list | None = None) -> str:
+                  transitions: list | None = None, trims: list | None = None) -> str:
     """Concatena le clip in un master unico (re-encode) + audio.
     audio_tracks=[{path, start_s, volume}] = mix multitraccia (dialoghi/musica/ambient/SFX) con
     ducking semplice via volume. `audio` singolo = retro-compat. aspect: 16:9/2.39:1/9:16/1:1 (letterbox).
     transitions=[{type,dur}] tra clip consecutive → dissolvenze reali (xfade); vuoto = stacchi netti (concat)."""
     if not clips:
         raise RuntimeError("nessuna clip da montare")
+    clips = _apply_trims(clips, trims, out_path, fps)         # trim in/out prima di tutto (montaggio)
     silent = str(Path(out_path).with_suffix(".silent.mp4"))
     _vf = _aspect_filter(aspect)
     _has_tr = bool(transitions) and any((t or {}).get("dur", 0) for t in transitions)

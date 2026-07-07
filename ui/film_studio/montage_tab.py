@@ -201,7 +201,10 @@ class MontageTab(QWidget):
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
                 f = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}.mp4")
                 if Path(f).exists():
-                    out.append({"file": f, "in_s": 0.0, "out_s": float(sh["duration_s"] or 4),
+                    ins, outs = float(sh.get("in_s", 0) or 0), float(sh.get("out_s", 0) or 0)  # trim per-shot
+                    if not (outs > ins):
+                        ins, outs = 0.0, float(sh["duration_s"] or 4)
+                    out.append({"file": f, "in_s": ins, "out_s": outs,
                                 "name": f"S{sc['ord']}.{sh['ord']}", "shot_id": sh["id"], "sh_ord": sh["ord"]})
         return out
 
@@ -401,16 +404,20 @@ class MontageTab(QWidget):
                   + list(getattr(self, "_ambient_tracks", []) or []))   # #95: includi l'ambient nel master
         default_t = self.trans.currentData() or ""          # transizione: per-shot (shot.transition) o default
         dur = self.trans_dur.value()
-        per = []
+        per, trims = [], []
+        for c in (self._cur_clips or []):
+            sh = db.get("shot", c.get("shot_id")) or {}
+            trims.append({"in_s": sh.get("in_s", 0) or 0, "out_s": sh.get("out_s", 0) or 0})  # trim per-shot
         for c in (self._cur_clips or [])[:-1]:
             sh = db.get("shot", c.get("shot_id")) or {}
             t = sh.get("transition") or default_t
             per.append({"type": t, "dur": dur} if t else {"type": "", "dur": 0})
         trans = per if any(p["type"] for p in per) else None
+        trims = trims if any(t["out_s"] > t["in_s"] for t in trims) else None
         try:
             otio_export.render_master(clips, out, audio_tracks=tracks or None,
                                       aspect=self.aspect.currentData() or "",   # B7: aspect ora applicato
-                                      transitions=trans)                        # transizioni reali (xfade)
+                                      transitions=trans, trims=trims)           # transizioni + trim per-shot
             self.info.setText(tr("fs.mt.master_done", "Master: {f}").format(f=out))
         except Exception as e:                              # noqa: BLE001
             QMessageBox.critical(self, tr("fs.mt.master", "Master"), str(e)[:600])
