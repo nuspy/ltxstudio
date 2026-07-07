@@ -2482,5 +2482,8 @@
   "fs.mt.audio_overflow": "⚠ {k} shot(s): dialogue longer than shot duration (extend the shot or trim the text)",
   "fs.sb.mdl_default": "(auto)",
   "fs.sb.mdl_img": "Image model:",
-  "fs.sb.mdl_vid": "Video model:"
+  "fs.sb.mdl_vid": "Video model:",
+  "fs.regen.similar": "↻ Regenerate segment (similar)",
+  "fs.regen.change": "↻ Regenerate segment (what to change…)",
+  "fs.regen.prompt": "What to change / what should happen:"
 }

@@ -77,6 +77,8 @@ class StoryboardTab(QWidget):
         ev.addWidget(self.edit)
         from ui.film_studio.asset_dialog import attach as _attach_at
         _attach_at(self.edit)
+        from ui.film_studio.regen_menu import attach_regen_menu
+        attach_regen_menu(self.edit)                         # tasto destro su selezione → Rigenera segmento
         from PySide6.QtWidgets import QSpinBox as _SB
         sh_seed = QHBoxLayout()
         sh_seed.addWidget(QLabel(tr("fs.sb.seed", "Seed (0=auto/blocca)")))

@@ -79,6 +79,8 @@ class ScriptTab(QWidget):
         v.addWidget(self.summary)
         v.addWidget(QLabel(tr("fs.script.text", "Copione (editabile)")))
         self.text = QPlainTextEdit()
+        from ui.film_studio.regen_menu import attach_regen_menu
+        attach_regen_menu(self.text)                         # tasto destro su selezione → Rigenera segmento
         v.addWidget(self.text, 1)
         h2 = QHBoxLayout()
         self.btn_save = QPushButton(tr("fs.save", "💾 Salva")); self.btn_save.clicked.connect(self._save)

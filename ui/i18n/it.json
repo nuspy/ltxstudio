@@ -2482,5 +2482,8 @@
   "fs.mt.audio_overflow": "⚠ {k} shot: dialoghi più lunghi della durata (allunga l'inquadratura o taglia il testo)",
   "fs.sb.mdl_default": "(auto)",
   "fs.sb.mdl_img": "Modello immagine:",
-  "fs.sb.mdl_vid": "Modello video:"
+  "fs.sb.mdl_vid": "Modello video:",
+  "fs.regen.similar": "↻ Rigenera segmento (simile)",
+  "fs.regen.change": "↻ Rigenera segmento (cosa cambiare…)",
+  "fs.regen.prompt": "Cosa cambiare / cosa deve avvenire:"
 }
