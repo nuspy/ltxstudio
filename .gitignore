@@ -42,3 +42,4 @@ installer/_cache/
 *.ckpt
 *.pth
 *.gguf
+data/model_vram_cache.json

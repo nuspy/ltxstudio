@@ -265,6 +265,104 @@ def _flux_fp8_e4m3(path: str) -> bool:
         return False
 
 
+_DTYPE_BYTES = {"F8_E4M3": 1, "F8_E5M2": 1, "F16": 2, "BF16": 2, "F32": 4, "F64": 8,
+                "I8": 1, "U8": 1, "I16": 2, "I32": 4, "I64": 8, "BOOL": 1}
+
+
+def _precise_vram_mb(path: str, *, fp8_storage: bool = False) -> int:
+    """Stima PRECISA della VRAM di un checkpoint safetensors: somma i byte REALI in memoria di ogni tensore
+    (per dtype), non 'file×2+overhead'. Regole:
+      - fp8 (F8_*) caricato da from_single_file → diffusers upcasta a bf16 (2B); con storage fp8 resta 1B.
+      - F16/BF16 = 2B, F32 = 4B (norm/embed) restano com'è.
+      - se il file NON include il text-encoder (transformer-only, es. da assemblare) → aggiunge T5+CLIP+VAE.
+    Ritorna 0 se non leggibile (il chiamante ripiega sulla stima grezza). NB: NON per i .gguf (quantizzati)."""
+    try:
+        from core.model_detect import read_header
+        tensors, _ = read_header(path)
+    except Exception:                                        # noqa: BLE001
+        return 0
+    total, has_te = 0.0, False
+    for k, t in tensors.items():
+        if k == "__metadata__":
+            continue
+        kl = k.lower()
+        if any(s in kl for s in ("text_encoder", "t5xxl", "t5.", "cond_stage", "clip_l", "text_model")):
+            has_te = True
+        n = 1
+        for s in t.get("shape", []):
+            n *= int(s)
+        dt = str(t.get("dtype", "F16"))
+        b = _DTYPE_BYTES.get(dt, 2)
+        if dt.startswith("F8") and not fp8_storage:          # upcast fp8→bf16 salvo storage fp8 (layerwise)
+            b = 2
+        total += n * b
+    mb = total / 1024**2
+    if not has_te:                                           # transformer-only → T5(9.1)+CLIP(0.25)+VAE(0.3)
+        mb += 9700
+    return int(mb)
+
+
+_VRAM_CACHE_PATH = r"E:\AI\ltxstudio\data\model_vram_cache.json"
+_vram_cache: dict | None = None
+
+
+def _vram_cache_load() -> dict:
+    global _vram_cache
+    if _vram_cache is None:
+        try:
+            import json
+            with open(_VRAM_CACHE_PATH, encoding="utf-8") as fh:
+                _vram_cache = json.load(fh)
+        except Exception:                                    # noqa: BLE001
+            _vram_cache = {}
+    return _vram_cache
+
+
+def _vram_cache_key(model_path: str) -> str:
+    try:
+        st = os.stat(model_path)
+        return f"{os.path.normpath(model_path).lower()}|{st.st_size}"   # invalida se il file cambia
+    except Exception:                                        # noqa: BLE001
+        return os.path.normpath(model_path).lower()
+
+
+def _vram_cache_get(model_path: str) -> int:
+    return int(_vram_cache_load().get(_vram_cache_key(model_path), {}).get("footprint_mb", 0) or 0)
+
+
+def _vram_cache_put(model_path: str, footprint_mb: int) -> None:
+    if footprint_mb <= 0:
+        return
+    c = _vram_cache_load()
+    c[_vram_cache_key(model_path)] = {"footprint_mb": int(footprint_mb),
+                                      "name": os.path.basename(model_path)}
+    try:
+        import json
+        os.makedirs(os.path.dirname(_VRAM_CACHE_PATH), exist_ok=True)
+        with open(_VRAM_CACHE_PATH, "w", encoding="utf-8") as fh:
+            json.dump(c, fh, indent=1)
+    except Exception:                                        # noqa: BLE001
+        pass
+
+
+def _measure_pipe_mb(pipe) -> int:
+    """Byte REALI in memoria dei moduli pesanti della pipeline (dopo il caricamento: onora dtype effettivi,
+    fp8-storage, upcast). È la misura più accurata → cache su file per riuso."""
+    total = 0
+    for name in ("transformer", "vae", "text_encoder", "text_encoder_2", "text_encoder_3", "unet"):
+        m = getattr(pipe, name, None)
+        if m is None or not hasattr(m, "parameters"):
+            continue
+        try:
+            for p in m.parameters(recurse=True):
+                total += p.numel() * p.element_size()
+            for b in m.buffers(recurse=True):
+                total += b.numel() * b.element_size()
+        except Exception:                                    # noqa: BLE001
+            pass
+    return int(total / 1024**2)
+
+
 def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
     Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dal ramo fp8.
@@ -749,17 +847,33 @@ def _load(model_path: str, arch: str, mm=None):
     # fp8 con layerwise casting (storage fp8) → RESTA ~dim file in memoria (niente upcast ×2) → il
     # full-stack entra GPU-resident. Senza casting (fallback) l'upcast a bf16 raddoppia come prima.
     _fp8_storage = bool(getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False))
-    _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf and not _fp8_storage) else sz_mb
-    # overhead: T5/CLIP/VAE + working. Con storage fp8 il transformer resta PICCOLO (non raddoppia) e nei
-    # checkpoint COMPLETI il file include già gli encoder → overhead ridotto, altrimenti la stima gonfiata
-    # forza un offload inutile (schnell-fp8 16GB → est 27GB → offload, invece entra in VRAM ed è veloce).
-    overhead = 4000 if arch == "zimage" else (6000 if _fp8_storage else 11000)
-    if _is_gguf and sz_mb:
-        est_mb = int(_eff_mb + overhead)                    # NIENTE floor VRAM_MB: il Q4/Q5 è davvero piccolo
-    elif _fp8_storage and sz_mb:
-        est_mb = int(_eff_mb + overhead)                    # fp8-storage: niente floor 24GB (entra sui 32GB)
-    else:
-        est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
+    # STIMA VRAM (dalla più precisa alla più grezza) + working-set attivazioni (fisso, scala poco col ns res):
+    #  1) CACHE su file: footprint REALE misurato dai moduli al 1° caricamento di QUESTO file (il più preciso).
+    #  2) PRECISA dall'header safetensors: byte reali per dtype (fp8→bf16 salvo storage fp8, F32 norm, ecc.).
+    #  3) GREZZA: file×(2 se fp8-upcast) + overhead — solo fallback (gguf o header illeggibile).
+    _WORKING = 3200                                          # attivazioni + VAE decode + workspace (≤1536)
+    _cached = _vram_cache_get(model_path)
+    _precise = 0 if (_is_gguf or _cached) else _precise_vram_mb(model_path, fp8_storage=_fp8_storage)
+    if _cached:
+        est_mb = _cached + _WORKING
+        print(f"[vram] stima da CACHE reale: modello {_cached}MB + working {_WORKING} = {est_mb}MB", flush=True)
+    elif _precise:
+        est_mb = _precise + _WORKING
+        print(f"[vram] stima PRECISA (header): modello {_precise}MB + working {_WORKING} = {est_mb}MB", flush=True)
+    else:                                                    # fallback grezzo (gguf / header illeggibile)
+        _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf and not _fp8_storage) else sz_mb
+        overhead = 4000 if arch == "zimage" else (6000 if _fp8_storage else 11000)
+        if (_is_gguf or _fp8_storage) and sz_mb:
+            est_mb = int(_eff_mb + overhead)                # niente floor VRAM_MB: quantizzato = davvero piccolo
+        else:
+            est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
+    # MISURA REALE dei moduli caricati → salva in cache (riuso ai prossimi load dello stesso file). Onora i
+    # dtype effettivi (fp8-storage/upcast) → è la stima più fedele. Solo per file locali non-gguf.
+    if not _is_gguf and Path(model_path).is_file() and not _cached:
+        _meas = _measure_pipe_mb(pipe)
+        if _meas > 0:
+            _vram_cache_put(model_path, _meas)
+            print(f"[vram] footprint reale misurato: {_meas}MB → salvato in cache", flush=True)
     # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral): NON entra tutto-su-GPU nei 32GB e nemmeno in
     # enable_model_cpu_offload (offload a livello-modello = transformer intero su GPU). Serve offload
     # SEQUENZIALE (granularità per-modulo: un layer alla volta su GPU). Memory-bounded e imposta

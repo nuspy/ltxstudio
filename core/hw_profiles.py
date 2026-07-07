@@ -40,11 +40,14 @@ _PROFILES = [
     (0,   "cpu",      {"NATIVE_FORCE_OFFLOAD": "1", "NATIVE_MAX_RES": "768", "NATIVE_ATTENTION": "sdpa"}),
     (8,   "8GB",      {"NATIVE_FORCE_OFFLOAD": "1", "NATIVE_MAX_RES": "768",  "NATIVE_FMT_HINT": "gguf_q4", "NATIVE_ATTENTION": "auto"}),
     (12,  "12GB",     {"NATIVE_FORCE_OFFLOAD": "1", "NATIVE_MAX_RES": "1024", "NATIVE_FMT_HINT": "gguf_q5", "NATIVE_ATTENTION": "auto"}),
-    (16,  "16GB",     {"NATIVE_GPU_MARGIN": "1.5", "NATIVE_GPU_FLOOR_MB": "2000", "NATIVE_MAX_RES": "1024", "NATIVE_FMT_HINT": "fp8", "NATIVE_ATTENTION": "auto"}),
-    (24,  "24GB",     {"NATIVE_GPU_MARGIN": "1.4", "NATIVE_GPU_FLOOR_MB": "1800", "NATIVE_MAX_RES": "1280", "NATIVE_FMT_HINT": "fp8", "NATIVE_ATTENTION": "auto"}),
-    (32,  "32GB",     {"NATIVE_GPU_MARGIN": "1.35", "NATIVE_GPU_FLOOR_MB": "1500", "NATIVE_MAX_RES": "1536", "NATIVE_FMT_HINT": "fp8_nvfp4", "NATIVE_ATTENTION": "auto"}),
-    (40,  "40GB",     {"NATIVE_GPU_MARGIN": "1.3", "NATIVE_GPU_FLOOR_MB": "1500", "NATIVE_MAX_RES": "2048", "NATIVE_FMT_HINT": "fp8_nvfp4", "NATIVE_ATTENTION": "auto"}),
-    (48,  "48GB+",    {"NATIVE_GPU_MARGIN": "1.25", "NATIVE_GPU_FLOOR_MB": "1500", "NATIVE_MAX_RES": "2048", "NATIVE_FMT_HINT": "bf16_fp8", "NATIVE_ATTENTION": "auto"}),
+    # MARGINE basso: la stima VRAM è ora PRECISA (byte reali dell'header/cache footprint) e include già il
+    # working-set → il margine copre solo l'incertezza di misura, non il grosso overhead di prima. Meno
+    # conservativo = più modelli restano GPU-resident (veloci) invece che offloadati inutilmente.
+    (16,  "16GB",     {"NATIVE_GPU_MARGIN": "1.15", "NATIVE_GPU_FLOOR_MB": "1500", "NATIVE_MAX_RES": "1024", "NATIVE_FMT_HINT": "fp8", "NATIVE_ATTENTION": "auto"}),
+    (24,  "24GB",     {"NATIVE_GPU_MARGIN": "1.12", "NATIVE_GPU_FLOOR_MB": "1200", "NATIVE_MAX_RES": "1280", "NATIVE_FMT_HINT": "fp8", "NATIVE_ATTENTION": "auto"}),
+    (32,  "32GB",     {"NATIVE_GPU_MARGIN": "1.10", "NATIVE_GPU_FLOOR_MB": "1200", "NATIVE_MAX_RES": "1536", "NATIVE_FMT_HINT": "fp8_nvfp4", "NATIVE_ATTENTION": "auto"}),
+    (40,  "40GB",     {"NATIVE_GPU_MARGIN": "1.08", "NATIVE_GPU_FLOOR_MB": "1200", "NATIVE_MAX_RES": "2048", "NATIVE_FMT_HINT": "fp8_nvfp4", "NATIVE_ATTENTION": "auto"}),
+    (48,  "48GB+",    {"NATIVE_GPU_MARGIN": "1.06", "NATIVE_GPU_FLOOR_MB": "1200", "NATIVE_MAX_RES": "2048", "NATIVE_FMT_HINT": "bf16_fp8", "NATIVE_ATTENTION": "auto"}),
 ]
 
 
