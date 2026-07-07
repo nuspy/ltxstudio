@@ -63,6 +63,9 @@ class FilmStudioWindow(QWidget):
         root = QVBoxLayout(self)
         root.addWidget(self._project_bar())
         root.addWidget(LlmSettings())
+        _banner = self._flow_banner()                        # guida al flusso (Classica sì, Pro no — riallineamento)
+        if _banner is not None:
+            root.addWidget(_banner)
         self.tabs = QTabWidget()
         # factory dei tab figli (override in FilmStudioWindowPro per le varianti Pro)
         self.script_tab = self._make_script_tab()
@@ -85,6 +88,15 @@ class FilmStudioWindow(QWidget):
 
     def _get_project(self):
         return self._project_id
+
+    def _flow_banner(self):
+        """Banner-guida al flusso di lavoro, per i PRINCIPIANTI (variante Classica). La Pro lo nasconde (override
+        → None): riallineamento Classica/Pro (prima la guida stava, invertita, nella Pro)."""
+        lbl = QLabel(tr("fs.flow", "Flusso:  ① Copione (idea → Racconto → copione)  →  ② Scenografia "
+                                   "(keyframe → video)  →  ③ Montaggio.   Usa @Nome per la coerenza degli asset."))
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("QLabel{background:#26333f;color:#d6e6f2;padding:6px 10px;border-radius:5px;}")
+        return lbl
 
     # ---- factory dei tab figli (Classica; override nella variante Pro) ----
     def _make_script_tab(self):

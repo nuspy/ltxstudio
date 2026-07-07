@@ -55,11 +55,11 @@ class FilmStudioWindowPro(FilmStudioWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("fs.title.pro", "🎬 AI Film Studio — Pro ✨"))
-        root = self.layout()                                 # [project_bar, LlmSettings, tabs]
-        # FS2 — banner-flusso in cima
-        root.insertWidget(0, self._flow_banner())
-        # FS1 — barra progetto collassabile (ora all'indice 1 dopo il banner)
-        pb = root.itemAt(1).widget()
+        root = self.layout()                                 # [project_bar, LlmSettings, tabs] (Pro: NO banner)
+        # RIALLINEAMENTO: il banner-guida al flusso ora sta nella CLASSICA (principianti); la Pro è lean
+        # (_flow_banner→None). Prima la guida stava, invertita, nella Pro.
+        # FS1 — barra progetto collassabile (project_bar è all'indice 0, niente banner sopra)
+        pb = root.itemAt(0).widget()
         grp = QGroupBox(tr("fs.pro.projbar", "⚙ Impostazioni progetto"))
         grp.setCheckable(True); grp.setChecked(True)
         gl = QVBoxLayout(grp); gl.setContentsMargins(6, 4, 6, 4)
@@ -73,15 +73,9 @@ class FilmStudioWindowPro(FilmStudioWindow):
         # FS5 — conferma prima del Master
         self._wrap_master_confirm()
 
-    # ---------- FS2 banner-flusso ----------
-    def _flow_banner(self) -> QWidget:
-        w = QWidget(); h = QHBoxLayout(w); h.setContentsMargins(6, 4, 6, 4)
-        lab = QLabel(tr("fs.pro.flow",
-            "Flusso:  ①  Copione   →   ②  Scenografia   →   ③  Montaggio   →   ④  Master"))
-        lab.setStyleSheet("color:#9aa0b4; padding:5px 10px; background:#181818; border:1px solid #2a2a2a; "
-                          "border-radius:6px; font-size:12px;")
-        h.addWidget(lab); h.addStretch(1)
-        return w
+    # ---------- riallineamento: Pro lean (la guida al flusso sta nella Classica) ----------
+    def _flow_banner(self):
+        return None                                          # nessun banner-guida in Pro (utenti esperti)
 
     # ---------- FS3 vista coda scheduler ----------
     def _queue_panel(self) -> QWidget:

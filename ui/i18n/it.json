@@ -2525,5 +2525,6 @@
   "fs.sb.takes_done": "Take v{v} ripristinato come corrente.",
   "fs.script.gen_narr": "📖 Genera Racconto",
   "fs.script.racconto": "Racconto cinematografico (prosa, editabile)",
-  "fs.ward.done": "Abbigliamento: {n} angoli generati"
+  "fs.ward.done": "Abbigliamento: {n} angoli generati",
+  "fs.flow": "Flusso:  ① Copione (idea → Racconto → copione)  →  ② Scenografia (keyframe → video)  →  ③ Montaggio.   Usa @Nome per la coerenza degli asset."
 }
