@@ -885,11 +885,20 @@ def _load(model_path: str, arch: str, mm=None):
     if os.environ.get("NATIVE_VAE_TILING") == "1":
         try:
             pipe.vae.enable_tiling()
+            print("[image] VAE TILING ATTIVO (NATIVE_VAE_TILING=1) — attenzione: può lasciare griglia/mosaico",
+                  flush=True)
         except Exception:                               # noqa: BLE001
             pass
     else:
         try:
-            pipe.vae.disable_tiling()
+            pipe.vae.disable_tiling()                    # niente giunzioni rettangolari sul decode
+            pipe.vae.disable_slicing()                   # slicing sul batch: irrilevante qui, ma azzeriamo tutto
+        except Exception:                               # noqa: BLE001
+            pass
+        # DIAGNOSTICA: se qualcuno vede ancora una griglia, il log dice lo stato reale del tiling del VAE.
+        try:
+            print(f"[image] VAE tiling={getattr(pipe.vae, 'use_tiling', '?')} "
+                  f"slicing={getattr(pipe.vae, 'use_slicing', '?')}", flush=True)
         except Exception:                               # noqa: BLE001
             pass
     attn = _set_attention(pipe, arch)

@@ -189,8 +189,13 @@ def sign_image(bgr, nonce: int | None = None, text: str | None = None):
         S[_MASK] = coeffs
         spat = cv2.idct(S)
         spat = cv2.resize(spat, (tw, th), interpolation=cv2.INTER_LINEAR)
-        spat *= (0.6 + 0.4 * min(1.0, tile.std() / 32.0))    # meno segnale nelle zone piatte (invisibilità)
-        Y[y0:y1, x0:x1] = np.clip(tile + spat, 0, 255)
+        # MASCHERA PERCETTIVA PER-PIXEL (non più per-tile): nasconde il segnale nel DETTAGLIO locale (|Laplaciano|
+        # sfumato) e lo azzera quasi del tutto sulle zone LISCE (pelle, cielo). Prima il floor 0.6 lasciava il 60%
+        # del segnale anche sul piatto → griglia 8×8 + macchie visibili (il bug segnalato). Ora il liscio prende
+        # ~8% (invisibile), la texture il 100% (watermark ancora rilevabile: la correlazione vive nel dettaglio).
+        act = cv2.GaussianBlur(np.abs(cv2.Laplacian(tile, cv2.CV_32F, ksize=3)), (0, 0), 2.0)
+        act = np.clip(act / 6.0, 0.08, 1.0)
+        Y[y0:y1, x0:x1] = np.clip(tile + spat * act, 0, 255)
     ycc[:, :, 0] = Y
     return cv2.cvtColor(np.clip(ycc, 0, 255).astype(np.uint8), cv2.COLOR_YCrCb2BGR)
 
