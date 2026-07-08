@@ -11,6 +11,16 @@ from __future__ import annotations
 import argparse, os, sys, importlib.util, time, traceback
 from pathlib import Path
 
+# TIMEOUT DI SICUREZZA sul Blender headless: sktn._run_headless_blender fa subprocess.run SENZA timeout → se
+# l'export si impianta (mesh troppo densa) resta appeso all'INFINITO (visto: 24 min). Monkeypatchiamo
+# subprocess.run per iniettare un timeout di default (kill del figlio allo scadere → errore pulito, niente hang).
+import subprocess as _sp
+_orig_run = _sp.run
+def _run_with_timeout(*_a, **_kw):
+    _kw.setdefault("timeout", int(os.environ.get("RIG_BLENDER_TIMEOUT", "420") or 420))
+    return _orig_run(*_a, **_kw)
+_sp.run = _run_with_timeout
+
 COMFY = os.environ.get("SKINTOKEN_COMFY_ROOT", r"E:\AI\Comfy_Nexus.bak\ComfyUI")
 SKDIR = os.path.join(COMFY, "custom_nodes", "ComfyUI-SkinToken")
 
@@ -65,7 +75,21 @@ def main():
     print("[rig] sktn_nodes importato", flush=True)
     import trimesh as Trimesh
     mesh = Trimesh.load(a.mesh, force="mesh")
-    print(f"[rig] mesh in: {len(mesh.vertices)} vert", flush=True)
+    print(f"[rig] mesh in: {len(mesh.vertices)} vert / {len(mesh.faces)} facce", flush=True)
+    # DECIMAZIONE anti-hang: una mesh molto densa (es. 467k facce da TRELLIS) fa IMPANTANARE l'export Blender
+    # (remove_doubles/gltf) → il rig restava appeso all'infinito. La portiamo a ~100k facce (qualità del rig
+    # invariata, export in pochi secondi). Env RIG_MAX_FACES (0 = disattiva).
+    _maxf = int(os.environ.get("RIG_MAX_FACES", "120000") or 0)
+    if _maxf and len(mesh.faces) > _maxf:
+        try:
+            _tr = max(0.05, min(0.95, 1.0 - (100000.0 / len(mesh.faces))))
+            _dec = mesh.simplify_quadric_decimation(_tr)
+            if _dec is not None and len(_dec.faces) > 100:
+                print(f"[rig] mesh decimata {len(mesh.faces)}→{len(_dec.faces)} facce (evita l'hang dell'export)",
+                      flush=True)
+                mesh = _dec
+        except Exception as _de:                              # noqa: BLE001
+            print(f"[rig] decimazione saltata ({_de}) — export potenzialmente lento", flush=True)
 
     ckpt = sktn.DEFAULT_TOKENRIG_CKPT
     sktn._ensure_required_models(ckpt)                        # scarica grpo/VAE/Qwen al primo uso
