@@ -161,6 +161,17 @@ class StoryboardTab(QWidget):
         eh.addWidget(self.btn_regen_kf); eh.addWidget(self.btn_regen_vid)
         eh.addWidget(self.btn_coverage); eh.addWidget(self.btn_takes); eh.addStretch(1)
         ev.addLayout(eh)
+        # Strip-varianti INLINE: i take del keyframe dello shot selezionato come thumbnail cliccabili
+        # (curatela senza dialog: clic = ripristina quel take come corrente, non-distruttivo).
+        from PySide6.QtWidgets import QListWidget as _LW
+        self.takes_lbl = QLabel(tr("fs.sb.variants", "Varianti (take) — clic per ripristinare:"))
+        self.takes_strip = _LW(); self.takes_strip.setViewMode(_LW.IconMode); self.takes_strip.setFlow(_LW.LeftToRight)
+        self.takes_strip.setWrapping(False); self.takes_strip.setFixedHeight(92)
+        from PySide6.QtCore import QSize as _QSz
+        self.takes_strip.setIconSize(_QSz(120, 68)); self.takes_strip.setMovement(_LW.Static)
+        self.takes_strip.itemClicked.connect(self._restore_take_inline)
+        self.takes_lbl.setVisible(False); self.takes_strip.setVisible(False)
+        ev.addWidget(self.takes_lbl); ev.addWidget(self.takes_strip)
         v.addWidget(eb)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(80)
         v.addWidget(self.log)
@@ -485,8 +496,9 @@ class StoryboardTab(QWidget):
     def _on_tree_sel(self, cur, _prev):
         self._sel = cur.data(0, Qt.UserRole) if cur else None
         if not self._sel:
-            self.edit.clear(); return
+            self.edit.clear(); self._reload_takes_strip(); return
         kind, rid = self._sel
+        self._reload_takes_strip()
         row = db.get(kind, rid)
         self.edit.setPlainText((row or {}).get("description", "") if row else "")
         self.cam_box.setVisible(kind == "shot")
@@ -518,6 +530,51 @@ class StoryboardTab(QWidget):
     def _save_seed(self):
         if self._sel and self._sel[0] == "shot":
             db.update("shot", self._sel[1], seed=int(self.shot_seed.value()))
+
+    def _reload_takes_strip(self):
+        """Popola la strip-varianti inline coi take del keyframe dello shot selezionato (o la nasconde)."""
+        if not hasattr(self, "takes_strip"):
+            return
+        self.takes_strip.clear()
+        show = bool(self._sel and self._sel[0] == "shot")
+        tk = []
+        if show:
+            from core.film_studio import takes
+            tk = takes.list_takes("shot", self._sel[1], "keyframe")
+        show = show and len(tk) > 0
+        self.takes_lbl.setVisible(show); self.takes_strip.setVisible(show)
+        if not show:
+            return
+        from PySide6.QtWidgets import QListWidgetItem
+        from PySide6.QtGui import QIcon
+        import os as _os
+        cur = self._current_kf_path()
+        cur_size = _os.path.getsize(cur) if (cur and _os.path.exists(cur)) else -1
+        for t in tk:
+            if not _os.path.exists(t["file"]):
+                continue
+            it = QListWidgetItem(QIcon(t["file"]), f"v{t['version']}")
+            it.setData(Qt.UserRole, t["version"])
+            if cur_size >= 0 and _os.path.getsize(t["file"]) == cur_size:   # take corrente (evidenziato)
+                it.setText(f"● v{t['version']}")
+            self.takes_strip.addItem(it)
+
+    def _current_kf_path(self) -> str:
+        if not (self._sel and self._sel[0] == "shot"):
+            return ""
+        sh = db.get("shot", self._sel[1]); sc = db.get("scene", sh["scene_id"]); pid = self._get_project()
+        return str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}_kf.png")
+
+    def _restore_take_inline(self, item):
+        """Clic su una variante nella strip → la ripristina come keyframe corrente (non-distruttivo)."""
+        if not (self._sel and self._sel[0] == "shot"):
+            return
+        from core.film_studio import takes
+        ver = item.data(Qt.UserRole)
+        canon = self._current_kf_path()
+        if canon and takes.restore_take("shot", self._sel[1], "keyframe", ver, canon):
+            self._refresh(); self._reload_takes_strip()
+            self.log.appendPlainText(tr("fs.sb.takes_done", "Take v{v} ripristinato come corrente.").format(v=ver))
 
     def _browse_takes(self):
         """Storia dei take del keyframe dello shot selezionato: galleria + ripristino non-distruttivo."""
@@ -759,6 +816,8 @@ class StoryboardTab(QWidget):
                     if p.get("_owner_kind") == "shot" and p.get("out"):
                         kind = "keyframe" if job.get("type") == "image" else "video"
                         takes.record_take("shot", int(p["_owner_id"]), kind, p["out"])
+                        if self._sel and self._sel[0] == "shot" and int(p["_owner_id"]) == int(self._sel[1]):
+                            self._reload_takes_strip()          # nuovo take → aggiorna la strip inline
                 except Exception:                            # noqa: BLE001
                     pass
             # #54 orchestrazione Auto a fasi: keyframe → video → montaggio
