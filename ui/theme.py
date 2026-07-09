@@ -101,10 +101,13 @@ QComboBox::down-arrow {{
     border-top: 6px solid {MUTED}; margin-right: 8px;
 }}
 QComboBox QAbstractItemView {{
-    background: {ELEV}; color: {TEXT};
+    background: {ELEV};
     border: 1px solid {BORDER_HI}; border-radius: 8px;
     selection-background-color: {ACCENT}; selection-color: #fff; outline: 0;
 }}
+/* NB: NIENTE `color:` qui. Un `color` sul popup fa sì che QStyleSheetStyle ignori il
+   Qt.ForegroundRole per-item → i colori VRAM verde/giallo/rosso dei modelli sparivano.
+   Il colore di default degli item eredita da `QWidget {{ color }}`; il per-item lo sovrascrive. */
 QSpinBox::up-button, QDoubleSpinBox::up-button,
 QSpinBox::down-button, QDoubleSpinBox::down-button {{
     background: {ELEV2}; border: none; width: 16px; border-radius: 4px; margin: 1px;
