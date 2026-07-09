@@ -1083,6 +1083,53 @@ def _default_model(arch: str) -> str:
     raise RuntimeError("nessun modello specificato e nessun FLUX trovato in diffusion_models")
 
 
+def _seam_tone_match(res_img, orig_img, mask_bool, feather: int, *, gain: bool = True,
+                     tau_mult: float = 3.0, clamp: int = 40):
+    """Elimina la LINEA di giunzione e il salto di tono (luminosità/saturazione/contrasto) tra la parte
+    ESISTENTE (foto) e la parte GENERATA, portando la tonalità del generato a quella della foto sui pixel di
+    CONFINE, con correzione forte al bordo che sfuma verso l'interno (distance transform). Usato sia da OUTPAINT
+    sia da INPAINT (prima solo outpaint → l'inpaint mostrava la linea + il cambio di saturazione/luminosità).
+
+    `mask_bool`: True = pixel GENERATO (da correggere), False = pixel FOTO (riferimento).
+    `gain=True`: applica anche un guadagno per-canale (std foto / std generato) → riallinea il CONTRASTO e la
+    SATURAZIONE al bordo, non solo la luminosità media. Seam-localizzato (falloff) per non ridipingere un
+    eventuale oggetto inserito lontano dal bordo. Ritorna l'immagine corretta (o l'originale se non applicabile).
+    """
+    try:
+        import cv2 as _cv2
+        import numpy as _np
+    except Exception:                                       # noqa: BLE001
+        return res_img
+    try:
+        _mk = _np.asarray(mask_bool, dtype=bool)
+        _ext = _mk.astype(_np.uint8); _pho = (~_mk).astype(_np.uint8)
+        _D = max(6, int(feather))
+        _ker = _np.ones((_D, _D), _np.uint8)
+        _seam_pho = (_pho > 0) & (_cv2.dilate(_ext, _ker) > 0)      # foto adiacente al bordo
+        _seam_gen = (_ext > 0) & (_cv2.dilate(_pho, _ker) > 0)      # generato adiacente al bordo
+        if _seam_pho.sum() < 50 or _seam_gen.sum() < 50:
+            return res_img
+        _g = _np.asarray(res_img, dtype=_np.float32)
+        _o = _np.asarray(orig_img, dtype=_np.float32)
+        m_pho = _o[_seam_pho].mean(0); m_gen = _g[_seam_gen].mean(0)               # medie per-canale al bordo
+        _off = _np.clip(m_pho - m_gen, -clamp, clamp)
+        if gain:
+            s_pho = _o[_seam_pho].std(0) + 1e-3; s_gen = _g[_seam_gen].std(0) + 1e-3
+            _gain = _np.clip(s_pho / s_gen, 0.80, 1.25)                            # riallinea contrasto/saturazione
+        else:
+            _gain = _np.ones(3, _np.float32)
+        _dist = _cv2.distanceTransform(_ext, _cv2.DIST_L2, 3)                      # 0 al bordo → cresce dentro
+        _tau = max(24.0, float(feather) * tau_mult)
+        _w = (_np.exp(-_dist / _tau)[:, :, None] * _mk[:, :, None]).astype(_np.float32)   # forte al bordo, sfuma
+        _corr = (_g - m_gen[None, None, :]) * _gain[None, None, :] + m_gen[None, None, :] + _off[None, None, :]
+        _g = _g * (1.0 - _w) + _corr * _w                                          # miscela: solo vicino al bordo
+        from PIL import Image as _Image
+        return _Image.fromarray(_np.clip(_g, 0, 255).astype("uint8"))
+    except Exception as _ce:                                # noqa: BLE001
+        print(f"[seam] tone-match saltato ({_ce})", flush=True)
+        return res_img
+
+
 def run(params: dict, mm, output_dir: str) -> dict:
     import torch
     from PIL import Image
@@ -1269,37 +1316,25 @@ def run(params: dict, mm, output_dir: str) -> dict:
             # Feather DIFFERENZIATO per modalità (l'inpaint andava bene "prima", solo l'outpaint aveva la linea):
             #  • INPAINT → anello SOTTILE (auto ~min_lato/128, 4–14 px): niente degradazione attorno all'edit.
             #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione + COLOR-MATCH al bordo.
+            import numpy as _np
+            _mk_bool = (_np.asarray(_m, dtype=_np.uint8) > 127)      # True = pixel da (ri)generare
             if params.get("outpaint"):
                 _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
-                # COLOR-MATCH: la linea di stacco residua è un salto di TONO (l'estensione ha luminosità/colore un
-                # filo diversi dalla foto). Portiamo la tonalità dell'estensione a quella della foto sui pixel di
-                # CONFINE, con correzione forte al bordo che sfuma verso l'interno dell'estensione (distance transf).
-                # Env NATIVE_OUTPAINT_COLORMATCH=0 per disattivare.
+                # COLOR-MATCH al bordo (outpaint): l'estensione ha tono/luminosità un filo diversi dalla foto →
+                # linea di stacco. Riallinea al confine con falloff verso l'interno. Env NATIVE_OUTPAINT_COLORMATCH=0.
                 if os.environ.get("NATIVE_OUTPAINT_COLORMATCH", "1") == "1":
-                    try:
-                        import numpy as _np, cv2 as _cv2
-                        _mk = (_np.asarray(_m, dtype=_np.uint8) > 127)       # True = estensione (generata)
-                        _ext = _mk.astype(_np.uint8); _pho = (~_mk).astype(_np.uint8)
-                        _D = max(6, int(_feather))
-                        _ker = _np.ones((_D, _D), _np.uint8)
-                        _seam_pho = (_pho > 0) & (_cv2.dilate(_ext, _ker) > 0)   # foto adiacente al bordo
-                        _seam_gen = (_ext > 0) & (_cv2.dilate(_pho, _ker) > 0)   # estensione adiacente al bordo
-                        if _seam_pho.sum() > 50 and _seam_gen.sum() > 50:
-                            _g = _np.asarray(res_img, dtype=_np.float32)
-                            _o = _np.asarray(_orig, dtype=_np.float32)
-                            _off = _np.clip(_o[_seam_pho].mean(0) - _g[_seam_gen].mean(0), -45, 45)  # per-canale
-                            _dist = _cv2.distanceTransform(_ext, _cv2.DIST_L2, 3)   # 0 al bordo → cresce dentro
-                            _tau = max(24.0, _feather * 3.0)
-                            _w = _np.exp(-_dist / _tau)[:, :, None] * _mk[:, :, None]  # forte al bordo, sfuma; solo estensione
-                            _g = _g + _off[None, None, :] * _w
-                            res_img = Image.fromarray(_np.clip(_g, 0, 255).astype("uint8"))
-                    except Exception as _ce:                                 # noqa: BLE001
-                        print(f"[outpaint] color-match saltato ({_ce})", flush=True)
+                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
                 _fo = int(round(_feather * 1.9))                         # dilata la regione generata prima di sfumare
                 _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))       # → la sfumatura NON tocca il bordo tela
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
             else:
                 _feather = int(params.get("feather") or 0) or max(4, min(14, int(round(min(res_img.size) / 128))))
+                # COLOR-MATCH al bordo (INPAINT — prima MANCAVA): il generato ha spesso luminosità/saturazione/
+                # contrasto un filo diversi dalla foto → LINEA di giunzione + "cambio di tono" visibili su aree
+                # ampie/lisce. Seam-localizzato (falloff dal bordo) per NON ridipingere un eventuale oggetto
+                # inserito lontano dal bordo. Env NATIVE_INPAINT_COLORMATCH=0 per disattivare.
+                if os.environ.get("NATIVE_INPAINT_COLORMATCH", "1") == "1":
+                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
                 _m = _m.filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
