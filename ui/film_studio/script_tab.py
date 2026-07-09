@@ -74,10 +74,14 @@ class ScriptTab(QWidget):
         from ui.film_studio.asset_dialog import attach as _attach_at
         _attach_at(self.inp)                              # digitando @ si apre l'AssetDialog
         h = QHBoxLayout()
+        self.btn_table = QPushButton(tr("fs.script.table", "🎲 Tavolo (bivi/beat)"))
+        self.btn_table.setToolTip(tr("fs.script.table_tt", "Co-scrittura interattiva: l'LLM propone i beat della "
+                                     "storia con bivi alternativi; scegli un ramo per beat e li intreccia nel Racconto."))
+        self.btn_table.clicked.connect(self._cowrite_table)
         self.btn_racconto = QPushButton(tr("fs.script.gen_narr", "📖 Genera Racconto")); self.btn_racconto.clicked.connect(self._gen_racconto)
         self.btn_gen = QPushButton(tr("fs.script.gen", "✍️ Genera copione")); self.btn_gen.clicked.connect(self._gen)
         self.btn_regen = QPushButton(tr("fs.script.regen", "↻ Rigenera")); self.btn_regen.clicked.connect(self._regen)
-        h.addWidget(self.btn_racconto); h.addWidget(self.btn_gen); h.addWidget(self.btn_regen); h.addStretch(1)
+        h.addWidget(self.btn_table); h.addWidget(self.btn_racconto); h.addWidget(self.btn_gen); h.addWidget(self.btn_regen); h.addStretch(1)
         bv.addLayout(h)
         v.addWidget(box)
         v.addWidget(QLabel(tr("fs.script.racconto", "Racconto cinematografico (prosa, editabile)")))
@@ -148,6 +152,93 @@ class ScriptTab(QWidget):
     def _on_racconto_fail(self, err: str):
         self.btn_racconto.setEnabled(True)
         QMessageBox.critical(self, tr("fs.script.gen_narr", "Racconto"), str(err)[:600])
+
+    # ---- Co-scrittura interattiva: tavolo a beat/bivi ----
+    def _cowrite_table(self):
+        """Genera i beat con bivi (worker) e apre il tavolo di scelta."""
+        if not self.inp.toPlainText().strip():
+            QMessageBox.information(self, tr("fs.script.table", "Tavolo"), tr("fs.script.need_input", "Inserisci un input.")); return
+        if not L.available():
+            QMessageBox.warning(self, tr("fs.script.table", "Tavolo"), tr("fs.llm.unavailable", "LLM non disponibile.")); return
+        self.btn_table.setEnabled(False)
+        idea = self.inp.toPlainText().strip()
+        styles, genres = self.styles.currentText().strip(), self.genres.currentText().strip()
+        from PySide6.QtCore import QThread, Signal
+
+        class _BeatsWorker(QThread):
+            done = Signal(list)
+
+            def run(self):
+                from core.film_studio import cowriter
+                try:
+                    self.done.emit(cowriter.propose_beats(idea, styles, genres))
+                except Exception:                            # noqa: BLE001
+                    self.done.emit([])
+        self.summary.setPlainText(tr("fs.working", "Generazione…"))
+        self._beats_w = _BeatsWorker(); self._beats_w.done.connect(self._show_table); self._beats_w.start()
+
+    def _show_table(self, beats: list):
+        self.btn_table.setEnabled(True)
+        self.summary.setPlainText("")
+        if not beats:
+            QMessageBox.information(self, tr("fs.script.table", "Tavolo"),
+                                   tr("fs.script.table_none", "Nessun beat proposto (LLM non disponibile o risposta vuota).")); return
+        from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QVBoxLayout, QScrollArea, QWidget as _W,
+                                       QGroupBox, QRadioButton, QButtonGroup, QLabel as _L)
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.script.table", "🎲 Tavolo di co-scrittura")); dlg.resize(640, 620)
+        outer = QVBoxLayout(dlg)
+        outer.addWidget(_L(tr("fs.script.table_head", "Scegli un ramo per ogni beat: verranno intrecciati nel Racconto.")))
+        area = QScrollArea(); area.setWidgetResizable(True); inner = _W(); iv = QVBoxLayout(inner)
+        groups = []
+        for bi, b in enumerate(beats):
+            gb = QGroupBox(f"{bi + 1}. {b['beat']}"); gv = QVBoxLayout(gb)
+            bg = QButtonGroup(dlg)
+            for oi, o in enumerate(b["options"]):
+                rb = QRadioButton(f"{o['label']} — {o['text']}")
+                if oi == 0:
+                    rb.setChecked(True)
+                bg.addButton(rb, oi); gv.addWidget(rb)
+            iv.addWidget(gb); groups.append((b, bg))
+        iv.addStretch(1); area.setWidget(inner); outer.addWidget(area, 1)
+        bb = QDialogButtonBox(); bb.addButton(tr("fs.script.table_weave", "Intreccia nel Racconto"), QDialogButtonBox.AcceptRole)
+        bb.addButton(QDialogButtonBox.Cancel); bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        outer.addWidget(bb)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        chosen = []
+        for b, bg in groups:
+            oi = bg.checkedId() if bg.checkedId() >= 0 else 0
+            o = b["options"][oi] if oi < len(b["options"]) else b["options"][0]
+            chosen.append({"beat": b["beat"], "label": o["label"], "text": o["text"]})
+        self._assemble_chosen(chosen)
+
+    def _assemble_chosen(self, chosen: list):
+        """Intreccia i rami scelti in un racconto (worker) → campo Racconto."""
+        self.btn_table.setEnabled(False); self.racconto.setPlainText(tr("fs.working", "Generazione…"))
+        idea = self.inp.toPlainText().strip()
+        styles, genres = self.styles.currentText().strip(), self.genres.currentText().strip()
+        from PySide6.QtCore import QThread, Signal
+
+        class _AsmWorker(QThread):
+            done = Signal(str)
+
+            def run(self):
+                from core.film_studio import cowriter
+                try:
+                    self.done.emit(cowriter.assemble(idea, chosen, styles, genres))
+                except Exception:                            # noqa: BLE001
+                    self.done.emit("")
+        self._asm_w = _AsmWorker(); self._asm_w.done.connect(self._on_assembled); self._asm_w.start()
+
+    def _on_assembled(self, txt: str):
+        self.btn_table.setEnabled(True)
+        if not txt:
+            self.racconto.setPlainText("")
+            QMessageBox.information(self, tr("fs.script.table", "Tavolo"), tr("fs.script.table_fail", "Racconto non generato.")); return
+        self.racconto.setPlainText(txt.strip())
+        pid = self._get_project()
+        if pid:
+            db.save_script(pid, txt.strip(), summary="racconto", kind="narrative")
 
     def _on_done(self, txt: str):
         self.btn_gen.setEnabled(True); self.btn_regen.setEnabled(True)
