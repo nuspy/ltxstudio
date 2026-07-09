@@ -37,12 +37,18 @@ class MontageTab(QWidget):
         v = QVBoxLayout(self)
         h = QHBoxLayout()
         self.btn_refresh = QPushButton(tr("fs.mt.refresh", "↻ Aggiorna timeline")); self.btn_refresh.clicked.connect(self._refresh)
-        h.addWidget(self.btn_refresh); h.addStretch(1)
+        self.btn_reintegra = QPushButton(tr("fs.mt.reintegra", "↩ Reintegra clip escluse"))
+        self.btn_reintegra.setToolTip(tr("fs.mt.reintegra_tt", "Annulla le esclusioni «ripple» delle clip video."))
+        self.btn_reintegra.clicked.connect(self._reintegra)
+        h.addWidget(self.btn_refresh); h.addWidget(self.btn_reintegra); h.addStretch(1)
         v.addLayout(h)
         # #53 timeline visuale (clip video trascinabili + tracce audio)
         from ui.film_studio.timeline_widget import TimelineWidget
         self.timeline = TimelineWidget()
         self.timeline.reordered.connect(self._on_reorder)
+        self.timeline.ripple_deleted.connect(self._on_ripple)     # clip esclusa dal master (reversibile)
+        self.timeline.markers_changed.connect(self._on_markers)   # marker persistiti in project.config
+        self._ripple_excluded = set()
         v.addWidget(self.timeline)
         self.lst = QListWidget(); v.addWidget(self.lst, 1)
         box = QGroupBox(tr("fs.mt.output", "Output")); bv = QVBoxLayout(box)
@@ -293,6 +299,8 @@ class MontageTab(QWidget):
         out = []
         for sc in db.query("scene", "project_id=?", (pid,), order="ord"):
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+                if sh["id"] in self._ripple_excluded:            # esclusa via ripple delete (reversibile)
+                    continue
                 f = str(db.project_dir(pid) / f"scene_{sc['ord']}" / f"shot_{sh['ord']}.mp4")
                 if Path(f).exists():
                     ins, outs = float(sh.get("in_s", 0) or 0), float(sh.get("out_s", 0) or 0)  # trim per-shot
@@ -307,17 +315,48 @@ class MontageTab(QWidget):
         self._cur_clips = self._clips()
         for c in self._cur_clips:
             self.lst.addItem(f"{c['name']}  ({c['out_s']:.0f}s)  {Path(c['file']).name}")
-        # #53 popola la timeline visuale (clip video + tracce audio già generate)
+        # #53 popola la timeline visuale (clip video + tracce audio già generate, con waveform)
         audio = []
         for tr_name, src in [("dialoghi", getattr(self, "_audio_tracks", [])),
                              ("musica", getattr(self, "_extra_tracks", [])),
                              ("ambient", getattr(self, "_ambient_tracks", []))]:
             for a in src:
                 audio.append({"track": tr_name, "start_s": a.get("start_s", 0),
-                              "dur_s": a.get("dur_s", 4), "label": tr_name})
+                              "dur_s": a.get("dur_s", 4), "label": tr_name, "path": a.get("path", "")})
         self.timeline.set_data([{"id": c["shot_id"], "label": c["name"], "duration_s": c["out_s"]}
-                                for c in self._cur_clips], audio)
-        self.info.setText(tr("fs.mt.count", "{n} clip in timeline").format(n=len(self._cur_clips)))
+                                for c in self._cur_clips], audio, markers=self._load_markers())
+        extra = ""
+        if self._ripple_excluded:
+            extra = " · " + tr("fs.mt.excluded", "{k} escluse (ripple)").format(k=len(self._ripple_excluded))
+        self.info.setText(tr("fs.mt.count", "{n} clip in timeline").format(n=len(self._cur_clips)) + extra)
+
+    def _load_markers(self) -> list:
+        import json
+        pid = self._get_project()
+        if not pid:
+            return []
+        cfg = json.loads((db.get("project", pid) or {}).get("config") or "{}")
+        return cfg.get("markers", []) or []
+
+    def _on_markers(self, marks: list):
+        """Persiste i marker della timeline nella config del progetto."""
+        import json
+        pid = self._get_project()
+        if not pid:
+            return
+        cfg = json.loads((db.get("project", pid) or {}).get("config") or "{}")
+        cfg["markers"] = [float(m) for m in marks]
+        db.update("project", pid, config=json.dumps(cfg, ensure_ascii=False))
+
+    def _on_ripple(self, shot_id: int):
+        """Ripple delete: esclude la clip dal master (chiude il buco). Reversibile con «Reintegra»."""
+        self._ripple_excluded.add(int(shot_id))
+        self._refresh()
+
+    def _reintegra(self):
+        self._ripple_excluded.clear()
+        self._refresh()
+        self.info.setText(tr("fs.mt.reintegra_done", "Clip escluse reintegrate."))
 
     def _on_reorder(self, shot_ids: list):
         """#53 Drop sulla timeline → riscrive l'ord degli shot secondo il nuovo ordine visuale."""
