@@ -48,6 +48,18 @@ class StoryboardTab(QWidget):
         h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video)
         h.addWidget(self.btn_auto); h.addWidget(self.btn_shotlist); h.addWidget(self.btn_bible); h.addStretch(1)
         v.addLayout(h)
+        # Moonshot — agenti autoriali (LLM): segretario di edizione + direttore della fotografia
+        hm = QHBoxLayout()
+        self.btn_supervisor = QPushButton(tr("fs.sb.supervisor", "🧐 Supervisore continuità"))
+        self.btn_supervisor.setToolTip(tr("fs.sb.supervisor_tt", "Rilegge il breakdown e segnala i salti di "
+                                          "raccordo (180°/eyeline, oggetti, ora del giorno, condizioni)."))
+        self.btn_supervisor.clicked.connect(self._run_supervisor)
+        self.btn_dop = QPushButton(tr("fs.sb.dop", "🎥 DoP: suggerisci ripresa"))
+        self.btn_dop.setToolTip(tr("fs.sb.dop_tt", "Il direttore della fotografia propone camera+luce per gli "
+                                   "shot della SCENA selezionata, dalla Style Bible. Applichi ciò che vuoi."))
+        self.btn_dop.clicked.connect(self._run_dop)
+        hm.addWidget(self.btn_supervisor); hm.addWidget(self.btn_dop); hm.addStretch(1)
+        v.addLayout(hm)
         # B5: selettori modello immagine/video del progetto (salvati in config; niente più hardcode flux)
         mrow = QHBoxLayout()
         self.mdl_img = QComboBox(); self.mdl_vid = QComboBox()
@@ -548,6 +560,91 @@ class StoryboardTab(QWidget):
                                    tr("fs.sb.cov_none", "Servono ≥2 battute di dialogo per la copertura.")); return
         self._refresh()
         self.log.appendPlainText(tr("fs.sb.cov_done", "Copertura: {n} inquadrature (campo/controcampo).").format(n=len(ids)))
+
+    def _run_supervisor(self):
+        """Moonshot — segretario di edizione: rilegge il breakdown e segnala i salti di raccordo."""
+        pid = self._get_project()
+        if not pid or not db.query("scene", "project_id=?", (pid,)):
+            QMessageBox.information(self, tr("fs.sb.supervisor", "Supervisore"),
+                                   tr("fs.sb.no_break", "Fai prima il breakdown (scene/inquadrature).")); return
+        self.btn_supervisor.setEnabled(False); self.log.appendPlainText(tr("fs.working", "Generazione…"))
+        from PySide6.QtCore import QThread, Signal
+
+        class _W(QThread):
+            done = Signal(dict)
+
+            def run(self):
+                from core.film_studio import supervisor
+                try:
+                    self.done.emit(supervisor.script_supervisor(pid))
+                except Exception as e:                       # noqa: BLE001
+                    self.done.emit({"deterministic": [], "llm": [], "available": False, "error": str(e)})
+        self._sup_w = _W(); self._sup_w.done.connect(self._on_supervisor); self._sup_w.start()
+
+    def _on_supervisor(self, res: dict):
+        self.btn_supervisor.setEnabled(True)
+        lines = []
+        for w in res.get("deterministic", []):
+            lines.append("• [continuity] " + w)
+        for i in res.get("llm", []):
+            sev = {"high": "‼", "med": "⚠", "low": "·"}.get(i.get("severity", "med"), "⚠")
+            lines.append(f"{sev} [{i.get('where', '?')}] {i.get('kind', '')}: {i.get('note', '')}")
+        if not lines:
+            lines = [tr("fs.sb.sup_clean", "✓ Nessun salto di raccordo evidente.")
+                     + ("" if res.get("available") else " " + tr("fs.llm.unavailable", "(LLM non disponibile — solo controlli base)"))]
+        self.log.appendPlainText(tr("fs.sb.sup_head", "🧐 Supervisore continuità:"))
+        for ln in lines:
+            self.log.appendPlainText("  " + ln)
+
+    def _run_dop(self):
+        """Moonshot — direttore della fotografia: propone camera+luce per gli shot della scena selezionata."""
+        if not self._sel or self._sel[0] != "scene":
+            QMessageBox.information(self, tr("fs.sb.dop", "DoP"), tr("fs.sb.sel_scene", "Seleziona una scena.")); return
+        if not L.available():
+            QMessageBox.warning(self, tr("fs.sb.dop", "DoP"), tr("fs.llm.unavailable", "LLM non disponibile.")); return
+        scene_id = self._sel[1]
+        self.btn_dop.setEnabled(False); self.log.appendPlainText(tr("fs.working", "Generazione…"))
+        from PySide6.QtCore import QThread, Signal
+
+        class _W(QThread):
+            done = Signal(list)
+
+            def run(self):
+                from core.film_studio import supervisor
+                try:
+                    self.done.emit(supervisor.dop_suggestions(scene_id))
+                except Exception:                            # noqa: BLE001
+                    self.done.emit([])
+        self._dop_w = _W(); self._dop_w.done.connect(self._on_dop); self._dop_w.start()
+
+    def _on_dop(self, sugg: list):
+        self.btn_dop.setEnabled(True)
+        if not sugg:
+            QMessageBox.information(self, tr("fs.sb.dop", "DoP"), tr("fs.sb.dop_none", "Nessuna proposta (LLM o scena vuota).")); return
+        from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QVBoxLayout, QTableWidget, QTableWidgetItem,
+                                       QHeaderView)
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.sb.dop", "🎥 DoP: proposta ripresa")); lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel(tr("fs.sb.dop_head", "Proposte camera+luce per shot (Applica scrive shot.camera):")))
+        t = QTableWidget(len(sugg), 3)
+        t.setHorizontalHeaderLabels([tr("fs.sb.dop_shot", "Shot"), tr("fs.sb.dop_cam", "Camera + luce"),
+                                     tr("fs.sb.dop_why", "Perché")])
+        t.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        t.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        for r, s in enumerate(sugg):
+            cam = ", ".join(x for x in (s.get("camera", ""), s.get("lighting", "")) if x)
+            t.setItem(r, 0, QTableWidgetItem(str(s.get("ord", ""))))
+            t.setItem(r, 1, QTableWidgetItem(cam))
+            t.setItem(r, 2, QTableWidgetItem(s.get("rationale", "")))
+        t.resizeRowsToContents()
+        lay.addWidget(t, 1)
+        bb = QDialogButtonBox(); bb.addButton(tr("fs.sb.dop_apply", "Applica a tutti"), QDialogButtonBox.AcceptRole)
+        bb.addButton(QDialogButtonBox.Close); bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        if dlg.exec() == QDialog.Accepted:
+            from core.film_studio import supervisor
+            n = supervisor.apply_dop(sugg)
+            self._refresh()
+            self.log.appendPlainText(tr("fs.sb.dop_done", "🎥 DoP: camera+luce applicate a {n} shot.").format(n=n))
 
     def _save_shot_grammar(self, *_):
         """Compone shot.camera dai combo tipo-inquadratura + movimento (iniettato nel prompt in _gen)."""

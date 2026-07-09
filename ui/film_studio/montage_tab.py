@@ -86,6 +86,18 @@ class MontageTab(QWidget):
         r3.addWidget(QLabel(tr("fs.mt.dub_to", "Lingua"))); r3.addWidget(self.dub_lang)
         r3.addWidget(self.dub_relip); r3.addWidget(self.btn_dub)
         bv.addLayout(r3)
+        # Moonshot — critico + montatore a ritmo emotivo (leggono il breakdown, propongono senza distruggere)
+        r4 = QHBoxLayout()
+        self.btn_secondlook = QPushButton(tr("fs.mt.secondlook", "🔍 Secondo sguardo (critico)"))
+        self.btn_secondlook.setToolTip(tr("fs.mt.secondlook_tt", "Un critico rilegge il piano del film e dà "
+                                          "il «no» creativo finale: rilievi concreti + punti di forza."))
+        self.btn_secondlook.clicked.connect(self._second_look)
+        self.btn_rhythm = QPushButton(tr("fs.mt.rhythm", "📉 Ritmo emotivo"))
+        self.btn_rhythm.setToolTip(tr("fs.mt.rhythm_tt", "Disegna la curva di tensione per scena: modula le "
+                                      "durate degli shot (tensione alta → tagli corti) mantenendo il totale scena."))
+        self.btn_rhythm.clicked.connect(self._rhythm)
+        r4.addWidget(self.btn_secondlook); r4.addWidget(self.btn_rhythm); r4.addStretch(1)
+        bv.addLayout(r4)
         self.info = QLabel(""); bv.addWidget(self.info)
         v.addWidget(box)
         self._refresh()
@@ -191,6 +203,88 @@ class MontageTab(QWidget):
                     m += 1
         self.info.setText(tr("fs.mt.dub_done2", "Doppiaggio {l}: {n} battute; {m} video in re-lip-sync (coda).")
                           .format(l=lang, n=n, m=m))
+
+    def _second_look(self):
+        """Moonshot — «il secondo sguardo»: critico post-visione sul piano del film."""
+        from core import llm_service as L
+        pid = self._get_project()
+        if not pid or not db.query("scene", "project_id=?", (pid,)):
+            QMessageBox.information(self, tr("fs.mt.secondlook", "Secondo sguardo"),
+                                   tr("fs.mt.no_break", "Serve un breakdown (scene/inquadrature).")); return
+        if not L.available():
+            QMessageBox.warning(self, tr("fs.mt.secondlook", "Secondo sguardo"), tr("fs.llm.unavailable", "LLM non disponibile.")); return
+        self.btn_secondlook.setEnabled(False); self.info.setText(tr("fs.working", "Generazione…"))
+        from PySide6.QtCore import QThread, Signal
+
+        class _W(QThread):
+            done = Signal(dict)
+
+            def run(self):
+                from core.film_studio import supervisor
+                try:
+                    self.done.emit(supervisor.second_look(pid))
+                except Exception:                            # noqa: BLE001
+                    self.done.emit({"verdict": "", "notes": [], "strengths": [], "available": False})
+        self._sl_w = _W(); self._sl_w.done.connect(self._on_second_look); self._sl_w.start()
+
+    def _on_second_look(self, res: dict):
+        self.btn_secondlook.setEnabled(True)
+        if not res.get("available") or not (res.get("verdict") or res.get("notes")):
+            self.info.setText(tr("fs.mt.secondlook_none", "Nessun rilievo dal critico (LLM non disponibile o piano vuoto).")); return
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QPlainTextEdit as _PT
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.mt.secondlook", "🔍 Secondo sguardo")); lay = QVBoxLayout(dlg)
+        txt = _PT(); txt.setReadOnly(True); txt.setMinimumSize(560, 360)
+        body = ["◆ " + tr("fs.mt.sl_verdict", "Giudizio") + ": " + (res.get("verdict") or ""), ""]
+        if res.get("notes"):
+            body.append(tr("fs.mt.sl_notes", "Rilievi:"))
+            for n in res["notes"]:
+                body.append(f"  ⚠ [{n.get('where', '')}] {n.get('note', '')}")
+            body.append("")
+        if res.get("strengths"):
+            body.append(tr("fs.mt.sl_strengths", "Punti di forza:"))
+            for s in res["strengths"]:
+                body.append(f"  ✓ {s}")
+        txt.setPlainText("\n".join(body))
+        lay.addWidget(txt)
+        bb = QDialogButtonBox(QDialogButtonBox.Close); bb.rejected.connect(dlg.reject); bb.accepted.connect(dlg.accept)
+        lay.addWidget(bb); dlg.exec()
+        self.info.setText(tr("fs.mt.secondlook_done", "🔍 Secondo sguardo completato."))
+
+    def _rhythm(self):
+        """Moonshot — montaggio a ritmo emotivo: curva di tensione per scena → rimodula le durate degli shot."""
+        pid = self._get_project()
+        scenes = db.query("scene", "project_id=?", (pid,), order="ord") if pid else []
+        if not scenes:
+            QMessageBox.information(self, tr("fs.mt.rhythm", "Ritmo"), tr("fs.mt.no_break", "Serve un breakdown (scene/inquadrature).")); return
+        from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout, QSlider, QVBoxLayout, QLabel as _L)
+        from PySide6.QtCore import Qt as _Qt
+        dlg = QDialog(self); dlg.setWindowTitle(tr("fs.mt.rhythm", "📉 Ritmo emotivo")); outer = QVBoxLayout(dlg)
+        outer.addWidget(_L(tr("fs.mt.rhythm_head", "Tensione per scena (0 = respiro/lenta, 100 = incalzante):")))
+        form = QFormLayout(); sliders = []
+        for sc in scenes:
+            s = QSlider(_Qt.Horizontal); s.setRange(0, 100); s.setValue(50); s.setMinimumWidth(240)
+            form.addRow(f"S{sc['ord']}: {(sc.get('description') or '')[:36]}", s)
+            sliders.append(s)
+        outer.addLayout(form)
+        bb = QDialogButtonBox(); bb.addButton(tr("fs.mt.rhythm_apply", "Anteprima + applica"), QDialogButtonBox.AcceptRole)
+        bb.addButton(QDialogButtonBox.Cancel); bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        outer.addWidget(bb)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        from core.film_studio import supervisor
+        tension = [s.value() / 100.0 for s in sliders]
+        changes = supervisor.emotional_rhythm(pid, tension)
+        if not changes:
+            self.info.setText(tr("fs.mt.rhythm_none", "Nessuna modifica di durata.")); return
+        prev = "\n".join(f"  {c['ord']}: {c['old']:.1f}s → {c['new']:.1f}s"
+                         for c in changes if abs(c['new'] - c['old']) >= 0.1)[:1200]
+        if QMessageBox.question(self, tr("fs.mt.rhythm", "Ritmo emotivo"),
+                                tr("fs.mt.rhythm_confirm", "Applico queste durate?\n\n{p}").format(p=prev or "—")
+                                ) != QMessageBox.Yes:
+            return
+        n = supervisor.apply_rhythm(changes)
+        self._refresh()
+        self.info.setText(tr("fs.mt.rhythm_done", "📉 Ritmo emotivo: {n} durate aggiornate.").format(n=n))
 
     def _clips(self) -> list[dict]:
         pid = self._get_project()
