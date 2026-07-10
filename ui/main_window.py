@@ -557,10 +557,9 @@ class MainWindow(QMainWindow):
             self.video_def_tab.set_video(self._last_video_path)
             self.video_extend_tab.set_video(self._last_video_path)
 
-        # Auto-avvio ComfyUI se non è già in esecuzione (il polling sotto lo rileva quando è pronto).
+        # Solo il server NATIVO viene avviato (migrazione zero-ComfyUI completata): l'auto-avvio ComfyUI è
+        # stato rimosso (#51). Il polling sotto rileva il server nativo quando è pronto.
         self._maybe_autostart_native()
-        # ComfyUI NON viene più avviato in automatico (migrazione zero-comfy): solo il server nativo.
-        # _maybe_autostart_comfyui() resta definito per il fallback manuale/diagnostica, non chiamato.
 
         # poll stato ComfyUI + completamento job
         self._status_timer = QTimer(self); self._status_timer.timeout.connect(self._refresh_status)
@@ -1235,21 +1234,6 @@ class MainWindow(QMainWindow):
             self._log(f"[Nativo] {msg}" if ok else f"[Nativo] auto-avvio saltato: {msg}")
         except Exception as e:                   # noqa: BLE001
             self._log(f"[Nativo] auto-avvio errore: {e}")
-
-    def _maybe_autostart_comfyui(self):
-        """Se ComfyUI non risponde su 127.0.0.1:8188, lo avvia in automatico (finestra separata,
-        via run_nvidia.bat). Non blocca: `_refresh_status` rileva quando è pronto e carica
-        l'inventario. Se è già attivo, non fa nulla."""
-        try:
-            if self.driver.is_up():
-                return
-            from core.comfy_launcher import launch
-            ok, msg = launch()
-            self._log(f"[ComfyUI] {msg}" if ok else f"[ComfyUI] auto-avvio saltato: {msg}")
-            if ok and hasattr(self, "status_lbl"):
-                self.status_lbl.setText(tr("mw.comfy_autostart_status"))
-        except Exception as e:                   # noqa: BLE001
-            self._log(f"[ComfyUI] auto-avvio errore: {e}")
 
     def _ensure_flux2_encoder(self, unet: str | None) -> bool:
         """Pre-check FLUX.2: se il modello è FLUX.2 e il suo encoder testo manca, OFFRE di scaricarlo
