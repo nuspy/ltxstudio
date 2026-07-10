@@ -58,7 +58,38 @@ def sign_linux(out_dir: str, cfg: dict) -> bool:
     return True
 
 
+def sign_macos(out_dir: str, cfg: dict) -> bool:
+    """codesign (Developer ID Application, hardened runtime) + notarizzazione (notarytool) + staple → evita
+    il blocco Gatekeeper (\"app non verificata\"). Config (env o cfg):
+      APPLE_SIGN_IDENTITY  = \"Developer ID Application: Nome (TEAMID)\"
+      APPLE_NOTARY_PROFILE = profilo keychain per `notarytool` (creato con `notarytool store-credentials`).
+    Senza identità NON blocca: stampa la guida ed esce."""
+    ident = cfg.get("apple_identity") or os.environ.get("APPLE_SIGN_IDENTITY")
+    if not ident:
+        print("  [firma] APPLE_SIGN_IDENTITY assente → salto (serve un 'Developer ID Application' + "
+              "notarizzazione per evitare Gatekeeper). Vedi Apple Developer.")
+        return False
+    d = Path(out_dir)
+    targets = list(d.rglob("*.app")) + list(d.rglob("*.dmg")) + list(d.rglob("*.pkg"))
+    ok = True
+    for t in targets:                                       # codesign con hardened runtime + timestamp
+        cmd = ["codesign", "--force", "--deep", "--options", "runtime", "--timestamp", "--sign", ident, str(t)]
+        print("  $", " ".join(cmd))
+        if subprocess.run(cmd).returncode != 0:
+            ok = False
+    prof = cfg.get("apple_notary_profile") or os.environ.get("APPLE_NOTARY_PROFILE")
+    for t in list(d.rglob("*.dmg")) + list(d.rglob("*.pkg")):   # notarizza+staple i pacchetti distribuibili
+        if prof:
+            subprocess.run(["xcrun", "notarytool", "submit", str(t), "--keychain-profile", prof, "--wait"])
+            subprocess.run(["xcrun", "stapler", "staple", str(t)])
+        else:
+            print("  [firma] APPLE_NOTARY_PROFILE assente → codesign fatto, notarizzazione saltata.")
+    return ok
+
+
 def sign_artifacts(out_dir: str, os_target: str, cfg: dict) -> bool:
     if os_target == "windows":
         return sign_windows(out_dir, cfg)
+    if os_target in ("macos", "darwin", "osx"):
+        return sign_macos(out_dir, cfg)
     return sign_linux(out_dir, cfg)
