@@ -353,10 +353,14 @@ def build_dataset_json(dataset_dir: str) -> str:
         if not f.endswith(".mp4"):
             continue
         cap = os.path.join(dataset_dir, os.path.splitext(f)[0] + ".txt")
-        rows.append({"video": os.path.join(dataset_dir, f),
-                     "caption": open(cap, encoding="utf-8").read().strip() if os.path.exists(cap) else ""})
+        _cap_txt = ""
+        if os.path.exists(cap):
+            with open(cap, encoding="utf-8") as _cf2:
+                _cap_txt = _cf2.read().strip()
+        rows.append({"video": os.path.join(dataset_dir, f), "caption": _cap_txt})
     dj = os.path.join(dataset_dir, "dataset.json")
-    json.dump(rows, open(dj, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    with open(dj, "w", encoding="utf-8") as _fh:               # handle chiuso (Windows: evita file-in-use)
+        json.dump(rows, _fh, ensure_ascii=False, indent=2)
     return dj
 
 
@@ -461,9 +465,12 @@ def build_clip_dataset(clips: list[dict], dataset_dir: str, *, global_caption: s
         if not cap:
             for sib in (os.path.splitext(src)[0] + ".txt", os.path.splitext(src)[0] + "_prompt.txt"):
                 if os.path.exists(sib):
-                    cap = open(sib, encoding="utf-8").read().strip(); break
+                    with open(sib, encoding="utf-8") as _sf:    # handle chiuso (loop → niente leak accumulati)
+                        cap = _sf.read().strip()
+                    break
         cap = cap or global_caption or ""
-        open(os.path.join(dataset_dir, f"{stem}.txt"), "w", encoding="utf-8").write(cap)
+        with open(os.path.join(dataset_dir, f"{stem}.txt"), "w", encoding="utf-8") as _cf:
+            _cf.write(cap)
         if not cap:
             empty_stems.append(stem)
         n += 1

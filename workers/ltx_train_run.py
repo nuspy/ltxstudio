@@ -29,13 +29,16 @@ def main():
     args = ap.parse_args()
 
     import yaml
-    cfg = yaml.safe_load(open(args.template, encoding="utf-8"))
-    for k, v in json.load(open(args.overrides, encoding="utf-8")).items():
-        set_dotted(cfg, k, v)
+    with open(args.template, encoding="utf-8") as _tf:          # handle chiusi: su Windows un handle aperto
+        cfg = yaml.safe_load(_tf)                                # bloccherebbe la cancellazione del config temp
+    with open(args.overrides, encoding="utf-8") as _of:
+        for k, v in json.load(_of).items():
+            set_dotted(cfg, k, v)
     out_dir = cfg.get("output_dir") or os.path.dirname(args.out_lora) or "."
     os.makedirs(out_dir, exist_ok=True)
     final = os.path.join(out_dir, "_train_config.yaml")
-    yaml.safe_dump(cfg, open(final, "w", encoding="utf-8"), sort_keys=False, allow_unicode=True)
+    with open(final, "w", encoding="utf-8") as _ff:
+        yaml.safe_dump(cfg, _ff, sort_keys=False, allow_unicode=True)
     print(f"[train] config → {final}", flush=True)
 
     cmd = [sys.executable, "-u", os.path.join(TRAINER, "scripts", "train.py"), final]

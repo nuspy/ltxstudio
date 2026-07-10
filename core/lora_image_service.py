@@ -97,7 +97,8 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
                     continue
                 if clip.get("use_face") and s.face_focus:
                     _face_crop_image(out_png)
-            open(os.path.splitext(out_png)[0] + ".txt", "w", encoding="utf-8").write(clip["caption"])
+            with open(os.path.splitext(out_png)[0] + ".txt", "w", encoding="utf-8") as _cap_fh:
+                _cap_fh.write(clip["caption"])                 # handle chiuso (loop dataset → niente leak)
             n += 1
             log(f"Immagine {n}/{total}: {stem}")
         for rm in s.real_media:                    # materiale reale (foto): copiato; video: estrae 1 frame

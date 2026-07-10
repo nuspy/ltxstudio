@@ -1046,7 +1046,7 @@ def run_generation(p: dict) -> str:
         mks = sorted(_glob.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
         nf = min(nf, len(mks))
         masks_t = load_mask_tensor(mks[:nf], int(p.get("height", 320)), int(p.get("width", 512)),
-                                   dilate=int(p.get("mask_dilate", 0)), blur=float(p.get("mask_blur", 0)))
+                                   dilate=int(p.get("mask_dilate", 24)), blur=float(p.get("mask_blur", 6.0)))
         video = pipe.inpaint(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 320)), width=int(p.get("width", 512)),
