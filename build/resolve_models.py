@@ -40,17 +40,17 @@ def _hf_file(repo_id: str, filename: str, token: str | None) -> dict | None:
 
 
 def _hf_repo_size(repo_id: str, token: str | None) -> dict | None:
-    """Size totale di uno snapshot repo (per i modelli 'diffusers'). URL = pagina repo (snapshot_download a runtime)."""
+    """Snapshot repo (modelli 'diffusers'): bakiamo solo l'URL di PROVENIENZA + la size dell'INTERO repo come
+    campo INFORMATIVO `repo_full_mb` (NON `size_mb`: la size utile è il `approx_gb` curato — il repo pieno
+    conta anche varianti/formati doppi che non scarichiamo). Download a runtime via repo_id (snapshot_download)."""
     try:
         from huggingface_hub import HfApi
-        files = HfApi().list_repo_files(repo_id=repo_id, token=token)
-        # size approssimata: somma dei .safetensors/bin via get_paths_info
-        info = HfApi().get_paths_info(repo_id=repo_id, paths=[f for f in files], token=token, expand=True)
-        total = 0
-        for it in info:
-            total += (getattr(getattr(it, "lfs", None), "size", None) or getattr(it, "size", 0) or 0)
-        return {"url": f"hf://{repo_id}", "sha256": None,
-                "size_mb": round(total / 2**20) if total else None, "kind": "hf-snapshot"}
+        api = HfApi()
+        files = api.list_repo_files(repo_id=repo_id, token=token)
+        info = api.get_paths_info(repo_id=repo_id, paths=list(files), token=token, expand=True)
+        total = sum((getattr(getattr(it, "lfs", None), "size", None) or getattr(it, "size", 0) or 0) for it in info)
+        return {"url": f"https://huggingface.co/{repo_id}", "kind": "hf-snapshot",
+                "repo_full_mb": round(total / 2**20) if total else None}
     except Exception as e:                                   # noqa: BLE001
         print(f"  [hf-repo] {repo_id}: {e}")
         return None

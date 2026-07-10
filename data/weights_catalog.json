@@ -2,132 +2,624 @@
   "_comment": "Catalogo pesi del wizard. La destinazione è derivata: <base_dir>/<type>/<family>/<repo_basename> (per snapshot) o <base_dir>/<type>/<family>/<filename> (per file). I pesi tool-specifici hanno 'tool_dest' (percorso fisso del modulo, ignora base_dir). 'scan_names' = nomi cartella/file da cercare nel pre-scan per capire se esiste già. gated=true richiede HF token + accettazione licenza su HF.",
   "weights": [
     {
-      "id": "flux1-dev", "module": "Immagini", "label": "FLUX.1 [dev]", "kind": "snapshot",
-      "repo_id": "black-forest-labs/FLUX.1-dev", "type": "diffusers", "family": "Flux",
-      "gated": true, "approx_gb": 24, "scan_names": ["FLUX.1-dev", "flux1-dev"]
+      "id": "flux1-dev",
+      "module": "Immagini",
+      "label": "FLUX.1 [dev]",
+      "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.1-dev",
+      "type": "diffusers",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 24,
+      "scan_names": [
+        "FLUX.1-dev",
+        "flux1-dev"
+      ],
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
+      "repo_full_mb": 55204
     },
     {
-      "id": "flux1-fill", "module": "Inpaint", "label": "FLUX.1 Fill [dev]", "kind": "snapshot",
-      "repo_id": "black-forest-labs/FLUX.1-Fill-dev", "type": "diffusers", "family": "Flux",
-      "gated": true, "approx_gb": 24, "scan_names": ["FLUX.1-Fill-dev", "FLUX_DEV_Fill"]
+      "id": "flux1-fill",
+      "module": "Inpaint",
+      "label": "FLUX.1 Fill [dev]",
+      "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.1-Fill-dev",
+      "type": "diffusers",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 24,
+      "scan_names": [
+        "FLUX.1-Fill-dev",
+        "FLUX_DEV_Fill"
+      ],
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev",
+      "repo_full_mb": 55367
     },
     {
-      "id": "flux1-kontext", "module": "Editing", "label": "FLUX.1 Kontext [dev]", "kind": "snapshot",
-      "repo_id": "black-forest-labs/FLUX.1-Kontext-dev", "type": "diffusers", "family": "Flux",
-      "gated": true, "approx_gb": 24, "scan_names": ["FLUX.1-Kontext-dev", "Kontext"]
+      "id": "flux1-kontext",
+      "module": "Editing",
+      "label": "FLUX.1 Kontext [dev]",
+      "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.1-Kontext-dev",
+      "type": "diffusers",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 24,
+      "scan_names": [
+        "FLUX.1-Kontext-dev",
+        "Kontext"
+      ],
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev",
+      "repo_full_mb": 55209
     },
     {
-      "id": "flux2-dev", "module": "Immagini", "label": "FLUX.2 [dev]", "kind": "snapshot",
-      "repo_id": "black-forest-labs/FLUX.2-dev", "type": "diffusers", "family": "Flux",
-      "gated": true, "approx_gb": 64, "scan_names": ["FLUX.2-dev", "flux2-dev", "FLUX_2_Dev"]
+      "id": "flux2-dev",
+      "module": "Immagini",
+      "label": "FLUX.2 [dev]",
+      "kind": "snapshot",
+      "repo_id": "black-forest-labs/FLUX.2-dev",
+      "type": "diffusers",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 64,
+      "scan_names": [
+        "FLUX.2-dev",
+        "flux2-dev",
+        "FLUX_2_Dev"
+      ],
+      "url": "https://huggingface.co/black-forest-labs/FLUX.2-dev",
+      "repo_full_mb": 169411
     },
     {
-      "id": "mistral-flux2-te", "module": "Immagini", "label": "Mistral-3 24B (TE FLUX.2)", "kind": "snapshot",
-      "repo_id": "mistralai/Mistral-Small-3.1-24B-Instruct-2503", "type": "text_encoders", "family": "Flux",
-      "gated": true, "approx_gb": 48, "scan_names": ["Mistral-Small-3.1-24B", "mistral_3_small_flux2"]
+      "id": "mistral-flux2-te",
+      "module": "Immagini",
+      "label": "Mistral-3 24B (TE FLUX.2)",
+      "kind": "snapshot",
+      "repo_id": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "type": "text_encoders",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 48,
+      "scan_names": [
+        "Mistral-Small-3.1-24B",
+        "mistral_3_small_flux2"
+      ],
+      "url": "https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "repo_full_mb": 91627
     },
     {
-      "id": "zimage-turbo", "module": "Immagini", "label": "Z-Image Turbo", "kind": "snapshot",
-      "repo_id": "Tongyi-MAI/Z-Image-Turbo", "type": "diffusers", "family": "Z-Image",
-      "gated": false, "approx_gb": 12, "scan_names": ["Z-Image-Turbo", "z_image"]
+      "id": "zimage-turbo",
+      "module": "Immagini",
+      "label": "Z-Image Turbo",
+      "kind": "snapshot",
+      "repo_id": "Tongyi-MAI/Z-Image-Turbo",
+      "type": "diffusers",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 12,
+      "scan_names": [
+        "Z-Image-Turbo",
+        "z_image"
+      ],
+      "url": "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo",
+      "repo_full_mb": 31376
     },
     {
-      "id": "ernie-image", "module": "Immagini", "label": "ERNIE-Image", "kind": "snapshot",
-      "repo_id": "baidu/ERNIE-Image", "type": "diffusers", "family": "Ernie",
-      "gated": false, "approx_gb": 16, "scan_names": ["ERNIE-Image", "ernie"]
+      "id": "ernie-image",
+      "module": "Immagini",
+      "label": "ERNIE-Image",
+      "kind": "snapshot",
+      "repo_id": "baidu/ERNIE-Image",
+      "type": "diffusers",
+      "family": "Ernie",
+      "gated": false,
+      "approx_gb": 16,
+      "scan_names": [
+        "ERNIE-Image",
+        "ernie"
+      ],
+      "url": "https://huggingface.co/baidu/ERNIE-Image",
+      "repo_full_mb": 30182
     },
     {
-      "id": "ltx23", "module": "Video", "label": "LTX-2.3 (video+audio)", "kind": "snapshot",
-      "repo_id": "Lightricks/LTX-2.3", "type": "diffusers", "family": "LTX",
-      "gated": true, "approx_gb": 40, "scan_names": ["LTX-2.3", "ltx23", "ltx-2.3"]
+      "id": "ltx23",
+      "module": "Video",
+      "label": "LTX-2.3 (video+audio)",
+      "kind": "snapshot",
+      "repo_id": "Lightricks/LTX-2.3",
+      "type": "diffusers",
+      "family": "LTX",
+      "gated": true,
+      "approx_gb": 40,
+      "scan_names": [
+        "LTX-2.3",
+        "ltx23",
+        "ltx-2.3"
+      ],
+      "url": "https://huggingface.co/Lightricks/LTX-2.3",
+      "repo_full_mb": 149732
     },
     {
-      "id": "da2", "module": "Mondo 3D (WorldGen)", "label": "DA-2 depth", "kind": "snapshot",
-      "repo_id": "haodongli/DA-2", "type": "depth", "family": "DA-2",
-      "gated": false, "approx_gb": 2, "scan_names": ["DA-2", "da2"]
+      "id": "da2",
+      "module": "Mondo 3D (WorldGen)",
+      "label": "DA-2 depth",
+      "kind": "snapshot",
+      "repo_id": "haodongli/DA-2",
+      "type": "depth",
+      "family": "DA-2",
+      "gated": false,
+      "approx_gb": 2,
+      "scan_names": [
+        "DA-2",
+        "da2"
+      ],
+      "url": "https://huggingface.co/haodongli/DA-2",
+      "repo_full_mb": 1316
     },
     {
-      "id": "mmaudio", "module": "Musica (MMAudio)", "label": "MMAudio large_44k_v2", "kind": "snapshot",
-      "repo_id": "hkchengrex/MMAudio", "type": "audio", "family": "MMAudio",
-      "gated": false, "approx_gb": 6, "scan_names": ["MMAudio", "mmaudio"]
+      "id": "mmaudio",
+      "module": "Musica (MMAudio)",
+      "label": "MMAudio large_44k_v2",
+      "kind": "snapshot",
+      "repo_id": "hkchengrex/MMAudio",
+      "type": "audio",
+      "family": "MMAudio",
+      "gated": false,
+      "approx_gb": 6,
+      "scan_names": [
+        "MMAudio",
+        "mmaudio"
+      ],
+      "url": "https://huggingface.co/hkchengrex/MMAudio",
+      "repo_full_mb": 52122
     },
     {
-      "id": "heartmula-gen", "module": "Musica (HeartMuLa)", "label": "HeartMuLa Gen config", "kind": "snapshot",
-      "repo_id": "HeartMuLa/HeartMuLaGen", "type": "audio", "family": "HeartMuLa",
-      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt", "gated": false, "approx_gb": 1, "scan_names": ["HeartMuLaGen"]
+      "id": "heartmula-gen",
+      "module": "Musica (HeartMuLa)",
+      "label": "HeartMuLa Gen config",
+      "kind": "snapshot",
+      "repo_id": "HeartMuLa/HeartMuLaGen",
+      "type": "audio",
+      "family": "HeartMuLa",
+      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt",
+      "gated": false,
+      "approx_gb": 1,
+      "scan_names": [
+        "HeartMuLaGen"
+      ],
+      "url": "https://huggingface.co/HeartMuLa/HeartMuLaGen",
+      "repo_full_mb": 9
     },
     {
-      "id": "heartmula-3b", "module": "Musica (HeartMuLa)", "label": "HeartMuLa 3B", "kind": "snapshot",
-      "repo_id": "HeartMuLa/HeartMuLa-oss-3B-happy-new-year", "type": "audio", "family": "HeartMuLa",
-      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartMuLa-oss-3B", "gated": false, "approx_gb": 12, "scan_names": ["HeartMuLa-oss-3B"]
+      "id": "heartmula-3b",
+      "module": "Musica (HeartMuLa)",
+      "label": "HeartMuLa 3B",
+      "kind": "snapshot",
+      "repo_id": "HeartMuLa/HeartMuLa-oss-3B-happy-new-year",
+      "type": "audio",
+      "family": "HeartMuLa",
+      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartMuLa-oss-3B",
+      "gated": false,
+      "approx_gb": 12,
+      "scan_names": [
+        "HeartMuLa-oss-3B"
+      ],
+      "url": "https://huggingface.co/HeartMuLa/HeartMuLa-oss-3B-happy-new-year",
+      "repo_full_mb": 15023
     },
     {
-      "id": "heartcodec", "module": "Musica (HeartMuLa)", "label": "HeartCodec", "kind": "snapshot",
-      "repo_id": "HeartMuLa/HeartCodec-oss-20260123", "type": "audio", "family": "HeartMuLa",
-      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartCodec-oss", "gated": false, "approx_gb": 3, "scan_names": ["HeartCodec"]
+      "id": "heartcodec",
+      "module": "Musica (HeartMuLa)",
+      "label": "HeartCodec",
+      "kind": "snapshot",
+      "repo_id": "HeartMuLa/HeartCodec-oss-20260123",
+      "type": "audio",
+      "family": "HeartMuLa",
+      "tool_dest": "E:\\AI\\Tools\\heartlib\\ckpt\\HeartCodec-oss",
+      "gated": false,
+      "approx_gb": 3,
+      "scan_names": [
+        "HeartCodec"
+      ],
+      "url": "https://huggingface.co/HeartMuLa/HeartCodec-oss-20260123",
+      "repo_full_mb": 6331
     },
     {
-      "id": "qwen3-8b-klein-te", "module": "Inpaint", "label": "Qwen3-8B (TE FLUX.2 Klein NSFW/miraclein)", "kind": "snapshot",
-      "repo_id": "Qwen/Qwen3-8B", "type": "diffusers", "family": "_te",
-      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_8b", "gated": false, "approx_gb": 16,
-      "scan_names": ["qwen3_8b", "Qwen3-8B"]
+      "id": "qwen3-8b-klein-te",
+      "module": "Inpaint",
+      "label": "Qwen3-8B (TE FLUX.2 Klein NSFW/miraclein)",
+      "kind": "snapshot",
+      "repo_id": "Qwen/Qwen3-8B",
+      "type": "diffusers",
+      "family": "_te",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_8b",
+      "gated": false,
+      "approx_gb": 16,
+      "scan_names": [
+        "qwen3_8b",
+        "Qwen3-8B"
+      ],
+      "url": "https://huggingface.co/Qwen/Qwen3-8B",
+      "repo_full_mb": 15638
     },
     {
-      "id": "qwen3-4b-klein-te", "module": "Inpaint", "label": "Qwen3-4B (TE FLUX.2 Klein-4B SFW)", "kind": "snapshot",
-      "repo_id": "Qwen/Qwen3-4B", "type": "diffusers", "family": "_te",
-      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_4b", "gated": false, "approx_gb": 8,
-      "scan_names": ["qwen3_4b", "Qwen3-4B"]
+      "id": "qwen3-4b-klein-te",
+      "module": "Inpaint",
+      "label": "Qwen3-4B (TE FLUX.2 Klein-4B SFW)",
+      "kind": "snapshot",
+      "repo_id": "Qwen/Qwen3-4B",
+      "type": "diffusers",
+      "family": "_te",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_4b",
+      "gated": false,
+      "approx_gb": 8,
+      "scan_names": [
+        "qwen3_4b",
+        "Qwen3-4B"
+      ],
+      "url": "https://huggingface.co/Qwen/Qwen3-4B",
+      "repo_full_mb": 7687
     },
     {
-      "id": "trellis2-4b", "module": "Modello 3D (TRELLIS)", "label": "TRELLIS.2-4B (immagine→3D)", "kind": "snapshot",
-      "repo_id": "microsoft/TRELLIS.2-4B", "type": "mesh", "family": "TRELLIS",
-      "tool_dest": "E:\\AI\\Tools\\TRELLIS2\\models\\TRELLIS.2-4B", "gated": false, "approx_gb": 25,
-      "scan_names": ["TRELLIS.2-4B", "trellis2"]
+      "id": "trellis2-4b",
+      "module": "Modello 3D (TRELLIS)",
+      "label": "TRELLIS.2-4B (immagine→3D)",
+      "kind": "snapshot",
+      "repo_id": "microsoft/TRELLIS.2-4B",
+      "type": "mesh",
+      "family": "TRELLIS",
+      "tool_dest": "E:\\AI\\Tools\\TRELLIS2\\models\\TRELLIS.2-4B",
+      "gated": false,
+      "approx_gb": 25,
+      "scan_names": [
+        "TRELLIS.2-4B",
+        "trellis2"
+      ],
+      "url": "https://huggingface.co/microsoft/TRELLIS.2-4B",
+      "repo_full_mb": 15485
     },
     {
-      "id": "dinov3-vitl16", "module": "Modello 3D (TRELLIS)", "label": "DINOv3 ViT-L (encoder, mirror non-gated)", "kind": "snapshot",
-      "repo_id": "camenduru/dinov3-vitl16-pretrain-lvd1689m", "type": "encoder", "family": "DINOv3",
-      "gated": false, "approx_gb": 1.2, "scan_names": ["dinov3-vitl16", "camenduru"],
-      "note": "facebook/dinov3-vitl16 è GATED → si usa il mirror camenduru; patch model_name in pipeline.json"
+      "id": "dinov3-vitl16",
+      "module": "Modello 3D (TRELLIS)",
+      "label": "DINOv3 ViT-L (encoder, mirror non-gated)",
+      "kind": "snapshot",
+      "repo_id": "camenduru/dinov3-vitl16-pretrain-lvd1689m",
+      "type": "encoder",
+      "family": "DINOv3",
+      "gated": false,
+      "approx_gb": 1.2,
+      "scan_names": [
+        "dinov3-vitl16",
+        "camenduru"
+      ],
+      "note": "facebook/dinov3-vitl16 è GATED → si usa il mirror camenduru; patch model_name in pipeline.json",
+      "url": "https://huggingface.co/camenduru/dinov3-vitl16-pretrain-lvd1689m",
+      "repo_full_mb": 1156
     },
     {
-      "id": "birefnet", "module": "Modello 3D (TRELLIS)", "label": "BiRefNet (rembg)", "kind": "snapshot",
-      "repo_id": "ZhengPeng7/BiRefNet", "type": "segmentation", "family": "BiRefNet",
-      "gated": false, "approx_gb": 0.5, "scan_names": ["BiRefNet"],
-      "note": "rembg per TRELLIS (al posto di briaai/RMBG-2.0 gated). Serve pip kornia+timm nel venv TRELLIS2"
+      "id": "birefnet",
+      "module": "Modello 3D (TRELLIS)",
+      "label": "BiRefNet (rembg)",
+      "kind": "snapshot",
+      "repo_id": "ZhengPeng7/BiRefNet",
+      "type": "segmentation",
+      "family": "BiRefNet",
+      "gated": false,
+      "approx_gb": 0.5,
+      "scan_names": [
+        "BiRefNet"
+      ],
+      "note": "rembg per TRELLIS (al posto di briaai/RMBG-2.0 gated). Serve pip kornia+timm nel venv TRELLIS2",
+      "url": "https://huggingface.co/ZhengPeng7/BiRefNet",
+      "repo_full_mb": 424
     },
     {
-      "id": "svdq-fp4-fluxfill", "module": "Mondo 3D (WorldGen)", "label": "FLUX.1-Fill FP4 (nunchaku, low-VRAM)", "kind": "snapshot",
-      "repo_id": "mit-han-lab/svdq-fp4-flux.1-fill-dev", "type": "diffusers", "family": "FLUX",
-      "gated": false, "approx_gb": 7, "scan_names": ["svdq-fp4-flux", "svdq"],
-      "note": "ramo low_vram di WorldGen; evita i 24GB del FLUX-Fill bf16. Richiede patch nunchaku Windows (backslash repo-id)"
+      "id": "svdq-fp4-fluxfill",
+      "module": "Mondo 3D (WorldGen)",
+      "label": "FLUX.1-Fill FP4 (nunchaku, low-VRAM)",
+      "kind": "snapshot",
+      "repo_id": "mit-han-lab/svdq-fp4-flux.1-fill-dev",
+      "type": "diffusers",
+      "family": "FLUX",
+      "gated": false,
+      "approx_gb": 7,
+      "scan_names": [
+        "svdq-fp4-flux",
+        "svdq"
+      ],
+      "note": "ramo low_vram di WorldGen; evita i 24GB del FLUX-Fill bf16. Richiede patch nunchaku Windows (backslash repo-id)",
+      "url": "https://huggingface.co/mit-han-lab/svdq-fp4-flux.1-fill-dev",
+      "repo_full_mb": 6715
     },
     {
-      "id": "worldgen-lora", "module": "Mondo 3D (WorldGen)", "label": "WorldGen img2scene LoRA", "kind": "snapshot",
-      "repo_id": "LeoXie/WorldGen", "type": "lora", "family": "WorldGen",
-      "gated": false, "approx_gb": 0.1, "scan_names": ["WorldGen", "worldgen_img2scene"]
+      "id": "worldgen-lora",
+      "module": "Mondo 3D (WorldGen)",
+      "label": "WorldGen img2scene LoRA",
+      "kind": "snapshot",
+      "repo_id": "LeoXie/WorldGen",
+      "type": "lora",
+      "family": "WorldGen",
+      "gated": false,
+      "approx_gb": 0.1,
+      "scan_names": [
+        "WorldGen",
+        "worldgen_img2scene"
+      ],
+      "url": "https://huggingface.co/LeoXie/WorldGen",
+      "repo_full_mb": 76
     },
     {
-      "id": "acestep-3.5b", "module": "Musica (ACE-Step)", "label": "ACE-Step v1 3.5B", "kind": "snapshot",
-      "repo_id": "ACE-Step/ACE-Step-v1-3.5B", "type": "audio", "family": "ACE-Step",
-      "tool_dest": "C:\\Users\\atain\\.cache\\ace-step\\checkpoints", "gated": false, "approx_gb": 14,
-      "scan_names": ["ACE-Step-v1-3.5B", "acestep"],
-      "note": "file grosso 6.5GB → su connessione instabile usare resume/hf_xet (IncompleteRead)"
+      "id": "acestep-3.5b",
+      "module": "Musica (ACE-Step)",
+      "label": "ACE-Step v1 3.5B",
+      "kind": "snapshot",
+      "repo_id": "ACE-Step/ACE-Step-v1-3.5B",
+      "type": "audio",
+      "family": "ACE-Step",
+      "tool_dest": "C:\\Users\\atain\\.cache\\ace-step\\checkpoints",
+      "gated": false,
+      "approx_gb": 14,
+      "scan_names": [
+        "ACE-Step-v1-3.5B",
+        "acestep"
+      ],
+      "note": "file grosso 6.5GB → su connessione instabile usare resume/hf_xet (IncompleteRead)",
+      "url": "https://huggingface.co/ACE-Step/ACE-Step-v1-3.5B",
+      "repo_full_mb": 7892
     },
     {
-      "id": "voice-fish", "module": "Voce (clone)", "label": "Fish/OpenAudio S1-mini", "kind": "snapshot",
-      "repo_id": "fishaudio/openaudio-s1-mini", "type": "tts", "family": "voice",
-      "gated": true, "approx_gb": 3.6, "scan_names": ["openaudio", "fish-speech"]
+      "id": "voice-fish",
+      "module": "Voce (clone)",
+      "label": "Fish/OpenAudio S1-mini",
+      "kind": "snapshot",
+      "repo_id": "fishaudio/openaudio-s1-mini",
+      "type": "tts",
+      "family": "voice",
+      "gated": true,
+      "approx_gb": 3.6,
+      "scan_names": [
+        "openaudio",
+        "fish-speech"
+      ]
     },
     {
-      "id": "voice-vibevoice", "module": "Voce (clone)", "label": "VibeVoice 1.5B (multi-speaker)", "kind": "snapshot",
-      "repo_id": "microsoft/VibeVoice-1.5B", "type": "tts", "family": "voice",
-      "gated": false, "approx_gb": 5.4, "scan_names": ["VibeVoice"]
+      "id": "voice-vibevoice",
+      "module": "Voce (clone)",
+      "label": "VibeVoice 1.5B (multi-speaker)",
+      "kind": "snapshot",
+      "repo_id": "microsoft/VibeVoice-1.5B",
+      "type": "tts",
+      "family": "voice",
+      "gated": false,
+      "approx_gb": 5.4,
+      "scan_names": [
+        "VibeVoice"
+      ],
+      "url": "https://huggingface.co/microsoft/VibeVoice-1.5B",
+      "repo_full_mb": 5158
     },
     {
-      "id": "voice-cosyvoice2", "module": "Voce (clone)", "label": "CosyVoice2 0.5B", "kind": "snapshot",
-      "repo_id": "FunAudioLLM/CosyVoice2-0.5B", "type": "tts", "family": "voice",
-      "gated": false, "approx_gb": 4.9, "scan_names": ["CosyVoice2", "cosyvoice"]
+      "id": "voice-cosyvoice2",
+      "module": "Voce (clone)",
+      "label": "CosyVoice2 0.5B",
+      "kind": "snapshot",
+      "repo_id": "FunAudioLLM/CosyVoice2-0.5B",
+      "type": "tts",
+      "family": "voice",
+      "gated": false,
+      "approx_gb": 4.9,
+      "scan_names": [
+        "CosyVoice2",
+        "cosyvoice"
+      ],
+      "url": "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B",
+      "repo_full_mb": 4632
+    },
+    {
+      "id": "gfpgan-14",
+      "module": "FaceRestore",
+      "label": "GFPGAN v1.4 (restauro volti)",
+      "kind": "file",
+      "type": "facerestore_models",
+      "family": "GFPGAN",
+      "filename": "GFPGANv1.4.pth",
+      "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth",
+      "approx_gb": 0.3,
+      "used_by": [
+        "cap.restore"
+      ],
+      "scan_names": [
+        "GFPGANv1.4",
+        "gfpgan"
+      ],
+      "gated": false
+    },
+    {
+      "id": "codeformer",
+      "module": "FaceRestore",
+      "label": "CodeFormer (restauro volti)",
+      "kind": "file",
+      "type": "facerestore_models",
+      "family": "CodeFormer",
+      "filename": "codeformer.pth",
+      "url": "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",
+      "approx_gb": 0.3,
+      "used_by": [
+        "cap.restore"
+      ],
+      "scan_names": [
+        "codeformer"
+      ],
+      "gated": false
+    },
+    {
+      "id": "pulid-flux",
+      "module": "Face",
+      "label": "PuLID FLUX (identità volto)",
+      "kind": "file",
+      "type": "pulid",
+      "family": "Flux",
+      "filename": "pulid_flux_v0.9.1.safetensors",
+      "repo_id": "guozinan/PuLID",
+      "approx_gb": 1.1,
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "scan_names": [
+        "pulid_flux",
+        "pulid"
+      ],
+      "gated": false,
+      "url": "https://huggingface.co/guozinan/PuLID/resolve/main/pulid_flux_v0.9.1.safetensors",
+      "sha256": "92c41c3af322b02e58e1b32842e4601e08c8f16ec1fe80089dbe957df510f51d",
+      "size_mb": 1089
+    },
+    {
+      "id": "flux1-krea",
+      "module": "Immagini",
+      "label": "FLUX.1 Krea [dev]",
+      "kind": "snapshot",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "repo_id": "black-forest-labs/FLUX.1-Krea-dev",
+      "approx_gb": 24,
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "scan_names": [
+        "FLUX.1-Krea-dev",
+        "FLUX_Krea_Dev",
+        "krea"
+      ],
+      "gated": false,
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Krea-dev",
+      "repo_full_mb": 55215
+    },
+    {
+      "id": "ltx-iclora-canny",
+      "module": "ControlNet",
+      "label": "LTX-2 IC-LoRA Canny",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "filename": "ltx-2-19b-ic-lora-canny-control.safetensors",
+      "approx_gb": 1.0,
+      "used_by": [
+        "cap.controlnet"
+      ],
+      "scan_names": [
+        "ic-lora-canny",
+        "canny-control"
+      ],
+      "gated": false
+    },
+    {
+      "id": "ltx-iclora-depth",
+      "module": "ControlNet",
+      "label": "LTX-2 IC-LoRA Depth",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "filename": "ltx-2-19b-ic-lora-depth-control.safetensors",
+      "approx_gb": 1.0,
+      "used_by": [
+        "cap.controlnet"
+      ],
+      "scan_names": [
+        "ic-lora-depth",
+        "depth-control"
+      ],
+      "gated": false
+    },
+    {
+      "id": "ltx-iclora-pose",
+      "module": "ControlNet",
+      "label": "LTX-2 IC-LoRA Pose",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "filename": "ltx-2-19b-ic-lora-pose-control.safetensors",
+      "approx_gb": 1.0,
+      "used_by": [
+        "cap.controlnet"
+      ],
+      "scan_names": [
+        "ic-lora-pose",
+        "pose-control"
+      ],
+      "gated": false
+    },
+    {
+      "id": "flux-vae-ae",
+      "module": "VAE",
+      "label": "FLUX.1 VAE (ae)",
+      "kind": "file",
+      "type": "VAE",
+      "family": "Flux",
+      "filename": "ae.safetensors",
+      "approx_gb": 0.3,
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "scan_names": [
+        "ae.safetensors"
+      ],
+      "gated": false
+    },
+    {
+      "id": "flux2-vae",
+      "module": "VAE",
+      "label": "FLUX.2 VAE",
+      "kind": "file",
+      "type": "VAE",
+      "family": "Flux",
+      "filename": "flux2-vae.safetensors",
+      "approx_gb": 0.3,
+      "used_by": [
+        "cap.gen_images",
+        "cap.video"
+      ],
+      "scan_names": [
+        "flux2-vae"
+      ],
+      "gated": false
+    },
+    {
+      "id": "skintoken-grpo",
+      "module": "Rig 3D",
+      "label": "SkinToken grpo (rig 3D)",
+      "kind": "file",
+      "type": "skintoken",
+      "family": "SkinToken",
+      "filename": "grpo_1400.ckpt",
+      "approx_gb": 2.0,
+      "used_by": [
+        "cap.threed"
+      ],
+      "scan_names": [
+        "grpo_1400",
+        "articulation_xl",
+        "skintoken"
+      ],
+      "gated": false
+    },
+    {
+      "id": "ernie-ministral",
+      "module": "TextEncoder",
+      "label": "Ernie ministral-3-3b (encoder)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Ernie",
+      "filename": "ministral-3-3b.safetensors",
+      "approx_gb": 6.0,
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "scan_names": [
+        "ministral-3-3b",
+        "ministral"
+      ],
+      "gated": false
     }
   ]
 }
