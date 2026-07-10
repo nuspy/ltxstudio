@@ -22,6 +22,12 @@ def main():
     apply_theme(app)
     win = MainWindow()
     win.show()
+    # Primo avvio: wizard «Setup modelli» (cartelle → collega i locali → scarica i mancanti dell'edizione).
+    try:
+        from ui.setup import first_run
+        first_run.maybe_show(win)
+    except Exception:                                       # noqa: BLE001 — non deve mai bloccare l'avvio
+        pass
     sys.exit(app.exec())
 
 
