@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "Tisser dans le Récit",
   "fs.script.table_fail": "Récit non généré.",
   "fs.tl.ripple": "Supprimer (ripple)",
-  "fs.tl.marker_del": "Retirer le marqueur {t:.1f}s"
+  "fs.tl.marker_del": "Retirer le marqueur {t:.1f}s",
+  "weights.show_all": "Afficher tous les modules",
+  "weights.show_all.tt": "Désactiver le filtre par édition / modules présents.",
+  "weights.link": "🔗 Lier les trouvés",
+  "weights.link.tt": "Lier (junction/hardlink, sans admin) les poids trouvés dans le dossier de recherche au lieu de les retélécharger.",
+  "weights.link.none": "Aucun poids trouvé à lier (fais d'abord «Rechercher les existants»).",
+  "weights.link.done": "{n} poids liés (sans retélécharger).",
+  "weights.import": "＋ Importer les inconnus",
+  "weights.import.tt": "Lier dans le catalogue les modèles trouvés dans le dossier de recherche mais non listés (pour les utiliser dans l'app).",
+  "weights.import.none": "Aucun modèle inconnu dans le dossier.",
+  "weights.import.confirm": "{n} modèles non listés trouvés. Les lier dans le dossier Models (sans les copier) pour que l'app les détecte ?\n\n{names}",
+  "weights.import.done": "{n} modèles importés (liés ; le détecteur les repérera).",
+  "setup.title": "Configuration des modèles — LTX Studio",
+  "setup.head": "Bienvenue ! Avant de commencer, indique où tu conserves déjà tes modèles IA : je les LIE (sans les copier ni les retélécharger) et ensuite tu ne télécharges que les poids nécessaires aux modules de ton édition.\n①  Dossier de base   →   ②  «Rechercher les existants»   →   ③  «🔗 Lier les trouvés» / «＋ Importer les inconnus»   →   ④  «Sélectionner les manquants» + «Télécharger».",
+  "setup.skip": "Passer pour l'instant",
+  "setup.done": "Terminé ✓"
 }

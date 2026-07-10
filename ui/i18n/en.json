@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "Weave into the Story",
   "fs.script.table_fail": "Story not generated.",
   "fs.tl.ripple": "Delete (ripple)",
-  "fs.tl.marker_del": "Remove marker {t:.1f}s"
+  "fs.tl.marker_del": "Remove marker {t:.1f}s",
+  "weights.show_all": "Show all modules",
+  "weights.show_all.tt": "Turn off filtering by edition / installed modules.",
+  "weights.link": "🔗 Link found",
+  "weights.link.tt": "Link (junction/hardlink, no admin needed) the weights found in the search folder instead of re-downloading them.",
+  "weights.link.none": "No weights found to link (run «Scan for existing» first).",
+  "weights.link.done": "Linked {n} weights (without re-downloading).",
+  "weights.import": "＋ Import unknown",
+  "weights.import.tt": "Link into the catalog the models found in the search folder but not listed (so you can use them in the app).",
+  "weights.import.none": "No unknown models in the folder.",
+  "weights.import.confirm": "Found {n} unlisted models. Link them into the Models folder (without copying) so the app detects them?\n\n{names}",
+  "weights.import.done": "Imported {n} models (linked; the detector will pick them up).",
+  "setup.title": "Model setup — LTX Studio",
+  "setup.head": "Welcome! Before you begin, tell us where you already keep your AI models: I LINK them (without copying or re-downloading) and then you only download the weights your edition's modules need.\n①  Base folder   →   ②  «Scan for existing»   →   ③  «🔗 Link found» / «＋ Import unknown»   →   ④  «Select missing» + «Download».",
+  "setup.skip": "Skip for now",
+  "setup.done": "Done ✓"
 }

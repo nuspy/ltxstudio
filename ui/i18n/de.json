@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "In die Erzählung verweben",
   "fs.script.table_fail": "Erzählung nicht erzeugt.",
   "fs.tl.ripple": "Löschen (Ripple)",
-  "fs.tl.marker_del": "Marker {t:.1f}s entfernen"
+  "fs.tl.marker_del": "Marker {t:.1f}s entfernen",
+  "weights.show_all": "Alle Module anzeigen",
+  "weights.show_all.tt": "Filterung nach Edition / vorhandenen Modulen deaktivieren.",
+  "weights.link": "🔗 Gefundene verknüpfen",
+  "weights.link.tt": "Die im Suchordner gefundenen Gewichte verknüpfen (junction/hardlink, ohne Admin), statt sie erneut herunterzuladen.",
+  "weights.link.none": "Keine Gewichte zum Verknüpfen gefunden (führe zuerst «Vorhandene suchen» aus).",
+  "weights.link.done": "{n} Gewichte verknüpft (ohne erneuten Download).",
+  "weights.import": "＋ Unbekannte importieren",
+  "weights.import.tt": "Im Suchordner gefundene, aber nicht gelistete Modelle in den Katalog verknüpfen (um sie in der App zu nutzen).",
+  "weights.import.none": "Keine unbekannten Modelle im Ordner.",
+  "weights.import.confirm": "{n} nicht gelistete Modelle gefunden. In den Ordner Models verknüpfen (ohne Kopieren), damit die App sie erkennt?\n\n{names}",
+  "weights.import.done": "{n} Modelle importiert (verknüpft; der Detektor erkennt sie).",
+  "setup.title": "Modell-Einrichtung — LTX Studio",
+  "setup.head": "Willkommen! Gib vor dem Start an, wo du deine KI-Modelle bereits ablegst: Ich VERKNÜPFE sie (ohne Kopieren oder erneuten Download) und dann lädst du nur die Gewichte herunter, die die Module deiner Edition benötigen.\n①  Basisordner   →   ②  «Vorhandene suchen»   →   ③  «🔗 Gefundene verknüpfen» / «＋ Unbekannte importieren»   →   ④  «Fehlende auswählen» + «Herunterladen».",
+  "setup.skip": "Vorerst überspringen",
+  "setup.done": "Fertig ✓"
 }

@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "编织进故事",
   "fs.script.table_fail": "未生成故事。",
   "fs.tl.ripple": "删除（ripple）",
-  "fs.tl.marker_del": "移除标记 {t:.1f}s"
+  "fs.tl.marker_del": "移除标记 {t:.1f}s",
+  "weights.show_all": "显示所有模块",
+  "weights.show_all.tt": "关闭按版本／已安装模块的筛选。",
+  "weights.link": "🔗 链接已找到项",
+  "weights.link.tt": "将搜索文件夹中找到的权重进行链接（junction/hardlink，无需管理员），而不是重新下载。",
+  "weights.link.none": "未找到可链接的权重（请先执行「搜索现有」）。",
+  "weights.link.done": "已链接 {n} 个权重（无需重新下载）。",
+  "weights.import": "＋ 导入未知项",
+  "weights.import.tt": "将搜索文件夹中找到但未列出的模型链接到目录（以便在应用中使用）。",
+  "weights.import.none": "文件夹中没有未知模型。",
+  "weights.import.confirm": "发现 {n} 个未列出的模型。是否将它们链接到 Models 文件夹（不复制），以便应用检测到它们？\n\n{names}",
+  "weights.import.done": "已导入 {n} 个模型（已链接；检测器将识别它们）。",
+  "setup.title": "模型设置 — LTX Studio",
+  "setup.head": "欢迎！开始之前，请指明你已存放 AI 模型的位置：我会将它们进行链接（不复制也不重新下载），然后你只需下载你的版本模块所需的权重。\n①  基础文件夹   →   ②  「搜索现有」   →   ③  「🔗 链接已找到项」／「＋ 导入未知项」   →   ④  「选择缺失项」+「下载」。",
+  "setup.skip": "暂时跳过",
+  "setup.done": "完成 ✓"
 }

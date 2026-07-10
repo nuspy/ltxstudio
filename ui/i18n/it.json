@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "Intreccia nel Racconto",
   "fs.script.table_fail": "Racconto non generato.",
   "fs.tl.ripple": "Elimina (ripple)",
-  "fs.tl.marker_del": "Rimuovi marker {t:.1f}s"
+  "fs.tl.marker_del": "Rimuovi marker {t:.1f}s",
+  "weights.show_all": "Mostra tutti i moduli",
+  "weights.show_all.tt": "Disattiva il filtro per edizione/moduli presenti.",
+  "weights.link": "🔗 Collega trovati",
+  "weights.link.tt": "Collega (junction/hardlink, senza admin) i pesi trovati nella cartella di ricerca invece di riscaricarli.",
+  "weights.link.none": "Nessun peso trovato da collegare (fai prima «Cerca esistenti»).",
+  "weights.link.done": "Collegati {n} pesi (senza riscaricare).",
+  "weights.import": "＋ Importa sconosciuti",
+  "weights.import.tt": "Collega nel catalogo i modelli trovati nella cartella di ricerca ma non elencati (per usarli nell'app).",
+  "weights.import.none": "Nessun modello sconosciuto nella cartella.",
+  "weights.import.confirm": "Trovati {n} modelli non elencati. Collegarli nella cartella Models (senza copiarli) così l'app li rileva?\n\n{names}",
+  "weights.import.done": "Importati {n} modelli (collegati; il detector li rileverà).",
+  "setup.title": "Setup modelli — LTX Studio",
+  "setup.head": "Benvenuto! Prima di iniziare, indica dove tieni già i modelli AI: li COLLEGO (senza copiarli né riscaricarli) e poi scarichi solo i pesi che servono ai moduli della tua edizione.\n①  Cartella base   →   ②  «Cerca esistenti»   →   ③  «🔗 Collega trovati» / «＋ Importa sconosciuti»   →   ④  «Seleziona mancanti» + «Scarica».",
+  "setup.skip": "Salta per ora",
+  "setup.done": "Fatto ✓"
 }

@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "Entrelazar en el Relato",
   "fs.script.table_fail": "Relato no generado.",
   "fs.tl.ripple": "Eliminar (ripple)",
-  "fs.tl.marker_del": "Quitar marcador {t:.1f}s"
+  "fs.tl.marker_del": "Quitar marcador {t:.1f}s",
+  "weights.show_all": "Mostrar todos los módulos",
+  "weights.show_all.tt": "Desactivar el filtro por edición / módulos presentes.",
+  "weights.link": "🔗 Vincular encontrados",
+  "weights.link.tt": "Vincular (junction/hardlink, sin admin) los pesos encontrados en la carpeta de búsqueda en lugar de volver a descargarlos.",
+  "weights.link.none": "No se encontraron pesos para vincular (haz primero «Buscar existentes»).",
+  "weights.link.done": "Vinculados {n} pesos (sin volver a descargar).",
+  "weights.import": "＋ Importar desconocidos",
+  "weights.import.tt": "Vincular en el catálogo los modelos encontrados en la carpeta de búsqueda pero no listados (para usarlos en la app).",
+  "weights.import.none": "Ningún modelo desconocido en la carpeta.",
+  "weights.import.confirm": "Se encontraron {n} modelos no listados. ¿Vincularlos en la carpeta Models (sin copiarlos) para que la app los detecte?\n\n{names}",
+  "weights.import.done": "Importados {n} modelos (vinculados; el detector los detectará).",
+  "setup.title": "Configuración de modelos — LTX Studio",
+  "setup.head": "¡Bienvenido! Antes de empezar, indica dónde guardas ya tus modelos de IA: los VINCULO (sin copiarlos ni volver a descargarlos) y luego solo descargas los pesos que necesitan los módulos de tu edición.\n①  Carpeta base   →   ②  «Buscar existentes»   →   ③  «🔗 Vincular encontrados» / «＋ Importar desconocidos»   →   ④  «Seleccionar faltantes» + «Descargar».",
+  "setup.skip": "Omitir por ahora",
+  "setup.done": "Hecho ✓"
 }

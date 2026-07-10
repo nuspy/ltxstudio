@@ -2575,5 +2575,20 @@
   "fs.script.table_weave": "Beleszövés az Elbeszélésbe",
   "fs.script.table_fail": "Az Elbeszélés nem jött létre.",
   "fs.tl.ripple": "Törlés (ripple)",
-  "fs.tl.marker_del": "{t:.1f}s jelölő eltávolítása"
+  "fs.tl.marker_del": "{t:.1f}s jelölő eltávolítása",
+  "weights.show_all": "Összes modul megjelenítése",
+  "weights.show_all.tt": "A kiadás / meglévő modulok szerinti szűrés kikapcsolása.",
+  "weights.link": "🔗 Találtak összekapcsolása",
+  "weights.link.tt": "A keresési mappában talált súlyok összekapcsolása (junction/hardlink, rendszergazda nélkül) az újbóli letöltés helyett.",
+  "weights.link.none": "Nem található összekapcsolható súly (előbb futtasd a «Meglévők keresése» műveletet).",
+  "weights.link.done": "{n} súly összekapcsolva (újbóli letöltés nélkül).",
+  "weights.import": "＋ Ismeretlenek importálása",
+  "weights.import.tt": "A keresési mappában talált, de nem listázott modellek összekapcsolása a katalógusba (hogy használhasd őket az alkalmazásban).",
+  "weights.import.none": "Nincs ismeretlen modell a mappában.",
+  "weights.import.confirm": "{n} nem listázott modell található. Összekapcsolod őket a Models mappába (másolás nélkül), hogy az alkalmazás felismerje őket?\n\n{names}",
+  "weights.import.done": "{n} modell importálva (összekapcsolva; a detektor felismeri őket).",
+  "setup.title": "Modellek beállítása — LTX Studio",
+  "setup.head": "Üdvözlünk! Mielőtt elkezded, add meg, hol tárolod már az AI-modelljeidet: ÖSSZEKAPCSOLOM őket (másolás vagy újbóli letöltés nélkül), majd csak a kiadásod moduljaihoz szükséges súlyokat töltöd le.\n①  Alapmappa   →   ②  «Meglévők keresése»   →   ③  «🔗 Találtak összekapcsolása» / «＋ Ismeretlenek importálása»   →   ④  «Hiányzók kiválasztása» + «Letöltés».",
+  "setup.skip": "Kihagyás egyelőre",
+  "setup.done": "Kész ✓"
 }
