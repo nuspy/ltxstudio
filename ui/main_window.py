@@ -3090,6 +3090,27 @@ class MainWindow(QMainWindow):
                 pass
             self._log("Video scartato (revert).")
 
+    def _materialize_talk_audio(self, ac: dict) -> str | None:
+        """G3 — per Talk: se il tab Audio non ha un file pronto, prova a produrlo senza bloccare l'utente:
+        (a) un TTS già generato nel tab Audio (pending) → usalo; (b) voce «clone» + testo → sintesi TTS ora.
+        Ritorna il path o None (per i casi 'native'/'mute' che davvero non hanno una traccia). Non solleva."""
+        try:
+            pend = self.audio_tab.has_pending_tts() if hasattr(self.audio_tab, "has_pending_tts") else None
+            if pend and Path(str(pend)).exists():
+                self._log(f"[Talk] uso il TTS già generato: {Path(str(pend)).name}")
+                return str(pend)
+            if ac.get("audio_mode") == "clone" and (ac.get("tts_text") or "").strip() \
+                    and ac.get("clone_voice") is not None:
+                from core.tts_engine import synthesize as _tts_synth
+                self._log(f"[Talk] sintesi voce clonata '{ac['clone_voice'].name}' ({ac.get('tts_engine')})…")
+                out = _tts_synth(ac.get("tts_engine") or "edge", ac["clone_voice"], ac["tts_text"].strip())
+                if out and Path(str(out)).exists():
+                    self._log(f"[Talk] audio clonato pronto: {Path(str(out)).name}")
+                    return str(out)
+        except Exception as e:                              # noqa: BLE001
+            self._log(f"[Talk] materializzazione audio fallita: {e}")
+        return None
+
     def _maybe_multitalk(self, vals: dict, v2v: dict, mode: str) -> bool:
         """Instrada Talk/Canta al motore MultiTalk nativo. Ritorna True se gestito (→ on_generate
         deve fermarsi). MultiTalk è audio-driven: serve un audio REALE (file/canzone)."""
@@ -3100,6 +3121,10 @@ class MainWindow(QMainWindow):
         else:                                            # talk: audio dal tab Audio (file utente/TTS)
             ac = self.audio_tab.get_audio_config() if hasattr(self, "audio_tab") else {}
             audio_path = ac.get("audio_file")
+            # G3 — se non c'è un file pronto, prova a MATERIALIZZARLO (clone+testo → TTS; TTS pending → usa),
+            # come fa il ramo ComfyUI: prima Talk si bloccava «Audio mancante» anche con una voce clone scelta.
+            if not (audio_path and Path(str(audio_path)).exists()):
+                audio_path = self._materialize_talk_audio(ac)
             sep = False
             ascale = 2.0
         if not audio_path or not Path(audio_path).exists():
@@ -3116,6 +3141,12 @@ class MainWindow(QMainWindow):
             return True
         fps = int(vals.get("fps", 25) or 25)
         length = float(vals.get("length_s") or 0)
+        # G4 — talk DA VIDEO: la durata deve seguire il video sorgente (prima poteva troncare). Poi, se ancora
+        # nulla, la durata dell'audio.
+        if src_video and Path(str(src_video)).exists():
+            _dv = self._probe_duration(src_video)
+            if _dv and _dv > 0:
+                length = _dv
         if length <= 0:
             length = self._probe_duration(audio_path) or 5.0
         # durata segmento + overlap crossfade dalla GUI (Avanzate → Video lungo); default chunk 15s
@@ -3138,9 +3169,11 @@ class MainWindow(QMainWindow):
             "separate_vocals": sep, "audio_scale": ascale, "blocks_to_swap": "auto", "context": True,
             "seg_frames": seg_frames, "overlap_frames": overlap_frames,
             "ref_anchor_strength": ref_anchor, "anchor_every": anchor_every, "resume": resume,
-            # #3 talk region: anima solo bocca/volto (reimagine=off) tenendo fermo il resto
-            "talk_region": v2v.get("talk_region"), "talk_mask_offset": int(v2v.get("talk_mask_offset", 0) or 0),
-            "talk_reimagine": bool(v2v.get("talk_reimagine", False)),
+            # #3 talk region: anima solo bocca/volto (reimagine=off) tenendo fermo il resto.
+            # G2 — SOLO in modalità talk: nel canto (full-body) la regione-bocca non ha senso e non va passata.
+            "talk_region": v2v.get("talk_region") if mode == "talk" else None,
+            "talk_mask_offset": int(v2v.get("talk_mask_offset", 0) or 0) if mode == "talk" else 0,
+            "talk_reimagine": bool(v2v.get("talk_reimagine", False)) if mode == "talk" else False,
             "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
         }
         self._start_native_multitalk(params)
