@@ -176,13 +176,20 @@ triade *tieni / varia / dirigi* su ogni artefatto.
   (`coverage.wardrobe_prompts`), **riallineamento Classica/Pro** (guida→Classica, Pro lean, testato), **worker
   video persistente** (`gen_shot_video` usa il server :8190 se attivo → no reload LTX 22B/shot).
 
-**⏳ Rimane** (solo pezzi che richiedono GPU/uso reale o giudizio-utente):
-- **Rigen non-distruttiva estesa a strip-varianti visibili nel tree** (oggi c'è la storia-take con galleria).
-- **Co-scrittura interattiva vera** (oggi il Racconto è generato+editabile; manca il tavolo a bivi/beat).
-- **Timeline pro completa** (ripple/marker/waveform; oggi c'è trim in/out + riordino).
-- **Moonshot** (virtual script supervisor, DoP-agente, montaggio a ritmo emotivo, «secondo sguardo», ecc.).
+**✅ Completato nel terzo lotto (2026-07-10)** — codice committato; i18n 15 lingue + validazione live pendenti:
+- **Strip-varianti take INLINE nel tree** (`storyboard_tab`: striscia thumbnail cliccabili sotto il tree, ripristino
+  non-distruttivo senza dialog, take corrente evidenziato).
+- **Co-scrittura interattiva vera** (`core/film_studio/cowriter.py` + `script_tab`: tavolo a beat con bivi via LLM,
+  scelta ramo per beat → intreccio nel Racconto).
+- **Timeline pro** (`timeline_widget`: marker doppio-click persistiti in config, ripple-delete via menu + «Reintegra»,
+  waveform dai picchi wav).
+- **Moonshot** (`core/film_studio/supervisor.py`: script-supervisor continuità, DoP-agente camera+luce dalla Style
+  Bible, «secondo sguardo» critico post-piano, montaggio a ritmo emotivo con curva di tensione per scena).
+
+**⏳ Rimane**:
 - **feature_matrix**: aggiungere le nuove sotto-capability al seed esterno con i18n_key (oggi funzionano perché
   dentro `cap.filmstudio` già gated e dev è permissivo).
+- **Validazione live** delle nuove feature (rimandata: ottimizzazione ForexGPT occupa la macchina).
 
 ## 5. Sintesi finale del panel
 Avete un'**officina** eccellente; manca il **teatro**. Tre atti riportano l'anima — **intenzione persistente**
