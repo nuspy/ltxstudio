@@ -4307,6 +4307,18 @@ class MainWindow(QMainWindow):
             simplify=float(cfg.get("simplify", 0.95) or 0.95),
             texture_size=int(cfg.get("texture_size", 1024) or 1024),
             target_faces=int(cfg.get("target_face_count", 0) or 0),   # #95: facce target dal tab (era ignorato)
+            # Parametri GUI ora REALMENTE usati dal backend nativo TRELLIS.2 (prima ignorati):
+            resolution=str(cfg.get("resolution") or "") or None,
+            max_tokens=int(cfg.get("max_tokens", 0) or 0) or None,
+            guidance=float(cfg.get("guidance", -1.0)),
+            geo_steps=int(cfg.get("steps", 0) or 0) or None,
+            tex_guidance=float(cfg.get("tex_guidance", -1.0)),
+            tex_steps=int(cfg.get("tex_steps", 0) or 0) or None,
+            texture=bool(cfg.get("texture", True)),
+            remove_bg=bool(cfg.get("remove_background", True)),
+            attn=str(cfg.get("attn_backend") or "auto"),
+            precision=str(cfg.get("precision") or "auto"),
+            bg_color=str(cfg.get("background_color") or "black"),
             on_log=_tlog)
         out_glb = str(trellis_service.glb_path(name))
         self._log(f"[nativo] TRELLIS 3D su {Path(image_path).name} (res {cfg.get('resolution','')})…")

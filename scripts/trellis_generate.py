@@ -70,27 +70,51 @@ if os.path.isdir(_FB):
         pass
 
 
-def _patch_preprocess(pipeline):
+_BG_RGB = {"black": (0, 0, 0), "gray": (128, 128, 128), "white": (255, 255, 255)}
+
+
+def _patch_preprocess(pipeline, bg_color="black"):
     """Rende preprocess_image a prova di crash SENZA perdere la rimozione-sfondo per le immagini vere.
     Il preprocess ufficiale (riga 153) fa `np.min(bbox…)` su un array VUOTO quando il rembg non trova alcun
     soggetto (immagini piatte / alpha vuota) → `ValueError: zero-size array`. Qui si mantiene il percorso rembg
     normale e, SOLO se fallisce/non trova soggetto, si ripiega passando l'INTERA immagine come soggetto
-    (alpha 254 → has_alpha=True → bbox = tutta l'immagine)."""
+    (alpha 254 → has_alpha=True → bbox = tutta l'immagine).
+
+    `bg_color` (GUI): il preprocess ufficiale compone SEMPRE su NERO (rgb*alpha). Se l'utente sceglie gray/white
+    ricomponiamo il soggetto sul colore scelto (rgb*alpha + bg*(1-alpha)). NB: il modello TRELLIS è addestrato
+    su sfondo nero → 'black' resta il default consigliato; gray/white sono esposti perché l'utente li controlla."""
     import numpy as np
     from PIL import Image
     _orig = pipeline.preprocess_image
+    _bg = _BG_RGB.get(bg_color, (0, 0, 0))
 
     def _full_frame(img):
         rgb = img.convert("RGB")
         arr = np.dstack([np.array(rgb), np.full(rgb.size[::-1], 254, np.uint8)])
         return Image.fromarray(arr, "RGBA")
 
+    def _recolor_bg(rgb_img):
+        """Il preprocess ufficiale ha già composto su nero: per gray/white NON basta (l'alpha è perso).
+        Ricostruiamo un alpha approssimato dai pixel non-neri e ricomponiamo sul colore scelto. Best-effort;
+        su 'black' non tocca nulla."""
+        if _bg == (0, 0, 0):
+            return rgb_img
+        arr = np.asarray(rgb_img.convert("RGB"), np.float32)
+        alpha = (arr.max(axis=2, keepdims=True) > 4).astype(np.float32)   # soggetto = pixel non (quasi) neri
+        bg = np.array(_bg, np.float32)[None, None, :]
+        out = arr * alpha + bg * (1.0 - alpha)
+        return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
+
     def _safe(img):
         try:
-            return _orig(img)                                # rembg: soggetto isolato (immagini normali)
+            res = _orig(img)                                 # rembg: soggetto isolato (immagini normali)
         except Exception as e:                               # noqa: BLE001  (bbox vuoto o rembg ko)
             print(f"[trellis] soggetto non rilevato ({type(e).__name__}) → uso l'intera immagine", flush=True)
-            return _orig(_full_frame(img))                   # fallback: tutta l'immagine come soggetto
+            res = _orig(_full_frame(img))                    # fallback: tutta l'immagine come soggetto
+        try:
+            return _recolor_bg(res)
+        except Exception:                                    # noqa: BLE001  (ricolore fallito → tieni il nero)
+            return res
 
     pipeline.preprocess_image = _safe
 
@@ -111,7 +135,32 @@ def main():
         else "microsoft/TRELLIS.2-4B"
     ap.add_argument("--model", default=_default_model)
     ap.add_argument("--parent-pid", type=int, default=0)          # PID dell'app: se muore, ci autodistruggiamo
+    # ── Parametri GUI (prima ignorati) ora cablati all'API ufficiale TRELLIS.2 ──
+    ap.add_argument("--pipeline_type", default="1024_cascade",    # ← GUI "resolution": 512/1024/1024_cascade/1536_cascade
+                    choices=["512", "1024", "1024_cascade", "1536_cascade"])
+    ap.add_argument("--max_tokens", type=int, default=49152)       # ← GUI "Dettaglio" (max_num_tokens di run)
+    ap.add_argument("--guidance", type=float, default=-1.0)        # ← GUI geo guidance → guidance_strength (ss+shape); <0 = default modello
+    ap.add_argument("--steps", type=int, default=0)                # ← GUI geo steps (ss+shape); 0 = default modello
+    ap.add_argument("--tex_guidance", type=float, default=-1.0)    # ← GUI texture guidance → tex guidance_strength
+    ap.add_argument("--tex_steps", type=int, default=0)            # ← GUI texture steps
+    ap.add_argument("--texture", type=int, default=1)              # ← GUI toggle texture PBR (1=on → texture_extraction)
+    ap.add_argument("--remove_bg", type=int, default=1)            # ← GUI rimuovi sfondo (preprocess_image)
+    ap.add_argument("--attn", default="auto",                      # ← GUI backend attenzione (env ATTN_BACKEND)
+                    choices=["auto", "flash_attn", "xformers", "sdpa", "sageattn"])
+    ap.add_argument("--precision", default="auto",                 # ← GUI precisione (autocast bf16/fp16)
+                    choices=["auto", "bf16", "fp16", "fp32"])
+    ap.add_argument("--bg_color", default="black",                 # ← GUI colore sfondo (composito soggetto)
+                    choices=["black", "gray", "white"])
     a = ap.parse_args()
+
+    # ATTN backend: TRELLIS legge os.environ['ATTN_BACKEND'] all'IMPORT del modulo attention (config.py).
+    # Va impostato PRIMA di `from trellis2 …` (l'import è più in basso in questo main). sageattn non è
+    # supportato da TRELLIS (set valido: xformers/flash_attn/flash_attn_3/sdpa/naive) → ripiega su sdpa.
+    _attn_map = {"flash_attn": "flash_attn", "xformers": "xformers", "sdpa": "sdpa", "sageattn": "sdpa"}
+    if a.attn in _attn_map:
+        os.environ["ATTN_BACKEND"] = _attn_map[a.attn]
+        if a.attn == "sageattn":
+            print("[trellis] sageattn non supportato da TRELLIS → uso sdpa", flush=True)
 
     # WATCHDOG anti-orfano: se l'APP (padre) muore — anche per CRASH — questo subprocess si autodistrugge,
     # così non resta a occupare GPU/VRAM (niente DUE istanze TRELLIS che competono). Vedi scripts/_watchdog.py.
@@ -147,24 +196,55 @@ def main():
     pipeline.cuda()
     print(f"[trellis] load {time.time()-t0:.0f}s", flush=True)
 
-    _patch_preprocess(pipeline)                              # preprocess a prova di crash (bbox vuoto)
+    _patch_preprocess(pipeline, bg_color=a.bg_color)         # preprocess crash-safe + colore sfondo GUI
     image = Image.open(a.image).convert("RGB")
     torch.manual_seed(a.seed)
+
+    # Override sampler dalla GUI: chiavi REALI dell'API = 'steps' + 'guidance_strength' (FlowEuler…Sampler).
+    # geo guidance/steps → sparse-structure + shape-slat; texture → tex-slat. Dict vuoto = default del modello.
+    _ss, _sh, _tx = {}, {}, {}
+    if a.steps > 0:
+        _ss["steps"] = int(a.steps); _sh["steps"] = int(a.steps)
+    if a.guidance >= 0:
+        _ss["guidance_strength"] = float(a.guidance); _sh["guidance_strength"] = float(a.guidance)
+    if a.tex_steps > 0:
+        _tx["steps"] = int(a.tex_steps)
+    if a.tex_guidance >= 0:
+        _tx["guidance_strength"] = float(a.tex_guidance)
+
+    # Precisione: bf16/fp16 → autocast attorno alla diffusione (best-effort); auto/fp32 = nessun wrapping.
+    import contextlib
+    _dt = {"bf16": torch.bfloat16, "fp16": torch.float16}.get(a.precision)
+    _ctx = torch.autocast("cuda", dtype=_dt) if _dt else contextlib.nullcontext()
+
+    def _run(ptype):
+        with _ctx:
+            return pipeline.run(
+                image, seed=int(a.seed), pipeline_type=ptype, max_num_tokens=int(a.max_tokens),
+                sparse_structure_sampler_params=_ss, shape_slat_sampler_params=_sh,
+                tex_slat_sampler_params=_tx, preprocess_image=bool(a.remove_bg))[0]
+
     t1 = time.time()
-    print("[trellis] STEP pipeline.run (diffusion)", flush=True)
-    mesh = pipeline.run(image)[0]
+    print(f"[trellis] STEP pipeline.run (res={a.pipeline_type}, tok={a.max_tokens}, geo_steps={a.steps or 'def'}, "
+          f"geo_g={a.guidance if a.guidance>=0 else 'def'}, attn={a.attn}, prec={a.precision})", flush=True)
+    try:
+        mesh = _run(a.pipeline_type)
+    except AssertionError as _ae:                            # il modello non ha i flow-model per quel pipeline_type
+        print(f"[trellis] pipeline_type '{a.pipeline_type}' non disponibile ({_ae}) → default del modello", flush=True)
+        mesh = _run(None)
     print(f"[trellis] diffusion {time.time()-t1:.0f}s", flush=True)
     t2 = time.time()
     print("[trellis] STEP simplify", flush=True)
     mesh.simplify(int(a.simplify_cap))                            # cap facce prima del postprocess
-    print("[trellis] STEP to_glb", flush=True)
+    print(f"[trellis] STEP to_glb (texture={'on' if a.texture else 'off'})", flush=True)
     glb = o_voxel.postprocess.to_glb(
         vertices=mesh.vertices, faces=mesh.faces, attr_volume=mesh.attrs,
         coords=mesh.coords, attr_layout=mesh.layout, voxel_size=mesh.voxel_size,
         aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
         decimation_target=int(a.decimation), texture_size=int(a.texture_size),
+        texture_extraction=bool(a.texture),                      # ← GUI toggle texture PBR (off = solo geometria)
         remesh=True, remesh_band=1, remesh_project=0, verbose=False)
-    print(f"[trellis] to_glb (dec={a.decimation},tex={a.texture_size}) {time.time()-t2:.0f}s", flush=True)
+    print(f"[trellis] to_glb (dec={a.decimation},tex={a.texture_size},pbr={bool(a.texture)}) {time.time()-t2:.0f}s", flush=True)
 
     out = os.path.join(a.output_dir, "model.glb")
     Path(a.output_dir).mkdir(parents=True, exist_ok=True)

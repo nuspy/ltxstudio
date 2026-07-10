@@ -41,19 +41,45 @@ def glb_path(name: str) -> Path:
 def make_job(image_path: str, name: str = "model", *, seed: int = 1,
              ss_steps: int = 12, slat_steps: int = 12, simplify: float = 0.95,
              texture_size: int = 1024, target_faces: int | None = None,
-             hf_token: str | None = None, **cbs) -> Job:
+             hf_token: str | None = None,
+             resolution: str | None = None, max_tokens: int | None = None,
+             guidance: float | None = None, geo_steps: int | None = None,
+             tex_guidance: float | None = None, tex_steps: int | None = None,
+             texture: bool = True, remove_bg: bool = True,
+             attn: str | None = None, precision: str | None = None,
+             bg_color: str | None = None, **cbs) -> Job:
     out = OUT_DIR / _safe(name)
     out.mkdir(parents=True, exist_ok=True)
-    # NB: trellis_generate.py (API ufficiale microsoft/TRELLIS.2) accetta SOLO questi argomenti.
-    # ss_steps/slat_steps/simplify restano nella firma per compat con la GUI ma non sono passati
-    # (la pipeline ufficiale usa i suoi default). target_faces → --decimation (facce target del GUI).
+    # trellis_generate.py cabla ORA all'API ufficiale TRELLIS.2 i parametri della GUI:
+    # resolution→--pipeline_type, max_tokens→--max_tokens, guidance/geo_steps→sampler geo (ss+shape),
+    # tex_*→sampler texture, texture→--texture (texture_extraction), remove_bg→--remove_bg (preprocess),
+    # attn→ATTN_BACKEND, precision→autocast, bg_color→composito soggetto. target_faces→--decimation.
     import os as _os
     kill_orphans()                                               # niente DUE istanze: pulisci orfani da crash precedenti
     cmd = [TRELLIS_VENV_PY, "-u", str(GEN_SCRIPT), "--image", image_path, "--output_dir", str(out),
            "--seed", int(seed), "--texture_size", int(texture_size),
+           "--texture", 1 if texture else 0, "--remove_bg", 1 if remove_bg else 0,
            "--parent-pid", int(_os.getpid())]                    # watchdog: se l'app muore, il subprocess muore
     if target_faces:
         cmd += ["--decimation", int(target_faces)]
+    if resolution:
+        cmd += ["--pipeline_type", str(resolution)]
+    if max_tokens:
+        cmd += ["--max_tokens", int(max_tokens)]
+    if guidance is not None and guidance >= 0:
+        cmd += ["--guidance", float(guidance)]
+    if geo_steps:
+        cmd += ["--steps", int(geo_steps)]
+    if tex_guidance is not None and tex_guidance >= 0:
+        cmd += ["--tex_guidance", float(tex_guidance)]
+    if tex_steps:
+        cmd += ["--tex_steps", int(tex_steps)]
+    if attn and attn != "auto":
+        cmd += ["--attn", str(attn)]
+    if precision and precision != "auto":
+        cmd += ["--precision", str(precision)]
+    if bg_color:
+        cmd += ["--bg_color", str(bg_color)]
     # ISOLAMENTO dal venv PADRE (app = ComfyUI venv): il subprocess gira nel venv TRELLIS ma erediterebbe
     # l'ambiente dell'app → può caricare torch/CUDA DLL SBAGLIATE = crash nativo intermittente (il backend da
     # solo funziona, dall'app muore). Rimuoviamo PYTHONPATH/PYTHONHOME/PYTHONSTARTUP e togliamo dal PATH le
