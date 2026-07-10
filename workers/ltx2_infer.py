@@ -519,6 +519,64 @@ def _auto_gguf() -> str | None:
     return None
 
 
+def _blend_images(a: str, b: str, alpha: float, out: str) -> bool:
+    """Miscela due immagini (a=ultimo frame, b=foto originale) al peso `alpha` → conditioning anti-drift.
+    Ritorna True se scritta. Best-effort."""
+    try:
+        from PIL import Image
+        ia = Image.open(a).convert("RGB")
+        ib = Image.open(b).convert("RGB").resize(ia.size)
+        Image.blend(ia, ib, max(0.0, min(1.0, float(alpha)))).save(out)
+        return os.path.exists(out)
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
+def _probe_frames(path: str) -> int:
+    """Numero di frame video reali (per il RESUME: un chunk valido ha ~cf frame). 0 se illeggibile."""
+    try:
+        import json as _j
+        import subprocess
+        r = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+                            "-show_entries", "stream=nb_read_frames", "-of", "json", path],
+                           capture_output=True, text=True, timeout=60)
+        return int(_j.loads(r.stdout)["streams"][0]["nb_read_frames"])
+    except Exception:                                        # noqa: BLE001
+        return 0
+
+
+def _xfade_concat(parts: list, out: str, fps: float, overlap_s: float) -> bool:
+    """Concat con CROSSFADE video progressivo tra clip (join morbidi sui video lunghi). Usato SOLO per clip
+    SENZA audio (l'a2v resta concat netto per non desincronizzare il lip-sync). Fallback False → concat netto."""
+    try:
+        import json as _j
+        import subprocess
+        durs = []
+        for pt in parts:
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", pt],
+                               capture_output=True, text=True, timeout=30)
+            durs.append(float(_j.loads(r.stdout)["format"]["duration"]))
+        ov = max(0.05, min(float(overlap_s), min(durs) * 0.5))
+        inputs = []
+        for pt in parts:
+            inputs += ["-i", pt]
+        vf = ""
+        prev = "0:v"
+        offset = durs[0] - ov
+        for k in range(1, len(parts)):
+            outv = f"v{k}"
+            vf += f"[{prev}][{k}:v]xfade=transition=fade:duration={ov:.3f}:offset={offset:.3f}[{outv}];"
+            prev = outv
+            offset += durs[k] - ov
+        vf = vf.rstrip(";")
+        cmd = ["ffmpeg", "-v", "error", *inputs, "-filter_complex", vf, "-map", f"[{prev}]",
+               "-r", str(fps), out, "-y"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        return r.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 0
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
 def _run_chunked(p: dict, chunk: int) -> str:
     """Genera un video lungo a CHUNK in-process (pipe in cache → carica una volta sola), con
     continuità: l'ultimo frame di un chunk diventa l'immagine di conditioning del successivo;
@@ -529,6 +587,10 @@ def _run_chunked(p: dict, chunk: int) -> str:
     total = int(p["num_frames"])
     seg_dur = chunk / fps
     prev_img = p.get("image_path")
+    orig_img = prev_img                                       # #39 anti-drift: la foto ORIGINALE per il re-anchor
+    _anchor_every = int(p.get("anchor_every", 0) or 0)        # ogni N chunk riparte dalla foto (azzera la deriva)
+    _ref_anchor = max(0.0, min(1.0, float(p.get("ref_anchor_strength", 0.0) or 0.0)))  # blend foto→conditioning
+    _resume = bool(p.get("resume", False))                    # #38 riusa i chunk già prodotti (ripresa dopo crash)
     base = os.path.splitext(p["output"])[0]
     parts: list[str] = []
     n = (total + chunk - 1) // chunk
@@ -540,6 +602,15 @@ def _run_chunked(p: dict, chunk: int) -> str:
         cp.pop("chunk_frames", None)
         cp["num_frames"] = cf
         cp["image_path"] = prev_img
+        # #39 ANTI-DRIFT: frena il collasso autoregressivo re-ancorando alla foto originale.
+        if i > 0 and orig_img and os.path.exists(str(orig_img)):
+            if _anchor_every and (i % _anchor_every == 0):    # hard reset: riparte dalla foto (piccolo salto)
+                cp["image_path"] = orig_img
+                print(f"[chunk] {i}: re-anchor HARD alla foto originale", flush=True)
+            elif _ref_anchor > 0 and prev_img and os.path.exists(str(prev_img)):
+                _bl = f"{base}_chunk{i}_anchor.png"           # blend morbido ultimo-frame↔foto come conditioning
+                if _blend_images(prev_img, orig_img, _ref_anchor, _bl):
+                    cp["image_path"] = _bl
         # #29 durata-illimitata MULTI-PROMPT: prompt diverso per finestra temporale (prompts=[{start_s,prompt}])
         if p.get("prompts"):
             t_chunk = i * seg_dur
@@ -553,6 +624,16 @@ def _run_chunked(p: dict, chunk: int) -> str:
             cp["audio_start_time"] = round(i * seg_dur, 3)
             cp["audio_max_duration"] = round(seg_dur, 3)
         cp["output"] = f"{base}_chunk{i}.mp4"
+        # #38 RESUME: se il chunk esiste già ed è valido (n. frame ~ atteso) → riusalo (ripresa dopo crash).
+        if _resume and os.path.exists(cp["output"]) and _probe_frames(cp["output"]) >= cf - 2:
+            print(f"[chunk] {i} già valido → riuso (resume)", flush=True)
+            last = f"{base}_chunk{i}_last.png"
+            subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", cp["output"],
+                            "-update", "1", "-q:v", "2", last, "-y"], check=False)
+            if os.path.exists(last):
+                prev_img = last                              # continuità dal chunk riusato
+            parts.append(cp["output"])
+            continue
         print(f"[chunk] {i + 1}/{n} ({cf} frame, audio_start={cp.get('audio_start_time', 0)})", flush=True)
         try:
             run_generation(cp)                               # pipe in cache dal 2° chunk → veloce
@@ -579,12 +660,19 @@ def _run_chunked(p: dict, chunk: int) -> str:
         if os.path.exists(last):
             prev_img = last                                  # continuità visiva
         parts.append(cp["output"])
-    lst = f"{base}_list.txt"
-    with open(lst, "w", encoding="utf-8") as fh:
-        for pt in parts:
-            fh.write(f"file '{pt}'\n")
-    subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
-                    "-c", "copy", p["output"], "-y"], check=False)
+    # CROSSFADE (join morbidi) solo se richiesto (env) e SENZA audio: l'a2v (talk/canto) resta concat netto
+    # per non desincronizzare il lip-sync. Fallback automatico al concat netto se il filtergraph fallisce.
+    _ov = int(p.get("overlap_frames", 0) or 0)
+    _xf = (os.environ.get("LTX_CHUNK_XFADE") == "1" and _ov > 0 and len(parts) > 1
+           and not p.get("audio_path")
+           and _xfade_concat(parts, p["output"], fps, _ov / max(fps, 1)))
+    if not _xf:
+        lst = f"{base}_list.txt"
+        with open(lst, "w", encoding="utf-8") as fh:
+            for pt in parts:
+                fh.write(f"file '{pt}'\n")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst,
+                        "-c", "copy", p["output"], "-y"], check=False)
     # DURATA REALE vs richiesta: se qualche chunk è fallito, la durata è RIDOTTA. NON silenzioso (l'utente
     # vedeva "10s→5s" senza spiegazione): avvisa con i secondi effettivi prodotti. Il primo chunk (i==0) fa
     # già raise; qui gestiamo i chunk SUCCESSIVI persi.

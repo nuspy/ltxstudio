@@ -2674,7 +2674,19 @@ class MainWindow(QMainWindow):
         # Ora: ≤20s = singolo shot (durata piena garantita); >20s = chunk da ~20s memory-bounded.
         _single_max = int(20 * fps) // 8 * 8 + 1             # ~481 frame @24fps
         if nf > _single_max:
-            params["chunk_frames"] = _single_max
+            # LV1/LV3: anche il video NATIVO normale ora rispetta gli slider «Video lungo» (Avanzate):
+            # durata-segmento, overlap crossfade, anti-drift (re-anchor) e resume — prima inerti in nativo.
+            try:
+                _lv = self.advanced_tab.long_video_config()
+                _seg = int(float(_lv.get("seg_seconds", 20) or 20) * fps)
+                _chunk = min(_seg, _single_max) if _seg >= 9 else _single_max
+                params["chunk_frames"] = max(9, _chunk // 8 * 8 + 1)
+                params["overlap_frames"] = int(_lv.get("overlap", 0) or 0)
+                params["ref_anchor_strength"] = float(_lv.get("ref_anchor_strength", 0.0) or 0.0)
+                params["anchor_every"] = int(_lv.get("anchor_every", 0) or 0)
+                params["resume"] = bool(_lv.get("resume", False))
+            except Exception:                                # noqa: BLE001
+                params["chunk_frames"] = _single_max
         # CONTROLNET (#24): preprocessa il ref-video (canny/depth/pose) e passalo al worker come guida
         cnet = self.controlnet_tab.get_values()
         if cnet.get("controlnet_enabled") and cnet.get("controlnet_ref_video"):
@@ -2952,11 +2964,17 @@ class MainWindow(QMainWindow):
             "num_frames": nf, "fps": int(params.get("fps", 25)),
             "steps": int(params.get("steps", 8)), "guidance": float(params.get("guidance", 3.0)),
             "seed": _mt_seed, "offload": "cpu",
-            # #4 forza dell'audio sul video (sing_audio_scale) → modality_scale del guider audio
-            "audio_scale": float(params.get("audio_scale", 3.0) or 3.0),
+            # #4 forza dell'audio sul video (sing_audio_scale) → modality_scale del guider audio (G5: default 2.0
+            # coerente con la GUI; il canto usa il valore del pannello, il talk 2.0).
+            "audio_scale": float(params.get("audio_scale", 2.0) or 2.0),
             # #4 separa la voce dalla base prima del lip-sync (Canta) — gestito nel thread del worker
             "_sep_vocals": bool(params.get("separate_vocals", False)),
             "ref_strength": 1.0, "output": params.get("output", str(OUTPUT_DIR / "talk_native.mp4")),
+            # VIDEO LUNGHI (LV2): anti-drift + resume + overlap crossfade nel worker chunked
+            "overlap_frames": int(params.get("overlap_frames", 0) or 0),
+            "ref_anchor_strength": float(params.get("ref_anchor_strength", 0.0) or 0.0),
+            "anchor_every": int(params.get("anchor_every", 0) or 0),
+            "resume": bool(params.get("resume", False)),
         }
         # #3 talk region: se c'è una regione e reimagine è OFF, composita solo bocca/volto sul
         #    frame sorgente statico DOPO l'a2v (post-step nel worker).
@@ -2965,8 +2983,13 @@ class MainWindow(QMainWindow):
             nat["_talk_offset"] = int(params.get("talk_mask_offset", 0) or 0)
             nat["_talk_source"] = img
         _single_max = int(20 * fps) // 8 * 8 + 1             # ≤20s = singolo shot (LTX-2.3 regge)
-        if nf > _single_max:
-            nat["chunk_frames"] = _single_max
+        # LV2: usa la durata-segmento della GUI (Avanzate → Video lungo) come chunk, cappata al max per-shot
+        # e quantizzata (≡1 mod 8). Prima il chunk era fisso a 20s ignorando lo slider.
+        _seg = int(params.get("seg_frames", 0) or 0)
+        _chunk = min(_seg, _single_max) if _seg >= 9 else _single_max
+        _chunk = max(9, _chunk // 8 * 8 + 1)
+        if nf > _chunk:
+            nat["chunk_frames"] = _chunk
         self._log(f"[lip-sync nativo] a2v LTX-2 GGUF — {nf} frame {nat['width']}x{nat['height']}…")
         self._mt_worker = _NativeLtx2Worker(nat)
         self._enqueue(tr("queue.job.lipsync", "Lip-sync"), self._mt_worker, self._on_multitalk_done,
@@ -3166,6 +3189,10 @@ class MainWindow(QMainWindow):
             "prompt": vals.get("prompt_positive", ""), "negative": vals.get("prompt_negative", ""),
             "width": int(vals.get("width", 640) or 640), "height": int(vals.get("height", 640) or 640),
             "num_frames": max(25, int(length * fps)), "fps": fps,
+            # propaga steps/cfg/seed scelti nel tab Video a talk/canto (prima usava i default 8/3.0)
+            "steps": int(vals.get("steps", 8) or 8),
+            "guidance": float(vals.get("cfg", vals.get("guidance", 3.0)) or 3.0),
+            "seed": vals.get("seed"),
             "separate_vocals": sep, "audio_scale": ascale, "blocks_to_swap": "auto", "context": True,
             "seg_frames": seg_frames, "overlap_frames": overlap_frames,
             "ref_anchor_strength": ref_anchor, "anchor_every": anchor_every, "resume": resume,
