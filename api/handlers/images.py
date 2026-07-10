@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from api import gate
 from api.jobs import MANAGER
 from api.handlers._common import run_image, parse_loras, out_path
 
@@ -95,17 +96,20 @@ def register(app: FastAPI):
 
     @app.post("/image/generate", tags=["immagini"])
     def image_generate(req: GenerateReq):
+        gate.require("cap.gen_images")                         # rispetta l'edizione come la GUI (403 se off)
         p = req.model_dump(exclude_none=True)
         p["loras"] = parse_loras(p.get("loras"))
         return _submit("image.generate", lambda job: run_image(p))
 
     @app.post("/image/edit", tags=["immagini"])
     def image_edit(req: EditReq):
+        gate.require("cap.gen_images")
         p = req.model_dump(exclude_none=True)
         return _submit("image.edit", lambda job: run_image(p))
 
     @app.post("/image/recolor", tags=["immagini"])
     def image_recolor(req: RecolorReq):
+        gate.require("cap.inpaint")
         subj = (req.subject + " ") if req.subject else ""
         p = {"arch": req.arch, "model": req.model, "image_path": req.image_path,
              "prompt": f"recolor {subj}to {req.target}, keep everything else identical",
@@ -114,27 +118,32 @@ def register(app: FastAPI):
 
     @app.post("/image/inpaint", tags=["immagini"])
     def image_inpaint(req: InpaintReq):
+        gate.require("cap.inpaint")
         p = req.model_dump(exclude_none=True)
         return _submit("image.inpaint", lambda job: run_image(p))
 
     @app.post("/image/outpaint", tags=["immagini"])
     def image_outpaint(req: OutpaintReq):
+        gate.require("cap.inpaint")
         p = req.model_dump(exclude_none=True)
         p["outpaint"] = True
         return _submit("image.outpaint", lambda job: run_image(p))
 
     @app.post("/image/upscale", tags=["immagini"])
     def image_upscale(req: UpscaleReq):
+        gate.require("cap.upscale_image")
         p = req.model_dump(exclude_none=True); p["_module"] = "upscale"
         return _submit("image.upscale", lambda job: run_image(p))
 
     @app.post("/image/segment", tags=["immagini"])
     def image_segment(req: SegmentReq):
+        gate.require("cap.sam")
         p = req.model_dump(exclude_none=True); p["_module"] = "segment"
         return _submit("image.segment", lambda job: run_image(p))
 
     @app.post("/image/faceswap", tags=["immagini"])
     def image_faceswap(req: FaceSwapReq):
+        gate.require("cap.gen_images")
         def fn(job):
             from core import faceswap
             if not faceswap.available():

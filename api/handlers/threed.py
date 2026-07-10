@@ -11,6 +11,7 @@ import os
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from api import gate
 from api.jobs import MANAGER
 
 
@@ -62,6 +63,7 @@ def register(app: FastAPI):
 
     @app.post("/threed/image_to_3d", tags=["3d"])
     def image_to_3d(req: ImageTo3DReq):
+        gate.require("cap.threed")
         def fn(job):
             from core import trellis_service as ts
             errs = ts.preflight(req.image_path)
@@ -77,6 +79,7 @@ def register(app: FastAPI):
 
     @app.post("/threed/rig", tags=["3d"])
     def rig(req: RigReq):
+        gate.require("cap.threed")
         def fn(job):
             from core import rig_service as rs
             _errs = rs.preflight(req.mesh_path)             # preflight richiede il mesh_path
@@ -91,12 +94,14 @@ def register(app: FastAPI):
 
     @app.post("/threed/world", tags=["3d"])
     def world(req: WorldReq):
+        gate.require("cap.threed")
         def fn(job):
             from core import world_service as ws
             p = ws.WorldParams(name=req.name, image_path=req.image_path, prompt=req.prompt,
                                resolution=req.resolution, low_vram=req.low_vram)
-            if ws.preflight(p):
-                raise RuntimeError("; ".join(ws.preflight(p)))
+            _errs = ws.preflight(p)                          # una sola chiamata (era invocata 2×)
+            if _errs:
+                raise RuntimeError("; ".join(_errs))
             j = ws.make_job(p, mesh=req.mesh, hf_token=req.hf_token, on_log=job.log)
             j.run()
             base = os.path.join(str(getattr(ws, "OUT_ROOT", "output/worlds")), req.name)
@@ -105,6 +110,7 @@ def register(app: FastAPI):
 
     @app.post("/threed/convert", tags=["3d"])
     def convert(req: ConvertReq):
+        gate.require("cap.threed")
         def fn(job):
             from pathlib import Path
             from core import world_service as ws

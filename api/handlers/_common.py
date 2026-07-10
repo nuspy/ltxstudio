@@ -58,24 +58,30 @@ def run_ltx2(params: dict, job=None, *, timeout: float = 7200) -> list[str]:
     params.setdefault("output", out_path("api_video"))
     jf = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
     json.dump(params, jf); jf.close()
-    env = dict(os.environ, HF_HUB_OFFLINE="1", PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
-    proc = subprocess.Popen([LTX2_PY, "-u", LTX2_WORKER, jf.name], env=env,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                            encoding="utf-8", errors="replace")
-    result = None
-    t0 = time.time()
-    for line in proc.stdout:
-        line = line.rstrip()
-        if job is not None and (line.startswith("[") or line.startswith("OK:")):
-            job.log(line[:200])
-        if line.startswith("OK:"):
-            result = line[3:].strip()
-        if time.time() - t0 > timeout:
-            proc.kill(); raise RuntimeError("timeout generazione video")
-    proc.wait()
-    if result and os.path.exists(result):
-        return [result]
-    raise RuntimeError("LTX-2 nativo: nessun output prodotto")
+    try:                                                     # il file-params temporaneo va SEMPRE rimosso a fine job
+        env = dict(os.environ, HF_HUB_OFFLINE="1", PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
+        proc = subprocess.Popen([LTX2_PY, "-u", LTX2_WORKER, jf.name], env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                encoding="utf-8", errors="replace")
+        result = None
+        t0 = time.time()
+        for line in proc.stdout:
+            line = line.rstrip()
+            if job is not None and (line.startswith("[") or line.startswith("OK:")):
+                job.log(line[:200])
+            if line.startswith("OK:"):
+                result = line[3:].strip()
+            if time.time() - t0 > timeout:
+                proc.kill(); raise RuntimeError("timeout generazione video")
+        proc.wait()
+        if result and os.path.exists(result):
+            return [result]
+        raise RuntimeError("LTX-2 nativo: nessun output prodotto")
+    finally:
+        try:
+            os.unlink(jf.name)                               # niente accumulo di _*.json nel temp
+        except OSError:
+            pass
 
 
 def run_job_obj(job_obj) -> list[str]:

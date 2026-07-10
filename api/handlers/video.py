@@ -11,6 +11,7 @@ import subprocess
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from api import gate
 from api.jobs import MANAGER
 from api.handlers._common import run_ltx2, parse_loras, out_path
 
@@ -154,6 +155,7 @@ def register(app: FastAPI):
 
     @app.post("/video/generate", tags=["video"])
     def video_generate(req: GenerateReq):
+        gate.require("cap.video")                             # rispetta l'edizione come la GUI (403 se off)
         p = _base(req)
         if req.audio_path:                                   # a2v (lip-sync/canto)
             p.update(audio_path=req.audio_path, audio_scale=req.audio_scale,
@@ -168,11 +170,13 @@ def register(app: FastAPI):
 
     @app.post("/video/keyframes", tags=["video"])
     def video_keyframes(req: KeyframesReq):
+        gate.require("cap.video")
         p = _base(req); p["keyframes"] = req.keyframes; p["output"] = out_path("video_kf")
         return _submit("video.keyframes", lambda job: run_ltx2(p, job))
 
     @app.post("/video/extend", tags=["video"])
     def video_extend(req: ExtendReq):
+        gate.require("cap.extend_retake")
         def fn(job):
             src = req.video_path
             fps = 25
@@ -203,6 +207,7 @@ def register(app: FastAPI):
 
     @app.post("/video/retake", tags=["video"])
     def video_retake(req: RetakeReq):
+        gate.require("cap.extend_retake")
         p = {"retake": True, "video_path": req.video_path, "prompt": req.prompt,
              "start_time": req.start_time, "end_time": req.end_time,
              "width": req.width, "height": req.height, "fps": req.fps, "steps": req.steps,
@@ -211,6 +216,7 @@ def register(app: FastAPI):
 
     @app.post("/video/v2v_edit", tags=["video"])
     def video_v2v_edit(req: V2VEditReq):
+        gate.require("cap.video")
         p = {"control_video": req.control_video, "edit_lora": req.edit_lora,
              "control_strength": req.control_strength, "prompt": req.prompt,
              "width": req.width, "height": req.height, "fps": req.fps, "steps": req.steps,
@@ -220,6 +226,7 @@ def register(app: FastAPI):
 
     @app.post("/video/controlnet", tags=["video"])
     def video_controlnet(req: ControlNetReq):
+        gate.require("cap.controlnet")
         p = {"control_video": req.control_video, "control_type": req.control_type,
              "control_strength": req.control_strength, "prompt": req.prompt,
              "width": req.width, "height": req.height, "fps": req.fps, "steps": req.steps,
@@ -231,6 +238,7 @@ def register(app: FastAPI):
 
     @app.post("/video/lipsync", tags=["video"])
     def video_lipsync(req: LipsyncReq):
+        gate.require("cap.video")
         def fn(job):
             audio = req.audio_path
             if req.separate_vocals:
@@ -253,18 +261,21 @@ def register(app: FastAPI):
 
     @app.post("/video/enhance", tags=["video"])
     def video_enhance(req: EnhanceReq):
+        gate.require("cap.restore")
         def fn(job):
             out = out_path(f"{req.engine}")
             if req.engine == "flashvsr":
                 from core import flashvsr_service as fv
-                if fv.preflight():
-                    raise RuntimeError("; ".join(fv.preflight()))
+                _errs = fv.preflight()                        # una sola chiamata (era invocata 2×)
+                if _errs:
+                    raise RuntimeError("; ".join(_errs))
                 fv.upscale_video(req.video_path, out, scale=req.scale,
                                  on_log=lambda l: job.log(l))
             else:
                 from core import seedvr2_service as sv
-                if sv.preflight():
-                    raise RuntimeError("; ".join(sv.preflight()))
+                _errs = sv.preflight()                        # una sola chiamata (era invocata 2×)
+                if _errs:
+                    raise RuntimeError("; ".join(_errs))
                 sv.upscale_video(req.video_path, out, resolution=req.resolution,
                                  model=req.seedvr2_model, batch_size=req.batch_size,
                                  block_swap=req.block_swap, on_log=lambda l: job.log(l))
@@ -273,6 +284,7 @@ def register(app: FastAPI):
 
     @app.post("/video/rife", tags=["video"])
     def video_rife(req: RifeReq):
+        gate.require("cap.restore")
         def fn(job):
             from core import rife
             if not rife.available():
@@ -301,6 +313,7 @@ def register(app: FastAPI):
 
     @app.post("/video/faceswap", tags=["video"])
     def video_faceswap(req: FaceSwapVideoReq):
+        gate.require("cap.video")
         def fn(job):
             from core import faceswap
             if not faceswap.available():

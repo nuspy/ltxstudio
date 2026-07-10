@@ -11,6 +11,7 @@ import os
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from api import gate
 from api.jobs import MANAGER
 from api.handlers._common import out_path, parse_loras
 
@@ -54,6 +55,7 @@ def register(app: FastAPI):
 
     @app.post("/film/script", tags=["film"])
     def film_script(req: ScriptReq):
+        gate.require("cap.filmstudio")
         def fn(job):
             from core import llm_service
             if not llm_service.available():
@@ -70,6 +72,7 @@ def register(app: FastAPI):
 
     @app.post("/film/asset_image", tags=["film"])
     def film_asset_image(req: AssetImageReq):
+        gate.require("cap.filmstudio")
         def fn(job):
             from core.film_studio import gen_service
             out = out_path("film_asset", "png")
@@ -81,6 +84,7 @@ def register(app: FastAPI):
 
     @app.post("/film/shot_video", tags=["film"])
     def film_shot_video(req: ShotVideoReq):
+        gate.require("cap.filmstudio")
         def fn(job):
             from core.film_studio import gen_service
             out = out_path("film_shot")

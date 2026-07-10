@@ -9,6 +9,7 @@ import os
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+from api import gate
 from api.jobs import MANAGER
 from api.handlers._common import out_path
 
@@ -75,11 +76,13 @@ def register(app: FastAPI):
 
     @app.post("/music/song", tags=["musica"])
     def music_song(req: SongReq):
+        gate.require("cap.music_song")
         def fn(job):
             if req.engine == "acestep":
                 from core import acestep_service as ax
-                if ax.preflight(req.tags):
-                    raise RuntimeError("; ".join(ax.preflight(req.tags)))
+                _errs = ax.preflight(req.tags)               # una sola chiamata (era invocata 2×)
+                if _errs:
+                    raise RuntimeError("; ".join(_errs))
                 j = ax.make_job(req.tags, "" if req.instrumental else req.lyrics, req.name,
                                 duration=float(req.duration_s), guidance=req.guidance,
                                 lazy=req.lazy_load, on_log=job.log)
@@ -102,6 +105,7 @@ def register(app: FastAPI):
 
     @app.post("/music/sonify", tags=["musica"])
     def music_sonify(req: SonifyReq):
+        gate.require("cap.music_sonify")
         def fn(job):
             from core import music_service as ms
             p = ms.SonifyParams(name=req.name, video_path=req.video_path, prompt=req.prompt,
@@ -122,6 +126,7 @@ def register(app: FastAPI):
 
     @app.post("/music/music_video", tags=["musica"])
     def music_video(req: MusicVideoReq):
+        gate.require("cap.music_video")
         def fn(job):
             from core import music_video_service as mv
             out = out_path("music_video")
@@ -135,6 +140,7 @@ def register(app: FastAPI):
 
     @app.post("/audio/tts", tags=["musica"])
     def audio_tts(req: TTSReq):
+        gate.require("cap.audio_tts_clone")
         def fn(job):
             from core import tts_engine as tts
             voice = tts.VoicePreset(name="api", engine=req.engine, voice_id=req.voice_id,
@@ -146,6 +152,7 @@ def register(app: FastAPI):
 
     @app.post("/audio/separate_vocals", tags=["musica"])
     def audio_separate_vocals(req: SeparateVocalsReq):
+        gate.require("cap.audio_tts_clone")                   # utility audio → stessa cap della voce
         def fn(job):
             from core import vocal_separation as vs
             if not vs.available():
@@ -156,6 +163,7 @@ def register(app: FastAPI):
 
     @app.post("/audio/transcribe", tags=["musica"])
     def audio_transcribe(req: TranscribeReq):
+        gate.require("cap.audio_tts_clone")                   # utility audio → stessa cap della voce
         def fn(job):
             from core import handy_api
             txt = handy_api.transcribe(req.audio_path)
