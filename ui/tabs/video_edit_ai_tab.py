@@ -62,6 +62,15 @@ class VideoEditAITab(QWidget):
         rrow.addWidget(self.ref_img, 1); rrow.addWidget(self.ref_btn)
         self.ref_row_lbl = QLabel(tr("vedit.ref_lbl", "Immagine sostitutiva (personaggio)"))
         f.addRow(self.ref_row_lbl, self._wrap_ref(rrow))
+        # #102 forza dell'IDENTITÀ del nuovo personaggio (ref) vs movimento/struttura (canny). Prima hardcoded 1.0.
+        from PySide6.QtWidgets import QDoubleSpinBox as _DSB0
+        self.ref_strength = _DSB0(); self.ref_strength.setRange(0.1, 1.0); self.ref_strength.setSingleStep(0.05)
+        self.ref_strength.setValue(0.8)
+        self.ref_strength.setToolTip(tr("vedit.ref_strength.tt", "Quanto conta l'immagine di riferimento "
+                                        "(identità del nuovo personaggio) rispetto al movimento del video: "
+                                        "alto = più fedele alla foto, basso = più libertà."))
+        self.ref_strength_lbl = QLabel(tr("vedit.ref_strength_lbl", "Forza identità (riferimento)"))
+        f.addRow(self.ref_strength_lbl, self.ref_strength)
 
         self.prompt = QPlainTextEdit(); self.prompt.setFixedHeight(70)
         self.prompt.setPlaceholderText(tr("vedit.prompt_ph", "cosa generare/cambiare (es. a blue motorcycle / snowy winter)"))
@@ -122,9 +131,14 @@ class VideoEditAITab(QWidget):
 
     def _on_mode(self, *_):
         key = self.mode.currentData()
-        self.obj.setEnabled(key == "inpaint")
         is_rc = (key == "replace_char")
-        for w in (self.ref_img, self.ref_btn, self.ref_row_lbl):
+        # #102: il campo «oggetto» serve all'inpaint E a replace_char (= personaggio da sostituire, per la
+        # maschera SAM2 di precisione — opzionale: vuoto = sostituzione su tutto il frame).
+        self.obj.setEnabled(key == "inpaint" or is_rc)
+        self.obj.setPlaceholderText(
+            tr("vedit.obj_ph_rc", "personaggio da sostituire (es. person) — opz., limita al soggetto") if is_rc
+            else tr("vedit.obj_ph", "oggetto da selezionare (es. car, person) — per Inpaint"))
+        for w in (self.ref_img, self.ref_btn, self.ref_row_lbl, self.ref_strength, self.ref_strength_lbl):
             w.setEnabled(is_rc)
         if key == "inpaint":
             self.note.setText(tr("vedit.note_inpaint",
@@ -134,8 +148,9 @@ class VideoEditAITab(QWidget):
         elif is_rc:
             self.note.setText(tr("vedit.note_replace_char",
                 "Sostituisci personaggio: carica un'immagine = primo frame del video ma con SOLO il personaggio "
-                "cambiato. Il canny del video preserva scena/movimento; l'audio originale è mantenuto. "
-                "Video lunghi elaborati a segmenti."))
+                "cambiato. Il canny preserva scena/movimento; l'audio è mantenuto. Indica il «personaggio da "
+                "sostituire» (a parole) per limitare la sostituzione al soggetto (SAM2, sfondo intatto); "
+                "vuoto = tutto il frame. Video lunghi a segmenti."))
         else:
             self.note.setText(tr("vedit.note_edit", "Modifica globale del video da istruzione testuale."))
 
@@ -155,7 +170,8 @@ class VideoEditAITab(QWidget):
                "cfg_scale": float(self.cfg.value()), "guide": float(self.guide.value()),
                "mask_dilate": int(self.dilate.value()), "mask_blur": float(self.blur.value()),
                "enhance": self.vedit_enhance.isChecked(),
-               "ref_image": self.ref_img.text().strip()}
+               "ref_image": self.ref_img.text().strip(),
+               "ref_strength": float(self.ref_strength.value())}   # #102 forza identità del riferimento
         if key == "inpaint" and not cfg["object"]:
             self.log.appendPlainText(tr("vedit.err_no_obj", "Inpaint: indica l'oggetto da selezionare (a parole).")); return
         if key == "replace_char" and not cfg["ref_image"]:

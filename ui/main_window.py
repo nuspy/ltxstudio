@@ -232,6 +232,17 @@ class _VideoEditAIWorker(QThread):
         self.cfg = cfg
         self.out_dir = out_dir
 
+    def _probe_wh(self, video: str) -> tuple[int, int]:
+        """Risoluzione (w, h) del video via ffprobe. (0, 0) se illeggibile."""
+        try:
+            import json as _j2, subprocess as _sp2
+            r = _sp2.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "stream=width,height", "-of", "json", video], capture_output=True, text=True, timeout=30)
+            s = _j2.loads(r.stdout)["streams"][0]
+            return int(s["width"]), int(s["height"])
+        except Exception:                                       # noqa: BLE001
+            return 0, 0
+
     def run(self):
         import json as _j, os as _os, subprocess as _sp, time as _t
         try:
@@ -271,15 +282,50 @@ class _VideoEditAIWorker(QThread):
                 self.progress.emit("[edit] maschera tracciata → latent-inpaint")
             elif cfg["mode"] == "replace_char":                # #102 Sostituisci personaggio (union-control-ref)
                 from core import controlnet_preprocess as _cp
+                # PREFLIGHT: il peso union-control-ref deve esistere (altrimenti il worker degrada IN SILENZIO
+                # a ti2v ignorando canny+union-control). Errore chiaro con hint.
+                _lp = _os.path.join(r"E:\AI\Models\LoRA", str(cfg["edit_lora"]).replace("/", _os.sep))
+                if not _os.path.exists(_lp):
+                    self.done.emit({"status": "error", "error":
+                        f"Peso «Sostituisci personaggio» mancante:\n{_lp}\nScaricalo dal tab «Pesi modelli» "
+                        "(IC-LoRA union-control-ref di LTX-2.3)."}); return
+                # VALIDAZIONE immagine di riferimento vs aspetto del video (best practice: primo frame stessa inquadratura)
+                try:
+                    from PIL import Image as _Im
+                    _rw, _rh = _Im.open(cfg["ref_image"]).size
+                    _vw, _vh = self._probe_wh(src)
+                    if _vw and _vh and _rh and _vh and abs(_rw / _rh - _vw / _vh) > 0.15:
+                        self.progress.emit(f"[replace] ⚠ immagine di riferimento {_rw}x{_rh}: aspetto diverso dal "
+                                           f"video {_vw}x{_vh} → usa il PRIMO FRAME del video col nuovo personaggio.")
+                except Exception:                              # noqa: BLE001
+                    pass
                 canny_v = _os.path.join(self.out_dir, f"_canny_{base}_{stamp}.mp4")
                 self.progress.emit("[replace] canny del video sorgente (guida struttura)…")
                 _cp.preprocess_video(src, "canny", canny_v)    # struttura/movimento preservati
                 params["control_video"] = canny_v
                 params["image_path"] = cfg.get("ref_image")    # immagine sostitutiva = riferimento (frame 0)
                 params["control_strength"] = 0.6               # union-control-ref (ricetta SECourses)
+                params["ref_strength"] = float(cfg.get("ref_strength", 0.8))   # #102 forza identità del riferimento
                 params["loras"] = [{"path": r"E:\AI\Models\LoRA\LTX-2\LTX2.3_Crisp_Enhance.safetensors",
                                     "strength": 1.0}]          # enhance nitidezza
                 params["_mux_audio_from"] = src                # preserva l'audio originale
+                # #102 PRECISIONE: se l'utente indica il personaggio da sostituire → SAM2 lo traccia e il worker
+                # ricompone SOLO quell'area (sfondo intatto al pixel). Vuoto = sostituzione su tutto il frame.
+                if cfg.get("object"):
+                    self.progress.emit("[replace] SAM2: traccio il personaggio da sostituire…")
+                    _seg = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+                                         "inference_server", "backends", "video_segment.py")
+                    _guide = _os.path.join(self.out_dir, f"_rcguide_{base}_{stamp}.mp4")
+                    _sp.run([self.INF_PY, "-u", _seg, src, cfg["object"], _guide,
+                             str(int(cfg.get("mask_dilate", 24)))],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace")
+                    _td = _os.path.splitext(src)[0] + "_track"
+                    if _os.path.isdir(_os.path.join(_td, "masks")):
+                        params["char_mask_dir"] = _os.path.join(_td, "masks")
+                        params["original_frames_dir"] = _os.path.join(_td, "frames")
+                        params["mask_blur"] = float(cfg.get("mask_blur", 6.0))
+                    else:
+                        self.progress.emit("[replace] ⚠ tracking SAM2 fallito → sostituzione su tutto il frame.")
             else:
                 params["control_video"] = src                  # edit/style: video sorgente come guide
             jf = _os.path.join(self.out_dir, f"_editp_{stamp}.json")

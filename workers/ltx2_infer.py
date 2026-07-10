@@ -532,6 +532,105 @@ def _blend_images(a: str, b: str, alpha: float, out: str) -> bool:
         return False
 
 
+def _composite_char_mask(out: str, char_mask_dir: str, original_frames_dir: str, *,
+                         fps: float, mask_dilate: int = 12, mask_blur: float = 6.0) -> bool:
+    """#102 Character Replacement — composite deterministico PER-FRAME.
+
+    Dopo la generazione union-control (iclora) l'INTERO frame è rigenerato; qui ricomponiamo tenendo il
+    frame ORIGINALE FUORI dalla maschera del personaggio (dilatata + feather) e il frame GENERATO DENTRO →
+    solo il personaggio è sostituito, lo sfondo resta preservato al pixel. Il canny segue posa/movimento →
+    il personaggio generato è già allineato → composite pulito.
+
+    In-place: riscrive `out` (video), ri-muxando l'audio originale se presente. Best-effort: False → tiene
+    l'output non composito (nessun peggioramento). Riusa `load_mask_tensor` (dilate+blur) per coerenza col
+    ramo inpaint. NB: eseguito PRIMA di stego/watermark così la firma copre il risultato finale."""
+    import glob as _g
+    import subprocess as _sp
+    import tempfile as _tf
+    try:
+        import numpy as _np
+        from PIL import Image as _Im
+    except Exception as _e:                                   # noqa: BLE001
+        print(f"[replace_char] composite saltato (PIL/numpy assenti): {_e}", flush=True)
+        return False
+
+    masks = sorted(_g.glob(os.path.join(char_mask_dir, "*.png")))
+    origs = sorted(_g.glob(os.path.join(original_frames_dir, "*.png")))
+    if not masks or not origs:
+        print(f"[replace_char] composite saltato: masks={len(masks)} origs={len(origs)}", flush=True)
+        return False
+
+    work = _tf.mkdtemp(prefix="rc_comp_")
+    gen_dir = os.path.join(work, "gen")
+    comp_dir = os.path.join(work, "comp")
+    os.makedirs(gen_dir, exist_ok=True)
+    os.makedirs(comp_dir, exist_ok=True)
+    try:
+        # 1) estrai i frame GENERATI dal video di output
+        r = _sp.run(["ffmpeg", "-v", "error", "-i", out, "-start_number", "0",
+                     os.path.join(gen_dir, "g_%06d.png")], capture_output=True, text=True, timeout=1800)
+        gens = sorted(_g.glob(os.path.join(gen_dir, "*.png")))
+        if r.returncode != 0 or not gens:
+            print(f"[replace_char] composite: estrazione frame fallita ({r.stderr[:200]})", flush=True)
+            return False
+
+        n = min(len(gens), len(masks), len(origs))
+        # dimensioni target = frame generato (l'output può differire dall'originale per padding/scale)
+        gw, gh = _Im.open(gens[0]).size
+        # 2) composite per-frame: fuori maschera = originale, dentro = generato (bordo feathered)
+        from PIL import ImageFilter as _F
+        for i in range(n):
+            g = _Im.open(gens[i]).convert("RGB")
+            o = _Im.open(origs[i]).convert("RGB").resize((gw, gh))
+            m = _Im.open(masks[i]).convert("L").resize((gw, gh))
+            if mask_dilate > 0:
+                k = mask_dilate if mask_dilate % 2 == 1 else mask_dilate + 1
+                m = m.filter(_F.MaxFilter(k))
+            if mask_blur > 0:
+                m = m.filter(_F.GaussianBlur(mask_blur))
+            ga = _np.asarray(g, _np.float32)
+            oa = _np.asarray(o, _np.float32)
+            ma = (_np.asarray(m, _np.float32) / 255.0)[..., None]     # (H,W,1) in [0,1]
+            comp = oa * (1.0 - ma) + ga * ma                          # dentro=gen, fuori=orig
+            _Im.fromarray(_np.clip(comp, 0, 255).astype(_np.uint8)).save(
+                os.path.join(comp_dir, f"c_{i:06d}.png"))
+
+        # 3) riassembla + ri-mux audio dall'output originale (se presente)
+        tmp_v = os.path.join(work, "composited.mp4")
+        r2 = _sp.run(["ffmpeg", "-v", "error", "-framerate", str(fps), "-start_number", "0",
+                      "-i", os.path.join(comp_dir, "c_%06d.png"), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                      "-crf", "16", tmp_v, "-y"], capture_output=True, text=True, timeout=1800)
+        if r2.returncode != 0 or not os.path.exists(tmp_v):
+            print(f"[replace_char] composite: riassemblaggio fallito ({r2.stderr[:200]})", flush=True)
+            return False
+
+        has_audio = bool(_sp.run(["ffprobe", "-v", "error", "-select_streams", "a:0",
+                                  "-show_entries", "stream=index", "-of", "csv=p=0", out],
+                                 capture_output=True, text=True, timeout=30).stdout.strip())
+        final = os.path.join(work, "final.mp4")
+        if has_audio:
+            r3 = _sp.run(["ffmpeg", "-v", "error", "-i", tmp_v, "-i", out, "-map", "0:v", "-map", "1:a",
+                          "-c:v", "copy", "-c:a", "aac", "-shortest", final, "-y"],
+                         capture_output=True, text=True, timeout=600)
+            src = final if (r3.returncode == 0 and os.path.exists(final)) else tmp_v
+        else:
+            src = tmp_v
+
+        import shutil as _sh
+        _sh.copyfile(src, out)
+        print(f"[replace_char] composite OK: {n} frame ricomposti (audio={'sì' if has_audio else 'no'})", flush=True)
+        return True
+    except Exception as _e:                                   # noqa: BLE001
+        print(f"[replace_char] composite errore: {_e}", flush=True)
+        return False
+    finally:
+        import shutil as _sh
+        try:
+            _sh.rmtree(work, ignore_errors=True)
+        except Exception:                                    # noqa: BLE001
+            pass
+
+
 def _probe_frames(path: str) -> int:
     """Numero di frame video reali (per il RESUME: un chunk valido ha ~cf frame). 0 se illeggibile."""
     try:
@@ -890,6 +989,12 @@ def run_generation(p: dict) -> str:
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
     else:
         ptype = "a2v" if p.get("audio_path") else "ti2v"      # audio dato → lip-sync/canto NATIVO
+        # #102 GUARDIA: control_video presente ma NESSUN IC-LoRA risolto → il ControlNet/replace_char verrebbe
+        # ignorato IN SILENZIO (degrado a ti2v). Il GUI fa già hard-error sul peso mancante; qui almeno lo urlo.
+        if p.get("control_video"):
+            print(f"[warn] control_video presente ma IC-LoRA non risolto (edit_lora={p.get('edit_lora')!r}, "
+                  f"control_type={p.get('control_type')!r}) → guida IGNORATA, degrado a {ptype}. "
+                  "Scarica il peso IC-LoRA.", flush=True)
     _off = _auto_offload(p, ckpt)                            # GGUF→cpu sempre; fp8→none se c'entra tutto in GPU
     _stage(f"Caricamento modello ({os.path.basename(ckpt)[:28]}, offload={_off})…")
     pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype)
@@ -1023,6 +1128,14 @@ def run_generation(p: dict) -> str:
     _stage("Decodifica VAE e salvataggio video…")
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
+    # #102 Character Replacement: se il ramo iclora ha una maschera personaggio (SAM2 tracking), ricomponi
+    # PER-FRAME — solo il personaggio è sostituito, lo sfondo resta pixel-perfect dall'originale. Deterministico
+    # e sicuro senza test; l'alternativa attention_mask (cam) resta env-gated (REPLACE_CHAR_ATTN_MASK, sopra).
+    if ptype == "iclora" and p.get("char_mask_dir") and p.get("original_frames_dir"):
+        _stage("Ricomposizione personaggio (maschera SAM2)…")
+        _composite_char_mask(out, p["char_mask_dir"], p["original_frames_dir"], fps=fps,
+                             mask_dilate=int(p.get("mask_dilate", 12)),
+                             mask_blur=float(p.get("mask_blur", 6.0)))
     try:                                                     # #107 firma invisibile di provenienza (default ON)
         from core import stego
         if stego.enabled():
