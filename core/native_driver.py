@@ -33,6 +33,14 @@ def is_up() -> bool:
 
 
 def submit(module: str, params: dict) -> str:
+    # M1 — prima di un job IMMAGINE libera i server di categoria diversa (video :8190): su single-GPU la
+    # pipeline video residua terrebbe la VRAM. Pipeline-aware: immagine→immagine consecutive non rifanno il
+    # /free (guard nel coordinatore). Best-effort, non blocca la submit se il coordinatore non è disponibile.
+    try:
+        from core import mem_coordinator
+        mem_coordinator.free_for("image")
+    except Exception:                                       # noqa: BLE001
+        pass
     r = _post("/submit", {"module": module, "params": params})
     if "prompt_id" not in r:
         raise RuntimeError(r.get("error", "submit fallito"))

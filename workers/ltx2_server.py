@@ -65,6 +65,25 @@ def history(jid: str):
     return _jobs.get(jid, {"status": "unknown"})
 
 
+@app.post("/free")
+def free():
+    """M2 — libera la VRAM/RAM tenuta dalla pipeline video (chiamato quando la prossima pipeline è di un'ALTRA
+    categoria: immagine/3D/mondi/musica). Prima MANCAVA → dopo un video la VRAM restava occupata a tempo
+    indefinito e i job immagine successivi finivano in offload."""
+    import gc
+    import torch
+    n = len(ltx2_infer._PIPE_CACHE)
+    try:
+        ltx2_infer._PIPE_CACHE.clear()
+    except Exception:                                       # noqa: BLE001
+        pass
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    print(f"[ltx2] /free: {n} pipeline video scaricate", flush=True)
+    return {"freed_pipelines": n}
+
+
 @app.get("/system_stats")
 def system_stats():
     import torch

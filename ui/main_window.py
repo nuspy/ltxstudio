@@ -990,14 +990,19 @@ class MainWindow(QMainWindow):
         import urllib.request
 
         def _hit(port: int) -> bool:
-            try:
-                r = urllib.request.urlopen(urllib.request.Request(
+            try:                                             # 200 senza eccezione = /free eseguito (idempotente)
+                urllib.request.urlopen(urllib.request.Request(
                     f"http://127.0.0.1:{port}/free", data=b"{}",
                     headers={"Content-Type": "application/json"}), timeout=25).read()
-                return b"ok" in (r or b"")
+                return True
             except Exception:                                # noqa: BLE001 (server giù = niente da liberare)
                 return False
-        freed = [n for p, n in ((8189, "immagini"), (8200, "API")) if _hit(p)]
+        freed = [n for p, n in ((8189, "immagini"), (8200, "API"), (8190, "video")) if _hit(p)]  # M2: anche il video
+        try:
+            from core import mem_coordinator                  # tutto liberato → il prossimo job rifà il /free giusto
+            mem_coordinator.reset()
+        except Exception:                                    # noqa: BLE001
+            pass
         try:
             if self.driver.free_memory():                    # ComfyUI, se davvero attivo (extra)
                 freed.append("comfy")

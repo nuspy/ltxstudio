@@ -54,15 +54,14 @@ def ensure_server(wait_s: int = 120) -> bool:
 
 
 def _free_gpu_servers() -> None:
-    """Libera la VRAM tenuta da ALTRI server (immagini :8189) prima del video: su single-GPU un solo
-    modello pesante alla volta, altrimenti il transformer 22B non entra e sborza in shared-RAM."""
-    import urllib.request
-    for url in ("http://127.0.0.1:8189/free",):
-        try:
-            urllib.request.urlopen(urllib.request.Request(url, data=b"{}",
-                                   headers={"Content-Type": "application/json"}), timeout=20).read()
-        except Exception:                                      # noqa: BLE001
-            pass
+    """M1 — prima del VIDEO libera i server di categoria DIVERSA (immagini :8189 + API :8200): su single-GPU
+    un solo modello pesante alla volta, altrimenti il transformer 22B non entra e sborza in shared-RAM.
+    Via mem_coordinator (pipeline-aware): video→video consecutivi NON rifanno il /free (pipeline riusata)."""
+    try:
+        from core import mem_coordinator
+        mem_coordinator.free_for("video", timeout=20)
+    except Exception:                                          # noqa: BLE001
+        pass
 
 
 def _to_dm_relative(model: str) -> str:

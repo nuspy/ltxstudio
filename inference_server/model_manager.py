@@ -115,7 +115,7 @@ class ModelManager:
             _, free = self._vram_total_free_mb()
             if free < need_mb:
                 STORE.evict_unused(need_mb - free)
-                self.flush()
+                self.flush(force=True)                   # spazio richiesto ORA → svuota davvero
         except Exception:                               # noqa: BLE001
             pass
 
@@ -228,12 +228,26 @@ class ModelManager:
             STORE.bump_epoch()
         except Exception:                               # noqa: BLE001
             pass
-        self.flush()
+        self.flush(force=True)                          # /free = libera davvero tutto
 
     @staticmethod
-    def flush() -> None:
+    def flush(force: bool = False) -> None:
+        """M3 — `empty_cache()` EURISTICO (come `soft_empty_cache` di ComfyUI): svuotare il caching allocator
+        ad ogni unload è costoso e spesso inutile. Lo facciamo solo se il reserved-ma-libero (memoria che il
+        caching allocator tiene senza usarla) supera il 25% del free reale — oppure se `force=True` (/free,
+        make_room: lì lo spazio serve ORA)."""
         gc.collect()
-        if torch is not None and torch.cuda.is_available():
+        if torch is None or not torch.cuda.is_available():
+            return
+        if force:
+            torch.cuda.empty_cache()
+            return
+        try:
+            free, _ = torch.cuda.mem_get_info()
+            cached_unused = torch.cuda.memory_reserved() - torch.cuda.memory_allocated()
+            if cached_unused > free * 0.25:
+                torch.cuda.empty_cache()
+        except Exception:                                   # noqa: BLE001
             torch.cuda.empty_cache()
 
     @staticmethod

@@ -39,7 +39,7 @@ def main() -> int:
     # LIBERA la VRAM dei server GPU (immagini :8189, api :8200) prima di caricare i pesi 3D — evita l'OOM
     # "crash all'avvio" quando il ModelManager tiene i modelli residenti dopo una generazione immagine.
     import urllib.request as _u
-    for _port in (8189, 8200):
+    for _port in (8189, 8200, 8190):                          # M1/M2: libera anche il server video
         try:
             _u.urlopen(_u.Request(f"http://127.0.0.1:{_port}/free", data=b"{}",
                                   headers={"Content-Type": "application/json"}), timeout=15).read()
