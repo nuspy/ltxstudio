@@ -4192,7 +4192,9 @@ class MainWindow(QMainWindow):
                     subject=cfg["subject"],
                     style=cfg["style"],
                     seed=seed,
-                    steps=cfg["color_steps"])
+                    steps=cfg["color_steps"],
+                    denoise=cfg.get("color_denoise", 0.85),
+                    guidance=cfg.get("color_guidance", 2.5))
                 label = tr("mw.colorize_label")
             else:  # restore_and_colorize
                 prompt = self.restorer.build_restore_and_colorize(
@@ -4202,7 +4204,10 @@ class MainWindow(QMainWindow):
                     subject=cfg["subject"],
                     style=cfg["style"],
                     seed=seed,
-                    steps=cfg["color_steps"])
+                    steps=cfg["color_steps"],
+                    denoise=cfg.get("color_denoise", 0.85),
+                    guidance=cfg.get("color_guidance", 2.5),
+                    target_scale=cfg.get("target_scale", 2.0))
                 label = tr("mw.restore_colorize_label")
 
             self._inpaint_pid = self.driver.submit(prompt)

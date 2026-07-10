@@ -132,6 +132,15 @@ class RestoreTab(QWidget):
         self.color_steps.setValue(20)
         self.color_steps.setToolTip(tr("res.color.steps.tt", "Step di diffusione per la colorazione: più step = più qualità (e più lento)."))
         cf.addRow(tr("res.color.steps_lbl"), self.color_steps)
+        self.color_denoise = QDoubleSpinBox()
+        self.color_denoise.setRange(0.30, 1.00); self.color_denoise.setSingleStep(0.05); self.color_denoise.setValue(0.85)
+        self.color_denoise.setToolTip(tr("res.color.denoise.tt", "Intensità: alto = colori più decisi ma meno "
+                                         "fedele alla struttura; basso = struttura più preservata."))
+        cf.addRow(tr("res.color.denoise_lbl", "Intensità (denoise)"), self.color_denoise)
+        self.color_guidance = QDoubleSpinBox()
+        self.color_guidance.setRange(1.0, 6.0); self.color_guidance.setSingleStep(0.5); self.color_guidance.setValue(2.5)
+        self.color_guidance.setToolTip(tr("res.color.guidance.tt", "Aderenza al soggetto/stile descritto."))
+        cf.addRow(tr("res.color.guidance_lbl", "Aderenza (guidance)"), self.color_guidance)
         v.addWidget(self.color_grp)
 
         # ── Face-swap (T5): impone un volto sorgente sulla foto target ─────
@@ -225,6 +234,8 @@ class RestoreTab(QWidget):
             "subject": self.subject_edit.text().strip(),
             "style": self.style_edit.text().strip() or "natural realistic colors",
             "color_steps": self.color_steps.value(),
+            "color_denoise": self.color_denoise.value(),
+            "color_guidance": self.color_guidance.value(),
         }
         self.request_restore.emit(cfg)
 
@@ -294,4 +305,6 @@ class RestoreTab(QWidget):
             "subject": self.subject_edit.text().strip(),
             "style": self.style_edit.text().strip() or "natural realistic colors",
             "color_steps": self.color_steps.value(),
+            "color_denoise": self.color_denoise.value(),
+            "color_guidance": self.color_guidance.value(),
         }

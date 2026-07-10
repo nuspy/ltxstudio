@@ -82,7 +82,9 @@ class RestorePipeline:
                        subject: str = "",
                        style: str = "natural realistic colors",
                        seed: int = 0,
-                       steps: int = 20) -> dict:
+                       steps: int = 20,
+                       denoise: float = 0.85,
+                       guidance: float = 2.5) -> dict:
         """Colorizzazione B&W → colore tramite FLUX.2 (Kontext-style img2img).
 
         Il modello riceve la foto in B&W come riferimento e il prompt descrive i colori
@@ -130,7 +132,7 @@ class RestorePipeline:
         p["6"] = {"class_type": "CLIPTextEncode",
                   "inputs": {"text": color_prompt, "clip": ["5", 0]}}
         p["7"] = {"class_type": "FluxGuidance",
-                  "inputs": {"conditioning": ["6", 0], "guidance": 2.5}}
+                  "inputs": {"conditioning": ["6", 0], "guidance": float(guidance)}}
         p["8"] = {"class_type": "CLIPTextEncode",
                   "inputs": {"text": "", "clip": ["5", 0]}}
 
@@ -138,14 +140,14 @@ class RestorePipeline:
         p["9"] = {"class_type": "EmptyFlux2LatentImage",
                   "inputs": {"width": 1024, "height": 1024, "batch_size": 1}}
 
-        # KSampler con denoise alto (img2img) — colorizza dall'immagine di partenza
+        # KSampler con denoise (img2img) — denoise alto = colori più decisi, basso = struttura più fedele
         p["10"] = {"class_type": "KSampler",
                    "inputs": {
                        "model": ["4", 0], "positive": ["7", 0], "negative": ["8", 0],
                        "latent_image": ["3", 0],    # usa la foto B&W come init
                        "seed": int(seed), "steps": int(steps),
                        "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
-                       "denoise": 0.85,             # alta per cambiare colori ma bassa per struttura
+                       "denoise": float(denoise),
                    }}
         p["11"] = {"class_type": "VAEDecode", "inputs": {"samples": ["10", 0], "vae": ["2", 0]}}
         p["12"] = {"class_type": "SaveImage",
@@ -159,7 +161,9 @@ class RestorePipeline:
                                    flux2_model: str = _DEFAULT_FLUX2_MODEL,
                                    subject: str = "",
                                    style: str = "natural realistic colors",
-                                   seed: int = 0, steps: int = 20) -> dict:
+                                   seed: int = 0, steps: int = 20,
+                                   denoise: float = 0.85, guidance: float = 2.5,
+                                   target_scale: float = 2.0) -> dict:
         """Pipeline combinata: prima ESRGAN, poi colorizzazione FLUX.2.
 
         Utile per vecchie foto B&W danneggiate o a bassa risoluzione.
@@ -184,8 +188,11 @@ class RestorePipeline:
         p["2"] = {"class_type": "UpscaleModelLoader", "inputs": {"model_name": upscale_model}}
         p["3"] = {"class_type": "ImageUpscaleWithModel",
                   "inputs": {"upscale_model": ["2", 0], "image": ["1", 0]}}
+        # ESRGAN è ×4 nativo: porta al fattore RICHIESTO (scale_by = target/4). Prima 0.5 fisso (= sempre ×2,
+        # sbagliato se l'utente chiedeva ×4). Clamp ai limiti sensati.
+        _sb = max(0.1, min(2.0, float(target_scale) / 4.0))
         p["4"] = {"class_type": "ImageScaleBy",
-                  "inputs": {"image": ["3", 0], "upscale_method": "lanczos", "scale_by": 0.5}}
+                  "inputs": {"image": ["3", 0], "upscale_method": "lanczos", "scale_by": _sb}}
 
         # 3. Colorizzazione FLUX.2
         p["5"] = {"class_type": "VAELoader", "inputs": {"vae_name": "Flux\\flux2-vae.safetensors"}}
@@ -197,7 +204,7 @@ class RestorePipeline:
         p["9"] = {"class_type": "CLIPTextEncode",
                   "inputs": {"text": color_prompt, "clip": ["8", 0]}}
         p["10"] = {"class_type": "FluxGuidance",
-                   "inputs": {"conditioning": ["9", 0], "guidance": 2.5}}
+                   "inputs": {"conditioning": ["9", 0], "guidance": float(guidance)}}
         p["11"] = {"class_type": "CLIPTextEncode",
                    "inputs": {"text": "", "clip": ["8", 0]}}
         p["12"] = {"class_type": "KSampler",
@@ -206,7 +213,7 @@ class RestorePipeline:
                        "latent_image": ["6", 0],
                        "seed": int(seed), "steps": int(steps),
                        "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
-                       "denoise": 0.85,
+                       "denoise": float(denoise),
                    }}
         p["13"] = {"class_type": "VAEDecode", "inputs": {"samples": ["12", 0], "vae": ["5", 0]}}
         p["14"] = {"class_type": "SaveImage",
