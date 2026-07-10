@@ -41,3 +41,16 @@ _Data: 2026-07-10 · indagine SOLO LETTURA sul codice reale · test di generazio
 
 **NB:** i fix "safe" sono wiring statico applicabile subito; G1/LV1 toccano i percorsi di generazione e vanno
 validati con un test live (rimandato per ForexGPT).
+
+## Stato implementazione (2026-07-10, alla cieca — validazione live pendente)
+Scelta: **opzione (b)** — potenziare il path nativo **LTX-2 a2v** (non rianimare il worker Wan morto).
+- ✅ **G1/LV2** → **ANTI-DRIFT** (re-anchor: blend ultimo-frame↔foto con `ref_anchor_strength`, o hard reset ogni
+  `anchor_every` chunk) e **RESUME** (salta i chunk già validi) in `ltx2_infer._run_chunked`. Parametri passati da
+  `_start_native_multitalk`. Wan resta come codice non cablato (non rimosso).
+- ✅ **LV1/LV3** → `_generate_video_native` mappa gli slider «Video lungo» (seg/overlap/ref_anchor/anchor_every/
+  resume) anche nel nativo normale; il chunk usa la durata-segmento GUI (non più fisso 20s).
+- ✅ **G2** (talk-region solo in talk), **G3** (materializza audio talk), **G4** (durata talk-da-video), **G5**
+  (audio_scale 2.0 coerente), **steps/cfg/seed** propagati a talk/canto.
+- ⏳ **CROSSFADE** join (`_xfade_concat`) = opt-in `LTX_CHUNK_XFADE=1` e SOLO clip senza audio (a2v = concat netto
+  per non desincronizzare il lip-sync) → attivare e validare al live-test.
+- ⏳ **Validazione live** di tutto (rimandata: ForexGPT).
