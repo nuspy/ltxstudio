@@ -27,6 +27,7 @@ class WeightsTab(QWidget):
         self._proc: QProcess | None = None
         self._checks: dict[str, tuple[QCheckBox, dict]] = {}
         self._found: dict[str, str] = {}                 # id → path trovato dallo scan
+        self._show_all = False                           # False = solo i pesi usati dai moduli dell'edizione
         self._total = 0
         self._done = 0
 
@@ -66,10 +67,22 @@ class WeightsTab(QWidget):
         self._build_list()
 
         h = QHBoxLayout()
+        self.chk_all = QCheckBox(tr("weights.show_all", "Mostra tutti i moduli"))
+        self.chk_all.setToolTip(tr("weights.show_all.tt", "Disattiva il filtro per edizione/moduli presenti."))
+        self.chk_all.toggled.connect(self._on_show_all)
         self.btn_refresh = QPushButton(tr("weights.refresh", "Aggiorna stato")); self.btn_refresh.clicked.connect(self._refresh)
         self.btn_missing = QPushButton(tr("weights.sel_missing", "Seleziona mancanti")); self.btn_missing.clicked.connect(self._select_missing)
+        self.btn_link = QPushButton(tr("weights.link", "🔗 Collega trovati"))
+        self.btn_link.setToolTip(tr("weights.link.tt", "Collega (junction/hardlink, senza admin) i pesi trovati "
+                                    "nella cartella di ricerca invece di riscaricarli."))
+        self.btn_link.clicked.connect(self._link_found)
+        self.btn_import = QPushButton(tr("weights.import", "＋ Importa sconosciuti"))
+        self.btn_import.setToolTip(tr("weights.import.tt", "Collega nel catalogo i modelli trovati nella cartella "
+                                      "di ricerca ma non elencati (per usarli nell'app)."))
+        self.btn_import.clicked.connect(self._import_unknown)
         self.btn_dl = QPushButton(tr("weights.download", "Scarica selezionati")); self.btn_dl.clicked.connect(self._download)
-        h.addWidget(self.btn_refresh); h.addWidget(self.btn_missing); h.addStretch(1); h.addWidget(self.btn_dl)
+        h.addWidget(self.chk_all); h.addWidget(self.btn_refresh); h.addWidget(self.btn_missing)
+        h.addWidget(self.btn_link); h.addWidget(self.btn_import); h.addStretch(1); h.addWidget(self.btn_dl)
         root.addLayout(h)
 
         self.bar = QProgressBar(); self.status = QLabel("—"); self.status.setStyleSheet("color:#9aa1b0;")
@@ -79,7 +92,12 @@ class WeightsTab(QWidget):
         self._refresh()
 
     def _build_list(self):
-        for module, entries in wc.by_module().items():
+        # only_wanted: mostra SOLO i pesi usati dai moduli PRESENTI nell'edizione (feature_matrix). «Mostra
+        # tutti» disattiva il filtro (per curatela/debug).
+        groups = wc.by_module(only_wanted=not self._show_all)
+        if not groups and not self._show_all:            # edizione minimale / niente moduli → mostra tutto
+            groups = wc.by_module()
+        for module, entries in groups.items():
             box = QGroupBox(module); v = QVBoxLayout(box)
             for e in entries:
                 cb = QCheckBox()
@@ -87,6 +105,17 @@ class WeightsTab(QWidget):
                 v.addWidget(cb)
             self._list.addWidget(box)
         self._list.addStretch(1)
+
+    def _rebuild_list(self):
+        """Ricostruisce la lista pesi (dopo il toggle «Mostra tutti»)."""
+        while self._list.count():
+            it = self._list.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.setParent(None)
+        self._checks.clear()
+        self._build_list()
+        self._refresh()
 
     def _label_for(self, e: dict) -> str:
         base = self.base.text().strip() or None
@@ -132,6 +161,83 @@ class WeightsTab(QWidget):
                 self._found[e["id"]] = hit; n += 1
         self._refresh()
         self.status.setText(tr("weights.scan.done", "Trovati {n} pesi già esistenti.").format(n=n))
+
+    def _on_show_all(self, checked: bool):
+        self._show_all = bool(checked)
+        self._rebuild_list()
+
+    def _link_found(self):
+        """Collega (junction/hardlink, no admin) i pesi trovati dallo scan invece di riscaricarli."""
+        if not self._found:
+            self.status.setText(tr("weights.link.none", "Nessun peso trovato da collegare (fai prima «Cerca esistenti»).")); return
+        from core import linkutil
+        base = self.base.text().strip() or None
+        n = 0
+        for _id, (cb, e) in self._checks.items():
+            src = self._found.get(e["id"])
+            if not src:
+                continue
+            dst = wc.dest_for(e, base)
+            if e.get("kind") == "file":
+                dst = dst / (e.get("filename") or Path(src).name)
+            r = linkutil.link_or_copy(str(src), str(dst))
+            self.logview.appendPlainText(f"[collega] {e['id']}: {src} → {r}")
+            if r in ("hardlink", "junction", "symlink", "copy", "exists"):
+                n += 1
+        self._found.clear()
+        self._refresh()
+        self.status.setText(tr("weights.link.done", "Collegati {n} pesi (senza riscaricare).").format(n=n))
+
+    def _import_unknown(self):
+        """Collega nella cartella Models i file-modello trovati nella cartella di ricerca ma NON elencati nel
+        catalogo → il detector (model_detect) li rileva e diventano usabili nell'app. Nessuna rete."""
+        sdir = self.search.text().strip()
+        if not sdir or not Path(sdir).is_dir():
+            self.status.setText(tr("weights.scan.none", "Indica una cartella in cui cercare.")); return
+        known = set()
+        for _id, (cb, e) in self._checks.items():
+            for n in e.get("scan_names", []):
+                known.add(str(n).lower())
+            if e.get("repo_id"):
+                known.add(e["repo_id"].split("/")[-1].lower())
+        unknown: list[Path] = []
+        root = Path(sdir)
+        for p in root.rglob("*"):
+            try:
+                if p.is_file() and p.suffix.lower() in wc.IMG_EXT and p.stat().st_size > 50 * 2**20:
+                    stem = p.stem.lower()
+                    if not any(k and (k in stem or stem in k) for k in known):
+                        unknown.append(p)
+            except Exception:                               # noqa: BLE001
+                continue
+        if not unknown:
+            self.status.setText(tr("weights.import.none", "Nessun modello sconosciuto nella cartella.")); return
+        from PySide6.QtWidgets import QMessageBox
+        names = "\n".join("• " + p.name for p in unknown[:40]) + ("\n…" if len(unknown) > 40 else "")
+        if QMessageBox.question(self, tr("weights.import", "Importa sconosciuti"),
+                                tr("weights.import.confirm", "Trovati {n} modelli non elencati. Collegarli nella "
+                                   "cartella Models (senza copiarli) così l'app li rileva?\n\n{names}")
+                                .format(n=len(unknown), names=names)) != QMessageBox.Yes:
+            return
+        from core import linkutil
+        base = self.base.text().strip() or wc.get_base_dir()
+        try:
+            from core import model_importer as _mi
+            _classify = _mi._classify_type_family
+        except Exception:                                   # noqa: BLE001
+            _classify = None
+        n = 0
+        for p in unknown:
+            try:
+                typ, fam = _classify(str(p)) if _classify else ("diffusion_models", "misc")
+            except Exception:                               # noqa: BLE001
+                typ, fam = "diffusion_models", "misc"
+            dst = Path(base) / (typ or "diffusion_models") / (fam or "misc") / p.name
+            r = linkutil.link_or_copy(str(p), str(dst))
+            self.logview.appendPlainText(f"[importa] {p.name} → {typ}/{fam} · {r}")
+            if r in ("hardlink", "junction", "symlink", "copy", "exists"):
+                n += 1
+        self.status.setText(tr("weights.import.done", "Importati {n} modelli (collegati; il detector li rileverà).").format(n=n))
 
     def _select_missing(self):
         base = self.base.text().strip() or None
