@@ -172,7 +172,8 @@ class WeightsTab(QWidget):
             self.status.setText(tr("weights.link.none", "Nessun peso trovato da collegare (fai prima «Cerca esistenti»).")); return
         from core import linkutil
         base = self.base.text().strip() or None
-        n = 0
+        # avviso una-tantum: alcuni pesi sono su un ALTRO volume → link impossibile, servirebbe COPIARLI (grande).
+        targets = []
         for _id, (cb, e) in self._checks.items():
             src = self._found.get(e["id"])
             if not src:
@@ -180,7 +181,19 @@ class WeightsTab(QWidget):
             dst = wc.dest_for(e, base)
             if e.get("kind") == "file":
                 dst = dst / (e.get("filename") or Path(src).name)
-            r = linkutil.link_or_copy(str(src), str(dst))
+            targets.append((e, src, str(dst)))
+        _copy_needed = [t for t in targets if linkutil.would_copy(t[1], t[2])]
+        _allow_copy = True
+        if _copy_needed:
+            from PySide6.QtWidgets import QMessageBox
+            _allow_copy = QMessageBox.question(self, tr("weights.link", "Collega"),
+                tr("weights.link.crossvol", "{k} pesi sono su un altro disco rispetto alla cartella base: non "
+                   "si possono collegare, andrebbero COPIATI (occupano spazio). Copiarli? "
+                   "(In alternativa, imposta la cartella base sullo stesso disco dei modelli.)")
+                .format(k=len(_copy_needed))) == QMessageBox.Yes
+        n = 0
+        for e, src, dst in targets:
+            r = linkutil.link_or_copy(src, dst, on_copy=(lambda *_a: _allow_copy))
             self.logview.appendPlainText(f"[collega] {e['id']}: {src} → {r}")
             if r in ("hardlink", "junction", "symlink", "copy", "exists"):
                 n += 1

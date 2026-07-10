@@ -47,6 +47,15 @@ def is_linked(path: str) -> bool:
     return False
 
 
+def would_copy(src: str, dst: str) -> bool:
+    """True se `link_or_copy` dovrebbe RICORRERE ALLA COPIA perché il link non è possibile: su Windows un FILE
+    su volume DIVERSO dalla destinazione (l'hardlink richiede lo stesso volume). Le dir usano junction (ok) e
+    mac/Linux i symlink (ok) → False. Serve al chiamante per AVVISARE prima di una copia grande."""
+    if os.name != "nt" or os.path.isdir(src):
+        return False
+    return not _same_volume(src, os.path.dirname(os.path.abspath(dst)))
+
+
 def link_or_copy(src: str, dst: str, *, on_copy=None, progress=None) -> str:
     """Collega `src`→`dst` senza admin (o copia in fallback). `src` file o directory.
     Ritorna: 'exists' | 'hardlink' | 'junction' | 'symlink' | 'copy' | 'skipped' | 'error'.
