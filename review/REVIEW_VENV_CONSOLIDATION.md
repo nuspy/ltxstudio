@@ -11,7 +11,8 @@ metadati pip (`pyvenv.cfg`, `torch/version.py`, `*.dist-info`), zero import._
 | Tools/inference_server_venv_py311 | 3.11.9 | 2.11.0 | cu130 | 3.9 | base py3.11 per install_trellis (non runtime) |
 | Tools/WorldGen/venv | 3.12.10 | **2.7.1** | cu128 | 7.3 | Mondo 3D (torch diverso → separato) |
 | Tools/TRELLIS2/venv | 3.11.9 | 2.9.1 | cu130 | 6.2 | 3D (py+cuda diversi → separato) |
-| Tools/MMAudio/venv | 3.10.11 | 2.11.0 | **cpu** | 1.5 | sonorizza video (py+cpu → separato) |
+| **Tools/MMAudio/venv** | 3.10.11 | 2.11.0 | cpu | 1.6 | **DONOR** (sonify → host `ltx2_venv`, py3.10) |
+| **Tools/SkinTokens/venv** | 3.12.10 | 2.11.0 | cu128 | 4.8 | **ORFANO** (rig gira sul venv ComfyUI) |
 | **Tools/ACE-Step/venv** | 3.12.10 | 2.11.0 | cu128 | 6.1 | **DONOR** (acestep → host) |
 | **Tools/ACE-Step/venv15** | 3.12.10 | 2.11.0 | cu128 | 6.4 | **DONOR** (acestep15 → host) |
 | **Tools/F5-TTS/venv** | 3.12.10 | 2.11.0 | cu128 | 6.0 | **DONOR** (f5tts → host) |
@@ -19,8 +20,6 @@ metadati pip (`pyvenv.cfg`, `torch/version.py`, `*.dist-info`), zero import._
 | **Tools/XTTS/venv** | 3.12.10 | 2.11.0 | cu128 | 5.2 | **DONOR** (xtts → host) |
 | **Tools/FlashVSR/venv** | 3.12.10 | 2.11.0 | cu128 | 5.0 | **DONOR** (flashvsr → host) |
 | **Tools/SeedVR2/venv** | 3.12.10 | 2.11.0 | cu128 | 5.0 | **DONOR** (seedvr2 → host) |
-| Tools/SkinTokens/venv | 3.12.10 | 2.11.0 | cu128 | 4.8 | rig (usa il venv ComfyUI, non l'host) |
-
 ## La consolidazione è GIÀ CABLATA nel codice
 7 service selezionano l'host consolidato con fallback automatico:
 ```python
@@ -41,8 +40,13 @@ transformers **4.57.6** / hf-hub 0.36. F5-TTS e SeedVR2 sono stati **validati su
 sul 4.57/0.36 va rifatta al live-test (per heartlib con `datasets` 5.0→3.4 e FlashVSR con transformers 4.46→4.57
 il rischio è più alto — testare per primi).
 
+Anche **MMAudio** è consolidato: `music_service.py` punta `MMAUDIO_VENV_PY` a **`ltx2_venv`** (stesso py3.10,
+`_CONS_MM`), superset per nome (0 da copiare) → `MMAudio/venv` è un donor inerte. **SkinTokens/venv** invece è
+**orfano**: nessun service lo referenzia (il rig gira sul venv ComfyUI).
+
 ## Cosa resta da fare (SOLO al live-test — è distruttivo)
-La consolidazione runtime è completa; manca il **recupero disco**: cancellare i 7 donor inerti = **~39 GB**.
+La consolidazione runtime è completa; manca il **recupero disco**: cancellare gli 8 donor inerti (~40 GB) +
+l'orfano SkinTokens (4.8 GB) = **~45 GB**.
 Non eseguito ora: (a) è irreversibile, (b) va prima confermato il live-test di ciascun service dall'host,
 (c) va fatto il backup NAS.
 
@@ -54,13 +58,13 @@ Playbook (in ordine):
    l'host è superset (guardie integrate; default = dry-run).
 
 ## Venv che restano (giustificati, NON consolidabili)
-- **app/GUI** (Comfy venv, torch 2.8) e **ltx2_venv** (py3.10, video): core, ABI diverse dall'host.
-- **WorldGen** (torch 2.7.1), **TRELLIS2** (py3.11+cu130), **MMAudio** (py3.10+cpu): Python/torch/CUDA diversi →
-  la copia RECORD romperebbe l'ABI. Restano isolati.
-- **SkinTokens/rig**: gira sul venv ComfyUI (Blender+SkinToken node), non sull'host.
+- **app/GUI** (Comfy venv, torch 2.8) e **ltx2_venv** (py3.10, video+MMAudio): core, ABI diverse dall'host.
+- **WorldGen** (torch 2.7.1), **TRELLIS2** (py3.11+cu130): Python/torch/CUDA diversi → la copia RECORD
+  romperebbe l'ABI. Restano isolati.
 - **inference_server_venv_py311**: interprete base py3.11 per creare i venv 3D, non un runtime.
 
 ## Bilancio
-- **Runtime venv attivi**: da ~15 a **8** (app, ltx2, inference_server[+7 tool], WorldGen, TRELLIS2, MMAudio,
-  inference_server_py311, +rig su ComfyUI). Consolidamento tool transformers-ecosystem: **7→1** ✅ (già attivo).
-- **Recupero disco pendente**: ~39 GB (cancellazione donor, gated dal live-test).
+- **Runtime venv attivi**: da ~15 a **6** (app, ltx2[+MMAudio], inference_server[+7 tool], WorldGen, TRELLIS2,
+  inference_server_py311). Consolidamento transformers-ecosystem **7→1** + MMAudio→ltx2 ✅ (già attivo in codice).
+- **Recupero disco pendente**: **~45 GB** — 8 donor consolidati + orfano SkinTokens (gated dal live-test).
+- **Playbook di cancellazione**: `scripts/prune_donor_venvs.py` (dry-run di default; `--apply` dopo backup+test).

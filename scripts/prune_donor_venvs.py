@@ -20,17 +20,24 @@ import shutil
 import sys
 from pathlib import Path
 
-HOST = Path(r"E:\AI\Tools\inference_server_venv")
+INF = r"E:\AI\Tools\inference_server_venv"
+LTX2 = r"E:\AI\Tools\ltx2_venv"
 
-# donor → (path venv, service che DEVE usare _CONS)
+# donor → (path venv, host consolidato, service che DEVE usarlo)
 DONORS = {
-    "ACE-Step/venv":    (r"E:\AI\Tools\ACE-Step\venv",    "core/acestep_service.py"),
-    "ACE-Step/venv15":  (r"E:\AI\Tools\ACE-Step\venv15",  "core/acestep15_service.py"),
-    "F5-TTS/venv":      (r"E:\AI\Tools\F5-TTS\venv",       "core/f5tts_service.py"),
-    "XTTS/venv":        (r"E:\AI\Tools\XTTS\venv",         "core/xtts_service.py"),
-    "heartlib/venv":    (r"E:\AI\Tools\heartlib\venv",     "core/music_service.py"),
-    "FlashVSR/venv":    (r"E:\AI\Tools\FlashVSR\venv",     "core/flashvsr_service.py"),
-    "SeedVR2/venv":     (r"E:\AI\Tools\SeedVR2\venv",      "core/seedvr2_service.py"),
+    "ACE-Step/venv":    (r"E:\AI\Tools\ACE-Step\venv",    INF,  "core/acestep_service.py"),
+    "ACE-Step/venv15":  (r"E:\AI\Tools\ACE-Step\venv15",  INF,  "core/acestep15_service.py"),
+    "F5-TTS/venv":      (r"E:\AI\Tools\F5-TTS\venv",       INF,  "core/f5tts_service.py"),
+    "XTTS/venv":        (r"E:\AI\Tools\XTTS\venv",         INF,  "core/xtts_service.py"),
+    "heartlib/venv":    (r"E:\AI\Tools\heartlib\venv",     INF,  "core/music_service.py"),
+    "FlashVSR/venv":    (r"E:\AI\Tools\FlashVSR\venv",     INF,  "core/flashvsr_service.py"),
+    "SeedVR2/venv":     (r"E:\AI\Tools\SeedVR2\venv",      INF,  "core/seedvr2_service.py"),
+    "MMAudio/venv":     (r"E:\AI\Tools\MMAudio\venv",      LTX2, "core/music_service.py"),   # host = ltx2_venv
+}
+
+# ORFANI: nessun service li referenzia (deletabili, ma non "consolidati" → sezione a parte, prudente)
+ORPHANS = {
+    "SkinTokens/venv":  r"E:\AI\Tools\SkinTokens\venv",   # rig gira sul venv ComfyUI, non su questo
 }
 
 REPO = Path(__file__).resolve().parent.parent
@@ -66,32 +73,44 @@ def _service_uses_cons(service_rel: str) -> bool:
 
 def main() -> None:
     apply = "--apply" in sys.argv
-    if not HOST.exists():
-        print(f"HOST assente: {HOST} — nulla da fare (i tool userebbero i propri venv).")
-        return
-    host_d = _dists(HOST)
-    print(f"HOST {HOST} — {len(host_d)} distribuzioni{'' if apply else '  [DRY-RUN: nessuna cancellazione]'}\n")
-
+    print("DONOR CONSOLIDATI" + ("" if apply else "  [DRY-RUN: nessuna cancellazione]") + "\n")
     reclaim = 0.0
     to_delete: list[tuple[str, Path]] = []
-    for name, (path, service) in DONORS.items():
+    _host_cache: dict[str, set[str]] = {}
+    for name, (path, host_path, service) in DONORS.items():
         venv = Path(path)
+        host = Path(host_path)
         if not venv.exists():
             print(f"  · {name:20} già assente")
             continue
+        if not host.exists():
+            print(f"  [TENERE      ] {name:20} host assente ({host.name}) → il tool userebbe questo venv")
+            continue
+        host_d = _host_cache.setdefault(host_path, _dists(host))
         uses = _service_uses_cons(service)
         missing = _dists(venv) - host_d
         gb = _dir_gb(venv)
         ok = uses and not missing
         flag = "CANCELLABILE" if ok else "TENERE"
         why = "" if ok else (" (service non usa _CONS!)" if not uses
-                             else f" (host manca di {len(missing)} pkg: {sorted(missing)[:4]}…)")
-        print(f"  [{flag:12}] {name:20} {gb:5.1f} GB  ← {service}{why}")
+                             else f" (host {host.name} manca di {len(missing)} pkg: {sorted(missing)[:4]}…)")
+        print(f"  [{flag:12}] {name:20} {gb:5.1f} GB  → {host.name}  ({service}){why}")
         if ok:
             reclaim += gb
             to_delete.append((name, venv))
 
-    print(f"\nRecupero disco possibile: {reclaim:.1f} GB su {len(to_delete)} donor.")
+    print("\nORFANI (nessun service li usa) — deletabili con prudenza:")
+    for name, path in ORPHANS.items():
+        venv = Path(path)
+        if not venv.exists():
+            print(f"  · {name:20} già assente")
+            continue
+        gb = _dir_gb(venv)
+        print(f"  [ORFANO      ] {name:20} {gb:5.1f} GB  (verifica manuale prima di cancellare)")
+        reclaim += gb
+        to_delete.append((name, venv))
+
+    print(f"\nRecupero disco possibile: {reclaim:.1f} GB su {len(to_delete)} venv.")
     if not to_delete:
         return
     if not apply:
