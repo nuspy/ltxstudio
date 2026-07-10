@@ -412,6 +412,18 @@ def _auto_offload(p: dict, ckpt: str) -> str:
             _how = "file"
         _ENC_GB = 10.0                                        # gemma text-encoder (~9) + vae + vocoder
         _WORK_GB = 8.0                                        # attivazioni temporali (picco denoise/decode)
+        # M4 — budget attivazioni DINAMICO (env LTX_DYNAMIC_WORKBUDGET=1): scala col volume del clip
+        # (width×height×frames) invece del fisso 8GB. Su clip piccoli tiene tutto residente più spesso; su clip
+        # grandi alza il margine → meno spill invisibile in shared-VRAM. Default OFF (comportamento invariato).
+        if os.environ.get("LTX_DYNAMIC_WORKBUDGET") == "1":
+            try:
+                _w = int(p.get("width", 768) or 768); _h = int(p.get("height", 512) or 512)
+                _f = int(p.get("num_frames", p.get("frames", 97)) or 97)
+                _ref = 768 * 512 * 97
+                _WORK_GB = max(6.0, min(16.0, 8.0 * (_w * _h * _f) / _ref))
+                print(f"[auto-offload] work-budget dinamico (M4) {_w}x{_h}x{_f} → {_WORK_GB:.1f}GB", flush=True)
+            except Exception:                                # noqa: BLE001
+                _WORK_GB = 8.0
         need = tr_gb + _ENC_GB + _WORK_GB                     # full-stack residente (solo fp8, no GGUF)
         mode = "none" if free_gb >= need else "cpu"
         print(f"[auto-offload] free={free_gb:.0f}GB tr={tr_gb:.0f}({_how})+enc{_ENC_GB:.0f}+work{_WORK_GB:.0f}"
@@ -464,8 +476,30 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         pipe = Klass(
             checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
             gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
-    _PIPE_CACHE.clear()                                       # 1 pipeline alla volta (VRAM/RAM)
+    # M5 (versione sicura) — LRU di pipeline configurabile (env LTX_VIDEO_PIPE_LRU, default 1 = comportamento
+    # storico: 1 pipeline alla volta). Chi ha VRAM di scorta può alzarlo a 2 per tenere ti2v+a2v residenti ed
+    # evitare il reload di gemma/VAE alternando tipo di generazione (talk↔normale). Il refcount PROFONDO dei
+    # componenti condivisi (gemma/VAE tra pipeline diverse) richiede di iniettarli nei costruttori del package
+    # esterno ltx_pipelines → va fatto con ispezione + test live (rimandato).
+    _lru = max(1, int(os.environ.get("LTX_VIDEO_PIPE_LRU", "1") or 1))
     _PIPE_CACHE[key] = pipe
+    while len(_PIPE_CACHE) > _lru:                            # evinci i più vecchi (dict = ordine d'inserimento)
+        _oldk = next(iter(_PIPE_CACHE))
+        if _oldk == key:
+            break
+        _old = _PIPE_CACHE.pop(_oldk)
+        try:
+            del _old
+        except Exception:                                    # noqa: BLE001
+            pass
+    import gc as _gc
+    _gc.collect()
+    try:
+        import torch as _t
+        if _t.cuda.is_available():
+            _t.cuda.empty_cache()
+    except Exception:                                        # noqa: BLE001
+        pass
     return pipe
 
 
