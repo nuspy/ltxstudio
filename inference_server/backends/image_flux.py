@@ -1167,6 +1167,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
 
     # Face adapter PuLID (identità del volto da una foto) — FLUX/kontext
     _pulid_h = None
+    _tcfg = float(params.get("pulid_true_cfg", 1.0) or 1.0)   # true-CFG (2 pass/step) — deciso QUI: serve al PuLID
     if params.get("pulid_face") and arch in ("flux", "kontext"):
         try:
             from core import pulid_adapter
@@ -1174,13 +1175,20 @@ def run(params: dict, mm, output_dir: str) -> dict:
             if isinstance(_faces, str) and "|" in _faces:
                 _faces = [f for f in _faces.split("|") if f.strip()]
             _pl = pulid_adapter.load(pipe.transformer)
-            _emb = pulid_adapter.extract_id(_pl, _faces)
+            # true-CFG (2 pass/step): identità sul cond, uncond sull'uncond → il CFG amplifica l'identità;
+            # inoltre lo step di denoising va contato ogni 2 forward (prima start_step si sfasava).
+            _use_tcfg = _tcfg > 1.0
+            if _use_tcfg:
+                _emb, _unemb = pulid_adapter.extract_id(_pl, _faces, want_uncond=True)
+            else:
+                _emb, _unemb = pulid_adapter.extract_id(_pl, _faces), None
             _pulid_h = pulid_adapter.attach(pipe.transformer, _pl, _emb,
                                             float(params.get("pulid_strength", 0.8)),
-                                            start_step=int(params.get("pulid_start_step", 0)))
+                                            start_step=int(params.get("pulid_start_step", 0)),
+                                            uncond_emb=_unemb, cfg_passes=2 if _use_tcfg else 1)
             _nf = len(_faces) if isinstance(_faces, list) else 1
             print(f"[pulid] attivo ({len(_pulid_h)} hook, {_nf} foto, strength={params.get('pulid_strength', 0.8)}, "
-                  f"start_step={params.get('pulid_start_step', 0)})", flush=True)
+                  f"start_step={params.get('pulid_start_step', 0)}, true_cfg={_tcfg})", flush=True)
         except Exception as _e:                          # noqa: BLE001
             print(f"[pulid] disattivato (errore): {_e}", flush=True)
             _pulid_h = None
@@ -1198,7 +1206,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
               generator=g)
     neg = params.get("negative")
     # PuLID true CFG: migliora l'aderenza al prompt / bilancia identità (solo se la pipeline lo supporta).
-    _tcfg = float(params.get("pulid_true_cfg", 1.0) or 1.0)
+    # `_tcfg` è già stato calcolato sopra (serviva anche al PuLID per il conteggio pass/step + uncond).
     if _tcfg > 1.0 and params.get("pulid_face"):
         try:
             import inspect

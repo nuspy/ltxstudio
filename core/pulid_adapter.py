@@ -64,53 +64,76 @@ def load(transformer, device="cuda", dtype=None):
     return pulid
 
 
-def extract_id(pulid, face_image_path):
+def extract_id(pulid, face_image_path, want_uncond: bool = False):
     """id_embedding dal volto (antelopev2 + eva-clip + pulid_encoder). Accetta UNA foto o una LISTA:
-    con più foto dello stesso volto ne fa la MEDIA degli embedding → identità più robusta/stabile."""
+    con più foto dello stesso volto ne fa la MEDIA degli embedding → identità più robusta/stabile.
+    `want_uncond=True` → ritorna (id_emb, uncond_emb): l'uncond serve al pass negativo del true-CFG
+    (best-practice PuLID-FLUX: identità sul cond, uncond sull'uncond, così il CFG amplifica l'identità)."""
     import cv2
     import torch
     paths = list(face_image_path) if isinstance(face_image_path, (list, tuple)) else [face_image_path]
-    embs = []
+    embs, unembs = [], []
     for p in paths:
         if not p:
             continue
         img = cv2.imread(str(p))
         if img is None:
             continue
-        e, _ = pulid.get_id_embedding(img, cal_uncond=False)
+        e, u = pulid.get_id_embedding(img, cal_uncond=want_uncond)
         embs.append(e)
+        if want_uncond and u is not None:
+            unembs.append(u)
     if not embs:
         raise FileNotFoundError(str(face_image_path))
-    return embs[0] if len(embs) == 1 else torch.stack(embs, dim=0).mean(dim=0)
+    id_emb = embs[0] if len(embs) == 1 else torch.stack(embs, dim=0).mean(dim=0)
+    if not want_uncond:
+        return id_emb
+    un = None
+    if unembs:
+        un = unembs[0] if len(unembs) == 1 else torch.stack(unembs, dim=0).mean(dim=0)
+    return id_emb, un
 
 
-def attach(transformer, pulid, id_emb, strength: float = 0.8, start_step: int = 0):
+def attach(transformer, pulid, id_emb, strength: float = 0.8, start_step: int = 0,
+           uncond_emb=None, cfg_passes: int = 1):
     """Hook sui blocchi del FluxTransformer2DModel diffusers: replica il forward di PuLID-FLUX
     (flux/model.py) — `hid = hid + strength * pulid_ca[ca_idx](id, hid)` ogni `double_interval`
     double-block e ogni `single_interval` single-block, con ca_idx CONDIVISO double→single e
-    AZZERATO a ogni forward del transformer (ogni step di denoising).
-    start_step: inietta l'ID SOLO dai step >= start_step (0 = da subito) — così la composizione/posa
-    si forma prima e l'identità entra dopo (migliore aderenza al prompt), come il parametro ufficiale."""
+    AZZERATO a ogni forward del transformer.
+
+    `cfg_passes`: quanti FORWARD del transformer per step di denoising (1 = distilled/guidance-embed;
+      2 = true-CFG, cond+uncond). Serve a: (a) contare gli STEP reali per `start_step` (prima con true-CFG
+      il contatore raddoppiava); (b) applicare l'identità SOLO al pass cond, e `uncond_emb` (o NIENTE) al
+      pass uncond → il true-CFG amplifica davvero l'identità invece di cancellarla.
+    `uncond_emb`: embedding per il pass uncond (da extract_id(..., want_uncond=True)); None = nessuna
+      identità sull'uncond (approssimazione comune e comunque corretta per il CFG).
+    start_step: inietta l'ID SOLO dai step >= start_step (0 = da subito) — la posa si forma prima,
+      l'identità entra dopo (migliore aderenza al prompt), come il parametro ufficiale."""
     ca = pulid.pulid_ca
     di = int(getattr(transformer, "pulid_double_interval", 2) or 2)
     si = int(getattr(transformer, "pulid_single_interval", 4) or 4)
+    cfg_passes = max(1, int(cfg_passes))
     handles = []
     idx = [0]
-    step = [0]
+    fwd = [0]                                                # numero di forward del transformer (cumulativo)
 
-    # CRITICO: azzera il contatore ca_idx all'inizio di OGNI forward del transformer (per-step),
-    # altrimenti accumula tra gli step e dopo ~2 step esaurisce i pulid_ca → effetto nullo.
     def _reset(_m, _inp):
         idx[0] = 0
-        step[0] += 1                                          # conta gli step (1 forward/step in distilled)
+        fwd[0] += 1
     handles.append(transformer.register_forward_pre_hook(_reset))
 
     def _ca_hook(_m, _inp, out):
         # FluxTransformerBlock / FluxSingleTransformerBlock → (encoder_hidden_states, hidden_states)
-        if idx[0] >= len(ca) or (step[0] - 1) < start_step:  # gating start_step (salta i primi step)
+        step = (fwd[0] - 1) // cfg_passes                    # step di denoising REALE (indip. dal n. di pass)
+        parity = (fwd[0] - 1) % cfg_passes                   # 0 = cond, >0 = uncond (true-CFG)
+        if idx[0] >= len(ca) or step < start_step:           # gating start_step (salta i primi step)
+            return out
+        emb = id_emb if parity == 0 else uncond_emb          # identità sul cond; uncond_emb (o None) sull'uncond
+        if emb is None:                                      # uncond senza embedding → non applicare nulla
+            idx[0] += 1
             return out
         enc, hid = out if isinstance(out, tuple) else (None, out)
-        hid = hid + strength * ca[idx[0]](id_emb, hid)
+        hid = hid + strength * ca[idx[0]](emb, hid)
         idx[0] += 1
         return (enc, hid) if enc is not None else hid
 
