@@ -63,6 +63,10 @@ class VideoDefTab(QWidget):
         self.batch = QSpinBox(); self.batch.setRange(1, 121); self.batch.setSingleStep(4); self.batch.setValue(5)
         self.batch.setToolTip(tr("def.batch.tt"))
         f.addRow(tr("def.batch_lbl"), self.batch)
+        self.overlap = QSpinBox(); self.overlap.setRange(0, 16); self.overlap.setValue(3)
+        self.overlap.setToolTip(tr("def.overlap.tt", "Frame di sovrapposizione temporale tra i chunk SeedVR2: "
+                                   "riduce lo scatto ai tagli sui video lunghi (0 = usa il default 3)."))
+        f.addRow(tr("def.overlap_lbl", "Overlap temporale"), self.overlap)
         # esrgan
         self.esrgan_model = QComboBox()
         self.esrgan_model.setMaxVisibleItems(20)   # fix: mostra tutti i modelli nel popup
@@ -105,6 +109,11 @@ class VideoDefTab(QWidget):
         ef.addRow(self.exr_btn)
         root.addWidget(ebox)
 
+        # catena: dopo la super-risoluzione applica restauro volti (+ RIFE) in UN'unica sequenza
+        self.chain_face = QCheckBox(tr("def.chain_face", "🔗 Poi restauro volti (in sequenza)"))
+        self.chain_face.setToolTip(tr("def.chain_face.tt", "Dopo la super-risoluzione applica automaticamente il "
+                                      "restauro volti e poi (se attivo) il RIFE, senza rilanciare a mano."))
+        root.addWidget(self.chain_face)
         self.run_btn = QPushButton(tr("def.run.btn"))
         self.run_btn.setObjectName("generate"); self.run_btn.clicked.connect(lambda: self.request_enhance.emit())
         self.run_btn.setToolTip(tr("def.run.tt", "Avvia il miglioramento definizione video con il motore selezionato."))
@@ -176,9 +185,11 @@ class VideoDefTab(QWidget):
             "batch_size": self.batch.value(),
             "esrgan_model": self.esrgan_model.currentText() if not self.esrgan_model.currentText().startswith("(") else "",
             "target_scale": self.scale.value(),
+            "temporal_overlap": self.overlap.value(),
             "rife": self.rife.isChecked(),
             "rife_multiplier": self.rife_mult.currentIndex() + 2,
             "rife_ckpt": self.rife_ckpt.currentText(),
+            "chain_face": self.chain_face.isChecked(),
         }
 
     def _wrap(self, layout):
@@ -229,10 +240,11 @@ class VideoDefTab(QWidget):
     # ---- interno ----
     def _on_engine(self, *_):
         key = _ENGINE_KEY[self.engine.currentIndex()]
-        sv = key == "seedvr2"; es = key == "esrgan"
+        sv = key == "seedvr2"; es = key == "esrgan"; fv = key == "flashvsr"
         self.seedvr2_model.setEnabled(sv); self.blocks.setEnabled(sv); self.batch.setEnabled(sv)
-        self.resolution.setEnabled(sv)
-        self.esrgan_model.setEnabled(es); self.scale.setEnabled(es)
+        self.resolution.setEnabled(sv); self.overlap.setEnabled(sv)
+        self.esrgan_model.setEnabled(es)
+        self.scale.setEnabled(es or fv)                      # FlashVSR: scala nativa ×4, poi porta al fattore scelto
 
     def _pick(self):
         fn, _ = QFileDialog.getOpenFileName(self, tr("def.pick.dialog.title"), "", tr("def.pick.dialog.filter"))

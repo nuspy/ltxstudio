@@ -52,9 +52,11 @@ def _mux_audio(src_with_audio: str, video_no_audio: str, out: str) -> str:
         return out
 
 
-def upscale_video(inp: str, out: str, *, scale: float = 4.0, seed: int = 0, sparse: float = 2.0,
-                  local_range: int = 11, on_log=None) -> str:
-    """Super-risolve un video x4 con FlashVSR (streaming). Ritorna il path mp4 (audio rimuxato)."""
+def upscale_video(inp: str, out: str, *, scale: float = 4.0, target_scale: float | None = None,
+                  seed: int = 0, sparse: float = 2.0, local_range: int = 11, on_log=None) -> str:
+    """Super-risolve un video con FlashVSR (streaming, ×4 nativo del modello). `target_scale` (opz.): fattore
+    finale desiderato — dopo il ×4 nativo il video viene ridimensionato a originale×target_scale (es. 2×).
+    Ritorna il path mp4 (audio rimuxato)."""
     errs = preflight()
     if errs:
         raise RuntimeError("; ".join(errs))
@@ -71,6 +73,21 @@ def upscale_video(inp: str, out: str, *, scale: float = 4.0, seed: int = 0, spar
     proc.wait()
     if proc.returncode != 0 or not os.path.exists(tmp):
         raise RuntimeError(f"FlashVSR fallito (exit {proc.returncode}).")
+    # porta dal ×4 nativo al fattore RICHIESTO: ridimensiona il ×4 di (target/4). Se target≈4 (o assente) = no-op.
+    if target_scale and abs(float(target_scale) - float(scale)) > 0.01:
+        _f = float(target_scale) / float(scale)
+        _scaled = str(Path(tmp).with_name("_fvs_scaled_" + Path(tmp).name))
+        r = subprocess.run(["ffmpeg", "-v", "error", "-i", tmp, "-vf",
+                            f"scale=trunc(iw*{_f}/2)*2:trunc(ih*{_f}/2)*2:flags=lanczos",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", _scaled, "-y"], capture_output=True)
+        if r.returncode == 0 and os.path.exists(_scaled):
+            try:
+                os.remove(tmp)
+            except Exception:                              # noqa: BLE001
+                pass
+            tmp = _scaled
+            if on_log:
+                on_log(f"[flashvsr] ridimensionato al fattore x{target_scale:g}")
     res = _mux_audio(inp, tmp, out)
     try:
         os.remove(tmp)

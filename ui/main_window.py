@@ -182,17 +182,18 @@ class _SeedVR2Worker(QThread):
     progress = Signal(str)
 
     def __init__(self, src: str, out: str, *, resolution: int, batch_size: int, chunk_size: int,
-                 model: str = "", block_swap: int = 0):
+                 model: str = "", block_swap: int = 0, temporal_overlap: int = 0):
         super().__init__()
         self.src, self.out = src, out
         self.resolution, self.batch_size, self.chunk_size = resolution, batch_size, chunk_size
-        self.model, self.block_swap = model, block_swap
+        self.model, self.block_swap, self.temporal_overlap = model, block_swap, temporal_overlap
 
     def run(self):
         from core import seedvr2_service as sv
         try:
             sv.upscale_video(self.src, self.out, resolution=self.resolution, batch_size=self.batch_size,
                              chunk_size=self.chunk_size, model=self.model or "", block_swap=self.block_swap,
+                             temporal_overlap=self.temporal_overlap,
                              on_log=lambda l: self.progress.emit(l))
             self.done.emit({"status": "success", "output": [self.out]})
         except Exception as e:                          # noqa: BLE001
@@ -204,14 +205,15 @@ class _FlashVSRWorker(QThread):
     done = Signal(dict)
     progress = Signal(str)
 
-    def __init__(self, src: str, out: str):
+    def __init__(self, src: str, out: str, target_scale: float = 4.0):
         super().__init__()
-        self.src, self.out = src, out
+        self.src, self.out, self.target_scale = src, out, target_scale
 
     def run(self):
         from core import flashvsr_service as fv
         try:
-            fv.upscale_video(self.src, self.out, on_log=lambda l: self.progress.emit(l))
+            fv.upscale_video(self.src, self.out, target_scale=self.target_scale,
+                             on_log=lambda l: self.progress.emit(l))
             self.done.emit({"status": "success", "output": [self.out]})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
@@ -2839,6 +2841,9 @@ class MainWindow(QMainWindow):
         # #10 RIFE dal tab Definizione: se attivo, fluidifica DOPO l'upscale (consumato in _maybe_rife).
         self._pending_def_rife = ({"factor": int(cfg.get("rife_multiplier", 2) or 2)}
                                   if cfg.get("rife") else None)
+        # CATENA: dopo la super-risoluzione applica restauro volti (poi RIFE) in sequenza, senza rilanciare.
+        self._pending_def_face = (self.video_def_tab.get_face_restore_config()
+                                  if cfg.get("chain_face") else None)
         engine = cfg.get("engine", "seedvr2")
         if engine == "seedvr2":                          # SeedVR2 nativo (diffusion VSR, coerenza temporale)
             from core import seedvr2_service as sv
@@ -2851,7 +2856,8 @@ class MainWindow(QMainWindow):
             self._sv2_worker = _SeedVR2Worker(src, out, resolution=int(cfg.get("resolution", 1080) or 1080),
                                               batch_size=int(cfg.get("batch_size", 5) or 5), chunk_size=120,
                                               model=cfg.get("seedvr2_model", "") or "",
-                                              block_swap=int(cfg.get("blocks_to_swap", 0) or 0))
+                                              block_swap=int(cfg.get("blocks_to_swap", 0) or 0),
+                                              temporal_overlap=int(cfg.get("temporal_overlap", 3) or 0))
             self._enqueue(tr("queue.job.seedvr2", "Super-risoluzione (SeedVR2)"), self._sv2_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
@@ -2862,8 +2868,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "FlashVSR", "\n".join(errs) +
                     "\n\n" + tr("mw.flashvsr_install_hint", "Installa con: python scripts/install_flashvsr.py")); return
             out = str(OUTPUT_DIR / f"flashvsr_{Path(src).stem}.mp4")
-            self._log(f"[nativo] FlashVSR x4 super-risoluzione su {Path(src).name}…")
-            self._fv_worker = _FlashVSRWorker(src, out)
+            _fvs = float(cfg.get("target_scale", 4.0) or 4.0)
+            self._log(f"[nativo] FlashVSR super-risoluzione (x4 nativo → x{_fvs:g}) su {Path(src).name}…")
+            self._fv_worker = _FlashVSRWorker(src, out, target_scale=_fvs)
             self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
@@ -3008,6 +3015,14 @@ class MainWindow(QMainWindow):
         out = (res.get("output") or [None])[0]
         self._last_video_path = out
         self._log(f"[video] pronto: {out}")
+        # CATENA tab Definizione: super-risoluzione → RESTAURO VOLTI → (RIFE), in sequenza. Consuma il flag una
+        # sola volta: il face-restore ri-entra qui con _pending_def_face=None → prosegue a face-swap/RIFE.
+        _pf = getattr(self, "_pending_def_face", None)
+        if _pf and out:
+            self._pending_def_face = None
+            self._log("[catena] restauro volti sul video migliorato…")
+            self._face_restore_native({**_pf, "video": out})
+            return
         # post-process: face-swap automatico se attivo (impone un volto da foto su tutti i frame)
         fs = self.video_tab.get_face_swap_auto() if hasattr(self.video_tab, "get_face_swap_auto") else None
         if fs and fs.get("face") and out:
