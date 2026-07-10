@@ -110,9 +110,13 @@ def register(app: FastAPI):
             errs = ms.preflight_sonify(p)
             if errs:
                 raise RuntimeError("; ".join(errs))
+            import time as _t
+            _t0 = _t.time()
             j = ms.make_sonify_job(p, on_log=job.log)
             j.run()
-            out = p.out_path() if hasattr(p, "out_path") else None
+            # SonifyParams non ha out_path(): MMAudio scrive in MUSIC_OUTPUT_DIR con nome dinamico →
+            # prendi l'ultimo audio prodotto DOPO l'avvio del job (prima: p.out_path() inesistente → sempre []).
+            out = ms.find_latest_audio(after=_t0)
             return [str(out)] if out and os.path.exists(str(out)) else []
         return _submit("music.sonify", fn)
 

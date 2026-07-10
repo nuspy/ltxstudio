@@ -604,9 +604,12 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
                 job = cosyvoice_service.make_job(clean, voice.sample_path,
                                                  prompt_text=voice.sample_transcript, out_name=voice.slug())
                 job.run() if hasattr(job, "run") else None
-                f = find_latest_audio() if "find_latest_audio" in globals() else None
-                if f:
-                    return Path(f)
+                # BUG: prima cercava find_latest_audio() in globals() di QUESTO modulo (non esiste qui, sta in
+                # music_service) → sempre None → CosyVoice2 nativo FALLIVA SEMPRE anche a sintesi riuscita.
+                # Il service scrive in OUT_DIR/<safe(slug)>.wav (pattern identico a _synthesize_native_clone).
+                res = cosyvoice_service.OUT_DIR / f"{cosyvoice_service._safe(voice.slug())}.wav"
+                if res.exists():
+                    return res
         except Exception as _e:                            # noqa: BLE001
             raise RuntimeError(f"CosyVoice2 nativo ha fallito: {_e}") from _e
         # #51 zero-ComfyUI: niente più fallback a ComfyUI. Se il nativo non è installato/non produce

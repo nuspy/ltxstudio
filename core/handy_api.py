@@ -146,15 +146,23 @@ def tts(text: str, *, voice: str = "if_sara", lang: str = "it", speed: float = 1
     b64 = res.get("audio_b64")
     if not b64 or not out_wav:
         return ""
-    os.makedirs(os.path.dirname(out_wav) or ".", exist_ok=True)
-    open(out_wav, "wb").write(base64.b64decode(b64))
+    try:                                                     # b64 corrotto / disco pieno / permessi → "" (no crash)
+        os.makedirs(os.path.dirname(out_wav) or ".", exist_ok=True)
+        open(out_wav, "wb").write(base64.b64decode(b64))
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[handy] scrittura TTS fallita: {e}", flush=True)
+        return ""
     return out_wav
 
 
 def clone_voice(name: str, audio_path: str, port: int | None = None) -> dict:
     if not ensure(port):
         return {}
-    b64 = base64.b64encode(open(audio_path, "rb").read()).decode()
+    try:                                                     # file assente/illeggibile → {} (no FileNotFoundError)
+        b64 = base64.b64encode(open(audio_path, "rb").read()).decode()
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[handy] lettura campione voce fallita ({audio_path}): {e}", flush=True)
+        return {}
     fmt = os.path.splitext(audio_path)[1].lstrip(".").lower() or "wav"
     return _post_json("/voices/clone", {"name": name, "audio_b64": b64, "format": fmt}, port=port)
 
