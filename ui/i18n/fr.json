@@ -2590,5 +2590,13 @@
   "setup.title": "Configuration des modèles — LTX Studio",
   "setup.head": "Bienvenue ! Avant de commencer, indique où tu conserves déjà tes modèles IA : je les LIE (sans les copier ni les retélécharger) et ensuite tu ne télécharges que les poids nécessaires aux modules de ton édition.\n①  Dossier de base   →   ②  «Rechercher les existants»   →   ③  «🔗 Lier les trouvés» / «＋ Importer les inconnus»   →   ④  «Sélectionner les manquants» + «Télécharger».",
   "setup.skip": "Passer pour l'instant",
-  "setup.done": "Terminé ✓"
+  "setup.done": "Terminé ✓",
+  "def.overlap_lbl": "Chevauchement temporel",
+  "def.overlap.tt": "Images de chevauchement temporel entre les segments SeedVR2 : réduit les à-coups aux coupures sur les vidéos longues (0 = utiliser la valeur par défaut 3).",
+  "def.chain_face": "🔗 Puis restaurer les visages (à la suite)",
+  "def.chain_face.tt": "Après la super-résolution, applique automatiquement la restauration des visages puis (si activé) le RIFE, sans relancer à la main.",
+  "res.color.denoise_lbl": "Intensité (denoise)",
+  "res.color.denoise.tt": "Intensité : élevée = couleurs plus marquées mais moins fidèle à la structure ; faible = structure mieux préservée.",
+  "res.color.guidance_lbl": "Fidélité (guidance)",
+  "res.color.guidance.tt": "Fidélité au sujet/style décrit."
 }

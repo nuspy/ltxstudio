@@ -2590,5 +2590,13 @@
   "setup.title": "Modell-Einrichtung — LTX Studio",
   "setup.head": "Willkommen! Gib vor dem Start an, wo du deine KI-Modelle bereits ablegst: Ich VERKNÜPFE sie (ohne Kopieren oder erneuten Download) und dann lädst du nur die Gewichte herunter, die die Module deiner Edition benötigen.\n①  Basisordner   →   ②  «Vorhandene suchen»   →   ③  «🔗 Gefundene verknüpfen» / «＋ Unbekannte importieren»   →   ④  «Fehlende auswählen» + «Herunterladen».",
   "setup.skip": "Vorerst überspringen",
-  "setup.done": "Fertig ✓"
+  "setup.done": "Fertig ✓",
+  "def.overlap_lbl": "Zeitliche Überlappung",
+  "def.overlap.tt": "Frames zeitlicher Überlappung zwischen SeedVR2-Chunks: reduziert das Ruckeln an Schnitten bei langen Videos (0 = Standardwert 3 verwenden).",
+  "def.chain_face": "🔗 Dann Gesichter restaurieren (in Folge)",
+  "def.chain_face.tt": "Nach der Super-Resolution automatisch die Gesichtsrestaurierung und dann (falls aktiv) RIFE anwenden, ohne manuellen Neustart.",
+  "res.color.denoise_lbl": "Intensität (denoise)",
+  "res.color.denoise.tt": "Intensität: hoch = kräftigere Farben, aber weniger strukturtreu; niedrig = Struktur besser erhalten.",
+  "res.color.guidance_lbl": "Treue (guidance)",
+  "res.color.guidance.tt": "Treue zum beschriebenen Motiv/Stil."
 }

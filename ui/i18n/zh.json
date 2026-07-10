@@ -2590,5 +2590,13 @@
   "setup.title": "模型设置 — LTX Studio",
   "setup.head": "欢迎！开始之前，请指明你已存放 AI 模型的位置：我会将它们进行链接（不复制也不重新下载），然后你只需下载你的版本模块所需的权重。\n①  基础文件夹   →   ②  「搜索现有」   →   ③  「🔗 链接已找到项」／「＋ 导入未知项」   →   ④  「选择缺失项」+「下载」。",
   "setup.skip": "暂时跳过",
-  "setup.done": "完成 ✓"
+  "setup.done": "完成 ✓",
+  "def.overlap_lbl": "时间重叠",
+  "def.overlap.tt": "SeedVR2 分块之间的时间重叠帧数：减少长视频剪辑处的卡顿（0 = 使用默认值 3）。",
+  "def.chain_face": "🔗 然后修复面部（依次执行）",
+  "def.chain_face.tt": "超分辨率之后自动应用面部修复，然后（若启用）执行 RIFE，无需手动重新运行。",
+  "res.color.denoise_lbl": "强度（denoise）",
+  "res.color.denoise.tt": "强度：高 = 色彩更鲜明但对结构的还原度较低；低 = 更好地保留结构。",
+  "res.color.guidance_lbl": "贴合度（guidance）",
+  "res.color.guidance.tt": "对所描述主体/风格的贴合度。"
 }

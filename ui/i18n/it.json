@@ -2590,5 +2590,13 @@
   "setup.title": "Setup modelli — LTX Studio",
   "setup.head": "Benvenuto! Prima di iniziare, indica dove tieni già i modelli AI: li COLLEGO (senza copiarli né riscaricarli) e poi scarichi solo i pesi che servono ai moduli della tua edizione.\n①  Cartella base   →   ②  «Cerca esistenti»   →   ③  «🔗 Collega trovati» / «＋ Importa sconosciuti»   →   ④  «Seleziona mancanti» + «Scarica».",
   "setup.skip": "Salta per ora",
-  "setup.done": "Fatto ✓"
+  "setup.done": "Fatto ✓",
+  "def.overlap_lbl": "Overlap temporale",
+  "def.overlap.tt": "Frame di sovrapposizione temporale tra i chunk SeedVR2: riduce lo scatto ai tagli sui video lunghi (0 = usa il default 3).",
+  "def.chain_face": "🔗 Poi restauro volti (in sequenza)",
+  "def.chain_face.tt": "Dopo la super-risoluzione applica automaticamente il restauro volti e poi (se attivo) il RIFE, senza rilanciare a mano.",
+  "res.color.denoise_lbl": "Intensità (denoise)",
+  "res.color.denoise.tt": "Intensità: alto = colori più decisi ma meno fedele alla struttura; basso = struttura più preservata.",
+  "res.color.guidance_lbl": "Aderenza (guidance)",
+  "res.color.guidance.tt": "Aderenza al soggetto/stile descritto."
 }

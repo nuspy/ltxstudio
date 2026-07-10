@@ -2590,5 +2590,13 @@
   "setup.title": "모델 설정 — LTX Studio",
   "setup.head": "환영합니다! 시작하기 전에 AI 모델을 이미 보관하고 있는 위치를 알려주세요. 제가 복사하거나 다시 내려받지 않고 연결하며, 그 후에는 에디션의 모듈에 필요한 가중치만 내려받으면 됩니다.\n①  기본 폴더   →   ②  «기존 항목 검색»   →   ③  «🔗 찾은 항목 연결» / «＋ 알 수 없는 항목 가져오기»   →   ④  «누락 항목 선택» + «다운로드».",
   "setup.skip": "지금은 건너뛰기",
-  "setup.done": "완료 ✓"
+  "setup.done": "완료 ✓",
+  "def.overlap_lbl": "시간적 오버랩",
+  "def.overlap.tt": "SeedVR2 청크 간의 시간적 오버랩 프레임: 긴 영상의 컷 지점에서 끊김을 줄입니다(0 = 기본값 3 사용).",
+  "def.chain_face": "🔗 이어서 얼굴 복원(순차 실행)",
+  "def.chain_face.tt": "초해상도 이후 얼굴 복원을 자동으로 적용하고, 이어서(활성화된 경우) RIFE를 실행하며 수동으로 다시 실행할 필요가 없습니다.",
+  "res.color.denoise_lbl": "강도(denoise)",
+  "res.color.denoise.tt": "강도: 높음 = 색상이 더 뚜렷하지만 구조에 대한 충실도가 낮아짐; 낮음 = 구조가 더 잘 보존됨.",
+  "res.color.guidance_lbl": "충실도(guidance)",
+  "res.color.guidance.tt": "설명된 대상/스타일에 대한 충실도."
 }

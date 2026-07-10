@@ -2590,5 +2590,13 @@
   "setup.title": "Modellek beállítása — LTX Studio",
   "setup.head": "Üdvözlünk! Mielőtt elkezded, add meg, hol tárolod már az AI-modelljeidet: ÖSSZEKAPCSOLOM őket (másolás vagy újbóli letöltés nélkül), majd csak a kiadásod moduljaihoz szükséges súlyokat töltöd le.\n①  Alapmappa   →   ②  «Meglévők keresése»   →   ③  «🔗 Találtak összekapcsolása» / «＋ Ismeretlenek importálása»   →   ④  «Hiányzók kiválasztása» + «Letöltés».",
   "setup.skip": "Kihagyás egyelőre",
-  "setup.done": "Kész ✓"
+  "setup.done": "Kész ✓",
+  "def.overlap_lbl": "Időbeli átfedés",
+  "def.overlap.tt": "Időbeli átfedési képkockák a SeedVR2 darabok között: csökkenti a rángatózást a vágásoknál hosszú videóknál (0 = az alapértelmezett 3 használata).",
+  "def.chain_face": "🔗 Majd arcok helyreállítása (sorban)",
+  "def.chain_face.tt": "A szuperfelbontás után automatikusan alkalmazza az archelyreállítást, majd (ha be van kapcsolva) a RIFE-et, kézi újraindítás nélkül.",
+  "res.color.denoise_lbl": "Erősség (denoise)",
+  "res.color.denoise.tt": "Erősség: magas = határozottabb színek, de kevésbé hű a szerkezethez; alacsony = a szerkezet jobban megőrződik.",
+  "res.color.guidance_lbl": "Hűség (guidance)",
+  "res.color.guidance.tt": "Hűség a leírt témához/stílushoz."
 }

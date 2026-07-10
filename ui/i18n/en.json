@@ -2590,5 +2590,13 @@
   "setup.title": "Model setup — LTX Studio",
   "setup.head": "Welcome! Before you begin, tell us where you already keep your AI models: I LINK them (without copying or re-downloading) and then you only download the weights your edition's modules need.\n①  Base folder   →   ②  «Scan for existing»   →   ③  «🔗 Link found» / «＋ Import unknown»   →   ④  «Select missing» + «Download».",
   "setup.skip": "Skip for now",
-  "setup.done": "Done ✓"
+  "setup.done": "Done ✓",
+  "def.overlap_lbl": "Temporal overlap",
+  "def.overlap.tt": "Temporal overlap frames between SeedVR2 chunks: reduces judder at cuts on long videos (0 = use the default 3).",
+  "def.chain_face": "🔗 Then restore faces (in sequence)",
+  "def.chain_face.tt": "After super-resolution, automatically apply face restoration and then (if enabled) RIFE, with no manual re-run.",
+  "res.color.denoise_lbl": "Strength (denoise)",
+  "res.color.denoise.tt": "Strength: high = bolder colors but less faithful to the structure; low = structure better preserved.",
+  "res.color.guidance_lbl": "Adherence (guidance)",
+  "res.color.guidance.tt": "Adherence to the described subject/style."
 }
