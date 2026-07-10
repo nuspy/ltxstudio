@@ -2867,10 +2867,12 @@ class MainWindow(QMainWindow):
             self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
-        # esrgan: upscale per-frame nativo (spandrel)
+        # esrgan: upscale per-frame nativo (spandrel). CHIAVI CORRETTE: il backend video_postprocess.run()
+        # legge 'image_path' e 'target_scale' (prima passavamo 'video'/'scale' → KeyError = upscale ESRGAN
+        # video ROTTO, e comunque il fattore ignorato).
         params = {
-            "video": src, "model": cfg.get("esrgan_model"),
-            "scale": int(cfg.get("target_scale", 2) or 2), "seed": _r.randint(0, 2**31),
+            "image_path": src, "model": cfg.get("esrgan_model"),
+            "target_scale": int(cfg.get("target_scale", 2) or 2), "seed": _r.randint(0, 2**31),
         }
         self._log(f"[nativo] definizione video (upscale per-frame x{params['scale']}) su {Path(src).name}…")
         self._native_worker = _NativeImageWorker(params, module="video_upscale")

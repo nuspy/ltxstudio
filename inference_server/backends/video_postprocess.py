@@ -66,11 +66,19 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
     except Exception as e:                                  # noqa: BLE001
         return {"status": "error", "error": f"GFPGAN non installato nel venv nativo ({e}). "
                 "pip install gfpgan; poi riprova."}
-    video = params["image_path"]
-    if not os.path.exists(video):
+    video = params.get("image_path") or params.get("video")
+    if not video or not os.path.exists(video):
         return {"status": "error", "error": f"video non trovato: {video}"}
     model = params.get("model") or r"E:\AI\Models\facerestore_models\GFPGANv1.4.pth"
-    restorer = GFPGANer(model_path=model, upscale=1, arch="clean", channel_multiplier=2)
+    # ARCH corretto dal nome modello: CodeFormer ha la 'fidelity' (weight), GFPGAN no. Prima si caricava
+    # SEMPRE come GFPGAN 'clean' → un checkpoint CodeFormer sbagliava arch e la fidelity era ignorata.
+    _fid = float(params.get("fidelity", 0.5) or 0.5)
+    _is_cf = "codeformer" in os.path.basename(str(model)).lower()
+    _arch = "CodeFormer" if _is_cf else "clean"
+    try:
+        restorer = GFPGANer(model_path=model, upscale=1, arch=_arch, channel_multiplier=2)
+    except Exception:                                        # noqa: BLE001 — gfpgan vecchio senza arch CodeFormer
+        restorer = GFPGANer(model_path=model, upscale=1, arch="clean", channel_multiplier=2)
     td, ind, frames, fps, _ = _frames_io(video)
     try:
         if not frames:
@@ -78,7 +86,10 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
         outd = os.path.join(td, "out"); os.makedirs(outd)
         for fp in frames:
             arr = np.array(Image.open(fp).convert("RGB"))[:, :, ::-1]   # BGR per gfpgan
-            _, _, restored = restorer.enhance(arr, has_aligned=False, paste_back=True)
+            try:                                             # 'weight' = fidelity CodeFormer (ignorato da GFPGAN)
+                _, _, restored = restorer.enhance(arr, has_aligned=False, paste_back=True, weight=_fid)
+            except TypeError:                                # gfpgan senza il parametro weight
+                _, _, restored = restorer.enhance(arr, has_aligned=False, paste_back=True)
             Image.fromarray(restored[:, :, ::-1]).save(os.path.join(outd, fp.name))
         os.makedirs(output_dir, exist_ok=True)
         out_path = str(Path(output_dir) / f"native_faces_{params.get('seed', 0)}.mp4")
@@ -104,8 +115,8 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
 def run_fps(params: dict, mm, output_dir: str) -> dict:
     """Aumento FPS video — interpolazione movimento ffmpeg (minterpolate). Niente ComfyUI/modelli.
     RIFE (qualità superiore via rete neurale) = upgrade futuro con modello dedicato."""
-    video = params["image_path"]
-    if not os.path.exists(video):
+    video = params.get("image_path") or params.get("video")
+    if not video or not os.path.exists(video):
         return {"status": "error", "error": f"video non trovato: {video}"}
     target = int(params.get("target_fps", 60))
     os.makedirs(output_dir, exist_ok=True)
@@ -138,8 +149,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
     from PIL import Image
     from inference_server.backends.image_upscale import _resolve, _load, _upscale_tiled, _run_once
 
-    video = params["image_path"]
-    if not os.path.exists(video):
+    video = params.get("image_path") or params.get("video")   # robusto a entrambe le chiavi
+    if not video or not os.path.exists(video):
         return {"status": "error", "error": f"video non trovato: {video}"}
     mp = _resolve(params["model"])
     if not os.path.exists(mp):
@@ -159,7 +170,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
         frames = sorted(Path(ind).glob("f_*.png"))
         if not frames:
             return {"status": "error", "error": "estrazione frame fallita"}
-        # 2) upscale per-frame
+        # 2) upscale per-frame → poi porta al FATTORE RICHIESTO (target_scale). Prima il target_scale era
+        # ignorato: l'ESRGAN esce alla sua scala nativa (es. 4×) anche se l'utente chiedeva 2× → output
+        # sempre 4× (come nel path IMMAGINE, image_upscale.run() righe 78-80, che invece lo applica).
+        _tgt = params.get("target_scale") or params.get("scale")   # robusto a entrambe le chiavi
         for fp in frames:
             img = Image.open(fp).convert("RGB")
             t = torch.from_numpy(np.array(img)).float().permute(2, 0, 1).unsqueeze(0) / 255.0
@@ -167,7 +181,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 t = t.cuda()
             out = _upscale_tiled(model, t) if max(img.size) > 1024 else _run_once(model, t)
             arr = (out.clamp(0, 1)[0].permute(1, 2, 0).float().cpu().numpy() * 255).astype("uint8")
-            Image.fromarray(arr).save(os.path.join(outd, fp.name))
+            res = Image.fromarray(arr)
+            if _tgt:                                          # scala finale = dimensioni ORIGINALI × target_scale
+                res = res.resize((int(img.width * float(_tgt)), int(img.height * float(_tgt))), Image.LANCZOS)
+            res.save(os.path.join(outd, fp.name))
         # 3) ricomponi video + riporta l'audio originale
         os.makedirs(output_dir, exist_ok=True)
         path = str(Path(output_dir) / f"native_videoup_{params.get('seed', 0)}.mp4")
