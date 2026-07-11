@@ -129,6 +129,15 @@ class Job:
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
+        # Prima del job GPU effimero (musica/voce) libera i server persistenti (immagini/video):
+        # con FLUX 22GB residente il runner ACE-Step vedeva <12GB liberi → cpu_offload=True (lento e
+        # sospetto causa del rumore grigio #ACE). Stesso pattern di ltx2_service._free_gpu_servers;
+        # il guard di mem_coordinator evita /free ripetuti tra job musica consecutivi.
+        try:
+            from core import mem_coordinator
+            mem_coordinator.free_for("music", timeout=20)
+        except Exception:                                     # noqa: BLE001
+            pass
         env = os.environ.copy()
         if self.env:
             for _k, _v in self.env.items():
