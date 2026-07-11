@@ -76,7 +76,7 @@ def case_outpaint(w, spy):
 def case_video_generation(w, spy):
     """Video: on_generate deve instradare al motore nativo con module/params video (prompt, width,
     height, num_frames, fps)."""
-    w.video_tab.prompt.setPlainText("a dog running on the beach")
+    w.video_tab.prompt.setPlainText("a steampunk hot-air balloon race over a candy-colored canyon at sunset")
     w.tabs.setCurrentWidget(w.video_tab)
     w.on_generate()
     assert spy.calls, "video: nessuna richiesta inviata da on_generate"

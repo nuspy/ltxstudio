@@ -145,7 +145,9 @@ def load_canvas_image(window, path: str | None = None):
     if not os.path.exists(path):
         make_test_image(path)
     cv = window.frame1_tab.canvas
-    cv.load_image(path)                                   # imposta canvas._image_path (→ frame1_tab.image_path)
+    # fit_mode esplicito: il default 'ask' legge user_prefs REALI (canvas_fit_mode ricordato) → test
+    # non ermetico (canvas che resta es. 704×1280 invece di adottare le proporzioni della foto).
+    cv.load_image(path, fit_mode="canvas")                # imposta canvas._image_path (→ frame1_tab.image_path)
     return path
 
 

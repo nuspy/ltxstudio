@@ -317,13 +317,13 @@ def run(p: dict) -> str:
         latent = {"samples": getattr(latent, "samples", latent)}
     print(f"[cond] ok, latent={tuple(latent['samples'].shape)}", flush=True)
 
-    # ── AUDIO (modello AV congiunto LTX-2.3). L'audio è generato ANCHE per t2v/i2v puri (il modello LTX-2.3
-    # produce audio nativamente): default ON (opt-out con generate_audio=False). Audio fornito = ENCODE+KEEP
-    # (lip-sync/canto), video generato; nessun file = audio GENERATIVO (empty latent). Vedi task #89. ──
+    # ── AUDIO (modello AV congiunto LTX-2.3). Senza condizionamento (t2v/i2v puri) l'audio LTX-2 è RUMORE
+    # non condizionato ("rumore grigio", vedi fix b6073a9 in ltx2_infer.py): default OFF, opt-in con
+    # generate_audio=True. Audio fornito = ENCODE+KEEP (lip-sync/canto), video generato. ──
     av_mode = False
     audio_vae = None
     _has_audio_file = bool(p.get("audio_path")) and os.path.isfile(str(p.get("audio_path")))
-    _want_audio = bool(p.get("generate_audio", True))    # genera audio anche senza file (t2v/i2v)
+    _want_audio = bool(p.get("generate_audio", False))   # opt-in: senza file l'audio generato è rumore
     if _has_audio_file or _want_audio:
         from comfy_extras.nodes_lt import LTXVConcatAVLatent
         from comfy_extras.nodes_lt_audio import LTXVAudioVAEEncode, LTXVEmptyLatentAudio
@@ -413,18 +413,29 @@ def _save_mp4(images, out_path: str, fps: float, audio=None, audio_sr: int = 441
         wav = audio[0] if hasattr(audio, "dim") and audio.dim() == 3 else audio   # [C,N]
         wpath = out_path + ".audio.wav"
         torchaudio.save(wpath, wav.cpu().float(), audio_sr)
-        proc = subprocess.Popen(
-            ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", str(fps),
-             "-i", "-", "-i", wpath, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
-             "-shortest", out_path], stdin=subprocess.PIPE)
-        proc.stdin.write(arr.tobytes())
-        proc.stdin.close()
-        proc.wait()
+        ok = False
         try:
-            os.remove(wpath)
+            proc = subprocess.Popen(
+                ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", str(fps),
+                 "-i", "-", "-i", wpath, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                 "-shortest", out_path], stdin=subprocess.PIPE)
+            proc.stdin.write(arr.tobytes())
+            proc.stdin.close()
+            proc.wait()
+            ok = proc.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 0
         except OSError:
-            pass
-        return out_path
+            # ffmpeg morto a metà stream (es. audio invalido per aac): il write su stdin fallisce.
+            ok = False
+        finally:
+            try:
+                os.remove(wpath)
+            except OSError:
+                pass
+        if ok:
+            return out_path
+        # fallback: NON perdere la generazione per un mux fallito → salva il video MUTO
+        print("[save] mux audio fallito → salvo il video senza audio", flush=True)
+        # ricade nel ramo solo-video qui sotto
     proc = subprocess.Popen(
         ["ffmpeg", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
          "-r", str(fps), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", out_path],
