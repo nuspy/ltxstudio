@@ -201,11 +201,11 @@ class _SeedVR2Worker(QThread):
 
 
 class _FlashVSRWorker(QThread):
-    """FlashVSR v1.1 super-risoluzione video x4 (repo diffsynth, venv isolato). Stream log + path."""
+    """FlashVSR v1.1 super-risoluzione video fino a ×4, default ×2 (repo diffsynth, venv isolato). Stream log + path."""
     done = Signal(dict)
     progress = Signal(str)
 
-    def __init__(self, src: str, out: str, target_scale: float = 4.0):
+    def __init__(self, src: str, out: str, target_scale: float = 2.0):
         super().__init__()
         self.src, self.out, self.target_scale = src, out, target_scale
 
@@ -2921,8 +2921,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "FlashVSR", "\n".join(errs) +
                     "\n\n" + tr("mw.flashvsr_install_hint", "Installa con: python scripts/install_flashvsr.py")); return
             out = str(OUTPUT_DIR / f"flashvsr_{Path(src).stem}.mp4")
-            _fvs = float(cfg.get("target_scale", 4.0) or 4.0)
-            self._log(f"[nativo] FlashVSR super-risoluzione (x4 nativo → x{_fvs:g}) su {Path(src).name}…")
+            _fvs = float(cfg.get("target_scale", 2.0) or 2.0)
+            self._log(f"[nativo] FlashVSR super-risoluzione (x{_fvs:g}) su {Path(src).name}…")
             self._fv_worker = _FlashVSRWorker(src, out, target_scale=_fvs)
             self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
                           self._on_multitalk_done, on_progress=self._log)

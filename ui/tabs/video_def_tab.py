@@ -244,7 +244,7 @@ class VideoDefTab(QWidget):
         self.seedvr2_model.setEnabled(sv); self.blocks.setEnabled(sv); self.batch.setEnabled(sv)
         self.resolution.setEnabled(sv); self.overlap.setEnabled(sv)
         self.esrgan_model.setEnabled(es)
-        self.scale.setEnabled(es or fv)                      # FlashVSR: scala nativa ×4, poi porta al fattore scelto
+        self.scale.setEnabled(es or fv)                      # FlashVSR: gira alla scala scelta (max ×4 nativo — #156)
 
     def _pick(self):
         fn, _ = QFileDialog.getOpenFileName(self, tr("def.pick.dialog.title"), "", tr("def.pick.dialog.filter"))

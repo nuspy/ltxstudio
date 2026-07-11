@@ -30,14 +30,13 @@ def is_installed() -> bool:
 
 
 def _vram_free_mb() -> int:
+    # via nvidia-smi/NVML (core/gpu_mem): questo modulo gira anche nel processo GUI, che non deve
+    # MAI creare un contesto CUDA (torch.cuda.mem_get_info lo creava — regola app-no-cuda-context).
     try:
-        import torch
-        if torch.cuda.is_available():
-            free, _tot = torch.cuda.mem_get_info()
-            return int(free / 1048576)
+        from core.gpu_mem import free_vram_mb
+        return int(free_vram_mb())
     except Exception:                                       # noqa: BLE001
-        pass
-    return 0
+        return 0
 
 
 def _auto_block_swap(model: str) -> tuple[int, str]:
@@ -64,9 +63,11 @@ def preflight() -> list[str]:
 
 def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = "", batch_size: int = 5,
                   chunk_size: int = 0, temporal_overlap: int = 0, color: str = "lab",
-                  cuda_device: str = "0", block_swap: int = 0, on_log=None) -> str:
+                  cuda_device: str = "0", block_swap: int = 0, timeout_s: float | None = None,
+                  on_log=None) -> str:
     """Super-risolve un video. batch_size deve essere 4n+1 (1,5,9,...). chunk_size>0 = streaming
     memory-bounded per video lunghi. block_swap>0 = override manuale (0 = auto sulla VRAM libera).
+    `timeout_s` (o env LTX_SEEDVR2_TIMEOUT_S, default 3600) termina il processo se sfora (#156).
     Ritorna il path di output (mp4)."""
     errs = preflight()
     if errs:
@@ -86,13 +87,32 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
         cmd += ["--chunk_size", str(chunk_size), "--temporal_overlap", str(temporal_overlap or 3)]
     if blocks > 0:
         cmd += ["--blocks_to_swap", str(blocks), "--dit_offload_device", offload, "--vae_offload_device", offload]
+    if timeout_s is None:
+        timeout_s = float(os.environ.get("LTX_SEEDVR2_TIMEOUT_S", "3600") or 0)
     env = dict(os.environ, PYTHONPATH=str(CLI_DIR))
     proc = subprocess.Popen(cmd, cwd=str(CLI_DIR), env=env, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    for line in proc.stdout:                                # stream log
-        if on_log:
-            on_log(line.rstrip())
-    proc.wait()
+    killed = {"timeout": False}
+    wd = None
+    if timeout_s > 0:
+        import threading
+        def _kill():
+            killed["timeout"] = True
+            try:
+                proc.kill()
+            except Exception:                                # noqa: BLE001
+                pass
+        wd = threading.Timer(timeout_s, _kill); wd.daemon = True; wd.start()
+    try:
+        for line in proc.stdout:                            # stream log
+            if on_log:
+                on_log(line.rstrip())
+        proc.wait()
+    finally:
+        if wd:
+            wd.cancel()
+    if killed["timeout"]:
+        raise RuntimeError(f"SeedVR2: timeout ({int(timeout_s)}s) — processo terminato.")
     if proc.returncode != 0 or not os.path.exists(out):
         raise RuntimeError(f"SeedVR2 fallito (exit {proc.returncode}).")
     try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile

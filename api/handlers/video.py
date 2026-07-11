@@ -138,7 +138,7 @@ class EnhanceReq(BaseModel):
     resolution: int = 1080
     batch_size: int = 5
     block_swap: int = 0
-    scale: float = 4.0
+    scale: float = 2.0
 
 
 class RifeReq(BaseModel):

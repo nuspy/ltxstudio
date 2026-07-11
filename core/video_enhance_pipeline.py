@@ -18,10 +18,12 @@ import re
 
 # nomi modello SeedVR2 (auto-download in ComfyUI/models/SEEDVR2)
 SEEDVR2_MODELS = {
-    "SeedVR2 7B FP16 (qualità max)":  "seedvr2_ema_7b_fp16.safetensors",
+    # fp8 3B per PRIMO = default GUI (#156): resta residente in VRAM, niente offload. I fp16 pieni
+    # restano come scelta esplicita dell'utente (7B fp16 su 32GB = offload lentissimo).
+    "SeedVR2 3B FP8":                 "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
     "SeedVR2 7B FP8 (leggero)":       "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
     "SeedVR2 3B FP16 (veloce)":       "seedvr2_ema_3b_fp16.safetensors",
-    "SeedVR2 3B FP8":                 "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+    "SeedVR2 7B FP16 (qualità max)":  "seedvr2_ema_7b_fp16.safetensors",
 }
 SEEDVR2_VAE = "ema_vae_fp16.safetensors"
 
