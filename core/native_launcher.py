@@ -25,7 +25,9 @@ def launch() -> tuple[bool, str]:
     try:
         env = dict(os.environ)
         env.setdefault("NATIVE_ATTENTION", "auto")          # Sage se disponibile, else SDPA
-        env.setdefault("NATIVE_FBCACHE", "1")               # First Block Cache
+        env.setdefault("NATIVE_FBCACHE", "0")               # First Block Cache OFF di default: dava MACCHIE
+        #   chiaro-scure sulle immagini FLUX (cache dei blocchi = denoise impreciso). Con fp8 la velocità c'è già.
+        #   Opt-in con NATIVE_FBCACHE=1 per chi preferisce velocità a fedeltà.
         env.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
         # Profilo hardware auto: calibra VRAM/RAM (offload, margine, risoluzione max) per la GPU corrente
         try:

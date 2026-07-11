@@ -342,6 +342,9 @@ def _precise_vram_mb(path: str, *, fp8_storage: bool = False) -> int:
         b = _DTYPE_BYTES.get(dt, 2)
         if dt.startswith("F8") and not fp8_storage:          # upcast fp8→bf16 salvo storage fp8 (layerwise)
             b = 2
+        elif fp8_storage and dt in ("BF16", "F16") and n >= 1_000_000 \
+                and not any(s in kl for s in ("norm", "embed")):
+            b = 1                                            # bf16/f16 GRANDE → layerwise casting a fp8 (1B storage)
         total += n * b
     mb = total / 1024**2
     if not has_te:                                           # transformer-only → T5(9.1)+CLIP(0.25)+VAE(0.3)
@@ -441,14 +444,17 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     if _is_gguf:
         tr._ls_is_gguf = True    # il GGUF NON tollera model_cpu_offload (pesi quantizzati→CPU = calcolo su CPU,
         #                          166s/step): _place lo terrà SEMPRE gpu-resident (vedi _place).
-    if (os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf
-            and _flux_fp8_e4m3(transformer_path)):
+    # REGOLA "tutto su fp8" (direttiva utente): il transformer FLUX si carica SEMPRE come storage fp8
+    # (layerwise casting), non solo se il checkpoint è già fp8. I bf16 vengono quantizzati a fp8 e4m3
+    # (compute bf16) → ~metà VRAM, GPU-resident, niente offload. fp8-nativi = lossless; bf16 = minima
+    # perdita accettata. Disattivabile con NATIVE_FLUX1_FP8=0 (fallback bf16 pieno, come prima).
+    if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf:
         try:
             tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn,
                                         compute_dtype=bf16)   # skip default: norm/embed restano bf16
             tr._ls_fp8_storage = True
-            print("[flux] transformer fp8 STORAGE (layerwise casting): ~metà VRAM, niente offload",
-                  flush=True)
+            _src = "fp8-nativo" if _flux_fp8_e4m3(transformer_path) else "bf16→fp8"
+            print(f"[flux] transformer STORAGE fp8 (layerwise, {_src}): ~metà VRAM, niente offload", flush=True)
         except Exception as e:                           # noqa: BLE001
             print(f"[flux] layerwise fp8 non applicato ({e}) → bf16 (fallback)", flush=True)
     return tr, _cfg_name
@@ -851,14 +857,15 @@ def _load(model_path: str, arch: str, mm=None):
     # (16GB) → gpu-resident → veloce. Ripristina lo storage fp8 sul transformer (l'assemble path lo fa già in
     # _load_flux_tr). Solo FLUX.1 (flux/kontext/inpaint), file fp8 e4m3, non GGUF. Off: NATIVE_FLUX1_FP8=0.
     _tr0 = getattr(pipe, "transformer", None)
+    # "tutto su fp8": qualsiasi checkpoint FLUX (bf16 o fp8) → storage fp8 layerwise → entra in VRAM, niente offload.
     if (_tr0 is not None and not getattr(_tr0, "_ls_fp8_storage", False)
             and os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and arch in ("flux", "kontext", "inpaint")
-            and Path(model_path).is_file() and not str(model_path).lower().endswith(".gguf")
-            and _flux_fp8_e4m3(model_path)):
+            and Path(model_path).is_file() and not str(model_path).lower().endswith(".gguf")):
         try:
             _tr0.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
             _tr0._ls_fp8_storage = True
-            print("[flux] checkpoint fp8 → transformer storage fp8 (layerwise): entra in VRAM, niente offload",
+            _src = "fp8-nativo" if _flux_fp8_e4m3(model_path) else "bf16→fp8"
+            print(f"[flux] checkpoint → transformer storage fp8 (layerwise, {_src}): entra in VRAM, niente offload",
                   flush=True)
         except Exception as _e:                             # noqa: BLE001
             print(f"[flux] layerwise fp8 su checkpoint non applicato ({_e}) → bf16", flush=True)
