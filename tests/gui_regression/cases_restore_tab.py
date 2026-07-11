@@ -186,6 +186,8 @@ def case_colorize_basic(w, spy):
 
 def _make_colorize_model_case(model: str):
     def case(w, spy):
+        if not _COLORIZE_PORTATO_NATIVO:
+            return                                 # skip: rotta ComfyUI dismessa, porting pendente
         rt = w.restore_tab
         _goto(w); _force_servers_up(w)
         rt.set_flux2_models([model])             # combo FLUX.2 = solo questo
