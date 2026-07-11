@@ -1292,12 +1292,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
     # (es. alcune pipeline custom), si riprova senza.
-    try:
-        kw["callback_on_step_end"] = _make_preview_cb(arch, int(kw.get("width", 1024)),
-                                                      int(kw.get("height", 1024)), kw["num_inference_steps"])
-        kw["callback_on_step_end_tensor_inputs"] = ["latents"]
-    except Exception:                                       # noqa: BLE001
-        pass
+    if os.environ.get("NATIVE_NO_PREVIEW_CB") != "1":       # A/B macchie: callback escludibile via env
+        try:
+            kw["callback_on_step_end"] = _make_preview_cb(arch, int(kw.get("width", 1024)),
+                                                          int(kw.get("height", 1024)), kw["num_inference_steps"])
+            kw["callback_on_step_end_tensor_inputs"] = ["latents"]
+        except Exception:                                   # noqa: BLE001
+            pass
     try:
         out = pipe(**kw)
     except TypeError as _te:                                # pipeline senza callback_on_step_end
@@ -1318,10 +1319,11 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # combacia 1:1 con la foto/bbox (niente disallineamento in load_inpaint_result, aspetto identico).
     if needs_image and res_img.size != _orig_wh:
         res_img = res_img.resize(_orig_wh, Image.LANCZOS)
-    # DITHER anti-BANDING sul GENERATO — PRIMA della ricomposizione, così tocca SOLO la regione rigenerata e
-    # NON i pixel originali fuori maschera (il dither DOPO la composite sporcava di puntini le parti intatte:
-    # era la causa delle "macchie/puntini fuori dalla maschera"). ±1.7 livelli, impercettibile. Env NATIVE_DITHER=0.
-    if os.environ.get("NATIVE_DITHER", "1") == "1":
+    # DITHER anti-BANDING — DEFAULT OFF (11/07): il rumore ±1.7 su OGNI immagine era il COLPEVOLE PRINCIPALE
+    # delle "macchie chiaro/scure" sui fondi lisci (bisezione T14→T18: job path pulito senza dither, macchiato
+    # con). Su fondi scuri uniformi si percepisce come sporco e, ridimensionato a schermo, si alias in chiazze.
+    # Opt-in NATIVE_DITHER=1 per chi vede POSTERIZATION/banding sui gradienti (il problema per cui era nato).
+    if os.environ.get("NATIVE_DITHER", "0") == "1":
         try:
             import numpy as _np
             _a = _np.asarray(res_img).astype(_np.float32) + _np.random.uniform(-1.7, 1.7, (res_img.height, res_img.width, 1))

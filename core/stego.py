@@ -39,8 +39,9 @@ _KEY = os.environ.get("ATF_STEGO_KEY", "AIToolsForge::provenance::v1::do-not-sha
 GRID = 8              # 8x8 = 64 tile (più siti d'impressione: presence più forte + capacità payload)
 CANON = 80           # dimensione canonica del tile per la DCT (robustezza a resize)
 NONCE_BANK = 24      # nonce provati dal detector (periodo del carrier per-frame)
-_ALPHA = 9.0         # ampiezza PRESENCE — tarata per INVISIBILITÀ: _ALPHA=20 dava PSNR 32 con tessere 80px
-                     # VISIBILI ("a macchie") sulle immagini generate. A 9 → PSNR ~39, maxΔ~9, z~10.8 (soglia 5).
+_ALPHA = 6.0         # ampiezza PRESENCE — tarata per INVISIBILITÀ: _ALPHA=20 dava PSNR 32 con tessere 80px
+                     # VISIBILI ("a macchie"); a 9 restava un VELO percettibile sui fondi lisci scuri (test
+                     # utente 11/07, T15 vs T11). A 6 → z~7 (soglia 5, margine ok) e velo sotto soglia visiva.
 _Z_THRESH = 5.0      # soglia z-score di rilevamento (falsi positivi ~ 1e-6 a coda gaussiana)
 # PAYLOAD testo custom OPZIONALE — limite fisico del watermark invisibile screenshot-robusto = pochi byte.
 # 5 byte testo + 1 CRC8 = 48 bit (0 errori misurati dopo JPEG55 + screenshot 0.6x). Vuoto = solo presence
