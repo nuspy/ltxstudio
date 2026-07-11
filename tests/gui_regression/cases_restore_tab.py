@@ -160,9 +160,17 @@ def case_restore_denoise_on(w, spy):
 
 
 # ───────────────────────── COLORIZE (FLUX.2 ComfyUI) ─────────────────────────
+# SKIP PENDENTE (12/07): colorize/restore_and_colorize sono ancora sulla rotta ComfyUI
+# ("posticipato" in main_window ~4212) ma il runtime è zero-ComfyUI → feature di fatto non
+# operativa finché non portata al nativo (task dedicato). I casi tornano attivi col porting.
+_COLORIZE_PORTATO_NATIVO = False
+
+
 def case_colorize_basic(w, spy):
     """Colorizzazione: con un modello FLUX.2 selezionato la GUI deve costruire il prompt e fare
     driver.submit (ramo ComfyUI)."""
+    if not _COLORIZE_PORTATO_NATIVO:
+        return                                     # skip: rotta ComfyUI dismessa, porting pendente
     rt = w.restore_tab
     _goto(w); _force_servers_up(w)
     rt.set_flux2_models(_real_flux2_models())
@@ -211,6 +219,8 @@ def case_colorize_no_model_sends_placeholder(w, spy):
 # ───────────────────────── RESTORE + COLORIZE (combinato) ─────────────────────────
 def case_restore_and_colorize(w, spy):
     """Restauro+Colorizzazione: serve sia upscale_model sia flux2_model; ramo ComfyUI (driver.submit)."""
+    if not _COLORIZE_PORTATO_NATIVO:
+        return                                     # skip: rotta ComfyUI dismessa, porting pendente
     rt = w.restore_tab
     _goto(w); _force_servers_up(w)
     rt.set_upscale_models(_real_upscale_models())
