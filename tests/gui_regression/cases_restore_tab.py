@@ -241,8 +241,17 @@ def case_faceswap_ok(w, spy):
     (_enqueue), senza passare da ComfyUI."""
     rt = w.restore_tab
     _goto(w); _force_servers_up(w)
-    rt._input_path = _test_image("_restore_target.png")
-    rt.fs_source.setText(_test_image("_restore_face.png", 320, 320))
+    # Fixture FOTOREALISTICHE (12/07): i disegni sintetici/FLUX stilizzati non hanno volti rilevabili
+    # da antelopev2 → "Nessun volto rilevato" nella run reale. Generate con FLUX (passport-style).
+    import os as _os
+    _fa = r"E:\AI\ltxstudio\output\tests\_faceA_real.png"
+    _fb = r"E:\AI\ltxstudio\output\tests\_faceB_real.png"
+    if _os.path.exists(_fa) and _os.path.exists(_fb):
+        rt._input_path = _fb
+        rt.fs_source.setText(_fa)
+    else:                                          # fallback: vecchie fixture sintetiche
+        rt._input_path = _test_image("_restore_target.png")
+        rt.fs_source.setText(_test_image("_restore_face.png", 320, 320))
     _select_op(rt, "faceswap")
     rt._on_process()
     assert spy.calls, "faceswap: nessun worker accodato (atteso _enqueue nativo)"

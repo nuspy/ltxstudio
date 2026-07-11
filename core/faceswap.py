@@ -45,8 +45,12 @@ def _delegate(mode: str, target: str, source_face: str, out: str) -> str:
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     line = next((l for l in (r.stdout or "").splitlines() if l.startswith("OK:")), "")
     if not line:
+        # Estrai il MOTIVO vero (ultima riga d'errore), non la coda dei log: il tail 500 mostrava
+        # il dump provider onnxruntime al posto di "Nessun volto rilevato" → diagnosi impossibile.
+        _all = ((r.stderr or "") + "\n" + (r.stdout or "")).splitlines()
+        _err = next((l for l in reversed(_all) if "Error" in l or "error" in l.lower()), "")
         raise RuntimeError("face-swap (subprocess inference_server_venv) fallito: "
-                           + ((r.stderr or "") + (r.stdout or ""))[-500:])
+                           + (_err.strip() or f"exit {r.returncode}"))
     return line[3:].strip()
 
 
