@@ -18,6 +18,21 @@ INSIGHTFACE_ROOT = r"E:\AI\Models\insightface"   # contiene models/antelopev2/
 _CACHE: dict = {}
 
 
+def clear_cache() -> None:
+    """Svuota la cache modulo (face encoder EVA-CLIP + insightface + pulid_ca): questi modelli vivono
+    FUORI dal ComponentStore, quindi /free (MM.clear) non li vedeva → GB pinnati in VRAM anche dopo la
+    liberazione (OOM a cascata nei job successivi, visto nella run frame1 dell'11/07)."""
+    _CACHE.clear()
+    try:
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:                                    # noqa: BLE001
+        pass
+
+
 def available() -> bool:
     if not os.path.exists(PULID_WEIGHTS):
         return False

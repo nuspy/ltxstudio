@@ -228,6 +228,11 @@ class ModelManager:
             STORE.bump_epoch()
         except Exception:                               # noqa: BLE001
             pass
+        try:                                            # PuLID: cache modulo FUORI dallo store (eva-clip/
+            from core import pulid_adapter              # insightface) — senza questo /free lasciava GB
+            pulid_adapter.clear_cache()                 # pinnati in VRAM (OOM a cascata, run 11/07)
+        except Exception:                               # noqa: BLE001
+            pass
         self.flush(force=True)                          # /free = libera davvero tutto
 
     @staticmethod
