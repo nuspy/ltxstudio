@@ -420,9 +420,10 @@ class Frame1Tab(QWidget):
         if arch_lbl == "FLUX":
             for m in (self._models or []):
                 ml = m.lower()
-                # Escludi i NON-generativi: Fill (inpaint), Kontext (editing) e Redux (adattatore di
-                # image-variation, 4 chiavi: non è un modello t2i → in gen crasha "list index out of range").
-                if "fill" in ml or "kontext" in ml or "redux" in ml:
+                # Escludi i NON-generativi: Fill (inpaint), Kontext (editing), Redux (adattatore di
+                # image-variation) e Klein (FLUX.2 edit-instruct, role=edit nel detector: il loader
+                # t2i flux2 non mappa le sue chiavi → 'double_blocks.7.img_mlp.2'; vive nel ramo inpaint).
+                if "fill" in ml or "kontext" in ml or "redux" in ml or "klein" in ml:
                     continue
                 if any(k in ml for k in kws):
                     if not allow and self._mcat.is_nsfw(m):
