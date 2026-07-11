@@ -212,17 +212,19 @@ def main():
     if a.tex_guidance >= 0:
         _tx["guidance_strength"] = float(a.tex_guidance)
 
-    # Precisione: bf16/fp16 → autocast attorno alla diffusione (best-effort); auto/fp32 = nessun wrapping.
-    import contextlib
-    _dt = {"bf16": torch.bfloat16, "fp16": torch.float16}.get(a.precision)
-    _ctx = torch.autocast("cuda", dtype=_dt) if _dt else contextlib.nullcontext()
+    # Precisione: NIENTE autocast. I kernel Triton custom di TRELLIS (flex_gemm sparse-conv) esigono dtype
+    # COERENTE tra input e pesi: torch.autocast casta solo alcune op → "Both operands must be same dtype
+    # (fp32 vs fp16)" e la generazione crasha. Quindi TRELLIS gira alla sua PRECISIONE NATIVA; il valore del
+    # dropdown resta informativo (auto = nativa). bf16/fp16 espliciti vengono ignorati per non rompere i kernel.
+    if a.precision not in ("auto", "fp32"):
+        print(f"[trellis] precision='{a.precision}' non applicata (i kernel sparse-conv richiedono la "
+              "precisione nativa) → uso la precisione nativa del modello", flush=True)
 
     def _run(ptype):
-        with _ctx:
-            return pipeline.run(
-                image, seed=int(a.seed), pipeline_type=ptype, max_num_tokens=int(a.max_tokens),
-                sparse_structure_sampler_params=_ss, shape_slat_sampler_params=_sh,
-                tex_slat_sampler_params=_tx, preprocess_image=bool(a.remove_bg))[0]
+        return pipeline.run(
+            image, seed=int(a.seed), pipeline_type=ptype, max_num_tokens=int(a.max_tokens),
+            sparse_structure_sampler_params=_ss, shape_slat_sampler_params=_sh,
+            tex_slat_sampler_params=_tx, preprocess_image=bool(a.remove_bg))[0]
 
     t1 = time.time()
     print(f"[trellis] STEP pipeline.run (res={a.pipeline_type}, tok={a.max_tokens}, geo_steps={a.steps or 'def'}, "

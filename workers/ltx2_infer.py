@@ -1126,6 +1126,13 @@ def run_generation(p: dict) -> str:
     print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video, {ptype})", flush=True)
     out = p["output"]
     _stage("Decodifica VAE e salvataggio video…")
+    # LTX-2 restituisce SEMPRE una traccia audio anche per i2v/ti2v/iclora: senza condizionamento audio è
+    # RUMORE non condizionato ("rumore grigio"). La scartiamo (video muto) tranne quando l'audio è davvero
+    # richiesto — a2v (canto/parlato) o audio_path fornito. Così i video generati/editati NON hanno più rumore.
+    _audio_requested = (ptype == "a2v") or bool(p.get("audio_path"))
+    if not _audio_requested and audio is not None:
+        print("[audio] nessun audio richiesto → scarto la traccia LTX-2 (rumore non condizionato)", flush=True)
+        audio = None
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
     # #102 Character Replacement: se il ramo iclora ha una maschera personaggio (SAM2 tracking), ricomponi
