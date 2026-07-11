@@ -52,8 +52,11 @@ def patch_dialogs():
     QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: ("", ""))
     QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: ("", ""))
     QFileDialog.getExistingDirectory = staticmethod(lambda *a, **k: "")
-    QDialog.exec = lambda self, *a, **k: 0          # i dialog (preview/conferma) → "annullato"
-    QDialog.exec_ = lambda self, *a, **k: 0
+    # I dialog di conferma rispondono ACCETTA (1): con 0 ("annullato") il dialog Accetta/Revert
+    # post-video prendeva il ramo Revert → os.remove(out) = TUTTI i video della run reale
+    # CANCELLATI subito dopo il PASS (scoperto dall'utente: "non vedo nessun nuovo video").
+    QDialog.exec = lambda self, *a, **k: 1
+    QDialog.exec_ = lambda self, *a, **k: 1
 
 
 class Spy:
