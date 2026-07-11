@@ -323,6 +323,9 @@ CHECKPOINT = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors
 UPSAMPLER = r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"              # Gemma-3 12B UFFICIALE Lightricks (non-gated, formato ltx-core)
 LORA_DIR = r"E:\AI\Models\LoRA"
+# LoRA di DISTILLAZIONE ufficiale (Lightricks/LTX-2.3, 7.6GB): OBBLIGATORIA per usare i checkpoint DEV
+# (non-distilled) con la pipeline two-stage — senza, il dev esce "dematerializzato" (nuvole di voxel).
+DISTILLED_LORA = r"E:\AI\Models\LoRA\LTX-2\ltx-2.3-22b-distilled-lora-384-1.1.safetensors"
 # IC-LoRA di controllo (canny/depth/pose) presenti su disco — #24 ControlNet nativo, nessun download
 IC_LORA = {
     "canny": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-canny-control.safetensors",
@@ -473,8 +476,22 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
             quantization=quant, offload_mode=offload, distilled=True)
     else:
         Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
+        # DEV (non-distilled) sulla two-stage: SENZA la LoRA di distillazione lo stage distillato
+        # sotto-denoisa → figure "dematerializzate" (nuvole di voxel). Se il checkpoint non è un
+        # distilled e la LoRA ufficiale è su disco, la applichiamo; altrimenti warning esplicito.
+        _dlora = []
+        if "distilled" not in os.path.basename(ckpt).lower():
+            if os.path.exists(DISTILLED_LORA):
+                _dlora = [LoraPathStrengthAndSDOps(DISTILLED_LORA, 1.0, LTXV_LORA_COMFY_RENAMING_MAP)]
+                print(f"[dev] checkpoint non-distilled → applico la distilled-LoRA ufficiale "
+                      f"({os.path.basename(DISTILLED_LORA)})", flush=True)
+            else:
+                print("[warn] checkpoint DEV senza LoRA di distillazione su disco: la two-stage "
+                      "sotto-denoisa (video 'dematerializzato'). Scarica Lightricks/LTX-2.3 "
+                      f"ltx-2.3-22b-distilled-lora-384-1.1.safetensors in {os.path.dirname(DISTILLED_LORA)}",
+                      flush=True)
         pipe = Klass(
-            checkpoint_path=ckpt, distilled_lora=[], spatial_upsampler_path=UPSAMPLER,
+            checkpoint_path=ckpt, distilled_lora=_dlora, spatial_upsampler_path=UPSAMPLER,
             gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     # M5 (versione sicura) — LRU di pipeline configurabile (env LTX_VIDEO_PIPE_LRU, default 1 = comportamento
     # storico: 1 pipeline alla volta). Chi ha VRAM di scorta può alzarlo a 2 per tenere ti2v+a2v residenti ed
