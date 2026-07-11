@@ -222,6 +222,13 @@ def _set_attention(pipe, arch: str = "") -> str:
     attention') → forziamo SDPA per arch 'zimage'."""
     import os
     if arch == "zimage":
+        # Z-Image usa attn_mask → Sage non supportato. RESET ATTIVO a 'native': ritornare "sdpa"
+        # senza settare lasciava il backend Sage ereditato dal processo (job FLUX precedenti) →
+        # "`attn_mask` is not supported for sage attention" ad ogni generazione Z-Image.
+        try:
+            pipe.transformer.set_attention_backend("native")
+        except Exception:                                    # noqa: BLE001
+            pass
         return "sdpa"
     # Gli arch IMAGE-CONDITIONED (inpaint/Fill, kontext, edit, Klein) preferirebbero SDPA (reference-correct),
     # ma forzare il RESET del backend a ogni job rallenta molto (SDPA ~2× più lento di Sage) → di default NON
