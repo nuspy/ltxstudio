@@ -13,7 +13,7 @@ from __future__ import annotations
 import copy
 
 # Modelli default (override via build() args)
-_DEFAULT_UPSCALE = "4xUltraSharp.pth"
+_DEFAULT_UPSCALE = "4x-UltraSharpV2.safetensors"   # nome REALE su disco (era "4xUltraSharp.pth" inesistente)
 _DEFAULT_FLUX2_MODEL = ""  # da specificare dall'utente
 
 # Nota: FLUX Kontext per colorizzazione reusa KontextPipeline (già in uso per recolor).

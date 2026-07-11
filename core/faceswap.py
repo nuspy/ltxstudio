@@ -17,8 +17,37 @@ import subprocess
 
 INSIGHTFACE_ROOT = r"E:\AI\Models\insightface"
 INSWAPPER = os.path.join(INSIGHTFACE_ROOT, "inswapper_128.onnx")
+# insightface NON è nel venv GUI/API (Comfy) ma è nell'inference_server_venv → se manca localmente,
+# il face-swap viene DELEGATO a un subprocess in quel venv (allineato al consolidamento #61).
+_INF_PY = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"
 
 _CACHE: dict = {}
+
+
+def _has_insightface() -> bool:
+    try:
+        import insightface  # noqa: F401
+        return True
+    except Exception:                                   # noqa: BLE001
+        return False
+
+
+def _inf_has_insightface() -> bool:
+    return os.path.isdir(os.path.join(os.path.dirname(os.path.dirname(_INF_PY)),
+                                      "Lib", "site-packages", "insightface"))
+
+
+def _delegate(mode: str, target: str, source_face: str, out: str) -> str:
+    """Esegue il face-swap nell'inference_server_venv (che ha insightface) via subprocess."""
+    runner = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "scripts", "faceswap_run.py")
+    r = subprocess.run([_INF_PY, "-u", runner, mode, target, source_face, out],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    line = next((l for l in (r.stdout or "").splitlines() if l.startswith("OK:")), "")
+    if not line:
+        raise RuntimeError("face-swap (subprocess inference_server_venv) fallito: "
+                           + ((r.stderr or "") + (r.stdout or ""))[-500:])
+    return line[3:].strip()
 
 
 def _add_torch_cuda_dlls():
@@ -36,11 +65,7 @@ def _add_torch_cuda_dlls():
 def available() -> bool:
     if not os.path.exists(INSWAPPER):
         return False
-    try:
-        import insightface  # noqa: F401
-        return True
-    except Exception:                                   # noqa: BLE001
-        return False
+    return _has_insightface() or _inf_has_insightface()   # locale, o delegabile all'inference_server_venv
 
 
 def _providers():
@@ -79,6 +104,8 @@ def _source_face(path: str):
 
 
 def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
+    if not os.environ.get("FACESWAP_INPROC") and not _has_insightface():
+        return _delegate("image", target_path, source_face_path, out_path)   # → inference_server_venv
     import cv2
     app, sw = _load()
     src = _source_face(source_face_path)
@@ -110,6 +137,8 @@ def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
 
 def swap_video(video_path: str, source_face_path: str, out_path: str, progress=None) -> str:
     """Face-swap su ogni frame del video; ri-muxa l'audio originale."""
+    if not os.environ.get("FACESWAP_INPROC") and not _has_insightface():
+        return _delegate("video", video_path, source_face_path, out_path)     # → inference_server_venv
     import cv2
     app, sw = _load()
     src = _source_face(source_face_path)
