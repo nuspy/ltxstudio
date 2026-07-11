@@ -221,10 +221,10 @@ def _set_attention(pipe, arch: str = "") -> str:
     Z-Image usa attention_mask → SageAttention non lo supporta ('attn_mask is not supported for sage
     attention') → forziamo SDPA per arch 'zimage'."""
     import os
-    if arch == "zimage":
-        # Z-Image usa attn_mask → Sage non supportato. RESET ATTIVO a 'native': ritornare "sdpa"
-        # senza settare lasciava il backend Sage ereditato dal processo (job FLUX precedenti) →
-        # "`attn_mask` is not supported for sage attention" ad ogni generazione Z-Image.
+    # Sage SOLO per la famiglia FLUX: gli arch con attn_mask (Z-Image/Lumina2, Ernie) non lo
+    # supportano ("attn_mask is not supported for sage attention") e nello stesso processo
+    # EREDITANO il backend Sage settato dai job FLUX precedenti → RESET ATTIVO a 'native'.
+    if arch not in ("flux", "kontext", "inpaint") and not str(arch).startswith("flux2"):
         try:
             pipe.transformer.set_attention_backend("native")
         except Exception:                                    # noqa: BLE001
