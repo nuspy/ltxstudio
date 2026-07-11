@@ -300,8 +300,32 @@ def _make_fr_detector_case(det_name: str):
     return case
 
 
+# ── LIVE: auto-chain RIFE + FaceRestore dopo super-risoluzione ────────────────────
+def case_rife_facerestore_chain_live(w, spy):
+    """LIVE: ESRGAN (veloce) + RIFE (fps) + chain_face ON su un video REALE. In run_real il worker
+    di upscale viene eseguito; il callback done, con chain_face, enqueua a sua volta il restauro volti
+    (catturato ed eseguito anch'esso da RealSpy) → valida l'auto-chain RIFE→FaceRestore end-to-end."""
+    src = _make_test_video()                             # _vdef_test_input.mp4 ora è un video REALE
+    t = w.video_def_tab
+    t.set_video(src)
+    _set_engine(t, 1)                                    # ESRGAN = più veloce per il chain
+    if t.esrgan_model.count() == 0:
+        raise AssertionError("nessun modello ESRGAN disponibile (scan disco vuoto)")
+    t.esrgan_model.setCurrentIndex(0)
+    t.scale.setValue(2.0)
+    t.rife.setChecked(True)
+    t.rife_mult.setCurrentText("2×")
+    t.chain_face.setChecked(True)
+    w.generate_video_enhance()
+    assert spy.calls, "enhance+rife+chain: nessun enqueue"
+    assert spy.calls[0]["module"] == "video_upscale", f"module iniziale inatteso: {spy.calls[0]}"
+
+
 # ════════════════════════ assemblaggio CASES ════════════════════════
 CASES = [
+    ("videodef_rife_facerestore_chain_live",
+     "LIVE: ESRGAN + RIFE + chain_face → auto-chain super-risoluzione→RIFE→restauro volti.",
+     case_rife_facerestore_chain_live),
     ("videodef_enhance_engine_esrgan",
      "ESRGAN: la GUI enqueua module=video_upscale con video+scale+model.", case_enhance_engine_esrgan),
     ("videodef_enhance_engine_seedvr2",

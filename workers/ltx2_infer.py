@@ -958,7 +958,7 @@ def run_generation(p: dict) -> str:
         torch.cuda.set_per_process_memory_fraction(float(os.environ["LTX_VRAM_FRACTION"]))
     loras = []
     for lo in p.get("loras", []):
-        path = lo["name"]
+        path = lo.get("name") or lo.get("path")             # robusto: alcuni chiamanti usano "path"
         if not os.path.isabs(path):
             path = os.path.join(LORA_DIR, path)
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),

@@ -197,8 +197,53 @@ def case_defaults_edit(w, spy):
     assert abs(float(cfg.get("strength", -1)) - 1.0) < 1e-6, f"strength default atteso 1.0: {cfg.get('strength')}"
 
 
+# ── #102 REPLACE CHAR (LIVE): video reale + ref personaggio + SAM2 → composite ─────
+def case_replace_char_sam2(w, spy):
+    """#102: replace_char con maschera SAM2. Video sorgente REALE + ref_image personaggio B +
+    object='person' → _VideoEditAIWorker (SAM2 tracking → canny → iclora union-control-ref →
+    _composite_char_mask). In run_real il worker viene ESEGUITO (generazione reale)."""
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _set_video(w)                                        # _vedit_test_input.mp4 ora è un video REALE
+    _select_mode(w, "replace_char")
+    t.ref_img.setText(str(H.OUT_DIR / "_portraitB.png"))  # personaggio sostitutivo (ritratto reale)
+    t.obj.setText("person")                              # SAM2 limita la sostituzione al soggetto
+    t.ref_strength.setValue(0.8)
+    t.prompt.setPlainText("")                            # replace_char: il personaggio viene dall'immagine
+    t._go()
+    assert spy.calls, "replace_char: nessuna richiesta accodata"
+    cfg = _cfg_of(w)
+    assert cfg.get("mode") == "replace_char", f"mode errato: {cfg.get('mode')}"
+    assert cfg.get("ref_image"), "ref_image mancante in cfg"
+    assert cfg.get("object") == "person", f"object non propagato: {cfg.get('object')}"
+    assert abs(float(cfg.get("ref_strength", -1)) - 0.8) < 1e-6, f"ref_strength errato: {cfg.get('ref_strength')}"
+
+
+def case_replace_char_fullframe(w, spy):
+    """#102: replace_char SENZA object → sostituzione su tutto il frame (nessun composite SAM2)."""
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _set_video(w)
+    _select_mode(w, "replace_char")
+    t.ref_img.setText(str(H.OUT_DIR / "_portraitB.png"))
+    t.obj.setText("")                                    # niente SAM2 → tutto il frame
+    t.ref_strength.setValue(0.9)
+    t.prompt.setPlainText("")
+    t._go()
+    assert spy.calls, "replace_char full-frame: nessuna richiesta accodata"
+    cfg = _cfg_of(w)
+    assert cfg.get("mode") == "replace_char"
+    assert not (cfg.get("object") or ""), f"object doveva essere vuoto: {cfg.get('object')}"
+
+
 CASES = (
-    [(f"vedit_mode_{k}", f"Modalità {k}: _go accoda l'edit con edit_lora '{tok}', prompt e video.",
+    [("vedit_replace_char_sam2",
+      "#102 LIVE: replace_char con SAM2 (video reale + ref + object) → composite personaggio.",
+      case_replace_char_sam2),
+     ("vedit_replace_char_fullframe",
+      "#102 LIVE: replace_char senza object → sostituzione full-frame.",
+      case_replace_char_fullframe)]
+    + [(f"vedit_mode_{k}", f"Modalità {k}: _go accoda l'edit con edit_lora '{tok}', prompt e video.",
       _make_mode_case(k, tok)) for k, tok in _MODE_LORA.items()]
     + [(f"vedit_strength_{v.replace('.', '')}",
         f"Forza editing={v}: il valore del combo è propagato in cfg['strength'].",

@@ -329,7 +329,41 @@ _BG = ["black", "gray", "white"]
 _TEX_SIZES = ["1024", "2048", "4096"]
 
 
+# ───────────────────────── LIVE: 9 parametri reali → GLB vero ─────────────────────────
+def case_trellis_9params_live(w, spy):
+    """LIVE: i 9 parametri GUI (resolution/precision/attn/remove_bg/bg_color/guidance/steps/texture/
+    tex_guidance/tex_steps) ora sono CABLATI all'API ufficiale TRELLIS.2. NESSUN patch di make_job →
+    in run_real il worker nativo viene ESEGUITO davvero (subprocess) e produce un GLB reale in output/3d.
+    Steps bassi per velocità: la riuscita del GLB prova che tutti i flag sono passati correttamente
+    (un flag malformato farebbe fallire argparse dello script)."""
+    import core.trellis_service as ts
+    assert ts.is_installed(), "TRELLIS non installato: impossibile il test LIVE nativo"
+    t = w.trellis_tab
+    w.tabs.setCurrentWidget(t)
+    t.set_input_path(str(H.OUT_DIR / "_portraitA.png"))  # immagine reale
+    t.resolution.setCurrentText("1024_cascade")
+    t.precision.setCurrentText("bf16")
+    t.attn.setCurrentText("sdpa")
+    t.remove_bg.setChecked(True)
+    t.bg_color.setCurrentText("gray")
+    t.guidance.setValue(6.5)
+    t.steps.setValue(8)                                  # basso = veloce
+    t.texture.setChecked(True)
+    t.tex_guidance.setValue(3.0)
+    t.tex_steps.setValue(8)
+    t.faces.setValue(120000)
+    t.tex_size.setCurrentText("1024")
+    t.seed_random.setChecked(False)
+    t.seed.setValue(7)
+    t._on_generate()
+    assert spy.calls, "trellis 9params LIVE: nessun job accodato (_enqueue non chiamato)"
+    assert spy.calls[-1]["via"] == "enqueue", f"atteso enqueue nativo, ottenuto: {spy.calls[-1]}"
+
+
 CASES = [
+    ("trellis_9params_live",
+     "LIVE #3D: i 9 parametri GUI cablati all'API TRELLIS.2 → genera un GLB reale in output/3d.",
+     case_trellis_9params_live),
     ("trellis_generate_native_default",
      "NATIVO: genera 3D → accoda job e passa a make_job seed/steps/texture_size.",
      case_generate_native_default),

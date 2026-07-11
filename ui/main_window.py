@@ -264,7 +264,7 @@ class _VideoEditAIWorker(QThread):
             if cfg["mode"] == "inpaint":                       # SAM2 track → latent-inpaint (vinpaint)
                 self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
-                seg = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+                seg = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
                                     "inference_server", "backends", "video_segment.py")
                 # passa il dilate della GUI anche al TRACKING (le maschere del guide devono combaciare
                 # con quelle che il worker userà — prima il CLI girava con dilate=0 fisso)
@@ -306,14 +306,14 @@ class _VideoEditAIWorker(QThread):
                 params["image_path"] = cfg.get("ref_image")    # immagine sostitutiva = riferimento (frame 0)
                 params["control_strength"] = 0.6               # union-control-ref (ricetta SECourses)
                 params["ref_strength"] = float(cfg.get("ref_strength", 0.8))   # #102 forza identità del riferimento
-                params["loras"] = [{"path": r"E:\AI\Models\LoRA\LTX-2\LTX2.3_Crisp_Enhance.safetensors",
-                                    "strength": 1.0}]          # enhance nitidezza
+                params["loras"] = [{"name": r"E:\AI\Models\LoRA\LTX-2\LTX2.3_Crisp_Enhance.safetensors",
+                                    "strength": 1.0}]          # enhance nitidezza (chiave "name" = convenzione worker)
                 params["_mux_audio_from"] = src                # preserva l'audio originale
                 # #102 PRECISIONE: se l'utente indica il personaggio da sostituire → SAM2 lo traccia e il worker
                 # ricompone SOLO quell'area (sfondo intatto al pixel). Vuoto = sostituzione su tutto il frame.
                 if cfg.get("object"):
                     self.progress.emit("[replace] SAM2: traccio il personaggio da sostituire…")
-                    _seg = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+                    _seg = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
                                          "inference_server", "backends", "video_segment.py")
                     _guide = _os.path.join(self.out_dir, f"_rcguide_{base}_{stamp}.mp4")
                     _sp.run([self.INF_PY, "-u", _seg, src, cfg["object"], _guide,
@@ -330,7 +330,7 @@ class _VideoEditAIWorker(QThread):
                 params["control_video"] = src                  # edit/style: video sorgente come guide
             jf = _os.path.join(self.out_dir, f"_editp_{stamp}.json")
             _j.dump(params, open(jf, "w"))
-            worker = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+            worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
                                    "workers", "ltx2_infer.py")
             self.progress.emit("[edit] genero il video (LTX-2)…")
             r2 = _sp.run([self.LTX2_PY, "-u", worker, jf], capture_output=True, text=True,
@@ -2830,16 +2830,39 @@ class MainWindow(QMainWindow):
         self._enqueue(tr("queue.job.video_retake", "Video ReTake"), self._ltx2_worker, self._on_multitalk_done,
                       on_progress=lambda s: self._log("[nativo] " + s))
 
+    def _probe_video_dims(self, video: str):
+        """(width, height, nb_frames, fps) del video via ffprobe; (0,0,0,0) se illeggibile."""
+        try:
+            import json as _j, subprocess as _sp
+            r = _sp.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames",
+                         "-show_entries", "stream=width,height,nb_read_frames,r_frame_rate",
+                         "-of", "json", video], capture_output=True, text=True, timeout=60)
+            s = _j.loads(r.stdout)["streams"][0]
+            num, den = (s.get("r_frame_rate", "25/1") + "/1").split("/")[:2]
+            fps = round(float(num) / float(den)) if float(den) else 25
+            return int(s["width"]), int(s["height"]), int(s.get("nb_read_frames", 0) or 0), fps
+        except Exception:                                    # noqa: BLE001
+            return 0, 0, 0, 0
+
     def _gen_video_edit_ai(self, cfg: dict):
         """#24/#59/#60 Modifica Video AI: edit-anything / inpaint (SAM2 track) / style — worker async."""
-        # #7 risoluzione/fps/durata dai controlli del tab Video (erano hard-coded 512×320/25f/25fps).
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
         _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64
-        cfg.setdefault("width", _r64e(vv.get("width", 512) or 512))
-        cfg.setdefault("height", _r64e(vv.get("height", 320) or 320))
-        cfg.setdefault("fps", _fps)
-        cfg.setdefault("num_frames", max(9, int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
+        # L'EDIT deve PRESERVARE risoluzione/durata/fps del video SORGENTE (le maschere SAM2 e il canny sono
+        # tracciati sul sorgente → l'output deve combaciare, altrimenti è distorto e di durata sbagliata).
+        # Prima si usavano i controlli t2v del tab Video (704×1280/8s) → output non allineato al sorgente.
+        _sw, _sh, _snf, _sfps = self._probe_video_dims(cfg.get("video", ""))
+        if _sw and _sh:
+            cfg.setdefault("width", _r64e(_sw)); cfg.setdefault("height", _r64e(_sh))
+            cfg.setdefault("fps", int(_sfps or _fps))
+            cfg.setdefault("num_frames", max(9, (_snf // 8 * 8 + 1) if _snf else
+                                             int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
+        else:                                                # probe fallito → fallback ai controlli del tab
+            cfg.setdefault("width", _r64e(vv.get("width", 512) or 512))
+            cfg.setdefault("height", _r64e(vv.get("height", 320) or 320))
+            cfg.setdefault("fps", _fps)
+            cfg.setdefault("num_frames", max(9, int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
         if cfg.get("enhance") and (cfg.get("prompt") or "").strip():   # arricchimento prompt invisibile (opzionale)
             try:
                 from core import prompt_enhance as pe
