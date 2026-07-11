@@ -78,16 +78,29 @@ def preprocess_video(video_path: str, kind: str, out_video: str, fps: float | No
         raise FileNotFoundError(video_path)
     fps = fps or (cap.get(cv2.CAP_PROP_FPS) or 24.0)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)); h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # GUARDIE anti silent-failure: un ref-video illeggibile/corrotto produceva un out_video da 1 BYTE
+    # senza errori → il worker LTX crashava molto a valle (exit 1 criptico). Errore chiaro QUI.
+    if w <= 0 or h <= 0:
+        cap.release()
+        raise ValueError(f"video di riferimento illeggibile (dimensioni {w}x{h}): {video_path}")
+    if kind.lower() != "canny":
+        cap.release()
+        raise NotImplementedError(f"preprocess_video supporta solo 'canny' in-process; '{kind}' è per-frame su modello.")
     os.makedirs(os.path.dirname(out_video) or ".", exist_ok=True)
     vw = cv2.VideoWriter(out_video, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-    if kind.lower() != "canny":
-        cap.release(); vw.release()
-        raise NotImplementedError(f"preprocess_video supporta solo 'canny' in-process; '{kind}' è per-frame su modello.")
+    if not vw.isOpened():
+        cap.release()
+        raise RuntimeError(f"VideoWriter non apribile per {out_video} (codec mp4v, {w}x{h}@{fps:g}fps)")
+    n = 0
     while True:
         ok, fr = cap.read()
         if not ok:
             break
         e = cv2.Canny(fr, 100, 200)
         vw.write(cv2.cvtColor(e, cv2.COLOR_GRAY2BGR))
+        n += 1
     cap.release(); vw.release()
+    if n == 0 or not os.path.exists(out_video) or os.path.getsize(out_video) < 1024:
+        raise RuntimeError(f"preprocess {kind}: nessun frame estratto da {video_path} (frame={n}) — "
+                           "video di riferimento non valido.")
     return out_video

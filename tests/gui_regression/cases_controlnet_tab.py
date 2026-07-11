@@ -29,11 +29,23 @@ import harness as H
 
 # ───────────────────────── helper locali ─────────────────────────
 def _dummy_video(name: str = "_cn_ref.mp4") -> str:
-    """Crea un file segnaposto come video di riferimento (basta che il path sia truthy/esista)."""
+    """Crea un VERO mini-video (12 frame 64x64) come riferimento: nella run REALE il preprocess
+    ControlNet lo legge davvero (l'header fittizio produceva una guida da 1 byte → worker exit 1)."""
     p = str(H.OUT_DIR / name)
-    if not os.path.exists(p):
-        with open(p, "wb") as fh:
-            fh.write(b"\x00\x00\x00\x18ftypmp42")     # header fittizio (il preprocess è mockato)
+    if not os.path.exists(p) or os.path.getsize(p) < 1024:
+        import subprocess
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i",
+                        "testsrc2=size=64x64:rate=12:duration=1", "-pix_fmt", "yuv420p", p, "-y"],
+                       check=False)
+        if not os.path.exists(p) or os.path.getsize(p) < 1024:   # fallback senza ffmpeg: cv2
+            import cv2
+            import numpy as np
+            vw = cv2.VideoWriter(p, cv2.VideoWriter_fourcc(*"mp4v"), 12, (64, 64))
+            for i in range(12):
+                fr = np.full((64, 64, 3), i * 20 % 255, np.uint8)
+                cv2.circle(fr, (32, 32), 6 + i, (255, 255, 255), 2)
+                vw.write(fr)
+            vw.release()
     return p
 
 
