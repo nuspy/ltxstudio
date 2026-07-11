@@ -32,23 +32,24 @@ def _load(model_path: str, _arch: str = "upscale"):
     return model, VRAM_MB
 
 
-def _upscale_tiled(model, t, tile: int = 512, overlap: int = 32):
-    """Upscale a tile per limitare la VRAM. t: (1,3,H,W) in [0,1] su device del modello."""
+def _upscale_tiled(model, t, tile: int = 512, overlap: int = 32, cpu_accum: bool = False):
+    """Upscale a tile per limitare la VRAM. t: (1,3,H,W) in [0,1] su device del modello.
+    `cpu_accum`: accumula l'output su CPU (retry post-OOM: i buffer 4×H×4×W fp32 non pesano in VRAM)."""
     import torch
-    import torch.nn.functional as F
     scale = getattr(model, "scale", 4) or 4
     _, _, h, w = t.shape
-    out = torch.zeros((1, 3, h * scale, w * scale), device=t.device, dtype=t.dtype)
+    _dev = "cpu" if cpu_accum else t.device
+    out = torch.zeros((1, 3, h * scale, w * scale), device=_dev, dtype=torch.float32)
     wsum = torch.zeros_like(out)
     # autocast fp16 (audit acceleratori): ESRGAN/spandrel girava in fp32 puro → +20-30% e metà VRAM
-    # sui tensor-core; l'accumulo resta nel dtype di `out` (fp32) → nessuna perdita visibile.
+    # sui tensor-core; l'accumulo resta fp32 → nessuna perdita visibile.
     _ac = torch.autocast("cuda", dtype=torch.float16, enabled=t.is_cuda)
     for y in range(0, h, tile - overlap):
         for x in range(0, w, tile - overlap):
             y2, x2 = min(y + tile, h), min(x + tile, w)
             with torch.no_grad(), _ac:
                 ot = model(t[:, :, y:y2, x:x2])
-            ot = ot.float()
+            ot = ot.float().to(_dev)
             oy, ox = y * scale, x * scale
             out[:, :, oy:oy + ot.shape[2], ox:ox + ot.shape[3]] += ot
             wsum[:, :, oy:oy + ot.shape[2], ox:ox + ot.shape[3]] += 1
@@ -71,7 +72,27 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if torch.cuda.is_available():
         t = t.cuda()
     big = max(img.size) > 1024
-    out = _upscale_tiled(model, t) if big else _run_once(model, t)
+    # RECUPERO OOM (run 12/07: SCHAT-L/HAT esplodeva a tile 512 e l'OOM pinnava la VRAM → i modelli
+    # SUCCESSIVI cadevano a domino): su OOM pulisci e RITENTA con tile 256 + accumulo su CPU; se
+    # fallisce ancora → scarica il modello, libera e ritorna errore chiaro (mai VRAM avvelenata).
+    try:
+        out = _upscale_tiled(model, t) if big else _run_once(model, t)
+    except torch.cuda.OutOfMemoryError:
+        import gc
+        gc.collect(); torch.cuda.empty_cache()
+        try:
+            out = _upscale_tiled(model, t, tile=256, cpu_accum=True)
+            print(f"[upscale] OOM a tile 512 → retry ok (tile 256, accumulo CPU): {os.path.basename(mp)}",
+                  flush=True)
+        except torch.cuda.OutOfMemoryError:
+            del t
+            try:
+                mm.unload(key, allow_cpu=False)
+            except Exception:                                # noqa: BLE001
+                pass
+            gc.collect(); torch.cuda.empty_cache()
+            return {"status": "error", "error": f"OOM upscale con {os.path.basename(mp)} anche a tile 256: "
+                                                "modello troppo pesante per la VRAM disponibile."}
     arr = (out.clamp(0, 1)[0].permute(1, 2, 0).float().cpu().numpy() * 255).astype("uint8")
     res = Image.fromarray(arr)
     # ridimensiona al fattore target richiesto (l'ESRGAN scala ×N fisso)
