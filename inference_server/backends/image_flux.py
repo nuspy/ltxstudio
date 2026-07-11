@@ -484,8 +484,19 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     got: list[str] = []                                  # rollback anti refcount-leak
     try:
         tr = STORE.acquire(tr_key, lambda: _load_flux_tr(transformer_path, arch)[0]); got.append(tr_key)
-        vae = STORE.acquire("vae_flux", lambda: AutoencoderKL.from_single_file(
-            AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)); got.append("vae_flux")
+        # VAE: ComfyUI decodifica il VAE FLUX in FP32 di default (bf16/fp16 → chiazze tonali sui fondi
+        # lisci). Test A/B macchie: NATIVE_VAE_FP32=1 → fp32 (footprint VAE ~320MB, trascurabile).
+        # I wrapper castano gli input (le pipeline passano latenti/immagini in bf16 → mismatch coi conv fp32).
+        _vae_dt = torch.float32 if os.environ.get("NATIVE_VAE_FP32") == "1" else bf16
+        def _mk_vae():
+            v = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"),
+                                               torch_dtype=_vae_dt)
+            if _vae_dt is torch.float32:
+                _od, _oe = v.decode, v.encode
+                v.decode = lambda z, *a, **k: _od(z.float(), *a, **k)
+                v.encode = lambda x, *a, **k: _oe(x.float(), *a, **k)
+            return v
+        vae = STORE.acquire("vae_flux", _mk_vae); got.append("vae_flux")
         te = STORE.acquire("clip_l", lambda: CLIPTextModel.from_pretrained(
             os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)); got.append("clip_l")
         te2 = STORE.acquire("t5xxl", lambda: T5EncoderModel.from_pretrained(
