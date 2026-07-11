@@ -1133,6 +1133,19 @@ def run_generation(p: dict) -> str:
     if not _audio_requested and audio is not None:
         print("[audio] nessun audio richiesto → scarto la traccia LTX-2 (rumore non condizionato)", flush=True)
         audio = None
+    # GUARDIA anti-NaN: pesi corrotti (es. GGUF con download incompleto) producono frame NaN che il
+    # VAE/encoder trasforma in VIDEO VERDE UNIFORME, consegnato come "successo". Meglio un errore chiaro.
+    def _nan_guard(chunks):
+        for _c in chunks:
+            if torch.is_tensor(_c) and (torch.isnan(_c).any() or torch.isinf(_c).any()):
+                raise RuntimeError(
+                    "Frame NaN/inf dal denoise: pesi del modello corrotti o incompatibili "
+                    "(es. GGUF con download incompleto). Verifica/riscarica il checkpoint selezionato.")
+            yield _c
+    if torch.is_tensor(video):
+        video = next(_nan_guard([video]))
+    else:
+        video = _nan_guard(video)
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
     # #102 Character Replacement: se il ramo iclora ha una maschera personaggio (SAM2 tracking), ricomponi

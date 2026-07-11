@@ -405,6 +405,14 @@ def run(p: dict) -> str:
 
 def _save_mp4(images, out_path: str, fps: float, audio=None, audio_sr: int = 44100) -> str:
     import numpy as np
+    # GUARDIA anti-NaN: pesi corrotti/incompatibili producono frame NaN → video VERDE uniforme
+    # consegnato come successo. Errore esplicito invece del silenzio.
+    if torch.isnan(images).any() or torch.isinf(images).any():
+        raise RuntimeError("Frame NaN/inf dal denoise: pesi del modello corrotti o incompatibili "
+                           "(es. GGUF con download incompleto). Verifica/riscarica il checkpoint.")
+    if audio is not None and hasattr(audio, "isnan") and torch.isnan(audio).any():
+        print("[save] audio generato NaN → scartato (video muto)", flush=True)
+        audio = None
     arr = (images.clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)  # (N,H,W,3)
     n, h, w, _ = arr.shape
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
