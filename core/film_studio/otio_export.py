@@ -38,8 +38,17 @@ def _aspect_filter(aspect: str) -> str:
 
 
 def _probe_dur(path: str) -> float:
-    """Durata (s) di una clip via ffprobe (per calcolare gli offset delle transizioni)."""
+    """Durata (s) dello stream VIDEO via ffprobe (per gli offset delle transizioni).
+    NON quella del container: nelle clip a2v l'audio paddato è più lungo del video
+    (12.0 vs 11.88) → offset xfade oltre la fine del video → la catena non scattava
+    mai e il master si troncava alla prima clip (film di test 12/07)."""
     try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                            "-show_entries", "stream=duration",
+                            "-of", "default=nk=1:nw=1", path], capture_output=True, text=True)
+        d = float((r.stdout or "0").strip() or 0)
+        if d > 0:
+            return d
         r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                             "-of", "default=nk=1:nw=1", path], capture_output=True, text=True)
         return float((r.stdout or "0").strip() or 0)
@@ -58,7 +67,9 @@ def _build_silent_xfade(clips: list[str], transitions: list, silent: str, fps: f
         inp += ["-i", c]
     filt = []
     for i in range(len(clips)):                             # normalizza ogni input (aspect+fps+formato)
-        chain = (vf + "," if vf else "") + f"fps={fps},format=yuv420p,setsar=1"
+        # setpts=PTS-STARTPTS: le clip a2v (audio incorporato) hanno timestamp che NON partono da 0
+        # → la catena xfade collassava alla prima transizione (master 11.96s su ~200, "ok" rc=0).
+        chain = (vf + "," if vf else "") + f"fps={fps},format=yuv420p,setsar=1,setpts=PTS-STARTPTS"
         filt.append(f"[{i}:v]{chain}[n{i}]")
     prev, total = "[n0]", durs[0]
     for i in range(1, len(clips)):
@@ -122,7 +133,7 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "",
             _inp += ["-i", c]
         _filt = []
         for i in range(len(_ex)):
-            chain = (_vf + "," if _vf else "") + f"fps={fps},format=yuv420p,setsar=1"
+            chain = (_vf + "," if _vf else "") + f"fps={fps},format=yuv420p,setsar=1,setpts=PTS-STARTPTS"
             _filt.append(f"[{i}:v]{chain}[n{i}]")
         _filt.append("".join(f"[n{i}]" for i in range(len(_ex))) + f"concat=n={len(_ex)}:v=1:a=0[vout]")
         _r = subprocess.run(["ffmpeg", "-v", "error", *_inp, "-filter_complex", ";".join(_filt),
