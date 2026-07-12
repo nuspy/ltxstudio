@@ -86,11 +86,42 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
     # SEMPRE come GFPGAN 'clean' → un checkpoint CodeFormer sbagliava arch e la fidelity era ignorata.
     _fid = float(params.get("fidelity", 0.5) or 0.5)
     _is_cf = "codeformer" in os.path.basename(str(model)).lower()
-    _arch = "CodeFormer" if _is_cf else "clean"
-    try:
-        restorer = GFPGANer(model_path=model, upscale=1, arch=_arch, channel_multiplier=2)
-    except Exception:                                        # noqa: BLE001 — gfpgan vecchio senza arch CodeFormer
+    if _is_cf:
+        # CodeFormer: arch VQGAN+transformer — la lib gfpgan NON la carica (state_dict mismatch
+        # su GFPGANv1Clean). Rete vendorizzata + FaceRestoreHelper (facexlib) per detect/paste.
+        import torch
+        from facexlib.utils.face_restoration_helper import FaceRestoreHelper
+        from inference_server.backends.codeformer_vendor import build_codeformer
+        _dev = "cuda" if torch.cuda.is_available() else "cpu"
+        _net = build_codeformer(model, device=_dev)
+        _helper = FaceRestoreHelper(1, face_size=512, crop_ratio=(1, 1),
+                                    det_model=params.get("detection") or "retinaface_resnet50",
+                                    save_ext="png", use_parse=True, device=_dev)
+
+        def _restore_bgr(bgr):
+            _helper.clean_all()
+            _helper.read_image(bgr)
+            if not _helper.get_face_landmarks_5(only_center_face=False, resize=640, eye_dist_threshold=5):
+                return bgr                                   # nessun volto: frame invariato
+            _helper.align_warp_face()
+            for _face in _helper.cropped_faces:
+                t = torch.from_numpy(_face[..., ::-1].copy()).float().permute(2, 0, 1) / 255.0
+                t = ((t - 0.5) / 0.5).unsqueeze(0).to(_dev)
+                with torch.no_grad():
+                    _out = _net(t, w=_fid, adain=True)[0]
+                _img = ((_out.squeeze(0).clamp(-1, 1) + 1) / 2 * 255).byte().permute(1, 2, 0).cpu().numpy()
+                _helper.add_restored_face(_img[..., ::-1].astype("uint8").copy())
+            _helper.get_inverse_affine(None)
+            return _helper.paste_faces_to_input_image()
+    else:
         restorer = GFPGANer(model_path=model, upscale=1, arch="clean", channel_multiplier=2)
+
+        def _restore_bgr(bgr):
+            try:                                             # 'weight' = fidelity (ignorato da GFPGAN clean)
+                _, _, r = restorer.enhance(bgr, has_aligned=False, paste_back=True, weight=_fid)
+            except TypeError:                                # gfpgan senza il parametro weight
+                _, _, r = restorer.enhance(bgr, has_aligned=False, paste_back=True)
+            return r
     td, ind, frames, fps, _ = _frames_io(video)
     try:
         if not frames:

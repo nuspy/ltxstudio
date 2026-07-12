@@ -43,12 +43,15 @@ def _upscale_tiled(model, t, tile: int = 512, overlap: int = 32, cpu_accum: bool
     wsum = torch.zeros_like(out)
     # autocast fp16 (audit acceleratori): ESRGAN/spandrel girava in fp32 puro → +20-30% e metà VRAM
     # sui tensor-core; l'accumulo resta fp32 → nessuna perdita visibile.
-    _ac = torch.autocast("cuda", dtype=torch.float16, enabled=t.is_cuda)
+    _ac = torch.autocast("cuda", dtype=torch.float16, enabled=_half_ok(model, t))
     for y in range(0, h, tile - overlap):
         for x in range(0, w, tile - overlap):
             y2, x2 = min(y + tile, h), min(x + tile, w)
             with torch.no_grad(), _ac:
                 ot = model(t[:, :, y:y2, x:x2])
+            if ot.isnan().any():                             # overflow fp16 sul tile → rifai in fp32
+                with torch.no_grad():
+                    ot = model(t[:, :, y:y2, x:x2])
             ot = ot.float().to(_dev)
             oy, ox = y * scale, x * scale
             out[:, :, oy:oy + ot.shape[2], ox:ox + ot.shape[3]] += ot
@@ -120,5 +123,15 @@ def run(params: dict, mm, output_dir: str) -> dict:
 
 def _run_once(model, t):
     import torch
-    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=t.is_cuda):
-        return model(t).float()
+    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=_half_ok(model, t)):
+        out = model(t).float()
+    if out.isnan().any():                                    # overflow fp16 → frame NERO: rifai in fp32
+        with torch.no_grad():
+            out = model(t).float()
+    return out
+
+
+def _half_ok(model, t) -> bool:
+    """autocast fp16 SOLO dove sicuro: 6 modelli su 23 (DAT/HAT/UltraSharpV2) overflowano in fp16
+    → NaN → clamp → output NERO (run 12/07, DIAG_upscale_fp16_*). spandrel dichiara supports_half."""
+    return bool(t.is_cuda) and getattr(model, "supports_half", True) is not False
