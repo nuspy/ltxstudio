@@ -121,7 +121,8 @@ def _patch_preprocess(pipeline, bg_color="black"):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--image", required=True)
+    ap.add_argument("--image", required=True, action="append",
+                    help="ripetibile: più viste dello stesso oggetto (multi-immagine, token concatenati)")
     ap.add_argument("--output_dir", required=True)
     ap.add_argument("--seed", type=int, default=1)
     # Default SENSATI per velocità: decimation 1M + texture 2048 + remesh = postprocess lentissimo.
@@ -197,8 +198,35 @@ def main():
     print(f"[trellis] load {time.time()-t0:.0f}s", flush=True)
 
     _patch_preprocess(pipeline, bg_color=a.bg_color)         # preprocess crash-safe + colore sfondo GUI
-    image = Image.open(a.image).convert("RGB")
+    _paths = a.image if isinstance(a.image, list) else [a.image]
+    images = [Image.open(p).convert("RGB") for p in _paths]
+    image = images[0]
     torch.manual_seed(a.seed)
+
+    # MULTI-VISTA (2-4 immagini dello stesso oggetto): la pipeline ufficiale espone run(image) singola,
+    # ma il condizionatore accetta liste — replichiamo la semantica del MultiImageConditionedMixin del
+    # repo: encode di ogni vista e CONCATENAZIONE dei token in un'unica sequenza (neg_cond = zeros).
+    if len(images) > 1:
+        print(f"[trellis] MULTI-VISTA: {len(images)} immagini (token concatenati)", flush=True)
+        if bool(a.remove_bg):
+            images = [pipeline.preprocess_image(im) for im in images]
+        _low_vram = getattr(pipeline, "low_vram", False)
+
+        def _multi_get_cond(_img_ignored, resolution, include_neg_cond=True):
+            pipeline.image_cond_model.image_size = resolution
+            if _low_vram:
+                pipeline.image_cond_model.to(pipeline.device)
+            feats = pipeline.image_cond_model(images)          # (N, T, D)
+            if _low_vram:
+                pipeline.image_cond_model.cpu()
+            cond = feats.reshape(1, -1, feats.shape[-1])       # (1, N·T, D): viste concatenate
+            out = {"cond": cond}
+            if include_neg_cond:
+                out["neg_cond"] = torch.zeros_like(cond)
+            return out
+
+        pipeline.get_cond = _multi_get_cond
+        a.remove_bg = 0                                        # preprocess già fatto qui (per tutte le viste)
 
     # Override sampler dalla GUI: chiavi REALI dell'API = 'steps' + 'guidance_strength' (FlowEuler…Sampler).
     # geo guidance/steps → sparse-structure + shape-slat; texture → tex-slat. Dict vuoto = default del modello.

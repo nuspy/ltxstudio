@@ -56,10 +56,16 @@ def make_job(image_path: str, name: str = "model", *, seed: int = 1,
     # attn→ATTN_BACKEND, precision→autocast, bg_color→composito soggetto. target_faces→--decimation.
     import os as _os
     kill_orphans()                                               # niente DUE istanze: pulisci orfani da crash precedenti
-    cmd = [TRELLIS_VENV_PY, "-u", str(GEN_SCRIPT), "--image", image_path, "--output_dir", str(out),
-           "--seed", int(seed), "--texture_size", int(texture_size),
-           "--texture", 1 if texture else 0, "--remove_bg", 1 if remove_bg else 0,
-           "--parent-pid", int(_os.getpid())]                    # watchdog: se l'app muore, il subprocess muore
+    # MULTI-VISTA: image_path può essere una LISTA di path (più foto dello stesso oggetto) →
+    # --image ripetuto; lo script concatena i token delle viste nel condizionatore.
+    _imgs = image_path if isinstance(image_path, (list, tuple)) else [image_path]
+    cmd = [TRELLIS_VENV_PY, "-u", str(GEN_SCRIPT)]
+    for _im in _imgs:
+        cmd += ["--image", str(_im)]
+    cmd += ["--output_dir", str(out),
+            "--seed", int(seed), "--texture_size", int(texture_size),
+            "--texture", 1 if texture else 0, "--remove_bg", 1 if remove_bg else 0,
+            "--parent-pid", int(_os.getpid())]                   # watchdog: se l'app muore, il subprocess muore
     if target_faces:
         cmd += ["--decimation", int(target_faces)]
     if resolution:

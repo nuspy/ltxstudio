@@ -507,6 +507,28 @@ for _ts in _TEX_SIZES:
         ),
     ))
 
+def case_multiview_config(w, spy):
+    """Multi-vista: le viste extra della lista compaiono in get_config()['image_paths'] dopo
+    l'input primario (contratto GUI→backend; UI-only, nessuna generazione)."""
+    from PySide6.QtCore import Qt as _Qt
+    from PySide6.QtWidgets import QListWidgetItem
+    t = w.trellis_tab
+    p1 = H.make_test_image(str(H.OUT_DIR / "_trellis_view1.png"))
+    p2 = H.make_test_image(str(H.OUT_DIR / "_trellis_view2.png"), 512, 512)
+    t._input_path = p1
+    t.views_list.clear()
+    it = QListWidgetItem("v2"); it.setData(_Qt.UserRole, p2)
+    t.views_list.addItem(it)
+    cfg = t.get_config()
+    assert cfg.get("image_paths") == [p1, p2], f"image_paths errato: {cfg.get('image_paths')}"
+    assert cfg.get("image_path") == p1, "l'input primario resta image_path (retro-compatibilità)"
+    t.views_list.clear()
+    assert t.get_config().get("image_paths") == [p1], "lista svuotata → resta solo il primario"
+
+
+# NB: case_multiview_config è REGISTRATO in cases_zz_lora_image_apply (file di coda) per non
+# spostare gli indici --start delle categorie del loop in corso (trellis resta a 38 casi).
+
 # In run_real i casi mock-based (nativo con _J fittizio / ramo ComfyUI) skippano via
 # _SkipMockOnly; il caso end-to-end trellis_9params_live resta eseguito ovunque.
 CASES = [(n, d, _skip_in_real(f)) for n, d, f in _RAW_CASES]

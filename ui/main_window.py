@@ -4289,15 +4289,17 @@ class MainWindow(QMainWindow):
         self.quality_tab.setCurrentWidget(self.restore_tab)
 
     # ---------- TRELLIS.2 (immagine → modello 3D) ----------
-    def _trellis_native(self, cfg: dict, image_path: str):
-        """TRELLIS 3D NATIVO (venv isolato, subprocess) — immagine→GLB. Zero ComfyUI."""
+    def _trellis_native(self, cfg: dict, image_path):
+        """TRELLIS 3D NATIVO (venv isolato, subprocess) — immagine→GLB. Zero ComfyUI.
+        `image_path`: str o LISTA di path (multi-vista: più foto dello stesso oggetto)."""
         from PySide6.QtWidgets import QMessageBox
         from core import trellis_service
-        errs = trellis_service.preflight(image_path)
+        _primary = image_path[0] if isinstance(image_path, (list, tuple)) else image_path
+        errs = trellis_service.preflight(_primary)
         if errs:
             QMessageBox.warning(self, "TRELLIS", "\n".join(errs)); return
         seed = random.randint(0, 2**31 - 1) if cfg.get("seed_random", True) else int(cfg.get("seed", 0))
-        name = f"trellis_{Path(image_path).stem}_{seed}"
+        name = f"trellis_{Path(_primary).stem}_{seed}"
         steps = int(cfg.get("steps", 12) or 12)
         _trellis_tail = []                                   # ring-buffer per l'errore VERO del subprocess
         # LOG SU FILE (sopravvive a un eventuale crash dell'app): ogni riga del subprocess TRELLIS viene
@@ -4440,11 +4442,19 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.no_image_title"),
                                 tr("mw.select_image_to_process_msg")); return
 
+        # MULTI-VISTA: viste extra dal tab (immagini aggiuntive dello stesso oggetto). Il primario
+        # risolto sopra (file/canvas/masked) resta la vista 1; le extra si accodano. Solo nativo.
+        _views = [p for p in (cfg.get("image_paths") or [])
+                  if p and not str(p).startswith("<") and os.path.exists(str(p)) and str(p) != image_path]
+
         # BACKEND NATIVO (TRELLIS via venv isolato, zero ComfyUI) se installato
         try:
             from core import trellis_service
             if trellis_service.is_installed():
-                return self._trellis_native(cfg, image_path)
+                _inp = [image_path] + _views if _views else image_path
+                if _views:
+                    self._log(f"[trellis] multi-vista: {1 + len(_views)} immagini")
+                return self._trellis_native(cfg, _inp)
         except Exception:  # noqa: BLE001
             pass
 

@@ -192,6 +192,36 @@ class TrellisTab(QWidget):
         il.addWidget(masked_btn)
         v.addWidget(inp_grp)
 
+        # ── Viste aggiuntive (multi-immagine): più foto dello stesso oggetto da angoli diversi
+        #    migliorano la geometria (i token delle viste vengono concatenati nel condizionatore). ──
+        mv_grp = QGroupBox(tr("trellis.multi.group", "Viste aggiuntive (opzionale)"))
+        mv = QVBoxLayout(mv_grp)
+        mv_info = QLabel(tr("trellis.multi.info",
+                            "Aggiungi altre foto dello STESSO oggetto da angoli diversi (fronte/retro/lato): "
+                            "la geometria 3D migliora. Max 3 viste extra."))
+        mv_info.setWordWrap(True); mv_info.setStyleSheet("color:#9aa1b0; font-size:11px;")
+        mv.addWidget(mv_info)
+        from PySide6.QtWidgets import QListWidget, QListWidgetItem
+        from PySide6.QtCore import QSize
+        from PySide6.QtGui import QIcon, QPixmap
+        self.views_list = QListWidget()
+        self.views_list.setViewMode(QListWidget.IconMode)
+        self.views_list.setIconSize(QSize(72, 72))
+        self.views_list.setFixedHeight(96)
+        self.views_list.setToolTip(tr("trellis.multi.list.tt",
+                                      "Anteprime delle viste extra: selezionane una e usa 'Rimuovi' per toglierla."))
+        mv.addWidget(self.views_list)
+        mvb = QHBoxLayout()
+        self.mv_add_btn = QPushButton(tr("trellis.multi.add", "＋ Aggiungi vista"))
+        self.mv_add_btn.setToolTip(tr("trellis.multi.add.tt", "Scegli un'altra foto dell'oggetto da un angolo diverso."))
+        self.mv_add_btn.clicked.connect(self._add_view)
+        self.mv_del_btn = QPushButton(tr("trellis.multi.remove", "− Rimuovi"))
+        self.mv_del_btn.setToolTip(tr("trellis.multi.remove.tt", "Rimuovi la vista selezionata dalla lista."))
+        self.mv_del_btn.clicked.connect(self._remove_view)
+        mvb.addWidget(self.mv_add_btn); mvb.addWidget(self.mv_del_btn); mvb.addStretch()
+        mv.addLayout(mvb)
+        v.addWidget(mv_grp)
+
         # ── Qualità / modello ──
         q_grp = QGroupBox(tr("trellis.quality.group"))
         qf = QFormLayout(q_grp); qf.setLabelAlignment(Qt.AlignRight)
@@ -331,6 +361,40 @@ class TrellisTab(QWidget):
         self._input_path = "<from_canvas_masked>"
         self.path_edit.setText(tr("trellis.input.canvas_masked.selected"))
 
+    # ---------- viste aggiuntive (multi-immagine) ----------
+    def _add_view(self):
+        if self.views_list.count() >= 3:
+            QMessageBox.information(self, tr("trellis.multi.group", "Viste aggiuntive (opzionale)"),
+                                    tr("trellis.multi.max_msg", "Massimo 3 viste extra (4 immagini totali)."))
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("trellis.multi.add", "＋ Aggiungi vista"), str(Path.home()),
+            tr("trellis.input.filter"))
+        if not path:
+            return
+        from PySide6.QtWidgets import QListWidgetItem
+        from PySide6.QtGui import QIcon, QPixmap
+        pix = QPixmap(path)
+        item = QListWidgetItem(Path(path).name)
+        if not pix.isNull():
+            item.setIcon(QIcon(pix.scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation)))
+        item.setToolTip(path)
+        item.setData(Qt.UserRole, path)
+        self.views_list.addItem(item)
+
+    def _remove_view(self):
+        for it in self.views_list.selectedItems():
+            self.views_list.takeItem(self.views_list.row(it))
+
+    def extra_views(self) -> list[str]:
+        """Path delle viste aggiuntive (esistenti su disco), in ordine di lista."""
+        out = []
+        for i in range(self.views_list.count()):
+            p = self.views_list.item(i).data(Qt.UserRole)
+            if p and os.path.exists(str(p)):
+                out.append(str(p))
+        return out
+
     def _on_generate(self):
         self.request_trellis.emit(self.get_config())
 
@@ -338,6 +402,8 @@ class TrellisTab(QWidget):
     def get_config(self) -> dict:
         return {
             "image_path": self._input_path,
+            # multi-vista: input primario + viste extra (il backend concatena i token delle viste)
+            "image_paths": ([self._input_path] if self._input_path else []) + self.extra_views(),
             "resolution": self.resolution.currentText(),
             "precision": self.precision.currentText(),
             "attn_backend": self.attn.currentText(),

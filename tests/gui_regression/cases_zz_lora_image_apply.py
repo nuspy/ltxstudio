@@ -80,3 +80,14 @@ for _i, (_name, _comfy, _nsfw) in enumerate(_LORAS):
         f"LoRA immagine '{_name}'{' [NSFW]' if _nsfw else ''}: selezione + generazione FLUX reale con la LoRA applicata.",
         _make_case(_i, _name, _comfy, _nsfw),
     ))
+
+# ── casi extra registrati in coda (indice-stabili per il loop --start) ──
+try:
+    from cases_trellis_tab import case_multiview_config as _trellis_mv
+    CASES.append((
+        "trellis_multiview_config",
+        "Multi-vista TRELLIS: viste extra della lista → get_config()['image_paths'] (primario + extra).",
+        _trellis_mv,
+    ))
+except Exception:                                            # noqa: BLE001
+    pass
