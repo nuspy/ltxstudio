@@ -242,8 +242,12 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
         params["loras"] = loras
     if audio_path:
         params["audio_path"] = audio_path
-    if nf > 150:
-        params["chunk_frames"] = 121
+    # chunking SOLO oltre i 20s (indicazione utente 12/07: sotto, LTX-2 genera in passata unica —
+    # niente giunzioni e niente reload per-chunk). Prima la soglia era 150 frame (~6s): ogni shot
+    # cinematografico da 15-18s finiva spezzato in 3-4 chunk senza necessità.
+    _max_single = int(20 * fps)
+    if nf > _max_single:
+        params["chunk_frames"] = _max_single - (_max_single - 1) % 8   # multiplo 8+1 compatibile LTX
     # Worker VIDEO PERSISTENTE (server :8190, modello già caricato) se attivo → niente reload di LTX ~22B ad
     # ogni shot (era il collo di bottiglia di «Genera Tutti»). Altrimenti fallback al subprocess.
     if _ltx2_server_up():
