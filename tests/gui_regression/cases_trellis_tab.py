@@ -24,10 +24,29 @@ from __future__ import annotations
 import harness as H
 
 
+class _SkipMockOnly(Exception):
+    """Skip dei casi mock-based in run REALE: il RealSpy ESEGUE i worker → il Job fittizio _J
+    (senza .start) crasha, e il ramo ComfyUI è dismesso. Il contratto parametri resta coperto
+    dalla suite mock; in run reale gira il caso end-to-end nativo dedicato."""
+
+
+def _skip_in_real(fn):
+    def _w(w, spy):
+        try:
+            return fn(w, spy)
+        except _SkipMockOnly:
+            return
+    _w.__doc__ = fn.__doc__
+    _w.__name__ = getattr(fn, "__name__", "case")
+    return _w
+
+
 # ───────────────────────── infrastruttura di cattura ─────────────────────────
 def _native_capture(w):
     """Forza il percorso NATIVO e cattura i kwargs passati a trellis_service.make_job.
     Ritorna (cap, restore)."""
+    if getattr(H, "REAL_MODE", False):
+        raise _SkipMockOnly()
     import core.trellis_service as ts
     orig_inst, orig_make = ts.is_installed, ts.make_job
     cap: dict = {}
@@ -53,6 +72,8 @@ def _native_capture(w):
 def _comfy_capture(w):
     """Forza il percorso COMFYUI e cattura i kwargs passati a self.trellisser.build.
     Ritorna (cap, restore)."""
+    if getattr(H, "REAL_MODE", False):
+        raise _SkipMockOnly()
     import core.trellis_service as ts
     orig_inst = ts.is_installed
     orig_build = w.trellisser.build
@@ -360,7 +381,7 @@ def case_trellis_9params_live(w, spy):
     assert spy.calls[-1]["via"] == "enqueue", f"atteso enqueue nativo, ottenuto: {spy.calls[-1]}"
 
 
-CASES = [
+_RAW_CASES = [
     ("trellis_9params_live",
      "LIVE #3D: i 9 parametri GUI cablati all'API TRELLIS.2 → genera un GLB reale in output/3d.",
      case_trellis_9params_live),
@@ -485,3 +506,7 @@ for _ts in _TEX_SIZES:
                 if cap.get("texture_size") != int(val) else None))(_ts),
         ),
     ))
+
+# In run_real i casi mock-based (nativo con _J fittizio / ramo ComfyUI) skippano via
+# _SkipMockOnly; il caso end-to-end trellis_9params_live resta eseguito ovunque.
+CASES = [(n, d, _skip_in_real(f)) for n, d, f in _RAW_CASES]
