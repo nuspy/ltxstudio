@@ -268,7 +268,12 @@ def case_caption_command(w, spy):
     assert proc is not None and proc.started_with, "caption: QProcess non avviato"
     prog, args = proc.started_with
     args = args or []
-    assert str(ts.VENV_PYTHON) == str(prog), f"caption non usa il python del venv: {prog}"
+    # Router multi-engine: joycaption→venv15 (default se pronto), florence2→venv training.
+    # Il python deve appartenere a UNO dei motori validi (il vecchio assert pretendeva solo
+    # il venv training → falso FAIL col design attuale).
+    from core import caption_service as cs
+    _valid = {str(cs.VENV15_PY), str(ts.VENV_PYTHON)}
+    assert str(prog) in _valid, f"caption non usa un python dei motori validi: {prog}"
     assert "--dir" in args, f"--dir mancante: {args}"
     assert "--trigger" in args and "ohwx" in args, f"--trigger mancante: {args}"
     assert "--overwrite" in args, f"--overwrite mancante: {args}"
@@ -276,18 +281,24 @@ def case_caption_command(w, spy):
 
 
 def case_caption_blocked_not_installed(w, spy):
-    """Caption senza modulo installato: deve avvisare e NON avviare alcun processo."""
+    """Caption senza ALCUN motore disponibile: deve avvisare e NON avviare alcun processo.
+    Col router multi-engine va spento ANCHE joycaption (spegnere solo florence2 lasciava
+    partire joycaption — comportamento corretto del prodotto, falso FAIL del caso)."""
     from core import training_service as ts
+    from core import caption_service as cs
     orig_inst = ts.is_installed
+    orig_joy = cs.joycaption_ready
     ts.is_installed = lambda: False
+    cs.joycaption_ready = lambda: False
     tt, orig = _install_fake_qprocess()
     try:
         _prep_dataset(w)
         w.train_tab._caption_dataset()
     finally:
         ts.is_installed = orig_inst
+        cs.joycaption_ready = orig_joy
         tt.QProcess = orig
-    assert w.train_tab._caption_proc is None, "caption avviato senza modulo installato"
+    assert w.train_tab._caption_proc is None, "caption avviato senza alcun motore disponibile"
 
 
 def case_caption_blocked_bad_dataset(w, spy):
