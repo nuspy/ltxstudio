@@ -72,7 +72,9 @@ def _build_silent_xfade(clips: list[str], transitions: list, silent: str, fps: f
         prev, total = out_lbl, off + durs[i]
     r = subprocess.run(["ffmpeg", "-v", "error", *inp, "-filter_complex", ";".join(filt),
                         "-map", prev, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps),
-                        silent, "-y"], check=False)
+                        silent, "-y"], check=False, capture_output=True, text=True)
+    if r.returncode != 0:                                    # PRIMA falliva muto → fallback silenzioso
+        print(f"[master] xfade fallito → fallback concat. ffmpeg: {(r.stderr or '')[-300:]}", flush=True)
     return r.returncode == 0 and os.path.exists(silent)
 
 
@@ -110,11 +112,24 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "",
     _vf = _aspect_filter(aspect)
     _has_tr = bool(transitions) and any((t or {}).get("dur", 0) for t in transitions)
     if not (_has_tr and _build_silent_xfade(clips, transitions, silent, fps, _vf)):
-        work = Path(out_path).with_suffix(".list.txt")      # stacchi netti (veloce) o fallback da xfade
-        work.write_text("".join(f"file '{c}'\n" for c in clips if os.path.exists(c)), "utf-8")
-        subprocess.run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(work),
-                        *(["-vf", _vf] if _vf else []),
-                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps), silent, "-y"], check=False)
+        # stacchi netti: concat A FILTRO (v=1:a=0), NON il demuxer -f concat — quello esige stream
+        # OMOGENEI e con clip miste (a2v con audio incorporato + ti2v mute) TRONCAVA il master alla
+        # prima clip (film di test 12/07: 18 clip → 11.96s). Il filtro ignora l'audio per design:
+        # dialoghi e musica arrivano dal mix multitraccia sotto.
+        _ex = [c for c in clips if os.path.exists(c)]
+        _inp = []
+        for c in _ex:
+            _inp += ["-i", c]
+        _filt = []
+        for i in range(len(_ex)):
+            chain = (_vf + "," if _vf else "") + f"fps={fps},format=yuv420p,setsar=1"
+            _filt.append(f"[{i}:v]{chain}[n{i}]")
+        _filt.append("".join(f"[n{i}]" for i in range(len(_ex))) + f"concat=n={len(_ex)}:v=1:a=0[vout]")
+        _r = subprocess.run(["ffmpeg", "-v", "error", *_inp, "-filter_complex", ";".join(_filt),
+                             "-map", "[vout]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", str(fps),
+                             silent, "-y"], check=False, capture_output=True, text=True)
+        if _r.returncode != 0:
+            print(f"[master] concat a filtro fallito: {(_r.stderr or '')[-300:]}", flush=True)
     tracks = list(audio_tracks or ([] if not audio else [{"path": audio, "start_s": 0, "volume": 1.0}]))
     tracks = [t for t in tracks if t.get("path") and os.path.exists(t["path"])]
     if not tracks:
