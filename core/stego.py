@@ -293,9 +293,11 @@ def enabled() -> bool:
         pass
     try:
         from core import user_prefs
-        return bool(user_prefs.get("stego_watermark", True))
+        # DEFAULT OFF (decisione utente 12/07): ad alpha rilevabile il velo resta percettibile
+        # sui fondi lisci → qualità prima; la firma è OPT-IN dal checkbox nei settings.
+        return bool(user_prefs.get("stego_watermark", False))
     except Exception:                                        # noqa: BLE001
-        return True
+        return False
 
 
 def sign_file(path: str) -> str:

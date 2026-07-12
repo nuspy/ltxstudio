@@ -105,6 +105,58 @@ def _patch_preprocess(pipeline, bg_color="black"):
         out = arr * alpha + bg * (1.0 - alpha)
         return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8))
 
+    def _fill_alpha_holes(rgba_img):
+        """BUCHI INTERNI dell'alpha rembg (review 12/07: le parti BIANCHE del soggetto venivano
+        classificate sfondo → non generate). Regola: è sfondo SOLO ciò che è connesso al bordo
+        dell'immagine; le zone trasparenti interne al soggetto tornano opache (alpha 255)."""
+        try:
+            arr = np.array(rgba_img)
+            if arr.ndim != 3 or arr.shape[2] != 4:
+                return rgba_img
+            bg = arr[:, :, 3] <= int(0.8 * 255)              # candidato sfondo
+            if not bg.any():
+                return rgba_img
+            try:
+                import cv2
+                num, labels = cv2.connectedComponents(bg.astype(np.uint8), connectivity=4)
+            except Exception:                                # noqa: BLE001 — fallback scipy
+                from scipy import ndimage
+                labels, num = ndimage.label(bg)
+            border = set(np.unique(np.concatenate([labels[0, :], labels[-1, :],
+                                                   labels[:, 0], labels[:, -1]])))
+            border.discard(0)
+            holes = bg & ~np.isin(labels, list(border))
+            n = int(holes.sum())
+            if n:
+                arr[:, :, 3] = np.where(holes, 255, arr[:, :, 3])
+                print(f"[trellis] alpha: riempiti {n}px di buchi INTERNI al soggetto "
+                      "(parti chiare scambiate per sfondo)", flush=True)
+                return Image.fromarray(arr, "RGBA")
+        except Exception as _e:                              # noqa: BLE001
+            print(f"[trellis] hole-fill alpha saltato ({_e})", flush=True)
+        return rgba_img
+
+    # wrappa il rembg della pipeline: l'output RGBA passa dal riempi-buchi PRIMA di bbox/crop/composite
+    try:
+        _orig_rembg = pipeline.rembg_model
+
+        class _RembgHoleFill:
+            def __call__(self, img):
+                return _fill_alpha_holes(_orig_rembg(img))
+
+            def to(self, *a, **k):
+                _orig_rembg.to(*a, **k); return self
+
+            def cpu(self, *a, **k):
+                _orig_rembg.cpu(*a, **k); return self
+
+            def __getattr__(self, name):
+                return getattr(_orig_rembg, name)
+
+        pipeline.rembg_model = _RembgHoleFill()
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[trellis] wrap rembg non applicato ({_e})", flush=True)
+
     def _safe(img):
         try:
             res = _orig(img)                                 # rembg: soggetto isolato (immagini normali)

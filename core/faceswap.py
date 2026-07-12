@@ -134,6 +134,41 @@ def _restore_swapped_face(img):
         return img
 
 
+def _match_face_tone(swapped, original, faces):
+    """COLOR-MATCH del volto swappato alla carnagione del TARGET (review 12/07: orecchie/collo
+    restano originali → contrasto forte se la carnagione della sorgente differisce). Sposta media
+    e deviazione LAB della regione volto swappata verso quelle della stessa regione PRE-swap
+    (standard alla ReActor). Blending con falloff radiale: i bordi si fondono con la pelle attorno.
+    Opt-out: FACESWAP_TONE_MATCH=0."""
+    if os.environ.get("FACESWAP_TONE_MATCH", "1") != "1":
+        return swapped
+    import cv2
+    import numpy as np
+    out = swapped
+    for f in faces:
+        x1, y1, x2, y2 = [int(v) for v in f.bbox]
+        h, w = out.shape[:2]
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(w, x2), min(h, y2)
+        if x2 - x1 < 8 or y2 - y1 < 8:
+            continue
+        reg_s = out[y1:y2, x1:x2].astype(np.float32)
+        reg_o = original[y1:y2, x1:x2].astype(np.float32)
+        lab_s = cv2.cvtColor(reg_s / 255.0, cv2.COLOR_BGR2LAB)
+        lab_o = cv2.cvtColor(reg_o / 255.0, cv2.COLOR_BGR2LAB)
+        mean_s, std_s = lab_s.reshape(-1, 3).mean(0), lab_s.reshape(-1, 3).std(0) + 1e-6
+        mean_o, std_o = lab_o.reshape(-1, 3).mean(0), lab_o.reshape(-1, 3).std(0) + 1e-6
+        lab_m = (lab_s - mean_s) / std_s * std_o + mean_o
+        reg_m = np.clip(cv2.cvtColor(lab_m, cv2.COLOR_LAB2BGR) * 255.0, 0, 255)
+        # falloff radiale: pieno al centro del volto, 0 al bordo bbox → nessuna cucitura
+        yy, xx = np.mgrid[0:y2 - y1, 0:x2 - x1].astype(np.float32)
+        cy, cx = (y2 - y1) / 2.0, (x2 - x1) / 2.0
+        d = np.sqrt(((yy - cy) / cy) ** 2 + ((xx - cx) / cx) ** 2)
+        wgt = np.clip(1.2 - d, 0, 1)[..., None]
+        out[y1:y2, x1:x2] = (reg_s * (1 - wgt) + reg_m * wgt).astype(np.uint8)
+    return out
+
+
 def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
     if not os.environ.get("FACESWAP_INPROC") and not _has_insightface():
         return _delegate("image", target_path, source_face_path, out_path)   # → inference_server_venv
@@ -143,8 +178,11 @@ def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
     img = cv2.imread(target_path)
     if img is None:
         raise FileNotFoundError(target_path)
-    for f in app.get(img):
+    _orig = img.copy()
+    _faces = app.get(img)
+    for f in _faces:
         img = sw.get(img, f, src, paste_back=True)
+    img = _match_face_tone(img, _orig, _faces)           # carnagione uniforme con orecchie/collo
     img = _restore_swapped_face(img)                     # anti-"plasticoso": restauro post-swap
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     cv2.imwrite(out_path, img)
