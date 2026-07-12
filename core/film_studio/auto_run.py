@@ -208,6 +208,26 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
     _wait(kf_jids, jmap, "keyframe", on_progress, cancel, base=0.0, span=0.40)
 
     # ── FASE 2: video ─────────────────────────────────────────────────────────
+    # Worker video PERSISTENTE (:8190): avviato QUI (dopo i keyframe, così non contende la VRAM
+    # al FLUX) se non è già su. Il modello 22B si carica UNA volta al primo shot e resta per
+    # tutti gli altri — senza, ogni shot rilegge 29GB da disco (visto live: 4 min/clip di cui
+    # 2 di solo load). free_for('video') in gen_shot_video svuota prima i server immagine.
+    try:
+        if not gen_service._ltx2_server_up():
+            import subprocess as _sp
+            _flags = getattr(_sp, "DETACHED_PROCESS", 0) | getattr(_sp, "CREATE_NEW_PROCESS_GROUP", 0)
+            _srv_log = open(str(db.ROOT / "ltx2_server_8190.log"), "a", encoding="utf-8")
+            _sp.Popen([gen_service.LTX2_PY, "-u",
+                       str(Path(__file__).resolve().parents[2] / "workers" / "ltx2_server.py")],
+                      stdout=_srv_log, stderr=_sp.STDOUT, creationflags=_flags,
+                      env={**__import__("os").environ, "HF_HUB_OFFLINE": "1"})
+            for _ in range(20):                              # attesa best-effort (poi fallback subprocess)
+                time.sleep(1)
+                if gen_service._ltx2_server_up():
+                    print("[auto_run] worker video persistente :8190 avviato", flush=True)
+                    break
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[auto_run] server :8190 non avviato ({_e}) → fallback subprocess per-shot", flush=True)
     vid_jids, jmap = [], {}
     for it in shots:
         sh, state, outdir = it["sh"], it["state"], it["outdir"]

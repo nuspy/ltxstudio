@@ -165,6 +165,25 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
 LTX2_SERVER = os.environ.get("LTX2_SERVER", "http://127.0.0.1:8190")   # worker video persistente (opzionale)
 
 
+def _wait_free_vram(min_mb: int = 24000, max_s: int = 30) -> int:
+    """Attende il rilascio EFFETTIVO della VRAM (asincrono rispetto a /free e unload): se un worker
+    22B parte con la VRAM ancora occupata, le sue allocazioni finiscono in SHARED memory (WDDM) e
+    ci restano anche a VRAM svuotata → GPU all'1%, clip eterne. Poll via nvidia-smi (MAI torch.cuda
+    nel processo app)."""
+    free_mb = 0
+    try:
+        from core import gpu_mem as _gm
+        for _ in range(max_s):
+            free_mb = _gm.free_vram_mb()
+            if free_mb >= min_mb:
+                break
+            time.sleep(1)
+        print(f"[film] VRAM libera pre-worker: {free_mb}MB", flush=True)
+    except Exception:                                        # noqa: BLE001
+        pass
+    return free_mb
+
+
 def _ltx2_server_up() -> bool:
     """True se il server video persistente risponde (modello già caricato in VRAM)."""
     import json as _j
@@ -251,23 +270,20 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
     # Worker VIDEO PERSISTENTE (server :8190, modello già caricato) se attivo → niente reload di LTX ~22B ad
     # ogni shot (era il collo di bottiglia di «Genera Tutti»). Altrimenti fallback al subprocess.
     if _ltx2_server_up():
+        # PRIMO job (server senza pipeline in cache): il SUO caricamento sceglie fp8-vs-GGUF in base
+        # alla VRAM libera in quell'istante → aspetta il rilascio effettivo come per il subprocess
+        # (visto live: shot_4 servito col subprocess morente = GGUF + 40GB alloc su 32). Dai job
+        # successivi il server tiene la VRAM di proposito e non si aspetta nulla.
+        try:
+            import urllib.request as _ur
+            _st = json.loads(_ur.urlopen(f"{LTX2_SERVER}/system_stats", timeout=5).read())
+            if int(_st.get("cached_pipelines", 0)) == 0:
+                _wait_free_vram()
+        except Exception:                                    # noqa: BLE001
+            pass
         return _submit_persistent(params, out_mp4)
-    # ATTESA DEL RILASCIO EFFETTIVO (solo ramo subprocess: il server persistente tiene la VRAM di
-    # proposito): /free e unload sono asincroni rispetto al driver — se il worker parte mentre la
-    # VRAM è ancora occupata, le sue allocazioni finiscono in SHARED memory (WDDM) e ci RESTANO
-    # anche a VRAM svuotata → GPU all'1%, clip eterne (visto live: 3.4GB dedicata / 26GB shared).
-    # Poll via nvidia-smi (MAI torch.cuda nel processo app).
-    try:
-        from core import gpu_mem as _gm
-        _free_mb = 0
-        for _ in range(30):
-            _free_mb = _gm.free_vram_mb()
-            if _free_mb >= 24000:
-                break
-            time.sleep(1)
-        print(f"[film] VRAM libera pre-worker: {_free_mb}MB", flush=True)
-    except Exception:                                        # noqa: BLE001
-        pass
+    # ramo subprocess: stessa attesa (le allocazioni WDDM finite in shared NON migrano più).
+    _wait_free_vram()
     jf = out_mp4 + ".json"
     with open(jf, "w") as _f:                        # fix: handle non chiuso (leak FD nei loop)
         json.dump(params, _f)
