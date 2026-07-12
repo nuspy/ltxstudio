@@ -84,6 +84,11 @@ def make_job(p: WorldParams, *, mesh: bool, hf_token: str | None = None, **cbs) 
            "HF_HUB_DISABLE_XET": "1"}
     if hf_token:
         env.update(HF_TOKEN=hf_token, HUGGING_FACE_HUB_TOKEN=hf_token)
+    else:
+        # senza token il repo gated (FLUX.1-dev) risponde 401 al check di revisione ANCHE se i
+        # pesi sono già tutti in cache → offline forzato: usa la cache; tanto senza token non
+        # potrebbe comunque scaricare nulla di gated.
+        env["HF_HUB_OFFLINE"] = "1"
     return Job(cmd, WORLDGEN_DIR, env=env, **cbs)
 
 

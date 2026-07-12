@@ -79,6 +79,9 @@ class WorldTab(QWidget):
         self.res = QSpinBox(); self.res.setRange(512, 4096); self.res.setSingleStep(128); self.res.setValue(1600)
         f.addRow(tr("world.res", "Risoluzione"), self.res)
         self.low_vram = QCheckBox(tr("world.lowvram", "Low VRAM")); f.addRow("", self.low_vram)
+        # default ON: ramo nunchaku fp4 (validato, pesi presenti); OFF richiede FLUX.1-dev bf16
+        # completo (~34GB, mai scaricati dall'installer) e crasha su cache standard
+        self.low_vram.setChecked(True)
         self.hf = QLineEdit(); self.hf.setEchoMode(QLineEdit.Password)
         self.hf.setPlaceholderText(tr("world.hf.hint", "HF token (FLUX.1-dev gated)"))
         f.addRow(tr("world.hf", "HF token"), self.hf)
