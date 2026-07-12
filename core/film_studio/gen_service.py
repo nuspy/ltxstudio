@@ -236,21 +236,6 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
         _lllm.unload()
     except Exception:                                        # noqa: BLE001
         pass
-    # ATTESA DEL RILASCIO EFFETTIVO: /free e unload sono asincroni rispetto al driver — se il
-    # worker parte mentre la VRAM è ancora occupata, le sue allocazioni finiscono in SHARED
-    # memory (WDDM) e ci RESTANO anche a VRAM svuotata → GPU all'1%, clip eterne (visto live:
-    # 3.4GB dedicata / 26GB shared). Poll via nvidia-smi (MAI torch.cuda nel processo app).
-    try:
-        from core import gpu_mem as _gm
-        _free_mb = 0
-        for _ in range(30):
-            _free_mb = _gm.free_vram_mb()
-            if _free_mb >= 24000:
-                break
-            time.sleep(1)
-        print(f"[film] VRAM libera pre-worker: {_free_mb}MB", flush=True)
-    except Exception:                                        # noqa: BLE001
-        pass
     if keyframes:
         params["keyframes"] = keyframes
     if loras:
@@ -263,6 +248,22 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
     # ogni shot (era il collo di bottiglia di «Genera Tutti»). Altrimenti fallback al subprocess.
     if _ltx2_server_up():
         return _submit_persistent(params, out_mp4)
+    # ATTESA DEL RILASCIO EFFETTIVO (solo ramo subprocess: il server persistente tiene la VRAM di
+    # proposito): /free e unload sono asincroni rispetto al driver — se il worker parte mentre la
+    # VRAM è ancora occupata, le sue allocazioni finiscono in SHARED memory (WDDM) e ci RESTANO
+    # anche a VRAM svuotata → GPU all'1%, clip eterne (visto live: 3.4GB dedicata / 26GB shared).
+    # Poll via nvidia-smi (MAI torch.cuda nel processo app).
+    try:
+        from core import gpu_mem as _gm
+        _free_mb = 0
+        for _ in range(30):
+            _free_mb = _gm.free_vram_mb()
+            if _free_mb >= 24000:
+                break
+            time.sleep(1)
+        print(f"[film] VRAM libera pre-worker: {_free_mb}MB", flush=True)
+    except Exception:                                        # noqa: BLE001
+        pass
     jf = out_mp4 + ".json"
     with open(jf, "w") as _f:                        # fix: handle non chiuso (leak FD nei loop)
         json.dump(params, _f)
