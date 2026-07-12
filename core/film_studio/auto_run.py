@@ -197,6 +197,8 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
         prompt, refs = gen_service.compose_shot_prompt(sh, state, guard, path_mode=pmode, flavor="image")
         seed = int(sh.get("seed", 0) or 0) or (int(sh["id"]) * 2654435761 % (2 ** 31 - 1))
         out = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
+        if Path(out).exists() and Path(out).stat().st_size > 1000:   # IDEMPOTENTE: ripresa/riparazione
+            continue                                                 # (rilanciare run() rigenera SOLO i mancanti)
         jid = scheduler.enqueue("image", {"prompt": prompt, "out": out,
                                           "face_ref": (refs["ref_images"] or [""])[0],
                                           "ref_images": refs["ref_images"], "loras": refs["loras"],
@@ -213,6 +215,9 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
     # tutti gli altri — senza, ogni shot rilegge 29GB da disco (visto live: 4 min/clip di cui
     # 2 di solo load). free_for('video') in gen_shot_video svuota prima i server immagine.
     try:
+        import os as _os
+        if _os.environ.get("LTX2_NO_PERSISTENT") == "1":
+            raise RuntimeError("disabilitato da LTX2_NO_PERSISTENT (bug #160 in corso)")
         if not gen_service._ltx2_server_up():
             import subprocess as _sp
             _flags = getattr(_sp, "DETACHED_PROCESS", 0) | getattr(_sp, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -234,6 +239,8 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
         prompt, refs = gen_service.compose_shot_prompt(sh, state, guard, path_mode=pmode, flavor="video")
         seed = int(sh.get("seed", 0) or 0) or (int(sh["id"]) * 2654435761 % (2 ** 31 - 1))
         out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")
+        if Path(out).exists() and Path(out).stat().st_size > 100_000:   # IDEMPOTENTE (vedi keyframe)
+            continue
         kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
         kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
         jid = scheduler.enqueue("video", {"prompt": prompt, "out": out,
