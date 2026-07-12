@@ -172,7 +172,9 @@ def _make_music(pid: int, total_s: float) -> dict | None:
                 src = dest
             except Exception:                                # noqa: BLE001
                 pass
-            return {"path": str(src), "start_s": 0, "volume": 0.3}   # ducking sotto i dialoghi
+            # loop=True: se ACE consegna una traccia più corta del film (visto 23.9s su 180 richiesti,
+            # instabilità #15) la musica si ripete fino a fine video invece di lasciare il silenzio.
+            return {"path": str(src), "start_s": 0, "volume": 0.3, "loop": True}   # ducking sotto i dialoghi
     except Exception:                                        # noqa: BLE001
         pass
     return None

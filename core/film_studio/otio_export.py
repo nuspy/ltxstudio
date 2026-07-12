@@ -145,9 +145,15 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "",
     tracks = [t for t in tracks if t.get("path") and os.path.exists(t["path"])]
     if not tracks:
         os.replace(silent, out_path); return _watermark_master(out_path)
-    # mix multitraccia: ogni traccia ritardata (adelay) e attenuata (volume) → amix
+    # mix multitraccia: ogni traccia ritardata (adelay) e attenuata (volume) → amix.
+    # La durata del MASTER è quella del VIDEO ('-t vdur', NON '-shortest': tagliava il film
+    # alla fine dell'ultima battuta — 147s su 196 nel film di test). track['loop']=True fa
+    # ripetere la traccia (musica corta) fino a fine film.
+    vdur = _probe_dur(silent)
     cmd = ["ffmpeg", "-v", "error", "-i", silent]
     for t in tracks:
+        if t.get("loop"):
+            cmd += ["-stream_loop", "-1"]
         cmd += ["-i", t["path"]]
     filt = []
     for i, t in enumerate(tracks, start=1):
@@ -156,7 +162,8 @@ def render_master(clips: list[str], out_path: str, *, audio: str = "",
     mix_in = "".join(f"[a{i}]" for i in range(1, len(tracks) + 1))
     filt.append(f"{mix_in}amix=inputs={len(tracks)}:duration=longest:dropout_transition=0[aout]")
     cmd += ["-filter_complex", ";".join(filt), "-map", "0:v", "-map", "[aout]",
-            "-c:v", "copy", "-c:a", "aac", "-shortest", out_path, "-y"]
+            "-c:v", "copy", "-c:a", "aac",
+            *(["-t", f"{vdur:.3f}"] if vdur > 0 else ["-shortest"]), out_path, "-y"]
     subprocess.run(cmd, check=False)
     if not os.path.exists(out_path):
         os.replace(silent, out_path)
