@@ -183,14 +183,24 @@ def complete(system: str, user: str, *, json: bool = False, temperature: float |
     return proc.decode(out[0][n_in:], skip_special_tokens=True).strip()
 
 
-def complete_json(system: str, user: str, **kw):
-    """Come complete(json=True) ma fa il parse robusto (estrae l'oggetto/array anche se circondato da testo)."""
-    txt = complete(system, user, json=True, **kw)
-    for pat in (r"\{.*\}", r"\[.*\]"):
-        m = re.search(pat, txt, re.DOTALL)
-        if m:
-            try:
-                return json.loads(m.group(0))
-            except Exception:                               # noqa: BLE001
-                continue
-    raise ValueError("output LLM non è JSON valido:\n" + txt[:500])
+def complete_json(system: str, user: str, *, retries: int = 2, **kw):
+    """Come complete(json=True) ma fa il parse robusto (estrae l'oggetto/array anche se circondato
+    da testo). Se il parse fallisce (tipico: output TRONCATO da max_tokens su breakdown lunghi)
+    RIPROVA fino a `retries` volte alzando il budget del 50% a giro — l'LLM è stocastico e il
+    film automatico non deve morire per un JSON monco (successo al primo run, crash al secondo)."""
+    last = ""
+    mt = int(kw.pop("max_tokens", 1200))
+    for attempt in range(1 + max(0, retries)):
+        txt = complete(system, user, json=True, max_tokens=mt, **kw)
+        last = txt
+        for pat in (r"\{.*\}", r"\[.*\]"):
+            m = re.search(pat, txt, re.DOTALL)
+            if m:
+                try:
+                    return json.loads(m.group(0))
+                except Exception:                           # noqa: BLE001
+                    continue
+        mt = int(mt * 1.5)
+        print(f"[llm] JSON non valido (tentativo {attempt + 1}, probabile troncamento) → "
+              f"riprovo con max_tokens={mt}", flush=True)
+    raise ValueError("output LLM non è JSON valido:\n" + last[:500])
