@@ -33,8 +33,19 @@ def build(pid: int, *, max_tokens: int = 6000) -> int:
         raise RuntimeError("Copione mancante: genera prima il copione")
     racconto = db.latest_script(pid, "narrative")
     ctx = ("Cinematic treatment:\n" + racconto["text"] + "\n\n") if racconto else ""
-    data = L.complete_json(SYS, f"Film duration: {proj.get('duration_s', 60)}s.\n\n{ctx}" + copione["text"],
-                           max_tokens=max_tokens)
+    # VALIDAZIONE DI FORMA + retry: su output troncato il parser di complete_json può ripiegare
+    # sull'ARRAY interno (lista, non dict) o su un dict senza 'scenes' → prima finiva in
+    # "0 scene salvate" SENZA errore e auto_run moriva con "Nessuna ripresa da generare".
+    data = {}
+    for _att in range(3):
+        data = L.complete_json(SYS, f"Film duration: {proj.get('duration_s', 60)}s.\n\n{ctx}" + copione["text"],
+                               max_tokens=int(max_tokens * (1 + 0.5 * _att)))
+        if isinstance(data, dict) and data.get("scenes"):
+            break
+        print(f"[breakdown] risposta senza 'scenes' (tentativo {_att + 1}: "
+              f"{type(data).__name__}) → riprovo con più budget", flush=True)
+    else:
+        raise RuntimeError("breakdown: l'LLM non ha prodotto scene valide dopo 3 tentativi")
     # sostituisci scene/shot precedenti del progetto
     for sc in db.query("scene", "project_id=?", (pid,)):
         for sh in db.query("shot", "scene_id=?", (sc["id"],)):
