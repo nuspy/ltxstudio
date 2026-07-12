@@ -958,7 +958,27 @@ def run_generation(p: dict) -> str:
     # sostituzione a forza con un GGUF più piccolo (era un downgrade non richiesto della qualità, e nel caso
     # limite puntava a un file inesistente → 0 output). Forzabile con gguf_transformer esplicito.
     if "gguf_transformer" not in p and not p.get("model"):
-        g = _auto_gguf()
+        # #158: il GGUF dequantizza in Python A OGNI forward (1660 Linear × step ≈ minuti a passata:
+        # i2v 24f = 629s vs 65s del fp8). Se il checkpoint fp8 di default STA in VRAM (transformer
+        # residente + attivazioni; gemma/vae su CPU con offload=cpu) usiamo QUELLO; il GGUF resta
+        # il fallback per le GPU dove il fp8 non entra (VRAM tarata per macchina, mai fissa).
+        _fits_fp8 = False
+        try:
+            if torch.cuda.is_available():
+                _free_gb = torch.cuda.mem_get_info()[0] / 1e9
+                _ck_def = _resolve_ckpt(None)
+                # con offload=cpu in VRAM resta SOLO il transformer: file bundle − ~10GB di
+                # encoder (gemma/vae/vocoder, che vanno su CPU) + 8GB attivazioni (_WORK_GB).
+                # Misurato: dev-fp8 29GB file → gen 49f OK con 29.5GB liberi, 77s (vs 25min GGUF).
+                _file_gb = os.path.getsize(_ck_def) / 1e9 if os.path.exists(_ck_def) else 29.0
+                _tr_gb = max(12.0, _file_gb - 10.0)
+                _fits_fp8 = _free_gb >= _tr_gb + 8.0
+                print(f"[auto-gguf] check fp8: liberi {_free_gb:.1f}GB vs transformer {_tr_gb:.1f}"
+                      f"+8GB → {'fp8 (niente GGUF, #158)' if _fits_fp8 else 'GGUF (VRAM insufficiente)'}",
+                      flush=True)
+        except Exception as _e158:                           # noqa: BLE001
+            print(f"[auto-gguf] check fp8 fallito ({_e158}) → fallback GGUF", flush=True)
+        g = None if _fits_fp8 else _auto_gguf()
         if g:
             print("[auto-gguf] nessun modello scelto → GGUF Q4 di default", flush=True)
             p["gguf_transformer"] = g
