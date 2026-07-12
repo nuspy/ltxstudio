@@ -27,6 +27,27 @@ NEG = "blurry, low quality, deformed, distorted face, extra limbs, watermark, te
 _REF_RE = re.compile(r"@([A-Za-z0-9_]+)(?:#([A-Za-z0-9_]+))?")
 
 
+# ─────────────── prompt → JSON strutturato (schema PromptBuilder), condiviso ───────────────
+def _apply_prompt_json(prompt: str, negative: str, loras: list | None, out_path: str,
+                       *, kind: str, structure: bool) -> tuple[str, str]:
+    """Converte il prompt nello schema JSON e lo ricompone (trigger LoRA preservati). Salva il JSON accanto
+    all'output per riapertura/modifica. No-op se disattivato (LTX_PROMPT_JSON=0) o structure=False.
+    Restituisce (prompt_ricomposto, negative_unito)."""
+    from core import prompt_struct
+    if not structure or not prompt_struct.enabled():
+        return prompt, negative
+    triggers = [l.get("trigger", "") for l in (loras or []) if l.get("trigger")]
+    new_prompt, extra_neg, pj = prompt_struct.structure_and_compose(prompt, kind=kind, triggers=triggers)
+    if extra_neg:
+        negative = (negative + ", " + extra_neg).strip(", ") if negative else extra_neg
+    try:                                                     # sidecar JSON (non fatale)
+        with open(out_path + ".prompt.json", "w", encoding="utf-8") as _f:
+            json.dump(pj, _f, ensure_ascii=False, indent=2)
+    except Exception:                                        # noqa: BLE001
+        pass
+    return new_prompt, negative
+
+
 # ─────────────── @Reference resolver ───────────────
 def resolve_refs(text: str, path_mode: str = "fast", flavor: str = "image") -> dict:
     """Estrae gli @Nome[#Variante] dal testo e li risolve in {ref_images, loras, trigger_map, clean_text}.
@@ -73,13 +94,48 @@ def resolve_refs(text: str, path_mode: str = "fast", flavor: str = "image") -> d
             "trigger_map": trigger_map, "clean_text": clean}
 
 
+def style_suffix(cfg: dict) -> str:
+    """Style Bible del progetto → coda iniettata in OGNI prompt (logline/palette/look/registi). Condivisa
+    tra storyboard (UI) e auto_run (Lucky Director). Vuoto se non impostata."""
+    sb = (cfg or {}).get("style_bible") or {}
+    bits = []
+    if sb.get("look"):
+        bits.append(sb["look"])
+    if sb.get("palette"):
+        bits.append("color palette: " + sb["palette"])
+    if sb.get("directors"):
+        bits.append("in the visual style of " + sb["directors"])
+    if sb.get("logline"):
+        bits.append("overall tone: " + sb["logline"])
+    return (", " + ", ".join(bits)) if bits else ""
+
+
+def compose_shot_prompt(sh: dict, state: dict, guard: dict, *, path_mode: str = "fast",
+                        flavor: str = "image") -> tuple[str, dict]:
+    """Costruisce il prompt di generazione di uno shot (identico a storyboard._gen): @ref risolti +
+    camera/luce + tag di continuity + 'required' + Style Bible. Ritorna (prompt, refs). CONDIVISO
+    tra Cinema Studio e Lucky Director. La conversione in JSON avviene poi dentro gen_image/gen_shot_video."""
+    from core.film_studio import continuity as ct
+    required = (guard or {}).get("required", "")
+    refs = resolve_refs(sh.get("description", ""), path_mode, flavor=flavor)
+    cam = (sh.get("camera") or "").strip()
+    prompt = (refs["clean_text"] + ". " + (cam + ". " if cam else "")
+              + ct.to_prompt(state) + ((", " + required) if required else "")
+              + style_suffix(guard))
+    return prompt, refs
+
+
 # ─────────────── immagini (keyframe / asset sheet) ───────────────
 def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 1024, seed: int = 7,
               face_ref: str = "", ref_image: str = "", ref_images: list | None = None,
-              loras: list | None = None, arch: str = "flux", model: str = "", negative: str = "") -> str:
+              loras: list | None = None, arch: str = "flux", model: str = "", negative: str = "",
+              structure: bool = True) -> str:
     """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali.
     arch/model: architettura+checkpoint scelti nel progetto (B5: prima hardcoded flux). negative: estende il
-    negative di default (continuity elementi vietati)."""
+    negative di default (continuity elementi vietati). structure: converte il prompt in JSON strutturato
+    (schema PromptBuilder) e lo ricompone — così OGNI invio passa dallo stesso formato (Lucky Director / Cinema
+    Studio). Il JSON è salvato in <out_png>.prompt.json per riapertura/modifica."""
+    prompt, negative = _apply_prompt_json(prompt, negative, loras, out_png, kind="image", structure=structure)
     neg = NEG + (", " + negative if negative else "")
     params = {"arch": arch, "prompt": prompt, "negative": neg, "width": width, "height": height,
               "steps": 22, "guidance": 3.5, "seed": seed, "output": out_png}
@@ -149,14 +205,37 @@ def _submit_persistent(params: dict, out_mp4: str, timeout: int = 1800) -> str:
 def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int = 512, fps: int = 25,
                    duration_s: float = 4.0, seed: int = 7, keyframes: list | None = None,
                    loras: list | None = None, audio_path: str = "", model_gguf: str = "",
-                   negative: str = "") -> str:
+                   negative: str = "", structure: bool = True) -> str:
     """Genera il video di uno shot col worker nativo LTX-2.3 GGUF. keyframes=[{path,frame,strength}].
-    model_gguf: transformer scelto nel progetto (B5), altrimenti il distilled Q4 di default."""
+    model_gguf: transformer scelto nel progetto (B5), altrimenti il distilled Q4 di default.
+    structure: converte il prompt in JSON strutturato e lo ricompone (vedi gen_image)."""
+    prompt, negative = _apply_prompt_json(prompt, negative, loras, out_mp4, kind="video", structure=structure)
     nf = max(9, int(round(duration_s * fps)) // 8 * 8 + 1)
     neg = NEG + (", " + negative if negative else "")
-    params = {"gguf_transformer": model_gguf or GGUF, "prompt": prompt, "negative": neg, "width": width,
+    params = {"prompt": prompt, "negative": neg, "width": width,
               "height": height, "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0,
-              "seed": seed, "offload": "cpu", "output": out_mp4}
+              "seed": seed, "output": out_mp4}
+    # #158: GGUF/offload solo se SCELTI nel progetto (B5). In auto decide il worker: fp8 residente
+    # se entra in VRAM (4s/step), GGUF+cpu come fallback per GPU piccole. Prima si forzava SEMPRE
+    # il Q4 col dequant per-forward → ~470s/step su ogni shot del film.
+    if model_gguf:
+        params["gguf_transformer"] = model_gguf
+        params["offload"] = "cpu"
+    # libera i server delle ALTRE categorie (es. FLUX 22GB dei keyframe) prima del video 22B:
+    # senza, il transformer LTX spillava in shared-VRAM (clip da 21+ min nel film di test).
+    try:
+        from core import mem_coordinator as _mc
+        _mc.free_for("video", timeout=20)
+    except Exception:                                        # noqa: BLE001
+        pass
+    # e sfratta Gemma (device_map='auto' l'ha messa in VRAM al copione e nessuno la scaricava):
+    # il prompt JSON di questo shot è già stato calcolato sopra; al prossimo shot si ricarica
+    # (VRAM di nuovo libera a worker uscito) o va in CPU da sola se stretta.
+    try:
+        from core import lyrics_llm as _lllm
+        _lllm.unload()
+    except Exception:                                        # noqa: BLE001
+        pass
     if keyframes:
         params["keyframes"] = keyframes
     if loras:
