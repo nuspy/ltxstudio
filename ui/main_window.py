@@ -2934,7 +2934,7 @@ class MainWindow(QMainWindow):
             "image_path": src, "model": cfg.get("esrgan_model"),
             "target_scale": int(cfg.get("target_scale", 2) or 2), "seed": _r.randint(0, 2**31),
         }
-        self._log(f"[nativo] definizione video (upscale per-frame x{params['scale']}) su {Path(src).name}…")
+        self._log(f"[nativo] definizione video (upscale per-frame x{params['target_scale']}) su {Path(src).name}…")
         self._native_worker = _NativeImageWorker(params, module="video_upscale")
         self._enqueue(tr("queue.job.video_upscale", "Definizione video (upscale)"), self._native_worker,
                       self._on_multitalk_done)

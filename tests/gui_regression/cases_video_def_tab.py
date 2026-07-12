@@ -91,8 +91,8 @@ def case_enhance_engine_esrgan(w, spy):
     c = spy.calls[-1]
     assert c["module"] == "video_upscale", f"module inatteso per ESRGAN: {c}"
     p = c["params"]
-    assert p.get("video") == src, f"video mancante/errato: {p}"
-    assert p.get("scale"), f"scale mancante: {p}"
+    assert p.get("image_path") == src, f"image_path (video sorgente) mancante/errato: {p}"
+    assert p.get("target_scale"), f"target_scale mancante: {p}"
 
 
 def case_enhance_engine_seedvr2(w, spy):

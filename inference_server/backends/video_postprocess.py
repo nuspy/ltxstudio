@@ -70,6 +70,18 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
     if not video or not os.path.exists(video):
         return {"status": "error", "error": f"video non trovato: {video}"}
     model = params.get("model") or r"E:\AI\Models\facerestore_models\GFPGANv1.4.pth"
+    # la GUI passa il NOME file (es. 'codeformer-v0.1.0.pth'), non il path: risolvi nelle dir note
+    if not os.path.exists(str(model)):
+        _name = os.path.basename(str(model))
+        for _d in (r"E:\AI\Models\facerestore_models",
+                   r"E:\AI\Comfy_Nexus.bak\ComfyUI\models\facerestore_models"):
+            _cand = os.path.join(_d, _name)
+            if os.path.exists(_cand):
+                model = _cand
+                break
+        else:
+            return {"status": "error", "error": f"modello restauro volti non trovato: {_name} "
+                    r"(atteso in E:\AI\Models\facerestore_models)"}
     # ARCH corretto dal nome modello: CodeFormer ha la 'fidelity' (weight), GFPGAN no. Prima si caricava
     # SEMPRE come GFPGAN 'clean' → un checkpoint CodeFormer sbagliava arch e la fidelity era ignorata.
     _fid = float(params.get("fidelity", 0.5) or 0.5)
