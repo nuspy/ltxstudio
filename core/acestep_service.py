@@ -65,7 +65,10 @@ def make_job(tags: str, lyrics: str = "", out_name: str = "song", *, duration: f
              steps: int = 60, guidance: float = 15.0, gs_text: float = 0.0, gs_lyric: float = 0.0,
              lazy: bool = False, adv: dict | None = None, **cbs) -> Job:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    a = adv or {}
+    a = dict(adv or {})
+    # DEFAULT overlapped-decode (validato dall'utente 12/07): il decode DCAE per segmenti separati
+    # produceva audio "frammentato a microsegmenti"; con l'overlap le giunzioni spariscono.
+    a.setdefault("overlapped_decode", True)
     ext = a.get("format") or "wav"
     out = OUT_DIR / f"{_safe(out_name)}.{ext}"
     cmd = [AS_VENV_PY, "-u", str(GEN_SCRIPT), "--tags", tags, "--lyrics", lyrics or "",

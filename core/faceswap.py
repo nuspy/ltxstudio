@@ -107,6 +107,33 @@ def _source_face(path: str):
     return max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
 
 
+def _restore_swapped_face(img):
+    """Post-restore del volto swappato (GFPGAN/CodeFormer): inswapper lavora a 128×128 → il volto
+    incollato è plasticoso/a bassa risoluzione (review utente 12/07). Il restauro riporta pelle e
+    dettaglio alla risoluzione del target. Best-effort (senza gfpgan → immagine invariata).
+    Opt-out: FACESWAP_RESTORE=0. Modello override: FACESWAP_RESTORE_MODEL."""
+    if os.environ.get("FACESWAP_RESTORE", "1") != "1":
+        return img
+    try:
+        from gfpgan import GFPGANer
+        model = os.environ.get("FACESWAP_RESTORE_MODEL",
+                               r"E:\AI\Models\facerestore_models\GFPGANv1.4.pth")
+        if not os.path.exists(model):
+            return img
+        _is_cf = "codeformer" in os.path.basename(model).lower()
+        try:
+            restorer = GFPGANer(model_path=model, upscale=1,
+                                arch="CodeFormer" if _is_cf else "clean", channel_multiplier=2)
+        except Exception:                                # noqa: BLE001 — gfpgan vecchio senza arch CodeFormer
+            restorer = GFPGANer(model_path=model, upscale=1, arch="clean", channel_multiplier=2)
+        _, _, restored = restorer.enhance(img, has_aligned=False, only_center_face=False,
+                                          paste_back=True)
+        return restored if restored is not None else img
+    except Exception as _e:                              # noqa: BLE001
+        print(f"[faceswap] restauro volto saltato ({_e})", flush=True)
+        return img
+
+
 def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
     if not os.environ.get("FACESWAP_INPROC") and not _has_insightface():
         return _delegate("image", target_path, source_face_path, out_path)   # → inference_server_venv
@@ -118,6 +145,7 @@ def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
         raise FileNotFoundError(target_path)
     for f in app.get(img):
         img = sw.get(img, f, src, paste_back=True)
+    img = _restore_swapped_face(img)                     # anti-"plasticoso": restauro post-swap
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     cv2.imwrite(out_path, img)
     try:  # #107 firma invisibile di provenienza (default ON) — PRIMA del watermark visibile
