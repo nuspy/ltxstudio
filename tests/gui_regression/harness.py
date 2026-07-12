@@ -38,6 +38,12 @@ def app():
     return _APP
 
 
+# True quando la suite gira in modalità REALE (run_real.py): i casi scritti per i rami
+# ComfyUI MOCKATI (es. rig via _force_comfy + cattura rigger.build) non sono eseguibili
+# lì (RealSpy intercetta solo _enqueue, ComfyUI è dismesso) → skippano con nota.
+REAL_MODE = False
+
+
 def patch_dialogs():
     """Rende non-bloccanti i dialog modali (altrimenti i test si piantano in offscreen)."""
     from PySide6.QtWidgets import QMessageBox, QFileDialog, QInputDialog, QDialog

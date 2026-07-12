@@ -21,6 +21,22 @@ from pathlib import Path
 import harness as H
 
 
+class _SkipComfyBranch(Exception):
+    """Segnala lo skip dei casi comfy-mock in run reale (intercettata dai casi stessi)."""
+
+
+def _skip_in_real(fn):
+    """Decoratore: il caso ritorna subito (skip) se _force_comfy segnala REAL_MODE."""
+    def _w(w, spy):
+        try:
+            return fn(w, spy)
+        except _SkipComfyBranch:
+            return                                    # skip esplicito in run_real
+    _w.__doc__ = fn.__doc__
+    _w.__name__ = getattr(fn, "__name__", "case")
+    return _w
+
+
 # ───────────────────────── helper ─────────────────────────
 def _open_rig(w):
     """Porta in primo piano il tab Rig (no-op se non in un QTabWidget)."""
@@ -45,7 +61,11 @@ def _set_mesh(w, name: str = "_rig_test_mesh.glb") -> str:
 
 def _force_comfy(w):
     """Forza il ramo ComfyUI (SkinTokens nativo NON installato, driver up, nodo presente, Blender ok)
-    e cattura i kwargs passati a RigPipeline.build. Ritorna il dict `cap`."""
+    e cattura i kwargs passati a RigPipeline.build. Ritorna il dict `cap`.
+    SOLO SUITE MOCK: in run_real (H.REAL_MODE) questo ramo non è eseguibile (RealSpy non
+    intercetta driver.submit e ComfyUI è dismesso) → i casi che lo usano skippano."""
+    if getattr(H, "REAL_MODE", False):
+        raise _SkipComfyBranch()
     from core import rig_service
     import core.blender_installer as bi
     rig_service.is_installed = lambda: False
@@ -283,7 +303,7 @@ def case_get_config_shape(w, spy):
     assert not missing, f"get_config() chiavi mancanti: {missing}"
 
 
-CASES = [
+_RAW_CASES = [
     ("rig_generate_default",
      "Rig (default): la GUI invia una richiesta backend con mesh + template di default.",
      case_generate_default),
@@ -346,3 +366,7 @@ CASES = [
     ("rig_get_config_shape",
      "get_config() espone tutte le chiavi attese dalla pipeline.", case_get_config_shape),
 ]
+
+# In run_real i casi comfy-mock skippano (via _SkipComfyBranch dentro _force_comfy); il wrap è
+# innocuo per la suite mock. Il ramo NATIVO (rig_native_branch) resta eseguito ovunque.
+CASES = [(n, d, _skip_in_real(f)) for n, d, f in _RAW_CASES]

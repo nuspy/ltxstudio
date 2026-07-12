@@ -26,6 +26,7 @@ OUTDIR = ROOT / "output" / "tests" / "REAL"
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
 import harness as H                       # noqa: E402  (riusa build helpers/dialoghi)
+H.REAL_MODE = True                        # i casi comfy-mock (rig ecc.) skippano in run reale
 
 
 def _ram_vram() -> str:
