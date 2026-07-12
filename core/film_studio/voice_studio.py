@@ -178,10 +178,14 @@ def auto_cast_voices(project_id: int) -> int:
         idx = used.get(gender, 0)
         used[gender] = idx + 1
         chosen = same[idx % len(same)] if same else None
-        pitches = ["+0Hz", "-25Hz", "+25Hz", "-40Hz", "+40Hz"]          # giro-preset esaurito → varia il tono
-        extra = pitches[(idx // max(1, len(same))) % len(pitches)] if same else "+0Hz"
-        pr = {"rate": "+0%", "volume": "+0%",
-              "pitch": f"{_hz(_AGE_PITCH.get(age, '+0Hz')) + _hz(extra):+d}Hz"}
+        # prosodia differenziata DENTRO lo stesso genere (review 12/07: i preset Edge della
+        # stessa lingua si somigliano troppo — Elsa vs Isabella ~3Hz). La rotazione usa l'indice
+        # PER-GENERE: il primo di ogni genere resta naturale (maschile grave, femminile acuto),
+        # i successivi si scostano di tono/ritmo → distinguibili senza uscire dal registro.
+        pitches = ["+0Hz", "-30Hz", "+35Hz", "-15Hz", "+20Hz"]
+        rates = ["+0%", "-10%", "+8%", "-5%", "+12%"]
+        pr = {"rate": rates[idx % len(rates)], "volume": "+0%",
+              "pitch": f"{_hz(_AGE_PITCH.get(age, '+0Hz')) + _hz(pitches[idx % len(pitches)]):+d}Hz"}
         db.insert("voice", origin="auto_cast", name=f"voce_{a.get('name', 'attore')}",
                   params=json.dumps({"engine": "edge", "voice_id": chosen.voice_id if chosen else "",
                                      "language": lang, "gender": gender, "age": age, "prosody": pr},
@@ -210,9 +214,17 @@ def synth_dialogue(text: str, voice_row: dict, out_wav: str, *, engine: str = ""
         raise RuntimeError("Handy-API non disponibile (:8720).")
     if engine == "edge":
         pr = params.get("prosody") or {}
-        T.edge_synthesize(text, params.get("voice_id", ""), Path(out_wav),
-                          rate=pr.get("rate", "+0%"), volume=pr.get("volume", "+0%"),
-                          pitch=pr.get("pitch", "+0Hz"))
+        got = T.edge_synthesize(text, params.get("voice_id", ""), Path(out_wav),
+                                rate=pr.get("rate", "+0%"), volume=pr.get("volume", "+0%"),
+                                pitch=pr.get("pitch", "+0Hz"))
+        # Edge produce MP3; i chiamanti (mix master, _wav_dur, lip-sync a2v) usano il PATH .wav
+        # richiesto → senza conversione le battute andavano perse in silenzio nel montaggio.
+        if str(got) != str(out_wav) and Path(got).exists():
+            import subprocess as _sp
+            _sp.run(["ffmpeg", "-y", "-v", "error", "-i", str(got), str(out_wav)],
+                    capture_output=True, timeout=120)
+            if not Path(out_wav).exists():
+                return str(got)                              # conversione fallita: almeno l'mp3 vero
     else:                                                   # clone CosyVoice via job
         job = __import__("core.cosyvoice_service", fromlist=["make_job"]).make_job(
             text, voice_row.get("sample", ""), out_name=Path(out_wav).stem)
