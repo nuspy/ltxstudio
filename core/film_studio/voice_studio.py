@@ -115,6 +115,82 @@ def voice_for_actor(actor_id: int) -> dict | None:
     return rows[0] if rows else None
 
 
+def _hz(s: str) -> int:
+    try:
+        return int(str(s).replace("Hz", "").replace("+", ""))
+    except Exception:                                       # noqa: BLE001
+        return 0
+
+
+def auto_cast_voices(project_id: int) -> int:
+    """Casting AUTOMATICO per la run headless (Lucky Director / «Genera film completo»):
+    1) ricava gli attori dai dialoghi del breakdown (@Nome); 2) crea gli asset Attore mancanti
+    (con breve descrizione visiva LLM — aiuta anche la coerenza dei prompt); 3) a ogni attore
+    senza voce lega una voce DISTINTA e deterministica — preset Edge per genere/lingua RUOTATO
+    tra gli attori dello stesso genere + prosodia (pitch) differenziata (voice.actor_id →
+    stessa voce per tutte le battute del personaggio, in ogni scena).
+    Senza questo, in auto le battute venivano SALTATE (film muto: il flusso automatico non
+    creava né asset né voci — solo la GUI Asset lo faceva). Ritorna quante voci ha creato."""
+    import time as _t
+
+    # attori citati nei dialoghi (fonte di verità del breakdown; la tabella asset è GLOBALE)
+    mentioned: dict[str, dict] = {}
+    for sc in db.query("scene", "project_id=?", (project_id,), order="ord"):
+        for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
+            for d in json.loads(sh.get("dialogues") or "[]"):
+                nm = (d.get("actor") or "").lstrip("@").strip()
+                if nm:
+                    ent = mentioned.setdefault(nm.lower(), {"name": nm, "lines": []})
+                    ent["lines"].append(d.get("text") or "")
+
+    used: dict[str, int] = {}
+    made = 0
+    for key in sorted(mentioned):
+        nm = mentioned[key]["name"]
+        assets = [x for x in db.find_assets(nm, "actor") if (x.get("name") or "").lower() == nm.lower()]
+        if assets:
+            a = assets[0]
+        else:                                               # asset mancante in auto: crealo (scope come la GUI)
+            sample = " ".join(mentioned[key]["lines"][:3])[:280]
+            try:
+                vis = L.complete(
+                    "Describe this film character's physical appearance in ONE short sentence "
+                    "(age, build, hair, distinctive traits). Output only the sentence.",
+                    f"Character: {nm}. Sample lines: {sample}", max_tokens=80).strip()
+            except Exception:                               # noqa: BLE001
+                vis = ""
+            aid = db.insert("asset", type="actor", name=nm, description=vis, fields="{}",
+                            tags="", scope="project", created=_t.time())
+            a = {"id": aid, "name": nm, "description": vis}
+        if voice_for_actor(a["id"]):
+            continue
+        desc = f"{nm}. {a.get('description') or ''} Battute: " + " ".join(mentioned[key]["lines"][:3])[:200]
+        try:
+            attrs = L.complete_json(_SYS, desc, max_tokens=200)
+        except Exception:                                   # noqa: BLE001
+            attrs = {}
+        gender = str(attrs.get("gender") or ("female" if made % 2 else "male")).lower()
+        age = str(attrs.get("age") or "adult")
+        lang = _LANG.get(str(attrs.get("language", "it")).lower(), "it-IT")
+        presets = T.edge_list_voices(lang.split("-")[0]) if T.edge_available() else []
+        same = [p for p in presets
+                if (("female" in (p.name or "").lower()) == (gender == "female"))] or presets
+        idx = used.get(gender, 0)
+        used[gender] = idx + 1
+        chosen = same[idx % len(same)] if same else None
+        pitches = ["+0Hz", "-25Hz", "+25Hz", "-40Hz", "+40Hz"]          # giro-preset esaurito → varia il tono
+        extra = pitches[(idx // max(1, len(same))) % len(pitches)] if same else "+0Hz"
+        pr = {"rate": "+0%", "volume": "+0%",
+              "pitch": f"{_hz(_AGE_PITCH.get(age, '+0Hz')) + _hz(extra):+d}Hz"}
+        db.insert("voice", origin="auto_cast", name=f"voce_{a.get('name', 'attore')}",
+                  params=json.dumps({"engine": "edge", "voice_id": chosen.voice_id if chosen else "",
+                                     "language": lang, "gender": gender, "age": age, "prosody": pr},
+                                    ensure_ascii=False),
+                  sample="", actor_id=a["id"])
+        made += 1
+    return made
+
+
 def synth_dialogue(text: str, voice_row: dict, out_wav: str, *, engine: str = "") -> str:
     """Sintetizza una battuta. Il MOTORE è scelto dall'utente (param `engine`, o quello salvato nella
     voce): 'kokoro'/'handy_clone' = Handy-API; 'edge'/'cosyvoice2'/... = motore predisposto. Nessun
