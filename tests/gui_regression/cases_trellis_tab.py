@@ -431,7 +431,7 @@ _RAW_CASES = [
 
 # Un caso per OGNI risoluzione concreta (scopre 'funziona solo una risoluzione/modello').
 for _res in _RESOLUTIONS:
-    CASES.append((
+    _RAW_CASES.append((
         f"trellis_resolution_{_res}",
         f"Risoluzione '{_res}': build riceve resolution='{_res}'.",
         _comfy_case(
@@ -444,7 +444,7 @@ for _res in _RESOLUTIONS:
 
 # Un caso per OGNI formato di export.
 for _fmt in _FORMATS:
-    CASES.append((
+    _RAW_CASES.append((
         f"trellis_format_{_fmt}",
         f"Formato '{_fmt}': build riceve file_format='{_fmt}'.",
         _comfy_case(
@@ -457,7 +457,7 @@ for _fmt in _FORMATS:
 
 # Un caso per OGNI precisione.
 for _prec in _PRECISIONS:
-    CASES.append((
+    _RAW_CASES.append((
         f"trellis_precision_{_prec}",
         f"Precisione '{_prec}': build riceve precision='{_prec}'.",
         _comfy_case(
@@ -470,7 +470,7 @@ for _prec in _PRECISIONS:
 
 # Un caso per OGNI backend di attention.
 for _att in _ATTN:
-    CASES.append((
+    _RAW_CASES.append((
         f"trellis_attn_{_att}",
         f"Attention '{_att}': build riceve attn_backend='{_att}'.",
         _comfy_case(
@@ -483,7 +483,7 @@ for _att in _ATTN:
 
 # Un caso per OGNI colore di sfondo.
 for _bg in _BG:
-    CASES.append((
+    _RAW_CASES.append((
         f"trellis_bg_{_bg}",
         f"Sfondo '{_bg}': build riceve background_color='{_bg}'.",
         _comfy_case(
@@ -496,7 +496,7 @@ for _bg in _BG:
 
 # Un caso per OGNI dimensione texture.
 for _ts in _TEX_SIZES:
-    CASES.append((
+    _RAW_CASES.append((
         f"trellis_tex_size_{_ts}",
         f"Dimensione texture '{_ts}': build riceve texture_size={_ts}.",
         _comfy_case(
