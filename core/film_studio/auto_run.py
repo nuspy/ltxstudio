@@ -107,7 +107,10 @@ def _synth_dialogue_tracks(pid: int) -> list[dict]:
 
 
 def _shot_dialogue_audio(sh: dict, outdir: str) -> str:
-    """PRIMO dialogo dello shot → wav (per il lip-sync a2v del video). Headless. Vedi storyboard equivalente."""
+    """PRIMO dialogo dello shot → wav (per il lip-sync a2v del video). Headless. Vedi storyboard equivalente.
+    Il wav viene PADDATO DI SILENZIO alla durata esatta dello shot: la pipeline a2v esige che
+    l'audio copra l'intera clip (battuta 5s su shot 12s → AssertionError 'Latent shape [125]
+    does not match [297]' = i 7 shot col parlato persi nel film di test 12/07)."""
     try:
         from core.film_studio import voice_studio as vs
         for d in json.loads(sh.get("dialogues") or "[]"):
@@ -121,6 +124,16 @@ def _shot_dialogue_audio(sh: dict, outdir: str) -> str:
                 continue
             wav = str(Path(outdir) / f"shot_{sh['ord']}_dlg.wav")
             vs.synth_dialogue(text, vrow, wav)
+            dur = float(sh.get("duration_s") or 0)
+            if dur > 0:
+                import shutil as _sh
+                import subprocess as _sp
+                padded = str(Path(outdir) / f"shot_{sh['ord']}_dlg_pad.wav")
+                _ff = _sh.which("ffmpeg") or "ffmpeg"
+                _sp.run([_ff, "-y", "-v", "error", "-i", wav, "-af", "apad",
+                         "-t", f"{dur:.3f}", padded], capture_output=True, timeout=120)
+                if Path(padded).exists() and Path(padded).stat().st_size > 1000:
+                    return padded
             return wav
     except Exception:                                        # noqa: BLE001
         pass
