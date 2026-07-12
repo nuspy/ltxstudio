@@ -302,12 +302,17 @@ class TrellisTab(QWidget):
         af = QFormLayout(a_grp); af.setLabelAlignment(Qt.AlignRight)
         self.precision = QComboBox()
         self.precision.addItems(["auto", "bf16", "fp16", "fp32"])
+        # default bf16+sdpa+gray = parametri della generazione di riferimento approvata
+        # (con "auto" precisione/attention aggressive → meno dettagli, cuciture texture)
+        self.precision.setCurrentText("bf16")
         af.addRow(tr("trellis.adv.precision"), self.precision)
         self.attn = QComboBox()
         self.attn.addItems(["auto", "flash_attn", "xformers", "sdpa", "sageattn"])
+        self.attn.setCurrentText("sdpa")
         af.addRow(tr("trellis.adv.attn"), self.attn)
         self.bg_color = QComboBox()
         self.bg_color.addItems(["black", "gray", "white"])
+        self.bg_color.setCurrentText("gray")
         af.addRow(tr("trellis.adv.bg"), self.bg_color)
         v.addWidget(a_grp)
 
