@@ -43,8 +43,88 @@ from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
 from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
 from ltx_pipelines.a2vid_two_stage import A2VidPipelineTwoStage   # audio→video (lip-sync canto), nativo
 from ltx_pipelines.utils.args import ImageConditioningInput
-from ltx_pipelines.utils.media_io import encode_video
+from ltx_pipelines.utils.media_io import encode_video as _encode_video_torchcodec
 from ltx_pipelines.utils.types import OffloadMode
+
+
+def _torchcodec_ok() -> bool:
+    """torchcodec riesce a caricare le sue DLL FFmpeg?
+
+    Se NO, `encode_video` — che è la funzione che SCRIVE l'mp4 — muore con SEGFAULT (exit 139):
+    il video viene generato benissimo (denoise completo) e poi il processo esplode NELL'ATTO DI
+    SALVARE, senza traceback e senza file. È il motivo per cui il videoclip riempiva la cartella di
+    .json e non produceva un solo video, e per cui i test 'a occhio' sembravano crash casuali.
+    """
+    try:
+        from torchcodec.encoders import VideoEncoder  # noqa: F401
+        return True
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[encode] torchcodec NON caricabile ({type(_e).__name__}) → salvo con PyAV", flush=True)
+        return False
+
+
+def _encode_video_pyav(video, fps: int, audio, output_path: str, **_kw) -> None:
+    """Salvataggio del video con PyAV (fallback quando torchcodec non carica le FFmpeg).
+
+    Stessa semantica di encode_video: accetta un tensore [F,H,W,C] o un iteratore di chunk.
+    """
+    import av
+    import numpy as np
+
+    chunks = [video] if torch.is_tensor(video) else list(video)
+    if not chunks:
+        raise RuntimeError("encode: nessun frame da salvare")
+    first = chunks[0]
+    h, w = int(first.shape[-3]), int(first.shape[-2])
+
+    container = av.open(output_path, mode="w")
+    stream = container.add_stream("libx264", rate=int(fps))
+    stream.width, stream.height = w, h
+    stream.pix_fmt = "yuv420p"
+    stream.options = {"crf": "19", "preset": "veryfast"}
+    for chunk in chunks:
+        arr = chunk.detach().to("cpu").float().clamp(0, 1).mul(255).to(torch.uint8).numpy()
+        for frame in arr:                                    # [H,W,C] uint8
+            container.mux(stream.encode(av.VideoFrame.from_ndarray(np.ascontiguousarray(frame),
+                                                                   format="rgb24")))
+    for pkt in stream.encode():
+        container.mux(pkt)
+    container.close()
+
+    if audio is not None:                                    # audio: muxato con ffmpeg (PyAV già scritto il video)
+        try:
+            import shutil
+            import subprocess
+            import tempfile
+            wav = tempfile.mktemp(suffix=".wav")
+            import soundfile as sf
+            # L'oggetto Audio di ltx_pipelines espone `waveform` (C,N), NON `data`: chiedere .data sollevava
+            # AttributeError, l'except qui sotto lo declassava a una riga di log e OGNI video a2v (canto/talk)
+            # usciva MUTO — proprio la funzione il cui unico scopo è il lip-sync sull'audio. Il ramo torchcodec
+            # (che usa .waveform) non lo nascondeva, ma su Windows torchcodec non carica le sue FFmpeg → si
+            # passa SEMPRE di qui.
+            _w = getattr(audio, "waveform", None)
+            if _w is None:
+                _w = audio.data                              # compat con eventuali altri tipi audio
+            arr = _w.detach().cpu().float().numpy()
+            if arr.ndim == 3:                                # (B,C,N) → (C,N)
+                arr = arr[0]
+            sf.write(wav, arr.T, int(audio.sampling_rate))   # soundfile vuole (N,C)
+            tmp = output_path + ".mux.mp4"
+            ff = shutil.which("ffmpeg") or "ffmpeg"
+            subprocess.run([ff, "-y", "-loglevel", "error", "-i", output_path, "-i", wav,
+                            "-c:v", "copy", "-c:a", "aac", "-shortest", tmp], check=True)
+            os.replace(tmp, output_path)
+        except Exception as _ae:                             # noqa: BLE001 — meglio il video muto che nessun video
+            print(f"[encode] !! AUDIO NON MUXATO ({type(_ae).__name__}: {_ae}) → video MUTO", flush=True)
+
+
+def encode_video(video, fps, audio, output_path, video_chunks_number=None, **kw):
+    """Scrive l'mp4: torchcodec se le sue DLL caricano, altrimenti PyAV."""
+    if _torchcodec_ok():
+        return _encode_video_torchcodec(video=video, fps=fps, audio=audio, output_path=output_path,
+                                        video_chunks_number=video_chunks_number, **kw)
+    return _encode_video_pyav(video, fps, audio, output_path)
 
 # Fix meta-tensor: il meta-device loading di ltx-core + l'ottimizzazione SDPA-mask di transformers
 # fa `.item()` su un tensore 'meta' (crash su qualsiasi torch recente). Disabilitando lo skip,
@@ -413,7 +493,17 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         except Exception:                                    # noqa: BLE001
             tr_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
             _how = "file"
-        _ENC_GB = 10.0                                        # gemma text-encoder (~9) + vae + vocoder
+        # ⚠ La stima `tr_gb` di vram_estimate conta il BUNDLE INTERO (transformer + gemma + vae +
+        # vocoder ≈ 37GB) e poi ci sommava ANCORA _ENC_GB: need=55 su 32GB di VRAM ⇒ sceglieva
+        # SEMPRE 'cpu'. E 'cpu' = block-streaming = pesi in PINNED MEMORY: con un pagefile fisso da
+        # 16GB l'allocazione fallisce e il processo muore di SEGFAULT (exit 139) mentre carica —
+        # denoise perfetto, poi crash, zero mp4. Era questo a far fallire ogni clip del videoclip.
+        # Il transformer DA SOLO è ~(file − 10GB di encoder), esattamente come stima l'auto-gguf qui
+        # sopra; con quello, su 32GB l'fp8 RESIDENTE ci sta — e va pure 3× più veloce (1.46 s/it vs
+        # 4.75 s/it in streaming). Misurato il 13/07 su 704x1280x65f.
+        _file_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 29.0
+        tr_gb = min(tr_gb, max(12.0, _file_gb - 10.0))        # niente doppio conteggio degli encoder
+        _ENC_GB = 0.0                                         # gemma/vae vanno su CPU comunque
         _WORK_GB = 8.0                                        # attivazioni temporali (picco denoise/decode)
         # M4 — budget attivazioni DINAMICO (env LTX_DYNAMIC_WORKBUDGET=1): scala col volume del clip
         # (width×height×frames) invece del fisso 8GB. Su clip piccoli tiene tutto residente più spesso; su clip
@@ -836,6 +926,18 @@ def run_t2a(p: dict) -> str:
     return out
 
 
+def _has_audio_track(path: str) -> bool:
+    """Il file ha davvero una traccia audio? (ffprobe). Usato per accorgersi che un a2v è uscito muto."""
+    import subprocess
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
+                            "stream=codec_type", "-of", "csv=p=0", path],
+                           capture_output=True, text=True, timeout=30)
+        return "audio" in (r.stdout or "")
+    except Exception:                                        # noqa: BLE001
+        return True                                          # in dubbio: non toccare il file
+
+
 def _ensure_stereo(audio_path: str) -> str:
     """L'audio VAE LTX-2 richiede 2 canali (conv_in groups=1, 2ch). Le registrazioni voce sono spesso
     MONO → conv2d fallisce ('expected 2 channels, got 1'). Convertiamo a stereo via ffmpeg se serve;
@@ -949,45 +1051,22 @@ def run_generation(p: dict) -> str:
     _chunk = int(p.get("chunk_frames", 0))
     if _chunk and int(p.get("num_frames", 0)) > _chunk:
         return _run_chunked(p, _chunk)
-    # Un GGUF è transformer-only (niente vae/gemma): se arriva come 'model', spostalo su gguf_transformer
-    # (il checkpoint base di default fornisce i componenti mancanti).
-    if str(p.get("model", "")).lower().endswith(".gguf") and "gguf_transformer" not in p:
-        p["gguf_transformer"] = p.pop("model")
-    # Auto-GGUF: SOLO se l'utente NON ha scelto un modello (auto). Con un modello ESPLICITO (es. il 22B fp8)
-    # lo RISPETTIAMO e lo facciamo entrare con l'offload dinamico per-blocco (come ComfyUI) — niente più
-    # sostituzione a forza con un GGUF più piccolo (era un downgrade non richiesto della qualità, e nel caso
-    # limite puntava a un file inesistente → 0 output). Forzabile con gguf_transformer esplicito.
-    if "gguf_transformer" not in p and not p.get("model"):
-        # #158: il GGUF dequantizza in Python A OGNI forward (1660 Linear × step ≈ minuti a passata:
-        # i2v 24f = 629s vs 65s del fp8). Se il checkpoint fp8 di default STA in VRAM (transformer
-        # residente + attivazioni; gemma/vae su CPU con offload=cpu) usiamo QUELLO; il GGUF resta
-        # il fallback per le GPU dove il fp8 non entra (VRAM tarata per macchina, mai fissa).
-        _fits_fp8 = False
-        try:
-            if torch.cuda.is_available():
-                _free_gb = torch.cuda.mem_get_info()[0] / 1e9
-                _ck_def = _resolve_ckpt(None)
-                # con offload=cpu in VRAM resta SOLO il transformer: file bundle − ~10GB di
-                # encoder (gemma/vae/vocoder, che vanno su CPU) + 8GB attivazioni (_WORK_GB).
-                # Misurato: dev-fp8 29GB file → gen 49f OK con 29.5GB liberi, 77s (vs 25min GGUF).
-                _file_gb = os.path.getsize(_ck_def) / 1e9 if os.path.exists(_ck_def) else 29.0
-                _tr_gb = max(12.0, _file_gb - 10.0)
-                _fits_fp8 = _free_gb >= _tr_gb + 8.0
-                print(f"[auto-gguf] check fp8: liberi {_free_gb:.1f}GB vs transformer {_tr_gb:.1f}"
-                      f"+8GB → {'fp8 (niente GGUF, #158)' if _fits_fp8 else 'GGUF (VRAM insufficiente)'}",
-                      flush=True)
-        except Exception as _e158:                           # noqa: BLE001
-            print(f"[auto-gguf] check fp8 fallito ({_e158}) → fallback GGUF", flush=True)
-        g = None if _fits_fp8 else _auto_gguf()
-        if g:
-            print("[auto-gguf] nessun modello scelto → GGUF Q4 di default", flush=True)
-            p["gguf_transformer"] = g
-            p["_gguf_auto"] = True                          # AUTO (non scelto): scartabile se il fp8 entra su GPU
-    # RISOLVI il GGUF a path ASSOLUTO: la GUI passa un path RELATIVO (es. "LTXVideo\\LTX-2\\…Q4.gguf") e
-    # np.memmap NON lo trova rispetto alla cwd → "cannot mmap" / FileNotFoundError su ogni chunk. Resolve in
-    # diffusion_models; se manca del tutto, ripiega sull'auto-GGUF esistente.
-    if p.get("gguf_transformer"):
-        p["gguf_transformer"] = _resolve_gguf(p["gguf_transformer"])
+    # ── GGUF VIDEO: RIMOSSO DAL PRODOTTO (13/07) ─────────────────────────────────────────────
+    # Il loader GGUF dequantizza in Python A OGNI forward (1660 Linear × step) → ~500 s/step contro
+    # i ~4 s/step dell'fp8: oltre un'ORA per clip. E il Q6_K (16.6GB) residente andava in OOM alle
+    # risoluzioni normali (704x1280x161f) → cartelle piene di .json e ZERO mp4 (misurato: 13 job,
+    # 0 video). Non esisteva uno scenario in cui convenisse. Il video usa SEMPRE il checkpoint fp8.
+    # Qui non si "ignora in silenzio": un GGUF che arriva viene SCARTATO con un avviso esplicito,
+    # perché i progetti/gui_state vecchi possono ancora contenerne uno selezionato.
+    # (I GGUF delle IMMAGINI — FLUX Fill per l'inpaint — non c'entrano e restano.)
+    _stale = p.pop("gguf_transformer", None)
+    if str(p.get("model", "")).lower().endswith(".gguf"):
+        _stale = _stale or p.pop("model")
+        p.pop("model", None)
+    if _stale:
+        print(f"[gguf] IGNORATO '{os.path.basename(str(_stale))}': i GGUF video sono stati rimossi "
+              f"(≈500 s/step e OOM). Uso il checkpoint fp8.", flush=True)
+        p.pop("offload", None)                              # l'offload 'cpu' era imposto DAL GGUF
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
     # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)
@@ -1185,6 +1264,25 @@ def run_generation(p: dict) -> str:
         video = _nan_guard(video)
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
+    # RETE DI SICUREZZA: se l'audio era RICHIESTO (a2v: canto/lip-sync) ma il file è uscito muto — encoder
+    # in fallback, mux fallito, traccia vuota — rimuxa dal file audio ORIGINALE, sulla stessa finestra usata
+    # per condizionare la generazione (audio_start_time + durata del chunk) → resta in sync anche nei video
+    # lunghi. Un lip-sync senza audio non è un output valido: meglio ricostruirlo che consegnarlo muto.
+    if _audio_requested and p.get("audio_path") and os.path.exists(out) and not _has_audio_track(out):
+        import subprocess                                     # non è importato a livello modulo
+        _a0 = float(p.get("audio_start_time", 0.0) or 0.0)
+        _dur = nf / float(fps)
+        _mux = out + ".fixaudio.mp4"
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-ss", f"{_a0:.3f}",
+                            "-t", f"{_dur:.3f}", "-i", _ensure_stereo(p["audio_path"]),
+                            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac",
+                            "-shortest", _mux], capture_output=True)
+        if r.returncode == 0 and os.path.exists(_mux) and os.path.getsize(_mux) > 0:
+            os.replace(_mux, out)
+            print(f"[audio] video uscito muto → audio rimuxato dal file sorgente "
+                  f"(offset {_a0:.2f}s, durata {_dur:.2f}s)", flush=True)
+        else:
+            print(f"[audio] !! rimux di sicurezza FALLITO: {r.stderr[-300:] if r.stderr else '?'}", flush=True)
     # #102 Character Replacement: se il ramo iclora ha una maschera personaggio (SAM2 tracking), ricomponi
     # PER-FRAME — solo il personaggio è sostituito, lo sfondo resta pixel-perfect dall'originale. Deterministico
     # e sicuro senza test; l'alternativa attention_mask (cam) resta env-gated (REPLACE_CHAR_ATTN_MASK, sopra).
