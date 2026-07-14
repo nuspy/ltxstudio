@@ -92,24 +92,40 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
         pipe.to("cuda")
         print(f"[place] GGUF → gpu-resident FORZATO (free={free_mb:.0f}MB, offload rotto sui GGUF)", flush=True)
         return "gpu"
-    # margine 1.10 (era 1.35, troppo prudente): un modello che ENTRA (o quasi) resta SU GPU — molto più veloce
-    # che offload su RAM. Lo sforo delle attivazioni va in shared-VRAM (poco, tollerabile) invece di streammare
-    # i pesi dalla RAM ad ogni run. Override NATIVE_GPU_MARGIN. Solo se NON ci sta proprio → model_cpu_offload.
-    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.12"))
-    floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1200"))  # lascia margine al sistema
-    _need = vram_mb * margin + floor_mb
-    print(f"[place] free={free_mb:.0f}MB est={vram_mb}MB margin={margin} need={_need:.0f}MB "
-          f"→ {'gpu' if free_mb >= _need else 'offload'}", flush=True)
+    # Il MARGINE va applicato ai soli PESI: il working-set (attivazioni + VAE decode) è già una stima piena e
+    # va SOMMATO, non moltiplicato — moltiplicarlo aggiungeva ~400MB di working fantasma e spediva in offload
+    # modelli che entravano (FLUX.1 fp8: pesi 23.9GB + working 3.2GB = 29.4GB su 31GB liberi → GPU).
+    margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.06"))      # solo overhead allocator/frammentazione
+    floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "800"))   # lascia margine al sistema
+    working = float(getattr(pipe, "_ls_working_mb", 0) or 0)
+    weights = max(float(vram_mb) - working, 0.0)          # vram_mb = pesi mancanti + working (vedi _ensure_placement)
+    _need = weights * margin + working + floor_mb
+    print(f"[place] free={free_mb:.0f}MB pesi={weights:.0f}MB working={working:.0f}MB margin={margin} "
+          f"need={_need:.0f}MB → {'gpu' if free_mb >= _need else 'no'}", flush=True)
     if free_mb >= _need:
         pipe.to("cuda")                                 # tutto residente su GPU; la cache ModelManager lo riusa
         return "gpu"
-    # Se il FULL-STACK non entra tutto-su-GPU → model_cpu_offload: il transformer resta su GPU per TUTTO il
-    # denoise loop (veloce), mentre T5/VAE vengono onload/offloadati intorno (encode/decode una volta ciascuno).
-    # NB: `pipe.to("cuda")` metterebbe ANCHE il T5 (9.5GB) sulla GPU → su un transformer da 22GB su 32GB sfora
-    # SEMPRE in shared-RAM (era il "base lentissimo": 31.5GB su 32GB → spill delle attivazioni). model_cpu_offload
-    # tiene su GPU solo ~22GB (transformer) + attivazioni → ENTRA e va veloce (~step nativi). L'onload del
-    # transformer è UNA volta per generazione (non per-step). NB niente sequential auto (segfault fp8 su Windows).
-    _ = resident_mb  # (non più usato per forzare gpu: to('cuda') includerebbe il T5 → spill garantito su 32GB)
+    # Il FULL-STACK non entra. Prima di rassegnarsi all'offload: ci sta il TRANSFORMER (+VAE) da solo? Se sì →
+    # STICKY: transformer/VAE RESIDENTI su GPU, solo CLIP+T5 (9.5GB, usati per l'encode a inizio job) tenuti in
+    # RAM e onloadati al volo. Il transformer NON viene ricaricato ad ogni generazione — che è ciò che rende
+    # enable_model_cpu_offload lento (streamma i pesi dalla RAM ad ogni run: la RAM sale, scende, e la VRAM si
+    # riempie solo a metà job) e fragile (offload + hook layerwise fp8 su Windows → crash del processo).
+    _tr_vae = 0.0
+    for _n in ("transformer", "vae"):
+        _m = getattr(pipe, _n, None)
+        if _m is not None and hasattr(_m, "parameters"):
+            try:
+                _tr_vae += sum(p.numel() * p.element_size() for p in _m.parameters(recurse=True)) / 1024**2
+                _tr_vae += sum(b.numel() * b.element_size() for b in _m.buffers(recurse=True)) / 1024**2
+            except Exception:                            # noqa: BLE001
+                pass
+    if _tr_vae and free_mb >= _tr_vae * margin + working + floor_mb:
+        print(f"[place] full-stack non entra, ma transformer+vae sì ({_tr_vae:.0f}MB) → STICKY "
+              f"(transformer residente, T5/CLIP onload-per-encode)", flush=True)
+        return _place_sticky(pipe)
+    # Nemmeno il transformer da solo → model_cpu_offload (un componente alla volta su GPU). Lento ma entra.
+    # NB niente sequential auto (segfault fp8 su Windows).
+    _ = resident_mb
     pipe.enable_model_cpu_offload()
     return "offload"
 
@@ -131,13 +147,25 @@ def _place_sticky(pipe) -> str:
             if m is not None:
                 _, hook = cpu_offload_with_hook(m, "cuda", prev_module_hook=hook)
         pipe._ls_sticky_hook = hook
-        pipe._execution_device = torch.device("cuda")        # coi text-encoder hooked, forza il device
+        # NIENTE `pipe._execution_device = torch.device("cuda")`: in diffusers è una property SENZA
+        # setter, e assegnarla sollevava AttributeError. L'except qui sotto lo declassava a una riga
+        # di log, così lo sticky FALLIVA SEMPRE (30/30 nei batch del videoclip) e ripiegava su
+        # enable_model_cpu_offload — cioè l'ESATTO OPPOSTO di ciò che doveva fare: il transformer
+        # veniva tolto e rimesso in GPU a OGNI foto (~5 s di warmup per immagine, metà del tempo).
+        # E non serviva comunque: _execution_device deriva già 'cuda' dal transformer residente.
+        _dev = getattr(pipe, "_execution_device", None)
+        if str(_dev) != "cuda:0" and str(_dev) != "cuda":     # se non lo deriva, allora sì che va forzato
+            type(pipe)._execution_device = property(lambda self: torch.device("cuda"))
+            print(f"[place] STICKY: _execution_device era {_dev} → forzato a cuda sulla classe", flush=True)
         free_mb = torch.cuda.mem_get_info()[0] / 1024**2 if torch.cuda.is_available() else 0
-        print(f"[place] STICKY: transformer+vae residenti, T5/CLIP offload-with-hook (free {free_mb:.0f}MB)",
-              flush=True)
+        print(f"[place] STICKY: transformer+vae residenti, T5/CLIP offload-with-hook "
+              f"(exec_device={getattr(pipe, '_execution_device', '?')}, free {free_mb:.0f}MB)", flush=True)
         return "sticky"
     except Exception as _e:                                  # noqa: BLE001
-        print(f"[place] sticky fallito ({_e}) → offload normale", flush=True)
+        # ATTENZIONE, non è un dettaglio: qui si perde il batch-mode e si torna a ricaricare il
+        # transformer per ogni immagine. Va URLATO, non sussurrato (prima passava inosservato).
+        print(f"[place] !! STICKY FALLITO ({type(_e).__name__}: {_e}) → offload normale: il "
+              f"transformer verrà RICARICATO A OGNI IMMAGINE (batch lento)", flush=True)
         try:
             pipe.enable_model_cpu_offload()
         except Exception:                                    # noqa: BLE001
@@ -375,24 +403,30 @@ def _vram_cache_load() -> dict:
     return _vram_cache
 
 
-def _vram_cache_key(model_path: str) -> str:
+def _vram_cache_key(model_path: str, fp8_storage: bool = False) -> str:
+    # Il footprint dipende dal DTYPE con cui il modello viene caricato, non solo dal file: lo STESSO
+    # FLUX_Dev pesa 32.4GB in bf16 e 23.9GB con storage fp8 (layerwise). Senza il dtype nella chiave, una
+    # misura bf16 (scritta prima che l'fp8 fosse il default) veniva riusata per il carico fp8 → stima
+    # gonfiata di 8.5GB → _place sceglieva 'offload' anche quando il full-stack ENTRAVA in VRAM.
+    _dt = "|fp8" if fp8_storage else ""
     try:
         st = os.stat(model_path)
-        return f"{os.path.normpath(model_path).lower()}|{st.st_size}"   # invalida se il file cambia
+        return f"{os.path.normpath(model_path).lower()}|{st.st_size}{_dt}"   # invalida se il file cambia
     except Exception:                                        # noqa: BLE001
-        return os.path.normpath(model_path).lower()
+        return f"{os.path.normpath(model_path).lower()}{_dt}"
 
 
-def _vram_cache_get(model_path: str) -> int:
-    return int(_vram_cache_load().get(_vram_cache_key(model_path), {}).get("footprint_mb", 0) or 0)
+def _vram_cache_get(model_path: str, fp8_storage: bool = False) -> int:
+    return int(_vram_cache_load().get(_vram_cache_key(model_path, fp8_storage), {})
+               .get("footprint_mb", 0) or 0)
 
 
-def _vram_cache_put(model_path: str, footprint_mb: int) -> None:
+def _vram_cache_put(model_path: str, footprint_mb: int, fp8_storage: bool = False) -> None:
     if footprint_mb <= 0:
         return
     c = _vram_cache_load()
-    c[_vram_cache_key(model_path)] = {"footprint_mb": int(footprint_mb),
-                                      "name": os.path.basename(model_path)}
+    c[_vram_cache_key(model_path, fp8_storage)] = {"footprint_mb": int(footprint_mb),
+                                                   "name": os.path.basename(model_path)}
     try:
         import json
         os.makedirs(os.path.dirname(_VRAM_CACHE_PATH), exist_ok=True)
@@ -834,6 +868,8 @@ def _load(model_path: str, arch: str, mm=None):
                     _ST.retain(_ck)                       # la nuova shell referenzia gli stessi componenti
                 pipe._ls_shared = True
                 pipe._ls_est_mb = getattr(_src, "_ls_est_mb", VRAM_MB.get(arch, 24000))
+                pipe._ls_weights_mb = getattr(_src, "_ls_weights_mb", pipe._ls_est_mb)
+                pipe._ls_working_mb = getattr(_src, "_ls_working_mb", 0)   # stessi componenti → stesso footprint
                 _set_attention(pipe, arch)
                 print(f"[flux] from_pipe: riuso componenti della sorella per '{arch}' (zero load)", flush=True)
                 return pipe, 50
@@ -932,32 +968,40 @@ def _load(model_path: str, arch: str, mm=None):
     # full-stack entra GPU-resident. Senza casting (fallback) l'upcast a bf16 raddoppia come prima.
     _fp8_storage = bool(getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False))
     # STIMA VRAM (dalla più precisa alla più grezza) + working-set attivazioni (fisso, scala poco col ns res):
-    #  1) CACHE su file: footprint REALE misurato dai moduli al 1° caricamento di QUESTO file (il più preciso).
-    #  2) PRECISA dall'header safetensors: byte reali per dtype (fp8→bf16 salvo storage fp8, F32 norm, ecc.).
-    #  3) GREZZA: file×(2 se fp8-upcast) + overhead — solo fallback (gguf o header illeggibile).
+    #  1) MISURA dei moduli GIÀ CARICATI: byte reali (onora fp8-storage/upcast/quantizzazione). È la verità:
+    #     la pipeline è in RAM qui e il placement è comunque RINVIATO a run() → misurarla non costa nulla e
+    #     non c'è motivo di indovinare. (Prima si preferiva la CACHE su file: una misura bf16 vecchia teneva
+    #     FLUX_Dev a 32.4GB invece dei 23.9GB reali in fp8 → 'offload' anche quando entrava tutto in VRAM.)
+    #  2) CACHE su file (chiave dtype-aware): solo se la misura non è disponibile.
+    #  3) PRECISA dall'header safetensors: byte reali per dtype (fp8→bf16 salvo storage fp8, F32 norm, ecc.).
+    #  4) GREZZA: file×(2 se fp8-upcast) + overhead — solo fallback (gguf o header illeggibile).
     _WORKING = 3200                                          # attivazioni + VAE decode + workspace (≤1536)
-    _cached = _vram_cache_get(model_path)
-    _precise = 0 if (_is_gguf or _cached) else _precise_vram_mb(model_path, fp8_storage=_fp8_storage)
-    if _cached:
-        est_mb = _cached + _WORKING
-        print(f"[vram] stima da CACHE reale: modello {_cached}MB + working {_WORKING} = {est_mb}MB", flush=True)
+    _meas = _measure_pipe_mb(pipe) if Path(model_path).is_file() else 0
+    _cached = 0 if _meas else _vram_cache_get(model_path, _fp8_storage)
+    _precise = 0 if (_meas or _is_gguf or _cached) else _precise_vram_mb(model_path, fp8_storage=_fp8_storage)
+    if _meas:
+        _weights_mb = _meas
+        print(f"[vram] footprint REALE misurato: {_meas}MB (fp8={_fp8_storage}) + working {_WORKING}", flush=True)
+        _vram_cache_put(model_path, _meas, _fp8_storage)
+    elif _cached:
+        _weights_mb = _cached
+        print(f"[vram] stima da CACHE: modello {_cached}MB + working {_WORKING}", flush=True)
     elif _precise:
-        est_mb = _precise + _WORKING
-        print(f"[vram] stima PRECISA (header): modello {_precise}MB + working {_WORKING} = {est_mb}MB", flush=True)
+        _weights_mb = _precise
+        print(f"[vram] stima PRECISA (header): modello {_precise}MB + working {_WORKING}", flush=True)
     else:                                                    # fallback grezzo (gguf / header illeggibile)
         _eff_mb = sz_mb * 2 if (sz_mb and "fp8" in _base and not _is_gguf and not _fp8_storage) else sz_mb
-        overhead = 4000 if arch == "zimage" else (6000 if _fp8_storage else 11000)
+        overhead = 800 if arch == "zimage" else (2800 if _fp8_storage else 7800)   # ex overhead - _WORKING
         if (_is_gguf or _fp8_storage) and sz_mb:
-            est_mb = int(_eff_mb + overhead)                # niente floor VRAM_MB: quantizzato = davvero piccolo
+            _weights_mb = int(_eff_mb + overhead)          # niente floor VRAM_MB: quantizzato = davvero piccolo
         else:
-            est_mb = max(VRAM_MB.get(arch, 16000), int(_eff_mb + overhead)) if sz_mb else VRAM_MB.get(arch, 16000)
-    # MISURA REALE dei moduli caricati → salva in cache (riuso ai prossimi load dello stesso file). Onora i
-    # dtype effettivi (fp8-storage/upcast) → è la stima più fedele. Solo per file locali non-gguf.
-    if not _is_gguf and Path(model_path).is_file() and not _cached:
-        _meas = _measure_pipe_mb(pipe)
-        if _meas > 0:
-            _vram_cache_put(model_path, _meas)
-            print(f"[vram] footprint reale misurato: {_meas}MB → salvato in cache", flush=True)
+            _weights_mb = (max(VRAM_MB.get(arch, 16000) - _WORKING, int(_eff_mb + overhead)) if sz_mb
+                           else VRAM_MB.get(arch, 16000) - _WORKING)
+    est_mb = int(_weights_mb) + _WORKING
+    # PESI e WORKING separati: _place applica il margine solo ai PESI (il working è già una stima piena, e
+    # moltiplicarlo per il margine sommava un secondo working fantasma → offload per poche centinaia di MB).
+    pipe._ls_weights_mb = int(_weights_mb)
+    pipe._ls_working_mb = _WORKING
     # FLUX.2 (transformer ~32B fp8 = 33GB + TE Mistral): NON entra tutto-su-GPU nei 32GB e nemmeno in
     # enable_model_cpu_offload (offload a livello-modello = transformer intero su GPU). Serve offload
     # SEQUENZIALE (granularità per-modulo: un layer alla volta su GPU). Memory-bounded e imposta
@@ -1037,6 +1081,66 @@ def _latent_to_pil(latent, arch):
     rgb = (rgb - lo) / (hi - lo + 1e-6)                       # min-max → [0,1] (sempre visibile)
     arr = (rgb.clamp(0, 1) * 255).round().to(torch.uint8).numpy()
     return Image.fromarray(arr, "RGB")
+
+
+def _make_diffdiff_cb(pipe, init_image, change_map, steps, width, height, dtype, device, base_cb=None):
+    """DIFFERENTIAL DIFFUSION: una 'forza' DIVERSA PER OGNI PIXEL, invece di un unico `strength`.
+
+    Serve alla composizione (Integra/Componi): incollata la foto nella sua posizione/scala/rotazione,
+    vogliamo che il modello ne fonda BORDI e LUCE senza riscrivere il soggetto. Con un solo `strength`
+    è impossibile: basso non fonde niente, alto distrugge l'identità.
+
+    Come funziona (arXiv 2306.00950): la change-map dice QUANDO ogni pixel smette di essere ancorato
+    all'originale. A ogni step si ripristina il latente di partenza (rumoreggiato al timestep corrente)
+    dove `change < soglia_step`; la soglia scende 1→0, quindi i pixel con change alto (l'anello di
+    contatto) cambiano da subito, quelli con change basso (il cuore dell'oggetto) restano intatti.
+
+    Best-effort: qualsiasi problema → si torna al comportamento normale (la generazione non si rompe).
+    """
+    import numpy as np
+    import torch
+
+    try:
+        vae = pipe.vae
+        sf = getattr(vae.config, "scaling_factor", 0.3611)
+        shift = getattr(vae.config, "shift_factor", 0.1159)
+        img = init_image.convert("RGB").resize((width, height), Image.LANCZOS)
+        t = torch.from_numpy(np.array(img)).float().div(127.5).sub(1.0).permute(2, 0, 1)[None]
+        t = t.to(device=device, dtype=vae.dtype)
+        with torch.no_grad():
+            lat = vae.encode(t).latent_dist.sample()
+        lat = (lat - shift) * sf                              # latente dell'immagine INCOLLATA
+        lat = pipe._pack_latents(lat, 1, lat.shape[1], lat.shape[2], lat.shape[3]).to(dtype)
+
+        # change-map → risoluzione del latente packed (ogni token = patch 16x16 di pixel)
+        cm = change_map.convert("L").resize((width // 16, height // 16), Image.BILINEAR)
+        cm = torch.from_numpy(np.array(cm)).float().div(255.0).reshape(1, -1, 1)
+        cm = cm.to(device=device, dtype=dtype)               # (1, L, 1) → broadcast sui 64 canali
+        if cm.shape[1] != lat.shape[1]:
+            return base_cb                                   # forme incoerenti: non rischiare
+        noise = torch.randn(lat.shape, device=device, dtype=dtype, generator=None)
+    except Exception as exc:                                 # noqa: BLE001
+        print(f"[diffdiff] non attivabile ({type(exc).__name__}: {exc}) → inpaint normale", flush=True)
+        return base_cb
+
+    print(f"[diffdiff] attiva: change-map per-pixel su {cm.shape[1]} token", flush=True)
+    sched = pipe.scheduler
+
+    def _cb(pp, step, timestep, cbk):
+        try:
+            lats = cbk["latents"]
+            thr = 1.0 - float(step + 1) / float(max(1, steps))   # 1 → 0 lungo il denoise
+            keep = (cm < thr).to(lats.dtype)                     # 1 dove il pixel NON deve ancora cambiare
+            if keep.any():
+                # latente originale rumoreggiato al timestep corrente (flow-matching: lerp noise↔latent)
+                sigma = timestep / 1000.0 if float(timestep) > 1.0 else float(timestep)
+                orig_t = (1.0 - sigma) * lat + sigma * noise
+                cbk["latents"] = lats * (1.0 - keep) + orig_t * keep
+        except Exception:                                    # noqa: BLE001 — mai rompere la generazione
+            pass
+        return base_cb(pp, step, timestep, cbk) if base_cb else cbk
+
+    return _cb
 
 
 def _make_preview_cb(arch, width, height, steps):
@@ -1306,6 +1410,23 @@ def run(params: dict, mm, output_dir: str) -> dict:
             kw["callback_on_step_end_tensor_inputs"] = ["latents"]
         except Exception:                                   # noqa: BLE001
             pass
+
+    # DIFFERENTIAL DIFFUSION (composizione): se il job porta una change-map, la incateniamo al callback
+    # dell'anteprima. Così i bordi si fondono e il soggetto incollato resta sé stesso — cosa impossibile
+    # con un solo `strength` globale. Attiva solo su richiesta esplicita (Integra/Componi la passano).
+    _cm_p = params.get("change_map")
+    if _cm_p and Path(str(_cm_p)).exists() and params.get("image_path"):
+        try:
+            import torch as _t
+            _dev = getattr(pipe, "_execution_device", None) or _t.device("cuda")
+            _dt = getattr(pipe.transformer, "dtype", _t.bfloat16)
+            kw["callback_on_step_end"] = _make_diffdiff_cb(
+                pipe, Image.open(params["image_path"]), Image.open(str(_cm_p)),
+                int(kw["num_inference_steps"]), int(kw.get("width", 1024)), int(kw.get("height", 1024)),
+                _dt, _dev, base_cb=kw.get("callback_on_step_end"))
+            kw["callback_on_step_end_tensor_inputs"] = ["latents"]
+        except Exception as _dde:                            # noqa: BLE001
+            print(f"[diffdiff] disattivata ({_dde}) → inpaint normale", flush=True)
     try:
         out = pipe(**kw)
     except TypeError as _te:                                # pipeline senza callback_on_step_end

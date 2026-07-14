@@ -54,6 +54,16 @@ def _tee_log() -> None:
 
 _tee_log()
 
+# Il server è morto più volte SENZA traceback (log troncato a metà job) → non è un'eccezione Python ma un
+# crash del processo (segfault/access violation: kernel CUDA, hook accelerate + layerwise fp8, driver).
+# faulthandler stampa lo stack Python anche su SIGSEGV/SIGABRT → finisce nel tee di output/server.log e la
+# prossima morte lascia una prova invece del silenzio.
+try:
+    import faulthandler
+    faulthandler.enable(file=sys.stderr, all_threads=True)
+except Exception:                                           # noqa: BLE001
+    pass
+
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
 
