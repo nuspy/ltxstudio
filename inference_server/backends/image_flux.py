@@ -805,6 +805,11 @@ def _load(model_path: str, arch: str, mm=None):
             if cand.is_file():
                 model_path = str(cand)
                 break
+    # SEMPRE tracciato: quale stringa è arrivata dalla GUI e a quale file è stata risolta. Senza questa riga
+    # un modello non risolto scivolava muto nel ramo HF (nessun log fino al crash) e non c'era modo di sapere
+    # CHI l'avesse mandato.
+    print(f"[image] modello richiesto: '{_model_raw}' → '{model_path}' "
+          f"(file={Path(model_path).is_file()}, arch={arch})", flush=True)
     # AUTO-DEQUANT: se è un checkpoint quantizzato ComfyUI (comfy_quant), convertilo in bf16 (cache).
     try:
         from core.dequant_comfy import ensure_dequantized
@@ -904,8 +909,19 @@ def _load(model_path: str, arch: str, mm=None):
                 pipe = _assemble_zimage(model_path)
             else:
                 raise
+    elif Path(model_path).is_dir():
+        pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)   # repo diffusers LOCALE (dir)
     else:
-        pipe = Pipe.from_pretrained(model_path, torch_dtype=torch.bfloat16)
+        # NON è né un file né una cartella locale → from_pretrained lo tratterebbe come REPO ID HuggingFace.
+        # Se il repo è in cache (es. black-forest-labs/FLUX.1-dev in E:\hf_cache) il caricamento RIESCE: 16
+        # file, 7 componenti, tutto su CPU — la generazione parte sulla CPU (GPU allo 0%) e il processo muore
+        # per esaurimento memoria. È esattamente il "genera su CPU e poi il server crasha". L'app è LOCALE:
+        # un modello che non sta su disco è un errore di configurazione, non un pretesto per andare in rete.
+        raise RuntimeError(
+            f"Modello non trovato su disco: '{model_path}'. La GUI ha inviato un nome che non "
+            f"corrisponde a nessun file in E:\\AI\\Models\\diffusion_models (né a una cartella diffusers "
+            f"locale). Seleziona un modello dal menù a tendina. NB: NON viene scaricato da HuggingFace — "
+            f"caricarlo da lì significherebbe generare su CPU.")
     # fp8 LAYERWISE sul transformer del CHECKPOINT COMPLETO (from_single_file, es. flux1-schnell-fp8 16GB):
     # from_single_file lo upcasta a bf16 (~32GB) → NON entra nei 32GB → offload lento. ComfyUI lo tiene fp8
     # (16GB) → gpu-resident → veloce. Ripristina lo storage fp8 sul transformer (l'assemble path lo fa già in
