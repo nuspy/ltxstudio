@@ -81,6 +81,8 @@ app = FastAPI(title="LTX Studio — Native Inference Server")
 MM = ModelManager()
 OUTPUT_DIR = r"E:\AI\ltxstudio\output"
 
+
+
 _jobs: dict[str, dict] = {}
 _q: "queue.Queue[str]" = queue.Queue()
 
@@ -108,7 +110,7 @@ def _worker():
         preview_bus.set_message("Caricamento componenti…")  # fase iniziale (finché il backend non aggiorna)
         try:
             handler = HANDLERS[job["module"]]
-            res = handler(job["params"], MM, OUTPUT_DIR)
+            res = handler(job["params"], MM, OUTPUT_DIR)    # il caricamento prende LOAD_LOCK internamente
             job.update(res)
             job["status"] = res.get("status", "success")
         except Exception as e:                          # noqa: BLE001
@@ -162,4 +164,11 @@ def free():
 
 if __name__ == "__main__":
     import uvicorn
+    # PRECARICA T5/CLIP/VAE nel main thread PRIMA dell'event loop: i text-encoder (transformers, safe_open
+    # mmap) NON sono coperti dal no-mmap di image_flux e segfaulterebbero se caricati nel thread worker
+    # mentre uvicorn serve richieste. Il transformer per-file invece è coperto dal no-mmap. Best-effort.
+    try:
+        image_flux.preload_shared_components()
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[preload] saltato ({_e})", flush=True)
     uvicorn.run(app, host="127.0.0.1", port=8189)

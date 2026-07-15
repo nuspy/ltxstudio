@@ -17,6 +17,47 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+
+def _disable_safetensors_mmap() -> None:
+    """CAUSA-RADICE dei crash "genera su CPU e il server muore". safetensors carica i checkpoint via mmap
+    (memory-mapped file). Su Windows, mentre il THREAD worker copia i tensori dal file mappato
+    (torch/storage.__getitem__ in C++, GIL rilasciato), se uvicorn esegue una richiesta HTTP nello stesso
+    istante — /preview, /system_stats, /history sotto il polling della GUI — la lettura mmap va in ACCESS
+    VIOLATION e il processo MUORE (crash nativo, nessun traceback Python; il faulthandler l'ha inchiodato al
+    load_file del transformer). Dimostrato: con polling → crash sistematico; senza alcuna richiesta servita
+    durante il caricamento → mai. Serializzare gli endpoint NON basta: le richieste già in volo continuano.
+
+    Fix definitivo: sostituisce safetensors.torch.load_file con una versione che legge il file in RAM
+    (open().read()) e deserializza dai bytes — NIENTE mmap, quindi niente memoria mappata a cui accedere
+    concorrentemente. È il meccanismo del flag `disable_mmap` di diffusers. Costo: picco RAM ≈ 2× dimensione
+    file durante il load (bytes + tensori), poi scende (ok con 128GB; per questo NON si tenta più il
+    from_single_file che fallisce, vedi _load: raddoppierebbe il picco). Copre ogni from_single_file
+    (transformer FLUX.1/2, VAE, zimage). I text-encoder (transformers) usano un path safe_open diverso →
+    per quelli il crash si evita precaricandoli nel MAIN thread (preload_shared_components)."""
+    try:
+        import safetensors.torch as _sft
+        if getattr(_sft, "_ls_no_mmap", False):
+            return
+        _sft._ls_orig_load_file = _sft.load_file
+
+        def _load_file_ram(filename, device="cpu"):
+            with open(filename, "rb") as f:
+                data = f.read()
+            # I tensori di load() sono VIEW nel buffer `data`: `data` resta vivo per refcount finché i tensori
+            # esistono (NON fare `del data` → "deallocated bytearray has exported buffers"). Niente clone:
+            # raddoppiava il picco e reintroduceva il crash. Il buffer si libera quando il modello è evicted.
+            sd = _sft.load(data)
+            if device not in ("cpu", None, "cpu:0"):
+                sd = {k: v.to(device) for k, v in sd.items()}
+            return sd
+        _sft.load_file = _load_file_ram
+        _sft._ls_no_mmap = True
+    except Exception as _e:                                  # noqa: BLE001 — non fatale
+        print(f"[safetensors] disable-mmap non applicato ({_e})", flush=True)
+
+
+_disable_safetensors_mmap()
+
 # (nome classe diffusers, supporta from_single_file, richiede immagine input)
 SPEC = {
     "flux":    ("FluxPipeline",        True,  False),
@@ -538,6 +579,12 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
                 v.encode = lambda x, *a, **k: _oe(x.float(), *a, **k)
             return v
         vae = STORE.acquire("vae_flux", _mk_vae); got.append("vae_flux")
+        # NB: T5/CLIP si caricano col meta-loading di transformers (_load_state_dict_into_meta_model), che
+        # rilascia il GIL durante le copie tensore. Se questo avviene nel THREAD worker mentre l'event loop
+        # asyncio (main thread) è attivo, il processo SEGFAULTA in torch/storage.__getitem__ (crash nativo,
+        # niente traceback — il faulthandler l'ha inchiodato al load del T5). Per questo il server PRECARICA
+        # i componenti condivisi all'avvio nel MAIN thread (preload_shared_components), prima di uvicorn:
+        # quando il worker arriva qui, STORE.acquire trova già T5/CLIP/VAE in cache e non li ricarica.
         te = STORE.acquire("clip_l", lambda: CLIPTextModel.from_pretrained(
             os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)); got.append("clip_l")
         te2 = STORE.acquire("t5xxl", lambda: T5EncoderModel.from_pretrained(
@@ -784,6 +831,34 @@ def _sibling_pipe(mm, model_raw: str, arch: str):
     return None
 
 
+def preload_shared_components() -> None:
+    """Precarica i componenti FLUX.1 CONDIVISI (T5-XXL, CLIP-L, VAE) nello STORE, **nel main thread**, PRIMA
+    di uvicorn. I text-encoder si caricano via transformers (safe_open mmap) che il monkeypatch no-mmap NON
+    copre → se caricati nel thread worker mentre uvicorn serve richieste, segfaultano come il transformer.
+    Caricandoli qui, nel main thread e prima dell'event loop, non c'è concorrenza; poi il worker li trova
+    già nello STORE (refcount) e non li ricarica. Il transformer per-file invece si carica nel worker ma è
+    coperto dal no-mmap. acquire+release: refcount→0, restano in cache CPU riusabili ed evictabili."""
+    import torch
+    from transformers import CLIPTextModel, T5EncoderModel
+    from diffusers import AutoencoderKL
+    from inference_server.component_store import STORE
+    bf16 = torch.bfloat16
+    _vae_dt = torch.float32 if os.environ.get("NATIVE_VAE_FP32") == "1" else bf16
+    loaders = {
+        "clip_l": lambda: CLIPTextModel.from_pretrained(os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16),
+        "t5xxl": lambda: T5EncoderModel.from_pretrained(os.path.join(TE_DIR, "t5xxl"), torch_dtype=bf16),
+        "vae_flux": lambda: AutoencoderKL.from_single_file(
+            AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=_vae_dt),
+    }
+    for key, loader in loaders.items():
+        try:
+            STORE.acquire(key, loader)
+            STORE.release(key)
+            print(f"[preload] componente condiviso '{key}' pronto (main thread)", flush=True)
+        except Exception as _e:                              # noqa: BLE001 — edizione senza FLUX.1 / file assente
+            print(f"[preload] '{key}' non precaricato ({type(_e).__name__}: {_e}) — non fatale", flush=True)
+
+
 def _load(model_path: str, arch: str, mm=None):
     """Loader per il ModelManager: ritorna (pipe, vram_mb)."""
     import torch
@@ -898,14 +973,19 @@ def _load(model_path: str, arch: str, mm=None):
             pipe = _assemble_zimage(model_path)
         else:
             raise RuntimeError(f"GGUF non supportato per arch '{arch}' (solo flux/kontext/inpaint/zimage).")
+    elif is_file and arch in ("flux", "kontext", "inpaint"):
+        # I file FLUX.1 in diffusion_models sono SOLO-TRANSFORMER (niente TE/VAE dentro): vai DIRETTO
+        # all'assemblaggio coi componenti locali. NON tentare prima Pipe.from_single_file: fallirebbe
+        # sempre ("CLIPTextModel weights missing"), e col caricamento in-RAM (no-mmap) quel tentativo
+        # fallito legge comunque l'intero file da 22GB → doppio caricamento = MemoryError. _assemble_flux
+        # carica solo il transformer dal file, quindi funziona anche coi rari checkpoint completi.
+        pipe = _assemble_flux(Pipe, model_path, arch=arch)
     elif is_file:
         try:
             pipe = Pipe.from_single_file(model_path, torch_dtype=torch.bfloat16)
         except Exception:                               # noqa: BLE001
             # file 'solo transformer' (manca TE/VAE nel checkpoint) → assembla coi componenti locali
-            if arch in ("flux", "kontext", "inpaint"):
-                pipe = _assemble_flux(Pipe, model_path, arch=arch)
-            elif arch == "zimage":
+            if arch == "zimage":
                 pipe = _assemble_zimage(model_path)
             else:
                 raise
@@ -1288,7 +1368,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
     # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
-    pipe = mm.ensure(key)                                   # carica il NUOVO modello (CPU) + acquire componenti
+    pipe = mm.ensure(key)                                   # carica il NUOVO modello (CPU, no-mmap) + componenti
     # STICKY-TRANSFORMER (batch, es. Music Video Studio): transformer+vae residenti per tutto il batch, solo
     # T5/CLIP a rotazione → niente dente-di-sega. Attivato dai params (placement_mode='sticky').
     pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky")
