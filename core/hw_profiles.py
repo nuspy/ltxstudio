@@ -52,11 +52,15 @@ _PROFILES = [
 
 
 def profile_for(vram_gb: float) -> tuple[str, dict]:
-    """Ritorna (nome_profilo, env) per la VRAM data."""
-    name, env = _PROFILES[0][1:][0], _PROFILES[0][2]
+    """Ritorna (nome_profilo, env) per la VRAM data.
+
+    TOLLERANZA: le GPU riportano SEMPRE meno del nominale (driver/riservato/allineamento): una "32GB"
+    espone ~31.8GB, una "24GB" ~23.6, una "16GB" ~15.8. Col confronto secco `>= tier`, una RTX 5090 da
+    31.8GB non raggiungeva la soglia 32 e ricadeva nel profilo 24GB (risoluzione/margine più prudenti del
+    dovuto). Arrotondiamo con 1GB di tolleranza: 31.8 → conta come 32."""
     chosen = _PROFILES[0]
     for tier, nm, e in _PROFILES:
-        if vram_gb >= tier:
+        if vram_gb >= tier - 1.0:                           # 31.8 ≥ 31 → profilo 32GB; 23.6 ≥ 23 → 24GB
             chosen = (tier, nm, e)
     return chosen[1], dict(chosen[2])
 
