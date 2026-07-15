@@ -17,46 +17,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-
-def _disable_safetensors_mmap() -> None:
-    """CAUSA-RADICE dei crash "genera su CPU e il server muore". safetensors carica i checkpoint via mmap
-    (memory-mapped file). Su Windows, mentre il THREAD worker copia i tensori dal file mappato
-    (torch/storage.__getitem__ in C++, GIL rilasciato), se uvicorn esegue una richiesta HTTP nello stesso
-    istante — /preview, /system_stats, /history sotto il polling della GUI — la lettura mmap va in ACCESS
-    VIOLATION e il processo MUORE (crash nativo, nessun traceback Python; il faulthandler l'ha inchiodato al
-    load_file del transformer). Dimostrato: con polling → crash sistematico; senza alcuna richiesta servita
-    durante il caricamento → mai. Serializzare gli endpoint NON basta: le richieste già in volo continuano.
-
-    Fix definitivo: sostituisce safetensors.torch.load_file con una versione che legge il file in RAM
-    (open().read()) e deserializza dai bytes — NIENTE mmap, quindi niente memoria mappata a cui accedere
-    concorrentemente. È il meccanismo del flag `disable_mmap` di diffusers. Costo: picco RAM ≈ 2× dimensione
-    file durante il load (bytes + tensori), poi scende (ok con 128GB; per questo NON si tenta più il
-    from_single_file che fallisce, vedi _load: raddoppierebbe il picco). Copre ogni from_single_file
-    (transformer FLUX.1/2, VAE, zimage). I text-encoder (transformers) usano un path safe_open diverso →
-    per quelli il crash si evita precaricandoli nel MAIN thread (preload_shared_components)."""
-    try:
-        import safetensors.torch as _sft
-        if getattr(_sft, "_ls_no_mmap", False):
-            return
-        _sft._ls_orig_load_file = _sft.load_file
-
-        def _load_file_ram(filename, device="cpu"):
-            with open(filename, "rb") as f:
-                data = f.read()
-            # I tensori di load() sono VIEW nel buffer `data`: `data` resta vivo per refcount finché i tensori
-            # esistono (NON fare `del data` → "deallocated bytearray has exported buffers"). Niente clone:
-            # raddoppiava il picco e reintroduceva il crash. Il buffer si libera quando il modello è evicted.
-            sd = _sft.load(data)
-            if device not in ("cpu", None, "cpu:0"):
-                sd = {k: v.to(device) for k, v in sd.items()}
-            return sd
-        _sft.load_file = _load_file_ram
-        _sft._ls_no_mmap = True
-    except Exception as _e:                                  # noqa: BLE001 — non fatale
-        print(f"[safetensors] disable-mmap non applicato ({_e})", flush=True)
-
-
-_disable_safetensors_mmap()
+# NB: safetensors carica via mmap (default). Va bene: questo modulo gira nel PROCESSO FIGLIO isolato
+# (job_runner), single-thread e SENZA uvicorn → nessuna richiesta HTTP concorrente durante il mmap, quindi
+# nessuna access violation (era quello a uccidere il server persistente). Niente più load-in-RAM: il mmap
+# NON legge il checkpoint in RAM (nessun picco né attesa), i pesi vanno diretti in VRAM. Vedi
+# [[server-mmap-uvicorn-crash]].
 
 # (nome classe diffusers, supporta from_single_file, richiede immagine input)
 SPEC = {
@@ -1385,7 +1350,26 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
     # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
-    pipe = mm.ensure(key)                                   # carica il NUOVO modello (CPU, no-mmap) + componenti
+    try:
+        pipe = mm.ensure(key)                              # carica il NUOVO modello (mmap→VRAM) + componenti
+    except (MemoryError, OSError) as _me:
+        # Windows "paging file too small" (os error 1455) o MemoryError: il COMMIT LIMIT (RAM + file di
+        # paging) è saturo → il mmap del checkpoint non trova spazio da impegnare. diffusers lo maschera con
+        # un MemoryError criptico (fa f.read() sull'intero file nel gestore d'errore). Diamo un messaggio
+        # AZIONABILE con i numeri reali. Vedi [[server-mmap-uvicorn-crash]] / task pagefile.
+        _hint = ""
+        try:
+            import psutil
+            _av = psutil.virtual_memory().available / 2**30
+            _sz = os.path.getsize(model) / 2**30 if os.path.isfile(model) else 0
+            _hint = f" (RAM libera {_av:.0f}GB, modello ~{_sz:.0f}GB)"
+        except Exception:                                  # noqa: BLE001
+            pass
+        raise RuntimeError(
+            f"Memoria di sistema esaurita nel caricare il modello{_hint}. Su Windows è il 'commit limit' "
+            f"(RAM + file di paging) ad essere pieno, non la sola RAM. Rimedi: chiudi i programmi che "
+            f"consumano molta RAM (es. Unity, browser), oppure aumenta il file di paging di Windows "
+            f"(Impostazioni → Sistema → Memoria virtuale; ora è fisso a 16GB). Dettaglio: {_me}") from _me
     # STICKY-TRANSFORMER (batch, es. Music Video Studio): transformer+vae residenti per tutto il batch, solo
     # T5/CLIP a rotazione → niente dente-di-sega. Attivato dai params (placement_mode='sticky').
     pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky")
