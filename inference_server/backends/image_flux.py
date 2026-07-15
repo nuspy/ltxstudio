@@ -1365,6 +1365,23 @@ def run(params: dict, mm, output_dir: str) -> dict:
         print(f"[image] modello non specificato → default {os.path.basename(model)}", flush=True)
     key = register(mm, model, arch)
     preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
+    # CAMBIO MODELLO — sfratta il PRECEDENTE *prima* di caricare il nuovo. Col caricamento in-RAM (no-mmap
+    # anti-crash) il checkpoint sta ~22GB in RAM come buffer: tenerne DUE insieme (vecchio ancora in cache +
+    # nuovo che si legge) = MemoryError → il worker muore e il server smette di processare (sembra un crash).
+    # Se `key` NON è già in cache (modello diverso), scarica ORA tutte le shell + i componenti orfani → il
+    # buffer del vecchio si libera e fa spazio. I componenti CONDIVISI (T5/CLIP/VAE) del nuovo restano nello
+    # STORE (refcount li protegge appena `mm.ensure` li riacquisisce).
+    if os.environ.get("NATIVE_AUTOEVICT", "1") == "1" and key not in mm._cache:
+        try:
+            from inference_server.component_store import STORE
+            if mm.evict_others(key):                        # key non in cache → scarica TUTTE le shell vecchie
+                _tot = torch.cuda.mem_get_info()[1] if torch.cuda.is_available() else 0
+                STORE.evict_unused(_tot)                     # libera i transformer orfani (buffer no-mmap incluso)
+                mm.flush()
+                import gc as _gc
+                _gc.collect()                                # forza il rilascio dei buffer bytes del vecchio
+        except Exception as _e:                             # noqa: BLE001
+            print(f"[image] pre-evict cambio modello saltato ({_e})", flush=True)
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
     # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
