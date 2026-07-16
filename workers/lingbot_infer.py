@@ -115,8 +115,36 @@ def _load_pipeline(model_dir: str, variant: str, i2v: bool = False):
         except Exception:                                    # noqa: BLE001
             raise RuntimeError(f"Caricamento pipeline LingBot fallito da {model_dir}: {ex}")
 
+    # VAE in fp32 (come da README ufficiale: --vae_dtype fp32). La pipeline dà i latenti in fp32 al decode;
+    # con la VAE in bf16 → "Input type (float) and bias type (BFloat16)" al VAEDecode (visibile solo con
+    # model_cpu_offload; residente talvolta perdona). Teniamola fp32 sempre.
+    try:
+        if hasattr(pipe, "vae") and pipe.vae is not None:
+            pipe.vae.to(torch.float32)
+    except Exception:                                        # noqa: BLE001
+        pass
+
     free = _free_vram_mb()
     force_offload = os.environ.get("NATIVE_FORCE_OFFLOAD") == "1"
+    # LINGBOT_OFFLOAD: forza la strategia (utile per video lunghi dove le ATTIVAZIONI, non i pesi, saturano
+    # la VRAM → i pesi residenti andrebbero in OOM; con model_cpu_offload i pesi si streammano e le
+    # attivazioni hanno spazio). 'model' | 'sequential' | 'resident' | 'auto' (default).
+    mode = os.environ.get("LINGBOT_OFFLOAD", "auto").lower()
+    if mode == "model":
+        pipe.enable_model_cpu_offload()
+        print(f"[lingbot] offload model_cpu (forzato, VRAM libera {free}MB)", flush=True)
+        try:
+            if hasattr(pipe, "vae"):
+                pipe.vae.enable_tiling()
+        except Exception:                                    # noqa: BLE001
+            pass
+        _PIPE_CACHE[key] = pipe
+        return pipe
+    if mode == "resident":
+        pipe = pipe.to("cuda")
+        print(f"[lingbot] pipeline RESIDENTE (forzato, VRAM libera {free}MB)", flush=True)
+        _PIPE_CACHE[key] = pipe
+        return pipe
     heavy = variant == "moe"
     # Ingombro APPROSSIMATIVO dei pesi residenti per variante (transformer+VLM text-encoder+VAE):
     # Dense ~15GB, MoE ~60GB+ (serve comunque quant+offload). Le ATTIVAZIONI (dipendono da frame×risoluzione)
