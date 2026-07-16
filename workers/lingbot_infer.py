@@ -115,15 +115,11 @@ def _load_pipeline(model_dir: str, variant: str, i2v: bool = False):
         except Exception:                                    # noqa: BLE001
             raise RuntimeError(f"Caricamento pipeline LingBot fallito da {model_dir}: {ex}")
 
-    # VAE in fp32 (come da README ufficiale: --vae_dtype fp32). La pipeline dà i latenti in fp32 al decode;
-    # con la VAE in bf16 → "Input type (float) and bias type (BFloat16)" al VAEDecode (visibile solo con
-    # model_cpu_offload; residente talvolta perdona). Teniamola fp32 sempre.
-    try:
-        if hasattr(pipe, "vae") and pipe.vae is not None:
-            pipe.vae.to(torch.float32)
-    except Exception:                                        # noqa: BLE001
-        pass
-
+    # NB VAE = Wan VAE (conv3d): tenerla in bf16 (come il resto). NON castarla a fp32 → il conv3d fp32 su
+    # CUDA non ha kernel (aten::slow_conv3d_forward è solo CPU). E NON usare model_cpu_offload con questa
+    # VAE → l'hook di accelerate le dà input fp32 mentre i pesi restano bf16 ("Input type float / bias
+    # BFloat16"). Conclusione: LingBot va in RESIDENTE (bf16); per i video lunghi si limita la VRAM con la
+    # risoluzione o il chunking, non con l'offload dei pesi.
     free = _free_vram_mb()
     force_offload = os.environ.get("NATIVE_FORCE_OFFLOAD") == "1"
     # LINGBOT_OFFLOAD: forza la strategia (utile per video lunghi dove le ATTIVAZIONI, non i pesi, saturano
