@@ -1,0 +1,11 @@
+{
+  "prompt": "the fresco comes alive: the cherubs blink, grin and start juggling the oranges between each other across the ceiling, clouds slowly swirl, one trumpet plays and gold dust rains down toward the camera; playful, funny, museum ambience preserved. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 419597863,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-i2v-01-out.mp4",
+  "image_path": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\_work\\vid-i2v-01-src.png"
+}

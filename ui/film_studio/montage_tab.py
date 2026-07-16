@@ -57,14 +57,22 @@ class MontageTab(QWidget):
         for code, lab in _ASPECT:
             self.aspect.addItem(lab, code)
         r1.addWidget(QLabel(tr("fs.mt.aspect", "Aspetto"))); r1.addWidget(self.aspect)
-        self.trans = QComboBox()                             # transizione di default tra le clip
+        self.trans = QComboBox()                             # transizione di default TRA RIPRESE (stessa scena)
         for code, lab in _TRANS:
             self.trans.addItem(lab, code)
-        r1.addWidget(QLabel(tr("fs.mt.trans", "Transizione"))); r1.addWidget(self.trans)
+        r1.addWidget(QLabel(tr("fs.mt.trans_shot", "Transizione riprese"))); r1.addWidget(self.trans)
         from PySide6.QtWidgets import QDoubleSpinBox as _DSB
         self.trans_dur = _DSB(); self.trans_dur.setRange(0.1, 3.0); self.trans_dur.setSingleStep(0.1)
         self.trans_dur.setValue(0.5); self.trans_dur.setSuffix(" s")
         r1.addWidget(self.trans_dur)
+        self.scene_trans = QComboBox()                       # transizione TRA SCENE (può differire dalle riprese)
+        for code, lab in _TRANS:
+            self.scene_trans.addItem(lab, code)
+        self.scene_trans.setCurrentIndex(1)                  # default: dissolvenza tra scene (stacco tra riprese)
+        r1.addWidget(QLabel(tr("fs.mt.trans_scene", "Transizione scene"))); r1.addWidget(self.scene_trans)
+        self.scene_trans_dur = _DSB(); self.scene_trans_dur.setRange(0.1, 3.0); self.scene_trans_dur.setSingleStep(0.1)
+        self.scene_trans_dur.setValue(0.8); self.scene_trans_dur.setSuffix(" s")
+        r1.addWidget(self.scene_trans_dur)
         self.fmt = QComboBox()
         for code, lab in _FMT:
             self.fmt.addItem(lab, code)
@@ -307,7 +315,8 @@ class MontageTab(QWidget):
                     if not (outs > ins):
                         ins, outs = 0.0, float(sh["duration_s"] or 4)
                     out.append({"file": f, "in_s": ins, "out_s": outs,
-                                "name": f"S{sc['ord']}.{sh['ord']}", "shot_id": sh["id"], "sh_ord": sh["ord"]})
+                                "name": f"S{sc['ord']}.{sh['ord']}", "shot_id": sh["id"], "sh_ord": sh["ord"],
+                                "scene_id": sc["id"], "transition": sh.get("transition") or ""})
         return out
 
     def _refresh(self):
@@ -535,17 +544,17 @@ class MontageTab(QWidget):
         out = str(db.project_dir(pid) / "master.mp4")
         tracks = (list(getattr(self, "_audio_tracks", []) or []) + list(getattr(self, "_extra_tracks", []) or [])
                   + list(getattr(self, "_ambient_tracks", []) or []))   # #95: includi l'ambient nel master
-        default_t = self.trans.currentData() or ""          # transizione: per-shot (shot.transition) o default
-        dur = self.trans_dur.value()
-        per, trims = [], []
+        from core.film_studio import montage_render
+        trims = []
         for c in (self._cur_clips or []):
             sh = db.get("shot", c.get("shot_id")) or {}
             trims.append({"in_s": sh.get("in_s", 0) or 0, "out_s": sh.get("out_s", 0) or 0})  # trim per-shot
-        for c in (self._cur_clips or [])[:-1]:
-            sh = db.get("shot", c.get("shot_id")) or {}
-            t = sh.get("transition") or default_t
-            per.append({"type": t, "dur": dur} if t else {"type": "", "dur": 0})
-        trans = per if any(p["type"] for p in per) else None
+        # transizioni a DUE LIVELLI (scene vs riprese), stessa logica riusata da Lucky Director
+        per = montage_render.build_transitions(
+            self._cur_clips or [],
+            scene_trans=self.scene_trans.currentData() or "", shot_trans=self.trans.currentData() or "",
+            scene_dur=self.scene_trans_dur.value(), shot_dur=self.trans_dur.value())
+        trans = per if montage_render.has_any(per) else None
         trims = trims if any(t["out_s"] > t["in_s"] for t in trims) else None
         try:
             otio_export.render_master(clips, out, audio_tracks=tracks or None,

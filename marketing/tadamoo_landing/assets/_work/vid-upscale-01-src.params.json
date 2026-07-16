@@ -1,0 +1,10 @@
+{
+  "prompt": "Vintage-looking low-res clip (real or generated then degraded): a 1980s-style roller-skating crew gliding along a beach promenade, VHS grain, chroma bleed, soft blurry 360p. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 875896734,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\_work\\vid-upscale-01-src.raw.mp4"
+}

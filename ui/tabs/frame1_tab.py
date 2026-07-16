@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QLabel,
     QComboBox, QSlider, QFormLayout, QGroupBox, QSpinBox, QPushButton, QLineEdit,
     QCheckBox, QTabWidget, QScrollArea, QFrame, QDoubleSpinBox, QToolButton,
-    QListWidget,
+    QListWidget, QFileDialog,
 )
 
 from ui.mask_canvas import MaskCanvas
@@ -583,6 +583,34 @@ class Frame1Tab(QWidget):
                 self.integrate_puzzle.setToolTip(tr("f1.integrate.puzzle.tt.on"))
 
     # ---------- inpaint / outpaint ----------
+    def _photo_field(self, placeholder: str) -> dict:
+        """Campo 'foto da modificare': path + Sfoglia + X.
+
+        Regola (richiesta utente 13/07): se il campo è VUOTO, la foto da modificare è quella già
+        caricata NEL CANVAS. Prima la GUI chiedeva una foto ma il campo per darla non esisteva nella
+        sezione: l'unico modo era caricarla nel canvas, senza che nulla lo dicesse.
+        Ritorna {"row": widget da mettere nel form, "edit": QLineEdit con il path}.
+        """
+        row = QWidget(); h = QHBoxLayout(row); h.setContentsMargins(0, 0, 0, 0); h.setSpacing(4)
+        edit = QLineEdit(); edit.setPlaceholderText(placeholder)
+        edit.setToolTip(tr("f1.photo.tt",
+                           "Foto da modificare. Se lasci vuoto, viene usata l'immagine del canvas."))
+        b_open = QPushButton("📂"); b_open.setFixedWidth(30)
+        b_open.setToolTip(tr("f1.photo.browse.tt", "Scegli una foto dal disco"))
+        b_clr = QPushButton("✕"); b_clr.setFixedWidth(26)
+        b_clr.setToolTip(tr("f1.photo.clear.tt", "Svuota → usa la foto del canvas"))
+
+        def _browse():
+            fn, _ = QFileDialog.getOpenFileName(self, tr("f1.photo.browse.tt", "Scegli una foto"), "",
+                                                tr("canvas.image_filter", "Immagini (*.png *.jpg *.jpeg *.webp)"))
+            if fn:
+                edit.setText(fn)
+
+        b_open.clicked.connect(_browse)
+        b_clr.clicked.connect(lambda: edit.clear())
+        h.addWidget(edit, 1); h.addWidget(b_open); h.addWidget(b_clr)
+        return {"row": row, "edit": edit}
+
     def _inpaint_box(self) -> QWidget:
         """Tab Inpaint/Outpaint diviso in DUE sezioni indipendenti, ognuna con i suoi
         parametri (anche duplicati: negativo/steps/seed) e il proprio bottone di generazione:
@@ -614,6 +642,8 @@ class Frame1Tab(QWidget):
         # ============ SEZIONE 1: INPAINT / OUTPAINT ============
         ipo_box = QGroupBox(tr("f1.inpaint.group"))
         f = QFormLayout(ipo_box)
+        # Inpaint/outpaint lavorano SEMPRE sulla foto del canvas (è lì che disegni la maschera): nessun
+        # campo file qui. Il campo esiste solo in "Integra", dove la base può essere un'altra foto.
         self.inpaint_prompt = QPlainTextEdit(); self.inpaint_prompt.setMaximumHeight(36)
         self.inpaint_prompt.setPlaceholderText(tr("f1.inpaint.prompt.ph"))
         self.inpaint_prompt.setToolTip(tr("f1.inpaint.prompt.tt", "Descrivi cosa disegnare nell'area mascherata (inpaint)."))
@@ -698,6 +728,9 @@ class Frame1Tab(QWidget):
         # ============ SEZIONE 2: INTEGRA ============
         int_box = QGroupBox(tr("f1.integrate.group"))
         g = QFormLayout(int_box)
+        # Foto di BASE su cui fondere i layer. Vuoto = la foto del canvas (com'era, ma ora è detto).
+        self.int_photo = self._photo_field(tr("f1.photo.ph", "(vuoto = la foto nel canvas)"))
+        g.addRow(tr("f1.photo_base_lbl", "Foto di base"), self.int_photo["row"])
         self.integrate_prompt = QPlainTextEdit(); self.integrate_prompt.setMaximumHeight(36)
         self.integrate_prompt.setPlaceholderText(tr("f1.integrate.prompt.ph"))
         self.integrate_prompt.setToolTip(tr("f1.integrate.prompt.tt", "Istruzione su come fondere le immagini extra nella scena."))
@@ -762,6 +795,15 @@ class Frame1Tab(QWidget):
         info = QLabel(tr("f1.compose.info")); info.setWordWrap(True)
         info.setStyleSheet("color:#9bd; font-size:11px;")
         cg.addWidget(info)
+        # LISTA VUOTA = usa il CANVAS: la base è la foto del canvas e le foto da comporre sono i suoi
+        # LAYER, ciascuno con la SUA maschera e con posizione/scala/rotazione che gli hai dato.
+        # (Con la lista piena, invece, le foto vengono affiancate e la collocazione la sceglie il
+        # modello: nessun controllo spaziale — è un limite dei modelli, non della GUI.)
+        hint = QLabel(tr("f1.compose.canvas_hint",
+                         "💡 Lascia la lista VUOTA per usare il canvas: base = foto del canvas, "
+                         "elementi = i layer, con le loro maschere, posizioni, scale e rotazioni."))
+        hint.setWordWrap(True); hint.setStyleSheet("color:#8c8; font-size:11px;")
+        cg.addWidget(hint)
         self.compose_list = QListWidget(); self.compose_list.setMaximumHeight(110)
         self.compose_list.setToolTip(tr("f1.compose.list.tt"))
         cg.addWidget(self.compose_list)
@@ -1273,6 +1315,10 @@ class Frame1Tab(QWidget):
             "integrate_steps": self.int_steps.value(),
             "integrate_guidance": self.int_guidance.value() / 10.0,
             "integrate_seed": None if self.int_seed_rand.isChecked() else self.int_seed.value(),
+            # FOTO DI BASE di "Integra", scelta a mano. Vuoto ⇒ si usa quella del CANVAS (main_window
+            # la carica nel canvas prima di procedere). Inpaint/outpaint usano solo il canvas.
+            "integrate_photo": (self.int_photo["edit"].text().strip()
+                                if hasattr(self, "int_photo") else ""),
             # Campi inpaint/outpaint
             "negative": self.inp_neg.toPlainText().strip(),
             "strength": self.strength.value() / 100.0,

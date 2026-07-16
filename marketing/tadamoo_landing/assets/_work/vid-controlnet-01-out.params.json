@@ -1,0 +1,13 @@
+{
+  "prompt": "same motion via canny guide: a gleaming chrome robot breakdancing on the deck of a space station, Earth glowing in the panoramic window behind, neon teal rim lights, sparks when it hits the freeze — identical choreography to the source. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 1497853288,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-controlnet-01-out.mp4",
+  "control_video": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-controlnet-01-guide.mp4",
+  "control_type": "canny",
+  "control_strength": 0.8
+}

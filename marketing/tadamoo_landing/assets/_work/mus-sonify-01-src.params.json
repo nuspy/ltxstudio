@@ -1,0 +1,10 @@
+{
+  "prompt": "Silent clip: a busy summer gelato kiosk by the sea — scooping gelato into cones, kids running, seagulls hovering, waves breaking, a bicycle bell moment. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 1997190726,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\_work\\mus-sonify-01-src.raw.mp4"
+}

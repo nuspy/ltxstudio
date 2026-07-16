@@ -1,0 +1,10 @@
+{
+  "prompt": "Real or generated clip: a breakdancer in a sunlit empty parking lot performing a clean windmill into a freeze, static camera, high contrast, clearly readable silhouette. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 814096924,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-controlnet-01-src.mp4"
+}

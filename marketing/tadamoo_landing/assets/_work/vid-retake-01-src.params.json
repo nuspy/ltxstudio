@@ -1,0 +1,10 @@
+{
+  "prompt": "A rooftop dinner party at dusk, friends raising glasses in a calm toast, string lights, city skyline behind, gentle handheld camera. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 1731055584,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-retake-01-src.mp4"
+}

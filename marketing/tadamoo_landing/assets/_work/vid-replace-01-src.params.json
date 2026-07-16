@@ -1,0 +1,10 @@
+{
+  "prompt": "A knight in dull practice armor clumsily dancing flamenco on a wooden stage in an empty theater, spotlights on, funny and endearing, medium-wide shot. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 347455234,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-replace-01-src.mp4"
+}

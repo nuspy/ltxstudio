@@ -43,3 +43,8 @@ installer/_cache/
 *.pth
 *.gguf
 data/model_vram_cache.json
+
+# artefatti (non committare)
+mocap_env/
+apps/studio-mobile/npm_install.log
+apps/studio-mobile/tsconfig.tsbuildinfo

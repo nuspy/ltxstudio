@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaDaMoo — LTX Studio · C'è uno studio intero nella tua scheda video</title>
+<meta name="description" content="TaDaMoo (LTX Studio): immagini, video, musica, voci, film e mondi 3D — generati al 100% sul tuo computer. Nessun cloud, nessun abbonamento. Promo di lancio: $99 invece di $198, aggiornamenti a vita.">
+<meta property="og:title" content="TaDaMoo — C'è uno studio intero nella tua scheda video.">
+<meta property="og:description" content="Dieci svelamenti da qui alla Luna. Immagini, video, musica, voce, cinema, 3D: tutto locale, tutto tuo. −50% al lancio.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,500&family=Sora:wght@300;400;600&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:ital@0;1&display=swap" rel="stylesheet">
+<script type="module" src="https://unpkg.com/@google/model-viewer@3.4.0/dist/model-viewer.min.js"></script>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+/* ==========================================================================
+   TaDaMoo — una scena sola, dalla Terra alla Luna.
+   ========================================================================== */
+:root{
+  --night:#0a0918;
+  --cream:#f3ead6;
+  --dim:#a89fc4;
+  --gold:#ffd166;
+  --coral:#ff5d73;
+  --teal:#3fe8b0;
+  --lilac:#b39dff;
+  --ice:#8fd8ff;
+  --rose:#ff9de2;
+  --amber:#ffab5e;
+  --leaf:#9ee86e;
+  --d:"Fraunces",Georgia,serif;
+  --b:"Sora",system-ui,sans-serif;
+  --g:"Space Grotesk",system-ui,sans-serif;
+  --m:"IBM Plex Mono",ui-monospace,monospace;
+  --w:1060px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-snap-type:y proximity}
+html,body{overflow-x:clip;max-width:100%}
+body{
+  background:var(--night);color:var(--cream);
+  font-family:var(--b);font-weight:300;font-size:16.5px;line-height:1.68;
+  text-align:center;
+}
+img,video,canvas,svg{max-width:100%}
+a{color:inherit}
+button{font:inherit;color:inherit}
+::selection{background:var(--gold);color:#1b1030}
+
+/* ---- la scena: un unico canvas dietro tutto -------------------------------- */
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.hero-videobg{position:fixed;inset:0;z-index:1;pointer-events:none}
+.hero-videobg video{width:100%;height:100%;object-fit:cover;opacity:.28}
+header.hero,main,footer{position:relative;z-index:2}
+
+/* ---- HUD di rotta (destra): filo inciso + fotone --------------------------- */
+#hud{position:fixed;right:30px;top:0;height:100svh;z-index:40;pointer-events:none}
+#hud .wire{position:absolute;right:0;top:10svh;bottom:10svh;width:1px;background:linear-gradient(rgba(243,234,214,0),rgba(243,234,214,.22) 12%,rgba(243,234,214,.22) 88%,rgba(243,234,214,0))}
+#hud .photon{
+  position:absolute;right:-4px;bottom:10svh;width:9px;height:9px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#fff,var(--gold) 60%,transparent 75%);
+  box-shadow:0 0 14px 3px rgba(255,209,102,.55);
+}
+#quota{
+  position:fixed;right:44px;bottom:26px;z-index:40;pointer-events:none;
+  font-family:var(--m);font-size:.64rem;letter-spacing:.22em;color:var(--dim);
+  writing-mode:vertical-rl;transform:rotate(180deg);
+}
+#topbar{position:fixed;top:0;left:0;height:2px;width:0;z-index:41;background:linear-gradient(90deg,var(--coral),var(--gold));display:none}
+
+/* ==========================================================================
+   Tipografia da manifesto
+   ========================================================================== */
+h1,h2{font-family:var(--d);font-weight:300;letter-spacing:-.015em}
+.tada{
+  font-family:var(--m);font-size:.66rem;letter-spacing:.34em;text-transform:uppercase;color:var(--acc,var(--gold));
+  display:flex;align-items:center;justify-content:center;gap:1em;margin-bottom:1.2rem;
+}
+.tada::before,.tada::after{content:"";height:1px;width:52px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--acc,var(--gold)) 60%,transparent));}
+.tada::after{background:linear-gradient(90deg,color-mix(in srgb,var(--acc,var(--gold)) 60%,transparent),transparent)}
+.tada b{font-weight:400;color:var(--cream)}
+
+/* ==========================================================================
+   HERO
+   ========================================================================== */
+.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 1.25rem 3rem;scroll-snap-align:start;overflow:clip}
+.hero .in{position:relative;z-index:2;max-width:56rem}
+.kicker{font-family:var(--m);font-size:.68rem;letter-spacing:.4em;text-transform:uppercase;color:var(--gold);margin-bottom:1.6rem}
+.hero h1{font-size:clamp(2.4rem,6vw,4.4rem);line-height:1.07;margin:0 auto 1.3rem;max-width:20ch}
+.hero h1 b{font-weight:700}
+.hero h1 em{font-style:italic;font-weight:500;
+  background:linear-gradient(100deg,var(--gold) 5%,var(--coral) 55%,var(--lilac));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .sub{max-width:42rem;margin:0 auto 2.1rem;color:var(--dim);font-size:1.04rem}
+.hero .sub b{color:var(--cream);font-weight:400}
+.hero-meta{display:flex;gap:1.8rem;justify-content:center;flex-wrap:wrap;margin-top:2rem;font-family:var(--g);font-size:.74rem;letter-spacing:.12em;color:var(--dim)}
+.hero-meta i{font-style:normal;color:var(--gold);font-weight:500}
+.cue{margin-top:3rem;font-family:var(--m);font-size:.62rem;letter-spacing:.34em;color:var(--dim);animation:cue 3s ease-in-out infinite}
+@keyframes cue{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(8px);opacity:1}}
+
+/* ---- etimologia: la didascalia incisa --------------------------------------- */
+.etym{
+  max-width:46rem;margin:0 auto;padding:1.8rem 1.5rem;
+  border-top:1px solid rgba(243,234,214,.14);border-bottom:1px solid rgba(243,234,214,.14);
+  font-family:var(--d);font-weight:300;font-size:1.02rem;line-height:1.8;color:var(--dim);
+}
+.etym b{font-weight:700;color:var(--cream)}
+.etym em{font-style:italic;color:var(--gold);font-weight:500}
+.etym .ipa{font-family:var(--m);font-style:normal;font-size:.8rem;color:var(--dim)}
+
+/* ==========================================================================
+   CTA — vetro inciso, riempimento al passaggio
+   ========================================================================== */
+.cta{
+  position:relative;display:inline-flex;align-items:center;gap:.6em;cursor:pointer;text-decoration:none;
+  font-family:var(--g);font-weight:500;font-size:.93rem;letter-spacing:.05em;color:var(--cream);
+  padding:.82rem 1.75rem;border-radius:999px;border:1px solid transparent;overflow:hidden;
+  background:linear-gradient(rgba(12,10,32,.66),rgba(12,10,32,.66)) padding-box,
+             linear-gradient(115deg,var(--gold),var(--coral) 55%,var(--lilac)) border-box;
+  transition:color .3s ease,box-shadow .3s ease;
+}
+.cta::after{
+  content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;opacity:0;
+  background:linear-gradient(115deg,var(--gold),var(--coral));transition:opacity .3s ease;
+}
+.cta:hover{color:#1b1030;box-shadow:0 10px 42px -8px rgba(255,120,110,.5)}
+.cta:hover::after{opacity:1}
+.cta .arr{transition:transform .3s ease}
+.cta:hover .arr{transform:translateX(5px)}
+.cta:focus-visible{outline:2px solid var(--cream);outline-offset:3px}
+.cta.solid{color:#1b1030;background:linear-gradient(115deg,var(--gold),var(--coral));box-shadow:0 8px 34px -6px rgba(255,93,115,.45)}
+.cta.solid:hover{box-shadow:0 12px 48px -6px rgba(255,209,102,.6)}
+.ctaline{margin-top:2rem}
+.ctanote{display:block;margin-top:.6rem;font-family:var(--m);font-size:.68rem;letter-spacing:.08em;color:var(--dim)}
+.old{text-decoration:line-through;opacity:.55;margin-right:.3em}
+
+/* ==========================================================================
+   Tappe — trasparenti sulla scena, concatenate
+   ========================================================================== */
+.tappa{position:relative;padding:clamp(3rem,7vh,4.6rem) 1.25rem;scroll-snap-align:start;overflow:clip}
+.tin{max-width:var(--w);margin:0 auto;transition:transform .9s cubic-bezier(.22,.9,.3,1),opacity .9s ease}
+.tappa:not(.on) .tin{transform:translateY(40px);opacity:0}
+.tappa h2{font-size:clamp(1.9rem,4.6vw,3.2rem);line-height:1.1;max-width:23ch;margin:0 auto .9rem}
+.tappa h2 em{font-style:italic;font-weight:500;color:var(--acc,var(--gold))}
+.tappa .sub{max-width:44rem;margin:0 auto 1.9rem;color:var(--dim);font-size:.97rem}
+.tappa .sub b{color:var(--cream);font-weight:400}
+
+/* orbita di parole-funzione */
+.orbitwords{
+  overflow:clip;margin:0 auto 2rem;max-width:min(760px,90vw);padding:.4rem 0;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent);
+}
+.orbitwords>div{display:inline-flex;white-space:nowrap;animation:tick 40s linear infinite}
+.orbitwords span{font-family:var(--g);font-size:.7rem;letter-spacing:.26em;text-transform:uppercase;color:rgba(243,234,214,.4);padding:0 1.3em}
+.orbitwords span::after{content:"·";margin-left:2.6em;color:var(--acc,var(--gold));opacity:.6}
+@keyframes tick{to{transform:translateX(-50%)}}
+
+/* ==========================================================================
+   Frammenti: i media sono i protagonisti (risultato grande, origini satelliti)
+   ========================================================================== */
+.belt{display:flex;flex-wrap:wrap;gap:1.6rem 1.4rem;justify-content:center;align-items:flex-start;margin:0 auto 1rem}
+.frag{
+  position:relative;display:block;width:300px;background:none;border:0;cursor:pointer;text-align:center;
+  transition:transform .2s ease-out;
+  animation:float 7s ease-in-out infinite;
+}
+.frag:nth-child(2n){animation-delay:-2.4s}.frag:nth-child(3n){animation-delay:-4.6s}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -7px}}
+.frag.lead{width:min(720px,100%)}
+.frag .devwrap{
+  position:relative;border-radius:22px 34px 24px 36px;overflow:hidden;aspect-ratio:16/10;
+  box-shadow:0 20px 60px -22px rgba(0,0,0,.85);
+  outline:1px solid rgba(243,234,214,.1);outline-offset:-1px;
+  transition:outline-color .3s,box-shadow .3s;
+}
+.frag.lead .devwrap{aspect-ratio:16/8.2;border-radius:28px 46px 30px 50px}
+.frag:hover .devwrap{outline-color:color-mix(in srgb,var(--acc,var(--gold)) 55%,transparent);
+  box-shadow:0 26px 80px -20px color-mix(in srgb,var(--acc,var(--gold)) 38%,rgba(0,0,0,.9))}
+.frag::before{ /* alone nella scena */
+  content:"";position:absolute;inset:-12% -8%;z-index:-1;border-radius:50%;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--acc,var(--gold)) 13%,transparent),transparent 75%);
+  opacity:0;transition:opacity .4s;
+}
+.frag:hover::before{opacity:1}
+.frag:focus-visible{outline:2px solid var(--acc,var(--gold));outline-offset:4px}
+.frag .cap{margin-top:.8rem}
+.frag .cap .t{font-family:var(--d);font-weight:500;font-size:1.06rem;display:block;line-height:1.3}
+.frag.lead .cap .t{font-size:1.3rem}
+.frag .cap .l{font-size:.78rem;color:var(--dim);display:block;margin-top:.15rem}
+.frag .open{
+  position:absolute;top:.7rem;right:.9rem;z-index:4;font-family:var(--m);font-size:.58rem;letter-spacing:.2em;
+  color:var(--cream);background:rgba(10,9,24,.55);border:1px solid rgba(243,234,214,.25);
+  border-radius:999px;padding:.22rem .7rem;opacity:0;transform:translateY(-4px);transition:.3s;
+}
+.frag:hover .open,.frag:focus-visible .open{opacity:1;transform:none}
+/* satelliti: le origini orbitano sul bordo del risultato */
+.sats{position:absolute;left:.9rem;bottom:.8rem;display:flex;gap:.5rem;z-index:4}
+.sat{
+  width:58px;height:58px;border-radius:50%;overflow:hidden;flex:none;position:relative;
+  outline:1px solid rgba(243,234,214,.35);box-shadow:0 6px 18px rgba(0,0,0,.6);
+}
+.sat .dev{position:absolute;inset:0}
+.satlab{
+  position:absolute;left:.9rem;bottom:4.6rem;z-index:4;font-family:var(--m);font-size:.55rem;
+  letter-spacing:.18em;color:rgba(243,234,214,.75);text-transform:uppercase;
+}
+
+/* ==========================================================================
+   .dev — "sviluppi": paesaggi astratti coerenti (mai box grigi)
+   ========================================================================== */
+.dev{position:absolute;inset:0;background:linear-gradient(172deg,var(--s1,#181438),var(--s2,#241a4e) 52%,var(--s3,#3a2358))}
+.dev .beam{
+  position:absolute;left:var(--lx,68%);top:var(--ly,24%);width:64%;aspect-ratio:1;transform:translate(-50%,-50%);
+  border-radius:50%;background:radial-gradient(circle,var(--bc,rgba(255,214,150,.5)),transparent 68%);
+}
+.dev .orb{
+  position:absolute;left:68%;top:28%;width:23%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle at 36% 32%,var(--o1,#ffe9b8),var(--o2,#d9973e) 78%);
+  box-shadow:0 0 26px -2px var(--o1,#ffe9b8);
+}
+.dev .dune{position:absolute;left:-14%;bottom:-46%;width:84%;aspect-ratio:1.35;border-radius:50%;background:var(--d1,#171232)}
+.dev .dune.b{left:auto;right:-20%;bottom:-56%;width:98%;background:var(--d2,#100d26)}
+.dev .grain{
+  position:absolute;inset:0;opacity:.4;
+  background-image:radial-gradient(rgba(243,234,214,.4) .6px,transparent 1.1px);
+  background-size:44px 36px;background-position:6px 4px;
+}
+.dev .veil{
+  position:absolute;inset:0;
+  background:linear-gradient(108deg,transparent 44%,rgba(243,234,214,.08) 50%,transparent 56%);
+  background-size:230% 100%;animation:veil 4.2s ease-in-out infinite;
+}
+@keyframes veil{0%{background-position:135% 0}100%{background-position:-95% 0}}
+/* modificatori */
+.dev.d-rain::after{
+  content:"";position:absolute;inset:-45% 0 0;
+  background:repeating-linear-gradient(13deg,transparent 0 17px,rgba(176,196,235,.26) 17px 18px);
+  animation:rain 1.1s linear infinite;
+}
+@keyframes rain{to{transform:translateY(48px)}}
+.dev.d-edges{background:linear-gradient(#05050d,#03030a)}
+.dev.d-edges .beam,.dev.d-edges .veil{display:none}
+.dev.d-edges .orb{background:transparent;border:1.5px solid rgba(255,255,255,.92);box-shadow:0 0 12px rgba(255,255,255,.7),inset 0 0 10px rgba(255,255,255,.25)}
+.dev.d-edges .dune{background:transparent;border:1.5px solid rgba(255,255,255,.55);border-bottom:0}
+.dev.d-edges .grain{opacity:.25;background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);background-size:30px 30px}
+.dev.d-blur .orb,.dev.d-blur .dune,.dev.d-blur .beam{filter:blur(5px)}
+.dev.d-blur .grain{opacity:.7;background-size:9px 8px}
+.dev.d-noorb .orb{display:none}
+/* onda vocale / musica */
+.dev .wave{position:absolute;left:8%;right:8%;bottom:16%;height:44%;display:flex;align-items:flex-end;justify-content:center;gap:3px}
+.dev .wave i{width:3px;border-radius:2px;background:linear-gradient(to top,var(--wc,var(--lilac)),transparent);animation:eq 1.15s ease-in-out infinite}
+@keyframes eq{0%,100%{height:16%}50%{height:92%}}
+
+/* ==========================================================================
+   Slider prima/dopo — trascinabile, in pagina e nei dialog
+   ========================================================================== */
+.cmp{position:relative;width:100%;height:100%;touch-action:pan-y;cursor:ew-resize}
+.cmp .side{position:absolute;inset:0;overflow:hidden}
+.cmp .side.after{clip-path:inset(0 0 0 50%)}
+.cmp .lab{
+  position:absolute;top:.75rem;z-index:6;font-family:var(--m);font-size:.58rem;letter-spacing:.22em;
+  color:var(--cream);background:rgba(10,9,24,.62);border-radius:6px;padding:.2rem .6rem;pointer-events:none;
+}
+.cmp .lab.l{left:.8rem}.cmp .lab.r{right:.8rem}
+.cmp .bar{position:absolute;top:0;bottom:0;left:50%;width:1.5px;background:var(--cream);z-index:5;pointer-events:none;box-shadow:0 0 16px rgba(243,234,214,.9)}
+.cmp .bar::after{
+  content:"◂ ▸";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);white-space:nowrap;
+  font-family:var(--g);font-size:.62rem;letter-spacing:.1em;color:#1b1030;background:var(--cream);
+  border-radius:999px;padding:.32rem .55rem;box-shadow:0 4px 18px rgba(0,0,0,.5);
+}
+.cmp input[type=range]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;z-index:7;margin:0}
+/* protagonista Immagini in pagina */
+#cmp-stage{
+  position:relative;width:min(860px,100%);aspect-ratio:16/8;margin:0 auto;border-radius:28px 46px 30px 50px;overflow:hidden;
+  outline:1px solid rgba(243,234,214,.12);outline-offset:-1px;box-shadow:0 26px 80px -24px rgba(0,0,0,.9);
+}
+.city{position:absolute;inset:0}
+.city svg{position:absolute;left:0;bottom:0;width:100%;height:74%}
+.side.before .city{background:linear-gradient(180deg,#232c46 0%,#33405e 55%,#1c2338 100%)}
+.side.before .city svg path{fill:#10162a}
+.side.after .city{background:linear-gradient(180deg,#ffd98a 0%,#ffab5e 48%,#ff7b6b 100%)}
+.side.after .city svg path{fill:#571f3e}
+.sunbloom{position:absolute;top:6%;left:13%;width:70px;height:70px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#fffbe8,#ffd166 68%,transparent 70%);box-shadow:0 0 60px 18px rgba(255,209,102,.6)}
+.zest i{position:absolute;width:9px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff2a8,#f0be34);box-shadow:0 0 9px rgba(255,220,120,.75)}
+.rainveil{position:absolute;inset:-35% 0 0;background:repeating-linear-gradient(14deg,transparent 0 16px,rgba(186,202,240,.3) 16px 17px);animation:rain 1s linear infinite}
+.under-spell{max-width:860px;margin:1rem auto 1.8rem}
+
+/* incantesimo */
+.spell{
+  position:relative;font-family:var(--m);font-style:italic;font-size:.78rem;line-height:1.6;color:var(--cream);
+  border:1px solid color-mix(in srgb,var(--acc,var(--gold)) 35%,transparent);
+  background:rgba(9,8,22,.72);border-radius:14px;padding:.85rem 5.4rem .85rem 1.1rem;text-align:left;
+}
+.spell b{display:block;font-style:normal;font-family:var(--g);font-size:.58rem;letter-spacing:.3em;text-transform:uppercase;color:var(--acc,var(--gold));margin-bottom:.4rem}
+.spell .copy{
+  position:absolute;top:.7rem;right:.7rem;cursor:pointer;font-family:var(--g);font-size:.6rem;letter-spacing:.14em;
+  color:var(--cream);background:transparent;border:1px solid rgba(243,234,214,.3);border-radius:999px;padding:.28rem .75rem;
+  transition:.25s;font-style:normal;
+}
+.spell .copy:hover{border-color:var(--acc,var(--gold));color:var(--acc,var(--gold))}
+.spell .copy:focus-visible{outline:2px solid var(--acc,var(--gold))}
+
+/* ==========================================================================
+   Numeri incisi + credo
+   ========================================================================== */
+.bignums{display:flex;flex-wrap:wrap;gap:2rem 3.6rem;justify-content:center;margin:2.6rem auto 0;max-width:62rem}
+.bignums .n{
+  font-family:var(--g);font-weight:700;font-size:clamp(2.3rem,5vw,3.6rem);line-height:1;
+  background:linear-gradient(165deg,var(--cream),var(--gold) 80%);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.bignums .l{font-family:var(--m);font-size:.6rem;letter-spacing:.26em;text-transform:uppercase;color:var(--dim);margin-top:.55rem}
+.creed{display:flex;flex-direction:column;gap:.35rem;max-width:40rem;margin:0 auto;font-family:var(--d);font-weight:300;font-size:1.04rem;color:var(--dim)}
+.creed span b{color:var(--cream);font-weight:500}
+.creed span em{font-style:italic;color:var(--acc,var(--gold))}
+
+/* ==========================================================================
+   Oblò 3D · telescopio mondi · console di rotta
+   ========================================================================== */
+.porthole{position:relative;width:min(400px,90vw);aspect-ratio:1;border-radius:50%;overflow:hidden;flex:none;
+  outline:1px solid rgba(143,216,255,.35);outline-offset:-1px;margin:0 auto;
+  background:radial-gradient(circle at 50% 26%,rgba(143,216,255,.12),rgba(8,7,20,.72) 70%);
+  box-shadow:0 0 0 10px rgba(143,216,255,.05),0 0 70px -18px rgba(143,216,255,.45),inset 0 0 60px rgba(5,5,14,.8);
+}
+.porthole model-viewer{width:100%;height:100%;background:transparent;--poster-color:transparent}
+.porthole.small{width:min(300px,80vw)}
+.hcap{margin-top:.9rem}
+.hcap .t{font-family:var(--d);font-weight:500;font-size:1.1rem;display:block}
+.hcap .l{font-size:.78rem;color:var(--dim);display:block;margin-top:.15rem;max-width:24rem;margin-inline:auto}
+#world-stage{
+  position:relative;width:min(880px,100%);height:430px;margin:0 auto;border-radius:40px 60px 44px 64px;overflow:hidden;
+  outline:1px solid rgba(158,232,110,.3);outline-offset:-1px;
+  background:radial-gradient(120% 100% at 50% 0%,rgba(158,232,110,.08),rgba(8,7,20,.7) 70%);
+  box-shadow:0 30px 90px -30px rgba(0,0,0,.9),0 0 70px -24px rgba(158,232,110,.35);
+}
+#world-stage canvas{width:100%;height:100%}
+#world-start{position:absolute;inset:0;display:flex;flex-direction:column;gap:.9rem;align-items:center;justify-content:center;background:transparent;border:0;cursor:pointer}
+#world-start .iris{
+  width:84px;height:84px;border-radius:50%;position:relative;
+  border:1px solid var(--leaf);box-shadow:0 0 34px rgba(158,232,110,.35),inset 0 0 26px rgba(158,232,110,.18);
+  transition:transform .35s ease,box-shadow .35s ease;
+}
+#world-start .iris::before{content:"";position:absolute;inset:14px;border-radius:50%;border:1px dashed rgba(158,232,110,.6);animation:spin 14s linear infinite}
+#world-start .iris::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);background:var(--leaf);box-shadow:0 0 16px var(--leaf)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#world-start:hover .iris{transform:scale(1.07);box-shadow:0 0 50px rgba(158,232,110,.55),inset 0 0 30px rgba(158,232,110,.3)}
+#world-start strong{font-family:var(--d);font-weight:500;font-size:1.15rem}
+#world-start span{font-family:var(--m);font-size:.6rem;letter-spacing:.2em;color:var(--dim)}
+.world-help{font-family:var(--m);font-size:.62rem;letter-spacing:.18em;color:var(--dim);margin-top:.8rem}
+
+.console{
+  width:min(600px,100%);margin:0 auto;text-align:left;border-radius:20px 30px 22px 32px;overflow:hidden;
+  outline:1px solid rgba(143,216,255,.22);outline-offset:-1px;background:rgba(9,8,22,.74);
+  box-shadow:0 24px 70px -26px rgba(0,0,0,.9);font-family:var(--g);backdrop-filter:blur(5px);
+}
+.cs-head{display:flex;justify-content:space-between;align-items:center;padding:.7rem 1.1rem;border-bottom:1px solid rgba(243,234,214,.09);font-family:var(--m);font-size:.6rem;letter-spacing:.22em;color:var(--dim)}
+.cs-vram{display:flex;align-items:center;gap:.6em}
+.cs-gauge{width:92px;height:5px;border-radius:3px;background:rgba(243,234,214,.1);overflow:hidden}
+.cs-gauge i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--teal),var(--gold));animation:gauge 5.5s ease-in-out infinite}
+@keyframes gauge{0%,100%{width:44%}50%{width:79%}}
+.cs-row{display:flex;align-items:center;gap:.85rem;padding:.62rem 1.1rem;border-bottom:1px solid rgba(243,234,214,.05);font-size:.8rem}
+.cs-row:last-child{border-bottom:0}
+.cs-dot{width:9px;height:9px;border-radius:50%;flex:none;animation:pulse 2.6s ease-in-out infinite}
+.cs-dot.g{background:var(--leaf);box-shadow:0 0 9px var(--leaf)}
+.cs-dot.y{background:var(--gold);box-shadow:0 0 9px var(--gold);animation-delay:.6s}
+.cs-dot.r{background:var(--coral);box-shadow:0 0 9px var(--coral);animation-delay:1.1s}
+@keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
+.cs-name{flex:1;color:var(--cream)}
+.cs-fit{font-family:var(--m);font-size:.58rem;letter-spacing:.06em;color:var(--dim)}
+.cs-pick{font-family:var(--m);font-size:.56rem;letter-spacing:.1em;color:#0c1522;background:var(--ice);border-radius:6px;padding:.14rem .5rem}
+
+/* ==========================================================================
+   Allunaggio
+   ========================================================================== */
+#decollo{min-height:92svh;display:flex;align-items:center}
+.ticket{
+  position:relative;max-width:27rem;margin:2rem auto 0;padding:1.9rem 1.8rem;
+  background:rgba(243,234,214,.05);border-radius:24px;backdrop-filter:blur(8px);
+  outline:1px solid rgba(255,209,102,.38);outline-offset:-1px;
+  box-shadow:0 30px 100px -24px rgba(255,93,115,.35);
+}
+.ticket .head{font-family:var(--m);font-size:.58rem;letter-spacing:.3em;color:var(--teal);margin-bottom:1rem}
+.price{font-family:var(--d);font-weight:700;font-size:3.6rem;color:var(--gold);line-height:1}
+.price .old{font-size:1.3rem;color:var(--dim)}
+.price small{font-size:.9rem;color:var(--dim);font-family:var(--b);font-weight:300}
+.plist{list-style:none;margin:1.2rem 0 1.5rem;text-align:left;font-size:.87rem}
+.plist li{padding:.28rem 0 .28rem 1.5rem;position:relative;color:var(--dim)}
+.plist li b{color:var(--cream);font-weight:400}
+.plist li::before{content:"✦";position:absolute;left:.1rem;color:var(--teal)}
+footer{padding:2.6rem 1rem 3.2rem;color:var(--dim);font-size:.78rem}
+footer a{color:var(--gold)}
+
+/* ==========================================================================
+   Dialog immersivo — un'apertura per tappa, chiusura simmetrica
+   ========================================================================== */
+dialog#exd{
+  border:0;border-radius:26px;padding:0;width:min(880px,94vw);max-height:92svh;
+  background:linear-gradient(168deg,#151038,#0a0922 70%);color:var(--cream);text-align:center;overflow:hidden;
+  outline:1px solid color-mix(in srgb,var(--acc,var(--gold)) 40%,transparent);outline-offset:-1px;
+}
+dialog#exd::backdrop{background:rgba(5,4,14,.78);backdrop-filter:blur(8px)}
+.exd-in{padding:1.6rem 1.5rem 1.5rem;position:relative;max-height:92svh;overflow-y:auto}
+.exd-close{
+  position:absolute;top:.85rem;right:.85rem;cursor:pointer;z-index:8;width:36px;height:36px;border-radius:50%;
+  border:1px solid rgba(243,234,214,.28);background:rgba(9,8,22,.65);color:var(--cream);font-size:.95rem;line-height:1;
+  transition:transform .25s,border-color .25s;
+}
+.exd-close:hover{transform:rotate(90deg);border-color:var(--acc,var(--gold))}
+.exd-close:focus-visible{outline:2px solid var(--acc,var(--gold))}
+.exd-k{font-family:var(--m);font-size:.58rem;letter-spacing:.32em;text-transform:uppercase;color:var(--acc,var(--gold))}
+.exd-t{font-family:var(--d);font-weight:500;font-size:clamp(1.5rem,3.4vw,2.1rem);margin:.45rem 0 .7rem;line-height:1.15}
+.exd-d{color:var(--dim);font-size:.93rem;max-width:38rem;margin:0 auto 1.2rem;text-align:left}
+.exd-d b{color:var(--cream);font-weight:400}
+/* zona media grande */
+.exd-media{position:relative;margin:0 auto 1.1rem;width:100%}
+.exd-frame{
+  position:relative;width:100%;aspect-ratio:16/8.6;border-radius:18px;overflow:hidden;
+  outline:1px solid rgba(243,234,214,.13);outline-offset:-1px;box-shadow:0 20px 60px -24px rgba(0,0,0,.9);
+}
+.exd-pair{display:flex;gap:.8rem;align-items:stretch;justify-content:center;flex-wrap:wrap}
+.exd-pair .half{position:relative;flex:1 1 280px;min-width:260px;aspect-ratio:16/9.4;border-radius:16px;overflow:hidden;outline:1px solid rgba(243,234,214,.13);outline-offset:-1px}
+.exd-tag{
+  position:absolute;left:.7rem;bottom:.6rem;z-index:5;font-family:var(--m);font-size:.56rem;letter-spacing:.18em;
+  color:rgba(243,234,214,.85);background:rgba(9,8,22,.62);border-radius:6px;padding:.16rem .55rem;text-transform:uppercase;
+}
+.exd-sat{position:absolute;right:.8rem;bottom:.7rem;z-index:6;display:flex;flex-direction:column;align-items:center;gap:.3rem}
+.exd-sat .sat{width:84px;height:84px}
+.exd-sat .slab{font-family:var(--m);font-size:.52rem;letter-spacing:.16em;color:rgba(243,234,214,.8);text-transform:uppercase;background:rgba(9,8,22,.6);border-radius:5px;padding:.1rem .4rem}
+.exd-media audio{width:min(460px,100%);margin-top:.7rem}
+.ytmark{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;
+  width:64px;height:44px;border-radius:12px;background:rgba(255,93,115,.92);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 30px rgba(255,93,115,.5);
+}
+.ytmark::after{content:"";border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #fff}
+.ytnote{position:absolute;right:.7rem;top:.6rem;z-index:5;font-family:var(--m);font-size:.54rem;letter-spacing:.12em;color:rgba(243,234,214,.7);background:rgba(9,8,22,.6);border-radius:5px;padding:.14rem .5rem}
+.exd-frame iframe,.half iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
+/* aperture del sipario */
+dialog#exd[data-open="curtain-h"].opening{animation:dCH .55s cubic-bezier(.25,.9,.3,1) both}
+dialog#exd[data-open="curtain-h"].closing{animation:dCH .45s cubic-bezier(.6,.05,.8,.5) reverse both}
+@keyframes dCH{from{clip-path:inset(0 50% 0 50% round 26px);opacity:.5}to{clip-path:inset(0 0 0 0 round 26px);opacity:1}}
+dialog#exd[data-open="curtain-v"].opening{animation:dCV .55s cubic-bezier(.25,.9,.3,1) both}
+dialog#exd[data-open="curtain-v"].closing{animation:dCV .45s cubic-bezier(.6,.05,.8,.5) reverse both}
+@keyframes dCV{from{clip-path:inset(50% 0 50% 0 round 26px);opacity:.5}to{clip-path:inset(0 0 0 0 round 26px);opacity:1}}
+dialog#exd[data-open="zoom"].opening{animation:dZ .5s cubic-bezier(.2,.9,.3,1.12) both}
+dialog#exd[data-open="zoom"].closing{animation:dZ .4s ease-in reverse both}
+@keyframes dZ{from{transform:scale(.62);opacity:0}to{transform:scale(1);opacity:1}}
+dialog#exd[data-open="zoom-out"].opening{animation:dZO .5s cubic-bezier(.2,.9,.3,1.08) both}
+dialog#exd[data-open="zoom-out"].closing{animation:dZO .4s ease-in reverse both}
+@keyframes dZO{from{transform:scale(1.32);opacity:0}to{transform:scale(1);opacity:1}}
+dialog#exd[data-open="fade"].opening{animation:dF .55s ease both}
+dialog#exd[data-open="fade"].closing{animation:dF .45s ease reverse both}
+@keyframes dF{from{opacity:0}to{opacity:1}}
+dialog#exd[data-open="warp"].opening{animation:dW .55s ease both}
+dialog#exd[data-open="warp"].closing{animation:dW .45s ease reverse both}
+@keyframes dW{from{transform:scale(.93);filter:blur(16px);opacity:0}to{transform:scale(1);filter:blur(0);opacity:1}}
+dialog#exd[data-open="tilt"].opening{animation:dT .55s cubic-bezier(.2,.9,.3,1.08) both}
+dialog#exd[data-open="tilt"].closing{animation:dT .45s ease-in reverse both}
+@keyframes dT{from{transform:rotate(3.5deg) translateY(46px) scale(.94);opacity:0}to{transform:none;opacity:1}}
+dialog#exd[data-open="pixel"].opening{animation:dF .3s ease both}
+dialog#exd[data-open="pixel"].closing{animation:dF .55s ease reverse both}
+.exd-pix{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(7,1fr);pointer-events:none;z-index:7}
+.exd-pix i{background:#0a0922;transition:opacity .4s ease}
+dialog#exd.pixdone .exd-pix i{opacity:0}
+
+/* ==========================================================================
+   Mobile — denso, centrato, overflow-x bloccato
+   ========================================================================== */
+@media (max-width:940px){
+  #hud,#quota{display:none}
+  #topbar{display:block}
+  .frag{width:min(360px,100%)}
+  .frag.lead{width:100%}
+  .belt{gap:1.3rem 1rem}
+  .tappa{padding:2.6rem 1rem}
+  .exd-in{padding:1.2rem .9rem 1.1rem}
+  .exd-sat .sat{width:64px;height:64px}
+  .porthole{width:min(320px,86vw)}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto;scroll-snap-type:none}
+  *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
+  .tappa:not(.on) .tin{transform:none;opacity:1}
+  .orbitwords>div{animation:none}
+  .frag{animation:none}
+}
+
+/* --- media reali (Fase B) --- */
+.dev-real{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit;background:#0a0f18}
+.exd-frame video.dev-real,.half video.dev-real{cursor:pointer}
+</style>
+</head>
+<body>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<!-- HUD di rotta -->
+<div id="hud" aria-hidden="true"><div class="wire"></div><div class="photon"></div></div>
+<div id="quota" aria-hidden="true">QUOTA 0 M · RAMPA DI LANCIO</div>
+<div id="topbar" aria-hidden="true"></div>
+
+<!-- ======================================================================
+     HERO
+     ====================================================================== -->
+<header class="hero" data-quota="QUOTA 0 M · RAMPA DI LANCIO" data-motif="aurora">
+  <div class="hero-videobg" data-asset-id="hero-bg-01" data-video-src="assets/hero-bg-01.mp4"></div>
+  <div class="in">
+    <p class="kicker">TaDaMoo · LTX Studio</p>
+    <h1>C'è <b>uno studio intero</b> nella tua scheda video.<br><em>Qualcuno doveva pur dirtelo.</em></h1>
+    <p class="sub">
+      Atelier, set cinematografico, sala d'incisione, officina 3D: TaDaMoo li monta <b>nella tua GPU</b> e getta la chiave del cloud.
+      Nessun abbonamento, nessuna coda sui server altrui, nessun comitato di sorveglianza sulla tua tela.
+      Da qui alla Luna ci sono dieci svelamenti: <b>scorri, il sipario è già alzato.</b>
+    </p>
+    <a class="cta solid" href="buy.html">Prendi il biglietto — <span><span class="old">$198</span>$99</span> <span class="arr">→</span></a>
+    <span class="ctanote">promo di lancio −50% · aggiornamenti e nuove versioni a vita</span>
+    <div class="hero-meta">
+      <span><i>100%</i> locale</span><span><i>0</i> abbonamenti</span><span><i>∞</i> tentativi</span><span><i>SFW·NSFW·Studio</i> inclusi</span>
+    </div>
+    <p class="cue">SCORRI — SI PARTE ▾</p>
+  </div>
+</header>
+
+<main>
+
+<!-- etimologia -->
+<section class="tappa" id="nome" style="--acc:var(--gold)" data-quota="QUOTA 0 M · IL NOME SULLA FUSOLIERA">
+  <div class="tin">
+    <p class="etym">
+      <b>TaDaMoo</b> <span class="ipa">/ta·da·mù/</span> — due prestiti dichiarati.
+      <em>«Ta-Da!»</em>, la sillaba del prestigiatore nell'istante esatto in cui il velo cade;
+      e <em>«To Da Moon»</em>, lo slancio di chi parte per la Luna a cavallo di una palla di cannone,
+      alla maniera del Barone di Münchhausen: il viaggio impossibile, intrapreso comunque,
+      riuscito per eccesso di convinzione. Quel che segue è il numero completo — dieci svelamenti, un solo palco.
+    </p>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº01 · Perché locale
+     ====================================================================== -->
+<section class="tappa" id="locale" style="--acc:var(--gold)" data-quota="T−10 SECONDI · CHECK PRE-VOLO" data-danim="fade" data-motif="aurora">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 01 · Check pre-volo</p>
+    <h2>La nuvola più affidabile<br>è <em>il tuo case</em>.</h2>
+    <p class="sub">
+      Le AI in cloud sono ottime inquiline: pagano poco, leggono la tua posta e ogni tanto cambiano la serratura.
+      TaDaMoo abita da te. Ciò che crei <b>non attraversa nessun server</b>, non scade a fine mese,
+      e nessun moderatore d'oltreoceano decide cosa può dipingere un adulto in casa propria.
+    </p>
+    <div class="creed">
+      <span>La privacy non è una promessa: <b>è l'architettura</b>.</span>
+      <span>Paghi una volta. <em>Crei per sempre.</em></span>
+      <span>La tua GPU lavora <b>gratis, di notte, senza lamentarsi</b>.</span>
+      <span>L'arte adulta è consentita: <em>è casa tua</em>.</span>
+    </div>
+    <div class="bignums">
+      <div><div class="n">100%</div><div class="l">in locale</div></div>
+      <div><div class="n">0</div><div class="l">abbonamenti</div></div>
+      <div><div class="n">22B</div><div class="l">parametri a bordo</div></div>
+      <div><div class="n">15</div><div class="l">lingue</div></div>
+      <div><div class="n">∞</div><div class="l">secondi di video</div></div>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Trasloca lo studio da te <span class="arr">→</span></a>
+      <span class="ctanote"><span class="old">$198</span>$99 una tantum · il contatore non esiste</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº02 · Immagini
+     ====================================================================== -->
+<section class="tappa" id="immagini" style="--acc:var(--coral)" data-quota="11 KM · TROPOSFERA" data-danim="curtain-h" data-motif="darkroom">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 02 · Immagini</p>
+    <h2>Ogni immagine che sai descrivere<br><em>esiste già</em>. Va solo sviluppata.</h2>
+    <p class="sub">
+      Tre motori in camera oscura — <b>FLUX, Z-Image, Ernie</b> — e nessun rullino da finire.
+      Qui sotto, la stessa strada prima e dopo una frase: <b>trascina il confine</b> e guarda piovere al contrario.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>testo → immagine</span><span>edit con una frase</span><span>inpaint su maschera</span><span>outpaint</span><span>composizione multi-foto</span><span>volto coerente pulid</span><span>face-swap</span><span>ricolora</span><span>upscale & restauro</span>
+      <span>testo → immagine</span><span>edit con una frase</span><span>inpaint su maschera</span><span>outpaint</span><span>composizione multi-foto</span><span>volto coerente pulid</span><span>face-swap</span><span>ricolora</span><span>upscale & restauro</span>
+    </div></div>
+
+    <!-- PROTAGONISTA: slider trascinabile (funziona ora) -->
+    <div id="cmp-stage" data-asset-id="img-edit-01">
+      <div class="cmp" data-cmp>
+        <div class="side before">
+          <img class="dev-real cmp-real" src="assets/img-edit-01-src.webp" alt="Prima della modifica" loading="lazy" decoding="async">
+          <span class="lab l">PRIMA · PIOGGIA</span>
+        </div>
+        <div class="side after">
+          <img class="dev-real cmp-real" src="assets/img-edit-01-out.webp" alt="Dopo la modifica" loading="lazy" decoding="async">
+          <span class="lab r">DOPO · FESTA DEI LIMONI</span>
+        </div>
+        <div class="bar"></div>
+        <input type="range" min="0" max="100" value="50" aria-label="Confronto prima e dopo la modifica">
+      </div>
+    </div>
+    <div class="spell under-spell"><b>✦ Incantesimo</b><span class="sptxt">turn the rainy street into a sunny lemon festival in Amalfi — keep the same street, buildings and vespa</span><button class="copy" type="button">COPIA</button></div>
+
+    <div class="belt">
+      <button class="frag" data-ex="img-t2i-01" data-asset-id="img-t2i-01"></button>
+      <button class="frag" data-ex="img-inpaint-01" data-asset-id="img-inpaint-01"></button>
+      <button class="frag" data-ex="img-outpaint-01" data-asset-id="img-outpaint-01"></button>
+      <button class="frag" data-ex="img-compose-01" data-asset-id="img-compose-01"></button>
+      <button class="frag" data-ex="img-pulid-01" data-asset-id="img-pulid-01"></button>
+      <button class="frag" data-ex="img-faceswap-01" data-asset-id="img-faceswap-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Apri la camera oscura <span class="arr">→</span></a>
+      <span class="ctanote">il rullino è infinito · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº03 · Video
+     ====================================================================== -->
+<section class="tappa" id="video" style="--acc:var(--teal)" data-quota="100 KM · LINEA DI KÁRMÁN" data-danim="zoom" data-motif="film">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 03 · Video</p>
+    <h2>La cinepresa è <em>un'opinione</em>.</h2>
+    <p class="sub">
+      Godard sosteneva che il cinema è la verità ventiquattro volte al secondo. <b>LTX-2 la fabbrica in casa</b>:
+      piani sequenza senza limite di durata, scene rigirate al millimetro, ritratti che cantano.
+      Il set non chiude mai — e non fattura mai.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>testo → video</span><span>foto → video</span><span>storyboard multi-scena</span><span>durata illimitata</span><span>controlnet canny·depth·pose</span><span>cambio di protagonista</span><span>lip-sync & canto</span><span>retake</span><span>super-risoluzione</span><span>prolunga</span>
+      <span>testo → video</span><span>foto → video</span><span>storyboard multi-scena</span><span>durata illimitata</span><span>controlnet canny·depth·pose</span><span>cambio di protagonista</span><span>lip-sync & canto</span><span>retake</span><span>super-risoluzione</span><span>prolunga</span>
+    </div></div>
+    <div class="belt">
+      <button class="frag lead" data-ex="vid-long-01" data-asset-id="vid-long-01"></button>
+    </div>
+    <div class="belt">
+      <button class="frag" data-ex="vid-controlnet-01" data-asset-id="vid-controlnet-01"></button>
+      <button class="frag" data-ex="vid-t2v-01" data-asset-id="vid-t2v-01"></button>
+      <button class="frag" data-ex="vid-i2v-01" data-asset-id="vid-i2v-01"></button>
+      <button class="frag" data-ex="vid-storyboard-01" data-asset-id="vid-storyboard-01"></button>
+      <button class="frag" data-ex="vid-replace-01" data-asset-id="vid-replace-01"></button>
+      <button class="frag" data-ex="vid-lipsync-01" data-asset-id="vid-lipsync-01"></button>
+      <button class="frag" data-ex="vid-retake-01" data-asset-id="vid-retake-01"></button>
+      <button class="frag" data-ex="vid-upscale-01" data-asset-id="vid-upscale-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Il primo ciak è stasera <span class="arr">→</span></a>
+      <span class="ctanote">nessun noleggio attrezzatura · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº04 · Musica
+     ====================================================================== -->
+<section class="tappa" id="musica" style="--acc:var(--lilac)" data-quota="400 KM · ORBITA BASSA" data-danim="pixel" data-motif="harmonics">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 04 · Musica</p>
+    <h2>L'orchestra è nel case,<br><em>già accordata</em>.</h2>
+    <p class="sub">
+      Canzoni con voce e testo, strumentali da falò, un rumorista che <b>deduce i suoni guardando i fotogrammi</b>,
+      videoclip montati sul battere. L'estate ha bisogno di una colonna sonora: dettale il tema.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>canzoni complete</span><span>ace-step</span><span>testi ai in 15 lingue</span><span>strumentali</span><span>sonorizzazione video</span><span>videoclip automatici</span><span>karaoke lrc</span><span>post-produzione</span>
+      <span>canzoni complete</span><span>ace-step</span><span>testi ai in 15 lingue</span><span>strumentali</span><span>sonorizzazione video</span><span>videoclip automatici</span><span>karaoke lrc</span><span>post-produzione</span>
+    </div></div>
+    <div class="belt">
+      <button class="frag lead" data-ex="mus-song-01" data-asset-id="mus-song-01"></button>
+    </div>
+    <div class="belt">
+      <button class="frag" data-ex="mus-acestep-01" data-asset-id="mus-acestep-01"></button>
+      <button class="frag" data-ex="mus-sonify-01" data-asset-id="mus-sonify-01"></button>
+      <button class="frag" data-ex="mus-musicvideo-01" data-asset-id="mus-musicvideo-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Accorda la tua estate <span class="arr">→</span></a>
+      <span class="ctanote">diritti: tuoi, per definizione · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº05 · Voce
+     ====================================================================== -->
+<section class="tappa" id="voce" style="--acc:var(--amber)" data-quota="2.000 KM · SILENZIO ORBITALE" data-danim="fade" data-motif="spectrum">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 05 · Voce</p>
+    <h2>Trenta secondi di voce,<br><em>un cast infinito</em>.</h2>
+    <p class="sub">
+      La sintesi recita — pause, sorrisi e sospiri <b>annotati a copione</b>. E con trenta secondi di campione
+      la tua voce impara battute che non hai mai registrato. Un cast completo, nessuna sala di doppiaggio.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>text-to-speech espressivo</span><span>clonazione vocale</span><span>marcatori emozioni & pause</span><span>libreria voci</span><span>voce → lip-sync video</span>
+      <span>text-to-speech espressivo</span><span>clonazione vocale</span><span>marcatori emozioni & pause</span><span>libreria voci</span><span>voce → lip-sync video</span>
+    </div></div>
+    <div class="belt">
+      <button class="frag lead" data-ex="voice-clone-01" data-asset-id="voice-clone-01"></button>
+      <button class="frag" data-ex="voice-tts-01" data-asset-id="voice-tts-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Fai parlare le tue storie <span class="arr">→</span></a>
+      <span class="ctanote">la sala di doppiaggio è compresa · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº06 · Cinema Studio
+     ====================================================================== -->
+<section class="tappa" id="cinema" style="--acc:var(--gold)" data-quota="36.000 KM · ORBITA GEOSTAZIONARIA" data-danim="curtain-v" data-motif="projector">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 06 · Cinema Studio</p>
+    <h2>Dalla logline ai titoli di coda,<br><em>senza passare dal produttore</em>.</h2>
+    <p class="sub">
+      Scrivi una riga. Il Cinema Studio scrittura i personaggi, costruisce i set, gira, doppia, musica e monta —
+      lasciandoti la poltrona del regista e l'ultima parola. Per le sere di pigrizia c'è il <b>quadrifoglio</b>: un click, un film.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>copione → asset → scene → montaggio</span><span>lucky director one-click</span><span>personaggi coerenti</span><span>voci e dialoghi</span><span>colonna sonora</span><span>serie & episodi</span><span>versioning</span>
+      <span>copione → asset → scene → montaggio</span><span>lucky director one-click</span><span>personaggi coerenti</span><span>voci e dialoghi</span><span>colonna sonora</span><span>serie & episodi</span><span>versioning</span>
+    </div></div>
+    <div class="belt">
+      <button class="frag lead" data-ex="cinema-film-01" data-asset-id="cinema-film-01"></button>
+      <button class="frag" data-ex="cinema-lucky-01" data-asset-id="cinema-lucky-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Occupa la poltrona del regista <span class="arr">→</span></a>
+      <span class="ctanote">budget di produzione: <span class="old">$198</span>$99, una volta</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº07 · Officina 3D
+     ====================================================================== -->
+<section class="tappa" id="tre-d" style="--acc:var(--ice)" data-quota="100.000 KM · SPAZIO PROFONDO" data-danim="tilt" data-motif="lattice">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 07 · Officina 3D</p>
+    <h2>La scultura,<br><em>senza il marmo per terra</em>.</h2>
+    <p class="sub">
+      Una fotografia entra, una mesh PBR esce. Poi scheletro e pelle automatici, e il movimento lo rubi
+      a un video o alla tua webcam. Gli oblò qui sotto contengono <b>pezzi veri usciti dall'officina</b>: ruotali.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>immagine → mesh pbr</span><span>trellis</span><span>rig + skinning automatici</span><span>mocap da video</span><span>retarget mixamo & ue5</span><span>export 13 formati</span>
+      <span>immagine → mesh pbr</span><span>trellis</span><span>rig + skinning automatici</span><span>mocap da video</span><span>retarget mixamo & ue5</span><span>export 13 formati</span>
+    </div></div>
+    <div class="belt" style="align-items:center">
+      <div data-asset-id="d3-mesh-01">
+        <div class="porthole">
+          <model-viewer src="assets/placeholder_mesh.glb" camera-controls auto-rotate shadow-intensity="1" alt="Mesh PBR generata da una fotografia — trascina per ruotare"></model-viewer>
+        </div>
+        <div class="hcap"><span class="t">Dalla foto alla materia</span><span class="l">TRELLIS trasforma un'immagine in una mesh PBR da game engine. Questo pezzo è generato davvero.</span></div>
+      </div>
+      <div data-asset-id="d3-rig-01">
+        <div class="porthole small">
+          <model-viewer src="assets/placeholder_rigged.glb" camera-controls auto-rotate shadow-intensity="1" alt="Modello con scheletro e skinning automatici"></model-viewer>
+        </div>
+        <div class="hcap"><span class="t">Ossa in omaggio</span><span class="l">Rig e skinning automatici: la statua riceve uno scheletro e la voglia di usarlo.</span></div>
+      </div>
+      <button class="frag" data-ex="d3-mocap-01" data-asset-id="d3-mocap-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Apri l'officina <span class="arr">→</span></a>
+      <span class="ctanote">scalpello, ossa e movimento inclusi · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº08 · Mondi
+     ====================================================================== -->
+<section class="tappa" id="mondi" style="--acc:var(--leaf)" data-quota="200.000 KM · PUNTO DI NON RITORNO" data-danim="warp" data-motif="horizon">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 08 · Mondi 3D</p>
+    <h2>I luoghi che dipingi<br><em>hanno una porta</em>.</h2>
+    <p class="sub">
+      Una foto diventa un luogo: profondità vera, muri veri, scale che salgono davvero.
+      Il telescopio è già puntato — <b>entra e cammina</b>: W A S D, il mouse è lo sguardo.
+    </p>
+    <div data-asset-id="world-01">
+      <div id="world-stage">
+        <button id="world-start" type="button" aria-label="Accendi il proiettore dei mondi 3D">
+          <span class="iris"></span>
+          <strong>Accendi il Proiettore Mondi</strong>
+          <span>WORLD-01 · SCENA SEGNAPOSTO</span>
+        </button>
+      </div>
+      <div class="world-help">W A S D — CAMMINA · TRASCINA — GUARDA</div>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Apri un varco <span class="arr">→</span></a>
+      <span class="ctanote">i tuoi quadri, visitabili · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº09 · LoRA
+     ====================================================================== -->
+<section class="tappa" id="lora" style="--acc:var(--rose)" data-quota="300.000 KM · ROTTA LUNARE" data-danim="zoom-out" data-motif="constellation">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 09 · Il tuo stile</p>
+    <h2>L'AI ha talento.<br>Ora può avere <em>il tuo</em>.</h2>
+    <p class="sub">
+      Cinque foto del tuo personaggio o del tuo tratto: il wizard costruisce il dataset, allena una LoRA per foto
+      e una per video, e da quel momento il modello <b>parla con il tuo accento</b>. Lo stile non si affitta: si possiede.
+    </p>
+    <div class="orbitwords" aria-hidden="true"><div>
+      <span>lora foto · flux</span><span>lora video · ltx-2</span><span>dataset automatico</span><span>captioning ai</span><span>wizard soggetti</span><span>focus volto</span>
+      <span>lora foto · flux</span><span>lora video · ltx-2</span><span>dataset automatico</span><span>captioning ai</span><span>wizard soggetti</span><span>focus volto</span>
+    </div></div>
+    <div class="belt">
+      <button class="frag lead" data-ex="lora-photo-01" data-asset-id="lora-photo-01"></button>
+      <button class="frag" data-ex="lora-video-01" data-asset-id="lora-video-01"></button>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Firma il modello <span class="arr">→</span></a>
+      <span class="ctanote">il tuo immaginario, brevettato in casa · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Ta-Da! Nº10 · Sala macchine
+     ====================================================================== -->
+<section class="tappa" id="modelli" style="--acc:var(--ice)" data-quota="380.000 KM · ULTIMA CORREZIONE DI ROTTA" data-danim="warp" data-motif="orbits">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> Nº 10 · Sala macchine</p>
+    <h2>Sala macchine<br><em>con maggiordomo</em>.</h2>
+    <p class="sub">
+      Migliaia di modelli su Civitai e Hugging Face: un link, un drag-drop, e sono in libreria.
+      TaDaMoo riconosce l'architettura, misura la VRAM e apparecchia la combinazione giusta, semaforo alla mano.
+      Il maggiordomo consiglia; <b>il volante resta tuo</b>: override manuale su tutto.
+    </p>
+    <div class="console" data-asset-id="models-ui-01" role="img" aria-label="Console dei modelli: semafori di compatibilità VRAM, scelta automatica e override manuale">
+      <div class="cs-head"><span>LIBRERIA MODELLI · AUTOSELECT</span><span class="cs-vram">VRAM <span class="cs-gauge"><i></i></span></span></div>
+      <div class="cs-row"><span class="cs-dot g"></span><span class="cs-name">flux.2-dev · fp8</span><span class="cs-fit">14.1 GB · nativo</span><span class="cs-pick">AUTO ✓</span></div>
+      <div class="cs-row"><span class="cs-dot y"></span><span class="cs-name">ltx-2.3 · 19B bf16</span><span class="cs-fit">ci sta, con block-swap</span><span class="cs-pick">OVERRIDE</span></div>
+      <div class="cs-row"><span class="cs-dot r"></span><span class="cs-name">ltx-2.3 · 19B fp32</span><span class="cs-fit">propone la variante fp8</span><span class="cs-pick">SUGGERITO</span></div>
+      <div class="cs-row"><span class="cs-dot g"></span><span class="cs-name">la-tua-lora.safetensors</span><span class="cs-fit">arch: FLUX ✓ · da Civitai</span><span class="cs-pick">AUTO ✓</span></div>
+    </div>
+    <div class="ctaline">
+      <a class="cta" href="buy.html">Assumi il maggiordomo <span class="arr">→</span></a>
+      <span class="ctanote">tu pensi all'arte, lui ai gigabyte · <span class="old">$198</span>$99</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================================
+     Allunaggio
+     ====================================================================== -->
+<section class="tappa" id="decollo" style="--acc:var(--gold)" data-quota="384.400 KM · MARE DELLA TRANQUILLITÀ" data-danim="fade" data-motif="landing">
+  <div class="tin">
+    <p class="tada"><b>Ta-Da!</b> · Allunaggio</p>
+    <h2>384.400 km.<br><em>Un solo biglietto.</em></h2>
+    <p class="sub">
+      Il Barone partì a cavallo di una palla di cannone e nessuno gli chiese l'abbonamento.
+      Tutto quello che hai attraversato — immagini, video, musica, voce, cinema, 3D, mondi, LoRA —
+      vive in un'unica app, sul tuo computer, <b>per sempre</b>.
+    </p>
+    <div class="ticket">
+      <div class="head">BIGLIETTO LUNARE · SOLA ANDATA · −50% AL LANCIO</div>
+      <div class="price"><span class="old">$198</span> $99 <small>una volta sola</small></div>
+      <ul class="plist">
+        <li><b>Tutte le funzioni</b>, nessun modulo venduto a parte</li>
+        <li>Edizioni <b>SFW · NSFW · Studio</b> incluse</li>
+        <li>Aggiornamenti e <b>nuove versioni a vita</b></li>
+        <li>100% locale: <b>privacy per architettura</b>, zero abbonamenti</li>
+        <li>Installer selettivo: scarichi solo i pesi che ti servono</li>
+      </ul>
+      <a class="cta solid" href="buy.html" style="width:100%;justify-content:center">To Da Moon <span class="arr">→</span></a>
+      <span class="ctanote">a fine promo il prezzo torna a $198 · la Luna invece resta</span>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p><b>TaDaMoo · LTX Studio</b> — il tuo studio creativo, 100% locale. <a href="buy.html">Biglietti</a></p>
+  <p style="margin-top:.6rem;opacity:.55">© 2026 TaDaMoo · PC Windows con GPU NVIDIA · le demo sono generate con LTX Studio.</p>
+</footer>
+
+<dialog id="exd" aria-labelledby="exd-title">
+  <div class="exd-in">
+    <button class="exd-close" type="button" aria-label="Chiudi">✕</button>
+    <div id="exd-body"></div>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ==========================================================================
+   .dev — costruttore degli "sviluppi" (paesaggi astratti coerenti)
+   ========================================================================== */
+function devHTML(spec){
+  /* Fase B: se il pezzo ha un media reale lo mostriamo al posto dello sviluppo grafico.
+     Tutti i renderer passano di qui, quindi slider/satelliti/coppie si integrano da soli. */
+  if(spec.img) return `<img class="dev-real" src="${spec.img}" alt="${spec.alt||spec.tag||''}" loading="lazy" decoding="async">`;
+  if(spec.video) return `<video class="dev-real" src="${spec.video}" muted loop playsinline preload="metadata" aria-label="${spec.tag||''}"></video>`;
+  const wave = spec.wave ? '<span class="wave">'+Array.from({length:22},(_,i)=>
+    `<i style="animation-delay:${(i*.09%1.1).toFixed(2)}s;height:${14+((i*37)%72)}%"></i>`).join('')+'</span>' : '';
+  return `<span class="dev ${spec.m||''}" style="${spec.v||''}">
+    <span class="beam"></span><span class="orb"></span>
+    <span class="dune"></span><span class="dune b"></span>
+    ${wave}<span class="grain"></span><span class="veil"></span>
+  </span>`;
+}
+
+/* ==========================================================================
+   Gli esempi. mode: single | slider | slider-sat | result-sats | yt | ytpair | audio | audiopair
+   ========================================================================== */
+const EX = {
+/* ------------------------------- IMMAGINI ------------------------------- */
+"img-t2i-01":{k:"testo → immagine",t:"Sviluppo istantaneo",card:"Descrivi. Sviluppa. Appendi.",mode:"single",
+  d:"Scrivi la scena come la ricorderesti da un sogno — la nonna che surfa l'onda turchese all'ora d'oro — e il modello la <b>sviluppa in nativo</b>, alla risoluzione piena, senza filigrane né code. Sotto il cofano: FLUX o Z-Image o Ernie, a scelta; il campionatore compie i suoi passaggi di diffusione e ti porge la stampa. Se non è quella giusta, la prossima è gratis: il rullino non finisce.",
+  spell:"a joyful 70-year-old grandmother in a flower-print wetsuit surfing a giant turquoise wave at golden hour, spray like confetti, hot-air balloons on the horizon",
+  p:[{id:"img-t2i-01",img:"assets/img-t2i-01.webp",img:"assets/img-t2i-01.webp",img:"assets/img-t2i-01.webp",tag:"IMMAGINE · 2048×1152",v:"--s1:#0f2c40;--s2:#0e4c5e;--s3:#ff9d5e;--o1:#ffe9b8;--o2:#e8a34e;--d1:#0a2233;--d2:#071825;--lx:70%;--ly:22%"}]},
+"img-inpaint-01":{k:"inpaint su maschera",t:"Chirurgia di scena",card:"Cerchi l'errore, detti la sostituzione.",mode:"slider-sat",satlab:"MASCHERA",
+  d:"Nel canvas disegni una maschera col pennello attorno alla torta anonima; il resto della festa è protetto. Il modello rigenera <b>solo l'area cerchiata</b>, campionando luce, prospettiva e grana dal contesto: la torta diventa una galassia glassata a cinque piani e nessun invitato si accorge dell'operazione. Trascina il confine per ispezionare la sutura: non c'è.",
+  spell:"replace the plain cake with a five-tier galaxy-glazed cake with gold-leaf stars and lit sparklers — same warm garden light",
+  p:[{id:"img-inpaint-01-src",img:"assets/img-inpaint-01-src.webp",img:"assets/img-inpaint-01-src.webp",img:"assets/img-inpaint-01-src.webp",tag:"PRIMA",v:"--s1:#2e2416;--s2:#4e3a22;--s3:#8a6535;--o1:#f0e0c0;--o2:#b98d4e;--d1:#241a0e;--d2:#17110a;--lx:30%;--ly:20%"},
+     {id:"img-inpaint-01-out",img:"assets/img-inpaint-01-out.webp",img:"assets/img-inpaint-01-out.webp",img:"assets/img-inpaint-01-out.webp",tag:"DOPO",v:"--s1:#231246;--s2:#42207a;--s3:#ff5d73;--o1:#ffd166;--o2:#b34ea8;--d1:#1a0e33;--d2:#120a24;--lx:30%;--ly:20%"},
+     {id:"img-inpaint-01-mask",img:"assets/img-inpaint-01-mask.webp",img:"assets/img-inpaint-01-mask.webp",img:"assets/img-inpaint-01-mask.webp",tag:"MASCHERA",v:"--s1:#000;--s2:#000;--s3:#000",m:"d-edges"}]},
+"img-outpaint-01":{k:"outpaint",t:"Oltre il bordo",card:"Ogni foto è una finestra. Apri la parete.",mode:"slider",
+  d:"L'inquadratura stretta sulla barca era una finestra; l'outpaint <b>allarga la tela</b> e chiede al modello di continuare il mondo con la stessa luce e la stessa grana. Il mercato galleggiante riappare intero: le palafitte, la nebbiolina sul fiume, l'alba color pesca che alla foto originale spettava di diritto. Trascina: a sinistra il ritaglio, a destra il mondo.",
+  spell:"extend the canvas: reveal the whole floating market around the boat — flower boats, stilt houses, mist, peach-pink dawn",
+  p:[{id:"img-outpaint-01-src",img:"assets/img-outpaint-01-src.webp",img:"assets/img-outpaint-01-src.webp",img:"assets/img-outpaint-01-src.webp",tag:"ORIGINALE · CROP",v:"--s1:#0e2c36;--s2:#174a52;--s3:#2a7a6b;--o1:#d8f0e0;--o2:#4a9a80;--d1:#0a2028;--d2:#06161c;--lx:52%;--ly:30%"},
+     {id:"img-outpaint-01-out",img:"assets/img-outpaint-01-out.webp",img:"assets/img-outpaint-01-out.webp",img:"assets/img-outpaint-01-out.webp",tag:"TELA ESTESA",v:"--s1:#331d3e;--s2:#743652;--s3:#ff9d5e;--o1:#ffe9b8;--o2:#d97a4e;--d1:#241428;--d2:#170d1a;--lx:52%;--ly:30%"}]},
+"img-compose-01":{k:"composizione multi-foto",t:"Matrimoni impossibili",card:"Due foto mai presentate. Una scena sola.",mode:"result-sats",
+  d:"Dai al modello due fotografie che non si sono mai incontrate — la violinista in studio, la mongolfiera contro il cielo — e chiedi <b>una scena, non un collage</b>. La composizione multi-riferimento fonde i soggetti in una sola luce: lei suona nel cesto di vimini sopra i campi di lavanda, e sembra esserci nata. Le due origini restano in orbita, qui sotto a destra.",
+  spell:"one coherent scene, no collage: the violinist plays in the balloon's basket over misty lavender fields at dawn, sheet music fluttering away like birds",
+  p:[{id:"img-compose-01-out",tag:"RISULTATO · SCENA UNICA",v:"--s1:#241a4e;--s2:#4e2b7a;--s3:#b39dff;--o1:#ffe9b8;--o2:#8a5ec9;--d1:#1a1238;--d2:#110b26;--lx:64%;--ly:24%"},
+     {id:"img-compose-01-a",img:"assets/img-compose-01-a.webp",img:"assets/img-compose-01-a.webp",img:"assets/img-compose-01-a.webp",tag:"FOTO A",v:"--s1:#22222e;--s2:#3a3a4c;--s3:#5a5a72;--o1:#e8e0d0;--o2:#8a8296;--d1:#1a1a24;--d2:#121218;--lx:40%;--ly:30%"},
+     {id:"img-compose-01-b",img:"assets/img-compose-01-b.webp",img:"assets/img-compose-01-b.webp",img:"assets/img-compose-01-b.webp",tag:"FOTO B",v:"--s1:#1c2a38;--s2:#2e4a5e;--s3:#5e88a0;--o1:#f0e6d0;--o2:#7a9ab0;--d1:#16222c;--d2:#0e171e;--lx:60%;--ly:26%"}]},
+"img-pulid-01":{k:"volto coerente · pulid",t:"Lo stesso volto, mille vite",card:"Un ritratto basta. Poi: ogni epoca.",mode:"result-sats",
+  d:"A PuLID basta la foto in orbita qui sotto per <b>imparare un volto e non dimenticarlo più</b>: l'identità viene iniettata nell'attenzione del modello, non incollata sopra. Così la stessa persona diventa un'astronoma rinascimentale che dipinge costellazioni su un globo celeste, con la luce di Vermeer — e resta lei, riconoscibile al primo sguardo, in ogni epoca che le regali.",
+  spell:"same person as a renaissance astronomer painting constellations on a celestial globe, Vermeer window light — identical face",
+  p:[{id:"img-pulid-01-out",tag:"GENERAZIONE · STESSO VOLTO",v:"--s1:#33240f;--s2:#5e4420;--s3:#c9963e;--o1:#fff0cc;--o2:#c98d3e;--d1:#241a0c;--d2:#171008;--lx:26%;--ly:26%"},
+     {id:"img-pulid-01-face",img:"assets/img-pulid-01-face.webp",img:"assets/img-pulid-01-face.webp",img:"assets/img-pulid-01-face.webp",tag:"FOTO VOLTO",v:"--s1:#24242c;--s2:#3a3844;--s3:#565064;--o1:#f0e6d6;--o2:#a08a72;--d1:#1c1c22;--d2:#131316;--lx:50%;--ly:28%"}]},
+"img-faceswap-01":{k:"face-swap",t:"Il trapezio è tuo",card:"La scena che meriti, col volto giusto: il tuo.",mode:"slider",
+  d:"C'è una scena che meriti — il trapezio sotto i riflettori, i coriandoli nel fascio di luce — e un volto che può portartici: il tuo. Il face-swap sostituisce <b>solo l'identità</b>: illuminazione, grana di pellicola e vertigine restano rigorosamente di scena. Trascina il confine e osserva il passaggio di consegne.",
+  spell:"face-swap: il volto di riferimento sul trapezista — illuminazione e grana preservate",
+  p:[{id:"img-faceswap-01-src",img:"assets/img-faceswap-01-src.webp",img:"assets/img-faceswap-01-src.webp",img:"assets/img-faceswap-01-src.webp",tag:"ORIGINALE",v:"--s1:#2a1030;--s2:#54184a;--s3:#963268;--o1:#f0d6e0;--o2:#a84e80;--d1:#1e0c24;--d2:#140818;--lx:66%;--ly:22%"},
+     {id:"img-faceswap-01-out",tag:"CON IL TUO VOLTO",v:"--s1:#2a1030;--s2:#54184a;--s3:#ff5d8e;--o1:#ffd166;--o2:#c94e80;--d1:#1e0c24;--d2:#140818;--lx:66%;--ly:22%"}]},
+/* --------------------------------- VIDEO --------------------------------- */
+"vid-long-01":{k:"video lungo illimitato",t:"Il piano sequenza di sessanta secondi",card:"60 secondi, zero tagli: la postina che decolla.",mode:"yt",dur:"60s · SEQUENZA UNICA",
+  d:"Sessanta secondi <b>senza un solo taglio</b>: la postina consegna l'alba porta a porta, la bicicletta prende velocità lungo il porto e a fine molo smette di toccare terra, con le lettere che la seguono come gabbiani. Tecnicamente: una catena autoregressiva che passa il contesto di segmento in segmento, così la memoria del motore non finisce mai — il video dura quanto la storia, non quanto la VRAM.",
+  spell:"one continuous 60-second shot, no cuts: a mailwoman's dawn delivery ride lifts off over the bay, letters swirling behind like white birds",
+  p:[{id:"vid-long-01",video:"assets/vid-long-01.mp4",video:"assets/vid-long-01.mp4",video:"assets/vid-long-01.mp4",tag:"VIDEO · 60s",v:"--s1:#331d3e;--s2:#743652;--s3:#ffab5e;--o1:#fff0cc;--o2:#e8874e;--d1:#241428;--d2:#170d1a;--lx:74%;--ly:20%"}]},
+"vid-controlnet-01":{k:"controlnet · canny",t:"Il movimento è sacro. Il mondo no.",card:"Stessa danza, pianeta diverso.",mode:"ytpair",satlab:"GUIDA CANNY",dur:"15s",
+  d:"ControlNet estrae dal girato una <b>mappa di contorni</b> — la figura guida che vedi in orbita — e la tratta come una reliquia: ogni passo del ballerino sopravvive identico, fotogramma per fotogramma. Poi il prompt cambia tutto il resto: il parcheggio assolato diventa il ponte di una stazione orbitale, il ballerino un automa di cromo. La coreografia non se n'è accorta.",
+  spell:"same motion via canny guide: a chrome robot breakdancing on a space-station deck, Earth in the window — identical choreography",
+  p:[{id:"vid-controlnet-01-src",video:"assets/vid-controlnet-01-src.mp4",video:"assets/vid-controlnet-01-src.mp4",video:"assets/vid-controlnet-01-src.mp4",tag:"VIDEO INIZIALE",v:"--s1:#382a12;--s2:#6a4a1c;--s3:#c9963e;--o1:#fff0cc;--o2:#c9873e;--d1:#281e0e;--d2:#181208;--lx:70%;--ly:22%"},
+     {id:"vid-controlnet-01-out",video:"assets/vid-controlnet-01-out.mp4",video:"assets/vid-controlnet-01-out.mp4",video:"assets/vid-controlnet-01-out.mp4",tag:"VIDEO FINALE",v:"--s1:#0e1a3a;--s2:#1a3462;--s3:#3fe8b0;--o1:#d8f6ff;--o2:#3e8ac9;--d1:#0a1428;--d2:#060d1a;--lx:70%;--ly:22%"},
+     {id:"vid-controlnet-01-guide",video:"assets/vid-controlnet-01-guide.mp4",video:"assets/vid-controlnet-01-guide.mp4",video:"assets/vid-controlnet-01-guide.mp4",tag:"GUIDA",v:"--s1:#000;--s2:#000;--s3:#000",m:"d-edges"}]},
+"vid-t2v-01":{k:"testo → video",t:"Cinema a dettatura",card:"Le lanterne rapiscono una barca. Tu detti.",mode:"yt",dur:"20s",
+  d:"Detti la scena e LTX-2 la gira: uno sciame di lanterne di carta solleva la barchetta fuori dal porto e la porta a vela tra le stelle, scia di scintille compresa. Direzione della fotografia, movimento di macchina e fisica dell'assurdo sono <b>dedotti dal testo</b> — tu hai firmato solo la sceneggiatura, ventisette parole.",
+  spell:"a swarm of glowing paper lanterns lifts a tiny sailboat into the night sky, golden sparks trailing — slow ascending camera, 20 seconds",
+  p:[{id:"vid-t2v-01",video:"assets/vid-t2v-01.mp4",video:"assets/vid-t2v-01.mp4",video:"assets/vid-t2v-01.mp4",tag:"VIDEO · 20s",v:"--s1:#121a3e;--s2:#26336a;--s3:#b39dff;--o1:#ffe9b8;--o2:#8a6ec9;--d1:#0e142e;--d2:#090d1e;--lx:64%;--ly:26%"}]},
+"vid-i2v-01":{k:"foto → video",t:"L'affresco impertinente",card:"Il soffitto barocco si sveglia e giocola.",mode:"ytpair",dur:"15s",
+  d:"Dai in pasto al motore una fotografia ferma da tre secoli — l'affresco coi cherubini — e la modalità image-to-video la <b>rimette in servizio</b>: le palpebre sbattono, le arance passano di mano in mano a giocoleria, una tromba suona da sola e la polvere d'oro piove verso l'obiettivo. Il museo, comprensibilmente, finge di non vedere.",
+  spell:"the fresco comes alive: cherubs juggle the oranges, one trumpet plays, gold dust rains toward the camera — 15 seconds",
+  p:[{id:"vid-i2v-01-src",img:"assets/vid-i2v-01-src.webp",img:"assets/vid-i2v-01-src.webp",img:"assets/vid-i2v-01-src.webp",tag:"FOTO DI PARTENZA",v:"--s1:#2c2214;--s2:#4e3e22;--s3:#8a6e3e;--o1:#f0e0c0;--o2:#b9954e;--d1:#221a10;--d2:#15100a;--lx:48%;--ly:24%"},
+     {id:"vid-i2v-01-out",video:"assets/vid-i2v-01-out.mp4",video:"assets/vid-i2v-01-out.mp4",video:"assets/vid-i2v-01-out.mp4",tag:"VIDEO · 15s",v:"--s1:#33240f;--s2:#6a4a1c;--s3:#ffd166;--o1:#fff4d0;--o2:#e8b34e;--d1:#241a0c;--d2:#171008;--lx:48%;--ly:24%"}]},
+"vid-storyboard-01":{k:"storyboard multi-scena",t:"Quattro appunti, un solo respiro",card:"4 keyframe a tempo → un piano sequenza.",mode:"yt",dur:"30s · 4 SCENE",
+  d:"Fissi quattro momenti su una linea del tempo — l'aquilone impigliato, la bambina che sale, la corsa nel prato, la vista dal cielo — e lo storyboard li <b>cuce in un'unica ripresa continua</b>: ogni keyframe diventa un'ancora latente e il modello riempie il tragitto tra l'una e l'altra. Il montaggio non è stato saltato: non è mai esistito.",
+  spell:"4 timed keyframes stitched into one continuous coherent shot — tangled kite, the climb, the meadow run, the aerial view — 30 seconds",
+  p:[{id:"vid-storyboard-01",tag:"VIDEO · 30s",v:"--s1:#123a3e;--s2:#1c5e64;--s3:#3fe8b0;--o1:#d8fff0;--o2:#3eb98a;--d1:#0e2c30;--d2:#081d20;--lx:30%;--ly:22%"}]},
+"vid-replace-01":{k:"cambio di protagonista",t:"Il ruolo resta, l'attore cambia",card:"Il cavaliere esce, l'automa entra. Stessa scena.",mode:"ytpair",satlab:"RIFERIMENTO",dur:"15s",
+  d:"Il flamenco resta, il ballerino cambia: indichi il nuovo protagonista con un'immagine di riferimento — un automa liberty in ottone, in orbita qui sotto — e il character replacement lo innesta <b>nella stessa scena, sulla stessa coreografia</b>, con sbuffi di vapore sugli accenti. Palco, luci e zapateado non firmano nessun cambio di contratto.",
+  spell:"replace the knight with the brass automaton from the reference: same choreography, same stage, steam puffs on the accents — 15 seconds",
+  p:[{id:"vid-replace-01-src",video:"assets/vid-replace-01-src.mp4",video:"assets/vid-replace-01-src.mp4",video:"assets/vid-replace-01-src.mp4",tag:"VIDEO INIZIALE",v:"--s1:#2a1e30;--s2:#48344e;--s3:#7a5e8a;--o1:#e8dce0;--o2:#8a6e96;--d1:#201624;--d2:#150e18;--lx:60%;--ly:24%"},
+     {id:"vid-replace-01-out",video:"assets/vid-replace-01-out.mp4",video:"assets/vid-replace-01-out.mp4",video:"assets/vid-replace-01-out.mp4",tag:"VIDEO FINALE",v:"--s1:#2a1e30;--s2:#5e3a2a;--s3:#c9963e;--o1:#ffe9b8;--o2:#c9873e;--d1:#201624;--d2:#150e18;--lx:60%;--ly:24%"},
+     {id:"vid-replace-01-ref",img:"assets/vid-replace-01-ref.webp",img:"assets/vid-replace-01-ref.webp",img:"assets/vid-replace-01-ref.webp",tag:"RIF.",v:"--s1:#1c160e;--s2:#362a16;--s3:#5e4a26;--o1:#ffd166;--o2:#8a6e2e;--d1:#161009;--d2:#0e0a06;--lx:50%;--ly:30%"}]},
+"vid-lipsync-01":{k:"lip-sync & canto",t:"Il ritratto che canta",card:"Una foto + una canzone = un debutto.",mode:"yt",dur:"15s",
+  d:"Servono una foto — la nonna sul balcone, vestito a girasoli — e quindici secondi di soprano generato nella tappa Musica. Il lip-sync <b>legge l'audio e anima il ritratto</b>: attacca l'acuto con il mento giusto e le sopracciglia giuste, i gerani ondeggiano, il vicinato apre le persiane per sentire meglio. Buffo e commovente nello stesso fotogramma.",
+  spell:"portrait photo + 15s soprano line → the portrait sings with perfect lip-sync, acting the high note — 15 seconds",
+  p:[{id:"vid-lipsync-01",tag:"VIDEO · 15s",v:"--s1:#33240f;--s2:#6a3a2a;--s3:#ff9d5e;--o1:#fff0cc;--o2:#e8874e;--d1:#241a0c;--d2:#171008;--lx:34%;--ly:22%"}]},
+"vid-retake-01":{k:"retake",t:"Ciak, si rifà (solo il secondo 4)",card:"Rigiri 4 secondi. Il resto non si accorge.",mode:"ytpair",dur:"15s",
+  d:"Il brindisi sul tetto era buono, ma poteva esplodere. ReTake seleziona <b>solo i secondi da 4 a 8</b>, li rigira con il nuovo prompt — coriandoli, stelle filanti, sparklers nei bicchieri — e li ricuce nel girato con confini invisibili. Il resto del video non è stato toccato e non è nella posizione di lamentarsi.",
+  spell:"retake seconds 4–8 only: the toast erupts into confetti and sparklers — seamless boundaries with the untouched footage",
+  p:[{id:"vid-retake-01-src",video:"assets/vid-retake-01-src.mp4",video:"assets/vid-retake-01-src.mp4",video:"assets/vid-retake-01-src.mp4",tag:"ORIGINALE",v:"--s1:#1c1e36;--s2:#303458;--s3:#5a608a;--o1:#e8e4f0;--o2:#7a80a8;--d1:#16182a;--d2:#0e101c;--lx:56%;--ly:22%"},
+     {id:"vid-retake-01-out",tag:"RETAKE 4–8s",v:"--s1:#241246;--s2:#4e207a;--s3:#ff5d73;--o1:#ffd166;--o2:#b34e8a;--d1:#1a0e33;--d2:#120a24;--lx:56%;--ly:22%"}]},
+"vid-upscale-01":{k:"super-risoluzione",t:"Restauro d'epoca",card:"Da VHS del 1985 a 4K, senza inventare.",mode:"slider",dur:"15s",
+  d:"I pattinatori del lungomare, versione 1985: grana VHS, colori in fuga, dettagli in vacanza. SeedVR2 li riporta in 4K <b>senza inventarsi nulla</b>: la super-risoluzione temporale ritrova i dettagli dove la cassetta li aveva soltanto nascosti, e li tiene stabili fotogramma dopo fotogramma. Trascina il confine: a sinistra la nostalgia, a destra la nitidezza.",
+  spell:"SeedVR2 super-resolution to 4K: crisp faces, stable temporal detail, no hallucinated artifacts",
+  p:[{id:"vid-upscale-01-src",video:"assets/vid-upscale-01-src.mp4",video:"assets/vid-upscale-01-src.mp4",video:"assets/vid-upscale-01-src.mp4",tag:"SORGENTE · 360p",v:"--s1:#24242a;--s2:#3a3a44;--s3:#56565e;--o1:#c8c8d4;--o2:#6e6e7a;--d1:#1c1c20;--d2:#131316;--lx:60%;--ly:24%",m:"d-blur"},
+     {id:"vid-upscale-01-out",tag:"RISULTATO · 4K",v:"--s1:#12333e;--s2:#1c5e6e;--s3:#8fd8ff;--o1:#f0faff;--o2:#4ea0c9;--d1:#0e262e;--d2:#08191e;--lx:60%;--ly:24%"}]},
+/* --------------------------------- MUSICA -------------------------------- */
+"mus-song-01":{k:"canzone completa · heartmula",t:"La hit dell'estate (la tua)",card:"Disco italiana, 118 BPM, litorale al tramonto.",mode:"audio",dur:"90s",
+  d:"Chiedi una disco italiana da litorale, 118 battiti, voce femminile, e un ritornello che non chiede il permesso di restare in testa. HeartMuLa scrive e <b>canta la canzone intera</b> — strofe, ponte, dissolvenza sulle onde — con testo tuo o generato in una delle quindici lingue. La SIAE di casa tua sei tu.",
+  spell:"upbeat italian summer disco, female voice, 118 BPM, seaside road-trip at golden hour — 90s, chorus: 'stasera si vola fino alla luna'",
+  p:[{id:"mus-song-01",audio:"assets/mus-song-01.mp3",audio:"assets/mus-song-01.mp3",audio:"assets/mus-song-01.mp3",tag:"AUDIO · 90s",v:"--s1:#221650;--s2:#42288a;--s3:#b39dff;--o1:#e8dcff;--o2:#8a5ec9;--d1:#1a1038;--d2:#110a26;--lx:50%;--ly:20%;--wc:#b39dff",wave:true,m:"d-noorb"}]},
+"mus-acestep-01":{k:"strumentale · ace-step",t:"Strumentale da falò",card:"Surf-rock notturno con conto alla rovescia.",mode:"audio",dur:"60s",
+  d:"Chitarre twang annegate nel riverbero, timpani che corrono, un organo che entra come un'onda lunga — e un ponte trionfale che sa di conto alla rovescia. ACE-Step genera <b>strumentali interi con struttura</b>, non loop: intro, climax e uscita di scena. Il falò canta da solo; tu tieni il tempo.",
+  spell:"surf-rock instrumental, 140 BPM, beach bonfire at midnight, twangy reverb guitars, triumphant countdown bridge — 60s, no vocals",
+  p:[{id:"mus-acestep-01",audio:"assets/mus-acestep-01.mp3",audio:"assets/mus-acestep-01.mp3",audio:"assets/mus-acestep-01.mp3",tag:"AUDIO · 60s",v:"--s1:#181240;--s2:#302270;--s3:#8b5eff;--o1:#d8ccff;--o2:#6e4ec9;--d1:#120d30;--d2:#0b0820;--lx:50%;--ly:20%;--wc:#8fd8ff",wave:true,m:"d-noorb"}]},
+"mus-sonify-01":{k:"sonorizzazione · mmaudio",t:"Il rumorista invisibile",card:"Il video è muto. Lui lo ascolta lo stesso.",mode:"ytpair",dur:"15s",
+  d:"Dai a MMAudio un video muto del chiosco dei gelati e lui <b>deduce i suoni guardando i fotogrammi</b>: le onde, i gabbiani, lo squeak umido della paletta, il campanello della bici — ciascuno esattamente sul fotogramma giusto. Nessuna libreria di effetti, nessun rumorista in studio: solo un modello che ha imparato che faccia ha ogni suono.",
+  spell:"audio deduced from frames only: waves, gulls, the wet scoop squeak, crowd chatter, the bicycle bell exactly on cue",
+  p:[{id:"mus-sonify-01-src",video:"assets/mus-sonify-01-src.mp4",video:"assets/mus-sonify-01-src.mp4",video:"assets/mus-sonify-01-src.mp4",tag:"VIDEO MUTO",v:"--s1:#14333e;--s2:#20525e;--s3:#3e8a80;--o1:#e0f6f0;--o2:#3e9a8a;--d1:#0e262e;--d2:#08191e;--lx:66%;--ly:24%"},
+     {id:"mus-sonify-01-out",video:"assets/mus-sonify-01-out.mp4",video:"assets/mus-sonify-01-out.mp4",video:"assets/mus-sonify-01-out.mp4",tag:"SONORIZZATO · 15s",v:"--s1:#14333e;--s2:#1c5e64;--s3:#3fe8b0;--o1:#d8fff0;--o2:#3eb98a;--d1:#0e2c30;--d2:#081d20;--lx:66%;--ly:24%;--wc:#3fe8b0",wave:true}]},
+"mus-musicvideo-01":{k:"videoclip automatico",t:"Il videoclip che si gira da solo",card:"Canzone → storyboard → clip montate sul beat.",mode:"yt",dur:"30s",
+  d:"Consegni la canzone e uno stile — «pellicola anni '70 sbiadita dal sole» — e il regista automatico <b>ascolta il testo, scrive lo storyboard e monta sul battere</b>: litorale con decappottabile d'epoca, falò al crepuscolo, tuffo nel plancton luminoso, stop-frame finale al faro. Un videoclip intero, senza etichetta discografica tra i piedi.",
+  spell:"auto music video from the summer song: 70s sun-bleached film, scene cuts on the beat, scenes follow the lyrics — 30s cutdown",
+  p:[{id:"mus-musicvideo-01",tag:"VIDEO · 30s",v:"--s1:#331d3e;--s2:#6a2a52;--s3:#ff9de2;--o1:#ffe9b8;--o2:#c94e8a;--d1:#241428;--d2:#170d1a;--lx:28%;--ly:22%"}]},
+/* ---------------------------------- VOCE ---------------------------------- */
+"voice-clone-01":{k:"clonazione vocale",t:"Trenta secondi di te",card:"La tua voce impara battute mai registrate.",mode:"audiopair",
+  d:"Le presti trenta secondi — una ricetta letta in cucina va benissimo — e la clonazione impara <b>timbro, cadenza e il tuo modo di sorridere sulle vocali</b>. Da quel momento la tua voce recita battute che non hai mai pronunciato: a sinistra il campione, a destra una frase nuova di zecca. Il doppiatore sei tu, anche quando dormi.",
+  spell:"clone → «Capitano ai motori: rotta verso il Mare della Tranquillità. E stavolta il dolce lo portiamo noi.»",
+  p:[{id:"voice-clone-01-sample",audio:"assets/voice-clone-01-sample.mp3",audio:"assets/voice-clone-01-sample.mp3",audio:"assets/voice-clone-01-sample.mp3",tag:"CAMPIONE · 30s",v:"--s1:#33240f;--s2:#5a4420;--s3:#c9963e;--o1:#fff0cc;--o2:#c9873e;--d1:#241a0c;--d2:#171008;--lx:50%;--ly:22%;--wc:#ffab5e",wave:true,m:"d-noorb"},
+     {id:"voice-clone-01-out",audio:"assets/voice-clone-01-out.mp3",audio:"assets/voice-clone-01-out.mp3",tag:"FRASE NUOVA · 20s",v:"--s1:#38200f;--s2:#6a3a1c;--s3:#ff9d5e;--o1:#fff0cc;--o2:#e8874e;--d1:#281808;--d2:#181006;--lx:50%;--ly:22%;--wc:#ffd166",wave:true,m:"d-noorb"}]},
+"voice-tts-01":{k:"tts espressivo",t:"Il narratore su misura",card:"Pause, sorrisi e sospiri: annotati a copione.",mode:"audio",dur:"25s",
+  d:"Scrivi il testo come un copione — <b>[caldo]</b>, <b>[pausa]</b>, <b>[risata]</b> — e la voce lo recita invece di leggerlo: rallenta dove serve suspense, sorride dove l'hai annotato, respira dove respireresti tu. Otto motori TTS a scelta, una libreria di voci riusabile in tutto lo studio, dal videoclip al film.",
+  spell:"[warm] Signore e signori… [pause] allacciate la fantasia. [excited] Benvenuti a bordo. [laugh] — 25s",
+  p:[{id:"voice-tts-01",audio:"assets/voice-tts-01.mp3",audio:"assets/voice-tts-01.mp3",audio:"assets/voice-tts-01.mp3",tag:"AUDIO · 25s",v:"--s1:#2c2214;--s2:#524224;--s3:#a8823e;--o1:#f0e0c0;--o2:#b9954e;--d1:#221a10;--d2:#15100a;--lx:50%;--ly:22%;--wc:#ffd166",wave:true,m:"d-noorb"}]},
+/* --------------------------------- CINEMA --------------------------------- */
+"cinema-film-01":{k:"cinema studio · film completo",t:"Dalla logline ai titoli di coda",card:"Una riga → un corto con dialoghi e musica.",mode:"yt",dur:"45s · CINEMASCOPE",
+  d:"«Un bagnino timido e un ombrellone in fuga si innamorano durante il maestrale.» Da questa riga il Cinema Studio <b>scrittura Nino e l'ombrellone a righe</b>, disegna la spiaggia a mezzogiorno e nella tempesta, gira le scene, doppia i dialoghi, compone la colonna sonora estiva e chiude il montaggio. I gabbiani fanno il coro pettegolo. Il finale — l'ombrellone piantato per sempre accanto alla torretta — commuove chiunque abbia mai perso un ombrellone.",
+  spell:"logline → script → cast → set → shots → dialoghi ITA → colonna sonora estiva → final cut · 45 secondi, 2.35:1",
+  p:[{id:"cinema-film-01",tag:"FILM · 45s",v:"--s1:#33240f;--s2:#6a4a1c;--s3:#ffd166;--o1:#fff4d0;--o2:#e8b34e;--d1:#241a0c;--d2:#171008;--lx:24%;--ly:24%"}]},
+"cinema-lucky-01":{k:"lucky director",t:"Il quadrifoglio",card:"Un click. Il film si fa da solo. Tu guardi.",mode:"yt",dur:"30s · TIMELAPSE",
+  d:"Scrivi «una gara di tuffi tra nonni campioni in un faro abbandonato», premi il quadrifoglio e ti siedi: il timelapse mostra <b>il copione che si scrive, i personaggi che nascono, le scene che si girano e il montaggio che si chiude</b> — da solo, fino al film finito. È la fortuna, addestrata: Lucky Director orchestra l'intera pipeline senza chiederti nulla, tranne l'idea.",
+  spell:"prompt → Lucky Director → il Cinema Studio lavora in autonomia fino al film finito · timelapse 30s",
+  p:[{id:"cinema-lucky-01",tag:"TIMELAPSE · 30s",v:"--s1:#10301c;--s2:#1c5232;--s3:#8ee86e;--o1:#e8ffd8;--o2:#4eb96e;--d1:#0c2416;--d2:#07180e;--lx:70%;--ly:22%"}]},
+/* ----------------------------------- 3D ----------------------------------- */
+"d3-mocap-01":{k:"mocap da video",t:"La statua che balla come te",card:"Balli tu in salotto; ripete lei sul palco lunare.",mode:"result-sats",satlab:"SCHELETRO",
+  d:"Fai la tua danza della vittoria davanti alla webcam — braccia a mulinello, giravolta, finger-guns. Il mocap <b>traccia lo scheletro fotogramma per fotogramma</b> (l'orbita qui sotto) e il retargeting consegna ogni passo al personaggio riggato, che la ripete su un palco lunare senza sbagliare un tempo. Nessuna tuta, nessun marker: solo te e la tua reputazione.",
+  spell:"video → scheletro mocap → retarget sul personaggio riggato · stessa identica danza · 15 secondi",
+  p:[{id:"d3-mocap-01-out",tag:"ANIMAZIONE FINALE",v:"--s1:#0e1a3a;--s2:#1a3462;--s3:#8fd8ff;--o1:#f0faff;--o2:#4e8ac9;--d1:#0a1428;--d2:#060d1a;--lx:50%;--ly:22%"},
+     {id:"d3-mocap-01-src",tag:"VIDEO SORGENTE",v:"--s1:#2a1e30;--s2:#48344e;--s3:#8a6e9a;--o1:#e8dce0;--o2:#8a6e96;--d1:#201624;--d2:#150e18;--lx:44%;--ly:26%"},
+     {id:"d3-mocap-01-skel",tag:"SCHELETRO",v:"--s1:#000;--s2:#020c06;--s3:#04180c",m:"d-edges"}]},
+/* ---------------------------------- LORA ---------------------------------- */
+"lora-photo-01":{k:"lora foto · flux",t:"Il tuo immaginario, addestrato",card:"5 foto → il tuo personaggio, ovunque.",mode:"result-sats",satlab:"DATASET ×5",
+  d:"Cinque foto dell'inventore coi baffi a manubrio, e il wizard fa tutto il resto: <b>dataset, didascalie, training</b> — anche di notte, anche con poca VRAM. Da lì in poi la parola «nv3ntor» invoca lui: in bicicletta sugli anelli di Saturno, addormentato sulla Luna sotto l'ombrellone. Sempre lui, sempre riconoscibile — perché adesso il modello lo conosce per nome.",
+  spell:"trigger: nv3ntor → «nv3ntor riding a penny-farthing on the rings of Saturn, scattering glowing bolts like seeds»",
+  p:[{id:"lora-photo-01-out",tag:"GENERAZIONI COL TRIGGER",v:"--s1:#2a1650;--s2:#54288a;--s3:#ff9de2;--o1:#ffe9b8;--o2:#b34ea8;--d1:#1e1038;--d2:#140a26;--lx:66%;--ly:22%"},
+     {id:"lora-photo-01-src",tag:"DATASET",v:"--s1:#2c2214;--s2:#48381e;--s3:#7a5e36;--o1:#f0e0c0;--o2:#a8824e;--d1:#221a10;--d2:#15100a;--lx:44%;--ly:26%"}]},
+"lora-video-01":{k:"lora video · ltx-2",t:"E adesso, recita",card:"Il tuo soggetto entra in scena. In video.",mode:"yt",dur:"15s",
+  d:"La LoRA video porta il personaggio dal ritratto al set: l'inventore svela il razzo artigianale in giardino, il razzo tossisce, decolla dolcemente sopra l'orto e lui saluta col cappello mentre i cavoli applaudono in foglie. <b>Stessa faccia, stesso gilet, adesso in movimento</b> — perché la LoRA addestrata sulle foto ha una gemella addestrata per il video.",
+  spell:"nv3ntor unveils a sputtering homemade rocket, lifts gently over the vegetable garden, salutes with his hat — 15 seconds",
+  p:[{id:"lora-video-01",tag:"VIDEO · 15s",v:"--s1:#331d3e;--s2:#6a2a52;--s3:#ff9de2;--o1:#ffe9b8;--o2:#c94e8a;--d1:#241428;--d2:#170d1a;--lx:32%;--ly:24%"}]}
+};
+
+/* ==========================================================================
+   Frammenti in pagina: risultato grande + satelliti origine + tilt/glow
+   ========================================================================== */
+document.querySelectorAll('.frag').forEach(frag=>{
+  const ex = EX[frag.dataset.ex]; if(!ex) return;
+  const front = ex.p[0];
+  const sats = ex.p.slice(1,3);
+  frag.innerHTML =
+    `<span class="devwrap">${devHTML(front)}
+      ${ex.mode==='yt'||ex.mode==='ytpair'?'<span class="ytmark" aria-hidden="true"></span>':''}
+      ${ex.dur?`<span class="ytnote">${ex.dur}</span>`:''}
+      ${sats.length?`<span class="satlab">ORIGINE</span><span class="sats">${sats.map(s=>`<span class="sat">${devHTML(s)}</span>`).join('')}</span>`:''}
+      <span class="open">APRI ✦</span>
+    </span>
+    <span class="cap"><span class="t">${ex.t}</span><span class="l">${ex.card}</span></span>`;
+  frag.setAttribute('aria-haspopup','dialog');
+  if(!reduced){
+    frag.addEventListener('pointermove',e=>{
+      const r = frag.getBoundingClientRect();
+      const x=(e.clientX-r.left)/r.width, y=(e.clientY-r.top)/r.height;
+      frag.style.transform=`perspective(800px) rotateY(${(x-.5)*8}deg) rotateX(${(0.5-y)*6}deg)`;
+    });
+    frag.addEventListener('pointerleave',()=>{frag.style.transform='';});
+  }
+  frag.addEventListener('click',()=>openEx(frag));
+});
+
+/* ==========================================================================
+   Dialog immersivo
+   ========================================================================== */
+const dlg = document.getElementById('exd');
+const dlgBody = document.getElementById('exd-body');
+let pixTimer=null;
+
+function sliderHTML(b,a){
+  return `<div class="exd-frame"><div class="cmp" data-cmp>
+    <div class="side before">${devHTML(b)}<span class="lab l">${b.tag}</span></div>
+    <div class="side after">${devHTML(a)}<span class="lab r">${a.tag}</span></div>
+    <div class="bar"></div>
+    <input type="range" min="0" max="100" value="50" aria-label="Confronto prima e dopo">
+  </div></div>`;
+}
+function satHTML(s,lab){
+  return `<span class="exd-sat"><span class="sat">${devHTML(s)}</span><span class="slab">${lab||s.tag}</span></span>`;
+}
+function ytFrame(p,cls){
+  /* Video SELF-HOSTED (niente YouTube): preload="none" → si scarica solo al play, non pesa sul first-paint. */
+  if(p.video) return `<div class="${cls||'exd-frame'}" data-asset-id="${p.id}">
+    <video class="dev-real" src="${p.video}" controls preload="none" playsinline aria-label="${p.tag}"></video>
+    <span class="exd-tag">${p.tag}</span>
+  </div>`;
+  return `<div class="${cls||'exd-frame'}" data-yt-id="PLACEHOLDER" data-asset-id="${p.id}">
+    ${devHTML(p)}<span class="ytmark" aria-hidden="true"></span>
+    <span class="exd-tag">${p.tag}</span><span class="ytnote">data-yt-id="PLACEHOLDER"</span>
+  </div>`;
+}
+function mediaHTML(ex){
+  const p = ex.p;
+  switch(ex.mode){
+    case 'single':
+      return `<div class="exd-frame">${devHTML(p[0])}<span class="exd-tag">${p[0].tag}</span></div>`;
+    case 'slider':
+      return sliderHTML(p[0],p[1]);
+    case 'slider-sat':
+      return `<div style="position:relative">${sliderHTML(p[0],p[1])}${satHTML(p[2],ex.satlab)}</div>`;
+    case 'result-sats':
+      return `<div style="position:relative"><div class="exd-frame">${devHTML(p[0])}<span class="exd-tag">${p[0].tag}</span></div>
+        <div class="exd-sat" style="flex-direction:row;align-items:flex-end;gap:.6rem">
+          ${p.slice(1).map(s=>`<span style="display:flex;flex-direction:column;align-items:center;gap:.3rem"><span class="sat">${devHTML(s)}</span><span class="slab">${s.tag}</span></span>`).join('')}
+        </div></div>`;
+    case 'yt':
+      return ytFrame(p[0]);
+    case 'ytpair':{
+      const sat = p[2] ? satHTML(p[2],ex.satlab) : '';
+      return `<div style="position:relative"><div class="exd-pair">
+        <div class="half">${devHTML(p[0])}<span class="exd-tag">${p[0].tag}</span></div>
+        ${ytFrame(p[1],'half')}
+      </div>${sat}</div>`;}
+    case 'audio':
+      return `<div class="exd-frame">${devHTML(p[0])}<span class="exd-tag">${p[0].tag}</span></div>
+        <audio controls preload="none" aria-label="${p[0].tag}" data-asset-id="${p[0].id}" src="${p[0].audio||''}"></audio>`;
+    case 'audiopair':
+      return `<div class="exd-pair">
+          <div class="half">${devHTML(p[0])}<span class="exd-tag">${p[0].tag}</span></div>
+          <div class="half">${devHTML(p[1])}<span class="exd-tag">${p[1].tag}</span></div>
+        </div>
+        <audio controls preload="none" aria-label="${p[0].tag}" data-asset-id="${p[0].id}" src="${p[0].audio||''}"></audio>
+        <audio controls preload="none" aria-label="${p[1].tag}" data-asset-id="${p[1].id}" src="${p[1].audio||''}"></audio>`;
+  }
+  return '';
+}
+
+function bindSliders(root){
+  root.querySelectorAll('[data-cmp]').forEach(cmp=>{
+    const range = cmp.querySelector('input[type=range]');
+    const after = cmp.querySelector('.side.after');
+    const bar = cmp.querySelector('.bar');
+    const set = v=>{ after.style.clipPath=`inset(0 0 0 ${v}%)`; bar.style.left=v+'%'; };
+    range.addEventListener('input',()=>set(range.value)); set(range.value);
+  });
+}
+
+function openEx(frag){
+  const ex = EX[frag.dataset.ex];
+  const sec = frag.closest('.tappa');
+  const anim = sec?.dataset.danim || 'fade';
+  dlg.style.setProperty('--acc', getComputedStyle(sec).getPropertyValue('--acc')||'var(--gold)');
+  dlg.dataset.open = reduced ? 'fade' : anim;
+
+  dlgBody.innerHTML =
+    `<span class="exd-k">${ex.k}</span>
+     <h3 class="exd-t" id="exd-title">${ex.t}</h3>
+     <div class="exd-media">${mediaHTML(ex)}</div>
+     <p class="exd-d">${ex.d}</p>
+     <div class="spell"><b>✦ Incantesimo</b><span class="sptxt">${ex.spell}</span><button class="copy" type="button">COPIA</button></div>`;
+  bindSliders(dlgBody);
+  hydrateYT(dlgBody);
+  bindCopy(dlgBody);
+
+  dlg.querySelector('.exd-pix')?.remove();
+  dlg.classList.remove('pixdone');
+  if (dlg.dataset.open==='pixel' && !reduced){
+    const g=document.createElement('div'); g.className='exd-pix'; g.setAttribute('aria-hidden','true');
+    for(let i=0;i<63;i++){const c=document.createElement('i');c.style.transitionDelay=(Math.random()*.45).toFixed(2)+'s';g.appendChild(c);}
+    dlg.querySelector('.exd-in').appendChild(g);
+  }
+  dlg.classList.remove('closing'); dlg.classList.add('opening');
+  dlg.showModal();
+  if (dlg.dataset.open==='pixel' && !reduced){
+    clearTimeout(pixTimer); pixTimer=setTimeout(()=>dlg.classList.add('pixdone'),60);
+  }
+}
+function closeEx(){
+  if (reduced){ dlg.close(); return; }
+  dlg.classList.remove('opening'); dlg.classList.add('closing');
+  if (dlg.dataset.open==='pixel') dlg.classList.remove('pixdone');
+  setTimeout(()=>{ dlg.classList.remove('closing'); dlg.close(); }, dlg.dataset.open==='pixel'?540:440);
+}
+dlg.querySelector('.exd-close').addEventListener('click',closeEx);
+dlg.addEventListener('cancel',e=>{e.preventDefault();closeEx();});
+dlg.addEventListener('click',e=>{if(e.target===dlg)closeEx();});
+
+/* copia incantesimo */
+function bindCopy(root){
+  root.querySelectorAll('.spell .copy').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const txt = btn.parentElement.querySelector('.sptxt')?.textContent||'';
+      navigator.clipboard?.writeText(txt).then(()=>{btn.textContent='COPIATO ✓';setTimeout(()=>btn.textContent='COPIA',1600);});
+    });
+  });
+}
+bindCopy(document);
+
+/* YouTube: quando data-yt-id ≠ PLACEHOLDER monta l'iframe */
+function hydrateYT(root){
+  root.querySelectorAll('[data-yt-id]').forEach(el=>{
+    const id = el.dataset.ytId;
+    if (id && id!=='PLACEHOLDER' && !el.querySelector('iframe')){
+      el.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${id}" title="Demo TaDaMoo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+    }
+  });
+}
+
+/* slider in pagina */
+bindSliders(document);
+
+/* ==========================================================================
+   Rivelazione tappe + quota + progresso
+   ========================================================================== */
+let skyP = 0;
+(function(){
+  const secs = document.querySelectorAll('.tappa, header.hero');
+  const quota = document.getElementById('quota');
+  if ('IntersectionObserver' in window && !reduced){
+    const io = new IntersectionObserver(es=>es.forEach(e=>{
+      e.target.classList.toggle('on', e.isIntersecting);
+      if (e.isIntersecting && e.target.dataset.quota && quota) quota.textContent = e.target.dataset.quota;
+    }),{threshold:.22});
+    secs.forEach(s=>io.observe(s));
+  } else secs.forEach(s=>s.classList.add('on'));
+
+  const photon = document.querySelector('#hud .photon');
+  const top = document.getElementById('topbar');
+  const upd = ()=>{
+    const max = document.documentElement.scrollHeight - innerHeight;
+    skyP = max>0 ? Math.min(1, scrollY/max) : 0;
+    if (photon) photon.style.bottom = (10 + skyP*80)+'svh';
+    if (top) top.style.width = (skyP*100)+'%';
+  };
+  addEventListener('scroll',upd,{passive:true}); upd();
+})();
+
+/* ==========================================================================
+   IL CIELO — un'unica scena: palette notte→alba lunare, nebulose, 3 strati
+   di stelle, motivi per tappa che si fondono, la Luna che si avvicina
+   ========================================================================== */
+(function(){
+  const cv = document.getElementById('sky'); if(!cv) return;
+  const ctx = cv.getContext('2d');
+  const DPR = Math.min(devicePixelRatio||1, 1.6);
+  let W,H,L1,L2,L3,shoot=[],t=0;
+  const mk=n=>Array.from({length:n},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.3+.4,tw:Math.random()*7}));
+  function rs(){ W=cv.width=innerWidth*DPR; H=cv.height=innerHeight*DPR; L1=mk(85);L2=mk(55);L3=mk(30); }
+  addEventListener('resize',rs); rs();
+
+  const stops=[
+    [[10,9,24],[13,11,32],[121,80,235],[40,24,96]],
+    [[11,12,34],[10,22,44],[63,232,176],[38,26,116]],
+    [[15,12,42],[27,14,50],[255,93,115],[84,32,116]],
+    [[22,14,44],[50,22,56],[255,171,94],[140,52,98]],
+    [[28,22,48],[70,48,66],[255,209,102],[186,122,108]]
+  ];
+  const lerp=(a,b,k)=>a+(b-a)*k;
+  function pal(p){
+    const x=Math.min(.9999,Math.max(0,p))*(stops.length-1);
+    const i=Math.floor(x),k=x-i,A=stops[i],B=stops[Math.min(i+1,stops.length-1)];
+    return A.map((c,ci)=>c.map((v,vi)=>Math.round(lerp(v,B[ci][vi],k))));
+  }
+  const rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
+  const rgba=(c,a)=>`rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  /* attivazione dei motivi per tappa (centro sezione vs centro viewport) */
+  const motifEls=[...document.querySelectorAll('[data-motif]')];
+  function acts(){
+    const out=[];
+    for(const el of motifEls){
+      const r=el.getBoundingClientRect();
+      const mid=r.top+r.height/2;
+      const a=Math.max(0,1-Math.abs(mid-innerHeight/2)/(innerHeight*.78));
+      if(a>0.02) out.push([el.dataset.motif,a]);
+    }
+    return out;
+  }
+
+  /* icosaedro per la tappa 3D */
+  const PHI=(1+Math.sqrt(5))/2, V=[
+    [0,1,PHI],[0,1,-PHI],[0,-1,PHI],[0,-1,-PHI],[1,PHI,0],[1,-PHI,0],
+    [-1,PHI,0],[-1,-PHI,0],[PHI,0,1],[-PHI,0,1],[PHI,0,-1],[-PHI,0,-1]
+  ];
+  const E=[];
+  for(let i=0;i<12;i++)for(let j=i+1;j<12;j++){
+    const d=Math.hypot(V[i][0]-V[j][0],V[i][1]-V[j][1],V[i][2]-V[j][2]);
+    if(Math.abs(d-2)<.01)E.push([i,j]);
+  }
+  /* costellazione LoRA (posizioni fisse) */
+  const CST=[[.2,.3],[.34,.18],[.5,.3],[.62,.16],[.78,.28],[.68,.46],[.5,.55],[.32,.5],[.42,.7],[.6,.68]];
+
+  const MOTIF={
+    aurora(a){
+      for(let k=0;k<3;k++){
+        ctx.beginPath();
+        for(let x=0;x<=W;x+=W/60){
+          const y=H*(.24+.07*k)+Math.sin(x/W*5+t/70+k*1.8)*H*.045;
+          x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+        }
+        ctx.strokeStyle=k%2?`rgba(63,232,176,${.1*a})`:`rgba(179,157,255,${.09*a})`;
+        ctx.lineWidth=(22-k*5)*DPR; ctx.stroke();
+      }
+    },
+    darkroom(a){
+      for(let i=0;i<12;i++){
+        const x=W*((i*.37+t/2600)%1), y=H*((i*.61+t/4200)%1), r=(10+(i%5)*9)*DPR;
+        const g=ctx.createRadialGradient(x,y,0,x,y,r);
+        g.addColorStop(0,`rgba(255,180,140,${.1*a})`); g.addColorStop(1,'rgba(255,180,140,0)');
+        ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+      }
+    },
+    film(a){
+      for(let k=0;k<5;k++){
+        const y=H*(.18+k*.16), ph=((t*(1.4+k*.3)*DPR)%(W*1.6))-W*.3;
+        const g=ctx.createLinearGradient(Math.max(0,ph-160*DPR),0,ph+160*DPR,0);
+        g.addColorStop(0,'rgba(63,232,176,0)');g.addColorStop(.5,`rgba(143,216,255,${.16*a})`);g.addColorStop(1,'rgba(63,232,176,0)');
+        ctx.fillStyle=g; ctx.fillRect(0,y,W,1.6*DPR);
+      }
+    },
+    harmonics(a){
+      for(let k=0;k<4;k++){
+        ctx.beginPath();
+        const amp=(14+11*k)*DPR*(0.6+0.4*Math.sin(t/26+k));
+        for(let x=0;x<=W;x+=W/90){
+          const y=H*.5+Math.sin(x/W*10+t/16+k*.9)*amp;
+          x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+        }
+        ctx.strokeStyle=`rgba(179,157,255,${(.18-.03*k)*a})`; ctx.lineWidth=1.4*DPR; ctx.stroke();
+      }
+    },
+    spectrum(a){
+      ctx.beginPath();
+      for(let x=0;x<=W;x+=W/140){
+        const env=Math.sin(x/W*Math.PI);
+        const y=H*.52+Math.sin(x/(28*DPR)+t/6)*Math.cos(x/(90*DPR)-t/9)*H*.06*env;
+        x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle=`rgba(255,171,94,${.3*a})`; ctx.lineWidth=1.6*DPR;
+      ctx.shadowColor='rgba(255,171,94,.8)'; ctx.shadowBlur=10*a*DPR; ctx.stroke(); ctx.shadowBlur=0;
+    },
+    projector(a){
+      const g=ctx.createLinearGradient(0,0,W*.7,H*.75);
+      g.addColorStop(0,`rgba(255,214,150,${.14*a})`); g.addColorStop(1,'rgba(255,214,150,0)');
+      ctx.save(); ctx.beginPath();
+      ctx.moveTo(-W*.02,H*.04); ctx.lineTo(W*.72,H*.5); ctx.lineTo(W*.5,H*.9); ctx.closePath();
+      ctx.fillStyle=g; ctx.fill(); ctx.clip();
+      for(let i=0;i<16;i++){
+        const x=W*((i*.23+t/900)%0.7), y=H*(.1+((i*.41+t/1400)%.7));
+        ctx.fillStyle=`rgba(255,240,210,${.2*a})`;
+        ctx.beginPath(); ctx.arc(x,y,1.1*DPR,0,7); ctx.fill();
+      }
+      ctx.restore();
+    },
+    lattice(a){
+      const cx=W*.5, cy=H*.46, R=Math.min(W,H)*.2;
+      const ry=t/160, rx=t/230, P=[];
+      for(const v of V){
+        let[x,y,z]=v;
+        let x1=x*Math.cos(ry)+z*Math.sin(ry), z1=-x*Math.sin(ry)+z*Math.cos(ry);
+        let y1=y*Math.cos(rx)-z1*Math.sin(rx); z1=y*Math.sin(rx)+z1*Math.cos(rx);
+        const s=R/(3.2-z1);
+        P.push([cx+x1*s*2.2,cy+y1*s*2.2]);
+      }
+      const n=Math.floor(E.length*a);
+      ctx.strokeStyle=`rgba(143,216,255,${.32*a})`; ctx.lineWidth=1*DPR;
+      for(let i=0;i<n;i++){const[p,q]=E[i];ctx.beginPath();ctx.moveTo(P[p][0],P[p][1]);ctx.lineTo(P[q][0],P[q][1]);ctx.stroke();}
+      ctx.fillStyle=`rgba(240,250,255,${.6*a})`;
+      for(const p of P){ctx.beginPath();ctx.arc(p[0],p[1],1.6*DPR,0,7);ctx.fill();}
+    },
+    horizon(a){
+      const y=H*.86, r=W*.75;
+      ctx.strokeStyle=`rgba(158,232,110,${.35*a})`; ctx.lineWidth=1.4*DPR;
+      ctx.shadowColor='rgba(158,232,110,.9)'; ctx.shadowBlur=16*a*DPR;
+      ctx.beginPath(); ctx.arc(W/2,y+r*.92,r,Math.PI*1.28,Math.PI*1.72); ctx.stroke(); ctx.shadowBlur=0;
+      const g=ctx.createLinearGradient(0,y-H*.16,0,y);
+      g.addColorStop(0,'rgba(158,232,110,0)'); g.addColorStop(1,`rgba(158,232,110,${.1*a})`);
+      ctx.fillStyle=g; ctx.fillRect(0,y-H*.16,W,H*.16);
+    },
+    constellation(a){
+      const n=Math.max(1,Math.floor(CST.length*a));
+      ctx.strokeStyle=`rgba(255,157,226,${.35*a})`; ctx.lineWidth=1*DPR;
+      ctx.beginPath();
+      for(let i=0;i<n;i++){const[px,py]=CST[i];i===0?ctx.moveTo(px*W,py*H):ctx.lineTo(px*W,py*H);}
+      ctx.stroke();
+      for(let i=0;i<n;i++){
+        const[px,py]=CST[i];
+        const pr=(1.6+Math.sin(t/14+i)*0.7)*DPR;
+        ctx.fillStyle=`rgba(255,220,240,${.75*a})`;
+        ctx.beginPath();ctx.arc(px*W,py*H,pr,0,7);ctx.fill();
+      }
+    },
+    orbits(a){
+      const cx=W*.5, cy=H*.5;
+      for(let k=0;k<3;k++){
+        const rx=Math.min(W,H)*(.18+k*.09), ryy=rx*.38;
+        ctx.strokeStyle=`rgba(143,216,255,${.2*a})`; ctx.lineWidth=1*DPR;
+        ctx.setLineDash([4*DPR,7*DPR]);
+        ctx.beginPath(); ctx.ellipse(cx,cy,rx,ryy,-.3,0,7); ctx.stroke(); ctx.setLineDash([]);
+        const th=t/(60+k*28)+k*2;
+        const px=cx+Math.cos(th)*rx*Math.cos(-.3)-Math.sin(th)*ryy*Math.sin(-.3);
+        const py=cy+Math.cos(th)*rx*Math.sin(-.3)+Math.sin(th)*ryy*Math.cos(-.3);
+        ctx.fillStyle=`rgba(240,250,255,${.8*a})`;
+        ctx.beginPath();ctx.arc(px,py,2*DPR,0,7);ctx.fill();
+      }
+    },
+    landing(a){
+      for(let i=0;i<10;i++){
+        const x=W*((i*.31+t/2400)%1), y=H*(.92-((i*.17+t/900)%.5));
+        ctx.fillStyle=`rgba(255,230,180,${.14*a})`;
+        ctx.beginPath();ctx.arc(x,y,1.2*DPR,0,7);ctx.fill();
+      }
+    }
+  };
+
+  function stars(list,speed,par,alpha){
+    for(const s of list){
+      const a=alpha*(0.4+0.6*Math.abs(Math.sin(s.tw+t/(34/speed))));
+      ctx.fillStyle=`rgba(243,234,214,${a.toFixed(2)})`;
+      const y=(s.y*H+skyP*H*par)%H;
+      ctx.beginPath();ctx.arc(s.x*W,y,s.r*DPR,0,7);ctx.fill();
+    }
+  }
+
+  function frame(){
+    t++;
+    const [c1,c2,n1,n2]=pal(skyP);
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,rgb(c1)); g.addColorStop(1,rgb(c2));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    const nb=(x,y,r,c,a)=>{const gg=ctx.createRadialGradient(x,y,0,x,y,r);
+      gg.addColorStop(0,rgba(c,a));gg.addColorStop(1,rgba(c,0));
+      ctx.fillStyle=gg;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();};
+    nb(W*(.2+.1*Math.sin(skyP*6)),H*(.72-skyP*.44),Math.min(W,H)*.52,n1,.12);
+    nb(W*(.86-skyP*.3),H*(.18+skyP*.5),Math.min(W,H)*.44,n2,.15);
+    nb(W*.5,H*(1.08-skyP*.85),Math.min(W,H)*.6,n1,.06);
+
+    stars(L1,.7,.5,.45); stars(L2,1.1,.28,.65); stars(L3,1.6,.12,.9);
+
+    if(Math.random()<.005&&!reduced)shoot.push({x:Math.random()*W*.7,y:Math.random()*H*.3,l:0});
+    shoot=shoot.filter(s=>s.l<36);
+    for(const s of shoot){s.l++;s.x+=12*DPR;s.y+=5.5*DPR;
+      ctx.strokeStyle=`rgba(255,209,102,${1-s.l/36})`;ctx.lineWidth=1.6*DPR;
+      ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-34*DPR,s.y-15*DPR);ctx.stroke();}
+
+    for(const[m,a]of acts()) MOTIF[m]?.(a);
+
+    /* la Luna si avvicina: puntino all'inizio, limbo immenso all'allunaggio */
+    const mr=Math.min(W,H)*(0.045+0.5*skyP*skyP);
+    const mx=W*(0.82-0.32*skyP), my=H*(0.14+0.62*skyP*skyP);
+    const mg=ctx.createRadialGradient(mx-mr*.35,my-mr*.35,mr*.1,mx,my,mr);
+    mg.addColorStop(0,'#fbf3dd'); mg.addColorStop(.8,'#e8ca84'); mg.addColorStop(1,'#c9a45e');
+    ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(mx,my,mr,0,7); ctx.fill();
+    /* crateri con luce radente */
+    const CR=[[-.32,-.12,.16],[.24,.18,.11],[.04,.44,.08],[-.2,.3,.06],[.32,-.26,.07],[-.05,-.4,.05],[.5,.4,.05]];
+    for(const[dx,dy,dr]of CR){
+      const cxp=mx+dx*mr, cyp=my+dy*mr, crr=dr*mr;
+      ctx.fillStyle='rgba(160,124,60,.32)';
+      ctx.beginPath();ctx.arc(cxp,cyp,crr,0,7);ctx.fill();
+      ctx.strokeStyle='rgba(255,245,220,.4)';ctx.lineWidth=Math.max(1,crr*.12);
+      ctx.beginPath();ctx.arc(cxp,cyp,crr*.92,Math.PI*.7,Math.PI*1.5);ctx.stroke();
+    }
+    const halo=ctx.createRadialGradient(mx,my,mr,mx,my,mr*1.7);
+    halo.addColorStop(0,'rgba(255,209,102,.2)');halo.addColorStop(1,'rgba(255,209,102,0)');
+    ctx.fillStyle=halo;ctx.beginPath();ctx.arc(mx,my,mr*1.7,0,7);ctx.fill();
+
+    if(!reduced)requestAnimationFrame(frame);
+  }
+  frame(); /* con reduced-motion: un solo fotogramma statico */
+})();
+
+/* hero video-bg (Fase B) */
+(function(){
+  const hbg=document.querySelector('.hero-videobg');
+  if(hbg&&hbg.dataset.videoSrc){
+    const v=document.createElement('video');
+    v.src=hbg.dataset.videoSrc;v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;
+    hbg.appendChild(v);
+  }
+})();
+hydrateYT(document);
+
+/* ==========================================================================
+   Proiettore Mondi — three.js orbit + WASD (on-demand)
+   ========================================================================== */
+document.getElementById('world-start')?.addEventListener('click', async function(){
+  const stage=document.getElementById('world-stage');
+  this.remove();
+  const THREE=await import('three');
+  const {OrbitControls}=await import('three/addons/controls/OrbitControls.js');
+  const {GLTFLoader}=await import('three/addons/loaders/GLTFLoader.js');
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setSize(stage.clientWidth,stage.clientHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  stage.appendChild(renderer.domElement);
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x0a1410,.03);
+  const camera=new THREE.PerspectiveCamera(60,stage.clientWidth/stage.clientHeight,.1,200);
+  camera.position.set(0,1.6,5);
+  scene.add(new THREE.HemisphereLight(0xd8f7c8,0x0a2016,1.2));
+  const sun=new THREE.DirectionalLight(0xfff3d8,1.5);sun.position.set(5,10,3);scene.add(sun);
+  scene.add(new THREE.GridHelper(60,60,0x2e6b4f,0x14382a));
+  new GLTFLoader().load('assets/placeholder_world.glb',g=>{
+    const o=g.scene,box=new THREE.Box3().setFromObject(o);
+    const s=box.getSize(new THREE.Vector3()).length()||1;o.scale.setScalar(6/s);
+    const c=box.getCenter(new THREE.Vector3()).multiplyScalar(6/s);
+    o.position.sub(c);o.position.y+=1.2;scene.add(o);
+  },undefined,()=>{});
+  const controls=new OrbitControls(camera,renderer.domElement);
+  controls.target.set(0,1.2,0);controls.enableDamping=true;
+  const keys={};
+  addEventListener('keydown',e=>{if('wasdWASD'.includes(e.key))keys[e.key.toLowerCase()]=true;});
+  addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+  const clock=new THREE.Clock();
+  (function loop(){
+    requestAnimationFrame(loop);
+    const dt=clock.getDelta(),sp=4*dt;
+    const dir=new THREE.Vector3();camera.getWorldDirection(dir);dir.y=0;dir.normalize();
+    const side=new THREE.Vector3().crossVectors(dir,new THREE.Vector3(0,1,0));
+    const mv=new THREE.Vector3();
+    if(keys.w)mv.add(dir);if(keys.s)mv.sub(dir);if(keys.d)mv.add(side);if(keys.a)mv.sub(side);
+    if(mv.lengthSq()>0){mv.normalize().multiplyScalar(sp);camera.position.add(mv);controls.target.add(mv);}
+    controls.update();renderer.render(scene,camera);
+  })();
+  addEventListener('resize',()=>{
+    camera.aspect=stage.clientWidth/stage.clientHeight;camera.updateProjectionMatrix();
+    renderer.setSize(stage.clientWidth,stage.clientHeight);
+  });
+});
+</script>
+</body>
+</html>

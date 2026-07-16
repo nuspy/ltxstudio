@@ -1,0 +1,6 @@
+file 'E:\AI\ltxstudio\marketing\tadamoo_landing\assets\vid-long-01_chunk0.mp4'
+file 'E:\AI\ltxstudio\marketing\tadamoo_landing\assets\vid-long-01_chunk1.mp4'
+file 'E:\AI\ltxstudio\marketing\tadamoo_landing\assets\vid-long-01_chunk2.mp4'
+file 'E:\AI\ltxstudio\marketing\tadamoo_landing\assets\vid-long-01_chunk3.mp4'
+file 'E:\AI\ltxstudio\marketing\tadamoo_landing\assets\vid-long-01_chunk4.mp4'
+file 'E:\AI\ltxstudio\marketing\tadamoo_landing\assets\vid-long-01_chunk5.mp4'

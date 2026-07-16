@@ -1,0 +1,455 @@
+{
+  "hero-bg-01": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\hero-bg-01.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "img-edit-01-out": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-edit-01-out.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "img-edit-01-src": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-edit-01-src.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "img-t2i-01": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-t2i-01.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "placeholder_clip_a": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\placeholder_clip_a.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "placeholder_clip_b": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\placeholder_clip_b.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "placeholder_clip_c": {
+    "status": "done",
+    "files": [
+      "E:\\ai\\ltxstudio\\marketing\\tadamoo_landing\\assets\\placeholder_clip_c.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:50:56",
+    "recovered": true
+  },
+  "img-inpaint-01-src": {
+    "status": "done",
+    "elapsed_s": 68.3,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-inpaint-01-src.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-inpaint-01-src.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:52:50"
+  },
+  "img-inpaint-01-mask": {
+    "status": "done",
+    "elapsed_s": 0.2,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-inpaint-01-mask.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-inpaint-01-mask.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:52:51"
+  },
+  "img-inpaint-01-out": {
+    "status": "done",
+    "elapsed_s": 74.5,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-inpaint-01-out.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-inpaint-01-out.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 17:57:08"
+  },
+  "img-outpaint-01-src": {
+    "status": "done",
+    "elapsed_s": 41.2,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-outpaint-01-src.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-outpaint-01-src.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:01:26"
+  },
+  "img-outpaint-01-out": {
+    "status": "done",
+    "elapsed_s": 56.6,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-outpaint-01-out.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-outpaint-01-out.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:02:23"
+  },
+  "img-compose-01-a": {
+    "status": "done",
+    "elapsed_s": 36.7,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-compose-01-a.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-compose-01-a.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:02:59"
+  },
+  "img-compose-01-b": {
+    "status": "done",
+    "elapsed_s": 15.3,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-compose-01-b.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-compose-01-b.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:03:15"
+  },
+  "img-compose-01-out": {
+    "status": "manual",
+    "note": "compose multi-reference non nella mappa API validata — fare dalla GUI (Componi)",
+    "ts": "2026-07-12 17:54:32"
+  },
+  "img-pulid-01-face": {
+    "status": "done",
+    "elapsed_s": 15.4,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-pulid-01-face.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-pulid-01-face.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:03:30"
+  },
+  "img-pulid-01-out": {
+    "status": "manual",
+    "note": "PuLID (riferimento volto) non nella mappa API validata — fare dalla GUI",
+    "ts": "2026-07-12 17:54:34"
+  },
+  "img-faceswap-01-src": {
+    "status": "done",
+    "elapsed_s": 17.4,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\img-faceswap-01-src.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_img-faceswap-01-src.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:03:47"
+  },
+  "img-faceswap-01-out": {
+    "status": "manual",
+    "note": "face-swap non nella mappa API validata — fare dalla GUI",
+    "ts": "2026-07-12 17:54:36"
+  },
+  "vid-t2v-01": {
+    "status": "done",
+    "elapsed_s": 233.5,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-t2v-01.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-t2v-01.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:09:40"
+  },
+  "vid-i2v-01-src": {
+    "status": "done",
+    "elapsed_s": 48.6,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-i2v-01-src.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-i2v-01-src.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:10:29"
+  },
+  "vid-i2v-01-out": {
+    "status": "done",
+    "elapsed_s": 201.2,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-i2v-01-out.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-i2v-01-out.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:13:50"
+  },
+  "vid-storyboard-01": {
+    "status": "manual",
+    "note": "storyboard multi-keyframe non nella mappa API validata — fare dal pannello Storyboard",
+    "ts": "2026-07-12 18:13:50"
+  },
+  "vid-long-01": {
+    "status": "done",
+    "elapsed_s": 764.7,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-long-01.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-long-01.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:26:34"
+  },
+  "vid-controlnet-01-src": {
+    "status": "done",
+    "elapsed_s": 175.3,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-controlnet-01-src.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-controlnet-01-src.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:29:30"
+  },
+  "vid-controlnet-01-guide": {
+    "status": "done",
+    "elapsed_s": 4.2,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-controlnet-01-guide.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-controlnet-01-guide.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:29:34"
+  },
+  "vid-controlnet-01-out": {
+    "status": "done",
+    "elapsed_s": 217.9,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-controlnet-01-out.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-controlnet-01-out.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:33:12"
+  },
+  "vid-replace-01-src": {
+    "status": "done",
+    "elapsed_s": 181.5,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-replace-01-src.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-replace-01-src.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:36:13"
+  },
+  "vid-replace-01-ref": {
+    "status": "done",
+    "elapsed_s": 49.4,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-replace-01-ref.webp",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-replace-01-ref.webp"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:37:03"
+  },
+  "vid-replace-01-out": {
+    "status": "done",
+    "elapsed_s": 208.0,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-replace-01-out.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-replace-01-out.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:40:31"
+  },
+  "vid-lipsync-01": {
+    "status": "manual",
+    "note": "lip-sync a2v (foto+audio) non nella mappa API validata — fare dalla GUI",
+    "ts": "2026-07-12 18:40:31"
+  },
+  "vid-retake-01-src": {
+    "status": "done",
+    "elapsed_s": 181.3,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-retake-01-src.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-retake-01-src.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:43:32"
+  },
+  "vid-retake-01-out": {
+    "status": "manual",
+    "note": "ReTake non nella mappa API validata — fare dal pannello ReTake",
+    "ts": "2026-07-12 18:43:32"
+  },
+  "vid-upscale-01-src": {
+    "status": "done",
+    "elapsed_s": 170.1,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-upscale-01-src.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_vid-upscale-01-src.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:46:22"
+  },
+  "vid-upscale-01-out": {
+    "status": "manual",
+    "note": "upscale SeedVR2 4K non nella mappa API validata — fare da Migliora qualità",
+    "ts": "2026-07-12 18:46:22"
+  },
+  "mus-song-01": {
+    "status": "done",
+    "elapsed_s": 96.3,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\mus-song-01.mp3",
+      "E:\\AI\\ltxstudio\\output\\LANDING_mus-song-01.mp3"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:47:59"
+  },
+  "mus-acestep-01": {
+    "status": "done",
+    "elapsed_s": 30.8,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\mus-acestep-01.mp3",
+      "E:\\AI\\ltxstudio\\output\\LANDING_mus-acestep-01.mp3"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:48:29"
+  },
+  "mus-sonify-01-src": {
+    "status": "done",
+    "elapsed_s": 193.9,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\mus-sonify-01-src.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_mus-sonify-01-src.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:51:43"
+  },
+  "mus-sonify-01-out": {
+    "status": "done",
+    "elapsed_s": 117.4,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\mus-sonify-01-out.mp4",
+      "E:\\AI\\ltxstudio\\output\\LANDING_mus-sonify-01-out.mp4"
+    ],
+    "note": "",
+    "ts": "2026-07-12 18:53:41"
+  },
+  "mus-musicvideo-01": {
+    "status": "manual",
+    "note": "Cinema Studio / videomusicale: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:41"
+  },
+  "voice-tts-01": {
+    "status": "done",
+    "elapsed_s": 24.3,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\voice-tts-01.mp3",
+      "E:\\AI\\ltxstudio\\output\\LANDING_voice-tts-01.mp3"
+    ],
+    "note": "",
+    "ts": "2026-07-12 19:23:12"
+  },
+  "voice-clone-01-sample": {
+    "status": "done",
+    "elapsed_s": 0.2,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\voice-clone-01-sample.mp3",
+      "E:\\AI\\ltxstudio\\output\\LANDING_voice-clone-01-sample.mp3"
+    ],
+    "note": "usa il campione della voce esistente in voices\\ (manifest chiede registrazione reale)",
+    "ts": "2026-07-12 18:53:45"
+  },
+  "voice-clone-01-out": {
+    "status": "done",
+    "elapsed_s": 20.4,
+    "files": [
+      "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\voice-clone-01-out.mp3",
+      "E:\\AI\\ltxstudio\\output\\LANDING_voice-clone-01-out.mp3"
+    ],
+    "note": "",
+    "ts": "2026-07-12 19:33:44"
+  },
+  "cinema-film-01": {
+    "status": "manual",
+    "note": "Cinema Studio / videomusicale: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "cinema-lucky-01": {
+    "status": "manual",
+    "note": "Cinema Studio / videomusicale: da fare a parte (indicazione esplicita utente) (screen-capture)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "d3-mesh-01-src": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "d3-mesh-01-out": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "d3-rig-01": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "d3-mocap-01-src": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente) (video persona reale)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "d3-mocap-01-skel": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "d3-mocap-01-out": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "world-01-src": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "world-01-out": {
+    "status": "manual",
+    "note": "slot 3D/GLB/mondo: da fare a parte (indicazione esplicita utente)",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "lora-photo-01-src": {
+    "status": "manual",
+    "note": "richiede PuLID + dataset coerente, non nella mappa API validata",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "lora-photo-01-out": {
+    "status": "manual",
+    "note": "richiede training LoRA — da fare a parte",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "lora-video-01": {
+    "status": "manual",
+    "note": "richiede training LoRA video — da fare a parte",
+    "ts": "2026-07-12 18:53:49"
+  },
+  "models-ui-01": {
+    "status": "manual",
+    "note": "screenshot reale della UI — da fare a mano",
+    "ts": "2026-07-12 18:53:49"
+  }
+}

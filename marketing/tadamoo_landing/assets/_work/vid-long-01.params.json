@@ -1,0 +1,11 @@
+{
+  "prompt": "One single continuous 60-second shot, no cuts: a cheerful mailwoman pedals her bicycle through a waking seaside town at sunrise delivering letters — she rings the bell, waves at a baker pulling out bread, rides through a flock of pigeons that scatter into the pink sky, coasts downhill along the harbor as fishing boats leave, and as she reaches the pier's end the bicycle gently lifts off the ground and flies over the bay, letters swirling behind her like white birds, ending high above the town with the sun fully risen. Inspiring, warm, one unbroken camera follow. 60 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 1441,
+  "fps": 24,
+  "steps": 8,
+  "seed": 1430665976,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-long-01.mp4",
+  "chunk_frames": 241
+}

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Il tuo biglietto lunare — TaDaMoo · LTX Studio · $99 al lancio</title>
+<meta name="description" content="Il biglietto lunare TaDaMoo: $99 invece di $198, una volta sola. Tutte le funzioni, edizioni SFW/NSFW/Studio, aggiornamenti e nuove versioni a vita. 100% locale.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,500&family=Sora:wght@300;400;600&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0a0918;--cream:#f3ead6;--dim:#a89fc4;
+  --gold:#ffd166;--coral:#ff5d73;--teal:#3fe8b0;--lilac:#b39dff;--ice:#8fd8ff;
+  --d:"Fraunces",Georgia,serif;--b:"Sora",system-ui,sans-serif;
+  --g:"Space Grotesk",system-ui,sans-serif;--m:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:clip;max-width:100%}
+body{
+  background:var(--night);color:var(--cream);
+  font-family:var(--b);font-weight:300;font-size:16.5px;line-height:1.68;
+  text-align:center;min-height:100vh;padding:2rem 1rem 4rem;
+}
+a{color:var(--gold)}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.page{position:relative;z-index:2;max-width:60rem;margin:0 auto}
+h1,h2{font-family:var(--d);font-weight:300;letter-spacing:-.015em}
+h1{font-size:clamp(2rem,5vw,3.3rem);line-height:1.1;margin:.9rem auto 1rem;max-width:20ch}
+h1 em{font-style:italic;font-weight:500;
+  background:linear-gradient(100deg,var(--gold),var(--coral) 60%,var(--lilac));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.back{display:inline-block;font-family:var(--m);font-size:.68rem;letter-spacing:.22em;text-decoration:none;color:var(--dim);margin-bottom:1.6rem;transition:color .25s}
+.back:hover{color:var(--gold)}
+.kicker{font-family:var(--m);font-size:.66rem;letter-spacing:.4em;text-transform:uppercase;color:var(--gold)}
+.sub{color:var(--dim);max-width:42rem;margin:0 auto 2.4rem;font-size:1rem}
+.sub b{color:var(--cream);font-weight:400}
+
+/* ---- carta d'imbarco -------------------------------------------------- */
+.pass{
+  position:relative;max-width:33rem;margin:0 auto 3rem;text-align:left;
+  background:rgba(243,234,214,.05);backdrop-filter:blur(8px);
+  border-radius:26px;outline:1px solid rgba(255,209,102,.4);outline-offset:-1px;
+  box-shadow:0 34px 110px -26px rgba(255,93,115,.4);overflow:hidden;
+}
+.pass .strip{
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;
+  padding:.85rem 1.6rem;border-bottom:1px dashed rgba(243,234,214,.25);
+  font-family:var(--m);font-size:.6rem;letter-spacing:.24em;color:var(--teal);
+}
+.pass .strip em{font-style:normal;color:var(--dim)}
+.pass .body{padding:1.6rem 1.6rem 1.8rem;text-align:center}
+.route{
+  display:flex;align-items:center;justify-content:center;gap:1rem;margin-bottom:1.1rem;
+  font-family:var(--g);font-weight:700;font-size:1.5rem;letter-spacing:.06em;
+}
+.route .leg{display:flex;flex-direction:column}
+.route .leg small{font-family:var(--m);font-size:.56rem;letter-spacing:.22em;color:var(--dim);font-weight:400}
+.route .dashes{flex:1;max-width:130px;height:1px;background:repeating-linear-gradient(90deg,rgba(243,234,214,.5) 0 6px,transparent 6px 12px);position:relative}
+.route .dashes::after{content:"";position:absolute;right:-3px;top:-3.5px;width:8px;height:8px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#fff,var(--gold) 65%,transparent 78%);box-shadow:0 0 12px rgba(255,209,102,.7)}
+.price{font-family:var(--d);font-weight:700;font-size:3.8rem;color:var(--gold);line-height:1}
+.price .old{font-size:1.4rem;color:var(--dim);text-decoration:line-through;margin-right:.4rem}
+.price small{font-size:.95rem;color:var(--dim);font-family:var(--b);font-weight:300}
+.includes{list-style:none;text-align:left;margin:1.3rem 0 1.6rem;font-size:.9rem}
+.includes li{padding:.3rem 0 .3rem 1.6rem;position:relative;color:var(--dim)}
+.includes li b{color:var(--cream);font-weight:400}
+.includes li::before{content:"✦";position:absolute;left:.15rem;color:var(--teal)}
+.buy-btn{
+  position:relative;display:inline-flex;width:100%;justify-content:center;align-items:center;gap:.6em;
+  cursor:pointer;border:0;text-decoration:none;overflow:hidden;
+  font-family:var(--g);font-weight:700;font-size:1.05rem;letter-spacing:.04em;color:#1b1030;
+  background:linear-gradient(115deg,var(--gold),var(--coral));
+  border-radius:999px;padding:1rem 2rem;box-shadow:0 10px 38px -8px rgba(255,93,115,.5);
+  transition:box-shadow .3s ease;
+}
+.buy-btn::before{
+  content:"";position:absolute;top:0;left:-80%;width:50%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.5),transparent);
+  transform:skewX(-20deg);transition:left .55s ease;
+}
+.buy-btn:hover::before{left:130%}
+.buy-btn:hover{box-shadow:0 14px 52px -8px rgba(255,209,102,.65)}
+.buy-btn:focus-visible{outline:2px solid var(--cream);outline-offset:3px}
+.note{font-size:.72rem;font-family:var(--m);letter-spacing:.06em;color:var(--dim);margin-top:.9rem}
+.badges{display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap;margin-top:1.1rem;font-family:var(--g);font-size:.68rem;letter-spacing:.1em;color:var(--dim)}
+.badges span{border:1px solid rgba(243,234,214,.16);border-radius:999px;padding:.24rem .8rem}
+.barcode{
+  height:36px;margin:1.4rem auto 0;width:min(300px,80%);opacity:.55;
+  background:repeating-linear-gradient(90deg,var(--cream) 0 2px,transparent 2px 5px,var(--cream) 5px 6px,transparent 6px 11px);
+}
+
+/* ---- il carico -------------------------------------------------------- */
+.hlabel{font-family:var(--m);font-size:.62rem;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);
+  display:flex;align-items:center;justify-content:center;gap:1em;margin:2.6rem 0 1.4rem}
+.hlabel::before,.hlabel::after{content:"";height:1px;width:52px;background:rgba(255,209,102,.4)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.9rem;margin:0 auto 1rem;text-align:left}
+.mod{
+  background:rgba(243,234,214,.04);border-radius:16px 22px 16px 24px;padding:1rem 1.15rem;
+  outline:1px solid rgba(243,234,214,.1);outline-offset:-1px;transition:outline-color .3s;
+}
+.mod:hover{outline-color:rgba(255,209,102,.45)}
+.mod h3{font-family:var(--d);font-weight:500;font-size:1rem;color:var(--gold);margin-bottom:.3rem}
+.mod p{font-size:.83rem;color:var(--dim)}
+
+/* ---- FAQ --------------------------------------------------------------- */
+.faq{max-width:44rem;margin:0 auto;text-align:left}
+details{
+  background:rgba(243,234,214,.04);border-radius:14px;margin-bottom:.6rem;padding:.85rem 1.15rem;
+  outline:1px solid rgba(243,234,214,.1);outline-offset:-1px;transition:outline-color .3s;
+}
+details:hover{outline-color:rgba(255,209,102,.4)}
+summary{cursor:pointer;font-weight:400;font-family:var(--d);font-size:1.02rem;color:var(--cream)}
+summary::marker{color:var(--gold)}
+details p{margin-top:.55rem;font-size:.88rem;color:var(--dim)}
+details p b{color:var(--cream);font-weight:400}
+footer{margin-top:3rem;font-size:.78rem;color:var(--dim);opacity:.8}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
+}
+</style>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="page">
+  <a class="back" href="index.html">← TORNA ALLA ROTTA</a>
+  <div>
+    <p class="kicker">TaDaMoo · LTX Studio · check-in</p>
+    <h1>Un biglietto per la Luna.<br><em>Sola andata, per fortuna.</em></h1>
+    <p class="sub">
+      Un pagamento, uno studio completo, per sempre. Quando esce una nuova versione, la tua si aggiorna gratis —
+      <b>a vita, senza asterischi</b>. Il ritorno non è previsto: dopo, difficilmente vorrai riconsegnare le chiavi.
+    </p>
+  </div>
+
+  <div class="pass">
+    <div class="strip"><span>CARTA D'IMBARCO · −50% AL LANCIO</span><em>VOLO TDM-001</em></div>
+    <div class="body">
+      <div class="route">
+        <span class="leg">TERRA<small>LA TUA SCRIVANIA</small></span>
+        <span class="dashes" aria-hidden="true"></span>
+        <span class="leg">LUNA<small>MARE DELLA TRANQUILLITÀ</small></span>
+      </div>
+      <div class="price"><span class="old">$198</span>$99 <small>una volta sola</small></div>
+      <ul class="includes">
+        <li><b>Tutte le funzioni incluse</b>: immagini, video, musica, voce, Cinema Studio, 3D, mondi, LoRA, sala modelli</li>
+        <li>Edizioni <b>SFW · NSFW · Studio</b> comprese nel prezzo</li>
+        <li><b>Aggiornamenti e nuove versioni a vita</b> — nessun upgrade a pagamento, mai</li>
+        <li>100% locale: <b>privacy per architettura</b>, zero abbonamenti, zero crediti</li>
+        <li>Installer selettivo: scarichi solo i pesi dei moduli che scegli</li>
+        <li>Interfaccia in 15 lingue, italiano incluso</li>
+      </ul>
+      <!-- Mock: il checkout reale (Patreon/SubscribeStar/itch) verrà collegato qui -->
+      <button class="buy-btn" type="button" onclick="alert('Anteprima: il checkout verrà collegato al lancio. Tieni il posto vicino al finestrino.')">Imbarcati a $99 →</button>
+      <p class="note">PAGAMENTO UNICO · DOWNLOAD IMMEDIATO AL LANCIO · PROMO RISERVATA AI PRIMI PIONIERI</p>
+      <div class="badges"><span>Licenza personale</span><span>Windows + GPU NVIDIA</span><span>Attivazione offline</span></div>
+      <div class="barcode" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <p class="hlabel">Il carico in stiva</p>
+  <div class="grid">
+    <div class="mod"><h3>Immagini</h3><p>FLUX, Z-Image, Ernie: genera, modifica con una frase, inpaint su maschera, outpaint, componi più foto, stesso volto ovunque, face-swap.</p></div>
+    <div class="mod"><h3>Video</h3><p>LTX-2: testo→video, foto→video, storyboard, piani sequenza illimitati, ControlNet, cambio di protagonista, lip-sync, ReTake, super-risoluzione.</p></div>
+    <div class="mod"><h3>Musica</h3><p>Canzoni complete con voce, strumentali, sonorizzazione automatica dei tuoi video, videoclip montati sul battere.</p></div>
+    <div class="mod"><h3>Voce</h3><p>TTS che recita — pause, sorrisi, sospiri annotati — e clonazione vocale da trenta secondi di campione.</p></div>
+    <div class="mod"><h3>Cinema Studio</h3><p>Da una riga a un film montato: copione, personaggi, set, voci, musica. E il quadrifoglio: un click, un film.</p></div>
+    <div class="mod"><h3>3D & Mondi</h3><p>Foto→mesh PBR, rig e skinning automatici, mocap dalla webcam, mondi esplorabili in WASD, export per game engine.</p></div>
+    <div class="mod"><h3>LoRA</h3><p>Il tuo stile o il tuo personaggio, addestrato in casa: dataset automatico, training foto e video.</p></div>
+    <div class="mod"><h3>Sala macchine</h3><p>Import da Civitai e Hugging Face, autoselect per VRAM e architettura con semafori, override manuale su tutto.</p></div>
+  </div>
+
+  <p class="hlabel">Domande dei futuri pionieri</p>
+  <div class="faq">
+    <details>
+      <summary>«$99 una volta sola» significa davvero nessun altro costo?</summary>
+      <p>Sì, e senza giochi di prestigio sul listino: <b>nessun abbonamento, nessun credito, nessuna API a consumo</b>. Paghi il biglietto una volta; ogni aggiornamento e ogni nuova versione futura sono inclusi, a vita.</p>
+    </details>
+    <details>
+      <summary>Che computer mi serve?</summary>
+      <p>Un PC Windows con GPU NVIDIA. TaDaMoo misura da solo la tua VRAM e adatta i modelli (fp8/fp4, block-swap) per rendere al meglio sulla tua macchina — dal portatile da 8 GB alla workstation.</p>
+    </details>
+    <details>
+      <summary>I miei contenuti passano da qualche server?</summary>
+      <p>No, mai. Prompt, foto, video, voci e progetti <b>nascono, vivono e restano sul tuo computer</b>. La connessione serve solo per scaricare i pesi dei modelli la prima volta.</p>
+    </details>
+    <details>
+      <summary>Cosa cambia tra le edizioni SFW, NSFW e Studio?</summary>
+      <p>Nel prezzo, nulla: sono tutte incluse, scegli tu quale installare. L'edizione NSFW toglie i filtri sui contenuti adulti — è il tuo computer, la linea editoriale la scrivi tu.</p>
+    </details>
+    <details>
+      <summary>Devo scaricare centinaia di GB di modelli?</summary>
+      <p>No: l'installer selettivo scarica <b>solo i pesi dei moduli che scegli</b>, e se hai già modelli sul disco li collega senza duplicarli.</p>
+    </details>
+    <details>
+      <summary>E se ho bisogno di aiuto?</summary>
+      <p>Manuale integrato, community di pionieri e aggiornamenti frequenti. Sei in viaggio, ma non da solo.</p>
+    </details>
+  </div>
+
+  <footer>
+    <p>© 2026 TaDaMoo · LTX Studio — <a href="index.html">torna alla rotta</a></p>
+    <p>Pagina di anteprima: il checkout verrà attivato al lancio.</p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* lo stesso cielo, versione quieta: stelle, nebulose, la Luna vicina */
+(function(){
+  const cv=document.getElementById('sky'); if(!cv)return;
+  const ctx=cv.getContext('2d');
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const DPR=Math.min(devicePixelRatio||1,1.6);
+  let W,H,S=[],t=0;
+  function rs(){W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;
+    S=Array.from({length:110},()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.3+.4,tw:Math.random()*7}));}
+  addEventListener('resize',rs);rs();
+  function frame(){
+    t++;
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#1c1630');g.addColorStop(1,'#463044');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    const nb=(x,y,r,c,a)=>{const gg=ctx.createRadialGradient(x,y,0,x,y,r);
+      gg.addColorStop(0,`rgba(${c},${a})`);gg.addColorStop(1,`rgba(${c},0)`);
+      ctx.fillStyle=gg;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();};
+    nb(W*.2,H*.3,Math.min(W,H)*.5,'255,171,94',.1);
+    nb(W*.85,H*.7,Math.min(W,H)*.45,'179,157,255',.12);
+    for(const s of S){
+      const a=.35+.55*Math.abs(Math.sin(s.tw+t/30));
+      ctx.fillStyle=`rgba(243,234,214,${a.toFixed(2)})`;
+      ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r*DPR,0,7);ctx.fill();
+    }
+    /* la Luna, ormai vicina */
+    const mr=Math.min(W,H)*.34, mx=W*.5, my=H*1.18;
+    const mg=ctx.createRadialGradient(mx-mr*.3,my-mr*.4,mr*.1,mx,my,mr);
+    mg.addColorStop(0,'#fbf3dd');mg.addColorStop(.8,'#e8ca84');mg.addColorStop(1,'#c9a45e');
+    ctx.fillStyle=mg;ctx.beginPath();ctx.arc(mx,my,mr,0,7);ctx.fill();
+    ctx.fillStyle='rgba(160,124,60,.3)';
+    [[-.3,-.55,.1],[.2,-.62,.07],[-.05,-.7,.05],[.42,-.5,.06]].forEach(([dx,dy,dr])=>{
+      ctx.beginPath();ctx.arc(mx+dx*mr,my+dy*mr,dr*mr,0,7);ctx.fill();});
+    const halo=ctx.createRadialGradient(mx,my,mr,mx,my,mr*1.5);
+    halo.addColorStop(0,'rgba(255,209,102,.22)');halo.addColorStop(1,'rgba(255,209,102,0)');
+    ctx.fillStyle=halo;ctx.beginPath();ctx.arc(mx,my,mr*1.5,0,7);ctx.fill();
+    if(!reduced)requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>

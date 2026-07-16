@@ -48,13 +48,14 @@ def list_image_models() -> list[tuple[str, str, str]]:
 
 
 def list_video_gguf() -> list[tuple[str, str]]:
-    """[(label, path)] dei GGUF video (LTX-2) locali."""
-    out, seen = [], set()
-    for p in glob.glob(os.path.join(_DM, "**", "*.gguf"), recursive=True):
-        k = os.path.normpath(p).lower()
-        if k in seen:
-            continue
-        seen.add(k)
-        out.append((os.path.basename(p), p))
-    out.sort(key=lambda t: t[0].lower())
-    return out
+    """VUOTA di proposito: i GGUF VIDEO (LTX-2) sono stati rimossi dal prodotto (13/07).
+
+    Motivo: il loader dequantizza in Python A OGNI forward (1660 Linear × step) → ~500 s/step
+    contro i ~4 s/step dell'fp8, cioè oltre un'ora per clip; e il Q6_K (16.6GB) residente andava
+    in OOM alle risoluzioni normali (704x1280), producendo cartelle di .json e zero video.
+    Non c'era alcuno scenario in cui convenisse. Il video usa SEMPRE il checkpoint fp8.
+
+    NB: i GGUF delle IMMAGINI (FLUX Fill per l'inpaint) restano: quelli funzionano e sono usati.
+    La funzione resta (firma invariata) per non rompere i chiamanti: semplicemente non offre nulla.
+    """
+    return []

@@ -63,26 +63,17 @@ class PromptBuilder(QWidget):
         v.addLayout(row)
 
     # ── composizione ─────────────────────────────────────────────────────────
+    def _fields(self) -> dict:
+        """Campi correnti come dizionario nello schema condiviso (core.prompt_struct)."""
+        return {"subject": self.subject.text(), "action": self.action.text(), "setting": self.setting.text(),
+                "style": self.style.currentText(), "camera": self.camera.currentText(),
+                "light": self.light.currentText(), "mood": self.mood.text(),
+                "details": self.details.text(), "negative": self.negative.text()}
+
     def compose(self) -> tuple[str, str]:
-        """Costruisce (prompt, negative) in linguaggio naturale dai campi valorizzati."""
-        parts = []
-        for w in (self.subject, self.action, self.setting):
-            t = w.text().strip()
-            if t:
-                parts.append(t)
-        style = self.style.currentText().strip()
-        if style:
-            parts.append(f"{style} style")
-        for label, w in ((None, self.camera), (None, self.light)):
-            t = w.currentText().strip()
-            if t:
-                parts.append(t)
-        for w in (self.mood, self.details):
-            t = w.text().strip()
-            if t:
-                parts.append(t)
-        prompt = ", ".join(parts)
-        return prompt, self.negative.text().strip()
+        """Costruisce (prompt, negative) dai campi valorizzati. Usa la composizione CONDIVISA con la pipeline."""
+        from core import prompt_struct
+        return prompt_struct.compose_fields(self._fields())
 
     def _emit(self):
         p, n = self.compose()
@@ -90,11 +81,7 @@ class PromptBuilder(QWidget):
 
     # ── JSON (preset/riproducibilità) ─────────────────────────────────────────
     def get_json(self) -> str:
-        d = {"subject": self.subject.text(), "action": self.action.text(), "setting": self.setting.text(),
-             "style": self.style.currentText(), "camera": self.camera.currentText(),
-             "light": self.light.currentText(), "mood": self.mood.text(),
-             "details": self.details.text(), "negative": self.negative.text()}
-        return json.dumps(d, ensure_ascii=False, indent=2)
+        return json.dumps(self._fields(), ensure_ascii=False, indent=2)
 
     def set_json(self, s: str):
         try:

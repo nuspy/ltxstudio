@@ -6,13 +6,17 @@ così la GUI resta leggera. Usato dall'astrazione `core/backend.py`.
 from __future__ import annotations
 
 import json
+import threading
 import time
+import urllib.error
 import urllib.request
 import urllib.parse    # NB: DEVE stare qui in cima. Se importato DENTRO preview(), `urllib` diventa una
                        # variabile LOCALE dell'intera funzione → la 1ª riga urllib.request.Request(...) dà
                        # UnboundLocalError → preview() tornava sempre None (progress/anteprima mai aggiornati).
 
 BASE = "http://127.0.0.1:8189"
+
+_LAUNCH_LOCK = threading.Lock()         # serializza i riavvii: N chiamanti → UN solo server, non N
 
 
 def _post(path: str, payload: dict, timeout: int = 30) -> dict:
@@ -32,6 +36,38 @@ def is_up() -> bool:
         return False
 
 
+def _say(log, msg: str) -> None:
+    (log or print)(msg)
+
+
+def ensure_up(*, timeout: float = 180.0, log=None) -> bool:
+    """Garantisce che il server nativo risponda: se è CADUTO lo riavvia e attende che torni pronto.
+
+    Bloccante e senza Qt → chiamabile da qualunque thread (GUI, worker, API, Film Studio). Il riavvio è
+    serializzato dal lock: se dieci job partono insieme mentre il server è morto, parte UN solo server e
+    tutti aspettano quello. Un server appena avviato non occupa VRAM (carica i pesi solo al primo job),
+    quindi rialzarlo non ruba memoria a una generazione video in corso.
+    """
+    if is_up():
+        return True
+    with _LAUNCH_LOCK:
+        if is_up():                                         # rialzato da un altro chiamante mentre attendevamo
+            return True
+        from core.native_launcher import launch
+        ok, msg = launch()
+        _say(log, f"[nativo] server non risponde → RIAVVIO AUTOMATICO: {msg}")
+        if not ok:
+            return False
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < timeout:
+            time.sleep(1.0)
+            if is_up():
+                _say(log, f"[nativo] server di nuovo pronto ({int(time.monotonic() - t0)}s)")
+                return True
+        _say(log, f"[nativo] il server non è tornato su entro {int(timeout)}s")
+        return False
+
+
 def submit(module: str, params: dict) -> str:
     # M1 — prima di un job IMMAGINE libera i server di categoria diversa (video :8190): su single-GPU la
     # pipeline video residua terrebbe la VRAM. Pipeline-aware: immagine→immagine consecutive non rifanno il
@@ -41,7 +77,15 @@ def submit(module: str, params: dict) -> str:
         mem_coordinator.free_for("image")
     except Exception:                                       # noqa: BLE001
         pass
-    r = _post("/submit", {"module": module, "params": params})
+    payload = {"module": module, "params": params}
+    try:
+        r = _post("/submit", payload)
+    except urllib.error.HTTPError:
+        raise                                               # il server C'È e ha risposto (400/500): errore vero
+    except OSError as e:                                    # porta chiusa / connessione rifiutata = processo morto
+        if not ensure_up():
+            raise RuntimeError(f"server nativo giù e riavvio automatico fallito ({e})") from e
+        r = _post("/submit", payload)                       # ritenta una volta sul server appena rialzato
     if "prompt_id" not in r:
         raise RuntimeError(r.get("error", "submit fallito"))
     return r["prompt_id"]
@@ -51,8 +95,15 @@ def history(prompt_id: str) -> dict:
     return _get(f"/history/{prompt_id}")
 
 
-def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float = 1800) -> dict:
-    """Submit + polling fino a success/error. Ritorna l'entry job (con 'output')."""
+def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float = 1800,
+                 retry_on_crash: bool = True, log=None) -> dict:
+    """Submit + polling fino a success/error. Ritorna l'entry job (con 'output').
+
+    Se il server MUORE a metà job (OOM, segfault), il job muore con lui: lo rialziamo e rilanciamo la
+    generazione UNA sola volta (`retry_on_crash`), così un crash isolato non si vede in GUI. La condizione
+    è `not is_up()`: un server vivo ma lento (history in timeout perché sta decodificando) NON deve mai far
+    ripartire il job — sarebbe lavoro doppio.
+    """
     pid = submit(module, params)
     t0 = time.monotonic()
     _misses = 0
@@ -63,6 +114,10 @@ def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float
         except Exception:                                # noqa: BLE001  — NON abortire per un singolo polling
             _misses += 1
             if _misses > 30:                             # ~30 polling falliti di fila = server davvero morto
+                if retry_on_crash and not is_up() and ensure_up(log=log):
+                    _say(log, "[nativo] il server è morto durante il job → rilancio la generazione (1 volta)")
+                    return run_and_wait(module, params, poll=poll, timeout=timeout,
+                                        retry_on_crash=False, log=log)
                 return {"status": "error", "error": "server nativo non risponde al polling /history"}
             time.sleep(poll)
             continue

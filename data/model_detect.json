@@ -2354,5 +2354,43 @@
    1772850566396322100,
    17888773
   ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors.normalized.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors.normalized.safetensors",
+  "name": "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors.normalized.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": 3072,
+  "n_double": 19,
+  "n_single": 38,
+  "_sig": [
+   1783358095442276800,
+   23802903480
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\LTXVideo\\LTX-2\\nvfp4\\ltx-2.3-22b-dev-nvfp4.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\LTXVideo\\LTX-2\\nvfp4\\ltx-2.3-22b-dev-nvfp4.safetensors",
+  "name": "ltx-2.3-22b-dev-nvfp4.safetensors",
+  "folder": "nvfp4",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1783836897554251000,
+   21701367310
+  ]
  }
 }

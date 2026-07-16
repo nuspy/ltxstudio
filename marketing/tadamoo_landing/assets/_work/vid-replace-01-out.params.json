@@ -1,0 +1,13 @@
+{
+  "prompt": "replace the knight with the brass automaton from the reference: same flamenco choreography, same stage and spotlights, gears glinting as it stomps and twirls, tiny puffs of steam on the accents. 15 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 361,
+  "fps": 24,
+  "steps": 8,
+  "seed": 279405274,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-replace-01-out.mp4",
+  "control_video": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\_work\\vid-replace-01-out.guide.mp4",
+  "control_type": "canny",
+  "control_strength": 0.8
+}

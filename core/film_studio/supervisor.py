@@ -177,27 +177,32 @@ def second_look(pid: int) -> dict:
 
 # ─────────────────────────────── 4) montaggio a ritmo emotivo ───────────────────────────────
 def emotional_rhythm(pid: int, tension: list[float]) -> list[dict]:
-    """Da una curva di tensione per SCENA (0..1) rimodula le durate degli shot: tensione alta → tagli più
-    corti (ritmo incalzante), bassa → respiro. Mantiene invariata la durata TOTALE di ogni scena (redistribuisce
-    tra i suoi shot). Ritorna [{shot_id, old, new}] SENZA scrivere (l'utente conferma). Deterministico, no LLM.
+    """Da una curva di tensione per SCENA (0..1) rimodula il RITMO: la tensione ridistribuisce il tempo TRA le
+    scene mantenendo invariata la durata TOTALE del film (scena tesa → compressa/tagli più rapidi, scena lenta →
+    dilatata/respiro), preservando le proporzioni interne di ciascuna scena. Ritorna [{shot_id, ord, old, new}]
+    SENZA scrivere (l'utente conferma). Deterministico, no LLM.
 
-    Modello: fattore di lunghezza per shot = 1/(0.4 + 1.2*t) → a t=0 shot ~1.79× la media, a t=1 ~0.62×.
+    Modello: peso-scena = durata_originale × 1/(0.4 + 1.2·t) → a t=1 la scena «vale» meno tempo che a t=0;
+    i pesi si normalizzano al totale-film, così la somma resta identica.
     """
-    scenes = collect_breakdown(pid)
-    out = []
+    scenes = [sc for sc in collect_breakdown(pid) if sc["shots"]]
+    if not scenes:
+        return []
+    orig = []                                               # durata originale per scena (fallback 4s/shot)
+    weights = []
     for i, sc in enumerate(scenes):
-        shots = sc["shots"]
-        if not shots:
-            continue
-        t = float(tension[i]) if i < len(tension) else 0.5
-        t = max(0.0, min(1.0, t))
-        total = sum(float(sh["duration_s"] or 0) for sh in shots) or (len(shots) * 4.0)
-        factor = 1.0 / (0.4 + 1.2 * t)                      # curva monotòna decrescente in t
-        weights = [factor] * len(shots)                     # (uniforme entro la scena: la tensione è per-scena)
-        wsum = sum(weights) or 1.0
-        for sh, w in zip(shots, weights):
-            new = round(total * w / wsum, 1)
-            new = max(0.6, new)                             # nessuno shot sotto ~0.6s
+        tot = sum(float(sh["duration_s"] or 0) for sh in sc["shots"]) or (len(sc["shots"]) * 4.0)
+        t = max(0.0, min(1.0, float(tension[i]) if i < len(tension) else 0.5))
+        orig.append(tot)
+        weights.append(tot / (0.4 + 1.2 * t))               # scala il tempo della scena secondo la tensione
+    film_total = sum(orig)
+    wsum = sum(weights) or 1.0
+    out = []
+    for sc, o, w in zip(scenes, orig, weights):
+        scene_new = film_total * w / wsum                   # nuovo budget della scena (totale-film invariato)
+        for sh in sc["shots"]:
+            share = (float(sh["duration_s"] or 0) / o) if o else (1.0 / len(sc["shots"]))
+            new = max(0.6, round(scene_new * share, 1))     # preserva le proporzioni interne; min ~0.6s
             out.append({"shot_id": sh["id"], "ord": f"{sc['ord']}.{sh['ord']}",
                         "old": float(sh["duration_s"] or 0), "new": new})
     return out

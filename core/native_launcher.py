@@ -29,6 +29,10 @@ def launch() -> tuple[bool, str]:
         #   (A/B 11/07 a seed fisso: chiazze identiche con FBCache off, sage/sdpa, fp8/bf16, VAE fp32 e
         #   perfino con diffusers puro → è FLUX.1-dev sotto ~1MP, non la cache). Opt-out NATIVE_FBCACHE=0.
         env.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+        # NB niente PYTORCH_CUDA_ALLOC_CONF=expandable_segments: su WINDOWS non è supportato (PyTorch lo
+        # ignora con "expandable_segments not supported on this platform") → non è una via per la
+        # frammentazione VRAM qui. L'accumulo di pipeline va evitato a monte, liberando (/free) prima di
+        # cambiare arch/checkpoint. (landing 12/07)
         # Profilo hardware auto: calibra VRAM/RAM (offload, margine, risoluzione max) per la GPU corrente
         try:
             from core import hw_profiles

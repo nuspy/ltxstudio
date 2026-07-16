@@ -1,0 +1,10 @@
+{
+  "prompt": "A swarm of glowing paper lanterns gently lifts a tiny wooden sailboat out of a moonlit harbor and carries it up into the night sky; an astonished fisherwoman on the pier throws her hat in the air and laughs; the boat sails between the stars leaving a trail of golden sparks. Warm whimsical tone, slow ascending camera following the boat, gentle wind sounds and distant harbor bells. 20 seconds.",
+  "width": 1280,
+  "height": 704,
+  "num_frames": 481,
+  "fps": 24,
+  "steps": 8,
+  "seed": 539058807,
+  "output": "E:\\AI\\ltxstudio\\marketing\\tadamoo_landing\\assets\\vid-t2v-01.mp4"
+}

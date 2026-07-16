@@ -21,28 +21,19 @@ _PATHS = [("fast", "fs.path.fast"), ("lora", "fs.path.lora"), ("mixed", "fs.path
 _RUN = [("supervised", "fs.run.supervised"), ("auto", "fs.run.auto")]
 
 
-def _register_scheduler_handlers():
-    """Mappa i tipi di job sul Generation Service nativo (idempotente)."""
-    def _img(p):
-        return gen_service.gen_image(p["prompt"], p["out"], face_ref=p.get("face_ref", ""),
-                                     ref_images=p.get("ref_images"), loras=p.get("loras"),
-                                     arch=p.get("arch", "flux"), model=p.get("model", ""),
-                                     negative=p.get("negative", ""), seed=int(p.get("seed", 7)))
+def _cap_on(cap: str) -> bool:
+    """True se la capability è abilitata nell'edizione (dev/manifest assente = permissivo)."""
+    try:
+        from core import features
+        return bool(features.is_enabled(cap))
+    except Exception:                                        # noqa: BLE001
+        return True
 
-    def _vid(p):
-        keyframes = p.get("keyframes")
-        cf = p.get("chain_from")                              # raccordo: ultimo frame del video precedente
-        if cf and not keyframes:
-            from core.film_studio import reference_chain
-            link_png = str(p["out"]).rsplit(".", 1)[0] + "_link.png"
-            keyframes = reference_chain.prev_shot_link(cf, link_png, strength=0.35)
-        return gen_service.gen_shot_video(p["prompt"], p["out"], duration_s=p.get("duration_s", 4),
-                                          keyframes=keyframes, loras=p.get("loras"),
-                                          audio_path=p.get("audio_path", "") or "",
-                                          model_gguf=p.get("model_gguf", ""),
-                                          negative=p.get("negative", ""), seed=int(p.get("seed", 7)))
-    scheduler.register("image", _img)
-    scheduler.register("video", _vid)
+
+def _register_scheduler_handlers():
+    """Mappa i tipi di job sul Generation Service nativo (idempotente). Logica in core (riusata headless)."""
+    from core.film_studio import handlers
+    handlers.register_default_handlers()
 
 
 class FilmStudioWindow(QWidget):
@@ -144,6 +135,11 @@ class FilmStudioWindow(QWidget):
         h.addWidget(b)
         b_mng = QPushButton(tr("fs.project_manage", "📂 Progetti")); b_mng.clicked.connect(self._manage_projects)
         h.addWidget(b_mng)
+        if _cap_on("cap.lucky_director"):                    # gating feature-matrix (Full+); dev = sempre visibile
+            b_lucky = QPushButton(tr("ld.button", "🍀 Lucky Director"))
+            b_lucky.setToolTip(tr("ld.button_tt", "Genera un film completo in automatico da un solo prompt (o file)."))
+            b_lucky.clicked.connect(self._lucky_director)
+            h.addWidget(b_lucky)
         # CRUD diretto sul progetto selezionato (oltre al dialog 📂): rinomina / duplica / elimina
         b_ren = QPushButton("✏️"); b_ren.setToolTip(tr("fs.project_rename", "Rinomina progetto"))
         b_ren.setMaximumWidth(34); b_ren.clicked.connect(self._rename_project); h.addWidget(b_ren)
@@ -206,6 +202,20 @@ class FilmStudioWindow(QWidget):
         except Exception:                                   # noqa: BLE001
             self.mt_tab._master()                          # fallback: master comunque
         self.tabs.setCurrentWidget(self.mt_tab)
+
+    def _lucky_director(self):
+        """🍀 Lucky Director: film completo automatico da un prompt/file → progetto riapribile qui."""
+        from ui.film_studio.lucky_director_dialog import LuckyDirectorDialog
+        dlg = LuckyDirectorDialog(self)
+        dlg.project_ready.connect(self._on_lucky_ready)
+        dlg.exec()
+
+    def _on_lucky_ready(self, pid: int):
+        """A fine generazione: aggiorna la lista progetti e seleziona il film appena creato (editabile)."""
+        self._refresh_projects()
+        idx = self.proj_combo.findData(int(pid))
+        if idx >= 0:
+            self.proj_combo.setCurrentIndex(idx)
 
     def _manage_projects(self):
         from ui.film_studio.projects_dialog import FsProjectsDialog

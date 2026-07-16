@@ -1,0 +1,14 @@
+{
+  "mus-sonify-01-out.mp4": 2.539,
+  "mus-sonify-01-src.mp4": 2.309,
+  "vid-controlnet-01-guide.mp4": 14.632,
+  "vid-controlnet-01-out.mp4": 11.634,
+  "vid-controlnet-01-src.mp4": 1.956,
+  "vid-i2v-01-out.mp4": 1.348,
+  "vid-long-01.mp4": 42.281,
+  "vid-replace-01-out.mp4": 0.247,
+  "vid-replace-01-src.mp4": 0.521,
+  "vid-retake-01-src.mp4": 2.189,
+  "vid-t2v-01.mp4": 2.691,
+  "vid-upscale-01-src.mp4": 0.562
+}

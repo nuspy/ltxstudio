@@ -8,6 +8,7 @@ collegati separatamente; qui c'è tutta l'editing UI + export (immagine composit
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 try:
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QPushButton, QSlider, QLabel, QFileDialog,
     QListWidget, QListWidgetItem, QComboBox, QFrame, QGraphicsOpacityEffect,
     QToolButton, QMenu, QDialog, QSpinBox, QDialogButtonBox, QFormLayout, QCheckBox,
+    QMessageBox, QApplication,
 )
 
 from core.mask_store import MaskStore
@@ -385,6 +387,17 @@ class MaskCanvas(QWidget):
                       ("↓", self._layer_down), ("🗑", self._layer_del)]:
             x = QPushButton(t); x.setMaximumWidth(48); x.clicked.connect(fn); lb.addWidget(x)
         side.addLayout(lb)
+        cut = QHBoxLayout()
+        b_cut = QPushButton(tr("canvas.cutout_btn", "✂ Scontorna"))
+        b_cut.setToolTip(tr("canvas.cutout.tt", "Toglie lo sfondo alla foto selezionata: senza questo, "
+                                                "lo sfondo (il bianco) viene incollato sulla scena e non "
+                                                "viene integrato."))
+        b_cut.clicked.connect(self._cutout_selected)
+        b_rst = QPushButton(tr("canvas.cutout_undo_btn", "↺ Sfondo"))
+        b_rst.setToolTip(tr("canvas.cutout_undo.tt", "Rimette la foto originale, con il suo sfondo."))
+        b_rst.clicked.connect(self._restore_selected)
+        cut.addWidget(b_cut); cut.addWidget(b_rst)
+        side.addLayout(cut)
         mid.addLayout(side)
         lay.addLayout(mid, 1)
         self._hint = _ToolHint(self)        # tooltip grafico animato (fluttua sul canvas)
@@ -693,20 +706,140 @@ class MaskCanvas(QWidget):
     # ---------- layer immagini importate (ognuno con la sua maschera) ----------
     def _import_layer(self):
         fn, _ = QFileDialog.getOpenFileName(self, tr("canvas.import_layer_title"), "", tr("canvas.image_filter"))
-        if not fn:
-            return
-        pix = QPixmap(fn)
+        if fn:
+            self.add_layer(fn)
+
+    def add_layer(self, path: str, mask_path: str | None = None, *, index: int = 0) -> bool:
+        """Aggiunge una foto come LAYER sul canvas. API pubblica: la usa anche «Integra» per portare
+        sul canvas le foto della lista laterale (che altrimenti non entrerebbero mai nel composito).
+
+        `mask_path` è la maschera DELLA FOTO (spazio-immagine): la riproiettiamo nello spazio-scena con
+        la stessa trasformazione del layer, altrimenti finirebbe fuori posto. `index` sfalsa le foto
+        aggiunte in blocco, così non si sovrappongono tutte nello stesso punto.
+        """
+        pix = QPixmap(path)
         if pix.isNull():
-            return
+            return False
         it = QGraphicsPixmapItem(pix)
         it.setFlag(QGraphicsPixmapItem.ItemIsMovable, self.mode == "move")
         s = min(self.aspect_w / pix.width(), self.aspect_h / pix.height()) * 0.6
-        it.setScale(s); it.setPos(self.aspect_w*0.2, self.aspect_h*0.2)
+        it.setScale(s)
+        off = (index % 4) * 0.08                                 # a cascata: restano tutte afferrabili
+        it.setPos(self.aspect_w * (0.2 + off), self.aspect_h * (0.2 + off))
         self.scene.addItem(it)
-        self._entries.append({"item": it, "mask": self._new_mask(), "name": Path(fn).name, "base": False})
+        mask = self._new_mask()
+        if mask_path and os.path.exists(mask_path):
+            m = QImage(mask_path)
+            if not m.isNull():
+                m = m.scaled(pix.width(), pix.height(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+                pm = QPainter(mask)
+                pm.setTransform(it.sceneTransform())             # spazio-immagine → spazio-scena
+                pm.drawImage(0, 0, m.convertToFormat(QImage.Format_Alpha8))
+                pm.end()
+        self._entries.append({"item": it, "mask": mask, "name": Path(path).name,
+                              "base": False, "path": path})
+        # SCONTORNO AUTOMATICO (nessuna azione separata da fare): lo sfondo di una foto stock è quasi
+        # sempre un RETTANGOLO BIANCO, e per il modello un rettangolo bianco su una foto "è" uno
+        # screenshot — a denoise alto ci disegna dentro finestre di dialogo e paesaggi (visto il 13/07).
+        # Tolto lo sfondo, resta il solo soggetto e la scena sotto è quella vera.
+        if not pix.hasAlphaChannel() and (Path.home() / ".u2net" / "u2net.onnx").exists():
+            self.cutout_layer(len(self._entries) - 1, ask=False)   # ask=False → nessun download a sorpresa
         self._reindex_z()
         self._rebuild_layer_list()
         self.layer_list.setCurrentRow(len(self._entries) - 1)   # seleziona la nuova (mostra la sua maschera)
+        return True
+
+    # ---------- scontorno (rimozione sfondo) ----------
+    def _cutout_selected(self):
+        e = self._entries[self._active]
+        if e["base"]:
+            QMessageBox.information(self, tr("canvas.cutout_btn", "✂ Scontorna"),
+                                    tr("canvas.cutout.pick_layer",
+                                       "Seleziona una FOTO AGGIUNTA (non lo sfondo di base).")); return
+        self.cutout_layer(self._active)
+
+    def _restore_selected(self):
+        e = self._entries[self._active]
+        if e["base"] or not e.get("path"):
+            return
+        pix = QPixmap(e["path"])
+        if not pix.isNull():
+            e["item"].setPixmap(pix)                    # torna la foto originale, sfondo compreso
+            e.pop("cutout", None)
+            self.status.setText(tr("canvas.cutout_restored", "Sfondo originale ripristinato."))
+
+    def cutout_layer(self, idx: int, *, ask: bool = True) -> bool:
+        """Toglie lo SFONDO alla foto-layer (rembg/u2net, su CPU).
+
+        È il motivo per cui «Integra» lasciava il rettangolo bianco attorno al soggetto: una foto opaca
+        porta con sé il proprio sfondo, che finisce nel composito e — peggio — diventa parte della
+        silhouette «da non toccare». Scontornata, resta il solo soggetto e tutto ciò che gli sta intorno
+        è zona che il modello rigenera e integra.
+
+        CPU forzata: onnxruntime-gpu creerebbe un contesto CUDA NEL PROCESSO GUI, che manda in crash i
+        worker GPU isolati. Il modello (~176MB) si scarica al primo uso, previa conferma.
+        """
+        e = self._entries[idx]
+        src = e.get("path")
+        if e["base"] or not src or not os.path.exists(src):
+            return False
+        home_model = Path.home() / ".u2net" / "u2net.onnx"
+        if not home_model.exists() and ask:
+            if QMessageBox.question(
+                    self, tr("canvas.cutout_dl_title", "Scarico il modello di scontorno?"),
+                    tr("canvas.cutout_dl_msg",
+                       "Per togliere lo sfondo serve il modello u2net (~176 MB), che non è ancora sul "
+                       "disco. Lo scarico ora? (una sola volta)"),
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes) != QMessageBox.Yes:
+                return False
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            from PIL import Image as _PILImage
+            from rembg import new_session, remove
+            if getattr(self, "_rembg", None) is None:
+                self._rembg = new_session("u2net", providers=["CPUExecutionProvider"])
+            out = remove(_PILImage.open(src).convert("RGB"), session=self._rembg,
+                         post_process_mask=True).convert("RGBA")
+            # PULIZIA DELL'ALPHA: rembg lascia un alone di alpha intermedia sullo sfondo (nel test:
+            # solo il 7% dei pixel era pienamente opaco, l'83% trasparente, il resto un VELO). Quel velo
+            # è esattamente il rettangolo chiaro che si vedeva attorno all'oggetto integrato. Sotto 60 →
+            # sfondo (via del tutto), sopra 190 → soggetto pieno, in mezzo una rampa per non seghettare.
+            if np is not None:
+                arr = np.array(out)
+                a = arr[..., 3].astype(np.float32)
+                arr[..., 3] = np.clip((a - 60.0) * (255.0 / 130.0), 0, 255).astype(np.uint8)
+                out = _PILImage.fromarray(arr, "RGBA")
+            qi = QImage(out.tobytes("raw", "RGBA"), out.width, out.height, QImage.Format_RGBA8888).copy()
+            e["item"].setPixmap(QPixmap.fromImage(qi))   # stesse dimensioni → scala/posizione invariate
+            e["cutout"] = True
+            self.status.setText(tr("canvas.cutout_done", "Sfondo rimosso: ora il soggetto si integra."))
+            return True
+        except Exception as ex:                          # noqa: BLE001
+            QMessageBox.warning(self, tr("canvas.cutout_btn", "✂ Scontorna"),
+                                tr("canvas.cutout_failed", "Scontorno non riuscito: {e}").format(e=ex))
+            return False
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def _alpha_silhouette(self, e) -> QImage | None:
+        """Silhouette del layer ricavata dalla sua TRASPARENZA (PNG con alpha o foto scontornata),
+        proiettata nello spazio-scena. None se la foto è opaca (là non sappiamo dov'è il soggetto)."""
+        pm = e["item"].pixmap()
+        if pm.isNull() or not pm.hasAlphaChannel() or np is None:
+            return None
+        img = pm.toImage().convertToFormat(QImage.Format_ARGB32)
+        if self._alpha_array(img).min() >= 250:          # opaca: niente da cui dedurre il contorno
+            return None
+        W, H = self.aspect_w, self.aspect_h
+        sil = QImage(W, H, QImage.Format_ARGB32); sil.fill(Qt.transparent)
+        wm = QImage(img.size(), QImage.Format_ARGB32); wm.fill(QColor(255, 255, 255))
+        wm.setAlphaChannel(img.convertToFormat(QImage.Format_Alpha8))
+        p = QPainter(sil)
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+        p.setTransform(e["item"].sceneTransform())
+        p.drawImage(0, 0, wm)
+        p.end()
+        return sil
 
     def selected_layer(self):
         e = self._entries[self._active]
@@ -1026,11 +1159,85 @@ class MaskCanvas(QWidget):
                     return True
         return False
 
+    def _morph(self, sil: QImage, r: int, *, grow: bool = True) -> QImage:
+        """Ingrossa (grow) o assottiglia (erode) una sagoma di r pixel — max/min filter separabile.
+
+        Serve per due cose opposte e complementari:
+          • dilate → ZONA DI EDIT: il modello lavora attorno all'oggetto (mano, ombra, contatto).
+          • erode  → ZONA PROTETTA: l'oggetto che HAI SCELTO non deve essere rigenerato, o il modello
+                     te ne inventa un altro (letteralmente: tre calici al posto del tuo).
+        """
+        if np is None or r <= 0:
+            return sil
+        a = self._alpha_array(sil).astype(np.uint8)
+        for axis in (0, 1):
+            pad = [(0, 0), (0, 0)]; pad[axis] = (r, r)
+            p = np.pad(a, pad, mode="constant", constant_values=0 if grow else 255)
+            st = np.stack([np.roll(p, s, axis=axis) for s in range(-r, r + 1)], 0)
+            a = st.max(0) if grow else st.min(0)
+            a = a[r:-r, :] if axis == 0 else a[:, r:-r]
+        out = QImage(sil.width(), sil.height(), QImage.Format_ARGB32)
+        out.fill(QColor(255, 255, 255))
+        alpha = QImage(np.ascontiguousarray(a).data, sil.width(), sil.height(),
+                       sil.width(), QImage.Format_Alpha8).copy()
+        out.setAlphaChannel(alpha)
+        return out
+
+    def _binarize(self, sil: QImage, thr: int) -> QImage:
+        """Sagoma piena: alpha ≥ thr → 255, altrimenti 0. Serve per «è oggetto o non lo è» (vetro, capelli)."""
+        if np is None:
+            return sil
+        a = (self._alpha_array(sil) >= thr).astype(np.uint8) * 255
+        out = QImage(sil.width(), sil.height(), QImage.Format_ARGB32)
+        out.fill(QColor(255, 255, 255))
+        out.setAlphaChannel(QImage(np.ascontiguousarray(a).data, sil.width(), sil.height(),
+                                   sil.width(), QImage.Format_Alpha8).copy())
+        return out
+
+    def _alpha_array(self, m: QImage):
+        """Canale alpha come array numpy (H×W, uint8). La COPIA è obbligatoria: `a` è un QImage locale e
+        una vista sul suo buffer diventerebbe memoria liberata appena la funzione ritorna (letture
+        casuali — erode e dilate producevano lo stesso risultato)."""
+        a = m.convertToFormat(QImage.Format_Alpha8)
+        buf = np.frombuffer(a.constBits(), dtype=np.uint8, count=a.sizeInBytes())
+        return np.array(buf.reshape(a.height(), a.bytesPerLine())[:, :a.width()])
+
+    def _mask_bounds(self, m: QImage) -> QRectF:
+        """Riquadro dei pixel dipinti in una maschera (vuota → rettangolo nullo)."""
+        if np is not None:
+            a = self._alpha_array(m)
+            ys, xs = np.nonzero(a > 0)
+            if not len(xs):
+                return QRectF()
+            return QRectF(float(xs.min()), float(ys.min()),
+                          float(xs.max() - xs.min() + 1), float(ys.max() - ys.min() + 1))
+        x0 = y0 = 10**9; x1 = y1 = -1                      # senza numpy: scansione a campione
+        step = max(1, m.width() // 256)
+        for y in range(0, m.height(), step):
+            for x in range(0, m.width(), step):
+                if (m.pixel(x, y) >> 24) & 0xFF:
+                    x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
+        if x1 < 0:
+            return QRectF()
+        return QRectF(x0, y0, x1 - x0 + step, y1 - y0 + step)
+
     def export_integrate(self, out_dir: Path) -> dict:
-        """Input stile MagicQuill `foreground_edit`: NON incolla il rettangolo intero.
-        L'OGGETTO (maschera disegnata del layer, o in fallback il suo bbox) resta come seme;
-        la ZONA DI EDIT attorno (bbox cresciuto) viene messa a BIANCO; il resto = base.
-        Kontext (+ puzzle_lora) RIGENERA quella zona integrando il contenuto, senza copiarlo."""
+        """Input stile MagicQuill `foreground_edit` — la ricetta che INTEGRA DAVVERO (validata il 3/06).
+
+        L'OGGETTO (maschera disegnata del layer, o in fallback il suo bbox) resta come seme; la ZONA DI
+        EDIT attorno (bbox cresciuto) va a BIANCO; il resto = base. Il modello rigenera quella zona: ed è
+        LARGA di proposito, perché lì dentro ci finiscono anche mano e braccio — così può PIEGARE IL
+        BRACCIO e far CHIUDERE LE DITA attorno all'oggetto, invece di limitarsi a rifinirne i bordi.
+
+        Due strade sbagliate già percorse (13/07, entrambe verificate a occhio sul risultato):
+          · ring-mask sottile attorno alla sagoma → non c'è spazio per la mano: l'oggetto resta appoggiato;
+          · sagoma protetta + niente alone → l'oggetto è intatto ma la scena non lo accoglie.
+        La cucitura del riquadro NON si cura restringendo la maschera: si cura sfumandola (feather ampio
+        passato al backend da generate_integrate).
+
+        Se non c'è NESSUN layer ma hai mascherato un'area della foto del canvas, quella è la regione da
+        integrare: stessa logica, l'oggetto è ciò che hai mascherato.
+        """
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
         W, H = self.aspect_w, self.aspect_h
         frame = QRectF(0, 0, W, H)
@@ -1038,23 +1245,48 @@ class MaskCanvas(QWidget):
         comp = QImage(self._composite(out_dir)).convertToFormat(QImage.Format_ARGB32)
         obj = QImage(W, H, QImage.Format_ARGB32); obj.fill(Qt.transparent)        # dove c'è l'oggetto
         region = QImage(W, H, QImage.Format_ARGB32); region.fill(Qt.transparent)  # zona di edit
-        po = QPainter(obj); pr = QPainter(region); po.setPen(Qt.NoPen); pr.setPen(Qt.NoPen)
+        wreg = QImage(W, H, QImage.Format_ARGB32); wreg.fill(Qt.transparent)      # zona da SBIANCARE
+        po = QPainter(obj); pr = QPainter(region); pv = QPainter(wreg)
+        for _p in (po, pr, pv):
+            _p.setPen(Qt.NoPen)
         any_region = False
         for e in self._entries[1:]:                        # solo immagini importate
             bbox = e["item"].sceneBoundingRect().intersected(frame)
             if bbox.width() < 2 or bbox.height() < 2:
                 continue
+            grown = bbox.adjusted(-grow, -grow, grow, grow).intersected(frame)
             if self._mask_filled(e["mask"]):               # oggetto = maschera disegnata
                 wm = QImage(W, H, QImage.Format_ARGB32); wm.fill(QColor(255, 255, 255))
                 wm.setAlphaChannel(e["mask"].convertToFormat(QImage.Format_Alpha8))
                 po.drawImage(0, 0, wm)
-            else:                                           # fallback: tutto il rettangolo
-                po.fillRect(bbox, QColor(255, 255, 255))
-            pr.fillRect(bbox.adjusted(-grow, -grow, grow, grow).intersected(frame), QColor(255, 255, 255))
+            else:
+                sil = self._alpha_silhouette(e)            # foto scontornata/PNG: l'oggetto è la sagoma…
+                if sil is not None:
+                    po.drawImage(0, 0, sil)
+                else:
+                    # …foto OPACA (scontorno non disponibile): l'oggetto è tutto il suo rettangolo e lo
+                    # sfondo va coperto — l'alone bianco serve solo QUI, ed è un ripiego: il modello lo
+                    # legge come "spazio vuoto da riempire" e a volte ci mette dentro qualsiasi cosa.
+                    po.fillRect(bbox, QColor(255, 255, 255))
+                    pv.fillRect(grown, QColor(255, 255, 255))
+            # La ZONA DI EDIT è il rettangolo cresciuto in OGNI caso: è lo spazio in cui il modello
+            # ridisegna la mano che afferra e piega il braccio. Stringerla è ciò che rompe l'integrazione
+            # (con l'anello sottile l'oggetto resta lì appoggiato, e nessuno lo prende in mano).
+            pr.fillRect(grown, QColor(255, 255, 255))
             any_region = True
-        po.end(); pr.end()
-        # alone bianco = zona di edit MENO l'oggetto
-        whiten = region.copy()
+        if not any_region and self._mask_filled(self._entries[0]["mask"]):
+            base_m = self._entries[0]["mask"].convertToFormat(QImage.Format_Alpha8)
+            wm = QImage(W, H, QImage.Format_ARGB32); wm.fill(QColor(255, 255, 255))
+            wm.setAlphaChannel(base_m)
+            po.drawImage(0, 0, wm)                          # oggetto = l'area che hai mascherato
+            bounds = self._mask_bounds(base_m)
+            if not bounds.isNull():
+                pr.fillRect(bounds.adjusted(-grow, -grow, grow, grow).intersected(frame),
+                            QColor(255, 255, 255))
+                any_region = True
+        po.end(); pr.end(); pv.end()
+        # alone bianco = zona da sbiancare (solo foto opache) MENO l'oggetto
+        whiten = wreg.copy()
         pw = QPainter(whiten); pw.setCompositionMode(QPainter.CompositionMode_DestinationOut)
         pw.drawImage(0, 0, obj); pw.end()
         prepared = comp.copy()
@@ -1063,7 +1295,9 @@ class MaskCanvas(QWidget):
         msk = QImage(W, H, QImage.Format_ARGB32); msk.fill(Qt.black)
         pm = QPainter(msk); pm.drawImage(0, 0, region); pm.end()
         mpath = out_dir / "integrate_mask.png"; msk.save(str(mpath))
-        return {"image": str(ipath), "mask": str(mpath), "has_region": any_region and self.has_layers()}
+        # has_region NON dipende da has_layers(): senza layer ma con una maschera sulla foto del canvas
+        # c'è eccome qualcosa da integrare (era il blocco «aggiungi una o più immagini»).
+        return {"image": str(ipath), "mask": str(mpath), "has_region": bool(any_region)}
 
     def _drop_layers(self):
         for e in self._entries[1:]:           # rimuove i layer importati (tiene la base)

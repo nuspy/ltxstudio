@@ -39,6 +39,10 @@ def _gen_image(subject_type: str, ref: str, prompt: str, out_png: str, width: in
     else:                                         # concetto / senza foto: t2i
         params = {"arch": "flux", "prompt": prompt, "negative": NEG, "width": width, "height": height,
                   "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png}
+    # STICKY: qui si genera un DATASET (decine di immagini di fila). Senza, il server rimette il
+    # transformer in GPU a OGNI foto: ~5s di warmup ciascuna, cioè metà del tempo buttato. Con lo
+    # sticky resta residente e dalla 2ª foto in poi si passa da ~24s a ~5s (misurato 13/07).
+    params["placement_mode"] = "sticky"
     res = native_driver.run_and_wait("image", params, timeout=600)
     p = res.get("output") or out_png
     if p and os.path.exists(p) and p != out_png:

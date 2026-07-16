@@ -1,0 +1,596 @@
+{
+  "$schema_note": "Manifest degli slot media della landing TaDaMoo (Fase B). Ogni slot ha un data-asset-id corrispondente in index.html. 'struttura' descrive il layout: single | before_after | before_mask_after | video_triplet. 'pezzi' elenca ogni artefatto da produrre con il SUO prompt completo. Le durate video sono minime (>=15s). vid-long-01 e' il video da 60s in sequenza unica richiesto.",
+  "regole_generazione": {
+    "temi": "allegri / sexy-non-sessuali / divertenti / ispiranti, sempre diversi tra loro; estate per musica e cinema; MAI gatti o cani",
+    "watermark": "nessuno: i media sono demo del prodotto",
+    "lingua_prompt": "inglese (resa migliore sui modelli); i testi parlati/cantati in italiano dove indicato",
+    "naming_file": "usare l'id del pezzo come nome file, es. assets/img-edit-01-src.webp",
+    "risoluzioni_minime": "immagini: lato lungo >=1024 (>=2048 consigliato per i protagonisti); video: >=1280x704 o 704x1280 (unica eccezione vid-upscale-01-src, degradato di proposito); i media compaiono GRANDI in pagina e a pieno dialog: niente miniature"
+  },
+  "slots": [
+    {
+      "id": "hero-bg-01",
+      "sezione": "hero",
+      "tipo": "video",
+      "struttura": "single",
+      "durata_s": 20,
+      "risoluzione": "1920x1080, loop perfetto, da comprimere <8MB",
+      "pezzi": [
+        {
+          "id": "hero-bg-01",
+          "ruolo": "video di sfondo hero (opacita' 35%, dietro al canvas)",
+          "prompt": "Slow dreamy drift through a deep indigo night sky filled with twinkling golden stars, a huge warm cream-colored full moon rising on the right, faint pastel aurora ribbons of teal and lilac, a tiny cheerful retro rocket with a flickering flame crossing the frame diagonally leaving a thin sparkling trail, whimsical storybook tone, seamless loop, no text, no people. Camera: very slow upward tilt."
+        }
+      ]
+    },
+    {
+      "id": "img-t2i-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "single",
+      "risoluzione": "2048x1152 (16:9), export WebP q85",
+      "pezzi": [
+        {
+          "id": "img-t2i-01",
+          "ruolo": "risultato testo->immagine",
+          "prompt": "A joyful 70-year-old grandmother with silver hair in a flower-print wetsuit surfing a giant turquoise wave at golden hour, arms wide open laughing, spray of seawater catching the sunlight like confetti, a lighthouse and hot-air balloons on the horizon, dynamic low angle, crisp photorealistic detail, warm festive palette, pure joy."
+        }
+      ]
+    },
+    {
+      "id": "img-edit-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "before_after",
+      "risoluzione": "1344x1024 ciascuna, WebP",
+      "pezzi": [
+        {
+          "id": "img-edit-01-src",
+          "ruolo": "originale",
+          "prompt": "A quiet narrow street in an Italian coastal town on a gray rainy afternoon, wet cobblestones reflecting dull sky, closed shutters, one empty vespa parked, muted desaturated colors, melancholic documentary photo style."
+        },
+        {
+          "id": "img-edit-01-out",
+          "ruolo": "risultato (edit da testo sull'originale)",
+          "prompt_edit": "turn the rainy street into a sunny lemon festival in Amalfi: bright blue sky, garlands of lemons strung between balconies, striped market stalls, confetti in the air, people in summer clothes celebrating, warm saturated light — keep the same street, buildings and vespa"
+        }
+      ]
+    },
+    {
+      "id": "img-inpaint-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "before_mask_after",
+      "risoluzione": "1536x1536 ciascuna (originale, maschera b/n, risultato), WebP",
+      "pezzi": [
+        {
+          "id": "img-inpaint-01-src",
+          "ruolo": "originale",
+          "prompt": "A cozy birthday party table in a sunlit garden, friends leaning in with party hats, and at the center a small plain white sheet cake with a single candle, shallow depth of field, warm afternoon light, candid photo."
+        },
+        {
+          "id": "img-inpaint-01-mask",
+          "ruolo": "maschera (bianco = area rigenerata)",
+          "prompt": "Maschera binaria disegnata nel canvas di LTX Studio: selezione a pennello dell'area della torta al centro del tavolo. Esportare la maschera reale usata (bianco su nero)."
+        },
+        {
+          "id": "img-inpaint-01-out",
+          "ruolo": "risultato inpaint",
+          "prompt_inpaint": "replace the plain cake with a spectacular five-tier galaxy-glazed cake with swirling purple-blue mirror glaze, gold leaf stars and lit sparklers shooting tiny fireworks — matching the same warm garden lighting and perspective"
+        }
+      ]
+    },
+    {
+      "id": "img-outpaint-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "before_after",
+      "risoluzione": "originale 1024x1024, risultato 2048x1024 (estensione laterale), WebP",
+      "pezzi": [
+        {
+          "id": "img-outpaint-01-src",
+          "ruolo": "originale (inquadratura stretta)",
+          "prompt": "Close crop of a wooden longtail boat overflowing with tropical fruit and paper umbrellas, an elderly vendor smiling under a straw hat, early morning light on the water, square crop that clearly cuts off the surrounding scene."
+        },
+        {
+          "id": "img-outpaint-01-out",
+          "ruolo": "risultato outpaint (tela allargata)",
+          "prompt_outpaint": "extend the canvas left and right: reveal the whole floating market around the boat — dozens of colorful boats loaded with flowers and fruit, stilt houses with drying laundry, mist over the river, birds crossing a peach-pink dawn sky, seamless continuation of light and style"
+        }
+      ]
+    },
+    {
+      "id": "img-compose-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "before_after",
+      "nota": "composizione multi-foto: due sorgenti + un risultato (multiref, no collage)",
+      "risoluzione": "sorgenti 1024x1024, risultato 1536x1024, WebP",
+      "pezzi": [
+        {
+          "id": "img-compose-01-a",
+          "ruolo": "foto A",
+          "prompt": "Studio portrait of a young street violinist with freckles and a mustard beanie, holding a worn violin, neutral gray background, soft window light, editorial photography."
+        },
+        {
+          "id": "img-compose-01-b",
+          "ruolo": "foto B",
+          "prompt": "A majestic striped hot-air balloon in cream and coral colors, photographed from below against a clear sky, wicker basket with brass details, crisp product-photo clarity, neutral context."
+        },
+        {
+          "id": "img-compose-01-out",
+          "ruolo": "risultato composizione",
+          "prompt_compose": "one coherent scene, no collage: the violinist from photo A plays standing in the wicker basket of the hot-air balloon from photo B, floating over misty lavender fields at dawn, sheet-music pages fluttering away like birds, cinematic warm light, both subjects preserved faithfully"
+        }
+      ]
+    },
+    {
+      "id": "img-pulid-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "before_after",
+      "risoluzione": "volto 1024x1024, risultato 1536x2048, WebP",
+      "pezzi": [
+        {
+          "id": "img-pulid-01-face",
+          "ruolo": "foto volto di riferimento (PuLID)",
+          "prompt": "Natural smartphone selfie of a woman in her 30s with curly auburn hair and warm brown eyes, soft daylight, plain background, gentle smile, sharp focus on the face. (In alternativa usare una foto reale con liberatoria.)"
+        },
+        {
+          "id": "img-pulid-01-out",
+          "ruolo": "generazione con lo stesso volto",
+          "prompt": "PuLID face reference attached. The same person as a renaissance astronomer in a candle-lit tower studio, painting constellations on a giant celestial globe, velvet emerald robe, brass telescopes and star charts around, Vermeer-like window light, oil-painting realism — identical face, clearly recognizable."
+        }
+      ]
+    },
+    {
+      "id": "img-faceswap-01",
+      "sezione": "immagini",
+      "tipo": "image",
+      "struttura": "before_after",
+      "risoluzione": "1344x1024 ciascuna, WebP",
+      "pezzi": [
+        {
+          "id": "img-faceswap-01-src",
+          "ruolo": "originale (scena target)",
+          "prompt": "A glamorous circus trapeze artist in a sequined emerald costume mid-swing under warm spotlights, confetti falling through the beam of light, dramatic but joyful big-top atmosphere, dynamic freeze-frame photography, face clearly visible."
+        },
+        {
+          "id": "img-faceswap-01-out",
+          "ruolo": "risultato face-swap",
+          "prompt_faceswap": "face-swap: sostituire il volto del trapezista con il volto di riferimento dell'utente (usare la stessa foto volto di img-pulid-01-face per coerenza demo), illuminazione e grana della scena preservate."
+        }
+      ]
+    },
+    {
+      "id": "vid-t2v-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 20,
+      "risoluzione": "1920x1080 25fps (upload YouTube), generare nativo LTX-2",
+      "pezzi": [
+        {
+          "id": "vid-t2v-01",
+          "ruolo": "video testo->video",
+          "prompt": "A swarm of glowing paper lanterns gently lifts a tiny wooden sailboat out of a moonlit harbor and carries it up into the night sky; an astonished fisherwoman on the pier throws her hat in the air and laughs; the boat sails between the stars leaving a trail of golden sparks. Warm whimsical tone, slow ascending camera following the boat, gentle wind sounds and distant harbor bells. 20 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-i2v-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "before_after",
+      "durata_s": 15,
+      "risoluzione": "foto 1344x768, video 1920x1080 25fps",
+      "pezzi": [
+        {
+          "id": "vid-i2v-01-src",
+          "ruolo": "foto statica di partenza",
+          "prompt": "A baroque ceiling fresco of chubby cherubs among pink clouds holding oranges and golden trumpets, ornate gilded frame, museum lighting, slightly low camera angle as if a visitor is looking up."
+        },
+        {
+          "id": "vid-i2v-01-out",
+          "ruolo": "video generato dalla foto",
+          "prompt_i2v": "the fresco comes alive: the cherubs blink, grin and start juggling the oranges between each other across the ceiling, clouds slowly swirl, one trumpet plays and gold dust rains down toward the camera; playful, funny, museum ambience preserved. 15 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-storyboard-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 30,
+      "risoluzione": "1920x1080 25fps",
+      "nota": "storyboard multi-scena: 4 keyframe a tempo (0s/8s/16s/24s) -> video continuo senza stacchi",
+      "pezzi": [
+        {
+          "id": "vid-storyboard-01",
+          "ruolo": "video da storyboard (4 keyframe)",
+          "prompt": "Keyframe 1 (0s): a red kite tangled in a cherry tree in an empty summer park. Keyframe 2 (8s): a girl in a yellow raincoat climbs the tree to free it. Keyframe 3 (16s): she runs across the meadow, the kite climbing higher against towering white clouds. Keyframe 4 (24s): aerial view from the kite looking down at her tiny waving figure in the green field. One continuous coherent shot connecting all four moments, joyful orchestral build, golden afternoon light. 30 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-long-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 60,
+      "risoluzione": "1920x1080 25fps",
+      "nota": "IL VIDEO DA 60s IN SEQUENZA UNICA (catena autoregressiva video-lunghi, nessun taglio)",
+      "pezzi": [
+        {
+          "id": "vid-long-01",
+          "ruolo": "sequenza unica 60 secondi",
+          "prompt": "One single continuous 60-second shot, no cuts: a cheerful mailwoman pedals her bicycle through a waking seaside town at sunrise delivering letters — she rings the bell, waves at a baker pulling out bread, rides through a flock of pigeons that scatter into the pink sky, coasts downhill along the harbor as fishing boats leave, and as she reaches the pier's end the bicycle gently lifts off the ground and flies over the bay, letters swirling behind her like white birds, ending high above the town with the sun fully risen. Inspiring, warm, one unbroken camera follow. 60 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-controlnet-01",
+      "sezione": "video",
+      "tipo": "video",
+      "struttura": "video_triplet",
+      "durata_s": 15,
+      "risoluzione": "3 clip 1280x720 25fps (minimo 1280x704), <10MB ciascuna",
+      "pezzi": [
+        {
+          "id": "vid-controlnet-01-src",
+          "ruolo": "video iniziale (riferimento movimento)",
+          "prompt": "Real or generated clip: a breakdancer in a sunlit empty parking lot performing a clean windmill into a freeze, static camera, high contrast, clearly readable silhouette. 15 seconds."
+        },
+        {
+          "id": "vid-controlnet-01-guide",
+          "ruolo": "figura guida (mappa canny estratta)",
+          "prompt": "Estrazione automatica ControlNet canny dal video iniziale in LTX Studio: esportare la preview degli edge (linee bianche su nero) come clip."
+        },
+        {
+          "id": "vid-controlnet-01-out",
+          "ruolo": "video finale (stesso movimento, mondo nuovo)",
+          "prompt_controlnet": "same motion via canny guide: a gleaming chrome robot breakdancing on the deck of a space station, Earth glowing in the panoramic window behind, neon teal rim lights, sparks when it hits the freeze — identical choreography to the source. 15 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-replace-01",
+      "sezione": "video",
+      "tipo": "video",
+      "struttura": "video_triplet",
+      "durata_s": 15,
+      "risoluzione": "clip 1280x720 25fps + immagine riferimento 1024x1024",
+      "pezzi": [
+        {
+          "id": "vid-replace-01-src",
+          "ruolo": "video iniziale",
+          "prompt": "A knight in dull practice armor clumsily dancing flamenco on a wooden stage in an empty theater, spotlights on, funny and endearing, medium-wide shot. 15 seconds."
+        },
+        {
+          "id": "vid-replace-01-ref",
+          "ruolo": "figura guida (immagine riferimento nuovo soggetto)",
+          "prompt": "Character reference sheet: an elegant art-deco brass automaton with emerald glass eyes, polished gears visible at the joints, front and three-quarter view, neutral background."
+        },
+        {
+          "id": "vid-replace-01-out",
+          "ruolo": "video finale (character replacement)",
+          "prompt_replace": "replace the knight with the brass automaton from the reference: same flamenco choreography, same stage and spotlights, gears glinting as it stomps and twirls, tiny puffs of steam on the accents. 15 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-lipsync-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 15,
+      "risoluzione": "1080x1920 verticale (reel) o 1920x1080, 25fps",
+      "pezzi": [
+        {
+          "id": "vid-lipsync-01",
+          "ruolo": "canto lip-sync da foto + audio",
+          "prompt": "Input: portrait photo of a proud opera-loving nonna in a sunflower dress on a balcony + 15s audio of a soaring lyric soprano line (generated with the Music tab, Italian lyrics 'vola vola cuore mio'). Output: the portrait sings with perfect lip-sync, eyebrows and chin acting the high note, laundry and geraniums swaying, neighbors' shutters opening to listen. Funny and touching. 15 seconds."
+        }
+      ]
+    },
+    {
+      "id": "vid-retake-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "before_after",
+      "durata_s": 15,
+      "risoluzione": "1920x1080 25fps (split-screen prima/dopo oppure due clip in sequenza)",
+      "pezzi": [
+        {
+          "id": "vid-retake-01-src",
+          "ruolo": "video originale",
+          "prompt": "A rooftop dinner party at dusk, friends raising glasses in a calm toast, string lights, city skyline behind, gentle handheld camera. 15 seconds."
+        },
+        {
+          "id": "vid-retake-01-out",
+          "ruolo": "video con ReTake dei secondi 4-8",
+          "prompt_retake": "ReTake seconds 4-8 only: the toast erupts into a joyful confetti-and-streamers explosion with sparklers appearing in every glass, everyone laughing — rest of the video untouched, seamless boundaries."
+        }
+      ]
+    },
+    {
+      "id": "vid-upscale-01",
+      "sezione": "video",
+      "tipo": "video_yt",
+      "struttura": "before_after",
+      "durata_s": 15,
+      "risoluzione": "sorgente 480x360 degradata, risultato 3840x2160 (SeedVR2), montaggio split-screen",
+      "pezzi": [
+        {
+          "id": "vid-upscale-01-src",
+          "ruolo": "video originale bassa qualita'",
+          "prompt": "Vintage-looking low-res clip (real or generated then degraded): a 1980s-style roller-skating crew gliding along a beach promenade, VHS grain, chroma bleed, soft blurry 360p. 15 seconds."
+        },
+        {
+          "id": "vid-upscale-01-out",
+          "ruolo": "risultato super-risoluzione",
+          "prompt_upscale": "SeedVR2 super-resolution to 4K: crisp faces, readable textures on skates and palm leaves, stable temporal detail, no hallucinated artifacts — presented as a wipe split-screen against the source."
+        }
+      ]
+    },
+    {
+      "id": "mus-song-01",
+      "sezione": "musica",
+      "tipo": "audio",
+      "struttura": "single",
+      "durata_s": 90,
+      "risoluzione": "WAV 44.1kHz -> mp3 320kbps per il web",
+      "pezzi": [
+        {
+          "id": "mus-song-01",
+          "ruolo": "canzone completa HeartMuLa",
+          "prompt": "Upbeat Italian summer disco-pop, female voice, 118 BPM, seaside road-trip feeling at golden hour: shimmering funk guitar, handclaps, warm analog synth bass, singalong chorus. Lyrics theme (Italian): windows down along the coast road, salt in the hair, 'stasera si vola fino alla luna'. Structure: intro, verse, pre-chorus, big chorus, verse, chorus, outro with waves. 90 seconds."
+        }
+      ]
+    },
+    {
+      "id": "mus-acestep-01",
+      "sezione": "musica",
+      "tipo": "audio",
+      "struttura": "single",
+      "durata_s": 60,
+      "risoluzione": "WAV 44.1kHz -> mp3 320kbps",
+      "pezzi": [
+        {
+          "id": "mus-acestep-01",
+          "ruolo": "strumentale ACE-Step",
+          "prompt": "Surf-rock instrumental, 140 BPM: twangy reverb-drenched guitars, driving tom-heavy drums, organ stabs, beach-bonfire-at-midnight energy with a triumphant bridge that feels like a rocket countdown. No vocals. 60 seconds."
+        }
+      ]
+    },
+    {
+      "id": "mus-sonify-01",
+      "sezione": "musica",
+      "tipo": "video_yt",
+      "struttura": "before_after",
+      "durata_s": 15,
+      "risoluzione": "1920x1080 25fps (prima meta' muta, seconda meta' sonorizzata, con cartello)",
+      "pezzi": [
+        {
+          "id": "mus-sonify-01-src",
+          "ruolo": "video muto",
+          "prompt": "Silent clip: a busy summer gelato kiosk by the sea — scooping gelato into cones, kids running, seagulls hovering, waves breaking, a bicycle bell moment. 15 seconds."
+        },
+        {
+          "id": "mus-sonify-01-out",
+          "ruolo": "video sonorizzato MMAudio",
+          "prompt_sonify": "MMAudio inference from frames only: waves, gulls, the wet scoop squeak, crowd chatter, the bicycle bell exactly on cue — audio fully deduced from the images, no manual foley."
+        }
+      ]
+    },
+    {
+      "id": "mus-musicvideo-01",
+      "sezione": "musica",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 30,
+      "risoluzione": "1920x1080 25fps",
+      "pezzi": [
+        {
+          "id": "mus-musicvideo-01",
+          "ruolo": "videomusicale automatico (canzone -> storyboard -> clip montate a ritmo)",
+          "prompt": "Auto music video from mus-song-01 (summer disco): style 'sun-bleached 70s film with lens flares'; scene pace on the beat; scenes follow the lyrics — coastal road with vintage convertible, beach bonfire twilight dance, moonlit dive into phosphorescent water, final freeze-frame jump at the lighthouse. 30-second cutdown."
+        }
+      ]
+    },
+    {
+      "id": "voice-tts-01",
+      "sezione": "voce",
+      "tipo": "audio",
+      "struttura": "single",
+      "durata_s": 25,
+      "risoluzione": "WAV 24kHz+ -> mp3",
+      "pezzi": [
+        {
+          "id": "voice-tts-01",
+          "ruolo": "narrazione TTS con marcatori",
+          "prompt": "Italian TTS, warm theatrical male narrator: \"[warm] Signore e signori... [pause] allacciate la fantasia. [excited] Benvenuti a bordo del razzo TaDaMoo! [pause] Prossima fermata: [whisper] la Luna. [laugh]\" — using emotion and pause markers exactly as written. 25 seconds."
+        }
+      ]
+    },
+    {
+      "id": "voice-clone-01",
+      "sezione": "voce",
+      "tipo": "audio",
+      "struttura": "before_after",
+      "durata_s": 20,
+      "risoluzione": "campione 30s + risultato 20s, mp3",
+      "pezzi": [
+        {
+          "id": "voice-clone-01-sample",
+          "ruolo": "campione voce originale",
+          "prompt": "Registrazione reale (con liberatoria) di 30 secondi: una voce femminile legge una ricetta della torta al limone in cucina, tono naturale."
+        },
+        {
+          "id": "voice-clone-01-out",
+          "ruolo": "voce clonata su testo nuovo",
+          "prompt_clone": "Stessa voce clonata legge un testo MAI registrato: \"Capitano ai motori: rotta verso il Mare della Tranquillita'. E stavolta il dolce lo portiamo noi.\" — timbro e cadenza riconoscibili al primo ascolto. 20 secondi."
+        }
+      ]
+    },
+    {
+      "id": "cinema-film-01",
+      "sezione": "cinema",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 45,
+      "risoluzione": "1920x816 (2.35:1 cinemascope) o 1920x1080, 25fps",
+      "pezzi": [
+        {
+          "id": "cinema-film-01",
+          "ruolo": "cortometraggio Cinema Studio (estivo)",
+          "prompt": "Complete short film from one line: 'A shy lifeguard and a runaway beach umbrella fall in love during a mistral storm.' Cinema Studio pipeline: script -> characters (lifeguard Nino, a red-striped umbrella with a personality) -> beach sets at noon and in the storm -> shots -> Italian dialogue -> summer orchestral score -> final cut. Romantic-comedy tone, windswept sand, seagulls as gossiping chorus, happy ending with the umbrella planted next to his tower forever. 45-second cut."
+        }
+      ]
+    },
+    {
+      "id": "cinema-lucky-01",
+      "sezione": "cinema",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 30,
+      "risoluzione": "1920x1080, screen-capture + picture-in-picture del risultato",
+      "pezzi": [
+        {
+          "id": "cinema-lucky-01",
+          "ruolo": "timelapse Lucky Director (one-click)",
+          "prompt": "Screen recording timelapse: type the prompt 'una gara di tuffi tra nonni campioni in un faro abbandonato, estate, commovente e buffa', click the clover button, watch Cinema Studio autonomously write the script, cast characters, build sets, shoot scenes and edit — ending on 3 seconds of the finished film. 30 seconds, upbeat editing."
+        }
+      ]
+    },
+    {
+      "id": "d3-mesh-01",
+      "sezione": "tre-d",
+      "tipo": "glb",
+      "struttura": "before_after",
+      "risoluzione": "foto 1024x1024 + GLB <15MB con texture PBR 2048",
+      "placeholder_attuale": "assets/placeholder_mesh.glb (cavaliere TRELLIS reale)",
+      "pezzi": [
+        {
+          "id": "d3-mesh-01-src",
+          "ruolo": "foto originale",
+          "prompt": "Product-style photo of a fantastical mechanical hummingbird sculpture made of copper, teal enamel and tiny clock gears, perched on a brass stand, neutral light gray background, sharp full view."
+        },
+        {
+          "id": "d3-mesh-01-out",
+          "ruolo": "mesh PBR generata (TRELLIS) per il viewer",
+          "prompt_3d": "TRELLIS image-to-3D from d3-mesh-01-src: full PBR mesh (albedo/metallic/roughness), clean topology ~60k faces, GLB export — sostituire assets/placeholder_mesh.glb."
+        }
+      ]
+    },
+    {
+      "id": "d3-rig-01",
+      "sezione": "tre-d",
+      "tipo": "glb",
+      "struttura": "single",
+      "risoluzione": "GLB riggato <15MB, idle animation inclusa se possibile",
+      "placeholder_attuale": "assets/placeholder_rigged.glb (cavaliere riggato reale)",
+      "pezzi": [
+        {
+          "id": "d3-rig-01",
+          "ruolo": "mesh riggata con scheletro automatico",
+          "prompt_rig": "Auto-rig + skinning (SkinTokens) della mesh d3-mesh-01-out o di un personaggio TRELLIS umanoide (es. 'a cheerful astronaut chef with a whisk'), template Mixamo, con una breve animazione di saluto applicata via mocap — sostituire assets/placeholder_rigged.glb."
+        }
+      ]
+    },
+    {
+      "id": "d3-mocap-01",
+      "sezione": "tre-d",
+      "tipo": "video",
+      "struttura": "video_triplet",
+      "durata_s": 15,
+      "risoluzione": "3 clip 1280x720 25fps",
+      "pezzi": [
+        {
+          "id": "d3-mocap-01-src",
+          "ruolo": "video sorgente (persona reale)",
+          "prompt": "Webcam/phone clip: a person doing a goofy victory dance in a living room — arm rolls, a spin, finger-guns finale. Clear full body, steady camera. 15 seconds."
+        },
+        {
+          "id": "d3-mocap-01-skel",
+          "ruolo": "figura guida (scheletro mocap)",
+          "prompt": "Export della preview mocap di LTX Studio: scheletro stick-figure tracciato sul video sorgente (overlay verde su nero)."
+        },
+        {
+          "id": "d3-mocap-01-out",
+          "ruolo": "animazione finale sul modello 3D",
+          "prompt_retarget": "Retarget del mocap sul personaggio riggato d3-rig-01: la statua/astronauta ripete l'identica danza della vittoria su un palco lunare low-poly, render viewport o turntable. 15 seconds."
+        }
+      ]
+    },
+    {
+      "id": "world-01",
+      "sezione": "mondi",
+      "tipo": "world",
+      "struttura": "before_after",
+      "risoluzione": "foto 1920x1080 + scena GLB <40MB (mesh world) per il proiettore three.js",
+      "placeholder_attuale": "assets/placeholder_world.glb (oggetto 3D, NON un mondo: sostituire con scena WorldGen)",
+      "pezzi": [
+        {
+          "id": "world-01-src",
+          "ruolo": "foto di partenza",
+          "prompt": "A sun-drenched Greek island alley at siesta time: whitewashed walls, cobalt-blue doors, bougainvillea cascading overhead, a staircase curving up toward a tiny chapel, warm shadows, inviting depth — perfect for walking into."
+        },
+        {
+          "id": "world-01-out",
+          "ruolo": "mondo esplorabile (WorldGen)",
+          "prompt_world": "WorldGen scene from world-01-src, mode mesh: explorable GLB of the alley with correct depth (walls, stairs, doors, vegetation volumes), baked lighting from the photo — sostituire assets/placeholder_world.glb e aggiornare il path nel proiettore."
+        }
+      ]
+    },
+    {
+      "id": "lora-photo-01",
+      "sezione": "lora",
+      "tipo": "image",
+      "struttura": "before_after",
+      "risoluzione": "griglia 5 foto dataset 512x512 + 2-3 generazioni 1024x1344, WebP",
+      "pezzi": [
+        {
+          "id": "lora-photo-01-src",
+          "ruolo": "dataset soggetto (griglia 5 foto)",
+          "prompt": "Five varied photos of the same invented character for LoRA training: an eccentric 60-year-old inventor with a white handlebar mustache, round amber goggles on the forehead and a patched tweed vest — front, profile, three-quarter, laughing, arms crossed; plain workshop background. (Generarle con PuLID per identita' coerente.)"
+        },
+        {
+          "id": "lora-photo-01-out",
+          "ruolo": "generazioni post-training",
+          "prompt": "With the trained LoRA (trigger: nv3ntor): 'nv3ntor riding a penny-farthing bicycle on the rings of Saturn, scattering glowing bolts like seeds, nebula sky, joyful epic illustration' + 'nv3ntor asleep in a deckchair on the Moon under a beach umbrella, Earth rising, summer vibes'."
+        }
+      ]
+    },
+    {
+      "id": "lora-video-01",
+      "sezione": "lora",
+      "tipo": "video_yt",
+      "struttura": "single",
+      "durata_s": 15,
+      "risoluzione": "1920x1080 25fps",
+      "pezzi": [
+        {
+          "id": "lora-video-01",
+          "ruolo": "video con LoRA video del soggetto",
+          "prompt": "With the video LoRA of the same inventor (nv3ntor): he proudly unveils a sputtering homemade rocket in his backyard, it launches him gently over the vegetable garden while he salutes with his hat, fireworks of cabbage leaves — same recognizable face and vest as the photo LoRA. 15 seconds."
+        }
+      ]
+    },
+    {
+      "id": "models-ui-01",
+      "sezione": "modelli",
+      "tipo": "image",
+      "struttura": "single",
+      "risoluzione": "screenshot reale 2560x1440 -> WebP",
+      "pezzi": [
+        {
+          "id": "models-ui-01",
+          "ruolo": "screenshot UI tab Modelli",
+          "prompt": "Screenshot reale (non generato) della tab Modelli di LTX Studio: ricerca Civitai aperta, dropdown modelli con i semafori VRAM verde/giallo/rosso ben visibili e un override manuale selezionato; finestra pulita a 2560x1440, tema scuro."
+        }
+      ]
+    }
+  ]
+}
