@@ -1018,14 +1018,19 @@ class MusicTab(QWidget):
             vt = getattr(mw, "video_tab", None)
             if vt is not None and hasattr(vt, "get_values"):
                 vv = vt.get_values()
-                if vv.get("model_gguf"):
-                    cfg["video_gguf"] = vv["model_gguf"]
-                elif vv.get("model"):
+                # NIENTE model_gguf: i GGUF video sono rimossi (13/07). Se un vecchio gui_state ne
+                # tiene ancora uno selezionato, lo IGNORIAMO invece di ereditarlo nel videoclip.
+                if vv.get("model") and not str(vv["model"]).lower().endswith(".gguf"):
                     cfg["video_model"] = vv["model"]
                 if vv.get("width"):
                     cfg["width"] = int(vv["width"])
                 if vv.get("height"):
                     cfg["height"] = int(vv["height"])
+                # 2ª architettura: eredita LTX/LingBot dal tab Video
+                cfg["video_arch"] = vv.get("video_arch", "ltx")
+                if vv.get("video_arch") == "lingbot":
+                    cfg["lingbot_variant"] = vv.get("lingbot_variant", "dense")
+                    cfg["run_refiner"] = bool(vv.get("run_refiner"))
         except Exception:                                    # noqa: BLE001
             pass
         return cfg

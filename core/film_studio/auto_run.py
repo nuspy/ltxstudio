@@ -191,6 +191,7 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
     pmode = proj.get("path_mode", "fast")
     img_arch, img_model = guard.get("img_arch", "flux"), guard.get("img_model", "")
     vid_gguf, forbidden = guard.get("vid_gguf", ""), guard.get("forbidden", "")
+    vid_arch = guard.get("vid_arch", "ltx")                   # 2ª architettura video (LTX/LingBot)
     shots = _iter_shots(pid)
     if not shots:
         raise RuntimeError("Nessuna ripresa da generare (breakdown mancante)")
@@ -263,7 +264,8 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
                                           "loras": refs["loras"],
                                           "audio_path": _shot_dialogue_audio(sh, outdir),
                                           "model_gguf": vid_gguf, "seed": seed, "negative": forbidden,
-                                          "width": width or 0, "height": height or 0},
+                                          "width": width or 0, "height": height or 0,
+                                          "video_arch": vid_arch},
                                 owner_kind="shot", owner_id=sh["id"])
         vid_jids.append(jid); jmap[jid] = prompt
     _wait(vid_jids, jmap, "video", on_progress, cancel, base=0.40, span=0.40)

@@ -1,6 +1,6 @@
 """Videomusicale AUTOMATICO (1 workflow): canzone (HeartMuLa) → storyboard LLM (Gemma traduce +
 crea scene coerenti col testo) → mappa temporale proporzionale al contenuto → chunk video NATIVI
-(LTX-2.3 GGUF, i2v concatenati, un prompt-scena per sezione) → concat + mux dell'audio.
+(LTX-2.3 fp8 in auto, i2v concatenati, un prompt-scena per sezione) → concat + mux dell'audio.
 
 Coerenza testo↔immagini: lo storyboard dell'LLM segue l'ordine del testo; i pesi delle scene
 distribuiscono il tempo (HeartMuLa canta le sezioni in ordine → mappa proporzionale = buon
@@ -16,12 +16,12 @@ import os
 import subprocess
 from pathlib import Path
 
-from core import lyrics_llm
+from core import ltx_video_job, lyrics_llm
 
 REPO = Path(__file__).resolve().parents[1]
 LTX2_PY = r"E:\AI\Tools\ltx2_venv\Scripts\python.exe"
-LTX2_WORKER = str(REPO / "workers" / "ltx2_infer.py")
-GGUF = r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf"
+# NB: nessuna costante GGUF di default. Il GGUF si usa SOLO se scelto dall'utente (passa da
+# core/ltx_video_job): forzarlo costava ~500 s/step (dequant per-forward) e OOM col modello residente.
 NEG = "blurry, low quality, deformed, gore, watermark, text, distorted faces, extra limbs"
 
 
@@ -166,23 +166,24 @@ def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int 
 
 
 def gen_scene_video(scene: dict, out_mp4: str, *, width: int = 704, height: int = 512, fps: int = 25,
-                    model: str | None = None, model_gguf: str | None = None) -> str:
+                    model: str | None = None, model_gguf: str | None = None,
+                    arch: str = "ltx", lingbot_variant: str = "dense", run_refiner: bool = False) -> str:
     """Genera lo spezzone video della scena (i2v dall'immagine di apertura, durata = length_s).
-    model_gguf/model: transformer scelto nel tab Video (se None → GGUF distilled di default)."""
+    model_gguf/model: transformer scelto nel tab Video; se None il worker sceglie da sé (fp8).
+    arch: 'ltx' (default) o 'lingbot' (2ª architettura); per LingBot si passano variante e refiner."""
     nf = _valid_nf(min(float(scene["length_s"]), 6.7), fps)
-    _gguf = model_gguf or (model if str(model or "").lower().endswith(".gguf") else None) or GGUF
-    params = {"image_path": scene.get("image_path", ""), "gguf_transformer": _gguf,
-              "prompt": scene["video_prompt"], "negative": NEG, "width": width, "height": height,
-              "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0, "seed": 8,
-              "offload": "cpu", "ref_strength": 1.0, "output": out_mp4}
-    if model and not str(model).lower().endswith(".gguf"):   # modello non-GGUF esplicito (fp8/bf16)
-        params["model"] = model
-    jf = out_mp4 + ".json"
-    json.dump(params, open(jf, "w"))
-    env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
-    if not os.path.exists(out_mp4):
-        raise RuntimeError("video scena fallito: " + (r.stdout[-400:] + r.stderr[-400:]))
+    _extra = {"ref_strength": 1.0}
+    if arch == "lingbot":
+        _extra["lingbot_variant"] = lingbot_variant
+        if run_refiner:
+            _extra["run_refiner"] = True
+    # Un solo posto per la policy del video (#158: niente GGUF forzato) → core/ltx_video_job.
+    ltx_video_job.generate(
+        output=out_mp4, image_path=scene.get("image_path", ""), prompt=scene["video_prompt"],
+        negative=NEG, width=width, height=height, num_frames=nf, fps=fps,
+        steps=8, guidance=3.0, seed=8, model=model, model_gguf=model_gguf, arch=arch,
+        extra=_extra,
+    )
     scene["video_path"] = out_mp4
     return out_mp4
 
@@ -366,7 +367,7 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
         log(f"[storyboard] LLM non disponibile ({e}) → scena unica")
         scenes = []
     try:
-        lyrics_llm.unload()                                # libera Gemma dalla VRAM prima del video GGUF
+        lyrics_llm.unload()                                # libera Gemma dalla VRAM prima del video
     except Exception:                                      # noqa: BLE001
         pass
     if not scenes:
@@ -389,19 +390,12 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
         cond = image_path if cut else prev
         out_i = os.path.join(scratch, f"chunk_{i:03d}.mp4")
         if not os.path.exists(out_i):
-            params = {
-                "image_path": cond, "gguf_transformer": GGUF,
-                "prompt": scene["prompt"] + style_sfx, "negative": NEG,
-                "width": width, "height": height, "num_frames": nf, "fps": fps,
-                "steps": steps, "guidance": 3.0, "seed": 8, "offload": "cpu",
-                "ref_strength": 1.0, "output": out_i,
-            }
-            jf = os.path.join(scratch, f"c_{i:03d}.json")
-            json.dump(params, open(jf, "w"))
             log(f"Chunk {i + 1}/{nch}{' ✂' if cut else ''}…")
-            r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
-            if not os.path.exists(out_i):
-                raise RuntimeError(f"chunk {i} fallito: " + (r.stdout[-500:] + r.stderr[-500:]))
+            ltx_video_job.generate(                          # policy #158 centralizzata
+                output=out_i, image_path=cond, prompt=scene["prompt"] + style_sfx, negative=NEG,
+                width=width, height=height, num_frames=nf, fps=fps,
+                steps=steps, guidance=3.0, seed=8, extra={"ref_strength": 1.0},
+            )
         prev_prompt = scene["prompt"]
         last = os.path.join(scratch, f"last_{i:03d}.png")
         subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-0.12", "-i", out_i, "-update", "1",

@@ -20,8 +20,8 @@ from core import native_driver
 from core.film_studio import db
 
 LTX2_PY = r"E:\AI\Tools\ltx2_venv\Scripts\python.exe"
-LTX2_WORKER = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "workers", "ltx2_infer.py")
-GGUF = r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf"
+# NB: nessuna costante GGUF di default. Il GGUF si usa SOLO se scelto dall'utente (passa da
+# core/ltx_video_job): forzarlo costava ~500 s/step (dequant per-forward) e OOM col modello residente.
 NEG = "blurry, low quality, deformed, distorted face, extra limbs, watermark, text"
 
 _REF_RE = re.compile(r"@([A-Za-z0-9_]+)(?:#([A-Za-z0-9_]+))?")
@@ -151,6 +151,11 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
             params["ref_images"] = _refs                     # multi-reference (composizione senza incollaggio)
     if loras:
         params["loras"] = loras
+    # STICKY: un film genera N keyframe di fila (uno per shot). Senza, il server rimette il
+    # transformer in GPU a OGNI keyframe (~5s di warmup a testa: su 18 shot sono ~1,5 minuti buttati).
+    # Residente per tutto il batch: ~24s → ~5s a immagine. La VRAM viene comunque sfrattata prima dei
+    # video (free_for("video") in ltx_video_job), quindi non ruba spazio al transformer 22B. (13/07)
+    params["placement_mode"] = "sticky"
     res = native_driver.run_and_wait("image", params, timeout=900)
     p = (res.get("output") or [out_png])
     p = p[0] if isinstance(p, list) else p
@@ -224,20 +229,28 @@ def _submit_persistent(params: dict, out_mp4: str, timeout: int = 1800) -> str:
 def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int = 512, fps: int = 25,
                    duration_s: float = 4.0, seed: int = 7, keyframes: list | None = None,
                    loras: list | None = None, audio_path: str = "", model_gguf: str = "",
-                   negative: str = "", structure: bool = True) -> str:
-    """Genera il video di uno shot col worker nativo LTX-2.3 GGUF. keyframes=[{path,frame,strength}].
+                   negative: str = "", structure: bool = True, video_arch: str = "ltx",
+                   lingbot_variant: str = "dense", run_refiner: bool = False) -> str:
+    """Genera il video di uno shot col worker nativo. keyframes=[{path,frame,strength}].
     model_gguf: transformer scelto nel progetto (B5), altrimenti il distilled Q4 di default.
+    video_arch: 'ltx' (default) o 'lingbot' (2ª architettura, worker/venv dedicati).
     structure: converte il prompt in JSON strutturato e lo ricompone (vedi gen_image)."""
     prompt, negative = _apply_prompt_json(prompt, negative, loras, out_mp4, kind="video", structure=structure)
     nf = max(9, int(round(duration_s * fps)) // 8 * 8 + 1)
     neg = NEG + (", " + negative if negative else "")
+    video_arch = (video_arch or "ltx").lower()
     params = {"prompt": prompt, "negative": neg, "width": width,
               "height": height, "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0,
-              "seed": seed, "output": out_mp4}
+              "seed": seed, "output": out_mp4, "arch": video_arch}
+    if video_arch == "lingbot":
+        params["lingbot_variant"] = lingbot_variant
+        params["steps"] = 40                                  # default ufficiale LingBot
+        if run_refiner:
+            params["run_refiner"] = True
     # #158: GGUF/offload solo se SCELTI nel progetto (B5). In auto decide il worker: fp8 residente
     # se entra in VRAM (4s/step), GGUF+cpu come fallback per GPU piccole. Prima si forzava SEMPRE
     # il Q4 col dequant per-forward → ~470s/step su ogni shot del film.
-    if model_gguf:
+    if model_gguf and video_arch != "lingbot":
         params["gguf_transformer"] = model_gguf
         params["offload"] = "cpu"
     # libera i server delle ALTRE categorie (es. FLUX 22GB dei keyframe) prima del video 22B:
@@ -268,8 +281,9 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
     if nf > _max_single:
         params["chunk_frames"] = _max_single - (_max_single - 1) % 8   # multiplo 8+1 compatibile LTX
     # Worker VIDEO PERSISTENTE (server :8190, modello già caricato) se attivo → niente reload di LTX ~22B ad
-    # ogni shot (era il collo di bottiglia di «Genera Tutti»). Altrimenti fallback al subprocess.
-    if _ltx2_server_up():
+    # ogni shot (era il collo di bottiglia di «Genera Tutti»). Il server persistente è LTX-only → LingBot
+    # va sempre al subprocess dedicato. Altrimenti fallback al subprocess.
+    if video_arch != "lingbot" and _ltx2_server_up():
         # PRIMO job (server senza pipeline in cache): il SUO caricamento sceglie fp8-vs-GGUF in base
         # alla VRAM libera in quell'istante → aspetta il rilascio effettivo come per il subprocess
         # (visto live: shot_4 servito col subprocess morente = GGUF + 40GB alloc su 32). Dai job
@@ -284,11 +298,9 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
         return _submit_persistent(params, out_mp4)
     # ramo subprocess: stessa attesa (le allocazioni WDDM finite in shared NON migrano più).
     _wait_free_vram()
-    jf = out_mp4 + ".json"
-    with open(jf, "w") as _f:                        # fix: handle non chiuso (leak FD nei loop)
-        json.dump(params, _f)
-    env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
-    if not os.path.exists(out_mp4):
-        raise RuntimeError("gen_shot_video fallita: " + (r.stdout[-400:] + r.stderr[-400:]))
+    # Lancio CENTRALIZZATO (core/ltx_video_job): identico a videoclip/LoRA-video, così la policy del
+    # video (#158) sta in un posto solo e non può più restare indietro in un percorso soltanto.
+    # free_vram=False: la VRAM è già stata liberata qui sopra (free_for + _wait_free_vram).
+    from core import ltx_video_job
+    ltx_video_job.run_clip(params, free_vram=False)
     return out_mp4

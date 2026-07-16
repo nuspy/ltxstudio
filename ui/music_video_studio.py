@@ -556,17 +556,26 @@ class MusicVideoStudio(QWidget):
         return kw
 
     def _vid_kw(self) -> dict:
-        """kwargs per gen_scene_video: modello/GGUF + risoluzione (dal tab Video)."""
+        """kwargs per gen_scene_video: modello + risoluzione (dal tab Video).
+
+        NIENTE model_gguf: i GGUF video sono stati rimossi (13/07). Prima il videoclip EREDITAVA il
+        GGUF selezionato nel tab Video e ci finiva dentro senza accorgersene: ~500 s/step invece di
+        ~4 e, col Q6_K, OOM ⇒ 13 job e zero mp4. Il video usa sempre il checkpoint fp8.
+        """
         c = self.media_cfg
         kw: dict = {}
-        if c.get("video_gguf"):
-            kw["model_gguf"] = c["video_gguf"]
         if c.get("video_model"):
             kw["model"] = c["video_model"]
         if c.get("width"):
             kw["width"] = int(c["width"])
         if c.get("height"):
             kw["height"] = int(c["height"])
+        # 2ª architettura video (LTX/LingBot) ereditata dal tab Video
+        if c.get("video_arch"):
+            kw["arch"] = c["video_arch"]
+        if c.get("video_arch") == "lingbot":
+            kw["lingbot_variant"] = c.get("lingbot_variant", "dense")
+            kw["run_refiner"] = bool(c.get("run_refiner"))
         return kw
 
     def _run(self, fn, *args, **kw):

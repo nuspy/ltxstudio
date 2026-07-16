@@ -11,21 +11,8 @@ from PySide6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QLabel, QMessa
 
 from core import llm_service as L
 from core.film_studio import db, gen_service, continuity as ct, scheduler
+from core.film_studio.breakdown import SYS as _SYS   # system-prompt breakdown CONDIVISO (core, riuso Lucky Director)
 from ui.i18n_manager import tr
-
-# Schema INTERNO (invisibile all'utente): shot arricchito con camera+lighting per prompt di generazione più
-# coerenti e cinematografici. camera = inquadratura+angolo (es. "wide shot, low angle"); lighting = luce/mood.
-_SYS = ("You are a film script supervisor. Break the screenplay into SCENES and SHOTS. "
-        "Output STRICT JSON: {\"scenes\":[{\"description\":str,\"style\":str,\"duration_s\":number,"
-        "\"continuity\":{\"time_of_day\":str,\"weather\":str,\"mood\":str},"
-        "\"shots\":[{\"description\":str,\"duration_s\":number,"
-        "\"camera\":str,\"lighting\":str,"
-        "\"dialogues\":[{\"actor\":str,\"text\":str}],\"keyframe\":str}]}]}. "
-        "camera = concrete shot type + angle (e.g. 'wide shot, low angle', 'close-up'). "
-        "lighting = light + mood (e.g. 'soft golden hour', 'harsh neon'). "
-        "description = the visual content of the shot (subject + action + setting). "
-        "Sum of shot durations = scene duration; sum of scene durations = film duration. "
-        "Keep @Name references. No prose outside JSON.")
 
 
 class StoryboardTab(QWidget):
@@ -74,10 +61,16 @@ class StoryboardTab(QWidget):
                 self.mdl_vid.addItem(lbl, {"path": path})
         except Exception:                                    # noqa: BLE001
             pass
+        # 2ª architettura video: LTX-2 vs LingBot-Video (salvata nel config progetto → auto_run/handlers)
+        self.vid_arch = QComboBox(); self.vid_arch.setMinimumWidth(140)
+        self.vid_arch.addItem(tr("fs.sb.arch_ltx", "LTX-2"), "ltx")
+        self.vid_arch.addItem(tr("fs.sb.arch_lingbot", "LingBot-Video"), "lingbot")
         self.mdl_img.currentIndexChanged.connect(self._save_models)
         self.mdl_vid.currentIndexChanged.connect(self._save_models)
+        self.vid_arch.currentIndexChanged.connect(self._save_models)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_img", "Modello immagine:"))); mrow.addWidget(self.mdl_img)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_vid", "Modello video:"))); mrow.addWidget(self.mdl_vid)
+        mrow.addWidget(QLabel(tr("fs.sb.arch_vid", "Arch. video:"))); mrow.addWidget(self.vid_arch)
         from PySide6.QtWidgets import QCheckBox as _CkB
         self.chk_chain = _CkB(tr("fs.sb.chain", "🔗 Raccordo continuo"))
         self.chk_chain.setToolTip(tr("fs.sb.chain_tt", "Usa l'ultimo frame dello shot precedente come aggancio "
@@ -259,19 +252,8 @@ class StoryboardTab(QWidget):
         self.log.appendPlainText(tr("fs.sb.done", "Breakdown: {n} scene").format(n=len(data.get('scenes', []))))
 
     def _style_suffix(self, cfg: dict) -> str:
-        """Style Bible del progetto → coda iniettata in OGNI prompt (l'intenzione persistente dell'autore:
-        logline emotiva + palette + look + registi-faro). Vuoto se non impostata."""
-        sb = cfg.get("style_bible") or {}
-        bits = []
-        if sb.get("look"):
-            bits.append(sb["look"])
-        if sb.get("palette"):
-            bits.append("color palette: " + sb["palette"])
-        if sb.get("directors"):
-            bits.append("in the visual style of " + sb["directors"])
-        if sb.get("logline"):
-            bits.append("overall tone: " + sb["logline"])
-        return (", " + ", ".join(bits)) if bits else ""
+        """Style Bible → coda del prompt. Delega alla versione CONDIVISA (gen_service.style_suffix)."""
+        return gen_service.style_suffix(cfg)
 
     def _edit_style_bible(self):
         """Editor Style Bible (logline/palette/look/registi) salvato in project.config."""
@@ -308,6 +290,7 @@ class StoryboardTab(QWidget):
         cfg["img_arch"] = (im or {}).get("arch", "flux") if im else "flux"
         cfg["img_model"] = (im or {}).get("path", "") if im else ""
         cfg["vid_gguf"] = (vd or {}).get("path", "") if vd else ""
+        cfg["vid_arch"] = self.vid_arch.currentData() or "ltx"
         db.update("project", pid, config=json.dumps(cfg, ensure_ascii=False))
 
     def _load_models(self):
@@ -326,6 +309,11 @@ class StoryboardTab(QWidget):
                     idx = i; break
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
+        # architettura video salvata
+        self.vid_arch.blockSignals(True)
+        _ia = self.vid_arch.findData(cfg.get("vid_arch", "ltx"))
+        self.vid_arch.setCurrentIndex(_ia if _ia >= 0 else 0)
+        self.vid_arch.blockSignals(False)
 
     def _gen(self, what: str):
         pid = self._get_project()
@@ -347,7 +335,9 @@ class StoryboardTab(QWidget):
             _prev_vid = None                                 # ultimo shot-video della scena (per il raccordo)
             for sh in db.query("shot", "scene_id=?", (sc["id"],), order="ord"):
                 _flavor = "image" if what == "keyframe" else "video"   # B2: LoRA del flavor giusto
-                refs = gen_service.resolve_refs(sh["description"], pmode, flavor=_flavor)
+                # prompt-shot CONDIVISO con Lucky Director (gen_service.compose_shot_prompt): @ref + camera +
+                # continuity + required + Style Bible. La conversione JSON avviene poi in gen_image/gen_shot_video.
+                prompt, refs = gen_service.compose_shot_prompt(sh, state, guard, path_mode=pmode, flavor=_flavor)
                 # B4: seed per-shot — bloccato (>0) o stabile-per-shot (varia tra shot, riproducibile) invece
                 # del default fisso 7 per tutti. Congela l'identità/inquadratura di QUESTO shot.
                 _seed = int(sh.get("seed", 0) or 0) or (int(sh["id"]) * 2654435761 % (2**31 - 1))
@@ -355,10 +345,6 @@ class StoryboardTab(QWidget):
                     self.log.appendPlainText(tr("fs.sb.too_many_lora",
                         "⚠ Scena {s} shot {h}: {n} LoRA simultanee (>3) — rischio interferenza, valuta split.")
                         .format(s=sc["ord"], h=sh["ord"], n=len(refs["loras"])))
-                cam = (sh.get("camera") or "").strip()      # camera+luce dallo schema shot (prima ignorati)
-                prompt = (refs["clean_text"] + ". " + (cam + ". " if cam else "")
-                          + ct.to_prompt(state) + ((", " + required) if required else "")
-                          + self._style_suffix(guard))       # Style Bible iniettata in ogni prompt
                 outdir = str(db.project_dir(pid) / f"scene_{sc['ord']}")
                 Path(outdir).mkdir(parents=True, exist_ok=True)
                 if what == "keyframe":
@@ -376,7 +362,8 @@ class StoryboardTab(QWidget):
                     audio_path = self._shot_dialogue_audio(sh, outdir)
                     _job = {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
                             "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
-                            "model_gguf": vid_gguf, "seed": _seed, "negative": forbidden}
+                            "model_gguf": vid_gguf, "seed": _seed, "negative": forbidden,
+                            "video_arch": guard.get("vid_arch", "ltx")}
                     if chain and _prev_vid and not kfs:       # raccordo: aggancia all'ultimo frame del video prima
                         _job["chain_from"] = _prev_vid        # estratto a runtime (il precedente sarà già pronto)
                     jid = scheduler.enqueue("video", _job, owner_kind="shot", owner_id=sh["id"])
