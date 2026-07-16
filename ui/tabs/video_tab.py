@@ -120,10 +120,27 @@ class VideoTab(QWidget):
         self.nsfw.currentTextChanged.connect(self._on_nsfw)
         self.nsfw.setToolTip(tr("vid.nsfw.tt", "SFW: solo modelli sicuri. NSFW: aggiunge modelli per contenuto adulto."))
         form.addRow(tr("vid.content_lbl"), self.nsfw)
+        # --- Architettura video: LTX-2 vs LingBot-Video (2ª architettura) ---
+        # Cambiare architettura ripopola il dropdown modello e abilita/disabilita i controlli non
+        # supportati (v2v/controlnet/audio per LingBot). Vedi core.model_catalog.video_caps.
+        self.video_arch = QComboBox()
+        self.video_arch.addItem(tr("vid.arch.ltx", "LTX-2 (tutte le funzioni)"), "ltx")
+        self.video_arch.addItem(tr("vid.arch.lingbot", "LingBot-Video (MoE, qualità SOTA)"), "lingbot")
+        self.video_arch.setToolTip(tr("vid.arch.tt",
+            "LTX-2: audio nativo, controlnet, v2v, storyboard. LingBot-Video: T2V/I2V/TI2V + refiner, "
+            "prompt JSON strutturato; niente audio/controlnet/v2v."))
+        try:
+            _ia = self.video_arch.findData(user_prefs.get("video_arch", "ltx"))
+            self.video_arch.setCurrentIndex(_ia if _ia >= 0 else 0)
+        except Exception:                                       # noqa: BLE001
+            pass
+        self.video_arch.currentIndexChanged.connect(self._on_arch_changed)
+        form.addRow(tr("vid.arch_lbl", "Architettura"), self.video_arch)
         self.model = QComboBox()
         self.model.setMaxVisibleItems(20)       # fix: mostra tutti i modelli nel popup
         self.model.currentIndexChanged.connect(self._on_model_changed)
         self.model.currentIndexChanged.connect(self._update_model_star)
+        self.model.activated.connect(self._on_model_activated)   # offerta download LingBot solo su click utente
         mrow = QHBoxLayout(); mrow.setContentsMargins(0, 0, 0, 0)
         mrow.addWidget(self.model, 1)
         # filtro precisione (fp16/fp8/fp4/gguf) + colori VRAM sul dropdown modelli video
@@ -152,8 +169,15 @@ class VideoTab(QWidget):
         # FPS e Durata sulla stessa riga (compattazione richiesta)
         self.fps = QSpinBox(); self.fps.setRange(1, 60); self.fps.setValue(24)
         self.fps.setToolTip(tr("vid.fps.tt", "Frame al secondo. 24 = cinematografico, 30 = TV, 60 = fluid."))
-        self.length = QDoubleSpinBox(); self.length.setRange(1, 60); self.length.setValue(8.0); self.length.setSuffix(" s")
-        self.length.setToolTip(tr("vid.length.tt", "Durata del video in secondi."))
+        # DURATA ILLIMITATA (13/07): il cap a 60s era un limite della sola GUI — il motore sa già fare
+        # video di qualunque lunghezza con la catena autoregressiva a chunk (memory-bounded: genera,
+        # decodifica e cuce un segmento alla volta, quindi la VRAM non cresce con la durata).
+        # Oltre i 20s per passata LTX-2 non regge: sopra quella soglia si spezza in chunk in automatico.
+        self.length = QDoubleSpinBox(); self.length.setRange(1, 86400)   # fino a 24h: di fatto nessun tetto
+        self.length.setDecimals(1); self.length.setValue(8.0); self.length.setSuffix(" s")
+        self.length.setToolTip(tr("vid.length.tt",
+                                  "Durata del video in secondi. Nessun limite: oltre i 20s il video "
+                                  "viene generato a segmenti concatenati (la VRAM resta costante)."))
         fpsdur = QHBoxLayout()
         fpsdur.addWidget(QLabel(tr("vid.fps_lbl"))); fpsdur.addWidget(self.fps)
         fpsdur.addSpacing(12)
@@ -205,7 +229,29 @@ class VideoTab(QWidget):
             pass
         self.video_engine_sel.setToolTip(tr("vid.engine.tt",
             "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v."))
-        form.addRow(tr("vid.engine_lbl", "Motore video"), self.video_engine_sel)
+        self.engine_row_lbl = QLabel(tr("vid.engine_lbl", "Motore video"))
+        form.addRow(self.engine_row_lbl, self.video_engine_sel)
+        # --- Opzioni LingBot-Video (progressive disclosure: visibili solo con arch=LingBot) ---
+        self.lingbot_box = QGroupBox(tr("vid.lingbot.group", "Opzioni LingBot-Video"))
+        _lbf = QFormLayout(self.lingbot_box)
+        self.lingbot_refiner = QCheckBox(tr("vid.lingbot.refiner", "Refiner a 2 stadi (solo MoE, +qualità)"))
+        self.lingbot_refiner.setChecked(True)
+        self.lingbot_refiner.setToolTip(tr("vid.lingbot.refiner.tt",
+            "Applica il 2° DiT di raffinamento (~8 step) dopo il video base. Solo modello MoE 30B."))
+        _lbf.addRow(self.lingbot_refiner)
+        self.lingbot_rewriter = QCheckBox(tr("vid.lingbot.rewriter", "Prompt Rewriter (prosa → JSON strutturato)"))
+        self.lingbot_rewriter.setChecked(True)
+        self.lingbot_rewriter.setToolTip(tr("vid.lingbot.rewriter.tt",
+            "LingBot preferisce prompt JSON strutturati: riscrive il tuo prompt con il rewriter proprietario "
+            "(Qwen3.6-27B + LoRA) e genera anche il negative automatico. Richiede i pesi del rewriter."))
+        _lbf.addRow(self.lingbot_rewriter)
+        _lb_note = QLabel(tr("vid.lingbot.note",
+            "LingBot non supporta audio/lip-sync, ControlNet, V2V e storyboard a keyframe: quei pannelli "
+            "sono disattivati. Per il lip-sync usa MultiTalk sul video generato."))
+        _lb_note.setWordWrap(True); _lb_note.setStyleSheet("color:#74c0fc;")
+        _lbf.addRow(_lb_note)
+        self.lingbot_box.setVisible(False)
+        root.addWidget(self.lingbot_box)
         # #104 TeaCache: cache che salta gli step di denoising quasi-invariati (velocità). 0=off.
         # Conviene con MOLTI step (HQ/Pro); soglia più alta = più veloce ma più perdita qualità.
         self.teacache = QDoubleSpinBox()
@@ -315,6 +361,7 @@ class VideoTab(QWidget):
 
         self._refilter_models()
         self._on_preset(self.res_preset.currentText())
+        self._on_arch_changed()      # applica lo stato iniziale dell'architettura (LTX/LingBot)
 
     def _wrap(self, layout):
         w = QWidget(); w.setLayout(layout); return w
@@ -322,6 +369,131 @@ class VideoTab(QWidget):
     def _on_nsfw(self, *_):
         self._refilter_models()      # riselezione istantanea modelli utilizzabili
         self.lora.refresh()          # re-filtro LoRA per NSFW
+
+    # ── architettura video (LTX ↔ LingBot) ───────────────────────────────────
+    def _arch(self) -> str:
+        return (self.video_arch.currentData() if hasattr(self, "video_arch") else "ltx") or "ltx"
+
+    def _on_arch_changed(self, *_):
+        arch = self._arch()
+        try:
+            user_prefs.set("video_arch", arch)
+        except Exception:                                       # noqa: BLE001
+            pass
+        is_ling = arch == "lingbot"
+        # progressive disclosure del pannello LingBot
+        if hasattr(self, "lingbot_box"):
+            self.lingbot_box.setVisible(is_ling)
+        # abilita/disabilita i controlli SOLO-LTX con tooltip esplicativo (non li nasconde: l'utente capisce)
+        from core.model_catalog import video_caps
+        caps = video_caps(arch)
+        tip = tr("vid.arch.unavailable", "Non disponibile con l'architettura {a}").format(a=arch.upper())
+        ltx_only = [
+            (getattr(self, "v2v_panel", None), not caps["v2v"]),
+            (getattr(self, "storyboard_panel", None), not caps["storyboard"]),
+            (getattr(self, "teacache", None), is_ling),
+            (getattr(self, "video_engine_sel", None), is_ling),
+            (getattr(self, "engine_row_lbl", None), is_ling),
+            (getattr(self, "lora", None), is_ling),          # le LoRA LTX non si applicano a LingBot
+        ]
+        for w, disable in ltx_only:
+            if w is None:
+                continue
+            w.setEnabled(not disable)
+            try:
+                w.setToolTip(tip if disable else "")
+            except Exception:                                   # noqa: BLE001
+                pass
+        # ripopola il dropdown modello per l'architettura scelta
+        if is_ling:
+            self._refilter_lingbot_models()
+        else:
+            self._refilter_models()
+
+    def _refilter_lingbot_models(self):
+        """Popola il dropdown con le varianti LingBot (Dense/MoE) risolte dal catalogo pesi.
+        A differenza di LTX (file singoli) i modelli LingBot sono snapshot diffusers → voci logiche."""
+        from core import weights_catalog as wc
+        from core import model_precision as _mp
+        from PySide6.QtGui import QColor
+        entries = {e["id"]: e for e in wc.load()}
+        _free_gb = _mp.gpu_free_gb()
+        self.model.blockSignals(True)
+        self.model.clear()
+        # (id_catalogo, variante, etichetta)
+        variants = [
+            ("lingbot_dense", "dense", tr("vid.lingbot.dense", "Dense 1.3B (leggero, tutte le GPU)")),
+            ("lingbot_dense_fp8", "dense", tr("vid.lingbot.dense_fp8", "Dense 1.3B fp8 (consumer)")),
+            ("lingbot_moe_uint4", "moe", tr("vid.lingbot.moe_uint4", "MoE 30B uint4 (qualità, consumer)")),
+            ("lingbot_moe", "moe", tr("vid.lingbot.moe", "MoE 30B bf16 (qualità max, VRAM alta)")),
+        ]
+        for cat_id, variant, label in variants:
+            e = entries.get(cat_id)
+            if not e:
+                continue
+            present = False
+            model_dir = ""
+            try:
+                present = wc.is_present(e)
+                model_dir = str(wc.dest_for(e))
+            except Exception:                                   # noqa: BLE001
+                pass
+            badge = "" if present else "⬇ "                    # non scaricato → offerto al download
+            gb = e.get("approx_gb", 0)
+            self.model.addItem(f"{badge}{label}  · ~{gb}GB",
+                               {"kind": "lingbot", "variant": variant, "cat_id": cat_id,
+                                "model": model_dir if present else "", "present": present, "key": f"lingbot:{cat_id}"})
+            self.model.setItemData(self.model.count() - 1,
+                                   tr("vid.lingbot.item.tt", "LingBot {v} — {s}").format(
+                                       v=variant, s=(tr("vid.present", "presente") if present else tr("vid.missing", "da scaricare"))),
+                                   Qt.ToolTipRole)
+            if not present:
+                self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self.model.blockSignals(False)
+        # NB: NON offrire il download qui (refilter è anche programmatico) — l'offerta parte solo su
+        # selezione ESPLICITA dell'utente (model.activated → _on_model_activated), mai in automatico.
+
+    def _on_model_activated(self, *_):
+        """Solo su click utente: se ha scelto un modello LingBot non presente, offri il download."""
+        if self._arch() == "lingbot":
+            self._maybe_offer_lingbot_download()
+
+    def _maybe_offer_lingbot_download(self):
+        """Se il modello LingBot selezionato non è presente, offre il download (con barra di progresso)."""
+        data = self.model.currentData() or {}
+        if data.get("kind") != "lingbot" or data.get("present"):
+            return
+        cat_id = data.get("cat_id")
+        from PySide6.QtWidgets import QMessageBox
+        r = QMessageBox.question(
+            self, tr("vid.lingbot.dl.title", "Scaricare il modello LingBot?"),
+            tr("vid.lingbot.dl.msg", "Il modello '{m}' non è ancora scaricato. Vuoi scaricarlo ora?").format(
+                m=data.get("cat_id", "")),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if r == QMessageBox.Yes and cat_id:
+            self._download_lingbot(cat_id)
+
+    def _download_lingbot(self, cat_id: str):
+        """Scarica un peso del catalogo via scripts/download_weights.py con dialog di progresso (non blocca la UI)."""
+        import sys
+        from pathlib import Path
+        from PySide6.QtCore import QProcess
+        from PySide6.QtWidgets import QProgressDialog
+        script = str(Path(__file__).resolve().parents[2] / "scripts" / "download_weights.py")
+        dlg = QProgressDialog(tr("vid.lingbot.dl.progress", "Scaricamento {m}…").format(m=cat_id),
+                              tr("common.cancel", "Annulla"), 0, 0, self)
+        dlg.setWindowTitle(tr("vid.lingbot.dl.title", "Scaricamento LingBot"))
+        dlg.setMinimumWidth(420)
+        proc = QProcess(self)
+        proc.setProcessChannelMode(QProcess.MergedChannels)
+
+        def _fin(*_):
+            dlg.close()
+            self._refilter_lingbot_models()                     # riflette la nuova presenza
+        proc.finished.connect(_fin)
+        dlg.canceled.connect(proc.kill)
+        proc.start(sys.executable, ["-u", script, "--ids", cat_id])
+        dlg.show()
 
     def _resolve_model_path(self, name: str) -> str | None:
         """Risolve il nome relativo del modello video al path assoluto (per la detection header)."""
@@ -735,10 +907,19 @@ class VideoTab(QWidget):
             "refine_hr": self.refine_hr.isChecked(),
             "i2v_method": self.i2v_method.currentData() or "addguide",
             "teacache_thresh": float(self.teacache.value()) if hasattr(self, "teacache") else 0.0,
+            "video_arch": self._arch(),
         }
         sel_data = self.model.currentData() or {"kind": "auto"}
         kind = sel_data.get("kind")
-        if kind == "gguf":
+        if kind == "lingbot":
+            # LingBot: model = cartella diffusers (vuota → il worker risolve dal catalogo), variante + refiner
+            v["model_kind"] = "lingbot"
+            v["model"] = sel_data.get("model", "")
+            v["lingbot_variant"] = sel_data.get("variant", "dense")
+            v["run_refiner"] = bool(getattr(self, "lingbot_refiner", None) and self.lingbot_refiner.isChecked()
+                                    and sel_data.get("variant") == "moe")
+            v["lingbot_rewriter"] = bool(getattr(self, "lingbot_rewriter", None) and self.lingbot_rewriter.isChecked())
+        elif kind == "gguf":
             v["model_kind"] = "gguf"
             v["model_gguf"] = sel_data.get("model")
             v["model"] = sel_data.get("model", "")

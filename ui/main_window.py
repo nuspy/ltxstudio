@@ -11,7 +11,7 @@ from PySide6.QtGui import QPixmap, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTabWidget, QPushButton,
     QLabel, QProgressBar, QPlainTextEdit, QMessageBox, QProgressDialog, QApplication,
-    QMenu, QToolButton, QSplitter,
+    QMenu, QToolButton, QSplitter, QInputDialog,
 )
 
 from ui.i18n_manager import tr, i18n, LANGUAGES, LANG_FLAGS
@@ -255,7 +255,9 @@ class _VideoEditAIWorker(QThread):
                       "edit_lora": cfg["edit_lora"], "control_strength": float(cfg.get("strength", 1.0)),
                       "width": int(cfg.get("width", 512)), "height": int(cfg.get("height", 320)),
                       "num_frames": int(cfg.get("num_frames", 25)), "fps": int(cfg.get("fps", 25)),
-                      "seed": 42, "offload": "cpu", "output": out}
+                      # niente offload forzato: 'cpu' = block-streaming = pinned memory ⇒ SEGFAULT
+                      # col pagefile da 16GB. In auto il worker sceglie residente (più veloce). (13/07)
+                      "seed": 42, "output": out}
             if cfg["mode"] == "inpaint":                       # #59 parametri inpaint dalla GUI
                 params["control_strength"] = float(cfg.get("guide", 0.4))
                 params["cfg_scale"] = float(cfg.get("cfg_scale", 6.0))
@@ -453,13 +455,26 @@ class _NativeLtx2Worker(QThread):
         """#91: termina il subprocess del worker (anti-orfano VRAM). Windows: kill dell'albero."""
         _kill_proc_tree(getattr(self, "proc", None))
 
+    LINGBOT_PY = r"E:\AI\Tools\lingbot_venv\Scripts\python.exe"
+
     def run(self):
         import json as _json, os as _os, subprocess as _sp, tempfile as _tf
         try:
-            worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "ltx2_infer.py")
-            if not _os.path.exists(self.LTX2_PY):
-                self.done.emit({"status": "error", "error": f"venv ltx2 mancante: {self.LTX2_PY}"})
-                return
+            # arch = "lingbot" → 2ª architettura (venv + worker dedicati); default LTX-2.
+            _arch = (self.params.get("arch") or "ltx").lower()
+            if _arch == "lingbot":
+                py = self.LINGBOT_PY
+                worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "lingbot_infer.py")
+                if not _os.path.exists(py):
+                    self.done.emit({"status": "error",
+                                    "error": f"venv LingBot mancante: {py}. Esegui scripts/install_lingbot.py"})
+                    return
+            else:
+                py = self.LTX2_PY
+                worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "ltx2_infer.py")
+                if not _os.path.exists(py):
+                    self.done.emit({"status": "error", "error": f"venv ltx2 mancante: {py}"})
+                    return
             # #4 separazione voce (Canta): isola i vocals dalla canzone PRIMA del lip-sync (in-process,
             # venv comfy con demucs). Fail-safe: se fallisce, resta l'audio originale.
             if self.params.pop("_sep_vocals", False) and self.params.get("audio_path"):
@@ -476,7 +491,7 @@ class _NativeLtx2Worker(QThread):
             env = dict(_os.environ)
             env["HF_HUB_OFFLINE"] = "1"
             env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-            proc = _sp.Popen([self.LTX2_PY, "-u", worker, jf.name], env=env,
+            proc = _sp.Popen([py, "-u", worker, jf.name], env=env,
                              stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
             self.proc = proc                                # #91: esposto per stop() alla chiusura
             out_path = None
@@ -1281,6 +1296,45 @@ class MainWindow(QMainWindow):
         except Exception as e:                   # noqa: BLE001
             self._log(f"[Nativo] auto-avvio errore: {e}")
 
+    def _ensure_native_ready(self, timeout: int = 180) -> bool:
+        """Il backend nativo DEVE esserci quando premi Genera: se è caduto lo riavvia invece di
+        sbatterti in faccia un errore. Mostra l'attesa (dialog annullabile) e ritorna True quando è
+        pronto. L'errore compare solo se il riavvio fallisce davvero — allora c'è un problema vero.
+
+        Il riavvio in sé sta in `native_driver.ensure_up()` (senza Qt, così vale anche per Film Studio,
+        API e servizi): qui lo eseguiamo in un thread per non congelare la finestra.
+        """
+        import concurrent.futures
+        import time as _time
+        from core import native_driver
+        if native_driver.is_up():
+            return True
+        if getattr(self, "_native_restarting", False):
+            return False                                    # riavvio già in corso: niente doppioni
+        self._native_restarting = True
+        dlg = QProgressDialog(tr("mw.native_restart_msg"), tr("mw.native_restart_cancel"), 0, 0, self)
+        dlg.setWindowTitle(tr("mw.native_restart_title"))
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.show()
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(native_driver.ensure_up, timeout=float(timeout), log=self._log)
+                while not fut.done():
+                    QApplication.processEvents()
+                    if dlg.wasCanceled():
+                        self._log("[Nativo] riavvio annullato — il server continua a partire in background.")
+                        return False                        # il thread finisce da solo: niente kill a metà avvio
+                    _time.sleep(0.05)
+                ok = bool(fut.result())
+        finally:
+            self._native_restarting = False
+            dlg.close()
+        if not ok:
+            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
+                                tr("mw.native_restart_failed_msg").format(timeout=timeout))
+        return ok
+
     def _ensure_flux2_encoder(self, unet: str | None) -> bool:
         """Pre-check FLUX.2: se il modello è FLUX.2 e il suo encoder testo manca, OFFRE di scaricarlo
         (Comfy-Org via huggingface_hub). Ritorna True se si può procedere (encoder presente o appena
@@ -1467,20 +1521,13 @@ class MainWindow(QMainWindow):
             ss.set_encoder_availability(_tes)
 
     def _video_gguf_models(self, oi: dict) -> list[str]:
-        """Raccoglie i loader GGUF supportati dal workflow video, se presenti in ComfyUI."""
-        out: list[str] = []
-        for cls, inp in (("GGUFLoaderKJ", "model_name"), ("UnetLoaderGGUF", "unet_name")):
-            spec = oi.get(cls, {}).get("input", {}).get("required", {}).get(inp)
-            if not isinstance(spec, list) or not spec:
-                continue
-            head = spec[0]
-            options = head if isinstance(head, list) else (
-                spec[1].get("options", []) if head == "COMBO" and len(spec) > 1
-                and isinstance(spec[1], dict) else [])
-            for name in options:
-                if name not in out:
-                    out.append(name)
-        return out
+        """VUOTA: i GGUF VIDEO sono stati rimossi dal prodotto (13/07).
+
+        Restavano nel dropdown del tab Video e venivano ereditati da Music Video / Film Studio: chi li
+        sceglieva otteneva ~500 s/step (dequant per-forward) invece di ~4, e col Q6_K l'OOM. Il video
+        usa SEMPRE l'fp8. (I GGUF delle IMMAGINI — FLUX Fill inpaint — non sono toccati.)
+        """
+        return []
 
     def _log(self, msg: str):
         # THREAD-SAFE: appendPlainText tocca un QWidget → deve girare SOLO sul thread GUI. I job a subprocess
@@ -1992,8 +2039,6 @@ class MainWindow(QMainWindow):
         from core import backend
         if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
-        if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
         cfg = self.frame1_tab.get_inpaint_config()
@@ -2082,13 +2127,12 @@ class MainWindow(QMainWindow):
         from core import backend
         if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
-        if not self.frame1_tab.image_path:
-            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_base_photo_canvas_msg")); return
+        # Foto di base: dal nuovo campo della tab, oppure — se vuoto — quella già nel canvas.
+        if not self._resolve_photo(self.frame1_tab.get_inpaint_config().get("integrate_photo", "")):
+            return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
-        if not self.frame1_tab.canvas.has_layers():
-            QMessageBox.information(self, tr("mw.no_image_to_integrate_title"),
-                                    tr("mw.no_image_to_integrate_msg")); return
+        self._layers_from_compose_list()          # le foto della lista laterale ENTRANO nel canvas
         cfg = self.frame1_tab.get_inpaint_config()
         engine = cfg.get("integrate_engine", "kontext")
         # Modello deciso dall'utente nel combo (contestuale all'engine selezionato).
@@ -2114,7 +2158,7 @@ class MainWindow(QMainWindow):
             if not exp.get("has_region"):
                 QMessageBox.information(self, tr("mw.nothing_to_integrate_title"),
                                         tr("mw.nothing_to_integrate_msg")); return
-            self._inpaint_bbox = None
+            self._inpaint_bbox = None                   # Integra lavora sull'intera scena (niente crop)
             self._inpaint_before = exp.get("image")     # confronto prima/dopo (composito di partenza)
             img_name = self._upload_local(exp["image"])
             # Campi dedicati alla sezione Integra (separati da quelli di inpaint/outpaint).
@@ -2142,6 +2186,52 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, tr("mw.integrate_error_title"), str(e)); self._log(f"[ERR] integrate: {e}")
 
+    def _layers_from_compose_list(self) -> int:
+        """Porta sul canvas le foto elencate nella lista laterale, con la loro maschera.
+
+        Erano il buco di «Integra»: le foto della lista non erano layer del canvas, e Integra guarda
+        solo i layer → chiedeva «aggiungi una o più immagini» anche quando la lista era piena. Le
+        aggiungiamo solo se il canvas non ha già dei layer (altrimenti raddoppieremmo gli oggetti che
+        hai posizionato a mano) e ci fermiamo a quelle non ancora presenti. Ritorna quante ne ha messe.
+        """
+        canvas = self.frame1_tab.canvas
+        if canvas.has_layers():
+            return 0
+        cc = self.frame1_tab.get_compose_config()
+        imgs = [p for p in cc.get("images", []) if p and os.path.exists(p)]
+        masks = cc.get("masks", {})
+        added = 0
+        for i, p in enumerate(imgs):
+            if canvas.add_layer(p, masks.get(p), index=i):
+                added += 1
+        if added:
+            self._log(f"[integra] {added} foto dalla lista portate sul canvas (con le loro maschere) — "
+                      f"spostale/ridimensionale, poi rilancia se vuoi cambiarne la posa.")
+        return added
+
+    def _resolve_photo(self, chosen: str) -> bool:
+        """Risolve la FOTO DI BASE di «Integra»: campo della tab → canvas.
+
+        Se il campo è VUOTO la base è la foto già nel canvas; se l'utente ne ha scelta una col campo
+        file, la CARICHIAMO nel canvas — così maschere, layer e anteprima lavorano tutti sulla stessa
+        immagine. Ritorna False (con avviso) solo se non c'è né l'una né l'altra. Inpaint/outpaint non
+        passano di qui: la loro base è per definizione la foto su cui hai disegnato la maschera.
+        """
+        chosen = (chosen or "").strip()
+        if chosen:
+            if not os.path.exists(chosen):
+                QMessageBox.warning(self, tr("mw.no_image_title"),
+                                    tr("mw.photo_not_found", "Foto non trovata:\n{p}").format(p=chosen))
+                return False
+            if os.path.abspath(chosen) != os.path.abspath(self.frame1_tab.image_path or ""):
+                self.frame1_tab.canvas.load_image(chosen)     # diventa la base del canvas
+                self._log(f"[foto] uso la foto scelta: {os.path.basename(chosen)}")
+            return True
+        if not self.frame1_tab.image_path:
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg"))
+            return False
+        return True                                           # campo vuoto → foto del canvas
+
     def generate_compose(self):
         """Componi 2+ foto SEPARATE in un'unica immagine senza incollarle (niente occlusione):
         multi-reference (catena ReferenceLatent) o stitch (affianca). FLUX.1 (Kontext) o FLUX.2.
@@ -2153,6 +2243,26 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
         cfg = self.frame1_tab.get_compose_config()
         imgs = cfg.get("images") or []
+        # LISTA VUOTA ⇒ usa il CANVAS: base = foto del canvas, elementi = i suoi LAYER, ognuno con la
+        # SUA maschera e con posizione/scala/rotazione date dall'utente. È l'unico modo di rispettare
+        # davvero il layout: nessun modello FLUX ha un conditioning spaziale per i riferimenti — la
+        # geometria va "cotta" nei pixel e nella maschera (paste-then-refine). export_integrate() fa
+        # esattamente questo: composito con le trasformazioni + maschere per-layer + anello di edit.
+        if not imgs:
+            if not self.frame1_tab.image_path:
+                QMessageBox.information(self, tr("f1.compose.group"),
+                                        tr("mw.compose_need_canvas_msg",
+                                           "Aggiungi foto alla lista, oppure carica una foto nel canvas "
+                                           "e incollaci sopra i layer da comporre."))
+                return
+            if not self.frame1_tab.canvas.has_layers():
+                QMessageBox.information(self, tr("f1.compose.group"),
+                                        tr("mw.compose_need_layers_msg",
+                                           "Il canvas non ha layer da comporre. Importa le foto sul canvas "
+                                           "(posizionale/ruotale, disegna la loro maschera) oppure usa la lista."))
+                return
+            self._log("[componi] lista vuota → uso il canvas: base + layer con maschere e trasformazioni")
+            return self.generate_integrate()                  # stessa meccanica: paste-then-refine
         if len(imgs) < 2:
             QMessageBox.information(self, tr("f1.compose.group"), tr("mw.compose_need_two_msg")); return
         engine = cfg.get("engine", "kontext")
@@ -2561,10 +2671,7 @@ class MainWindow(QMainWindow):
     def _start_native_image(self, cfg, v, loras, seed, negative):
         """Genera un'immagine via backend nativo (InferenceServer) invece di ComfyUI."""
         from core import native_driver
-        if not native_driver.is_up():
-            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
-                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde. "
-                   "Avvialo, oppure rimetti il backend 'image' su ComfyUI."))
+        if not self._ensure_native_ready():   # caduto? lo riavvia da sé
             return
         params = {"model": cfg["model"], "arch": cfg["arch"], "prompt": cfg["prompt"],
                   "negative": negative, "width": v["width"], "height": v["height"],
@@ -2745,6 +2852,24 @@ class MainWindow(QMainWindow):
                 params.pop("image_path", None)        # i keyframe sostituiscono il singolo frame iniziale
                 self._log(f"[nativo] storyboard: {len(kfs)} keyframe a tempo → video multi-scena")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        # ── 2ª ARCHITETTURA: LingBot-Video ──────────────────────────────────────────────
+        # Se l'utente ha scelto LingBot nel tab Video, instrada al worker dedicato e salta tutta la
+        # logica motore/GGUF LTX (LingBot ha il suo venv + gestione memoria). Prompt JSON + rewriter
+        # sono gestiti a monte (Fase 5) se abilitati.
+        if vals.get("video_arch") == "lingbot":
+            params["arch"] = "lingbot"
+            params["lingbot_variant"] = vals.get("lingbot_variant", "dense")
+            if vals.get("run_refiner"):
+                params["run_refiner"] = True
+            params.pop("gguf_transformer", None)                # LingBot non usa i GGUF LTX
+            self._log(f"[lingbot] LingBot-Video ({params['lingbot_variant']}, "
+                      f"refiner={'on' if params.get('run_refiner') else 'off'}): "
+                      f"{params['width']}x{params['height']} {nf} frame")
+            self._ltx2_worker = _NativeLtx2Worker(params)
+            self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
+            self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
+                          on_progress=lambda s: self._log("[lingbot] " + s))
+            return
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
         # SELETTORE MOTORE VIDEO: default 'ltx2_infer' (tutte le feature). 'comfy' = comfy-native
@@ -2823,7 +2948,8 @@ class MainWindow(QMainWindow):
             "regenerate_video": True, "regenerate_audio": bool(v2v.get("v2v_regen_audio", False)),
             "steps": int(self.video_tab.sampler_seed.steps.value()), "guidance": float(self.video_tab.sampler_seed.cfg.value()),
             "seed": int(vals.get("seed", self.video_tab.sampler_seed.seed.value())),   # #95 V1: seed randomizzato
-            "offload": "cpu", "output": out,
+            # niente offload forzato: 'cpu' = pinned memory ⇒ SEGFAULT col pagefile da 16GB (13/07)
+            "output": out,
         }
         self._log(f"[nativo] ReTake [{params['start_time']:.1f}–{params['end_time']:.1f}]s su {Path(src).name}…")
         self._ltx2_worker = _NativeLtx2Worker(params)
@@ -2970,7 +3096,8 @@ class MainWindow(QMainWindow):
             "width": _r64x(v.get("width", 512)), "height": _r64x(v.get("height", 512)),
             "num_frames": nf, "fps": fps, "steps": ext_steps,
             "guidance": float(self.video_tab.sampler_seed.cfg.value()), "seed": _seed,
-            "offload": "cpu", "ref_strength": 1.0, "output": cont,
+            # niente offload forzato: 'cpu' = pinned memory ⇒ SEGFAULT col pagefile da 16GB (13/07)
+            "ref_strength": 1.0, "output": cont,
         }
         # seg_seconds → dimensione del chunk in-process (memory-bounded) per estensioni lunghe;
         # il worker segmenta quando num_frames > chunk_frames (continuità via ultimo frame).
@@ -3014,7 +3141,11 @@ class MainWindow(QMainWindow):
         if not img and src:                              # talk da video → estrai il primo frame
             img = str(OUTPUT_DIR / f"_talk_src_{int(_t.time())}.png")
             _sp.run(["ffmpeg", "-v", "error", "-i", src, "-vframes", "1", img, "-y"], check=False)
-        nf = int(params.get("num_frames", 121))
+        fps = int(params.get("fps", 25) or 25)               # NameError: 'fps' era usato più sotto senza esistere
+        nf = int(params.get("num_frames", 121) or 0)
+        if nf < 9:                                           # durata 0/assente → il video usciva a 0s (o crash)
+            nf = max(9, int(round(float(params.get("seconds", 5) or 5) * fps)) // 8 * 8 + 1)
+            self._log(f"[lip-sync] durata non valida → uso {nf} frame ({nf / fps:.1f}s)")
         _r64m = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: dimensioni multiple di 64
         _mt_seed = params.get("seed")                        # #95 V3: seed dal chiamante (re-roll possibile), altrimenti random
         _mt_seed = int(_mt_seed) if _mt_seed is not None else random.randint(0, 2**31)
@@ -3023,9 +3154,12 @@ class MainWindow(QMainWindow):
             "prompt": params.get("prompt", ""),
             "negative": params.get("negative", "") or "worst quality, blurry",
             "width": _r64m(params.get("width", 512)), "height": _r64m(params.get("height", 512)),
-            "num_frames": nf, "fps": int(params.get("fps", 25)),
+            "num_frames": nf, "fps": fps,
             "steps": int(params.get("steps", 8)), "guidance": float(params.get("guidance", 3.0)),
-            "seed": _mt_seed, "offload": "cpu",
+            # NIENTE "offload": "cpu" — il block-streaming carica i pesi in PINNED MEMORY e col pagefile
+            # da 16GB l'allocazione fallisce ⇒ SEGFAULT (exit 139) dopo un denoise perfetto, senza mp4.
+            # In auto il worker tiene il transformer residente: niente crash e ~3× più veloce. (13/07)
+            "seed": _mt_seed,
             # #4 forza dell'audio sul video (sing_audio_scale) → modality_scale del guider audio (G5: default 2.0
             # coerente con la GUI; il canto usa il valore del pannello, il talk 2.0).
             "audio_scale": float(params.get("audio_scale", 2.0) or 2.0),
@@ -3052,7 +3186,8 @@ class MainWindow(QMainWindow):
         _chunk = max(9, _chunk // 8 * 8 + 1)
         if nf > _chunk:
             nat["chunk_frames"] = _chunk
-        self._log(f"[lip-sync nativo] a2v LTX-2 GGUF — {nf} frame {nat['width']}x{nat['height']}…")
+        self._log(f"[lip-sync nativo] a2v LTX-2 fp8 — {nf} frame ({nf / fps:.1f}s) "
+                  f"{nat['width']}x{nat['height']}…")
         self._mt_worker = _NativeLtx2Worker(nat)
         self._enqueue(tr("queue.job.lipsync", "Lip-sync"), self._mt_worker, self._on_multitalk_done,
                       on_progress=lambda s: self._log("[lip-sync] " + s))
@@ -3283,10 +3418,7 @@ class MainWindow(QMainWindow):
         import os
         from core import native_driver
         from core.inpaint_pipeline import InpaintPipeline
-        if not native_driver.is_up():
-            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
-                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde. "
-                   "Avvialo, oppure rimetti il backend 'image' su ComfyUI."))
+        if not self._ensure_native_ready():   # caduto? lo riavvia da sé
             return
         model = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
         # FLUX.2 Klein (miraclein) = arch distillata edit-instruct con encoder Qwen3: instradata a
@@ -3327,25 +3459,55 @@ class MainWindow(QMainWindow):
         import os
         from core import native_driver
         from core.kontext_pipeline import KONTEXT_MODEL
-        if not native_driver.is_up():
-            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
-                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde."))
+        if not self._ensure_native_ready():   # caduto? lo riavvia da sé
             return
         if not prompt:
-            prompt = ("Seamlessly integrate the added object into the scene: match the lighting, "
-                      "shadows, color and perspective so it looks naturally part of the photo.")
+            # IL PROMPT DEVE NOMINARE L'OGGETTO. Non è un dettaglio: con "the added object" il modello non
+            # sa cosa ha davanti e lo REINVENTA (a parità di tutto il resto, al posto del calice mi ha
+            # prodotto un aggeggio bianco con una faccina). Nominandolo — "wine glass" — la stessa identica
+            # generazione, stesso seed, restituisce la mano che lo tiene. Quindi lo chiediamo, non lo
+            # indoviniamo. NB "fingers wrapping around it" fa generare VETRI IN FRANTUMI: frase piana.
+            what, ok = QInputDialog.getText(
+                self, tr("mw.integrate_what_title", "Che cosa stai inserendo?"),
+                tr("mw.integrate_what_msg",
+                   "Descrivi in poche parole l'oggetto aggiunto (in inglese rende meglio):\n"
+                   "es. «a glass of white wine», «a leather handbag», «a cat»"))
+            what = (what or "").strip()
+            if ok and what:
+                prompt = (f"the hand holds {what}; match the lighting, shadows, color and perspective "
+                          f"so it looks like a real part of the photo; photorealistic")
+            else:
+                prompt = ("the hand holds the added object naturally; match the lighting, shadows, color "
+                          "and perspective so it looks like a real part of the photo; photorealistic")
+            self._log(f"[integra] prompt: {prompt}")
         # INTEGRA MASK-BASED: se il canvas ha esportato la maschera della zona-edit, usa INPAINT
         # (FLUX Fill) su quella regione → rigenera/fonde l'oggetto nella scena (luce/ombre/bordi)
         # invece del kontext senza maschera (che preservava l'oggetto = solo posizionato). Vedi
         # export_integrate (oggetto-seme + alone bianco) + [[video-edit-inpaint-nativo]].
         mask = exp.get("mask")
         if mask and os.path.exists(mask):
-            # Usa il MODELLO SCELTO dall'utente (dropdown integra); FLUX_DEV_Fill solo se non ne ha scelto uno.
-            _fill = model or r"Flux\FLUX_DEV_Fill.safetensors"
-            fill = _fill if os.path.isabs(_fill) else os.path.join(r"E:\AI\Models\diffusion_models", _fill)
-            params = {"model": fill, "arch": "inpaint", "prompt": prompt, "negative": negative,
+            # MODELLO: il dropdown dell'utente comanda; il DEFAULT è un FLUX normale, NON il Fill.
+            # È la differenza fra integrare e tirare a sorte: il Fill ignora ciò che sta sotto la maschera
+            # e rigenera da zero (a parità di seed ho ottenuto una mano col calice, vetri in frantumi e un
+            # paesaggio). Un FLUX normale entra in FluxInpaintPipeline, che ha `strength`: parte dai TUOI
+            # pixel e li reinterpreta quanto basta — è il SetLatentNoiseMask della vecchia IntegratePipeline
+            # (ComfyUI, 3/06), quella che davvero piegava il braccio e chiudeva le dita sull'oggetto.
+            _m = model or r"Flux\FLUX_Dev.safetensors"
+            mp = _m if os.path.isabs(_m) else os.path.join(r"E:\AI\Models\diffusion_models", _m)
+            params = {"model": mp, "arch": "inpaint", "prompt": prompt, "negative": negative,
                       "image_path": exp["image"], "mask_path": mask,
-                      "steps": max(steps, 20), "guidance": 18.0, "seed": seed}   # 30→18: evita over-guidance ("ghepardo")
+                      # guidance ≥3.5 (standard FLUX): col 2.5 ereditato dal tab (tarato per Kontext) il
+                      # modello si allontana dal prompt e reinventa l'oggetto.
+                      "steps": max(steps, 25), "guidance": max(3.5, float(guidance or 0)), "seed": seed,
+                      # DENOISE 0.65 — misurato: a 0.55 l'oggetto resta incollato (nessuna mano), a 0.75
+                      # il modello lo cancella. A 0.65 la mano lo afferra e l'oggetto resta il tuo.
+                      "denoise": float(cfg.get("integrate_denoise") or 0.65),
+                      # FEATHER AMPIO (default inpaint 6px): il backend ricompone i pixel originali fuori
+                      # maschera; con la zona-edit larga un bordo netto disegna un RIQUADRO visibile.
+                      "feather": 48}
+            # NB: niente change-map (Differential Diffusion) qui — provata il 13/07 e RIMOSSA: peggiorava
+            # il risultato rispetto all'alone bianco + maschera larga di export_integrate. Il supporto nel
+            # backend resta (params["change_map"]), ma non lo alimentiamo.
             self._log(f"Integra mask-based (modello={os.path.basename(fill)}, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
         else:
             unet = model or KONTEXT_MODEL
@@ -3371,9 +3533,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"),
                                     tr("vid.pulid_kf.no_face", "Scegli prima una o più foto del volto.")); return
         from core import native_driver
-        if not native_driver.is_up():
-            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
-                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde.")); return
+        if not self._ensure_native_ready():   # caduto? lo riavvia da sé
+            return
         vals = self.video_tab.get_values()
         gc = self.frame1_tab.get_gen_config()
         model = gc.get("model") if gc.get("arch") == "flux" else None   # riusa il modello FLUX di Frame1
@@ -3434,9 +3595,7 @@ class MainWindow(QMainWindow):
     def _start_native_upscale(self, model, scale, image_path=None):
         """Upscale via backend NATIVO (ESRGAN/spandrel) — niente ComfyUI."""
         from core import native_driver
-        if not native_driver.is_up():
-            QMessageBox.warning(self, tr("mw.native_off_title", "Backend nativo offline"),
-                tr("mw.native_off_msg", "L'InferenceServer nativo (porta 8189) non risponde."))
+        if not self._ensure_native_ready():   # caduto? lo riavvia da sé
             return
         params = {"model": model, "arch": "upscale", "image_path": image_path or self.frame1_tab.image_path,
                   "target_scale": float(scale), "seed": 0}
