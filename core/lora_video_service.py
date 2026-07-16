@@ -9,7 +9,7 @@ Best practice automatizzate:
 - Dataset MISTO: oltre ai clip generati si possono includere video/foto REALI dell'utente.
 - Preprocess + training con il trainer UFFICIALE LTX-2 (packages/ltx-trainer), config low-VRAM.
 
-Zero ComfyUI. I clip video si generano col motore nativo (worker ltx2_infer, GGUF); i keyframe
+Zero ComfyUI. I clip video si generano col motore nativo (worker ltx2_infer, fp8 auto); i keyframe
 PuLID col server immagini nativo (:8189). Pensato per un worker GUI (callback progress) o CLI.
 """
 from __future__ import annotations
@@ -21,13 +21,13 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from core import lora_coverage
+from core import lora_coverage, ltx_video_job
 
 REPO = Path(__file__).resolve().parents[1]
 LTX2_PY = r"E:\AI\Tools\ltx2_venv\Scripts\python.exe"
-LTX2_WORKER = str(REPO / "workers" / "ltx2_infer.py")
 TRAIN_RUN = str(REPO / "workers" / "ltx_train_run.py")
-GGUF = r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf"
+# NB: nessuna costante GGUF di default. Il GGUF si usa SOLO se scelto dall'utente (passa da
+# core/ltx_video_job): forzarlo costava ~500 s/step (dequant per-forward) e OOM col modello residente.
 TRAINER_DIR = r"E:\AI\Tools\LTX-2\packages\ltx-trainer"
 LTX_CKPT = r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\ltx-2.3-22b-dev-fp8.safetensors"
 GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"
@@ -152,6 +152,9 @@ def _gen_keyframe_pulid(photo: str, prompt: str, out_png: str, width: int, heigh
         "arch": "flux", "prompt": prompt, "negative": NEG,
         "pulid_face": photo, "pulid_strength": strength,
         "width": width, "height": height, "steps": 18, "guidance": 3.5, "seed": 7,
+        # STICKY: i keyframe si generano UNO PER CLIP, in serie. Senza, il transformer viene rimesso
+        # in GPU a ogni keyframe (~5s di warmup a testa). Residente: ~24s → ~5s. (13/07)
+        "placement_mode": "sticky",
         "output": out_png,
     }, timeout=600)
     p = res.get("output") or out_png
@@ -160,35 +163,33 @@ def _gen_keyframe_pulid(photo: str, prompt: str, out_png: str, width: int, heigh
     return os.path.exists(out_png)
 
 
+def _clip_extra(source_arch: str, base: dict | None = None) -> dict:
+    """extra per ltx_video_job.generate: aggiunge i campi LingBot se il motore-sorgente è lingbot."""
+    e = dict(base or {})
+    if source_arch == "lingbot":
+        e["lingbot_variant"] = "dense"                       # dataset: Dense = veloce, sufficiente per i clip
+    return e
+
+
 def _gen_clip(cond_image: str, prompt: str, out_mp4: str, width: int, height: int,
-              num_frames: int, fps: int) -> None:
-    params = {
-        "image_path": cond_image, "gguf_transformer": GGUF, "prompt": prompt, "negative": NEG,
-        "width": width, "height": height, "num_frames": num_frames, "fps": fps,
-        "steps": 8, "guidance": 3.0, "seed": 7, "offload": "cpu", "ref_strength": 1.0, "output": out_mp4,
-    }
-    jf = out_mp4 + ".json"
-    json.dump(params, open(jf, "w"))
-    env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
-    if not os.path.exists(out_mp4):
-        raise RuntimeError("clip fallita: " + (r.stdout[-400:] + r.stderr[-400:]))
+              num_frames: int, fps: int, source_arch: str = "ltx") -> None:
+    # policy video (#158: niente GGUF forzato) in un solo posto → core/ltx_video_job
+    # source_arch: motore che GENERA i clip del dataset (ltx o lingbot) — indipendente dal target LoRA (#8)
+    ltx_video_job.generate(
+        output=out_mp4, image_path=cond_image, prompt=prompt, negative=NEG,
+        width=width, height=height, num_frames=num_frames, fps=fps,
+        steps=8, guidance=3.0, seed=7, arch=source_arch, extra=_clip_extra(source_arch, {"ref_strength": 1.0}),
+    )
 
 
 def _gen_clip_kf(keyframes: list[dict], prompt: str, out_mp4: str, width: int, height: int,
-                 num_frames: int, fps: int) -> None:
+                 num_frames: int, fps: int, source_arch: str = "ltx") -> None:
     """Clip con keyframe multipli (foto/angoli a frame diversi) = rotazione/angoli coerenti."""
-    params = {
-        "keyframes": keyframes, "gguf_transformer": GGUF, "prompt": prompt, "negative": NEG,
-        "width": width, "height": height, "num_frames": num_frames, "fps": fps,
-        "steps": 8, "guidance": 3.0, "seed": 7, "offload": "cpu", "output": out_mp4,
-    }
-    jf = out_mp4 + ".json"
-    json.dump(params, open(jf, "w"))
-    env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    r = subprocess.run([LTX2_PY, "-u", LTX2_WORKER, jf], env=env, capture_output=True, text=True)
-    if not os.path.exists(out_mp4):
-        raise RuntimeError("clip multi-keyframe fallita: " + (r.stdout[-400:] + r.stderr[-400:]))
+    ltx_video_job.generate(                                  # stessa policy centralizzata
+        output=out_mp4, keyframes=keyframes, prompt=prompt, negative=NEG,
+        width=width, height=height, num_frames=num_frames, fps=fps,
+        steps=8, guidance=3.0, seed=7, arch=source_arch, extra=_clip_extra(source_arch),
+    )
 
 
 def _face_crop(mp4: str, target_w: int, target_h: int, margin: float = 2.4) -> None:
@@ -282,7 +283,7 @@ def _recaption_clips(dataset_dir: str, engine: str, mode: str, trigger: str, log
 def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 768, height: int = 512,
                      clip_seconds: float = 3.0, fps: int = 25, use_pulid: bool = True,
                      caption_engine: str = "procedural", caption_mode: str = "descriptive",
-                     progress=None) -> dict:
+                     source_arch: str = "ltx", progress=None) -> dict:
     """Genera i clip (con caption .txt) per tutti i soggetti + include il materiale reale.
     caption_engine: 'procedural' | 'joycaption' | 'florence2' (VLM → ricaptiona via frame). Ritorna {dir, clips}."""
     def log(m):
@@ -304,7 +305,7 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
                 if len(seq) >= 2:                            # ROTAZIONE multi-keyframe (angoli coerenti)
                     kfs = [{"path": ph, "frame": int(j * (nf - 1) / (len(seq) - 1)), "strength": 1.0}
                            for j, ph in enumerate(seq)]
-                    _gen_clip_kf(kfs, clip["prompt"], out_mp4, width, height, nf, fps)
+                    _gen_clip_kf(kfs, clip["prompt"], out_mp4, width, height, nf, fps, source_arch)
                 else:
                     cond = clip.get("ref") or s.photo
                     if clip["use_face"] and use_pulid and cond:   # keyframe PuLID = somiglianza forte
@@ -316,7 +317,7 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
                     if not cond:
                         log(f"  [skip] '{stem}': nessuna foto (serve almeno una foto del soggetto)")
                         continue
-                    _gen_clip(cond, clip["prompt"], out_mp4, width, height, nf, fps)
+                    _gen_clip(cond, clip["prompt"], out_mp4, width, height, nf, fps, source_arch)
                 if clip.get("use_face") and s.face_focus and os.path.exists(out_mp4):
                     _face_crop(out_mp4, width, height)          # ritaglia sul volto → LoRA del viso
             open(os.path.splitext(out_mp4)[0] + ".txt", "w", encoding="utf-8").write(clip["caption"])
@@ -336,7 +337,7 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
             else:   # foto reale → breve clip i2v (il trainer vuole video)
                 dst = os.path.join(dataset_dir, stem + ".mp4")
                 if not os.path.exists(dst):
-                    _gen_clip(rm, _subj_desc(s) + ", subtle natural motion", dst, width, height, nf, fps)
+                    _gen_clip(rm, _subj_desc(s) + ", subtle natural motion", dst, width, height, nf, fps, source_arch)
             open(os.path.splitext(dst)[0] + ".txt", "w", encoding="utf-8").write(cap)
             n_done += 1
             log(f"Reale {n_done}/{total}: {stem}")
@@ -502,14 +503,17 @@ def make_lora_from_clips(clips: list[dict], name: str, out_dir: str, *, global_c
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, rank: int = 16, steps: int = 2000,
               clip_seconds: float = 3.0, use_pulid: bool = True,
               caption_engine: str = "procedural", caption_mode: str = "descriptive",
-              low_vram: bool = True, progress=None) -> dict:
-    """Pipeline COMPLETA: dataset → preprocess → train. Ritorna {dataset, lora}."""
+              low_vram: bool = True, source_arch: str = "ltx", progress=None) -> dict:
+    """Pipeline COMPLETA: dataset → preprocess → train. Ritorna {dataset, lora}.
+    source_arch: motore che genera i clip del dataset (ltx/lingbot); il TARGET LoRA resta LTX qui (il
+    training LingBot vive in core/lora_lingbot_service, riusando questo generate_dataset)."""
     W, H, FPS = 768, 512, 25
     nf = int(round(clip_seconds * FPS) // 8 * 8 + 1)
     work = os.path.join(out_dir, name)
     ds = os.path.join(work, "dataset")
     generate_dataset(subjects, ds, width=W, height=H, clip_seconds=clip_seconds, use_pulid=use_pulid,
-                     caption_engine=caption_engine, caption_mode=caption_mode, progress=progress)
+                     caption_engine=caption_engine, caption_mode=caption_mode,
+                     source_arch=source_arch, progress=progress)
     trig = ", ".join(sorted({s.trig() for s in subjects}))
     pre = preprocess(ds, work, width=W, height=H, num_frames=nf, trigger=trig, progress=progress)
     lora = os.path.join(work, name + ".safetensors")

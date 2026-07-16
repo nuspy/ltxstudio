@@ -37,8 +37,20 @@ class _LoraWorker(QThread):
         subjects, name, out_dir, opts, full = self._a
         try:
             from core import lora_video_service as svc
+            target = opts.pop("target_arch", "ltx")          # formato LoRA finale (ltx/lingbot)
+            source = opts.get("source_arch", "ltx")           # motore dei clip-sorgente
             if full:
-                res = svc.make_lora(subjects, name, out_dir, progress=self.progress.emit, **opts)
+                if target == "lingbot":
+                    # training SPERIMENTALE con target LingBot (clip generati da LingBot)
+                    from core import lora_lingbot_service as lsvc
+                    res = lsvc.make_lora(subjects, name, out_dir, rank=opts.get("rank", 16),
+                                         steps=opts.get("steps", 1500), clip_seconds=opts.get("clip_seconds", 3.0),
+                                         use_pulid=opts.get("use_pulid", True),
+                                         caption_engine=opts.get("caption_engine", "procedural"),
+                                         caption_mode=opts.get("caption_mode", "descriptive"),
+                                         progress=self.progress.emit)
+                else:
+                    res = svc.make_lora(subjects, name, out_dir, progress=self.progress.emit, **opts)
             else:
                 import os
                 ds = os.path.join(out_dir, name, "dataset")
@@ -46,7 +58,7 @@ class _LoraWorker(QThread):
                                      use_pulid=opts.get("use_pulid", True),
                                      caption_engine=opts.get("caption_engine", "procedural"),
                                      caption_mode=opts.get("caption_mode", "descriptive"),
-                                     progress=self.progress.emit)
+                                     source_arch=source, progress=self.progress.emit)
                 res = {"dataset": ds}
             self.finished_lora.emit(res)
         except Exception as e:                          # noqa: BLE001
@@ -164,6 +176,20 @@ class LoraVideoTab(QWidget):
         from ui.widgets.caption_picker import CaptionPicker
         self.cap_picker = CaptionPicker()                    # captioner VLM (frame/clip) opzionale
         g.addWidget(QLabel(tr("ilora.cap", "Captioner")), 3, 0); g.addWidget(self.cap_picker, 3, 1, 1, 3)
+        # Formato di output LoRA + motore di generazione dei clip-sorgente (2ª architettura)
+        self.lora_target = QComboBox()
+        self.lora_target.addItem(tr("tlora.target_ltx", "LTX-2.3"), "ltx")
+        self.lora_target.addItem(tr("tlora.target_lingbot", "LingBot (sperimentale)"), "lingbot")
+        self.lora_source = QComboBox()
+        self.lora_source.addItem(tr("tlora.source_ltx", "LTX-2"), "ltx")
+        self.lora_source.addItem(tr("tlora.source_lingbot", "LingBot-Video"), "lingbot")
+        self.lora_source.setToolTip(tr("tlora.source.tt",
+            "Motore che genera i clip del dataset. Puoi usare LingBot per i clip-sorgente anche se il "
+            "formato LoRA finale è LTX."))
+        g.addWidget(QLabel(tr("tlora.target", "Formato LoRA")), 4, 0); g.addWidget(self.lora_target, 4, 1)
+        g.addWidget(QLabel(tr("tlora.source", "Clip sorgente da")), 4, 2); g.addWidget(self.lora_source, 4, 3)
+        # se il target è LingBot, il formato dei clip DEVE essere LingBot → sincronizza
+        self.lora_target.currentIndexChanged.connect(self._sync_lora_target)
         v.addLayout(g)
         h = QHBoxLayout()
         self.btn_install = QPushButton(tr("tlora.install", "Installa trainer")); self.btn_install.clicked.connect(self._install)
@@ -346,6 +372,15 @@ class LoraVideoTab(QWidget):
         except Exception as e:                          # noqa: BLE001
             QMessageBox.critical(self, tr("tlora.train", "LoRA"), str(e))
 
+    def _sync_lora_target(self, *_):
+        """Se il formato LoRA è LingBot, i clip-sorgente DEVONO essere LingBot → forza e blocca il combo."""
+        is_ling = (self.lora_target.currentData() == "lingbot")
+        if is_ling:
+            _i = self.lora_source.findData("lingbot")
+            if _i >= 0:
+                self.lora_source.setCurrentIndex(_i)
+        self.lora_source.setEnabled(not is_ling)
+
     def _start(self, full: bool):
         if self._worker and self._worker.isRunning():
             return
@@ -363,6 +398,9 @@ class LoraVideoTab(QWidget):
         opts = {"rank": self.lora_rank.value(), "steps": self.lora_steps.value(),
                 "clip_seconds": self.lora_clip.value(), "use_pulid": self.lora_pulid.isChecked(),
                 "low_vram": self.lora_lowvram.isChecked(), **self.cap_picker.get()}
+        if hasattr(self, "lora_target"):
+            opts["target_arch"] = self.lora_target.currentData() or "ltx"
+            opts["source_arch"] = self.lora_source.currentData() or "ltx"
         self.btn_dataset.setEnabled(False); self.btn_full.setEnabled(False)
         self._log(tr("tlora.started", "Avvio (può richiedere molto tempo)…"))
         _name = self.lora_name.text().strip() or "my_lora"
