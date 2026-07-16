@@ -85,43 +85,55 @@ def _free_vram_mb() -> int:
 _PIPE_CACHE: dict = {}
 
 
-def _load_pipeline(model_dir: str, variant: str):
-    """Costruisce (e cacha) la LingBotVideoPipeline. Sceglie dtype + strategia offload per fascia VRAM.
+def _load_pipeline(model_dir: str, variant: str, i2v: bool = False):
+    """Costruisce (e cacha) la pipeline LingBot. Sceglie la CLASSE giusta (T2V vs I2V), dtype + strategia
+    offload per fascia VRAM.
 
-    MoE: i pesi residenti totali sono ENORMI (~60GB transformer + ~60GB refiner bf16) ma le attivazioni
-    per-forward sono piccole (3B attivi). Su GPU consumer si usa il quant (uint4/gguf) + offload
-    sequenziale: gli esperti stanno in CPU-RAM e vengono streammati in VRAM on-demand (VRAM piatta ~8GB).
-    Dense 1.3B: entra comodo, resta residente in VRAM."""
-    key = (model_dir, variant)
+    La classe pipeline vive nel pacchetto `lingbot_video` (NON è registrata in diffusers né nello snapshot):
+      - T2V: lingbot_video.pipeline_lingbot_video.LingBotVideoPipeline
+      - I2V/TI2V: lingbot_video.pipeline_lingbot_video_i2v.LingBotVideoImageToVideoPipeline
+
+    MoE: pesi residenti enormi (~60GB transformer + ~60GB refiner bf16) ma attivazioni per-forward piccole
+    (3B attivi) → quant (uint4/gguf) + offload sequenziale. Dense 1.3B: ~12GB, resta residente in VRAM."""
+    key = (model_dir, variant, i2v)
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
 
-    from diffusers import DiffusionPipeline
-
-    dtype = torch.bfloat16                                    # VALIDATE: transformer/text_encoder bf16, vae fp32
-    print(f"[lingbot] carico pipeline: {model_dir} (variant={variant}, dtype=bf16)", flush=True)
+    dtype = torch.bfloat16                                    # transformer/text_encoder bf16, vae fp32
+    print(f"[lingbot] carico pipeline: {model_dir} (variant={variant}, i2v={i2v}, dtype=bf16)", flush=True)
     try:
-        pipe = DiffusionPipeline.from_pretrained(model_dir, torch_dtype=dtype, trust_remote_code=True)
+        if i2v:
+            from lingbot_video.pipeline_lingbot_video_i2v import LingBotVideoImageToVideoPipeline as _Pipe
+        else:
+            from lingbot_video.pipeline_lingbot_video import LingBotVideoPipeline as _Pipe
+        pipe = _Pipe.from_pretrained(model_dir, torch_dtype=dtype)
     except Exception as ex:                                   # noqa: BLE001
-        raise RuntimeError(f"Caricamento LingBotVideoPipeline fallito da {model_dir}: {ex}")
+        # fallback: prova via diffusers/trust_remote_code (se un domani lo registrano nello snapshot)
+        try:
+            from diffusers import DiffusionPipeline
+            pipe = DiffusionPipeline.from_pretrained(model_dir, torch_dtype=dtype, trust_remote_code=True)
+        except Exception:                                    # noqa: BLE001
+            raise RuntimeError(f"Caricamento pipeline LingBot fallito da {model_dir}: {ex}")
 
     free = _free_vram_mb()
     force_offload = os.environ.get("NATIVE_FORCE_OFFLOAD") == "1"
-    # soglia: MoE o poca VRAM → offload; Dense con VRAM abbondante → residente
     heavy = variant == "moe"
-    if force_offload or (heavy and free < 30000) or free < 10000:
-        # sequenziale = minimo picco VRAM (esperti streammati), più lento ma non va OOM
+    # Ingombro APPROSSIMATIVO dei pesi residenti per variante (transformer+VLM text-encoder+VAE):
+    # Dense ~15GB, MoE ~60GB+ (serve comunque quant+offload). Le ATTIVAZIONI (dipendono da frame×risoluzione)
+    # sono a parte: per i video lunghi si limitano col chunking, non con l'offload dei pesi.
+    need_gb = 60000 if heavy else 15000
+    if force_offload or (heavy and free < 30000):
         try:
-            pipe.enable_sequential_cpu_offload()
+            pipe.enable_sequential_cpu_offload()             # esperti MoE streammati: VRAM minima
             print(f"[lingbot] offload SEQUENZIALE (VRAM libera {free}MB, variant={variant})", flush=True)
         except Exception:                                    # noqa: BLE001
             pipe.enable_model_cpu_offload()
             print("[lingbot] offload model_cpu (fallback)", flush=True)
-    elif heavy or free < 40000:
-        pipe.enable_model_cpu_offload()
-        print(f"[lingbot] offload model_cpu (VRAM libera {free}MB)", flush=True)
+    elif free < need_gb:
+        pipe.enable_model_cpu_offload()                      # non entra residente → offload dei moduli
+        print(f"[lingbot] offload model_cpu (VRAM libera {free}MB < ~{need_gb}MB)", flush=True)
     else:
-        pipe = pipe.to("cuda")
+        pipe = pipe.to("cuda")                               # RESIDENTE = veloce (caso Dense su 24/32GB)
         print(f"[lingbot] pipeline RESIDENTE in VRAM (libera {free}MB)", flush=True)
 
     try:
@@ -137,6 +149,14 @@ def _load_pipeline(model_dir: str, variant: str):
 # ── generazione singola ──────────────────────────────────────────────────────
 def _to_multiple(v: int, m: int = 16) -> int:
     return max(m, (int(v) // m) * m)
+
+
+def _snap_frames(n: int) -> int:
+    """LingBot esige num_frames = 1 oppure 4n+1 (vae_scale_factor_temporal=4)."""
+    n = int(n)
+    if n <= 1:
+        return 1
+    return ((n - 1) // 4) * 4 + 1
 
 
 def _gen_once(pipe, p: dict, *, num_frames: int, image_path: str = "") -> list:
@@ -156,16 +176,42 @@ def _gen_once(pipe, p: dict, *, num_frames: int, image_path: str = "") -> list:
         num_frames=int(num_frames),
         num_inference_steps=int(p.get("steps", 40)),
         guidance_scale=float(p.get("guidance", 3.0)),
-        generator=torch.Generator(device="cpu").manual_seed(int(p.get("seed", 7))),
+        shift=float(p.get("shift", 3.0)),                    # default ufficiale LingBot (README)
+        generator=torch.Generator(device=("cuda" if torch.cuda.is_available() else "cpu")).manual_seed(int(p.get("seed", 7))),
     )
     if image_path and os.path.exists(image_path):
         kwargs["image"] = Image.open(image_path).convert("RGB")   # VALIDATE: nome arg TI2V (image / conditioning)
 
     result = pipe(**kwargs)
     frames = getattr(result, "frames", result)
-    # diffusers ritorna spesso frames[0] = lista di PIL/np per il primo batch
-    if isinstance(frames, (list, tuple)) and frames and isinstance(frames[0], (list, tuple)):
-        frames = frames[0]
+    # LingBot (output_type="np"): frames = list[ ndarray (num_frames, H, W, C) in [0,1] ], una per batch.
+    if isinstance(frames, (list, tuple)) and frames and not isinstance(frames[0], Image.Image):
+        frames = frames[0]                                    # array video del batch 0: (F,H,W,C) o (F,C,H,W)
+    return _to_uint8_list(frames)
+
+
+def _to_uint8_list(vid) -> list:
+    """Normalizza l'output della pipeline in una LISTA di frame (H,W,C) uint8.
+    Gestisce: ndarray/tensor (B,F,H,W,C)/(F,H,W,C)/(F,C,H,W), o lista di frame PIL/HWC."""
+    import numpy as np
+    from PIL import Image
+    if isinstance(vid, (list, tuple)):                        # già una lista di frame (PIL o HWC)
+        return _as_uint8_frames(vid)
+    if torch.is_tensor(vid):
+        vid = vid.detach().cpu().float().numpy()
+    vid = np.asarray(vid)
+    if vid.ndim == 5:                                         # (B, ...) → batch 0
+        vid = vid[0]
+    if vid.ndim == 4:
+        if vid.shape[-1] in (1, 3, 4):                        # (F,H,W,C)
+            pass
+        elif vid.shape[1] in (1, 3, 4):                       # (F,C,H,W) → (F,H,W,C)
+            vid = np.transpose(vid, (0, 2, 3, 1))
+        frames = [vid[i] for i in range(vid.shape[0])]
+    elif vid.ndim == 3:                                       # singolo frame
+        frames = [vid]
+    else:
+        raise RuntimeError(f"formato frame LingBot inatteso: shape {vid.shape}")
     return _as_uint8_frames(frames)
 
 
@@ -222,9 +268,9 @@ def _run_chunked(pipe, p: dict, out: str, fps: int) -> str:
     import numpy as np
     from PIL import Image
 
-    total = int(p.get("num_frames", 121))
-    chunk = int(p.get("chunk_frames", 121))
-    overlap = int(p.get("chunk_overlap", 8))
+    total = _snap_frames(p.get("num_frames", 121))
+    chunk = _snap_frames(p.get("chunk_frames", 121))
+    overlap = max(0, (int(p.get("chunk_overlap", 8)) // 4) * 4)   # multiplo di 4 (compat 4n+1)
     seg_dir = out + "_segs"
     os.makedirs(seg_dir, exist_ok=True)
 
@@ -233,8 +279,8 @@ def _run_chunked(pipe, p: dict, out: str, fps: int) -> str:
     produced = 0
     idx = 0
     while produced < total:
-        n = min(chunk, total - produced + (overlap if produced else 0))
-        n = max(9, n)
+        n = _snap_frames(min(chunk, total - produced + (overlap if produced else 0)))
+        n = max(5, n)                                        # minimo valido 4n+1 = 5
         print(f"[lingbot] chunk {idx} — {n} frame (prodotti {produced}/{total})", flush=True)
         fr = _gen_once(pipe, p, num_frames=n, image_path=start_img)
         if p.get("lingbot_variant") == "moe" and p.get("run_refiner"):
@@ -312,13 +358,14 @@ def run_generation(p: dict) -> str:
     fps = int(p.get("fps", 24))
     model_dir, variant = _resolve_model_dir(p)
     p["lingbot_variant"] = variant
-    pipe = _load_pipeline(model_dir, variant)
+    i2v = bool(p.get("image_path"))                          # I2V/TI2V se c'è un frame di partenza
+    pipe = _load_pipeline(model_dir, variant, i2v=i2v)
 
     if int(p.get("chunk_frames", 0)) and int(p.get("num_frames", 0)) > int(p.get("chunk_frames", 0)):
         out = _run_chunked(pipe, p, out, fps)
     else:
-        frames = _gen_once(pipe, p, num_frames=int(p.get("num_frames", 121)),
-                           image_path=p.get("image_path", "") or "")
+        nf = _snap_frames(p.get("num_frames", 121))          # LingBot: 1 o 4n+1
+        frames = _gen_once(pipe, p, num_frames=nf, image_path=p.get("image_path", "") or "")
         if variant == "moe" and p.get("run_refiner"):
             frames = _refine(pipe, p, frames)
         _encode_frames(frames, out, fps, p)
