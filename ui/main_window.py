@@ -2862,6 +2862,22 @@ class MainWindow(QMainWindow):
             if vals.get("run_refiner"):
                 params["run_refiner"] = True
             params.pop("gguf_transformer", None)                # LingBot non usa i GGUF LTX
+            # #16/#17 Prompt Rewriter: LingBot consuma caption JSON. Se attivo, riscrivi prosa→JSON
+            # (proprietario Qwen3.6-27B+LoRA se scaricato, altrimenti composer locale Gemma) + auto-negative.
+            if vals.get("lingbot_rewriter"):
+                try:
+                    from core import prompt_rewrite_lingbot as _rw
+                    self._log("[lingbot] rewriter prompt → caption JSON…"
+                              + ("" if _rw.available() else " (composer locale, rewriter non scaricato)"))
+                    _pj, _neg = _rw.rewrite(params.get("prompt", ""),
+                                            first_frame=params.get("image_path", "") or "",
+                                            nsfw=(vals.get("nsfw_mode") == "nsfw"))
+                    if _pj:
+                        params["prompt"] = _pj
+                    if _neg:
+                        params["negative"] = _neg
+                except Exception as _rex:                       # noqa: BLE001
+                    self._log(f"[lingbot] rewriter saltato ({_rex})")
             self._log(f"[lingbot] LingBot-Video ({params['lingbot_variant']}, "
                       f"refiner={'on' if params.get('run_refiner') else 'off'}): "
                       f"{params['width']}x{params['height']} {nf} frame")
