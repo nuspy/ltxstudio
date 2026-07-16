@@ -35,6 +35,8 @@
     {"id": "seedvr2_weights", "label": "SeedVR2 (upscale video)", "size_mb": 9000, "editions": ["plus", "premium", "studio"], "on_demand": true},
     {"id": "grounding_dino", "label": "GroundingDINO", "size_mb": 938, "editions": ["plus", "premium", "studio"], "on_demand": true},
     {"id": "sam_hq", "label": "SAM-HQ", "size_mb": 1250, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "facerestore_models", "label": "CodeFormer + GFPGAN", "size_mb": 1000, "editions": ["plus", "premium", "studio"], "on_demand": true}
+    {"id": "facerestore_models", "label": "CodeFormer + GFPGAN", "size_mb": 1000, "editions": ["plus", "premium", "studio"], "on_demand": true},
+    {"id": "lingbot_dense_fp8", "label": "LingBot-Video Dense 1.3B fp8 (2ª arch video, consumer)", "size_mb": 8000, "editions": ["plus", "premium", "studio"], "sensitivity": "normal", "on_demand": true},
+    {"id": "lingbot_moe_uint4", "label": "LingBot-Video MoE 30B uint4 (2ª arch video, qualità)", "size_mb": 22000, "editions": ["premium", "studio"], "sensitivity": "normal", "on_demand": true}
   ]
 }
