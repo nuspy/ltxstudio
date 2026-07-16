@@ -46,6 +46,10 @@ def file_gb(path: str) -> float:
 # overhead per FAMIGLIA rilevata dall'header (più affidabile del nome)
 _OVERHEAD_FAMILY = {
     "ltxv": 14.0, "wan21": 14.0, "wan22": 14.0, "hunyuan_video": 14.0,   # Gemma/T5 video + VAE video
+    # LingBot: snapshot diffusers self-contained. Il text-encoder è una VLM Qwen (~9GB) + VAE ~0.5GB.
+    # NB per la MoE il "footprint file" (uint4 ~22GB) è ciò che occupa RAM/VRAM streamata, l'overhead qui
+    # copre solo TE+VAE. La classify() usa comunque la dim file come proxy del transformer.
+    "lingbot": 10.0,
     "zimage": 4.0,                                                       # encoder piccolo
     "flux1": 11.0, "flux2": 11.0, "ernie": 11.0, "qwen_image": 11.0,     # T5/CLIP/Mistral/Qwen + VAE
     "sd15": 3.0, "sdxl": 4.0, "sd3": 6.0,

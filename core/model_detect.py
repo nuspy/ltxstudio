@@ -149,6 +149,9 @@ def _from_arch_str(a: str):
     if "qwen" in s and "image" in s:
         return ("qwen_image", "edit" if "edit" in s else "base", "edit" if "edit" in s else "t2i", "image")
     # VIDEO
+    if "lingbot" in s:
+        var = "moe" if ("moe" in s or "30b" in s or "a3b" in s) else "dense"
+        return ("lingbot", var, "video", "video")
     if "ltx" in s or "lightricks" in s:
         return ("ltxv", "base", "video", "video")
     if "wan" in s:
@@ -170,6 +173,11 @@ def _from_keys(tensors: dict, name: str):
     nl = name.lower()
 
     # --- VIDEO prima di FLUX (Hunyuan Video condivide double/single/vector/guidance) ---
+    # LingBot-Video: normalmente uno snapshot diffusers (rilevato da cartella/config); ma se si punta al
+    # solo transformer .safetensors, riconoscilo dal nome + eventuali chiavi MoE (experts/gate).
+    if "lingbot" in nl:
+        var = "moe" if (_has(keys, "experts") or _has(keys, ".gate.") or "moe" in nl or "30b" in nl) else "dense"
+        return ("lingbot", var, "video", "video")
     if _has(keys, "individual_token_refiner"):
         return ("hunyuan_video", "base", "video", "video")
     if _has(keys, "patch_embedding"):                     # Wan (2.1/2.2)
@@ -355,6 +363,8 @@ def compatible_components(det: dict) -> dict:
         "ltxv":   {"vae": "ltx-2 builtin", "text_encoders": ["t5xxl"]},
         "wan21":  {"vae": "wan_vae", "text_encoders": ["umt5_xxl"]},
         "wan22":  {"vae": "wan_vae", "text_encoders": ["umt5_xxl"]},
+        # LingBot: pipeline diffusers self-contained (vae+text_encoder VLM Qwen dentro lo snapshot).
+        "lingbot": {"vae": "builtin (diffusers)", "text_encoders": ["builtin (Qwen VLM)"]},
     }
     return M.get(fam, {"vae": "auto", "text_encoders": []})
 

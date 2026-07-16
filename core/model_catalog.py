@@ -21,6 +21,28 @@ ARCH_DEFAULTS = {
     "Ernie":   {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 4.0, "clip_type": "flux2"},
 }
 
+# Capability per ARCHITETTURA VIDEO — usata dalla GUI per abilitare/disabilitare i controlli quando
+# l'utente cambia architettura (video_tab._on_arch_changed). LingBot NON supporta audio/a2v, controlnet,
+# v2v/retake, storyboard a keyframe latenti; SUPPORTA invece il refiner (2 stadi) e l'extend a chunk.
+# Vedi [[native-video-engine]] / piano LingBot.
+ARCH_VIDEO_CAPS = {
+    "ltx": {
+        "t2v": True, "i2v": True, "ti2v": True, "a2v": True, "audio": True,
+        "controlnet": True, "v2v": True, "retake": True, "storyboard": True,
+        "extend": True, "refiner": False, "lipsync": True, "keyframes": True,
+    },
+    "lingbot": {
+        "t2v": True, "i2v": True, "ti2v": True, "a2v": False, "audio": False,
+        "controlnet": False, "v2v": False, "retake": False, "storyboard": False,
+        "extend": True, "refiner": True, "lipsync": False, "keyframes": False,
+    },
+}
+
+
+def video_caps(arch: str) -> dict:
+    """Capability dell'architettura video (default = LTX se sconosciuta)."""
+    return ARCH_VIDEO_CAPS.get((arch or "ltx").lower(), ARCH_VIDEO_CAPS["ltx"])
+
 # Valori consigliati hardcoded per i modelli più comuni (con nota "supposed" se non da Civitai)
 _RECOMMENDED: dict[str, dict] = {
     "ltx-2.3-22b-distilled": {"steps": 8, "cfg": 0.9, "note": "distilled"},
@@ -35,6 +57,10 @@ _RECOMMENDED: dict[str, dict] = {
     "q4_k": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
     "flux2": {"steps": 20, "cfg": 3.5, "note": "supposed"},
     "flux": {"steps": 20, "cfg": 3.5, "note": "supposed"},
+    # LingBot-Video (default ufficiali dal README: 40 step base, guidance 3, refiner 8 step)
+    "lingbot": {"steps": 40, "cfg": 3.0, "note": "lingbot base"},
+    "lingbot-dense": {"steps": 40, "cfg": 3.0, "note": "lingbot dense 1.3b"},
+    "lingbot-moe": {"steps": 40, "cfg": 3.0, "note": "lingbot moe 30b + refiner 8 step"},
 }
 
 
