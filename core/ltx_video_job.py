@@ -25,7 +25,9 @@ REPO = Path(__file__).resolve().parent.parent
 LTX2_PY = r"E:\AI\Tools\ltx2_venv\Scripts\python.exe"
 LTX2_WORKER = str(REPO / "workers" / "ltx2_infer.py")
 # 2ª architettura video: LingBot-Video (venv + worker dedicati). Selezione via params["arch"].
-LINGBOT_PY = r"E:\AI\Tools\lingbot_venv\Scripts\python.exe"
+# venv311 = Python 3.11 + torch 2.11 cu130 + FlashAttention-2 (sm120): la ricetta che genera CORRETTAMENTE
+# (FA + caption JSON ricca + --batch_cfg). Il venv cp312 senza FA dava garbage. Vedi [[lingbot-video-2nd-arch]].
+LINGBOT_PY = r"E:\AI\Tools\lingbot_venv311\Scripts\python.exe"
 LINGBOT_WORKER = str(REPO / "workers" / "lingbot_infer.py")
 
 # quale (python, worker) usare per ogni architettura

@@ -455,7 +455,7 @@ class _NativeLtx2Worker(QThread):
         """#91: termina il subprocess del worker (anti-orfano VRAM). Windows: kill dell'albero."""
         _kill_proc_tree(getattr(self, "proc", None))
 
-    LINGBOT_PY = r"E:\AI\Tools\lingbot_venv\Scripts\python.exe"
+    LINGBOT_PY = r"E:\AI\Tools\lingbot_venv311\Scripts\python.exe"  # py3.11+torch2.11+FA2 (ricetta corretta)
 
     def run(self):
         import json as _json, os as _os, subprocess as _sp, tempfile as _tf
@@ -2862,22 +2862,23 @@ class MainWindow(QMainWindow):
             if vals.get("run_refiner"):
                 params["run_refiner"] = True
             params.pop("gguf_transformer", None)                # LingBot non usa i GGUF LTX
-            # #16/#17 Prompt Rewriter: LingBot consuma caption JSON. Se attivo, riscrivi prosa→JSON
-            # (proprietario Qwen3.6-27B+LoRA se scaricato, altrimenti composer locale Gemma) + auto-negative.
-            if vals.get("lingbot_rewriter"):
-                try:
-                    from core import prompt_rewrite_lingbot as _rw
-                    self._log("[lingbot] rewriter prompt → caption JSON…"
-                              + ("" if _rw.available() else " (composer locale, rewriter non scaricato)"))
-                    _pj, _neg = _rw.rewrite(params.get("prompt", ""),
-                                            first_frame=params.get("image_path", "") or "",
-                                            nsfw=(vals.get("nsfw_mode") == "nsfw"))
-                    if _pj:
-                        params["prompt"] = _pj
-                    if _neg:
-                        params["negative"] = _neg
-                except Exception as _rex:                       # noqa: BLE001
-                    self._log(f"[lingbot] rewriter saltato ({_rex})")
+            # #16/#17 Caption JSON OBBLIGATORIA: LingBot col prompt in prosa genera GARBAGE — serve lo schema
+            # ricco. Sempre: rewriter proprietario (Qwen3.6-27B+LoRA) se scaricato, altrimenti composer
+            # locale Gemma (prompt_struct.to_lingbot_json). Il risultato va in params["prompt_json"].
+            try:
+                from core import prompt_rewrite_lingbot as _rw
+                _dur = max(1.0, int(params.get("num_frames", 121)) / float(params.get("fps", 24)))
+                self._log("[lingbot] prompt → caption JSON ricca"
+                          + ("" if _rw.available() else " (composer locale Gemma)"))
+                _pj, _neg = _rw.rewrite(params.get("prompt", ""),
+                                        first_frame=params.get("image_path", "") or "",
+                                        nsfw=(vals.get("nsfw_mode") == "nsfw"))
+                if _pj:
+                    params["prompt_json"] = _pj
+                if _neg:
+                    params["negative"] = _neg
+            except Exception as _rex:                           # noqa: BLE001
+                self._log(f"[lingbot] composer caption fallito ({_rex}) → prosa incapsulata dal worker")
             self._log(f"[lingbot] LingBot-Video ({params['lingbot_variant']}, "
                       f"refiner={'on' if params.get('run_refiner') else 'off'}): "
                       f"{params['width']}x{params['height']} {nf} frame")

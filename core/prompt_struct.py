@@ -107,24 +107,43 @@ def structure_and_compose(text: str, *, kind: str = "image", nsfw: bool = False,
     return prompt, negative, d
 
 
-def to_lingbot_json(text: str, *, nsfw: bool = False, first_frame: str = "") -> tuple[str, str]:
-    """Composer JSON per LingBot-Video (#16): LingBot consuma caption JSON strutturate, non prosa.
+def to_lingbot_json(text: str, *, nsfw: bool = False, first_frame: str = "", duration: float = 5.0) -> tuple[str, str]:
+    """Composer JSON per LingBot-Video (#16): LingBot consuma caption JSON RICCHE, non prosa.
 
-    Riusa `structure()` (LLM locale) per riempire lo schema a 9 campi, poi lo serializza nel formato
-    caption che il DiT LingBot si aspetta. Ritorna (json_prompt_str, negative). Fallback-safe.
-
-    ⚠️ VALIDATE: lo schema esatto delle caption LingBot va confermato contro il pacchetto ufficiale.
-    Qui produciamo un JSON descrittivo (caption + campi) accettato da un rewriter/loader tollerante; la
-    versione proprietaria a 2 stadi vive in core/prompt_rewrite_lingbot."""
+    VALIDATO (17/07): il DiT genera correttamente SOLO con lo schema ricco del runner ufficiale
+    (`comprehensive_description` + `camera_info` + `prominent_elements`); la prosa nuda dà garbage.
+    Riusa `structure()` (LLM Gemma locale) per i 9 campi e li mappa su quello schema. Ritorna
+    (json_prompt_str, negative). Fallback-safe. Il rewriter proprietario (Qwen3.6-27B) sta in
+    core/prompt_rewrite_lingbot; questo è il fallback locale."""
     import json as _json
     d = structure(text, kind="video", nsfw=nsfw)
-    caption, negative = compose_fields(d)
+    # descrizione ricca = prosa ricomposta dai campi (o il testo grezzo se l'LLM non c'era)
+    scene, negative = compose_fields(d)
+    scene = scene or (text or "")
+    subject = str(d.get("subject", "") or "").strip()
     obj = {
-        "caption": caption or (text or ""),
-        "subject": d.get("subject", ""), "action": d.get("action", ""),
-        "setting": d.get("setting", ""), "style": d.get("style", ""),
-        "camera": d.get("camera", ""), "light": d.get("light", ""),
-        "mood": d.get("mood", ""), "details": d.get("details", ""),
+        "caption": {
+            "comprehensive_description": {
+                "scene_content_description": scene,
+                "camera_info": {
+                    "color": str(d.get("mood", "") or ""),
+                    "frame_size": "",
+                    "shot_type_angle": str(d.get("camera", "") or ""),
+                    "lens_size": "",
+                    "composition": "",
+                    "lighting": str(d.get("light", "") or ""),
+                    "lighting_type": "",
+                },
+                "prominent_elements": (
+                    [{"name": subject, "description": (subject + ". " + str(d.get("details", "") or "")).strip(". "),
+                      "location": "center", "relative_size": "medium",
+                      "shape_and_color": str(d.get("details", "") or "")}]
+                    if subject else []
+                ),
+                "world_knowledge": [],
+            }
+        },
+        "duration": round(float(duration), 2),
     }
     if first_frame:
         obj["has_first_frame"] = True
