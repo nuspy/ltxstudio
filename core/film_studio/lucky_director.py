@@ -106,7 +106,7 @@ def make_film(spec: dict, *, on_progress=None, cancel=None) -> dict:
     name = (spec.get("name") or "").strip() or f"Lucky Director {time.strftime('%Y-%m-%d %H:%M', time.localtime())}"
 
     # progetto (auto, riapribile in Cinema Studio)
-    cfg = {"img_arch": "flux", "img_model": "", "vid_gguf": "",
+    cfg = {"img_arch": spec.get("img_arch", "flux"), "img_model": "", "vid_gguf": "",
            "vid_arch": spec.get("vid_arch", "ltx"),          # 2ª architettura video (LTX/LingBot)
            "forbidden": "", "required": "",
            "style_bible": {}, "lucky_director": True}

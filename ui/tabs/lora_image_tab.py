@@ -17,7 +17,8 @@ from ui.i18n_manager import tr
 from ui.tabs.lora_video_tab import LoraVideoTab
 
 _BASES = [("flux2-dev", "FLUX.2 [dev]"), ("flux2-klein-4b", "FLUX.2 Klein 4B"),
-          ("flux2-klein-9b", "FLUX.2 Klein 9B"), ("flux1-dev", "FLUX.1 [dev]")]
+          ("flux2-klein-9b", "FLUX.2 Klein 9B"), ("flux1-dev", "FLUX.1 [dev]"),
+          ("krea2", "Krea 2 [Raw]")]
 
 
 class _LoraImageWorker(QThread):

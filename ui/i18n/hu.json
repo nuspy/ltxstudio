@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "A háttér eltávolításához kell az u2net modell (~176 MB), ami még nincs a lemezen. Letöltsem most? (csak egyszer)",
   "canvas.cutout_done": "Háttér eltávolítva: a tárgy most már beleolvad a képbe.",
   "canvas.cutout_restored": "Eredeti háttér visszaállítva.",
-  "canvas.cutout_failed": "A kivágás nem sikerült: {e}"
+  "canvas.cutout_failed": "A kivágás nem sikerült: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Kép arch.:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Kép architektúra"
 }

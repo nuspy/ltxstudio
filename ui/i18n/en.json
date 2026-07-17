@@ -2714,5 +2714,11 @@
   "vid.arch.krea_rt": "Krea Realtime (autoregressive, long/extend)",
   "vid.arch.krea_rt.model": "Krea Realtime 14B (autoregressive)",
   "fs.sb.arch_krea_rt": "Krea Realtime",
-  "ld.arch_krea_rt": "Krea Realtime"
+  "ld.arch_krea_rt": "Krea Realtime",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Arch. img:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Image architecture"
 }

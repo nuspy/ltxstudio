@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "去除背景需要 u2net 模型（约 176 MB），磁盘上还没有。现在下载吗？（仅一次）",
   "canvas.cutout_done": "背景已移除：主体现在可以融入画面。",
   "canvas.cutout_restored": "已恢复原始背景。",
-  "canvas.cutout_failed": "抠图失败：{e}"
+  "canvas.cutout_failed": "抠图失败：{e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "图像架构：",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "图像架构"
 }

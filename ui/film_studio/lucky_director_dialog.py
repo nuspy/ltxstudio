@@ -125,6 +125,11 @@ class LuckyDirectorDialog(QDialog):
         for code, lab in _CONSIST:
             self.consist.addItem(lab, code)
         form.addRow(tr("ld.consistency", "Character consistency"), self.consist)
+        # 2ª architettura IMMAGINE: FLUX vs Krea 2 (per i keyframe)
+        self.img_arch = QComboBox()
+        self.img_arch.addItem(tr("ld.arch_flux", "FLUX"), "flux")
+        self.img_arch.addItem(tr("ld.arch_krea2", "Krea 2"), "krea2")
+        form.addRow(tr("ld.image_arch", "Image architecture"), self.img_arch)
         # 2ª architettura video: LTX-2 vs LingBot-Video
         self.vid_arch = QComboBox()
         self.vid_arch.addItem(tr("ld.arch_ltx", "LTX-2"), "ltx")
@@ -178,6 +183,7 @@ class LuckyDirectorDialog(QDialog):
             "scene_trans": self.scene_trans.currentData() or "",
             "shot_trans": self.shot_trans.currentData() or "",
             "make_music": self.music.isChecked(),
+            "img_arch": self.img_arch.currentData() or "flux",
             "vid_arch": self.vid_arch.currentData() or "ltx",
         }
 

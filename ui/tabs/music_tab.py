@@ -1012,6 +1012,11 @@ class MusicTab(QWidget):
                 m = f1._gen_model_name()
                 if m:
                     cfg["image_model"] = m
+            # 2ª architettura immagine (es. 'krea2'): eredita l'arch scelta nel tab Foto
+            if f1 is not None and hasattr(f1, "get_gen_config"):
+                _ia = (f1.get_gen_config() or {}).get("arch")
+                if _ia and _ia != "flux":
+                    cfg["image_arch"] = _ia
         except Exception:                                    # noqa: BLE001
             pass
         try:                                                 # modello + risoluzione dal tab Video

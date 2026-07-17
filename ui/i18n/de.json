@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "Zum Entfernen des Hintergrunds wird das u2net-Modell (~176 MB) benötigt, das noch nicht auf der Platte liegt. Jetzt herunterladen? (nur einmal)",
   "canvas.cutout_done": "Hintergrund entfernt: Das Motiv fügt sich jetzt ein.",
   "canvas.cutout_restored": "Originaler Hintergrund wiederhergestellt.",
-  "canvas.cutout_failed": "Freistellen fehlgeschlagen: {e}"
+  "canvas.cutout_failed": "Freistellen fehlgeschlagen: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Bild-Arch.:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Bildarchitektur"
 }

@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "배경 제거에는 u2net 모델(약 176MB)이 필요한데 아직 디스크에 없습니다. 지금 내려받을까요? (한 번만)",
   "canvas.cutout_done": "배경 제거 완료: 이제 피사체가 자연스럽게 어울립니다.",
   "canvas.cutout_restored": "원래 배경을 복원했습니다.",
-  "canvas.cutout_failed": "누끼 실패: {e}"
+  "canvas.cutout_failed": "누끼 실패: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "이미지 아키텍처:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "이미지 아키텍처"
 }

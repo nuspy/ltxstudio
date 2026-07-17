@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "إزالة الخلفية تتطلّب نموذج u2net (‏~176 ميغابايت) وهو غير موجود بعد. أُنزّله الآن؟ (مرّة واحدة)",
   "canvas.cutout_done": "أُزيلت الخلفية: صار بإمكان العنصر الاندماج في المشهد.",
   "canvas.cutout_restored": "أُعيدت الخلفية الأصلية.",
-  "canvas.cutout_failed": "فشل قصّ الخلفية: {e}"
+  "canvas.cutout_failed": "فشل قصّ الخلفية: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "بنية الصورة:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "بنية الصورة"
 }

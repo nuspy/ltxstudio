@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "Retirer l'arrière-plan nécessite le modèle u2net (~176 Mo), absent du disque. Le télécharger maintenant ? (une seule fois)",
   "canvas.cutout_done": "Arrière-plan retiré : le sujet peut s'intégrer.",
   "canvas.cutout_restored": "Arrière-plan d'origine rétabli.",
-  "canvas.cutout_failed": "Détourage échoué : {e}"
+  "canvas.cutout_failed": "Détourage échoué : {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Arch. img :",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Architecture image"
 }

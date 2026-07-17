@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "बैकग्राउंड हटाने के लिए u2net मॉडल (~176 MB) चाहिए, जो अभी डिस्क पर नहीं है। अभी डाउनलोड करें? (केवल एक बार)",
   "canvas.cutout_done": "बैकग्राउंड हटा दिया गया: अब विषय दृश्य में घुल-मिल जाएगा।",
   "canvas.cutout_restored": "मूल बैकग्राउंड बहाल कर दिया गया।",
-  "canvas.cutout_failed": "बैकग्राउंड हटाना विफल: {e}"
+  "canvas.cutout_failed": "बैकग्राउंड हटाना विफल: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "छवि आर्किटेक्चर:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "छवि आर्किटेक्चर"
 }

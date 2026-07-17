@@ -23,22 +23,27 @@ NEG = "blurry, low quality, deformed, distorted face, extra limbs, watermark, te
 
 
 def _gen_image(subject_type: str, ref: str, prompt: str, out_png: str, width: int, height: int,
-               use_face: bool) -> bool:
-    """Genera UNA immagine col motore nativo: volto→FLUX.1+PuLID, oggetto/luogo con foto→Kontext, altrimenti t2i."""
+               use_face: bool, gen_arch: str = "flux") -> bool:
+    """Genera UNA immagine col motore nativo: volto→FLUX.1+PuLID, oggetto/luogo con foto→Kontext, altrimenti t2i.
+
+    `gen_arch` sceglie l'architettura per lo scatto t2i "concetto/senza foto" (es. 'flux' o 'krea2'). PuLID e
+    Kontext restano su FLUX.1: sono strumenti di identità/riferimento indipendenti dalla base finale della LoRA
+    (Krea 2 non li supporta), così il dataset resta coerente qualunque sia la base scelta per il training.
+    """
     from core import native_driver
     if not native_driver.is_up():
         return False
-    if use_face and ref:                          # personaggio: identità forte via PuLID
+    if use_face and ref:                          # personaggio: identità forte via PuLID (sempre FLUX.1)
         params = {"arch": "flux", "prompt": prompt, "negative": NEG, "pulid_face": ref,
                   "pulid_strength": 0.85, "width": width, "height": height, "steps": 20,
                   "guidance": 3.5, "seed": 7, "output": out_png}
-    elif ref:                                     # oggetto/luogo: foto di riferimento via Kontext
+    elif ref:                                     # oggetto/luogo: foto di riferimento via Kontext (sempre FLUX.1)
         params = {"arch": "kontext", "prompt": prompt, "negative": NEG, "image_path": ref,
                   "width": width, "height": height, "steps": 20, "guidance": 3.0, "seed": 7,
                   "output": out_png}
-    else:                                         # concetto / senza foto: t2i
-        params = {"arch": "flux", "prompt": prompt, "negative": NEG, "width": width, "height": height,
-                  "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png}
+    else:                                         # concetto / senza foto: t2i sull'architettura scelta
+        params = {"arch": (gen_arch or "flux"), "prompt": prompt, "negative": NEG, "width": width,
+                  "height": height, "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png}
     # STICKY: qui si genera un DATASET (decine di immagini di fila). Senza, il server rimette il
     # transformer in GPU a OGNI foto: ~5s di warmup ciascuna, cioè metà del tempo buttato. Con lo
     # sticky resta residente e dalla 2ª foto in poi si passa da ~24s a ~5s (misurato 13/07).
@@ -77,7 +82,7 @@ def _face_crop_image(png: str, margin: float = 2.4) -> None:
 
 def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 1024, height: int = 1024,
                      caption_engine: str = "procedural", caption_mode: str = "descriptive",
-                     progress=None) -> dict:
+                     gen_arch: str = "flux", progress=None) -> dict:
     """Genera le IMMAGINI (+ caption .txt) in un'unica cartella (formato ai-toolkit).
     caption_engine: 'procedural' (trigger+tag) | 'joycaption' | 'florence2' — se VLM, ricaptiona con quello."""
     def log(m):
@@ -96,7 +101,8 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
             out_png = os.path.join(dataset_dir, stem + ".png")
             if not os.path.exists(out_png):
                 ref = clip.get("ref") or ""
-                if not _gen_image(s.type, ref, clip["prompt"], out_png, width, height, clip["use_face"]):
+                if not _gen_image(s.type, ref, clip["prompt"], out_png, width, height, clip["use_face"],
+                                  gen_arch=gen_arch):
                     log(f"  [skip] '{stem}': server immagini non attivo o nessuna foto")
                     continue
                 if clip.get("use_face") and s.face_focus:
@@ -143,7 +149,8 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
     # training (transformer+TE); il costo su modelli che entrerebbero è minimo rispetto a un OOM a metà run.
     p = ts.TrainParams(name=name, base_model=base, dataset_path=dataset_dir, rank=rank, alpha=rank,
                        steps=steps, trigger_word=trigger,
-                       low_vram=(base == "flux2-dev" or "klein" in (base or "").lower()))
+                       low_vram=(base == "flux2-dev" or base == "krea2"
+                                 or "klein" in (base or "").lower()))
     errs = ts.preflight(p)
     if errs:
         raise RuntimeError("; ".join(errs))
@@ -166,11 +173,15 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
 
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, base: str = "flux2-dev",
               rank: int = 16, steps: int = 2000, width: int = 1024, height: int = 1024,
-              caption_engine: str = "procedural", caption_mode: str = "descriptive", progress=None) -> dict:
-    """Pipeline COMPLETA immagini: dataset → train (ai-toolkit FLUX.2). Ritorna {dataset, lora}."""
+              caption_engine: str = "procedural", caption_mode: str = "descriptive",
+              gen_arch: str = "flux", progress=None) -> dict:
+    """Pipeline COMPLETA immagini: dataset → train (ai-toolkit). Ritorna {dataset, lora}.
+
+    `base` = base del training (flux2-dev/klein/krea2…); `gen_arch` = architettura per generare il dataset
+    (default flux; 'krea2' per un dataset generato con Krea 2)."""
     ds = os.path.join(out_dir, name, "dataset")
-    generate_dataset(subjects, ds, width=width, height=height,
-                     caption_engine=caption_engine, caption_mode=caption_mode, progress=progress)
+    generate_dataset(subjects, ds, width=width, height=height, caption_engine=caption_engine,
+                     caption_mode=caption_mode, gen_arch=gen_arch, progress=progress)
     trig = ", ".join(sorted({s.trig() for s in subjects}))
     lora = train(ds, name, out_dir, base=base, trigger=trig, rank=rank, steps=steps, progress=progress)
     return {"dataset": ds, "lora": lora}

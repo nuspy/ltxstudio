@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "Για την αφαίρεση φόντου χρειάζεται το μοντέλο u2net (~176 MB), που δεν υπάρχει ακόμη στον δίσκο. Να το κατεβάσω τώρα; (μία φορά μόνο)",
   "canvas.cutout_done": "Το φόντο αφαιρέθηκε: τώρα το αντικείμενο μπορεί να ενσωματωθεί.",
   "canvas.cutout_restored": "Το αρχικό φόντο επαναφέρθηκε.",
-  "canvas.cutout_failed": "Η αποκοπή απέτυχε: {e}"
+  "canvas.cutout_failed": "Η αποκοπή απέτυχε: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Αρχ. εικόνας:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Αρχιτεκτονική εικόνας"
 }

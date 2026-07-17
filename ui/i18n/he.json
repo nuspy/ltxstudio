@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "להסרת הרקע דרוש מודל u2net (כ-176 MB) שעדיין לא נמצא בדיסק. להוריד עכשיו? (פעם אחת בלבד)",
   "canvas.cutout_done": "הרקע הוסר: כעת הנושא יכול להשתלב.",
   "canvas.cutout_restored": "הרקע המקורי שוחזר.",
-  "canvas.cutout_failed": "הסרת הרקע נכשלה: {e}"
+  "canvas.cutout_failed": "הסרת הרקע נכשלה: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "ארכיטקטורת תמונה:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "ארכיטקטורת תמונה"
 }

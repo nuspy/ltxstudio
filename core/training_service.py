@@ -62,6 +62,12 @@ BASE_MODELS: dict[str, BaseModelSpec] = {
     "flux2-dev": BaseModelSpec(
         "flux2-dev", "FLUX.2 [dev]", "black-forest-labs/FLUX.2-dev", "flux2", False,
         "PESANTE: ~64GB transformer + ~48GB Mistral. Richiede quantize+low_vram."),
+    # Krea 2: ai-toolkit (ostris) supporta l'arch krea2 (trainer ufficiale). Si allena sul RAW
+    # (qualità piena) e la LoRA risultante si applica anche sul Turbo distillato. TE Qwen3-VL pesante
+    # → quantize_te + low_vram consigliati su 32GB.
+    "krea2": BaseModelSpec(
+        "krea2", "Krea 2 [Raw]", "krea/Krea-2-Raw", "krea2", False,
+        "~26GB transformer + Qwen3-VL. Allena sul Raw; la LoRA vale anche sul Turbo. quantize+low_vram su 32GB."),
 }
 
 DEFAULT_SAMPLE_PROMPTS = [

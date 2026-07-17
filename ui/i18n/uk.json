@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "Щоб прибрати тло, потрібна модель u2net (~176 МБ), якої ще немає на диску. Завантажити зараз? (один раз)",
   "canvas.cutout_done": "Тло прибрано: тепер об'єкт впишеться у сцену.",
   "canvas.cutout_restored": "Початкове тло відновлено.",
-  "canvas.cutout_failed": "Обтравка не вдалася: {e}"
+  "canvas.cutout_failed": "Обтравка не вдалася: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Арх. зобр.:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Архітектура зображення"
 }

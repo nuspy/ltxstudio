@@ -545,6 +545,8 @@ class MusicVideoStudio(QWidget):
         """kwargs per gen_scene_image: modello (dal tab Foto) + risoluzione (dal tab Video) + sticky."""
         c = self.media_cfg
         kw: dict = {}
+        if c.get("image_arch"):                          # 2ª architettura immagine (es. 'krea2')
+            kw["arch"] = c["image_arch"]
         if c.get("image_model"):
             kw["model"] = c["image_model"]
         if c.get("width"):

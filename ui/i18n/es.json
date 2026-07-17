@@ -2670,5 +2670,11 @@
   "canvas.cutout_dl_msg": "Para quitar el fondo hace falta el modelo u2net (~176 MB), que aún no está en el disco. ¿Lo descargo ahora? (una sola vez)",
   "canvas.cutout_done": "Fondo eliminado: ahora el sujeto se integra.",
   "canvas.cutout_restored": "Fondo original restaurado.",
-  "canvas.cutout_failed": "Recorte fallido: {e}"
+  "canvas.cutout_failed": "Recorte fallido: {e}",
+  "fs.sb.arch_flux": "FLUX",
+  "fs.sb.arch_img": "Arq. img:",
+  "fs.sb.arch_krea2": "Krea 2",
+  "ld.arch_flux": "FLUX",
+  "ld.arch_krea2": "Krea 2",
+  "ld.image_arch": "Arquitectura de imagen"
 }

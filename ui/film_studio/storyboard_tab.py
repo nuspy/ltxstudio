@@ -61,6 +61,11 @@ class StoryboardTab(QWidget):
                 self.mdl_vid.addItem(lbl, {"path": path})
         except Exception:                                    # noqa: BLE001
             pass
+        # 2ª architettura IMMAGINE: FLUX (dropdown checkpoint sopra) vs Krea 2 (snapshot diffusers, senza file).
+        # Se != FLUX vince sull'arch del checkpoint (img_model resta vuoto → risolto dal worker dedicato).
+        self.img_arch = QComboBox(); self.img_arch.setMinimumWidth(120)
+        self.img_arch.addItem(tr("fs.sb.arch_flux", "FLUX"), "flux")
+        self.img_arch.addItem(tr("fs.sb.arch_krea2", "Krea 2"), "krea2")
         # 2ª architettura video: LTX-2 vs LingBot-Video (salvata nel config progetto → auto_run/handlers)
         self.vid_arch = QComboBox(); self.vid_arch.setMinimumWidth(140)
         self.vid_arch.addItem(tr("fs.sb.arch_ltx", "LTX-2"), "ltx")
@@ -68,8 +73,10 @@ class StoryboardTab(QWidget):
         self.vid_arch.addItem(tr("fs.sb.arch_krea_rt", "Krea Realtime"), "krea_rt")
         self.mdl_img.currentIndexChanged.connect(self._save_models)
         self.mdl_vid.currentIndexChanged.connect(self._save_models)
+        self.img_arch.currentIndexChanged.connect(self._save_models)
         self.vid_arch.currentIndexChanged.connect(self._save_models)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_img", "Modello immagine:"))); mrow.addWidget(self.mdl_img)
+        mrow.addWidget(QLabel(tr("fs.sb.arch_img", "Arch. img:"))); mrow.addWidget(self.img_arch)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_vid", "Modello video:"))); mrow.addWidget(self.mdl_vid)
         mrow.addWidget(QLabel(tr("fs.sb.arch_vid", "Arch. video:"))); mrow.addWidget(self.vid_arch)
         from PySide6.QtWidgets import QCheckBox as _CkB
@@ -288,8 +295,13 @@ class StoryboardTab(QWidget):
         cfg = json.loads(proj.get("config") or "{}")
         im = self.mdl_img.currentData()
         vd = self.mdl_vid.currentData()
-        cfg["img_arch"] = (im or {}).get("arch", "flux") if im else "flux"
-        cfg["img_model"] = (im or {}).get("path", "") if im else ""
+        img_arch = self.img_arch.currentData() or "flux"
+        if img_arch == "flux":                       # FLUX: usa arch+file del checkpoint scelto
+            cfg["img_arch"] = (im or {}).get("arch", "flux") if im else "flux"
+            cfg["img_model"] = (im or {}).get("path", "") if im else ""
+        else:                                        # Krea 2: snapshot diffusers, nessun file
+            cfg["img_arch"] = img_arch
+            cfg["img_model"] = ""
         cfg["vid_gguf"] = (vd or {}).get("path", "") if vd else ""
         cfg["vid_arch"] = self.vid_arch.currentData() or "ltx"
         db.update("project", pid, config=json.dumps(cfg, ensure_ascii=False))
@@ -310,6 +322,11 @@ class StoryboardTab(QWidget):
                     idx = i; break
             combo.setCurrentIndex(idx)
             combo.blockSignals(False)
+        # architettura immagine salvata (krea2 = snapshot; qualunque valore non-krea2 → FLUX)
+        self.img_arch.blockSignals(True)
+        _ii = self.img_arch.findData(cfg.get("img_arch", "flux"))
+        self.img_arch.setCurrentIndex(_ii if _ii >= 0 else 0)
+        self.img_arch.blockSignals(False)
         # architettura video salvata
         self.vid_arch.blockSignals(True)
         _ia = self.vid_arch.findData(cfg.get("vid_arch", "ltx"))

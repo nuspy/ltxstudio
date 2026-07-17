@@ -140,16 +140,18 @@ def recompute_lengths(scenes: list[dict], song_dur: float) -> None:
 
 
 def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int = 512,
-                    model: str | None = None, placement_mode: str | None = None) -> str:
-    """Genera l'immagine di apertura della scena (modulo immagini nativo, FLUX).
-    model: modello scelto nel tab Foto (se None → default del server). placement_mode: 'sticky' per tenere il
-    transformer residente durante il batch (niente ricarico per-foto)."""
+                    model: str | None = None, placement_mode: str | None = None,
+                    arch: str = "flux") -> str:
+    """Genera l'immagine di apertura della scena (modulo immagini nativo).
+    arch: architettura immagine ('flux' default o 'krea2' → worker dedicato via native_driver). model: modello
+    scelto nel tab Foto (se None → default del server; ignorato per krea2, che è uno snapshot senza file).
+    placement_mode: 'sticky' per tenere il transformer residente durante il batch (niente ricarico per-foto)."""
     from core import native_driver
     _p = {
-        "arch": "flux", "prompt": scene["img_prompt"], "negative": NEG,
+        "arch": (arch or "flux"), "prompt": scene["img_prompt"], "negative": NEG,
         "width": width, "height": height, "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png,
     }
-    if model:                                            # eredita il modello del tab Foto (altrimenti default srv)
+    if model and (arch or "flux") == "flux":             # eredita il modello del tab Foto (solo FLUX ha un file)
         _p["model"] = model
     if placement_mode:                                   # 'sticky' → transformer residente per il batch
         _p["placement_mode"] = placement_mode
