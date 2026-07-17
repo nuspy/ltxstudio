@@ -137,6 +137,28 @@ class VideoTab(QWidget):
             pass
         self.video_arch.currentIndexChanged.connect(self._on_arch_changed)
         form.addRow(tr("vid.arch_lbl", "Architettura"), self.video_arch)
+
+        # VIDEO LUNGO: Continuo (Self-Forcing rolling, una sola ripresa senza tagli, durata illimitata a memoria
+        # costante) vs A blocchi (l'architettura selezionata sopra genera a segmenti/estensione: qualità per
+        # segmento più alta ma con possibili cuciture). "Continuo" instrada al motore Self-Forcing.
+        self.long_mode = QComboBox()
+        self.long_mode.addItem(tr("vid.long.blocks", "A blocchi (arch selezionata)"), "blocks")
+        self.long_mode.addItem(tr("vid.long.continuous", "Continuo (Self-Forcing, senza tagli)"), "continuous")
+        self.long_mode.setToolTip(tr("vid.long.tt",
+            "Continuo: una sola ripresa senza cuciture, durata illimitata a memoria costante (motore "
+            "Self-Forcing 1.3B). A blocchi: l'architettura scelta genera a segmenti (qualità per segmento più "
+            "alta ma possibili stacchi)."))
+        form.addRow(tr("vid.long_lbl", "Video lungo"), self.long_mode)
+
+        # Decode a basso consumo (LTX): tile VAE più piccoli → meno VRAM di picco per film lunghi / alta
+        # risoluzione (più lento ma niente OOM). Lo streaming decode/su-disco di LTX è già attivo di suo.
+        from PySide6.QtWidgets import QCheckBox as _CkBox
+        self.decode_lowmem = _CkBox(tr("vid.decode_lowmem", "Decode a basso consumo (film lunghi / 4K)"))
+        self.decode_lowmem.setToolTip(tr("vid.decode_lowmem.tt",
+            "Riduce la VRAM di picco del decode VAE (tile più piccoli). Utile per video molto lunghi o ad alta "
+            "risoluzione; leggermente più lento. Vale per LTX-2."))
+        form.addRow("", self.decode_lowmem)
+
         self.model = QComboBox()
         self.model.setMaxVisibleItems(20)       # fix: mostra tutti i modelli nel popup
         self.model.currentIndexChanged.connect(self._on_model_changed)
@@ -983,7 +1005,12 @@ class VideoTab(QWidget):
             "i2v_method": self.i2v_method.currentData() or "addguide",
             "teacache_thresh": float(self.teacache.value()) if hasattr(self, "teacache") else 0.0,
             "video_arch": self._arch(),
+            "decode_lowmem": bool(self.decode_lowmem.isChecked()) if hasattr(self, "decode_lowmem") else False,
         }
+        # VIDEO LUNGO "Continuo" → instrada al motore Self-Forcing (una ripresa continua, senza tagli).
+        if hasattr(self, "long_mode") and self.long_mode.currentData() == "continuous":
+            v["video_arch"] = "self_forcing"
+            v["long_mode"] = "continuous"
         sel_data = self.model.currentData() or {"kind": "auto"}
         kind = sel_data.get("kind")
         if kind == "krea_rt":

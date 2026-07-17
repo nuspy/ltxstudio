@@ -2731,5 +2731,11 @@
   "f1.gen.dl.msg": "Il modello '{m}' non è scaricato: {ids} · ~{gb}GB. Scaricarlo ora?",
   "f1.gen.dl.progress": "Scaricamento {m}…",
   "fs.sb.arch_self_forcing": "Self-Forcing (realtime, lungo)",
-  "ld.arch_self_forcing": "Self-Forcing (realtime, lungo)"
+  "ld.arch_self_forcing": "Self-Forcing (realtime, lungo)",
+  "vid.long_lbl": "Video lungo",
+  "vid.long.blocks": "A blocchi (arch selezionata)",
+  "vid.long.continuous": "Continuo (Self-Forcing, senza tagli)",
+  "vid.long.tt": "Continuo: una sola ripresa senza cuciture, durata illimitata a memoria costante (motore Self-Forcing 1.3B). A blocchi: l'architettura scelta genera a segmenti (qualità per segmento più alta ma possibili stacchi).",
+  "vid.decode_lowmem": "Decode a basso consumo (film lunghi / 4K)",
+  "vid.decode_lowmem.tt": "Riduce la VRAM di picco del decode VAE (tile più piccoli). Utile per video molto lunghi o ad alta risoluzione; leggermente più lento. Vale per LTX-2."
 }

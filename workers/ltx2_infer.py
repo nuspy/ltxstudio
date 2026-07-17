@@ -40,6 +40,19 @@ torch._scaled_mm = _scaled_mm_f32
 from ltx_core.components.guiders import MultiModalGuiderParams
 from ltx_core.loader import LoraPathStrengthAndSDOps, LTXV_LORA_COMFY_RENAMING_MAP
 from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
+from ltx_core.model.video_vae.tiling import SpatialTilingConfig, TemporalTilingConfig
+
+
+def _tiling_config(p: dict) -> TilingConfig:
+    """TilingConfig per il decode VAE. Il decode LTX è GIÀ streaming (tile temporali → chunk → encode_video
+    scrive su disco a flusso). `decode_lowmem` (toggle GUI) usa tile più piccoli: meno VRAM di picco per film
+    lunghi / alta risoluzione (più lento, ma niente OOM). Default = preset ufficiale (768px / 80 frame)."""
+    if p.get("decode_lowmem"):
+        return TilingConfig(
+            spatial_config=SpatialTilingConfig(tile_size_in_pixels=512, tile_overlap_in_pixels=64),
+            temporal_config=TemporalTilingConfig(tile_size_in_frames=32, tile_overlap_in_frames=8),
+        )
+    return TilingConfig.default()
 from ltx_pipelines.ti2vid_two_stages import TI2VidTwoStagesPipeline
 from ltx_pipelines.a2vid_two_stage import A2VidPipelineTwoStage   # audio→video (lip-sync canto), nativo
 from ltx_pipelines.utils.args import ImageConditioningInput
@@ -1163,6 +1176,7 @@ def run_generation(p: dict) -> str:
                                 modality_scale=float(p.get("audio_scale", 3.0)), stg_blocks=[29])
     nf = int(p.get("num_frames", 121))
     fps = float(p.get("fps", 25.0))
+    _tc = _tiling_config(p)                                   # decode VAE a chunk (streaming); tile piccoli se lowmem
     tg = time.time()
     _stage(f"Generazione video — {int(p.get('steps', 30))} step (encode prompt + denoise)…")
     if ptype == "vinpaint":                                  # #59 inpaint: guide=video orig + attention_mask + CFG
@@ -1188,7 +1202,7 @@ def run_generation(p: dict) -> str:
             video_guider_params=vg, images=imgs, audio_path=_ensure_stereo(p["audio_path"]),
             audio_start_time=float(p.get("audio_start_time", 0.0)),
             audio_max_duration=p.get("audio_max_duration"),
-            tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+            tiling_config=_tc, enhance_prompt=bool(p.get("enhance", False)))
     elif ptype == "retake":                                  # #24 ReTake: rigenera [start,end] di un video sorgente
         print(f"[retake] {p['video_path']} sezione [{p.get('start_time',0)},{p.get('end_time',0)}]s", flush=True)
         _rt_src = _prep_retake_source(p["video_path"], p.get("width"), p.get("height"))
@@ -1204,7 +1218,7 @@ def run_generation(p: dict) -> str:
             num_inference_steps=int(p.get("steps", 40)), video_guider_params=vg,
             regenerate_video=bool(p.get("regenerate_video", True)),
             regenerate_audio=bool(p.get("regenerate_audio", True)),
-            tiling_config=TilingConfig.default())
+            tiling_config=_tc)
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
@@ -1225,7 +1239,7 @@ def run_generation(p: dict) -> str:
             prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
             height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, images=imgs, video_conditioning=[(cv, cstr)],
-            enhance_prompt=bool(p.get("enhance", False)), tiling_config=TilingConfig.default(),
+            enhance_prompt=bool(p.get("enhance", False)), tiling_config=_tc,
             conditioning_attention_strength=float(p.get("conditioning_attention", 1.0)),
             conditioning_attention_mask=cam)
     else:
@@ -1247,7 +1261,7 @@ def run_generation(p: dict) -> str:
             seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
             video_guider_params=vg, audio_guider_params=ag, images=images,
-            tiling_config=TilingConfig.default(), enhance_prompt=bool(p.get("enhance", False)))
+            tiling_config=_tc, enhance_prompt=bool(p.get("enhance", False)))
     print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video, {ptype})", flush=True)
     out = p["output"]
     _stage("Decodifica VAE e salvataggio video…")
@@ -1272,7 +1286,7 @@ def run_generation(p: dict) -> str:
     else:
         video = _nan_guard(video)
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
-                 video_chunks_number=get_video_chunks_number(nf, TilingConfig.default()))
+                 video_chunks_number=get_video_chunks_number(nf, _tc))
     # RETE DI SICUREZZA: se l'audio era RICHIESTO (a2v: canto/lip-sync) ma il file è uscito muto — encoder
     # in fallback, mux fallito, traccia vuota — rimuxa dal file audio ORIGINALE, sulla stessa finestra usata
     # per condizionare la generazione (audio_start_time + durata del chunk) → resta in sync anche nei video

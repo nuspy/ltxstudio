@@ -2731,5 +2731,11 @@
   "f1.gen.dl.msg": "The model '{m}' is not downloaded: {ids} · ~{gb}GB. Download now?",
   "f1.gen.dl.progress": "Downloading {m}…",
   "fs.sb.arch_self_forcing": "Self-Forcing (realtime, long)",
-  "ld.arch_self_forcing": "Self-Forcing (realtime, long)"
+  "ld.arch_self_forcing": "Self-Forcing (realtime, long)",
+  "vid.long_lbl": "Long video",
+  "vid.long.blocks": "In blocks (selected arch)",
+  "vid.long.continuous": "Continuous (Self-Forcing, seamless)",
+  "vid.long.tt": "Continuous: a single seamless take, unlimited length at constant memory (Self-Forcing 1.3B engine). In blocks: the selected architecture generates in segments (higher per-segment quality but possible seams).",
+  "vid.decode_lowmem": "Low-memory decode (long films / 4K)",
+  "vid.decode_lowmem.tt": "Reduces peak VAE decode VRAM (smaller tiles). Useful for very long or high-resolution videos; slightly slower. Applies to LTX-2."
 }

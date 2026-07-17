@@ -2776,6 +2776,7 @@ class MainWindow(QMainWindow):
             "offload": "", "loras": loras, "output": out,   # "" = AUTO: il worker decide (none se ci sta,
             #                                                block-swap per-blocco se serve — come ComfyUI)
             "teacache_thresh": float(vals.get("teacache_thresh", 0.0) or 0.0),   # #104 cache velocità (0=off)
+            "decode_lowmem": bool(vals.get("decode_lowmem")),   # tile VAE piccoli (film lunghi/4K, LTX)
         }
         # MODELLO scelto nel tab Video → al worker. Senza questo il worker usava SEMPRE il checkpoint
         # di default → "funziona solo un modello" (qualunque scelta nel dropdown era ignorata).
