@@ -138,6 +138,42 @@ def run_generation(p: dict) -> str:
     pipeline.generator.load_state_dict(sd[key])                    # VALIDATE: chiave stato (ema vs no)
     pipeline = pipeline.to(dtype=torch.bfloat16)
 
+    # Decode VAE STREAMING: il decode del VAE fa `out = cat(out, out_)` → ACCUMULA tutti i 477 frame su GPU →
+    # OOM sui video lunghi (la KV-cache invece si svuota bene grazie allo sfratto). Qui decodifico frame-per-frame
+    # spostando OGNI frame su CPU appena fatto: in VRAM non resta mai più di 1 frame. Prima libero anche
+    # transformer + KV-cache (a denoise finito non servono). Ritorna [b,t,c,h,w] in [-1,1] su CPU (la pipeline
+    # applica poi *0.5+0.5). Sostituisce pipeline.vae.decode_to_pixel.
+    def _decode_streaming(latents, use_cache=False):               # noqa: ARG001
+        try:                                                       # libera memoria inutile prima del decode
+            pipeline.generator.to("cpu"); pipeline.kv_cache1 = None; pipeline.crossattn_cache = None
+            import gc; gc.collect(); torch.cuda.empty_cache()
+        except Exception as _fe:                                   # noqa: BLE001
+            print(f"[self_forcing] free pre-decode: {_fe}", flush=True)
+        vae = pipeline.vae
+        m = vae.model
+        latents = latents.permute(0, 2, 1, 3, 4)                   # [b,t,c,h,w] → [b,c,t,h,w] (come decode_to_pixel)
+        sc = [vae.mean.to(latents.device, latents.dtype), 1.0 / vae.std.to(latents.device, latents.dtype)]
+        outs_b = []
+        for u in latents:                                          # batch
+            z = u.unsqueeze(0)
+            if isinstance(sc[0], torch.Tensor):
+                z = z / sc[1].view(1, m.z_dim, 1, 1, 1) + sc[0].view(1, m.z_dim, 1, 1, 1)
+            else:
+                z = z / sc[1] + sc[0]
+            m.clear_cache()
+            x = m.conv2(z)
+            frames = []
+            for i in range(x.shape[2]):
+                m._conv_idx = [0]
+                o = m.decoder(x[:, :, i:i + 1, :, :], feat_cache=m._feat_map, feat_idx=m._conv_idx)
+                frames.append(o.float().clamp_(-1, 1).cpu())       # SUBITO su CPU → in VRAM 1 frame alla volta
+                del o
+            m.clear_cache()
+            outs_b.append(torch.cat(frames, dim=2).squeeze(0))     # [c,t,h,w] CPU
+        torch.cuda.empty_cache()
+        return torch.stack(outs_b, 0).permute(0, 2, 1, 3, 4)       # [b,t,c,h,w] CPU, range [-1,1]
+    pipeline.vae.decode_to_pixel = _decode_streaming
+
     # VIDEO LUNGO a memoria COSTANTE (finestra scorrevole con SFRATTO). Il modello HA la logica di eviction
     # (causal_model: shift a sinistra dei token vecchi quando la cache si riempie), ma solo se
     # `local_attn_size != -1` sui MODULI di attenzione (non basta sul pipeline/model: ogni blocco ha il suo,
