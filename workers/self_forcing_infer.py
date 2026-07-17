@@ -84,6 +84,7 @@ def run_generation(p: dict) -> str:
         if pth not in sys.path:
             sys.path.insert(0, pth)
 
+    import time
     import torch
     from omegaconf import OmegaConf
     from einops import rearrange
@@ -94,6 +95,7 @@ def run_generation(p: dict) -> str:
     torch.set_grad_enabled(False)
     device = torch.device("cuda")
     set_seed(int(p.get("seed", 0)))
+    _t0 = time.perf_counter()                                     # cronometro: distingue overhead FISSO vs generazione
 
     cfg = OmegaConf.merge(OmegaConf.load("configs/default_config.yaml"),
                           OmegaConf.load("configs/self_forcing_dmd.yaml"))
@@ -102,6 +104,18 @@ def run_generation(p: dict) -> str:
     key = "generator_ema" if "generator_ema" in sd else "generator"
     pipeline.generator.load_state_dict(sd[key])                    # VALIDATE: chiave stato (ema vs no)
     pipeline = pipeline.to(dtype=torch.bfloat16)
+
+    # ESPERIMENTO video-lungo: se local_attn_size è finito, la KV-cache ROLLA (finestra scorrevole) invece di
+    # essere fissa a 21 latenti → durata potenzialmente illimitata. Override opzionale (default: invariato).
+    _la = p.get("kv_local_attn")
+    if _la is not None:
+        try:
+            pipeline.local_attn_size = int(_la)
+            if hasattr(pipeline.generator, "model"):
+                pipeline.generator.model.local_attn_size = int(_la)
+            print(f"[self_forcing] local_attn_size override = {int(_la)} (finestra scorrevole rolling)", flush=True)
+        except Exception as _ex:                                   # noqa: BLE001
+            print(f"[self_forcing] override local_attn_size fallito: {_ex}", flush=True)
 
     low = get_cuda_free_memory_gb(gpu) < 40                        # 32GB → block-swap del text-encoder
     if low:
@@ -117,7 +131,10 @@ def run_generation(p: dict) -> str:
     lat_h, lat_w = _snap_lat(H), _snap_lat(W)
     n_out = int(p.get("num_output_frames") or 0)
     if n_out <= 0:                                                 # da durata pixel: ~4 px per latente
-        n_out = max(3, ((int(p.get("num_frames", 81)) - 1) // 4) + 1)
+        n_out = ((int(p.get("num_frames", 81)) - 1) // 4) + 1
+    # il modello richiede num_frames latenti multipli di num_frame_per_block (=3) → arrotondo
+    _fpb = int(getattr(cfg, "num_frame_per_block", 3) or 3)
+    n_out = max(_fpb, round(n_out / _fpb) * _fpb)
     fps = int(p.get("fps", 16))
     prompt = p.get("prompt", "")
 
@@ -130,10 +147,24 @@ def run_generation(p: dict) -> str:
         t = t.permute(2, 0, 1)[None, :, None].to(device=device, dtype=torch.bfloat16)   # (1,C,1,H,W)
         initial_latent = pipeline.vae.encode_to_latent(t).to(device=device, dtype=torch.bfloat16)
 
+    torch.cuda.synchronize()
+    _t_load = time.perf_counter() - _t0                          # FISSO: costruzione pipeline + ckpt + to-device
+
+    # Tetto per-chiamata: la KV-cache del checkpoint `dmd` è fissa a 32760 token = 21 latenti (~5s) → oltre
+    # va in overflow. Il VIDEO LUNGO (>5s) richiede il chaining a finestre (in lavorazione) o il checkpoint
+    # `self_forcing_10s`. Qui limito a una finestra per garantire un output valido.
+    MAX_WIN = 21 // _fpb * _fpb                                   # 21 latenti (~5s) — cap sicuro del dmd
+    if _la is None and n_out > MAX_WIN:                           # senza rolling: clip a 5s per un output valido
+        print(f"[self_forcing] durata richiesta {n_out} latenti > cap per-chiamata {MAX_WIN} (~5s): "
+              f"clip a {MAX_WIN} (usa kv_local_attn per il rolling)", flush=True)
+        n_out = MAX_WIN
     noise = torch.randn([1, n_out, 16, lat_h, lat_w], device=device, dtype=torch.bfloat16)
     print(f"[self_forcing] t2v realtime {W}x{H} ~{n_out} latenti (~{(n_out-1)*4+1}px @ {fps}fps), 4 step", flush=True)
+    _tg = time.perf_counter()
     video, _lat = pipeline.inference(noise=noise, text_prompts=[prompt], return_latents=True,
                                      initial_latent=initial_latent, low_memory=low)
+    torch.cuda.synchronize()
+    _t_gen = time.perf_counter() - _tg                           # SCALA con la durata: encode+denoise autoregressivo+VAE
     # (b,t,c,h,w) in [0,1] → (t,h,w,c) uint8
     import numpy as np
     vid = rearrange(video, "b t c h w -> b t h w c")[0].float().cpu().numpy()
@@ -141,12 +172,20 @@ def run_generation(p: dict) -> str:
         raise RuntimeError("Frame NaN/inf: pesi Self-Forcing/Wan corrotti o incompleti.")
     frames = (vid * 255.0).clip(0, 255).astype("uint8")
 
+    _ts = time.perf_counter()
     import imageio
     imageio.mimsave(out, list(frames), fps=fps, codec="libx264", quality=8, macro_block_size=16)
     try:
         pipeline.vae.model.clear_cache()
     except Exception:                                             # noqa: BLE001
         pass
+    _t_save = time.perf_counter() - _ts
+    n_px = int(frames.shape[0])
+    # Riepilogo tempi: LOAD/SAVE sono ~FISSI (uguali per 5s o 10min); GEN è la generazione VERA (scala).
+    gen_rate = _t_gen / max(1, n_px)
+    print(f"[timing] load={_t_load:.1f}s (fisso) | GEN={_t_gen:.1f}s ({gen_rate*1000:.0f}ms/frame, "
+          f"{n_px/max(0.001,_t_gen):.2f} fps gen) | save={_t_save:.1f}s | frame={n_px} @ {fps}fps "
+          f"= {n_px/fps:.1f}s video | TOT={_t_load+_t_gen+_t_save:.1f}s", flush=True)
 
     try:                                                          # #107 stego + #106 watermark
         from core import stego
