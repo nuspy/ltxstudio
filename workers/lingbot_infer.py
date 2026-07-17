@@ -90,6 +90,35 @@ def _rich_caption(p: dict) -> dict:
     }
 
 
+def _free_vram_mb() -> int:
+    try:
+        from core import gpu_mem
+        return int(gpu_mem.free_vram_mb())
+    except Exception:                                        # noqa: BLE001
+        return 0
+
+
+def _fit_to_vram(width: int, height: int, num_frames: int, free_mb: int) -> tuple[int, int]:
+    """Evita l'OOM: se il video non entra in VRAM, RIDUCE la risoluzione (mantenendo durata e aspect).
+
+    LingBot su 32GB ha un floor residente ~22GB (pesi + text-encoder VLM che il runner NON offloada) →
+    restano pochi GB per le attivazioni. Il --batch_cfg (necessario) le raddoppia. Calibrazione: 121f a
+    480×832 entra con ~30GB liberi. Il budget in 'pixel-frame' scala con la VRAM libera. Riduzione ⇒ log
+    esplicito (mai cap silenzioso). Per durate lunghe è preferibile la risoluzione più bassa all'OOM."""
+    import math
+    if free_mb <= 0:
+        return width, height
+    pf = width * height * num_frames
+    ref_pf = 121 * 480 * 832                                 # punto calibrato (riuscito)
+    budget = ref_pf * max(0.35, min(2.5, (free_mb - 1500) / 27000.0))
+    if pf <= budget:
+        return width, height
+    scale = math.sqrt(budget / pf)
+    nw = max(256, (int(width * scale) // 16) * 16)
+    nh = max(256, (int(height * scale) // 16) * 16)
+    return nw, nh
+
+
 def _mode(p: dict) -> str:
     if int(p.get("num_frames", 121)) <= 1:
         return "t2i"
@@ -103,6 +132,13 @@ def run_generation(p: dict) -> str:
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     model_dir, variant = _resolve_model_dir(p)
     mode = _mode(p)
+    # ANTI-OOM: se il video non entra in VRAM, riduci la risoluzione (durata invariata) invece di crashare.
+    _w0, _h0 = int(p.get("width", 832)), int(p.get("height", 480))
+    _fw, _fh = _fit_to_vram(_w0, _h0, int(p.get("num_frames", 121)), _free_vram_mb())
+    if (_fw, _fh) != (_w0, _h0):
+        print(f"[lingbot] VRAM: risoluzione {_w0}x{_h0} → {_fw}x{_fh} per {p.get('num_frames')}f "
+              f"(evita OOM; per l'alta risoluzione lunga serve più VRAM/offload)", flush=True)
+        p["width"], p["height"] = _fw, _fh
     # scrivi la caption JSON ricca in un file temporaneo
     cap = _rich_caption(p)
     cf = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
