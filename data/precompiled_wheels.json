@@ -1,0 +1,33 @@
+{
+  "_comment": "Manifest dei wheel PRE-COMPILATI per la distribuzione (task #75). Niente build lato utente: i wheel arch-specific si mettono in precompiled_wheels/ (o E:/AI/wheels) e install_accelerators.py li seleziona per package + torch-ver + sm/cp/cu nel filename. sm=compute capability (86=Ampere,89=Ada,120=Blackwell). Vedi docs/precompiled.pdf e [[precompiled-libs-distribution]].",
+  "search_dirs": ["E:\\AI\\Tools\\precompiled_wheels", "E:\\AI\\wheels"],
+  "wheels": [
+    {
+      "package": "flash_attn",
+      "version": "2.8.4",
+      "filename": "flash_attn-2.8.4+cu130torch211cuda131sm86sm89sm120-cp311-cp311-win_amd64.whl",
+      "torch": "2.11",
+      "cuda": "cu130",
+      "sm": ["86", "89", "120"],
+      "python": "cp311",
+      "os": "win_amd64",
+      "size_mb": 298,
+      "required": true,
+      "used_by": ["LingBot-Video (OBBLIGATORIO: senza flash-attn il modello genera garbage)"],
+      "note": "Blackwell (RTX 5090, sm120) supportato. FA3/Hopper NON incluso (kernel sm90); il transformer LingBot e' patchato per usare la varlen di FA2. Va nel venv lingbot_venv311 (py3.11+torch2.11)."
+    },
+    {
+      "package": "xformers",
+      "version": "0.0.35",
+      "filename": "xformers-0.0.35+03b91d7d.d20260601-py39-none-win_amd64.whl",
+      "torch": "any",
+      "cuda": "any",
+      "sm": ["any"],
+      "python": "py39",
+      "os": "win_amd64",
+      "size_mb": 9,
+      "required": false,
+      "used_by": ["attention memory-efficient (opzionale, alternativa a flash/sage)"]
+    }
+  ]
+}

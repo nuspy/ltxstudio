@@ -28,6 +28,20 @@ from pathlib import Path
 
 DEFAULT_VENV = r"E:\AI\Comfy_Nexus.bak\ComfyUI\venv\Scripts\python.exe"   # runtime principale LTX Studio
 DEFAULT_WHEELS = r"E:\AI\Tools\precompiled_wheels"
+MANIFEST = Path(__file__).resolve().parent.parent / "data" / "precompiled_wheels.json"
+
+
+def _search_dirs(cli_wheels: str) -> list[Path]:
+    """Dir dove cercare i wheel: quella da CLI + quelle del manifest (data/precompiled_wheels.json)."""
+    dirs = [Path(cli_wheels)]
+    try:
+        import json
+        for d in json.loads(MANIFEST.read_text("utf-8")).get("search_dirs", []):
+            if Path(d) not in dirs:
+                dirs.append(Path(d))
+    except Exception:                                       # noqa: BLE001
+        pass
+    return [d for d in dirs if d.is_dir()]
 
 # Alcuni acceleratori vanno in un venv DIVERSO da quello principale:
 #   insightface (ReActor/face-swap) → `inference_server_venv` (nel comfy venv dà KeyError numpy.uint32
@@ -106,11 +120,15 @@ def _install_one(name, py, is_win, tv, sm, cp, wdir, dry):
         return _pip(py, "-U", name, dry=dry)
 
     if strat == "wheel":
-        if not wdir.is_dir():
-            print(f"    [{name}] serve wheel pre-compilato per {tmm}/{sm}/{cp} in {wdir} (docs/precompiled.pdf)."); return False
+        wdirs = wdir if isinstance(wdir, list) else [wdir]
+        wdirs = [d for d in wdirs if d.is_dir()]
+        if not wdirs:
+            print(f"    [{name}] serve wheel pre-compilato per {tmm}/{sm}/{cp} in precompiled_wheels/ (docs/precompiled.pdf)."); return False
         base = imp.replace("_", "-").split("-")[0]
-        cands = [w for w in wdir.glob("*.whl")
+        os_tag = "win_amd64" if is_win else "linux"          # niente wheel Linux su Windows e viceversa
+        cands = [w for d in wdirs for w in d.glob("*.whl")
                  if base in w.name.lower().replace("_", "-")
+                 and os_tag in w.name.lower()
                  and (not tmm or tmm in w.name.lower())
                  and (sm in w.name.lower() or cp in w.name.lower() or cu in w.name.lower())]
         if not cands:
@@ -134,8 +152,9 @@ def main():
         sys.exit(f"venv non trovato: {py}")
     is_win = platform.system() == "Windows"
     tv, sm, cp, present = _probe(py)
-    wdir = Path(a.wheels)
+    wdir = _search_dirs(a.wheels)                            # cerca in precompiled_wheels/ + E:/AI/wheels (manifest)
     print(f"[accel] OS={platform.system()} · torch={tv} · arch={sm} · py={cp} · cuda={_cuda_tag(tv)}")
+    print(f"[accel] dir wheel: {[str(d) for d in wdir] or 'nessuna'}")
     print(f"[accel] già presenti: {sorted(present) or 'nessuno'}")
 
     want = [x.strip() for x in a.only.split(",") if x.strip()] or list(ACCELERATORS)
