@@ -129,6 +129,7 @@ class LuckyDirectorDialog(QDialog):
         self.vid_arch = QComboBox()
         self.vid_arch.addItem(tr("ld.arch_ltx", "LTX-2"), "ltx")
         self.vid_arch.addItem(tr("ld.arch_lingbot", "LingBot-Video"), "lingbot")
+        self.vid_arch.addItem(tr("ld.arch_krea_rt", "Krea Realtime"), "krea_rt")
         form.addRow(tr("ld.video_arch", "Video architecture"), self.vid_arch)
         self.music = QCheckBox(tr("ld.music", "Generate a soundtrack")); self.music.setChecked(True)
         form.addRow("", self.music)

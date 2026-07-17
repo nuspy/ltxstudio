@@ -65,6 +65,7 @@ class StoryboardTab(QWidget):
         self.vid_arch = QComboBox(); self.vid_arch.setMinimumWidth(140)
         self.vid_arch.addItem(tr("fs.sb.arch_ltx", "LTX-2"), "ltx")
         self.vid_arch.addItem(tr("fs.sb.arch_lingbot", "LingBot-Video"), "lingbot")
+        self.vid_arch.addItem(tr("fs.sb.arch_krea_rt", "Krea Realtime"), "krea_rt")
         self.mdl_img.currentIndexChanged.connect(self._save_models)
         self.mdl_vid.currentIndexChanged.connect(self._save_models)
         self.vid_arch.currentIndexChanged.connect(self._save_models)

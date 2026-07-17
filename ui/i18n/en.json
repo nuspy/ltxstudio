@@ -2710,5 +2710,9 @@
   "vid.attn.flash": "Flash / SDPA (exact, fast)",
   "vid.attn.sage": "SageAttention (fp8, small GPUs)",
   "vid.attn.auto": "Auto (flash on recent GPUs)",
-  "vid.attn.tt": "LTX attention backend. Flash/SDPA = exact and faster on recent GPUs (e.g. RTX 5090). Sage = quantized fp8 (approximate), can help on small GPUs. Only one runs."
+  "vid.attn.tt": "LTX attention backend. Flash/SDPA = exact and faster on recent GPUs (e.g. RTX 5090). Sage = quantized fp8 (approximate), can help on small GPUs. Only one runs.",
+  "vid.arch.krea_rt": "Krea Realtime (autoregressive, long/extend)",
+  "vid.arch.krea_rt.model": "Krea Realtime 14B (autoregressive)",
+  "fs.sb.arch_krea_rt": "Krea Realtime",
+  "ld.arch_krea_rt": "Krea Realtime"
 }
