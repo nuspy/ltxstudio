@@ -20,6 +20,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Meno frammentazione VRAM (14B su 32GB è tirato): l'allocatore può espandere i segmenti invece di
+# richiedere blocchi contigui. DEVE stare prima dell'init CUDA di torch. Lo suggerisce l'errore OOM.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 import torch
 
 torch.set_grad_enabled(False)
@@ -57,34 +61,41 @@ def _load_pipeline(krea_dir: str, wan_dir: str, kv_frames: int):
     key = (krea_dir, kv_frames)
     if key in _PIPE:
         return _PIPE[key]
-    # VALIDATE: caricamento della pipeline modular Wan-RT. La strada canonica diffusers 0.36:
-    #   from diffusers import ModularPipeline ; pipe = ModularPipeline.from_pretrained(krea_dir, ...)
-    # Il modular_model_index punta ai componenti Wan (repo separato) → si passa il base Wan locale.
-    from diffusers import ModularPipeline
+    # Pipeline modular Wan-RT (diffusers 0.36). Il modular_model_index mappa i componenti ai repo:
+    #   transformer → krea/krea-realtime-video ; text_encoder(UMT5)/tokenizer/vae(AutoencoderKLWan)/scheduler
+    #   (UniPC) → Wan-AI/Wan2.1-T2V-14B-Diffusers. `load_components()` li scaricherebbe DA HF: qui li carichiamo
+    #   invece dai path LOCALI e li registriamo con update_components() (niente ri-download, connessione metered).
+    from diffusers import ModularPipeline, AutoencoderKLWan, UniPCMultistepScheduler, AutoModel
+    from transformers import UMT5EncoderModel, AutoTokenizer
     print(f"[krea_rt] carico WanModularPipeline: {krea_dir} (base Wan={wan_dir}, kv={kv_frames})", flush=True)
     pipe = ModularPipeline.from_pretrained(krea_dir, trust_remote_code=True)
-    # componenti Wan dal base locale (VAE/TE/tokenizer/scheduler) se il modular li richiede da repo
-    try:
-        if wan_dir and os.path.isdir(wan_dir) and hasattr(pipe, "load_components"):
-            pipe.load_components(wan_dir)                    # VALIDATE: nome metodo modular per i componenti
-    except Exception as ex:                                  # noqa: BLE001
-        print(f"[krea_rt] componenti Wan: {ex}", flush=True)
 
-    free = _free_vram_mb()
-    try:                                                    # fp8 sul transformer 14B (~28GB bf16 → ~14GB)
-        tr = getattr(pipe, "transformer", None)
-        if tr is not None and free < 44000:
-            tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
-            print(f"[krea_rt] transformer fp8 (VRAM libera {free}MB)", flush=True)
+    # Diagnostica confermata: transformer fp8 = 14.7GB, UMT5 bf16 ~11GB, VAE fp32 ~0.5GB → ~26GB residenti,
+    # stanno nei 32GB SENZA offload (il ComponentsManager offload ri-materializzava a bf16 = 27GB → OOM).
+    # Ordine di caricamento su cuda scelto per la frammentazione (Windows non ha expandable_segments):
+    # prima UMT5 (blocco grande, GPU vuota → alloc pulita), poi il transformer fp8 (tanti tensori piccoli).
+    comps: dict = {}
+    tok = vae = None
+    if wan_dir and os.path.isdir(wan_dir):
+        te = UMT5EncoderModel.from_pretrained(wan_dir, subfolder="text_encoder", torch_dtype=torch.bfloat16)
+        te.to("cuda")                                       # 1° in GPU (≈11GB) — allocazione contigua pulita
+        comps["text_encoder"] = te
+        comps["tokenizer"] = AutoTokenizer.from_pretrained(wan_dir, subfolder="tokenizer")
+        vae = AutoencoderKLWan.from_pretrained(wan_dir, subfolder="vae", torch_dtype=torch.float32)  # conv3d fp32
+        comps["vae"] = vae
+        comps["scheduler"] = UniPCMultistepScheduler.from_pretrained(wan_dir, subfolder="scheduler")
+    try:                                                    # transformer krea 14B (codice custom LOCALE)
+        tr = AutoModel.from_pretrained(os.path.join(krea_dir, "transformer"), torch_dtype=torch.bfloat16,
+                                       trust_remote_code=True, local_files_only=True)
+        tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)  # →14.7GB
+        tr.to("cuda")
+        print("[krea_rt] transformer fp8 residente (~14.7GB) + UMT5 bf16 + VAE fp32", flush=True)
+        comps["transformer"] = tr
     except Exception as ex:                                 # noqa: BLE001
-        print(f"[krea_rt] fp8 non applicato ({ex})", flush=True)
-    try:
-        pipe = pipe.to("cuda")
-    except Exception:                                       # noqa: BLE001
-        try:
-            pipe.enable_model_cpu_offload()
-        except Exception:                                   # noqa: BLE001
-            pass
+        print(f"[krea_rt] transformer load: {ex}", flush=True)
+    if vae is not None:
+        vae.to("cuda")                                      # VAE fp32 per ultimo (piccolo)
+    pipe.update_components(**comps)
     _PIPE[key] = pipe
     return pipe
 
