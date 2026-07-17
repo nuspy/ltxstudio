@@ -460,21 +460,14 @@ class _NativeLtx2Worker(QThread):
     def run(self):
         import json as _json, os as _os, subprocess as _sp, tempfile as _tf
         try:
-            # arch = "lingbot" → 2ª architettura (venv + worker dedicati); default LTX-2.
+            # arch → venv+worker dedicati (ltx/lingbot/krea_rt) dal dispatch centrale. Default LTX-2.
             _arch = (self.params.get("arch") or "ltx").lower()
-            if _arch == "lingbot":
-                py = self.LINGBOT_PY
-                worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "lingbot_infer.py")
-                if not _os.path.exists(py):
-                    self.done.emit({"status": "error",
-                                    "error": f"venv LingBot mancante: {py}. Esegui scripts/install_lingbot.py"})
-                    return
-            else:
-                py = self.LTX2_PY
-                worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "ltx2_infer.py")
-                if not _os.path.exists(py):
-                    self.done.emit({"status": "error", "error": f"venv ltx2 mancante: {py}"})
-                    return
+            from core.ltx_video_job import _ARCH_RUNNER as _RUN
+            py, worker = _RUN.get(_arch, _RUN["ltx"])
+            if not _os.path.exists(py):
+                self.done.emit({"status": "error",
+                                "error": f"venv per arch '{_arch}' mancante: {py}. Esegui lo script install_*."})
+                return
             # #4 separazione voce (Canta): isola i vocals dalla canzone PRIMA del lip-sync (in-process,
             # venv comfy con demucs). Fail-safe: se fallisce, resta l'audio originale.
             if self.params.pop("_sep_vocals", False) and self.params.get("audio_path"):
@@ -2886,6 +2879,18 @@ class MainWindow(QMainWindow):
             self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
             self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
                           on_progress=lambda s: self._log("[lingbot] " + s))
+            return
+        # ── 3ª ARCHITETTURA: Krea Realtime (autoregressivo) ─────────────────────────────
+        if vals.get("video_arch") == "krea_rt":
+            params["arch"] = "krea_rt"
+            params.pop("gguf_transformer", None)
+            # prompt TESTO semplice (no JSON). kv-cache/num_blocks li decide il worker per VRAM/durata.
+            self._log(f"[krea_rt] Krea Realtime 14B (autoregressivo): "
+                      f"{params['width']}x{params['height']} {nf} frame")
+            self._ltx2_worker = _NativeLtx2Worker(params)
+            self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
+            self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
+                          on_progress=lambda s: self._log("[krea_rt] " + s))
             return
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")

@@ -30,10 +30,15 @@ LTX2_WORKER = str(REPO / "workers" / "ltx2_infer.py")
 LINGBOT_PY = r"E:\AI\Tools\lingbot_venv311\Scripts\python.exe"
 LINGBOT_WORKER = str(REPO / "workers" / "lingbot_infer.py")
 
+# 3ª architettura video: Krea Realtime 14B (autoregressivo, venv dedicato).
+KREA_RT_PY = r"E:\AI\Tools\krea_rt_venv\Scripts\python.exe"
+KREA_RT_WORKER = str(REPO / "workers" / "krea_rt_infer.py")
+
 # quale (python, worker) usare per ogni architettura
 _ARCH_RUNNER = {
     "ltx": (LTX2_PY, LTX2_WORKER),
     "lingbot": (LINGBOT_PY, LINGBOT_WORKER),
+    "krea_rt": (KREA_RT_PY, KREA_RT_WORKER),
 }
 
 NEG = "worst quality, inconsistent motion, blurry, jittery, distorted"
@@ -116,9 +121,9 @@ def build_params(
     elif image_path:
         params["image_path"] = image_path
 
-    if arch == "lingbot":
-        # LingBot: nessuna policy GGUF LTX. model = path cartella diffusers (o vuoto → il worker
-        # risolve dal catalogo). La variante (dense/moe) e run_refiner arrivano via `extra`.
+    if arch != "ltx":
+        # Architetture diffusers (lingbot, krea_rt): nessuna policy GGUF LTX. model = path cartella
+        # diffusers (o vuoto → il worker risolve dal catalogo). Variante/refiner/kv-cache via `extra`.
         if model:
             params["model"] = model
     else:
