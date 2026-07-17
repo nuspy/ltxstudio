@@ -231,6 +231,25 @@ class VideoTab(QWidget):
             "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v."))
         self.engine_row_lbl = QLabel(tr("vid.engine_lbl", "Motore video"))
         form.addRow(self.engine_row_lbl, self.video_engine_sel)
+        # Backend di ATTENZIONE (LTX): flash/SDPA (esatto, veloce su GPU recenti) vs Sage (fp8, GPU piccole).
+        # Sostituiscono lo stesso operatore; se ne usa uno. Default flash. Vedi core/attention_backend.
+        self.attn_backend = QComboBox()
+        self.attn_backend.addItem(tr("vid.attn.flash", "Flash / SDPA (esatto, veloce)"), "flash")
+        self.attn_backend.addItem(tr("vid.attn.sage", "SageAttention (fp8, GPU piccole)"), "sage")
+        self.attn_backend.addItem(tr("vid.attn.auto", "Auto (flash su GPU recenti)"), "auto")
+        self.attn_backend.setToolTip(tr("vid.attn.tt",
+            "Backend di attenzione LTX. Flash/SDPA = esatto e più veloce su GPU recenti (es. RTX 5090). "
+            "Sage = fp8 quantizzato (approssimato), può aiutare su GPU piccole. Ne gira uno solo."))
+        try:
+            from core import attention_backend as _ab
+            _ia = self.attn_backend.findData(_ab.get())
+            self.attn_backend.setCurrentIndex(_ia if _ia >= 0 else 0)
+            self.attn_backend.currentIndexChanged.connect(
+                lambda *_: _ab.set(self.attn_backend.currentData()))
+        except Exception:                                       # noqa: BLE001
+            pass
+        self.attn_row_lbl = QLabel(tr("vid.attn_lbl", "Attenzione"))
+        form.addRow(self.attn_row_lbl, self.attn_backend)
         # --- Opzioni LingBot-Video (progressive disclosure: visibili solo con arch=LingBot) ---
         self.lingbot_box = QGroupBox(tr("vid.lingbot.group", "Opzioni LingBot-Video"))
         _lbf = QFormLayout(self.lingbot_box)
@@ -394,6 +413,8 @@ class VideoTab(QWidget):
             (getattr(self, "teacache", None), is_ling),
             (getattr(self, "video_engine_sel", None), is_ling),
             (getattr(self, "engine_row_lbl", None), is_ling),
+            (getattr(self, "attn_backend", None), is_ling),  # LingBot usa sempre FlashAttention (obbligo)
+            (getattr(self, "attn_row_lbl", None), is_ling),
             (getattr(self, "lora", None), is_ling),          # le LoRA LTX non si applicano a LingBot
         ]
         for w, disable in ltx_only:

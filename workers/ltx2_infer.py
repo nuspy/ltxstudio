@@ -275,8 +275,17 @@ def _patch_sage_attention():
     """ACCELERAZIONE: instrada l'attention di ltx-core (SDPAAttention chiama
     F.scaled_dot_product_attention) su **SageAttention** (attention quantizzata fp8, come ComfyUI) →
     forward del transformer molto più veloce (taglia i ~90s/step del 22B). Fallback sicuro alla SDPA
-    originale per i casi non supportati (mask presente, head_dim≠64/128, dtype non half). Env LTX_SAGE=0 disattiva."""
-    if os.environ.get("LTX_SAGE", "1") != "1":
+    originale per i casi non supportati (mask presente, head_dim≠64/128, dtype non half).
+
+    ATTIVAZIONE: preferenza GUI (core.attention_backend), non più env. Default = flash/SDPA (esatto, più
+    veloce su Blackwell) → Sage OFF salvo scelta esplicita 'sage'/'auto-su-GPU-vecchia'. Un solo switch."""
+    try:
+        from core import attention_backend
+        _use_sage = attention_backend.ltx_use_sage()
+    except Exception:                                        # noqa: BLE001 — fallback: env legacy
+        _use_sage = os.environ.get("LTX_SAGE", "1") == "1"
+    if not _use_sage:
+        print("[attn] SageAttention OFF (preferenza GUI: flash/SDPA esatta)", flush=True)
         return
     try:
         import torch

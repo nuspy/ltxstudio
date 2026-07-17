@@ -20,16 +20,27 @@ os.chdir(COMFY)                                          # cwd corretto: import 
 import torch  # noqa: E402
 import folder_paths  # noqa: E402
 
-# SAGEATTENTION: acceleratore attention (fp8) — ComfyUI la usa se args.use_sage_attention=True. Senza,
-# l'attention LTX gira lenta. La attiviamo se sageattention è installata (env LTX_SAGE=0 per disattivarla).
-if os.environ.get("LTX_SAGE", "1") != "0":
+# SAGEATTENTION: acceleratore attention (fp8) — ComfyUI la usa se args.use_sage_attention=True.
+# ATTIVAZIONE: preferenza GUI (core.attention_backend), non più env. Default = flash/SDPA (esatto, più
+# veloce su Blackwell). Serve il repo LTX Studio in sys.path per importare core.* (qui il cwd è ComfyUI).
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO not in sys.path:
+    sys.path.insert(0, _REPO)
+try:
+    from core import attention_backend as _ab
+    _use_sage = _ab.ltx_use_sage()
+except Exception:                                            # noqa: BLE001 — fallback: env legacy
+    _use_sage = os.environ.get("LTX_SAGE", "1") != "0"
+if _use_sage:
     try:
         import sageattention  # noqa: F401
         from comfy.cli_args import args as _comfy_args
         _comfy_args.use_sage_attention = True
-        print("[sage] SageAttention ATTIVA (ComfyUI)", flush=True)
+        print("[attn] SageAttention ATTIVA (ComfyUI)", flush=True)
     except Exception as _e:  # noqa: BLE001
-        print(f"[sage] non attivata: {_e}", flush=True)
+        print(f"[attn] Sage non attivata: {_e}", flush=True)
+else:
+    print("[attn] SageAttention OFF (preferenza GUI: flash/SDPA esatta)", flush=True)
 
 # Registra i percorsi modelli reali (E:\AI\Models) oltre ai default di ComfyUI.
 for _folder, _path in (("diffusion_models", r"E:\AI\Models\diffusion_models"),
