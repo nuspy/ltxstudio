@@ -77,17 +77,24 @@ def install_krea2() -> int:
               "(Krea 2 riusa lo stesso venv: diffusers 0.39 + Qwen3-VL + FA2).")
         return 1
     print(f"[krea2] uso il venv LingBot: {LINGBOT_VENV}")
-    # La Krea2Pipeline è custom-code: prova il caricamento via trust_remote_code dallo snapshot HF (il worker
-    # lo fa a runtime). Se serve il pacchetto krea-2 (mmdit/sampling), lo si clona + pip install --no-deps.
-    if not os.environ.get("SKIP_PKG"):
-        r = subprocess.run([str(py), "-c", "import importlib.util as u;print(bool(u.find_spec('krea2')))"],
-                           capture_output=True, text=True)
-        if "True" not in (r.stdout or ""):
-            if not (KREA2_PKG.exists() and any(KREA2_PKG.iterdir())):
-                print(f"[krea2] clono {KREA2_REPO} → {KREA2_PKG} (per la pipeline, se trust_remote_code non basta)")
-                run(["git", "clone", "--depth", "1", KREA2_REPO, str(KREA2_PKG)])
-            if KREA2_PKG.exists():
-                run([str(py), "-m", "pip", "install", "-e", str(KREA2_PKG), "--no-deps"])
+    # VALIDATO live (17/07): la diffusers 0.39.0 installata in lingbot_venv311 ESPONE GIÀ `Krea2Pipeline`
+    # (e Krea2Transformer2DModel/AutoencoderKLQwenImage) — il worker la importa da `diffusers` senza altro.
+    # NON serve il pacchetto krea-2-oss: richiede Python>=3.12 (qui 3.11) e pinna transformers==4.57.1, che
+    # confliggerebbe con la 5.8 di LingBot (Qwen3-VL). Lo clono/installo SOLO se la classe manca davvero.
+    r = subprocess.run([str(py), "-c", "from diffusers import Krea2Pipeline; print('HAVE')"],
+                       capture_output=True, text=True)
+    if "HAVE" in (r.stdout or ""):
+        print("[krea2] Krea2Pipeline già presente in diffusers — nessun pacchetto extra necessario.")
+    elif not os.environ.get("SKIP_PKG"):
+        print("[krea2] Krea2Pipeline assente in diffusers → provo il pacchetto krea-2 (--no-deps, best-effort).")
+        if not (KREA2_PKG.exists() and any(KREA2_PKG.iterdir())):
+            print(f"[krea2] clono {KREA2_REPO} → {KREA2_PKG}")
+            run(["git", "clone", "--depth", "1", KREA2_REPO, str(KREA2_PKG)])
+        if KREA2_PKG.exists():
+            # --ignore-requires-python: il pin >=3.12 è solo un vincolo dei metadata; il codice puro-python
+            # gira anche su 3.11. --no-deps: non toccare transformers/diffusers del venv LingBot.
+            run([str(py), "-m", "pip", "install", "-e", str(KREA2_PKG), "--no-deps",
+                 "--ignore-requires-python"])
     print("[krea2] pronto. Il worker carica Krea2Pipeline (fp8) dallo snapshot krea/Krea-2-Turbo|Raw.")
     return 0
 
