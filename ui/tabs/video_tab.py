@@ -126,6 +126,7 @@ class VideoTab(QWidget):
         self.video_arch = QComboBox()
         self.video_arch.addItem(tr("vid.arch.ltx", "LTX-2 (tutte le funzioni)"), "ltx")
         self.video_arch.addItem(tr("vid.arch.lingbot", "LingBot-Video (MoE, qualità SOTA)"), "lingbot")
+        self.video_arch.addItem(tr("vid.arch.krea_rt", "Krea Realtime (autoregressivo, long/extend)"), "krea_rt")
         self.video_arch.setToolTip(tr("vid.arch.tt",
             "LTX-2: audio nativo, controlnet, v2v, storyboard. LingBot-Video: T2V/I2V/TI2V + refiner, "
             "prompt JSON strutturato; niente audio/controlnet/v2v."))
@@ -400,22 +401,24 @@ class VideoTab(QWidget):
         except Exception:                                       # noqa: BLE001
             pass
         is_ling = arch == "lingbot"
-        # progressive disclosure del pannello LingBot
+        is_ltx = arch == "ltx"
+        # progressive disclosure del pannello LingBot (refiner/rewriter) — solo LingBot
         if hasattr(self, "lingbot_box"):
             self.lingbot_box.setVisible(is_ling)
-        # abilita/disabilita i controlli SOLO-LTX con tooltip esplicativo (non li nasconde: l'utente capisce)
+        # abilita/disabilita i controlli SOLO-LTX (teacache/motore/attention/LoRA valgono solo per LTX;
+        # v2v/storyboard secondo le capability dell'arch). Non li nasconde: tooltip esplicativo.
         from core.model_catalog import video_caps
         caps = video_caps(arch)
         tip = tr("vid.arch.unavailable", "Non disponibile con l'architettura {a}").format(a=arch.upper())
         ltx_only = [
             (getattr(self, "v2v_panel", None), not caps["v2v"]),
             (getattr(self, "storyboard_panel", None), not caps["storyboard"]),
-            (getattr(self, "teacache", None), is_ling),
-            (getattr(self, "video_engine_sel", None), is_ling),
-            (getattr(self, "engine_row_lbl", None), is_ling),
-            (getattr(self, "attn_backend", None), is_ling),  # LingBot usa sempre FlashAttention (obbligo)
-            (getattr(self, "attn_row_lbl", None), is_ling),
-            (getattr(self, "lora", None), is_ling),          # le LoRA LTX non si applicano a LingBot
+            (getattr(self, "teacache", None), not is_ltx),
+            (getattr(self, "video_engine_sel", None), not is_ltx),
+            (getattr(self, "engine_row_lbl", None), not is_ltx),
+            (getattr(self, "attn_backend", None), not is_ltx),   # LingBot/Krea usano sempre FlashAttention
+            (getattr(self, "attn_row_lbl", None), not is_ltx),
+            (getattr(self, "lora", None), not is_ltx),           # le LoRA LTX non si applicano alle altre arch
         ]
         for w, disable in ltx_only:
             if w is None:
@@ -428,6 +431,9 @@ class VideoTab(QWidget):
         # ripopola il dropdown modello per l'architettura scelta
         if is_ling:
             self._refilter_lingbot_models()
+        elif arch == "krea_rt":
+            self._refilter_diffusers_arch_models([("krea_rt", "base",
+                tr("vid.arch.krea_rt.model", "Krea Realtime 14B (autoregressivo)"))])
         else:
             self._refilter_models()
 
@@ -482,7 +488,7 @@ class VideoTab(QWidget):
     def _maybe_offer_lingbot_download(self):
         """Se il modello LingBot selezionato non è presente, offre il download (con barra di progresso)."""
         data = self.model.currentData() or {}
-        if data.get("kind") != "lingbot" or data.get("present"):
+        if not data.get("cat_id") or data.get("present"):    # generico: qualunque modello del catalogo mancante
             return
         cat_id = data.get("cat_id")
         from PySide6.QtWidgets import QMessageBox
@@ -510,11 +516,40 @@ class VideoTab(QWidget):
 
         def _fin(*_):
             dlg.close()
-            self._refilter_lingbot_models()                     # riflette la nuova presenza
+            self._on_arch_changed()                             # ripopola per l'arch corrente (riflette la presenza)
         proc.finished.connect(_fin)
         dlg.canceled.connect(proc.kill)
         proc.start(sys.executable, ["-u", script, "--ids", cat_id])
         dlg.show()
+
+    def _refilter_diffusers_arch_models(self, items: list):
+        """Popola il dropdown con modelli-snapshot diffusers di un'arch (es. Krea Realtime) dal catalogo.
+        items = [(cat_id, variant, label)]. Generico (come _refilter_lingbot_models). Data kind = arch."""
+        from core import weights_catalog as wc
+        from PySide6.QtGui import QColor
+        arch = self._arch()
+        entries = {e["id"]: e for e in wc.load()}
+        self.model.blockSignals(True)
+        self.model.clear()
+        for cat_id, variant, label in items:
+            e = entries.get(cat_id)
+            if not e:
+                continue
+            present, model_dir = False, ""
+            try:
+                present = wc.is_present(e)
+                model_dir = str(wc.dest_for(e))
+            except Exception:                                   # noqa: BLE001
+                pass
+            badge = "" if present else "⬇ "
+            gb = e.get("approx_gb", 0)
+            self.model.addItem(f"{badge}{label}  · ~{gb}GB",
+                               {"kind": arch, "variant": variant, "cat_id": cat_id,
+                                "model": model_dir if present else "", "present": present,
+                                "key": f"{arch}:{cat_id}"})
+            if not present:
+                self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self.model.blockSignals(False)
 
     def _resolve_model_path(self, name: str) -> str | None:
         """Risolve il nome relativo del modello video al path assoluto (per la detection header)."""
@@ -932,7 +967,10 @@ class VideoTab(QWidget):
         }
         sel_data = self.model.currentData() or {"kind": "auto"}
         kind = sel_data.get("kind")
-        if kind == "lingbot":
+        if kind == "krea_rt":
+            v["model_kind"] = "krea_rt"
+            v["model"] = sel_data.get("model", "")
+        elif kind == "lingbot":
             # LingBot: model = cartella diffusers (vuota → il worker risolve dal catalogo), variante + refiner
             v["model_kind"] = "lingbot"
             v["model"] = sel_data.get("model", "")

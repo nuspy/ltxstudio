@@ -49,7 +49,8 @@ INPAINT_MODELS = {
 }
 # generazione: arch -> (architettura catalogo LoRA, keyword per filtrare i modelli in diffusion_models)
 GEN_ARCH = {
-    "FLUX": ("Flux", ("flux", "getphat", "fuxcapacity", "krea")),
+    "FLUX": ("Flux", ("flux", "getphat", "fuxcapacity")),   # "krea" tolto: ora ambiguo con Krea 2
+    "Krea 2": ("Krea2", ("krea-2", "krea2")),               # arch immagine alternativa (Turbo/Raw)
     "Z-Image": ("Z-Image", ("z-image", "z_image", "zimage")),
     "Ernie": ("Ernie", ("ernie",)),
 }
@@ -1390,7 +1391,7 @@ class Frame1Tab(QWidget):
             "pulid_strength": (self.gen_pulid_strength.value() if hasattr(self, "gen_pulid_strength") else 0.8),
             "pulid_start_step": (self.gen_pulid_start.value() if hasattr(self, "gen_pulid_start") else 0),
             "pulid_true_cfg": (self.gen_pulid_truecfg.value() if hasattr(self, "gen_pulid_truecfg") else 1.0),
-            "arch": {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
+            "arch": {"FLUX": "flux", "Krea 2": "krea2", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
             "model": self._gen_model_name(),
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),
