@@ -104,6 +104,15 @@ def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float
     è `not is_up()`: un server vivo ma lento (history in timeout perché sta decodificando) NON deve mai far
     ripartire il job — sarebbe lavoro doppio.
     """
+    # Architetture immagine con venv/worker DEDICATO (es. Krea 2: Qwen3-VL/diffusers 0.39, incompatibile con
+    # l'inference_server) → bypassano il server e girano in subprocess (core/img_gen_job), come il video.
+    if module == "image":
+        try:
+            from core import img_gen_job
+            if img_gen_job.handles(params.get("arch")):
+                return img_gen_job.run(params, timeout=int(timeout))
+        except Exception as _e:                              # noqa: BLE001 — se manca il dispatch dedicato, prosegui col server
+            _say(log, f"[nativo] dispatch immagine dedicato non disponibile ({_e}) -> server")
     pid = submit(module, params)
     t0 = time.monotonic()
     _misses = 0
