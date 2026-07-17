@@ -2712,7 +2712,7 @@
   "vid.attn.auto": "Auto (flash su GPU recenti)",
   "vid.attn.tt": "Backend di attenzione LTX. Flash/SDPA = esatto e più veloce su GPU recenti (es. RTX 5090). Sage = fp8 quantizzato (approssimato), può aiutare su GPU piccole. Ne gira uno solo.",
   "vid.arch.krea_rt": "Krea Realtime (autoregressivo, long/extend)",
-  "vid.arch.krea_rt.model": "Krea Realtime 14B (autoregressivo)",
+  "vid.arch.krea_rt.model": "Krea Realtime 14B (autoregressivo, qualità)",
   "fs.sb.arch_krea_rt": "Krea Realtime",
   "ld.arch_krea_rt": "Krea Realtime",
   "fs.sb.arch_flux": "FLUX",
@@ -2720,5 +2720,14 @@
   "fs.sb.arch_krea2": "Krea 2",
   "ld.arch_flux": "FLUX",
   "ld.arch_krea2": "Krea 2",
-  "ld.image_arch": "Architettura immagine"
+  "ld.image_arch": "Architettura immagine",
+  "vid.model.dl.title": "Scaricare il modello?",
+  "vid.model.dl.msg": "Il modello '{m}' (e le sue dipendenze) non è scaricato: {ids} · ~{gb}GB. Scaricarlo ora?",
+  "vid.model.dl.progress": "Scaricamento {m}…",
+  "vid.arch.sf13b.model": "Self-Forcing 1.3B (realtime, leggero)",
+  "f1.gen.krea2.turbo": "Krea 2 Turbo (8 step, veloce)",
+  "f1.gen.krea2.raw": "Krea 2 Raw (52 step, qualità)",
+  "f1.gen.dl.title": "Scaricare il modello?",
+  "f1.gen.dl.msg": "Il modello '{m}' non è scaricato: {ids} · ~{gb}GB. Scaricarlo ora?",
+  "f1.gen.dl.progress": "Scaricamento {m}…"
 }

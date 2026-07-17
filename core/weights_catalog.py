@@ -66,6 +66,34 @@ def is_present(entry: dict, base: str | None = None) -> bool:
     return d.is_dir() and any(d.iterdir())
 
 
+def missing_ids_with_deps(entry: dict, base: str | None = None) -> list[str]:
+    """id (entry + `deps` ricorsive) NON ancora presenti, in ordine di download (deps prima).
+    Serve al download-on-select: es. krea_rt richiede anche la base wan → li scarica insieme."""
+    by_id = {e["id"]: e for e in load()}
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def visit(eid: str) -> None:
+        if eid in seen:
+            return
+        seen.add(eid)
+        e = by_id.get(eid)
+        if not e:
+            return
+        for dep in e.get("deps", []):               # dipendenze prima (base Wan prima del modello)
+            visit(dep)
+        if not is_present(e, base) and eid not in out:
+            out.append(eid)
+
+    visit(entry.get("id", ""))
+    return out
+
+
+def ready_with_deps(entry: dict, base: str | None = None) -> bool:
+    """True se l'entry E tutte le sue dipendenze sono presenti."""
+    return not missing_ids_with_deps(entry, base)
+
+
 # ── scan pre-download: cerca se esiste già in una directory dell'utente ───────
 def scan_existing(entry: dict, search_dir: str, max_depth: int = 6) -> str | None:
     """Cerca ricorsivamente in `search_dir` una cartella/file che corrisponda agli scan_names

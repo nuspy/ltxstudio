@@ -183,6 +183,7 @@ class Frame1Tab(QWidget):
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)
         self.gen_model.currentIndexChanged.connect(self._refilter_gen_encoder)
         self.gen_model.currentIndexChanged.connect(self._update_auto_components)
+        self.gen_model.activated.connect(self._maybe_offer_gen_download)   # download-on-select (Krea 2)
         gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
         gmrow.addWidget(self.gen_model, 1)
         # filtro precisione (fp16/fp8/fp4/gguf) + colori VRAM (verde/giallo/rosso) sul dropdown modelli
@@ -413,6 +414,9 @@ class Frame1Tab(QWidget):
 
     def _reload_gen(self, *_):
         arch_lbl = self.gen_arch.currentText()
+        if arch_lbl == "Krea 2":                              # snapshot diffusers → varianti dal catalogo (no file)
+            self._reload_gen_krea2()
+            return
         _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
         allow = self._allow_nsfw()
         models = []
@@ -497,9 +501,85 @@ class Frame1Tab(QWidget):
         user_prefs.toggle_fav_model("inpaint:" + lbl)
         self._update_inp_star()
 
+    def _reload_gen_krea2(self, *_):
+        """Popola il dropdown con le varianti Krea 2 (Turbo/Raw) dal catalogo pesi, con badge ⬇ se non presenti
+        (Krea 2 è uno snapshot diffusers, non un checkpoint-file → download-on-select come per il video)."""
+        from core import weights_catalog as wc
+        from PySide6.QtGui import QColor
+        entries = {e["id"]: e for e in wc.load()}
+        self.gen_model.blockSignals(True)
+        self.gen_model.clear()
+        for cat_id, label in (("krea2_turbo", tr("f1.gen.krea2.turbo", "Krea 2 Turbo (8 step, veloce)")),
+                              ("krea2_raw", tr("f1.gen.krea2.raw", "Krea 2 Raw (52 step, qualità)"))):
+            e = entries.get(cat_id)
+            if not e:
+                continue
+            present = False
+            try:
+                present = wc.ready_with_deps(e)
+            except Exception:                                 # noqa: BLE001
+                pass
+            gb = e.get("approx_gb", 0)
+            self.gen_model.addItem(f"{'' if present else '⬇ '}{label}  · ~{gb}GB", cat_id)
+            if not present:
+                self.gen_model.setItemData(self.gen_model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self.gen_model.blockSignals(False)
+        self._update_gen_star()
+
+    def _maybe_offer_gen_download(self, *_):
+        """Solo su click utente: se l'arch immagine è a snapshot (Krea 2) e la variante scelta non è presente,
+        offre il download (con dipendenze) via download_weights, come nel tab Video."""
+        if self.gen_arch.currentText() != "Krea 2":
+            return
+        cat_id = self.gen_model.currentData()
+        if not isinstance(cat_id, str) or not cat_id.startswith("krea2"):
+            return
+        from core import weights_catalog as wc
+        entries = {e["id"]: e for e in wc.load()}
+        e = entries.get(cat_id)
+        if not e:
+            return
+        missing = wc.missing_ids_with_deps(e)
+        if not missing:
+            return
+        gb = sum(int(entries.get(m, {}).get("approx_gb", 0) or 0) for m in missing)
+        from PySide6.QtWidgets import QMessageBox
+        r = QMessageBox.question(
+            self, tr("f1.gen.dl.title", "Scaricare il modello?"),
+            tr("f1.gen.dl.msg", "Il modello '{m}' non è scaricato: {ids} · ~{gb}GB. Scaricarlo ora?").format(
+                m=cat_id, ids=", ".join(missing), gb=gb),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if r == QMessageBox.Yes:
+            self._download_gen_weights(missing)
+
+    def _download_gen_weights(self, ids):
+        """Scarica pesi del catalogo (modello immagine + deps) con dialog di progresso non bloccante."""
+        import sys
+        from pathlib import Path
+        from PySide6.QtCore import QProcess
+        from PySide6.QtWidgets import QProgressDialog
+        ids_arg = ",".join([ids] if isinstance(ids, str) else list(ids))
+        script = str(Path(__file__).resolve().parents[2] / "scripts" / "download_weights.py")
+        dlg = QProgressDialog(tr("f1.gen.dl.progress", "Scaricamento {m}…").format(m=ids_arg),
+                              tr("common.cancel", "Annulla"), 0, 0, self)
+        dlg.setWindowTitle(tr("f1.gen.dl.title", "Scaricamento modello"))
+        dlg.setMinimumWidth(420)
+        proc = QProcess(self)
+        proc.setProcessChannelMode(QProcess.MergedChannels)
+
+        def _fin(*_):
+            dlg.close()
+            self._reload_gen_krea2()                          # riflette la nuova presenza (toglie il ⬇)
+        proc.finished.connect(_fin)
+        dlg.canceled.connect(proc.kill)
+        proc.start(sys.executable, ["-u", script, "--ids", ids_arg])
+        dlg.show()
+
     def _gen_model_name(self) -> str:
         """Nome modello selezionato; risolve la voce '⚡ Auto' al miglior modello dell'arch corrente
         (stesso criterio del motore auto_select: preferiti + qualità di famiglia)."""
+        if self.gen_arch.currentText() == "Krea 2":           # snapshot: nessun file-modello (risolto dal worker)
+            return ""
         if not self.gen_model.count():
             return ""
         if self.gen_model.currentData() == "__auto__":
@@ -1393,6 +1473,9 @@ class Frame1Tab(QWidget):
             "pulid_true_cfg": (self.gen_pulid_truecfg.value() if hasattr(self, "gen_pulid_truecfg") else 1.0),
             "arch": {"FLUX": "flux", "Krea 2": "krea2", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
             "model": self._gen_model_name(),
+            # Krea 2: variante (turbo/raw) dalla voce selezionata nel dropdown → il worker risolve lo snapshot
+            "krea2_variant": ("raw" if str(self.gen_model.currentData() or "").endswith("raw") else "turbo")
+                             if self.gen_arch.currentText() == "Krea 2" else None,
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),
             "cfg": float(self.gen_cfg.value()) if hasattr(self, "gen_cfg") else None,

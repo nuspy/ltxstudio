@@ -432,8 +432,13 @@ class VideoTab(QWidget):
         if is_ling:
             self._refilter_lingbot_models()
         elif arch == "krea_rt":
-            self._refilter_diffusers_arch_models([("krea_rt", "base",
-                tr("vid.arch.krea_rt.model", "Krea Realtime 14B (autoregressivo)"))])
+            # due varianti selezionabili: 14B "quality" + 1.3B Self-Forcing "realtime" (leggero, ~realtime 5090)
+            self._refilter_diffusers_arch_models([
+                ("krea_rt", "quality",
+                 tr("vid.arch.krea_rt.model", "Krea Realtime 14B (autoregressivo, qualità)")),
+                ("self_forcing_dmd", "realtime",
+                 tr("vid.arch.sf13b.model", "Self-Forcing 1.3B (realtime, leggero)")),
+            ])
         else:
             self._refilter_models()
 
@@ -481,35 +486,49 @@ class VideoTab(QWidget):
         # selezione ESPLICITA dell'utente (model.activated → _on_model_activated), mai in automatico.
 
     def _on_model_activated(self, *_):
-        """Solo su click utente: se ha scelto un modello LingBot non presente, offri il download."""
-        if self._arch() == "lingbot":
-            self._maybe_offer_lingbot_download()
+        """Solo su click utente: se ha scelto un modello del catalogo non presente, scaricalo (con deps).
+        Generico per OGNI arch a snapshot (LingBot, Krea Realtime, Self-Forcing realtime…)."""
+        self._maybe_offer_lingbot_download()
 
     def _maybe_offer_lingbot_download(self):
-        """Se il modello LingBot selezionato non è presente, offre il download (con barra di progresso)."""
+        """Se il modello del catalogo selezionato (o una sua dipendenza) non è presente, ne avvia il download.
+        Generico per OGNI arch a snapshot. Conferma con la dimensione TOTALE (modello + base, es. Krea Realtime
+        richiede anche la base Wan) perché la connessione può essere metered."""
         data = self.model.currentData() or {}
-        if not data.get("cat_id") or data.get("present"):    # generico: qualunque modello del catalogo mancante
-            return
         cat_id = data.get("cat_id")
+        if not cat_id or data.get("present"):                 # nulla da scaricare
+            return
+        from core import weights_catalog as wc
+        entries = {e["id"]: e for e in wc.load()}
+        e = entries.get(cat_id)
+        if not e:
+            return
+        missing = wc.missing_ids_with_deps(e)                 # modello + dipendenze mancanti (base Wan inclusa)
+        if not missing:
+            return
+        gb = sum(int(entries.get(m, {}).get("approx_gb", 0) or 0) for m in missing)
         from PySide6.QtWidgets import QMessageBox
         r = QMessageBox.question(
-            self, tr("vid.lingbot.dl.title", "Scaricare il modello LingBot?"),
-            tr("vid.lingbot.dl.msg", "Il modello '{m}' non è ancora scaricato. Vuoi scaricarlo ora?").format(
-                m=data.get("cat_id", "")),
+            self, tr("vid.model.dl.title", "Scaricare il modello?"),
+            tr("vid.model.dl.msg", "Il modello '{m}' (e le sue dipendenze) non è scaricato: {ids} · ~{gb}GB. "
+               "Scaricarlo ora?").format(m=cat_id, ids=", ".join(missing), gb=gb),
             QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-        if r == QMessageBox.Yes and cat_id:
-            self._download_lingbot(cat_id)
+        if r == QMessageBox.Yes:
+            self._download_lingbot(missing)
 
-    def _download_lingbot(self, cat_id: str):
-        """Scarica un peso del catalogo via scripts/download_weights.py con dialog di progresso (non blocca la UI)."""
+    def _download_lingbot(self, ids):
+        """Scarica uno o più pesi del catalogo (modello + deps) via scripts/download_weights.py con dialog di
+        progresso (non blocca la UI). `ids` = str singolo o lista di id (deps prima)."""
         import sys
         from pathlib import Path
         from PySide6.QtCore import QProcess
         from PySide6.QtWidgets import QProgressDialog
+        id_list = [ids] if isinstance(ids, str) else list(ids)
+        ids_arg = ",".join(id_list)
         script = str(Path(__file__).resolve().parents[2] / "scripts" / "download_weights.py")
-        dlg = QProgressDialog(tr("vid.lingbot.dl.progress", "Scaricamento {m}…").format(m=cat_id),
+        dlg = QProgressDialog(tr("vid.model.dl.progress", "Scaricamento {m}…").format(m=ids_arg),
                               tr("common.cancel", "Annulla"), 0, 0, self)
-        dlg.setWindowTitle(tr("vid.lingbot.dl.title", "Scaricamento LingBot"))
+        dlg.setWindowTitle(tr("vid.model.dl.title", "Scaricamento modello"))
         dlg.setMinimumWidth(420)
         proc = QProcess(self)
         proc.setProcessChannelMode(QProcess.MergedChannels)
@@ -519,7 +538,7 @@ class VideoTab(QWidget):
             self._on_arch_changed()                             # ripopola per l'arch corrente (riflette la presenza)
         proc.finished.connect(_fin)
         dlg.canceled.connect(proc.kill)
-        proc.start(sys.executable, ["-u", script, "--ids", cat_id])
+        proc.start(sys.executable, ["-u", script, "--ids", ids_arg])
         dlg.show()
 
     def _refilter_diffusers_arch_models(self, items: list):
@@ -537,7 +556,7 @@ class VideoTab(QWidget):
                 continue
             present, model_dir = False, ""
             try:
-                present = wc.is_present(e)
+                present = wc.ready_with_deps(e)                  # presente = modello + base Wan (deps) scaricati
                 model_dir = str(wc.dest_for(e))
             except Exception:                                   # noqa: BLE001
                 pass

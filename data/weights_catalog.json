@@ -296,7 +296,10 @@
         "krea-realtime"
       ],
       "url": "https://huggingface.co/krea/krea-realtime-video",
-      "repo_full_mb": 29000
+      "repo_full_mb": 29000,
+      "deps": [
+        "wan21_14b_diffusers"
+      ]
     },
     {
       "id": "wan21_14b_diffusers",
@@ -833,7 +836,10 @@
       ],
       "url": "https://huggingface.co/gdhe17/Self-Forcing",
       "repo_full_mb": 5700,
-      "note": "realtime su 5090 (24GB min); runner repo Self-Forcing + base wan21_13b_diffusers"
+      "note": "realtime su 5090 (24GB min); runner repo Self-Forcing + base wan21_13b_diffusers",
+      "deps": [
+        "wan21_13b_diffusers"
+      ]
     }
   ]
 }
