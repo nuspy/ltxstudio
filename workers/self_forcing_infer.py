@@ -143,16 +143,22 @@ def run_generation(p: dict) -> str:
     # spostando OGNI frame su CPU appena fatto: in VRAM non resta mai più di 1 frame. Prima libero anche
     # transformer + KV-cache (a denoise finito non servono). Ritorna [b,t,c,h,w] in [-1,1] su CPU (la pipeline
     # applica poi *0.5+0.5). Sostituisce pipeline.vae.decode_to_pixel.
+    # `_dec["writer"]` (impostato prima dell'inference in modalità stream-to-disk) → ogni frame decodificato viene
+    # scritto SUBITO nell'mp4 (RAM COSTANTE anche su film da ore); altrimenti si accumula su CPU (video corti).
+    _dec = {"writer": None, "written": 0}
+
     def _decode_streaming(latents, use_cache=False):               # noqa: ARG001
         try:                                                       # libera memoria inutile prima del decode
             pipeline.generator.to("cpu"); pipeline.kv_cache1 = None; pipeline.crossattn_cache = None
             import gc; gc.collect(); torch.cuda.empty_cache()
         except Exception as _fe:                                   # noqa: BLE001
             print(f"[self_forcing] free pre-decode: {_fe}", flush=True)
+        import numpy as np
         vae = pipeline.vae
         m = vae.model
         latents = latents.permute(0, 2, 1, 3, 4)                   # [b,t,c,h,w] → [b,c,t,h,w] (come decode_to_pixel)
         sc = [vae.mean.to(latents.device, latents.dtype), 1.0 / vae.std.to(latents.device, latents.dtype)]
+        wr = _dec["writer"]
         outs_b = []
         for u in latents:                                          # batch
             z = u.unsqueeze(0)
@@ -166,11 +172,21 @@ def run_generation(p: dict) -> str:
             for i in range(x.shape[2]):
                 m._conv_idx = [0]
                 o = m.decoder(x[:, :, i:i + 1, :, :], feat_cache=m._feat_map, feat_idx=m._conv_idx)
-                frames.append(o.float().clamp_(-1, 1).cpu())       # SUBITO su CPU → in VRAM 1 frame alla volta
+                if wr is not None:                                 # STREAM-TO-DISK: normalizzo [-1,1]→uint8 e scrivo
+                    u8 = (o.float().clamp(-1, 1) * 0.5 + 0.5).clamp(0, 1).mul_(255).round().to(torch.uint8).cpu()
+                    for j in range(u8.shape[2]):                   # ogni frame temporale → HWC → mp4
+                        wr.append_data(u8[0, :, j].permute(1, 2, 0).numpy())
+                        _dec["written"] += 1
+                    del u8
+                else:
+                    frames.append(o.float().clamp_(-1, 1).cpu())   # accumulo (video corti)
                 del o
             m.clear_cache()
-            outs_b.append(torch.cat(frames, dim=2).squeeze(0))     # [c,t,h,w] CPU
+            if wr is None:
+                outs_b.append(torch.cat(frames, dim=2).squeeze(0))
         torch.cuda.empty_cache()
+        if wr is not None:                                         # già scritto su disco → placeholder minuscolo
+            return latents.new_zeros((latents.shape[0], 1, 1, 8, 8), dtype=torch.float32)
         return torch.stack(outs_b, 0).permute(0, 2, 1, 3, 4)       # [b,t,c,h,w] CPU, range [-1,1]
     pipeline.vae.decode_to_pixel = _decode_streaming
 
@@ -244,32 +260,40 @@ def run_generation(p: dict) -> str:
               f"clip a {MAX_WIN} (usa kv_local_attn per il rolling)", flush=True)
         n_out = MAX_WIN
     noise = torch.randn([1, n_out, 16, lat_h, lat_w], device=device, dtype=torch.bfloat16)
-    print(f"[self_forcing] t2v realtime {W}x{H} ~{n_out} latenti (~{(n_out-1)*4+1}px @ {fps}fps), 4 step", flush=True)
+    # STREAM-TO-DISK di default: il decode scrive ogni frame nell'mp4 → RAM COSTANTE a qualsiasi durata (film da
+    # ore). Disattivato solo se si vuole il riparo seam post (che serve la sequenza intera): col sink non serve.
+    _stream = bool(p.get("stream_to_disk", True)) and bool(p.get("no_seam_repair", True))
+    if _stream:
+        import imageio
+        _dec["writer"] = imageio.get_writer(out, fps=fps, codec="libx264", quality=8, macro_block_size=16)
+    print(f"[self_forcing] t2v realtime {W}x{H} ~{n_out} latenti (~{(n_out-1)*4+1}px @ {fps}fps), 4 step"
+          f"{' · stream-to-disk' if _stream else ''}", flush=True)
     _tg = time.perf_counter()
     video, _lat = pipeline.inference(noise=noise, text_prompts=[prompt], return_latents=True,
                                      initial_latent=initial_latent, low_memory=low)
     torch.cuda.synchronize()
-    _t_gen = time.perf_counter() - _tg                           # SCALA con la durata: encode+denoise autoregressivo+VAE
-    # (b,t,c,h,w) in [0,1] → (t,h,w,c) uint8. Conversione SU GPU: il video è già in VRAM; farla in float32
-    # su CPU creava 3-4 array da ~2GB (477×480×832×3) → MemoryError in RAM di sistema sui video lunghi.
-    # Qui: check finito + clamp + *255 + uint8 sulla GPU, poi porto in RAM solo l'uint8 (~0.5GB).
-    v = rearrange(video, "b t c h w -> b t h w c")[0]
-    if not torch.isfinite(v).all():
-        raise RuntimeError("Frame NaN/inf: pesi Self-Forcing/Wan corrotti o incompleti.")
-    frames = (v.clamp(0, 1) * 255.0).round().to(torch.uint8).cpu().numpy()
-    del v, video
-    if not p.get("no_seam_repair"):                              # ripara il grain al confine dell'orizzonte (~5s)
-        frames = _repair_seams(frames)
-
+    _t_gen = time.perf_counter() - _tg                           # SCALA con la durata: encode+denoise autoregr.+VAE
     _ts = time.perf_counter()
-    import imageio
-    imageio.mimsave(out, list(frames), fps=fps, codec="libx264", quality=8, macro_block_size=16)
+    if _stream:                                                  # video già scritto su disco frame-per-frame
+        _dec["writer"].close()
+        n_px = int(_dec["written"])
+        del video
+    else:                                                        # accumulo su CPU → conversione uint8 (SU GPU) + mimsave
+        v = rearrange(video, "b t c h w -> b t h w c")[0]
+        if not torch.isfinite(v).all():
+            raise RuntimeError("Frame NaN/inf: pesi Self-Forcing/Wan corrotti o incompleti.")
+        frames = (v.clamp(0, 1) * 255.0).round().to(torch.uint8).cpu().numpy()
+        del v, video
+        if not p.get("no_seam_repair"):                          # ripara il grain al confine dell'orizzonte (~5s)
+            frames = _repair_seams(frames)
+        import imageio
+        imageio.mimsave(out, list(frames), fps=fps, codec="libx264", quality=8, macro_block_size=16)
+        n_px = int(frames.shape[0])
     try:
         pipeline.vae.model.clear_cache()
     except Exception:                                             # noqa: BLE001
         pass
     _t_save = time.perf_counter() - _ts
-    n_px = int(frames.shape[0])
     # Riepilogo tempi: LOAD/SAVE sono ~FISSI (uguali per 5s o 10min); GEN è la generazione VERA (scala).
     gen_rate = _t_gen / max(1, n_px)
     print(f"[timing] load={_t_load:.1f}s (fisso) | GEN={_t_gen:.1f}s ({gen_rate*1000:.0f}ms/frame, "
