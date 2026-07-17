@@ -184,6 +184,9 @@ def run_generation(p: dict) -> str:
     _la = p.get("kv_local_attn")
     if _la is not None:
         _la = int(_la)
+        # ATTENTION SINK (StreamingLLM): tenere SEMPRE i primi `sink` frame nella cache stabilizza il roll
+        # della finestra → elimina il micro-noise ai multipli della finestra (ogni 5s) alla RADICE.
+        _sink = int(p.get("kv_sink", 3))
         pipeline.local_attn_size = _la
         n_set = 0
         for _m in pipeline.generator.model.modules():
@@ -192,8 +195,10 @@ def run_generation(p: dict) -> str:
                 n_set += 1
             if hasattr(_m, "max_attention_size"):
                 _m.max_attention_size = _la * 1560
-        print(f"[self_forcing] local_attn_size={_la} propagato a {n_set} moduli → finestra scorrevole con "
-              f"sfratto (cache ~costante, durata illimitata)", flush=True)
+            if hasattr(_m, "sink_size"):
+                _m.sink_size = _sink
+        print(f"[self_forcing] local_attn_size={_la}, sink_size={_sink} propagato a {n_set} moduli → finestra "
+              f"scorrevole con sfratto + attention-sink (cache costante, durata illimitata, roll fluido)", flush=True)
 
     low = get_cuda_free_memory_gb(gpu) < 40                        # 32GB → block-swap del text-encoder
     if low:
