@@ -796,6 +796,44 @@
         "ministral"
       ],
       "gated": false
+    },
+    {
+      "id": "wan21_13b_diffusers",
+      "module": "Video",
+      "label": "Wan 2.1 T2V 1.3B Diffusers (base per Self-Forcing realtime: VAE/TE/scheduler)",
+      "kind": "snapshot",
+      "repo_id": "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+      "type": "diffusers",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 17,
+      "scan_names": [
+        "Wan2.1-T2V-1.3B-Diffusers",
+        "wan2.1-t2v-1.3b"
+      ],
+      "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+      "repo_full_mb": 17000
+    },
+    {
+      "id": "self_forcing_dmd",
+      "module": "Video",
+      "label": "Self-Forcing 1.3B DMD (video autoregressivo REALTIME, base Wan 2.1 1.3B)",
+      "kind": "file",
+      "repo_id": "gdhe17/Self-Forcing",
+      "filename": "checkpoints/self_forcing_dmd.pt",
+      "type": "checkpoint",
+      "family": "SelfForcing",
+      "gated": false,
+      "approx_gb": 6,
+      "license": "apache-2.0",
+      "scan_names": [
+        "self_forcing_dmd",
+        "self-forcing",
+        "self_forcing"
+      ],
+      "url": "https://huggingface.co/gdhe17/Self-Forcing",
+      "repo_full_mb": 5700,
+      "note": "realtime su 5090 (24GB min); runner repo Self-Forcing + base wan21_13b_diffusers"
     }
   ]
 }
