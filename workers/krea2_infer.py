@@ -118,9 +118,9 @@ def run_generation(p: dict) -> str:
     neg = p.get("negative") or ""
     if neg:
         kwargs["negative_prompt"] = neg
-    mu = p.get("mu", d["mu"])
-    if mu is not None:                                         # timestep-shift (Turbo). VALIDATE: nome arg.
-        kwargs["mu"] = float(mu)
+    # NB (validato 17/07): Krea2Pipeline.__call__ NON accetta `mu` — la firma espone `sigmas`.
+    # Lo shift-timestep del Turbo (mu 1.15) è già codificato nel FlowMatchEulerDiscreteScheduler del
+    # model_index (is_distilled=true). Quindi non passiamo mu: lo scheduler applica lo shift corretto.
 
     result = pipe(**kwargs)
     img = result.images[0] if hasattr(result, "images") else (result[0] if isinstance(result, (list, tuple)) else result)
