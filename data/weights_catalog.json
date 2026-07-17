@@ -245,6 +245,77 @@
       "repo_full_mb": 54000
     },
     {
+      "id": "krea2_turbo",
+      "module": "Immagini",
+      "label": "Krea 2 Turbo (immagini, 8 step veloce)",
+      "kind": "snapshot",
+      "repo_id": "krea/Krea-2-Turbo",
+      "type": "diffusers",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 35,
+      "scan_names": [
+        "Krea-2-Turbo",
+        "krea-2-turbo",
+        "krea2-turbo"
+      ],
+      "url": "https://huggingface.co/krea/Krea-2-Turbo",
+      "repo_full_mb": 61000
+    },
+    {
+      "id": "krea2_raw",
+      "module": "Immagini",
+      "label": "Krea 2 Raw (immagini, qualità max + per LoRA)",
+      "kind": "snapshot",
+      "repo_id": "krea/Krea-2-Raw",
+      "type": "diffusers",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 35,
+      "scan_names": [
+        "Krea-2-Raw",
+        "krea-2-raw",
+        "krea2-raw"
+      ],
+      "url": "https://huggingface.co/krea/Krea-2-Raw",
+      "repo_full_mb": 35000
+    },
+    {
+      "id": "krea_rt",
+      "module": "Video",
+      "label": "Krea Realtime 14B (video autoregressivo, t2v/v2v/long)",
+      "kind": "snapshot",
+      "repo_id": "krea/krea-realtime-video",
+      "type": "diffusers",
+      "family": "KreaRT",
+      "gated": false,
+      "approx_gb": 29,
+      "scan_names": [
+        "krea-realtime-video",
+        "krea_rt",
+        "krea-realtime"
+      ],
+      "url": "https://huggingface.co/krea/krea-realtime-video",
+      "repo_full_mb": 29000
+    },
+    {
+      "id": "wan21_14b_diffusers",
+      "module": "Video",
+      "label": "Wan 2.1 T2V 14B Diffusers (base per Krea Realtime: VAE/TE/scheduler)",
+      "kind": "snapshot",
+      "repo_id": "Wan-AI/Wan2.1-T2V-14B-Diffusers",
+      "type": "diffusers",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 33,
+      "scan_names": [
+        "Wan2.1-T2V-14B-Diffusers",
+        "wan2.1-t2v-14b"
+      ],
+      "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-14B-Diffusers",
+      "repo_full_mb": 33000
+    },
+    {
       "id": "da2",
       "module": "Mondo 3D (WorldGen)",
       "label": "DA-2 depth",
