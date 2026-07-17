@@ -23,6 +23,12 @@ SF_REPO = r"E:\AI\Tools\self-forcing"
 if _ROOT not in sys.path:                       # core.* importabile fin da subito (prima del chdir sul repo)
     sys.path.insert(0, _ROOT)
 
+# Anti-frammentazione VRAM: con la KV-cache stesa la memoria si frammenta e alloc da ~550MB falliscono
+# pur avendo GB liberi (l'utente ha misurato: muore a ~27GB con VRAM libera). Windows NON supporta
+# expandable_segments → uso garbage_collection_threshold (libera aggressivo i blocchi cache-ati) +
+# max_split_size_mb (non spezzetta i blocchi grandi). DEVE stare prima dell'init CUDA di torch.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "garbage_collection_threshold:0.9,max_split_size_mb:256")
+
 
 def _resolve_paths(p: dict) -> tuple[str, str]:
     """(checkpoint_dmd.pt, wan_native_dir) dal catalogo pesi."""
@@ -132,17 +138,26 @@ def run_generation(p: dict) -> str:
     pipeline.generator.load_state_dict(sd[key])                    # VALIDATE: chiave stato (ema vs no)
     pipeline = pipeline.to(dtype=torch.bfloat16)
 
-    # ESPERIMENTO video-lungo: se local_attn_size è finito, la KV-cache ROLLA (finestra scorrevole) invece di
-    # essere fissa a 21 latenti → durata potenzialmente illimitata. Override opzionale (default: invariato).
+    # VIDEO LUNGO a memoria COSTANTE (finestra scorrevole con SFRATTO). Il modello HA la logica di eviction
+    # (causal_model: shift a sinistra dei token vecchi quando la cache si riempie), ma solo se
+    # `local_attn_size != -1` sui MODULI di attenzione (non basta sul pipeline/model: ogni blocco ha il suo,
+    # fissato alla costruzione). Propagando local_attn_size + max_attention_size a TUTTI i moduli:
+    #  - la KV-cache è piccola (es. 21 frame ≈ 6GB) e COSTANTE a qualsiasi durata,
+    #  - lo sfratto tiene solo gli ultimi `local_attn_size` frame (finestra in distribuzione → qualità piena),
+    #  → durata ILLIMITATA senza OOM. Questa è la strada giusta (intuizione utente: sfrattare la KV inutile).
     _la = p.get("kv_local_attn")
     if _la is not None:
-        try:
-            pipeline.local_attn_size = int(_la)
-            if hasattr(pipeline.generator, "model"):
-                pipeline.generator.model.local_attn_size = int(_la)
-            print(f"[self_forcing] local_attn_size override = {int(_la)} (finestra scorrevole rolling)", flush=True)
-        except Exception as _ex:                                   # noqa: BLE001
-            print(f"[self_forcing] override local_attn_size fallito: {_ex}", flush=True)
+        _la = int(_la)
+        pipeline.local_attn_size = _la
+        n_set = 0
+        for _m in pipeline.generator.model.modules():
+            if hasattr(_m, "local_attn_size"):
+                _m.local_attn_size = _la
+                n_set += 1
+            if hasattr(_m, "max_attention_size"):
+                _m.max_attention_size = _la * 1560
+        print(f"[self_forcing] local_attn_size={_la} propagato a {n_set} moduli → finestra scorrevole con "
+              f"sfratto (cache ~costante, durata illimitata)", flush=True)
 
     low = get_cuda_free_memory_gb(gpu) < 40                        # 32GB → block-swap del text-encoder
     if low:
@@ -192,12 +207,14 @@ def run_generation(p: dict) -> str:
                                      initial_latent=initial_latent, low_memory=low)
     torch.cuda.synchronize()
     _t_gen = time.perf_counter() - _tg                           # SCALA con la durata: encode+denoise autoregressivo+VAE
-    # (b,t,c,h,w) in [0,1] → (t,h,w,c) uint8
-    import numpy as np
-    vid = rearrange(video, "b t c h w -> b t h w c")[0].float().cpu().numpy()
-    if np.isnan(vid).any() or np.isinf(vid).any():
+    # (b,t,c,h,w) in [0,1] → (t,h,w,c) uint8. Conversione SU GPU: il video è già in VRAM; farla in float32
+    # su CPU creava 3-4 array da ~2GB (477×480×832×3) → MemoryError in RAM di sistema sui video lunghi.
+    # Qui: check finito + clamp + *255 + uint8 sulla GPU, poi porto in RAM solo l'uint8 (~0.5GB).
+    v = rearrange(video, "b t c h w -> b t h w c")[0]
+    if not torch.isfinite(v).all():
         raise RuntimeError("Frame NaN/inf: pesi Self-Forcing/Wan corrotti o incompleti.")
-    frames = (vid * 255.0).clip(0, 255).astype("uint8")
+    frames = (v.clamp(0, 1) * 255.0).round().to(torch.uint8).cpu().numpy()
+    del v, video
     if not p.get("no_seam_repair"):                              # ripara il grain al confine dell'orizzonte (~5s)
         frames = _repair_seams(frames)
 
