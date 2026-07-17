@@ -141,6 +141,8 @@ def run_generation(p: dict) -> str:
         p["width"], p["height"] = _fw, _fh
     # scrivi la caption JSON ricca in un file temporaneo
     cap = _rich_caption(p)
+    if isinstance(cap, dict):
+        cap.pop("duration", None)                            # la durata la comanda --num_frames (GUI), non il JSON
     cf = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
     json.dump(cap, cf, ensure_ascii=False)
     cf.close()
