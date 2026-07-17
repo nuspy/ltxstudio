@@ -2540,7 +2540,9 @@ class MainWindow(QMainWindow):
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
-        if not cfg["model"] or cfg["model"].startswith("("):
+        # Krea 2 è uno SNAPSHOT diffusers (nessun file-modello): usa krea2_variant, non un checkpoint → salta il
+        # controllo "modello obbligatorio" (il worker risolve turbo/raw dal catalogo).
+        if cfg.get("arch") != "krea2" and (not cfg["model"] or cfg["model"].startswith("(")):
             QMessageBox.warning(self, tr("mw.no_model_title"), tr("mw.no_model_arch_msg").format(arch=cfg['arch'])); return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
@@ -2670,6 +2672,7 @@ class MainWindow(QMainWindow):
                   "negative": negative, "width": v["width"], "height": v["height"],
                   "steps": cfg["steps"], "guidance": cfg.get("cfg") or 3.5,
                   "seed": seed, "loras": loras,
+                  "krea2_variant": cfg.get("krea2_variant"),   # Krea 2: turbo/raw (snapshot, no file-modello)
                   # #95 I1: componenti scelti dall'utente (erano scartati → il backend usava i default)
                   "sampler": cfg.get("sampler"), "scheduler": cfg.get("scheduler"),
                   "encoder": cfg.get("encoder"), "clip_type": cfg.get("clip_type"), "vae": cfg.get("vae"),
