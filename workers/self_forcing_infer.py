@@ -181,7 +181,9 @@ def run_generation(p: dict) -> str:
     #  - la KV-cache è piccola (es. 21 frame ≈ 6GB) e COSTANTE a qualsiasi durata,
     #  - lo sfratto tiene solo gli ultimi `local_attn_size` frame (finestra in distribuzione → qualità piena),
     #  → durata ILLIMITATA senza OOM. Questa è la strada giusta (intuizione utente: sfrattare la KV inutile).
-    _la = p.get("kv_local_attn")
+    # Modalità CONTINUA di DEFAULT (validata): finestra scorrevole 21 latenti (~5s, in-distribuzione) → OGNI
+    # percorso dell'app (tab Video, Cinema Studio, videoclip, Lucky) genera video lungo senza doverlo chiedere.
+    _la = p.get("kv_local_attn", 21)
     if _la is not None:
         _la = int(_la)
         # ATTENTION SINK (StreamingLLM): tenere SEMPRE i primi `sink` frame nella cache stabilizza il roll

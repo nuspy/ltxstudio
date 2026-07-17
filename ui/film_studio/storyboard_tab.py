@@ -71,6 +71,7 @@ class StoryboardTab(QWidget):
         self.vid_arch.addItem(tr("fs.sb.arch_ltx", "LTX-2"), "ltx")
         self.vid_arch.addItem(tr("fs.sb.arch_lingbot", "LingBot-Video"), "lingbot")
         self.vid_arch.addItem(tr("fs.sb.arch_krea_rt", "Krea Realtime"), "krea_rt")
+        self.vid_arch.addItem(tr("fs.sb.arch_self_forcing", "Self-Forcing (realtime, lungo)"), "self_forcing")
         self.mdl_img.currentIndexChanged.connect(self._save_models)
         self.mdl_vid.currentIndexChanged.connect(self._save_models)
         self.img_arch.currentIndexChanged.connect(self._save_models)

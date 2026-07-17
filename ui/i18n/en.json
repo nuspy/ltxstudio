@@ -2729,5 +2729,7 @@
   "f1.gen.krea2.raw": "Krea 2 Raw (52 steps, quality)",
   "f1.gen.dl.title": "Download the model?",
   "f1.gen.dl.msg": "The model '{m}' is not downloaded: {ids} · ~{gb}GB. Download now?",
-  "f1.gen.dl.progress": "Downloading {m}…"
+  "f1.gen.dl.progress": "Downloading {m}…",
+  "fs.sb.arch_self_forcing": "Self-Forcing (realtime, long)",
+  "ld.arch_self_forcing": "Self-Forcing (realtime, long)"
 }

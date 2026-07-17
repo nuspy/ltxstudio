@@ -135,6 +135,7 @@ class LuckyDirectorDialog(QDialog):
         self.vid_arch.addItem(tr("ld.arch_ltx", "LTX-2"), "ltx")
         self.vid_arch.addItem(tr("ld.arch_lingbot", "LingBot-Video"), "lingbot")
         self.vid_arch.addItem(tr("ld.arch_krea_rt", "Krea Realtime"), "krea_rt")
+        self.vid_arch.addItem(tr("ld.arch_self_forcing", "Self-Forcing (realtime, lungo)"), "self_forcing")
         form.addRow(tr("ld.video_arch", "Video architecture"), self.vid_arch)
         self.music = QCheckBox(tr("ld.music", "Generate a soundtrack")); self.music.setChecked(True)
         form.addRow("", self.music)

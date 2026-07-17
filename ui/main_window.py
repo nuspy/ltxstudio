@@ -2896,7 +2896,12 @@ class MainWindow(QMainWindow):
         if vals.get("video_arch") == "self_forcing":
             params["arch"] = "self_forcing"
             params.pop("gguf_transformer", None)                # prompt TESTO semplice; durata=num_frames (rolling)
-            self._log(f"[self_forcing] Self-Forcing 1.3B realtime (autoregressivo): "
+            # Modalità CONTINUA di default (validata): finestra scorrevole 21 latenti (~5s, in-distribuzione) con
+            # SFRATTO della KV-cache + attention-sink → durata ILLIMITATA a memoria costante, seam eliminati.
+            params.setdefault("kv_local_attn", int(vals.get("kv_local_attn", 21)))
+            params.setdefault("kv_sink", int(vals.get("kv_sink", 3)))
+            params.setdefault("no_seam_repair", True)           # il sink pulisce alla radice, niente blend post
+            self._log(f"[self_forcing] Self-Forcing 1.3B realtime (continuo, finestra scorrevole+sink): "
                       f"{params['width']}x{params['height']} {nf} frame")
             self._ltx2_worker = _NativeLtx2Worker(params)
             self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
