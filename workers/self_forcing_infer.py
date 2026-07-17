@@ -72,6 +72,33 @@ def _snap_lat(px: int) -> int:
     return max(16, int(px) // 8)
 
 
+def _repair_seams(frames, trained_lat: int = 21, px_per_lat: int = 4, search: int = 8, win: int = 3):
+    """Ripara i pochi frame rumorosi al CONFINE dell'orizzonte addestrato (ogni `trained_lat` latenti ≈ 5s):
+    quando il rollout supera per la prima volta la lunghezza di training il modello "singhiozza" per ~5 frame.
+    NON è stitching. Rilevo il picco di differenza inter-frame vicino al confine atteso e sostituisco quella
+    manciata di frame con un blend lineare dei frame puliti prima/dopo (impercettibile: il moto è lento)."""
+    import numpy as np
+    T = int(frames.shape[0])
+    if T < 3 * win + 6:
+        return frames
+    d = np.abs(np.diff(frames.astype(np.int16), axis=0)).mean(axis=tuple(range(1, frames.ndim)))  # diff per coppia
+    lat_total = (T - 1) // px_per_lat + 1
+    for sl in range(trained_lat, lat_total, trained_lat):
+        c = sl * px_per_lat                                       # posizione pixel attesa del confine
+        lo, hi = max(1, c - search), min(T - 1, c + search)
+        if hi <= lo:
+            continue
+        peak = lo + int(np.argmax(d[lo - 1:hi - 1]))             # il frame col salto di rumore = il seam
+        a, b = max(0, peak - win - 1), min(T - 1, peak + win + 1)
+        if b - a < 2:
+            continue
+        fa, fb = frames[a].astype(np.float32), frames[b].astype(np.float32)
+        for i in range(a + 1, b):
+            t = (i - a) / (b - a)
+            frames[i] = (fa * (1 - t) + fb * t).clip(0, 255).astype(np.uint8)
+    return frames
+
+
 def run_generation(p: dict) -> str:
     out = p["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
@@ -171,6 +198,8 @@ def run_generation(p: dict) -> str:
     if np.isnan(vid).any() or np.isinf(vid).any():
         raise RuntimeError("Frame NaN/inf: pesi Self-Forcing/Wan corrotti o incompleti.")
     frames = (vid * 255.0).clip(0, 255).astype("uint8")
+    if not p.get("no_seam_repair"):                              # ripara il grain al confine dell'orizzonte (~5s)
+        frames = _repair_seams(frames)
 
     _ts = time.perf_counter()
     import imageio
