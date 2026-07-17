@@ -148,7 +148,12 @@ def _from_arch_str(a: str):
         return ("hidream", "base", "t2i", "image")
     if "qwen" in s and "image" in s:
         return ("qwen_image", "edit" if "edit" in s else "base", "edit" if "edit" in s else "t2i", "image")
+    if "krea-2" in s or "krea2" in s:
+        var = "raw" if "raw" in s else "turbo"
+        return ("krea2", var, "t2i", "image")
     # VIDEO
+    if "krea-realtime" in s or "krea_rt" in s or "krea-rt" in s:
+        return ("krea_rt", "base", "video", "video")
     if "lingbot" in s:
         var = "moe" if ("moe" in s or "30b" in s or "a3b" in s) else "dense"
         return ("lingbot", var, "video", "video")
@@ -365,6 +370,9 @@ def compatible_components(det: dict) -> dict:
         "wan22":  {"vae": "wan_vae", "text_encoders": ["umt5_xxl"]},
         # LingBot: pipeline diffusers self-contained (vae+text_encoder VLM Qwen dentro lo snapshot).
         "lingbot": {"vae": "builtin (diffusers)", "text_encoders": ["builtin (Qwen VLM)"]},
+        # Krea: snapshot diffusers self-contained. Krea2 = Qwen3-VL + VAE Qwen-Image; Krea RT = base Wan 2.1.
+        "krea2": {"vae": "builtin (Qwen-Image)", "text_encoders": ["builtin (Qwen3-VL)"]},
+        "krea_rt": {"vae": "builtin (Wan)", "text_encoders": ["builtin (UMT5, base Wan 2.1)"]},
     }
     return M.get(fam, {"vae": "auto", "text_encoders": []})
 

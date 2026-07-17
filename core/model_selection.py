@@ -14,6 +14,8 @@ _SKIP = ("vae", "clip", "t5", "text_encoder", "lora", "upscal", "controlnet", "i
 def arch_of(name: str) -> str:
     """Famiglia d'architettura dedotta dal nome file (flux/flux2/zimage/ernie)."""
     nl = name.lower()
+    if "krea-2" in nl or "krea2" in nl:
+        return "krea2"
     if "flux2" in nl or "klein" in nl:
         return "flux2"
     if "z-image" in nl or "zimage" in nl or "z_image" in nl:

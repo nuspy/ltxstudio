@@ -17,14 +17,14 @@ from core import offline_inventory as inv
 
 # task → sottostringhe di architettura compatibili (match su arch_of o sul nome file)
 TASK_ARCH = {
-    "image":   ["flux", "zimage", "sd3", "sdxl", "lumina", "ernie"],
+    "image":   ["flux", "krea2", "zimage", "sd3", "sdxl", "lumina", "ernie"],
     "kontext": ["kontext", "flux2"],
     "inpaint": ["inpaint", "fill", "flux2"],
-    "video":   ["ltx", "lingbot", "wan", "hunyuan"],
+    "video":   ["ltx", "lingbot", "krea_rt", "wan", "hunyuan"],
 }
 # preferenza di qualità per famiglia (più alto = preferito); euristica, sovrascrivibile
-ARCH_PREF = {"flux2": 6, "flux": 5, "kontext": 5, "zimage": 4, "sd3": 3, "lumina": 3,
-             "sdxl": 2, "ernie": 2, "ltx": 6, "lingbot": 6, "wan": 4, "hunyuan": 3}
+ARCH_PREF = {"flux2": 6, "flux": 5, "krea2": 5, "kontext": 5, "zimage": 4, "sd3": 3, "lumina": 3,
+             "sdxl": 2, "ernie": 2, "ltx": 6, "lingbot": 6, "krea_rt": 5, "wan": 4, "hunyuan": 3}
 
 _cat = ModelCatalog()
 

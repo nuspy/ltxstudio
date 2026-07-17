@@ -36,12 +36,31 @@ ARCH_VIDEO_CAPS = {
         "controlnet": False, "v2v": False, "retake": False, "storyboard": False,
         "extend": True, "refiner": True, "lipsync": False, "keyframes": False,
     },
+    # Krea Realtime: autoregressivo → t2v + v2v + extend/long NATIVI (num_blocks); niente audio/controlnet/
+    # refiner/storyboard-latente.
+    "krea_rt": {
+        "t2v": True, "i2v": True, "ti2v": True, "a2v": False, "audio": False,
+        "controlnet": False, "v2v": True, "retake": False, "storyboard": False,
+        "extend": True, "refiner": False, "lipsync": False, "keyframes": False,
+    },
+}
+
+# Capability per ARCHITETTURA IMMAGINE (analogo per le immagini). Krea 2 = solo t2i (niente inpaint/kontext/
+# controlnet nel primo giro). Le arch FLUX/… coprono tutto (default).
+ARCH_IMAGE_CAPS = {
+    "krea2": {"t2i": True, "inpaint": False, "kontext": False, "controlnet": False, "pulid": False},
 }
 
 
 def video_caps(arch: str) -> dict:
     """Capability dell'architettura video (default = LTX se sconosciuta)."""
     return ARCH_VIDEO_CAPS.get((arch or "ltx").lower(), ARCH_VIDEO_CAPS["ltx"])
+
+
+def image_caps(arch: str) -> dict:
+    """Capability dell'architettura immagine. Default = tutto abilitato (FLUX/Z-Image/Ernie)."""
+    _full = {"t2i": True, "inpaint": True, "kontext": True, "controlnet": True, "pulid": True}
+    return ARCH_IMAGE_CAPS.get((arch or "").lower(), _full)
 
 # Valori consigliati hardcoded per i modelli più comuni (con nota "supposed" se non da Civitai)
 _RECOMMENDED: dict[str, dict] = {
@@ -61,6 +80,14 @@ _RECOMMENDED: dict[str, dict] = {
     "lingbot": {"steps": 40, "cfg": 3.0, "note": "lingbot base"},
     "lingbot-dense": {"steps": 40, "cfg": 3.0, "note": "lingbot dense 1.3b"},
     "lingbot-moe": {"steps": 40, "cfg": 3.0, "note": "lingbot moe 30b + refiner 8 step"},
+    # Krea 2 (immagini): Turbo distillato (8 step, cfg 0, mu 1.15) / Raw (52 step, cfg 3.5)
+    "krea-2-turbo": {"steps": 8, "cfg": 0.0, "note": "krea2 turbo distilled (mu 1.15)"},
+    "krea2-turbo": {"steps": 8, "cfg": 0.0, "note": "krea2 turbo distilled"},
+    "krea-2-raw": {"steps": 52, "cfg": 3.5, "note": "krea2 raw (qualità/LoRA)"},
+    "krea2-raw": {"steps": 52, "cfg": 3.5, "note": "krea2 raw"},
+    # Krea Realtime (video): distillato ~4 step, autoregressivo
+    "krea-realtime": {"steps": 4, "cfg": 1.0, "note": "krea realtime autoregressivo"},
+    "krea_rt": {"steps": 4, "cfg": 1.0, "note": "krea realtime 14b"},
 }
 
 
