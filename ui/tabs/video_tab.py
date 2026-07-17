@@ -989,6 +989,10 @@ class VideoTab(QWidget):
         if kind == "krea_rt":
             v["model_kind"] = "krea_rt"
             v["model"] = sel_data.get("model", "")
+            # variante REALTIME (Self-Forcing 1.3B) → arch/worker dedicato; "quality" resta il 14B krea_rt
+            if sel_data.get("variant") == "realtime" or sel_data.get("cat_id") == "self_forcing_dmd":
+                v["video_arch"] = "self_forcing"
+                v["krea_rt_variant"] = "realtime"
         elif kind == "lingbot":
             # LingBot: model = cartella diffusers (vuota → il worker risolve dal catalogo), variante + refiner
             v["model_kind"] = "lingbot"

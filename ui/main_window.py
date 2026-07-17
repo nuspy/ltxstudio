@@ -2892,6 +2892,17 @@ class MainWindow(QMainWindow):
             self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
                           on_progress=lambda s: self._log("[krea_rt] " + s))
             return
+        # ── variante REALTIME di Krea: Self-Forcing 1.3B (autoregressivo leggero, ~realtime sulla 5090) ──
+        if vals.get("video_arch") == "self_forcing":
+            params["arch"] = "self_forcing"
+            params.pop("gguf_transformer", None)                # prompt TESTO semplice; durata=num_frames (rolling)
+            self._log(f"[self_forcing] Self-Forcing 1.3B realtime (autoregressivo): "
+                      f"{params['width']}x{params['height']} {nf} frame")
+            self._ltx2_worker = _NativeLtx2Worker(params)
+            self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
+            self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
+                          on_progress=lambda s: self._log("[self_forcing] " + s))
+            return
         self._log(f"[nativo] video LTX-2 GGUF: {params['width']}x{params['height']} {nf} frame "
                   f"{'+audio' if params.get('audio_path') else ''} {'(chunk)' if params.get('chunk_frames') else ''}")
         # SELETTORE MOTORE VIDEO: default 'ltx2_infer' (tutte le feature). 'comfy' = comfy-native

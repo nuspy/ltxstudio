@@ -34,11 +34,16 @@ LINGBOT_WORKER = str(REPO / "workers" / "lingbot_infer.py")
 KREA_RT_PY = r"E:\AI\Tools\krea_rt_venv\Scripts\python.exe"
 KREA_RT_WORKER = str(REPO / "workers" / "krea_rt_infer.py")
 
+# variante REALTIME di krea_rt: Self-Forcing 1.3B (autoregressivo leggero, ~realtime sulla 5090). Riusa il
+# venv krea_rt_venv; il worker gira il runner del repo Self-Forcing come libreria. Vedi [[krea-arches]].
+SELF_FORCING_WORKER = str(REPO / "workers" / "self_forcing_infer.py")
+
 # quale (python, worker) usare per ogni architettura
 _ARCH_RUNNER = {
     "ltx": (LTX2_PY, LTX2_WORKER),
     "lingbot": (LINGBOT_PY, LINGBOT_WORKER),
     "krea_rt": (KREA_RT_PY, KREA_RT_WORKER),
+    "self_forcing": (KREA_RT_PY, SELF_FORCING_WORKER),
 }
 
 NEG = "worst quality, inconsistent motion, blurry, jittery, distorted"
