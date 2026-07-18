@@ -139,9 +139,13 @@ def run_generation(p: dict) -> str:
     # `kv_cache_num_frames` come input di call.
     from diffusers.modular_pipelines import PipelineState
 
-    def _m16(k, dflt):
-        return max(256, (int(p.get(k, dflt)) // 16) * 16)
-    w16, h16 = _m16("width", 832), _m16("height", 480)
+    # RISOLUZIONE FISSA 832×480: il modello vendored HARDCODA frame_seqlen=1560 (causal_model.py:411, perché
+    # torch.compile non gradisce il calcolo dinamico) = i token latenti di 832×480 (52×30). Ad altre
+    # risoluzioni il block_mask (creato con 1560) non combacia col forward → ValueError flex_attention. Quindi
+    # ignoriamo la risoluzione richiesta e forziamo 832×480 (l'unica supportata da questo checkpoint).
+    w16, h16 = 832, 480
+    if (int(p.get("width", 832)), int(p.get("height", 480))) != (832, 480):
+        print("[krea_rt] risoluzione forzata a 832×480 (il modello hardcoda frame_seqlen=1560)", flush=True)
     steps = int(p.get("steps", 4))
     gen = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(int(p.get("seed", 7)))
 
