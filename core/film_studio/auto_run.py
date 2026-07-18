@@ -11,6 +11,7 @@ otio_export. Emette avanzamento via callback on_progress(phase, index, total, pr
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from pathlib import Path
