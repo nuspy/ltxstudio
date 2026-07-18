@@ -212,13 +212,13 @@ class _PersistentChild:
             self._lock.release()
 
     def free(self, timeout: float = 10):
+        # /free = cambio-pipeline (un altro motore vuole la VRAM). KILLA il figlio: la sua VRAM è rilasciata
+        # dall'OS all'uscita, e — soprattutto — il prossimo job spawnerà un figlio FRESCO. Non riusiamo lo
+        # stesso processo dopo un free perché ricaricare un modello dopo averne scaricato uno È un secondo
+        # load in-process (il segfault/stallo che l'isolamento evita). Il respawn è veloce (~1s + il load).
         with self._lock:
-            if self._alive():
-                try:
-                    self._send("FREE", ("FREED",), timeout)
-                    self.model_key = "-"
-                except Exception:                            # noqa: BLE001
-                    self._kill()
+            self._kill()
+            self.model_key = "-"
 
 
 _child = _PersistentChild() if _PERSIST else None
