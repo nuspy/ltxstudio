@@ -264,6 +264,12 @@ def run_generation(p: dict) -> str:
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     model_dir, variant = _resolve_model_dir(p)
     pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=False)))  # t2i ora applica le LoRA
+    # ATTENZIONE T2I DETERMINISTICA: forza 'native' (SDPA). Il t2i NON ha attn_mask di padding, quindi
+    # flash_varlen/flash/sage danno griglie/strisce colorate (macchie seed-dipendenti). Sul server
+    # PERSISTENTE il pipe è condiviso: un run_edit precedente lo lascia in flash_varlen → il t2i successivo
+    # erediterebbe quel backend e artefatterebbe. Resettando a 'native' ogni t2i è pulito e ripetibile,
+    # indipendentemente da edit precedenti o da backend globali ereditati dall'ambiente. (bug KAIRA 18/07)
+    _set_attention(pipe, os.environ.get("KREA2_ATTN_T2I", "native"))
     d = _VARIANT_DEFAULTS.get(variant, _VARIANT_DEFAULTS["turbo"])
 
     def _m16(v, default):
