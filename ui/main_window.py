@@ -2074,6 +2074,12 @@ class MainWindow(QMainWindow):
                 negative = cfg.get("negative") or ""
                 self._log(tr("mw.no_mask_kontext_log",
                              "Nessuna maschera → modifica dell'INTERA foto secondo la descrizione (Kontext)"))
+                if cfg.get("integrate_engine") == "krea2":        # motore Krea 2 Edit selezionato in Integra
+                    self._start_native_krea2_edit([exp["image"]], ptxt, negative,
+                                                  cfg.get("grounding", 768),
+                                                  cfg.get("integrate_variant", "turbo"), seed,
+                                                  label=tr("queue.job.krea2edit", "Krea 2 Edit"))
+                    return
                 # exp SENZA 'mask' → _start_native_kontext prende il ramo kontext puro (no Fill)
                 self._start_native_kontext({"image": exp["image"]}, None, ptxt, negative, steps, seed, 2.5)
             except Exception as e:                               # noqa: BLE001
@@ -2161,6 +2167,12 @@ class MainWindow(QMainWindow):
             negative = cfg.get("integrate_negative") or ""
             aux = cfg.get("integrate_puzzle_lora") or None    # puzzle_lora opzionale (solo Kontext)
             guidance = cfg.get("integrate_guidance", 2.5)
+            if engine == "krea2":                             # motore Krea 2 Edit → edit del composito (single)
+                self._start_native_krea2_edit([exp["image"]], ptxt, negative,
+                                              cfg.get("grounding", 768),
+                                              cfg.get("integrate_variant", "turbo"), seed,
+                                              label=tr("queue.job.krea2edit", "Krea 2 Edit"))
+                return
             # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. FLUX.2 e puzzle_lora → ComfyUI.
             from core import backend
             if backend.is_native("image") and engine == "kontext" and not aux:
@@ -2260,6 +2272,13 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("f1.compose.group"), tr("mw.compose_need_two_msg")); return
         engine = cfg.get("engine", "kontext")
         model = cfg.get("model")
+        if engine == "krea2":                             # Krea 2 Edit → multi-reference VERO (scena+soggetto,
+            # 2 latenti separati ai frame RoPE 1/2 — non lo stitch di FLUX.1). Il modello ne gestisce max 2.
+            self._start_native_krea2_edit(imgs[:2], cfg.get("prompt", ""), "",
+                                          cfg.get("grounding", 768), cfg.get("variant", "turbo"),
+                                          random.randint(0, 2**31),
+                                          label=tr("queue.job.krea2edit", "Krea 2 Edit"))
+            return
         if engine == "flux2" and not model:
             QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
                                 tr("mw.flux2_model_missing_integrate_msg")); return
@@ -2328,6 +2347,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.color_missing_title"),
                                 tr("mw.color_missing_msg")); return
         engine = cc["engine"]; model = None
+        if engine == "krea2":                             # Krea 2 Edit → recolor per istruzione (single)
+            what = (cc.get("subject") or "").strip() or "the main subject"
+            rprompt = (f"Recolor {what} to {cc['target']}. Keep the original texture, material, "
+                       f"lighting and shadows; change only the color.")
+            self._inpaint_before = self.frame1_tab.image_path
+            self._start_native_krea2_edit([self.frame1_tab.image_path], rprompt, "",
+                                          cc.get("grounding", 768), "turbo", random.randint(0, 2**31),
+                                          label=tr("queue.job.krea2edit", "Krea 2 Edit"))
+            return
         if engine == "flux2":
             from core.gen_pipeline import is_flux2           # (non è in scope a livello modulo)
             model = self.frame1_tab.get_inpaint_config().get("integrate_model")
@@ -3566,6 +3594,39 @@ class MainWindow(QMainWindow):
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.integrate", "Integra (Kontext)"), self._native_worker,
                       self._on_native_inpaint_done)
+
+    def _start_native_krea2_edit(self, images, prompt, negative, grounding, variant, seed,
+                                 label="Krea 2 Edit"):
+        """Krea 2 Edit — editing per istruzione (single/multi) NATIVO (Krea2EditPipeline, no ComfyUI).
+        `images` = lista di path (1 = single: frame 1; 2 = multi: scena=1, soggetto=2)."""
+        if not self._ensure_native_ready():
+            return
+        imgs = [p for p in (images or []) if p]
+        if not imgs:
+            QMessageBox.warning(self, tr("mw.no_model_title", "Manca l'immagine"),
+                                tr("mw.krea2edit_no_image", "Krea 2 Edit: carica una foto (canvas o lista Componi).")); return
+        if not (prompt or "").strip():
+            QMessageBox.information(self, tr("mw.no_mask_title", "Serve un'istruzione"),
+                                   tr("mw.krea2edit_no_prompt", "Scrivi COSA modificare nell'istruzione.")); return
+        is_raw = (variant == "raw")
+        params = {
+            "arch": "krea2_edit", "krea2_variant": variant,
+            "prompt": prompt, "negative": negative or "",
+            "grounding_px": int(grounding or 768),
+            # step/guidance tarati per l'EDIT (non i default t2i): Turbo 8/CFG1, Raw 20/CFG3.
+            "steps": 20 if is_raw else 8,
+            "guidance": 2.0 if is_raw else 0.0,
+            "seed": seed,
+        }
+        if len(imgs) == 1:
+            params["image_path"] = imgs[0]
+        else:
+            params["images"] = imgs[:2]
+        self._inpaint_mode = "krea2_edit"
+        self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._log(f"Krea 2 Edit ({variant}, {len(imgs)} img, grounding={params['grounding_px']}) inviato…")
+        self._enqueue(tr("queue.job.krea2edit", label), self._native_worker, self._on_native_inpaint_done)
 
     def _gen_pulid_keyframe_for_video(self, faces: str, _prompt: str):
         """One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → lo carica in Frame1
