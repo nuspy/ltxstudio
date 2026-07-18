@@ -23,6 +23,8 @@ OUTPUT_DIR = str(REPO / "output")
 _LINGBOT_PY = r"E:\AI\Tools\lingbot_venv311\Scripts\python.exe"
 _ARCH_RUNNER = {
     "krea2": (_LINGBOT_PY, str(REPO / "workers" / "krea2_infer.py")),
+    # editing per istruzione (single/multi) — stesso worker, ramo edit scelto da params['arch']
+    "krea2_edit": (_LINGBOT_PY, str(REPO / "workers" / "krea2_infer.py")),
 }
 
 
