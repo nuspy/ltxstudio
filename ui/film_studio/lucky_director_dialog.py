@@ -130,6 +130,12 @@ class LuckyDirectorDialog(QDialog):
         self.img_arch.addItem(tr("ld.arch_flux", "FLUX"), "flux")
         self.img_arch.addItem(tr("ld.arch_krea2", "Krea 2"), "krea2")
         form.addRow(tr("ld.image_arch", "Image architecture"), self.img_arch)
+        # coerenza volto negli shot con personaggi @Nome (NON sostituisce FLUX: switch)
+        self.coherence = QComboBox()
+        self.coherence.addItem(tr("ld.coh_flux", "FLUX (PuLID/Kontext)"), "flux")
+        self.coherence.addItem(tr("ld.coh_krea2edit", "Krea 2 Edit (coerenza volto)"), "krea2_edit")
+        self.coherence.setToolTip(tr("ld.coh.tt", "Ogni scena usa i riferimenti dei suoi personaggi."))
+        form.addRow(tr("ld.coherence", "Face coherence"), self.coherence)
         # 2ª architettura video: LTX-2 vs LingBot-Video
         self.vid_arch = QComboBox()
         self.vid_arch.addItem(tr("ld.arch_ltx", "LTX-2"), "ltx")
@@ -186,6 +192,7 @@ class LuckyDirectorDialog(QDialog):
             "make_music": self.music.isChecked(),
             "img_arch": self.img_arch.currentData() or "flux",
             "vid_arch": self.vid_arch.currentData() or "ltx",
+            "coherence_engine": self.coherence.currentData() or "flux",
         }
 
     # ── esecuzione ──────────────────────────────────────────────────────

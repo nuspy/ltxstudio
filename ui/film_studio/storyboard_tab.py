@@ -66,6 +66,15 @@ class StoryboardTab(QWidget):
         self.img_arch = QComboBox(); self.img_arch.setMinimumWidth(120)
         self.img_arch.addItem(tr("fs.sb.arch_flux", "FLUX"), "flux")
         self.img_arch.addItem(tr("fs.sb.arch_krea2", "Krea 2"), "krea2")
+        # COERENZA VOLTO/personaggio quando lo shot ha riferimenti (@Nome): FLUX (PuLID/Kontext) o Krea 2 Edit
+        # (in-context, usa i riferimenti dei personaggi di QUELLA scena). NON sostituisce FLUX: è uno switch.
+        self.coherence = QComboBox(); self.coherence.setMinimumWidth(150)
+        self.coherence.addItem(tr("fs.sb.coh_flux", "FLUX (PuLID/Kontext)"), "flux")
+        self.coherence.addItem(tr("fs.sb.coh_krea2edit", "Krea 2 Edit (coerenza volto)"), "krea2_edit")
+        self.coherence.setToolTip(tr("fs.sb.coh.tt",
+            "Motore per la coerenza del volto/personaggio negli shot con riferimenti @Nome. "
+            "Krea 2 Edit preserva meglio l'identità; ogni scena usa i riferimenti dei suoi personaggi."))
+        self.coherence.currentIndexChanged.connect(self._save_models)
         # 2ª architettura video: LTX-2 vs LingBot-Video (salvata nel config progetto → auto_run/handlers)
         self.vid_arch = QComboBox(); self.vid_arch.setMinimumWidth(140)
         self.vid_arch.addItem(tr("fs.sb.arch_ltx", "LTX-2"), "ltx")
@@ -78,6 +87,7 @@ class StoryboardTab(QWidget):
         self.vid_arch.currentIndexChanged.connect(self._save_models)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_img", "Modello immagine:"))); mrow.addWidget(self.mdl_img)
         mrow.addWidget(QLabel(tr("fs.sb.arch_img", "Arch. img:"))); mrow.addWidget(self.img_arch)
+        mrow.addWidget(QLabel(tr("fs.sb.coh_lbl", "Coerenza volto:"))); mrow.addWidget(self.coherence)
         mrow.addWidget(QLabel(tr("fs.sb.mdl_vid", "Modello video:"))); mrow.addWidget(self.mdl_vid)
         mrow.addWidget(QLabel(tr("fs.sb.arch_vid", "Arch. video:"))); mrow.addWidget(self.vid_arch)
         from PySide6.QtWidgets import QCheckBox as _CkB
@@ -305,6 +315,7 @@ class StoryboardTab(QWidget):
             cfg["img_model"] = ""
         cfg["vid_gguf"] = (vd or {}).get("path", "") if vd else ""
         cfg["vid_arch"] = self.vid_arch.currentData() or "ltx"
+        cfg["coherence_engine"] = self.coherence.currentData() or "flux"
         db.update("project", pid, config=json.dumps(cfg, ensure_ascii=False))
 
     def _load_models(self):
@@ -333,6 +344,11 @@ class StoryboardTab(QWidget):
         _ia = self.vid_arch.findData(cfg.get("vid_arch", "ltx"))
         self.vid_arch.setCurrentIndex(_ia if _ia >= 0 else 0)
         self.vid_arch.blockSignals(False)
+        # motore coerenza volto salvato
+        self.coherence.blockSignals(True)
+        _ic = self.coherence.findData(cfg.get("coherence_engine", "flux"))
+        self.coherence.setCurrentIndex(_ic if _ic >= 0 else 0)
+        self.coherence.blockSignals(False)
 
     def _gen(self, what: str):
         pid = self._get_project()
@@ -466,7 +482,10 @@ class StoryboardTab(QWidget):
             scheduler.enqueue("image", {"prompt": prompt, "out": out, "seed": seed,
                                         "face_ref": (refs["ref_images"] or [""])[0], "ref_images": refs["ref_images"],
                                         "loras": refs["loras"], "arch": _cfg.get("img_arch", "flux"),
-                                        "model": _cfg.get("img_model", "")},
+                                        "model": _cfg.get("img_model", ""),
+                                        "coherence_engine": _cfg.get("coherence_engine", "flux"),
+                                        "grounding_px": _cfg.get("grounding_px", 1024),
+                                        "krea2_variant": _cfg.get("krea2_variant", "turbo")},
                               owner_kind="shot", owner_id=sh["id"])
         else:
             out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")

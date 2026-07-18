@@ -129,14 +129,47 @@ def compose_shot_prompt(sh: dict, state: dict, guard: dict, *, path_mode: str = 
 def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 1024, seed: int = 7,
               face_ref: str = "", ref_image: str = "", ref_images: list | None = None,
               loras: list | None = None, arch: str = "flux", model: str = "", negative: str = "",
-              structure: bool = True) -> str:
+              structure: bool = True, coherence_engine: str = "flux",
+              grounding_px: int = 1024, krea2_variant: str = "turbo") -> str:
     """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali.
     arch/model: architettura+checkpoint scelti nel progetto (B5: prima hardcoded flux). negative: estende il
-    negative di default (continuity elementi vietati). structure: converte il prompt in JSON strutturato
-    (schema PromptBuilder) e lo ricompone — così OGNI invio passa dallo stesso formato (Lucky Director / Cinema
-    Studio). Il JSON è salvato in <out_png>.prompt.json per riapertura/modifica."""
+    negative di default (continuity elementi vietati). structure: converte il prompt in JSON strutturato.
+
+    coherence_engine: motore per la COERENZA VOLTO/personaggio quando ci sono riferimenti (switch utente,
+    NON sostituisce FLUX):
+      • "flux" (default) → PuLID (face_ref) / Kontext (ref_images), come prima;
+      • "krea2_edit" → Krea 2 Edit in-context: usa i riferimenti dei personaggi DI QUESTA scena
+        (face_ref+ref_images, già risolti per-scena da resolve_refs → ogni scena porta l'attore giusto)
+        come immagini di riferimento; il prompt dello shot è l'istruzione. Fino a 2 personaggi (multi-ref);
+        con 3+ riferimenti ricade su FLUX per quella scena (log)."""
     prompt, negative = _apply_prompt_json(prompt, negative, loras, out_png, kind="image", structure=structure)
     neg = NEG + (", " + negative if negative else "")
+
+    # ── Coerenza personaggio via Krea 2 Edit (in-context) ─────────────────────────────────────────
+    _krefs = []
+    for r in ([face_ref] + list(ref_images or []) + [ref_image]):
+        if r and r not in _krefs:
+            _krefs.append(r)
+    if str(coherence_engine).lower() == "krea2_edit" and _krefs:
+        if len(_krefs) > 2:
+            print(f"[film] krea2_edit: {len(_krefs)} riferimenti in scena > 2 → FLUX per questo shot", flush=True)
+        else:
+            kp = {"arch": "krea2_edit", "krea2_variant": krea2_variant, "prompt": prompt, "negative": neg,
+                  "grounding_px": int(grounding_px), "seed": seed, "output": out_png,
+                  "steps": 8 if krea2_variant != "raw" else 20,
+                  "guidance": 0.0 if krea2_variant != "raw" else 2.0}
+            if len(_krefs) == 1:
+                kp["image_path"] = _krefs[0]
+            else:
+                kp["images"] = _krefs[:2]
+            res = native_driver.run_and_wait("image", kp, timeout=900)
+            p = (res.get("output") or [out_png]); p = p[0] if isinstance(p, list) else p
+            if p and os.path.exists(p) and p != out_png:
+                import shutil; shutil.copyfile(p, out_png)
+            if res.get("status") != "success" and not os.path.exists(out_png):
+                raise RuntimeError(res.get("error", "gen_image krea2_edit fallita"))
+            return out_png
+
     params = {"arch": arch, "prompt": prompt, "negative": neg, "width": width, "height": height,
               "steps": 22, "guidance": 3.5, "seed": seed, "output": out_png}
     if model:                                                # checkpoint esplicito (altrimenti default del server)

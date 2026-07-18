@@ -219,6 +219,11 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
                                           "face_ref": (refs["ref_images"] or [""])[0],
                                           "ref_images": refs["ref_images"], "loras": refs["loras"],
                                           "arch": img_arch, "model": img_model,
+                                          # coerenza volto: FLUX (PuLID/Kontext) o Krea 2 Edit (in-context,
+                                          # usa i riferimenti dei personaggi di QUESTA scena via resolve_refs)
+                                          "coherence_engine": guard.get("coherence_engine", "flux"),
+                                          "grounding_px": guard.get("grounding_px", 1024),
+                                          "krea2_variant": guard.get("krea2_variant", "turbo"),
                                           "seed": seed, "negative": forbidden,
                                           "width": width or 0, "height": height or 0},
                                 owner_kind="shot", owner_id=sh["id"])

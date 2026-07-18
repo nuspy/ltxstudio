@@ -17,7 +17,10 @@ def _img(p: dict):
     return gen_service.gen_image(p["prompt"], p["out"], face_ref=p.get("face_ref", ""),
                                  ref_images=p.get("ref_images"), loras=p.get("loras"),
                                  arch=p.get("arch", "flux"), model=p.get("model", ""),
-                                 negative=p.get("negative", ""), seed=int(p.get("seed", 7)), **kw)
+                                 negative=p.get("negative", ""), seed=int(p.get("seed", 7)),
+                                 coherence_engine=p.get("coherence_engine", "flux"),
+                                 grounding_px=int(p.get("grounding_px", 1024)),
+                                 krea2_variant=p.get("krea2_variant", "turbo"), **kw)
 
 
 def _vid(p: dict):

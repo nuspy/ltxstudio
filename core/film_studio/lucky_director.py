@@ -108,6 +108,7 @@ def make_film(spec: dict, *, on_progress=None, cancel=None) -> dict:
     # progetto (auto, riapribile in Cinema Studio)
     cfg = {"img_arch": spec.get("img_arch", "flux"), "img_model": "", "vid_gguf": "",
            "vid_arch": spec.get("vid_arch", "ltx"),          # 2ª architettura video (LTX/LingBot)
+           "coherence_engine": spec.get("coherence_engine", "flux"),   # coerenza volto (FLUX/Krea 2 Edit)
            "forbidden": "", "required": "",
            "style_bible": {}, "lucky_director": True}
     pid = db.insert("project", name=name, kind="film", duration_s=duration_s, genres="", styles="",
