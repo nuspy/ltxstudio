@@ -6,7 +6,7 @@ categoria NON liberano nulla → il ModelManager/epoch riusa ciò che è già ca
 con lo stesso modello restano gratis).
 
 Categorie e porte dei server persistenti:
-- image  → :8189 (InferenceServer immagini) + :8200 (API pubblica, gen immagini in-process)
+- image  → :8189 (InferenceServer immagini) + :8200 (API pubblica) + :8191 (server Krea 2 / Krea 2 Edit)
 - video  → :8190 (server video persistente LTX-2.3)
 - 3d/world/music → subprocess EFFIMERI (GPU pulita a fine run) → prima di partire liberano TUTTO.
 
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import urllib.request
 
-_IMAGE_PORTS = (8189, 8200)
+_IMAGE_PORTS = (8189, 8200, 8191)   # 8191 = server Krea 2 persistente (immagini/edit)
 _VIDEO_PORTS = (8190,)
 
 # Ricorda l'ultima categoria servita in QUESTO processo: due job consecutivi della stessa categoria non
