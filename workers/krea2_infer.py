@@ -58,10 +58,33 @@ def _free_vram_mb() -> int:
 _PIPE_CACHE: dict = {}
 
 
+def _evict_pipes() -> None:
+    """Scarica tutti i pipe in cache e libera la VRAM (single-slot per il server persistente)."""
+    import gc
+    n = len(_PIPE_CACHE)
+    _PIPE_CACHE.clear()
+    gc.collect()
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:                                          # noqa: BLE001
+        pass
+    if n:
+        print(f"[krea2] single-slot: sfrattati {n} pipe per liberare la VRAM prima del nuovo load", flush=True)
+
+
 def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
     key = (model_dir, variant, tuple(loras))
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
+    # SINGLE-SLOT: prima di caricare un pipe con una chiave NUOVA, sfratta gli altri e libera la VRAM.
+    # Nel server PERSISTENTE i job alternano t2i (no LoRA) ed edit (LoRA identità): tenere 2 pipe fp8
+    # (~13GB l'uno) satura i 32GB → il 2° carica con VRAM stretta → `model_cpu_offload`, che rompe
+    # l'iniezione dei token di riferimento dell'edit (device/offload) → l'identità si perde (drift anime).
+    # Tenendo UN pipe per volta ogni load ha la VRAM piena → niente offload → edit coerente. Nel subprocess
+    # one-shot c'è comunque una sola chiave, quindi è un no-op.
+    if _PIPE_CACHE:
+        _evict_pipes()
     from diffusers import DiffusionPipeline
     print(f"[krea2] carico Krea2Pipeline: {model_dir} (variant={variant})", flush=True)
     try:

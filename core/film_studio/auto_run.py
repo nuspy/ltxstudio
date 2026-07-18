@@ -213,18 +213,17 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
     except Exception as e:                                   # noqa: BLE001
         print(f"[auto_run] casting voci fallito (non fatale): {e}", flush=True)
 
-    # Worker IMMAGINE PERSISTENTE Krea 2 (:8191): se i keyframe usano Krea 2 (arch krea2 o coerenza
-    # krea2_edit), avvialo ORA così la pipe si carica UNA volta e resta calda per tutti gli shot invece
-    # di ricaricarsi a ogni foto (film da decine di shot = ore). free_for('video') in FASE 2 lo libera.
-    if img_arch == "krea2" or guard.get("coherence_engine", "flux") == "krea2_edit":
+    # NB: il server IMMAGINE persistente Krea 2 (:8191) è DISABILITATO per default (KREA2_USE_SERVER=1 per
+    # riabilitarlo, solo t2i): eseguire più job Krea nello stesso processo corrompe lo stato dell'edit
+    # (drift identità). I keyframe girano quindi in subprocess freschi (coerenti). Vedi img_gen_job.
+    if os.environ.get("KREA2_USE_SERVER") == "1" and img_arch == "krea2":
         try:
-            import os as _os
             from core import img_gen_job as _ij
-            _os.environ["KREA2_SERVER_AUTOSTART"] = "1"
+            os.environ["KREA2_SERVER_AUTOSTART"] = "1"
             if _ij.maybe_autostart_server():
-                print("[auto_run] worker immagine persistente Krea 2 :8191 pronto", flush=True)
+                print("[auto_run] worker immagine persistente Krea 2 :8191 pronto (solo t2i)", flush=True)
         except Exception as _e:                                  # noqa: BLE001
-            print(f"[auto_run] server Krea 2 :8191 non avviato ({_e}) → subprocess per-shot", flush=True)
+            print(f"[auto_run] server Krea 2 :8191 non avviato ({_e})", flush=True)
 
     # ── FASE 1: keyframe ──────────────────────────────────────────────────────
     kf_jids, jmap = [], {}

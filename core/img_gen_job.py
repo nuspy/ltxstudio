@@ -29,9 +29,16 @@ _ARCH_RUNNER = {
 
 
 # Server Krea 2 PERSISTENTE (:8191): se attivo, il pipe è già caldo → nessun reload per shot.
-# Serve SOLO le arch del venv LingBot (krea2/krea2_edit). Autostart opzionale (KREA2_SERVER_AUTOSTART=1).
+# Autostart opzionale (KREA2_SERVER_AUTOSTART=1).
+# NB: SOLO il t2i puro ('krea2') passa dal server. L'EDIT ('krea2_edit') NO: eseguire più job Krea nello
+# stesso processo (il server) corrompe uno stato globale torch/diffusers (attention dispatch native↔
+# flash_varlen, autocast) che sopravvive anche allo sfratto del pipe → l'edit perde l'identità (drift, es.
+# volto anime al posto del riferimento). Ogni edit gira quindi in un SUBPROCESS fresco (un solo job per
+# processo = nessun accumulo di stato = coerenza garantita). Il t2i non ha coerenza da preservare → server ok.
 KREA2_SERVER = os.environ.get("KREA2_SERVER", "http://127.0.0.1:8191")
-_SERVER_ARCHS = ("krea2", "krea2_edit")
+# DISABILITATO (single job per processo): finché lo stato globale torch/diffusers non viene isolato, il
+# server è OFF per default. Riabilitabile con KREA2_USE_SERVER=1 (solo per t2i puro, MAI per l'edit).
+_SERVER_ARCHS = ("krea2",) if os.environ.get("KREA2_USE_SERVER") == "1" else ()
 
 
 def handles(arch: str | None) -> bool:
