@@ -131,6 +131,15 @@ def run_generation(p: dict) -> str:
     out = p["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     model_dir, variant = _resolve_model_dir(p)
+    # i2v: il dispatch condiviso (auto_run / ltx_video_job) passa l'immagine iniziale come `keyframes`
+    # (formato LTX: [{path, frame, strength}]). LingBot vuole invece `image_path`: se manca, lo ricaviamo dal
+    # primo keyframe → altrimenti `_mode` ripiega su 't2v' e il runner IGNORA il keyframe (clip incoerente col
+    # frame iniziale generato — es. volto diverso). Bug trovato dall'utente: "propendo per t2v".
+    if not p.get("image_path") and p.get("keyframes"):
+        kf0 = p["keyframes"][0]
+        kfp = kf0.get("path") if isinstance(kf0, dict) else kf0
+        if kfp and os.path.exists(str(kfp)):
+            p["image_path"] = str(kfp)
     mode = _mode(p)
     # ANTI-OOM: se il video non entra in VRAM, riduci la risoluzione (durata invariata) invece di crashare.
     _w0, _h0 = int(p.get("width", 832)), int(p.get("height", 480))
