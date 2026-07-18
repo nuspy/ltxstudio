@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import harness as H  # noqa: E402
 
-MODEL = "flux1-schnell-fp8.safetensors"
+MODEL = "FLUX_Dev.safetensors"
 OUT = r"E:\ai\ltxstudio\output"
 
 
@@ -34,7 +34,7 @@ def _gen(i: int, seed: int) -> tuple[float, dict]:
     from core import native_driver
     params = {"arch": "flux", "model": MODEL,
               "prompt": f"a lone lighthouse on a cliff at dawn, cinematic, test {i}",
-              "negative": "blurry", "width": 768, "height": 768, "steps": 4, "guidance": 0.0,
+              "negative": "blurry", "width": 768, "height": 768, "steps": 8, "guidance": 3.5,
               "seed": seed, "output": os.path.join(OUT, f"DIAG_persist_img{i}.png")}
     t = time.time()
     res = native_driver.run_and_wait("image", params, timeout=600)

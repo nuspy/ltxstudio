@@ -96,6 +96,27 @@ class ComponentStore:
     def resident_mb(self, device: str = "cuda") -> float:
         return sum(e.size_mb for e in self._items.values() if e.device == device)
 
+    def clear(self) -> int:
+        """HARD-free: distrugge TUTTI i componenti e libera la VRAM (empty_cache). Semantica di /free =
+        "un'altra pipeline ha bisogno della VRAM ORA" (cambio-pipeline). Ritorna quanti ne ha distrutti.
+        Da chiamare solo TRA i job (mai a job in corso)."""
+        import gc
+        n = len(self._items)
+        for k in list(self._items.keys()):
+            e = self._items.pop(k, None)
+            try:
+                del e.obj
+            except Exception:                               # noqa: BLE001
+                pass
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:                                   # noqa: BLE001
+            pass
+        return n
+
     def stats(self) -> dict:
         """Stato OSSERVABILE del ComponentStore (per i test app-completa e il monitor memoria): quali
         componenti sono residenti, su quale device, refcount e MB. Serve a VERIFICARE la gestione memoria

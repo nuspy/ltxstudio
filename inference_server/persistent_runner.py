@@ -71,7 +71,8 @@ def main() -> int:
                 break
             if cmd == "FREE":
                 try:
-                    component_store.STORE.evict_unused(1e12)   # svuota la VRAM (refcount==0)
+                    mm.clear_all()                             # scarica le shell → rilascia i componenti
+                    component_store.STORE.clear()              # hard-free: distrugge tutto + empty_cache
                 except Exception:                              # noqa: BLE001
                     pass
                 cur_key = "-"

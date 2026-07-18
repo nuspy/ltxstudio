@@ -162,6 +162,16 @@ class ModelManager:
         del e
         self.flush()
 
+    def clear_all(self, *, allow_cpu: bool = False) -> int:
+        """HARD-free: scarica TUTTE le shell/pipeline in cache (release dei componenti condivisi) e svuota la
+        cpu-cache. Usato dal /free del figlio persistente (cambio-pipeline: un altro motore vuole la VRAM).
+        allow_cpu=False → distrugge (VRAM subito libera) invece di demotare su RAM. Ritorna quante scaricate."""
+        n = len(self._cache)
+        for k in list(self._cache.keys()):
+            self.unload(k, allow_cpu=allow_cpu)
+        self._cpu_cache.clear()
+        return n
+
     def evict_others(self, keep_key: str) -> int:
         """AUTO-EVICT al cambio modello: scarica TUTTE le shell tranne keep_key (non-sticky) → rilascia i loro
         componenti. Il transformer del modello PRECEDENTE diventa orfano (refcount 0) e verrà liberato/demotato
