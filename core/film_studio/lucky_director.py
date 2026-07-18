@@ -130,6 +130,19 @@ def make_film(spec: dict, *, on_progress=None, cancel=None) -> dict:
     breakdown.build(pid)
     breakdown.normalize_durations(pid, duration_s)
 
+    # FASE 1b: CAST — replica in automatico lo step 'asset' di Cinema Studio: per ogni @Nome del copione
+    # crea l'asset + genera UNA foto di riferimento, così gli shot hanno un riferimento e la coerenza volto
+    # (PuLID/Kontext o Krea 2 Edit, secondo coherence_engine) si aggancia. Senza, i @Nome sono vuoti.
+    emit("cast", 1, 1, "", 0.04)
+    if cancel and cancel():
+        raise RuntimeError("Operazione annullata")
+    try:
+        from core.film_studio import cast_auto
+        cast_auto.build_cast(pid, img_arch=cfg.get("img_arch", "flux"),
+                             model=cfg.get("img_model", ""), progress=on_progress)
+    except Exception as _ce:                                      # noqa: BLE001 — il film prosegue anche senza cast
+        print(f"[lucky] cast_auto fallito ({_ce}) → shot senza coerenza", flush=True)
+
     # FASI 2-6: keyframe → video → audio → musica → master (orchestratore condiviso con Cinema Studio)
     res = auto_run.run(pid, aspect=aspect, scene_trans=spec.get("scene_trans", ""),
                        shot_trans=spec.get("shot_trans", ""),
