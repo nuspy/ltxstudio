@@ -166,7 +166,9 @@ class Krea2EditPipeline(Krea2Pipeline):
         b, c, lh, lw = lat.shape
         tokens = self._pack_latents(lat, b, c, lh, lw)           # (B, (lh/p)*(lw/p), z*p*p)
         gh, gw = lh // self.patch_size, lw // self.patch_size
-        return tokens.to(self._execution_device), gh, gw
+        # usa il `device` passato (cuda): dopo l'offload del text-encoder, self._execution_device
+        # potrebbe ritornare CPU e mandare i ref-token sul device sbagliato.
+        return tokens.to(device), gh, gw
 
     @staticmethod
     def _frame_image_ids(grid_h: int, grid_w: int, frame: int, device) -> torch.Tensor:
@@ -222,6 +224,14 @@ class Krea2EditPipeline(Krea2Pipeline):
             negative_prompt_embeds, negative_prompt_embeds_mask = self.grounded_text_hidden_states(
                 negative_prompt or "", neg_imgs, grounding_px, max_sequence_length, device
             )
+        # Il text-encoder (Qwen3-VL ~9GB) NON serve più nel loop di denoise: scaricalo in CPU così le
+        # attivazioni della sequenza in-context (target+ref, lunga) non sbordano in shared-VRAM (→ 100× più lento).
+        try:
+            if not getattr(self, "_ls_offloaded", False):        # non toccare se c'è già model_cpu_offload
+                self.text_encoder.to("cpu")
+                torch.cuda.empty_cache()
+        except Exception:                                        # noqa: BLE001
+            pass
 
         # 2) canale aspetto: VAE-encode delle sorgenti → token puliti + position_ids frame 1..N
         ref_tokens_list, ref_ids_list = [], []

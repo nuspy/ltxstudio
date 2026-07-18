@@ -94,6 +94,15 @@ def _load_pipeline(model_dir: str, variant: str):
             pipe.vae.enable_tiling()
     except Exception:                                          # noqa: BLE001
         pass
+    # ATTENZIONE = collo di bottiglia sulla sequenza in-context lunga (edit, ~7200 token): col default SDPA
+    # cade sul kernel MATH (O(n²)) perché Krea2 passa una attn_mask sui token testo → ~240s/step. FlashAttn-2
+    # NON accetta attn_mask; il kernel SDPA memory-efficient sì ed è velocissimo. Vale anche per il t2i.
+    _abe = os.environ.get("KREA2_ATTN", "flash_varlen")        # flash con cu_seqlens: gestisce il padding
+    try:
+        pipe.transformer.set_attention_backend(_abe)
+        print(f"[krea2] attention backend = {_abe}", flush=True)
+    except Exception as ex:                                    # noqa: BLE001
+        print(f"[krea2] set_attention_backend('{_abe}') fallito ({ex}) → default", flush=True)
     _PIPE_CACHE[key] = pipe
     return pipe
 
@@ -141,13 +150,20 @@ def _resolve_lora_paths(p: dict, edit: bool) -> list[tuple[str, float]]:
 def _apply_loras(pipe, loras: list[tuple[str, float]]) -> None:
     if not loras:
         return
+    from safetensors.torch import load_file
     names, weights = [], []
     for i, (path, w) in enumerate(loras):
         try:
             an = f"krea2_lora_{i}"
-            pipe.load_lora_weights(path, adapter_name=an)
+            sd = load_file(path)
+            # ComfyUI salva le LoRA col prefisso 'diffusion_model.'; diffusers (Krea2LoraLoaderMixin,
+            # modulo 'transformer') vuole 'transformer.'. Rimappo così load_lora_weights le riconosce
+            # (evita anche l'errore offline 'must specify weight_name', passando direttamente il dict).
+            if any(k.startswith("diffusion_model.") for k in sd):
+                sd = {("transformer." + k[len("diffusion_model."):]): v for k, v in sd.items()}
+            pipe.load_lora_weights(sd, adapter_name=an)
             names.append(an); weights.append(w)
-            print(f"[krea2] LoRA caricata: {os.path.basename(path)} @{w}", flush=True)
+            print(f"[krea2] LoRA caricata: {os.path.basename(path)} @{w} ({len(sd)} tensori)", flush=True)
         except Exception as ex:                                   # noqa: BLE001
             print(f"[krea2] LoRA fallita {os.path.basename(path)}: {ex}", flush=True)
     if names:
