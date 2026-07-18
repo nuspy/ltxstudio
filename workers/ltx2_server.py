@@ -86,9 +86,22 @@ def free():
 
 @app.get("/system_stats")
 def system_stats():
+    import os
     import torch
     free, total = (torch.cuda.mem_get_info() if torch.cuda.is_available() else (0, 0))
-    return {"up": True, "cached_pipelines": len(ltx2_infer._PIPE_CACHE),
+    # model_key per il gpu_registry unico: video:basename(ckpt) del pipe residente più recente (la chiave
+    # cache è (ckpt, qmode, offload, loras, stages, ptype)). '-' se nessuno.
+    model_key = "-"
+    try:
+        cache = ltx2_infer._PIPE_CACHE
+        if cache:
+            ckpt = list(cache.keys())[-1][0]
+            model_key = f"video:{os.path.basename(str(ckpt)) or '-'}"
+    except Exception:                                       # noqa: BLE001
+        pass
+    used_mb = (total - free) // 1024 // 1024
+    return {"up": True, "cached_pipelines": len(ltx2_infer._PIPE_CACHE), "model_key": model_key,
+            "vram_used_mb": used_mb, "model_vram_mb": used_mb,
             "vram_free_mb": free // 1024 // 1024, "vram_total_mb": total // 1024 // 1024}
 
 
