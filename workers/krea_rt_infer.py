@@ -109,23 +109,38 @@ def _load_pipeline(krea_dir: str, wan_dir: str, kv_frames: int):
     return pipe
 
 
-def _maybe_disable_compile() -> None:
-    """La perf REALTIME di krea_rt (≈1s video in ~2s dopo il load) viene dalla `torch.compile(max-autotune)`
-    del flex_attention SCALDATA: il warmup è un costo UNA-TANTUM dopo il load, poi è realtime. Quindi di
-    DEFAULT lo lasciamo attivo (serve un modello CALDO/persistente per ammortizzare il warmup — vedi il server
-    persistente). Solo per debug one-shot rapido si può disattivare con KREA_RT_NO_COMPILE=1 (eager: nessun
-    warmup ma niente realtime)."""
-    if os.environ.get("KREA_RT_NO_COMPILE") != "1":
+def _tune_compile() -> None:
+    """Il modello vendored compila flex_attention in `mode='max-autotune-no-cudagraphs'`: su questo
+    torch/GPU il warmup è >15 min (pathologico) → impraticabile anche una volta sola. Ma il compile SERVE per
+    la perf (eager = lento, niente realtime). Compromesso: forziamo `mode='default'` (warmup ~1-2 min, runtime
+    quasi-realtime) sovrascrivendo la mode richiesta dal codice vendored. Da fare PRIMA che il modulo venga
+    importato. Override:
+      KREA_RT_NO_COMPILE=1  → eager (debug: nessun warmup, nessun realtime)
+      KREA_RT_MAX_AUTOTUNE=1 → lascia max-autotune (solo se accetti il warmup lunghissimo)
+    """
+    if os.environ.get("KREA_RT_MAX_AUTOTUNE") == "1":
         return
     try:
-        torch.compile = lambda model=None, *a, **k: (model if model is not None else (lambda f: f))  # noqa: E731
-        print("[krea_rt] torch.compile DISATTIVATO (KREA_RT_NO_COMPILE=1): eager, no warmup ma NO realtime", flush=True)
+        _orig = torch.compile
+        if os.environ.get("KREA_RT_NO_COMPILE") == "1":
+            torch.compile = lambda model=None, *a, **k: (model if model is not None else (lambda f: f))  # noqa: E731
+            print("[krea_rt] torch.compile eager (KREA_RT_NO_COMPILE=1): no warmup, no realtime", flush=True)
+            return
+
+        def _fast_compile(model=None, *a, **k):
+            k.pop("mode", None)                             # scarta max-autotune
+            k["mode"] = "default"                           # warmup breve
+            if model is None:
+                return lambda f: _orig(f, *a, **k)
+            return _orig(model, *a, **k)
+        torch.compile = _fast_compile
+        print("[krea_rt] torch.compile mode='default' forzata (warmup breve invece di max-autotune)", flush=True)
     except Exception as _ce:                                 # noqa: BLE001
-        print(f"[krea_rt] disable compile: {_ce}", flush=True)
+        print(f"[krea_rt] tune compile: {_ce}", flush=True)
 
 
 def run_generation(p: dict) -> str:
-    _maybe_disable_compile()                                 # default: compile ON (realtime); opt-out debug
+    _tune_compile()                                          # mode=default (warmup breve); override via env
     out = p["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     fps = int(p.get("fps", 24))
