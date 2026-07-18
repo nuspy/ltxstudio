@@ -6,6 +6,7 @@ della continuity), sostituendo l'eventuale breakdown precedente. Headless: nessu
 from __future__ import annotations
 
 import json
+import re
 
 from core import llm_service as L
 from core.film_studio import db, continuity as ct
@@ -21,7 +22,10 @@ SYS = ("You are a film script supervisor. Break the screenplay into SCENES and S
        "lighting = light + mood (e.g. 'soft golden hour', 'harsh neon'). "
        "description = the visual content of the shot (subject + action + setting). "
        "Sum of shot durations = scene duration; sum of scene durations = film duration. "
-       "Keep @Name references. No prose outside JSON.")
+       "CRITICAL — CHARACTER CONSISTENCY: every character in the screenplay is tagged @Name (e.g. @Kaira). "
+       "In EVERY shot 'description' where a character appears you MUST write their @Name tag exactly "
+       "(e.g. '@Kaira draws her pistol as @Dorian ducks'), NOT a generic noun like 'the captain'. "
+       "This is required so their face stays consistent across shots. No prose outside JSON.")
 
 
 def build(pid: int, *, max_tokens: int = 6000) -> int:
@@ -60,6 +64,18 @@ def build(pid: int, *, max_tokens: int = 6000) -> int:
               f"{type(data).__name__}) → riprovo con più budget", flush=True)
     else:
         raise RuntimeError("breakdown: l'LLM non ha prodotto scene valide dopo 3 tentativi")
+    # RE-TAG DETERMINISTICO @Nome: l'LLM del breakdown a volte scarta i tag @Nome del copione (o li
+    # sostituisce con 'the captain') → cast_auto non trova personaggi → nessuna coerenza volto. Qui
+    # re-inseriamo gli @Nome del COPIONE nelle descrizioni riscritte, senza fidarci dell'LLM.
+    _names = sorted(set(re.findall(r"@([A-Za-z][A-Za-z0-9_]*)", copione["text"])), key=len, reverse=True)
+    # match esatto del nome proprio (maiuscolo) → niente falsi positivi su parole comuni omografe minuscole
+    _retag_pats = [(n, re.compile(r"(?<![@\w])" + re.escape(n) + r"\b")) for n in _names]
+
+    def _retag(text: str) -> str:
+        for n, pat in _retag_pats:
+            text = pat.sub("@" + n, text or "")
+        return text
+
     # sostituisci scene/shot precedenti del progetto
     for sc in db.query("scene", "project_id=?", (pid,)):
         for sh in db.query("shot", "scene_id=?", (sc["id"],)):
@@ -67,6 +83,9 @@ def build(pid: int, *, max_tokens: int = 6000) -> int:
         db.delete("scene", sc["id"])
     prev_state = None
     for i, sc in enumerate(scenes, 1):
+        sc["description"] = _retag(sc.get("description", ""))
+        for _sh in sc.get("shots", []):
+            _sh["description"] = _retag(_sh.get("description", ""))
         state = ct.propagate(prev_state, sc.get("continuity"))
         prev_state = state
         sid = db.insert("scene", project_id=pid, ord=i, description=sc.get("description", ""),
