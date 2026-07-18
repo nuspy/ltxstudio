@@ -174,6 +174,12 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
 
     params = {"arch": arch, "prompt": prompt, "negative": neg, "width": width, "height": height,
               "steps": 22, "guidance": 3.5, "seed": seed, "output": out_png}
+    if str(arch).lower() == "krea2":
+        # Krea 2 Turbo è DISTILLATO (guidance-distilled): vuole ~8 step e guidance 0.0 (niente CFG). Con i
+        # valori FLUX (22 step / guidance 3.5) la CFG sul negative genera un reticolo colorato sul volto
+        # (bug KAIRA — ritratti cast rovinati). Il ramo krea2_edit già usava 8/0.0; qui allineo il t2i puro.
+        params["steps"] = 8 if krea2_variant != "raw" else 52
+        params["guidance"] = 0.0 if krea2_variant != "raw" else 3.5
     if model:                                                # checkpoint esplicito (altrimenti default del server)
         params["model"] = model
     if face_ref:

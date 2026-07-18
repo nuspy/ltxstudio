@@ -131,6 +131,8 @@ def gen_portrait(prompt: str, out_png: str, *, arch: str = "flux", model: str | 
     _p = {"arch": (arch or "flux"), "prompt": prompt, "negative": NEG,
           "width": int(width), "height": int(height), "steps": 20, "guidance": 3.5, "seed": 12,
           "output": out_png}
+    if str(arch).lower() == "krea2":                     # Turbo distillato: 8 step, guidance 0.0 (no CFG)
+        _p["steps"] = 8; _p["guidance"] = 0.0
     if model and (arch or "flux") == "flux":
         _p["model"] = model
     res = native_driver.run_and_wait("image", _p, timeout=600)
@@ -230,6 +232,9 @@ def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int 
         "arch": (arch or "flux"), "prompt": scene["img_prompt"], "negative": NEG,
         "width": width, "height": height, "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png,
     }
+    if str(arch).lower() == "krea2":                     # Turbo distillato: 8 step, guidance 0.0 (no CFG)
+        _p["steps"] = 8 if krea2_variant != "raw" else 52
+        _p["guidance"] = 0.0 if krea2_variant != "raw" else 3.5
     if model and (arch or "flux") == "flux":             # eredita il modello del tab Foto (solo FLUX ha un file)
         _p["model"] = model
     if placement_mode:                                   # 'sticky' → transformer residente per il batch
