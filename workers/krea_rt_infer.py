@@ -109,7 +109,26 @@ def _load_pipeline(krea_dir: str, wan_dir: str, kv_frames: int):
     return pipe
 
 
+def _disable_max_autotune_compile() -> None:
+    """Il codice vendored del modello fa, a import-time, `flex_attention = torch.compile(..., mode=
+    'max-autotune-no-cudagraphs')`: il warmup max-autotune costa MINUTI e — in un worker one-shot
+    (subprocess per clip) — domina ogni run rendendolo impraticabile. Lo neutralizziamo rendendo
+    `torch.compile` un no-op (flex_attention gira eager: più lento per-step ma ZERO warmup). Da fare PRIMA
+    che il modulo del modello venga importato (cioè prima di AutoModel.from_pretrained). Riattivabile con
+    KREA_RT_COMPILE=1 (utile solo con un server persistente, dove il warmup si paga una volta sola)."""
+    if os.environ.get("KREA_RT_COMPILE") == "1":
+        return
+    try:
+        _orig = torch.compile
+        torch.compile = lambda model=None, *a, **k: (model if model is not None else (lambda f: f))  # noqa: E731
+        torch.compile._krea_orig = _orig
+        print("[krea_rt] torch.compile disattivato (flex_attention eager, niente warmup max-autotune)", flush=True)
+    except Exception as _ce:                                 # noqa: BLE001
+        print(f"[krea_rt] disable compile: {_ce}", flush=True)
+
+
 def run_generation(p: dict) -> str:
+    _disable_max_autotune_compile()                          # PRIMA del load del modello (import vendored)
     out = p["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     fps = int(p.get("fps", 24))
