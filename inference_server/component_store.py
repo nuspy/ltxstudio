@@ -96,6 +96,17 @@ class ComponentStore:
     def resident_mb(self, device: str = "cuda") -> float:
         return sum(e.size_mb for e in self._items.values() if e.device == device)
 
+    def stats(self) -> dict:
+        """Stato OSSERVABILE del ComponentStore (per i test app-completa e il monitor memoria): quali
+        componenti sono residenti, su quale device, refcount e MB. Serve a VERIFICARE la gestione memoria
+        allo switch di pipeline (condivisi tenuti, sfratto solo se serve). Vedi tests/app_env."""
+        comps = [{"key": k, "device": e.device, "refcount": e.refcount, "size_mb": round(e.size_mb, 1),
+                  "last_used": round(e.last_used, 2)} for k, e in self._items.items()]
+        comps.sort(key=lambda c: (c["device"] != "cuda", -c["size_mb"]))
+        return {"components": comps, "n": len(comps),
+                "vram_mb": round(self.resident_mb("cuda"), 1), "cpu_mb": round(self.resident_mb("cpu"), 1),
+                "epoch": self.placement_epoch}
+
     def resident_of(self, keys, device: str = "cuda") -> float:
         """MB dei componenti in `keys` GIÀ residenti su `device` — sottratti dalla stima di _place
         (lo spazio è già pagato, la pipeline li riusa)."""
