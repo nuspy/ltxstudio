@@ -87,6 +87,15 @@ def _load_pipeline(krea_dir: str, wan_dir: str, kv_frames: int):
     try:                                                    # transformer krea 14B (codice custom LOCALE)
         tr = AutoModel.from_pretrained(os.path.join(krea_dir, "transformer"), torch_dtype=torch.bfloat16,
                                        trust_remote_code=True, local_files_only=True)
+        # FONDI le proiezioni q/k/v (crea `to_qkv`, che il forward usa SEMPRE) PRIMA del cast fp8: se si fonde
+        # dopo, il to_qkv nuovo non ha l'hook del layerwise casting → matmul fp8×bf16 fallisce. In bf16 la
+        # fusione produce un Linear coperto dal casting successivo.
+        try:
+            for _blk in tr.blocks:
+                _blk.self_attn.fuse_projections()
+            print("[krea_rt] proiezioni q/k/v fuse (pre-fp8)", flush=True)
+        except Exception as _fe:                              # noqa: BLE001
+            print(f"[krea_rt] fuse_projections: {_fe}", flush=True)
         tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)  # →14.7GB
         tr.to("cuda")
         print("[krea_rt] transformer fp8 residente (~14.7GB) + UMT5 bf16 + VAE fp32", flush=True)
@@ -123,29 +132,39 @@ def run_generation(p: dict) -> str:
     total = int(p.get("num_frames", 121))
     num_blocks = max(1, round(total / (fpb * 4)))            # VALIDATE: relazione blocchi↔frame del VAE Wan
 
-    pipe = _load_pipeline(krea_dir, wan_dir, kv_frames)
+    pipe = _load_pipeline(krea_dir, wan_dir, kv_frames)     # le proiezioni sono già fuse (pre-fp8) qui dentro
+    # API MODULARE AUTOREGRESSIVA (dal README ufficiale): NON una chiamata sola, ma un LOOP per-blocco che
+    # tesse lo `state` (PipelineState). Generazione a blocchi con KV-cache rolling. Niente `guidance_scale`
+    # (usa i guiders interni), niente `image=` (l'i2v/v2v passa `video=` + `strength`), niente
+    # `kv_cache_num_frames` come input di call.
+    from diffusers.modular_pipelines import PipelineState
 
     def _m16(k, dflt):
         return max(256, (int(p.get(k, dflt)) // 16) * 16)
-    kwargs = dict(
-        prompt=p.get("prompt", ""),
-        negative_prompt=p.get("negative", NEG_DEFAULT),
-        height=_m16("height", 480), width=_m16("width", 832),
-        num_inference_steps=int(p.get("steps", 4)),         # distillato: ~4 step
-        guidance_scale=float(p.get("guidance", 1.0)),
-        num_blocks=num_blocks, num_frames_per_block=fpb, kv_cache_num_frames=kv_frames,
-        generator=torch.Generator(device="cpu").manual_seed(int(p.get("seed", 7))),
-    )
+    w16, h16 = _m16("width", 832), _m16("height", 480)
+    steps = int(p.get("steps", 4))
+    gen = torch.Generator(device="cuda" if torch.cuda.is_available() else "cpu").manual_seed(int(p.get("seed", 7)))
+
+    # i2v: init image come video di 1 frame + strength (v2v con clip corta). t2v: nessun video.
+    call = dict(prompt=p.get("prompt", ""), negative_prompt=p.get("negative", NEG_DEFAULT),
+                height=h16, width=w16, num_inference_steps=steps, num_blocks=num_blocks,
+                num_frames_per_block=fpb, generator=gen)
     if p.get("image_path") and os.path.exists(str(p["image_path"])):
         from PIL import Image
-        kwargs["image"] = Image.open(p["image_path"]).convert("RGB")   # i2v/v2v se supportato — VALIDATE
+        call["video"] = [Image.open(p["image_path"]).convert("RGB")]
+        call["strength"] = float(p.get("ref_strength", p.get("strength", 0.5)))
+        print(f"[krea_rt] i2v: init da {os.path.basename(p['image_path'])} strength={call['strength']}", flush=True)
 
-    print(f"[krea_rt] t2v autoregressivo: {kwargs['width']}x{kwargs['height']} ~{total}f "
-          f"({num_blocks} blocchi × {fpb}, kv={kv_frames}, {kwargs['num_inference_steps']} step)", flush=True)
-    result = pipe(**kwargs)
-    frames = getattr(result, "frames", result)
-    if isinstance(frames, (list, tuple)) and frames and not hasattr(frames[0], "save"):
-        frames = frames[0]
+    print(f"[krea_rt] autoregressivo: {w16}x{h16} ~{total}f ({num_blocks} blocchi × {fpb}, kv={kv_frames}, "
+          f"{steps} step)", flush=True)
+    frames = []
+    state = PipelineState()
+    for block_idx in range(num_blocks):
+        state = pipe(state, block_idx=block_idx, **call)
+        try:
+            frames.extend(state.values["videos"][0])
+        except Exception as _ee:                             # noqa: BLE001
+            raise RuntimeError(f"krea_rt: nessun 'videos' nello state al blocco {block_idx}: {_ee}")
 
     # NaN-guard + encode
     import numpy as np, imageio
