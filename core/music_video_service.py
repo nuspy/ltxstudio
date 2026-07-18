@@ -91,12 +91,66 @@ def _scene_for_chunk(i: int, nch: int, scenes: list[dict]) -> dict:
     return scenes[-1]
 
 
+# ───────────────────── CAST (personaggi ricorrenti col volto coerente) ─────────────────────
+def _cast_by_name(cast: list[dict] | None) -> dict:
+    """Indice case-insensitive del cast per nome. Ogni voce:
+    {name, role, instrument, ref_image, instrument_image, frequency}."""
+    return {str(c["name"]).strip().lower(): c
+            for c in (cast or []) if (c.get("name") or "").strip()}
+
+
+def _apply_cast_to_scene(scene: dict, by_name: dict) -> None:
+    """Aggancia il cast alla scena dello storyboard: sceglie il personaggio-hero fra i `chars`, imposta
+    `char_ref` (foto identità) + eventuale 2° riferimento `instrument_ref` (foto strumento) e AGGIUNGE il
+    tag testuale dello strumento al prompt. Il volto coerente avviene poi in gen_scene_image (krea2_edit).
+    Nessun cast/nessun match → scena invariata (b-roll/location)."""
+    names = scene.get("chars") or []
+    hero = next((by_name[n.lower()] for n in names if n.lower() in by_name), None)
+    if not hero:
+        return
+    ref = (hero.get("ref_image") or "").strip()
+    if ref and os.path.exists(ref):
+        scene["char_ref"] = ref
+    instr = (hero.get("instrument") or "").strip()
+    if instr and instr.lower() not in scene["img_prompt"].lower():
+        tag = f", holding/playing a {instr}"
+        scene["img_prompt"] += tag
+        scene["video_prompt"] += tag
+    instr_img = (hero.get("instrument_image") or "").strip()
+    if instr_img and os.path.exists(instr_img):
+        scene["instrument_ref"] = instr_img            # 2° riferimento Krea 2 Edit per i clip-hero
+
+
+def gen_portrait(prompt: str, out_png: str, *, arch: str = "flux", model: str | None = None,
+                 width: int = 768, height: int = 768) -> str:
+    """Ritratto di riferimento per un membro del cast (t2i, il motore immagine nativo). È la SORGENTE
+    dell'identità: la coerenza vera nei clip avviene poi via gen_scene_image(coherence_engine='krea2_edit').
+    Riusa native_driver come gen_scene_image → stesso percorso, nessuna duplicazione."""
+    from core import native_driver
+    os.makedirs(os.path.dirname(out_png) or ".", exist_ok=True)
+    _p = {"arch": (arch or "flux"), "prompt": prompt, "negative": NEG,
+          "width": int(width), "height": int(height), "steps": 20, "guidance": 3.5, "seed": 12,
+          "output": out_png}
+    if model and (arch or "flux") == "flux":
+        _p["model"] = model
+    res = native_driver.run_and_wait("image", _p, timeout=600)
+    p = res.get("output") or out_png
+    p = p[0] if isinstance(p, list) else p
+    if p and os.path.exists(p) and p != out_png:
+        import shutil
+        shutil.copyfile(p, out_png)
+    if not os.path.exists(out_png):
+        raise RuntimeError(res.get("error", "ritratto non generato"))
+    return out_png
+
+
 # ───────────────────── workflow INTERATTIVO (storyboard editabile) ─────────────────────
 def plan_scenes(*, lyrics: str, song_path: str, scene_seconds: float = 4.0, video_style: str = "",
-                image_hint: str = "", progress=None) -> list[dict]:
+                image_hint: str = "", cast: list[dict] | None = None, progress=None) -> list[dict]:
     """Crea l'ELENCO delle riprese SENZA generare: per ogni scena {order, start_s, length_s,
-    img_prompt, video_prompt, image_path, video_path}. start_s distribuito sul tempo (pesi LLM);
-    length_s = distanza dalla scena successiva (auto). Editabile dall'utente."""
+    img_prompt, video_prompt, image_path, video_path, chars?, location?, char_ref?, instrument_ref?}.
+    start_s distribuito sul tempo (pesi LLM); length_s = distanza dalla scena successiva (auto).
+    `cast` = personaggi ricorrenti col volto coerente (vedi _apply_cast_to_scene). Editabile dall'utente."""
     def log(m):
         if progress:
             progress(m)
@@ -105,7 +159,8 @@ def plan_scenes(*, lyrics: str, song_path: str, scene_seconds: float = 4.0, vide
     log("Storyboard (LLM)…")
     try:
         scenes = lyrics_llm.storyboard(lyrics, image_hint=image_hint,
-                                       target_scenes=min(target, MAX_SCENES), video_style=video_style)
+                                       target_scenes=min(target, MAX_SCENES), video_style=video_style,
+                                       cast=cast)
     except Exception:                                       # noqa: BLE001
         scenes = []
     finally:
@@ -116,14 +171,19 @@ def plan_scenes(*, lyrics: str, song_path: str, scene_seconds: float = 4.0, vide
     if not scenes:
         scenes = [{"prompt": "cinematic music video, dynamic, atmospheric", "weight": 1}]
     sfx = (", " + video_style.strip()) if (video_style or "").strip() else ""
+    by_name = _cast_by_name(cast)
     total_w = sum(max(1, s.get("weight", 1)) for s in scenes) or 1
     out, acc = [], 0.0
     for i, s in enumerate(scenes):
         start = round(acc / total_w * dur, 2)
         vp = s["prompt"].strip() + sfx
-        out.append({"order": i, "start_s": start, "length_s": 0.0,
-                    "video_prompt": vp, "img_prompt": vp + ", cinematic still frame",
-                    "image_path": "", "video_path": ""})
+        loc = (", " + s["location"].strip()) if s.get("location") else ""
+        scn = {"order": i, "start_s": start, "length_s": 0.0,
+               "video_prompt": vp, "img_prompt": vp + loc + ", cinematic still frame",
+               "image_path": "", "video_path": "",
+               "chars": s.get("chars") or [], "location": s.get("location", "")}
+        _apply_cast_to_scene(scn, by_name)                 # → char_ref / instrument_ref / tag strumento
+        out.append(scn)
         acc += max(1, s.get("weight", 1))
     recompute_lengths(out, dur)
     return out
@@ -152,9 +212,11 @@ def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int 
     from core import native_driver
     _ref = scene.get("char_ref") or char_ref             # per-scena → globale (attori diversi per scena)
     if str(coherence_engine).lower() == "krea2_edit" and _ref:
+        # 2° riferimento opzionale = foto strumento del musicista-hero (clip-hero: 1 persona + strumento)
+        _refs = [_ref] + ([scene["instrument_ref"]] if scene.get("instrument_ref") else [])
         _p = {"arch": "krea2_edit", "krea2_variant": krea2_variant, "prompt": scene["img_prompt"],
-              "negative": NEG, "image_path": _ref, "grounding_px": int(grounding_px), "seed": 7,
-              "output": out_png, "steps": 8 if krea2_variant != "raw" else 20,
+              "negative": NEG, "images": _refs, "image_path": _ref, "grounding_px": int(grounding_px),
+              "seed": 7, "output": out_png, "steps": 8 if krea2_variant != "raw" else 20,
               "guidance": 0.0 if krea2_variant != "raw" else 2.0}
         res = native_driver.run_and_wait("image", _p, timeout=600)
         p = res.get("output") or out_png; p = p[0] if isinstance(p, list) else p

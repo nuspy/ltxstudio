@@ -209,10 +209,14 @@ class MusicVideoStudio(QWidget):
         split = QSplitter(Qt.Horizontal)
         left = QWidget(); lv = QVBoxLayout(left)
         bar = QHBoxLayout()
+        self.btn_cast = QPushButton(tr("mvs.cast", "🎭 Cast")); self.btn_cast.clicked.connect(self._edit_cast)
+        self.btn_cast.setToolTip(tr("mvs.cast.tt",
+            "Personaggi ricorrenti (cantante, musicisti con strumento) col volto coerente tra i clip. "
+            "Con la coerenza Krea 2 Edit ogni scena col loro @Nome riusa la stessa identità."))
         self.btn_plan = QPushButton(tr("mvs.plan", "Crea elenco riprese (LLM)")); self.btn_plan.clicked.connect(self._plan)
         self.btn_align = QPushButton(tr("mvs.align", "🎯 Allinea al canto")); self.btn_align.clicked.connect(self._align)
         self.btn_imgs = QPushButton(tr("mvs.gen_imgs", "Genera immagini")); self.btn_imgs.clicked.connect(self._gen_images)
-        bar.addWidget(self.btn_plan); bar.addWidget(self.btn_align); bar.addWidget(self.btn_imgs)
+        bar.addWidget(self.btn_cast); bar.addWidget(self.btn_plan); bar.addWidget(self.btn_align); bar.addWidget(self.btn_imgs)
         bar.addStretch(1)
         # Memoria batch (sticky-transformer): tiene il transformer RESIDENTE in VRAM per tutto il batch →
         # niente dente-di-sega (ricarico per-foto). Default = Sticky (scelta utente), persistito in user_prefs.
@@ -456,8 +460,17 @@ class MusicVideoStudio(QWidget):
         self._worker = _Worker(mvs.plan_scenes, lyrics=self.proj.get("lyrics", ""), song_path=a["file"],
                                scene_seconds=float(self.proj.get("scene_seconds", 4)),
                                video_style=self.proj.get("video_style", ""),
-                               image_hint=self.proj.get("image_hint", ""))
+                               image_hint=self.proj.get("image_hint", ""),
+                               cast=mvp.get_cast(self.pid))         # cast-aware: @Nome + strumento nei clip
         self._worker.done.connect(self._on_plan); self._worker.start()
+
+    def _edit_cast(self):
+        """Apre l'editor del cast (personaggi ricorrenti). Salvato nel progetto → usato da _plan."""
+        from ui.music_cast_dialog import MusicCastDialog
+        dlg = MusicCastDialog(self.pid, self.media_cfg, self)
+        if dlg.exec():
+            n = len(mvp.get_cast(self.pid))
+            self.status.setText(tr("mvs.cast_saved", "Cast salvato: {n} personaggi. Ora crea l'elenco riprese.").format(n=n))
 
     def _on_plan(self, res: dict):
         self._busy(False)

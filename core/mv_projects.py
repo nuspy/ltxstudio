@@ -34,6 +34,24 @@ CREATE TABLE IF NOT EXISTS mv_scene(
 _conn: sqlite3.Connection | None = None
 
 
+# Colonne aggiunte dopo il varo (migrazione idempotente): cast del progetto + campi cast per-scena.
+_MIGRATIONS = {
+    "mv_project": [("cast", "TEXT")],                                    # JSON [{name,role,instrument,...}]
+    "mv_scene": [("chars", "TEXT"), ("location", "TEXT"),               # @Nomi presenti + location
+                 ("char_ref", "TEXT"), ("instrument_ref", "TEXT")],     # foto identità + foto strumento
+}
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    """Aggiunge le colonne cast mancanti alle tabelle esistenti (DB creati prima del cast)."""
+    for table, cols in _MIGRATIONS.items():
+        have = {r["name"] for r in c.execute(f"PRAGMA table_info({table})").fetchall()}
+        for name, typ in cols:
+            if name not in have:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {name} {typ}")
+    c.commit()
+
+
 def conn() -> sqlite3.Connection:
     global _conn
     if _conn is None:
@@ -41,6 +59,7 @@ def conn() -> sqlite3.Connection:
         _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
         _conn.row_factory = sqlite3.Row
         _conn.executescript(_SCHEMA)
+        _migrate(_conn)
         _conn.commit()
     return _conn
 
@@ -143,20 +162,52 @@ def save_scenes(pid: int, scenes: list[dict]) -> None:
 
 
 def add_scene(pid: int, s: dict) -> int:
+    import json as _j
+    chars = s.get("chars") or []
     c = conn().execute(
-        "INSERT INTO mv_scene(project_id,ord,start_s,length_s,img_prompt,video_prompt,image_path,video_path)"
-        " VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT INTO mv_scene(project_id,ord,start_s,length_s,img_prompt,video_prompt,image_path,video_path,"
+        "chars,location,char_ref,instrument_ref) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         (pid, int(s.get("order", 0)), float(s.get("start_s", 0)), float(s.get("length_s", 0)),
-         s.get("img_prompt", ""), s.get("video_prompt", ""), s.get("image_path", ""), s.get("video_path", "")))
+         s.get("img_prompt", ""), s.get("video_prompt", ""), s.get("image_path", ""), s.get("video_path", ""),
+         _j.dumps(chars), s.get("location", ""), s.get("char_ref", ""), s.get("instrument_ref", "")))
     conn().commit()
     return c.lastrowid
 
 
 def list_scenes(pid: int) -> list[dict]:
+    import json as _j
     rows = conn().execute("SELECT * FROM mv_scene WHERE project_id=? ORDER BY ord", (pid,)).fetchall()
-    return [{"order": r["ord"], "start_s": r["start_s"], "length_s": r["length_s"],
-             "img_prompt": r["img_prompt"], "video_prompt": r["video_prompt"],
-             "image_path": r["image_path"], "video_path": r["video_path"]} for r in rows]
+    out = []
+    for r in rows:
+        k = r.keys()
+        try:
+            chars = _j.loads(r["chars"]) if ("chars" in k and r["chars"]) else []
+        except Exception:                                    # noqa: BLE001
+            chars = []
+        out.append({"order": r["ord"], "start_s": r["start_s"], "length_s": r["length_s"],
+                    "img_prompt": r["img_prompt"], "video_prompt": r["video_prompt"],
+                    "image_path": r["image_path"], "video_path": r["video_path"],
+                    "chars": chars, "location": (r["location"] if "location" in k else "") or "",
+                    "char_ref": (r["char_ref"] if "char_ref" in k else "") or "",
+                    "instrument_ref": (r["instrument_ref"] if "instrument_ref" in k else "") or ""})
+    return out
+
+
+def get_cast(pid: int) -> list[dict]:
+    """Cast del progetto (personaggi ricorrenti). [] se nessuno."""
+    import json as _j
+    p = get_project(pid) or {}
+    raw = p.get("cast") if isinstance(p, dict) else None
+    try:
+        return _j.loads(raw) if raw else []
+    except Exception:                                        # noqa: BLE001
+        return []
+
+
+def set_cast(pid: int, cast: list[dict]) -> None:
+    """Salva il cast del progetto (lista [{name,role,instrument,ref_image,instrument_image,frequency}])."""
+    import json as _j
+    update_project(pid, cast=_j.dumps(cast or [], ensure_ascii=False))
 
 
 def project_dir(pid: int) -> Path:

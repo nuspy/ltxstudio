@@ -102,15 +102,47 @@ _SB_SYSTEM = (
 )
 
 
+def _cast_block(cast: list[dict] | None) -> str:
+    """Descrizione testuale del cast per lo storyboard: nomi, ruoli, strumenti, frequenza di apparizione.
+    Istruisce l'LLM a taggare le scene con @Nome (rispettando la frequenza) + assegnare una location."""
+    cast = [c for c in (cast or []) if (c.get("name") or "").strip()]
+    if not cast:
+        return ""
+    lines = []
+    for c in cast:
+        name = str(c["name"]).strip()
+        role = (c.get("role") or "performer").strip()
+        instr = (c.get("instrument") or "").strip()
+        freq = int(c.get("frequency", 60) or 60)
+        bit = f'  - @{name}: {role}'
+        if instr:
+            bit += f", plays {instr} (ALWAYS show the {instr} with them)"
+        bit += f" — appears in ~{freq}% of scenes"
+        lines.append(bit)
+    return (
+        "\n\nCAST (recurring people — reuse them CONSISTENTLY across scenes):\n" + "\n".join(lines) +
+        "\n\nFor EACH scene ALSO output:\n"
+        '  "chars": [ "@Name", ... ]  = which cast members appear in THIS scene (respect their % frequency; '
+        "the singer appears most; some scenes can be b-roll/location with nobody),\n"
+        '  "location": "<one short place, reuse a small set of recurring locations>".\n'
+        "When a musician appears, their instrument MUST be described in the scene prompt. "
+        "Keep each named person visually identical every time they appear."
+    )
+
+
 def storyboard(lyrics: str, image_hint: str = "", target_scenes: int | None = None,
-               video_style: str = "", max_new_tokens: int = 1600) -> list[dict]:
+               video_style: str = "", cast: list[dict] | None = None,
+               max_new_tokens: int = 1600) -> list[dict]:
     """Gemma-3 locale → storyboard per il videomusicale: lista ORDINATA di scene {prompt, weight}
     coerenti col testo (l'LLM traduce/interpreta). Parametri:
       image_hint    = descrizione dell'immagine iniziale/sfondo da mantenere coerente.
       target_scenes = numero scene desiderato (più scene = cambi più rapidi); None = 6-12 a scelta LLM.
       video_style   = stile/resa del video (es. 'cartone animato divertente', 'bianco e nero malinconico',
                       'realistico romantico'): NON è contenuto, va applicato a TUTTE le scene.
-    Ritorna [] se l'LLM non è disponibile/non produce JSON valido."""
+      cast          = personaggi ricorrenti [{name, role, instrument, frequency}]; se dato, ogni scena
+                      riceve anche `chars` (@Nome presenti) e `location`, per coerenza volto tra i clip.
+    Ritorna [] se l'LLM non è disponibile/non produce JSON valido. Le scene includono `chars`/`location`
+    solo quando c'è un cast."""
     import json
     import re
     import torch
@@ -127,6 +159,7 @@ def storyboard(lyrics: str, image_hint: str = "", target_scenes: int | None = No
     if (image_hint or "").strip():
         user += ("\n\nThe music video STARTS from and stays visually consistent with this background "
                  f"image: {image_hint.strip()}. Keep that setting/lighting coherent across scenes.")
+    user += _cast_block(cast)
     messages = [
         {"role": "system", "content": [{"type": "text", "text": _SB_SYSTEM}]},
         {"role": "user", "content": [{"type": "text", "text": user}]},
@@ -158,8 +191,16 @@ def storyboard(lyrics: str, image_hint: str = "", target_scenes: int | None = No
                 pass
     for it in arr:
         if isinstance(it, dict) and it.get("prompt"):
-            scenes.append({"prompt": str(it["prompt"]).strip(),
-                           "weight": max(1, int(it.get("weight", 1) or 1))})
+            sc = {"prompt": str(it["prompt"]).strip(),
+                  "weight": max(1, int(it.get("weight", 1) or 1))}
+            ch = it.get("chars")
+            if isinstance(ch, list):                        # @Nome presenti nella scena (solo con cast)
+                sc["chars"] = [str(x).lstrip("@").strip() for x in ch if str(x).strip()]
+            elif isinstance(ch, str) and ch.strip():
+                sc["chars"] = [x.lstrip("@").strip() for x in re.split(r"[,\s]+", ch) if x.strip()]
+            if isinstance(it.get("location"), str) and it["location"].strip():
+                sc["location"] = it["location"].strip()
+            scenes.append(sc)
     return scenes
 
 
