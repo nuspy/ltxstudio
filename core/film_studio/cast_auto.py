@@ -57,6 +57,22 @@ def _asset_has_image(aid: int) -> bool:
     return bool(db.query("image", "owner_kind='asset' AND owner_id=?", (aid,)))
 
 
+def _ptag(pid: int) -> str:
+    return f"ldproj:{pid}"
+
+
+def _project_asset(pid: int, name: str) -> dict | None:
+    """Asset del personaggio DI QUESTO progetto (taggato ldproj:<pid>). Così ogni Lucky Director ha il suo
+    cast: rilanciando il film (o generandone un altro con un @Nome omonimo) NON riusa i ritratti del film
+    precedente — che altrimenti, essendo gli asset globali (nessun project_id nello schema), verrebbero
+    ripescati per collisione di nome. La resume dello stesso progetto resta idempotente (stesso tag)."""
+    tag = _ptag(pid)
+    for a in db.find_assets(name_like=name):
+        if (a.get("name") or "").lower() == name.lower() and tag in (a.get("tags") or ""):
+            return a
+    return None
+
+
 def build_cast(pid: int, *, img_arch: str = "flux", model: str = "", width: int = 768, height: int = 768,
                progress=None) -> dict:
     """Per ogni `@Nome` del progetto: asset character (se manca) + UNA foto ritratto di riferimento (t2i).
@@ -90,14 +106,13 @@ def build_cast(pid: int, *, img_arch: str = "flux", model: str = "", width: int 
     outdir.mkdir(parents=True, exist_ok=True)
     made: dict[str, str] = {}
     for i, name in enumerate(names):
-        assets = db.find_assets(name_like=name)
-        asset = next((a for a in assets if (a.get("name") or "").lower() == name.lower()), None)
+        asset = _project_asset(pid, name)                         # solo il cast DI QUESTO film
         if asset and _asset_has_image(asset["id"]):
-            made[name] = "exists"; continue                       # già ha una foto → idempotente
+            made[name] = "exists"; continue                       # già ha una foto → idempotente (resume)
         desc = appear.get(name) or f"a person named {name}"
         if not asset:
             aid = db.insert("asset", type="character", name=name, description=desc,
-                            fields="{}", tags="", scope="project")
+                            fields="{}", tags=_ptag(pid), scope="project")
         else:
             aid = asset["id"]
         out = str(outdir / f"{name}.png")

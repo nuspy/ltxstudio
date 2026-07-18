@@ -59,7 +59,9 @@ def resolve_refs(text: str, path_mode: str = "fast", flavor: str = "image") -> d
     refs, ref_images, loras, trigger_map = [], [], [], {}
     for m in _REF_RE.finditer(text or ""):
         name, variant = m.group(1), m.group(2)
-        assets = db.find_assets(name_like=name)
+        # più recente per primo: se due film hanno un personaggio omonimo (es. Lucky Director rilanciato),
+        # usa quello del film CORRENTE (l'asset creato più di recente da cast_auto), non uno vecchio.
+        assets = sorted(db.find_assets(name_like=name), key=lambda a: a.get("created", 0) or 0, reverse=True)
         asset = next((a for a in assets if a["name"].lower() == name.lower()), assets[0] if assets else None)
         if not asset:
             continue

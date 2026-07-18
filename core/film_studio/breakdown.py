@@ -37,12 +37,26 @@ def build(pid: int, *, max_tokens: int = 6000) -> int:
     # sull'ARRAY interno (lista, non dict) o su un dict senza 'scenes' → prima finiva in
     # "0 scene salvate" SENZA errore e auto_run moriva con "Nessuna ripresa da generare".
     data = {}
+    def _scenes_of(d):
+        """Normalizza l'output LLM in una lista di scene. Gemma spesso restituisce l'ARRAY nudo di scene
+        (una `list`) invece di {"scenes":[...]}: accettarlo evita 3 retry inutili da migliaia di token
+        (visto ~15 min sprecati). Accetta anche chiavi alternative comuni."""
+        if isinstance(d, dict):
+            for k in ("scenes", "Scenes", "scene", "breakdown"):
+                if isinstance(d.get(k), list) and d[k]:
+                    return d[k]
+        if isinstance(d, list) and d and isinstance(d[0], dict) and (d[0].get("shots") or d[0].get("description")):
+            return d                                          # array nudo di scene
+        return None
+
+    scenes = None
     for _att in range(3):
         data = L.complete_json(SYS, f"Film duration: {proj.get('duration_s', 60)}s.\n\n{ctx}" + copione["text"],
                                max_tokens=int(max_tokens * (1 + 0.5 * _att)))
-        if isinstance(data, dict) and data.get("scenes"):
+        scenes = _scenes_of(data)
+        if scenes:
             break
-        print(f"[breakdown] risposta senza 'scenes' (tentativo {_att + 1}: "
+        print(f"[breakdown] risposta senza scene valide (tentativo {_att + 1}: "
               f"{type(data).__name__}) → riprovo con più budget", flush=True)
     else:
         raise RuntimeError("breakdown: l'LLM non ha prodotto scene valide dopo 3 tentativi")
@@ -52,7 +66,6 @@ def build(pid: int, *, max_tokens: int = 6000) -> int:
             db.delete("shot", sh["id"])
         db.delete("scene", sc["id"])
     prev_state = None
-    scenes = data.get("scenes", []) if isinstance(data, dict) else []
     for i, sc in enumerate(scenes, 1):
         state = ct.propagate(prev_state, sc.get("continuity"))
         prev_state = state
