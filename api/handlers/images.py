@@ -35,14 +35,17 @@ class GenerateReq(BaseModel):
 
 class EditReq(BaseModel):
     prompt: str
-    image_path: str
-    model: str
-    arch: str = Field("kontext", description="kontext | flux2_kontext")
+    image_path: str | None = None                              # single (o usa `images`)
+    images: list[str] | None = None                            # multi (krea2_edit: scena + soggetto, max 2)
+    model: str | None = None                                   # non richiesto per krea2_edit (snapshot)
+    arch: str = Field("kontext", description="kontext | flux2_kontext | krea2_edit")
     negative: str | None = None
     steps: int = 20
     guidance: float = 2.5
     seed: int = 0
     max_side: int = 1536
+    grounding_px: int = 768                                     # solo krea2_edit (512-1536, edit↔identità)
+    krea2_variant: str = "turbo"                               # solo krea2_edit: turbo | raw
 
 
 class RecolorReq(BaseModel):
