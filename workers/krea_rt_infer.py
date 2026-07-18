@@ -105,6 +105,14 @@ def run_generation(p: dict) -> str:
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     fps = int(p.get("fps", 24))
     krea_dir, wan_dir = _resolve_dirs(p)
+    # i2v: il dispatch passa l'immagine iniziale come `keyframes` (formato LTX); krea_rt legge `image_path`.
+    # Se manca, ricavalo dal primo keyframe → altrimenti parte in t2v ignorando il frame iniziale (clip
+    # incoerente col keyframe generato). Stesso fix di lingbot_infer.
+    if not p.get("image_path") and p.get("keyframes"):
+        _kf0 = p["keyframes"][0]
+        _kfp = _kf0.get("path") if isinstance(_kf0, dict) else _kf0
+        if _kfp and os.path.exists(str(_kfp)):
+            p["image_path"] = str(_kfp)
 
     # KV-cache ridotta sui 32GB (regola VRAM): meno frame di contesto = meno memoria (contesto più corto)
     free = _free_vram_mb()
