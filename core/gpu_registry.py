@@ -47,9 +47,15 @@ class ModelKey:
     def norm(self) -> tuple[str, str, str]:
         return (str(self.arch or "").lower(), str(self.model or "").lower(), str(self.dtype or "").lower())
 
+    def base(self) -> str:
+        """Chiave di RESIDENZA `arch:basename(model)` — stesso formato che i server riportano in
+        /system_stats (model_key). È su questa che si decide il riuso (il dtype non conta per l'identità)."""
+        import os
+        a, m, _ = self.norm()
+        return f"{a}:{os.path.basename(m) or '-'}"
+
     def __str__(self) -> str:
-        a, m, d = self.norm()
-        return f"{a}:{m or '-'}:{d or '-'}"
+        return self.base()
 
 
 @dataclass
