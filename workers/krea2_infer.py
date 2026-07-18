@@ -98,17 +98,19 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
             pipe.vae.enable_tiling()
     except Exception:                                          # noqa: BLE001
         pass
-    # ATTENZIONE = collo di bottiglia sulla sequenza in-context lunga (edit, ~7200 token): col default SDPA
-    # cade sul kernel MATH (O(n²)) perché Krea2 passa una attn_mask sui token testo → ~240s/step. FlashAttn-2
-    # NON accetta attn_mask; il kernel SDPA memory-efficient sì ed è velocissimo. Vale anche per il t2i.
-    _abe = os.environ.get("KREA2_ATTN", "flash_varlen")        # flash con cu_seqlens: gestisce il padding
-    try:
-        pipe.transformer.set_attention_backend(_abe)
-        print(f"[krea2] attention backend = {_abe}", flush=True)
-    except Exception as ex:                                    # noqa: BLE001
-        print(f"[krea2] set_attention_backend('{_abe}') fallito ({ex}) → default", flush=True)
+    # NB: il backend di attenzione lo imposta il CHIAMANTE — solo l'EDIT (sequenza in-context lunga con
+    # attn_mask di padding) vuole flash_varlen (vedi _set_attention). Il t2i resta sul default del modello:
+    # forzare flash_varlen anche sul t2i introduceva artefatti (macchie/griglie colorate seed-dipendenti).
     _PIPE_CACHE[key] = pipe
     return pipe
+
+
+def _set_attention(pipe, backend: str) -> None:
+    try:
+        pipe.transformer.set_attention_backend(backend)
+        print(f"[krea2] attention backend = {backend}", flush=True)
+    except Exception as ex:                                    # noqa: BLE001
+        print(f"[krea2] set_attention_backend('{backend}') fallito ({ex}) → default", flush=True)
 
 
 def _guidance_of(p: dict, default: float) -> float:
@@ -224,6 +226,7 @@ def run_edit(p: dict) -> str:
     from diffusers.pipelines.krea2.pipeline_krea2 import Krea2Pipeline as _Base
     if isinstance(pipe, _Base) and not isinstance(pipe, Krea2EditPipeline):
         pipe.__class__ = Krea2EditPipeline
+    _set_attention(pipe, os.environ.get("KREA2_ATTN", "flash_varlen"))   # edit: sequenza lunga → flash_varlen
     d = _VARIANT_DEFAULTS.get(variant, _VARIANT_DEFAULTS["turbo"])
 
     result = pipe.edit(
