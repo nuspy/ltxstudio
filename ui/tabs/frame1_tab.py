@@ -638,6 +638,14 @@ class Frame1Tab(QWidget):
             cur = ic.currentText()
             engine = (self.integrate_engine.currentIndex()
                       if hasattr(self, "integrate_engine") else 0)
+            if engine == 2:                        # Krea 2 Edit → varianti Turbo/Raw (snapshot, no file)
+                ic.clear()
+                for cid, lbl in (("krea2_turbo", tr("f1.gen.krea2.turbo", "Krea 2 Turbo (8 step, veloce)")),
+                                 ("krea2_raw", tr("f1.gen.krea2.raw", "Krea 2 Raw (52 step, qualità)"))):
+                    ic.addItem(lbl, {"krea2_variant": "raw" if cid.endswith("raw") else "turbo"})
+                if hasattr(self, "integrate_puzzle"):
+                    self.integrate_puzzle.setEnabled(False); self.integrate_puzzle.setChecked(False)
+                return
             if engine == 1:                        # FLUX.2
                 pool = flux2
                 empty = tr("f1.flux2.none")
@@ -817,12 +825,27 @@ class Frame1Tab(QWidget):
         self.integrate_prompt.setToolTip(tr("f1.integrate.prompt.tt", "Istruzione su come fondere le immagini extra nella scena."))
         g.addRow(tr("f1.integrate.prompt_lbl"), self.integrate_prompt)
         self.integrate_engine = QComboBox()
-        self.integrate_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2")])
+        self.integrate_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2"),
+                                        tr("f1.engine.krea2edit", "Krea 2 Edit")])
         self.integrate_engine.setToolTip(tr("f1.integrate.engine.tt"))
-        # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 vs FLUX.2) +
-        # abilitazione del puzzle_lora (LoRA FLUX.1 incompatibile con FLUX.2).
+        # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 / FLUX.2 / Krea 2 Turbo-Raw) +
+        # abilitazione del puzzle_lora (LoRA FLUX.1) + visibilità dello slider grounding (solo Krea 2 Edit).
         self.integrate_engine.currentIndexChanged.connect(self._on_integrate_engine_changed)
         g.addRow(tr("f1.integrate.engine_lbl"), self.integrate_engine)
+        # Slider GROUNDING (edit↔fedeltà identità) — solo per Krea 2 Edit. 512=edit forte … 1536=preserva
+        # identità (def 768). Manopola caratteristica del port comfyui-krea2edit.
+        grrow = QHBoxLayout()
+        self.edit_grounding = QSlider(Qt.Horizontal); self.edit_grounding.setRange(512, 1536)
+        self.edit_grounding.setSingleStep(64); self.edit_grounding.setValue(768)
+        self.edit_grounding_lbl = QLabel("768")
+        self.edit_grounding.valueChanged.connect(lambda v: self.edit_grounding_lbl.setText(str(int(v))))
+        self.edit_grounding.setToolTip(tr("f1.edit.grounding.tt",
+                                          "Bassa = edit più forte; alta = preserva meglio l'identità (Krea 2 Edit)."))
+        grrow.addWidget(self.edit_grounding, 1); grrow.addWidget(self.edit_grounding_lbl)
+        self._edit_grounding_row = self._wrapw(grrow)
+        self._edit_grounding_label = QLabel(tr("f1.edit.grounding_lbl", "Fedeltà / Edit"))
+        g.addRow(self._edit_grounding_label, self._edit_grounding_row)
+        self._edit_grounding_label.setVisible(False); self._edit_grounding_row.setVisible(False)
         self.integrate_puzzle = QCheckBox(tr("f1.integrate.puzzle"))
         self.integrate_puzzle.setChecked(False)   # OFF di default: introduce un artefatto a cornice
         self.integrate_puzzle.setToolTip(tr("f1.integrate.puzzle.tt"))
@@ -934,8 +957,10 @@ class Frame1Tab(QWidget):
         self.color_subject.setPlaceholderText(tr("f1.color.subject.ph"))
         self.color_subject.setToolTip(tr("f1.color.subject.tt", "Soggetto o area di cui cambiare colore (es. 'la maglietta', 'l'auto')."))
         f.addRow(tr("f1.color.subject_lbl"), self.color_subject)
-        self.color_engine = QComboBox(); self.color_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2")])
-        self.color_engine.setToolTip(tr("f1.color.engine.tt", "Motore per il cambio colore: Kontext (FLUX.1) o FLUX.2."))
+        self.color_engine = QComboBox()
+        self.color_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2"),
+                                    tr("f1.engine.krea2edit", "Krea 2 Edit")])
+        self.color_engine.setToolTip(tr("f1.color.engine.tt", "Motore per il cambio colore: Kontext (FLUX.1), FLUX.2 o Krea 2 Edit."))
         f.addRow(tr("f1.engine_lbl"), self.color_engine)
         self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
         self.color_steps.setToolTip(tr("f1.steps.tt", "Numero di passi di diffusione: più passi = più dettaglio e tempi più lunghi."))
@@ -959,11 +984,27 @@ class Frame1Tab(QWidget):
             self.color_target.setText(c.name())
             self.color_swatch.setStyleSheet(f"background:{c.name()}; border:1px solid #555; border-radius:5px;")
 
+    @staticmethod
+    def _engine_val(idx: int) -> str:
+        """Indice combo motore → valore backend. 0=Kontext(FLUX.1), 1=FLUX.2, 2=Krea 2 Edit."""
+        return {0: "kontext", 1: "flux2", 2: "krea2"}.get(int(idx), "kontext")
+
+    def edit_grounding_px(self) -> int:
+        return int(self.edit_grounding.value()) if hasattr(self, "edit_grounding") else 768
+
+    def _integrate_krea2_variant(self) -> str:
+        """Variante Krea 2 (turbo/raw) scelta nel combo Integra quando engine=Krea 2 Edit; altrimenti turbo."""
+        if getattr(self, "integrate_engine", None) is None or self.integrate_engine.currentIndex() != 2:
+            return "turbo"
+        d = self.integrate_model.currentData() if hasattr(self, "integrate_model") else None
+        return (d or {}).get("krea2_variant", "turbo") if isinstance(d, dict) else "turbo"
+
     def get_color_config(self) -> dict:
         return {
             "target": self.color_target.text().strip(),
             "subject": self.color_subject.text().strip(),
-            "engine": "flux2" if self.color_engine.currentIndex() == 1 else "kontext",
+            "engine": self._engine_val(self.color_engine.currentIndex()),
+            "grounding": self.edit_grounding_px(),
             "steps": self.color_steps.value(),
         }
 
@@ -1027,10 +1068,19 @@ class Frame1Tab(QWidget):
         return box
 
     def _on_integrate_engine_changed(self, _idx: int):
-        """Cambio motore Integra → ricarica modelli compatibili + label dinamica."""
-        engine_label = tr("f1.integrate.model.kontext") if _idx == 0 else tr("f1.integrate.model.flux2")
+        """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
+        if _idx == 2:
+            engine_label = tr("f1.integrate.model.krea2", "Modello (Krea 2)")
+        elif _idx == 1:
+            engine_label = tr("f1.integrate.model.flux2")
+        else:
+            engine_label = tr("f1.integrate.model.kontext")
         if hasattr(self, "_integrate_model_label"):
             self._integrate_model_label.setText(engine_label)
+        # slider grounding visibile SOLO per Krea 2 Edit
+        if hasattr(self, "_edit_grounding_row"):
+            self._edit_grounding_row.setVisible(_idx == 2)
+            self._edit_grounding_label.setVisible(_idx == 2)
         self._reload_flux_combos()
 
     def _on_seg_detector_changed(self, _idx: int):
@@ -1388,7 +1438,9 @@ class Frame1Tab(QWidget):
             "outpaint_prompt": self.outpaint_prompt.toPlainText().strip(),
             "integrate_prompt": self.integrate_prompt.toPlainText().strip(),
             "integrate_model": imodel or None,
-            "integrate_engine": "flux2" if self.integrate_engine.currentIndex() == 1 else "kontext",
+            "integrate_engine": self._engine_val(self.integrate_engine.currentIndex()),
+            "integrate_variant": self._integrate_krea2_variant(),   # turbo/raw quando engine=krea2
+            "grounding": self.edit_grounding_px(),
             "integrate_puzzle_lora": ("MagicQuill\\puzzle_lora.safetensors"
                                       if self.integrate_puzzle.isChecked() else None),
             # Campi dedicati all'integrazione (duplicati rispetto a inpaint/outpaint)
@@ -1447,7 +1499,9 @@ class Frame1Tab(QWidget):
             "masks": dict(getattr(self, "_compose_masks", {})),
             "method": "stitch" if self.compose_method.currentIndex() == 1 else "multiref",
             "prompt": self.compose_prompt.toPlainText().strip(),
-            "engine": "flux2" if self.integrate_engine.currentIndex() == 1 else "kontext",
+            "engine": self._engine_val(self.integrate_engine.currentIndex()),
+            "variant": self._integrate_krea2_variant(),            # turbo/raw quando engine=krea2
+            "grounding": self.edit_grounding_px(),
             "model": (self.integrate_model.currentText() if self.integrate_model.count() else "") or None,
         }
 
