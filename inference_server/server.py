@@ -96,6 +96,118 @@ def _tail(path: str, n: int = 2000) -> str:
         return ""
 
 
+# ─────────────── figlio PERSISTENTE (opt-in) — tiene il ComponentStore caldo tra i job ───────────────
+# Default OFF: il comportamento resta il per-job isolato (zero rischio). Con NATIVE_PERSISTENT_CHILD=1 si
+# tiene UN figlio vivo che riusa il modello tra job dello STESSO modello; al cambio-modello fa respawn (evita
+# il segfault del 2° load in-process). Il server resta senza torch → l'anti-crash è intatto (EOF = respawn).
+_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD") == "1"
+
+
+def _job_model_key(module: str, params: dict) -> str:
+    arch = str(params.get("arch", module) or module).lower()
+    model = str(params.get("model", "") or params.get("model_gguf", "") or "").lower()
+    return f"{arch}:{os.path.basename(model) or '-'}"
+
+
+class _PersistentChild:
+    """Un figlio `persistent_runner` vivo tra i job. Serializzato dal worker (coda seriale)."""
+
+    def __init__(self):
+        self._proc = None
+        self._reader = None
+        self._lines: "queue.Queue[str]" = queue.Queue()
+        self._lock = threading.Lock()                        # serializza l'IPC (RUN vs STATS/FREE)
+        self.model_key = "-"
+
+    def _alive(self) -> bool:
+        return self._proc is not None and self._proc.poll() is None
+
+    def _spawn(self, logf):
+        self._proc = subprocess.Popen(
+            [sys.executable, "-u", "-m", "inference_server.persistent_runner"],
+            cwd=PROJECT, env=dict(os.environ), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=logf, text=True, bufsize=1)
+        self.model_key = "-"
+
+        def _read():
+            try:
+                for ln in self._proc.stdout:
+                    self._lines.put(ln.strip())
+            except Exception:                                # noqa: BLE001
+                pass
+            self._lines.put("__EOF__")
+        self._reader = threading.Thread(target=_read, daemon=True)
+        self._reader.start()
+
+    def _kill(self):
+        if self._proc is not None:
+            try:
+                self._proc.stdin.write("QUIT\n"); self._proc.stdin.flush()
+            except Exception:                                # noqa: BLE001
+                pass
+            try:
+                self._proc.wait(timeout=5)
+            except Exception:                                # noqa: BLE001
+                try: self._proc.kill()
+                except Exception: pass                       # noqa: BLE001
+        self._proc = None
+        with self._lines.mutex:
+            self._lines.queue.clear()
+
+    def _send(self, line: str, wait_for: tuple, timeout: float):
+        self._proc.stdin.write(line + "\n"); self._proc.stdin.flush()
+        import time as _t
+        t0 = _t.time()
+        while _t.time() - t0 < timeout:
+            try:
+                out = self._lines.get(timeout=1.0)
+            except Exception:                                # noqa: BLE001
+                continue
+            if out == "__EOF__":
+                raise RuntimeError("figlio persistente morto (EOF)")
+            if any(out.startswith(w) for w in wait_for):
+                return out
+        raise TimeoutError(f"figlio persistente: nessuna risposta a '{line}' entro {timeout}s")
+
+    def run(self, module: str, params: dict, pf: str, rf: str, logf, timeout: float = 1800) -> None:
+        key = _job_model_key(module, params)
+        with self._lock:
+            # cambio-modello (o figlio morto) → respawn pulito (evita il 2° load in-process)
+            if not self._alive() or (self.model_key not in ("-", key)):
+                self._kill(); self._spawn(logf)
+            out = self._send(f"RUN {pf} {rf}", ("DONE", "ERR"), timeout)
+            if out.startswith("DONE"):
+                self.model_key = out[len("DONE "):].strip() or key
+
+    def stats(self, timeout: float = 5) -> dict | None:
+        # NON-BLOCCANTE: se un job è in corso (lock preso) ripiega sulla chiave cachata (niente race su stdin).
+        if not self._alive():
+            return None
+        if not self._lock.acquire(blocking=False):
+            return {"model_key": self.model_key, "components": [], "vram_mb": 0, "busy": True}
+        try:
+            sf = os.path.join(_JOB_DIR, "child_stats.json")
+            self._send(f"STATS {sf}", ("STATS_OK",), timeout)
+            with open(sf, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:                                    # noqa: BLE001
+            return {"model_key": self.model_key, "components": [], "vram_mb": 0}
+        finally:
+            self._lock.release()
+
+    def free(self, timeout: float = 10):
+        with self._lock:
+            if self._alive():
+                try:
+                    self._send("FREE", ("FREED",), timeout)
+                    self.model_key = "-"
+                except Exception:                            # noqa: BLE001
+                    self._kill()
+
+
+_child = _PersistentChild() if _PERSIST else None
+
+
 def _worker():
     """Coda seriale: per ogni job lancia un PROCESSO FIGLIO isolato (job_runner) e ne raccoglie il risultato.
     Il server non importa torch → non può crashare per il caricamento; se il figlio muore di crash nativo,
@@ -117,12 +229,24 @@ def _worker():
             env = dict(os.environ)
             env["LTX2_PREVIEW_DIR"] = _PREVIEW_DIR          # il figlio scrive preview.png/json qui
             env.pop("LTX2_SERVER_PREVIEW_DIR", None)        # nel figlio preview_bus SCRIVE, non legge
-            with open(lf, "w", encoding="utf-8", errors="replace") as logf:
-                proc = subprocess.Popen(
-                    [sys.executable, "-u", "-m", "inference_server.job_runner", pf, rf],
-                    cwd=PROJECT, env=env, stdout=logf, stderr=logf)
-                job["_pid"] = proc.pid
-                proc.wait()
+            done_persistent = False
+            if _PERSIST and _child is not None:
+                # FIGLIO PERSISTENTE: riusa il modello caldo tra i job (stesso modello). Fallback al per-job
+                # se il figlio non risponde/muore → nessuna regressione rispetto al comportamento attuale.
+                try:
+                    with open(lf, "w", encoding="utf-8", errors="replace") as logf:
+                        _child.run(job["module"], job["params"], pf, rf, logf)
+                    done_persistent = True
+                except Exception as _pe:                     # noqa: BLE001
+                    with open(lf, "a", encoding="utf-8", errors="replace") as logf:
+                        logf.write(f"\n[server] figlio persistente ko ({_pe}) → fallback per-job\n")
+            if not done_persistent:
+                with open(lf, "w", encoding="utf-8", errors="replace") as logf:
+                    proc = subprocess.Popen(
+                        [sys.executable, "-u", "-m", "inference_server.job_runner", pf, rf],
+                        cwd=PROJECT, env=env, stdout=logf, stderr=logf)
+                    job["_pid"] = proc.pid
+                    proc.wait()
             if os.path.exists(rf):
                 with open(rf, encoding="utf-8") as f:
                     res = json.load(f)
@@ -179,12 +303,26 @@ def system_stats():
         free = free_vram_mb()
     except Exception:                                       # noqa: BLE001
         free = 0
-    return {"vram_free_mb": free, "loaded": [], "isolated": True}
+    out = {"vram_free_mb": free, "loaded": [], "isolated": not _PERSIST}
+    if _PERSIST and _child is not None:                     # figlio persistente → stato OSSERVABILE per il registro
+        st = _child.stats()
+        if st:
+            out["model_key"] = st.get("model_key", _child.model_key)
+            out["components"] = [c.get("key") for c in st.get("components", [])]
+            out["model_vram_mb"] = st.get("vram_mb", 0)
+            out["loaded"] = out["components"]
+        else:
+            out["model_key"] = _child.model_key
+    return out
 
 
 @app.post("/free")
 def free():
-    # niente da liberare: ogni job gira in un processo che muore da sé (VRAM/RAM rilasciate all'uscita).
+    # per-job isolato: niente da liberare (il figlio muore da sé). Con figlio persistente: svuota il suo
+    # ComponentStore (VRAM) senza uccidere il processo (resta caldo per il prossimo modello).
+    if _PERSIST and _child is not None:
+        _child.free()
+        return {"ok": True, "freed": "persistent_child_store"}
     return {"ok": True}
 
 
