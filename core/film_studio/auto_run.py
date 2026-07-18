@@ -186,6 +186,13 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
     """Esegue l'intera pipeline (keyframe→video→audio→musica→master) in modo headless. Ritorna
     {'project_id', 'master'}. on_progress(phase, index, total, prompt, pct); cancel() → bool."""
     handlers.register_default_handlers()                     # assicura gli handler anche senza finestra UI
+    # Libera l'LLM (Gemma) dalla VRAM prima dei keyframe: dopo copione+breakdown resta caricato nel
+    # processo GUI (~24GB device_map=auto) e manderebbe in contesa/OOM i subprocess immagine (Krea2/FLUX).
+    try:
+        from core import llm_service as _L
+        _L.unload()
+    except Exception:                                        # noqa: BLE001
+        pass
     proj = db.get("project", pid) or {}
     guard = json.loads(proj.get("config") or "{}")
     pmode = proj.get("path_mode", "fast")

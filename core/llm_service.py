@@ -159,6 +159,18 @@ def available() -> bool:
     return lyrics_llm.available()
 
 
+def unload() -> None:
+    """Libera l'LLM dalla VRAM (provider gemma → scarica Gemma-3). DA CHIAMARE prima di generare
+    IMMAGINI/VIDEO: altrimenti Gemma (~24GB con device_map=auto) resta in VRAM nel processo GUI e i
+    subprocess pesanti (Krea2, LTX) vanno in contesa → OOM/crash. No-op per il provider lmstudio (out-of-process)."""
+    try:
+        if get_config().get("provider") == "gemma":
+            from core import lyrics_llm
+            lyrics_llm.unload()
+    except Exception:                                          # noqa: BLE001
+        pass
+
+
 def complete(system: str, user: str, *, json: bool = False, temperature: float | None = None,
              max_tokens: int = 1200) -> str:
     """Completion con il provider corrente. `json=True` chiede output JSON (best-effort)."""

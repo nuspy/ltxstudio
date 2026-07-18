@@ -78,6 +78,13 @@ def build_cast(pid: int, *, img_arch: str = "flux", model: str = "", width: int 
     rows = db.query("script", "project_id=?", (pid,), order="version")
     script = rows[-1]["text"] if rows else ""
     appear = extract_appearances(script, names)
+    # CRITICO: libera Gemma dalla VRAM prima dei ritratti Krea2 — altrimenti l'LLM (~24GB con
+    # device_map=auto nel processo GUI) va in contesa col subprocess immagine → crash "non generata".
+    try:
+        from core import llm_service as _L
+        _L.unload()
+    except Exception:                                             # noqa: BLE001
+        pass
 
     outdir = db.project_dir(pid) / "cast"
     outdir.mkdir(parents=True, exist_ok=True)
