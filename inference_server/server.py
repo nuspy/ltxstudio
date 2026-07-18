@@ -112,9 +112,12 @@ def _job_model_key(module: str, params: dict) -> str:
 class _PersistentChild:
     """Un figlio `persistent_runner` vivo tra i job. Serializzato dal worker (coda seriale)."""
 
+    _LOG = os.path.join(_JOB_DIR, "persistent_child.log")
+
     def __init__(self):
         self._proc = None
         self._reader = None
+        self._logf = None
         self._lines: "queue.Queue[str]" = queue.Queue()
         self._lock = threading.Lock()                        # serializza l'IPC (RUN vs STATS/FREE)
         self.model_key = "-"
@@ -122,11 +125,18 @@ class _PersistentChild:
     def _alive(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
 
-    def _spawn(self, logf):
+    def _spawn(self):
+        # log PROPRIO del figlio (aperto UNA volta e tenuto aperto per tutta la sua vita): il figlio è
+        # PERSISTENTE e sopravvive ai singoli job, quindi il suo stderr non può puntare a un logf per-job
+        # che si chiude a fine job (→ write su fd chiuso → stallo/crash del figlio ai job successivi).
+        try:
+            self._logf = open(self._LOG, "a", encoding="utf-8", errors="replace")
+        except Exception:                                    # noqa: BLE001
+            self._logf = None
         self._proc = subprocess.Popen(
             [sys.executable, "-u", "-m", "inference_server.persistent_runner"],
             cwd=PROJECT, env=dict(os.environ), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=logf, text=True, bufsize=1)
+            stderr=self._logf, text=True, bufsize=1)
         self.model_key = "-"
 
         def _read():
@@ -151,6 +161,12 @@ class _PersistentChild:
                 try: self._proc.kill()
                 except Exception: pass                       # noqa: BLE001
         self._proc = None
+        try:
+            if self._logf:
+                self._logf.close()
+        except Exception:                                    # noqa: BLE001
+            pass
+        self._logf = None
         with self._lines.mutex:
             self._lines.queue.clear()
 
@@ -169,12 +185,12 @@ class _PersistentChild:
                 return out
         raise TimeoutError(f"figlio persistente: nessuna risposta a '{line}' entro {timeout}s")
 
-    def run(self, module: str, params: dict, pf: str, rf: str, logf, timeout: float = 1800) -> None:
+    def run(self, module: str, params: dict, pf: str, rf: str, timeout: float = 1800) -> None:
         key = _job_model_key(module, params)
         with self._lock:
             # cambio-modello (o figlio morto) → respawn pulito (evita il 2° load in-process)
             if not self._alive() or (self.model_key not in ("-", key)):
-                self._kill(); self._spawn(logf)
+                self._kill(); self._spawn()
             out = self._send(f"RUN {pf} {rf}", ("DONE", "ERR"), timeout)
             if out.startswith("DONE"):
                 self.model_key = out[len("DONE "):].strip() or key
@@ -231,11 +247,10 @@ def _worker():
             env.pop("LTX2_SERVER_PREVIEW_DIR", None)        # nel figlio preview_bus SCRIVE, non legge
             done_persistent = False
             if _PERSIST and _child is not None:
-                # FIGLIO PERSISTENTE: riusa il modello caldo tra i job (stesso modello). Fallback al per-job
-                # se il figlio non risponde/muore → nessuna regressione rispetto al comportamento attuale.
+                # FIGLIO PERSISTENTE: riusa il modello caldo tra i job (stesso modello). Il figlio ha un log
+                # PROPRIO (persistent_child.log). Fallback al per-job se non risponde/muore → nessuna regressione.
                 try:
-                    with open(lf, "w", encoding="utf-8", errors="replace") as logf:
-                        _child.run(job["module"], job["params"], pf, rf, logf)
+                    _child.run(job["module"], job["params"], pf, rf)
                     done_persistent = True
                 except Exception as _pe:                     # noqa: BLE001
                     with open(lf, "a", encoding="utf-8", errors="replace") as logf:
