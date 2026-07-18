@@ -109,7 +109,7 @@ class MusicCastDialog(QDialog):
         self.status = QLabel(""); dv.addWidget(self.status)
         dv.addStretch(1)
         bb = QHBoxLayout()
-        b_ok = QPushButton(tr("common.save", "Salva")); b_ok.clicked.connect(self._save_close)
+        b_ok = QPushButton(tr("fs.save", "💾 Salva")); b_ok.clicked.connect(self._save_close)
         b_cancel = QPushButton(tr("common.cancel", "Annulla")); b_cancel.clicked.connect(self.reject)
         bb.addStretch(1); bb.addWidget(b_cancel); bb.addWidget(b_ok)
         dv.addLayout(bb)
