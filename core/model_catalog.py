@@ -48,7 +48,9 @@ ARCH_VIDEO_CAPS = {
 # Capability per ARCHITETTURA IMMAGINE (analogo per le immagini). Krea 2 = solo t2i (niente inpaint/kontext/
 # controlnet nel primo giro). Le arch FLUX/… coprono tutto (default).
 ARCH_IMAGE_CAPS = {
-    "krea2": {"t2i": True, "inpaint": False, "kontext": False, "controlnet": False, "pulid": False},
+    # Krea 2: t2i + editing per istruzione (single/multi, "kontext"-like) via Krea2EditPipeline.
+    # inpaint mascherato/controlnet/pulid non ancora supportati.
+    "krea2": {"t2i": True, "inpaint": False, "kontext": True, "edit": True, "controlnet": False, "pulid": False},
 }
 
 
@@ -59,7 +61,7 @@ def video_caps(arch: str) -> dict:
 
 def image_caps(arch: str) -> dict:
     """Capability dell'architettura immagine. Default = tutto abilitato (FLUX/Z-Image/Ernie)."""
-    _full = {"t2i": True, "inpaint": True, "kontext": True, "controlnet": True, "pulid": True}
+    _full = {"t2i": True, "inpaint": True, "kontext": True, "edit": True, "controlnet": True, "pulid": True}
     return ARCH_IMAGE_CAPS.get((arch or "").lower(), _full)
 
 # Valori consigliati hardcoded per i modelli più comuni (con nota "supposed" se non da Civitai)

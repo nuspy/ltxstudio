@@ -106,19 +106,31 @@ def _guidance_of(p: dict, default: float) -> float:
     return float(default)
 
 
+def _find_identity_lora() -> str | None:
+    """La LoRA `krea2_identity_edit` (raccomandata per preservare l'identità nell'edit) non è indicizzata
+    pubblicamente → la si cerca per nome nelle cartelle LoRA locali (l'utente la scarica da Patreon/Civitai
+    e la deposita lì). Ritorna il path (preferendo la versione più recente) o None."""
+    import glob
+    roots = [r"E:\AI\Models\Lora", r"E:\AI\Models\lora", r"E:\AI\Models\loras"]
+    hits: list[str] = []
+    for r in roots:
+        hits += glob.glob(os.path.join(r, "**", "krea2_identity_edit*.safetensors"), recursive=True)
+        hits += glob.glob(os.path.join(r, "**", "krea2*identity*edit*.safetensors"), recursive=True)
+    hits = sorted(set(hits))
+    return hits[-1] if hits else None                             # l'ordinamento mette v1_2 dopo v1
+
+
 def _resolve_lora_paths(p: dict, edit: bool) -> list[tuple[str, float]]:
-    """(path, weight) delle LoRA da applicare. In edit include SEMPRE `krea2_identity_edit_v1` @1.0
-    (obbligatoria per l'edit d'identità), più le LoRA scelte dall'utente in `p['loras']`."""
+    """(path, weight) delle LoRA da applicare. In edit include, se presente, `krea2_identity_edit` @1.0
+    (raccomandata per l'identità), più le LoRA scelte dall'utente in `p['loras']`."""
     out: list[tuple[str, float]] = []
-    try:
-        from core import weights_catalog as wc
-        entries = {e["id"]: e for e in wc.load()}
-        if edit:
-            e = entries.get("krea2_identity_edit_v1")
-            if e and wc.is_present(e):
-                out.append((str(wc.dest_for(e)), 1.0))
-    except Exception as ex:                                       # noqa: BLE001
-        print(f"[krea2] LoRA identity_edit non risolta ({ex})", flush=True)
+    if edit:
+        idp = _find_identity_lora()
+        if idp:
+            out.append((idp, 1.0))
+            print(f"[krea2] LoRA identity_edit trovata: {os.path.basename(idp)}", flush=True)
+        else:
+            print("[krea2] LoRA krea2_identity_edit NON trovata (edit ok, identità meno preservata)", flush=True)
     for lo in (p.get("loras") or []):
         path = lo.get("path") or lo.get("name")
         if path and os.path.isfile(path):
