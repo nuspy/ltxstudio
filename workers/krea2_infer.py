@@ -58,8 +58,8 @@ def _free_vram_mb() -> int:
 _PIPE_CACHE: dict = {}
 
 
-def _load_pipeline(model_dir: str, variant: str):
-    key = (model_dir, variant)
+def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
+    key = (model_dir, variant, tuple(loras))
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     from diffusers import DiffusionPipeline
@@ -69,6 +69,10 @@ def _load_pipeline(model_dir: str, variant: str):
         pipe = _Pipe.from_pretrained(model_dir, torch_dtype=torch.bfloat16)
     except Exception:                                          # noqa: BLE001 — fallback custom-code HF
         pipe = DiffusionPipeline.from_pretrained(model_dir, torch_dtype=torch.bfloat16, trust_remote_code=True)
+
+    # LoRA PRIMA del fp8: si caricano e si FONDONO nei pesi bf16, poi si casta a fp8 (altrimenti la matmul
+    # della LoRA su pesi Float8_e4m3fn non è implementata).
+    _apply_loras(pipe, list(loras))
 
     # fp8: transformer ~13B bf16 (~26GB) non entra residente sui 32GB → layerwise casting fp8_e4m3 (~13GB),
     # come FLUX in inference_server/backends/image_flux. Compute in bf16.
@@ -147,6 +151,28 @@ def _resolve_lora_paths(p: dict, edit: bool) -> list[tuple[str, float]]:
     return out
 
 
+def _convert_comfy_krea2_lora(sd: dict) -> dict:
+    """Converte le chiavi di una LoRA Krea 2 in formato ComfyUI (es. krea2_identity_edit) al naming del
+    `Krea2Transformer2DModel` di diffusers. Verificato sui moduli reali:
+      diffusion_model.  → transformer.          | .blocks.  → .transformer_blocks.
+      attn.wq/wk/wv/wo  → attn.to_q/to_k/to_v/to_out.0   | attn.gate → attn.to_gate
+      mlp.gate/up/down  → ff.gate/up/down
+    """
+    reps = [
+        ("diffusion_model.", "transformer."), (".blocks.", ".transformer_blocks."),
+        (".attn.wq.", ".attn.to_q."), (".attn.wk.", ".attn.to_k."), (".attn.wv.", ".attn.to_v."),
+        (".attn.wo.", ".attn.to_out.0."), (".attn.gate.", ".attn.to_gate."),
+        (".mlp.gate.", ".ff.gate."), (".mlp.up.", ".ff.up."), (".mlp.down.", ".ff.down."),
+    ]
+    out = {}
+    for k, v in sd.items():
+        nk = k
+        for a, b in reps:
+            nk = nk.replace(a, b)
+        out[nk] = v
+    return out
+
+
 def _apply_loras(pipe, loras: list[tuple[str, float]]) -> None:
     if not loras:
         return
@@ -156,11 +182,8 @@ def _apply_loras(pipe, loras: list[tuple[str, float]]) -> None:
         try:
             an = f"krea2_lora_{i}"
             sd = load_file(path)
-            # ComfyUI salva le LoRA col prefisso 'diffusion_model.'; diffusers (Krea2LoraLoaderMixin,
-            # modulo 'transformer') vuole 'transformer.'. Rimappo così load_lora_weights le riconosce
-            # (evita anche l'errore offline 'must specify weight_name', passando direttamente il dict).
             if any(k.startswith("diffusion_model.") for k in sd):
-                sd = {("transformer." + k[len("diffusion_model."):]): v for k, v in sd.items()}
+                sd = _convert_comfy_krea2_lora(sd)               # ComfyUI → naming diffusers
             pipe.load_lora_weights(sd, adapter_name=an)
             names.append(an); weights.append(w)
             print(f"[krea2] LoRA caricata: {os.path.basename(path)} @{w} ({len(sd)} tensori)", flush=True)
@@ -169,8 +192,11 @@ def _apply_loras(pipe, loras: list[tuple[str, float]]) -> None:
     if names:
         try:
             pipe.set_adapters(names, adapter_weights=weights)
-        except Exception:                                         # noqa: BLE001
-            pass
+            pipe.fuse_lora()                                      # fonde nei pesi bf16 (prima del cast fp8)
+            pipe.unload_lora_weights()
+            print("[krea2] LoRA fuse+unload OK", flush=True)
+        except Exception as ex:                                   # noqa: BLE001
+            print(f"[krea2] fuse_lora fallito ({ex})", flush=True)
 
 
 def _load_images(p: dict):
@@ -192,13 +218,12 @@ def run_edit(p: dict) -> str:
     if not imgs:
         raise RuntimeError("Krea 2 Edit: nessuna immagine sorgente (image_path/images).")
     model_dir, variant = _resolve_model_dir(p)
-    pipe = _load_pipeline(model_dir, variant)
+    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=True)))
     # trasforma la pipeline t2i caricata in quella di edit (stessi componenti, aggiunge edit())
     from workers.krea2_edit_pipeline import Krea2EditPipeline
     from diffusers.pipelines.krea2.pipeline_krea2 import Krea2Pipeline as _Base
     if isinstance(pipe, _Base) and not isinstance(pipe, Krea2EditPipeline):
         pipe.__class__ = Krea2EditPipeline
-    _apply_loras(pipe, _resolve_lora_paths(p, edit=True))
     d = _VARIANT_DEFAULTS.get(variant, _VARIANT_DEFAULTS["turbo"])
 
     result = pipe.edit(
@@ -235,8 +260,7 @@ def run_generation(p: dict) -> str:
     out = p["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     model_dir, variant = _resolve_model_dir(p)
-    pipe = _load_pipeline(model_dir, variant)
-    _apply_loras(pipe, _resolve_lora_paths(p, edit=False))        # colma il gap: il t2i ignorava le LoRA
+    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=False)))  # t2i ora applica le LoRA
     d = _VARIANT_DEFAULTS.get(variant, _VARIANT_DEFAULTS["turbo"])
 
     def _m16(v, default):
