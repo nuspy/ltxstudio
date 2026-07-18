@@ -42,6 +42,7 @@ class _LoraImageWorker(QThread):
                                      height=opts.get("height", 1024),
                                      caption_engine=opts.get("caption_engine", "procedural"),
                                      caption_mode=opts.get("caption_mode", "descriptive"),
+                                     coherence_engine=opts.get("coherence_engine", "flux"),
                                      progress=self.progress.emit)
                 res = {"dataset": ds}
             self.finished_lora.emit(res)
@@ -82,6 +83,13 @@ class LoraImageTab(LoraVideoTab):
         for m, lab in (("descriptive", tr("train.cap.m.desc", "Descrittiva")),
                        ("tags", tr("train.cap.m.tags", "Tag booru")), ("sd-prompt", tr("train.cap.m.sd", "Prompt SD"))):
             self.cap_mode.addItem(lab, m)
+        # coerenza volto per gli scatti CON foto di riferimento (soggetto): FLUX (PuLID/Kontext) o Krea 2 Edit
+        # (in-context, identità più fedele nel dataset). NON sostituisce FLUX.
+        self.coherence = QComboBox()
+        self.coherence.addItem(tr("ilora.coh_flux", "FLUX (PuLID/Kontext)"), "flux")
+        self.coherence.addItem(tr("ilora.coh_krea2edit", "Krea 2 Edit (coerenza volto)"), "krea2_edit")
+        self.coherence.setToolTip(tr("ilora.coh.tt",
+            "Motore per la coerenza del soggetto negli scatti con foto: Krea 2 Edit preserva meglio l'identità."))
         g.addWidget(QLabel(tr("tlora.lora_name", "Nome LoRA")), 0, 0); g.addWidget(self.lora_name, 0, 1)
         g.addWidget(QLabel(tr("ilora.base", "Modello base")), 0, 2); g.addWidget(self.base_model, 0, 3)
         g.addWidget(QLabel(tr("tlora.rank", "Rank")), 1, 0); g.addWidget(self.lora_rank, 1, 1)
@@ -90,6 +98,7 @@ class LoraImageTab(LoraVideoTab):
         g.addWidget(QLabel(tr("ilora.cap", "Captioner")), 2, 2)
         _cw = QHBoxLayout(); _cw.setContentsMargins(0, 0, 0, 0); _cw.addWidget(self.cap_engine, 1); _cw.addWidget(self.cap_mode)
         _cwrap = QWidget(); _cwrap.setLayout(_cw); g.addWidget(_cwrap, 2, 3)
+        g.addWidget(QLabel(tr("ilora.coh_lbl", "Coerenza volto")), 3, 0); g.addWidget(self.coherence, 3, 1)
         v.addLayout(g)
         h = QHBoxLayout()
         self.btn_install = QPushButton(tr("ilora.install", "Installa ai-toolkit")); self.btn_install.clicked.connect(self._install)
@@ -129,7 +138,8 @@ class LoraImageTab(LoraVideoTab):
         opts = {"base": self.base_model.currentData(), "rank": self.lora_rank.value(),
                 "steps": self.lora_steps.value(), "width": res, "height": res,
                 "caption_engine": self.cap_engine.currentData() or "procedural",
-                "caption_mode": self.cap_mode.currentData() or "descriptive"}
+                "caption_mode": self.cap_mode.currentData() or "descriptive",
+                "coherence_engine": self.coherence.currentData() or "flux"}
         self.btn_dataset.setEnabled(False); self.btn_full.setEnabled(False)
         self._log(tr("ilora.started", "Avvio LoRA FLUX.2 (può richiedere molto tempo)…"))
         _name = self.lora_name.text().strip() or "my_flux_lora"

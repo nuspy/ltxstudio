@@ -23,17 +23,24 @@ NEG = "blurry, low quality, deformed, distorted face, extra limbs, watermark, te
 
 
 def _gen_image(subject_type: str, ref: str, prompt: str, out_png: str, width: int, height: int,
-               use_face: bool, gen_arch: str = "flux") -> bool:
+               use_face: bool, gen_arch: str = "flux", coherence_engine: str = "flux",
+               grounding_px: int = 1024, krea2_variant: str = "turbo") -> bool:
     """Genera UNA immagine col motore nativo: volto→FLUX.1+PuLID, oggetto/luogo con foto→Kontext, altrimenti t2i.
 
-    `gen_arch` sceglie l'architettura per lo scatto t2i "concetto/senza foto" (es. 'flux' o 'krea2'). PuLID e
-    Kontext restano su FLUX.1: sono strumenti di identità/riferimento indipendenti dalla base finale della LoRA
-    (Krea 2 non li supporta), così il dataset resta coerente qualunque sia la base scelta per il training.
+    `gen_arch` sceglie l'architettura per lo scatto t2i "concetto/senza foto" (es. 'flux' o 'krea2').
+    `coherence_engine`: quando c'è una foto di riferimento, 'flux' (PuLID/Kontext) o 'krea2_edit' (in-context,
+    identità più fedele). NON sostituisce FLUX: switch dell'utente. La foto del soggetto è il riferimento
+    dell'edit e il prompt è l'istruzione → dataset con identità coerente.
     """
     from core import native_driver
     if not native_driver.is_up():
         return False
-    if use_face and ref:                          # personaggio: identità forte via PuLID (sempre FLUX.1)
+    if coherence_engine == "krea2_edit" and ref:  # coerenza via Krea 2 Edit (in-context, foto=riferimento)
+        params = {"arch": "krea2_edit", "krea2_variant": krea2_variant, "prompt": prompt, "negative": NEG,
+                  "image_path": ref, "grounding_px": int(grounding_px), "seed": 7, "output": out_png,
+                  "steps": 8 if krea2_variant != "raw" else 20,
+                  "guidance": 0.0 if krea2_variant != "raw" else 2.0}
+    elif use_face and ref:                        # personaggio: identità forte via PuLID (sempre FLUX.1)
         params = {"arch": "flux", "prompt": prompt, "negative": NEG, "pulid_face": ref,
                   "pulid_strength": 0.85, "width": width, "height": height, "steps": 20,
                   "guidance": 3.5, "seed": 7, "output": out_png}
@@ -82,7 +89,8 @@ def _face_crop_image(png: str, margin: float = 2.4) -> None:
 
 def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 1024, height: int = 1024,
                      caption_engine: str = "procedural", caption_mode: str = "descriptive",
-                     gen_arch: str = "flux", progress=None) -> dict:
+                     gen_arch: str = "flux", coherence_engine: str = "flux",
+                     grounding_px: int = 1024, krea2_variant: str = "turbo", progress=None) -> dict:
     """Genera le IMMAGINI (+ caption .txt) in un'unica cartella (formato ai-toolkit).
     caption_engine: 'procedural' (trigger+tag) | 'joycaption' | 'florence2' — se VLM, ricaptiona con quello."""
     def log(m):
@@ -102,7 +110,8 @@ def generate_dataset(subjects: list[Subject], dataset_dir: str, *, width: int = 
             if not os.path.exists(out_png):
                 ref = clip.get("ref") or ""
                 if not _gen_image(s.type, ref, clip["prompt"], out_png, width, height, clip["use_face"],
-                                  gen_arch=gen_arch):
+                                  gen_arch=gen_arch, coherence_engine=coherence_engine,
+                                  grounding_px=grounding_px, krea2_variant=krea2_variant):
                     log(f"  [skip] '{stem}': server immagini non attivo o nessuna foto")
                     continue
                 if clip.get("use_face") and s.face_focus:
@@ -174,14 +183,17 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, base: str = "flux2-dev",
               rank: int = 16, steps: int = 2000, width: int = 1024, height: int = 1024,
               caption_engine: str = "procedural", caption_mode: str = "descriptive",
-              gen_arch: str = "flux", progress=None) -> dict:
+              gen_arch: str = "flux", coherence_engine: str = "flux",
+              grounding_px: int = 1024, krea2_variant: str = "turbo", progress=None) -> dict:
     """Pipeline COMPLETA immagini: dataset → train (ai-toolkit). Ritorna {dataset, lora}.
 
     `base` = base del training (flux2-dev/klein/krea2…); `gen_arch` = architettura per generare il dataset
-    (default flux; 'krea2' per un dataset generato con Krea 2)."""
+    (default flux; 'krea2' per un dataset generato con Krea 2). `coherence_engine` = FLUX/krea2_edit per la
+    coerenza del soggetto negli scatti con foto."""
     ds = os.path.join(out_dir, name, "dataset")
     generate_dataset(subjects, ds, width=width, height=height, caption_engine=caption_engine,
-                     caption_mode=caption_mode, gen_arch=gen_arch, progress=progress)
+                     caption_mode=caption_mode, gen_arch=gen_arch, coherence_engine=coherence_engine,
+                     grounding_px=grounding_px, krea2_variant=krea2_variant, progress=progress)
     trig = ", ".join(sorted({s.trig() for s in subjects}))
     lora = train(ds, name, out_dir, base=base, trigger=trig, rank=rank, steps=steps, progress=progress)
     return {"dataset": ds, "lora": lora}
