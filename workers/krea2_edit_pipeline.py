@@ -233,11 +233,22 @@ class Krea2EditPipeline(Krea2Pipeline):
         except Exception:                                        # noqa: BLE001
             pass
 
-        # 2) canale aspetto: VAE-encode delle sorgenti → token puliti + position_ids frame 1..N
+        # 2) canale aspetto: VAE-encode delle sorgenti → token puliti + position_ids frame 1..N.
+        # Ogni riferimento è codificato alle SUE proporzioni (il position_ids per-frame gestisce griglie
+        # diverse): la 1ª immagine = target (stessa dimensione, per il single edit same-size); i riferimenti
+        # AGGIUNTIVI (soggetto nel multi) mantengono il LORO aspect così il volto non viene deformato
+        # (era la causa della bassa fedeltà del viso nel multi).
         ref_tokens_list, ref_ids_list = [], []
         for k, im in enumerate(images):
-            toks, gh, gw = self.encode_ref_image(im, height, width, device, generator)
-            ref_tokens_list.append(toks.to(prompt_embeds.dtype))
+            if k == 0:
+                rh, rw = height, width
+            elif isinstance(im, Image.Image):
+                rw0, rh0 = im.size
+                rh, rw = self._round_to_multiple(rh0, rw0)
+            else:
+                rh, rw = height, width
+            toks, gh, gw = self.encode_ref_image(im, rh, rw, device, generator)
+            ref_tokens_list.append(toks.to(device=device, dtype=prompt_embeds.dtype))
             ref_ids_list.append(self._frame_image_ids(gh, gw, frame=k + 1, device=device))
         ref_tokens = torch.cat(ref_tokens_list, dim=1) if ref_tokens_list else None
 
