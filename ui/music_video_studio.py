@@ -549,6 +549,10 @@ class MusicVideoStudio(QWidget):
             kw["arch"] = c["image_arch"]
         if c.get("image_model"):
             kw["model"] = c["image_model"]
+        if c.get("coherence_engine"):                    # coerenza volto: 'krea2_edit' + char_ref (personaggio)
+            kw["coherence_engine"] = c["coherence_engine"]
+            if c.get("char_ref"):
+                kw["char_ref"] = c["char_ref"]
         if c.get("width"):
             kw["width"] = int(c["width"])
         if c.get("height"):

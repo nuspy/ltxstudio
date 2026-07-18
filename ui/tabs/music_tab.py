@@ -339,6 +339,20 @@ class MusicTab(QWidget):
         mv2.addWidget(QLabel(tr("music.mv.pace", "Ritmo cambi scena")))
         mv2.addWidget(self.mv_pace)
         v.addLayout(mv2)
+        # --- Coerenza volto/personaggio tra le scene (Krea 2 Edit): motore + foto di riferimento ---
+        mv3 = QHBoxLayout()
+        self.mv_coherence = QComboBox()
+        self.mv_coherence.addItem(tr("music.mv.coh_none", "Coerenza volto: nessuna"), "flux")
+        self.mv_coherence.addItem(tr("music.mv.coh_krea2edit", "Coerenza volto: Krea 2 Edit"), "krea2_edit")
+        self.mv_coherence.setToolTip(tr("music.mv.coh.tt",
+            "Se attivo, ogni scena preserva l'identità del personaggio di riferimento (o di scene['char_ref'])."))
+        mv3.addWidget(self.mv_coherence)
+        self.mv_char_ref = QLineEdit()
+        self.mv_char_ref.setPlaceholderText(tr("music.mv.char_ref_ph", "Foto del personaggio (coerenza volto)"))
+        _bcr = QPushButton(tr("music.mv.browse", "Sfoglia…"))
+        _bcr.clicked.connect(lambda: self._pick_into(self.mv_char_ref))
+        mv3.addWidget(self.mv_char_ref, 1); mv3.addWidget(_bcr)
+        v.addLayout(mv3)
         # Badge stima carico VRAM (verde/giallo/rosso) + indicatore coda
         self.est_badge = QLabel(""); self.est_badge.setTextFormat(Qt.RichText)
         self.est_badge.setToolTip(tr("music.est.tt",
@@ -412,6 +426,14 @@ class MusicTab(QWidget):
                                            "Immagini (*.png *.jpg *.jpeg *.webp)")
         if p:
             self.mv_image.setText(p)
+
+    def _pick_into(self, line_edit):
+        """File-picker generico → scrive il path nel QLineEdit dato (es. foto personaggio per la coerenza)."""
+        from PySide6.QtWidgets import QFileDialog
+        p, _ = QFileDialog.getOpenFileName(self, tr("music.mv.char_ref", "Foto personaggio"), "",
+                                           "Immagini (*.png *.jpg *.jpeg *.webp)")
+        if p:
+            line_edit.setText(p)
 
     # ── Generazione testo canzone con AI (LLM locale Gemma-3) ──
     def _gen_lyrics_ai(self):
@@ -1019,6 +1041,15 @@ class MusicTab(QWidget):
                     cfg["image_arch"] = _ia
         except Exception:                                    # noqa: BLE001
             pass
+        # coerenza personaggio (Krea 2 Edit): motore + foto di riferimento dell'artista/personaggio;
+        # se impostato, ogni scena preserva quell'identità. Persone diverse per scena → scene['char_ref'].
+        if getattr(self, "mv_coherence", None) is not None:
+            _ce = self.mv_coherence.currentData() or "flux"
+            if _ce != "flux":
+                cfg["coherence_engine"] = _ce
+                _cr = (self.mv_char_ref.text().strip() if getattr(self, "mv_char_ref", None) else "")
+                if _cr:
+                    cfg["char_ref"] = _cr
         try:                                                 # modello + risoluzione dal tab Video
             vt = getattr(mw, "video_tab", None)
             if vt is not None and hasattr(vt, "get_values"):

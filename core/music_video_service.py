@@ -141,12 +141,29 @@ def recompute_lengths(scenes: list[dict], song_dur: float) -> None:
 
 def gen_scene_image(scene: dict, out_png: str, *, width: int = 704, height: int = 512,
                     model: str | None = None, placement_mode: str | None = None,
-                    arch: str = "flux") -> str:
+                    arch: str = "flux", coherence_engine: str = "flux", char_ref: str = "",
+                    grounding_px: int = 1024, krea2_variant: str = "turbo") -> str:
     """Genera l'immagine di apertura della scena (modulo immagini nativo).
-    arch: architettura immagine ('flux' default o 'krea2' → worker dedicato via native_driver). model: modello
-    scelto nel tab Foto (se None → default del server; ignorato per krea2, che è uno snapshot senza file).
-    placement_mode: 'sticky' per tenere il transformer residente durante il batch (niente ricarico per-foto)."""
+    arch: architettura immagine ('flux' default o 'krea2' → worker dedicato via native_driver).
+    coherence_engine + char_ref: se 'krea2_edit' e c'è un personaggio di riferimento (foto), la scena è
+    generata con Krea 2 Edit in-context (istruzione = img_prompt) preservando l'identità del personaggio tra
+    le scene. La scena può specificare un proprio riferimento (scene['char_ref']) → persone diverse in scene
+    diverse; altrimenti si usa il char_ref globale. NON sostituisce FLUX: switch dell'utente."""
     from core import native_driver
+    _ref = scene.get("char_ref") or char_ref             # per-scena → globale (attori diversi per scena)
+    if str(coherence_engine).lower() == "krea2_edit" and _ref:
+        _p = {"arch": "krea2_edit", "krea2_variant": krea2_variant, "prompt": scene["img_prompt"],
+              "negative": NEG, "image_path": _ref, "grounding_px": int(grounding_px), "seed": 7,
+              "output": out_png, "steps": 8 if krea2_variant != "raw" else 20,
+              "guidance": 0.0 if krea2_variant != "raw" else 2.0}
+        res = native_driver.run_and_wait("image", _p, timeout=600)
+        p = res.get("output") or out_png; p = p[0] if isinstance(p, list) else p
+        if p and os.path.exists(p) and p != out_png:
+            import shutil; shutil.copyfile(p, out_png)
+        if not os.path.exists(out_png):
+            raise RuntimeError(res.get("error", "immagine non generata"))
+        scene["image_path"] = out_png
+        return out_png
     _p = {
         "arch": (arch or "flux"), "prompt": scene["img_prompt"], "negative": NEG,
         "width": width, "height": height, "steps": 20, "guidance": 3.5, "seed": 7, "output": out_png,
