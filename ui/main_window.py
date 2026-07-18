@@ -3599,6 +3599,8 @@ class MainWindow(QMainWindow):
                                  label="Krea 2 Edit"):
         """Krea 2 Edit — editing per istruzione (single/multi) NATIVO (Krea2EditPipeline, no ComfyUI).
         `images` = lista di path (1 = single: frame 1; 2 = multi: scena=1, soggetto=2)."""
+        if not self._feature_gate("cap.krea2_edit"):   # feature d'edizione (plus+); DEV = permissivo
+            return
         if not self._ensure_native_ready():
             return
         imgs = [p for p in (images or []) if p]

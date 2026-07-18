@@ -106,7 +106,7 @@ def register(app: FastAPI):
 
     @app.post("/image/edit", tags=["immagini"])
     def image_edit(req: EditReq):
-        gate.require("cap.gen_images")
+        gate.require("cap.krea2_edit" if req.arch == "krea2_edit" else "cap.gen_images")
         p = req.model_dump(exclude_none=True)
         return _submit("image.edit", lambda job: run_image(p))
 

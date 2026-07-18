@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 # capability note all'app mobile (schermata → capability), stesse del feature matrix desktop.
 KNOWN_CAPS = [
-    "cap.gen_images", "cap.inpaint", "cap.sam", "cap.upscale_image", "cap.restore",
+    "cap.gen_images", "cap.inpaint", "cap.krea2_edit", "cap.sam", "cap.upscale_image", "cap.restore",
     "cap.video", "cap.video_lingbot", "cap.controlnet", "cap.extend_retake",
     "cap.audio_tts_clone", "cap.music_song", "cap.music_sonify", "cap.music_video",
     "cap.lora_image_train", "cap.lora_video_train",

@@ -1300,6 +1300,7 @@
   "feat.cap.watermark": "Watermark obbligatorio",
   "feat.cap.upscale_image": "Upscale immagine",
   "feat.cap.inpaint": "Inpaint / Outpaint / Recolor",
+  "feat.cap.krea2_edit": "Krea 2 Edit (editing per istruzione)",
   "feat.cap.sam": "Segmentazione oggetti (SAM)",
   "feat.cap.video": "Video t2v / i2v",
   "feat.cap.extend_retake": "Prolunga video + ReTake",
