@@ -110,7 +110,7 @@ class Frame1Tab(QWidget):
         # necessari come back-compat per le call-site esistenti.
         _placeholder = self._prompt_tab()        # crea self.img_nsfw / self.prompt / self.neg
         _placeholder.setVisible(False)
-        sub = QTabWidget()
+        sub = QTabWidget(); self.sub = sub        # esposto per navigazione/test dei sotto-tab
         sub.addTab(self._scroll(self._gen_box()), tr("f1.tab.gen"))
         sub.addTab(self._scroll(self._inpaint_box()), tr("f1.tab.inpaint"))
         sub.addTab(self._scroll(self._color_box()), tr("f1.tab.color"))
