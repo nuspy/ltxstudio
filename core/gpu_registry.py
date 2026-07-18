@@ -154,3 +154,28 @@ def acquire(want: ModelKey, *, category: str, need_mb: float = 0.0) -> dict:
     p = plan(want, category=category, need_mb=need_mb)
     p["freed"] = apply(p) if p["action"] == "evict_load" else []
     return p
+
+
+def before_job(category: str, *, arch: str = "", model: str = "", dtype: str = "",
+               need_mb: float = 0.0, log=None) -> dict:
+    """PUNTO DI CABLAGGIO nel dispatch (rimpiazza il coarse mem_coordinator.free_for con la decisione
+    model-aware): chiamato PRIMA di eseguire un job. Se il modello richiesto è già residente → NON libera
+    nulla (riuso). Al cambio-categoria (foto↔video) o mancanza spazio → libera i server giusti. Best-effort:
+    non solleva mai (in caso d'errore ripiega sul comportamento neutro). Ritorna il piano applicato."""
+    try:
+        want = ModelKey(arch=arch or category, model=model, dtype=dtype)
+        p = acquire(want, category=category, need_mb=need_mb)
+        if log:
+            try:
+                log(f"[gpu_registry] {category}/{want}: {p['action']} — {p['reason']}"
+                    + (f" (liberati {p['freed']})" if p.get("freed") else ""))
+            except Exception:                               # noqa: BLE001
+                pass
+        return p
+    except Exception:                                       # noqa: BLE001 — mai bloccare il job per il registro
+        # fallback neutro: coordina come prima (libera le altre categorie)
+        try:
+            mem_coordinator.free_for(category)
+        except Exception:                                   # noqa: BLE001
+            pass
+        return {"action": "fallback", "free_ports": [], "reason": "registro non disponibile"}

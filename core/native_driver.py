@@ -69,12 +69,13 @@ def ensure_up(*, timeout: float = 180.0, log=None) -> bool:
 
 
 def submit(module: str, params: dict) -> str:
-    # M1 — prima di un job IMMAGINE libera i server di categoria diversa (video :8190): su single-GPU la
-    # pipeline video residua terrebbe la VRAM. Pipeline-aware: immagine→immagine consecutive non rifanno il
-    # /free (guard nel coordinatore). Best-effort, non blocca la submit se il coordinatore non è disponibile.
+    # Registro GPU unico (model-aware): prima di un job IMMAGINE decide se RIUSARE il modello residente
+    # (nessun /free) o liberare i server di categoria diversa / a modello diverso se serve spazio. Rimpiazza
+    # il coarse free_for('image'). Best-effort: non blocca mai la submit (fallback neutro interno).
     try:
-        from core import mem_coordinator
-        mem_coordinator.free_for("image")
+        from core import gpu_registry
+        gpu_registry.before_job("image", arch=str(params.get("arch", "")),
+                                model=str(params.get("model", "")), log=print)
     except Exception:                                       # noqa: BLE001
         pass
     payload = {"module": module, "params": params}

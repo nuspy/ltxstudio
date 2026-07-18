@@ -64,10 +64,14 @@ def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 4
     nel processo app: creerebbe un contesto CUDA e farebbe crashare i worker isolati).
     """
     try:
-        from core import mem_coordinator as _mc
-        _mc.free_for("video", timeout=timeout)
+        from core import gpu_registry                        # registro unico: libera le altre categorie (immagine)
+        gpu_registry.before_job("video", arch="video", log=print)
     except Exception:                                        # noqa: BLE001 — best-effort, mai fatale
-        pass
+        try:
+            from core import mem_coordinator as _mc
+            _mc.free_for("video", timeout=timeout)
+        except Exception:                                    # noqa: BLE001
+            pass
     free_mb = 0
     try:
         from core import gpu_mem
