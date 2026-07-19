@@ -255,11 +255,13 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
     # al FLUX) se non è già su. Il modello 22B si carica UNA volta al primo shot e resta per
     # tutti gli altri — senza, ogni shot rilegge 29GB da disco (visto live: 4 min/clip di cui
     # 2 di solo load). free_for('video') in gen_shot_video svuota prima i server immagine.
+    # SOLO per arch=ltx: il server serve il modello LTX-2. Per krea_rt(→Self-Forcing)/lingbot avviarlo
+    # caricherebbe 22GB inutili in competizione col loro worker → si va diretti al subprocess dedicato.
     try:
         import os as _os
         if _os.environ.get("LTX2_NO_PERSISTENT") == "1":
             raise RuntimeError("disabilitato da LTX2_NO_PERSISTENT (bug #160 in corso)")
-        if not gen_service._ltx2_server_up():
+        if vid_arch == "ltx" and not gen_service._ltx2_server_up():
             import subprocess as _sp
             _flags = getattr(_sp, "DETACHED_PROCESS", 0) | getattr(_sp, "CREATE_NEW_PROCESS_GROUP", 0)
             _srv_log = open(str(db.ROOT / "ltx2_server_8190.log"), "a", encoding="utf-8")

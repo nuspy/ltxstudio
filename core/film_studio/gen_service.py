@@ -322,9 +322,10 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
     if nf > _max_single:
         params["chunk_frames"] = _max_single - (_max_single - 1) % 8   # multiplo 8+1 compatibile LTX
     # Worker VIDEO PERSISTENTE (server :8190, modello già caricato) se attivo → niente reload di LTX ~22B ad
-    # ogni shot (era il collo di bottiglia di «Genera Tutti»). Il server persistente è LTX-only → LingBot
-    # va sempre al subprocess dedicato. Altrimenti fallback al subprocess.
-    if video_arch != "lingbot" and _ltx2_server_up():
+    # ogni shot (era il collo di bottiglia di «Genera Tutti»). Il server persistente serve SOLO il modello
+    # LTX-2 → ogni altra architettura (LingBot, krea_rt→Self-Forcing, self_forcing) DEVE andare al subprocess
+    # dedicato via run_clip/_ARCH_RUNNER: instradarla qui produrrebbe clip col modello SBAGLIATO (LTX-2).
+    if video_arch == "ltx" and _ltx2_server_up():
         # PRIMO job (server senza pipeline in cache): il SUO caricamento sceglie fp8-vs-GGUF in base
         # alla VRAM libera in quell'istante → aspetta il rilascio effettivo come per il subprocess
         # (visto live: shot_4 servito col subprocess morente = GGUF + 40GB alloc su 32). Dai job
