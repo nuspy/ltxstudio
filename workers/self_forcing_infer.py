@@ -269,7 +269,18 @@ def run_generation(p: dict) -> str:
         print(f"[self_forcing] durata richiesta {n_out} latenti > cap per-chiamata {MAX_WIN} (~5s): "
               f"clip a {MAX_WIN} (usa kv_local_attn per il rolling)", flush=True)
         n_out = MAX_WIN
-    noise = torch.randn([1, n_out, 16, lat_h, lat_w], device=device, dtype=torch.bfloat16)
+    if initial_latent is not None:
+        # i2v: il PRIMO frame è l'immagine (encode_to_latent) → `independent_first_frame` (il ramo che accetta
+        # 1 solo latent di input: (1-1)%fpb==0). Il noise porta SOLO i frame GENERATATI e dev'essere multiplo di
+        # `num_frame_per_block` (assert in inference()); il totale = 1 (immagine) + noise. Metodo ufficiale
+        # (repo Self-Forcing inference.py --i2v). Il checkpoint dmd è t2v ma autoregressivo → condiziona sul primo
+        # latent pulito come fa coi frame già generati. VALIDATE: coerenza primo frame vs input.
+        pipeline.independent_first_frame = True
+        _gen = max(_fpb, ((n_out - 1) // _fpb) * _fpb)            # frame generati oltre il primo, multiplo di fpb
+        noise = torch.randn([1, _gen, 16, lat_h, lat_w], device=device, dtype=torch.bfloat16)
+        n_out = _gen + 1                                          # totale latenti (per log/px count)
+    else:
+        noise = torch.randn([1, n_out, 16, lat_h, lat_w], device=device, dtype=torch.bfloat16)
     # STREAM-TO-DISK di default: il decode scrive ogni frame nell'mp4 → RAM COSTANTE a qualsiasi durata (film da
     # ore). Disattivato solo se si vuole il riparo seam post (che serve la sequenza intera): col sink non serve.
     _stream = bool(p.get("stream_to_disk", True)) and bool(p.get("no_seam_repair", True))
