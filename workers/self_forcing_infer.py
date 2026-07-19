@@ -239,6 +239,16 @@ def run_generation(p: dict) -> str:
     fps = int(p.get("fps", 16))
     prompt = p.get("prompt", "")
 
+    # i2v: il dispatch condiviso (auto_run / ltx_video_job) passa l'immagine iniziale come `keyframes`
+    # (formato LTX); self_forcing legge `image_path`. Se manca, ricavalo dal primo keyframe → altrimenti
+    # parte in t2v ignorando il frame iniziale (clip incoerente col keyframe generato). Stesso fix di
+    # krea_rt_infer/lingbot_infer.
+    if not p.get("image_path") and p.get("keyframes"):
+        _kf0 = p["keyframes"][0]
+        _kfp = _kf0.get("path") if isinstance(_kf0, dict) else _kf0
+        if _kfp and os.path.exists(str(_kfp)):
+            p["image_path"] = str(_kfp)
+
     initial_latent = None                                         # i2v/estensione: VALIDATE (encode_to_latent)
     if p.get("image_path") and os.path.exists(str(p["image_path"])):
         from PIL import Image

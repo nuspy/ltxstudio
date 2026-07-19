@@ -38,11 +38,20 @@ KREA_RT_WORKER = str(REPO / "workers" / "krea_rt_infer.py")
 # venv krea_rt_venv; il worker gira il runner del repo Self-Forcing come libreria. Vedi [[krea-arches]].
 SELF_FORCING_WORKER = str(REPO / "workers" / "self_forcing_infer.py")
 
+# "Krea Realtime" nell'app = motore **Self-Forcing 1.3B** (l'unico VALIDATO: realtime ~2s di calcolo per 1s
+# di video, decode streaming-su-disco + sfratto KV-cache → durata illimitata a memoria costante, VRAM sotto
+# saturazione — confermato da log storici + mp4 reali). Il transformer **14B** (`krea_rt_infer`) è rimasto
+# uno scaffold pesante (fp8 layerwise + flex_attention, ~1000× più lento, mai validato) → resta raggiungibile
+# SOLO come opt-in di debug con env `KREA_RT_USE_14B=1`. Mettendo il redirect DENTRO `_ARCH_RUNNER`, tutti i
+# punti di dispatch (run_clip qui sotto + `_NativeLtx2Worker` in main_window, che legge questo dict) prendono
+# il motore giusto da un unico posto. Vedi [[krea-arches]].
+_KREA_RT_WORKER_EFF = KREA_RT_WORKER if os.environ.get("KREA_RT_USE_14B") == "1" else SELF_FORCING_WORKER
+
 # quale (python, worker) usare per ogni architettura
 _ARCH_RUNNER = {
     "ltx": (LTX2_PY, LTX2_WORKER),
     "lingbot": (LINGBOT_PY, LINGBOT_WORKER),
-    "krea_rt": (KREA_RT_PY, KREA_RT_WORKER),
+    "krea_rt": (KREA_RT_PY, _KREA_RT_WORKER_EFF),        # → Self-Forcing 1.3B (default) | 14B se KREA_RT_USE_14B=1
     "self_forcing": (KREA_RT_PY, SELF_FORCING_WORKER),
 }
 

@@ -2916,8 +2916,13 @@ class MainWindow(QMainWindow):
         if vals.get("video_arch") == "krea_rt":
             params["arch"] = "krea_rt"
             params.pop("gguf_transformer", None)
-            # prompt TESTO semplice (no JSON). kv-cache/num_blocks li decide il worker per VRAM/durata.
-            self._log(f"[krea_rt] Krea Realtime 14B (autoregressivo): "
+            # "Krea Realtime" = motore Self-Forcing 1.3B (VALIDATO: realtime, streaming-su-disco + sfratto
+            # KV-cache → durata illimitata). Il redirect è in core/ltx_video_job._ARCH_RUNNER (opt-in 14B via
+            # KREA_RT_USE_14B=1). Modalità continua di default (finestra scorrevole + attention-sink).
+            params.setdefault("kv_local_attn", int(vals.get("kv_local_attn", 21)))
+            params.setdefault("kv_sink", int(vals.get("kv_sink", 3)))
+            # prompt TESTO semplice (no JSON). num_blocks/durata li decide il worker per VRAM/durata.
+            self._log(f"[krea_rt] Krea Realtime (Self-Forcing 1.3B, autoregressivo realtime): "
                       f"{params['width']}x{params['height']} {nf} frame")
             self._ltx2_worker = _NativeLtx2Worker(params)
             self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
