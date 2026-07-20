@@ -460,6 +460,31 @@ def _measure_pipe_mb(pipe) -> int:
     return int(total / 1024**2)
 
 
+def _from_single_file_robust(cls, path: str, kw: dict):
+    """`from_single_file` col path veloce (low_cpu_mem_usage → meta-loading) con FALLBACK robusto.
+
+    Alcuni checkpoint FLUX non-standard (merge/community — es. il DEFAULT NSFW `fuxCapacityNSFWPornFlux`)
+    NON contengono tutte le chiavi che il config si aspetta: quei parametri/buffer restano su `meta`, e
+    diffusers 0.38 chiama comunque `dispatch_model(model, device_map)` → `model.to(device)` che esplode con
+    "Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty()". I checkpoint standard
+    (es. FLUX_Dev) coprono tutte le chiavi → nessun meta → path veloce. Perciò: provo il path veloce e SOLO
+    su quell'errore ricarico con `low_cpu_mem_usage=False` (init REALE dei buffer + `load_state_dict` diretto,
+    niente meta né dispatch_model) → funziona per QUALSIASI checkpoint problematico."""
+    try:
+        return cls.from_single_file(path, **kw)
+    except (RuntimeError, NotImplementedError) as e:
+        if "meta tensor" not in str(e) and "to_empty" not in str(e):
+            raise
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print(f"[flux] {cls.__name__}.from_single_file: checkpoint con chiavi scoperte (meta-tensor) → "
+              f"retry robusto low_cpu_mem_usage=False", flush=True)
+        return cls.from_single_file(path, low_cpu_mem_usage=False, **kw)
+
+
 def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
     Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dal ramo fp8.
@@ -483,11 +508,10 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     if _is_gguf:
         from diffusers import GGUFQuantizationConfig
         _gguf_kw = {"quantization_config": GGUFQuantizationConfig(compute_dtype=bf16)}
+    _sf_kw = dict(torch_dtype=bf16, **_gguf_kw)
     if os.path.isdir(_tr_cfg):
-        tr = FluxTransformer2DModel.from_single_file(
-            transformer_path, config=_tr_cfg, torch_dtype=bf16, local_files_only=True, **_gguf_kw)
-    else:
-        tr = FluxTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16, **_gguf_kw)
+        _sf_kw.update(config=_tr_cfg, local_files_only=True)
+    tr = _from_single_file_robust(FluxTransformer2DModel, transformer_path, _sf_kw)
     if _is_gguf:
         tr._ls_is_gguf = True    # il GGUF NON tollera model_cpu_offload (pesi quantizzati→CPU = calcolo su CPU,
         #                          166s/step): _place lo terrà SEMPRE gpu-resident (vedi _place).
@@ -618,7 +642,7 @@ def _assemble_zimage(transformer_path: str):
                            FlowMatchEulerDiscreteScheduler, ZImagePipeline)
     from transformers import AutoModel, AutoTokenizer
     bf16 = torch.bfloat16
-    tr = ZImageTransformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+    tr = _from_single_file_robust(ZImageTransformer2DModel, transformer_path, dict(torch_dtype=bf16))
     vae = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)
     te = AutoModel.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"), torch_dtype=bf16)
     tok = AutoTokenizer.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"))
@@ -688,7 +712,7 @@ def _assemble_flux2(Pipe, transformer_path: str):
         from inference_server.backends.flux2_transformer import load_flux2_transformer
         tr = load_flux2_transformer(transformer_path, tr_cfg_dir)
     else:
-        tr = Flux2Transformer2DModel.from_single_file(transformer_path, torch_dtype=bf16)
+        tr = _from_single_file_robust(Flux2Transformer2DModel, transformer_path, dict(torch_dtype=bf16))
     # AutoencoderKLFlux2 NON supporta from_single_file → from_config + load_state_dict (chiavi 1:1)
     vae = AutoencoderKLFlux2.from_config(json.load(open(os.path.join(FLUX2_DIR, "vae", "config.json"))))
     vae.load_state_dict(load_file(FLUX2_VAE), assign=True)
