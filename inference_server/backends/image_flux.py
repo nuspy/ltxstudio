@@ -63,6 +63,40 @@ FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
 KLEIN_QWEN_DIRS = {7680: os.path.join(TE_DIR, "qwen3_4b"), 12288: os.path.join(TE_DIR, "qwen3_8b")}
 
 
+# ── STEP LOG: tempo per-fase + VRAM/RAM + cosa fa, per capire la dinamica load→placement→gen dai log ──────
+# I job immagine sono seriali (un solo job per processo figlio) → un timer a livello di modulo è sicuro.
+import time as _time_mod                                    # noqa: E402
+_STEP = {"t0": 0.0, "last": 0.0}
+
+
+def _step_reset() -> None:
+    _STEP["t0"] = _STEP["last"] = _time_mod.perf_counter()
+
+
+def _step(label: str) -> None:
+    """Logga: +delta dall'ultimo step, tot dall'inizio, VRAM dedicata usata/totale (per vedere lo spill in
+    shared-RAM), RAM del processo, e COSA sta facendo. Così la dinamica si legge dai log."""
+    now = _time_mod.perf_counter()
+    d = now - _STEP["last"]
+    tot = now - _STEP["t0"]
+    _STEP["last"] = now
+    vram = ""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            _f, _t = torch.cuda.mem_get_info()
+            vram = f" | VRAM {(_t - _f) // 2**20}/{_t // 2**20}MB"
+    except Exception:                                       # noqa: BLE001
+        pass
+    ram = ""
+    try:
+        import psutil
+        ram = f" | RAM {psutil.Process().memory_info().rss // 2**20}MB"
+    except Exception:                                       # noqa: BLE001
+        pass
+    print(f"[step] +{d:6.1f}s (tot {tot:6.1f}s) {label}{vram}{ram}", flush=True)
+
+
 def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     """Posizionamento VRAM a TRE livelli (carica→usa→libera i componenti; l'inutilizzato esce dalla VRAM):
 
@@ -634,7 +668,9 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     tr_key = f"flux_tr:{os.path.normpath(transformer_path).lower()}:{_cfg_name}"
     got: list[str] = []                                  # rollback anti refcount-leak
     try:
+        _step("_assemble_flux: acquisisco transformer dallo STORE")
         tr = STORE.acquire(tr_key, lambda: _load_flux_tr(transformer_path, arch)[0]); got.append(tr_key)
+        _step("transformer acquisito")
         # VAE: ComfyUI decodifica il VAE FLUX in FP32 di default (bf16/fp16 → chiazze tonali sui fondi
         # lisci). Test A/B macchie: NATIVE_VAE_FP32=1 → fp32 (footprint VAE ~320MB, trascurabile).
         # I wrapper castano gli input (le pipeline passano latenti/immagini in bf16 → mismatch coi conv fp32).
@@ -648,6 +684,7 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
                 v.encode = lambda x, *a, **k: _oe(x.float(), *a, **k)
             return v
         vae = STORE.acquire("vae_flux", _mk_vae); got.append("vae_flux")
+        _step("VAE acquisito")
         # NB: T5/CLIP si caricano col meta-loading di transformers (_load_state_dict_into_meta_model), che
         # rilascia il GIL durante le copie tensore. Se questo avviene nel THREAD worker mentre l'event loop
         # asyncio (main thread) è attivo, il processo SEGFAULTA in torch/storage.__getitem__ (crash nativo,
@@ -656,8 +693,10 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
         # quando il worker arriva qui, STORE.acquire trova già T5/CLIP/VAE in cache e non li ricarica.
         te = STORE.acquire("clip_l", lambda: CLIPTextModel.from_pretrained(
             os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)); got.append("clip_l")
+        _step("CLIP-L acquisito")
         te2 = STORE.acquire("t5xxl", lambda: T5EncoderModel.from_pretrained(
             os.path.join(TE_DIR, "t5xxl"), torch_dtype=bf16)); got.append("t5xxl")
+        _step("T5-XXL acquisito (9GB)")
     except Exception:
         for k in got:
             STORE.release(k)
@@ -1430,11 +1469,14 @@ def run(params: dict, mm, output_dir: str) -> dict:
     from PIL import Image
     from inference_server import preview_bus
     _t_run0 = _time.perf_counter()                          # timing pre-load (diagnosi lentezza avvio, issue #1)
+    _step_reset()
+    _step(f"run() START arch={_arch_of(params)}")
     arch = _arch_of(params)
     model = params.get("model") or _default_model(arch)   # fix KeyError 'model' (music-video/LoRA/API)
     if not params.get("model"):
         print(f"[image] modello non specificato → default {os.path.basename(model)}", flush=True)
     key = register(mm, model, arch)
+    _step(f"register modello ({os.path.basename(str(model))})")
     preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
     # CAMBIO MODELLO — sfratta il PRECEDENTE *prima* di caricare il nuovo. Col caricamento in-RAM (no-mmap
     # anti-crash) il checkpoint sta ~22GB in RAM come buffer: tenerne DUE insieme (vecchio ancora in cache +
@@ -1451,11 +1493,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 mm.flush()
                 import gc as _gc
                 _gc.collect()                                # forza il rilascio dei buffer bytes del vecchio
+            _step("pre-evict cambio-modello (scaricato il precedente)")
         except Exception as _e:                             # noqa: BLE001
             print(f"[image] pre-evict cambio modello saltato ({_e})", flush=True)
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
     # _ensure_placement (make_room con i componenti PROPRI ormai refcountati → protetti).
+    _step("PRIMA di mm.ensure (sto per caricare transformer+componenti)")
     try:
         pipe = mm.ensure(key)                              # carica il NUOVO modello (mmap→VRAM) + componenti
     except (MemoryError, OSError) as _me:
@@ -1478,7 +1522,14 @@ def run(params: dict, mm, output_dir: str) -> dict:
             f"(Impostazioni → Sistema → Memoria virtuale; ora è fisso a 16GB). Dettaglio: {_me}") from _me
     # timing pre-load (issue #1): quanto ci mette il modello a essere pronto in RAM/VRAM. cache-hit = istantaneo
     # (persistent-child/riuso), altrimenti = lettura file + costruzione pipeline. Reso visibile nel log del job.
-    print(f"[image] pre-load: modello pronto in {_time.perf_counter()-_t_run0:.1f}s "
+    def _vram_mb():                                          # VRAM dedicata usata (per vedere lo spill in shared)
+        try:
+            _f, _t = torch.cuda.mem_get_info(); return (_t - _f) // 2**20, _t // 2**20
+        except Exception:                                   # noqa: BLE001
+            return -1, -1
+    _u, _tt = _vram_mb()
+    _step(f"mm.ensure FATTO (transformer+componenti pronti, cache-hit={key in getattr(mm, '_cache', {})})")
+    print(f"[image] FASE pre-load: {_time.perf_counter()-_t_run0:.1f}s | VRAM {_u}/{_tt}MB "
           f"(cache-hit={key in getattr(mm, '_cache', {})}, arch={arch}, {os.path.basename(str(model))})", flush=True)
     # STICKY-TRANSFORMER (batch, es. Music Video Studio): transformer+vae residenti per tutto il batch, solo
     # T5/CLIP a rotazione → niente dente-di-sega. Attivato dai params (placement_mode='sticky').
@@ -1495,10 +1546,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 mm.flush()
         except Exception as _e:                             # noqa: BLE001
             print(f"[image] auto-evict saltato ({_e})", flush=True)
+    _step("auto-evict FATTO (sto per fare il placement in VRAM)")
     where = _ensure_placement(pipe, mm, key)                # placement per-JOB (gpu|offload con VRAM attuale)
+    _step(f"placement FATTO = {where}")
     _set_attention(pipe, arch)                              # per-job: il transformer CONDIVISO può avere il
     print(f"[image] job {arch}: placement={where}", flush=True)  # processor dell'arch precedente (sage↔sdpa)
     mm.apply_loras(pipe, params.get("loras"))
+    _step("LoRA applicate (sto per iniziare il denoising)")
     preview_bus.set_message("Generazione…")
 
     # Face adapter PuLID (identità del volto da una foto) — FLUX/kontext

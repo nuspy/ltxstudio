@@ -35,8 +35,12 @@ def main() -> int:
         pass
 
     # gli handler importano torch: import QUI (nel figlio), MAI nel server HTTP.
+    import time as _t
+    _ti = _t.perf_counter()
     from inference_server.model_manager import ModelManager
     from inference_server.backends import image_flux, image_upscale, image_segment, video_postprocess
+    print(f"[step-child] import torch/diffusers/backends = {_t.perf_counter()-_ti:.1f}s "
+          f"(overhead figlio fresco per-job)", flush=True)
     handlers = {
         "image": image_flux.run,
         "upscale": image_upscale.run,
