@@ -494,6 +494,37 @@ def _from_single_file_robust(cls, path: str, kw: dict):
         return cls.from_single_file(path, low_cpu_mem_usage=False, **kw)
 
 
+def _flux_has_guidance(path: str) -> bool:
+    """True se il checkpoint FLUX ha il **guidance embedder** (Dev/Fill/Kontext). Schnell e i distillati
+    guidance-free NON ce l'hanno (niente `guidance_in.*`): caricati col config Dev (guidance_embeds=True)
+    lasciano i 4 tensori `time_text_embed.guidance_embedder.*` su 'meta' → crash meta-tensor. In dubbio
+    (header illeggibile/GGUF) assume Dev = comportamento attuale."""
+    try:
+        from safetensors import safe_open
+        with safe_open(path, framework="pt") as h:
+            for k in h.keys():
+                if "guidance_in" in k or "guidance_embedder" in k:
+                    return True
+        return False
+    except Exception:                                    # noqa: BLE001
+        return True
+
+
+def _flux_cfg_no_guidance(cfg_dir: str) -> str:
+    """Copia (cache-ata su disco, creata una volta) di `cfg_dir` con guidance_embeds=False — per i checkpoint
+    schnell/distillati senza guidance embedder. Così il modello combacia col checkpoint: 0 meta, niente crash."""
+    import json
+    dst = cfg_dir + "_noguid"
+    dst_cfg = os.path.join(dst, "config.json")
+    if not os.path.isfile(dst_cfg):
+        os.makedirs(dst, exist_ok=True)
+        c = json.load(open(os.path.join(cfg_dir, "config.json"), encoding="utf-8"))
+        c["guidance_embeds"] = False
+        with open(dst_cfg, "w", encoding="utf-8") as fh:
+            json.dump(c, fh)
+    return dst
+
+
 def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
     Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dal ramo fp8.
@@ -517,6 +548,12 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     if _is_gguf:
         from diffusers import GGUFQuantizationConfig
         _gguf_kw = {"quantization_config": GGUFQuantizationConfig(compute_dtype=bf16)}
+    # schnell/distillati (senza guidance embedder) col config Dev lasciano 4 tensori 'meta' → crash: usa un
+    # config guidance_embeds=False. (Non per GGUF: header non-safetensors.)
+    if os.path.isdir(_tr_cfg) and not _is_gguf and not _flux_has_guidance(transformer_path):
+        _tr_cfg = _flux_cfg_no_guidance(_tr_cfg)
+        print("[flux] checkpoint senza guidance embedder (schnell/distillato) → config guidance_embeds=False",
+              flush=True)
     _sf_kw = dict(torch_dtype=bf16, **_gguf_kw)
     if os.path.isdir(_tr_cfg):
         _sf_kw.update(config=_tr_cfg, local_files_only=True)
