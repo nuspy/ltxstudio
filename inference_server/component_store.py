@@ -65,9 +65,15 @@ class ComponentStore:
         e = self._items.get(key)
         if e is None:
             obj = loader()
-            e = _CEntry(obj=obj, size_mb=_measure_mb(obj), refcount=0, last_used=_now(),
+            _sz = _measure_mb(obj)
+            e = _CEntry(obj=obj, size_mb=_sz, refcount=0, last_used=_now(),
                         device="cpu")                    # from_pretrained/from_single_file → pesi su CPU
             self._items[key] = e
+            try:                                         # SMART-MEMORY: auto-popola il registro footprint (dtype-aware)
+                from core import model_registry
+                model_registry.ensure(key, obj, mb=_sz, category="image")
+            except Exception:                            # noqa: BLE001 — best-effort, mai fatale
+                pass
         e.refcount += 1
         e.last_used = _now()
         return e.obj
