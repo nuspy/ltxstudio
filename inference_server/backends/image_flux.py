@@ -786,6 +786,16 @@ def _assemble_zimage(transformer_path: str):
     from transformers import AutoModel, AutoTokenizer
     bf16 = torch.bfloat16
     tr = _from_single_file_robust(ZImageTransformer2DModel, transformer_path, dict(torch_dtype=bf16))
+    # fp8 STORAGE (direttiva "fp8 default ovunque"): Z-Image era bf16 (~19.5GB in VRAM) → col layerwise casting
+    # storage fp8/compute bf16 scende a ~metà (~10GB) → più VRAM libera, niente offload/saturazione. Come FLUX.1.
+    # Disattivabile con NATIVE_FLUX1_FP8=0.
+    if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1":
+        try:
+            tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=bf16)
+            tr._ls_fp8_storage = True
+            print("[zimage] transformer STORAGE fp8 (layerwise): ~metà VRAM, niente offload", flush=True)
+        except Exception as _e:                              # noqa: BLE001
+            print(f"[zimage] layerwise fp8 non applicato ({_e}) → bf16 (fallback)", flush=True)
     vae = AutoencoderKL.from_single_file(AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=bf16)
     te = AutoModel.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"), torch_dtype=bf16)
     tok = AutoTokenizer.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"))
@@ -1563,16 +1573,24 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # suoi ~2-3GB + hook + attivazioni saturerebbero col T5 residente).
     pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky"
                             or bool(params.get("pulid_face")))
-    # AUTO-EVICT del modello PRECEDENTE (richiesta utente): PRIMA di piazzare il nuovo, scarica le shell di
-    # altri modelli e libera dalla VRAM il loro transformer orfano → il nuovo modello trova VRAM PULITA
-    # (gpu-resident, niente offload/spill). I componenti CONDIVISI (T5/CLIP/VAE) usati dal nuovo restano.
+    # KEEP-UNTIL-SPACE-NEEDED (richiesta utente): un modello RESTA residente finché non serve la sua VRAM.
+    # Prima qui si sfrattavano gli altri modelli SEMPRE (evict incondizionato) → scaricava anche con VRAM libera
+    # ("pensa di doverlo scaricare"). Ora: sfratto SOLO se la VRAM libera NON basta per il nuovo modello, e
+    # libero solo il DEFICIT (size-aware), non tutta la VRAM. Così più modelli coesistono se c'è spazio.
     if os.environ.get("NATIVE_AUTOEVICT", "1") == "1":
         try:
             from inference_server.component_store import STORE
-            if mm.evict_others(key):
-                _tot = torch.cuda.mem_get_info()[1] if torch.cuda.is_available() else 0
-                STORE.evict_unused(_tot)                    # demota/libera i transformer orfani → VRAM libera
-                mm.flush()
+            _free_mb = (torch.cuda.mem_get_info()[0] // 2**20) if torch.cuda.is_available() else 0
+            _need_mb = _measure_pipe_mb(pipe) + int(getattr(pipe, "_ls_working_mb", 0) or 3200)
+            if _free_mb < _need_mb:                          # serve spazio → sfratta (size-aware, solo il deficit)
+                if mm.evict_others(key):
+                    STORE.evict_unused(max(1, _need_mb - _free_mb))
+                    mm.flush()
+                print(f"[image] auto-evict: serviva spazio (free {_free_mb} < need {_need_mb}MB) → sfrattati altri",
+                      flush=True)
+            else:
+                print(f"[image] auto-evict SALTATO: c'è spazio (free {_free_mb} ≥ need {_need_mb}MB) → gli altri "
+                      f"modelli RESTANO residenti", flush=True)
         except Exception as _e:                             # noqa: BLE001
             print(f"[image] auto-evict saltato ({_e})", flush=True)
     _step("auto-evict FATTO (sto per fare il placement in VRAM)")
