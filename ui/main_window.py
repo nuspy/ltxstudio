@@ -3579,7 +3579,7 @@ class MainWindow(QMainWindow):
                       "steps": max(steps, 25), "guidance": max(3.5, float(guidance or 0)), "seed": seed,
                       # DENOISE 0.65 — misurato: a 0.55 l'oggetto resta incollato (nessuna mano), a 0.75
                       # il modello lo cancella. A 0.65 la mano lo afferra e l'oggetto resta il tuo.
-                      "denoise": float(cfg.get("integrate_denoise") or 0.65),
+                      "denoise": float(self.frame1_tab.get_inpaint_config().get("integrate_denoise") or 0.65),
                       # FEATHER AMPIO (default inpaint 6px): il backend ricompone i pixel originali fuori
                       # maschera; con la zona-edit larga un bordo netto disegna un RIQUADRO visibile.
                       "feather": 48}
