@@ -88,13 +88,17 @@ def _step(label: str) -> None:
         import torch
         if torch.cuda.is_available():
             _f, _t = torch.cuda.mem_get_info()
-            vram = f" | VRAM {(_t - _f) // 2**20}/{_t // 2**20}MB"
+            _alloc = torch.cuda.memory_allocated() // 2**20     # tensori VIVI
+            _resv = torch.cuda.memory_reserved() // 2**20       # riservato dall'allocatore (include il transiente
+            vram = (f" | VRAMded {(_t - _f) // 2**20}/{_t // 2**20}MB "  # bf16 non rilasciato su Windows)
+                    f"alloc={_alloc} resv={_resv}MB")
     except Exception:                                       # noqa: BLE001
         pass
     ram = ""
     try:
         import psutil
-        ram = f" | RAM {psutil.Process().memory_info().rss // 2**20}MB"
+        _vm = psutil.virtual_memory()
+        ram = f" | RAM {psutil.Process().memory_info().rss // 2**20}MB (sys used {(_vm.total-_vm.available)//2**20}MB)"
     except Exception:                                       # noqa: BLE001
         pass
     print(f"[step] +{d:6.1f}s (tot {tot:6.1f}s) {label}{vram}{ram}", flush=True)
@@ -1555,9 +1559,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
     _step(f"mm.ensure FATTO (transformer+componenti pronti, cache-hit={key in getattr(mm, '_cache', {})})")
     print(f"[image] FASE pre-load: {_time.perf_counter()-_t_run0:.1f}s | VRAM {_u}/{_tt}MB "
           f"(cache-hit={key in getattr(mm, '_cache', {})}, arch={arch}, {os.path.basename(str(model))})", flush=True)
-    # STICKY-TRANSFORMER (batch, es. Music Video Studio): transformer+vae residenti per tutto il batch, solo
-    # T5/CLIP a rotazione → niente dente-di-sega. Attivato dai params (placement_mode='sticky').
-    pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky")
+    # STICKY-TRANSFORMER: transformer+VAE RESIDENTI, T5/CLIP onload-per-encode poi OFFLOAD (liberano ~10GB
+    # subito dopo l'encode del prompt, che è l'unico momento in cui servono). Attivato da placement_mode='sticky'
+    # (batch) O quando c'è **PuLID** (i suoi ~2-3GB + hook sul transformer + attivazioni saturerebbero la VRAM col
+    # T5 residente → encode lentissimo). È il tuo "scarica il componente che non serve più se serve spazio".
+    pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky"
+                            or bool(params.get("pulid_face")))
     # AUTO-EVICT del modello PRECEDENTE (richiesta utente): PRIMA di piazzare il nuovo, scarica le shell di
     # altri modelli e libera dalla VRAM il loro transformer orfano → il nuovo modello trova VRAM PULITA
     # (gpu-resident, niente offload/spill). I componenti CONDIVISI (T5/CLIP/VAE) usati dal nuovo restano.
