@@ -165,6 +165,10 @@ def generate(params: dict, timeout: int = 3600) -> dict:
             engine = user_prefs.get_engine("video", "comfy")
         except Exception:
             engine = "comfy"
+    # ComfyUI RIMOSSO (.bau): il motore comfy video non è più disponibile → forza il nativo LTX-2 ('lightricks').
+    if engine != "lightricks" and not os.path.exists(COMFY_PY):
+        print("[ltx2] ComfyUI non disponibile → motore video NATIVO (lightricks)", flush=True)
+        engine = "lightricks"
     if engine != "lightricks":
         return _generate_comfy_native(params, timeout)
     if not ensure_server():
