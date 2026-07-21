@@ -18,6 +18,10 @@ from pathlib import Path
 from core import native_driver, user_prefs
 
 COMFY_PY = r"E:\AI\Comfy_Nexus.bak\ComfyUI\venv\Scripts\python.exe"
+# ComfyUI RIMOSSO (cartelle rinominate .bau): il motore comfy non è più disponibile → si usa SOLO il nativo.
+# Se un giorno ComfyUI tornasse, questo torna True da solo. Il memory-management va replicato NATIVO seguendo
+# la logica di ComfyUI (model_management), non chiamando ComfyUI. Vedi [[native-backend-migration]].
+_COMFY_AVAILABLE = os.path.exists(COMFY_PY)
 REPO = str(Path(__file__).resolve().parent.parent)
 OUTPUT_DIR = r"E:\AI\ltxstudio\output"
 _DM_ROOT = r"E:\AI\Models\diffusion_models"
@@ -204,7 +208,7 @@ def generate(params: dict, timeout: int = 1800) -> dict:
     # DEFAULT 'diffusers' (nativo): ComfyUI è il ramo legacy/rotto e il suo /free svuotava la VRAM del server
     # nativo ad ogni t2i → ricaricava lo STESSO modello. Col nativo il ModelManager lo tiene in cache (nessun
     # reload per la medesima pipeline). Comfy solo se scelto ESPLICITAMENTE in Impostazioni.
-    if user_prefs.get_engine("image", "diffusers") == "comfy" and is_t2i:
+    if _COMFY_AVAILABLE and user_prefs.get_engine("image", "diffusers") == "comfy" and is_t2i:
         res = _comfy_t2i(params, timeout)
         if res.get("status") == "success":
             return res
