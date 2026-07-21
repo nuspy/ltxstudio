@@ -510,6 +510,23 @@ def _flux_has_guidance(path: str) -> bool:
         return True
 
 
+def _flux_tr_bf16_bytes(path: str) -> int:
+    """Stima i byte del SOLO transformer FLUX una volta in bf16 (target del load). Somma dall'header i tensori
+    `model.diffusion_model.*` (all-in-one) o tutti (file transformer-only) × 2 byte/elem. Serve alla guardia
+    direct-to-VRAM per NON sovrastimare con l'intero all-in-one (che include text_encoders/vae)."""
+    from safetensors import safe_open
+    total = 0
+    with safe_open(path, framework="pt") as h:
+        keys = list(h.keys())
+        tr_keys = [k for k in keys if k.startswith("model.diffusion_model.")] or keys
+        for k in tr_keys:
+            n = 1
+            for d in h.get_slice(k).get_shape():
+                n *= d
+            total += n * 2
+    return total
+
+
 def _flux_cfg_no_guidance(cfg_dir: str) -> str:
     """Copia (cache-ata su disco, creata una volta) di `cfg_dir` con guidance_embeds=False — per i checkpoint
     schnell/distillati senza guidance embedder. Così il modello combacia col checkpoint: 0 meta, niente crash."""
@@ -557,6 +574,21 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     _sf_kw = dict(torch_dtype=bf16, **_gguf_kw)
     if os.path.isdir(_tr_cfg):
         _sf_kw.update(config=_tr_cfg, local_files_only=True)
+    # DIRECT-TO-VRAM (issue #1): se in VRAM c'è spazio per il transiente bf16, carico i pesi DIRETTAMENTE su
+    # cuda (from_single_file device="cuda") → niente tensore bf16 ~24GB in RAM, i byte vanno dritti in VRAM
+    # (poi enable_layerwise_casting li porta a fp8 sul posto). Nel default la VRAM è già liberata da
+    # gpu_registry.before_job, quindi scatta. Se non c'è spazio (offload necessario) → path CPU come prima.
+    # Disattivabile con NATIVE_DIRECT_VRAM=0. GGUF escluso (ha la sua quantizzazione/placement).
+    if os.environ.get("NATIVE_DIRECT_VRAM", "1") == "1" and not _is_gguf and torch.cuda.is_available():
+        try:
+            _free = torch.cuda.mem_get_info()[0]
+            _bf16_need = _flux_tr_bf16_bytes(transformer_path)                   # SOLO il transformer, non l'all-in-one
+            if _bf16_need and _free > _bf16_need * 1.1 + 1500 * 2**20:           # +10% +1.5GB margine attivazioni
+                _sf_kw["device"] = "cuda"
+                print(f"[flux] direct-to-VRAM: transformer su cuda "
+                      f"(libera {_free//2**20}MB ≥ ~{int(_bf16_need*1.1)//2**20}MB) → niente staging RAM", flush=True)
+        except Exception as _de:                                                # noqa: BLE001
+            print(f"[flux] stima direct-to-VRAM saltata ({_de}) → path CPU", flush=True)
     tr = _from_single_file_robust(FluxTransformer2DModel, transformer_path, _sf_kw)
     if _is_gguf:
         tr._ls_is_gguf = True    # il GGUF NON tollera model_cpu_offload (pesi quantizzati→CPU = calcolo su CPU,
@@ -574,6 +606,8 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
             print(f"[flux] transformer STORAGE fp8 (layerwise, {_src}): ~metà VRAM, niente offload", flush=True)
         except Exception as e:                           # noqa: BLE001
             print(f"[flux] layerwise fp8 non applicato ({e}) → bf16 (fallback)", flush=True)
+    if _sf_kw.get("device") == "cuda" and torch.cuda.is_available():
+        torch.cuda.empty_cache()                         # direct-to-VRAM: recupera il transiente bf16 dopo il cast fp8
     return tr, _cfg_name
 
 
