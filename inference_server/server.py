@@ -102,7 +102,12 @@ def _tail(path: str, n: int = 2000) -> str:
 # figli = niente hang alla 2ª gen). Riuso per job dello STESSO modello; al CAMBIO modello respawn (evita il
 # segfault del 2° load in-process). Il server resta senza torch → anti-crash intatto (EOF/timeout = respawn +
 # fallback per-job). Disattivabile con NATIVE_PERSISTENT_CHILD=0 (torna al per-job isolato).
-_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD", "1") == "1"
+# DEFAULT OFF (stabilità): il figlio persistente diffusers su Windows dà **access violation** sul 2° load /
+# sotto pressione di memoria (visto: Ernie 16GB, Krea2). È la fragilità documentata ([[persistent-child-fragile]]).
+# Il per-job isolato è stabile da mesi. La residenza va riabilitata SOLO col caricamento robusto (to_empty/
+# materializzazione esplicita, coordinamento RAM cross-motore). La residenza COMFY invece resta ON (ComfyUI
+# model_management è nato per processi lunghi). Riattiva il diffusers: NATIVE_PERSISTENT_CHILD=1.
+_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD") == "1"
 
 
 def _job_model_key(module: str, params: dict) -> str:
