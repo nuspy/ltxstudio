@@ -616,7 +616,10 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     # (poi enable_layerwise_casting li porta a fp8 sul posto). Nel default la VRAM è già liberata da
     # gpu_registry.before_job, quindi scatta. Se non c'è spazio (offload necessario) → path CPU come prima.
     # Disattivabile con NATIVE_DIRECT_VRAM=0. GGUF escluso (ha la sua quantizzazione/placement).
-    if os.environ.get("NATIVE_DIRECT_VRAM", "1") == "1" and not _is_gguf and torch.cuda.is_available():
+    # DEFAULT OFF (regressione): caricare il transformer eager in VRAM riduce la VRAM libera → il placement
+    # differito lo scambia per "non ci sta" e va in OFFLOAD (rimette tutto su CPU = churn + gen lenta + PuLID
+    # rotto). Va riabilitato solo INSIEME al placement resident-aware (gestore unificato). Accendi: =1.
+    if os.environ.get("NATIVE_DIRECT_VRAM", "0") == "1" and not _is_gguf and torch.cuda.is_available():
         try:
             _free = torch.cuda.mem_get_info()[0]
             _bf16_need = _flux_tr_bf16_bytes(transformer_path)                   # SOLO il transformer, non l'all-in-one
