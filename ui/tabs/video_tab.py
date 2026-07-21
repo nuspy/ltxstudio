@@ -158,6 +158,14 @@ class VideoTab(QWidget):
             "Riduce la VRAM di picco del decode VAE (tile più piccoli). Utile per video molto lunghi o ad alta "
             "risoluzione; leggermente più lento. Vale per LTX-2."))
         form.addRow("", self.decode_lowmem)
+        # AUDIO NATIVO LTX-2: LTX-2.3 genera video+audio dal prompt (parlato/suoni). Di default l'audio non
+        # richiesto viene scartato (evita rumore sui prompt non-parlato). Attiva per TENERLO quando il prompt
+        # descrive parlato/suoni (es. «says "hello world"») → voce + lip-sync. Solo LTX-2.
+        self.native_audio = _CkBox(tr("vid.native_audio", "🔊 Audio nativo (parlato/suoni dal prompt) — LTX-2"))
+        self.native_audio.setToolTip(tr("vid.native_audio.tt",
+            "LTX-2.3 può generare l'audio dal prompt (voce, suoni) e sincronizzare le labbra. Attiva quando il "
+            "prompt descrive parlato/suoni. Da spento il video è muto (default, evita rumore casuale)."))
+        form.addRow("", self.native_audio)
 
         self.model = QComboBox()
         self.model.setMaxVisibleItems(20)       # fix: mostra tutti i modelli nel popup
@@ -1019,6 +1027,7 @@ class VideoTab(QWidget):
             "teacache_thresh": float(self.teacache.value()) if hasattr(self, "teacache") else 0.0,
             "video_arch": self._arch(),
             "decode_lowmem": bool(self.decode_lowmem.isChecked()) if hasattr(self, "decode_lowmem") else False,
+            "native_audio": bool(self.native_audio.isChecked()) if hasattr(self, "native_audio") else False,
         }
         # VIDEO LUNGO "Continuo" → instrada al motore Self-Forcing (una ripresa continua, senza tagli).
         if hasattr(self, "long_mode") and self.long_mode.currentData() == "continuous":

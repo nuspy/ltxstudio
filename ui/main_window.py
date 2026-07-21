@@ -2811,6 +2811,7 @@ class MainWindow(QMainWindow):
             #                                                block-swap per-blocco se serve — come ComfyUI)
             "teacache_thresh": float(vals.get("teacache_thresh", 0.0) or 0.0),   # #104 cache velocità (0=off)
             "decode_lowmem": bool(vals.get("decode_lowmem")),   # tile VAE piccoli (film lunghi/4K, LTX)
+            "native_audio": bool(vals.get("native_audio")),     # TIENI l'audio LTX-2 (parlato/suoni dal prompt)
         }
         # MODELLO scelto nel tab Video → al worker. Senza questo il worker usava SEMPRE il checkpoint
         # di default → "funziona solo un modello" (qualunque scelta nel dropdown era ignorata).
