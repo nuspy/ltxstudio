@@ -475,12 +475,21 @@ def _from_single_file_robust(cls, path: str, kw: dict):
     except (RuntimeError, NotImplementedError) as e:
         if "meta tensor" not in str(e) and "to_empty" not in str(e):
             raise
+        # I checkpoint **fp8** (F8_E4M3) col fallback `low_cpu_mem_usage=False` SEGFAULTANO (la conversione
+        # fp8→modello nel path non-meta è instabile): sostituire un errore con un segfault che stronca il figlio
+        # sarebbe peggio → per gli fp8 do un errore CHIARO e azionabile. Il fallback bf16 resta valido.
+        if _flux_fp8_e4m3(path):
+            raise RuntimeError(
+                f"'{os.path.basename(path)}' è un checkpoint fp8 all-in-one (model+text_encoders+vae) le cui "
+                f"chiavi QK-norm (.scale) non vengono mappate dal convertitore diffusers 0.38 → tensori 'meta'. "
+                f"Il caricamento nativo non lo supporta ancora. Usa un checkpoint FLUX **transformer-only** "
+                f"(cartella diffusion_models\\Flux, es. FLUX_Dev/getphat) o una variante **bf16**.") from e
         import gc
         import torch
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        print(f"[flux] {cls.__name__}.from_single_file: checkpoint con chiavi scoperte (meta-tensor) → "
+        print(f"[flux] {cls.__name__}.from_single_file: checkpoint bf16 con chiavi scoperte (meta-tensor) → "
               f"retry robusto low_cpu_mem_usage=False", flush=True)
         return cls.from_single_file(path, low_cpu_mem_usage=False, **kw)
 
