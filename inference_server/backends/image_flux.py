@@ -141,7 +141,21 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.06"))      # solo overhead allocator/frammentazione
     floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "800"))   # lascia margine al sistema
     working = float(getattr(pipe, "_ls_working_mb", 0) or 0)
-    weights = max(float(vram_mb) - working, 0.0)          # vram_mb = pesi mancanti + working (vedi _ensure_placement)
+    # RESIDENT-AWARE: i componenti GIÀ su cuda (es. transformer caricato direct-to-VRAM in fp8) NON vanno
+    # riconteggiati — `free_mb` li esclude già. Sottraendoli, servono solo i pesi ANCORA da caricare, così il
+    # placement non va in OFFLOAD a torto quando il grosso è già residente (bug: transformer 12GB fp8 su cuda +
+    # need 24GB > free 19GB → offload; invece basta caricare T5/CLIP/VAE ~10GB che entrano in 19GB).
+    _resident = 0.0
+    for _n in ("transformer", "vae", "text_encoder", "text_encoder_2"):
+        _m = getattr(pipe, _n, None)
+        if _m is not None and hasattr(_m, "parameters"):
+            try:
+                if next(_m.parameters()).device.type == "cuda":
+                    _resident += sum(p.numel() * p.element_size() for p in _m.parameters(recurse=True)) / 1024**2
+                    _resident += sum(b.numel() * b.element_size() for b in _m.buffers(recurse=True)) / 1024**2
+            except Exception:                               # noqa: BLE001
+                pass
+    weights = max(float(vram_mb) - working - _resident, 0.0)   # solo i pesi NON ancora su cuda
     _need = weights * margin + working + floor_mb
     print(f"[place] free={free_mb:.0f}MB pesi={weights:.0f}MB working={working:.0f}MB margin={margin} "
           f"need={_need:.0f}MB → {'gpu' if free_mb >= _need else 'no'}", flush=True)
@@ -616,10 +630,11 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     # (poi enable_layerwise_casting li porta a fp8 sul posto). Nel default la VRAM è già liberata da
     # gpu_registry.before_job, quindi scatta. Se non c'è spazio (offload necessario) → path CPU come prima.
     # Disattivabile con NATIVE_DIRECT_VRAM=0. GGUF escluso (ha la sua quantizzazione/placement).
-    # DEFAULT OFF (regressione): caricare il transformer eager in VRAM riduce la VRAM libera → il placement
-    # differito lo scambia per "non ci sta" e va in OFFLOAD (rimette tutto su CPU = churn + gen lenta + PuLID
-    # rotto). Va riabilitato solo INSIEME al placement resident-aware (gestore unificato). Accendi: =1.
-    if os.environ.get("NATIVE_DIRECT_VRAM", "0") == "1" and not _is_gguf and torch.cuda.is_available():
+    # DIRECT-TO-VRAM: OBBLIGATORIO per il fp8 — enable_layerwise_casting a float8 NON funziona su CPU (dtype
+    # GPU) → in CPU-load il transformer resta bf16 (24GB) e satura la VRAM. Caricato direct su cuda, il cast fp8
+    # riesce (12GB). Va di pari passo col placement RESIDENT-AWARE (_place sottrae ciò che è già su cuda, così
+    # non va in offload). Disattivabile con NATIVE_DIRECT_VRAM=0 (fallback bf16/offload).
+    if os.environ.get("NATIVE_DIRECT_VRAM", "1") == "1" and not _is_gguf and torch.cuda.is_available():
         try:
             _free = torch.cuda.mem_get_info()[0]
             _bf16_need = _flux_tr_bf16_bytes(transformer_path)                   # SOLO il transformer, non l'all-in-one
