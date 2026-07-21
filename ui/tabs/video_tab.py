@@ -225,6 +225,13 @@ class VideoTab(QWidget):
         form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
         # One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → poi l'i2v lo anima.
         # PuLID è FLUX-only, il video è LTX: keyframe→i2v è il modo corretto per l'identità sul video.
+        # CHECKBOX di attivazione (richiesta utente): PuLID è OPT-IN esplicito; da spento i campi/bottone sono
+        # disabilitati e il volto NON viene imposto.
+        self.pulid_kf_enable = QCheckBox(tr("vid.pulid_kf.enable", "Attiva PuLID (identità volto da foto)"))
+        self.pulid_kf_enable.setToolTip(tr("vid.pulid_kf.enable.tt",
+            "Se attivo: genera il primo frame con l'identità del volto (PuLID-FLUX) → i2v. Se spento: i2v normale, "
+            "nessun volto imposto."))
+        form.addRow("", self.pulid_kf_enable)
         prow = QHBoxLayout()
         self.pulid_kf_face = QLineEdit(); self.pulid_kf_face.setPlaceholderText(
             tr("vid.pulid_kf.ph", "foto volto (una o più, separate) → primo frame con l'identità"))
@@ -234,7 +241,13 @@ class VideoTab(QWidget):
         self.pulid_kf_gen.setToolTip(tr("vid.pulid_kf.gen.tt",
             "Genera il primo frame con l'identità del volto (PuLID-FLUX), poi usalo come start per l'i2v."))
         self.pulid_kf_gen.clicked.connect(
-            lambda: self.request_pulid_keyframe.emit(self.pulid_kf_face.text().strip(), ""))
+            lambda: self.request_pulid_keyframe.emit(self.pulid_kf_face.text().strip(), "")
+            if self.pulid_kf_enable.isChecked() else None)
+        # abilita/disabilita i campi PuLID secondo la checkbox
+        self.pulid_kf_enable.toggled.connect(lambda on: (
+            self.pulid_kf_face.setEnabled(on), self.pulid_kf_browse.setEnabled(on), self.pulid_kf_gen.setEnabled(on)))
+        for _w in (self.pulid_kf_face, self.pulid_kf_browse, self.pulid_kf_gen):
+            _w.setEnabled(False)                             # default: PuLID spento
         prow.addWidget(self.pulid_kf_face, 1); prow.addWidget(self.pulid_kf_browse); prow.addWidget(self.pulid_kf_gen)
         form.addRow(tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"), self._wrap(prow))
         # Selettore MOTORE video: ltx2_infer (default, tutte le feature) vs comfy-native (VRAM dinamica,
