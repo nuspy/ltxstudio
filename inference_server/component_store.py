@@ -172,8 +172,19 @@ class ComponentStore:
         LRU. Se il budget RAM lo consente → DEMOTE su CPU (restore veloce al prossimo acquire); se no →
         destroy. Ritorna i MB (stimati) liberati; make_room resta self-correcting su mem_get_info."""
         freed = 0.0
-        for k in sorted((k for k, e in self._items.items() if e.refcount == 0 and e.device == "cuda"),
-                        key=lambda k: self._items[k].last_used):
+        # SIZE-AWARE (direttiva utente): scegliere QUALE sfrattare per liberare `need_mb` col MINOR spreco/costo
+        # di reload — "più economico scaricare 2GB che 10GB se il buco è piccolo". Non LRU cieco:
+        #   1) se UN singolo orfano copre da solo il deficit → sfratta il PIÙ PICCOLO che basta (un solo reload,
+        #      niente over-eviction), tie-break LRU;
+        #   2) altrimenti servono più modelli → sfratta dal PIÙ GRANDE (copre con meno evizioni), tie-break LRU.
+        _orph = [(k, e.size_mb, e.last_used) for k, e in self._items.items()
+                 if e.refcount == 0 and e.device == "cuda"]
+        _cover = sorted((o for o in _orph if o[1] >= need_mb), key=lambda o: (o[1], o[2]))
+        if _cover:
+            _order = [_cover[0][0]]                          # il più piccolo che copre da solo
+        else:
+            _order = [o[0] for o in sorted(_orph, key=lambda o: (-o[1], o[2]))]   # grande→piccolo, tie LRU
+        for k in _order:
             e = self._items[k]
             self._shrink_cpu_lru(e.size_mb)
             demoted = False
