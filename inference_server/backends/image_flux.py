@@ -147,8 +147,7 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     working = float(getattr(pipe, "_ls_working_mb", 0) or 0)
     # RESIDENT-AWARE: i componenti GIÀ su cuda (es. transformer caricato direct-to-VRAM in fp8) NON vanno
     # riconteggiati — `free_mb` li esclude già. Sottraendoli, servono solo i pesi ANCORA da caricare, così il
-    # placement non va in OFFLOAD a torto quando il grosso è già residente (bug: transformer 12GB fp8 su cuda +
-    # need 24GB > free 19GB → offload; invece basta caricare T5/CLIP/VAE ~10GB che entrano in 19GB).
+    # placement non va in OFFLOAD a torto quando il grosso è già residente.
     _resident = 0.0
     for _n in ("transformer", "vae", "text_encoder", "text_encoder_2"):
         _m = getattr(pipe, _n, None)
@@ -1560,9 +1559,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
     print(f"[image] FASE pre-load: {_time.perf_counter()-_t_run0:.1f}s | VRAM {_u}/{_tt}MB "
           f"(cache-hit={key in getattr(mm, '_cache', {})}, arch={arch}, {os.path.basename(str(model))})", flush=True)
     # STICKY-TRANSFORMER: transformer+VAE RESIDENTI, T5/CLIP onload-per-encode poi OFFLOAD (liberano ~10GB
-    # subito dopo l'encode del prompt, che è l'unico momento in cui servono). Attivato da placement_mode='sticky'
-    # (batch) O quando c'è **PuLID** (i suoi ~2-3GB + hook sul transformer + attivazioni saturerebbero la VRAM col
-    # T5 residente → encode lentissimo). È il tuo "scarica il componente che non serve più se serve spazio".
+    # subito dopo l'encode del prompt). Attivato da placement_mode='sticky' (batch) O quando c'è **PuLID** (i
+    # suoi ~2-3GB + hook + attivazioni saturerebbero col T5 residente).
     pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky"
                             or bool(params.get("pulid_face")))
     # AUTO-EVICT del modello PRECEDENTE (richiesta utente): PRIMA di piazzare il nuovo, scarica le shell di
