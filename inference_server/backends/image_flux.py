@@ -633,11 +633,11 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     # (poi enable_layerwise_casting li porta a fp8 sul posto). Nel default la VRAM è già liberata da
     # gpu_registry.before_job, quindi scatta. Se non c'è spazio (offload necessario) → path CPU come prima.
     # Disattivabile con NATIVE_DIRECT_VRAM=0. GGUF escluso (ha la sua quantizzazione/placement).
-    # DIRECT-TO-VRAM: OBBLIGATORIO per il fp8 — enable_layerwise_casting a float8 NON funziona su CPU (dtype
-    # GPU) → in CPU-load il transformer resta bf16 (24GB) e satura la VRAM. Caricato direct su cuda, il cast fp8
-    # riesce (12GB). Va di pari passo col placement RESIDENT-AWARE (_place sottrae ciò che è già su cuda, così
-    # non va in offload). Disattivabile con NATIVE_DIRECT_VRAM=0 (fallback bf16/offload).
-    if os.environ.get("NATIVE_DIRECT_VRAM", "1") == "1" and not _is_gguf and torch.cuda.is_available():
+    # DIRECT-TO-VRAM: DEFAULT OFF — su questa piattaforma `from_single_file(device="cuda")` dà **access violation**
+    # in load_model_dict_into_meta (`.to(cuda, non_blocking)` crasha, expandable_segments non supportato). Il fp8
+    # via layerwise casting resta comunque applicato dopo (su CPU non riduce, ma niente crash). Riattivabile solo
+    # quando il load direct sarà robusto (block-swap nativo). Accendi per debug: NATIVE_DIRECT_VRAM=1.
+    if os.environ.get("NATIVE_DIRECT_VRAM", "0") == "1" and not _is_gguf and torch.cuda.is_available():
         try:
             _free = torch.cuda.mem_get_info()[0]
             _bf16_need = _flux_tr_bf16_bytes(transformer_path)                   # SOLO il transformer, non l'all-in-one
