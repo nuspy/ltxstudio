@@ -36,6 +36,9 @@ def main() -> int:
 
     # gli handler importano torch: import QUI (nel figlio), MAI nel server HTTP.
     import time as _t
+    _tbtn = float(params.get("_t_button") or 0)
+    if _tbtn:
+        print(f"[step-child] +{_t.time()-_tbtn:.1f}s dal bottone | figlio AVVIATO (spawn+attesa coda inclusi)", flush=True)
     _ti = _t.perf_counter()
     from inference_server.model_manager import ModelManager
     from inference_server.backends import image_flux, image_upscale, image_segment, video_postprocess

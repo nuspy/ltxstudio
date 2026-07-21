@@ -72,6 +72,8 @@ def submit(module: str, params: dict) -> str:
     # Registro GPU unico (model-aware): prima di un job IMMAGINE decide se RIUSARE il modello residente
     # (nessun /free) o liberare i server di categoria diversa / a modello diverso se serve spazio. Rimpiazza
     # il coarse free_for('image'). Best-effort: non blocca mai la submit (fallback neutro interno).
+    _tbtn = float(params.get("_t_button") or 0)
+    _rel = (lambda: f"+{time.time()-_tbtn:.1f}s dal bottone" if _tbtn else "")
     _tb = time.monotonic()
     try:
         from core import gpu_registry
@@ -79,8 +81,8 @@ def submit(module: str, params: dict) -> str:
                                 model=str(params.get("model", "")), log=print)
     except Exception:                                       # noqa: BLE001
         pass
-    print(f"[step-dispatch] before_job('image') = {time.monotonic()-_tb:.1f}s "
-          f"(libera/attende la VRAM dell'altra categoria prima di sottomettere)", flush=True)
+    print(f"[step-dispatch] {_rel()} | before_job('image') = {time.monotonic()-_tb:.1f}s "
+          f"(libera/attende la VRAM dell'altra categoria) → ora /submit al server", flush=True)
     payload = {"module": module, "params": params}
     try:
         r = _post("/submit", payload)

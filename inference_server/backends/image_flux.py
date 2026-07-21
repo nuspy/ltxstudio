@@ -63,20 +63,23 @@ FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
 KLEIN_QWEN_DIRS = {7680: os.path.join(TE_DIR, "qwen3_4b"), 12288: os.path.join(TE_DIR, "qwen3_8b")}
 
 
-# ── STEP LOG: tempo per-fase + VRAM/RAM + cosa fa, per capire la dinamica load→placement→gen dai log ──────
-# I job immagine sono seriali (un solo job per processo figlio) → un timer a livello di modulo è sicuro.
+# ── STEP LOG: timeline UNICA dal click "Genera" — timestamp + delta per OGNI passo (load, encoder, embedding,
+# denoise, VAE, decode). Cronometro WALL-CLOCK (time.time) ancorato al bottone (params["_t_button"]) così è
+# comparabile tra processo GUI e figlio. I job immagine sono seriali → timer a livello di modulo sicuro. ─────
 import time as _time_mod                                    # noqa: E402
 _STEP = {"t0": 0.0, "last": 0.0}
 
 
-def _step_reset() -> None:
-    _STEP["t0"] = _STEP["last"] = _time_mod.perf_counter()
+def _step_reset(t_button: float | None = None) -> None:
+    """Ancora la timeline al click del bottone (wall-clock passato dalla GUI) se disponibile, altrimenti ORA."""
+    _STEP["t0"] = float(t_button) if t_button else _time_mod.time()
+    _STEP["last"] = _time_mod.time()
 
 
 def _step(label: str) -> None:
-    """Logga: +delta dall'ultimo step, tot dall'inizio, VRAM dedicata usata/totale (per vedere lo spill in
-    shared-RAM), RAM del processo, e COSA sta facendo. Così la dinamica si legge dai log."""
-    now = _time_mod.perf_counter()
+    """Logga: +delta dall'ultimo step, tot DAL BOTTONE, VRAM dedicata usata/totale (spill in shared-RAM),
+    RAM del processo, e COSA sta facendo. Così l'intera dinamica click→immagine si legge dai log."""
+    now = _time_mod.time()
     d = now - _STEP["last"]
     tot = now - _STEP["t0"]
     _STEP["last"] = now
@@ -1359,6 +1362,7 @@ def _make_preview_cb(arch, width, height, steps):
         global _PREVIEW_CB_LOGGED
         if not _PREVIEW_CB_LOGGED:                            # log UNA volta: callback attaccato + forma latente
             _PREVIEW_CB_LOGGED = True
+            _step("→ encode prompt+embedding FATTO (1° step di denoise)")   # prima callback = encode finito
             try:
                 _lat = cbk.get("latents")
                 _sh = tuple(_lat.shape) if _lat is not None else None
@@ -1469,8 +1473,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
     from PIL import Image
     from inference_server import preview_bus
     _t_run0 = _time.perf_counter()                          # timing pre-load (diagnosi lentezza avvio, issue #1)
-    _step_reset()
-    _step(f"run() START arch={_arch_of(params)}")
+    global _PREVIEW_CB_LOGGED
+    _PREVIEW_CB_LOGGED = False                               # riarma il marker "encode fatto" per QUESTO job
+    _step_reset(params.get("_t_button"))                    # timeline ancorata al click "Genera" (wall-clock GUI)
+    _step(f"run() START nel figlio (arch={_arch_of(params)}) — prima riga dopo spawn+import")
     arch = _arch_of(params)
     model = params.get("model") or _default_model(arch)   # fix KeyError 'model' (music-video/LoRA/API)
     if not params.get("model"):
@@ -1688,6 +1694,16 @@ def run(params: dict, mm, output_dir: str) -> dict:
             kw["callback_on_step_end_tensor_inputs"] = ["latents"]
         except Exception as _dde:                            # noqa: BLE001
             print(f"[diffdiff] disattivata ({_dde}) → inpaint normale", flush=True)
+    _step(f"GEN START pipe() — encode prompt+embedding → {kw.get('num_inference_steps','?')} step denoise → VAE decode")
+    _vae = getattr(pipe, "vae", None)                       # cronometro del VAE decode (sotto-fase interna a pipe())
+    _orig_dec = getattr(_vae, "decode", None)
+    if _vae is not None and _orig_dec is not None:
+        def _timed_decode(*a, **k):
+            _step("→ VAE DECODE start")
+            _r = _orig_dec(*a, **k)
+            _step("→ VAE DECODE fatto")
+            return _r
+        _vae.decode = _timed_decode
     try:
         out = pipe(**kw)
     except TypeError as _te:                                # pipeline senza callback_on_step_end
@@ -1697,9 +1713,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
         else:
             raise
     finally:
+        if _vae is not None and _orig_dec is not None:
+            _vae.decode = _orig_dec                         # ripristina il decode originale
         if _pulid_h:
             from core import pulid_adapter
             pulid_adapter.detach(_pulid_h)
+    _step("GEN FATTA (denoise+decode completati)")
     preview_bus.set_message("Decodifica e salvataggio…")
     os.makedirs(output_dir, exist_ok=True)
     path = str(Path(output_dir) / f"native_{arch}_{params.get('seed', 0)}.png")
@@ -1757,6 +1776,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         except Exception as _e:                                      # noqa: BLE001
             print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
     res_img.save(path)
+    _step("IMMAGINE SALVATA su disco — FINE (dal click del bottone)")
     try:                                                     # #107 firma invisibile di provenienza (default ON, tutte le edizioni)
         from core import stego
         if stego.enabled():

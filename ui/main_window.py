@@ -136,6 +136,9 @@ class _NativeImageWorker(QThread):
 
     def __init__(self, params: dict, module: str = "image"):
         super().__init__()
+        import time as _t
+        params.setdefault("_t_button", _t.time())           # timeline unica dal click "Genera" (wall-clock)
+        print(f"[gen-timeline] t0 = click Genera (module={module}, arch={params.get('arch','')})", flush=True)
         self.params = params
         self.module = module
 
