@@ -96,11 +96,13 @@ def _tail(path: str, n: int = 2000) -> str:
         return ""
 
 
-# ─────────────── figlio PERSISTENTE (opt-in) — tiene il ComponentStore caldo tra i job ───────────────
-# Default OFF: il comportamento resta il per-job isolato (zero rischio). Con NATIVE_PERSISTENT_CHILD=1 si
-# tiene UN figlio vivo che riusa il modello tra job dello STESSO modello; al cambio-modello fa respawn (evita
-# il segfault del 2° load in-process). Il server resta senza torch → l'anti-crash è intatto (EOF = respawn).
-_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD") == "1"
+# ─────────────── figlio PERSISTENTE — RESIDENZA del modello tra le gen (richiesta utente) ───────────────
+# Default ON: tiene UN figlio `persistent_runner` vivo tra i job → il modello resta CALDO tra le gen (niente
+# reload ad ogni generazione = niente più "il modello si scarica dopo la gen", e niente contesa VRAM tra due
+# figli = niente hang alla 2ª gen). Riuso per job dello STESSO modello; al CAMBIO modello respawn (evita il
+# segfault del 2° load in-process). Il server resta senza torch → anti-crash intatto (EOF/timeout = respawn +
+# fallback per-job). Disattivabile con NATIVE_PERSISTENT_CHILD=0 (torna al per-job isolato).
+_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD", "1") == "1"
 
 
 def _job_model_key(module: str, params: dict) -> str:
