@@ -1391,9 +1391,11 @@ def _seam_tone_match(res_img, orig_img, mask_bool, feather: int, *, gain: bool =
 
 
 def run(params: dict, mm, output_dir: str) -> dict:
+    import time as _time
     import torch
     from PIL import Image
     from inference_server import preview_bus
+    _t_run0 = _time.perf_counter()                          # timing pre-load (diagnosi lentezza avvio, issue #1)
     arch = _arch_of(params)
     model = params.get("model") or _default_model(arch)   # fix KeyError 'model' (music-video/LoRA/API)
     if not params.get("model"):
@@ -1440,6 +1442,10 @@ def run(params: dict, mm, output_dir: str) -> dict:
             f"(RAM + file di paging) ad essere pieno, non la sola RAM. Rimedi: chiudi i programmi che "
             f"consumano molta RAM (es. Unity, browser), oppure aumenta il file di paging di Windows "
             f"(Impostazioni → Sistema → Memoria virtuale; ora è fisso a 16GB). Dettaglio: {_me}") from _me
+    # timing pre-load (issue #1): quanto ci mette il modello a essere pronto in RAM/VRAM. cache-hit = istantaneo
+    # (persistent-child/riuso), altrimenti = lettura file + costruzione pipeline. Reso visibile nel log del job.
+    print(f"[image] pre-load: modello pronto in {_time.perf_counter()-_t_run0:.1f}s "
+          f"(cache-hit={key in getattr(mm, '_cache', {})}, arch={arch}, {os.path.basename(str(model))})", flush=True)
     # STICKY-TRANSFORMER (batch, es. Music Video Studio): transformer+vae residenti per tutto il batch, solo
     # T5/CLIP a rotazione → niente dente-di-sega. Attivato dai params (placement_mode='sticky').
     pipe._ls_want_sticky = (str(params.get("placement_mode", "")).lower() == "sticky")
