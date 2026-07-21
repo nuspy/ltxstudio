@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
@@ -102,8 +103,8 @@ class LoraImageTab(LoraVideoTab):
         v.addLayout(g)
         h = QHBoxLayout()
         self.btn_install = QPushButton(tr("ilora.install", "Installa ai-toolkit")); self.btn_install.clicked.connect(self._install)
-        self.btn_dataset = QPushButton(tr("tlora.gen_dataset", "🎬 Genera dataset")); self.btn_dataset.clicked.connect(lambda: self._start(False))
-        self.btn_full = QPushButton(tr("ilora.gen_train", "🎓 Genera + Allena LoRA FLUX.2")); self.btn_full.clicked.connect(lambda: self._start(True))
+        self.btn_dataset = QPushButton(tr("tlora.gen_dataset", "🎬 Genera dataset")); self.btn_dataset.clicked.connect(lambda: self._start(False)); theme.style_generate(self.btn_dataset)
+        self.btn_full = QPushButton(tr("ilora.gen_train", "🎓 Genera + Allena LoRA FLUX.2")); self.btn_full.clicked.connect(lambda: self._start(True)); theme.style_generate(self.btn_full)
         h.addWidget(self.btn_install); h.addStretch(1); h.addWidget(self.btn_dataset); h.addWidget(self.btn_full)
         v.addLayout(h)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(110)

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit,
                                QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
@@ -27,9 +28,9 @@ class StoryboardTab(QWidget):
         h = QHBoxLayout()
         self.btn_break = QPushButton(tr("fs.sb.breakdown", "🎬 Breakdown scene/inquadrature (LLM)"))
         self.btn_break.clicked.connect(self._breakdown)
-        self.btn_keys = QPushButton(tr("fs.sb.keyframes", "🖼 Genera keyframe")); self.btn_keys.clicked.connect(lambda: self._gen("keyframe"))
-        self.btn_video = QPushButton(tr("fs.sb.videos", "🎥 Genera video")); self.btn_video.clicked.connect(lambda: self._gen("video"))
-        self.btn_auto = QPushButton(tr("fs.sb.auto", "🎬 Genera film completo")); self.btn_auto.clicked.connect(self._gen_all)
+        self.btn_keys = QPushButton(tr("fs.sb.keyframes", "🖼 Genera keyframe")); self.btn_keys.clicked.connect(lambda: self._gen("keyframe")); theme.style_generate(self.btn_keys)
+        self.btn_video = QPushButton(tr("fs.sb.videos", "🎥 Genera video")); self.btn_video.clicked.connect(lambda: self._gen("video")); theme.style_generate(self.btn_video)
+        self.btn_auto = QPushButton(tr("fs.sb.auto", "🎬 Genera film completo")); self.btn_auto.clicked.connect(self._gen_all); theme.style_generate(self.btn_auto)
         self.btn_shotlist = QPushButton(tr("fs.sb.shotlist", "📄 Shot-list")); self.btn_shotlist.clicked.connect(self._export_shotlist)
         self.btn_bible = QPushButton(tr("fs.sb.bible", "🎨 Style Bible")); self.btn_bible.clicked.connect(self._edit_style_bible)
         h.addWidget(self.btn_break); h.addWidget(self.btn_keys); h.addWidget(self.btn_video)

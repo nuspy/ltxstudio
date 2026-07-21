@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, QGridLayout, QGroupBox,
                                QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
                                QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QDoubleSpinBox,
@@ -193,8 +194,8 @@ class LoraVideoTab(QWidget):
         v.addLayout(g)
         h = QHBoxLayout()
         self.btn_install = QPushButton(tr("tlora.install", "Installa trainer")); self.btn_install.clicked.connect(self._install)
-        self.btn_dataset = QPushButton(tr("tlora.gen_dataset", "🎬 Genera dataset")); self.btn_dataset.clicked.connect(lambda: self._start(False))
-        self.btn_full = QPushButton(tr("tlora.gen_train", "🎓 Genera + Allena LoRA")); self.btn_full.clicked.connect(lambda: self._start(True))
+        self.btn_dataset = QPushButton(tr("tlora.gen_dataset", "🎬 Genera dataset")); self.btn_dataset.clicked.connect(lambda: self._start(False)); theme.style_generate(self.btn_dataset)
+        self.btn_full = QPushButton(tr("tlora.gen_train", "🎓 Genera + Allena LoRA")); self.btn_full.clicked.connect(lambda: self._start(True)); theme.style_generate(self.btn_full)
         h.addWidget(self.btn_install); h.addStretch(1); h.addWidget(self.btn_dataset); h.addWidget(self.btn_full)
         v.addLayout(h)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); self.log.setFixedHeight(110)

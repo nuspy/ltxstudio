@@ -3,6 +3,17 @@ from __future__ import annotations
 
 from PySide6.QtGui import QFont
 
+
+def style_generate(btn) -> None:
+    """Uniforma un bottone 'Genera' al colore della generazione video (#3ECF8E): verde pieno, testo scuro,
+    grassetto. Applicato ai bottoni-azione principali di tutte le pipeline (immagine/video/musica/film/lora…)
+    per coerenza visiva. Idempotente."""
+    btn.setStyleSheet(
+        "QPushButton { background: #3ecf8e; color: #16181d; font-weight: bold; border: none;"
+        " border-radius: 8px; padding: 8px 14px; }"
+        " QPushButton:hover { background: #4fdc9c; }"
+        " QPushButton:disabled { background: #2f3441; color: #6b7280; }")
+
 # palette
 BG       = "#16181d"   # sfondo finestra
 SURFACE  = "#1f222a"   # pannelli / group box

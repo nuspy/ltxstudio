@@ -15,6 +15,7 @@ import webbrowser
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QObject, Signal, QProcess, QUrl
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QLabel, QComboBox, QSpinBox, QPushButton, QLineEdit, QCheckBox,
@@ -92,7 +93,7 @@ class WorldTab(QWidget):
         h1 = QHBoxLayout()
         self.btn_install = QPushButton(tr("world.install", "Installa modulo"))
         self.btn_install.clicked.connect(self._install)
-        self.btn_gen = QPushButton(tr("world.gen", "Genera scena")); self.btn_gen.clicked.connect(self._gen)
+        self.btn_gen = QPushButton(tr("world.gen", "Genera scena")); self.btn_gen.clicked.connect(self._gen); theme.style_generate(self.btn_gen)
         self.btn_stop = QPushButton(tr("world.stop", "Stop")); self.btn_stop.setEnabled(False); self.btn_stop.clicked.connect(self._stop)
         h1.addWidget(self.btn_install); h1.addStretch(1); h1.addWidget(self.btn_gen); h1.addWidget(self.btn_stop)
         v.addLayout(h1)

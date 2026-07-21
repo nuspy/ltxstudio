@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, Signal, QProcess, QThread
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QPushButton, QLineEdit, QCheckBox,
@@ -364,10 +365,10 @@ class MusicTab(QWidget):
         self.btn_song_install.clicked.connect(lambda: self._install("--heartmula"))
         self.btn_acestep_install = QPushButton(tr("music.install.acestep", "Installa ACE-Step"))
         self.btn_acestep_install.clicked.connect(lambda: self._install("--acestep"))
-        self.btn_song = QPushButton(tr("music.song.gen", "Genera musica"))
+        self.btn_song = QPushButton(tr("music.song.gen", "Genera musica")); theme.style_generate(self.btn_song)
         self.btn_song.clicked.connect(self._gen_song)
         # Videomusicale automatico: canzone → storyboard LLM → video nativo coerente col testo
-        self.btn_music_video = QPushButton(tr("music.mv.gen", "🎬 Genera videomusicale"))
+        self.btn_music_video = QPushButton(tr("music.mv.gen", "🎬 Genera videomusicale")); theme.style_generate(self.btn_music_video)
         self.btn_music_video.setToolTip(tr("music.mv.gen.tt",
             "Crea canzone + video coerente col testo (storyboard LLM + LTX-2.3 nativo). Un'immagine iniziale è opzionale."))
         self.btn_music_video.clicked.connect(self._gen_music_video)
@@ -490,7 +491,7 @@ class MusicTab(QWidget):
         h = QHBoxLayout()
         self.btn_son_install = QPushButton(tr("music.install.mm", "Installa MMAudio"))
         self.btn_son_install.clicked.connect(lambda: self._install("--mmaudio"))
-        self.btn_son = QPushButton(tr("music.sonify.gen", "Genera audio"))
+        self.btn_son = QPushButton(tr("music.sonify.gen", "Genera audio")); theme.style_generate(self.btn_son)
         self.btn_son.clicked.connect(self._gen_sonify)
         h.addWidget(self.btn_son_install); h.addStretch(1); h.addWidget(self.btn_son)
         hw = QWidget(); hw.setLayout(h); f.addRow("", hw)

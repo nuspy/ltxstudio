@@ -3,6 +3,7 @@ rigenerazione segmento/totale + versioning."""
 from __future__ import annotations
 
 from PySide6.QtCore import QThread, Signal
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (QComboBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
                                QPlainTextEdit, QPushButton, QVBoxLayout, QWidget)
 
@@ -79,7 +80,7 @@ class ScriptTab(QWidget):
                                      "storia con bivi alternativi; scegli un ramo per beat e li intreccia nel Racconto."))
         self.btn_table.clicked.connect(self._cowrite_table)
         self.btn_racconto = QPushButton(tr("fs.script.gen_narr", "📖 Genera Racconto")); self.btn_racconto.clicked.connect(self._gen_racconto)
-        self.btn_gen = QPushButton(tr("fs.script.gen", "✍️ Genera copione")); self.btn_gen.clicked.connect(self._gen)
+        self.btn_gen = QPushButton(tr("fs.script.gen", "✍️ Genera copione")); self.btn_gen.clicked.connect(self._gen); theme.style_generate(self.btn_gen)
         self.btn_regen = QPushButton(tr("fs.script.regen", "↻ Rigenera")); self.btn_regen.clicked.connect(self._regen)
         h.addWidget(self.btn_table); h.addWidget(self.btn_racconto); h.addWidget(self.btn_gen); h.addWidget(self.btn_regen); h.addStretch(1)
         bv.addLayout(h)

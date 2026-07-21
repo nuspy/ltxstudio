@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Signal
+from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                                QPlainTextEdit, QPushButton, QVBoxLayout, QWidget)
 
@@ -106,7 +107,7 @@ class VideoEditAITab(QWidget):
         v.addLayout(f)
 
         self.note = QLabel(""); self.note.setWordWrap(True); v.addWidget(self.note)
-        self.btn_go = QPushButton(tr("vedit.go", "✨ Genera modifica")); self.btn_go.clicked.connect(self._go)
+        self.btn_go = QPushButton(tr("vedit.go", "✨ Genera modifica")); self.btn_go.clicked.connect(self._go); theme.style_generate(self.btn_go)
         v.addWidget(self.btn_go)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); v.addWidget(self.log, 1)
         self._on_mode()
