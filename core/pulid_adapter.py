@@ -33,6 +33,37 @@ def clear_cache() -> None:
         pass
 
 
+def _patch_xformers_sdpa() -> None:
+    """xformers `memory_efficient_attention` NON ha kernel per la RTX 5090 (Blackwell sm120, capability 12.0):
+    'requires device with capability <= (9,0)'. EVA-CLIP (eva_clip/eva_vit_model.py, transformer.py) lo usa →
+    PuLID crashava e restava mezzo-caricato in VRAM (→ VRAM piena → encode lentissimo). Lo rimpiazzo con torch
+    SDPA (stesse shape [B,M,H,K], gestisce scale/dropout/causal). Idempotente."""
+    try:
+        import torch
+        import torch.nn.functional as F
+        import xformers.ops as xops
+        if getattr(xops, "_ls_sdpa_patched", False):
+            return
+
+        def _mea(query, key, value, attn_bias=None, p=0.0, scale=None, **_kw):
+            q, k, v = query.transpose(1, 2), key.transpose(1, 2), value.transpose(1, 2)   # [B,M,H,K]→[B,H,M,K]
+            _causal, _mask = False, None
+            if attn_bias is not None:
+                if type(attn_bias).__name__ == "LowerTriangularMask":
+                    _causal = True
+                elif isinstance(attn_bias, torch.Tensor):
+                    _mask = attn_bias
+            o = F.scaled_dot_product_attention(q, k, v, attn_mask=_mask, dropout_p=(p or 0.0),
+                                               scale=scale, is_causal=_causal)
+            return o.transpose(1, 2).contiguous()                                          # →[B,M,H,K]
+        xops.memory_efficient_attention = _mea
+        xops._ls_sdpa_patched = True
+        print("[pulid] xformers.memory_efficient_attention → torch SDPA (RTX 5090/sm120 non ha il kernel xformers)",
+              flush=True)
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"[pulid] patch xformers→SDPA saltato ({_e})", flush=True)
+
+
 def available() -> bool:
     if not os.path.exists(PULID_WEIGHTS):
         return False
@@ -59,6 +90,7 @@ def load(transformer, device="cuda", dtype=None):
     if key in _CACHE:
         return _CACHE[key]
     _ensure_path()
+    _patch_xformers_sdpa()                                # RTX 5090: xformers mem_eff_attn → SDPA (altrimenti PuLID crasha)
     cwd = os.getcwd()
     os.chdir(PULID_REPO)                                  # path relativi del repo (models/antelopev2)
     try:

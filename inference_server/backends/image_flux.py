@@ -1597,6 +1597,11 @@ def run(params: dict, mm, output_dir: str) -> dict:
             _step(f"PuLID FALLITO: {type(_e).__name__}: {str(_e)[:80]}")
             print(f"[pulid] disattivato (errore): {_e}\n{_tb.format_exc()[-600:]}", flush=True)
             _pulid_h = None
+            try:                                         # LEAK: i modelli PuLID mezzo-caricati restano in VRAM
+                from core import pulid_adapter           # (→ VRAM piena → encode lentissimo). Svuota la cache.
+                pulid_adapter.clear_cache()
+            except Exception:                            # noqa: BLE001
+                pass
 
     g = torch.Generator(device="cuda").manual_seed(int(params.get("seed", 0)))
     # SETTINGS: il valore ESPLICITO (dal GUI) va SEMPRE rispettato — niente override lato pipeline.
