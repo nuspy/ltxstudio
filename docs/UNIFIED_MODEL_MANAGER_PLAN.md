@@ -65,6 +65,20 @@
 - **F5 — Cabla il planner combinatorio** (`plan_placement`) nella decisione di placement a runtime.
 - **F6 — Verifica end-to-end dall'app** (harness): matrice foto↔video, multi-modello, no reload spurio; giudizio memoria in Task Manager + `/system_stats`.
 
+## 4bis. Requisito SMART-MEMORY (direttiva utente, esplicita) + apprendimenti dal debug live
+**Registro VRAM + eviction combinatoria size-aware** (il cuore del gestore):
+- Tenere un **registro della VRAM occupata** per-componente (footprint reale dtype-aware, categoria, last_used, "serve ancora nel job?").
+- Quando serve spazio: **calcolo combinatorio** di *cosa* scaricare e *quando*, per **minimizzare tempo e carico/scarico**. Principio: **più economico sfrattare un modello da 2GB che uno da 10GB** se il buco richiesto è piccolo (best-fit su footprint, non LRU cieco). Riusa `core/vram_calibration.plan_placement`.
+- Scaricare un componente **appena non serve più** nel job (es. **T5/CLIP dopo l'encode del prompt** → STICKY) o al **cambio pipeline** se il nuovo non lo usa. Mai a ogni gen.
+
+**Apprendimenti dai log reali (t2i FLUX schnell + PuLID, 32GB):**
+1. **fp8 layerwise casting NON funziona su CPU** (float8 è dtype GPU): in CPU-load il transformer resta **bf16 (24GB)** → va caricato **direct-to-cuda** perché il cast fp8 riesca (12GB). [FATTO]
+2. **Windows: l'allocatore CUDA non rilascia il transiente** bf16 del direct-load (`expandable_segments` non supportato) → `reserved` (17GB) > `allocated` (12GB): il transformer "pesa" 17GB in VRAM. → il **vero fix è un loader fp8 STREAMING** (assegna i tensori fp8 direttamente, **senza** il transiente bf16, stile `flux2_transformer.load_flux2_transformer`). [DA FARE — F1b]
+3. **placement RESIDENT-AWARE**: `_place` deve sottrarre ciò che è **già su cuda** dal fabbisogno, o va in offload a torto. [FATTO]
+4. **T5-XXL bf16 = 9GB**; in fp8 ~4.5GB. **Tutti i componenti fp8 di default** (direttiva utente) — audit: FLUX.1 T5/CLIP e i VAE oggi bf16, da valutare fp8 (eccezione VAE fp32 anti-macchie [[flux-mottling-sub-1mp]]). [DA FARE]
+5. **STICKY quando PuLID/tight**: T5/CLIP offload dopo l'encode → libera ~10GB per denoise+PuLID. [FATTO tattico]
+6. **PuLID su RTX 5090**: xformers `memory_efficient_attention` non ha kernel sm120 → SDPA. [FATTO]
+
 ## 5. Rischi / vincoli
 - Il persistent child era fragile (2° load in-process → segfault Windows): la F1 (load robusto) è **prerequisito** della F2.
 - L'edit Krea2 NON può essere residente (drift identità) — resta subprocess fresco.
