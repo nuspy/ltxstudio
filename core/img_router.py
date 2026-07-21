@@ -79,6 +79,21 @@ class _ComfyChild:
                 return
         raise TimeoutError("comfy persistente: nessun READY")
 
+    def free(self) -> bool:
+        """Killa il figlio comfy → libera la sua VRAM (coordinamento cross-motore: quando gira diffusers/PuLID
+        su single-GPU). Il prossimo job comfy respawna. Ritorna True se ha killato qualcosa."""
+        with self._lock:
+            if self._proc is None:
+                return False
+            try:
+                self._proc.terminate(); self._proc.wait(timeout=8)
+            except Exception:                                # noqa: BLE001
+                try: self._proc.kill()
+                except Exception: pass                       # noqa: BLE001
+            self._proc = None
+            print("[comfy] figlio persistente liberato (VRAM per l'altro motore)", flush=True)
+            return True
+
     def run(self, pj: str, env: dict, timeout: int) -> str:
         with self._lock:
             if not self._alive():
@@ -171,4 +186,10 @@ def generate(params: dict, timeout: int = 1800) -> dict:
         if res.get("status") == "success":
             return res
         print(f"[img_router] comfy fallito → fallback diffusers: {str(res.get('error',''))[:200]}", flush=True)
+    # Path DIFFUSERS (non-comfy, o PuLID/inpaint, o comfy fallito): libera la VRAM del figlio comfy residente
+    # → il modello diffusers non contende (single-GPU). Il prossimo t2i comfy respawna (cambio-pipeline).
+    try:
+        _comfy_child.free()
+    except Exception:                                          # noqa: BLE001
+        pass
     return native_driver.run_and_wait("image", params, timeout=timeout)
