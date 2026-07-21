@@ -2960,6 +2960,15 @@ class MainWindow(QMainWindow):
         # (nativo puro) ha una gestione memoria più rudimentale sul 22B → resta come opzione (audio/controlnet/
         # lungo lo usano comunque). Cambiabile dal dropdown motore video in Impostazioni.
         _engine = _up.get_engine("video", "comfy")
+        # ComfyUI RIMOSSO (.bau): il motore comfy video non è più disponibile (COMFY_PY inesistente) → forza il
+        # NATIVO LTX-2 (ltx2_infer), altrimenti _VideoComfyWorker fallisce silenziosamente ("non genera").
+        try:
+            from core.ltx2_service import COMFY_PY as _CPY
+            if _engine == "comfy" and not os.path.exists(_CPY):
+                _engine = "ltx2_infer"
+                self._log("[motore] ComfyUI non disponibile → video NATIVO LTX-2")
+        except Exception:                                       # noqa: BLE001
+            pass
         # comfy copre: t2v/i2v/i2v-soft + KEYFRAME/storyboard (LTXVAddGuide). Restano su ltx2_infer solo
         # audio(a2v)/controlnet/long-chunk finché non portati anch'essi su comfy.
         _simple = not (params.get("audio_path") or params.get("control_video")
