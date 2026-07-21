@@ -742,7 +742,12 @@ class MaskCanvas(QWidget):
         # sempre un RETTANGOLO BIANCO, e per il modello un rettangolo bianco su una foto "è" uno
         # screenshot — a denoise alto ci disegna dentro finestre di dialogo e paesaggi (visto il 13/07).
         # Tolto lo sfondo, resta il solo soggetto e la scena sotto è quella vera.
-        if not pix.hasAlphaChannel() and (Path.home() / ".u2net" / "u2net.onnx").exists():
+        # OPT-IN (default OFF): lo scontorno u2net gira SINCRONO sul thread GUI → all'aggiunta foto BLOCCAVA
+        # l'app (specie al 1° load del modello ONNX). Ora l'aggiunta è istantanea; lo scontorno si fa a mano
+        # (azione dedicata) o attivando `_auto_cutout_on_add`. TODO: spostarlo in un thread di sfondo (l'apply
+        # alla scene deve restare sul thread GUI via signal).
+        if getattr(self, "_auto_cutout_on_add", False) \
+                and not pix.hasAlphaChannel() and (Path.home() / ".u2net" / "u2net.onnx").exists():
             self.cutout_layer(len(self._entries) - 1, ask=False)   # ask=False → nessun download a sorpresa
         self._reindex_z()
         self._rebuild_layer_list()
