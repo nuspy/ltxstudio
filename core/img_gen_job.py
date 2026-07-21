@@ -124,10 +124,26 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
     if not os.path.exists(py):
         return {"status": "error",
                 "error": f"venv per '{arch}' mancante: {py}. Esegui scripts/install_krea.py"}
-    # libera la VRAM delle altre categorie (server immagini/video) prima del modello pesante
+    # libera la VRAM delle altre categorie (video) prima del modello pesante
     try:
         from core import mem_coordinator as _mc
         _mc.free_for("image", timeout=20)
+    except Exception:                                        # noqa: BLE001
+        pass
+    # Krea 2 è un modello IMMAGINE DIVERSO in un venv SEPARATO → deve avere la VRAM tutta per sé: libera anche
+    # gli ALTRI motori immagine RESIDENTI (diffusers :8189 col figlio persistente + comfy), altrimenti la
+    # residenza lascia FLUX/comfy in VRAM e Krea2 va in OOM caricando il Qwen3-VL (crash su 'Loading checkpoint
+    # shards'). Single-GPU: un modello pesante alla volta.
+    try:
+        import urllib.request
+        urllib.request.urlopen(urllib.request.Request(
+            "http://127.0.0.1:8189/free", data=b"{}", headers={"Content-Type": "application/json"}),
+            timeout=20).read()
+    except Exception:                                        # noqa: BLE001
+        pass
+    try:
+        from core import img_router
+        img_router._comfy_child.free()
     except Exception:                                        # noqa: BLE001
         pass
     # PIPE CALDO: se il server persistente serve questa arch ed è su (o autostartabile), instrada lì.
