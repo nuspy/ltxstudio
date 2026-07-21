@@ -53,35 +53,68 @@ def _detect_arch(model_path: str) -> str:
 
 
 class _ComfyChild:
-    """Figlio comfy PERSISTENTE (residenza): un processo `img_comfy_native --persist` vivo tra le gen → i
-    modelli restano CALDI nella cache di ComfyUI (niente reload dalla 2ª gen). Protocollo stdin/stdout come il
-    figlio persistente diffusers. Serializzato dal lock (una gen alla volta). Fallback one-shot se muore."""
+    """Figlio comfy PERSISTENTE (residenza): `img_comfy_native --persist` vivo tra le gen → modelli CALDI nella
+    cache di ComfyUI (niente reload dalla 2ª gen). IPC via **reader-thread** (thread di sfondo che legge stdout in
+    una Queue) + `get(timeout)`: il thread chiamante NON si blocca mai su readline (la 1ª versione deadlockava la
+    GUI se il figlio moriva in init). Serializzato dal lock. Fallback one-shot se muore/timeout."""
 
     def __init__(self):
+        import threading
         self._proc = None
-        self._lock = __import__("threading").Lock()
+        self._q = None
+        self._lock = threading.Lock()
 
     def _alive(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
 
+    def _reader(self, proc, q) -> None:
+        try:
+            for line in proc.stdout:                          # blocca QUI, in un thread di sfondo (non la GUI)
+                q.put(line.rstrip("\n"))
+        except Exception:                                     # noqa: BLE001
+            pass
+        q.put(None)                                           # sentinella EOF
+
     def _spawn(self, env: dict) -> None:
+        import queue
+        import threading
+        self._q = queue.Queue()
         self._proc = subprocess.Popen(
             [COMFY_PY, os.path.join(REPO, "workers", "img_comfy_native.py"), "--persist"],
             cwd=REPO, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL, text=True, bufsize=1)
-        for _ in range(1200):                                # attende READY (primo init ComfyUI + eventuale load)
-            line = self._proc.stdout.readline()
-            if not line:
+        threading.Thread(target=self._reader, args=(self._proc, self._q), daemon=True).start()
+        self._wait_for(("READY",), 1200)                      # 1ª init ComfyUI (+eventuale load) può essere lunga
+        print("[comfy] figlio persistente PRONTO (modelli caldi tra le gen)", flush=True)
+
+    def _wait_for(self, prefixes: tuple, timeout: float) -> str:
+        """Legge dalla Queue del reader-thread fino a una riga con prefisso atteso, con timeout e check-alive.
+        Mai bloccante indefinito: se il figlio muore o non risponde → solleva → fallback one-shot."""
+        import queue
+        import time as _t
+        t0 = _t.time()
+        while _t.time() - t0 < timeout:
+            try:
+                line = self._q.get(timeout=2.0)
+            except queue.Empty:
+                if not self._alive():
+                    self._proc = None
+                    raise RuntimeError("comfy persistente morto (nessun output)")
+                continue
+            if line is None:
                 self._proc = None
-                raise RuntimeError("comfy persistente morto durante l'init")
-            if line.strip() == "READY":
-                print("[comfy] figlio persistente PRONTO (modelli caldi tra le gen)", flush=True)
-                return
-        raise TimeoutError("comfy persistente: nessun READY")
+                raise RuntimeError("comfy persistente morto (EOF)")
+            if line.startswith("ERR:"):
+                raise RuntimeError(line[4:])
+            for p in prefixes:
+                if line.startswith(p):
+                    return line
+            # altre righe (READY atteso, o log [load]/[gen]) → passa oltre
+        raise TimeoutError("timeout comfy persistente")
 
     def free(self) -> bool:
-        """Killa il figlio comfy → libera la sua VRAM (coordinamento cross-motore: quando gira diffusers/PuLID
-        su single-GPU). Il prossimo job comfy respawna. Ritorna True se ha killato qualcosa."""
+        """Killa il figlio comfy → libera la VRAM (coordinamento cross-motore quando gira diffusers/PuLID su
+        single-GPU). Il prossimo job comfy respawna. Ritorna True se ha killato qualcosa."""
         with self._lock:
             if self._proc is None:
                 return False
@@ -99,20 +132,8 @@ class _ComfyChild:
             if not self._alive():
                 self._spawn(env)
             self._proc.stdin.write(pj + "\n"); self._proc.stdin.flush()
-            import time as _t
-            t0 = _t.time()
-            while _t.time() - t0 < timeout:
-                line = self._proc.stdout.readline()
-                if not line:
-                    self._proc = None
-                    raise RuntimeError("comfy persistente morto (EOF)")
-                line = line.strip()
-                if line.startswith("OK:"):
-                    return line[3:].strip()
-                if line.startswith("ERR:"):
-                    raise RuntimeError(line[4:])
-                # altre righe (log [load]/[gen]) → passa oltre
-            raise TimeoutError("timeout comfy persistente")
+            line = self._wait_for(("OK:",), timeout)
+            return line[3:].strip()
 
 
 _comfy_child = _ComfyChild()
@@ -146,10 +167,10 @@ def _comfy_t2i(params: dict, timeout: int) -> dict:
                                headers={"Content-Type": "application/json"}), timeout=20).read()
     except Exception:                                          # noqa: BLE001
         pass
-    # FIGLIO PERSISTENTE (residenza): modelli caldi tra le gen. DEFAULT OFF (la 1ª versione con readline bloccante
-    # deadlockava il thread GUI se il figlio moriva durante l'init) → torna al one-shot finché non lo riscrivo con
-    # un reader-thread non-bloccante + timeout. Riabilita: COMFY_PERSISTENT=1.
-    if os.environ.get("COMFY_PERSISTENT", "0") == "1":
+    # FIGLIO PERSISTENTE (residenza): modelli caldi tra le gen. Ora con **reader-thread non-bloccante + timeout**
+    # (validato con mock: no deadlock, riuso a caldo, free) → default ON. Fallback one-shot se il figlio muore.
+    # Disattivabile: COMFY_PERSISTENT=0.
+    if os.environ.get("COMFY_PERSISTENT", "1") != "0":
         try:
             out = _comfy_child.run(pj, env, timeout)
             return {"status": "success", "output": [out]}
