@@ -16,6 +16,15 @@ richiede il tuo test. Qui sotto: cosa è FATTO+committato, lo stato stabile, e i
 - **comfy figlio persistente**: scritto ma **default OFF** (la 1ª versione con readline bloccante deadlockava il
   thread GUI). Comfy torna al **one-shot che funziona**.
 
+## ✅ FATTO — 2ª tornata (fix concreti verificati)
+- **integra immagini: `NameError 'cfg'`** in `_start_native_kontext` (integra mask-based) → legge
+  `get_inpaint_config()`. RISOLTO+committato.
+- **comfy residenza RIABILITATA** con **reader-thread non-bloccante** (validato con mock: no deadlock, riuso a
+  caldo tra i job, free). Fallback one-shot se il figlio muore. `COMFY_PERSISTENT=0` per spegnere.
+- **PuLID video: checkbox di attivazione** (opt-in esplicito; da spento campi+bottone disabilitati).
+- **Aggiunta foto al canvas NON blocca più**: lo scontorno u2net girava SINCRONO sul thread GUI (freeze lungo al
+  1° load ONNX) → ora **opt-in** (`_auto_cutout_on_add`, default OFF); aggiunta istantanea, scontorno manuale.
+
 ## Stato STABILE ora
 - **Motore comfy (il tuo)**: one-shot, veloce, VRAM dinamica ComfyUI. **Funziona.**
 - **Motore diffusers** (fallback PuLID/inpaint/kontext): figlio persistente ON ma **respawna** (vedi sotto) →
