@@ -52,8 +52,60 @@ def _detect_arch(model_path: str) -> str:
         return "flux2" if any(t in m for t in ("flux2", "flux_2", "flux 2")) else "flux"
 
 
+class _ComfyChild:
+    """Figlio comfy PERSISTENTE (residenza): un processo `img_comfy_native --persist` vivo tra le gen → i
+    modelli restano CALDI nella cache di ComfyUI (niente reload dalla 2ª gen). Protocollo stdin/stdout come il
+    figlio persistente diffusers. Serializzato dal lock (una gen alla volta). Fallback one-shot se muore."""
+
+    def __init__(self):
+        self._proc = None
+        self._lock = __import__("threading").Lock()
+
+    def _alive(self) -> bool:
+        return self._proc is not None and self._proc.poll() is None
+
+    def _spawn(self, env: dict) -> None:
+        self._proc = subprocess.Popen(
+            [COMFY_PY, os.path.join(REPO, "workers", "img_comfy_native.py"), "--persist"],
+            cwd=REPO, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        for _ in range(1200):                                # attende READY (primo init ComfyUI + eventuale load)
+            line = self._proc.stdout.readline()
+            if not line:
+                self._proc = None
+                raise RuntimeError("comfy persistente morto durante l'init")
+            if line.strip() == "READY":
+                print("[comfy] figlio persistente PRONTO (modelli caldi tra le gen)", flush=True)
+                return
+        raise TimeoutError("comfy persistente: nessun READY")
+
+    def run(self, pj: str, env: dict, timeout: int) -> str:
+        with self._lock:
+            if not self._alive():
+                self._spawn(env)
+            self._proc.stdin.write(pj + "\n"); self._proc.stdin.flush()
+            import time as _t
+            t0 = _t.time()
+            while _t.time() - t0 < timeout:
+                line = self._proc.stdout.readline()
+                if not line:
+                    self._proc = None
+                    raise RuntimeError("comfy persistente morto (EOF)")
+                line = line.strip()
+                if line.startswith("OK:"):
+                    return line[3:].strip()
+                if line.startswith("ERR:"):
+                    raise RuntimeError(line[4:])
+                # altre righe (log [load]/[gen]) → passa oltre
+            raise TimeoutError("timeout comfy persistente")
+
+
+_comfy_child = _ComfyChild()
+
+
 def _comfy_t2i(params: dict, timeout: int) -> dict:
-    """Genera t2i col worker comfy-native (one-shot subprocess). Ritorna {status, output:[png]}."""
+    """Genera t2i col worker comfy-native. Figlio PERSISTENTE (modelli caldi) se COMFY_PERSISTENT!=0, con
+    fallback al subprocess one-shot. Ritorna {status, output:[png]}."""
     model_abs = params.get("model", "")
     arch = _detect_arch(model_abs)
     comp = _ARCH_COMPONENTS.get(arch, _ARCH_COMPONENTS["flux"])
@@ -79,6 +131,16 @@ def _comfy_t2i(params: dict, timeout: int) -> dict:
                                headers={"Content-Type": "application/json"}), timeout=20).read()
     except Exception:                                          # noqa: BLE001
         pass
+    # FIGLIO PERSISTENTE (residenza): modelli caldi tra le gen. Fallback one-shot se muore/timeout.
+    if os.environ.get("COMFY_PERSISTENT", "1") != "0":
+        try:
+            out = _comfy_child.run(pj, env, timeout)
+            return {"status": "success", "output": [out]}
+        except Exception as _pe:                               # noqa: BLE001
+            print(f"[comfy] figlio persistente ko ({_pe}) → fallback one-shot", flush=True)
+        finally:
+            try: os.remove(pj)
+            except OSError: pass
     try:
         r = subprocess.run([COMFY_PY, os.path.join(REPO, "workers", "img_comfy_native.py"), pj],
                            cwd=REPO, env=env, capture_output=True, text=True, timeout=timeout)

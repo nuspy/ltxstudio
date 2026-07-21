@@ -116,7 +116,33 @@ def _save_png(images, out_path: str) -> str:
     return out_path
 
 
+def main_persist():
+    """Modalità PERSISTENTE (residenza): inizializza ComfyUI UNA volta, poi legge da stdin un path params.json
+    per job, genera e stampa 'OK:<png>' / 'ERR:<msg>'. I modelli restano CALDI nella cache di ComfyUI (stesso
+    file → nessun reload) → dalla 2ª gen è quasi istantanea. 'QUIT' esce. Protocollo riga-per-riga come il figlio
+    persistente diffusers. Il model_management di ComfyUI gestisce la VRAM dinamicamente tra i job."""
+    asyncio.run(_init())
+    print("READY", flush=True)
+    for line in sys.stdin:
+        line = line.strip()
+        if not line or line == "QUIT":
+            break
+        try:
+            with open(line, encoding="utf-8") as fh:
+                p = json.load(fh)
+            with torch.inference_mode():
+                out = run(p)
+            print("OK:" + out, flush=True)
+        except Exception as e:                                # noqa: BLE001
+            import traceback
+            sys.stderr.write(traceback.format_exc()); sys.stderr.flush()
+            print("ERR:" + repr(e)[:300], flush=True)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--persist":
+        main_persist()
+        return
     with open(sys.argv[1], encoding="utf-8") as fh:
         p = json.load(fh)
     asyncio.run(_init())
