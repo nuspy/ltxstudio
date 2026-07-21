@@ -146,8 +146,10 @@ def _comfy_t2i(params: dict, timeout: int) -> dict:
                                headers={"Content-Type": "application/json"}), timeout=20).read()
     except Exception:                                          # noqa: BLE001
         pass
-    # FIGLIO PERSISTENTE (residenza): modelli caldi tra le gen. Fallback one-shot se muore/timeout.
-    if os.environ.get("COMFY_PERSISTENT", "1") != "0":
+    # FIGLIO PERSISTENTE (residenza): modelli caldi tra le gen. DEFAULT OFF (la 1ª versione con readline bloccante
+    # deadlockava il thread GUI se il figlio moriva durante l'init) → torna al one-shot finché non lo riscrivo con
+    # un reader-thread non-bloccante + timeout. Riabilita: COMFY_PERSISTENT=1.
+    if os.environ.get("COMFY_PERSISTENT", "0") == "1":
         try:
             out = _comfy_child.run(pj, env, timeout)
             return {"status": "success", "output": [out]}
