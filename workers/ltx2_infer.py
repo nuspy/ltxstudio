@@ -1268,10 +1268,15 @@ def run_generation(p: dict) -> str:
     # LTX-2 restituisce SEMPRE una traccia audio anche per i2v/ti2v/iclora: senza condizionamento audio è
     # RUMORE non condizionato ("rumore grigio"). La scartiamo (video muto) tranne quando l'audio è davvero
     # richiesto — a2v (canto/parlato) o audio_path fornito. Così i video generati/editati NON hanno più rumore.
-    _audio_requested = (ptype == "a2v") or bool(p.get("audio_path"))
+    # native_audio: l'utente CHIEDE l'audio nativo (parlato/suoni dal prompt, es. «says "hello world"»). LTX-2.3
+    # genera audio+video insieme (ti2v con audio_guider) → tenerlo dà voce + lip-sync. Senza il flag si scarta
+    # come prima (evita il rumore non-condizionato sui prompt non-parlato).
+    _audio_requested = (ptype == "a2v") or bool(p.get("audio_path")) or bool(p.get("native_audio"))
     if not _audio_requested and audio is not None:
         print("[audio] nessun audio richiesto → scarto la traccia LTX-2 (rumore non condizionato)", flush=True)
         audio = None
+    elif bool(p.get("native_audio")) and audio is not None:
+        print("[audio] native_audio ON → TENGO la traccia LTX-2 (parlato/suoni dal prompt + lip-sync)", flush=True)
     # GUARDIA anti-NaN: pesi corrotti (es. GGUF con download incompleto) producono frame NaN che il
     # VAE/encoder trasforma in VIDEO VERDE UNIFORME, consegnato come "successo". Meglio un errore chiaro.
     def _nan_guard(chunks):

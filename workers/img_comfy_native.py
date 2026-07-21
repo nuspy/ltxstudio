@@ -56,7 +56,11 @@ def _unwrap(x):
 
 async def _init():
     import nodes
-    await nodes.init_extra_nodes(init_custom_nodes=True, init_api_nodes=False)
+    # init_custom_nodes=False: il t2i usa SOLO i nodi CORE di ComfyUI (UNETLoader/DualCLIPLoader/VAELoader/
+    # KSampler/VAEDecode) + comfy_extras (FluxGuidance/EmptySD3LatentImage). I CUSTOM node (rgthree, RES4LYF, …)
+    # non servono, ma caricandoli: (1) collidono col nostro pacchetto `server` → ImportError PromptServer,
+    # (2) allungano l'init di ~1 minuto. Quindi NON li carichiamo (init_extra_nodes carica comunque comfy_extras).
+    await nodes.init_extra_nodes(init_custom_nodes=False, init_api_nodes=False)
 
 
 def run(p: dict) -> str:
