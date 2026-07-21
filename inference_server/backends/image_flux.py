@@ -1567,6 +1567,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
     # Face adapter PuLID (identità del volto da una foto) — FLUX/kontext
     _pulid_h = None
     _tcfg = float(params.get("pulid_true_cfg", 1.0) or 1.0)   # true-CFG (2 pass/step) — deciso QUI: serve al PuLID
+    _step(f"PuLID? pulid_face={bool(params.get('pulid_face'))} arch={arch} placement={where} "
+          f"(l'offload rompe gli hook; deve essere gpu)")
     if params.get("pulid_face") and arch in ("flux", "kontext"):
         try:
             from core import pulid_adapter
@@ -1586,10 +1588,14 @@ def run(params: dict, mm, output_dir: str) -> dict:
                                             start_step=int(params.get("pulid_start_step", 0)),
                                             uncond_emb=_unemb, cfg_passes=2 if _use_tcfg else 1)
             _nf = len(_faces) if isinstance(_faces, list) else 1
+            _step(f"PuLID ATTACCATO: {len(_pulid_h) if _pulid_h else 0} hook, {_nf} foto, "
+                  f"strength={params.get('pulid_strength', 0.8)}, true_cfg={_tcfg}")
             print(f"[pulid] attivo ({len(_pulid_h)} hook, {_nf} foto, strength={params.get('pulid_strength', 0.8)}, "
                   f"start_step={params.get('pulid_start_step', 0)}, true_cfg={_tcfg})", flush=True)
         except Exception as _e:                          # noqa: BLE001
-            print(f"[pulid] disattivato (errore): {_e}", flush=True)
+            import traceback as _tb
+            _step(f"PuLID FALLITO: {type(_e).__name__}: {str(_e)[:80]}")
+            print(f"[pulid] disattivato (errore): {_e}\n{_tb.format_exc()[-600:]}", flush=True)
             _pulid_h = None
 
     g = torch.Generator(device="cuda").manual_seed(int(params.get("seed", 0)))
