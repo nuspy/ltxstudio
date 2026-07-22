@@ -32,6 +32,13 @@ class SubmitReq(BaseModel):
 
 
 def _worker() -> None:
+    # ⚠ CRITICO: `torch.set_grad_enabled(False)` di ltx2_infer (import-time) vale SOLO per il thread
+    # che importa (il main di uvicorn). Il grad-mode di torch è PER-THREAD: senza questa riga, qui
+    # l'autograd era ATTIVO → l'encode Gemma + il denoise trattenevano il grafo (~17GB di attivazioni
+    # live) → 40GB "allocati" su 32 → spill in shared WDDM → sistema saturo (visto live 22/07: OOM
+    # a 40.4GiB e crash a cascata). Stessa malattia documentata in testa a ltx2_infer, per-thread.
+    import torch
+    torch.set_grad_enabled(False)
     while True:
         jid = _q.get()
         job = _jobs.get(jid)
@@ -48,7 +55,8 @@ def _worker() -> None:
         except Exception:                                   # noqa: BLE001
             pass
         try:
-            out = ltx2_infer.run_generation(job["params"])
+            with torch.no_grad():                       # cintura+bretelle col set_grad_enabled sopra
+                out = ltx2_infer.run_generation(job["params"])
             job["output"] = [out]
             job["status"] = "success"
         except ltx2_infer.GenerationCancelled:              # cancel cooperativo (POST /cancel)
