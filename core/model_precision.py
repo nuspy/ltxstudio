@@ -103,8 +103,25 @@ def classify(name_or_path: str, free_vram_gb: float, *, file_path: str | None = 
             family = f
     if not prec:
         prec = detect_precision(name)
-    w = file_gb(fp) if (fp and os.path.isfile(fp)) else _EST_WEIGHTS_GB.get(prec, 24.0)
-    footprint = w + _overhead_gb(name, family)
+    # F6 unified-model-manager: preferisci il DB canonico (footprint misurato → header preciso);
+    # la vecchia euristica file_gb + overhead-per-famiglia resta come ULTIMO fallback.
+    w = footprint = 0.0
+    if fp and os.path.isfile(fp):
+        try:
+            from core import vram_estimate as _ve
+            _fp8 = (prec == "fp8")
+            _tr = _ve.transformer_mb(fp, fp8_storage=_fp8)
+            _tot, _src = _ve.estimate_mb(fp, fp8_storage=_fp8, working_mb=0)
+            if _tr > 0:
+                w = _tr / 1024.0
+            if _tot > 0:
+                footprint = _tot / 1024.0
+        except Exception:                                    # noqa: BLE001
+            pass
+    if not w:
+        w = file_gb(fp) if (fp and os.path.isfile(fp)) else _EST_WEIGHTS_GB.get(prec, 24.0)
+    if not footprint:
+        footprint = w + _overhead_gb(name, family)
     base = {"footprint_gb": round(footprint, 1), "weights_gb": round(w, 1), "precision": prec, "family": family}
     if not free_vram_gb or free_vram_gb <= 0:
         return {"color": "", **base}

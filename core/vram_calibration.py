@@ -142,7 +142,9 @@ def plan_placement(transformer_mb: int, arch: str, free_mb: int, working_mb: int
     LIBERA, decide cosa tenere RESIDENTE e cosa OFFLOADARE per minimizzare l'offload (= massima velocità).
     Ritorna {resident:[...], offload:[...], resident_mb, fits_all, mode}."""
     comps = ARCH_COMPONENTS.get(arch, [])
-    comp_sizes = [(c, COMPONENT_MB.get(c, 0)) for c in comps]
+    # F6: dimensioni componenti dal DB canonico (misure reali via comp_put) con fallback alla
+    # tabella statica — la tabella resta l'ultima risorsa, mai la prima scelta.
+    comp_sizes = [(c, _ve.comp_get(c) or COMPONENT_MB.get(c, 0)) for c in comps]
     total_comp = sum(s for _, s in comp_sizes)
     # 1) tutto residente (transformer + tutti i componenti + working)?
     if transformer_mb + total_comp + working_mb <= free_mb:
@@ -150,6 +152,9 @@ def plan_placement(transformer_mb: int, arch: str, free_mb: int, working_mb: int
                 "resident_mb": transformer_mb + total_comp, "fits_all": True}
     # 2) transformer residente + offload dei componenti più grossi finché entra (greedy dal più grande).
     budget = free_mb - transformer_mb - working_mb
+    if budget < 0:                                           # il transformer DA SOLO non entra → tutto offload
+        return {"resident": [], "offload": ["transformer"] + comps, "mode": "cpu",
+                "resident_mb": 0, "fits_all": False}
     resident, offload = ["transformer"], []
     for c, s in sorted(comp_sizes, key=lambda x: x[1]):      # tieni residenti i PIÙ PICCOLI (più riuso/veloci)
         if s <= budget:
@@ -157,6 +162,7 @@ def plan_placement(transformer_mb: int, arch: str, free_mb: int, working_mb: int
         else:
             offload.append(c)
     mode = "cpu" if offload else "none"
+    _sz = dict(comp_sizes)
     return {"resident": resident, "offload": offload, "mode": mode,
-            "resident_mb": transformer_mb + (total_comp - sum(COMPONENT_MB.get(c, 0) for c in offload)),
+            "resident_mb": transformer_mb + (total_comp - sum(_sz.get(c, 0) for c in offload)),
             "fits_all": not offload}

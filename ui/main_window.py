@@ -2787,7 +2787,15 @@ class MainWindow(QMainWindow):
         best, best_sz = None, -1
         for c in cands:
             try:
-                sz = os.path.getsize(c)
+                # F6: footprint dal DB canonico (per i GGUF ≈ dim file, ma se misurato è più preciso)
+                sz = 0
+                try:
+                    from core import vram_estimate as _ve
+                    _mb, _src = _ve.estimate_mb(c, working_mb=0)
+                    sz = int(_mb * 2**20) if _mb else 0
+                except Exception:                              # noqa: BLE001
+                    pass
+                sz = sz or os.path.getsize(c)
             except OSError:
                 continue
             if sz <= budget and sz > best_sz:                  # il più grande che entra = miglior qualità
@@ -3018,12 +3026,29 @@ class MainWindow(QMainWindow):
         # SEMPLICE e VRAM insufficiente: 1) auto-seleziona un LTX GGUF (dequant al volo, entra nei 32GB) →
         # resta NATIVO; 2) fallback comfy SOLO se davvero disponibile; 3) altrimenti avvisa (no output muto).
         if _engine != "comfy" and _simple and not params.get("gguf_transformer"):
+            # F6 unified-model-manager: VRAM LIBERA reale (gpu_mem/NVML, non il totale) e soglia dal
+            # peso VERO del modello scelto (transformer_mb: misurato → header) invece del 40GB fisso.
+            # Fallback: se il DB non conosce il modello, resta la soglia storica 40GB.
             try:
-                from core import model_precision as _mp
-                _free = float(_mp.gpu_free_gb())
+                from core import gpu_mem as _gm
+                _free = float(_gm.free_vram_mb()) / 1024.0
             except Exception:                                   # noqa: BLE001
-                _free = 999.0
-            if _free < 40.0:
+                try:
+                    from core import model_precision as _mp
+                    _free = float(_mp.gpu_free_gb())
+                except Exception:                               # noqa: BLE001
+                    _free = 999.0
+            _need_gb = 40.0
+            try:
+                from core import vram_estimate as _ve2
+                _mdl = str(params.get("model", "") or "")
+                if _mdl and os.path.exists(_mdl):
+                    _tr = _ve2.transformer_mb(_mdl, fp8_storage="fp8" in os.path.basename(_mdl).lower())
+                    if _tr > 0:
+                        _need_gb = _tr / 1024.0 + 8.0           # transformer + working video
+            except Exception:                                   # noqa: BLE001
+                pass
+            if _free < _need_gb:
                 _gguf = self._auto_pick_ltx_gguf(_free)
                 if _gguf:
                     # NON riassegnare in silenzio: CHIEDI (richiesta utente). Se mantiene il suo modello,

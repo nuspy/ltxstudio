@@ -28,6 +28,10 @@ _LEGACY_FOOTPRINT = os.path.join(os.path.dirname(_CACHE), "model_footprint.json"
 _DTYPE_BYTES = {"F8_E4M3": 1, "F8_E5M2": 1, "F16": 2, "BF16": 2, "F32": 4, "F64": 8,
                 "I8": 1, "U8": 1, "I16": 2, "I32": 4, "I64": 8, "BOOL": 1}
 _TE_KEYS = ("text_encoder", "t5xxl", "t5.", "cond_stage", "clip_l", "text_model", "gemma", "mistral")
+# prefissi TOP-LEVEL dei componenti NON-transformer nei bundle all-in-one (LTX: model.* è il
+# transformer; questi sono vae/proiezioni/vocoder) — esclusi da transformer_mb, non da header_mb.
+_AUX_PREFIXES = ("vae", "audio_vae", "video_vae", "vocoder", "text_embedding_projection",
+                 "text_embeddings_projection", "audio_decoder", "latent_upsampler", "first_stage_model")
 
 
 def _read_header(path: str) -> dict:
@@ -51,6 +55,7 @@ def _scan_header(path: str, *, fp8_storage: bool) -> tuple[float, float, bool]:
         kl = k.lower()
         is_te = any(s in kl for s in _TE_KEYS)
         has_te = has_te or is_te
+        is_aux = is_te or kl.split(".")[0] in _AUX_PREFIXES
         n = 1
         for s in t.get("shape", []):
             n *= int(s)
@@ -59,7 +64,7 @@ def _scan_header(path: str, *, fp8_storage: bool) -> tuple[float, float, bool]:
         if dt.startswith("F8") and not fp8_storage:
             b = 2
         total += n * b
-        if not is_te:
+        if not is_aux:
             tr_only += n * b
     return total / 1024**2, tr_only / 1024**2, has_te
 

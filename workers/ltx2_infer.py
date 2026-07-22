@@ -689,24 +689,21 @@ def _auto_offload(p: dict, ckpt: str) -> str:
             print(f"[auto-offload] GGUF {os.path.basename(_gguf)[:24]} → cpu "
                   f"(transformer residente, encoder su CPU — percorso testato)", flush=True)
             return "cpu"
+        # F6 unified-model-manager: peso del SOLO transformer dal DB canonico (misurato → header,
+        # via transformer_mb che ESCLUDE gemma/vae/vocoder già alla fonte). Prima si usava il bundle
+        # intero (37GB) corretto a mano con `file_gb-10`: need=55 su 32GB ⇒ sempre 'cpu' =
+        # block-streaming = pinned memory ⇒ SEGFAULT col pagefile 16GB (13/07). L'euristica resta
+        # come ULTIMO fallback se header e cache sono entrambi illeggibili.
+        _file_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 29.0
         try:
             from core import vram_estimate as _ve
-            _mb, _src = _ve.estimate_mb(ckpt, fp8_storage=True, working_mb=0)
-            tr_gb = (_mb / 1024.0) if _mb else (os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0)
-            _how = _src if _mb else "file"
-        except Exception:                                    # noqa: BLE001
-            tr_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 22.0
-            _how = "file"
-        # ⚠ La stima `tr_gb` di vram_estimate conta il BUNDLE INTERO (transformer + gemma + vae +
-        # vocoder ≈ 37GB) e poi ci sommava ANCORA _ENC_GB: need=55 su 32GB di VRAM ⇒ sceglieva
-        # SEMPRE 'cpu'. E 'cpu' = block-streaming = pesi in PINNED MEMORY: con un pagefile fisso da
-        # 16GB l'allocazione fallisce e il processo muore di SEGFAULT (exit 139) mentre carica —
-        # denoise perfetto, poi crash, zero mp4. Era questo a far fallire ogni clip del videoclip.
-        # Il transformer DA SOLO è ~(file − 10GB di encoder), esattamente come stima l'auto-gguf qui
-        # sopra; con quello, su 32GB l'fp8 RESIDENTE ci sta — e va pure 3× più veloce (1.46 s/it vs
-        # 4.75 s/it in streaming). Misurato il 13/07 su 704x1280x65f.
-        _file_gb = os.path.getsize(ckpt) / 1e9 if os.path.exists(ckpt) else 29.0
-        tr_gb = min(tr_gb, max(12.0, _file_gb - 10.0))        # niente doppio conteggio degli encoder
+            _tr_mb = _ve.transformer_mb(ckpt, fp8_storage=True)
+            if _tr_mb > 0:
+                tr_gb, _how = _tr_mb / 1024.0, "transformer_mb"
+            else:                                             # header illeggibile → euristica storica
+                tr_gb, _how = max(12.0, _file_gb - 10.0), "file-10"
+        except Exception:                                     # noqa: BLE001
+            tr_gb, _how = max(12.0, _file_gb - 10.0), "file-10"
         _ENC_GB = 0.0                                         # gemma/vae vanno su CPU comunque
         _WORK_GB = 8.0                                        # attivazioni temporali (picco denoise/decode)
         # M4 — budget attivazioni DINAMICO (env LTX_DYNAMIC_WORKBUDGET=1): scala col volume del clip
@@ -723,6 +720,19 @@ def _auto_offload(p: dict, ckpt: str) -> str:
                 _WORK_GB = 8.0
         need = tr_gb + _ENC_GB + _WORK_GB                     # full-stack residente (solo fp8, no GGUF)
         mode = "none" if free_gb >= need else "cpu"
+        # F6: planner combinatorio (plan_placement) come decisore DEFAULT (scelta utente 22/07):
+        # transformer residente se entra (gli encoder girano comunque per-stage), componenti dal DB
+        # canonico. Kill-switch: LTX_PLAN_PLACEMENT=0 → confronto diretto storico qui sopra.
+        if os.environ.get("LTX_PLAN_PLACEMENT", "1") != "0":
+            try:
+                from core import vram_calibration as _vc
+                _pl = _vc.plan_placement(int(tr_gb * 1024), "ltx2", int(free_gb * 1024),
+                                         int(_WORK_GB * 1024))
+                mode = "none" if "transformer" in _pl.get("resident", []) else "cpu"
+                print(f"[plan] resident={_pl.get('resident')} offload={_pl.get('offload')} "
+                      f"→ {mode}", flush=True)
+            except Exception as _pe:                          # noqa: BLE001
+                print(f"[plan] plan_placement non disponibile ({_pe}) → euristica diretta", flush=True)
         print(f"[auto-offload] free={free_gb:.0f}GB tr={tr_gb:.0f}({_how})+enc{_ENC_GB:.0f}+work{_WORK_GB:.0f}"
               f"=need{need:.0f} → {mode}", flush=True)
         return mode
