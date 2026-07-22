@@ -69,9 +69,21 @@ class VideoTab(QWidget):
         self._inventory_ready: bool = False
         # Contenuto in un'area scrollabile: la sezione impostazioni è lunga e senza scroll
         # i campi si sovrapponevano su finestre basse.
-        outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
+        outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0); outer.setSpacing(0)
         sc = QScrollArea(); sc.setWidgetResizable(True); sc.setFrameShape(QScrollArea.NoFrame)
-        host = QWidget(); root = QVBoxLayout(host); sc.setWidget(host); outer.addWidget(sc)
+        host = QWidget(); root = QVBoxLayout(host); sc.setWidget(host); outer.addWidget(sc, 1)
+        # FOOTER ANCORATO (fuori dallo scroll → sempre visibile anche scorrendo il tab):
+        # «Genera Video» + «Interrompi», spostati qui da sotto il canvas (richiesta utente).
+        # I click li cabla main_window (on_generate / driver.interrupt) — qui solo i widget.
+        _footer = QWidget(); _fl = QHBoxLayout(_footer)
+        _fl.setContentsMargins(8, 6, 8, 8)
+        self.generate_btn = QPushButton(tr("vid.generate.btn", "🎬 Genera Video"))
+        self.generate_btn.setObjectName("generate")
+        self.generate_btn.setToolTip(tr("vid.generate.btn.tt", "Genera il video con i parametri impostati."))
+        self.stop_btn = QPushButton(tr("btn.stop"))
+        self.stop_btn.setToolTip(tr("vid.stop.tt", "Interrompi la generazione in corso."))
+        _fl.addWidget(self.generate_btn, 2); _fl.addWidget(self.stop_btn, 1)
+        outer.addWidget(_footer)
 
         # --- Prompt (spostato qui dal tab Frame 1) ---
         prompt_group = QGroupBox(tr("vid.prompt.group"))

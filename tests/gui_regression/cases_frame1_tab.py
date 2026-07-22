@@ -504,6 +504,94 @@ def case_integrate_guidance_seed(w, spy):
         assert ok, f"guidance integrate errata per arch={p.get('arch')}: {g}"
 
 
+def case_integrate_pulid_separation(w, spy):
+    """I due container PuLID sono SEPARATI: quello in «Genera immagine» agisce solo sulla
+    generazione, quello in «Image to Image» solo sull'integra (richiesta utente 22/07)."""
+    f = w.frame1_tab
+    face = H.make_test_image(str(H.OUT_DIR / "_pulid_int_face.png"), 256, 256)
+    # Solo il box dell'Image to Image attivo → get_inpaint_config lo espone, get_gen_config NO.
+    f.gen_pulid_enable.setChecked(False)
+    f.int_pulid_enable.setChecked(True)
+    f.int_pulid_face.setText(face)
+    f.int_pulid_strength.setValue(0.65)
+    cfg = f.get_inpaint_config()
+    assert cfg.get("integrate_pulid_face") == face, f"int PuLID non propagato: {cfg.get('integrate_pulid_face')}"
+    assert abs(float(cfg.get("integrate_pulid_strength", 0)) - 0.65) < 0.01, \
+        f"int pulid_strength errata: {cfg.get('integrate_pulid_strength')}"
+    assert f.get_gen_config().get("pulid_face") is None, "il PuLID dell'integra è finito nella generazione"
+    # Viceversa: solo il box di Genera attivo → l'integra NON lo eredita.
+    f.int_pulid_enable.setChecked(False)
+    f.gen_pulid_enable.setChecked(True)
+    f.gen_pulid_face.setText(face)
+    assert f.get_inpaint_config().get("integrate_pulid_face") is None, \
+        "il PuLID della generazione è finito nell'integra"
+    assert f.get_gen_config().get("pulid_face") == face, "gen PuLID non propagato"
+    f.gen_pulid_enable.setChecked(False)
+
+
+def case_integrate_pulid_native(w, spy):
+    """Image to Image (Kontext) col SUO box PuLID attivo: pulid_face arriva nella richiesta nativa
+    (solo ramo kontext puro: il ramo mask-based/inpaint non applica PuLID, documentato)."""
+    _force_native_up()
+    _populate_inventory(w)
+    f = w.frame1_tab
+    f.img_nsfw.setCurrentText("NSFW")
+    H.load_canvas_image(w)
+    _add_canvas_layer(w)
+    face = H.make_test_image(str(H.OUT_DIR / "_pulid_int_face2.png"), 256, 256)
+    f.integrate_engine.setCurrentIndex(0)        # Kontext
+    f.integrate_puzzle.setChecked(False)
+    f.gen_pulid_enable.setChecked(False)         # il box di Genera NON deve contare
+    f.int_pulid_enable.setChecked(True)
+    f.int_pulid_face.setText(face)
+    f.integrate_prompt.setPlainText("integrate the object into the scene")
+    w.generate_integrate()
+    assert spy.calls, "integrate+PuLID: nessuna richiesta inviata"
+    c = spy.calls[-1]
+    if c["via"] == "enqueue":
+        p = c["params"]
+        if p.get("arch") == "kontext":           # ramo kontext puro: PuLID atteso
+            assert p.get("pulid_face") == face, f"pulid_face non arrivato al job kontext: {p.get('pulid_face')}"
+        else:                                    # ramo mask-based (inpaint): PuLID non applicato lì
+            assert p.get("arch") == "inpaint", f"arch inatteso: {p.get('arch')}"
+    f.int_pulid_enable.setChecked(False)
+
+
+def case_ui_footer_and_renames(w, spy):
+    """Layout 22/07: footer ANCORATI (Genera Video nel tab Video, Genera immagine nel sotto-tab),
+    bottoni-azione con stile «generate», sotto-tab rinominato Modifica Immagine."""
+    from PySide6.QtWidgets import QScrollArea
+
+    def _outside_scroll(btn):
+        p = btn.parent()
+        while p is not None:
+            if isinstance(p, QScrollArea):
+                return False
+            p = p.parent()
+        return True
+    # Genera Video: nel tab Video, FUORI dallo scroll (ancorato), stile generate, cablato a on_generate
+    vb = w.video_tab.generate_btn
+    assert _outside_scroll(vb), "Genera Video è dentro lo scroll: non è ancorato"
+    assert vb.objectName() == "generate", "Genera Video senza stile #generate"
+    assert w.gen_btn is vb, "alias main_window.gen_btn non punta al bottone del tab Video"
+    assert w.cancel_btn is w.video_tab.stop_btn, "alias cancel_btn non punta a Interrompi del tab Video"
+    # Genera immagine: footer ancorato nel sotto-tab + stile generate
+    f = w.frame1_tab
+    assert _outside_scroll(f.gen_btn), "Genera immagine è dentro lo scroll: non è ancorato"
+    assert f.gen_btn.objectName() == "generate", "Genera immagine senza stile #generate"
+    # Rinomina sotto-tab: l'etichetta deve essere quella nuova (tr f1.tab.inpaint = Modifica Immagine)
+    from ui.i18n_manager import tr as _tr
+    labels = [f.sub.tabText(i) for i in range(f.sub.count())]
+    assert _tr("f1.tab.inpaint") in labels, f"sotto-tab Modifica Immagine assente: {labels}"
+    assert "Inpaint / Outpaint" not in labels, f"vecchia etichetta ancora presente: {labels}"
+    # Il box PuLID dell'Image to Image esiste e si disabilita coi motori non-Kontext
+    assert hasattr(f, "int_pulid_enable"), "box PuLID dell'Image to Image mancante"
+    f.integrate_engine.setCurrentIndex(2)        # Krea 2 Edit → PuLID OFF
+    assert not f._int_pulid_group.isEnabled(), "int PuLID abilitato con motore non-Kontext"
+    f.integrate_engine.setCurrentIndex(0)        # Kontext → PuLID ON
+    assert f._int_pulid_group.isEnabled(), "int PuLID disabilitato col motore Kontext"
+
+
 def case_integrate_flux2(w, spy):
     """Integra con motore FLUX.2 (ramo ComfyUI): richiede un modello FLUX.2 selezionato → richiesta inviata."""
     _force_native_up()
@@ -849,6 +937,15 @@ CASES = (
         ("frame1_integrate_guidance_seed",
          "Integra: guidance e seed fisso propagati (ramo nativo Kontext).",
          case_integrate_guidance_seed),
+        ("frame1_integrate_pulid_separation",
+         "PuLID separati: box di Genera solo su genera, box di Image to Image solo su integra.",
+         case_integrate_pulid_separation),
+        ("frame1_integrate_pulid_native",
+         "Image to Image (Kontext) + PuLID dedicato: pulid_face nella richiesta nativa.",
+         case_integrate_pulid_native),
+        ("frame1_ui_footer_and_renames",
+         "Footer ancorati (Genera Video/immagine), stile bottoni-azione, rinomina Modifica Immagine.",
+         case_ui_footer_and_renames),
         ("frame1_integrate_flux2",
          "Integra con motore FLUX.2 (ComfyUI): modello FLUX.2 selezionato → richiesta inviata.",
          case_integrate_flux2),

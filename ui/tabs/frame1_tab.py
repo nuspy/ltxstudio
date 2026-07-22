@@ -111,7 +111,9 @@ class Frame1Tab(QWidget):
         _placeholder = self._prompt_tab()        # crea self.img_nsfw / self.prompt / self.neg
         _placeholder.setVisible(False)
         sub = QTabWidget(); self.sub = sub        # esposto per navigazione/test dei sotto-tab
-        sub.addTab(self._scroll(self._gen_box()), tr("f1.tab.gen"))
+        # «Genera immagine» col bottone-azione in FOOTER ANCORATO (fuori dallo scroll → sempre
+        # visibile). self.gen_btn è creato da _gen_box ma NON messo nel form.
+        sub.addTab(self._anchored(self._scroll(self._gen_box()), self.gen_btn), tr("f1.tab.gen"))
         sub.addTab(self._scroll(self._inpaint_box()), tr("f1.tab.inpaint"))
         sub.addTab(self._scroll(self._color_box()), tr("f1.tab.color"))
         sub.addTab(self._scroll(self._upscale_box()), tr("f1.tab.upscale"))
@@ -128,6 +130,18 @@ class Frame1Tab(QWidget):
         cv.addWidget(w); cv.addStretch(1)
         sc = QScrollArea(); sc.setWidgetResizable(True); sc.setFrameShape(QScrollArea.NoFrame); sc.setWidget(cont)
         return sc
+
+    @staticmethod
+    def _anchored(scroll: QWidget, btn: QPushButton) -> QWidget:
+        """Pagina con FOOTER ANCORATO: scroll sopra (stretch), bottone-azione sotto FUORI dallo
+        scroll → il bottone resta fermo e visibile anche scorrendo i controlli."""
+        page = QWidget(); pv = QVBoxLayout(page)
+        pv.setContentsMargins(0, 0, 0, 0); pv.setSpacing(0)
+        pv.addWidget(scroll, 1)
+        footer = QWidget(); fv = QVBoxLayout(footer)
+        fv.setContentsMargins(8, 6, 8, 8); fv.addWidget(btn)
+        pv.addWidget(footer)
+        return page
 
     def _prompt_tab(self) -> QWidget:
         # NSFW selector → spostato in "Genera immagine"; Prompt globale/negativo → spostati
@@ -280,7 +294,10 @@ class Frame1Tab(QWidget):
         self.gen_neg.setPlaceholderText(tr("f1.gen.neg.ph"))
         self.gen_neg.setToolTip(tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))
         f.addRow(tr("f1.neg_lbl"), self.gen_neg)
+        # Bottone-azione: NON nel form — vive nel footer ANCORATO in fondo al sotto-tab (sempre
+        # visibile anche scorrendo), con lo stile del bottone «Genera Video» (objectName generate).
         self.gen_btn = QPushButton(tr("f1.gen.btn"))
+        self.gen_btn.setObjectName("generate")
         self.gen_btn.setToolTip(tr("f1.gen.btn.tt", "Genera l'immagine di partenza con i parametri impostati."))
         self.gen_btn.clicked.connect(lambda: self.request_generate.emit())
 
@@ -297,56 +314,65 @@ class Frame1Tab(QWidget):
                 _self.gen_neg.setPlainText(n)
         self._open_prompt_builder = _open_prompt_builder
         self._apply_built_prompt = _apply_built_prompt
-        f.addRow(self.gen_btn)
         self.gen_warn_lbl = QLabel("")
         self.gen_warn_lbl.setWordWrap(True)
         self.gen_warn_lbl.setStyleSheet("color:#e67e22; font-size:11px;")
         self.gen_warn_lbl.setVisible(False)
         f.addRow(self.gen_warn_lbl)
         # --- Face adapter PuLID: imprime l'identità di un volto da una foto (solo FLUX) ---
-        pulid_group = QGroupBox(tr("f1.pulid.group")); self._pulid_group = pulid_group
-        pf = QFormLayout(pulid_group)
-        self.gen_pulid_enable = QCheckBox(tr("f1.pulid.enable"))
-        self.gen_pulid_enable.setToolTip(tr("f1.pulid.enable.tt"))
-        pf.addRow(self.gen_pulid_enable)
-        prow = QHBoxLayout()
-        self.gen_pulid_face = QLineEdit(); self.gen_pulid_face.setPlaceholderText(tr("f1.pulid.face.ph"))
-        self.gen_pulid_face.setToolTip(tr("f1.pulid.face.tt", "Percorso della foto del volto da cui PuLID copia l'identità (solo FLUX)."))
-        self.gen_pulid_face_btn = QPushButton(tr("f1.pulid.face.btn"))
-        self.gen_pulid_face_btn.setToolTip(tr("f1.pulid.face.btn.tt", "Sfoglia il disco per scegliere la foto del volto di riferimento."))
-        self.gen_pulid_face_btn.clicked.connect(self._pick_pulid_face)
-        prow.addWidget(self.gen_pulid_face, 1); prow.addWidget(self.gen_pulid_face_btn)
-        pf.addRow(tr("f1.pulid.face_lbl"), self._wrapw(prow))
-        self.gen_pulid_strength = QDoubleSpinBox()
-        self.gen_pulid_strength.setRange(0.0, 3.0); self.gen_pulid_strength.setSingleStep(0.05)
-        self.gen_pulid_strength.setValue(0.8)
-        self.gen_pulid_strength.setToolTip(tr("f1.pulid.strength.tt"))
-        pf.addRow(tr("f1.pulid.strength_lbl"), self.gen_pulid_strength)
-        # Parametri avanzati PuLID-FLUX ufficiali (prima inutilizzati)
-        self.gen_pulid_start = QSpinBox(); self.gen_pulid_start.setRange(0, 10); self.gen_pulid_start.setValue(0)
-        self.gen_pulid_start.setToolTip(tr("f1.pulid.start.tt",
-            "Da quale step iniziare a iniettare l'identità (0 = subito). Valori 1-4 lasciano formare prima la "
-            "posa/composizione dal prompt, poi applicano il volto → pose e prompt più fedeli."))
-        pf.addRow(tr("f1.pulid.start_lbl", "Start step"), self.gen_pulid_start)
-        self.gen_pulid_truecfg = QDoubleSpinBox(); self.gen_pulid_truecfg.setRange(1.0, 10.0)
-        self.gen_pulid_truecfg.setSingleStep(0.5); self.gen_pulid_truecfg.setValue(1.0)
-        self.gen_pulid_truecfg.setToolTip(tr("f1.pulid.truecfg.tt",
-            "True CFG (1.0 = veloce/off). >1 migliora l'aderenza al prompt e riduce il dominio dell'identità "
-            "(più lento). Attivo solo se la pipeline lo supporta."))
-        pf.addRow(tr("f1.pulid.truecfg_lbl", "True CFG"), self.gen_pulid_truecfg)
+        # Box costruito dall'helper riusabile: lo STESSO container è duplicato dentro «Image to
+        # Image» (ex Integra) con prefisso int_ — ciascuno agisce SOLO sulla propria operazione.
+        pulid_group = self._make_pulid_group("gen"); self._pulid_group = pulid_group
         f.addRow(pulid_group)
         # Default coerenti con l'architettura iniziale
         self._apply_arch_defaults(self.gen_arch.currentText())
         return box
 
-    def _pick_pulid_face(self):
+    def _make_pulid_group(self, prefix: str) -> QGroupBox:
+        """Container PuLID riusabile (volto da foto, solo FLUX): crea i widget `<prefix>_pulid_*`
+        e ritorna il group box. Usato con prefix="gen" (Genera immagine) e prefix="int"
+        (Image to Image): ogni copia agisce SOLO sulla propria operazione."""
+        box = QGroupBox(tr("f1.pulid.group"))
+        pf = QFormLayout(box)
+        enable = QCheckBox(tr("f1.pulid.enable")); enable.setToolTip(tr("f1.pulid.enable.tt"))
+        pf.addRow(enable)
+        prow = QHBoxLayout()
+        face = QLineEdit(); face.setPlaceholderText(tr("f1.pulid.face.ph"))
+        face.setToolTip(tr("f1.pulid.face.tt", "Percorso della foto del volto da cui PuLID copia l'identità (solo FLUX)."))
+        face_btn = QPushButton(tr("f1.pulid.face.btn"))
+        face_btn.setToolTip(tr("f1.pulid.face.btn.tt", "Sfoglia il disco per scegliere la foto del volto di riferimento."))
+        face_btn.clicked.connect(lambda: self._pick_pulid_face_into(face))
+        prow.addWidget(face, 1); prow.addWidget(face_btn)
+        pf.addRow(tr("f1.pulid.face_lbl"), self._wrapw(prow))
+        strength = QDoubleSpinBox()
+        strength.setRange(0.0, 3.0); strength.setSingleStep(0.05); strength.setValue(0.8)
+        strength.setToolTip(tr("f1.pulid.strength.tt"))
+        pf.addRow(tr("f1.pulid.strength_lbl"), strength)
+        # Parametri avanzati PuLID-FLUX ufficiali
+        start = QSpinBox(); start.setRange(0, 10); start.setValue(0)
+        start.setToolTip(tr("f1.pulid.start.tt",
+            "Da quale step iniziare a iniettare l'identità (0 = subito). Valori 1-4 lasciano formare prima la "
+            "posa/composizione dal prompt, poi applicano il volto → pose e prompt più fedeli."))
+        pf.addRow(tr("f1.pulid.start_lbl", "Start step"), start)
+        truecfg = QDoubleSpinBox(); truecfg.setRange(1.0, 10.0)
+        truecfg.setSingleStep(0.5); truecfg.setValue(1.0)
+        truecfg.setToolTip(tr("f1.pulid.truecfg.tt",
+            "True CFG (1.0 = veloce/off). >1 migliora l'aderenza al prompt e riduce il dominio dell'identità "
+            "(più lento). Attivo solo se la pipeline lo supporta."))
+        pf.addRow(tr("f1.pulid.truecfg_lbl", "True CFG"), truecfg)
+        for name, w in (("enable", enable), ("face", face), ("face_btn", face_btn),
+                        ("strength", strength), ("start", start), ("truecfg", truecfg)):
+            setattr(self, f"{prefix}_pulid_{name}", w)
+        return box
+
+    def _pick_pulid_face_into(self, target: QLineEdit):
         """Selettore foto volto per PuLID — accetta PIÙ foto (media embedding = identità più robusta)."""
         from PySide6.QtWidgets import QFileDialog
         paths, _ = QFileDialog.getOpenFileNames(
             self, tr("f1.pulid.face.btn"), "",
             "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
         if paths:
-            self.gen_pulid_face.setText("|".join(paths))     # più foto separate da | → media in PuLID
+            target.setText("|".join(paths))                  # più foto separate da | → media in PuLID
 
     # Default per architettura: CENTRALIZZATI in core/model_catalog.ARCH_DEFAULTS (review FASE G) —
     # un solo posto da aggiornare quando cambia un'arch, GUI e backend leggono la stessa fonte.
@@ -819,8 +845,10 @@ class Frame1Tab(QWidget):
         # bottoni Genera per inpaint/outpaint
         brow = QHBoxLayout()
         b_in = QPushButton(tr("f1.inpaint.btn")); b_in.clicked.connect(lambda: self.canvas.request_inpaint.emit())
+        b_in.setObjectName("generate")                        # stile bottone-azione (come Genera Video)
         b_in.setToolTip(tr("f1.inpaint.run.tt", "Riempi l'area mascherata mantenendo intatto il resto dell'immagine."))
         b_out = QPushButton(tr("f1.outpaint.btn")); b_out.clicked.connect(lambda: self.canvas.request_outpaint.emit())
+        b_out.setObjectName("generate")
         b_out.setToolTip(tr("f1.outpaint.run.tt", "Estendi l'immagine oltre i bordi generando il nuovo contenuto."))
         brow.addWidget(b_in); brow.addWidget(b_out)
         bw = QWidget(); bw.setLayout(brow); f.addRow(bw)
@@ -899,8 +927,13 @@ class Frame1Tab(QWidget):
         self.int_seed_rand.toggled.connect(lambda on: self.int_seed.setEnabled(not on))
         intseedrow.addWidget(self.int_seed, 1); intseedrow.addWidget(self.int_seed_rand)
         sw3 = QWidget(); sw3.setLayout(intseedrow); g.addRow(tr("f1.seed_lbl"), sw3)
-        # bottone Integra spostato qui dal canvas/workspace
+        # PuLID dedicato all'Image to Image: agisce SOLO su questa operazione (il gemello in
+        # «Genera immagine» agisce solo sulla generazione). Attivo col solo motore Kontext (FLUX.1).
+        self._int_pulid_group = self._make_pulid_group("int")
+        g.addRow(self._int_pulid_group)
+        # bottone Image to Image (ex Integra) spostato qui dal canvas/workspace
         b_int = QPushButton(tr("f1.integrate.btn"))
+        b_int.setObjectName("generate")                       # stile bottone-azione (come Genera Video)
         b_int.setToolTip(tr("f1.integrate.run.tt", "Fondi le immagini incollate sul canvas nella scena in modo coerente."))
         b_int.clicked.connect(lambda: self.request_integrate.emit())
         g.addRow(b_int)
@@ -948,6 +981,7 @@ class Frame1Tab(QWidget):
         self.compose_prompt.setToolTip(tr("f1.compose.prompt.tt", "Descrivi la scena finale che combina i soggetti delle foto elencate."))
         cg.addWidget(self.compose_prompt)
         b_comp = QPushButton(tr("f1.compose.btn"))
+        b_comp.setObjectName("generate")                      # stile bottone-azione (come Genera Video)
         b_comp.setToolTip(tr("f1.compose.run.tt", "Componi le foto elencate in un'unica immagine coerente."))
         b_comp.clicked.connect(lambda: self.request_compose.emit())
         cg.addWidget(b_comp)
@@ -1097,6 +1131,11 @@ class Frame1Tab(QWidget):
         if hasattr(self, "_edit_grounding_row"):
             self._edit_grounding_row.setVisible(_idx == 2)
             self._edit_grounding_label.setVisible(_idx == 2)
+        # PuLID dell'Image to Image: solo motore Kontext (FLUX.1) — i pesi PuLID sono per FLUX.1
+        if hasattr(self, "_int_pulid_group"):
+            self._int_pulid_group.setEnabled(_idx == 0)
+            self._int_pulid_group.setToolTip("" if _idx == 0 else tr("f1.pulid.only_kontext",
+                "PuLID (identità volto) funziona solo col motore Kontext (FLUX.1)."))
         self._reload_flux_combos()
 
     def _on_seg_detector_changed(self, _idx: int):
@@ -1468,6 +1507,16 @@ class Frame1Tab(QWidget):
             # la carica nel canvas prima di procedere). Inpaint/outpaint usano solo il canvas.
             "integrate_photo": (self.int_photo["edit"].text().strip()
                                 if hasattr(self, "int_photo") else ""),
+            # PuLID dedicato all'Image to Image (container proprio, separato da quello di Genera)
+            "integrate_pulid_face": ((self.int_pulid_face.text().strip() or None)
+                                     if getattr(self, "int_pulid_enable", None)
+                                     and self.int_pulid_enable.isChecked() else None),
+            "integrate_pulid_strength": (self.int_pulid_strength.value()
+                                         if hasattr(self, "int_pulid_strength") else 0.8),
+            "integrate_pulid_start_step": (self.int_pulid_start.value()
+                                           if hasattr(self, "int_pulid_start") else 0),
+            "integrate_pulid_true_cfg": (self.int_pulid_truecfg.value()
+                                         if hasattr(self, "int_pulid_truecfg") else 1.0),
             # Campi inpaint/outpaint
             "negative": self.inp_neg.toPlainText().strip(),
             "strength": self.strength.value() / 100.0,
