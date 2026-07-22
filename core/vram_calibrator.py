@@ -29,7 +29,7 @@ _WORKER_OF = {                                          # venv → (python, argv
              [os.path.join(_REPO, "workers", "ltx2_measure.py")]),
 }
 _GRACE_S = 60                                           # attesa dopo l'ultimo job utente
-_TICK_MS = 30_000
+_TICK_MS = 10_000                                       # 10s: i file CPU si misurano in secondi
 
 
 class CalibrationScheduler(QObject):
@@ -129,7 +129,8 @@ class CalibrationScheduler(QObject):
             else:                                       # exit 2 = strutturale (arch/pipeline) → mai più
                 self._skipped.add(cur["path"])
                 self.progress.emit(f"[calibrazione] saltato (exit {rc}): {cur['name']}")
-            return
+            # NIENTE return: la misura successiva parte SUBITO nello stesso tick (i file CPU durano
+            # secondi — aspettare il prossimo giro faceva ~1 file/minuto ⇒ ore per 90 file piccoli).
         self._targets = [t for t in self._targets if t["path"] not in self._skipped]
         if not self._targets:
             self._timer.stop()
