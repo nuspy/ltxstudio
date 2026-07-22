@@ -86,8 +86,12 @@ class CalibrationScheduler(QObject):
             self.progress.emit(f"[calibrazione] misura interrotta ({why}) — riprenderà a GPU libera")
 
     def _can_run(self, est_mb: float, size_mb: float) -> str:
-        """'' se si può misurare ORA, altrimenti il MOTIVO del blocco (per il log: prima il
-        calibratore aspettava in silenzio e sembrava rotto — 'non sta caricando nulla')."""
+        """'' se si può misurare ORA, altrimenti il MOTIVO del blocco.
+        NIENTE PRONOSTICI (richiesta utente): le misure caricano su CPU e non toccano la GPU,
+        quindi non c'è alcun gate VRAM né stime su "quanto occuperà" — si PROVA davvero; se la
+        memoria non basta il worker esce pulito (exit 3) e il modello viene rimandato. Restano
+        solo i gate di RISPETTO dell'utente (coda/grazia/server occupati) e un floor di sistema
+        assoluto minimo (commit < 4GB = sistema già in affanno: partire ora è solo dannoso)."""
         try:
             if self._queue.is_busy():
                 return "coda generazioni occupata"
@@ -102,18 +106,9 @@ class CalibrationScheduler(QObject):
         except Exception:                               # noqa: BLE001
             pass
         try:
-            from core import gpu_mem
-            _free = gpu_mem.free_vram_mb()
-            if _free < est_mb + 2000:
-                return f"VRAM insufficiente ({_free:.0f}MB liberi, servono {est_mb + 2000:.0f})"
-        except Exception:                               # noqa: BLE001
-            return "VRAM non leggibile"
-        try:
             from core import st_direct
-            _commit = st_direct.commit_avail_mb()
-            if _commit < size_mb * 1.2:
-                return (f"memoria di sistema insufficiente ({_commit:.0f}MB di commit liberi, "
-                        f"servono {size_mb * 1.2:.0f}) — riprovo quando si libera")
+            if st_direct.commit_avail_mb() < 4096:
+                return "sistema in affanno di memoria (<4GB di commit) — attendo"
         except Exception:                               # noqa: BLE001
             pass
         return ""

@@ -25,6 +25,25 @@ import ltx2_infer  # applica i fix meta (mask + buffer) e la cache pipeline  # n
 app = FastAPI(title="LTX Studio — Native Video Server (LTX-2.3)")
 _jobs: dict[str, dict] = {}
 _q: "queue.Queue[str]" = queue.Queue()
+_last_activity = [__import__("time").monotonic()]       # auto-shutdown per inattività (vedi _idle_watch)
+
+
+def _idle_watch() -> None:
+    """AUTO-SPEGNIMENTO per inattività (richiesta utente: il contesto CUDA del server ~0.6GB non
+    deve restare in VRAM per sempre). Dopo LTX2_SERVER_IDLE_S secondi senza job (default 30 min,
+    0 = mai) il processo esce: VRAM e parcheggio RAM tornano all'OS. La GUI lo rilancia da sola
+    al prossimo video (ensure_server): si paga solo ~15s di riavvio dopo lunghe pause."""
+    import time as _t
+    idle_s = float(os.environ.get("LTX2_SERVER_IDLE_S", "1800") or 0)
+    if idle_s <= 0:
+        return
+    while True:
+        _t.sleep(60)
+        busy = any(j.get("status") in ("pending", "running") for j in _jobs.values())
+        if not busy and _t.monotonic() - _last_activity[0] > idle_s:
+            print(f"[ltx2] inattivo da {idle_s/60:.0f} min → auto-spegnimento (VRAM/RAM all'OS)",
+                  flush=True)
+            os._exit(0)
 
 
 class SubmitReq(BaseModel):
@@ -76,16 +95,19 @@ def _worker() -> None:
                     torch.cuda.empty_cache()
             except Exception:                               # noqa: BLE001
                 pass
+            _last_activity[0] = __import__("time").monotonic()
             _q.task_done()
 
 
 threading.Thread(target=_worker, daemon=True).start()
+threading.Thread(target=_idle_watch, daemon=True).start()
 
 
 @app.post("/submit")
 def submit(req: SubmitReq):
     jid = uuid.uuid4().hex
     _jobs[jid] = {"status": "pending", "params": req.params, "output": []}
+    _last_activity[0] = __import__("time").monotonic()
     _q.put(jid)
     return {"prompt_id": jid}
 
