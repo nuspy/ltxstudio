@@ -153,23 +153,38 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
     # della LoRA su pesi Float8_e4m3fn non è implementata).
     _apply_loras(pipe, list(loras))
 
-    # fp8: transformer ~13B bf16 (~26GB) non entra residente sui 32GB → layerwise casting fp8_e4m3 (~13GB),
-    # come FLUX in inference_server/backends/image_flux. Compute in bf16.
+    # ── PLACEMENT PLANNER-DRIVEN (unificazione, commit 3): decide dal footprint MISURATO nel DB
+    # canonico (core/vram_estimate, popolato al primo load) invece delle soglie fisse. Prima run
+    # (DB muto) = 'legacy' → soglie storiche INVARIATE; dalla seconda il piano è esatto:
+    # bf16 pieno se entra (qualità massima), fp8 layerwise se entra solo così, offload se niente.
     free = _free_vram_mb()
+    _plan = "legacy"
     try:
-        if free < 40000 and hasattr(pipe, "transformer"):
+        from core import vram_calibration as _vc, vram_estimate as _ve
+        _plan = _vc.plan_krea2_placement(free, _ve.cache_get(model_dir),
+                                         _ve.cache_get(model_dir, "fp8"))
+    except Exception:                                          # noqa: BLE001
+        _plan = "legacy"
+    _fp8_applied = False
+    try:
+        _want_fp8 = (_plan in ("cuda_fp8", "offload_fp8")) if _plan != "legacy" else (free < 40000)
+        if _want_fp8 and hasattr(pipe, "transformer"):
             pipe.transformer.enable_layerwise_casting(
                 storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
-            print(f"[krea2] transformer fp8 layerwise (VRAM libera {free}MB)", flush=True)
+            _fp8_applied = True
+            print(f"[krea2] transformer fp8 layerwise (plan={_plan}, VRAM libera {free}MB)", flush=True)
     except Exception as ex:                                    # noqa: BLE001
         print(f"[krea2] fp8 non applicato ({ex})", flush=True)
 
     try:
-        if free < 30000:
+        _offload = (_plan == "offload_fp8") if _plan != "legacy" else (free < 30000)
+        if _offload:
             pipe.enable_model_cpu_offload()
-            print("[krea2] model_cpu_offload (VRAM stretta)", flush=True)
+            print(f"[krea2] model_cpu_offload (plan={_plan})", flush=True)
         else:
             pipe = pipe.to("cuda")
+            if _plan != "legacy":
+                print(f"[krea2] residente su GPU (plan={_plan})", flush=True)
     except Exception:                                          # noqa: BLE001
         pipe = pipe.to("cuda")
     try:
@@ -185,6 +200,14 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
             if _mod is not None and hasattr(_mod, "parameters"):
                 _mb += sum(q.numel() * q.element_size() for q in _mod.parameters()) / 2**20
         vram_ledger.register(f"krea2:{model_dir}", _mb, category="image", state="vram", path=model_dir)
+        # commit 3: PERSISTI il footprint misurato nel DB canonico (con layerwise casting lo storage
+        # è float8 → element_size()==1 → _mb È il footprint fp8; senza casting è il bf16). Dalla
+        # prossima run il planner ha il dato esatto.
+        if _mb > 0:
+            from core import vram_estimate as _ve2
+            _ve2.cache_put(model_dir, int(_mb), variant=("fp8" if _fp8_applied else ""),
+                           source="measured", category="image", arch="krea2",
+                           dtype=("fp8" if _fp8_applied else "bf16"))
     except Exception:                                          # noqa: BLE001
         pass
     # NB: il backend di attenzione lo imposta il CHIAMANTE — solo l'EDIT (sequenza in-context lunga con

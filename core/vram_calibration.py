@@ -139,6 +139,23 @@ def invalidate(path: str | None = None) -> int:
     return removed
 
 
+def plan_krea2_placement(free_mb: float, cached_bf16_mb: int, cached_fp8_mb: int,
+                         working_mb: int = 3000) -> str:
+    """Placement Krea2 PLANNER-DRIVEN (unificazione, commit 3): decide dal footprint MISURATO
+    (DB canonico) invece delle soglie fisse 40000/30000. Ritorna:
+      'cuda_bf16'   — il bf16 pieno entra (qualità massima, niente casting fp8)
+      'cuda_fp8'    — entra solo con storage fp8 layerwise
+      'offload_fp8' — footprint noto ma non entra → fp8 + model_cpu_offload
+      'legacy'      — DB muto su questo modello → soglie storiche (fallback, mai rimosse)."""
+    if cached_bf16_mb > 0 and free_mb >= cached_bf16_mb + working_mb:
+        return "cuda_bf16"
+    if cached_fp8_mb > 0 and free_mb >= cached_fp8_mb + working_mb:
+        return "cuda_fp8"
+    if cached_bf16_mb > 0 or cached_fp8_mb > 0:
+        return "offload_fp8"
+    return "legacy"
+
+
 def plan_placement(transformer_mb: int, arch: str, free_mb: int, working_mb: int = 3200) -> dict:
     """Planner COMBINATORIO: dato il transformer (dalla cache), l'arch (→ componenti richiesti) e la VRAM
     LIBERA, decide cosa tenere RESIDENTE e cosa OFFLOADARE per minimizzare l'offload (= massima velocità).
