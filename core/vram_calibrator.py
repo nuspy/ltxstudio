@@ -128,7 +128,10 @@ class CalibrationScheduler(QObject):
                 self._done += 1
                 self.progress.emit(f"[calibrazione] misurato: {cur['name']} "
                                    f"({self._done} fatti, {len(self._targets)} rimasti)")
-            else:
+            elif rc == 3:                               # memoria insufficiente ORA: transitorio → riprova
+                self._targets.append(cur)               # in fondo alla coda, quando il commit si libera
+                self.progress.emit(f"[calibrazione] rimandato (memoria insufficiente ora): {cur['name']}")
+            else:                                       # exit 2 = strutturale (arch/pipeline) → mai più
                 self._skipped.add(cur["path"])
                 self.progress.emit(f"[calibrazione] saltato (exit {rc}): {cur['name']}")
             return
@@ -140,10 +143,15 @@ class CalibrationScheduler(QObject):
             return
         # NO head-of-line blocking: se il primo non ci sta (VRAM/commit), prova i SUCCESSIVI più
         # piccoli — un modello leggero misurabile ora non deve aspettare il gigante in testa.
+        # GATE PER TIPO: la misura video (ltx2_measure) è SOLO-CPU, un tensore alla volta → niente
+        # gate VRAM (prima chiedeva est+2GB: il 22B da 37GB non partiva MAI su una scheda da 32GB)
+        # e commit fisso ~6GB; le misure immagine caricano la pipeline vera → gate pieni.
         t, why = None, ""
         for cand in sorted(self._targets, key=lambda x: float(x.get("size_mb") or 0)):
-            est = float(cand.get("est_mb") or cand.get("size_mb") or 20000)
-            why = self._can_run(est, float(cand.get("size_mb") or est))
+            _cpu_only = cand.get("venv") == "ltx2"       # ltx2_measure: zero VRAM, ~6GB commit fissi
+            est = 0.0 if _cpu_only else float(cand.get("est_mb") or cand.get("size_mb") or 20000)
+            _commit_mb = 6000.0 if _cpu_only else float(cand.get("size_mb") or est)
+            why = self._can_run(est, _commit_mb)
             if not why:
                 t = cand
                 break

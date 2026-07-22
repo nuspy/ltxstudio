@@ -54,11 +54,9 @@ def main() -> int:
                 fp8 = fp8 or str(info.get("dtype", "")).startswith("F8")
                 del t                                            # picco commit = un tensore
         gc.collect()
-    except MemoryError:
-        print("[measure] MemoryError (commit insufficiente) → skipped_commit", flush=True)
-        vram_estimate.cache_put(path, max(1, int(os.path.getsize(path) / 2**20)),
-                                variant=("fp8" if fp8 else ""), source="header", category="video")
-        return 2
+    except (MemoryError, OSError) as e:                     # transitorio (commit basso) → exit 3 = RIPROVA
+        print(f"[measure] memoria insufficiente ora ({type(e).__name__}) → riprovare più tardi", flush=True)
+        return 3
     total = int(sum(comps.values()))
     tr = int(comps.get("transformer", 0))
     vram_estimate.cache_put(path, total, variant=("fp8" if fp8 else ""), source="measured",

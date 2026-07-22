@@ -56,8 +56,16 @@ def main() -> int:
         except Exception:                                   # noqa: BLE001
             pass
         return 0
-    except Exception as e:                                  # noqa: BLE001
-        print(f"[measure] FALLITO ({type(e).__name__}: {e})", flush=True)
+    except (MemoryError, OSError) as e:                     # transitorio (commit/RAM bassi) → exit 3 = RIPROVA
+        print(f"[measure] memoria insufficiente ora ({type(e).__name__}: {e}) → riprovare più tardi",
+              flush=True)
+        return 3
+    except Exception as e:                                  # noqa: BLE001 — strutturale (arch/pipeline) → skip
+        _msg = str(e)
+        if "out of memory" in _msg.lower() or "paging file" in _msg.lower() or "1455" in _msg:
+            print(f"[measure] memoria insufficiente ora ({type(e).__name__}) → riprovare più tardi", flush=True)
+            return 3
+        print(f"[measure] FALLITO ({type(e).__name__}: {_msg[:300]})", flush=True)
         return 2
 
 
