@@ -218,12 +218,20 @@ class _PersistentChild:
         finally:
             self._lock.release()
 
-    def free(self, timeout: float = 10):
-        # /free = cambio-pipeline (un altro motore vuole la VRAM). KILLA il figlio: la sua VRAM è rilasciata
-        # dall'OS all'uscita, e — soprattutto — il prossimo job spawnerà un figlio FRESCO. Non riusiamo lo
-        # stesso processo dopo un free perché ricaricare un modello dopo averne scaricato uno È un secondo
-        # load in-process (il segfault/stallo che l'isolamento evita). Il respawn è veloce (~1s + il load).
+    def free(self, timeout: float = 10, demote: bool = False):
+        # /free = cambio-pipeline (un altro motore vuole la VRAM).
+        # demote=True (unified-model-manager): il figlio RESTA VIVO e parcheggia i modelli in RAM
+        # (FREE_DEMOTE → demote nel ModelManager/ComponentStore): se la pipeline successiva torna
+        # alle immagini, restore da RAM senza SSD. I load sono commit-safe (st_direct nel runner),
+        # che era la causa del segfault "2° load in-process". Fallback: kill come prima.
+        # demote=False: KILLA il figlio (VRAM *e* RAM rilasciate all'OS; prossimo job = figlio fresco).
         with self._lock:
+            if demote and self._alive():
+                try:
+                    self._send("FREE_DEMOTE", ("FREED",), timeout)
+                    return
+                except Exception:                            # noqa: BLE001 — figlio muto → kill
+                    pass
             self._kill()
             self.model_key = "-"
 
@@ -338,14 +346,20 @@ def system_stats():
     return out
 
 
+class _FreeReq(BaseModel):
+    mode: str = "demote"                                    # "demote" (parcheggia in RAM) | "destroy"
+
+
 @app.post("/free")
-def free():
-    # per-job isolato: niente da liberare (il figlio muore da sé). Con figlio persistente: svuota il suo
-    # ComponentStore (VRAM) senza uccidere il processo (resta caldo per il prossimo modello).
+def free(req: _FreeReq | None = None):
+    # per-job isolato: niente da liberare (il figlio muore da sé). Con figlio persistente:
+    # mode=demote → il figlio parcheggia i modelli in RAM e resta vivo (rientro veloce);
+    # mode=destroy → kill del figlio (VRAM e RAM all'OS). Vedi mem_coordinator.
+    mode = (req.mode if req else "demote").lower()
     if _PERSIST and _child is not None:
-        _child.free()
-        return {"ok": True, "freed": "persistent_child_store"}
-    return {"ok": True}
+        _child.free(demote=(mode != "destroy"))
+        return {"ok": True, "freed": "persistent_child_store", "mode": mode}
+    return {"ok": True, "mode": mode}
 
 
 if __name__ == "__main__":

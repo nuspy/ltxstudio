@@ -73,23 +73,34 @@ def history(jid: str):
     return _jobs.get(jid, {"status": "unknown"})
 
 
+class FreeReq(BaseModel):
+    mode: str = "demote"                                    # "demote" (parcheggia in RAM) | "destroy"
+
+
 @app.post("/free")
-def free():
-    """Libera la VRAM/RAM tenuta dalla pipeline immagine (chiamato quando la prossima pipeline è di un'ALTRA
-    categoria: video/3D/mondi/musica, via mem_coordinator). Senza, dopo le foto la VRAM resta occupata e il
-    job successivo (es. video 22B) finisce in offload/OOM."""
+def free(req: FreeReq | None = None):
+    """Libera la VRAM per un'altra pipeline (via mem_coordinator). Due modalità (unified-model-manager):
+    - demote (default): i pipe vengono PARCHEGGIATI su CPU-RAM (rientro senza SSD se si torna a Krea2);
+    - destroy: distrutti (VRAM e RAM all'OS — categorie effimere o «Libera VRAM»)."""
     import gc
     import torch
+    mode = (req.mode if req else "demote").lower()
     n = len(krea2_infer._PIPE_CACHE)
-    try:
-        krea2_infer._PIPE_CACHE.clear()
-    except Exception:                                       # noqa: BLE001
-        pass
+    parked_mb = 0.0
+    if mode == "destroy":
+        try:
+            krea2_infer._PIPE_CACHE.clear()
+        except Exception:                                   # noqa: BLE001
+            pass
+    else:
+        parked_mb = krea2_infer._demote_pipes()
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    print(f"[krea2] /free: {n} pipeline immagine scaricate", flush=True)
-    return {"freed_pipelines": n}
+    print(f"[krea2] /free mode={mode}: {n} pipe, parcheggio RAM {parked_mb:.0f}MB "
+          f"{'DISTRUTTO' if mode == 'destroy' else 'mantenuto'}", flush=True)
+    return {"freed_pipelines": n if mode == "destroy" else 0, "mode": mode,
+            "parked_ram_mb": round(parked_mb)}
 
 
 @app.get("/system_stats")

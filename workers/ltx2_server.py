@@ -65,23 +65,40 @@ def history(jid: str):
     return _jobs.get(jid, {"status": "unknown"})
 
 
+class FreeReq(BaseModel):
+    mode: str = "demote"                                    # "demote" (parcheggia in RAM) | "destroy"
+
+
 @app.post("/free")
-def free():
-    """M2 — libera la VRAM/RAM tenuta dalla pipeline video (chiamato quando la prossima pipeline è di un'ALTRA
-    categoria: immagine/3D/mondi/musica). Prima MANCAVA → dopo un video la VRAM restava occupata a tempo
-    indefinito e i job immagine successivi finivano in offload."""
+def free(req: FreeReq | None = None):
+    """M2/M-park — libera la VRAM per un'altra pipeline. Due modalità (unified-model-manager):
+    - demote (default): svuota la VRAM ma TIENE il parcheggio RAM (_PARK) e la _PIPE_CACHE →
+      se la pipeline successiva torna al video, i pesi rientrano dalla RAM (niente SSD).
+    - destroy: come prima — distrugge pipeline E parcheggio (chi chiama vuole anche la RAM:
+      categorie effimere 3D/mondi/musica, o il bottone «Libera VRAM»)."""
     import gc
     import torch
+    mode = (req.mode if req else "demote").lower()
     n = len(ltx2_infer._PIPE_CACHE)
-    try:
-        ltx2_infer._PIPE_CACHE.clear()
-    except Exception:                                       # noqa: BLE001
-        pass
+    parked = 0.0
+    if mode == "destroy":
+        try:
+            ltx2_infer._PIPE_CACHE.clear()
+            ltx2_infer._PARK.clear()
+        except Exception:                                   # noqa: BLE001
+            pass
+    else:                                                   # demote: VRAM sì, RAM no
+        try:
+            parked = sum(i["mb"] for i in ltx2_infer._PARK._info.values())
+        except Exception:                                   # noqa: BLE001
+            pass
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    print(f"[ltx2] /free: {n} pipeline video scaricate", flush=True)
-    return {"freed_pipelines": n}
+    print(f"[ltx2] /free mode={mode}: {n} pipeline, parcheggio RAM {parked:.0f}MB "
+          f"{'DISTRUTTO' if mode == 'destroy' else 'mantenuto'}", flush=True)
+    return {"freed_pipelines": n if mode == "destroy" else 0, "mode": mode,
+            "parked_ram_mb": round(parked)}
 
 
 @app.get("/system_stats")
@@ -100,9 +117,14 @@ def system_stats():
     except Exception:                                       # noqa: BLE001
         pass
     used_mb = (total - free) // 1024 // 1024
+    try:                                                    # M-park: lista modelli parcheggiati in RAM
+        parked = ltx2_infer._PARK.stats()
+    except Exception:                                       # noqa: BLE001
+        parked = []
     return {"up": True, "cached_pipelines": len(ltx2_infer._PIPE_CACHE), "model_key": model_key,
             "vram_used_mb": used_mb, "model_vram_mb": used_mb,
-            "vram_free_mb": free // 1024 // 1024, "vram_total_mb": total // 1024 // 1024}
+            "vram_free_mb": free // 1024 // 1024, "vram_total_mb": total // 1024 // 1024,
+            "parked": parked, "parked_ram_mb": round(sum(p["mb"] for p in parked))}
 
 
 if __name__ == "__main__":

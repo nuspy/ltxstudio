@@ -44,6 +44,18 @@ def main() -> int:
     except Exception:                                       # noqa: BLE001
         pass
 
+    # LOAD COMMIT-SAFE (unified-model-manager): safetensors.torch.load_file → I/O diretto senza
+    # mmap. Era il "segfault del 2° load in-process" che rendeva fragile questo figlio: il mmap
+    # copy-on-write impegna ~2× il checkpoint di COMMIT (vedi core/st_direct e la memoria
+    # pagefile-commit-mmap-crash). Con questo patch la residenza/demote diventa sostenibile.
+    try:
+        from core import st_direct
+        if st_direct.patch_safetensors_torch():
+            print("[persistent_runner] safetensors → I/O diretto (no-mmap, commit-safe)",
+                  file=sys.stderr, flush=True)
+    except Exception as _e:                                 # noqa: BLE001
+        print(f"[persistent_runner] patch no-mmap fallito: {_e}", file=sys.stderr, flush=True)
+
     # torch + handlers importati QUI (nel figlio), MAI nel server HTTP.
     from inference_server.model_manager import ModelManager
     from inference_server.backends import image_flux, image_upscale, image_segment, video_postprocess
@@ -75,6 +87,26 @@ def main() -> int:
                     component_store.STORE.clear()              # hard-free: distrugge tutto + empty_cache
                 except Exception:                              # noqa: BLE001
                     pass
+                cur_key = "-"
+                emit("FREED")
+                continue
+            if cmd == "FREE_DEMOTE":
+                # unified-model-manager: libera la VRAM ma PARCHEGGIA i modelli in RAM (la pipeline
+                # successiva potrebbe riusarli, o essere ancora ignota). Le shell monolitiche vanno in
+                # _cpu_cache (che resta), i componenti condivisi vengono demotati su CPU dallo store.
+                try:
+                    mm.clear_all(allow_cpu=True, keep_ram=True)
+                    n = component_store.STORE.demote_all()
+                    print(f"[persistent_runner] FREE_DEMOTE: {n} componenti parcheggiati in RAM",
+                          file=sys.stderr, flush=True)
+                except Exception as e:                         # noqa: BLE001
+                    print(f"[persistent_runner] FREE_DEMOTE fallito ({e}) → hard free",
+                          file=sys.stderr, flush=True)
+                    try:
+                        mm.clear_all()
+                        component_store.STORE.clear()
+                    except Exception:                          # noqa: BLE001
+                        pass
                 cur_key = "-"
                 emit("FREED")
                 continue

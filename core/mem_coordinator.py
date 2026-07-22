@@ -14,6 +14,7 @@ Solo stdlib (urllib): importabile anche da chiamanti leggeri. Best-effort, timeo
 """
 from __future__ import annotations
 
+import json
 import urllib.request
 
 _IMAGE_PORTS = (8189, 8200, 8191)   # 8191 = server Krea 2 persistente (immagini/edit)
@@ -24,12 +25,17 @@ _VIDEO_PORTS = (8190,)
 _last: dict[str, str | None] = {"cat": None}
 
 
-def _free_ports(ports, timeout: float) -> list[int]:
+def _free_ports(ports, timeout: float, mode: str = "demote") -> list[int]:
+    """POST /free ai server. `mode` (unified-model-manager):
+    - "demote": libera la VRAM ma PARCHEGGIA i modelli in RAM (la pipeline successiva potrebbe
+      riusarli, o essere ancora ignota) — i server che non conoscono il campo lo ignorano (=hard).
+    - "destroy": distruggi anche il parcheggio RAM (il chiamante vuole VRAM *e* RAM)."""
+    body = json.dumps({"mode": mode}).encode("utf-8")
     hit = []
     for p in ports:
         try:
             urllib.request.urlopen(
-                urllib.request.Request(f"http://127.0.0.1:{p}/free", data=b"{}",
+                urllib.request.Request(f"http://127.0.0.1:{p}/free", data=body,
                                        headers={"Content-Type": "application/json"}),
                 timeout=timeout).read()
             hit.append(p)
@@ -40,23 +46,26 @@ def _free_ports(ports, timeout: float) -> list[int]:
 
 def free_for(category: str, *, timeout: float = 8.0, force: bool = False) -> list[int]:
     """Libera i server delle categorie DIVERSE da `category`. Ritorna le porte effettivamente liberate.
-    `force=True` bypassa il guard "stessa categoria consecutiva" (es. il pulsante GUI «Libera VRAM»)."""
+    `force=True` bypassa il guard "stessa categoria consecutiva" (es. il pulsante GUI «Libera VRAM»).
+    Cambio image⇄video → demote (i modelli dell'altra categoria restano parcheggiati in RAM, pronti
+    al rientro); categorie EFFIMERE (3d/world/music) → destroy (vogliono anche la RAM)."""
     cat = (category or "").lower()
     if not force and _last["cat"] == cat:
         return []                                           # stessa categoria di fila → niente da cambiare
     _last["cat"] = cat
     if cat == "image":
-        return _free_ports(_VIDEO_PORTS, timeout)
+        return _free_ports(_VIDEO_PORTS, timeout, mode="demote")
     if cat == "video":
-        return _free_ports(_IMAGE_PORTS, timeout)
-    # 3d / world / music / sconosciute → effimere: libera TUTTI i server persistenti
-    return _free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout)
+        return _free_ports(_IMAGE_PORTS, timeout, mode="demote")
+    # 3d / world / music / sconosciute → effimere: liberano TUTTO, RAM compresa
+    return _free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout, mode="destroy")
 
 
 def free_all(*, timeout: float = 8.0) -> list[int]:
-    """Libera TUTTI i server GPU persistenti (pulsante GUI «Libera VRAM»). Resetta il guard di categoria."""
+    """Libera TUTTI i server GPU persistenti (pulsante GUI «Libera VRAM») — hard: anche i parcheggi RAM.
+    Resetta il guard di categoria."""
     _last["cat"] = None
-    return _free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout)
+    return _free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout, mode="destroy")
 
 
 def reset() -> None:

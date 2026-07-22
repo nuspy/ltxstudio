@@ -140,15 +140,24 @@ class ComponentStore:
         return sum(e.size_mb for k in (keys or ()) if (e := self._items.get(k)) and e.device == device)
 
     def _ram_ok(self, size_mb: float) -> bool:
-        """La CPU-cache può ospitare altri size_mb? Floor psutil (RAM sempre libera) + budget totale."""
+        """La CPU-cache può ospitare altri size_mb? Floor psutil (RAM fisica) + floor di COMMIT
+        (RAM+pagefile — il limite VERO su Windows: sforarlo = access violation, non OOM pulito;
+        vedi core/st_direct e la memoria pagefile-commit-mmap-crash) + budget totale."""
         try:
             import psutil
             avail_mb = psutil.virtual_memory().available / 2**20
         except Exception:                               # noqa: BLE001
             return False
+        try:
+            from core import st_direct
+            commit_mb = st_direct.commit_avail_mb()
+        except Exception:                               # noqa: BLE001
+            commit_mb = 1e9
         floor = float(os.environ.get("NATIVE_RAM_FLOOR_MB", "16384"))
+        cfloor = float(os.environ.get("NATIVE_COMMIT_FLOOR_MB", "20480"))
         budget = float(os.environ.get("NATIVE_CPU_CACHE_MB", "40960"))
-        return (avail_mb - size_mb > floor) and (self.resident_mb("cpu") + size_mb <= budget)
+        return ((avail_mb - size_mb > floor) and (commit_mb - size_mb > cfloor)
+                and (self.resident_mb("cpu") + size_mb <= budget))
 
     def _shrink_cpu_lru(self, need_mb: float) -> None:
         """Fa posto nel budget CPU distruggendo i cpu-cached più vecchi (refcount==0)."""
@@ -216,6 +225,44 @@ class ComponentStore:
         if freed:
             self.bump_epoch()                            # i device sono cambiati → rebind delle pipe
         return freed
+
+    def demote_all(self) -> int:
+        """FREE_DEMOTE (unified-model-manager): parcheggia in RAM TUTTI i componenti residenti in
+        VRAM — la pipeline successiva è di un'altra categoria (o ignota), ma questi modelli possono
+        servire di nuovo: invece di distruggerli, .to('cpu') se il budget/commit lo consente,
+        altrimenti destroy. Ritorna quanti componenti sono stati demotati."""
+        n = 0
+        for k in list(self._items.keys()):
+            e = self._items.get(k)
+            if e is None or e.device != "cuda":
+                continue
+            demoted = False
+            if self._ram_ok(e.size_mb) and hasattr(e.obj, "to"):
+                try:
+                    try:
+                        from accelerate.hooks import remove_hook_from_module
+                        remove_hook_from_module(e.obj, recurse=True)
+                    except Exception:                    # noqa: BLE001
+                        pass
+                    e.obj.to("cpu")
+                    e.device = "cpu"
+                    demoted = True
+                    n += 1
+                    print(f"[store] demote_all→cpu {k} ({e.size_mb:.0f}MB)", flush=True)
+                except Exception as _e:                  # noqa: BLE001
+                    print(f"[store] demote_all {k} fallita ({_e}) → destroy", flush=True)
+            if not demoted:
+                self._items.pop(k, None)
+                try:
+                    del e.obj
+                except Exception:                        # noqa: BLE001
+                    pass
+        import gc
+        gc.collect()
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        self.bump_epoch()                                # device cambiati → rebind al prossimo job
+        return n
 
     # ── epoch / stato ────────────────────────────────────────────────────────
     def bump_epoch(self) -> int:

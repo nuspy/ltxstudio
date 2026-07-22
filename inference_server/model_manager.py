@@ -162,14 +162,17 @@ class ModelManager:
         del e
         self.flush()
 
-    def clear_all(self, *, allow_cpu: bool = False) -> int:
+    def clear_all(self, *, allow_cpu: bool = False, keep_ram: bool = False) -> int:
         """HARD-free: scarica TUTTE le shell/pipeline in cache (release dei componenti condivisi) e svuota la
         cpu-cache. Usato dal /free del figlio persistente (cambio-pipeline: un altro motore vuole la VRAM).
-        allow_cpu=False → distrugge (VRAM subito libera) invece di demotare su RAM. Ritorna quante scaricate."""
+        allow_cpu=False → distrugge (VRAM subito libera) invece di demotare su RAM.
+        keep_ram=True (FREE_DEMOTE, unified-model-manager) → la cache CPU-RAM SOPRAVVIVE: i modelli
+        parcheggiati rientrano dal prossimo ensure senza toccare l'SSD. Ritorna quante scaricate."""
         n = len(self._cache)
         for k in list(self._cache.keys()):
             self.unload(k, allow_cpu=allow_cpu)
-        self._cpu_cache.clear()
+        if not keep_ram:
+            self._cpu_cache.clear()
         return n
 
     def evict_others(self, keep_key: str) -> int:

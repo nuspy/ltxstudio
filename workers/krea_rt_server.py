@@ -69,11 +69,19 @@ def history(jid: str):
     return _jobs.get(jid, {"status": "unknown"})
 
 
+class FreeReq(BaseModel):
+    mode: str = "demote"
+
+
 @app.post("/free")
-def free():
-    """Libera la VRAM del pipe krea_rt (chiamato dal registro quando un'ALTRA categoria/modello la richiede)."""
+def free(req: FreeReq | None = None):
+    """Libera la VRAM del pipe krea_rt (chiamato dal registro quando un'ALTRA categoria/modello la richiede).
+    NB unified-model-manager: qui il campo `mode` è accettato per uniformità ma demote = destroy —
+    il pipe autoregressivo tiene KV-cache/stato che non si sposta in modo pulito su CPU, e il modello
+    è piccolo (1.3B, reload ~5s dall'SSD): il parcheggio RAM non vale il rischio."""
     import gc
     import torch
+    mode = (req.mode if req else "demote").lower()
     n = len(krea_rt_infer._PIPE)
     try:
         krea_rt_infer._PIPE.clear()
@@ -82,8 +90,8 @@ def free():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    print(f"[krea_rt] /free: {n} pipeline scaricate", flush=True)
-    return {"freed_pipelines": n}
+    print(f"[krea_rt] /free (mode={mode}, sempre destroy): {n} pipeline scaricate", flush=True)
+    return {"freed_pipelines": n, "mode": mode}
 
 
 @app.get("/system_stats")

@@ -425,33 +425,24 @@ except Exception:  # noqa: BLE001
 def _patch_no_mmap_loader():
     """FIX 0xC0000005 / 'invalid python storage' (22/07): su Windows il percorso safetensors→torch
     (safe_open + UntypedStorage.from_file) mappa il checkpoint copy-on-write e impegna ~2× la sua
-    dimensione di COMMIT (RAM+pagefile). Con pagefile 16GB e il baseline degli altri processi, il
-    fp8 da 29GB non ha commit → access violation al primo get_tensor (misurato: la soglia di crash
-    è ~commit disponibile / 2; il file è integro). Qui si legge il file con I/O DIRETTO (seek+read
-    dei soli tensori richiesti, uno alla volta): commit di picco = un tensore, non 2× il file.
+    dimensione di COMMIT (RAM+pagefile) → crash quando il commit scarseggia (misurato: soglia
+    ≈ commit disponibile / 2; il file è integro). Lettura a I/O DIRETTO via core/st_direct
+    (seek+readinto per-tensore): commit di picco = un tensore, non 2× il file.
     Opt-out: LTX_MMAP=1 ripristina il loader mmap originale."""
     if os.environ.get("LTX_MMAP") == "1":
         return
     try:
-        import struct as _struct
+        from core import st_direct as _std
         import ltx_core.loader.sft_loader as _sft
         from ltx_core.loader.primitives import StateDict as _SD
 
-        _DT = {"F64": torch.float64, "F32": torch.float32, "F16": torch.float16,
-               "BF16": torch.bfloat16, "F8_E4M3": torch.float8_e4m3fn, "F8_E5M2": torch.float8_e5m2,
-               "I64": torch.int64, "I32": torch.int32, "I16": torch.int16, "I8": torch.int8,
-               "U8": torch.uint8, "BOOL": torch.bool}
-
-        def _read_header(path):
-            with open(path, "rb") as fh:
-                n = _struct.unpack("<Q", fh.read(8))[0]
-                return json.loads(fh.read(n)), 8 + n
+        _DT = _std._dtypes()
 
         def _load(self, path, sd_ops=None, device=None):
             sd, size, dtypes = {}, 0, set()
             device = device or torch.device("cpu")
             for shard in (path if isinstance(path, list) else [path]):
-                hdr, base = _read_header(shard)
+                hdr, base = _std.read_header(shard)
                 with open(shard, "rb") as fh:
                     for name, info in hdr.items():
                         if name == "__metadata__":
@@ -459,16 +450,7 @@ def _patch_no_mmap_loader():
                         expected = name if sd_ops is None else sd_ops.apply_to_key(name)
                         if expected is None:
                             continue
-                        a, b = info["data_offsets"]
-                        if b > a:
-                            fh.seek(base + a)
-                            buf = bytearray(b - a)          # readinto: zero copie transitorie (commit=1×)
-                            if fh.readinto(buf) != b - a:
-                                raise RuntimeError(f"lettura troncata di {name} da {shard}")
-                            value = torch.frombuffer(buf, dtype=_DT[info["dtype"]]).reshape(info["shape"])
-                        else:
-                            value = torch.empty(info["shape"], dtype=_DT[info["dtype"]])
-                        value = value.to(device=device)
+                        value = _std.read_tensor(fh, base, info, _DT).to(device=device)
                         pairs = ((expected, value),)
                         if sd_ops is not None:
                             pairs = sd_ops.apply_to_key_value(expected, value)
@@ -479,8 +461,7 @@ def _patch_no_mmap_loader():
             return _SD(sd=sd, device=device, size=size, dtype=dtypes)
 
         def _metadata(self, path):
-            hdr, _ = _read_header(path)
-            meta = hdr.get("__metadata__") or {}
+            meta = _std.metadata(path)
             return json.loads(meta["config"]) if "config" in meta else {}
 
         _sft.SafetensorsStateDictLoader.load = _load
@@ -491,6 +472,125 @@ def _patch_no_mmap_loader():
 
 
 _patch_no_mmap_loader()
+
+
+# ── PARCHEGGIO RAM (unified-model-manager): VRAM→RAM invece di eliminare ─────────────────────
+# Richiesta utente: un modello scaricato che potrà servire di nuovo (stessa pipeline, modello
+# comune tra pipeline, o pipeline successiva ignota) NON va distrutto ma parcheggiato in RAM
+# e ricaricato da lì; quando la pipeline successiva è nota e non lo usa → rimosso dalla RAM.
+try:
+    from ltx_core.loader.registry import DummyRegistry as _DummyReg
+except Exception:                                       # noqa: BLE001
+    _DummyReg = object
+
+
+class _CpuParkRegistry(_DummyReg):
+    """Registry ltx-core che parcheggia in RAM i pesi letti da disco.
+
+    Eredita da DummyRegistry DI PROPOSITO: `apply_loras` fonde in-place (rebind del dict) solo
+    quando isinstance(registry, DummyRegistry) — con un registry "vero" farebbe un clone completo
+    del transformer (2× VRAM sul load device = OOM sui 32GB). I tensori parcheggiati non vengono
+    mai mutati: get() ritorna una SHALLOW-copy del dict (la fusione LoRA rebinda gli slot della
+    copia, mai i tensori) e il .to(device/dtype) a valle crea copie nuove.
+
+    Commit-aware: parcheggia solo se il commit (RAM+pagefile) resta sopra il floor — su questa
+    macchina il limite vero è il commit, non la RAM fisica (vedi core/st_direct).
+    Env: LTX_RAM_PARK=0 disattiva; LTX_RAM_PARK_MB budget (default 48GB);
+         LTX_COMMIT_FLOOR_MB floor di commit da non intaccare (default 20GB)."""
+
+    def __init__(self):
+        self._sd: dict = {}                             # id → StateDict (tensori su CPU)
+        self._info: dict = {}                           # id → {paths, mb, used}
+
+    @staticmethod
+    def _gen_id(paths, sd_ops) -> str:
+        import hashlib
+        parts = [os.path.abspath(str(p)) for p in paths]
+        if sd_ops is not None:
+            parts.append(getattr(sd_ops, "name", str(sd_ops)))
+        return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _enabled() -> bool:
+        return os.environ.get("LTX_RAM_PARK", "1") != "0"
+
+    def _parked_mb(self) -> float:
+        return sum(i["mb"] for i in self._info.values())
+
+    def get(self, paths, sd_ops):
+        if not self._enabled():
+            return None
+        import time as _tm
+        sid = self._gen_id(paths, sd_ops)
+        e = self._sd.get(sid)
+        if e is None:
+            return None
+        self._info[sid]["used"] = _tm.monotonic()
+        print(f"[park] riuso da RAM: {os.path.basename(str(paths[0]))} "
+              f"({self._info[sid]['mb']:.0f}MB, no disco)", flush=True)
+        from ltx_core.loader.primitives import StateDict as _SD
+        return _SD(sd=dict(e.sd), device=e.device, size=e.size, dtype=e.dtype)
+
+    def add(self, paths, sd_ops, state_dict):
+        if not self._enabled():
+            return
+        import time as _tm
+        sid = self._gen_id(paths, sd_ops)
+        if sid in self._sd:
+            return
+        mb = sum(v.nbytes for v in state_dict.sd.values()) / 2**20
+        from core import st_direct as _std
+        floor = float(os.environ.get("LTX_COMMIT_FLOOR_MB", "20480"))
+        budget = float(os.environ.get("LTX_RAM_PARK_MB", "49152"))
+        while self._info and self._parked_mb() + mb > budget:  # LRU nel budget
+            self._drop(min(self._info, key=lambda k: self._info[k]["used"]))
+        if self._parked_mb() + mb > budget or _std.commit_avail_mb() - mb < floor:
+            print(f"[park] SKIP {os.path.basename(str(paths[0]))} ({mb:.0f}MB): "
+                  "commit/budget insufficiente → niente parcheggio", flush=True)
+            return
+        cpu_sd = {k: (v if v.device.type == "cpu" else v.to("cpu")) for k, v in state_dict.sd.items()}
+        from ltx_core.loader.primitives import StateDict as _SD
+        self._sd[sid] = _SD(sd=cpu_sd, device=torch.device("cpu"),
+                            size=state_dict.size, dtype=state_dict.dtype)
+        self._info[sid] = {"paths": [os.path.abspath(str(p)) for p in paths], "mb": mb,
+                           "used": _tm.monotonic()}
+        print(f"[park] parcheggiato in RAM: {os.path.basename(str(paths[0]))} "
+              f"({mb:.0f}MB, totale {self._parked_mb():.0f}MB)", flush=True)
+
+    def pop(self, paths, sd_ops):
+        sid = self._gen_id(paths, sd_ops)
+        self._info.pop(sid, None)
+        return self._sd.pop(sid, None)
+
+    def _drop(self, sid: str) -> None:
+        i = self._info.pop(sid, None)
+        self._sd.pop(sid, None)
+        if i:
+            print(f"[park] rimosso dalla RAM: {os.path.basename(i['paths'][0])} ({i['mb']:.0f}MB)",
+                  flush=True)
+
+    def drop_except(self, keep_paths) -> float:
+        """Regola di drop (pipeline del job ora NOTA): i pesi parcheggiati che il job non userà
+        vengono rimossi dalla RAM. `keep_paths` = file O directory (prefix-match) del job."""
+        keep = [os.path.abspath(str(p)) for p in keep_paths if p]
+        gone = 0.0
+        for sid in list(self._info):
+            used = any(pp == k or pp.startswith(k + os.sep)
+                       for pp in self._info[sid]["paths"] for k in keep)
+            if not used:
+                gone += self._info[sid]["mb"]
+                self._drop(sid)
+        return gone
+
+    def clear(self) -> None:
+        self._sd.clear()
+        self._info.clear()
+
+    def stats(self) -> list:
+        return [{"path": i["paths"][0], "mb": round(i["mb"], 1)} for i in self._info.values()]
+
+
+_PARK = _CpuParkRegistry()
 
 CHECKPOINT = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors"
 UPSAMPLER = r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
@@ -642,21 +742,29 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     if qmode == "fp8_scaled_mm" and offload != OffloadMode.NONE and quant is not None:
         import ltx_pipelines.utils.blocks as _blocks
         _blocks.fp8_cast_fuse_rule = quant.fuse_rule
+    def _build(Klass, **kw):
+        """Istanzia la pipeline passando il registry di parcheggio RAM (_PARK); se la classe non
+        accetta `registry` (firma diversa), fallback senza — il job gira, solo senza parcheggio."""
+        try:
+            return Klass(registry=_PARK, **kw)
+        except TypeError:
+            return Klass(**kw)
+
     if ptype == "vinpaint":                                  # #59 latent-inpaint VIDEO (sottoclasse ic_lora)
         from workers.ltx_inpaint_pipeline import InpaintPipeline
-        pipe = InpaintPipeline(
-            distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
-            gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+        pipe = _build(InpaintPipeline,
+                      distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
+                      gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (canny/depth/pose)
         from ltx_pipelines.ic_lora import ICLoraPipeline
-        pipe = ICLoraPipeline(
-            distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
-            gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+        pipe = _build(ICLoraPipeline,
+                      distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
+                      gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     elif ptype == "retake":                                  # #24 ReTake: rigenera sezione [start,end] di un video
         from ltx_pipelines.retake import RetakePipeline
-        pipe = RetakePipeline(
-            checkpoint_path=ckpt, gemma_root=GEMMA, loras=loras,
-            quantization=quant, offload_mode=offload, distilled=True)
+        pipe = _build(RetakePipeline,
+                      checkpoint_path=ckpt, gemma_root=GEMMA, loras=loras,
+                      quantization=quant, offload_mode=offload, distilled=True)
     else:
         Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
         # DEV (non-distilled) sulla two-stage: SENZA la LoRA di distillazione lo stage distillato
@@ -673,9 +781,9 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
                       "sotto-denoisa (video 'dematerializzato'). Scarica Lightricks/LTX-2.3 "
                       f"ltx-2.3-22b-distilled-lora-384-1.1.safetensors in {os.path.dirname(DISTILLED_LORA)}",
                       flush=True)
-        pipe = Klass(
-            checkpoint_path=ckpt, distilled_lora=_dlora, spatial_upsampler_path=UPSAMPLER,
-            gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+        pipe = _build(Klass,
+                      checkpoint_path=ckpt, distilled_lora=_dlora, spatial_upsampler_path=UPSAMPLER,
+                      gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     # M5 (versione sicura) — LRU di pipeline configurabile (env LTX_VIDEO_PIPE_LRU, default 1 = comportamento
     # storico: 1 pipeline alla volta). Chi ha VRAM di scorta può alzarlo a 2 per tenere ti2v+a2v residenti ed
     # evitare il reload di gemma/VAE alternando tipo di generazione (talk↔normale). Il refcount PROFONDO dei
@@ -1205,6 +1313,18 @@ def run_generation(p: dict) -> str:
                   f"control_type={p.get('control_type')!r}) → guida IGNORATA, degrado a {ptype}. "
                   "Scarica il peso IC-LoRA.", flush=True)
     _off = _auto_offload(p, ckpt)                            # GGUF→cpu sempre; fp8→none se c'entra tutto in GPU
+    # M-park: la pipeline del job è ora NOTA → i pesi parcheggiati in RAM che questo job NON userà
+    # vengono rimossi (regola di drop richiesta); quelli comuni (Gemma/VAE/upsampler/ckpt) restano.
+    try:
+        _keep = [ckpt, GEMMA, UPSAMPLER, DISTILLED_LORA, *IC_LORA.values(),
+                 *[lo.path for lo in loras]]
+        if _edit:
+            _keep.append(_edit)
+        _gone = _PARK.drop_except(_keep)
+        if _gone:
+            print(f"[park] drop pipeline-aware: liberati {_gone:.0f}MB di RAM", flush=True)
+    except Exception as _pe:                                 # noqa: BLE001
+        print(f"[park] drop fallito (ignoro): {_pe}", flush=True)
     _stage(f"Caricamento modello ({os.path.basename(ckpt)[:28]}, offload={_off})…")
     pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype)
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)

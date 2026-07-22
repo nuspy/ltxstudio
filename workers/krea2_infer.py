@@ -73,10 +73,50 @@ def _evict_pipes() -> None:
         print(f"[krea2] single-slot: sfrattati {n} pipe per liberare la VRAM prima del nuovo load", flush=True)
 
 
+def _demote_pipes() -> float:
+    """M-park (unified-model-manager): parcheggia i pipe in cache su CPU-RAM invece di distruggerli
+    (la pipeline successiva è di un'altra categoria, o ignota: se si torna a Krea2 il pipe rientra
+    dalla RAM senza rileggere l'SSD). I pipe con cpu_offload hanno già i pesi in RAM → no-op.
+    Ritorna i MB (stimati) lasciati parcheggiati."""
+    import gc
+    mb = 0.0
+    for key, pipe in list(_PIPE_CACHE.items()):
+        try:
+            if getattr(pipe, "_hf_hook", None) or getattr(getattr(pipe, "transformer", None), "_hf_hook", None):
+                continue                                       # cpu_offload: pesi già in RAM, hook fragili
+            pipe.to("cpu")
+            pipe._ls_parked_cpu = True                         # ri-promosso al prossimo cache-hit
+            for _m in ("transformer", "vae", "text_encoder"):
+                _mod = getattr(pipe, _m, None)
+                if _mod is not None:
+                    try:
+                        mb += sum(p.numel() * p.element_size() for p in _mod.parameters()) / 2**20
+                    except Exception:                          # noqa: BLE001
+                        pass
+        except Exception as ex:                                # noqa: BLE001 — pipe non spostabile → distruggi
+            print(f"[krea2] demote fallita ({ex}) → destroy", flush=True)
+            _PIPE_CACHE.pop(key, None)
+    gc.collect()
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:                                          # noqa: BLE001
+        pass
+    if mb:
+        print(f"[krea2] parcheggiati in RAM ~{mb:.0f}MB di pipe (VRAM libera)", flush=True)
+    return mb
+
+
 def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
     key = (model_dir, variant, tuple(loras))
     if key in _PIPE_CACHE:
-        return _PIPE_CACHE[key]
+        pipe = _PIPE_CACHE[key]
+        if getattr(pipe, "_ls_parked_cpu", False):             # M-park: rientro VRAM dalla RAM (no SSD)
+            print("[krea2] pipe parcheggiato in RAM → rientro su GPU", flush=True)
+            pipe = pipe.to("cuda")
+            pipe._ls_parked_cpu = False
+            _PIPE_CACHE[key] = pipe
+        return pipe
     # SINGLE-SLOT: prima di caricare un pipe con una chiave NUOVA, sfratta gli altri e libera la VRAM.
     # Nel server PERSISTENTE i job alternano t2i (no LoRA) ed edit (LoRA identità): tenere 2 pipe fp8
     # (~13GB l'uno) satura i 32GB → il 2° carica con VRAM stretta → `model_cpu_offload`, che rompe
