@@ -700,15 +700,8 @@ class VideoTab(QWidget):
         # fav-first: i preferiti compaiono in cima a ogni categoria
         def fav_first(lst):
             return sorted(lst, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
-        # NVFP4: scale di quantizzazione A BLOCCHI che il loader nativo non sa caricare (nessun
-        # percorso FP4 nello stack) → FUORI dal menu, come i GGUF video rimossi: esporre un modello
-        # che non può MAI partire produce solo l'errore della guardia. Backstop nel worker.
-        def _loadable(m: str) -> bool:
-            return "nvfp4" not in m.lower()
-        diffusion = fav_first([m for m in self._diffusion_models
-                               if self._is_ltx_video_model(m) and _loadable(m)])
-        checkpoints = fav_first([m for m in self._checkpoint_models
-                                 if self._is_ltx_video_model(m) and _loadable(m)])
+        diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)])
+        checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
         ggufs = fav_first([m for m in self._gguf_models if "ltx" in m.lower()])
 
         # Nessuna whitelist di compatibilità: TUTTI i modelli LTX video sono esposti.
