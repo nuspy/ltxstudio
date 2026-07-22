@@ -466,6 +466,10 @@ def _patch_no_mmap_loader():
 
         _sft.SafetensorsStateDictLoader.load = _load
         _sft.SafetensorsModelStateDictLoader.metadata = _metadata
+        # anche i chiamanti DIRETTI di safe_open (block_streaming.builder: scan chiavi + streaming
+        # per-blocco con offload=cpu) — senza, il ramo block-swap moriva di os error 1455.
+        if _std.patch_safe_open():
+            print("[no-mmap] anche safetensors.safe_open → shim I/O diretto", flush=True)
         print("[no-mmap] loader safetensors a I/O diretto (commit-safe col pagefile piccolo)", flush=True)
     except Exception as _e:  # noqa: BLE001
         print(f"[no-mmap] patch fallito: {_e}", flush=True)
