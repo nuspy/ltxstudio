@@ -15,9 +15,11 @@ import os
 
 # famiglia → venv di misura livello-2. Solo image (inference_server) e ltx video (ltx2_venv) hanno
 # un measure-worker (F7); le altre famiglie convergono on-first-use e restano fuori da to_measure.
+# SOLO famiglie che il backend nativo sa DAVVERO caricare (SPEC di image_flux: flux/flux2/zimage/
+# ernie): hidream NON è supportato → misurarlo è inutile (l'app non può usarlo) e falliva exit 2.
 _MEASURE_VENV = {
     "flux1": "inference_server", "flux2": "inference_server", "zimage": "inference_server",
-    "ernie": "inference_server", "krea2": "", "hidream": "inference_server",
+    "ernie": "inference_server", "krea2": "",
     "ltxv": "ltx2", "ltx2": "ltx2", "ltx": "ltx2",
 }
 
@@ -79,9 +81,10 @@ def audit(on_progress=None) -> dict:
         # ADAPTER (Redux & co.: non sono pipeline) e SHARD (model-0000X-of-N: non caricabili soli).
         import re as _re
         _is_shard = bool(_re.match(r"(?i)(model|diffusion_pytorch_model)-\d+-of-\d+", m["name"]))
+        _is_helper = "enhancer" in m["name"].lower()      # LLM di supporto (es. ernie prompt-enhancer)
         if mb <= 0 or (src != "measured" and not e.get("skipped_commit")):
             if (info["venv"] and not m["is_gguf"] and not _is_aux(m["path"])
-                    and str(det.get("role") or "") != "adapter" and not _is_shard):
+                    and str(det.get("role") or "") != "adapter" and not _is_shard and not _is_helper):
                 to_measure.append(info)
     return {"total": len(measured) + len(estimated) + len(unknown), "migrated": migrated,
             "measured": measured, "estimated": estimated, "unknown": unknown,
