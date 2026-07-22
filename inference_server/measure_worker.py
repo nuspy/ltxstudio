@@ -38,6 +38,15 @@ def main() -> int:
     from inference_server.backends import image_flux
     arch = sys.argv[2] if len(sys.argv) > 2 else ""
     if not arch:
+        # SENZA arch esplicita: chiedi al DETECTOR (famiglia canonica), non a _arch_of — che da un
+        # path nudo ricade su "flux" e caricava Z-Image/Ernie col loader FLUX (IndexError, exit 2).
+        try:
+            from core import model_detect
+            fam = str((model_detect.get(path) or {}).get("family") or "")
+            arch = {"flux1": "flux", "flux2": "flux2", "zimage": "zimage", "ernie": "ernie"}.get(fam, "")
+        except Exception:                                   # noqa: BLE001
+            arch = ""
+    if not arch:
         try:
             arch = image_flux._arch_of({"model": path})     # noqa: SLF001
         except Exception:                                   # noqa: BLE001

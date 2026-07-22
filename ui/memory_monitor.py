@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from PySide6.QtCore import Qt, QTimer, QPointF
+from PySide6.QtCore import Qt, QPointF, QThread, Signal
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (QDialog, QHeaderView, QLabel, QTableWidget, QTableWidgetItem,
                                QVBoxLayout, QWidget)
@@ -72,6 +72,43 @@ class _Spark(QWidget):
             pass
 
 
+class _Sampler(QThread):
+    """Campionatore in THREAD di sfondo: nvidia-smi/PDH (sysmon) + HTTP /system_stats dei server
+    (residents_detailed). PRIMA girava tutto nel QTimer del thread GUI: con un server occupato dal
+    denoise (GIL saturo) le 4 chiamate HTTP (timeout 2s l'una) + nvidia-smi sotto carico (1-3s)
+    congelavano l'app per svariati secondi A OGNI TICK durante le generazioni (visto live 22/07).
+    Qui la GUI riceve solo i DATI via signal e non blocca mai."""
+    sampled = Signal(dict, object)                       # (sysmon.sample(), rows|None)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._stop = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(self):
+        import time as _t
+        n = 0
+        while not self._stop:
+            try:
+                from core import sysmon
+                s = sysmon.sample()
+            except Exception:                            # noqa: BLE001
+                s = None
+            rows = None
+            if n % 2 == 1:                               # tabella modelli ogni 2s (metà frequenza)
+                try:
+                    from core import gpu_registry
+                    rows = gpu_registry.residents_detailed()
+                except Exception:                        # noqa: BLE001
+                    rows = None
+            if s is not None and not self._stop:
+                self.sampled.emit(s, rows)
+            n += 1
+            _t.sleep(1.0)
+
+
 class MemoryMonitor(QDialog):
     _GB = 1024 ** 3
 
@@ -107,19 +144,20 @@ class MemoryMonitor(QDialog):
         self._tbl.setMinimumHeight(90)
         lay.addWidget(self._models_head)
         lay.addWidget(self._tbl, 1)
-        self._timer = QTimer(self)
-        self._timer.setInterval(1000)
-        self._timer.timeout.connect(self._tick)
-        self._tbl_tick = 0                      # la tabella si aggiorna ogni 2s (metà del timer)
+        self._sampler: _Sampler | None = None   # thread di campionamento (vivo solo a finestra aperta)
 
     # apri/chiudi → avvia/ferma il polling (niente carico quando è chiusa)
     def showEvent(self, e):
-        self._tick()
-        self._timer.start()
+        if self._sampler is None or not self._sampler.isRunning():
+            self._sampler = _Sampler(self)
+            self._sampler.sampled.connect(self._on_sample)
+            self._sampler.start()
         super().showEvent(e)
 
     def hideEvent(self, e):
-        self._timer.stop()
+        if self._sampler is not None:
+            self._sampler.stop()
+            self._sampler = None                # il thread esce da solo entro ~1s (loop con flag)
         super().hideEvent(e)
 
     def resizeEvent(self, e):                    # scala il TESTO con l'altezza della finestra
@@ -130,12 +168,8 @@ class MemoryMonitor(QDialog):
             head.setFont(f)
         super().resizeEvent(e)
 
-    def _tick(self):
-        try:
-            from core import sysmon
-            s = sysmon.sample()
-        except Exception:                        # noqa: BLE001
-            return
+    def _on_sample(self, s: dict, rows):
+        """Aggiorna i widget coi dati arrivati dal thread campionatore (solo painting, mai I/O)."""
         g = self._GB
 
         def _row(key, title, used, total, pct_txt=None):
@@ -155,17 +189,11 @@ class MemoryMonitor(QDialog):
         head, spark = self._rows["gpu"]
         head.setText(f"{tr('mem.gpu', 'GPU (CUDA)')}   {s['gpu_util']}%")
         spark.push(s["gpu_util"] / 100.0)
-        self._tbl_tick += 1
-        if self._tbl_tick % 2 == 0:
-            self._refresh_models()
+        if rows is not None:
+            self._refresh_models(rows)
 
-    def _refresh_models(self):
-        """F4: tabella dei modelli residenti (ledger cross-venv + parked dei server)."""
-        try:
-            from core import gpu_registry
-            rows = gpu_registry.residents_detailed()
-        except Exception:                        # noqa: BLE001
-            return
+    def _refresh_models(self, rows: list):
+        """F4: tabella dei modelli residenti (dati già raccolti dal thread campionatore)."""
         _vram = QColor(46, 160, 96)
         _park = QColor(196, 148, 32)
         self._tbl.setRowCount(len(rows))

@@ -609,10 +609,14 @@ class _ModelAuditWorker(QThread):
 
 
 class MainWindow(QMainWindow):
+    # anteprime risultato pronte (dal thread di decode) → dialog sul thread GUI (queued connection)
+    _result_prev_ready = Signal(str, object, object)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle(tr("window.title"))
         self.resize(1180, 740)
+        self._result_prev_ready.connect(self._show_inpaint_result_ready)
 
         self.driver = ComfyDriver()
         self.bridge = ComfyBridge()
@@ -907,16 +911,19 @@ class MainWindow(QMainWindow):
         work.addWidget(self.frame1_tab.canvas, 1)        # spazio di lavoro per l'immagine
         work.addWidget(self.frame1_tab.segment_box)      # sistema di selezione con AI, sotto il canvas
         btns = QHBoxLayout()
-        self.gen_btn = QPushButton(tr("btn.generate")); self.gen_btn.setObjectName("generate")
+        # Genera/Interrompi SPOSTATI nel footer ancorato del tab Video («Genera Video», richiesta
+        # utente): qui restano solo Libera VRAM e Navigator. self.gen_btn/self.cancel_btn sono
+        # ALIAS ai bottoni del video_tab così tutte le call-site esistenti restano valide.
+        self.gen_btn = self.video_tab.generate_btn
         self.gen_btn.clicked.connect(self.on_generate)
-        self.cancel_btn = QPushButton(tr("btn.stop")); self.cancel_btn.clicked.connect(self.driver.interrupt)
+        self.cancel_btn = self.video_tab.stop_btn
+        self.cancel_btn.clicked.connect(self.driver.interrupt)
         self.free_vram_btn = QPushButton(tr("btn.free_vram"))
         self.free_vram_btn.setToolTip(tr("btn.free_vram.tt"))
         self.free_vram_btn.clicked.connect(self._on_free_vram)
         self.navigator_btn = QPushButton(tr("btn.navigator"))
         self.navigator_btn.setToolTip(tr("btn.navigator.tt"))
         self.navigator_btn.clicked.connect(self._open_navigator)
-        btns.addWidget(self.gen_btn, 2); btns.addWidget(self.cancel_btn, 1)
         btns.addWidget(self.free_vram_btn, 1); btns.addWidget(self.navigator_btn, 1)
         work.addLayout(btns)
         # Shortcut Ctrl+G per il Navigator
@@ -1553,7 +1560,15 @@ class MainWindow(QMainWindow):
         # (il polling di completion già conferma) per non bloccare il main thread sul /system_stats occupato.
         _all_native = all(backend.is_native(m) for m in ("image", "video", "enhance", "segment", "face"))
         up = False if _all_native else self.driver.is_up()
-        if (self._current_pid or self._inpaint_pid or self._seg_pid) and _all_native:
+        # CODA OCCUPATA = job in corso: i worker via _enqueue NON settano i *_pid, quindi prima
+        # si finiva comunque su native_driver.is_up() → HTTP (1.5s) sul thread GUI ogni 3s mentre
+        # il server era occupato dal denoise = micro-freeze ricorrenti (visto live 22/07).
+        _busy = False
+        try:
+            _busy = self.jobs.is_busy()
+        except Exception:                                   # noqa: BLE001
+            pass
+        if (_busy or self._current_pid or self._inpaint_pid or self._seg_pid) and _all_native:
             native_up = True
         else:
             native_up = native_driver.is_up()
@@ -2326,9 +2341,13 @@ class MainWindow(QMainWindow):
             # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. FLUX.2 e puzzle_lora → ComfyUI.
             from core import backend
             if backend.is_native("image") and engine == "kontext" and not aux:
-                _gc = self.frame1_tab.get_gen_config()      # riusa il box PuLID (se attivo) anche sull'integra
-                _pl = {k: _gc.get(k) for k in ("pulid_face", "pulid_strength", "pulid_start_step",
-                                               "pulid_true_cfg")} if _gc.get("pulid_face") else None
+                # PuLID DEDICATO all'Image to Image (container proprio nel pannello, separato da
+                # quello di «Genera immagine» che agisce solo sulla generazione).
+                _pl = ({"pulid_face": cfg.get("integrate_pulid_face"),
+                        "pulid_strength": cfg.get("integrate_pulid_strength", 0.8),
+                        "pulid_start_step": cfg.get("integrate_pulid_start_step", 0),
+                        "pulid_true_cfg": cfg.get("integrate_pulid_true_cfg", 1.0)}
+                       if cfg.get("integrate_pulid_face") else None)
                 self._start_native_kontext(exp, model, ptxt, negative, steps, seed, guidance, pulid=_pl)
                 return
             prompt = self.kontext.integrate(img_name, ptxt, engine=engine, model=model,
@@ -3768,7 +3787,7 @@ class MainWindow(QMainWindow):
             # NB: niente change-map (Differential Diffusion) qui — provata il 13/07 e RIMOSSA: peggiorava
             # il risultato rispetto all'alone bianco + maschera larga di export_integrate. Il supporto nel
             # backend resta (params["change_map"]), ma non lo alimentiamo.
-            self._log(f"Integra mask-based (modello={os.path.basename(fill)}, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
+            self._log(f"Integra mask-based (modello={os.path.basename(mp)}, backend NATIVO) inviato (steps={params['steps']}, seed={seed})…")
         else:
             unet = model or KONTEXT_MODEL
             mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
@@ -3782,7 +3801,7 @@ class MainWindow(QMainWindow):
         self._inpaint_mode = "integrazione"
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
-        self._enqueue(tr("queue.job.integrate", "Integra (Kontext)"), self._native_worker,
+        self._enqueue(tr("queue.job.integrate", "Image to Image (Kontext)"), self._native_worker,
                       self._on_native_inpaint_done)
 
     def _start_native_krea2_edit(self, images, prompt, negative, grounding, variant, seed,
@@ -3972,14 +3991,44 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self._log(f"[ERR] download risultato: {e}")
 
+    @staticmethod
+    def _load_scaled_image(path: str, box: int = 620):
+        """Decodifica un'immagine GIÀ SCALATA al box richiesto (QImageReader.setScaledSize).
+        Pensata per girare in un THREAD: un PNG upscalato 4x arriva a centinaia di MB e
+        decodificarlo pieno sul thread GUI congelava l'app (visto live 22/07 dopo un upscale)."""
+        from PySide6.QtGui import QImage, QImageReader
+        try:
+            r = QImageReader(path)
+            r.setAutoTransform(True)
+            sz = r.size()
+            if sz.isValid() and (sz.width() > box or sz.height() > box):
+                sz.scale(box, box, Qt.KeepAspectRatio)
+                r.setScaledSize(sz)
+            img = r.read()
+            return None if img.isNull() else img
+        except Exception:                                   # noqa: BLE001
+            return None
+
     def _show_inpaint_result(self, path: str):
+        """Prepara le anteprime (decode+scala) in un THREAD, poi mostra il dialog: la GUI non
+        blocca mai, nemmeno con risultati upscalati giganti."""
+        import threading
+        _before = self._inpaint_before
+
+        def _prep():
+            res = self._load_scaled_image(path)
+            bef = self._load_scaled_image(_before) if _before else None
+            # torna sul thread GUI per il dialog via SIGNAL (queued): QPixmap/QDialog SOLO lì
+            self._result_prev_ready.emit(path, res, bef)
+        threading.Thread(target=_prep, daemon=True).start()
+
+    def _show_inpaint_result_ready(self, path: str, res_img, bef_img):
         from PySide6.QtWidgets import QDialog, QDialogButtonBox
         dlg = QDialog(self); dlg.setWindowTitle(tr("mw.result_dialog_title").format(mode=self._inpaint_mode))
         v = QVBoxLayout(dlg)
-        before_pix = QPixmap(self._inpaint_before) if self._inpaint_before else None
-        if before_pix is not None and before_pix.isNull():
-            before_pix = None
-        lbl = _HoldCompareLabel(QPixmap(path), before_pix)
+        before_pix = QPixmap.fromImage(bef_img) if bef_img is not None else None
+        result_pix = QPixmap.fromImage(res_img) if res_img is not None else QPixmap(path)
+        lbl = _HoldCompareLabel(result_pix, before_pix)
         v.addWidget(lbl)
         if before_pix is not None:
             hint = QLabel(tr("mw.compare_hint"))

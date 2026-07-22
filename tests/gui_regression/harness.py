@@ -133,6 +133,20 @@ def build_window():
         _mp.gpu_free_gb = lambda: 32.0
     except Exception:                                          # noqa: BLE001
         pass
+    # NIENTE SERVER REALI dai test offscreen (visto live 22/07: un case ha avviato :8190 per
+    # davvero e il server orfano ha RUBATO la porta all'app dell'utente, per giunta col python
+    # sbagliato → generazioni utente rotte). ensure/spawn dei server persistenti → no-op.
+    try:
+        from core import ltx2_service as _l2s
+        _l2s.ensure_server = lambda *a, **k: False
+        _l2s.is_up = lambda *a, **k: False
+    except Exception:                                          # noqa: BLE001
+        pass
+    try:
+        from core import img_gen_job as _igj
+        _igj.maybe_autostart_server = lambda *a, **k: False
+    except Exception:                                          # noqa: BLE001
+        pass
     w = MainWindow()
     w.show()        # offscreen: necessario perché isVisible()/isVisibleTo() abbiano senso nei test UI
     return w

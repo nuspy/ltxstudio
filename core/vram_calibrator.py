@@ -175,10 +175,20 @@ class CalibrationScheduler(QObject):
         self._cur = self._targets.pop(0)
         env = dict(os.environ)
         env["HF_HUB_OFFLINE"] = "1"
+        # ARCH ESPLICITA al measure-worker immagini: senza, _arch_of ricade su "flux" e i checkpoint
+        # Z-Image/Ernie venivano caricati col loader FLUX → IndexError → "saltato exit 2" (visto live
+        # 22/07). La famiglia la sa già l'audit (model_detect): passarla, non re-indovinarla.
+        _arch = {"flux1": "flux", "flux2": "flux2", "zimage": "zimage",
+                 "ernie": "ernie"}.get(str(t.get("family") or ""), "")
+        _args = [t["path"], _arch] if (_arch and t["venv"] == "inference_server") else [t["path"]]
         try:
-            self._proc = subprocess.Popen([py, "-u", *argv, t["path"]], cwd=_REPO, env=env,
-                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            # stdout/stderr in un log VISIBILE (prima DEVNULL: gli "exit 2" erano indiagnosticabili)
+            _logf = open(os.path.join(_REPO, "output", "calib_worker.log"), "ab")
+            _logf.write(f"\n===== {t['name']} (venv {t['venv']}) =====\n".encode())
+            self._proc = subprocess.Popen([py, "-u", *argv, *_args], cwd=_REPO, env=env,
+                                          stdout=_logf, stderr=subprocess.STDOUT,
                                           creationflags=getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
+            _logf.close()                                   # il figlio tiene il suo handle
             _sz = f"~{est/1024:.1f}GB" if est >= 1024 else f"~{est:.0f}MB"
             self.progress.emit(f"[calibrazione] misuro {t['name']} ({_sz}, venv {t['venv']})…")
         except Exception as e:                          # noqa: BLE001
