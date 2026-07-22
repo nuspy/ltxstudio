@@ -161,41 +161,28 @@ class ComponentStore:
         return sum(e.size_mb for k in (keys or ()) if (e := self._items.get(k)) and e.device == device)
 
     def _ram_ok(self, size_mb: float) -> bool:
-        """La CPU-cache può ospitare altri size_mb? Floor psutil (RAM fisica) + floor di COMMIT
-        (RAM+pagefile — il limite VERO su Windows: sforarlo = access violation, non OOM pulito;
-        vedi core/st_direct e la memoria pagefile-commit-mmap-crash) + budget totale."""
+        """La CPU-cache può ospitare altri size_mb? Predicato UNIFICATO (commit 2): RAM fisica +
+        COMMIT (il limite VERO su Windows — vedi pagefile-commit-mmap-crash) + budget, da
+        core/mem_budget (env LS_* con fallback legacy NATIVE_*/LTX_*)."""
         try:
-            import psutil
-            avail_mb = psutil.virtual_memory().available / 2**20
+            from core import mem_budget
+            return mem_budget.fits(size_mb, self.resident_mb("cpu"), require_psutil=True)
         except Exception:                               # noqa: BLE001
             return False
-        try:
-            from core import st_direct
-            commit_mb = st_direct.commit_avail_mb()
-        except Exception:                               # noqa: BLE001
-            commit_mb = 1e9
-        floor = float(os.environ.get("NATIVE_RAM_FLOOR_MB", "16384"))
-        cfloor = float(os.environ.get("NATIVE_COMMIT_FLOOR_MB", "20480"))
-        budget = float(os.environ.get("NATIVE_CPU_CACHE_MB", "40960"))
-        return ((avail_mb - size_mb > floor) and (commit_mb - size_mb > cfloor)
-                and (self.resident_mb("cpu") + size_mb <= budget))
 
     def _shrink_cpu_lru(self, need_mb: float) -> None:
-        """Fa posto nel budget CPU distruggendo i cpu-cached più vecchi (refcount==0)."""
-        budget = float(os.environ.get("NATIVE_CPU_CACHE_MB", "40960"))
-        over = self.resident_mb("cpu") + need_mb - budget
-        if over <= 0:
-            return
-        for k in sorted((k for k, e in self._items.items() if e.refcount == 0 and e.device == "cpu"),
-                        key=lambda k: self._items[k].last_used):
+        """Fa posto nel budget CPU distruggendo i cpu-cached più vecchi (refcount==0). LRU unificata."""
+        from core import mem_budget
+        over = self.resident_mb("cpu") + need_mb - mem_budget.ram_cache_mb()
+        victims = mem_budget.pick_lru_victims(
+            ((k, e.size_mb, e.last_used) for k, e in self._items.items()
+             if e.refcount == 0 and e.device == "cpu"), over)
+        for k in victims:
             e = self._items.pop(k)
-            over -= e.size_mb
             try:
                 del e.obj
             except Exception:                           # noqa: BLE001
                 pass
-            if over <= 0:
-                break
 
     def evict_unused(self, need_mb: float) -> float:
         """ULTIMA risorsa di make_room: libera VRAM dai componenti orfani (refcount==0, device=cuda),

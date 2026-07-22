@@ -516,7 +516,11 @@ class _CpuParkRegistry(_DummyReg):
 
     @staticmethod
     def _enabled() -> bool:
-        return os.environ.get("LTX_RAM_PARK", "1") != "0"
+        try:                                            # commit 2: politica unificata (LS_RAM_CACHE=0
+            from core import mem_budget                 # o legacy LTX_RAM_PARK=0 → off)
+            return mem_budget.enabled()
+        except Exception:                               # noqa: BLE001
+            return os.environ.get("LTX_RAM_PARK", "1") != "0"
 
     def _parked_mb(self) -> float:
         return sum(i["mb"] for i in self._info.values())
@@ -543,14 +547,13 @@ class _CpuParkRegistry(_DummyReg):
         if sid in self._sd:
             return
         mb = sum(v.nbytes for v in state_dict.sd.values()) / 2**20
-        from core import st_direct as _std
-        floor = float(os.environ.get("LTX_COMMIT_FLOOR_MB", "20480"))
-        budget = float(os.environ.get("LTX_RAM_PARK_MB", "49152"))
+        from core import mem_budget                     # commit 2: budget/floor/predicato unificati
+        budget = mem_budget.ram_cache_mb()
         while self._info and self._parked_mb() + mb > budget:  # LRU nel budget
             self._drop(min(self._info, key=lambda k: self._info[k]["used"]))
-        if self._parked_mb() + mb > budget or _std.commit_avail_mb() - mb < floor:
+        if not mem_budget.fits(mb, self._parked_mb()):
             print(f"[park] SKIP {os.path.basename(str(paths[0]))} ({mb:.0f}MB): "
-                  "commit/budget insufficiente → niente parcheggio", flush=True)
+                  "commit/RAM/budget insufficiente → niente parcheggio", flush=True)
             return
         cpu_sd = {k: (v if v.device.type == "cpu" else v.to("cpu")) for k, v in state_dict.sd.items()}
         from ltx_core.loader.primitives import StateDict as _SD

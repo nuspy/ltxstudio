@@ -190,19 +190,14 @@ class ModelManager:
         return len(others)
 
     def _trim_cpu_cache(self) -> None:
-        """LRU della cache-RAM monolitica: distrugge i modelli MENO recenti finché il totale rientra nel budget
-        (NATIVE_CPU_CACHE_MB) E resta il floor di RAM libera (NATIVE_RAM_FLOOR_MB). Senza questo la RAM cresceva
-        fino al tetto cambiando modello di continuo, senza mai scendere."""
-        import os
-        budget = float(os.environ.get("NATIVE_CPU_CACHE_MB", "40960"))
-        floor = float(os.environ.get("NATIVE_RAM_FLOOR_MB", "16384"))
-
-        def _avail_mb() -> float:
-            try:
-                import psutil
-                return psutil.virtual_memory().available / 2**20
-            except Exception:                           # noqa: BLE001
-                return 1e9
+        """LRU della cache-RAM monolitica: distrugge i modelli MENO recenti finché il totale rientra nel
+        budget E resta il floor di RAM libera. Budget/floor UNIFICATI (commit 2): core/mem_budget
+        (env LS_* con fallback legacy). Il while-loop resta dinamico: ricontrolla la RAM disponibile
+        dopo OGNI drop (un pick statico non basterebbe)."""
+        from core import mem_budget
+        budget = mem_budget.ram_cache_mb()
+        floor = mem_budget.ram_floor_mb()
+        _avail_mb = mem_budget.avail_ram_mb
 
         def _total_mb() -> float:
             return sum(getattr(e, "vram_mb", 0) for e in self._cpu_cache.values())
