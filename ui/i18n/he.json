@@ -2707,5 +2707,7 @@
   "mvs.cast.no_ref": "(אין דיוקן)",
   "mvs.cast.need_name": "תן קודם שם לדמות.",
   "mvs.cast.gen_run": "יוצר את הדיוקן…",
-  "mvs.cast.gen_ok": "הדיוקן נוצר."
+  "mvs.cast.gen_ok": "הדיוקן נוצר.",
+  "audit.running": "בדיקת רישום המודלים…",
+  "audit.summary": "מודלים: {t} — {m} נמדדו, {e} משוערים, {u} לא ידועים, {k} למדידה"
 }

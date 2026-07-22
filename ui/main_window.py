@@ -524,6 +524,20 @@ class _NativeLtx2Worker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _ModelAuditWorker(QThread):
+    """F2 unified-model-manager: audit del registro dimensioni modelli in background all'avvio.
+    Solo header safetensors + JSON (model_detect.scan + calibrate_all livello-1): nessun torch,
+    nessuna GPU — sicuro nel processo GUI."""
+    done = Signal(dict)
+
+    def run(self):
+        try:
+            from core import startup_model_audit
+            self.done.emit(startup_model_audit.audit())
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"error": str(e)})
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -622,6 +636,11 @@ class MainWindow(QMainWindow):
         self._status_timer = QTimer(self); self._status_timer.timeout.connect(self._refresh_status)
         self._status_timer.start(3000); self._refresh_status()
 
+        # ── F2 unified-model-manager: audit del registro dimensioni modelli all'apertura ──
+        # Thread in background (solo header+JSON, zero torch/GPU): verifica se i modelli locali sono
+        # tutti classificati; il risultato (self._audit_result) alimenta il calibratore livello-2 (F7).
+        QTimer.singleShot(2000, self._start_model_audit)
+
         # ── Ripristino impostazioni GUI salvate (tutti i tab, automatico) ──
         # I campi statici si ripristinano subito; i menu popolati dall'inventario live di
         # ComfyUI (modelli, SAM, upscale, LoRA…) vengono ri-applicati una volta che
@@ -639,6 +658,28 @@ class MainWindow(QMainWindow):
                       f"{len(report['removed_tabs'])}")
         except Exception as e:                       # noqa: BLE001
             self._log(f"[gating] errore non bloccante: {e}")
+
+    # ---------- F2: audit registro dimensioni modelli (avvio) ----------
+    def _start_model_audit(self):
+        self._log(tr("audit.running", "Verifica registro modelli…"))
+        self._audit_worker = _ModelAuditWorker()
+        self._audit_worker.done.connect(self._on_model_audit_done)
+        self._audit_worker.start()
+
+    def _on_model_audit_done(self, res: dict):
+        if res.get("error"):
+            self._log(f"[audit] errore non bloccante: {res['error']}")
+            return
+        self._audit_result = res                        # consumato dal calibratore livello-2 (F7)
+        msg = tr("audit.summary",
+                 "Modelli: {t} — {m} misurati, {e} stimati, {u} sconosciuti, {k} da misurare").format(
+            t=res["total"], m=len(res["measured"]), e=len(res["estimated"]),
+            u=len(res["unknown"]), k=len(res["to_measure"]))
+        self._log("[audit] " + msg)
+        try:
+            self.statusBar().showMessage(msg, 20000)
+        except Exception:                               # noqa: BLE001
+            pass
 
     # ---------- UI ----------
     def _build_ui(self):

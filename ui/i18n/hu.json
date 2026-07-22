@@ -2707,5 +2707,7 @@
   "mvs.cast.no_ref": "(nincs portré)",
   "mvs.cast.need_name": "Előbb adj nevet a szereplőnek.",
   "mvs.cast.gen_run": "Portré generálása…",
-  "mvs.cast.gen_ok": "A portré elkészült."
+  "mvs.cast.gen_ok": "A portré elkészült.",
+  "audit.running": "Modellregiszter ellenőrzése…",
+  "audit.summary": "Modellek: {t} — {m} mért, {e} becsült, {u} ismeretlen, {k} mérendő"
 }

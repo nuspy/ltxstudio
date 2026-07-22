@@ -57,19 +57,22 @@ def enumerate_models() -> list[dict]:
             continue
         for ext in _EXTS:
             for p in glob.glob(os.path.join(root, "**", "*" + ext), recursive=True):
-                key = os.path.normpath(p).lower()
+                try:
+                    st = os.stat(p)
+                    sz = st.st_size // (1024 * 1024)
+                except OSError:
+                    continue
+                # dedup per inode: gli HARDLINK (stesso file in diffusion_models/ e Checkpoints/)
+                # contano UNA volta — per path apparivano come due modelli distinti da misurare.
+                key = (st.st_dev, st.st_ino) if st.st_ino else os.path.normpath(p).lower()
                 if key in seen:
                     continue
                 seen.add(key)
-                try:
-                    sz = os.path.getsize(p) // (1024 * 1024)
-                except OSError:
-                    continue
                 if sz < 200:                                 # salta LoRA/piccoli (non sono checkpoint pesanti)
                     continue
                 out.append({"path": p, "name": os.path.basename(p), "size_mb": sz,
                             "is_gguf": p.lower().endswith(".gguf"),
-                            "cached": _ve.cache_get(p) > 0})
+                            "cached": (_ve.cache_get(p) > 0 or _ve.cache_get(p, "fp8") > 0)})
     out.sort(key=lambda d: d["name"].lower())
     return out
 
@@ -83,18 +86,28 @@ def calibrate_all(force: bool = False, on_progress=None) -> dict:
     for i, m in enumerate(models):
         if m["cached"] and not force:
             skip += 1
-            res.append({"name": m["name"], "mb": _ve.cache_get(m["path"]), "source": "cache"})
+            _mb = _ve.cache_get(m["path"]) or _ve.cache_get(m["path"], "fp8")
+            res.append({"name": m["name"], "mb": _mb, "source": "cache"})
             if on_progress:
-                on_progress(i + 1, n, m["name"], _ve.cache_get(m["path"]))
+                on_progress(i + 1, n, m["name"], _mb)
             continue
+        _var = ""
         if m["is_gguf"]:
             mb = m["size_mb"]                                # GGUF: resta quantizzato → footprint ≈ dim file
             src = "gguf"
         else:
-            mb = _ve.header_mb(m["path"], fp8_storage=_is_fp8(m["path"]))
+            _fp8 = _is_fp8(m["path"])
+            _var = "fp8" if _fp8 else ""
+            mb = _ve.header_mb(m["path"], fp8_storage=_fp8)
             src = "header"
         if mb > 0:
-            _ve.cache_put(m["path"], mb)
+            _cat = ""
+            try:                                             # F2: categoria dal detector (kind image/video)
+                from core import model_detect
+                _cat = str((model_detect.get(m["path"]) or {}).get("kind") or "") if not m["is_gguf"] else ""
+            except Exception:                                # noqa: BLE001
+                pass
+            _ve.cache_put(m["path"], mb, variant=_var, source=src, category=_cat)
             done += 1
         res.append({"name": m["name"], "mb": mb, "source": src})
         if on_progress:

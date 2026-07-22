@@ -2707,5 +2707,7 @@
   "mvs.cast.no_ref": "(kein Porträt)",
   "mvs.cast.need_name": "Gib der Figur zuerst einen Namen.",
   "mvs.cast.gen_run": "Porträt wird erzeugt…",
-  "mvs.cast.gen_ok": "Porträt erzeugt."
+  "mvs.cast.gen_ok": "Porträt erzeugt.",
+  "audit.running": "Modellregister-Prüfung…",
+  "audit.summary": "Modelle: {t} — {m} gemessen, {e} geschätzt, {u} unbekannt, {k} zu messen"
 }

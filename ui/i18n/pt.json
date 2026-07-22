@@ -2707,5 +2707,7 @@
   "mvs.cast.no_ref": "(sem retrato)",
   "mvs.cast.need_name": "Dê um nome ao personagem primeiro.",
   "mvs.cast.gen_run": "Gerando o retrato…",
-  "mvs.cast.gen_ok": "Retrato gerado."
+  "mvs.cast.gen_ok": "Retrato gerado.",
+  "audit.running": "Verificação do registo de modelos…",
+  "audit.summary": "Modelos: {t} — {m} medidos, {e} estimados, {u} desconhecidos, {k} por medir"
 }
