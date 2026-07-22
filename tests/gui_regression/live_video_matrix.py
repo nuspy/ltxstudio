@@ -189,16 +189,14 @@ def case_audio_nativo(model_key):
 
 
 def case_extend():
-    """Prolunga un video esistente (ultimo DIAG mp4 in output)."""
+    """Prolunga un video esistente (ultimo DIAG mp4 in output) — widget veri del tab."""
     def run(w, app):
         srcs = sorted(OUT.glob("DIAG_*.mp4"), key=lambda p: p.stat().st_mtime)
         assert srcs, "nessun video sorgente per extend"
         tab = w.video_extend_tab
-        tab.src_path.setText(str(srcs[-1])) if hasattr(tab, "src_path") else None
-        if hasattr(tab, "ext_prompt"):
-            tab.ext_prompt.setPlainText("la scena continua con un lento zoom out")
-        if hasattr(tab, "add_seconds"):
-            tab.add_seconds.setValue(2)
+        tab.set_video(str(srcs[-1]))
+        tab.prompt.setPlainText("la scena continua con un lento zoom out")
+        tab.add_seconds.setValue(2.0)
         w.generate_video_extend()
     return run
 

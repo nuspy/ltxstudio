@@ -643,6 +643,23 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     return tr, _cfg_name
 
 
+def _is_svdq(path: str) -> bool:
+    """True per i checkpoint SVDQuant/nunchaku (motore FP4 Blackwell): naming ufficiale svdq-fp4_*."""
+    return "svdq" in os.path.basename(path or "").lower()
+
+
+def _load_nunchaku_flux_tr(path: str):
+    """Transformer FLUX.1 via MOTORE NUNCHAKU (SVDQuant FP4, kernel Blackwell): ~7GB in VRAM e
+    ~3× più veloce del bf16 a qualità ≈16-bit. Drop-in nel posto del FluxTransformer2DModel:
+    il resto della pipeline (VAE/T5/CLIP dallo store) è identico. Richiede la wheel `nunchaku`
+    abbinata a torch (installata nel venv immagini, 22/07)."""
+    import torch
+    from nunchaku import NunchakuFluxTransformer2dModel
+    print(f"[nunchaku] carico transformer SVDQ-FP4: {os.path.basename(path)}", flush=True)
+    tr = NunchakuFluxTransformer2dModel.from_pretrained(path, torch_dtype=torch.bfloat16)
+    return tr
+
+
 def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     """Assembla una pipeline FLUX-family da: transformer LOCALE (single_file) + VAE LOCALE
     (ae.safetensors) + text encoder convertiti (CLIP-L, T5-xxl). Per i file 'solo transformer'
@@ -650,14 +667,15 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
 
     COMPONENT STORE: T5/CLIP/VAE (identici per TUTTI i FLUX.1) e il transformer (per-file) vengono presi
     dallo store con refcount → mai ricaricati finché vivono lì; la pipeline è una "shell" leggera che li
-    referenzia (pipe._ls_component_keys). Rollback dei refcount se l'assemblaggio fallisce a metà."""
+    referenzia (pipe._ls_component_keys). Rollback dei refcount se l'assemblaggio fallisce a metà.
+    I checkpoint `svdq-*` passano dal motore NUNCHAKU (_load_nunchaku_flux_tr), stesso assemblaggio."""
     import os
     import torch
     from diffusers import AutoencoderKL, FlowMatchEulerDiscreteScheduler
     from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5TokenizerFast
     from inference_server.component_store import STORE
     bf16 = torch.bfloat16
-    _in_ch = _flux_in_channels(transformer_path)
+    _in_ch = None if _is_svdq(transformer_path) else _flux_in_channels(transformer_path)
     if arch == "inpaint" and _in_ch == 64:
         print("[flux] Modello FLUX STANDARD (64 canali) selezionato per l'inpaint: per il Fill nativo di "
               "qualità usa il modello 'FLUX.1 Fill' (384 canali). Procedo col config standard.")
@@ -667,7 +685,11 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
     got: list[str] = []                                  # rollback anti refcount-leak
     try:
         _step("_assemble_flux: acquisisco transformer dallo STORE")
-        tr = STORE.acquire(tr_key, lambda: _load_flux_tr(transformer_path, arch)[0]); got.append(tr_key)
+        if _is_svdq(transformer_path):
+            tr = STORE.acquire(tr_key, lambda: _load_nunchaku_flux_tr(transformer_path))
+        else:
+            tr = STORE.acquire(tr_key, lambda: _load_flux_tr(transformer_path, arch)[0])
+        got.append(tr_key)
         _step("transformer acquisito")
         # VAE: ComfyUI decodifica il VAE FLUX in FP32 di default (bf16/fp16 → chiazze tonali sui fondi
         # lisci). Test A/B macchie: NATIVE_VAE_FP32=1 → fp32 (footprint VAE ~320MB, trascurabile).
@@ -759,11 +781,18 @@ def _assemble_zimage(transformer_path: str):
                            FlowMatchEulerDiscreteScheduler, ZImagePipeline)
     from transformers import AutoModel, AutoTokenizer
     bf16 = torch.bfloat16
-    tr = _from_single_file_robust(ZImageTransformer2DModel, transformer_path, dict(torch_dtype=bf16))
+    if _is_svdq(transformer_path):
+        # MOTORE NUNCHAKU (SVDQuant FP4 Blackwell): ~4GB invece di ~10-19GB, qualità ≈16-bit.
+        from nunchaku import NunchakuZImageTransformer2DModel
+        print(f"[nunchaku] carico transformer Z-Image SVDQ-FP4: {os.path.basename(transformer_path)}",
+              flush=True)
+        tr = NunchakuZImageTransformer2DModel.from_pretrained(transformer_path, torch_dtype=bf16)
+    else:
+        tr = _from_single_file_robust(ZImageTransformer2DModel, transformer_path, dict(torch_dtype=bf16))
     # fp8 STORAGE (direttiva "fp8 default ovunque"): Z-Image era bf16 (~19.5GB in VRAM) → col layerwise casting
     # storage fp8/compute bf16 scende a ~metà (~10GB) → più VRAM libera, niente offload/saturazione. Come FLUX.1.
-    # Disattivabile con NATIVE_FLUX1_FP8=0.
-    if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1":
+    # Disattivabile con NATIVE_FLUX1_FP8=0. (Non si applica al motore nunchaku: già FP4 coi suoi kernel.)
+    if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_svdq(transformer_path):
         try:
             tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=bf16)
             tr._ls_fp8_storage = True
