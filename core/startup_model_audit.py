@@ -75,16 +75,21 @@ def audit(on_progress=None) -> dict:
             measured.append(info)
         else:                                               # header/gguf/voce legacy senza source = stima
             estimated.append(info)
-        # candidato livello-2: non ancora misurato, misurabile (venv noto), non marcato skipped.
-        # ESCLUSI: GGUF (footprint ≈ dim file), file AUSILIARI (VAE/TE soli: header già esatto,
-        # e il loader di pipeline non può caricarli — il detector li scambia per checkpoint),
-        # ADAPTER (Redux & co.: non sono pipeline) e SHARD (model-0000X-of-N: non caricabili soli).
+        # candidato livello-2: non ancora misurato → TUTTO in coda (richiesta utente: anche VAE &
+        # co. diventano voci STATICHE misurate, mai più calcolate al volo). Routing del misuratore:
+        # - checkpoint IMMAGINE caricabili dal backend (flux1/flux2/zimage/ernie, non shard/helper)
+        #   → measure_worker del server (misura la PIPELINE vera: upcast/quantizzazioni contano);
+        # - tutto il resto (VAE/TE/adapter/shard/helper/famiglie non supportate + video LTX)
+        #   → materializzatore CPU generico (ltx2_measure): byte reali, un tensore alla volta.
+        # Esclusi solo i GGUF: restano quantizzati → footprint ≈ dim file, già registrata.
         import re as _re
         _is_shard = bool(_re.match(r"(?i)(model|diffusion_pytorch_model)-\d+-of-\d+", m["name"]))
         _is_helper = "enhancer" in m["name"].lower()      # LLM di supporto (es. ernie prompt-enhancer)
+        _pipeline_ok = (info["venv"] == "inference_server" and not _is_shard and not _is_helper
+                        and not _is_aux(m["path"]) and str(det.get("role") or "") != "adapter")
         if mb <= 0 or (src != "measured" and not e.get("skipped_commit")):
-            if (info["venv"] and not m["is_gguf"] and not _is_aux(m["path"])
-                    and str(det.get("role") or "") != "adapter" and not _is_shard and not _is_helper):
+            if not m["is_gguf"]:
+                info["venv"] = "inference_server" if _pipeline_ok else "ltx2"
                 to_measure.append(info)
     return {"total": len(measured) + len(estimated) + len(unknown), "migrated": migrated,
             "measured": measured, "estimated": estimated, "unknown": unknown,

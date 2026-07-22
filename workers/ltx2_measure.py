@@ -59,11 +59,16 @@ def main() -> int:
         return 3
     total = int(sum(comps.values()))
     tr = int(comps.get("transformer", 0))
+    # categoria: bundle con transformer → video (LTX); file senza transformer (VAE/TE/adapter/shard
+    # misurati qui come materializzatore CPU GENERICO) → aux. I checkpoint IMMAGINE veri passano
+    # dal measure_worker del server (misura la pipeline caricata, con upcast/quant reali).
+    _cat = "video" if tr > 0 else "aux"
     vram_estimate.cache_put(path, total, variant=("fp8" if fp8 else ""), source="measured",
-                            category="video", dtype=("fp8" if fp8 else ""),
+                            category=_cat, dtype=("fp8" if fp8 else ""),
                             transformer_mb=tr, components={k: int(v) for k, v in comps.items()})
-    for k, v in sorted(comps.items(), key=lambda x: -x[1]):
-        vram_estimate.comp_put(f"ltx2:{k}", v, category=("video" if k == "transformer" else "aux"))
+    if _cat == "video":
+        for k, v in sorted(comps.items(), key=lambda x: -x[1]):
+            vram_estimate.comp_put(f"ltx2:{k}", v, category=("video" if k == "transformer" else "aux"))
     print(f"[measure] OK: {os.path.basename(path)} = {total}MB (transformer {tr}MB) → DB", flush=True)
     return 0
 
