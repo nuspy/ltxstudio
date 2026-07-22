@@ -667,11 +667,8 @@ def _resolve_gguf(g: str) -> str:
     hits = glob.glob(os.path.join(r"E:\AI\Models\diffusion_models", "**", os.path.basename(g)), recursive=True)
     if hits:
         return hits[0]
-    ag = _auto_gguf()
-    if ag:
-        print(f"[gguf] '{g}' non trovato → auto {os.path.basename(ag)}", flush=True)
-        return ag
-    print(f"[gguf] '{g}' non trovato e nessun GGUF disponibile → uso il checkpoint fp8 base", flush=True)
+    # NON trovato → "" e il chiamante dà errore chiaro. NIENTE ripiego sull'auto-GGUF o sull'fp8
+    # (regola utente 22/07: mai sostituire il modello scelto senza consenso).
     return ""
 
 
@@ -1325,16 +1322,28 @@ def run_generation(p: dict) -> str:
     # Qui non si "ignora in silenzio": un GGUF che arriva viene SCARTATO con un avviso esplicito,
     # perché i progetti/gui_state vecchi possono ancora contenerne uno selezionato.
     # (I GGUF delle IMMAGINI — FLUX Fill per l'inpaint — non c'entrano e restano.)
-    _stale = p.pop("gguf_transformer", None)
-    if str(p.get("model", "")).lower().endswith(".gguf"):
-        _stale = _stale or p.get("model")
-    if _stale:
-        # Regola utente 22/07: MAI sostituire il modello scelto senza consenso — prima qui si
-        # passava in silenzio al checkpoint fp8. Ora: errore chiaro, decide l'utente.
+    # ── GGUF VIDEO: RIABILITATI (22/07, spike misurato) ──────────────────────────────────────
+    # Il 13/07 furono tolti per "≈500 s/step e OOM": rimisurato oggi col memory-manager unificato
+    # (transformer RESIDENTE quantizzato + dequant GPU per-layer di gguf_native, encoder su CPU):
+    # Q4_K_M distilled = 3.7-3.8 s/step — pari all'fp8 — con ~12GB di transformer invece di ~23,
+    # frame corretti (niente video verde). La lentezza storica era il contesto (commit/mmap +
+    # manager immaturo), non il formato. Opt-out d'emergenza: LTX_GGUF_VIDEO=0.
+    # Regola consenso: il GGUF gira SOLO se scelto dall'utente (dropdown → gguf_transformer);
+    # se il path non esiste → errore chiaro in _resolve_gguf/_resolve_ckpt, MAI sostituzioni.
+    _g = p.get("gguf_transformer") or (p.get("model") if str(p.get("model", "")).lower().endswith(".gguf") else None)
+    if _g and os.environ.get("LTX_GGUF_VIDEO", "1") == "0":
         raise RuntimeError(
-            f"'{os.path.basename(str(_stale))}': i GGUF video sono stati rimossi dal prodotto "
-            f"(≈500 s/step e OOM alle risoluzioni normali). Seleziona un checkpoint "
-            f"fp8/nvfp4 dal menu (nessuna sostituzione automatica).")
+            f"'{os.path.basename(str(_g))}': i GGUF video sono disabilitati da LTX_GGUF_VIDEO=0. "
+            f"Seleziona un checkpoint fp8/nvfp4 dal menu (nessuna sostituzione automatica).")
+    if _g:
+        _gp = str(_g) if os.path.exists(str(_g)) else _resolve_gguf(str(_g))
+        if not _gp:
+            raise RuntimeError(
+                f"GGUF '{os.path.basename(str(_g))}' non trovato su disco: è stato spostato o "
+                f"rimosso. Seleziona un altro modello dal menu (nessuna sostituzione automatica).")
+        p["gguf_transformer"] = _gp
+        if str(p.get("model", "")).lower().endswith(".gguf"):
+            p.pop("model", None)                             # il transformer arriva dal GGUF
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
     # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)
