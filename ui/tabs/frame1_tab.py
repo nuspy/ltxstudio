@@ -178,6 +178,22 @@ class Frame1Tab(QWidget):
         self.gen_engine_sel.setToolTip(tr("f1.gen.engine.tt",
             "Comfy: gestione VRAM dinamica (consigliato, scala su tutte le GPU). Diffusers: pipeline classica."))
         f.addRow(tr("f1.gen.engine_lbl", "Motore"), self.gen_engine_sel)
+        # UN SOLO MOTORE → NIENTE DROPDOWN (richiesta utente): senza ComfyUI resta solo diffusers.
+        try:
+            from core.ltx2_service import comfy_available as _ca
+            if not _ca():
+                _ci = self.gen_engine_sel.findData("comfy")
+                if _ci >= 0:
+                    self.gen_engine_sel.removeItem(_ci)
+                if self.gen_engine_sel.count() <= 1:
+                    self.gen_engine_sel.setVisible(False)
+                    _lbl = f.labelForField(self.gen_engine_sel)
+                    if _lbl is not None:
+                        _lbl.setVisible(False)
+                    from core import user_prefs as _up3
+                    _up3.set_engine("image", "diffusers")
+        except Exception:                                       # noqa: BLE001
+            pass
         self.gen_model = QComboBox()
         self.gen_model.setToolTip(tr("f1.gen.model.tt", "Modello usato per generare l'immagine; i colori indicano la fattibilità con la VRAM disponibile."))
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)

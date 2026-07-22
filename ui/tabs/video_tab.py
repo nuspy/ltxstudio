@@ -275,6 +275,21 @@ class VideoTab(QWidget):
             "LTX-2 nativo: tutte le funzioni (audio/keyframe/controlnet). Comfy: VRAM dinamica, solo t2v/i2v."))
         self.engine_row_lbl = QLabel(tr("vid.engine_lbl", "Motore video"))
         form.addRow(self.engine_row_lbl, self.video_engine_sel)
+        # UN SOLO MOTORE → NIENTE DROPDOWN (richiesta utente): con ComfyUI rimosso resta solo il
+        # nativo LTX-2 → la riga sparisce e la pref viene normalizzata (via i residui 'comfy').
+        try:
+            from core.ltx2_service import comfy_available as _ca
+            if not _ca():
+                _ci = self.video_engine_sel.findData("comfy")
+                if _ci >= 0:
+                    self.video_engine_sel.removeItem(_ci)
+                if self.video_engine_sel.count() <= 1:
+                    self.video_engine_sel.setVisible(False)
+                    self.engine_row_lbl.setVisible(False)
+                    from core import user_prefs as _up2
+                    _up2.set_engine("video", "ltx2_infer")
+        except Exception:                                    # noqa: BLE001
+            pass
         # Backend di ATTENZIONE (LTX): flash/SDPA (esatto, veloce su GPU recenti) vs Sage (fp8, GPU piccole).
         # Sostituiscono lo stesso operatore; se ne usa uno. Default flash. Vedi core/attention_backend.
         self.attn_backend = QComboBox()

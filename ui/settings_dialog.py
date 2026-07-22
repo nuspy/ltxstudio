@@ -60,18 +60,33 @@ class SettingsDialog(QDialog):
         hint.setStyleSheet("color: #888; font-size: 11px;")
         form.addRow(hint)
 
-        self.cb_img_engine = QComboBox()
-        for val, key in _IMAGE_ENGINES:
-            self.cb_img_engine.addItem(tr(key), val)
-        self._select_by_data(self.cb_img_engine, user_prefs.get_engine("image", "comfy"))
-        form.addRow(tr("settings.engine_image"), self.cb_img_engine)
+        # UN SOLO MOTORE → NIENTE DROPDOWN (richiesta utente): senza ComfyUI le opzioni 'comfy'
+        # spariscono; se per una categoria resta un solo motore, la riga non viene costruita.
+        # Se spariscono entrambe, l'intero gruppo viene nascosto dal chiamante (grp vuoto).
+        try:
+            from core.ltx2_service import comfy_available as _ca
+            _has_comfy = _ca()
+        except Exception:                                    # noqa: BLE001
+            _has_comfy = True
+        img_engines = [e for e in _IMAGE_ENGINES if _has_comfy or e[0] != "comfy"]
+        vid_engines = [e for e in _VIDEO_ENGINES if _has_comfy or e[0] != "comfy"]
 
-        self.cb_vid_engine = QComboBox()
-        for val, key in _VIDEO_ENGINES:
-            self.cb_vid_engine.addItem(tr(key), val)
-        self._select_by_data(self.cb_vid_engine, user_prefs.get_engine("video", "comfy"))
-        form.addRow(tr("settings.engine_video"), self.cb_vid_engine)
+        if len(img_engines) > 1:
+            self.cb_img_engine = QComboBox()
+            for val, key in img_engines:
+                self.cb_img_engine.addItem(tr(key), val)
+            self._select_by_data(self.cb_img_engine, user_prefs.get_engine("image", "comfy"))
+            form.addRow(tr("settings.engine_image"), self.cb_img_engine)
 
+        if len(vid_engines) > 1:
+            self.cb_vid_engine = QComboBox()
+            for val, key in vid_engines:
+                self.cb_vid_engine.addItem(tr(key), val)
+            self._select_by_data(self.cb_vid_engine, user_prefs.get_engine("video", "comfy"))
+            form.addRow(tr("settings.engine_video"), self.cb_vid_engine)
+
+        if len(img_engines) <= 1 and len(vid_engines) <= 1:
+            grp.setVisible(False)                            # nessuna scelta da fare → gruppo via
         return grp
 
     @staticmethod
@@ -139,8 +154,10 @@ class SettingsDialog(QDialog):
     def _on_accept(self):
         """Persiste subito la scelta dei motori nativi, poi chiude (gli override li legge open_settings)."""
         try:
-            user_prefs.set_engine("image", self.cb_img_engine.currentData())
-            user_prefs.set_engine("video", self.cb_vid_engine.currentData())
+            if hasattr(self, "cb_img_engine"):           # assenti quando c'è un solo motore (riga nascosta)
+                user_prefs.set_engine("image", self.cb_img_engine.currentData())
+            if hasattr(self, "cb_vid_engine"):
+                user_prefs.set_engine("video", self.cb_vid_engine.currentData())
             if hasattr(self, "cb_stego"):
                 user_prefs.set("stego_watermark", self.cb_stego.isChecked())
                 user_prefs.set("stego_text", self.ed_stego_text.text().strip())

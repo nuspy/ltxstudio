@@ -25,6 +25,13 @@ COMFY_PY = r"E:\AI\Comfy_Nexus.bak\ComfyUI\venv\Scripts\python.exe"   # venv tor
 _DM_ROOT = r"E:\AI\Models\diffusion_models"
 
 
+def comfy_available() -> bool:
+    """Il motore comfy-native (ComfyUI-as-library) è installato? Con ComfyUI rimosso (.bau) è False:
+    la GUI in quel caso NASCONDE i dropdown di scelta motore (richiesta utente: se il motore è uno
+    solo, niente menu) e il dispatch va diretto al nativo."""
+    return os.path.exists(COMFY_PY)
+
+
 def is_up() -> bool:
     try:
         requests.get(f"{BASE}/system_stats", timeout=2)
