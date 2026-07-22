@@ -725,15 +725,20 @@ def _auto_offload(p: dict, ckpt: str) -> str:
             except Exception:                                # noqa: BLE001
                 _WORK_GB = 8.0
         need = tr_gb + _ENC_GB + _WORK_GB                     # full-stack residente (solo fp8, no GGUF)
-        mode = "none" if free_gb >= need else "cpu"
+        # HEADROOM +2GB (22/07): a 768×576 col dev-fp8 need=31 su free=31.8 passava per "none" ma il
+        # build frammentava (expandable_segments non supportato su Windows) → OOM a 128MB con 10GB
+        # "liberi". Il pareggio contabile non basta: sotto margine → encoder su CPU.
+        mode = "none" if free_gb >= need + 2.0 else "cpu"
         # F6: planner combinatorio (plan_placement) come decisore DEFAULT (scelta utente 22/07):
         # transformer residente se entra (gli encoder girano comunque per-stage), componenti dal DB
         # canonico. Kill-switch: LTX_PLAN_PLACEMENT=0 → confronto diretto storico qui sopra.
         if os.environ.get("LTX_PLAN_PLACEMENT", "1") != "0":
             try:
                 from core import vram_calibration as _vc
+                # stesso HEADROOM +2GB del ramo diretto: al planner si dichiara un working più
+                # grande, così il pareggio contabile non passa più per "none" (vedi OOM 768×576)
                 _pl = _vc.plan_placement(int(tr_gb * 1024), "ltx2", int(free_gb * 1024),
-                                         int(_WORK_GB * 1024))
+                                         int((_WORK_GB + 2.0) * 1024))
                 mode = "none" if "transformer" in _pl.get("resident", []) else "cpu"
                 print(f"[plan] resident={_pl.get('resident')} offload={_pl.get('offload')} "
                       f"→ {mode}", flush=True)

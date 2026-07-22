@@ -85,10 +85,14 @@ def _worker() -> None:
             job["status"] = "error"
             job["error"] = f"{e}\n{traceback.format_exc()[-1500:]}"
             try:                                            # traceback COMPLETO su file: i dialog GUI lo
-                import time as _t                           # troncano e l'errore vero andava perso
+                import json as _json                        # troncano e l'errore vero andava perso
+                import time as _t
+                _prm = {k: v for k, v in (job.get("params") or {}).items()
+                        if isinstance(v, (str, int, float, bool)) or v is None}
                 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output",
                                        "ltx2_errors.log"), "a", encoding="utf-8") as _lf:
                     _lf.write(f"\n===== {_t.strftime('%Y-%m-%d %H:%M:%S')} job {jid[:8]} =====\n"
+                              f"PARAMS: {_json.dumps(_prm, ensure_ascii=False)[:1200]}\n"
                               f"{traceback.format_exc()}\n")
             except Exception:                               # noqa: BLE001
                 pass
