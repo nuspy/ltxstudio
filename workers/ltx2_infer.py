@@ -749,20 +749,68 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         return "cpu"
 
 
+_TR_ONLY_CACHE: dict = {}
+
+
+def _is_transformer_only(ckpt: str) -> bool:
+    """True se il checkpoint contiene SOLO il transformer (es. i *_fp8_scaled in formato ComfyUI):
+    niente vocoder/audio_vae/video_vae → la pipeline nativa non può costruirci l'audio decoder
+    ('Config value resblock is None', visto live 22/07)."""
+    if ckpt in _TR_ONLY_CACHE:
+        return _TR_ONLY_CACHE[ckpt]
+    out = False
+    try:
+        from core import st_direct
+        hdr, _ = st_direct.read_header(ckpt)
+        ks = [k for k in hdr if k != "__metadata__"]
+        has_tr = any(k.startswith("model.diffusion_model.") for k in ks)
+        has_aux = any(k.split(".")[0] in ("vocoder", "audio_vae", "vae", "video_vae") for k in ks)
+        out = has_tr and not has_aux
+    except Exception:                                        # noqa: BLE001
+        out = False
+    _TR_ONLY_CACHE[ckpt] = out
+    return out
+
+
 def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two", ptype: str = "ti2v"):
     """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco.
-    ptype: 'ti2v' (testo/immagine→video) oppure 'a2v' (audio→video, lip-sync/canto)."""
+    ptype: 'ti2v' (testo/immagine→video) oppure 'a2v' (audio→video, lip-sync/canto).
+    Checkpoint SOLO-transformer (comfy fp8_scaled): pipeline costruita sulla TUPLA
+    (bundle_default, file_scelto) — il loader fonde gli state-dict e l'ULTIMO path vince sulle
+    chiavi comuni → transformer dal file dell'utente, VAE/vocoder/audio e config dal bundle."""
+    _ckpt_pipe: "str | tuple" = ckpt
+    if _is_transformer_only(ckpt) and os.path.exists(CHECKPOINT) \
+            and os.path.normcase(ckpt) != os.path.normcase(CHECKPOINT):
+        print(f"[bundle] '{os.path.basename(ckpt)}' è SOLO transformer → VAE/vocoder/audio dal "
+              f"bundle {os.path.basename(CHECKPOINT)}", flush=True)
+        _ckpt_pipe = (CHECKPOINT, ckpt)
+        if qmode == "fp8_scaled_mm":
+            # i comfy fp8_scaled NON hanno input_scale (attivazioni quantizzate al volo da comfy):
+            # FP8Linear resterebbe senza parametro → si passa al percorso fp8_cast (fold delle
+            # weight_scale scalari + storage fp8, upcast in inference). Stessa VRAM, niente crash.
+            qmode = "fp8_cast"
     lkey = tuple((lo.path, lo.strength) for lo in loras)
     key = (ckpt, qmode, offload_str, lkey, stages, ptype)
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     quant = None
-    if qmode == "fp8_scaled_mm":
+    if qmode == "nvfp4_scaled_mm":
+        from ltx_core.quantization import nvfp4_scaled_mm
+        if nvfp4_scaled_mm.available():
+            quant = nvfp4_scaled_mm.build_policy(ckpt)
+            print("[nvfp4-mm] matmul FP4 Blackwell ATTIVO: transformer residente a 4-bit (~11GB)",
+                  flush=True)
+        else:                                                # niente kernel → dequant fp8 storica
+            from ltx_core.quantization import fp8_cast
+            qmode = "fp8_cast"
+            quant = fp8_cast.build_policy(_ckpt_pipe)
+            print("[nvfp4-mm] kernel FP4 non disponibili → dequant a fp8 (percorso precedente)", flush=True)
+    elif qmode == "fp8_scaled_mm":
         from ltx_core.quantization import fp8_scaled_mm
         quant = fp8_scaled_mm.build_policy(ckpt)
     elif qmode == "fp8_cast":
         from ltx_core.quantization import fp8_cast
-        quant = fp8_cast.build_policy(ckpt)
+        quant = fp8_cast.build_policy(_ckpt_pipe)           # tupla bundle+transformer-only: scale da entrambi
     offload = {"cpu": OffloadMode.CPU, "disk": OffloadMode.DISK,
                "none": OffloadMode.NONE}.get(offload_str, OffloadMode.NONE)
     # ComfyUI-like: fp8 NATIVO (scaled_mm, niente upcast a bf16) + offload per-blocco insieme.
@@ -783,17 +831,17 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     if ptype == "vinpaint":                                  # #59 latent-inpaint VIDEO (sottoclasse ic_lora)
         from workers.ltx_inpaint_pipeline import InpaintPipeline
         pipe = _build(InpaintPipeline,
-                      distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
+                      distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (canny/depth/pose)
         from ltx_pipelines.ic_lora import ICLoraPipeline
         pipe = _build(ICLoraPipeline,
-                      distilled_checkpoint_path=ckpt, spatial_upsampler_path=UPSAMPLER,
+                      distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     elif ptype == "retake":                                  # #24 ReTake: rigenera sezione [start,end] di un video
         from ltx_pipelines.retake import RetakePipeline
         pipe = _build(RetakePipeline,
-                      checkpoint_path=ckpt, gemma_root=GEMMA, loras=loras,
+                      checkpoint_path=_ckpt_pipe, gemma_root=GEMMA, loras=loras,
                       quantization=quant, offload_mode=offload, distilled=True)
     else:
         Klass = A2VidPipelineTwoStage if ptype == "a2v" else TI2VidTwoStagesPipeline
@@ -801,7 +849,9 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         # sotto-denoisa → figure "dematerializzate" (nuvole di voxel). Se il checkpoint non è un
         # distilled e la LoRA ufficiale è su disco, la applichiamo; altrimenti warning esplicito.
         _dlora = []
-        if "distilled" not in os.path.basename(ckpt).lower():
+        if os.environ.get("LTX_NO_DLORA") == "1":
+            print("[dev] LTX_NO_DLORA=1 → distilled-LoRA NON applicata (diagnostica)", flush=True)
+        elif "distilled" not in os.path.basename(ckpt).lower():
             if os.path.exists(DISTILLED_LORA):
                 _dlora = [LoraPathStrengthAndSDOps(DISTILLED_LORA, 1.0, LTXV_LORA_COMFY_RENAMING_MAP)]
                 print(f"[dev] checkpoint non-distilled → applico la distilled-LoRA ufficiale "
@@ -812,7 +862,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
                       f"ltx-2.3-22b-distilled-lora-384-1.1.safetensors in {os.path.dirname(DISTILLED_LORA)}",
                       flush=True)
         pipe = _build(Klass,
-                      checkpoint_path=ckpt, distilled_lora=_dlora, spatial_upsampler_path=UPSAMPLER,
+                      checkpoint_path=_ckpt_pipe, distilled_lora=_dlora, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
     # M5 (versione sicura) — LRU di pipeline configurabile (env LTX_VIDEO_PIPE_LRU, default 1 = comportamento
     # storico: 1 pipeline alla volta). Chi ha VRAM di scorta può alzarlo a 2 per tenere ti2v+a2v residenti ed
@@ -1360,7 +1410,13 @@ def run_generation(p: dict) -> str:
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
                                               LTXV_LORA_COMFY_RENAMING_MAP))
     ckpt = _resolve_ckpt(p.get("model"))
-    qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
+    _bn = os.path.basename(ckpt).lower()
+    if p.get("quant"):
+        qmode = p["quant"]
+    elif "nvfp4" in _bn and os.environ.get("LTX_FP4_MM", "1") != "0":
+        qmode = "nvfp4_scaled_mm"                            # matmul FP4 Blackwell: pesi residenti 4-bit
+    else:
+        qmode = "fp8_scaled_mm" if "fp8" in _bn else "fp8_cast"
     t0 = time.time()
     # #24 ControlNet IC-LoRA: se c'è un control_video e il peso IC-LoRA del tipo è su disco → pipeline iclora
     _ic = IC_LORA.get(p.get("control_type", "")) if p.get("control_video") else None
