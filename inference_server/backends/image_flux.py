@@ -447,71 +447,45 @@ def _precise_vram_mb(path: str, *, fp8_storage: bool = False) -> int:
     return int(mb)
 
 
-_VRAM_CACHE_PATH = r"E:\AI\ltxstudio\data\model_vram_cache.json"
-_vram_cache: dict | None = None
-
-
-def _vram_cache_load() -> dict:
-    global _vram_cache
-    if _vram_cache is None:
-        try:
-            import json
-            with open(_VRAM_CACHE_PATH, encoding="utf-8") as fh:
-                _vram_cache = json.load(fh)
-        except Exception:                                    # noqa: BLE001
-            _vram_cache = {}
-    return _vram_cache
-
-
-def _vram_cache_key(model_path: str, fp8_storage: bool = False) -> str:
-    # Il footprint dipende dal DTYPE con cui il modello viene caricato, non solo dal file: lo STESSO
-    # FLUX_Dev pesa 32.4GB in bf16 e 23.9GB con storage fp8 (layerwise). Senza il dtype nella chiave, una
-    # misura bf16 (scritta prima che l'fp8 fosse il default) veniva riusata per il carico fp8 → stima
-    # gonfiata di 8.5GB → _place sceglieva 'offload' anche quando il full-stack ENTRAVA in VRAM.
-    _dt = "|fp8" if fp8_storage else ""
-    try:
-        st = os.stat(model_path)
-        return f"{os.path.normpath(model_path).lower()}|{st.st_size}{_dt}"   # invalida se il file cambia
-    except Exception:                                        # noqa: BLE001
-        return f"{os.path.normpath(model_path).lower()}{_dt}"
+# F1 unified-model-manager: il DB footprint è UNICO e vive in core/vram_estimate (stessa cache
+# model_vram_cache.json, chiave "path|size[|fp8]" — il footprint dipende dal DTYPE di carico: lo
+# stesso FLUX_Dev pesa 32.4GB bf16 / 23.9GB fp8-storage). Questi wrapper restano per i call-site
+# esistenti ma delegano al canonico: scrittura ATOMICA + metadati (source/category/components).
+from core import vram_estimate as _ve
 
 
 def _vram_cache_get(model_path: str, fp8_storage: bool = False) -> int:
-    return int(_vram_cache_load().get(_vram_cache_key(model_path, fp8_storage), {})
-               .get("footprint_mb", 0) or 0)
+    return _ve.cache_get(model_path, variant=("fp8" if fp8_storage else ""))
 
 
-def _vram_cache_put(model_path: str, footprint_mb: int, fp8_storage: bool = False) -> None:
-    if footprint_mb <= 0:
-        return
-    c = _vram_cache_load()
-    c[_vram_cache_key(model_path, fp8_storage)] = {"footprint_mb": int(footprint_mb),
-                                                   "name": os.path.basename(model_path)}
-    try:
-        import json
-        os.makedirs(os.path.dirname(_VRAM_CACHE_PATH), exist_ok=True)
-        with open(_VRAM_CACHE_PATH, "w", encoding="utf-8") as fh:
-            json.dump(c, fh, indent=1)
-    except Exception:                                        # noqa: BLE001
-        pass
+def _vram_cache_put(model_path: str, footprint_mb: int, fp8_storage: bool = False,
+                    components: dict | None = None) -> None:
+    _ve.cache_put(model_path, int(footprint_mb), variant=("fp8" if fp8_storage else ""),
+                  source="measured", category="image",
+                  dtype=("fp8" if fp8_storage else ""), components=components)
 
 
-def _measure_pipe_mb(pipe) -> int:
-    """Byte REALI in memoria dei moduli pesanti della pipeline (dopo il caricamento: onora dtype effettivi,
-    fp8-storage, upcast). È la misura più accurata → cache su file per riuso."""
-    total = 0
+def _measure_pipe_components(pipe) -> dict:
+    """Breakdown per-componente in MB (byte reali dtype-aware) — registrato nel DB canonico per il
+    planner (plan_placement decide QUALI componenti tenere residenti). {} i moduli assenti/rotti."""
+    out: dict = {}
     for name in ("transformer", "vae", "text_encoder", "text_encoder_2", "text_encoder_3", "unet"):
         m = getattr(pipe, name, None)
         if m is None or not hasattr(m, "parameters"):
             continue
         try:
-            for p in m.parameters(recurse=True):
-                total += p.numel() * p.element_size()
-            for b in m.buffers(recurse=True):
-                total += b.numel() * b.element_size()
+            tot = sum(p.numel() * p.element_size() for p in m.parameters(recurse=True))
+            tot += sum(b.numel() * b.element_size() for b in m.buffers(recurse=True))
+            out[name] = int(tot / 1024**2)
         except Exception:                                    # noqa: BLE001
             pass
-    return int(total / 1024**2)
+    return out
+
+
+def _measure_pipe_mb(pipe) -> int:
+    """Byte REALI in memoria dei moduli pesanti della pipeline (dopo il caricamento: onora dtype effettivi,
+    fp8-storage, upcast). È la misura più accurata → cache su file per riuso."""
+    return int(sum(_measure_pipe_components(pipe).values()))
 
 
 def _from_single_file_robust(cls, path: str, kw: dict):
@@ -1220,7 +1194,7 @@ def _load(model_path: str, arch: str, mm=None):
     if _meas:
         _weights_mb = _meas
         print(f"[vram] footprint REALE misurato: {_meas}MB (fp8={_fp8_storage}) + working {_WORKING}", flush=True)
-        _vram_cache_put(model_path, _meas, _fp8_storage)
+        _vram_cache_put(model_path, _meas, _fp8_storage, components=_measure_pipe_components(pipe))
     elif _cached:
         _weights_mb = _cached
         print(f"[vram] stima da CACHE: modello {_cached}MB + working {_WORKING}", flush=True)

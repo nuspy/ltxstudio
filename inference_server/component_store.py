@@ -70,8 +70,14 @@ class ComponentStore:
                         device="cpu")                    # from_pretrained/from_single_file → pesi su CPU
             self._items[key] = e
             try:                                         # SMART-MEMORY: auto-popola il registro footprint (dtype-aware)
-                from core import model_registry
-                model_registry.ensure(key, obj, mb=_sz, category="image")
+                from core import vram_estimate           # F1: DB canonico unico (era model_registry, write-only)
+                if not vram_estimate.comp_get(key):
+                    _cat = "image" if ("transformer" in key or ":tr" in key or "_tr" in key) else "aux"
+                    try:
+                        _dt = str(next(obj.parameters()).dtype).replace("torch.", "")
+                    except Exception:                    # noqa: BLE001
+                        _dt = ""
+                    vram_estimate.comp_put(key, _sz, category=_cat, dtype=_dt)
             except Exception:                            # noqa: BLE001 — best-effort, mai fatale
                 pass
         e.refcount += 1
