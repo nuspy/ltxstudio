@@ -44,6 +44,8 @@ def _candidates(task: str) -> list[str]:
     for cat in ("diffusion_models", "checkpoints"):
         try:
             for m in inv.list_models(cat):
+                if "nvfp4" in m.lower():               # scale FP4 a blocchi: il loader nativo non le carica
+                    continue
                 hay = _arch(m) + " " + m.lower()
                 if any(k in hay for k in keys):
                     out.append(m)
