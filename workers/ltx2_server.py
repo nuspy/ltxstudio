@@ -75,7 +75,7 @@ def _worker() -> None:
             pass
         try:
             with torch.no_grad():                       # cintura+bretelle col set_grad_enabled sopra
-                out = ltx2_infer.run_generation(job["params"])
+                out = ltx2_infer.run_generation_with_oom_retry(job["params"])
             job["output"] = [out]
             job["status"] = "success"
         except ltx2_infer.GenerationCancelled:              # cancel cooperativo (POST /cancel)

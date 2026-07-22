@@ -725,20 +725,18 @@ def _auto_offload(p: dict, ckpt: str) -> str:
             except Exception:                                # noqa: BLE001
                 _WORK_GB = 8.0
         need = tr_gb + _ENC_GB + _WORK_GB                     # full-stack residente (solo fp8, no GGUF)
-        # HEADROOM +2GB (22/07): a 768×576 col dev-fp8 need=31 su free=31.8 passava per "none" ma il
-        # build frammentava (expandable_segments non supportato su Windows) → OOM a 128MB con 10GB
-        # "liberi". Il pareggio contabile non basta: sotto margine → encoder su CPU.
-        mode = "none" if free_gb >= need + 2.0 else "cpu"
+        # Soglia STORICA (senza headroom): il distilled 24GB resta residente a 704×448 (il percorso
+        # veloce della residenza, −28% misurato). I casi limite che frammentano (es. dev 768×576)
+        # sono coperti dall'OOM-RETRY con offload=cpu in run_generation_with_oom_retry.
+        mode = "none" if free_gb >= need else "cpu"
         # F6: planner combinatorio (plan_placement) come decisore DEFAULT (scelta utente 22/07):
         # transformer residente se entra (gli encoder girano comunque per-stage), componenti dal DB
         # canonico. Kill-switch: LTX_PLAN_PLACEMENT=0 → confronto diretto storico qui sopra.
         if os.environ.get("LTX_PLAN_PLACEMENT", "1") != "0":
             try:
                 from core import vram_calibration as _vc
-                # stesso HEADROOM +2GB del ramo diretto: al planner si dichiara un working più
-                # grande, così il pareggio contabile non passa più per "none" (vedi OOM 768×576)
                 _pl = _vc.plan_placement(int(tr_gb * 1024), "ltx2", int(free_gb * 1024),
-                                         int((_WORK_GB + 2.0) * 1024))
+                                         int(_WORK_GB * 1024))
                 mode = "none" if "transformer" in _pl.get("resident", []) else "cpu"
                 print(f"[plan] resident={_pl.get('resident')} offload={_pl.get('offload')} "
                       f"→ {mode}", flush=True)
@@ -1633,12 +1631,41 @@ def _free_image_server() -> None:
         pass
 
 
+def run_generation_with_oom_retry(p: dict) -> str:
+    """run_generation + UNA ripetizione con offload=cpu in caso di CUDA OOM (gestione MEMORIA,
+    mai del modello): i casi limite (es. dev-fp8 a 768×576) frammentano il build residente su
+    Windows (niente expandable_segments) → invece di morire, si ripiega sul percorso streaming
+    (più lento ma stabile: device-fix + filtro comfy_quant nel builder, 22/07)."""
+    try:
+        return run_generation(p)
+    except GenerationCancelled:
+        raise
+    except Exception as e:                                   # noqa: BLE001
+        _msg = f"{type(e).__name__}: {e}"
+        if "out of memory" not in _msg.lower():
+            raise
+        if str(p.get("offload") or "") == "cpu":
+            raise                                            # era già streaming: niente da ritentare
+        print(f"[oom-retry] {_msg[:120]} → riprovo UNA volta con offload=cpu", flush=True)
+        try:
+            import gc
+            _PIPE_CACHE.clear()
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:                                    # noqa: BLE001
+            pass
+        p2 = dict(p)
+        p2["offload"] = "cpu"
+        return run_generation(p2)
+
+
 def main() -> None:
     with open(sys.argv[1], encoding="utf-8") as fh:
         p = json.load(fh)
     clear_cancel()                                           # top-level: nessun cancel residuo
     _free_image_server()
-    print("OK:" + run_generation(p), flush=True)
+    print("OK:" + run_generation_with_oom_retry(p), flush=True)
 
 
 if __name__ == "__main__":
