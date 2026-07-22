@@ -35,7 +35,9 @@ def native_scale(model_name: str) -> int:
 
 class VideoEnhancePipeline:
     def build(self, video_name: str, *, engine: str = "seedvr2",
-              seedvr2_model: str = "seedvr2_ema_7b_fp16.safetensors",
+              # default = 3B fp8: ESISTE ed entra in VRAM; il 7b_fp16 è su disco solo come
+              # .download INCOMPLETO (9.3GB parziali) → usarlo come default falliva sempre.
+              seedvr2_model: str = "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
               resolution: int = 1080, blocks_to_swap: int = 0, batch_size: int = 5,
               esrgan_model: str = "4x-UltraSharpV2.safetensors", target_scale: float = 2.0,
               fps: int = 24, rife: bool = False, rife_multiplier: int = 2,
