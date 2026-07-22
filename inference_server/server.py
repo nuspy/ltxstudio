@@ -97,17 +97,16 @@ def _tail(path: str, n: int = 2000) -> str:
 
 
 # ─────────────── figlio PERSISTENTE — RESIDENZA del modello tra le gen (richiesta utente) ───────────────
-# Default ON: tiene UN figlio `persistent_runner` vivo tra i job → il modello resta CALDO tra le gen (niente
-# reload ad ogni generazione = niente più "il modello si scarica dopo la gen", e niente contesa VRAM tra due
-# figli = niente hang alla 2ª gen). Riuso per job dello STESSO modello; al CAMBIO modello respawn (evita il
-# segfault del 2° load in-process). Il server resta senza torch → anti-crash intatto (EOF/timeout = respawn +
-# fallback per-job). Disattivabile con NATIVE_PERSISTENT_CHILD=0 (torna al per-job isolato).
-# DEFAULT OFF (stabilità): il figlio persistente diffusers su Windows dà **access violation** sul 2° load /
-# sotto pressione di memoria (visto: Ernie 16GB, Krea2). È la fragilità documentata ([[persistent-child-fragile]]).
-# Il per-job isolato è stabile da mesi. La residenza va riabilitata SOLO col caricamento robusto (to_empty/
-# materializzazione esplicita, coordinamento RAM cross-motore). La residenza COMFY invece resta ON (ComfyUI
-# model_management è nato per processi lunghi). Riattiva il diffusers: NATIVE_PERSISTENT_CHILD=1.
-_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD") == "1"
+# DEFAULT ON (unificazione motori, 22/07/2026): tiene UN figlio `persistent_runner` vivo tra i job → il
+# modello resta CALDO tra le gen (niente reload da SSD ad ogni generazione). Riuso per job dello STESSO
+# modello; al CAMBIO modello respawn di un figlio pulito. Il server resta senza torch → anti-crash intatto
+# (EOF/timeout = respawn + FALLBACK PER-JOB automatico: nessuna regressione se il figlio muore).
+# STORIA: era OFF per gli access-violation al 2° load su Windows (Ernie 16GB, Krea2) — la CAUSA era il
+# mmap copy-on-write dei safetensors che impegna ~2× il checkpoint di COMMIT (pagefile), vedi la memoria
+# pagefile-commit-mmap-crash. CURATA: persistent_runner patcha il load con core/st_direct (I/O diretto,
+# commit-safe), FREE_DEMOTE parcheggia in RAM invece di distruggere, e i floor sono commit-aware.
+# Opt-out: NATIVE_PERSISTENT_CHILD=0 (torna al per-job isolato puro).
+_PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD", "1") != "0"
 
 
 def _job_model_key(module: str, params: dict) -> str:
