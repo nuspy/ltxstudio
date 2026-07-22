@@ -628,6 +628,29 @@ IC_LORA = {
 _PIPE_CACHE: dict = {}
 
 
+def _nvfp4_guard(ckpt: str) -> None:
+    """I checkpoint NVFP4 hanno scale di quantizzazione A BLOCCHI (es. (128,256)): la catena
+    prequant di ltx-core supporta SOLO scale scalari per-tensore (fp8) e non esiste un percorso
+    FP4 scaled-mm nello stack. Senza guardia il load moriva a metà col criptico "Unsupported
+    scale shape (128, 256) for transformer_blocks…" (visto live 22/07). Qui: errore CHIARO e
+    IMMEDIATO, prima di leggere 12GB. Check doppio: nome file + header (scale non-scalari)."""
+    _name = os.path.basename(ckpt)
+    _blocky = "nvfp4" in _name.lower()
+    if not _blocky:
+        try:
+            from core import st_direct
+            hdr, _ = st_direct.read_header(ckpt)
+            _blocky = any(k.endswith("_scale") and len(v.get("shape") or []) > 0
+                          for k, v in hdr.items() if k != "__metadata__")
+        except Exception:                                   # noqa: BLE001 — header illeggibile: ci pensa il loader
+            return
+    if _blocky:
+        raise RuntimeError(
+            f"Checkpoint NVFP4 non supportato dal motore nativo: '{_name}' usa scale di "
+            "quantizzazione a blocchi (FP4) che il loader attuale non sa caricare. "
+            "Seleziona la versione fp8 (es. ltx-2.3-22b-dev-fp8.safetensors).")
+
+
 def _resolve_ckpt(model: str) -> str:
     ckpt = model or CHECKPOINT
     if os.path.isabs(ckpt) and os.path.exists(ckpt):
@@ -1344,6 +1367,7 @@ def run_generation(p: dict) -> str:
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
                                               LTXV_LORA_COMFY_RENAMING_MAP))
     ckpt = _resolve_ckpt(p.get("model"))
+    _nvfp4_guard(ckpt)                                       # NVFP4 non caricabile: errore chiaro SUBITO
     qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
     t0 = time.time()
     # #24 ControlNet IC-LoRA: se c'è un control_video e il peso IC-LoRA del tipo è su disco → pipeline iclora

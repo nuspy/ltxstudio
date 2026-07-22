@@ -181,11 +181,13 @@ def plan(want: ModelKey, *, category: str, need_mb: float = 0.0,
 
 def apply(planned: dict, *, timeout: float = 8.0) -> list[int]:
     """Esegue il piano: libera i server indicati (via HTTP /free, coordinato). Ritorna le porte liberate.
-    `reuse`/`load` senza free_ports → no-op (niente da scaricare)."""
+    `reuse`/`load` senza free_ports → no-op (niente da scaricare). Il mode (demote|destroy) lo decide
+    mem_coordinator.auto_mode(): con RAM/commit sotto i floor si svuota ANCHE il parcheggio RAM
+    (richiesta utente 22/07: «anche la RAM va svuotata dai modelli caricati, se non servono più»)."""
     ports = list(planned.get("free_ports") or [])
     if not ports:
         return []
-    freed = mem_coordinator._free_ports(ports, timeout)     # riusa la meccanica /free esistente
+    freed = mem_coordinator._free_ports(ports, timeout, mode=mem_coordinator.auto_mode())
     return freed
 
 

@@ -44,19 +44,39 @@ def _free_ports(ports, timeout: float, mode: str = "demote") -> list[int]:
     return hit
 
 
+def auto_mode() -> str:
+    """«Anche la RAM va svuotata dai modelli caricati, se non servono più» (richiesta utente 22/07):
+    il parcheggio RAM ha senso solo finché la RAM abbonda. Se la macchina è GIÀ corta (RAM fisica
+    disponibile sotto il floor, o commit sotto il floor), il demote sposterebbe solo il problema
+    dalla VRAM alla RAM → si passa a destroy: i modelli dell'altra categoria escono ANCHE dalla RAM
+    (si rileggeranno da SSD quando torneranno a servire). Con memoria abbondante resta demote:
+    il riuso a caldo image⇄video è il guadagno misurato della residenza (run 2 −28%)."""
+    try:
+        import psutil
+        from core import mem_budget, st_direct
+        if psutil.virtual_memory().available / 2**20 < mem_budget.ram_floor_mb():
+            return "destroy"
+        if st_direct.commit_avail_mb() < mem_budget.commit_floor_mb():
+            return "destroy"
+    except Exception:                                       # noqa: BLE001 — senza misure: comportamento storico
+        pass
+    return "demote"
+
+
 def free_for(category: str, *, timeout: float = 8.0, force: bool = False) -> list[int]:
     """Libera i server delle categorie DIVERSE da `category`. Ritorna le porte effettivamente liberate.
     `force=True` bypassa il guard "stessa categoria consecutiva" (es. il pulsante GUI «Libera VRAM»).
     Cambio image⇄video → demote (i modelli dell'altra categoria restano parcheggiati in RAM, pronti
-    al rientro); categorie EFFIMERE (3d/world/music) → destroy (vogliono anche la RAM)."""
+    al rientro), MA se RAM/commit sono sotto i floor si passa a destroy (vedi auto_mode);
+    categorie EFFIMERE (3d/world/music) → destroy (vogliono anche la RAM)."""
     cat = (category or "").lower()
     if not force and _last["cat"] == cat:
         return []                                           # stessa categoria di fila → niente da cambiare
     _last["cat"] = cat
     if cat == "image":
-        return _free_ports(_VIDEO_PORTS, timeout, mode="demote")
+        return _free_ports(_VIDEO_PORTS, timeout, mode=auto_mode())
     if cat == "video":
-        return _free_ports(_IMAGE_PORTS, timeout, mode="demote")
+        return _free_ports(_IMAGE_PORTS, timeout, mode=auto_mode())
     # 3d / world / music / sconosciute → effimere: liberano TUTTO, RAM compresa
     return _free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout, mode="destroy")
 
