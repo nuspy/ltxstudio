@@ -62,6 +62,12 @@ def _evict_pipes() -> None:
     """Scarica tutti i pipe in cache e libera la VRAM (single-slot per il server persistente)."""
     import gc
     n = len(_PIPE_CACHE)
+    try:                                                       # F3: ledger live
+        from core import vram_ledger
+        for _k in _PIPE_CACHE:
+            vram_ledger.unregister(f"krea2:{_k[0]}")
+    except Exception:                                          # noqa: BLE001
+        pass
     _PIPE_CACHE.clear()
     gc.collect()
     try:
@@ -93,6 +99,11 @@ def _demote_pipes() -> float:
                         mb += sum(p.numel() * p.element_size() for p in _mod.parameters()) / 2**20
                     except Exception:                          # noqa: BLE001
                         pass
+            try:                                               # F3: ledger live
+                from core import vram_ledger
+                vram_ledger.set_state(f"krea2:{key[0]}", "ram_parked")
+            except Exception:                                  # noqa: BLE001
+                pass
         except Exception as ex:                                # noqa: BLE001 — pipe non spostabile → distruggi
             print(f"[krea2] demote fallita ({ex}) → destroy", flush=True)
             _PIPE_CACHE.pop(key, None)
@@ -116,6 +127,11 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
             pipe = pipe.to("cuda")
             pipe._ls_parked_cpu = False
             _PIPE_CACHE[key] = pipe
+            try:                                               # F3: ledger live
+                from core import vram_ledger
+                vram_ledger.set_state(f"krea2:{key[0]}", "vram")
+            except Exception:                                  # noqa: BLE001
+                pass
         return pipe
     # SINGLE-SLOT: prima di caricare un pipe con una chiave NUOVA, sfratta gli altri e libera la VRAM.
     # Nel server PERSISTENTE i job alternano t2i (no LoRA) ed edit (LoRA identità): tenere 2 pipe fp8
@@ -159,6 +175,16 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
     try:
         if hasattr(pipe, "vae"):
             pipe.vae.enable_tiling()
+    except Exception:                                          # noqa: BLE001
+        pass
+    try:                                                       # F3: ledger live — nuova pipe caricata
+        from core import vram_ledger
+        _mb = 0.0
+        for _m in ("transformer", "vae", "text_encoder"):
+            _mod = getattr(pipe, _m, None)
+            if _mod is not None and hasattr(_mod, "parameters"):
+                _mb += sum(q.numel() * q.element_size() for q in _mod.parameters()) / 2**20
+        vram_ledger.register(f"krea2:{model_dir}", _mb, category="image", state="vram", path=model_dir)
     except Exception:                                          # noqa: BLE001
         pass
     # NB: il backend di attenzione lo imposta il CHIAMANTE — solo l'EDIT (sequenza in-context lunga con

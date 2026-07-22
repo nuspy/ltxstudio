@@ -80,6 +80,11 @@ class ComponentStore:
                     vram_estimate.comp_put(key, _sz, category=_cat, dtype=_dt)
             except Exception:                            # noqa: BLE001 — best-effort, mai fatale
                 pass
+            try:                                         # F3: ledger live di ciò che sta in VRAM
+                from core import vram_ledger
+                vram_ledger.register(key, _sz, category="image", state="vram")
+            except Exception:                            # noqa: BLE001
+                pass
         e.refcount += 1
         e.last_used = _now()
         return e.obj
@@ -103,6 +108,11 @@ class ComponentStore:
         e = self._items.get(key)
         if e is not None:
             e.device = device
+            try:                                        # F3: lo stato del ledger segue il device reale
+                from core import vram_ledger
+                vram_ledger.set_state(key, "vram" if device == "cuda" else "ram_parked")
+            except Exception:                           # noqa: BLE001
+                pass
 
     # ── memoria ──────────────────────────────────────────────────────────────
     def resident_mb(self, device: str = "cuda") -> float:
@@ -120,6 +130,11 @@ class ComponentStore:
                 del e.obj
             except Exception:                               # noqa: BLE001
                 pass
+        try:
+            from core import vram_ledger
+            vram_ledger.clear_own()
+        except Exception:                                   # noqa: BLE001
+            pass
         gc.collect()
         try:
             import torch
@@ -214,6 +229,11 @@ class ComponentStore:
                     e.device = "cpu"
                     demoted = True
                     print(f"[store] demote→cpu {k} ({e.size_mb:.0f}MB)", flush=True)
+                    try:
+                        from core import vram_ledger
+                        vram_ledger.set_state(k, "ram_parked")
+                    except Exception:                    # noqa: BLE001
+                        pass
                 except Exception as _e:                  # noqa: BLE001
                     print(f"[store] demote {k} fallita ({_e}) → destroy", flush=True)
             if not demoted:
@@ -223,6 +243,11 @@ class ComponentStore:
                 except Exception:                        # noqa: BLE001
                     pass
                 print(f"[store] destroy {k} ({e.size_mb:.0f}MB)", flush=True)
+                try:
+                    from core import vram_ledger
+                    vram_ledger.unregister(k)
+                except Exception:                        # noqa: BLE001
+                    pass
             freed += e.size_mb
             if torch is not None and torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -255,12 +280,22 @@ class ComponentStore:
                     demoted = True
                     n += 1
                     print(f"[store] demote_all→cpu {k} ({e.size_mb:.0f}MB)", flush=True)
+                    try:
+                        from core import vram_ledger
+                        vram_ledger.set_state(k, "ram_parked")
+                    except Exception:                    # noqa: BLE001
+                        pass
                 except Exception as _e:                  # noqa: BLE001
                     print(f"[store] demote_all {k} fallita ({_e}) → destroy", flush=True)
             if not demoted:
                 self._items.pop(k, None)
                 try:
                     del e.obj
+                except Exception:                        # noqa: BLE001
+                    pass
+                try:
+                    from core import vram_ledger
+                    vram_ledger.unregister(k)
                 except Exception:                        # noqa: BLE001
                     pass
         import gc

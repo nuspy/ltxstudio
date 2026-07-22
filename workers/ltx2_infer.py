@@ -556,6 +556,12 @@ class _CpuParkRegistry(_DummyReg):
                            "used": _tm.monotonic()}
         print(f"[park] parcheggiato in RAM: {os.path.basename(str(paths[0]))} "
               f"({mb:.0f}MB, totale {self._parked_mb():.0f}MB)", flush=True)
+        try:                                            # F3: ledger live (parcheggio = ram_parked)
+            from core import vram_ledger
+            vram_ledger.register(f"park:{os.path.basename(str(paths[0]))}", mb,
+                                 category="video", state="ram_parked", path=str(paths[0]))
+        except Exception:                               # noqa: BLE001
+            pass
 
     def pop(self, paths, sd_ops):
         sid = self._gen_id(paths, sd_ops)
@@ -568,6 +574,11 @@ class _CpuParkRegistry(_DummyReg):
         if i:
             print(f"[park] rimosso dalla RAM: {os.path.basename(i['paths'][0])} ({i['mb']:.0f}MB)",
                   flush=True)
+            try:                                        # F3: ledger live
+                from core import vram_ledger
+                vram_ledger.unregister(f"park:{os.path.basename(i['paths'][0])}")
+            except Exception:                           # noqa: BLE001
+                pass
 
     def drop_except(self, keep_paths) -> float:
         """Regola di drop (pipeline del job ora NOTA): i pesi parcheggiati che il job non userà
@@ -1331,6 +1342,14 @@ def run_generation(p: dict) -> str:
     if torch.cuda.is_available():
         print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "
               f"{torch.cuda.memory_reserved()/1e9:.1f}GB reserved", flush=True)
+    try:                                                     # F3: ledger live — il job video dichiara il suo modello
+        from core import vram_ledger as _vl
+        from core import vram_estimate as _vest
+        _est_mb, _ = _vest.estimate_mb(ckpt, fp8_storage=True, working_mb=0)
+        _vl.register(f"video:{os.path.basename(ckpt)}", _est_mb or os.path.getsize(ckpt) / 2**20,
+                     category="video", state="vram", path=ckpt)
+    except Exception:                                        # noqa: BLE001
+        pass
 
     # TRANSFORMER da GGUF (~14GB) per entrare nei 32GB come ComfyUI: gli altri componenti (Gemma/vae/
     # vocoder) restano sul checkpoint fp8 con offload; il transformer si carica quantizzato dal GGUF e
@@ -1521,6 +1540,11 @@ def run_generation(p: dict) -> str:
         out = watermark.apply_to_file(out)
     except Exception as _we:                                 # noqa: BLE001
         print(f"[watermark] {_we}", flush=True)
+    try:                                                     # F3: fine job → la VRAM del modello è rilasciata
+        from core import vram_ledger as _vl
+        _vl.unregister(f"video:{os.path.basename(ckpt)}")
+    except Exception:                                        # noqa: BLE001
+        pass
     return out
 
 

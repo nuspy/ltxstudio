@@ -95,6 +95,34 @@ def residents() -> list[Resident]:
     return out
 
 
+def residents_detailed() -> list[dict]:
+    """F3 unified-model-manager: vista COMPLETA per la UI — fonde il ledger cross-venv (dettaglio
+    per-modello/componente di TUTTI i processi, anche i worker effimeri) con i `parked` riportati
+    dai server in /system_stats. Ritorna [{key, mb, category, state, pid, venv, source}]."""
+    out: list[dict] = []
+    seen: set = set()
+    try:
+        from core import vram_ledger
+        for e in vram_ledger.snapshot():
+            out.append({"key": e["key"], "mb": e["mb"], "category": e["category"] or "?",
+                        "state": e["state"], "pid": e["pid"], "venv": e["venv"], "source": "ledger"})
+            seen.add(e["key"])
+    except Exception:                                       # noqa: BLE001
+        pass
+    for port, cat in SERVER_PORTS.items():                  # parcheggi dichiarati dai server (es. :8190)
+        s = _stats(port)
+        if not s:
+            continue
+        for p in (s.get("parked") or []):
+            key = f"park:{str(p.get('path', '')).rsplit(chr(92), 1)[-1].rsplit('/', 1)[-1]}"
+            if key in seen:
+                continue
+            out.append({"key": key, "mb": float(p.get("mb", 0) or 0), "category": cat,
+                        "state": "ram_parked", "pid": 0, "venv": f":{port}", "source": "server"})
+    out.sort(key=lambda d: -d["mb"])
+    return out
+
+
 def plan(want: ModelKey, *, category: str, need_mb: float = 0.0,
          headroom_mb: int = DEFAULT_HEADROOM_MB) -> dict:
     """Decide COSA fare prima di eseguire una pipeline che vuole `want` (categoria image/video).
