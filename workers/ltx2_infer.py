@@ -628,29 +628,6 @@ IC_LORA = {
 _PIPE_CACHE: dict = {}
 
 
-def _nvfp4_guard(ckpt: str) -> None:
-    """I checkpoint NVFP4 hanno scale di quantizzazione A BLOCCHI (es. (128,256)): la catena
-    prequant di ltx-core supporta SOLO scale scalari per-tensore (fp8) e non esiste un percorso
-    FP4 scaled-mm nello stack. Senza guardia il load moriva a metà col criptico "Unsupported
-    scale shape (128, 256) for transformer_blocks…" (visto live 22/07). Qui: errore CHIARO e
-    IMMEDIATO, prima di leggere 12GB. Check doppio: nome file + header (scale non-scalari)."""
-    _name = os.path.basename(ckpt)
-    _blocky = "nvfp4" in _name.lower()
-    if not _blocky:
-        try:
-            from core import st_direct
-            hdr, _ = st_direct.read_header(ckpt)
-            _blocky = any(k.endswith("_scale") and len(v.get("shape") or []) > 0
-                          for k, v in hdr.items() if k != "__metadata__")
-        except Exception:                                   # noqa: BLE001 — header illeggibile: ci pensa il loader
-            return
-    if _blocky:
-        raise RuntimeError(
-            f"Checkpoint NVFP4 non supportato dal motore nativo: '{_name}' usa scale di "
-            "quantizzazione a blocchi (FP4) che il loader attuale non sa caricare. "
-            "Seleziona la versione fp8 (es. ltx-2.3-22b-dev-fp8.safetensors).")
-
-
 def _resolve_ckpt(model: str) -> str:
     ckpt = model or CHECKPOINT
     if os.path.isabs(ckpt) and os.path.exists(ckpt):
@@ -666,10 +643,12 @@ def _resolve_ckpt(model: str) -> str:
                          recursive=True)
         if hits:
             return hits[0]
-    # NON trovato: invece di restituire un path fantasma (→ FileNotFoundError su OGNI chunk = 0 output),
-    # ripiega sul checkpoint di default e AVVISA. Il modello scelto era inesistente/spostato.
-    print(f"[ckpt] '{ckpt}' non trovato → uso il default {os.path.basename(CHECKPOINT)}", flush=True)
-    return CHECKPOINT
+    # NON trovato: ERRORE CHIARO, niente sostituzione silenziosa col default (regola utente 22/07:
+    # «è l'utente che sceglie cosa fare, non la app che prende il suo posto» — mai cambiare modello
+    # senza consenso). Prima qui si ripiegava sul CHECKPOINT default con un semplice print.
+    raise RuntimeError(
+        f"Modello video '{ckpt}' non trovato su disco: è stato spostato o rimosso. "
+        f"Seleziona un altro checkpoint dal menu (nessuna sostituzione automatica).")
 
 
 def _resolve_gguf(g: str) -> str:
@@ -1348,12 +1327,14 @@ def run_generation(p: dict) -> str:
     # (I GGUF delle IMMAGINI — FLUX Fill per l'inpaint — non c'entrano e restano.)
     _stale = p.pop("gguf_transformer", None)
     if str(p.get("model", "")).lower().endswith(".gguf"):
-        _stale = _stale or p.pop("model")
-        p.pop("model", None)
+        _stale = _stale or p.get("model")
     if _stale:
-        print(f"[gguf] IGNORATO '{os.path.basename(str(_stale))}': i GGUF video sono stati rimossi "
-              f"(≈500 s/step e OOM). Uso il checkpoint fp8.", flush=True)
-        p.pop("offload", None)                              # l'offload 'cpu' era imposto DAL GGUF
+        # Regola utente 22/07: MAI sostituire il modello scelto senza consenso — prima qui si
+        # passava in silenzio al checkpoint fp8. Ora: errore chiaro, decide l'utente.
+        raise RuntimeError(
+            f"'{os.path.basename(str(_stale))}': i GGUF video sono stati rimossi dal prodotto "
+            f"(≈500 s/step e OOM alle risoluzioni normali). Seleziona un checkpoint "
+            f"fp8/nvfp4 dal menu (nessuna sostituzione automatica).")
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
     # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)
@@ -1367,7 +1348,6 @@ def run_generation(p: dict) -> str:
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
                                               LTXV_LORA_COMFY_RENAMING_MAP))
     ckpt = _resolve_ckpt(p.get("model"))
-    _nvfp4_guard(ckpt)                                       # NVFP4 non caricabile: errore chiaro SUBITO
     qmode = p.get("quant") or ("fp8_scaled_mm" if "fp8" in os.path.basename(ckpt).lower() else "fp8_cast")
     t0 = time.time()
     # #24 ControlNet IC-LoRA: se c'è un control_video e il peso IC-LoRA del tipo è su disco → pipeline iclora

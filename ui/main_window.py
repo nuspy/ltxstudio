@@ -3174,30 +3174,12 @@ class MainWindow(QMainWindow):
             except Exception:                                   # noqa: BLE001
                 pass
             if _free < _need_gb:
-                _gguf = self._auto_pick_ltx_gguf(_free)
-                if _gguf:
-                    # NON riassegnare in silenzio: CHIEDI (richiesta utente). Se mantiene il suo modello,
-                    # niente swap → caricato con offload dinamico per-blocco (block-swap, come ComfyUI).
-                    _orig = params.get("model") or ""
-                    _choice = self._confirm_model_swap(_orig, _gguf,
-                        tr("mw.swap.reason_vram", "non entra nella VRAM disponibile (~{f:.0f}GB liberi)").format(f=_free))
-                    if _choice == _gguf:
-                        params["gguf_transformer"] = _gguf
-                        params.pop("model", None)
-                        self._log(f"[motore] VRAM {_free:.0f}GB<40 → LTX GGUF nativo: {Path(_gguf).name} (no comfy)")
-                    else:
-                        self._log("[motore] mantengo il modello scelto → offload dinamico per-blocco")
-                elif self.driver.is_up():
-                    _engine = "comfy"
-                    self._log("[motore] VRAM<40GB, nessun GGUF → comfy-native (block-swap)")
-                else:
-                    QMessageBox.warning(self, tr("mw.video_vram_title", "VRAM insufficiente per il video"),
-                        tr("mw.video_vram_gguf_msg",
-                           "Il modello video 22B non entra nella VRAM disponibile e ComfyUI non è attivo.\n\n"
-                           "Scegli/scarica un modello LTX GGUF (Q3/Q4/Q6) nel tab Video: gira NATIVO con "
-                           "dequantizzazione al volo, senza ComfyUI."))
-                    self._log("[motore] STOP: VRAM<40, nessun GGUF, comfy giù → serve un LTX GGUF")
-                    return
+                # NIENTE proposta di swap a GGUF: i GGUF video sono rimossi dal prodotto (13/07,
+                # ~500s/step) — il dialog proponeva un modello che ora fallisce sempre. Il modello
+                # SCELTO resta (regola utente: mai cambiare modello senza consenso): si carica con
+                # offload dinamico per-blocco (lento ma genera).
+                self._log(f"[motore] VRAM ~{_free:.0f}GB < necessaria ~{_need_gb:.0f}GB → "
+                          "modello scelto con offload dinamico per-blocco")
         if _engine == "comfy" and _simple:
             self._log("[motore] comfy-native (VRAM dinamica, no-OOM)")
             self._ltx2_worker = _VideoComfyWorker(params)

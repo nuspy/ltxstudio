@@ -722,8 +722,6 @@ class VideoTab(QWidget):
             add(f"{m}  · checkpoint", "checkpoint", m, self._is_nsfw_model(m))
 
         # Se l'utente ha già scelto qualcosa di concreto, preserva quella scelta nel refilter.
-        # cur_key=="auto" deriva dal populate iniziale (inventario vuoto): NON considerarlo
-        # come scelta utente, così l'auto-select può prendere il miglior modello concreto.
         matched = False
         if cur_key and cur_key != "auto":
             for i in range(self.model.count()):
@@ -732,12 +730,11 @@ class VideoTab(QWidget):
                     self.model.setCurrentIndex(i)
                     matched = True
                     break
-        # Auto-select del miglior modello (VRAM-aware) se nessuna scelta utente preservata.
-        if not matched and self._inventory_ready and not self._auto_selected:
-            best_idx = self._pick_best_model_index()
-            if best_idx is not None:
-                self.model.setCurrentIndex(best_idx)
-                self._auto_selected = True
+        # NESSUN auto-select silenzioso di un modello concreto (regola utente 22/07: «è l'utente
+        # che sceglie cosa fare, non la app che prende il suo posto»). Senza scelta preservata
+        # resta l'item «Auto» (indice 0): lì l'automatismo è DICHIARATO nell'etichetta.
+        if not matched:
+            self.model.setCurrentIndex(0)
         self.model.blockSignals(False)
         self._on_model_changed()
 
