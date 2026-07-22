@@ -421,6 +421,77 @@ try:
 except Exception:  # noqa: BLE001
     pass
 
+
+def _patch_no_mmap_loader():
+    """FIX 0xC0000005 / 'invalid python storage' (22/07): su Windows il percorso safetensors→torch
+    (safe_open + UntypedStorage.from_file) mappa il checkpoint copy-on-write e impegna ~2× la sua
+    dimensione di COMMIT (RAM+pagefile). Con pagefile 16GB e il baseline degli altri processi, il
+    fp8 da 29GB non ha commit → access violation al primo get_tensor (misurato: la soglia di crash
+    è ~commit disponibile / 2; il file è integro). Qui si legge il file con I/O DIRETTO (seek+read
+    dei soli tensori richiesti, uno alla volta): commit di picco = un tensore, non 2× il file.
+    Opt-out: LTX_MMAP=1 ripristina il loader mmap originale."""
+    if os.environ.get("LTX_MMAP") == "1":
+        return
+    try:
+        import struct as _struct
+        import ltx_core.loader.sft_loader as _sft
+        from ltx_core.loader.primitives import StateDict as _SD
+
+        _DT = {"F64": torch.float64, "F32": torch.float32, "F16": torch.float16,
+               "BF16": torch.bfloat16, "F8_E4M3": torch.float8_e4m3fn, "F8_E5M2": torch.float8_e5m2,
+               "I64": torch.int64, "I32": torch.int32, "I16": torch.int16, "I8": torch.int8,
+               "U8": torch.uint8, "BOOL": torch.bool}
+
+        def _read_header(path):
+            with open(path, "rb") as fh:
+                n = _struct.unpack("<Q", fh.read(8))[0]
+                return json.loads(fh.read(n)), 8 + n
+
+        def _load(self, path, sd_ops=None, device=None):
+            sd, size, dtypes = {}, 0, set()
+            device = device or torch.device("cpu")
+            for shard in (path if isinstance(path, list) else [path]):
+                hdr, base = _read_header(shard)
+                with open(shard, "rb") as fh:
+                    for name, info in hdr.items():
+                        if name == "__metadata__":
+                            continue
+                        expected = name if sd_ops is None else sd_ops.apply_to_key(name)
+                        if expected is None:
+                            continue
+                        a, b = info["data_offsets"]
+                        if b > a:
+                            fh.seek(base + a)
+                            buf = bytearray(b - a)          # readinto: zero copie transitorie (commit=1×)
+                            if fh.readinto(buf) != b - a:
+                                raise RuntimeError(f"lettura troncata di {name} da {shard}")
+                            value = torch.frombuffer(buf, dtype=_DT[info["dtype"]]).reshape(info["shape"])
+                        else:
+                            value = torch.empty(info["shape"], dtype=_DT[info["dtype"]])
+                        value = value.to(device=device)
+                        pairs = ((expected, value),)
+                        if sd_ops is not None:
+                            pairs = sd_ops.apply_to_key_value(expected, value)
+                        for k, v in pairs:
+                            size += v.nbytes
+                            dtypes.add(v.dtype)
+                            sd[k] = v
+            return _SD(sd=sd, device=device, size=size, dtype=dtypes)
+
+        def _metadata(self, path):
+            hdr, _ = _read_header(path)
+            meta = hdr.get("__metadata__") or {}
+            return json.loads(meta["config"]) if "config" in meta else {}
+
+        _sft.SafetensorsStateDictLoader.load = _load
+        _sft.SafetensorsModelStateDictLoader.metadata = _metadata
+        print("[no-mmap] loader safetensors a I/O diretto (commit-safe col pagefile piccolo)", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        print(f"[no-mmap] patch fallito: {_e}", flush=True)
+
+
+_patch_no_mmap_loader()
+
 CHECKPOINT = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors"
 UPSAMPLER = r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"              # Gemma-3 12B UFFICIALE Lightricks (non-gated, formato ltx-core)
