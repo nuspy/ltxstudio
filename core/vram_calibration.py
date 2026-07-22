@@ -15,8 +15,10 @@ import os
 
 from core import vram_estimate as _ve
 
-# Cartelle dei pesi (immagini + video). diffusion_models + Checkpoints.
-_MODEL_ROOTS = [r"E:\AI\Models\diffusion_models", r"E:\AI\Models\Checkpoints"]
+# Cartelle dei pesi (immagini + video + AUX F8: "modello" = tutto ciò che va in VRAM).
+_MODEL_ROOTS = [r"E:\AI\Models\diffusion_models", r"E:\AI\Models\Checkpoints",
+                r"E:\AI\Models\TextEncoders", r"E:\AI\Models\VAE",
+                r"E:\AI\Models\latent_upscale_models"]
 _EXTS = (".safetensors", ".gguf")
 
 # Footprint NOTI dei componenti CONDIVISI (bf16 in memoria) — base del planner combinatorio. Il transformer
@@ -68,7 +70,7 @@ def enumerate_models() -> list[dict]:
                 if key in seen:
                     continue
                 seen.add(key)
-                if sz < 200:                                 # salta LoRA/piccoli (non sono checkpoint pesanti)
+                if sz < 100:                                 # salta LoRA/piccoli (i VAE ~160MB restano dentro)
                     continue
                 out.append({"path": p, "name": os.path.basename(p), "size_mb": sz,
                             "is_gguf": p.lower().endswith(".gguf"),

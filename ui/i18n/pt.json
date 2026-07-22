@@ -2716,5 +2716,10 @@
   "mem.col.state": "Estado",
   "mem.col.proc": "Processo",
   "mem.state.vram": "VRAM",
-  "mem.state.parked": "RAM (estacionado)"
+  "mem.state.parked": "RAM (estacionado)",
+  "calib.title": "Medição real dos modelos",
+  "calib.msg": "{k} modelos ainda não têm peso VRAM medido (~{m} min no total, com GPU inativa).\nMedi-los torna precisa a gestão automática de memória.\n\nA medição NUNCA começa durante as suas gerações e para de imediato se iniciar uma.",
+  "calib.now": "Medir com GPU livre",
+  "calib.later": "Só na primeira utilização",
+  "calib.never": "Nunca"
 }

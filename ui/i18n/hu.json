@@ -2716,5 +2716,10 @@
   "mem.col.state": "Állapot",
   "mem.col.proc": "Folyamat",
   "mem.state.vram": "VRAM",
-  "mem.state.parked": "RAM (parkolt)"
+  "mem.state.parked": "RAM (parkolt)",
+  "calib.title": "Modellek valós mérése",
+  "calib.msg": "{k} modellnek még nincs mért VRAM-súlya (~{m} perc összesen, tétlen GPU-n).\nA mérés pontossá teszi az automatikus memóriakezelést.\n\nA mérés SOHA nem indul a generálásaid alatt, és azonnal leáll, ha elindítasz egyet.",
+  "calib.now": "Mérés szabad GPU-n",
+  "calib.later": "Csak első használatkor",
+  "calib.never": "Soha"
 }

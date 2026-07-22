@@ -680,6 +680,42 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(msg, 20000)
         except Exception:                               # noqa: BLE001
             pass
+        self._maybe_start_calibration(res)
+
+    def _maybe_start_calibration(self, res: dict):
+        """F7: dialog di CONSENSO (una volta, policy salvata) + misura reale in background a GPU
+        inattiva. La misura carica un modello alla volta nel venv giusto e si interrompe
+        all'istante se accodi una generazione."""
+        to_measure = [t for t in res.get("to_measure", []) if t.get("venv")]
+        if not to_measure:
+            return
+        from core import user_prefs as _up
+        pol = str(_up.get("calib_policy", ""))
+        if not pol:                                     # primo avvio post-feature: chiedi
+            from PySide6.QtWidgets import QMessageBox
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Question)
+            box.setWindowTitle(tr("calib.title", "Misura reale dei modelli"))
+            _min = max(1, len(to_measure))
+            box.setText(tr("calib.msg",
+                "{k} modelli non hanno ancora un peso VRAM misurato (~{m} min in totale, a GPU "
+                "inattiva).\nMisurarli rende precisa la gestione automatica della memoria.\n\n"
+                "La misura NON parte mai durante le tue generazioni e si interrompe subito se ne "
+                "avvii una.").format(k=_min, m=_min))
+            b_now = box.addButton(tr("calib.now", "Misura a GPU libera"), QMessageBox.AcceptRole)
+            box.addButton(tr("calib.later", "Solo al primo uso"), QMessageBox.RejectRole)
+            b_never = box.addButton(tr("calib.never", "Mai"), QMessageBox.DestructiveRole)
+            box.exec()
+            pol = ("idle" if box.clickedButton() is b_now
+                   else ("never" if box.clickedButton() is b_never else "on_use"))
+            _up.set("calib_policy", pol)
+        if pol != "idle":
+            return
+        from core.vram_calibrator import CalibrationScheduler
+        self._calib = CalibrationScheduler(self.jobs, self)
+        self._calib.progress.connect(self._log)
+        self._calib.set_targets(to_measure)
+        self._calib.start()
 
     # ---------- UI ----------
     def _build_ui(self):

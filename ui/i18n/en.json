@@ -2790,5 +2790,10 @@
   "mem.col.state": "State",
   "mem.col.proc": "Process",
   "mem.state.vram": "VRAM",
-  "mem.state.parked": "RAM (parked)"
+  "mem.state.parked": "RAM (parked)",
+  "calib.title": "Real model measurement",
+  "calib.msg": "{k} models have no measured VRAM weight yet (~{m} min total, on idle GPU).\nMeasuring them makes automatic memory management precise.\n\nMeasurement NEVER starts during your generations and stops instantly if you start one.",
+  "calib.now": "Measure when GPU is idle",
+  "calib.later": "Only on first use",
+  "calib.never": "Never"
 }

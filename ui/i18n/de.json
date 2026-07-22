@@ -2716,5 +2716,10 @@
   "mem.col.state": "Status",
   "mem.col.proc": "Prozess",
   "mem.state.vram": "VRAM",
-  "mem.state.parked": "RAM (geparkt)"
+  "mem.state.parked": "RAM (geparkt)",
+  "calib.title": "Echte Modellmessung",
+  "calib.msg": "{k} Modelle haben noch kein gemessenes VRAM-Gewicht (~{m} Min. gesamt, bei inaktiver GPU).\nDie Messung macht die automatische Speicherverwaltung präzise.\n\nDie Messung startet NIE während deiner Generierungen und stoppt sofort, wenn du eine startest.",
+  "calib.now": "Bei freier GPU messen",
+  "calib.later": "Nur bei erster Nutzung",
+  "calib.never": "Nie"
 }

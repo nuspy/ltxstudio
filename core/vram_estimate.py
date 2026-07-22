@@ -73,10 +73,12 @@ def header_mb(path: str, *, fp8_storage: bool = False) -> int:
     """MB reali in memoria di un checkpoint safetensors (0 se illeggibile / non-safetensors). fp8_storage=True
     → i pesi F8 restano 1B (layerwise casting); altrimenti diffusers li upcasta a bf16 (2B). Se il file NON
     include il text-encoder (transformer-only) → aggiunge T5/CLIP/VAE (~9.7GB)."""
-    mb, _tr, has_te = _scan_header(path, fp8_storage=fp8_storage)
+    mb, tr, has_te = _scan_header(path, fp8_storage=fp8_storage)
     if not mb:
         return 0
-    if not has_te:
+    # il supplemento TE esterni (~9.7GB) vale solo per i checkpoint transformer-only VERI: un file
+    # AUX (VAE 160MB, text-projection 2GB…) non ha TE ma non ne trascina nessuno al load (F8).
+    if not has_te and tr > 5120:
         mb += 9700
     return int(mb)
 

@@ -2716,5 +2716,10 @@
   "mem.col.state": "상태",
   "mem.col.proc": "프로세스",
   "mem.state.vram": "VRAM",
-  "mem.state.parked": "RAM (보관됨)"
+  "mem.state.parked": "RAM (보관됨)",
+  "calib.title": "모델 실제 측정",
+  "calib.msg": "{k}개 모델의 VRAM 실측 무게가 아직 없습니다 (총 ~{m}분, GPU 유휴 시).\n측정하면 자동 메모리 관리가 정확해집니다.\n\n측정은 생성 중에는 절대 시작되지 않으며, 생성을 시작하면 즉시 중단됩니다.",
+  "calib.now": "GPU 유휴 시 측정",
+  "calib.later": "첫 사용 시에만",
+  "calib.never": "안 함"
 }

@@ -2716,5 +2716,10 @@
   "mem.col.state": "État",
   "mem.col.proc": "Processus",
   "mem.state.vram": "VRAM",
-  "mem.state.parked": "RAM (garé)"
+  "mem.state.parked": "RAM (garé)",
+  "calib.title": "Mesure réelle des modèles",
+  "calib.msg": "{k} modèles n’ont pas encore de poids VRAM mesuré (~{m} min au total, GPU inactive).\nLes mesurer rend la gestion automatique de la mémoire précise.\n\nLa mesure ne démarre JAMAIS pendant vos générations et s’arrête aussitôt si vous en lancez une.",
+  "calib.now": "Mesurer quand le GPU est libre",
+  "calib.later": "Seulement à la première utilisation",
+  "calib.never": "Jamais"
 }

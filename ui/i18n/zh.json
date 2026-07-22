@@ -2716,5 +2716,10 @@
   "mem.col.state": "状态",
   "mem.col.proc": "进程",
   "mem.state.vram": "显存",
-  "mem.state.parked": "内存（暂存）"
+  "mem.state.parked": "内存（暂存）",
+  "calib.title": "模型真实测量",
+  "calib.msg": "{k} 个模型尚无实测显存占用（共约 {m} 分钟，GPU 空闲时进行）。\n测量后自动内存管理将更精确。\n\n测量绝不会在你生成时开始，若你开始生成会立即中断。",
+  "calib.now": "GPU 空闲时测量",
+  "calib.later": "仅在首次使用时",
+  "calib.never": "从不"
 }
