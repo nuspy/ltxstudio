@@ -62,7 +62,8 @@ class VideoJobError(RuntimeError):
     """La clip non è stata prodotta. Porta con sé l'output del worker."""
 
 
-def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 40) -> int:
+def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 40,
+                    *, model: str = "", gguf: str = "", arch: str = "ltx") -> int:
     """Sfratta i modelli delle altre categorie E ASPETTA che la VRAM sia DAVVERO libera.
 
     Il /free è ASINCRONO: torna subito, ma il rilascio della VRAM avviene dopo. Se il worker da 22B
@@ -74,7 +75,20 @@ def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 4
     """
     try:
         from core import gpu_registry                        # registro unico: libera le altre categorie (immagine)
-        gpu_registry.before_job("video", arch="video", log=print)
+        # F5 unified-model-manager: chiave modello VERA + need_mb dalla cache misurata/header —
+        # prima ModelKey era degenere ("video:-") e need_mb=0: il riuso video non veniva mai
+        # riconosciuto e lo sfratto size-aware non scattava.
+        _m = gguf or model
+        _need = 0
+        try:
+            from core import vram_estimate
+            if gguf and os.path.exists(gguf):
+                _need = int(os.path.getsize(gguf) / 2**20) + 9000     # GGUF ≈ dim file + working video
+            elif model and os.path.exists(model):
+                _need, _ = vram_estimate.estimate_mb(model, fp8_storage=True, working_mb=9000)
+        except Exception:                                    # noqa: BLE001
+            pass
+        gpu_registry.before_job("video", arch=arch or "video", model=_m, need_mb=_need, log=print)
     except Exception:                                        # noqa: BLE001 — best-effort, mai fatale
         try:
             from core import mem_coordinator as _mc
@@ -162,7 +176,9 @@ def run_clip(params: dict, *, free_vram: bool = True, timeout: int | None = None
     out = params["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     if free_vram:
-        free_video_vram()
+        free_video_vram(model=str(params.get("model", "") or ""),
+                        gguf=str(params.get("gguf_transformer", "") or ""),
+                        arch=(params.get("arch") or "ltx").lower())
 
     jf = out + ".json"
     with open(jf, "w", encoding="utf-8") as fh:

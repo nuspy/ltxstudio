@@ -161,9 +161,16 @@ def plan(want: ModelKey, *, category: str, need_mb: float = 0.0,
 
     projected_free = free_mb + sum(r.vram_mb for r in other_cat)
     if projected_free < need_mb + headroom_mb and same_cat_diff:
-        # serve ancora spazio: sfratta i modelli stessa-categoria a chiave diversa (LRU-ish: tutti), NON i condivisi
-        free_ports += [r.port for r in same_cat_diff]
-        reason.append(f"serve spazio ({int(need_mb)}+{headroom_mb}MB) → libero {[r.port for r in same_cat_diff]}")
+        # F5 unified-model-manager: sfratto SIZE-AWARE (prima si sfrattavano TUTTI): ordina per
+        # vram_mb crescente e ferma appena il deficit è coperto — sfratta il minimo indispensabile,
+        # col minor costo di reload. I componenti condivisi restano (li gestisce il /free demote).
+        for r in sorted(same_cat_diff, key=lambda x: x.vram_mb):
+            free_ports.append(r.port)
+            projected_free += r.vram_mb
+            if projected_free >= need_mb + headroom_mb:
+                break
+        reason.append(f"serve spazio ({int(need_mb)}+{headroom_mb}MB) → libero "
+                      f"{[p for p in free_ports if p not in [r.port for r in other_cat]]} (size-aware)")
 
     action = "evict_load" if free_ports else "load"
     if not reason:

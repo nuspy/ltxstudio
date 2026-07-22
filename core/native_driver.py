@@ -6,6 +6,7 @@ così la GUI resta leggera. Usato dall'astrazione `core/backend.py`.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import urllib.error
@@ -77,8 +78,20 @@ def submit(module: str, params: dict) -> str:
     _tb = time.monotonic()
     try:
         from core import gpu_registry
+        # F5 unified-model-manager: need_mb REALE (cache misurata → header) — prima era sempre 0 e
+        # il ramo size-aware del piano (sfratto minimo intra-categoria) non scattava mai.
+        _model = str(params.get("model", ""))
+        _need, _dtype = 0, ""
+        try:
+            from core import vram_estimate
+            if _model and os.path.isabs(_model) and os.path.exists(_model):
+                _fp8 = "fp8" in os.path.basename(_model).lower()
+                _need, _src = vram_estimate.estimate_mb(_model, fp8_storage=_fp8)
+                _dtype = "fp8" if _fp8 else ""
+        except Exception:                                   # noqa: BLE001
+            pass
         gpu_registry.before_job("image", arch=str(params.get("arch", "")),
-                                model=str(params.get("model", "")), log=print)
+                                model=_model, dtype=_dtype, need_mb=_need, log=print)
     except Exception:                                       # noqa: BLE001
         pass
     print(f"[step-dispatch] {_rel()} | before_job('image') = {time.monotonic()-_tb:.1f}s "
