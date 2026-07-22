@@ -113,7 +113,7 @@ class ModelCatalog:
         self.load()
 
     def load(self) -> None:
-        self._arch = {}; self._nsfw = {}
+        self._arch = {}; self._nsfw = {}; self._nsfw_user = {}
         if not self.path.exists():
             return
         try:
@@ -139,6 +139,11 @@ class ModelCatalog:
                 or _lvl(raw.get("nsfw_level")) >= 4
                 or _lvl(sm.get("preview_nsfw_level")) >= 4
             )
+            # OVERRIDE MANUALE (manual_enrichment → nsfw_user): VINCE sulle euristiche. Senza,
+            # un civitai.nsfw=True su UNA copia teneva NSFW i checkpoint BASE LTX anche dopo la
+            # correzione → in modalità SFW sparivano dal menu video (visto live 22/07).
+            if "nsfw_user" in raw:
+                self._nsfw_user[bn] = self._nsfw_user.get(bn, False) or bool(raw["nsfw_user"])
             self._nsfw[bn] = self._nsfw.get(bn, False) or nsfw   # OR: basta una voce NSFW
         try:
             self._mtime = self.path.stat().st_mtime
@@ -158,8 +163,12 @@ class ModelCatalog:
 
     def is_nsfw(self, name: str) -> bool:
         """True se il modello è NSFW SECONDO IL CATALOGO (flag top-level 'nsfw' o civitai).
-        Nessuna euristica: i modelli senza dato nel catalogo NON sono considerati NSFW."""
-        return bool(self._nsfw.get(_basename(name), False))
+        Nessuna euristica: i modelli senza dato nel catalogo NON sono considerati NSFW.
+        L'override manuale (nsfw_user, da manual_enrichment) ha la precedenza assoluta."""
+        bn = _basename(name)
+        if bn in getattr(self, "_nsfw_user", {}):
+            return bool(self._nsfw_user[bn])
+        return bool(self._nsfw.get(bn, False))
 
     def recommended_steps(self, name: str) -> "int | None":
         """Steps consigliati per il modello, o None se sconosciuto."""

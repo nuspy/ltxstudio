@@ -7,6 +7,8 @@ API:
 """
 from __future__ import annotations
 
+import os
+
 from core import lyrics_llm
 
 _SYS_IMG = ("You expand image-generation prompts. Rewrite the user's prompt into ONE vivid, detailed "
@@ -31,10 +33,41 @@ def available() -> bool:
 
 
 def enhance(prompt: str, kind: str = "image", nsfw: bool = False, max_new_tokens: int = 220) -> str:
-    """Arricchisce il prompt con Gemma locale. Non solleva: in caso di errore ritorna l'originale."""
+    """Arricchisce il prompt con Gemma locale. Non solleva: in caso di errore ritorna l'originale.
+
+    ⚠ SUBPROCESS: Gemma-3 12B (~23GB) NON deve entrare nel processo GUI — caricarla in-process
+    (transformers → safetensors mmap, NON coperto dal patch no-mmap della GUI) causava ACCESS
+    VIOLATION in torch_cpu.dll = crash secco dell'app al click di Genera inpaint/integra con
+    «Migliora prompt» attivo (visto live 22/07, Event Viewer 20:17 e 20:32). Qui si spawna lo
+    STESSO interprete in un processo separato (LS_ENHANCE_INPROC=1 → ramo in-process sotto):
+    se il figlio muore, si ritorna il prompt originale e l'app resta viva."""
     prompt = (prompt or "").strip()
     if not prompt or not available():
         return prompt
+    if os.environ.get("LS_ENHANCE_INPROC") != "1":
+        import json as _json
+        import subprocess
+        import sys
+        _repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env = dict(os.environ, LS_ENHANCE_INPROC="1", HF_HUB_OFFLINE="1")
+        try:
+            r = subprocess.run([sys.executable, "-m", "core.prompt_enhance"],
+                               input=_json.dumps({"prompt": prompt, "kind": kind, "nsfw": bool(nsfw),
+                                                  "max_new_tokens": int(max_new_tokens)}),
+                               capture_output=True, text=True, encoding="utf-8",
+                               cwd=_repo, env=env, timeout=420)
+            for line in reversed((r.stdout or "").splitlines()):
+                if line.startswith("ENHANCED:"):
+                    out = line[len("ENHANCED:"):].strip()
+                    return out or prompt
+        except Exception:                                   # noqa: BLE001 — enhance è best-effort
+            pass
+        return prompt
+    return _enhance_inproc(prompt, kind, nsfw, max_new_tokens)
+
+
+def _enhance_inproc(prompt: str, kind: str, nsfw: bool, max_new_tokens: int) -> str:
+    """Implementazione reale (SOLO nel subprocess dedicato: mai nel processo GUI)."""
     try:
         import torch
         model, proc = lyrics_llm._load()
@@ -53,3 +86,18 @@ def enhance(prompt: str, kind: str = "image", nsfw: bool = False, max_new_tokens
         return txt or prompt
     except Exception:                                       # noqa: BLE001
         return prompt
+
+
+if __name__ == "__main__":                                  # child del subprocess di enhance()
+    import json as _json
+    import sys as _sys
+    try:                                                    # commit-safe anche nel figlio
+        from core import st_direct
+        st_direct.patch_safetensors_torch()
+        st_direct.patch_safe_open()
+    except Exception:                                       # noqa: BLE001
+        pass
+    _req = _json.loads(_sys.stdin.read() or "{}")
+    _out = _enhance_inproc(str(_req.get("prompt", "")), str(_req.get("kind", "image")),
+                           bool(_req.get("nsfw")), int(_req.get("max_new_tokens", 220)))
+    print("ENHANCED:" + _out, flush=True)
