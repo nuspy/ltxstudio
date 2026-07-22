@@ -8,10 +8,11 @@ from collections import deque
 
 from PySide6.QtCore import Qt, QTimer, QPointF
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (QDialog, QHeaderView, QLabel, QTableWidget, QTableWidgetItem,
+                               QVBoxLayout, QWidget)
 
 try:
-    from ui.i18n import tr
+    from ui.i18n_manager import tr                         # fix: era `ui.i18n` (inesistente) → sempre fallback EN
 except Exception:                                          # noqa: BLE001
     def tr(_k, d=""):                                      # fallback
         return d
@@ -92,9 +93,24 @@ class MemoryMonitor(QDialog):
             lay.addWidget(head)
             lay.addWidget(spark, 1)
             self._rows[key] = (head, spark)
+        # F4 unified-model-manager: TABELLA dei modelli in VRAM / parcheggiati in RAM (ledger
+        # cross-venv + "parked" dei server). Verde = in VRAM, giallo = parcheggiato in RAM.
+        self._models_head = QLabel(tr("mem.models", "Modelli caricati"))
+        self._models_head.setStyleSheet("font-weight:600;")
+        self._tbl = QTableWidget(0, 4)
+        self._tbl.setHorizontalHeaderLabels([
+            tr("mem.col.model", "Modello"), tr("mem.col.mb", "MB"),
+            tr("mem.col.state", "Stato"), tr("mem.col.proc", "Processo")])
+        self._tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self._tbl.verticalHeader().setVisible(False)
+        self._tbl.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._tbl.setMinimumHeight(90)
+        lay.addWidget(self._models_head)
+        lay.addWidget(self._tbl, 1)
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
+        self._tbl_tick = 0                      # la tabella si aggiorna ogni 2s (metà del timer)
 
     # apri/chiudi → avvia/ferma il polling (niente carico quando è chiusa)
     def showEvent(self, e):
@@ -139,3 +155,27 @@ class MemoryMonitor(QDialog):
         head, spark = self._rows["gpu"]
         head.setText(f"{tr('mem.gpu', 'GPU (CUDA)')}   {s['gpu_util']}%")
         spark.push(s["gpu_util"] / 100.0)
+        self._tbl_tick += 1
+        if self._tbl_tick % 2 == 0:
+            self._refresh_models()
+
+    def _refresh_models(self):
+        """F4: tabella dei modelli residenti (ledger cross-venv + parked dei server)."""
+        try:
+            from core import gpu_registry
+            rows = gpu_registry.residents_detailed()
+        except Exception:                        # noqa: BLE001
+            return
+        _vram = QColor(46, 160, 96)
+        _park = QColor(196, 148, 32)
+        self._tbl.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            name = QTableWidgetItem(str(r["key"]))
+            mb = QTableWidgetItem(f"{r['mb']:.0f}")
+            mb.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            state = QTableWidgetItem(tr("mem.state.vram", "VRAM") if r["state"] == "vram"
+                                     else tr("mem.state.parked", "RAM (parcheggiato)"))
+            state.setForeground(_vram if r["state"] == "vram" else _park)
+            proc = QTableWidgetItem(f"{r['venv']} #{r['pid']}" if r["pid"] else str(r["venv"]))
+            for c, it in enumerate((name, mb, state, proc)):
+                self._tbl.setItem(i, c, it)

@@ -2709,5 +2709,12 @@
   "mvs.cast.gen_run": "正在生成肖像…",
   "mvs.cast.gen_ok": "肖像已生成。",
   "audit.running": "模型注册表检查…",
-  "audit.summary": "模型：{t} — 已测量 {m}，估算 {e}，未知 {u}，待测量 {k}"
+  "audit.summary": "模型：{t} — 已测量 {m}，估算 {e}，未知 {u}，待测量 {k}",
+  "mem.models": "已加载模型",
+  "mem.col.model": "模型",
+  "mem.col.mb": "MB",
+  "mem.col.state": "状态",
+  "mem.col.proc": "进程",
+  "mem.state.vram": "显存",
+  "mem.state.parked": "内存（暂存）"
 }

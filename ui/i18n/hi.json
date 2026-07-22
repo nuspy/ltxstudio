@@ -2709,5 +2709,12 @@
   "mvs.cast.gen_run": "चित्र बना रहे हैं…",
   "mvs.cast.gen_ok": "चित्र बन गया.",
   "audit.running": "मॉडल रजिस्ट्री जाँच…",
-  "audit.summary": "मॉडल: {t} — {m} मापे गए, {e} अनुमानित, {u} अज्ञात, {k} मापने हेतु"
+  "audit.summary": "मॉडल: {t} — {m} मापे गए, {e} अनुमानित, {u} अज्ञात, {k} मापने हेतु",
+  "mem.models": "लोड किए गए मॉडल",
+  "mem.col.model": "मॉडल",
+  "mem.col.mb": "MB",
+  "mem.col.state": "स्थिति",
+  "mem.col.proc": "प्रक्रिया",
+  "mem.state.vram": "VRAM",
+  "mem.state.parked": "RAM (पार्क किया गया)"
 }

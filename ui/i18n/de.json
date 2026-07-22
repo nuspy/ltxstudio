@@ -2709,5 +2709,12 @@
   "mvs.cast.gen_run": "Porträt wird erzeugt…",
   "mvs.cast.gen_ok": "Porträt erzeugt.",
   "audit.running": "Modellregister-Prüfung…",
-  "audit.summary": "Modelle: {t} — {m} gemessen, {e} geschätzt, {u} unbekannt, {k} zu messen"
+  "audit.summary": "Modelle: {t} — {m} gemessen, {e} geschätzt, {u} unbekannt, {k} zu messen",
+  "mem.models": "Geladene Modelle",
+  "mem.col.model": "Modell",
+  "mem.col.mb": "MB",
+  "mem.col.state": "Status",
+  "mem.col.proc": "Prozess",
+  "mem.state.vram": "VRAM",
+  "mem.state.parked": "RAM (geparkt)"
 }

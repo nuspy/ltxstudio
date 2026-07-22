@@ -2709,5 +2709,12 @@
   "mvs.cast.gen_run": "Generando el retrato…",
   "mvs.cast.gen_ok": "Retrato generado.",
   "audit.running": "Verificación del registro de modelos…",
-  "audit.summary": "Modelos: {t} — {m} medidos, {e} estimados, {u} desconocidos, {k} por medir"
+  "audit.summary": "Modelos: {t} — {m} medidos, {e} estimados, {u} desconocidos, {k} por medir",
+  "mem.models": "Modelos cargados",
+  "mem.col.model": "Modelo",
+  "mem.col.mb": "MB",
+  "mem.col.state": "Estado",
+  "mem.col.proc": "Proceso",
+  "mem.state.vram": "VRAM",
+  "mem.state.parked": "RAM (aparcado)"
 }

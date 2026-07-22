@@ -2709,5 +2709,12 @@
   "mvs.cast.gen_run": "جارٍ إنشاء الصورة…",
   "mvs.cast.gen_ok": "تم إنشاء الصورة.",
   "audit.running": "فحص سجل النماذج…",
-  "audit.summary": "النماذج: {t} — {m} مقاسة، {e} مقدّرة، {u} غير معروفة، {k} للقياس"
+  "audit.summary": "النماذج: {t} — {m} مقاسة، {e} مقدّرة، {u} غير معروفة، {k} للقياس",
+  "mem.models": "النماذج المحمّلة",
+  "mem.col.model": "النموذج",
+  "mem.col.mb": "ميغابايت",
+  "mem.col.state": "الحالة",
+  "mem.col.proc": "العملية",
+  "mem.state.vram": "VRAM",
+  "mem.state.parked": "RAM (مركون)"
 }

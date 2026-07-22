@@ -2709,5 +2709,12 @@
   "mvs.cast.gen_run": "Portré generálása…",
   "mvs.cast.gen_ok": "A portré elkészült.",
   "audit.running": "Modellregiszter ellenőrzése…",
-  "audit.summary": "Modellek: {t} — {m} mért, {e} becsült, {u} ismeretlen, {k} mérendő"
+  "audit.summary": "Modellek: {t} — {m} mért, {e} becsült, {u} ismeretlen, {k} mérendő",
+  "mem.models": "Betöltött modellek",
+  "mem.col.model": "Modell",
+  "mem.col.mb": "MB",
+  "mem.col.state": "Állapot",
+  "mem.col.proc": "Folyamat",
+  "mem.state.vram": "VRAM",
+  "mem.state.parked": "RAM (parkolt)"
 }
