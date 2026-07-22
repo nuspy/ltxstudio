@@ -21,6 +21,16 @@ _MEASURE_VENV = {
     "ltxv": "ltx2", "ltx2": "ltx2", "ltx": "ltx2",
 }
 
+# radici dei file AUSILIARI (F8): VAE/TextEncoder/upscaler DA SOLI non vanno misurati col loader
+# di pipeline (un `ae.safetensors` VAE-only caricato come pipeline FLUX fallisce per definizione —
+# visto live 22/07: 'saltato exit 2'). Per loro l'header è già byte-esatto (bf16, nessun upcast).
+_AUX_ROOTS = (r"E:\AI\Models\TextEncoders", r"E:\AI\Models\VAE", r"E:\AI\Models\latent_upscale_models")
+
+
+def _is_aux(path: str) -> bool:
+    p = os.path.normcase(os.path.abspath(path))
+    return any(p.startswith(os.path.normcase(r) + os.sep) for r in _AUX_ROOTS)
+
 
 def _detect(path: str) -> dict:
     try:
@@ -63,9 +73,15 @@ def audit(on_progress=None) -> dict:
             measured.append(info)
         else:                                               # header/gguf/voce legacy senza source = stima
             estimated.append(info)
-        # candidato livello-2: non ancora misurato, misurabile (venv noto), non marcato skipped
+        # candidato livello-2: non ancora misurato, misurabile (venv noto), non marcato skipped.
+        # ESCLUSI: GGUF (footprint ≈ dim file), file AUSILIARI (VAE/TE soli: header già esatto,
+        # e il loader di pipeline non può caricarli — il detector li scambia per checkpoint),
+        # ADAPTER (Redux & co.: non sono pipeline) e SHARD (model-0000X-of-N: non caricabili soli).
+        import re as _re
+        _is_shard = bool(_re.match(r"(?i)(model|diffusion_pytorch_model)-\d+-of-\d+", m["name"]))
         if mb <= 0 or (src != "measured" and not e.get("skipped_commit")):
-            if info["venv"] and not m["is_gguf"]:           # GGUF: footprint ≈ dim file, misura inutile
+            if (info["venv"] and not m["is_gguf"] and not _is_aux(m["path"])
+                    and str(det.get("role") or "") != "adapter" and not _is_shard):
                 to_measure.append(info)
     return {"total": len(measured) + len(estimated) + len(unknown), "migrated": migrated,
             "measured": measured, "estimated": estimated, "unknown": unknown,

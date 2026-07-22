@@ -155,7 +155,8 @@ class CalibrationScheduler(QObject):
             self._proc = subprocess.Popen([py, "-u", *argv, t["path"]], cwd=_REPO, env=env,
                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                           creationflags=getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
-            self.progress.emit(f"[calibrazione] misuro {t['name']} (~{est/1024:.0f}GB, venv {t['venv']})…")
+            _sz = f"~{est/1024:.1f}GB" if est >= 1024 else f"~{est:.0f}MB"
+            self.progress.emit(f"[calibrazione] misuro {t['name']} ({_sz}, venv {t['venv']})…")
         except Exception as e:                          # noqa: BLE001
             self._skipped.add(t["path"])
             self._cur = None
