@@ -85,33 +85,38 @@ class CalibrationScheduler(QObject):
                 self._targets.insert(0, cur)
             self.progress.emit(f"[calibrazione] misura interrotta ({why}) — riprenderà a GPU libera")
 
-    def _can_run(self, est_mb: float, size_mb: float) -> bool:
+    def _can_run(self, est_mb: float, size_mb: float) -> str:
+        """'' se si può misurare ORA, altrimenti il MOTIVO del blocco (per il log: prima il
+        calibratore aspettava in silenzio e sembrava rotto — 'non sta caricando nulla')."""
         try:
             if self._queue.is_busy():
-                return False
+                return "coda generazioni occupata"
         except Exception:                               # noqa: BLE001
-            return False
+            return "coda non interrogabile"
         if time.monotonic() - self._last_user_job < _GRACE_S:
-            return False
+            return "attesa di grazia dopo l'ultimo job"
         try:
             from core import gpu_registry
             if any(r.busy for r in gpu_registry.residents()):
-                return False
+                return "un server di generazione è occupato"
         except Exception:                               # noqa: BLE001
             pass
         try:
             from core import gpu_mem
-            if gpu_mem.free_vram_mb() < est_mb + 2000:
-                return False
+            _free = gpu_mem.free_vram_mb()
+            if _free < est_mb + 2000:
+                return f"VRAM insufficiente ({_free:.0f}MB liberi, servono {est_mb + 2000:.0f})"
         except Exception:                               # noqa: BLE001
-            return False
+            return "VRAM non leggibile"
         try:
             from core import st_direct
-            if st_direct.commit_avail_mb() < size_mb * 1.2:
-                return False                            # regola pagefile: mai sfondare il commit
+            _commit = st_direct.commit_avail_mb()
+            if _commit < size_mb * 1.2:
+                return (f"memoria di sistema insufficiente ({_commit:.0f}MB di commit liberi, "
+                        f"servono {size_mb * 1.2:.0f}) — riprovo quando si libera")
         except Exception:                               # noqa: BLE001
             pass
-        return True
+        return ""
 
     def _tick(self) -> None:
         if self._proc is not None:                      # misura in corso: controlla l'esito
@@ -127,17 +132,32 @@ class CalibrationScheduler(QObject):
                 self._skipped.add(cur["path"])
                 self.progress.emit(f"[calibrazione] saltato (exit {rc}): {cur['name']}")
             return
-        while self._targets and self._targets[0]["path"] in self._skipped:
-            self._targets.pop(0)
+        self._targets = [t for t in self._targets if t["path"] not in self._skipped]
         if not self._targets:
             self._timer.stop()
             self.progress.emit(f"[calibrazione] completata: {self._done} modelli misurati")
             self.finished_all.emit(self._done)
             return
-        t = self._targets[0]
-        est = float(t.get("est_mb") or t.get("size_mb") or 20000)
-        if not self._can_run(est, float(t.get("size_mb") or est)):
+        # NO head-of-line blocking: se il primo non ci sta (VRAM/commit), prova i SUCCESSIVI più
+        # piccoli — un modello leggero misurabile ora non deve aspettare il gigante in testa.
+        t, why = None, ""
+        for cand in sorted(self._targets, key=lambda x: float(x.get("size_mb") or 0)):
+            est = float(cand.get("est_mb") or cand.get("size_mb") or 20000)
+            why = self._can_run(est, float(cand.get("size_mb") or est))
+            if not why:
+                t = cand
+                break
+            if why.startswith(("coda", "attesa", "un server")):
+                break                                   # blocco GLOBALE: inutile provare gli altri
+        if t is None:
+            if why != getattr(self, "_last_wait_why", ""):
+                self._last_wait_why = why               # log SOLO al cambio di motivo (niente spam)
+                self.progress.emit(f"[calibrazione] in attesa: {why}")
             return
+        self._last_wait_why = ""
+        est = float(t.get("est_mb") or t.get("size_mb") or 20000)
+        self._targets.remove(t)
+        self._targets.insert(0, t)                      # il pop(0) sotto consuma il candidato scelto
         try:                                            # coordina come un job vero (/free demote)
             from core import gpu_registry
             cat = "video" if t["venv"] == "ltx2" else "image"
