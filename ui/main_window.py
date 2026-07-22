@@ -455,7 +455,16 @@ class _NativeLtx2Worker(QThread):
         self.proc = None                                    # #91: subprocess, per terminarlo alla chiusura
 
     def stop(self):
-        """#91: termina il subprocess del worker (anti-orfano VRAM). Windows: kill dell'albero."""
+        """#91: ferma la generazione. Path SERVER (:8190): cancel HTTP cooperativo — MAI il kill,
+        il processo server è condiviso e deve sopravvivere. Path subprocess: kill dell'albero."""
+        _jid = getattr(self, "_server_jid", None)
+        if _jid:
+            try:
+                from core import ltx2_service
+                ltx2_service.cancel_native(_jid)
+            except Exception:                               # noqa: BLE001
+                pass
+            return
         _kill_proc_tree(getattr(self, "proc", None))
 
     LINGBOT_PY = r"E:\AI\Tools\lingbot_venv311\Scripts\python.exe"  # py3.11+torch2.11+FA2 (ricetta corretta)
@@ -482,28 +491,42 @@ class _NativeLtx2Worker(QThread):
             _talk = {"region": self.params.pop("_talk_region", None),
                      "src": self.params.pop("_talk_source", None),
                      "offset": self.params.pop("_talk_offset", 0)}
-            jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
-            _json.dump(self.params, jf); jf.close()
-            env = dict(_os.environ)
-            env["HF_HUB_OFFLINE"] = "1"
-            env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-            proc = _sp.Popen([py, "-u", worker, jf.name], env=env,
-                             stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
-            self.proc = proc                                # #91: esposto per stop() alla chiusura
-            out_path = None
-            _tail = []                                      # ring-buffer dell'output per l'errore VERO
-            for line in proc.stdout:
-                line = line.rstrip()
-                if line:
-                    _tail.append(line)
-                    if len(_tail) > 40:
-                        _tail.pop(0)
-                if line.startswith("[") or line.startswith("OK:") or "Error" in line or "error" in line \
-                        or "Traceback" in line:
-                    self.progress.emit(line)
-                if line.startswith("OK:"):
-                    out_path = line[3:].strip()
-            proc.wait()
+            # ── RESIDENZA DI DEFAULT (unificazione motori): per arch 'ltx' il job va al SERVER
+            # persistente :8190 (pipeline + parcheggio RAM sopravvivono tra le generazioni →
+            # niente reload da SSD). Fallback AUTOMATICO al subprocess per-job se il server non
+            # parte o muore a metà. Opt-out: LTX_VIDEO_SERVER=0 / user_prefs 'video_server'.
+            out_path, _tail, _err_extra = None, [], ""
+            _served = False
+            if _arch == "ltx":
+                try:
+                    from core import ltx2_service as _svc
+                    if _svc.server_enabled() and _svc.ensure_server():
+                        self.progress.emit("[nativo] server video persistente :8190 (residenza)")
+                        out_path, _served, _err_extra = self._run_via_server(_svc)
+                except Exception as _se:                    # noqa: BLE001
+                    self.progress.emit(f"[nativo] server non disponibile ({_se}) → subprocess")
+                    _served = False
+            if not _served:
+                jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+                _json.dump(self.params, jf); jf.close()
+                env = dict(_os.environ)
+                env["HF_HUB_OFFLINE"] = "1"
+                env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+                proc = _sp.Popen([py, "-u", worker, jf.name], env=env,
+                                 stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
+                self.proc = proc                            # #91: esposto per stop() alla chiusura
+                for line in proc.stdout:
+                    line = line.rstrip()
+                    if line:
+                        _tail.append(line)
+                        if len(_tail) > 40:
+                            _tail.pop(0)
+                    if line.startswith("[") or line.startswith("OK:") or "Error" in line or "error" in line \
+                            or "Traceback" in line:
+                        self.progress.emit(line)
+                    if line.startswith("OK:"):
+                        out_path = line[3:].strip()
+                proc.wait()
             # #3 talk region: composita solo bocca/volto sul frame sorgente (reimagine=off)
             if out_path and _os.path.exists(out_path) and _talk["region"] and _talk["src"]:
                 from core import talk_region as _tr
@@ -515,13 +538,60 @@ class _NativeLtx2Worker(QThread):
             if out_path and _os.path.exists(out_path):
                 self.done.emit({"status": "success", "output": [out_path]})
             else:
-                # NON più "nessun output" e basta: mostra il MOTIVO reale (tail dell'output del worker,
-                # dove sta il traceback/OOM/checkpoint mancante) + il codice di uscita.
-                _why = "\n".join(_tail[-18:]) or "(nessun output dal worker)"
+                # NON più "nessun output" e basta: mostra il MOTIVO reale (path server: l'errore del
+                # job — il tail del traceback lato :8190; path subprocess: ring-buffer stdout + exit).
+                _why = _err_extra or "\n".join(_tail[-18:]) or "(nessun output dal worker)"
+                _p = getattr(self, "proc", None)
+                _rc = f" (exit {_p.returncode})" if _p is not None else ""
                 self.done.emit({"status": "error",
-                                "error": f"LTX-2 nativo: nessun output (exit {proc.returncode}).\n{_why}"})
+                                "error": f"LTX-2 nativo: nessun output{_rc}.\n{_why}"})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
+
+    def _run_via_server(self, svc) -> tuple:
+        """Submit+poll sul server video persistente. Ritorna (out_path, served, err):
+        served=False → il server è morto/il job è andato perso → il chiamante fa fallback al
+        subprocess con gli STESSI params (già ripuliti dal pre-processing: retry idempotente)."""
+        import time as _t
+        try:
+            jid = svc.submit_native(dict(self.params))
+        except Exception as e:                          # noqa: BLE001
+            self.progress.emit(f"[nativo] submit al server fallito ({e}) → subprocess")
+            return None, False, ""
+        self._server_jid = jid
+        _net_fails, _last_msg, _last_step = 0, "", -1
+        while True:
+            _t.sleep(2.5)
+            try:
+                h = svc.poll_native(jid)
+                _net_fails = 0
+            except Exception:                           # noqa: BLE001
+                _net_fails += 1
+                if _net_fails >= 5 and not svc.is_up():
+                    self.progress.emit("[nativo] server video morto a metà job → fallback subprocess")
+                    self._server_jid = None
+                    return None, False, ""
+                continue
+            st = h.get("status")
+            pr = h.get("progress") or {}
+            if pr.get("msg") and pr["msg"] != _last_msg:
+                _last_msg = pr["msg"]
+                self.progress.emit("[stage] " + _last_msg)
+            if pr.get("step") is not None and pr.get("step") != _last_step:
+                _last_step = pr["step"]
+                self.progress.emit(f"[nativo] step {pr.get('step')}/{pr.get('total', '?')}")
+            if st == "success":
+                self._server_jid = None
+                return (h.get("output") or [None])[0], True, ""
+            if st == "cancelled":
+                self._server_jid = None
+                return None, True, "generazione annullata dall'utente"
+            if st == "error":
+                self._server_jid = None
+                return None, True, str(h.get("error", ""))[-1500:]
+            if st == "unknown":                         # server riavviato: job perso → fallback
+                self._server_jid = None
+                return None, False, ""
 
 
 class _ModelAuditWorker(QThread):

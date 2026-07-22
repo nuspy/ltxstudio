@@ -1069,6 +1069,8 @@ def _run_chunked(p: dict, chunk: int) -> str:
         print(f"[chunk] {i + 1}/{n} ({cf} frame, audio_start={cp.get('audio_start_time', 0)})", flush=True)
         try:
             run_generation(cp)                               # pipe in cache dal 2° chunk → veloce
+        except GenerationCancelled:                          # annullato dall'utente: MAI retry, propaga
+            raise
         except Exception as _e:                              # es. ultimo chunk con audio più corto dei frame
             print(f"[chunk] {i} fallito ({type(_e).__name__}: {_e}) → 1 RETRY dopo pulizia VRAM", flush=True)
             import gc as _gc2
@@ -1077,6 +1079,8 @@ def _run_chunked(p: dict, chunk: int) -> str:
                 torch.cuda.empty_cache()
             try:
                 run_generation(cp)                           # RETRY: recupera la durata piena (era troncata muta)
+            except GenerationCancelled:                      # annullato: niente video ridotto "muto"
+                raise
             except Exception as _e2:                         # noqa: BLE001
                 print(f"[chunk] {i} fallito anche al retry ({type(_e2).__name__}: {_e2})", flush=True)
                 if i == 0:                                   # il PRIMO chunk fallito = nessun output: NON
@@ -1221,9 +1225,35 @@ def _prep_retake_source(video_path: str, width, height) -> str:
     return video_path
 
 
+class GenerationCancelled(Exception):
+    """Job annullato dall'utente (server /cancel o stop() GUI via server). Cancel COOPERATIVO:
+    controllato tra gli step del denoise (tqdm patch) e ai confini di fase (_stage) — NON è
+    istantaneo durante il decode VAE (scatta alla fase successiva)."""
+
+
+import threading as _threading                                 # noqa: E402
+_CANCEL = _threading.Event()
+
+
+def request_cancel() -> None:
+    """Chiede l'annullamento del job in corso (chiamato dal server :8190 su POST /cancel)."""
+    _CANCEL.set()
+
+
+def clear_cancel() -> None:
+    _CANCEL.clear()
+
+
+def _check_cancel() -> None:
+    if _CANCEL.is_set():
+        raise GenerationCancelled("annullato dall'utente")
+
+
 def _stage(msg: str) -> None:
     """Scrive la FASE corrente della pipeline su core.preview_file → il dialog anteprima la mostra (richiesta
-    utente: sapere cosa sta facendo la GPU). Anche su stdout per i log. Best-effort (mai rompe la gen)."""
+    utente: sapere cosa sta facendo la GPU). Anche su stdout per i log. Best-effort (mai rompe la gen).
+    È anche un punto di check del cancel cooperativo (abort ai confini di fase)."""
+    _check_cancel()
     print(f"[stage] {msg}", flush=True)
     try:
         from core import preview_file as _pf
@@ -1234,7 +1264,8 @@ def _stage(msg: str) -> None:
 
 def _install_step_progress() -> None:
     """Intercetta il tqdm del sampler LTX (ltx_pipelines.utils.samplers) per emettere lo STEP del denoise su
-    core.preview_file → barra 'step n/N' nel dialog anteprima. Best-effort, una volta per processo."""
+    core.preview_file → barra 'step n/N' nel dialog anteprima. Best-effort, una volta per processo.
+    Qui vive anche il check del cancel cooperativo per-step."""
     try:
         import ltx_pipelines.utils.samplers as _S
         if getattr(_S, "_ltx_tqdm_patched", False):
@@ -1249,6 +1280,7 @@ def _install_step_progress() -> None:
                     _pf.write_progress(int(self.n), int(self.total or self.n))
                 except Exception:                              # noqa: BLE001
                     pass
+                _check_cancel()                                # abort tra gli step del denoise
                 return r
         _S.tqdm = _PTqdm
         _S._ltx_tqdm_patched = True
@@ -1258,7 +1290,10 @@ def _install_step_progress() -> None:
 
 
 def run_generation(p: dict) -> str:
-    """Genera un video dai params. Riusabile da worker one-shot e da server persistente."""
+    """Genera un video dai params. Riusabile da worker one-shot e da server persistente.
+    NB cancel: il clear del flag è responsabilità del CHIAMANTE top-level (main() / ltx2_server)
+    — qui no, perché i video lunghi rientrano ricorsivamente per-chunk e un clear annullerebbe
+    un cancel arrivato tra un chunk e l'altro."""
     import time
     _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)
@@ -1580,6 +1615,7 @@ def _free_image_server() -> None:
 def main() -> None:
     with open(sys.argv[1], encoding="utf-8") as fh:
         p = json.load(fh)
+    clear_cancel()                                           # top-level: nessun cancel residuo
     _free_image_server()
     print("OK:" + run_generation(p), flush=True)
 

@@ -33,6 +33,40 @@ def is_up() -> bool:
         return False
 
 
+def server_enabled() -> bool:
+    """Residenza video di DEFAULT (unificazione motori): la GUI usa il server :8190 per arch 'ltx'
+    (pipeline + parcheggio RAM sopravvivono tra le generazioni → niente reload da SSD).
+    Opt-out: env LTX_VIDEO_SERVER=0 oppure user_prefs 'video_server'=False."""
+    if os.environ.get("LTX_VIDEO_SERVER", "").strip() == "0":
+        return False
+    try:
+        from core import user_prefs
+        return bool(user_prefs.get("video_server", True))
+    except Exception:                                       # noqa: BLE001
+        return True
+
+
+def submit_native(params: dict) -> str:
+    """Sottomette un job NATIVO al server persistente (:8190). Ritorna il job-id (solleva su errore).
+    Coordina prima i /free delle altre categorie (pipeline-aware: video→video consecutivi = no-op)."""
+    _free_gpu_servers()
+    r = requests.post(f"{BASE}/submit", json={"params": params}, timeout=30).json()
+    return r["prompt_id"]
+
+
+def poll_native(jid: str) -> dict:
+    """Stato del job: {status, output?, error?, progress?{msg,step,total}}."""
+    return requests.get(f"{BASE}/history/{jid}", timeout=10).json()
+
+
+def cancel_native(jid: str) -> dict:
+    """Annulla il job (cooperativo: tra gli step del denoise / ai confini di fase). Best-effort."""
+    try:
+        return requests.post(f"{BASE}/cancel/{jid}", timeout=10).json()
+    except Exception as e:                                  # noqa: BLE001
+        return {"status": "unreachable", "error": str(e)}
+
+
 def installed() -> bool:
     return os.path.exists(LTX2_PY) and os.path.exists(os.path.join(REPO, "workers", "ltx2_server.py"))
 

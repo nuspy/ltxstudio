@@ -262,18 +262,11 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
         if _os.environ.get("LTX2_NO_PERSISTENT") == "1":
             raise RuntimeError("disabilitato da LTX2_NO_PERSISTENT (bug #160 in corso)")
         if vid_arch == "ltx" and not gen_service._ltx2_server_up():
-            import subprocess as _sp
-            _flags = getattr(_sp, "DETACHED_PROCESS", 0) | getattr(_sp, "CREATE_NEW_PROCESS_GROUP", 0)
-            _srv_log = open(str(db.ROOT / "ltx2_server_8190.log"), "a", encoding="utf-8")
-            _sp.Popen([gen_service.LTX2_PY, "-u",
-                       str(Path(__file__).resolve().parents[2] / "workers" / "ltx2_server.py")],
-                      stdout=_srv_log, stderr=_sp.STDOUT, creationflags=_flags,
-                      env={**__import__("os").environ, "HF_HUB_OFFLINE": "1"})
-            for _ in range(20):                              # attesa best-effort (poi fallback subprocess)
-                time.sleep(1)
-                if gen_service._ltx2_server_up():
-                    print("[auto_run] worker video persistente :8190 avviato", flush=True)
-                    break
+            # unificazione motori: UNICO punto di spawn del server (core.ltx2_service.ensure_server),
+            # stesso usato dalla GUI — niente più Popen artigianale/doppio avvio.
+            from core import ltx2_service as _svc
+            if _svc.ensure_server(wait_s=40):
+                print("[auto_run] worker video persistente :8190 avviato", flush=True)
     except Exception as _e:                                  # noqa: BLE001
         print(f"[auto_run] server :8190 non avviato ({_e}) → fallback subprocess per-shot", flush=True)
     vid_jids, jmap = [], {}

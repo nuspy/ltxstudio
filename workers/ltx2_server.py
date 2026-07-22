@@ -37,15 +37,37 @@ def _worker() -> None:
         job = _jobs.get(jid)
         if not job:
             continue
+        if job.get("status") == "cancelled":                # annullato mentre era in coda → salta
+            _q.task_done()
+            continue
         job["status"] = "running"
+        ltx2_infer.clear_cancel()                           # top-level: nessun cancel residuo dal job prima
+        try:
+            from core import preview_file
+            preview_file.reset()                            # preview pulita per il nuovo job
+        except Exception:                                   # noqa: BLE001
+            pass
         try:
             out = ltx2_infer.run_generation(job["params"])
             job["output"] = [out]
             job["status"] = "success"
+        except ltx2_infer.GenerationCancelled:              # cancel cooperativo (POST /cancel)
+            job["status"] = "cancelled"
+            print(f"[ltx2] job {jid[:8]} ANNULLATO dall'utente", flush=True)
         except Exception as e:                              # noqa: BLE001
             job["status"] = "error"
             job["error"] = f"{e}\n{traceback.format_exc()[-1500:]}"
         finally:
+            # consistenza post-job (coda SERIALE): i latenti intermedi vanno via, _PIPE_CACHE e il
+            # parcheggio RAM (_PARK) restano — il job successivo riusa la pipeline senza reload.
+            try:
+                import gc
+                import torch
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:                               # noqa: BLE001
+                pass
             _q.task_done()
 
 
@@ -62,7 +84,33 @@ def submit(req: SubmitReq):
 
 @app.get("/history/{jid}")
 def history(jid: str):
-    return _jobs.get(jid, {"status": "unknown"})
+    d = dict(_jobs.get(jid, {"status": "unknown"}))
+    d.pop("params", None)                                   # non ritornare i params (grossi/inutili al client)
+    if d.get("status") == "running":
+        try:                                                # progress: il server è LOCALE → embedda il canale
+            from core import preview_file                   # a file di ltx2_infer (msg + step/total)
+            d["progress"] = preview_file.read() or {}
+        except Exception:                                   # noqa: BLE001
+            pass
+    return d
+
+
+@app.post("/cancel/{jid}")
+def cancel(jid: str):
+    """Annulla un job: in coda → marcato 'cancelled' (il worker lo salta); in esecuzione →
+    cancel COOPERATIVO (ltx2_infer controlla tra gli step del denoise e ai confini di fase;
+    NON è istantaneo durante il decode VAE). Il server e le sue cache restano vivi e consistenti."""
+    job = _jobs.get(jid)
+    if job is None:
+        return {"status": "not_found"}
+    st = job.get("status")
+    if st == "pending":
+        job["status"] = "cancelled"
+        return {"status": "cancelled"}
+    if st == "running":
+        ltx2_infer.request_cancel()
+        return {"status": "cancelling"}
+    return {"status": "done"}
 
 
 class FreeReq(BaseModel):
