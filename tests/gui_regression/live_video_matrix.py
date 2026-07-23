@@ -91,15 +91,19 @@ def _new_outputs(before: set) -> list[str]:
 
 
 def _select_model(w, path: str) -> bool:
-    """Seleziona nel dropdown video la voce il cui model/model_gguf corrisponde al path (basename)."""
+    """Seleziona nel dropdown video la voce il cui model corrisponde al path (basename).
+    ATTENDE il popolamento dell'inventario (async, tick 3s di _refresh_status): senza attesa i
+    case partivano col dropdown ancora ai soli fallback (Q6_K 'assente', visto 23/07)."""
     vt = w.video_tab
     base = os.path.basename(path).lower()
-    for i in range(vt.model.count()):
-        d = vt.model.itemData(i) or {}
-        m = str(d.get("model") or "")
-        if base in m.lower():
-            vt.model.setCurrentIndex(i)
-            return True
+    app = H.app()
+    for _round in range(30):                                # fino a ~15s
+        for i in range(vt.model.count()):
+            d = vt.model.itemData(i) or {}
+            if base in str(d.get("model") or "").lower():
+                vt.model.setCurrentIndex(i)
+                return True
+        _spin(app, 0.5)
     return False
 
 
@@ -138,16 +142,74 @@ def case_t2v(model_key):
     return run
 
 
-_I2V_PROMPT = ("l'uomo anziano col cappuccio guarda in camera, sbatte le palpebre e accenna "
-               "un sorriso, respiro visibile nell'aria fredda")   # coerente con la foto del canvas
-                                                                  # (prompt scollegato ⇒ "cambio scena")
+_I2V_IMG_PROMPT = ("ritratto fotorealistico di un vecchio marinaio con cappuccio scuro, barba bianca, "
+                   "occhi azzurri, molo nebbioso all'alba, luce fredda e cinematografica")
+_I2V_PROMPT = ("il vecchio marinaio col cappuccio guarda in camera, sbatte le palpebre e accenna "
+               "un sorriso, respiro visibile nell'aria fredda")   # coerente con la fixture generata
+_STARTED_8189 = [False]
+
+
+def _image_server_up() -> bool:
+    import urllib.request
+    try:                                                     # probe DIRETTA (is_up è mockata nei case)
+        urllib.request.urlopen("http://127.0.0.1:8189/system_stats", timeout=2).read()
+        return True
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
+def _ensure_i2v_fixture() -> str:
+    """Regola utente 23/07: i test i2v GENERANO PRIMA un'immagine coerente (backend immagini
+    vero), poi la animano. Fixture cacheata; il server :8189 avviato qui viene chiuso a fine run."""
+    fx = str(REP / "_i2v_fixture.png")
+    if os.path.exists(fx) and os.path.getsize(fx) > 30_000:
+        return fx
+    from core import native_driver
+    if not _image_server_up():
+        from core.native_launcher import launch
+        ok, msg = launch()
+        print(f"[fixture] avvio server immagini: {ok} {msg}", flush=True)
+        _STARTED_8189[0] = bool(ok)
+        for _ in range(180):
+            if _image_server_up():
+                break
+            time.sleep(1)
+    assert _image_server_up(), "server immagini :8189 non disponibile per la fixture i2v"
+    r = native_driver.run_and_wait("image", {
+        "model": r"E:\AI\Models\diffusion_models\Flux\FLUX_Krea_Dev.safetensors",
+        "arch": "flux", "prompt": _I2V_IMG_PROMPT, "negative": "low quality, cartoon",
+        "width": 704, "height": 448, "steps": 28, "guidance": 3.5, "seed": 77}, timeout=900)
+    outs = (r or {}).get("output") or []
+    assert r.get("status") == "success" and outs, f"fixture i2v non generata: {r}"
+    import shutil
+    shutil.copyfile(outs[0], fx)
+    print(f"[fixture] immagine i2v generata: {os.path.basename(outs[0])} → _i2v_fixture.png", flush=True)
+    return fx
+
+
+def _stop_image_server_if_started():
+    if not _STARTED_8189[0]:
+        return
+    import subprocess
+    try:                                                     # kill SOLO se avviato da questo run
+        r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                            "(Get-NetTCPConnection -LocalPort 8189 -State Listen -ErrorAction "
+                            "SilentlyContinue).OwningProcess | Select-Object -First 1"],
+                           capture_output=True, text=True, timeout=30)
+        pid = int((r.stdout or "0").strip() or 0)
+        if pid:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, timeout=30)
+            print(f"[fixture] server immagini avviato dal test → chiuso (pid {pid})", flush=True)
+    except Exception:                                        # noqa: BLE001
+        pass
 
 
 def case_i2v(model_key):
     def run(w, app):
+        fx = _ensure_i2v_fixture()
         _base_setup(w, _I2V_PROMPT, nsfw=(model_key == "eros"))
         assert _select_model(w, M[model_key]), f"modello {model_key} assente dal dropdown"
-        H.load_canvas_image(w)                              # foto nel canvas → i2v
+        H.load_canvas_image(w, fx)                          # foto GENERATA nel canvas → i2v
         try:
             w.video_tab.use_image.setChecked(True)
         except Exception:                                   # noqa: BLE001
@@ -159,9 +221,10 @@ def case_i2v(model_key):
 def case_i2v_768(model_key):
     """Regressione OOM/conditioning: la risoluzione del crash utente (768×576)."""
     def run(w, app):
+        fx = _ensure_i2v_fixture()
         _base_setup(w, _I2V_PROMPT, width=768, height=576)
         assert _select_model(w, M[model_key]), f"modello {model_key} assente"
-        H.load_canvas_image(w)
+        H.load_canvas_image(w, fx)
         try:
             w.video_tab.use_image.setChecked(True)
         except Exception:                                   # noqa: BLE001
@@ -317,6 +380,7 @@ def main() -> int:
         rp.write_text(("PASS\n" if ok else "FAIL\n") + detail + "\n", encoding="utf-8")
         print(f"[{'PASS' if ok else 'FAIL'}] {name}: {detail.splitlines()[0]}", flush=True)
         results.append((name, ok, detail.splitlines()[0]))
+    _stop_image_server_if_started()                          # niente processi test residui (memoria)
     n_ok = sum(1 for _, ok, _ in results if ok)
     summary = "\n".join(f"{'PASS' if ok else 'FAIL'}  {n}  {d}" for n, ok, d in results)
     (REP / "REAL_VIDEO_SUMMARY.txt").write_text(summary + f"\n\n== {n_ok}/{len(results)} PASS ==\n",
