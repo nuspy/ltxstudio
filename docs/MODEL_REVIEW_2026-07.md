@@ -43,8 +43,22 @@ Fatti già acquisiti:
 - **Incompleti**: `seedvr2_ema_7b_fp16.safetensors.download` (9.3GB parziali; esistono 3B fp8 + 7B fp8 completi).
 - LoRA: catalogo LTX ok (incl. NSFW); IC-LoRA su disco ma NON mappate nel dict (detailer, outpaint, refocus, uncompress, deinterlace, motiondeblur, lipdub, restyle, union/motion-track): candidate all'aggiunta come control_type.
 
-## Test live (matrice) — in corso
-_(riempita da tests/gui_regression/live_video_matrix.py → output/tests/REAL_VIDEO/)_
+## Test live (matrice) — esiti 22-23/07
+Tutti i casi generano DALLA GUI (report in output/tests/REAL_VIDEO/); qualità verificata sul frame.
+
+| Caso | Esito | Note |
+|---|---|---|
+| distilled fp8 (t2v, i2v, i2v@768, audio, LoRA) | ✅ 5/5 | Richiede il merge aux-bundle (checkpoint parziale ComfyUI) — implementato; 104-199s a VRAM libera; frame fotorealistici verificati |
+| dev fp8 t2v/i2v | ✅ | 101-125s |
+| dev nvfp4 t2v/i2v (dequant→fp8) | ✅ | 101-105s |
+| GGUF Q4_K_M t2v/i2v | ✅ | 170-185s; qualità buona (spike: 3.8 s/step) |
+| GGUF Q6_K t2v/i2v | ⚠️ | Genera ma ~17 MIN a clip anche a VRAM libera + puntinatura diffusa; il run t2v ha contribuito a saturare il sistema (percepito come crash PC). **Verdetto: sconsigliato — usare Q4_K_M distilled**; niente ulteriori stress-test |
+| eros (aux-bundle merge) | ✅ | Risolti i NaN (checkpoint parziale: video/audio-VAE assenti venivano zero-riempiti); ricetta 32 step/cfg 1.0; transformer 28GB → percorso streaming pesante |
+| extend | ✅ | 92s |
+| Self-Forcing (continuo) | ✅ | 76s, il più veloce |
+| LingBot dense t2v | ❌ | Genera ma output DEGENERE (assurdità visive) anche a VRAM libera; indiziati: steps/guidance ereditati dai default LTX (8/1.0 invece di 40/3.0); test discriminante con caption ricca+40 step in coda |
+| FP4 nativo (nvfp4_scaled_mm) | 🔄 | Motore Blackwell scritto: modalità kernel = 2.9-3.4 s/it ma artefatti a mosaico (noti upstream); modalità dequant (pesi 4-bit residenti + matmul bf16) in validazione |
+| Video corrotti segnalati dall'utente | spiegati | «Quadrati di rumore» = generazioni avvenute con la VRAM occupata da altri programmi; rigenerati puliti a VRAM libera. Aggiunta la verifica del CONTENUTO ai criteri PASS |
 
 ## Lista FP4/quant da aggiungere (ricerca online 22/07 — download SOLO dopo approvazione, connessione metered)
 
