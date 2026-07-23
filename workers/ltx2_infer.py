@@ -750,25 +750,56 @@ def _auto_offload(p: dict, ckpt: str) -> str:
 
 
 _TR_ONLY_CACHE: dict = {}
+_AUX_FAMILIES = ("vae", "audio_vae", "vocoder")             # componenti che il bundle DEVE fornire
 
 
 def _is_transformer_only(ckpt: str) -> bool:
-    """True se il checkpoint contiene SOLO il transformer (es. i *_fp8_scaled in formato ComfyUI):
-    niente vocoder/audio_vae/video_vae → la pipeline nativa non può costruirci l'audio decoder
-    ('Config value resblock is None', visto live 22/07)."""
+    """True se il checkpoint è PARZIALE: ha il transformer ma gli manca almeno una famiglia aux
+    (vae/audio_vae/vocoder). Casi reali: *_fp8_scaled ComfyUI (solo transformer → 'Config value
+    resblock is None') e finetune tipo eros (senza vae/audio_vae → il meta-fix zero-riempiva il
+    VideoEncoder → frame NaN, visto live 22-23/07)."""
     if ckpt in _TR_ONLY_CACHE:
         return _TR_ONLY_CACHE[ckpt]
     out = False
     try:
         from core import st_direct
         hdr, _ = st_direct.read_header(ckpt)
-        ks = [k for k in hdr if k != "__metadata__"]
-        has_tr = any(k.startswith("model.diffusion_model.") for k in ks)
-        has_aux = any(k.split(".")[0] in ("vocoder", "audio_vae", "vae", "video_vae") for k in ks)
-        out = has_tr and not has_aux
+        fams = {k.split(".")[0] for k in hdr if k != "__metadata__"}
+        has_tr = any(k.startswith("model.diffusion_model.") for k in hdr)
+        out = has_tr and any(f not in fams for f in _AUX_FAMILIES)
     except Exception:                                        # noqa: BLE001
         out = False
     _TR_ONLY_CACHE[ckpt] = out
+    return out
+
+
+def _ensure_aux_bundle() -> str:
+    """File cache con le SOLE componenti aux del bundle default (vae/audio_vae/vocoder/
+    text_embedding_projection, ~3GB): usato nella tupla (aux, checkpoint_scelto) per i checkpoint
+    parziali. Niente transformer del bundle nel merge → (a) nessuna weight_scale spuria applicata
+    ai pesi del finetune (i cast puri tipo eros verrebbero moltiplicati per scale altrui = garbage),
+    (b) niente doppia lettura da 29GB (il primo load del distilled passava da 708s)."""
+    out = os.path.join(os.path.dirname(CHECKPOINT), "_ltx23_aux_components.safetensors")
+    if os.path.exists(out) and os.path.getsize(out) > 100 * 2**20:
+        return out
+    from core import st_direct
+    from safetensors.torch import save_file
+    hdr, base = st_direct.read_header(CHECKPOINT)
+    dt = st_direct._dtypes()                                 # noqa: SLF001
+    keep = {}
+    with open(CHECKPOINT, "rb") as fh:
+        for k, info in hdr.items():
+            if k == "__metadata__" or k.startswith("model.diffusion_model."):
+                continue
+            keep[k] = st_direct.read_tensor(fh, base, info, dt)
+    _meta = hdr.get("__metadata__") or {}
+    save_file(keep, out, metadata={str(a): str(b) for a, b in _meta.items()} or None)
+    _n = len(keep)
+    keep.clear()                                             # i ~4GB dell'estrazione NON devono
+    import gc                                                # restare residenti nel load successivo
+    gc.collect()                                             # (MemoryError nel pinned-source, 23/07)
+    print(f"[bundle] estratte {_n} componenti aux del bundle → {os.path.basename(out)} "
+          f"({os.path.getsize(out)/2**30:.1f}GB, una tantum)", flush=True)
     return out
 
 
@@ -781,9 +812,9 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     _ckpt_pipe: "str | tuple" = ckpt
     if _is_transformer_only(ckpt) and os.path.exists(CHECKPOINT) \
             and os.path.normcase(ckpt) != os.path.normcase(CHECKPOINT):
-        print(f"[bundle] '{os.path.basename(ckpt)}' è SOLO transformer → VAE/vocoder/audio dal "
+        print(f"[bundle] '{os.path.basename(ckpt)}' è un checkpoint PARZIALE → componenti aux dal "
               f"bundle {os.path.basename(CHECKPOINT)}", flush=True)
-        _ckpt_pipe = (CHECKPOINT, ckpt)
+        _ckpt_pipe = (_ensure_aux_bundle(), ckpt)
         if qmode == "fp8_scaled_mm":
             # i comfy fp8_scaled NON hanno input_scale (attivazioni quantizzate al volo da comfy):
             # FP8Linear resterebbe senza parametro → si passa al percorso fp8_cast (fold delle
@@ -796,7 +827,21 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     quant = None
     if qmode == "nvfp4_scaled_mm":
         from ltx_core.quantization import nvfp4_scaled_mm
-        if nvfp4_scaled_mm.available():
+        # LoRA + FP4 residente = QUALITÀ DEGRADATA (23/07, misurato): fondere una LoRA impone il
+        # requant FP4 dei pesi fusi → si perde il QAT del checkpoint → "nubi di punti" sulle parti
+        # in movimento (visto sia in modalità kernel che dequant; la dequant delle scale è corretta,
+        # cos 0.9954). Coi checkpoint DEV la distilled-LoRA è obbligatoria → percorso fp8 pulito.
+        # L'FP4 residente resta per i checkpoint DISTILLED-fp4 (nessuna fusione). Forza: LTX_FP4_MM=force.
+        _needs_fuse = bool(loras) or ("distilled" not in os.path.basename(ckpt).lower()
+                                      and os.environ.get("LTX_NO_DLORA") != "1")
+        if _needs_fuse and os.environ.get("LTX_FP4_MM", "") != "force":
+            from ltx_core.quantization import fp8_cast
+            qmode = "fp8_cast"
+            quant = fp8_cast.build_policy(_ckpt_pipe)
+            print("[nvfp4-mm] LoRA da fondere (distilled-LoRA/utente) → il requant FP4 degraderebbe: "
+                  "uso la dequant a fp8 (qualità piena). FP4 residente = solo checkpoint distilled-fp4.",
+                  flush=True)
+        elif nvfp4_scaled_mm.available():
             quant = nvfp4_scaled_mm.build_policy(ckpt)
             print("[nvfp4-mm] matmul FP4 Blackwell ATTIVO: transformer residente a 4-bit (~11GB)",
                   flush=True)
