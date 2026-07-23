@@ -472,6 +472,20 @@ class VideoTab(QWidget):
             pass
         is_ling = arch == "lingbot"
         is_ltx = arch == "ltx"
+        # DEFAULT SAMPLER PER-ARCH (23/07): LingBot con gli 8 step/cfg~1 ereditati dai default LTX
+        # genera GARBAGE psichedelico (misurato: con 40 step/cfg 3.0 è pulito). I "suggested"
+        # rispettano le modifiche esplicite dell'utente (stesso meccanismo dei modelli distilled).
+        try:
+            ss = getattr(self, "sampler_seed", None)
+            if ss is not None:
+                if is_ling:
+                    ss.set_suggested_steps(40, note="LingBot")
+                    ss.set_suggested_cfg(3.0, note="LingBot")
+                elif arch in ("krea_rt", "self_forcing"):
+                    ss.set_suggested_steps(4, note="Self-Forcing/Realtime (distillato)")
+                    ss.set_suggested_cfg(1.0, note="Self-Forcing/Realtime")
+        except Exception:                                       # noqa: BLE001
+            pass
         # progressive disclosure del pannello LingBot (refiner/rewriter) — solo LingBot
         if hasattr(self, "lingbot_box"):
             self.lingbot_box.setVisible(is_ling)
