@@ -87,11 +87,20 @@ def _rewrite_proprietary(prompt: str, *, first_frame: str, mode: str) -> tuple[s
     args = [LINGBOT_PY, "-u", REWRITER_WORKER, "--prompt", prompt, "--mode", mode, "--out", out.name]
     if first_frame:
         args += ["--first-frame", first_frame]
-    subprocess.run(args, env=env, capture_output=True, text=True, timeout=600)
-    with open(out.name, encoding="utf-8") as f:
-        res = json.load(f)
+    r = subprocess.run(args, env=env, capture_output=True, text=True, timeout=600)
+    try:
+        with open(out.name, encoding="utf-8") as f:
+            res = json.load(f)
+    except Exception:                                        # noqa: BLE001
+        res = {}
     try:
         os.remove(out.name)
     except OSError:
         pass
-    return res.get("prompt_json", prompt), res.get("negative", "")
+    pj = res.get("prompt_json")
+    if not pj or pj == prompt:
+        # PRIMA il fallimento era SILENZIOSO: tornava la PROSA nuda che (a) bypassava il composer
+        # di fallback e (b) al DiT LingBot produce GARBAGE (rete verde — root-cause del 23/07).
+        raise RuntimeError(f"rewriter senza output (rc={r.returncode}): "
+                           f"{(r.stderr or r.stdout or '')[-300:]}")
+    return pj, res.get("negative", "")
