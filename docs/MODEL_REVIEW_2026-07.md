@@ -56,8 +56,8 @@ Tutti i casi generano DALLA GUI (report in output/tests/REAL_VIDEO/); qualità v
 | eros (aux-bundle merge) | ✅ | Risolti i NaN (checkpoint parziale: video/audio-VAE assenti venivano zero-riempiti); ricetta 32 step/cfg 1.0; transformer 28GB → percorso streaming pesante |
 | extend | ✅ | 92s |
 | Self-Forcing (continuo) | ✅ | 76s, il più veloce |
-| LingBot dense t2v | ❌ | Genera ma output DEGENERE (assurdità visive) anche a VRAM libera; indiziati: steps/guidance ereditati dai default LTX (8/1.0 invece di 40/3.0); test discriminante con caption ricca+40 step in coda |
-| FP4 nativo (nvfp4_scaled_mm) | 🔄 | Motore Blackwell scritto: modalità kernel = 2.9-3.4 s/it ma artefatti a mosaico (noti upstream); modalità dequant (pesi 4-bit residenti + matmul bf16) in validazione |
+| LingBot dense t2v | ⚠️ risolto in parte | Due root-cause trovate e corrette: (1) default per-arch mancanti (8 step/cfg 1 ereditati da LTX → ora 40/3.0 al cambio arch), (2) rewriter proprietario che falliva IN SILENZIO tornando prosa nuda → ora fallisce forte e scatta il composer. Con caption ricca+40 step l'output è cinematografico (verificato 832×480 E 704×448). Residuo: riparare il worker del rewriter (esce a vuoto rc=0) e portare il composer Gemma a subprocess |
+| FP4 nativo (nvfp4_scaled_mm) | ✅ con guardia | Motore Blackwell completo (kernel 2.9-3.4 s/it + modalità dequant). Trovato e MISURATO: fondere LoRA (inclusa la distilled) impone il requant FP4 → perso il QAT → nubi di punti (in entrambe le modalità; decodifica scale corretta, cos 0.9954). Guardia attiva: FP4 residente solo per checkpoint distilled-fp4 senza LoRA (es. FP4ME in lista); i dev-nvfp4 con LoRA vanno in dequant→fp8 (qualità piena, già verde in matrice) |
 | Video corrotti segnalati dall'utente | spiegati | «Quadrati di rumore» = generazioni avvenute con la VRAM occupata da altri programmi; rigenerati puliti a VRAM libera. Aggiunta la verifica del CONTENUTO ai criteri PASS |
 
 ## Lista FP4/quant da aggiungere (ricerca online 22/07 — download SOLO dopo approvazione, connessione metered)
