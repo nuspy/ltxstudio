@@ -73,6 +73,12 @@ _RECOMMENDED: dict[str, dict] = {
     # come ronzio/parlato incomprensibile. Serve la ricetta piena del 22B (≈32 step + LTXVScheduler,
     # CFG 1.0 con NAG), come per il dev/base: solo così l'audio nativo diventa intelligibile.
     "ltx2310eros": {"steps": 32, "cfg": 1.0, "note": "32 step + LTXVScheduler (audio+video puliti)"},
+    # GGUF del checkpoint DEV (Q5/Q6/Q8 "dev"): nel percorso GGUF la distilled-LoRA NON si applica
+    # (i pesi GGUF rimpiazzano il transformer già fuso) → a 8 step escono "nubi di punti"
+    # (visto live 23/07 sul Q6_K i2v). Ricetta dev senza LoRA: 32 step, cfg 1.0 (come eros).
+    "dev-q6": {"steps": 32, "cfg": 1.0, "note": "gguf-dev: 32 step (la distilled-LoRA non si applica ai GGUF)"},
+    "dev-q5": {"steps": 32, "cfg": 1.0, "note": "gguf-dev: 32 step (la distilled-LoRA non si applica ai GGUF)"},
+    "dev-q8": {"steps": 32, "cfg": 1.0, "note": "gguf-dev: 32 step (la distilled-LoRA non si applica ai GGUF)"},
     "q4_k_m": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
     "q4_k_s": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
     "q4_k": {"steps": 6, "cfg": 0.9, "note": "gguf-distilled"},
