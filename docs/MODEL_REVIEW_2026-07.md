@@ -76,6 +76,6 @@ Ordine di valore suggerito per la 5090 (dimensioni verificate su HF):
 | 6 | `svdq-fp4_r128-z-image-turbo.safetensors` | nunchaku-ai/nunchaku-z-image-turbo | 4.2 | SVDQ-FP4 | Z-Image in 4-bit quasi lossless (richiede stack nunchaku; wheel Windows dev) |
 | 7 | `svdq-fp4_r32-flux.1-dev/kontext/krea/fill` | nunchaku-ai/* | ~7 cad. | SVDQ-FP4 | FLUX.1 3× più veloce ≈ qualità 16-bit (kernel nunchaku, solo Blackwell) |
 | 8 | `svdq-fp4_r128-qwen-image-edit-2509-lightning-8steps` | nunchaku-ai/nunchaku-qwen-image-edit-2509 | 13.1 | SVDQ-FP4+Lightning | Miglior editing per istruzione in 4-bit (modello NUOVO, non installato) |
-| 9 | `svdq-fp4_r32-FLUX.2-klein-9B` | tonera/FLUX.2-klein-9B-Nunchaku | 5.8 | SVDQ-FP4 | Klein 9B (inpaint/edit evoluto) in 4-bit |
+| 9 | `svdq-fp4_r32-FLUX.2-klein-9B` | tonera/FLUX.2-klein-9B-Nunchaku | 5.8 | SVDQ-FP4 | SCARICATO ma IN ATTESA: né la stabile 1.2.1 né la nightly nunchaku hanno classi FLUX.2 (il port community gira solo via nodo ComfyUI custom) — si integra quando upstream le pubblica |
 
 Note: NVFP4 nativo richiede torch cu128/sm_120 (ok sulla 5090; il nostro loader NVFP4 dequant-a-fp8 li carica comunque). nunchaku = motore separato (wheel+integrazione: lavoro di porting nell'app, non solo download). Wan 2.5/2.6 "open" NON esistono (solo API).
