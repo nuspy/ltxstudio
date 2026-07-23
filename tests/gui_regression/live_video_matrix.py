@@ -103,8 +103,13 @@ def _select_model(w, path: str) -> bool:
     return False
 
 
-def _base_setup(w, prompt: str, width=704, height=448, secs=2.0):
+def _base_setup(w, prompt: str, width=704, height=448, secs=2.0, nsfw=False):
     vt = w.video_tab
+    if nsfw:                                                # eros & LoRA NSFW: visibili solo in NSFW
+        try:
+            vt.nsfw.setCurrentText("NSFW")
+        except Exception:                                   # noqa: BLE001
+            pass
     vt.prompt.setPlainText(prompt)
     try:
         vt.res_preset.setCurrentText("Personalizzato")
@@ -127,15 +132,20 @@ def _base_setup(w, prompt: str, width=704, height=448, secs=2.0):
 # ── definizione casi ─────────────────────────────────────────────────────────────
 def case_t2v(model_key):
     def run(w, app):
-        _base_setup(w, _prompt())
+        _base_setup(w, _prompt(), nsfw=(model_key == "eros"))
         assert _select_model(w, M[model_key]), f"modello {model_key} assente dal dropdown"
         w.on_generate()
     return run
 
 
+_I2V_PROMPT = ("l'uomo anziano col cappuccio guarda in camera, sbatte le palpebre e accenna "
+               "un sorriso, respiro visibile nell'aria fredda")   # coerente con la foto del canvas
+                                                                  # (prompt scollegato ⇒ "cambio scena")
+
+
 def case_i2v(model_key):
     def run(w, app):
-        _base_setup(w, _prompt())
+        _base_setup(w, _I2V_PROMPT, nsfw=(model_key == "eros"))
         assert _select_model(w, M[model_key]), f"modello {model_key} assente dal dropdown"
         H.load_canvas_image(w)                              # foto nel canvas → i2v
         try:
@@ -149,7 +159,7 @@ def case_i2v(model_key):
 def case_i2v_768(model_key):
     """Regressione OOM/conditioning: la risoluzione del crash utente (768×576)."""
     def run(w, app):
-        _base_setup(w, _prompt(), width=768, height=576)
+        _base_setup(w, _I2V_PROMPT, width=768, height=576)
         assert _select_model(w, M[model_key]), f"modello {model_key} assente"
         H.load_canvas_image(w)
         try:

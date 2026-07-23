@@ -1679,13 +1679,17 @@ class MainWindow(QMainWindow):
             ss.set_encoder_availability(_tes)
 
     def _video_gguf_models(self, oi: dict) -> list[str]:
-        """VUOTA: i GGUF VIDEO sono stati rimossi dal prodotto (13/07).
-
-        Restavano nel dropdown del tab Video e venivano ereditati da Music Video / Film Studio: chi li
-        sceglieva otteneva ~500 s/step (dequant per-forward) invece di ~4, e col Q6_K l'OOM. Il video
-        usa SEMPRE l'fp8. (I GGUF delle IMMAGINI — FLUX Fill inpaint — non sono toccati.)
-        """
-        return []
+        """GGUF video RIABILITATI (22-23/07, bc0c390): residenti quantizzati + dequant GPU sono
+        ~alla pari dell'fp8 (3.7-3.8 s/step misurati sul Q4_K_M). La lista arriva dal FILESYSTEM
+        (nell'inventario offline i .gguf non passano da object_info): senza, restava solo l'item
+        di fallback Q4 e il Q6_K spariva dal menu."""
+        import glob
+        root = r"E:\AI\Models\diffusion_models"
+        out = []
+        for p in glob.glob(os.path.join(root, "**", "*.gguf"), recursive=True):
+            if "ltx" in os.path.basename(p).lower():
+                out.append(os.path.relpath(p, root))
+        return sorted(set(out))
 
     def _log(self, msg: str):
         # THREAD-SAFE: appendPlainText tocca un QWidget → deve girare SOLO sul thread GUI. I job a subprocess
