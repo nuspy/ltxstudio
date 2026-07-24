@@ -1269,6 +1269,14 @@ def _load(model_path: str, arch: str, mm=None):
         # blockswap/offload flux2: pesi fp8 su CPU by design → MAI ri-piazzare (rebind lo salta)
         pipe._ls_no_rebind = True
         pipe._ls_place_mode = where
+    elif _is_svdq(model_path):
+        # NUNCHAKU (SVDQuant): i kernel FP4 girano SOLO su CUDA e NON sopravvivono all'offload
+        # accelerate (enable_model_cpu_offload sposta i moduli via hook → i buffer custom nunchaku
+        # restano su CPU → 'CUDA error: invalid argument'/assert nel forward, visto live 24/07). Il
+        # transformer svdq è piccolo (~4-7GB): residente su GPU, niente placement rinviato.
+        pipe.to("cuda")
+        pipe._ls_no_rebind = True
+        where = "gpu (nunchaku svdq)"
     else:
         # PLACEMENT RINVIATO a inizio job (_ensure_placement in run()): con componenti CONDIVISI lo stato
         # device/hook è globale e può cambiare tra un job e l'altro (altra shell in offload, demote su CPU)
