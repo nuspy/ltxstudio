@@ -64,6 +64,7 @@ Tutti i casi generano DALLA GUI (report in output/tests/REAL_VIDEO/); qualità v
 ## Motore Nunchaku (SVDQuant FP4) — collaudo 24/07
 - **FLUX.1 svdq: ✅ ECCELLENTE** — leopardo steampunk fotorealistico, prompt perfetto, **20 step in ~3s (6.4 it/s)** a 1024². Transformer ~7GB residente. Stesso percorso vale per Kontext svdq. Fix: svdq residente su CUDA (i kernel FP4 non sopravvivono all'offload accelerate).
 - **Z-Image svdq: ⚠️ KO su wheel stabile Windows** — assert `rotary_emb.shape==M` nel kernel zgemm; servono le wheel dev (JusteLeo/Nunchaku-Zimage-Win-Wheels). Registrato in FUTURE_CHECKS #3.
+- **FLUX.2-dev-NVFP4 UFFICIALE 32B: ✅ ECCELLENTE** — implementata `Nvfp4Linear` per FLUX.2 (weight U8 + block-scale + weight_scale_2, dequant comfy_kitchen, block-swap memory-bounded). Generazione reale fotorealistica perfetta (polpo in biblioteca subacquea), 28 step 111s a 1024², VRAM bounded. Il miglior open image ora usabile su 32GB.
 - **Klein FLUX.2 svdq**: la wheel nunchaku (stabile+nightly) non ha classi FLUX.2 → in attesa upstream (FUTURE_CHECKS #3).
 
 ## Lista FP4/quant da aggiungere (ricerca online 22/07 — download SOLO dopo approvazione, connessione metered)
