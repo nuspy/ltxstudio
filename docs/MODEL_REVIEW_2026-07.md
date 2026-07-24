@@ -60,6 +60,12 @@ Tutti i casi generano DALLA GUI (report in output/tests/REAL_VIDEO/); qualità v
 | FP4 nativo (nvfp4_scaled_mm) | ✅ con guardia | Motore Blackwell completo (kernel 2.9-3.4 s/it + modalità dequant). Trovato e MISURATO: fondere LoRA (inclusa la distilled) impone il requant FP4 → perso il QAT → nubi di punti (in entrambe le modalità; decodifica scale corretta, cos 0.9954). Guardia attiva: FP4 residente solo per checkpoint distilled-fp4 senza LoRA (es. FP4ME in lista); i dev-nvfp4 con LoRA vanno in dequant→fp8 (qualità piena, già verde in matrice) |
 | Video corrotti segnalati dall'utente | spiegati | «Quadrati di rumore» = generazioni avvenute con la VRAM occupata da altri programmi; rigenerati puliti a VRAM libera. Aggiunta la verifica del CONTENUTO ai criteri PASS |
 
+
+## Motore Nunchaku (SVDQuant FP4) — collaudo 24/07
+- **FLUX.1 svdq: ✅ ECCELLENTE** — leopardo steampunk fotorealistico, prompt perfetto, **20 step in ~3s (6.4 it/s)** a 1024². Transformer ~7GB residente. Stesso percorso vale per Kontext svdq. Fix: svdq residente su CUDA (i kernel FP4 non sopravvivono all'offload accelerate).
+- **Z-Image svdq: ⚠️ KO su wheel stabile Windows** — assert `rotary_emb.shape==M` nel kernel zgemm; servono le wheel dev (JusteLeo/Nunchaku-Zimage-Win-Wheels). Registrato in FUTURE_CHECKS #3.
+- **Klein FLUX.2 svdq**: la wheel nunchaku (stabile+nightly) non ha classi FLUX.2 → in attesa upstream (FUTURE_CHECKS #3).
+
 ## Lista FP4/quant da aggiungere (ricerca online 22/07 — download SOLO dopo approvazione, connessione metered)
 
 Ordine di valore suggerito per la 5090 (dimensioni verificate su HF):
