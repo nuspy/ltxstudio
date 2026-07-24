@@ -815,7 +815,8 @@
         "wan2.1-t2v-1.3b"
       ],
       "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
-      "repo_full_mb": 17000
+      "repo_full_mb": 17000,
+      "note": "NON per Self-Forcing (serve il formato nativo wan21_13b_original)"
     },
     {
       "id": "self_forcing_dmd",
@@ -838,8 +839,25 @@
       "repo_full_mb": 5700,
       "note": "realtime su 5090 (24GB min); runner repo Self-Forcing + base wan21_13b_diffusers",
       "deps": [
-        "wan21_13b_diffusers"
+        "wan21_13b_original"
       ]
+    },
+    {
+      "id": "wan21_13b_original",
+      "module": "Video",
+      "label": "Wan 2.1 T2V 1.3B (formato nativo, base per Self-Forcing realtime)",
+      "kind": "snapshot",
+      "repo_id": "Wan-AI/Wan2.1-T2V-1.3B",
+      "type": "checkpoint",
+      "family": "Wan13B",
+      "gated": false,
+      "approx_gb": 18,
+      "scan_names": [
+        "Wan2.1-T2V-1.3B",
+        "wan2.1-t2v-1.3b"
+      ],
+      "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B",
+      "repo_full_mb": 18000
     }
   ]
 }

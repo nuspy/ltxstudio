@@ -1459,7 +1459,7 @@ def run_generation(p: dict) -> str:
     if p.get("quant"):
         qmode = p["quant"]
     elif "nvfp4" in _bn and os.environ.get("LTX_FP4_MM", "1") != "0":
-        qmode = "nvfp4_scaled_mm"                            # matmul FP4 Blackwell: pesi residenti 4-bit
+        qmode = "nvfp4_scaled_mm"                            # matmul FP4 Blackwell: pesi residenti 4-bit (solo nvfp4 UFFICIALE QAT; FP4ME rimosso)
     else:
         qmode = "fp8_scaled_mm" if "fp8" in _bn else "fp8_cast"
     t0 = time.time()
