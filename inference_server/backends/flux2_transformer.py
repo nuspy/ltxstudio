@@ -58,12 +58,39 @@ class Fp8Linear(nn.Module):
         return F.linear(x, w, b)
 
 
+class Nvfp4Linear(nn.Module):
+    """Linear con peso NVFP4 (U8 packed e2m1 + weight_scale a blocchi fp8 swizzled + weight_scale_2 F32):
+    dequant on-the-fly nel forward via comfy_kitchen (block-swap come Fp8Linear). Formato ufficiale BFL
+    FLUX.2-dev-NVFP4 (= comfy_kitchen/nunchaku). Modalità DEQUANT (matmul bf16 pieno, niente quant delle
+    attivazioni): il più sicuro — riusa il block-swap e non introduce l'input_scale del file (kernel puro)."""
+
+    def __init__(self, in_features: int, out_features: int, bias: bool = True):
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.register_buffer("weight", torch.empty(out_features, in_features // 2, dtype=torch.uint8))
+        self.register_buffer("weight_scale", torch.empty(out_features, in_features // 16,
+                                                        dtype=torch.float8_e4m3fn))   # swizzled as-stored
+        self.register_buffer("weight_scale_2", torch.ones((), dtype=torch.float32))
+        self.bias = nn.Parameter(torch.empty(out_features, dtype=torch.bfloat16)) if bias else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        import comfy_kitchen as ck
+        import torch.nn.functional as F
+        dev = x.device
+        w = ck.dequantize_nvfp4(self.weight.to(dev), self.weight_scale_2.to(dev),
+                                self.weight_scale.to(dev), output_type=torch.bfloat16)
+        w = w[: self.out_features, : self.in_features]
+        b = self.bias.to(device=dev, dtype=x.dtype) if self.bias is not None else None
+        return F.linear(x.to(torch.bfloat16), w, b).to(x.dtype)
+
+
 def enable_blockswap(model, compute_device):
     """Block-swap stile ComfyUI (no accelerate): i pesi quantizzati (grossi) restano su CPU e il loro
     forward li sposta su GPU 1 layer alla volta; i moduli leggeri (norm/embed/modulation/bias) vanno su
     GPU stabilmente. Picco VRAM = moduli leggeri + 1 layer pesante. RAM tiene i pesi fp8."""
     for m in model.modules():
-        is_q = isinstance(m, Fp8Linear) or type(m).__name__ == "Nvfp4Linear"
+        is_q = isinstance(m, (Fp8Linear, Nvfp4Linear))
         if is_q:
             if getattr(m, "bias", None) is not None:        # bias piccolo → GPU; weight/packed restano CPU
                 m.bias.data = m.bias.data.to(compute_device)
@@ -120,41 +147,51 @@ def load_flux2_transformer(ckpt_path: str, config_dir: str):
     with init_empty_weights():
         tr = Flux2Transformer2DModel.from_config(cfg)
 
-    # 1) quali MODULI diffusers vanno resi Fp8Linear (dai pesi fp8 del checkpoint = quelli con .weight_scale)
+    # 1) quali MODULI diffusers vanno quantizzati. fp8: weight fp8 + weight_scale scalare. NVFP4 (BFL
+    #    flux2-dev-nvfp4): weight U8 + weight_scale 2D (blocchi) + weight_scale_2 scalare (+ input_scale).
     with safe_open(ckpt_path, framework="pt") as h:
         keys = set(h.keys())
         fp8_modules: dict[str, torch.Tensor] = {}        # module_name → weight_scale (scalar)
+        nvfp4_modules: set[str] = set()                  # module_name dei Linear NVFP4
         for k in keys:
             if not k.endswith(".weight"):
                 continue
             base = k[:-len(".weight")]
-            if (base + ".weight_scale") in keys:
+            if (base + ".weight_scale_2") in keys:       # NVFP4 (ha la scala globale)
+                for nk, _ci, _sp in _convert_key(k):
+                    nvfp4_modules.add(_module_and_attr(nk)[0])
+            elif (base + ".weight_scale") in keys:       # fp8 (solo scala scalare)
                 scale = h.get_tensor(base + ".weight_scale").float()
                 for nk, _ci, _sp in _convert_key(k):
-                    mod, _attr = _module_and_attr(nk)
-                    fp8_modules[mod] = scale
+                    fp8_modules[_module_and_attr(nk)[0]] = scale
 
-        # 2) sostituisci quei moduli con Fp8Linear (stessa shape, su meta)
+        # 2) sostituisci i moduli con Fp8Linear / Nvfp4Linear (stessa shape logica, su meta)
         modules = dict(tr.named_modules())
         for mod_name, scale in fp8_modules.items():
             old = modules.get(mod_name)
-            if not isinstance(old, nn.Linear):
-                continue
-            new = Fp8Linear(old.in_features, old.out_features, bias=old.bias is not None)
-            parent_name, child = _module_and_attr(mod_name)
-            setattr(modules.get(parent_name, tr), child, new)
+            if isinstance(old, nn.Linear):
+                new = Fp8Linear(old.in_features, old.out_features, bias=old.bias is not None)
+                parent_name, child = _module_and_attr(mod_name)
+                setattr(modules.get(parent_name, tr), child, new)
+        for mod_name in nvfp4_modules:
+            old = modules.get(mod_name)
+            if isinstance(old, nn.Linear):
+                new = Nvfp4Linear(old.in_features, old.out_features, bias=old.bias is not None)
+                parent_name, child = _module_and_attr(mod_name)
+                setattr(modules.get(parent_name, tr), child, new)
         modules = dict(tr.named_modules())               # rinfresca dopo le sostituzioni
         targets = {n for n, _ in tr.named_parameters()} | {n for n, _ in tr.named_buffers()}
 
-        # 3) streaming: assegna i pesi (fp8 ai Fp8Linear, bf16 ai Linear normali) + scale + split QKV
+        # 3) streaming: assegna i pesi + scale. NB: split QKV NON avviene sui NVFP4 di FLUX.2 (i qkv sono
+        #    già Linear separati nel formato BFL nvfp4 → ci_idx sempre None per gli U8).
         assigned = 0
         for k in keys:
-            if k.endswith((".weight_scale", ".input_scale")):
+            if k.endswith((".weight_scale", ".weight_scale_2", ".input_scale")):
                 continue
             base = k[:-len(".weight")] if k.endswith(".weight") else None
-            is_fp8 = bool(base and (base + ".weight_scale") in keys)
-            raw = h.get_tensor(k)                         # fp8 (resta fp8!) o bf16
-            scale = h.get_tensor(base + ".weight_scale").float() if is_fp8 else None
+            is_nvfp4 = bool(base and (base + ".weight_scale_2") in keys)
+            is_fp8 = bool(base and not is_nvfp4 and (base + ".weight_scale") in keys)
+            raw = h.get_tensor(k)                         # U8 (nvfp4) / fp8 / bf16
             for nk, ci, sp in _convert_key(k):
                 t = raw if ci is None else torch.chunk(raw, 3, dim=0)[ci]
                 if sp == "swap":
@@ -162,18 +199,26 @@ def load_flux2_transformer(ckpt_path: str, config_dir: str):
                 mod, attr = _module_and_attr(nk)
                 if nk not in targets:
                     continue
-                if is_fp8 and isinstance(modules.get(mod), Fp8Linear) and attr == "weight":
-                    set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())       # resta fp8
-                    set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu", value=scale)
+                _m = modules.get(mod)
+                if is_nvfp4 and isinstance(_m, Nvfp4Linear) and attr == "weight":
+                    set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())        # resta U8
+                    set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
+                                                value=h.get_tensor(base + ".weight_scale"))
+                    set_module_tensor_to_device(tr, mod + ".weight_scale_2", "cpu",
+                                                value=h.get_tensor(base + ".weight_scale_2").float())
+                elif is_fp8 and isinstance(_m, Fp8Linear) and attr == "weight":
+                    set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())         # resta fp8
+                    set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
+                                                value=h.get_tensor(base + ".weight_scale").float())
                 else:
-                    # dtype=bf16 ESPLICITO: senza, set_module_tensor_to_device ri-casta il valore al dtype
-                    # del modulo (float32 da from_config) → tutti i Linear plain restavano float32 e il
-                    # forward esplodeva "mat1 and mat2 dtype BFloat16 != float" su context_embedder.
+                    # dtype=bf16 ESPLICITO: senza, il valore veniva ri-castato a float32 (dtype del modulo
+                    # da from_config) → forward "mat1/mat2 BFloat16 != float".
                     set_module_tensor_to_device(tr, nk, "cpu", value=t.to(torch.bfloat16),
                                                 dtype=torch.bfloat16)
                 assigned += 1
     import logging
-    logging.info("[flux2_transformer] fp8-forward: %d Fp8Linear, %d tensori assegnati", len(fp8_modules), assigned)
+    logging.info("[flux2_transformer] %d Fp8Linear + %d Nvfp4Linear, %d tensori assegnati",
+                 len(fp8_modules), len(nvfp4_modules), assigned)
     return tr
 
 
