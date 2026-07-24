@@ -618,11 +618,26 @@ LORA_DIR = r"E:\AI\Models\LoRA"
 # (non-distilled) con la pipeline two-stage — senza, il dev esce "dematerializzato" (nuvole di voxel).
 DISTILLED_LORA = r"E:\AI\Models\LoRA\LTX-2\ltx-2.3-22b-distilled-lora-384-1.1.safetensors"
 # IC-LoRA di controllo (canny/depth/pose) presenti su disco — #24 ControlNet nativo, nessun download
+_LORA2 = r"E:\AI\Models\LoRA\LTX-2"
 IC_LORA = {
-    "canny": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-canny-control.safetensors",
-    "depth": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-depth-control.safetensors",
-    "pose": r"E:\AI\Models\LoRA\LTX-2\ltx-2-19b-ic-lora-pose-control.safetensors",
+    # ControlNet strutturale (control_video = canny/depth/pose del sorgente)
+    "canny": _LORA2 + r"\ltx-2-19b-ic-lora-canny-control.safetensors",
+    "depth": _LORA2 + r"\ltx-2-19b-ic-lora-depth-control.safetensors",
+    "pose": _LORA2 + r"\ltx-2-19b-ic-lora-pose-control.safetensors",
+    # editing/restauro per-riferimento (IC-LoRA presenti su disco, prima NON raggiungibili)
+    "detailer": _LORA2 + r"\ltx-2-19b-ic-lora-detailer.safetensors",
+    "outpaint": _LORA2 + r"\ltx-2.3-22b-ic-lora-outpaint.safetensors",
+    "refocus": _LORA2 + r"\ltx-2.3-22b-ic-lora-refocus.safetensors",
+    "uncompress": _LORA2 + r"\ltx-2.3-22b-ic-lora-uncompress.safetensors",
+    "deinterlace": _LORA2 + r"\ltx-2.3-22b-ic-lora-deinterlace.safetensors",
+    "motiondeblur": _LORA2 + r"\ltx-2.3-22b-ic-lora-motiondeblur.safetensors",
+    "hdr": _LORA2 + r"\ltx-2.3-22b-ic-lora-hdr-0.9.safetensors",
+    "lipdub": _LORA2 + r"\ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors",
+    "restyle": _LORA2 + r"\852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors",
+    "motion-track": _LORA2 + r"\ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
+    "union": _LORA2 + r"\ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
 }
+IC_LORA = {k: v for k, v in IC_LORA.items() if os.path.exists(v)}   # solo quelle presenti su disco
 
 
 _PIPE_CACHE: dict = {}
