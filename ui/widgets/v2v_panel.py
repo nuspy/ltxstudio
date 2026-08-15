@@ -55,7 +55,7 @@ class CollapsibleSection(QWidget):
 
 
 class V2VPanel(QWidget):
-    mode_changed = Signal(str)   # "normal" | "talk" | "sing" | "retake"
+    mode_changed = Signal(str)   # "normal" | "talk" | "sing" | "retake" | "listen"
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -75,14 +75,15 @@ class V2VPanel(QWidget):
         self.rb_normal = QRadioButton(tr("v2v.mode_normal"))
         self.rb_talk = QRadioButton(tr("v2v.mode_talk"))
         self.rb_sing = QRadioButton(tr("v2v.mode_sing"))
+        self.rb_listen = QRadioButton(tr("v2v.mode_listen"))
         self.rb_retake = QRadioButton(tr("v2v.mode_retake"))
         self.rb_normal.setChecked(True)
         self._mode_group = QButtonGroup(self)
-        for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_retake):
+        for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_listen, self.rb_retake):
             self._mode_group.addButton(rb); moderow.addWidget(rb)
         moderow.addStretch(1)
         root.addLayout(moderow)
-        for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_retake):
+        for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_listen, self.rb_retake):
             rb.toggled.connect(self._on_mode)
 
         # --- sorgente video (condivisa Talk/ReTake) ---
@@ -206,28 +207,66 @@ class V2VPanel(QWidget):
         self.sec_sing.setVisible(False)
         root.addWidget(self.sec_sing)
 
+        # --- sezione In ascolto (loop) — foto fissa -> ritratto che ascolta, girabile in loop ---
+        self.sec_listen = CollapsibleSection(tr("v2v.listen_section_title"))
+        ll = QVBoxLayout(self.sec_listen.content)
+        _intro = QLabel(tr("v2v.listen_intro")); _intro.setWordWrap(True)
+        ll.addWidget(_intro)
+        # durata: SOLO multipli interi del loop nativo (~8s) → wrap perfettamente seamless
+        dr = QHBoxLayout(); dr.addWidget(QLabel(tr("v2v.listen_duration_label")))
+        self.cmb_listen_dur = QComboBox()
+        self.cmb_listen_dur.addItem(tr("v2v.listen_dur_8"), 8.0)
+        self.cmb_listen_dur.addItem(tr("v2v.listen_dur_16"), 16.0)
+        self.cmb_listen_dur.addItem(tr("v2v.listen_dur_24"), 24.0)
+        dr.addWidget(self.cmb_listen_dur, 1); ll.addLayout(dr)
+        # intensità movimento (testa/espressione): più alta = keyframe centrali più liberi
+        mo = QHBoxLayout(); mo.addWidget(QLabel(tr("v2v.listen_motion_label")))
+        self.sl_listen_motion = QSlider(Qt.Horizontal); self.sl_listen_motion.setRange(0, 100)
+        self.sl_listen_motion.setValue(55)
+        self.lbl_listen_motion = QLabel("55%")
+        self.sl_listen_motion.valueChanged.connect(lambda v: self.lbl_listen_motion.setText(f"{v}%"))
+        self.sl_listen_motion.setToolTip(tr("v2v.listen_motion.tt"))
+        mo.addWidget(self.sl_listen_motion, 1); mo.addWidget(self.lbl_listen_motion)
+        ll.addLayout(mo)
+        # bocca chiusa: la persona ASCOLTA e non parla
+        from PySide6.QtWidgets import QCheckBox
+        self.cb_listen_mouth = QCheckBox(tr("v2v.listen_mouth_closed"))
+        self.cb_listen_mouth.setChecked(True)
+        self.cb_listen_mouth.setToolTip(tr("v2v.listen_mouth_closed.tt"))
+        ll.addWidget(self.cb_listen_mouth)
+        lnote = QLabel(tr("v2v.listen_note")); lnote.setWordWrap(True)
+        lnote.setStyleSheet("color:#74c0fc; padding:4px;")
+        ll.addWidget(lnote)
+        self.sec_listen.setVisible(False)
+        root.addWidget(self.sec_listen)
+
     # ---------------- logica ----------------
     def current_mode(self) -> str:
         if self.rb_talk.isChecked():
             return "talk"
         if self.rb_sing.isChecked():
             return "sing"
+        if self.rb_listen.isChecked():
+            return "listen"
         if self.rb_retake.isChecked():
             return "retake"
         return "normal"
 
     def _on_mode(self):
         m = self.current_mode()
-        self._src_wrap.setVisible(m in ("talk", "retake"))   # 'sing' usa la foto del Frame 1, non un video
+        self._src_wrap.setVisible(m in ("talk", "retake"))   # 'sing'/'listen' usano la foto del Frame 1, non un video
         self.sec_retake.setVisible(m == "retake")
         self.sec_talk.setVisible(m == "talk")
         self.sec_sing.setVisible(m == "sing")
+        self.sec_listen.setVisible(m == "listen")
         if m == "retake":
             self.sec_retake.set_expanded(True)
         if m == "talk":
             self.sec_talk.set_expanded(True)
         if m == "sing":
             self.sec_sing.set_expanded(True)
+        if m == "listen":
+            self.sec_listen.set_expanded(True)
         self.mode_changed.emit(m)
 
     def _pick_sing_audio(self):
@@ -357,7 +396,18 @@ class V2VPanel(QWidget):
             cfg.update({"sing_audio_path": self._sing_audio_path,
                         "sing_separate_vocals": self.cb_sing_vocals.isChecked(),
                         "sing_audio_scale": round(self.sl_sing_scale.value() / 10.0, 1)})
+        if m == "listen":
+            cfg.update(self.get_listen_config())
         return cfg
+
+    def get_listen_config(self) -> dict:
+        """Config della modalità 'In ascolto (loop)': durata (multipli seamless), intensità
+        movimento (0..1) e bocca chiusa. Usa la foto del Frame 1 come volto."""
+        return {
+            "listen_seconds": float(self.cmb_listen_dur.currentData() or 8.0),
+            "listen_motion": round(self.sl_listen_motion.value() / 100.0, 2),
+            "listen_mouth_closed": self.cb_listen_mouth.isChecked(),
+        }
 
     def validation_errors(self) -> list[str]:
         """Elenco di cosa manca per generare nella modalità corrente (per il dialog al Genera)."""
@@ -368,6 +418,8 @@ class V2VPanel(QWidget):
         if m == "sing":                       # 'Canta': serve l'audio (la foto viene dal Frame 1)
             if not self._sing_audio_path:
                 errs.append(tr("v2v.err_no_sing_audio"))
+            return errs
+        if m == "listen":                     # 'In ascolto': serve solo la foto del Frame 1 (verificata in main_window)
             return errs
         if not self._video_path:
             # ReTake richiede il video; Talk SENZA video genera dall'immagine del Frame 1 (ok).

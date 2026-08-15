@@ -639,12 +639,96 @@ IC_LORA = {
 }
 IC_LORA = {k: v for k, v in IC_LORA.items() if os.path.exists(v)}   # solo quelle presenti su disco
 
+# --- RELEASE LTX (2.3 default | 2.5) --------------------------------------------------------
+# I valori qui sopra sono la release 2.3 (storica). Per la 2.5 cambiano TUTTI: è uno split pack
+# (un file per componente) con Gemma 4, mentre la 2.3 è un monolite con Gemma 3 e i componenti
+# ausiliari dentro il checkpoint. Invece di infilare un `if release` nei ~15 punti che usano queste
+# costanti, le RILEGHIAMO una volta all'inizio del job da `core.ltx_release`: il resto del worker
+# resta identico. Legittimo perché il worker è un subprocess one-shot e il server tiene UNA sola
+# release per processo (vedi core/conflict_rules.py).
+LTX_RELEASE = "2.3"
+_CHECKPOINT_23 = CHECKPOINT   # monolite 2.3: da ripristinare se si torna alla 2.3 dopo un job 2.5
+VIDEO_VAE = ""          # 2.3: dentro il checkpoint · 2.5: file separato
+AUDIO_VAE = ""          # 2.3: dentro il checkpoint · 2.5: file separato (include il vocoder)
+UPSAMPLER_TEMPORAL = ""  # solo 2.5
+DURATION_HEAD = ""      # solo 2.5
+DIFFUSION_DECODER = ""  # solo 2.5
+SIGMA_DRIVEN = False    # 2.5 distilled: guidato da DISTILLED_SIGMAS, num_inference_steps IGNORATO
+
+
+def _apply_release(rel_id: str | None) -> None:
+    """Rilega le costanti dei componenti alla release richiesta. Chiamata all'inizio di ogni job."""
+    global LTX_RELEASE, CHECKPOINT, UPSAMPLER, UPSAMPLER_TEMPORAL, GEMMA, DISTILLED_LORA, IC_LORA
+    global VIDEO_VAE, AUDIO_VAE, DURATION_HEAD, DIFFUSION_DECODER, SIGMA_DRIVEN
+    from core import ltx_release as _rel
+    rid = str(rel_id or _rel.DEFAULT_RELEASE)
+    if rid == LTX_RELEASE and rid == "2.3":
+        return                                               # già legata alla 2.3: nulla da fare
+    r = _rel.get(rid)
+    LTX_RELEASE = r.id
+    GEMMA = r.text_encoder
+    UPSAMPLER = _rel.resolve(rid, "upsampler_spatial")       # 2.5 ricade sullo spatial 2.3 se manca
+    UPSAMPLER_TEMPORAL = r.upsampler_temporal
+    DISTILLED_LORA = r.distilled_lora
+    VIDEO_VAE, AUDIO_VAE = r.video_vae, r.audio_vae
+    DURATION_HEAD, DIFFUSION_DECODER = r.duration_head, r.diffusion_decoder
+    SIGMA_DRIVEN = r.sigma_driven
+    IC_LORA = {k: v for k, v in r.ic_lora.items() if os.path.exists(v)}
+    # 2.5: nessun monolite da cui estrarre il bundle ausiliario, il transformer va scelto
+    # ESPLICITAMENTE (ereditare il default 2.3 sarebbe una sostituzione silenziosa di modello,
+    # vietata). Tornando alla 2.3 il monolite va RIPRISTINATO, altrimenti il job successivo
+    # troverebbe CHECKPOINT vuoto.
+    CHECKPOINT = _CHECKPOINT_23 if r.id == "2.3" else ""
+    print(f"[release] LTX {r.id} — TE={os.path.basename(GEMMA) or GEMMA} · "
+          f"IC-LoRA={len(IC_LORA)} · sigma_driven={SIGMA_DRIVEN}", flush=True)
+
+
+def _adapt_model_paths(kw: dict) -> dict:
+    """Shim di compatibilità ltx-pipelines 1.1.6 → 1.2.0.
+
+    In 1.2.0 tutte le pipeline hanno sostituito `checkpoint_path`/`distilled_checkpoint_path` +
+    `gemma_root` con un unico `model_paths: ModelPaths`, che copre **entrambi** i layout:
+    `from_monolith()` per il checkpoint fat della 2.3 e `from_split()` per lo split pack della 2.5.
+    Su 1.1.6 (venv della 2.3) la classe non esiste → i kwargs storici passano intatti.
+
+    Il branch è sulla VERSIONE DELLA LIBRERIA, non sulla release: è il venv a decidere quale API
+    esiste. Un solo punto di traduzione invece di un `if` a ogni costruzione di pipeline."""
+    try:
+        from ltx_pipelines.utils.model_paths import ModelPaths
+    except Exception:                                        # noqa: BLE001
+        return kw                                            # 1.1.6: API legacy, niente da tradurre
+    ck = kw.pop("checkpoint_path", None)
+    ck2 = kw.pop("distilled_checkpoint_path", None)
+    gem = kw.pop("gemma_root", None)
+    ckpt = ck if ck is not None else ck2
+    if ckpt is None and gem is None:
+        return kw                                            # pipeline che non carica pesi qui
+    if LTX_RELEASE == "2.3":
+        kw["model_paths"] = ModelPaths.from_monolith(ckpt, gem)
+    else:
+        # Split pack: ogni componente è un file a sé. `or None` perché ModelPaths distingue
+        # "non richiesto" (None) da "path vuoto", e fallisce dove serve invece che al costruttore.
+        kw["model_paths"] = ModelPaths.from_split(
+            transformer_path=ckpt,
+            text_encoder_path=(gem or GEMMA) or None,
+            video_vae_path=VIDEO_VAE or None,
+            audio_vae_path=AUDIO_VAE or None,
+            duration_head_path=DURATION_HEAD or None,
+        )
+    return kw
+
 
 _PIPE_CACHE: dict = {}
 
 
 def _resolve_ckpt(model: str) -> str:
     ckpt = model or CHECKPOINT
+    if not ckpt:
+        # Succede solo su release senza checkpoint di default (2.5, split pack): messaggio esplicito
+        # invece del generico "non trovato", che manderebbe l'utente a cercare un file inesistente.
+        raise RuntimeError(
+            f"LTX {LTX_RELEASE} non ha un checkpoint predefinito: seleziona il transformer dal menu "
+            f"(la 2.5 è uno split pack, il transformer è un file a parte).")
     if os.path.isabs(ckpt) and os.path.exists(ckpt):
         return ckpt
     if not os.path.isabs(ckpt):
@@ -883,6 +967,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     def _build(Klass, **kw):
         """Istanzia la pipeline passando il registry di parcheggio RAM (_PARK); se la classe non
         accetta `registry` (firma diversa), fallback senza — il job gira, solo senza parcheggio."""
+        kw = _adapt_model_paths(kw)
         try:
             return Klass(registry=_PARK, **kw)
         except TypeError:
@@ -1244,7 +1329,8 @@ def run_t2a(p: dict) -> str:
     import time
     from ltx_pipelines.t2a_one_stage import T2AOneStagePipeline
     from ltx_pipelines.utils.media_io import encode_audio
-    ckpt = _resolve_ckpt(p.get("model", CHECKPOINT))
+    _apply_release(p.get("ltx_release"))
+    ckpt = _resolve_ckpt(p.get("model") or CHECKPOINT)
     # Il block-streaming (offload CPU) della T2AOneStagePipeline supporta SOLO bf16/fp8_cast
     # (fp8_scaled_mm non è ammesso) → default a fp8_cast, che entra nei 32GB col cast on-the-fly.
     qmode = p.get("quant", "fp8_cast")
@@ -1404,12 +1490,76 @@ def _install_step_progress() -> None:
         print(f"[stage] progresso per-step non attivo: {_e}", flush=True)
 
 
+def _build_listen_keyframes(pipe, p: dict, vg, _tc, nf: int, fps: float) -> list:
+    """Modalità 'In ascolto (loop)': da UNA foto fissa costruisce i keyframe per un ritratto che
+    ascolta (micromovimenti testa/ciglia, bocca chiusa) girabile in loop SENZA stacco/fading.
+
+    Tecnica validata (test Martina 24/07): la foto SOLA su entrambi i bordi dà video statico; il
+    movimento nasce da keyframe centrali DIVERSI. Qui li generiamo con una passata-seme corta i2v
+    dalla foto (riusando il modello già in VRAM), poi estraiamo 2 frame variati (testa mossa) e li
+    montiamo come:  foto@0 str1.0 · varA@~34% str_motion · varB@~66% str_motion · foto@ultimo str0.9.
+    L'ancora foto ai due bordi garantisce il wrap seamless; le varianti centrali forzano il moto."""
+    import time as _t
+    import subprocess                                        # non è importato a livello modulo
+    photo = p["image_path"]
+    lc = p.get("listen_loop") or {}
+    motion = max(0.0, min(1.0, float(lc.get("motion", 0.55))))
+    mouth_closed = bool(lc.get("mouth_closed", True))
+    W, H = int(p.get("width", 512)), int(p.get("height", 640))
+    seed = int(p.get("seed", 42))
+    # str keyframe centrali: più moto = strength più bassa (più libertà) → 0.82(subtle)..0.60(vivace)
+    kf_str = round(0.82 - 0.22 * motion, 2)
+    # passata-seme corta (~2s) che INDUCE il movimento di testa/espressione da estrarre come varianti
+    seed_nf = 49                                             # 8k+1 valido, ~2s @24fps: basta per 2 pose diverse
+    _mouth_neg = ("open mouth, talking, speaking, singing, moving lips, mouthing words, showing teeth, "
+                  "laughing, grinning widely, ") if mouth_closed else ""
+    seed_prompt = ("A person attentively listening in a video call, calm and relaxed, subtle natural head "
+                   "movements, gentle blinking, small shifts of gaze and expression, "
+                   + ("lips closed, silent, not speaking, " if mouth_closed else "")
+                   + "soft studio light, steady camera")
+    seed_neg = (_mouth_neg + "static, frozen, still image, motionless, distorted face, extra limbs, "
+                "worst quality, blurry")
+    seed_out = os.path.join(os.path.dirname(p["output"]) or ".", f"_listen_seed_{int(_t.time())}.mp4")
+    print(f"[listen] passata-seme {seed_nf}f @ {W}x{H} (motion={motion:.2f}, bocca_chiusa={mouth_closed}) …",
+          flush=True)
+    _sv, _ = pipe(
+        prompt=seed_prompt, negative_prompt=seed_neg, seed=seed,
+        height=H, width=W, num_frames=seed_nf, frame_rate=fps,
+        num_inference_steps=min(int(p.get("steps", 30)), 24), video_guider_params=vg,
+        images=[ImageConditioningInput(photo, 0, 1.0, 33)], tiling_config=_tc, enhance_prompt=False)
+    # scarto la traccia audio (rumore non condizionato) e salvo il seme per estrarne i frame
+    def _first(chunks):
+        for _c in chunks:
+            yield _c
+    _svv = next(_first([_sv])) if torch.is_tensor(_sv) else _first(_sv)
+    encode_video(video=_svv, fps=fps, audio=None, output_path=seed_out,
+                 video_chunks_number=get_video_chunks_number(seed_nf, _tc))
+    # estraggo 2 frame variati (≈45% e ≈75% del seme = testa già mossa, prima che l'i2v derivi troppo)
+    varA = seed_out + ".A.png"; varB = seed_out + ".B.png"
+    tA, tB = 0.45 * (seed_nf / fps), 0.75 * (seed_nf / fps)
+    for _ts, _dst in ((tA, varA), (tB, varB)):
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{_ts:.3f}", "-i", seed_out,
+                        "-frames:v", "1", "-q:v", "2", _dst], check=False)
+    kfs = [{"path": photo, "frame": 0, "strength": 1.0}]
+    if os.path.exists(varA):
+        kfs.append({"path": varA, "frame": int(round(nf * 0.34)), "strength": kf_str})
+    if os.path.exists(varB):
+        kfs.append({"path": varB, "frame": int(round(nf * 0.66)), "strength": kf_str})
+    kfs.append({"path": photo, "frame": nf - 1, "strength": 0.9})   # ancora finale = wrap seamless
+    # rinforzo il negative del render finale contro il parlato (i keyframe possono trascinare la bocca)
+    if mouth_closed:
+        p["negative"] = (_mouth_neg + (p.get("negative") or "worst quality, blurry")).strip()
+    print(f"[listen] keyframe montati: {len(kfs)} (centrali str={kf_str}) → render loop {nf}f", flush=True)
+    return kfs
+
+
 def run_generation(p: dict) -> str:
     """Genera un video dai params. Riusabile da worker one-shot e da server persistente.
     NB cancel: il clear del flag è responsabilità del CHIAMANTE top-level (main() / ltx2_server)
     — qui no, perché i video lunghi rientrano ricorsivamente per-chunk e un clear annullerebbe
     un cancel arrivato tra un chunk e l'altro."""
     import time
+    _apply_release(p.get("ltx_release"))                     # rilega i componenti alla release del job
     _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)
         return run_t2a(p)
@@ -1637,6 +1787,10 @@ def run_generation(p: dict) -> str:
             conditioning_attention_strength=float(p.get("conditioning_attention", 1.0)),
             conditioning_attention_mask=cam)
     else:
+        # 'In ascolto (loop)': da una foto fissa → keyframe auto (passata-seme di movimento) per un
+        # ritratto che ascolta girabile in loop. Costruiti QUI per riusare il modello già in VRAM.
+        if p.get("listen_loop") and p.get("image_path") and not p.get("keyframes"):
+            p["keyframes"] = _build_listen_keyframes(pipe, p, vg, _tc, nf, fps)
         images = []
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
             for kf in p["keyframes"]:
@@ -1686,6 +1840,25 @@ def run_generation(p: dict) -> str:
         video = _nan_guard(video)
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
                  video_chunks_number=get_video_chunks_number(nf, _tc))
+    # 'In ascolto (loop)': il render è il loop base (~8s, wrap seamless). Se l'utente ha chiesto una durata
+    # maggiore, la otteniamo RIPETENDO il loop base (multipli interi → i bordi restano seamless, niente
+    # crossfade/stacco). Fallback: se il ricalcolo/ripetizione fallisce, si consegna il loop base.
+    _ll = p.get("listen_loop") or {}
+    _tot = float(_ll.get("total_seconds", 0) or 0)
+    _base_s = nf / float(fps)
+    if _tot > _base_s + 0.1 and os.path.exists(out):
+        import subprocess                                     # non è importato a livello modulo
+        _reps = max(1, int(round(_tot / _base_s)))           # numero di loop interi (seamless)
+        _looped = out + ".loop.mp4"
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-stream_loop", str(_reps - 1), "-i", out,
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "17", _looped],
+                           capture_output=True)
+        if r.returncode == 0 and os.path.exists(_looped) and os.path.getsize(_looped) > 0:
+            os.replace(_looped, out)
+            print(f"[listen] loop base {_base_s:.1f}s ×{_reps} → {_reps*_base_s:.0f}s seamless", flush=True)
+        else:
+            print(f"[listen] !! ripetizione loop fallita ({r.stderr[-200:] if r.stderr else '?'}) "
+                  f"→ consegno il loop base {_base_s:.0f}s", flush=True)
     # RETE DI SICUREZZA: se l'audio era RICHIESTO (a2v: canto/lip-sync) ma il file è uscito muto — encoder
     # in fallback, mux fallito, traccia vuota — rimuxa dal file audio ORIGINALE, sulla stessa finestra usata
     # per condizionare la generazione (audio_start_time + durata del chunk) → resta in sync anche nei video

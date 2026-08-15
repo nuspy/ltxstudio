@@ -26,6 +26,10 @@ data/user_prefs.json
 data/age_ack.json
 data/usage.json
 data/catalog_paths.json
+data/gui_lang.json
+data/vram_ledger/
+data/model_vram_cache.json.tmp*
+data/model_footprint.json.migrated
 
 # Edizioni / build (Nuitka) — generati, mai nel repo
 core/edition.py
@@ -48,3 +52,5 @@ data/model_vram_cache.json
 mocap_env/
 apps/studio-mobile/npm_install.log
 apps/studio-mobile/tsconfig.tsbuildinfo
+# log runtime (i server/_uv*.log storici restano tracciati: ignore non tocca i file già in indice)
+*.log

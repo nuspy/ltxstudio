@@ -189,25 +189,6 @@
    29562341328
   ]
  },
- "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3-22b-distilled.safetensors": {
-  "path": "E:\\AI\\Models\\Checkpoints\\LTX\\ltx-2.3-22b-distilled.safetensors",
-  "name": "ltx-2.3-22b-distilled.safetensors",
-  "folder": "LTX",
-  "family": "ltxv",
-  "variant": "base",
-  "role": "video",
-  "kind": "video",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "folder",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1774946113497897100,
-   46149345038
-  ]
- },
  "E:\\AI\\Models\\Checkpoints\\Flux\\flux1-schnell-fp8.safetensors": {
   "path": "E:\\AI\\Models\\Checkpoints\\Flux\\flux1-schnell-fp8.safetensors",
   "name": "flux1-schnell-fp8.safetensors",
@@ -472,25 +453,6 @@
   "_sig": [
    1748567895312777000,
    9626369259
-  ]
- },
- "E:\\AI\\Models\\diffusion_models\\HunyuanVideo\\hunyuan_video_720_cfgdistill_fp8_e4m3fn.safetensors": {
-  "path": "E:\\AI\\Models\\diffusion_models\\HunyuanVideo\\hunyuan_video_720_cfgdistill_fp8_e4m3fn.safetensors",
-  "name": "hunyuan_video_720_cfgdistill_fp8_e4m3fn.safetensors",
-  "folder": "HunyuanVideo",
-  "family": "hunyuan_video",
-  "variant": "base",
-  "role": "video",
-  "kind": "video",
-  "precision": "fp8",
-  "arch_meta": "",
-  "source": "keys",
-  "hidden": null,
-  "n_double": 20,
-  "n_single": 40,
-  "_sig": [
-   1774788359444527400,
-   13185035336
   ]
  },
  "E:\\AI\\Models\\diffusion_models\\Z-Image\\zimageTurboNSFWBy_2602NSFWBF16.safetensors": {
@@ -1289,6 +1251,63 @@
   "_sig": [
    1784758571264107300,
    4129440510
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors",
+  "name": "flux2-dev-nvfp4-mixed.safetensors",
+  "folder": "nvfp4",
+  "family": "flux2",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "keys",
+  "hidden": 6144,
+  "n_double": 8,
+  "n_single": 48,
+  "_sig": [
+   1784771347912158200,
+   22772036568
+  ]
+ },
+ "E:\\AI\\Models\\diffusion_models\\LTXVideo\\LTX-2\\unsloth\\distilled-1.1\\ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf": {
+  "path": "E:\\AI\\Models\\diffusion_models\\LTXVideo\\LTX-2\\unsloth\\distilled-1.1\\ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf",
+  "name": "ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf",
+  "folder": "distilled-1.1",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "gguf",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1784772178847421600,
+   16388660768
+  ]
+ },
+ "E:\\AI\\Models\\TextEncoders\\Flux\\mistral_3_small_flux2_fp4_mixed.safetensors": {
+  "path": "E:\\AI\\Models\\TextEncoders\\Flux\\mistral_3_small_flux2_fp4_mixed.safetensors",
+  "name": "mistral_3_small_flux2_fp4_mixed.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1784771571891868300,
+   12275678071
   ]
  },
  "E:\\AI\\Models\\VAE\\ae.safetensors": {
@@ -2353,25 +2372,6 @@
   "_sig": [
    1756237522922978600,
    253860343
-  ]
- },
- "E:\\AI\\Models\\diffusion_models\\Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors": {
-  "path": "E:\\AI\\Models\\diffusion_models\\Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors",
-  "name": "flux2-dev-nvfp4-mixed.safetensors",
-  "folder": "nvfp4",
-  "family": "flux2",
-  "variant": "dev",
-  "role": "t2i",
-  "kind": "image",
-  "precision": "fp4",
-  "arch_meta": "",
-  "source": "keys",
-  "hidden": 6144,
-  "n_double": 8,
-  "n_single": 48,
-  "_sig": [
-   1784771347912158200,
-   22772036568
   ]
  }
 }

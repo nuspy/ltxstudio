@@ -1,0 +1,290 @@
+"""Registro delle RELEASE LTX (2.3 / 2.5) — fonte UNICA di verità per componenti e capability.
+
+Prima d'ora la "versione" LTX non esisteva come concetto: c'era una sola arch `"ltx"` e i path 2.3
+erano hardcoded in ~15 punti (worker, servizi, GUI, template). Qui la release diventa una dimensione
+di prima classe, ORTOGONALE all'architettura: l'arch resta `"ltx"`, la release è `"2.3"` o `"2.5"`.
+
+Perché serve un registro e non un secondo `_ARCH_RUNNER`:
+- 2.5 è uno **split pack** (un safetensors per componente: transformer, text encoder, VAE video,
+  VAE audio+vocoder, upscaler, duration head), mentre 2.3 è un checkpoint monolitico che impacchetta
+  transformer + VAE + text projection. I due set NON sono intercambiabili.
+- 2.5 richiede `transformers>=5.8,<5.15` (Gemma 4) mentre 2.3 gira su transformers 4.x → **venv
+  diversi**, quindi ogni release porta il proprio `python`/`worker`.
+- Le capability differiscono per *disponibilità dei pesi*, non per capacità del modello: 2.5 ha oggi
+  una sola IC-LoRA ufficiale contro le ~16 della 2.3, nessun checkpoint NSFW e nessun GGUF.
+
+stdlib-only e SENZA torch: questo modulo è importato anche dal processo GUI, che non deve mai creare
+un contesto CUDA (vedi [[app-no-cuda-context]]).
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+_MODELS = Path(r"E:\AI\Models")
+_TOOLS = Path(r"E:\AI\Tools")
+_REPO = Path(__file__).resolve().parents[1]
+
+# Stato di una capability. "cross" = tecnicamente possibile solo riusando un adapter dell'altra
+# release: il DiT ha la stessa topologia (48 layer, dim 4096, 128 canali latenti) e Lightricks
+# dichiara che «la grande maggioranza delle LoRA/IC-LoRA 2.3 gira su 2.5 senza modifiche», ma il
+# README del repo ufficiale è più prudente («a LoRA only works with the model it was trained on»).
+# Due fonti ufficiali in disaccordo → non blocchiamo, avvisiamo. La GUI mostra il badge di warning.
+CAP_YES, CAP_NO, CAP_CROSS = "yes", "no", "cross"
+
+
+@dataclass(frozen=True)
+class LtxRelease:
+    """Tutto ciò che distingue una release LTX. I path sono ASSOLUTI e possono non esistere:
+    `missing_components()` dice cosa manca senza mai sostituire nulla in automatico."""
+
+    id: str                                   # "2.3" | "2.5"
+    label: str                                # etichetta GUI
+    python: str                               # interprete del venv dedicato
+    worker: str                               # worker di inferenza (release-aware)
+    text_encoder: str                         # cartella (2.3, formato ltx-core) o file (2.5, split)
+    video_vae: str                            # "" per 2.3: è dentro il checkpoint monolitico
+    audio_vae: str                            # "" per 2.3 (idem); in 2.5 contiene ANCHE il vocoder
+    upsampler_spatial: str
+    upsampler_temporal: str                   # "" se la release non ce l'ha
+    distilled_lora: str                       # obbligatoria coi checkpoint dev, inutile coi distilled
+    duration_head: str                        # "" se assente
+    diffusion_decoder: str                    # "" se assente (2.5: decoder DiT alternativo al Conv VAE)
+    aux_bundle: str                           # bundle componenti ausiliarie (solo 2.3)
+    rgb_factors: str                          # chiave dei fattori latent2rgb per la preview
+    ic_lora: dict[str, str]
+    caps: dict[str, str]
+    ckpt_hints: tuple[str, ...]               # sottostringhe che identificano un checkpoint della release
+    sigma_driven: bool                        # True = guidato da schedule di sigma, non da num_inference_steps
+    te_overhead_gb: float                     # VRAM del text encoder + VAE, per il semaforo dei dropdown
+    min_vram_gb: float                        # minimo realistico col profilo più leggero
+    notes: str = ""
+    required: tuple[str, ...] = field(default_factory=tuple)   # attributi che DEVONO esistere su disco
+
+
+_LORA23 = _MODELS / "LoRA" / "LTX-2"
+
+# ---------------------------------------------------------------------------------------------
+# LTX-2.3 — checkpoint monolitico, Gemma 3, ecosistema completo (16 IC-LoRA, NSFW, GGUF).
+# ---------------------------------------------------------------------------------------------
+_R23 = LtxRelease(
+    id="2.3",
+    label="LTX 2.3",
+    python=str(_TOOLS / "ltx2_venv" / "Scripts" / "python.exe"),
+    worker=str(_REPO / "workers" / "ltx2_infer.py"),
+    text_encoder=str(_MODELS / "TextEncoders" / "gemma-3-ltx"),
+    video_vae="",                                     # dentro il checkpoint
+    audio_vae="",                                     # dentro il checkpoint
+    upsampler_spatial=str(_MODELS / "latent_upscale_models" / "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"),
+    upsampler_temporal="",
+    distilled_lora=str(_LORA23 / "ltx-2.3-22b-distilled-lora-384-1.1.safetensors"),
+    duration_head="",
+    diffusion_decoder="",
+    aux_bundle="_ltx23_aux_components.safetensors",   # risolto accanto al checkpoint
+    rgb_factors="ltx23",
+    ic_lora={
+        "canny": str(_LORA23 / "ltx-2-19b-ic-lora-canny-control.safetensors"),
+        "depth": str(_LORA23 / "ltx-2-19b-ic-lora-depth-control.safetensors"),
+        "pose": str(_LORA23 / "ltx-2-19b-ic-lora-pose-control.safetensors"),
+        "detailer": str(_LORA23 / "ltx-2-19b-ic-lora-detailer.safetensors"),
+        "outpaint": str(_LORA23 / "ltx-2.3-22b-ic-lora-outpaint.safetensors"),
+        "refocus": str(_LORA23 / "ltx-2.3-22b-ic-lora-refocus.safetensors"),
+        "uncompress": str(_LORA23 / "ltx-2.3-22b-ic-lora-uncompress.safetensors"),
+        "deinterlace": str(_LORA23 / "ltx-2.3-22b-ic-lora-deinterlace.safetensors"),
+        "motiondeblur": str(_LORA23 / "ltx-2.3-22b-ic-lora-motiondeblur.safetensors"),
+        "hdr": str(_LORA23 / "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors"),
+        "lipdub": str(_LORA23 / "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors"),
+        "restyle": str(_LORA23 / "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors"),
+        "motion-track": str(_LORA23 / "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors"),
+        "union": str(_LORA23 / "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"),
+    },
+    caps={
+        "t2v": CAP_YES, "i2v": CAP_YES, "ti2v": CAP_YES, "a2v": CAP_YES, "audio": CAP_YES,
+        "controlnet": CAP_YES, "v2v": CAP_YES, "retake": CAP_YES, "storyboard": CAP_YES,
+        "extend": CAP_YES, "lipsync": CAP_YES, "keyframes": CAP_YES,
+        "gguf": CAP_YES, "nsfw_ckpt": CAP_YES, "lora": CAP_YES,
+        "multishot": CAP_NO, "duration_head": CAP_NO,
+        "temporal_upscale": CAP_NO, "diffusion_decoder": CAP_NO, "hdr_master": CAP_NO,
+    },
+    ckpt_hints=("ltx-2.3", "ltx2.3", "ltx23", "ltx-2-3", "eros", "sulphur"),
+    sigma_driven=False,
+    te_overhead_gb=14.0,
+    min_vram_gb=12.0,                                 # GGUF Q4_K_M (13,2 GB su disco)
+    notes="Ecosistema completo: 16 IC-LoRA, checkpoint NSFW, GGUF. Inquadratura singola.",
+    required=("text_encoder",),
+)
+
+# ---------------------------------------------------------------------------------------------
+# LTX-2.5 — split pack, Gemma 4, multishot nativo. Ecosistema ancora quasi vuoto.
+# ---------------------------------------------------------------------------------------------
+_D25 = _MODELS / "diffusion_models"
+_VAE25 = _MODELS / "vae"
+_TE25 = _MODELS / "text_encoders"
+
+_R25 = LtxRelease(
+    id="2.5",
+    label="LTX 2.5",
+    # transformers>=5.8,<5.15 (Gemma 4) → NON può condividere il venv della 2.3, che gira su 4.x.
+    python=str(_TOOLS / "lingbot_venv" / "Scripts" / "python.exe"),
+    worker=str(_REPO / "workers" / "ltx2_infer.py"),
+    # Text encoder nvfp4 (6,9 GiB) invece dei 24,5 GiB del bf16 ufficiale: stesso layout
+    # weight/weight_scale/weight_scale_2 che sappiamo già leggere (flux2_transformer.Nvfp4Linear).
+    text_encoder=str(_TE25 / "gemma4-12b-with-proj-nvfp4-torchao.safetensors"),
+    video_vae=str(_VAE25 / "ltx-2.5-video-vae-conv-bf16.safetensors"),
+    audio_vae=str(_VAE25 / "ltx-2.5-audio-vae-bf16.safetensors"),
+    # Lo spatial upscaler 2.5 esiste, ma il README rimanda ancora a quello 2.3 — che abbiamo già
+    # su disco. `resolve()` prova prima il 2.5 e ricade sul 2.3 (stessa famiglia, non è una
+    # sostituzione di modello: è un componente ausiliario dichiarato compatibile da Lightricks).
+    upsampler_spatial=str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"),
+    upsampler_temporal=str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors"),
+    distilled_lora=str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-distilled-lora-450-bf16.safetensors"),
+    duration_head=str(_MODELS / "model_patches" / "ltx-2.5-duration-head-bf16.safetensors"),
+    diffusion_decoder=str(_VAE25 / "ltx-2.5-video-vae-bf16.safetensors"),
+    aux_bundle="",
+    rgb_factors="ltx25",
+    # Unico adapter ufficiale 2.5 al 11/08/2026. Tutto il resto del controllo (canny/depth/pose/
+    # union/HDR/DubIt/outpaint/…) esiste solo per 2.3 → capability "cross".
+    ic_lora={
+        "pixel-upscaler": str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors"),
+    },
+    caps={
+        "t2v": CAP_YES, "i2v": CAP_YES, "ti2v": CAP_YES, "a2v": CAP_YES, "audio": CAP_YES,
+        "v2v": CAP_YES, "retake": CAP_YES, "storyboard": CAP_YES, "extend": CAP_YES,
+        "keyframes": CAP_YES,
+        # Le pipeline ICLora/DubIt esistono nel codice 1.2.0, ma i PESI per 2.5 no: funzionano solo
+        # riusando gli adapter 2.3 → l'utente va avvisato, non bloccato.
+        "controlnet": CAP_CROSS, "lipsync": CAP_CROSS, "lora": CAP_CROSS,
+        "gguf": CAP_NO,                       # nessun GGUF 2.5 esiste (né ufficiale né community)
+        "nsfw_ckpt": CAP_NO,                  # 10Eros/Sulphur sono 2.3-only
+        "multishot": CAP_YES, "duration_head": CAP_YES,
+        "temporal_upscale": CAP_YES, "diffusion_decoder": CAP_YES, "hdr_master": CAP_YES,
+    },
+    ckpt_hints=("ltx-2.5", "ltx2.5", "ltx25", "ltx-2-5"),
+    sigma_driven=True,                        # DISTILLED_SIGMAS (9 valori = 8 step); num_inference_steps IGNORATO
+    # MISURATI dagli header l'11/08/2026 (non stimati): TE nvfp4 6,91 GiB + Conv VAE 1,35 + audio 0,34.
+    te_overhead_gb=8.6,
+    # Il transformer nvfp4 è 'mixed': 7,55 GiB FP4 packed + 0,94 di scale + 8,93 BF16 NON quantizzati
+    # = 17,43 GiB residenti (la policy FP4 non tocca i BF16). Con VAE ≈ 19,1 GiB + attivazioni → 24 GB
+    # è il minimo onesto. I 16 GB diventano possibili solo con la policy ibrida FP4+fp8 (F11).
+    min_vram_gb=24.0,
+    notes="Multishot nativo (2-4 shot, guidato dal prompt), duration head, decoder a diffusione, "
+          "upscaler temporale. Ecosistema adapter ancora minimo.",
+    required=("text_encoder", "video_vae", "audio_vae"),
+)
+
+LTX_RELEASES: dict[str, LtxRelease] = {"2.3": _R23, "2.5": _R25}
+DEFAULT_RELEASE = "2.3"
+
+
+def get(release: str | None) -> LtxRelease:
+    """Release per id. Sconosciuta → 2.3 (la release storica), MAI una scelta implicita di modello."""
+    return LTX_RELEASES.get(str(release or "").strip(), LTX_RELEASES[DEFAULT_RELEASE])
+
+
+def detect_release(path_or_name: str) -> str | None:
+    """Release di appartenenza di un checkpoint, dal nome file. `None` se non riconoscibile:
+    il chiamante deve dare errore chiaro, non indovinare (regola: nessuna sostituzione automatica)."""
+    n = os.path.basename((path_or_name or "").replace("\\", "/")).lower()
+    if not n:
+        return None
+    for rel in LTX_RELEASES.values():
+        if any(h in n for h in rel.ckpt_hints):
+            return rel.id
+    return None
+
+
+def cap(release: str | None, name: str) -> str:
+    """Stato di una capability: CAP_YES | CAP_NO | CAP_CROSS. Sconosciuta → CAP_NO."""
+    return get(release).caps.get(name, CAP_NO)
+
+
+def missing_components(release: str | None) -> list[str]:
+    """Componenti obbligatorie assenti dal disco, come nomi di campo (es. ['video_vae'])."""
+    rel = get(release)
+    out = []
+    for attr in rel.required:
+        p = getattr(rel, attr, "")
+        if not p or not os.path.exists(p):
+            out.append(attr)
+    return out
+
+
+def resolve(release: str | None, attr: str) -> str:
+    """Path di una componente, con l'UNICO fallback ammesso: lo spatial upscaler della 2.5 ricade su
+    quello 2.3 (Lightricks lo indica esplicitamente come ancora valido). Nessun altro ripiego:
+    un componente mancante deve emergere come errore, non essere sostituito in silenzio."""
+    rel = get(release)
+    p = getattr(rel, attr, "") or ""
+    if p and os.path.exists(p):
+        return p
+    if attr == "upsampler_spatial":
+        alt = _R23.upsampler_spatial
+        if os.path.exists(alt):
+            return alt
+    return p
+
+
+def is_ready(release: str | None) -> bool:
+    """True se la release ha tutte le componenti obbligatorie su disco e almeno un checkpoint."""
+    return not missing_components(release) and bool(checkpoints(release))
+
+
+# Sottostringhe che identificano un COMPONENTE, non un transformer: senza questo filtro la
+# scansione conta come "checkpoint" anche text projection, VAE, upscaler e LoRA che stanno nelle
+# stesse cartelle (es. `ltx-2.3_text_projection_bf16.safetensors` in Checkpoints\LTX).
+_NOT_A_CKPT = (
+    "text_projection", "text-projection", "text_encoder", "text-encoder",
+    "vae", "upscaler", "upsampler", "lora", "_aux_", "duration-head", "duration_head",
+    "connector", "vocoder", "embeddings-connector",
+)
+
+
+def checkpoints(release: str | None) -> list[str]:
+    """Transformer della release presenti su disco (scansione di diffusion_models/ e Checkpoints/).
+    Ordinati per nome; nessun filtro di qualità: la scelta resta dell'utente."""
+    rel = get(release)
+    found: list[str] = []
+    for root in (_MODELS / "diffusion_models", _MODELS / "Checkpoints"):
+        if not root.exists():
+            continue
+        for p in root.rglob("*"):
+            if p.suffix.lower() not in (".safetensors", ".gguf") or not p.is_file():
+                continue
+            low = p.name.lower()
+            if any(x in low for x in _NOT_A_CKPT):
+                continue
+            if detect_release(p.name) == rel.id:
+                found.append(str(p))
+    return sorted(found)
+
+
+def installed() -> list[str]:
+    """Release utilizzabili qui e ora, in ordine di id."""
+    return [r for r in sorted(LTX_RELEASES) if is_ready(r)]
+
+
+def runner(release: str | None) -> tuple[str, str]:
+    """(python, worker) della release — sostituisce il lookup fisso in `_ARCH_RUNNER['ltx']`."""
+    rel = get(release)
+    return rel.python, rel.worker
+
+
+def summary(release: str | None) -> str:
+    """Riga di sintesi per il selettore GUI: cosa ottieni scegliendo questa release."""
+    rel = get(release)
+    bits: list[str] = []
+    # Conta le IC-LoRA REALMENTE su disco, non quelle dichiarate: la riga dice cosa ottieni *qui e
+    # ora*. Il dialog di confronto mostra invece il catalogo completo della release.
+    n_ic = sum(1 for p in rel.ic_lora.values() if os.path.exists(p))
+    if rel.caps.get("multishot") == CAP_YES:
+        bits.append("multishot")
+    bits.append(f"{n_ic} IC-LoRA" if n_ic != 1 else "1 IC-LoRA")
+    if rel.caps.get("nsfw_ckpt") == CAP_YES:
+        bits.append("NSFW")
+    if rel.caps.get("gguf") == CAP_YES:
+        bits.append("GGUF")
+    if rel.caps.get("duration_head") == CAP_YES:
+        bits.append("durata auto")
+    bits.append(f"min {rel.min_vram_gb:.0f} GB")
+    return " · ".join(bits)

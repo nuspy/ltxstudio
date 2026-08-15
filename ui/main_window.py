@@ -1827,6 +1827,20 @@ class MainWindow(QMainWindow):
         # Lip-sync MultiTalk (Wan2.1) per Talk/Canta → motore nativo dedicato, salta il flusso ComfyUI
         if _mode in ("sing", "talk") and self._maybe_multitalk(vals, v2v, _mode):
             return
+        # 'In ascolto (loop)': ritratto che ascolta da UNA foto (Frame 1), girabile in loop senza stacco.
+        # Non è un V2V: usa la foto come i2v + keyframe auto → prosegue nel percorso NATIVO normale.
+        if _mode == "listen":
+            if not self.frame1_tab.image_path:
+                QMessageBox.warning(self, tr("mw.listen_title", "Ritratto in ascolto"),
+                                    tr("mw.listen_need_image", "Serve una foto nel Frame 1 (il volto che ascolterà)."))
+                return
+            vals["listen_loop"] = {"motion": v2v.get("listen_motion", 0.55),
+                                   "mouth_closed": v2v.get("listen_mouth_closed", True)}
+            vals["listen_seconds"] = float(v2v.get("listen_seconds", 8.0))
+            vals["use_image_force"] = True                   # la foto è la sorgente (anche se il toggle i2v è off)
+            self._log(f"[Ascolto] loop {vals['listen_seconds']:.0f}s da foto Frame 1 "
+                      f"(motion {vals['listen_loop']['motion']:.2f}, bocca chiusa={vals['listen_loop']['mouth_closed']}).")
+            _mode = "normal"                                 # salta il blocco V2V → percorso nativo standard
         if _mode != "normal":
             src = v2v.pop("v2v_video_path", None)
             if _mode == "talk" and not src:
@@ -2971,6 +2985,11 @@ class MainWindow(QMainWindow):
         import time as _t
         fps = int(self.video_tab.fps.value())
         length_s = float(self.video_tab.length.value()) if hasattr(self.video_tab, "length") else 5.0
+        if vals.get("listen_loop"):
+            # Render SEMPRE il solo loop base ~8s (frame che stanno in VRAM allo stage-2; 16/24s diretti
+            # = troppi frame → spilling). La durata scelta si ottiene ripetendo il loop base (seamless).
+            vals["listen_loop"]["total_seconds"] = float(vals.get("listen_seconds", 8.0))
+            length_s = 8.0
         nf = max(9, int(round(length_s * fps)) // 8 * 8 + 1)
         out = str(OUTPUT_DIR / f"ltx_native_{int(_t.time())}.mp4")
         # LTX-2 (two-stage) richiede width/height multipli di 64 → arrotonda (min 64) per non far
@@ -2997,10 +3016,12 @@ class MainWindow(QMainWindow):
             params["gguf_transformer"] = vals["model_gguf"]   # base checkpoint resta default per vae/gemma
         elif vals.get("model") and vals.get("model") not in ("", "auto"):
             params["model"] = vals["model"]
-        if use_image and self.frame1_tab.image_path:
+        if (use_image or vals.get("use_image_force")) and self.frame1_tab.image_path:
             params["image_path"] = self.frame1_tab.image_path
             params["ref_strength"] = float(vals.get("ref_strength", 1.0))
             params["i2v_method"] = vals.get("i2v_method", "addguide")   # addguide=guida piena / inplace=soft-ref
+        if vals.get("listen_loop"):                          # 'In ascolto (loop)': il worker costruisce i keyframe auto
+            params["listen_loop"] = vals["listen_loop"]
         # audio reale → audio→video (canto/lip-sync) nativo
         af = audio.get("audio_file")
         if af and os.path.exists(af):

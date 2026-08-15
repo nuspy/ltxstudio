@@ -55,6 +55,19 @@ _ARCH_RUNNER = {
     "self_forcing": (KREA_RT_PY, SELF_FORCING_WORKER),
 }
 
+
+def runner_for(params: dict) -> tuple[str, str]:
+    """(python, worker) per un job. Per l'arch `ltx` la scelta la fa la RELEASE (2.3/2.5), non l'arch:
+    le due release hanno venv incompatibili (2.5 richiede transformers>=5.8 per Gemma 4, 2.3 gira su
+    4.x), quindi il runner arriva da `core.ltx_release`. Le altre arch restano su `_ARCH_RUNNER`.
+    Punto UNICO: lo usano sia `run_clip` qui sotto sia `_NativeLtx2Worker` in main_window."""
+    arch = (params.get("arch") or "ltx").lower()
+    if arch == "ltx":
+        from core import ltx_release
+        rel = params.get("ltx_release") or ltx_release.DEFAULT_RELEASE
+        return ltx_release.runner(rel)
+    return _ARCH_RUNNER.get(arch, _ARCH_RUNNER["ltx"])
+
 NEG = "worst quality, inconsistent motion, blurry, jittery, distorted"
 
 
@@ -128,6 +141,7 @@ def build_params(
     model: str | None = None,
     model_gguf: str | None = None,
     arch: str = "ltx",
+    ltx_release: str | None = None,
     extra: dict | None = None,
 ) -> dict:
     """Params del worker con la policy #158 applicata una volta per tutte.
@@ -165,6 +179,19 @@ def build_params(
             params["offload"] = "cpu"
         elif model:                                          # checkpoint non-GGUF esplicito (fp8/bf16)
             params["model"] = model
+        # RELEASE LTX (2.3 | 2.5): dedotta dal checkpoint se non dichiarata. Se è dichiarata ma il
+        # checkpoint appartiene all'altra release, si ERRORE: i due set non sono intercambiabili
+        # (2.5 è uno split pack con Gemma 4, 2.3 un monolite con Gemma 3) e sceglierne una al posto
+        # dell'utente violerebbe la regola «mai sostituire il modello senza consenso».
+        from core import ltx_release as _rel
+        _ck = gguf or model or ""
+        _det = _rel.detect_release(_ck) if _ck else None
+        if ltx_release and _det and _det != str(ltx_release):
+            raise VideoJobError(
+                f"Il checkpoint '{os.path.basename(str(_ck))}' è di LTX {_det}, ma la release "
+                f"selezionata è LTX {ltx_release}. Scegli un checkpoint {ltx_release} oppure "
+                f"cambia release (nessuna sostituzione automatica).")
+        params["ltx_release"] = str(ltx_release or _det or _rel.DEFAULT_RELEASE)
 
     if extra:
         params.update(extra)                                 # ref_strength, loras, chunk_frames, audio, lingbot_variant…
@@ -184,8 +211,7 @@ def run_clip(params: dict, *, free_vram: bool = True, timeout: int | None = None
     with open(jf, "w", encoding="utf-8") as fh:
         json.dump(params, fh)
 
-    arch = (params.get("arch") or "ltx").lower()
-    py, worker = _ARCH_RUNNER.get(arch, _ARCH_RUNNER["ltx"])
+    py, worker = runner_for(params)                          # per 'ltx' decide la RELEASE, non l'arch
     env = dict(os.environ)
     env["HF_HUB_OFFLINE"] = "1"
     env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
