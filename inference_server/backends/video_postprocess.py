@@ -69,6 +69,11 @@ def run_face(params: dict, mm, output_dir: str) -> dict:
     video = params.get("image_path") or params.get("video")
     if not video or not os.path.exists(video):
         return {"status": "error", "error": f"video non trovato: {video}"}
+    try:                                                 # niente download silenzioso facexlib al 1° restauro
+        from core import facexlib_seed
+        facexlib_seed.ensure()
+    except Exception:                                    # noqa: BLE001
+        pass
     model = params.get("model") or r"E:\AI\Models\facerestore_models\GFPGANv1.4.pth"
     # la GUI passa il NOME file (es. 'codeformer-v0.1.0.pth'), non il path: risolvi nelle dir note
     if not os.path.exists(str(model)):

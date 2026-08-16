@@ -350,6 +350,14 @@ NEW = [
     N("gfpgan-13", "FaceRestore", "GFPGAN v1.3 (restauro volti)", category="aux",
       arch="gfpgan", filename="GFPGANv1.3.pth", type="facerestore_models", gb=0.3,
       note="url GitHub (non-HF): gestito dal downloader unico FASE B"),
+    N("facexlib-detection", "FaceRestore", "facexlib detection (RetinaFace R50)", category="aux",
+      arch="gfpgan", filename="detection_Resnet50_Final.pth", type="facerestore_models",
+      family="facexlib", gb=0.11, used_by=["cap.restore"],
+      note="pre-seed: core/facexlib_seed lo collega in gfpgan/weights dove facexlib lo cerca"),
+    N("facexlib-parsing", "FaceRestore", "facexlib parsing (ParseNet)", category="aux",
+      arch="gfpgan", filename="parsing_parsenet.pth", type="facerestore_models",
+      family="facexlib", gb=0.09, used_by=["cap.restore"],
+      note="pre-seed: core/facexlib_seed lo collega in gfpgan/weights dove facexlib lo cerca"),
     N("ultrasharp-v2", "Upscale", "4x-UltraSharpV2 (ESRGAN)", category="aux", arch="esrgan",
       repo="Kim2091/UltraSharpV2", remote="4x-UltraSharpV2.safetensors",
       filename="4x-UltraSharpV2.safetensors", type="Upscale", gb=0.14),
@@ -385,9 +393,11 @@ NEW = [
       kind="snapshot", repo="coqui/XTTS-v2", type="TTS", gb=2.0, scan=["XTTS-v2", "xtts"]),
 ]
 
-# url GitHub per voci file non-HF (il downloader FASE B le gestirà)
+# url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {
     "gfpgan-13": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
+    "facexlib-detection": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+    "facexlib-parsing": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
 }
 
 DEFAULT_CAT_BY_MODULE = {

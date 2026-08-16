@@ -123,6 +123,8 @@ def _restore_swapped_face(img):
         return img
     try:
         from gfpgan import GFPGANer
+        from core import facexlib_seed
+        facexlib_seed.ensure()                           # niente download silenzioso facexlib
         model = os.environ.get("FACESWAP_RESTORE_MODEL",
                                r"E:\AI\Models\facerestore_models\GFPGANv1.4.pth")
         if not os.path.exists(model):

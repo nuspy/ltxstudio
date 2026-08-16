@@ -2081,6 +2081,48 @@
       "category": "image",
       "arch": "flux2",
       "url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b"
+    },
+    {
+      "id": "facexlib-detection",
+      "module": "FaceRestore",
+      "label": "facexlib detection (RetinaFace R50)",
+      "kind": "file",
+      "filename": "detection_Resnet50_Final.pth",
+      "type": "facerestore_models",
+      "family": "facexlib",
+      "gated": false,
+      "approx_gb": 0.11,
+      "url": "https://github.com/xinntao/facexlib/releases/download/v0.1.0/detection_Resnet50_Final.pth",
+      "scan_names": [
+        "detection_Resnet50_Final"
+      ],
+      "category": "aux",
+      "arch": "gfpgan",
+      "used_by": [
+        "cap.restore"
+      ],
+      "note": "pre-seed: core/facexlib_seed lo collega in gfpgan/weights dove facexlib lo cerca"
+    },
+    {
+      "id": "facexlib-parsing",
+      "module": "FaceRestore",
+      "label": "facexlib parsing (ParseNet)",
+      "kind": "file",
+      "filename": "parsing_parsenet.pth",
+      "type": "facerestore_models",
+      "family": "facexlib",
+      "gated": false,
+      "approx_gb": 0.09,
+      "url": "https://github.com/xinntao/facexlib/releases/download/v0.2.2/parsing_parsenet.pth",
+      "scan_names": [
+        "parsing_parsenet"
+      ],
+      "category": "aux",
+      "arch": "gfpgan",
+      "used_by": [
+        "cap.restore"
+      ],
+      "note": "pre-seed: core/facexlib_seed lo collega in gfpgan/weights dove facexlib lo cerca"
     }
   ],
   "schema": 2,
