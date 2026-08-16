@@ -44,14 +44,29 @@ def _touch_activity():
 @app.middleware("http")
 async def _activity_mw(request: Request, call_next):
     _touch_activity()
+    path = request.url.path
+    _open = (path in ("/health", "/features", "/openapi.json")
+             or path.startswith("/docs") or path.startswith("/redoc"))
+    # Gating d'edizione dell'INTERA API (feature `api.rest` del matrix): prima nessuno la
+    # controllava e il server serviva anche le edizioni che non la includono. /health e
+    # /features restano aperti così il client mobile può mostrare l'upsell.
+    if not _open:
+        try:
+            from core import features
+            if not features.is_enabled("api.rest"):
+                from fastapi.responses import JSONResponse
+                info = features.manifest().get("features", {}).get("api.rest", {}) or {}
+                return JSONResponse({"error": "feature_disabled", "capability": "api.rest",
+                                     "i18n_key": info.get("i18n_key", ""),
+                                     "upsell": info.get("upsell")}, status_code=403)
+        except Exception:                                    # noqa: BLE001 — dev: fail-open come la GUI
+            pass
     # Auth bearer opzionale (solo se bind non-locale + token impostato). /health e /docs sempre liberi.
     from api.config import token_ok, auth_required
-    if auth_required():
-        path = request.url.path
-        if not (path in ("/health", "/openapi.json") or path.startswith("/docs") or path.startswith("/redoc")):
-            if not token_ok(request.headers.get("authorization")):
-                from fastapi.responses import JSONResponse
-                return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if auth_required() and not _open:
+        if not token_ok(request.headers.get("authorization")):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
     return await call_next(request)
 
 
