@@ -12,8 +12,15 @@ import os
 import sys
 
 PULID_REPO = r"E:\AI\Tools\PuLID"
-PULID_WEIGHTS = r"E:\AI\Models\pulid\pulid_flux_v0.9.1.safetensors"
-INSIGHTFACE_ROOT = r"E:\AI\Models\insightface"   # contiene models/antelopev2/
+# FASE H weights-unification: path DAL registro unico (fallback ai letterali storici).
+try:
+    from core.model_paths import p as _cat_p
+    PULID_WEIGHTS = _cat_p("pulid-flux", r"E:\AI\Models\pulid\pulid_flux_v0.9.1.safetensors")
+    INSIGHTFACE_ROOT = os.path.dirname(_cat_p("inswapper-128",
+                                              r"E:\AI\Models\insightface\inswapper_128.onnx"))
+except Exception:                                # noqa: BLE001
+    PULID_WEIGHTS = r"E:\AI\Models\pulid\pulid_flux_v0.9.1.safetensors"
+    INSIGHTFACE_ROOT = r"E:\AI\Models\insightface"   # contiene models/antelopev2/
 
 _CACHE: dict = {}
 
