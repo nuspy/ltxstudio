@@ -1,40 +1,37 @@
-"""Downloader pesi da HuggingFace per il wizard GUI (subprocess).
+"""Downloader pesi per il wizard GUI (subprocess) — CLI sopra il MOTORE UNICO core/downloader.
 
 Locale-first: scarica i pesi UNA VOLTA nelle cartelle locali; poi l'inferenza è offline.
-L'HF token (env HF_TOKEN) serve solo per i repo gated (es. FLUX.1-dev).
+L'HF token (env HF_TOKEN) serve solo per i repo gated (es. FLUX.1-dev, LTX-2.5).
+
+Novità FASE B (weights-unification):
+  - fast_downloader multi-connessione con resume (prima hf_hub single-stream che si piantava su xet);
+  - dipendenze scaricate PRIMA e in automatico (es. krea_rt → base Wan) — opt-out --no-deps;
+  - preflight dei repo GATED (l'errore arriva SUBITO e con l'url della licenza);
+  - verifica d'integrità post-download (sha256/struttura: un GGUF troncato fallisce qui);
+  - voci `no_remote` rifiutate con messaggio chiaro (prima: KeyError silenziato);
+  - progresso a BYTE: righe "[weights] … {id}: {MB}MB (v={MB/s})".
 
 Uso:
-  python scripts/download_weights.py --ids flux1-dev,heartcodec
+  python scripts/download_weights.py --ids flux1-dev,heartcodec [--base-dir DIR] [--no-deps]
   python scripts/download_weights.py --all
-Stampa righe "[weights] <id> ..." parsabili dalla GUI.
+Output parsabile dalla GUI: "[weights] ✓ <id> completato → <dest>" / "[weights] ✗ <id>: …".
 """
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core.weights_catalog import dest_for               # logica destinazione type/family
 
-CATALOG = Path(__file__).resolve().parents[1] / "data" / "weights_catalog.json"
+from core import downloader as dl  # noqa: E402
+from core import weights_catalog as wc  # noqa: E402
 
 
 def log(m: str) -> None:
     print(m, flush=True)
-
-
-def _ensure_hf() -> bool:
-    try:
-        import huggingface_hub  # noqa: F401
-        return True
-    except Exception:                                   # noqa: BLE001
-        log("[weights] installo huggingface_hub…")
-        rc = subprocess.run([sys.executable, "-m", "pip", "install", "huggingface_hub"]).returncode
-        return rc == 0
 
 
 def main() -> int:
@@ -42,38 +39,59 @@ def main() -> int:
     ap.add_argument("--ids", default="", help="id separati da virgola")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--base-dir", default=None, help="cartella base (override); i tool-dest la ignorano")
+    ap.add_argument("--no-deps", action="store_true", help="NON espandere le dipendenze")
     args = ap.parse_args()
 
-    catalog = json.loads(CATALOG.read_text("utf-8")).get("weights", [])
-    wanted = [e for e in catalog if args.all or e["id"] in args.ids.split(",")]
-    if not wanted:
-        log("[weights] nessun peso selezionato."); return 2
-    if not _ensure_hf():
-        log("[weights] ERRORE: huggingface_hub non installabile."); return 3
-
-    from huggingface_hub import snapshot_download, hf_hub_download
-    token = os.environ.get("HF_TOKEN") or None
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    ids = [i for i in args.ids.split(",") if i.strip()]
+    if args.all:
+        ids = [e["id"] for e in wc.load()]
+    entries = ([e for e in wc.load() if e["id"] in set(ids)] if args.no_deps
+               else dl.plan_ids(ids))
+    if not entries:
+        log("[weights] nessun peso selezionato.")
+        return 2
 
+    token = dl.resolve_token()
     fail = 0
-    for e in wanted:
-        dest = str(dest_for(e, args.base_dir)); Path(dest).mkdir(parents=True, exist_ok=True)
+    for e in entries:
+        if not wc.downloadable(e):
+            log(f"[weights] ✗ {e['id']}: nessuna fonte remota (no_remote) — "
+                f"{e.get('note') or 'usa scan/link o import manuale.'}")
+            fail += 1
+            continue
+        if wc.is_present(e, args.base_dir):
+            log(f"[weights] ✓ {e['id']} completato → già presente")
+            continue
         gated = " (gated: serve token)" if e.get("gated") else ""
-        log(f"[weights] ↓ {e['id']} — {e.get('label', e['repo_id'])} ~{e.get('approx_gb', '?')}GB{gated}")
+        log(f"[weights] ↓ {e['id']} — {e.get('label', e.get('repo_id', ''))} "
+            f"~{e.get('approx_gb', '?')}GB{gated}")
+        state = {"bytes": 0, "t0": time.monotonic(), "last": 0.0}
+
+        def _prog(n, fname, _s=state, _id=e["id"]):
+            _s["bytes"] += n
+            now = time.monotonic()
+            if now - _s["last"] >= 2.0:
+                _s["last"] = now
+                mb = _s["bytes"] / 2**20
+                spd = mb / max(now - _s["t0"], 0.001)
+                log(f"[weights] … {_id}: {mb:,.0f}MB (v={spd:,.1f}MB/s) {fname[-60:]}")
+
         try:
-            if e.get("kind") == "file":
-                hf_hub_download(repo_id=e["repo_id"], filename=e["filename"], local_dir=dest, token=token)
-            else:
-                snapshot_download(repo_id=e["repo_id"], local_dir=dest, token=token)
+            dest = dl.download_entry(e, base_dir=args.base_dir, token=token,
+                                     progress=_prog, log=log)
             log(f"[weights] ✓ {e['id']} completato → {dest}")
+        except dl.GatedRepoError as ex:
+            fail += 1
+            log(f"[weights] ✗ {e['id']}: accesso negato — accetta la licenza su "
+                f"{ex.license_url} e imposta l'HF token.")
+        except dl.IntegrityError as ex:
+            fail += 1
+            log(f"[weights] ✗ {e['id']}: file corrotto/incompleto ({ex}) — riprova (resume attivo).")
         except Exception as ex:                          # noqa: BLE001
             fail += 1
-            msg = str(ex)
-            if "gated" in msg.lower() or "401" in msg or "403" in msg:
-                log(f"[weights] ✗ {e['id']}: accesso negato — accetta la licenza su HF e imposta l'HF token.")
-            else:
-                log(f"[weights] ✗ {e['id']}: {msg[:300]}")
-    log(f"[weights] FINE: {len(wanted) - fail}/{len(wanted)} ok.")
+            log(f"[weights] ✗ {e['id']}: {str(ex)[:300]}")
+    log(f"[weights] FINE: {len(entries) - fail}/{len(entries)} ok.")
     return 1 if fail else 0
 
 
