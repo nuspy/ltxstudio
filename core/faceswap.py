@@ -170,7 +170,10 @@ def _match_face_tone(swapped, original, faces):
 
 
 def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
-    if not os.environ.get("FACESWAP_INPROC") and not _has_insightface():
+    # SEMPRE subprocess (no-CUDA-in-app): prima il ramo in-process scattava se insightface era
+    # importabile nel venv GUI/API → contesto CUDA onnxruntime + _CACHE mai liberata nel processo
+    # app. In-process solo nel runner dedicato (FACESWAP_INPROC=1) o senza il venv delegato.
+    if not os.environ.get("FACESWAP_INPROC") and os.path.exists(_INF_PY):
         return _delegate("image", target_path, source_face_path, out_path)   # → inference_server_venv
     import cv2
     app, sw = _load()
@@ -206,8 +209,9 @@ def swap_image(target_path: str, source_face_path: str, out_path: str) -> str:
 
 
 def swap_video(video_path: str, source_face_path: str, out_path: str, progress=None) -> str:
-    """Face-swap su ogni frame del video; ri-muxa l'audio originale."""
-    if not os.environ.get("FACESWAP_INPROC") and not _has_insightface():
+    """Face-swap su ogni frame del video; ri-muxa l'audio originale.
+    SEMPRE subprocess (no-CUDA-in-app, vedi swap_image)."""
+    if not os.environ.get("FACESWAP_INPROC") and os.path.exists(_INF_PY):
         return _delegate("video", video_path, source_face_path, out_path)     # → inference_server_venv
     import cv2
     app, sw = _load()

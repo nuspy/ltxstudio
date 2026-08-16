@@ -4,8 +4,10 @@ Interpola frame intermedi tra coppie consecutive → video più morbido. `factor
 fotogrammi (e l'fps) mantenendo la DURATA (quindi corregge gli scatti, non la velocità). Per
 correggere anche la velocità di Wan (16fps): generare a 16fps e poi RIFE a 24/30 → naturale e fluido.
 
-Riusa Practical-RIFE (codice + pesi flownet.pkl già su disco), in-process con torch. Nessun
-servizio esterno. Ri-muxa l'audio originale (stessa durata → resta sincronizzato).
+Riusa Practical-RIFE (codice + pesi flownet.pkl già su disco). Dal processo GUI/API gira SEMPRE
+come SUBPROCESS nel venv inference_server (scripts/rife_run.py): in-process creava un contesto
+CUDA + un modello in _CACHE mai liberati nel processo app (regola no-CUDA-in-app). Il ramo
+in-process resta solo per il runner (RIFE_INPROC=1). Ri-muxa l'audio originale.
 
 API:
   available() -> bool
@@ -18,6 +20,7 @@ import sys
 import subprocess
 
 RIFE_REPO = r"E:\AI\Framepack\FramePack\Practical-RIFE"
+_INF_PY = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"
 _CACHE: dict = {}
 
 
@@ -40,9 +43,37 @@ def _load():
     return m
 
 
+def _delegate(in_path: str, out_path: str, factor: int, target_fps: float | None, progress) -> str:
+    """Esegue RIFE nel venv inference_server via scripts/rife_run.py; inoltra il progress
+    (righe 'PROG:i/n') e ritorna il path da 'OK:<path>'."""
+    runner = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "scripts", "rife_run.py")
+    cmd = [_INF_PY, "-u", runner, in_path, out_path, str(int(factor)), str(float(target_fps or 0))]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace")
+    ok = ""
+    for line in proc.stdout:
+        line = line.strip()
+        if line.startswith("PROG:") and progress:
+            try:
+                i, n = line[5:].split("/")
+                progress(int(i), int(n))
+            except Exception:                               # noqa: BLE001
+                pass
+        elif line.startswith("OK:"):
+            ok = line[3:].strip()
+    proc.wait()
+    if not ok:
+        raise RuntimeError(f"RIFE (subprocess inference_server_venv) fallito: exit {proc.returncode}")
+    return ok
+
+
 def interpolate_video(in_path: str, out_path: str, factor: int = 2,
                       target_fps: float | None = None, progress=None) -> str:
-    """factor=2 → ×2 frame/fps (anti-judder). target_fps opzionale forza l'fps di uscita."""
+    """factor=2 → ×2 frame/fps (anti-judder). target_fps opzionale forza l'fps di uscita.
+    Dal processo app SEMPRE subprocess (no-CUDA-in-app); in-process solo nel runner dedicato."""
+    if not os.environ.get("RIFE_INPROC") and os.path.exists(_INF_PY):
+        return _delegate(in_path, out_path, factor, target_fps, progress)
     import cv2
     import torch
     import numpy as np
