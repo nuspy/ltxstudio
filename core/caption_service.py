@@ -64,10 +64,26 @@ def build_args(dataset_dir, engine: str = "joycaption", mode: str = "descriptive
     return args
 
 
+def _coordinate_vram() -> None:
+    """COORDINAMENTO CONDIZIONALE (mancava): JoyCaption nf4 è un VLM ~8GB che partiva con gli
+    altri motori residenti. Se la VRAM libera non basta → demote degli altri (parcheggio RAM,
+    rientro veloce a caption finito) + attesa del rilascio effettivo."""
+    try:
+        from core import gpu_mem, mem_coordinator
+        if gpu_mem.free_vram_mb() < 10000:
+            mem_coordinator.free_for("llm", timeout=15)
+            gpu_mem.wait_free_vram_mb(10000, timeout_s=20, tag="caption")
+    except Exception:                                        # noqa: BLE001
+        pass
+
+
 def python_and_args(dataset_dir, engine: str = "joycaption", mode: str = "descriptive",
                     trigger: str = "", overwrite: bool = False):
-    """(python_exe, args) per QProcess. python_exe = None se il venv del motore non è disponibile."""
+    """(python_exe, args) per QProcess. python_exe = None se il venv del motore non è disponibile.
+    Coordina la VRAM QUI (il chiamante lancia il QProcess subito dopo)."""
     py = _python_for(engine)
+    if py:
+        _coordinate_vram()
     return (str(py) if py else None), build_args(dataset_dir, engine, mode, trigger, overwrite)
 
 
@@ -79,6 +95,7 @@ def run_blocking(dataset_dir, engine: str = "joycaption", mode: str = "descripti
         if on_log:
             on_log(f"[caption] motore {engine} non disponibile (venv/pesi mancanti) — salto il captioning VLM.")
         return 1
+    _coordinate_vram()
     cmd = [str(py)] + build_args(dataset_dir, engine, mode, trigger, overwrite)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                             encoding="utf-8", errors="replace")

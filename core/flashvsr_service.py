@@ -64,6 +64,13 @@ def upscale_video(inp: str, out: str, *, scale: float = 2.0, target_scale: float
         raise RuntimeError("; ".join(errs))
     tgt = float(target_scale or scale or 2.0)
     run_scale = min(4.0, max(1.0, tgt))
+    # COORDINAMENTO (mancava): FlashVSR è Wan-based (load multi-GB) — libera gli altri motori e
+    # aspetta il rilascio effettivo prima di partire.
+    try:
+        from core import mem_coordinator as _mc
+        _mc.free_and_wait("video", need_mb=12000, wait_s=30)
+    except Exception:                                       # noqa: BLE001
+        pass
     if timeout_s is None:
         timeout_s = float(os.environ.get("LTX_FLASHVSR_TIMEOUT_S", "3600") or 0)
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)

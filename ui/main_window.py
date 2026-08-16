@@ -253,6 +253,14 @@ class _VideoEditAIWorker(QThread):
             src = cfg["video"]
             base = _os.path.splitext(_os.path.basename(src))[0]
             stamp = int(_t.time())
+            # COORDINAMENTO (mancava): SAM2/GroundingDINO (~3-5GB) e poi LTX-2 partono da questo
+            # worker come subprocess DIRETTI, fuori dal dispatch — libera gli altri motori e
+            # aspetta il rilascio effettivo prima del primo load GPU.
+            try:
+                from core import mem_coordinator as _mc
+                _mc.free_and_wait("video", need_mb=6000, wait_s=20)
+            except Exception:                               # noqa: BLE001
+                pass
             out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_{base}_{stamp}.mp4")
             params = {"prompt": cfg["prompt"], "negative": "worst quality, blurry",
                       "edit_lora": cfg["edit_lora"], "control_strength": float(cfg.get("strength", 1.0)),
@@ -338,6 +346,11 @@ class _VideoEditAIWorker(QThread):
             worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
                                    "workers", "ltx2_infer.py")
             self.progress.emit("[edit] genero il video (LTX-2)…")
+            try:                                            # attesa piena pre-22B (il SAM2 è appena uscito:
+                from core.ltx_video_job import free_video_vram as _fvv   # la sua VRAM sta rientrando)
+                _fvv(arch="ltx")
+            except Exception:                               # noqa: BLE001
+                pass
             r2 = _sp.run([self.LTX2_PY, "-u", worker, jf], capture_output=True, text=True,
                          encoding="utf-8", errors="replace")
             if _os.path.exists(out):
@@ -374,6 +387,13 @@ class _NativeMultiTalkWorker(QThread):
         import json as _json, os as _os, subprocess as _sp, tempfile as _tf
         try:
             worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "wan_multitalk.py")
+            # COORDINAMENTO (mancava): Wan2.1+MultiTalk è un load multi-GB — libera gli altri
+            # motori e aspetta il rilascio effettivo prima di partire.
+            try:
+                from core import mem_coordinator as _mc
+                _mc.free_and_wait("video", need_mb=18000)
+            except Exception:                               # noqa: BLE001
+                pass
             jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
             _json.dump(self.params, jf); jf.close()
             proc = _sp.Popen([self.COMFY_PY, "-u", worker, jf.name],
@@ -507,6 +527,15 @@ class _NativeLtx2Worker(QThread):
                     self.progress.emit(f"[nativo] server non disponibile ({_se}) → subprocess")
                     _served = False
             if not _served:
+                # COORDINAMENTO (mancava su TUTTO il ramo subprocess: LingBot/krea_rt/self_forcing
+                # e il fallback ltx): libera gli altri motori e ASPETTA il rilascio effettivo,
+                # come fa run_clip — senza, il worker caricava con FLUX/Krea2 ancora residenti.
+                try:
+                    from core.ltx_video_job import free_video_vram as _fvv
+                    _fvv(model=str(self.params.get("model", "") or ""),
+                         gguf=str(self.params.get("gguf_transformer", "") or ""), arch=_arch)
+                except Exception:                           # noqa: BLE001
+                    pass
                 jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
                 _json.dump(self.params, jf); jf.close()
                 env = dict(_os.environ)
@@ -3196,8 +3225,9 @@ class MainWindow(QMainWindow):
                 # ~500s/step) — il dialog proponeva un modello che ora fallisce sempre. Il modello
                 # SCELTO resta (regola utente: mai cambiare modello senza consenso): si carica con
                 # offload dinamico per-blocco (lento ma genera).
-                self._log(f"[motore] VRAM ~{_free:.0f}GB < necessaria ~{_need_gb:.0f}GB → "
-                          "modello scelto con offload dinamico per-blocco")
+                self._log(f"[motore] VRAM ~{_free:.0f}GB < necessaria ~{_need_gb:.0f}GB "
+                          "(misura PRE-liberazione: gli altri motori vengono sfrattati prima del "
+                          "load — la decisione residente/offload la fa il worker a VRAM liberata)")
         if _engine == "comfy" and _simple:
             self._log("[motore] comfy-native (VRAM dinamica, no-OOM)")
             self._ltx2_worker = _VideoComfyWorker(params)

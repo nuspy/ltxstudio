@@ -48,6 +48,17 @@ def enhance(prompt: str, kind: str = "image", nsfw: bool = False, max_new_tokens
         import json as _json
         import subprocess
         import sys
+        # COORDINAMENTO CONDIZIONALE (mancava): Gemma-3 12B (~23GB, device_map='auto') si
+        # auto-offloada su CPU se la VRAM è piena → enhance lentissimo. Se la VRAM libera non
+        # basta si DEMOTANO gli altri motori (parcheggio RAM: rientrano subito dopo — mai destroy,
+        # il motore che genera dopo l'enhance deve restare caldo) e si aspetta il rilascio.
+        try:
+            from core import gpu_mem, mem_coordinator
+            if gpu_mem.free_vram_mb() < 12000:
+                mem_coordinator.free_for("llm", timeout=15)
+                gpu_mem.wait_free_vram_mb(12000, timeout_s=20, tag="enhance")
+        except Exception:                                   # noqa: BLE001
+            pass
         _repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env = dict(os.environ, LS_ENHANCE_INPROC="1", HF_HUB_OFFLINE="1")
         try:

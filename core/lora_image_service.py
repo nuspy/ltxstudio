@@ -165,6 +165,12 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
         raise RuntimeError("; ".join(errs))
     cfg = ts.write_config(p)
     log(f"Training FLUX.2 LoRA (ai-toolkit, rank {rank}, {steps} step)…")
+    # COORDINAMENTO (mancava): training = ore con tutta la GPU → free_all HARD + attesa rilascio.
+    try:
+        from core import mem_coordinator as _mc
+        _mc.free_and_wait("train", need_mb=22000, hard=True)
+    except Exception:                                        # noqa: BLE001
+        pass
     cmd = [str(ts.VENV_PYTHON), str(ts.RUN_PY), str(cfg)]
     proc = subprocess.Popen(cmd, cwd=str(ts.AI_TOOLKIT_DIR), stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, bufsize=1)

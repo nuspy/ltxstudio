@@ -246,6 +246,13 @@ class TrainingRun:
             env["HUGGING_FACE_HUB_TOKEN"] = self.hf_token
         env.setdefault("PYTHONUNBUFFERED", "1")          # output immediato per il parsing
         env.setdefault("PYTHONIOENCODING", "utf-8")
+        # COORDINAMENTO (mancava): il training dura ORE e vuole tutta la GPU → free_all HARD
+        # (anche i parcheggi RAM: nessuno rientra a breve) + attesa del rilascio effettivo.
+        try:
+            from core import mem_coordinator as _mc
+            _mc.free_and_wait("train", need_mb=22000, hard=True)
+        except Exception:                                # noqa: BLE001
+            pass
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
         self._proc = subprocess.Popen(
             [str(VENV_PYTHON), "-u", str(RUN_PY), str(cfg_path)],

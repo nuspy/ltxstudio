@@ -73,6 +73,14 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
     if errs:
         raise RuntimeError("; ".join(errs))
     model = model or DEFAULT_MODEL
+    # COORDINAMENTO (mancava): libera gli altri motori e aspetta il rilascio EFFETTIVO PRIMA di
+    # _auto_block_swap — la taratura leggeva la VRAM con FLUX/LTX ancora residenti e si
+    # auto-castrava (swap massimo) o partiva nel buco del rilascio (shared-RAM).
+    try:
+        from core import mem_coordinator as _mc
+        _mc.free_and_wait("video", need_mb=12000, wait_s=30)
+    except Exception:                                       # noqa: BLE001
+        pass
     blocks, offload = _auto_block_swap(model)
     if block_swap > 0:                       # override manuale dalla GUI (altrimenti resta auto)
         blocks = block_swap

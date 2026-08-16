@@ -57,6 +57,12 @@ def train(dataset_dir: str, out_lora: str, *, trigger: str = "", rank: int = 16,
     env["HF_HUB_OFFLINE"] = "1"
     cmd = [LINGBOT_PY, "-u", TRAIN_WORKER, "--model", base, "--dataset", dj,
            "--out", out_lora, "--rank", str(rank), "--steps", str(steps), "--trigger", trigger]
+    # COORDINAMENTO (mancava): training = ore con tutta la GPU → free_all HARD + attesa rilascio.
+    try:
+        from core import mem_coordinator as _mc
+        _mc.free_and_wait("train", need_mb=22000, hard=True)
+    except Exception:                                        # noqa: BLE001
+        pass
     proc = subprocess.Popen(cmd, cwd=str(REPO), env=env, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
     for line in proc.stdout:

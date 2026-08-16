@@ -164,11 +164,19 @@ def _comfy_t2i(params: dict, timeout: int) -> dict:
     pj = os.path.join(OUTPUT_DIR, f"_iparams_{uuid.uuid4().hex[:8]}.json")
     Path(pj).write_text(json.dumps(p), encoding="utf-8")
     env = dict(os.environ, HF_HUB_OFFLINE="1", PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
-    # libera la VRAM del server diffusers :8189 (single-GPU: un modello pesante alla volta)
+    # libera la VRAM del server diffusers :8189 (single-GPU: un modello pesante alla volta) +
+    # COORDINAMENTO COMPLETO (mancava): anche i server VIDEO (:8190/:8192) e Krea2 (:8191) vanno
+    # liberati, e si aspetta il rilascio EFFETTIVO prima di lanciare il worker comfy.
     try:
         import urllib.request
-        urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8189/free", data=b"{}",
+        urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8189/free",
+                               data=b'{"mode": "demote"}',
                                headers={"Content-Type": "application/json"}), timeout=20).read()
+    except Exception:                                          # noqa: BLE001
+        pass
+    try:
+        from core import mem_coordinator as _mc
+        _mc.free_and_wait("image", need_mb=16000, wait_s=30)
     except Exception:                                          # noqa: BLE001
         pass
     # FIGLIO PERSISTENTE (residenza): modelli caldi tra le gen. Ora con **reader-thread non-bloccante + timeout**

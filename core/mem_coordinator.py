@@ -105,8 +105,32 @@ def free_for(category: str, *, timeout: float = 8.0, force: bool = False) -> lis
         return _freed(_free_ports(_VIDEO_PORTS, timeout, mode=auto_mode()))
     if cat == "video":
         return _freed(_free_ports(_IMAGE_PORTS, timeout, mode=auto_mode()))
-    # 3d / world / music / llm / sconosciute → effimere: liberano TUTTO, RAM compresa
+    if cat == "llm":
+        # LLM TRANSIENTI (enhancer Gemma, caption, rewrite): girano per pochi secondi e poi il
+        # motore di prima riprende → DEMOTE (parcheggio RAM, rientro veloce), mai destroy: il
+        # destroy costringerebbe a rileggere da SSD il modello che genera subito dopo.
+        return _freed(_free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout, mode=auto_mode()))
+    # 3d / world / music / sconosciute → effimere: liberano TUTTO, RAM compresa
     return _freed(_free_ports(_IMAGE_PORTS + _VIDEO_PORTS, timeout, mode="destroy"))
+
+
+def free_and_wait(category: str, *, need_mb: float = 16000, timeout: float = 20,
+                  wait_s: int = 40, hard: bool = False) -> int:
+    """free_for/free_all + ATTESA del rilascio EFFETTIVO (NVML): il pattern unico per i motori
+    subprocess che caricano modelli grossi (MultiTalk, SeedVR2, FlashVSR, LLM, training…). Il /free
+    risponde prima che il driver restituisca la VRAM (WDDM): senza attesa il worker parte nel buco
+    e alloca in shared-RAM. `need_mb` = fabbisogno del modello che sta per caricare (la soglia è
+    clampata alla VRAM fisica da wait_free_vram_mb: mai irraggiungibile). `hard=True` → free_all
+    (destroy, anche i parcheggi RAM: training/categorie effimere). Ritorna la VRAM libera."""
+    if hard:
+        free_all(timeout=timeout)
+    else:
+        free_for(category, timeout=timeout)
+    try:
+        from core import gpu_mem
+        return gpu_mem.wait_free_vram_mb(float(need_mb) + 2000, timeout_s=wait_s, tag=category)
+    except Exception:                                       # noqa: BLE001
+        return 0
 
 
 def free_all(*, timeout: float = 8.0) -> list[int]:

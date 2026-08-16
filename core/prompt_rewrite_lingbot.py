@@ -77,6 +77,15 @@ def rewrite(prompt: str, *, first_frame: str = "", nsfw: bool = False, mode: str
 def _rewrite_proprietary(prompt: str, *, first_frame: str, mode: str) -> tuple[str, str]:
     """Esegue il rewriter a 2 stadi + auto-negative nel venv LingBot (subprocess)."""
     base, lora = _rewriter_dirs()
+    # COORDINAMENTO CONDIZIONALE (mancava): Qwen3.6-27B base + LoRA è un load multi-GB. Se la VRAM
+    # libera non basta → demote degli altri (parcheggio RAM) + attesa del rilascio effettivo.
+    try:
+        from core import gpu_mem, mem_coordinator
+        if gpu_mem.free_vram_mb() < 16000:
+            mem_coordinator.free_for("llm", timeout=15)
+            gpu_mem.wait_free_vram_mb(16000, timeout_s=25, tag="rewriter")
+    except Exception:                                        # noqa: BLE001
+        pass
     import tempfile
     out = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
     out.close()
