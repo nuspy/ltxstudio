@@ -151,10 +151,14 @@ def plan(want: ModelKey, *, category: str, need_mb: float = 0.0,
             return {"action": "reuse", "reuse_port": r.port, "free_ports": [],
                     "reason": f"modello già residente su :{r.port}", "shared": r.components}
 
-    # 2) server di ALTRA categoria residenti → vanno liberati (cambio pipeline foto↔video)
-    other_cat = [r for r in res if r.category != category and r.vram_mb > 0]
+    # 2) server di ALTRA categoria residenti → vanno liberati (cambio pipeline foto↔video).
+    #    Un server BUSY riporta vram_mb=0 (non può misurarsi) ma NON è vuoto: va contato come
+    #    residente pesante (prima il filtro `vram_mb > 0` lo rendeva invisibile e il piano diceva
+    #    "spazio sufficiente" mentre un job occupava la GPU).
+    other_cat = [r for r in res if r.category != category and (r.vram_mb > 0 or r.busy)]
     # 3) stessa categoria, chiave diversa → libera solo se manca spazio
-    same_cat_diff = [r for r in res if r.category == category and r.key and r.key != want_key and r.vram_mb > 0]
+    same_cat_diff = [r for r in res if r.category == category and r.key and r.key != want_key
+                     and (r.vram_mb > 0 or r.busy)]
 
     free_ports: list[int] = [r.port for r in other_cat]
     reason = []

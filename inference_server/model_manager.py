@@ -253,6 +253,10 @@ class ModelManager:
         if torch is None or not torch.cuda.is_available():
             return
         if force:
+            try:
+                torch.cuda.synchronize()                    # WDDM rilascia lazy: barriera prima del report
+            except Exception:                               # noqa: BLE001
+                pass
             torch.cuda.empty_cache()
             return
         try:
@@ -263,24 +267,9 @@ class ModelManager:
         except Exception:                                   # noqa: BLE001
             torch.cuda.empty_cache()
 
-    @staticmethod
-    def place(pipe, vram_mb: float) -> str:
-        """Posiziona un pipeline: SU GPU se c'è spazio (resta caricato tra le run → niente offload/reload
-        ripetuto), altrimenti enable_model_cpu_offload. L'eviction quando serve spazio per un ALTRO modello
-        è gestita dalla cache LRU (make_room/unload). Anti system-memory-fallback Windows: GPU solo se
-        free ≥ vram·margine + floor. Override: NATIVE_FORCE_OFFLOAD / NATIVE_GPU_MARGIN / NATIVE_GPU_FLOOR_MB."""
-        import os
-        if os.environ.get("NATIVE_FORCE_OFFLOAD") == "1" or torch is None or not torch.cuda.is_available():
-            pipe.enable_model_cpu_offload()
-            return "offload"
-        free_mb = torch.cuda.mem_get_info()[0] / 1024**2
-        margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.35"))
-        floor_mb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "1500"))
-        if free_mb >= float(vram_mb) * margin + floor_mb:
-            pipe.to("cuda")
-            return "gpu"
-        pipe.enable_model_cpu_offload()
-        return "offload"
+    # NB: il vecchio `place()` statico (margine 1.35/floor 1500 MAI aggiornati) era DEAD CODE senza
+    # chiamanti — il placement vero è `image_flux._place` (margine/floor da env, tarati da
+    # hw_profiles). Rimosso per non confondere: una sola implementazione del placement.
 
     # ── LoRA hot-swap (su un pipeline diffusers) ─────────────────────────────
     @staticmethod

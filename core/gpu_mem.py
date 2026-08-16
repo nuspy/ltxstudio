@@ -41,6 +41,30 @@ def free_vram_gb() -> float:
     return free_vram_mb() / 1024.0
 
 
+def wait_free_vram_mb(min_free_mb: float, timeout_s: int = 40, poll_s: float = 1.0,
+                      tag: str = "") -> int:
+    """Attende il rilascio EFFETTIVO della VRAM: poll NVML/nvidia-smi finché `free ≥ min_free_mb`
+    o scade il timeout. È il tassello che mancava tra "/free inviato" e "carico il modello": il
+    rilascio driver è ASINCRONO rispetto alla risposta HTTP — se il load parte nel buco, CUDA
+    alloca in shared-RAM (WDDM) e ci resta (10-20× più lento). Nessun contesto CUDA (mai torch
+    nel processo app). La soglia è clampata alla VRAM fisica −2GB: mai irraggiungibile per design.
+    Ritorna la VRAM libera all'uscita (il chiamante può loggare/decidere)."""
+    import time as _t
+    total = total_vram_mb()
+    if total:
+        min_free_mb = min(float(min_free_mb), max(total - 2048, 1024))
+    free = free_vram_mb()
+    t0 = _t.monotonic()
+    while free < min_free_mb and _t.monotonic() - t0 < timeout_s:
+        _t.sleep(poll_s)
+        free = free_vram_mb()
+    ok = free >= min_free_mb
+    print(f"[vram-wait{('/' + tag) if tag else ''}] libera {free}MB / soglia {int(min_free_mb)}MB "
+          f"in {_t.monotonic() - t0:.1f}s ({'ok' if ok else 'ATTENZIONE: scaduto → rischio shared'})",
+          flush=True)
+    return free
+
+
 def total_vram_mb() -> int:
     """VRAM totale della GPU (MB), 0 se non rilevabile. Nessun contesto CUDA.
     Serve per rendere DINAMICHE le soglie di attesa (mai chiedere più VRAM di quanta la scheda ne abbia:

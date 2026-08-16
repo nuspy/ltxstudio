@@ -974,10 +974,15 @@ def _auto_offload(p: dict, ckpt: str) -> str:
                 print(f"[auto-offload] work-budget dinamico (M4) {_w}x{_h}x{_f} → {_WORK_GB:.1f}GB", flush=True)
             except Exception:                                # noqa: BLE001
                 _WORK_GB = 8.0
-        need = tr_gb + _ENC_GB + _WORK_GB                     # full-stack residente (solo fp8, no GGUF)
-        # Soglia STORICA (senza headroom): il distilled 24GB resta residente a 704×448 (il percorso
-        # veloce della residenza, −28% misurato). I casi limite che frammentano (es. dev 768×576)
-        # sono coperti dall'OOM-RETRY con offload=cpu in run_generation_with_oom_retry.
+        # Guard anti-sysmem-fallback (WDDM): margine sul transformer (frammentazione allocator) +
+        # floor assoluto — stessi env del backend immagini (NATIVE_GPU_MARGIN/NATIVE_GPU_FLOOR_MB,
+        # tarati per GPU da hw_profiles). Prima QUI il floor mancava del tutto: bastava sbordare di
+        # poche centinaia di MB per finire in shared-RAM (10-20× più lento) senza OOM visibile.
+        _margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.06") or 1.06)
+        _floor_gb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "800") or 800) / 1024.0
+        need = tr_gb * _margin + _ENC_GB + _WORK_GB + _floor_gb   # full-stack residente (solo fp8, no GGUF)
+        # I casi limite che frammentano (es. dev 768×576) restano coperti dall'OOM-RETRY con
+        # offload=cpu in run_generation_with_oom_retry.
         mode = "none" if free_gb >= need else "cpu"
         # F6: planner combinatorio (plan_placement) come decisore DEFAULT (scelta utente 22/07):
         # transformer residente se entra (gli encoder girano comunque per-stage), componenti dal DB
@@ -1053,6 +1058,57 @@ def _ensure_aux_bundle() -> str:
     return out
 
 
+def _uses_aux_bundle(ckpt: str) -> bool:
+    """True se _get_pipe costruirà questo checkpoint sulla tupla (bundle_aux, ckpt) — condizione
+    ESTRATTA perché anche _prepare_pipe_cache deve replicare l'aggiustamento del qmode nella chiave."""
+    return (_is_transformer_only(ckpt) and os.path.exists(CHECKPOINT)
+            and os.path.normcase(ckpt) != os.path.normcase(CHECKPOINT))
+
+
+def _key_qmode(ckpt: str, qmode: str) -> str:
+    """Il qmode che finisce nella CHIAVE cache di _get_pipe (i comfy fp8_scaled degradano a
+    fp8_cast PRIMA del calcolo della chiave; gli altri downgrade interni avvengono dopo)."""
+    return "fp8_cast" if (_uses_aux_bundle(ckpt) and qmode == "fp8_scaled_mm") else qmode
+
+
+def _prepare_pipe_cache(ckpt: str, qmode: str, loras: list, ptype: str,
+                        want_offload: str = "", stages: str = "two") -> str | None:
+    """Da chiamare PRIMA di misurare la VRAM (_auto_offload). Due compiti:
+      1) RIUSO: se in cache c'è una pipe con la stessa identità (ckpt, qmode, loras, ptype) a meno
+         dell'offload → ritorna il suo offload_str: _get_pipe farà cache-hit esatto SENZA misura.
+         Misurare ora vedrebbe la VRAM occupata dalla pipe STESSA → 'cpu' a torto → chiave diversa
+         → rebuild in streaming del modello già residente (il bug del riuso mancato).
+      2) SFRATTO PRE-MISURA: le pipe NON riusabili escono ORA (gc+synchronize+empty_cache), non
+         dentro _get_pipe DOPO la build com'era: la misura vede la VRAM reale (niente 'cpu' cachato
+         per colpa del vecchio 22B ancora residente) e la build non convive col vecchio (2× VRAM).
+    `want_offload` esplicito dell'utente: una pipe cachata con offload diverso NON è riusabile
+    (la scelta esplicita vince, regola no-override) e viene sfrattata."""
+    q_eff = _key_qmode(ckpt, qmode)
+    lkey = tuple((lo.path, lo.strength) for lo in loras)
+    reuse_off: str | None = None
+    stale = []
+    for k in list(_PIPE_CACHE):
+        _same = (k[0] == ckpt and k[1] == q_eff and k[3] == lkey and k[4] == stages and k[5] == ptype)
+        if _same and (not want_offload or k[2] == want_offload):
+            reuse_off = k[2]
+        else:
+            stale.append(k)
+    for k in stale:
+        _old = _PIPE_CACHE.pop(k, None)
+        del _old
+    if stale:
+        import gc as _gc
+        _gc.collect()
+        try:
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()                     # WDDM rilascia lazy: barriera prima della misura
+                torch.cuda.empty_cache()
+        except Exception:                                    # noqa: BLE001
+            pass
+        print(f"[evict] {len(stale)} pipeline non riusabili sfrattate PRIMA della misura VRAM", flush=True)
+    return reuse_off
+
+
 def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two", ptype: str = "ti2v"):
     """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco.
     ptype: 'ti2v' (testo/immagine→video) oppure 'a2v' (audio→video, lip-sync/canto).
@@ -1060,8 +1116,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     (bundle_default, file_scelto) — il loader fonde gli state-dict e l'ULTIMO path vince sulle
     chiavi comuni → transformer dal file dell'utente, VAE/vocoder/audio e config dal bundle."""
     _ckpt_pipe: "str | tuple" = ckpt
-    if _is_transformer_only(ckpt) and os.path.exists(CHECKPOINT) \
-            and os.path.normcase(ckpt) != os.path.normcase(CHECKPOINT):
+    if _uses_aux_bundle(ckpt):
         print(f"[bundle] '{os.path.basename(ckpt)}' è un checkpoint PARZIALE → componenti aux dal "
               f"bundle {os.path.basename(CHECKPOINT)}", flush=True)
         _ckpt_pipe = (_ensure_aux_bundle(), ckpt)
@@ -1074,6 +1129,26 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     key = (ckpt, qmode, offload_str, lkey, stages, ptype)
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
+    # M5-fix: fai spazio PRIMA di costruire (com'era, la vecchia pipe restava in cache DURANTE la
+    # build della nuova = 2× VRAM transitoria → spill/OOM proprio al cambio modello).
+    _lru = max(1, int(os.environ.get("LTX_VIDEO_PIPE_LRU", "1") or 1))
+    _evicted = 0
+    while len(_PIPE_CACHE) >= _lru:
+        _oldk = next(iter(_PIPE_CACHE))                      # dict = ordine d'inserimento (LRU)
+        _old = _PIPE_CACHE.pop(_oldk)
+        del _old
+        _evicted += 1
+    if _evicted:
+        import gc as _gc
+        _gc.collect()
+        try:
+            import torch as _t
+            if _t.cuda.is_available():
+                _t.cuda.synchronize()
+                _t.cuda.empty_cache()
+        except Exception:                                    # noqa: BLE001
+            pass
+        print(f"[evict] {_evicted} pipeline sfrattate prima della build (LRU {_lru})", flush=True)
     quant = None
     if qmode == "nvfp4_scaled_mm":
         from ltx_core.quantization import nvfp4_scaled_mm
@@ -1165,25 +1240,8 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # evitare il reload di gemma/VAE alternando tipo di generazione (talk↔normale). Il refcount PROFONDO dei
     # componenti condivisi (gemma/VAE tra pipeline diverse) richiede di iniettarli nei costruttori del package
     # esterno ltx_pipelines → va fatto con ispezione + test live (rimandato).
-    _lru = max(1, int(os.environ.get("LTX_VIDEO_PIPE_LRU", "1") or 1))
+    # (lo sfratto LRU avviene PRIMA della build, vedi sopra — qui si registra e basta)
     _PIPE_CACHE[key] = pipe
-    while len(_PIPE_CACHE) > _lru:                            # evinci i più vecchi (dict = ordine d'inserimento)
-        _oldk = next(iter(_PIPE_CACHE))
-        if _oldk == key:
-            break
-        _old = _PIPE_CACHE.pop(_oldk)
-        try:
-            del _old
-        except Exception:                                    # noqa: BLE001
-            pass
-    import gc as _gc
-    _gc.collect()
-    try:
-        import torch as _t
-        if _t.cuda.is_available():
-            _t.cuda.empty_cache()
-    except Exception:                                        # noqa: BLE001
-        pass
     return pipe
 
 
@@ -1810,7 +1868,20 @@ def run_generation(p: dict) -> str:
             print(f"[warn] control_video presente ma IC-LoRA non risolto (edit_lora={p.get('edit_lora')!r}, "
                   f"control_type={p.get('control_type')!r}) → guida IGNORATA, degrado a {ptype}. "
                   "Scarica il peso IC-LoRA.", flush=True)
-    _off = _auto_offload(p, ckpt)                            # GGUF→cpu sempre; fp8→none se c'entra tutto in GPU
+    # Ordine CRITICO (fix "misura prima dello sfratto"): (1) riuso/sfratto cache, (2) SOLO POI la
+    # misura VRAM. Prima _auto_offload misurava con la vecchia pipe ancora residente → free basso →
+    # 'cpu' (streaming lento) deciso e CACHATO anche quando, sfrattato il vecchio, il modello
+    # sarebbe stato residente; e il modello GIÀ residente veniva ricostruito invece che riusato
+    # (la misura vedeva la VRAM occupata dalla pipe stessa).
+    _reuse_off = _prepare_pipe_cache(ckpt, qmode, loras, ptype, want_offload=str(p.get("offload") or ""))
+    if p.get("offload"):
+        _off = p["offload"]                                  # scelta esplicita utente: vince sempre
+    elif _reuse_off is not None:
+        _off = _reuse_off
+        print(f"[auto-offload] pipe compatibile già in cache → riuso (offload={_off}, niente misura)",
+              flush=True)
+    else:
+        _off = _auto_offload(p, ckpt)                        # GGUF→cpu sempre; fp8→none se c'entra tutto in GPU
     # M-park: la pipeline del job è ora NOTA → i pesi parcheggiati in RAM che questo job NON userà
     # vengono rimossi (regola di drop richiesta); quelli comuni (Gemma/VAE/upsampler/ckpt) restano.
     try:

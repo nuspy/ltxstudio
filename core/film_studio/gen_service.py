@@ -339,6 +339,11 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
             _st = json.loads(_ur.urlopen(f"{LTX2_SERVER}/system_stats", timeout=5).read())
             if int(_st.get("cached_pipelines", 0)) == 0:
                 _wait_free_vram()
+            else:
+                # pipe calda: la VRAM è legittimamente del server → si aspetta solo il rilascio
+                # EFFETTIVO dei server immagini appena liberati (free_for sopra risponde prima
+                # che il driver restituisca la VRAM — WDDM), non l'intero fabbisogno.
+                _wait_free_vram(min_mb=8000, max_s=15)
         except Exception:                                    # noqa: BLE001
             pass
         return _submit_persistent(params, out_mp4)

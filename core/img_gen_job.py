@@ -146,6 +146,26 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
         img_router._comfy_child.free()
     except Exception:                                        # noqa: BLE001
         pass
+    # GARANZIA DI SCARICO COMPLETO: i /free rispondono prima che il driver restituisca la VRAM
+    # (WDDM). Krea2+Qwen3-VL sono ~20GB: se il load parte nel buco → shared-RAM/OOM. Se il server
+    # :8191 ha già la pipe calda la VRAM è legittimamente SUA → attesa corta (solo il rilascio
+    # degli altri), altrimenti attesa piena.
+    try:
+        from core import gpu_mem
+        _hot = arch in _SERVER_ARCHS and _server_up()
+        try:
+            import urllib.request as _u2
+            import json as _j2
+            _hot = _hot and int(_j2.loads(_u2.urlopen(
+                "http://127.0.0.1:8191/system_stats", timeout=3).read()).get("cached_pipelines", 0) or 0) > 0
+        except Exception:                                    # noqa: BLE001
+            _hot = False
+        if _hot:
+            gpu_mem.wait_free_vram_mb(6000, timeout_s=15, tag="krea2-res")
+        else:
+            gpu_mem.wait_free_vram_mb(22000, timeout_s=40, tag="krea2")
+    except Exception:                                        # noqa: BLE001
+        pass
     # PIPE CALDO: se il server persistente serve questa arch ed è su (o autostartabile), instrada lì.
     if arch in _SERVER_ARCHS and (_server_up() or maybe_autostart_server()):
         try:

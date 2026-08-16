@@ -55,10 +55,42 @@ def server_enabled() -> bool:
 
 def submit_native(params: dict) -> str:
     """Sottomette un job NATIVO al server persistente (:8190). Ritorna il job-id (solleva su errore).
-    Coordina prima i /free delle altre categorie (pipeline-aware: video→video consecutivi = no-op)."""
+    Coordina prima i /free delle altre categorie E ASPETTA il rilascio EFFETTIVO della VRAM (il
+    /free risponde prima che il driver la restituisca — WDDM): senza attesa il server misurava una
+    VRAM ancora occupata e sceglieva streaming/shared a torto. Questo path (GUI→server) era l'UNICO
+    senza alcuna attesa."""
     _free_gpu_servers()
+    _wait_for_video_vram(params)
     r = requests.post(f"{BASE}/submit", json={"params": params}, timeout=30).json()
     return r["prompt_id"]
+
+
+def _wait_for_video_vram(params: dict) -> None:
+    """Attesa DINAMICA pre-submit: soglia = fabbisogno vero del modello (cache misurata/header).
+    Se il server ha già una pipeline in cache (residenza voluta: la VRAM è SUA) si aspetta solo il
+    rilascio dei server immagini appena liberati (working ~8GB), non l'intero fabbisogno."""
+    try:
+        from core import gpu_mem
+        cached = 0
+        try:
+            cached = int(requests.get(f"{BASE}/system_stats", timeout=3).json()
+                         .get("cached_pipelines", 0) or 0)
+        except Exception:                                   # noqa: BLE001
+            pass
+        if cached > 0:
+            gpu_mem.wait_free_vram_mb(8000, timeout_s=15, tag="video-res")
+            return
+        need = 0
+        g = str(params.get("gguf_transformer") or "")
+        m = str(params.get("model") or "")
+        if g and os.path.exists(g):
+            need = int(os.path.getsize(g) / 2**20) + 9000
+        elif m and os.path.exists(m):
+            from core import vram_estimate
+            need, _ = vram_estimate.estimate_mb(m, fp8_storage=True, working_mb=9000)
+        gpu_mem.wait_free_vram_mb((need or 24000) + 2000, timeout_s=40, tag="video")
+    except Exception:                                       # noqa: BLE001
+        pass
 
 
 def poll_native(jid: str) -> dict:
@@ -218,7 +250,9 @@ def generate(params: dict, timeout: int = 3600) -> dict:
     p.setdefault("output", os.path.join(OUTPUT_DIR, f"ltx2_{uuid.uuid4().hex[:8]}.mp4"))
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     try:
-        jid = requests.post(f"{BASE}/submit", json={"params": p}, timeout=30).json()["prompt_id"]
+        # via submit_native: questo ramo POSTava DIRETTO senza liberare i server immagini né
+        # aspettare il rilascio → il 22B caricava con FLUX ancora residente (spill in shared).
+        jid = submit_native(p)
     except Exception as e:                                  # noqa: BLE001
         return {"status": "error", "error": f"submit fallito: {e}"}
     t0 = time.time()

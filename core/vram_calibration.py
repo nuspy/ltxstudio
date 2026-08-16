@@ -147,6 +147,7 @@ def plan_krea2_placement(free_mb: float, cached_bf16_mb: int, cached_fp8_mb: int
       'cuda_fp8'    — entra solo con storage fp8 layerwise
       'offload_fp8' — footprint noto ma non entra → fp8 + model_cpu_offload
       'legacy'      — DB muto su questo modello → soglie storiche (fallback, mai rimosse)."""
+    free_mb = max(0.0, free_mb - _gpu_floor_mb())            # anti-sysmem: floor assoluto (mai contarlo)
     if cached_bf16_mb > 0 and free_mb >= cached_bf16_mb + working_mb:
         return "cuda_bf16"
     if cached_fp8_mb > 0 and free_mb >= cached_fp8_mb + working_mb:
@@ -156,10 +157,22 @@ def plan_krea2_placement(free_mb: float, cached_bf16_mb: int, cached_fp8_mb: int
     return "legacy"
 
 
+def _gpu_floor_mb() -> int:
+    """Floor anti-sysmem-fallback (WDDM): MB di VRAM da NON contare mai come usabili — coprono
+    frammentazione dell'allocator e allocazioni di sistema. Env NATIVE_GPU_FLOOR_MB (tarato per
+    GPU da hw_profiles, es. 1200 su 32GB). Applicato QUI (punto unico dei planner) così tutti i
+    chiamanti di plan_placement/plan_krea2_placement ne beneficiano senza doppi conteggi."""
+    try:
+        return int(float(os.environ.get("NATIVE_GPU_FLOOR_MB", "800") or 800))
+    except Exception:                                        # noqa: BLE001
+        return 800
+
+
 def plan_placement(transformer_mb: int, arch: str, free_mb: int, working_mb: int = 3200) -> dict:
     """Planner COMBINATORIO: dato il transformer (dalla cache), l'arch (→ componenti richiesti) e la VRAM
     LIBERA, decide cosa tenere RESIDENTE e cosa OFFLOADARE per minimizzare l'offload (= massima velocità).
     Ritorna {resident:[...], offload:[...], resident_mb, fits_all, mode}."""
+    free_mb = max(0, int(free_mb - _gpu_floor_mb()))         # anti-sysmem: floor assoluto (mai contarlo)
     comps = ARCH_COMPONENTS.get(arch, [])
     # F6: dimensioni componenti dal DB canonico (misure reali via comp_put) con fallback alla
     # tabella statica — la tabella resta l'ultima risorsa, mai la prima scelta.

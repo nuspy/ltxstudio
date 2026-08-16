@@ -90,8 +90,15 @@ def submit(module: str, params: dict) -> str:
                 _dtype = "fp8" if _fp8 else ""
         except Exception:                                   # noqa: BLE001
             pass
-        gpu_registry.before_job("image", arch=str(params.get("arch", "")),
-                                model=_model, dtype=_dtype, need_mb=_need, log=print)
+        _plan = gpu_registry.before_job("image", arch=str(params.get("arch", "")),
+                                        model=_model, dtype=_dtype, need_mb=_need, log=print)
+        # GARANZIA DI SCARICO COMPLETO: il /free risponde PRIMA che il driver abbia davvero
+        # restituito la VRAM (WDDM). Se il piano ha sfrattato qualcuno, si aspetta il rilascio
+        # EFFETTIVO (NVML) prima del submit — altrimenti il child misura una VRAM ancora occupata
+        # e degrada a offload/sticky a torto. Con action=reuse o nessuno sfratto: niente attesa.
+        if _plan and _plan.get("free_ports"):
+            from core import gpu_mem
+            gpu_mem.wait_free_vram_mb(max(_need, 8000) + 2000, timeout_s=40, tag="image")
     except Exception:                                       # noqa: BLE001
         pass
     print(f"[step-dispatch] {_rel()} | before_job('image') = {time.monotonic()-_tb:.1f}s "

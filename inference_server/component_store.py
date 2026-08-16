@@ -139,6 +139,7 @@ class ComponentStore:
         try:
             import torch
             if torch.cuda.is_available():
+                torch.cuda.synchronize()                    # WDDM rilascia lazy: barriera prima del report
                 torch.cuda.empty_cache()
         except Exception:                                   # noqa: BLE001
             pass
@@ -288,6 +289,7 @@ class ComponentStore:
         import gc
         gc.collect()
         if torch is not None and torch.cuda.is_available():
+            torch.cuda.synchronize()                     # WDDM rilascia lazy: barriera prima del "FREED"
             torch.cuda.empty_cache()
         self.bump_epoch()                                # device cambiati → rebind al prossimo job
         return n

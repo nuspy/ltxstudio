@@ -129,6 +129,15 @@ def _place(pipe, vram_mb: int, resident_mb: int | None = None) -> str:
     if _forced == "1" or not torch.cuda.is_available():
         pipe.enable_model_cpu_offload()
         return "offload"
+    # mem_get_info è a livello DRIVER: i blocchi RESERVED-ma-inutilizzati dell'allocator torch non
+    # risultano liberi (visto live: reserved 17GB vs allocated 12GB → 5GB "spariti" e placement in
+    # offload a torto). Se lo scarto è significativo si restituiscono al driver PRIMA di misurare.
+    try:
+        if (torch.cuda.memory_reserved() - torch.cuda.memory_allocated()) > 1024**3:
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+    except Exception:                                        # noqa: BLE001
+        pass
     free_mb = torch.cuda.mem_get_info()[0] / 1024**2
     # GGUF: MAI model_cpu_offload → i pesi quantizzati (GGMLTensor) finiscono su CPU e il dequant+matmul
     # avviene su CPU = 166 s/step (spill), invece dei ~0.4 s/step gpu-resident. Il GGUF è piccolo (dequant
