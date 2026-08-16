@@ -1420,7 +1420,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
-      "remote_filename": "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
+      "remote_filename": "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-te-bf16",
@@ -1439,7 +1440,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
-      "remote_filename": "text_encoders/gemma4-12b-with-proj-ltx-2.5-bf16.safetensors"
+      "remote_filename": "text_encoders/gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-te-nvfp4-local",
@@ -1476,7 +1478,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-video-vae-conv-bf16.safetensors",
-      "remote_filename": "vae/ltx-2.5-video-vae-conv-bf16.safetensors"
+      "remote_filename": "vae/ltx-2.5-video-vae-conv-bf16.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-audio-vae",
@@ -1495,7 +1498,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-audio-vae-bf16.safetensors",
-      "remote_filename": "vae/ltx-2.5-audio-vae-bf16.safetensors"
+      "remote_filename": "vae/ltx-2.5-audio-vae-bf16.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-diffusion-decoder",
@@ -1533,7 +1537,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-      "remote_filename": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+      "remote_filename": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-temporal-upscaler",
@@ -1552,7 +1557,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors",
-      "remote_filename": "latent_upscale_models/ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors"
+      "remote_filename": "latent_upscale_models/ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-distilled-lora-450",
@@ -1571,7 +1577,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-22b-distilled-lora-450-bf16.safetensors",
-      "remote_filename": "loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors"
+      "remote_filename": "loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-duration-head",
@@ -1590,7 +1597,8 @@
       "repo_id": "Lightricks/LTX-2.5",
       "url": "https://huggingface.co/Lightricks/LTX-2.5",
       "filename": "ltx-2.5-duration-head-bf16.safetensors",
-      "remote_filename": "model_patches/ltx-2.5-duration-head-bf16.safetensors"
+      "remote_filename": "model_patches/ltx-2.5-duration-head-bf16.safetensors",
+      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
     },
     {
       "id": "ltx25-iclora-pixel-upscaler",
@@ -1609,7 +1617,8 @@
       "repo_id": "Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
       "url": "https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
       "filename": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors",
-      "note": "filename remoto da verificare col resolver (repo verificato)"
+      "note": "filename CONFERMATO (16/08, dal mirror ungate); mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)",
+      "remote_filename": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors"
     },
     {
       "id": "flux1-dev-single",
@@ -2123,6 +2132,105 @@
         "cap.restore"
       ],
       "note": "pre-seed: core/facexlib_seed lo collega in gfpgan/weights dove facexlib lo cerca"
+    },
+    {
+      "id": "ltx25-gguf-q4-distilled",
+      "module": "Video",
+      "label": "LTX-2.5 distilled GGUF Q4_K_M (GPU piccole)",
+      "kind": "file",
+      "repo_id": "Abiray/LTX-2.5-Distilled-GGUF",
+      "remote_filename": "LTX-2.5-Distilled-Q4_K_M.gguf",
+      "filename": "LTX-2.5-Distilled-Q4_K_M.gguf",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 14.6,
+      "scan_names": [
+        "LTX-2.5-Distilled-Q4_K_M"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "url": "https://huggingface.co/Abiray/LTX-2.5-Distilled-GGUF",
+      "note": "community (28K dl al 16/08); 1a gen GGUF 2.5 da validare live"
+    },
+    {
+      "id": "ltx25-gguf-q6-distilled",
+      "module": "Video",
+      "label": "LTX-2.5 distilled GGUF Q6_K (qualita, 24GB+)",
+      "kind": "file",
+      "repo_id": "Abiray/LTX-2.5-Distilled-GGUF",
+      "remote_filename": "LTX-2.5-Distilled-Q6_K.gguf",
+      "filename": "LTX-2.5-Distilled-Q6_K.gguf",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 17.3,
+      "scan_names": [
+        "LTX-2.5-Distilled-Q6_K"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "url": "https://huggingface.co/Abiray/LTX-2.5-Distilled-GGUF"
+    },
+    {
+      "id": "ltx25-te-gemma4-gguf",
+      "module": "Video",
+      "label": "LTX-2.5 Gemma-4 TE GGUF Q5_K_M (8.9GB vs 24.5 bf16)",
+      "kind": "file",
+      "repo_id": "elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF",
+      "remote_filename": "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+      "filename": "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+      "type": "text_encoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 8.9,
+      "scan_names": [
+        "gemma4-12b-with-proj-ltx-2.5-Q5_K_M"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "url": "https://huggingface.co/elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF",
+      "note": "TE quantizzato community; il loader TE GGUF nel worker 2.5 e da validare"
+    },
+    {
+      "id": "ltx25-lora-multisubject",
+      "module": "Video",
+      "label": "LTX-2.5 Multiple Subject Reference (LiconStudio)",
+      "kind": "file",
+      "repo_id": "LiconStudio/LTX-2.5-Multiple-Subject-Reference",
+      "remote_filename": "LTX-2.5-Licon-MSR-V1.safetensors",
+      "filename": "LTX-2.5-Licon-MSR-V1.safetensors",
+      "type": "LoRA",
+      "family": "LTX-2.5",
+      "gated": false,
+      "approx_gb": 1.22,
+      "scan_names": [
+        "LTX-2.5-Licon-MSR"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "url": "https://huggingface.co/LiconStudio/LTX-2.5-Multiple-Subject-Reference",
+      "note": "LoRA multi-riferimento soggetti (apache-2.0, 24 like al 16/08)"
+    },
+    {
+      "id": "ltx25-gguf-q2-distilled",
+      "module": "Video",
+      "label": "LTX-2.5 distilled GGUF Q2_K (8.2GB, GPU 12GB)",
+      "kind": "file",
+      "repo_id": "realrebelai/LTX-2.5_GGUFs",
+      "remote_filename": "LTX-2.5-Distilled-Q2_K.gguf",
+      "filename": "LTX-2.5-Distilled-Q2_K.gguf",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 8.2,
+      "scan_names": [
+        "LTX-2.5-Distilled-Q2_K"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "url": "https://huggingface.co/realrebelai/LTX-2.5_GGUFs",
+      "note": "quant estremo per GPU piccole; qualita da valutare"
     }
   ],
   "schema": 2,

@@ -166,8 +166,10 @@ _R25 = LtxRelease(
         # Le pipeline ICLora/DubIt esistono nel codice 1.2.0, ma i PESI per 2.5 no: funzionano solo
         # riusando gli adapter 2.3 → l'utente va avvisato, non bloccato.
         "controlnet": CAP_CROSS, "lipsync": CAP_CROSS, "lora": CAP_CROSS,
-        "gguf": CAP_NO,                       # nessun GGUF 2.5 esiste (né ufficiale né community)
-        "nsfw_ckpt": CAP_NO,                  # 10Eros/Sulphur sono 2.3-only
+        # GGUF 2.5: ESISTONO dal 12/08 (community: Abiray 28K dl Q3-Q8, realrebelai Q2-Q8) — a
+        # catalogo le voci ltx25-gguf-*; 1a generazione GGUF 2.5 col worker nativo da validare live.
+        "gguf": CAP_YES,
+        "nsfw_ckpt": CAP_NO,                  # 10Eros/Sulphur sono 2.3-only (TE heretic 2.5 esistono, ckpt no)
         "multishot": CAP_YES, "duration_head": CAP_YES,
         "temporal_upscale": CAP_YES, "diffusion_decoder": CAP_YES, "hdr_master": CAP_YES,
     },
@@ -176,11 +178,11 @@ _R25 = LtxRelease(
     # MISURATI dagli header l'11/08/2026 (non stimati): TE nvfp4 6,91 GiB + Conv VAE 1,35 + audio 0,34.
     te_overhead_gb=8.6,
     # Il transformer nvfp4 è 'mixed': 7,55 GiB FP4 packed + 0,94 di scale + 8,93 BF16 NON quantizzati
-    # = 17,43 GiB residenti (la policy FP4 non tocca i BF16). Con VAE ≈ 19,1 GiB + attivazioni → 24 GB
-    # è il minimo onesto. I 16 GB diventano possibili solo con la policy ibrida FP4+fp8 (F11).
-    min_vram_gb=24.0,
+    # = 17,43 GiB residenti. Coi GGUF community (dal 12/08: Q4_K_M 14,6 GiB residente quantizzato,
+    # Q2_K 8,2) il minimo realistico scende come per la 2.3 → 14 GB (Q2/Q3 + TE offload).
+    min_vram_gb=14.0,
     notes="Multishot nativo (2-4 shot, guidato dal prompt), duration head, decoder a diffusione, "
-          "upscaler temporale. Ecosistema adapter ancora minimo.",
+          "upscaler temporale. GGUF community dal 12/08 (Q2-Q8); LoRA community in crescita.",
     required=("text_encoder", "video_vae", "audio_vae"),
 )
 
