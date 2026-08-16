@@ -52,14 +52,18 @@ def main() -> int:
     print(f"[foto1] status={r1.get('status')} VRAM usata={vram_after_img}MB", flush=True)
     check("foto carica il modello (VRAM > 20GB)", vram_after_img > 20000)
 
-    # 2) arriva un job VIDEO → il dispatch chiama before_job('video'): il registro deve LIBERARE l'immagine
+    # 2) arriva un job VIDEO → il dispatch VERO chiama free_video_vram (before_job + ATTESA del
+    #    rilascio EFFETTIVO via NVML). NIENTE time.sleep: la garanzia nuova è che al ritorno la
+    #    VRAM sia GIÀ libera (prima serviva uno sleep(3) — prova che il ritorno di before_job
+    #    non significava VRAM libera; in produzione quello sleep non c'era).
     plan = gpu_registry.before_job("video", arch="video", log=print)
     print(f"[registry] piano video: {plan.get('action')} — {plan.get('reason')}", flush=True)
-    time.sleep(3)
-    vram_after_free = H.vram_used_mb()
-    print(f"[dopo before_job(video)] VRAM usata={vram_after_free}MB", flush=True)
-    check("foto→video libera il modello immagine (VRAM < 5GB)", vram_after_free < 5000)
     check("il registro ha deciso lo sfratto immagine", 8189 in (plan.get("free_ports") or []))
+    from core import ltx_video_job
+    free_mb = ltx_video_job.free_video_vram()
+    vram_after_free = H.vram_used_mb()
+    print(f"[dopo free_video_vram] libera={free_mb}MB, usata={vram_after_free}MB", flush=True)
+    check("foto→video libera il modello immagine (VRAM < 5GB, SENZA sleep)", vram_after_free < 5000)
 
     # 3) foto stesso modello dopo il video → il registro decide 'load' (era stato liberato)
     _dt2, r3 = _gen_img(2, 22)
