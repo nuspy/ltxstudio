@@ -215,16 +215,20 @@ def _wait_free_vram(min_mb: int = 24000, max_s: int = 30) -> int:
     """Attende il rilascio EFFETTIVO della VRAM (asincrono rispetto a /free e unload): se un worker
     22B parte con la VRAM ancora occupata, le sue allocazioni finiscono in SHARED memory (WDDM) e
     ci restano anche a VRAM svuotata → GPU all'1%, clip eterne. Poll via nvidia-smi (MAI torch.cuda
-    nel processo app)."""
+    nel processo app). La soglia è clampata alla VRAM fisica (dinamica per PC): su una scheda
+    piccola una soglia fissa non si raggiunge mai e l'attesa degenererebbe in uno sleep pieno."""
     free_mb = 0
     try:
         from core import gpu_mem as _gm
+        total_mb = _gm.total_vram_mb()
+        if total_mb:
+            min_mb = min(min_mb, max(total_mb - 2048, 1024))
         for _ in range(max_s):
             free_mb = _gm.free_vram_mb()
             if free_mb >= min_mb:
                 break
             time.sleep(1)
-        print(f"[film] VRAM libera pre-worker: {free_mb}MB", flush=True)
+        print(f"[film] VRAM libera pre-worker: {free_mb}MB (soglia {min_mb})", flush=True)
     except Exception:                                        # noqa: BLE001
         pass
     return free_mb

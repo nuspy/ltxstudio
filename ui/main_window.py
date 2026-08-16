@@ -1197,24 +1197,17 @@ class MainWindow(QMainWindow):
         self._log("Generazione annullata dall'utente.")
 
     def _on_free_vram(self):
-        """Libera la VRAM dei server GPU NATIVI (immagini :8189, API :8200) — /free svuota shell, cache CPU e
-        ComponentStore. Prima liberava solo ComfyUI (offline → 'impossibile'). Comfy resta come extra."""
-        import urllib.request
-
-        def _hit(port: int) -> bool:
-            try:                                             # 200 senza eccezione = /free eseguito (idempotente)
-                urllib.request.urlopen(urllib.request.Request(
-                    f"http://127.0.0.1:{port}/free", data=b"{}",
-                    headers={"Content-Type": "application/json"}), timeout=25).read()
-                return True
-            except Exception:                                # noqa: BLE001 (server giù = niente da liberare)
-                return False
-        freed = [n for p, n in ((8189, "immagini"), (8200, "API"), (8190, "video")) if _hit(p)]  # M2: anche il video
+        """Libera la VRAM di TUTTI i server GPU nativi (immagini :8189, Krea2 :8191, video :8190,
+        krea_rt :8192) via mem_coordinator.free_all() = mode "destroy" ESPLICITO: anche i parcheggi
+        RAM vanno all'OS («Libera VRAM» = libera davvero). Prima si POSTava `b"{}"` a 3 porte fisse
+        → mode default "demote" (parcheggio tenuto, e col vecchio bug il video restava in VRAM) e
+        :8191/:8192 non erano mai toccate. Comfy resta come extra."""
+        _names = {8189: "immagini", 8191: "krea2", 8190: "video", 8192: "krea_rt"}
         try:
-            from core import mem_coordinator                  # tutto liberato → il prossimo job rifà il /free giusto
-            mem_coordinator.reset()
+            from core import mem_coordinator
+            freed = [_names.get(p, str(p)) for p in mem_coordinator.free_all(timeout=25)]
         except Exception:                                    # noqa: BLE001
-            pass
+            freed = []
         try:
             if self.driver.free_memory():                    # ComfyUI, se davvero attivo (extra)
                 freed.append("comfy")
@@ -1228,7 +1221,7 @@ class MainWindow(QMainWindow):
         if freed:
             self._log(f"✅ VRAM liberata: {', '.join(freed)} — ora liberi {_free_gb:.1f} GB.")
         else:
-            self._log("[!] Nessun server GPU attivo da liberare (immagini :8189 / API :8200 offline).")
+            self._log("[!] Nessun server GPU attivo da liberare (:8189/:8190/:8191/:8192 offline).")
 
     def _open_film_studio(self):
         """Apre la finestra AI Film Studio (Text-to-Film, backend nativo). Variante Classica/Pro."""

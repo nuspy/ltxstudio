@@ -228,9 +228,9 @@ def main():
     # ModelManager che ora tiene i modelli residenti, una generazione 3D dopo un'immagine trovava la VRAM
     # piena → OOM al load = "crash all'avvio". stdlib-only (il venv TRELLIS non ha `core`).
     import urllib.request as _u
-    for _port in (8189, 8200, 8190):                          # M1/M2: libera anche il server video
-        try:
-            _u.urlopen(_u.Request(f"http://127.0.0.1:{_port}/free", data=b"{}",
+    for _port in (8189, 8190, 8191, 8192):                    # tutti i server GPU (8200 non ha /free)
+        try:                                                  # categoria EFFIMERA → destroy ESPLICITO
+            _u.urlopen(_u.Request(f"http://127.0.0.1:{_port}/free", data=b'{"mode": "destroy"}',
                                   headers={"Content-Type": "application/json"}), timeout=15).read()
             print(f"[trellis] VRAM server :{_port} liberata", flush=True)
         except Exception:                                    # noqa: BLE001 (server giù = niente da liberare)

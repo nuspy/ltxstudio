@@ -80,10 +80,10 @@ class ComponentStore:
                     vram_estimate.comp_put(key, _sz, category=_cat, dtype=_dt)
             except Exception:                            # noqa: BLE001 — best-effort, mai fatale
                 pass
-            try:                                         # F3: ledger live di ciò che sta in VRAM
-                from core import vram_ledger
-                vram_ledger.register(key, _sz, category="image", state="vram")
-            except Exception:                            # noqa: BLE001
+            try:                                         # F3: ledger live. Alla creazione i pesi sono su
+                from core import vram_ledger             # CPU (from_pretrained) → "ram_parked"; sarà
+                vram_ledger.register(key, _sz, category="image", state="ram_parked")  # note_device()
+            except Exception:                            # noqa: BLE001 — a metterlo "vram" dopo il place
                 pass
         e.refcount += 1
         e.last_used = _now()

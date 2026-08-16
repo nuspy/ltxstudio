@@ -25,11 +25,13 @@ from dataclasses import dataclass, field
 from core import gpu_mem, mem_coordinator
 
 # porta → categoria del server persistente (ciò che il registro coordina). Allineato a mem_coordinator.
+# :8200 (API) RIMOSSO: non ha /free né /system_stats — ogni chiamata era un fallimento garantito.
+# :8192 (krea_rt/Self-Forcing) AGGIUNTO: prima era orfano, nessuno lo liberava né lo contava.
 SERVER_PORTS = {
     8189: "image",      # InferenceServer FLUX (ComponentStore)
     8191: "image",      # Krea 2 (immagini/edit)
-    8200: "image",      # API pubblica (gen in-process)
     8190: "video",      # LTX-2 persistente
+    8192: "video",      # krea_rt / Self-Forcing
 }
 
 # margine di sicurezza: sotto questa VRAM libera (MB) consideriamo "serve spazio" e sfrattiamo prima di caricare.
@@ -179,16 +181,20 @@ def plan(want: ModelKey, *, category: str, need_mb: float = 0.0,
             "reason": "; ".join(reason), "shared": []}
 
 
-def apply(planned: dict, *, timeout: float = 8.0) -> list[int]:
+def apply(planned: dict, *, timeout: float = 15.0) -> list[int]:
     """Esegue il piano: libera i server indicati (via HTTP /free, coordinato). Ritorna le porte liberate.
     `reuse`/`load` senza free_ports → no-op (niente da scaricare). Il mode (demote|destroy) lo decide
     mem_coordinator.auto_mode(): con RAM/commit sotto i floor si svuota ANCHE il parcheggio RAM
-    (richiesta utente 22/07: «anche la RAM va svuotata dai modelli caricati, se non servono più»)."""
+    (richiesta utente 22/07: «anche la RAM va svuotata dai modelli caricati, se non servono più»).
+    Timeout 15s ≥ dei 10s che :8189 impiega ad aspettare il FREED del figlio (col vecchio 8s il
+    client mollava a metà demote e caricava DURANTE lo scarico). Gli esiti anomali (busy/timeout)
+    finiscono nel piano (`outcomes`): il chiamante può aspettare la VRAM reale prima di caricare."""
     ports = list(planned.get("free_ports") or [])
     if not ports:
         return []
-    freed = mem_coordinator._free_ports(ports, timeout, mode=mem_coordinator.auto_mode())
-    return freed
+    out = mem_coordinator._free_ports(ports, timeout, mode=mem_coordinator.auto_mode())
+    planned["outcomes"] = out
+    return mem_coordinator._freed(out)
 
 
 def acquire(want: ModelKey, *, category: str, need_mb: float = 0.0) -> dict:

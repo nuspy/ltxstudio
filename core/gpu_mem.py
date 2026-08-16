@@ -39,3 +39,26 @@ def free_vram_mb() -> int:
 def free_vram_gb() -> float:
     """VRAM libera (GB), 0.0 se non rilevabile. Nessun contesto CUDA."""
     return free_vram_mb() / 1024.0
+
+
+def total_vram_mb() -> int:
+    """VRAM totale della GPU (MB), 0 se non rilevabile. Nessun contesto CUDA.
+    Serve per rendere DINAMICHE le soglie di attesa (mai chiedere più VRAM di quanta la scheda ne abbia:
+    su una 12GB una soglia fissa da 24GB non si raggiunge mai e l'attesa degenera in uno sleep pieno)."""
+    try:
+        import pynvml  # type: ignore
+        pynvml.nvmlInit()
+        try:
+            h = pynvml.nvmlDeviceGetHandleByIndex(0)
+            return int(pynvml.nvmlDeviceGetMemoryInfo(h).total / (1024 * 1024))
+        finally:
+            pynvml.nvmlShutdown()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=5, creationflags=_CREATE_NO_WINDOW)
+        return int(float(out.stdout.strip().splitlines()[0]))
+    except Exception:  # noqa: BLE001
+        return 0

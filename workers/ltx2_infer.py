@@ -2065,11 +2065,15 @@ def _free_image_server() -> None:
     volta; il ModelManager del server ricaricherà il suo modello alla prossima richiesta immagine."""
     try:
         import urllib.request
-        urllib.request.urlopen(urllib.request.Request(
-            "http://127.0.0.1:8189/free", data=b"{}", headers={"Content-Type": "application/json"}),
-            timeout=20).read()
-        print("[worker] VRAM server immagini liberata (/free)", flush=True)
-    except Exception:                                        # noqa: BLE001  (server giù = niente da liberare)
+        for _p in (8189, 8191):                              # entrambi i server immagini (FLUX + Krea2)
+            try:                                             # demote ESPLICITO: l'immagine può tornare →
+                urllib.request.urlopen(urllib.request.Request(   # parcheggio RAM, non distruzione
+                    f"http://127.0.0.1:{_p}/free", data=b'{"mode": "demote"}',
+                    headers={"Content-Type": "application/json"}), timeout=20).read()
+                print(f"[worker] VRAM server immagini :{_p} liberata (/free demote)", flush=True)
+            except Exception:                                # noqa: BLE001  (server giù = niente da liberare)
+                pass
+    except Exception:                                        # noqa: BLE001
         pass
 
 

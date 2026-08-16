@@ -85,6 +85,11 @@ def free(req: FreeReq | None = None):
     import gc
     import torch
     mode = (req.mode if req else "demote").lower()
+    if any(j.get("status") in ("pending", "running") for j in _jobs.values()):
+        # un job sta usando la pipe: demotarla a metà denoise la corromperebbe → rifiuta, decide il
+        # coordinatore (il job GPU pesante dovrebbe comunque essere uno solo alla volta).
+        print(f"[krea2] /free mode={mode} RIFIUTATO: job in corso", flush=True)
+        return {"busy": True, "freed_pipelines": 0, "mode": mode}
     n = len(krea2_infer._PIPE_CACHE)
     parked_mb = 0.0
     if mode == "destroy":
@@ -96,18 +101,26 @@ def free(req: FreeReq | None = None):
         parked_mb = krea2_infer._demote_pipes()
     gc.collect()
     if torch.cuda.is_available():
+        torch.cuda.synchronize()                            # WDDM rilascia lazy: barriera prima del report
         torch.cuda.empty_cache()
+    free_mb = int(torch.cuda.mem_get_info()[0] / 2**20) if torch.cuda.is_available() else 0
     print(f"[krea2] /free mode={mode}: {n} pipe, parcheggio RAM {parked_mb:.0f}MB "
-          f"{'DISTRUTTO' if mode == 'destroy' else 'mantenuto'}", flush=True)
-    return {"freed_pipelines": n if mode == "destroy" else 0, "mode": mode,
-            "parked_ram_mb": round(parked_mb)}
+          f"{'DISTRUTTO' if mode == 'destroy' else 'mantenuto'}, VRAM libera {free_mb}MB", flush=True)
+    return {"busy": False, "freed_pipelines": n if mode == "destroy" else 0, "mode": mode,
+            "parked_ram_mb": round(parked_mb), "vram_free_mb": free_mb}
 
 
 @app.get("/system_stats")
 def system_stats():
     import torch
     free, total = (torch.cuda.mem_get_info() if torch.cuda.is_available() else (0, 0))
-    return {"up": True, "cached_pipelines": len(krea2_infer._PIPE_CACHE),
+    # model_key + vram PROPRIA (allocator di QUESTO processo): senza questi campi il gpu_registry
+    # vedeva Resident(key="", vram_mb=0) → una Krea2 residente era INVISIBILE e mai sfrattabile.
+    own_mb = int(torch.cuda.memory_reserved() / 2**20) if torch.cuda.is_available() else 0
+    busy = any(j.get("status") in ("pending", "running") for j in _jobs.values())
+    model_key = "image:krea2" if krea2_infer._PIPE_CACHE else "-"
+    return {"up": True, "busy": busy, "cached_pipelines": len(krea2_infer._PIPE_CACHE),
+            "model_key": model_key, "vram_used_mb": own_mb, "model_vram_mb": own_mb,
             "vram_free_mb": free // 1024 // 1024, "vram_total_mb": total // 1024 // 1024}
 
 

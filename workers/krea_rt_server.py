@@ -98,10 +98,12 @@ def free(req: FreeReq | None = None):
 def system_stats():
     import torch
     free, total = (torch.cuda.mem_get_info() if torch.cuda.is_available() else (0, 0))
-    used_mb = (total - free) // 1024 // 1024
+    # VRAM PROPRIA (allocator di questo processo), non total-free: quel numero includeva gli altri
+    # motori e falsava il projected_free del planner.
+    own_mb = int(torch.cuda.memory_reserved() / 2**20) if torch.cuda.is_available() else 0
     model_key = "video:krea_rt" if krea_rt_infer._PIPE else "-"   # per il gpu_registry unico
     return {"up": True, "cached_pipelines": len(krea_rt_infer._PIPE), "model_key": model_key,
-            "vram_used_mb": used_mb, "model_vram_mb": used_mb,
+            "vram_used_mb": own_mb, "model_vram_mb": own_mb,
             "vram_free_mb": free // 1024 // 1024, "vram_total_mb": total // 1024 // 1024}
 
 

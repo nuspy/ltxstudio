@@ -162,33 +162,40 @@ class FreeReq(BaseModel):
 @app.post("/free")
 def free(req: FreeReq | None = None):
     """M2/M-park — libera la VRAM per un'altra pipeline. Due modalità (unified-model-manager):
-    - demote (default): svuota la VRAM ma TIENE il parcheggio RAM (_PARK) e la _PIPE_CACHE →
-      se la pipeline successiva torna al video, i pesi rientrano dalla RAM (niente SSD).
-    - destroy: come prima — distrugge pipeline E parcheggio (chi chiama vuole anche la RAM:
-      categorie effimere 3D/mondi/musica, o il bottone «Libera VRAM»)."""
+    - demote (default): svuota la VRAM (la _PIPE_CACHE viene DISTRUTTA: tenerla = tenere i pesi
+      su GPU, il "demote finto" che lasciava il transformer 22B residente al cambio pipeline) ma
+      TIENE il parcheggio RAM (_PARK) → se la pipeline successiva torna al video, i pesi rientrano
+      dalla RAM (niente SSD). Sicuro con le LoRA: get() del park ritorna una shallow-copy, la
+      fusione non muta mai i tensori parcheggiati (vedi _CpuParkRegistry).
+    - destroy: distrugge pipeline E parcheggio (chi chiama vuole anche la RAM: categorie effimere
+      3D/mondi/musica, o il bottone «Libera VRAM»).
+    Se un job è in corso NON si libera nulla (si scaricherebbe la pipeline a metà denoise):
+    risposta {"busy": true} e il coordinatore decide (il job GPU dovrebbe essere uno solo)."""
     import gc
     import torch
     mode = (req.mode if req else "demote").lower()
+    if any(j.get("status") in ("pending", "running") for j in _jobs.values()):
+        print(f"[ltx2] /free mode={mode} RIFIUTATO: job in corso (la VRAM resta al job)", flush=True)
+        return {"busy": True, "freed_pipelines": 0, "mode": mode}
     n = len(ltx2_infer._PIPE_CACHE)
     parked = 0.0
-    if mode == "destroy":
-        try:
-            ltx2_infer._PIPE_CACHE.clear()
+    try:
+        ltx2_infer._PIPE_CACHE.clear()                      # in ENTRAMBE le modalità: la VRAM va liberata
+        if mode == "destroy":
             ltx2_infer._PARK.clear()
-        except Exception:                                   # noqa: BLE001
-            pass
-    else:                                                   # demote: VRAM sì, RAM no
-        try:
+        else:                                               # demote: parcheggio RAM mantenuto
             parked = sum(i["mb"] for i in ltx2_infer._PARK._info.values())
-        except Exception:                                   # noqa: BLE001
-            pass
+    except Exception:                                       # noqa: BLE001
+        pass
     gc.collect()
     if torch.cuda.is_available():
+        torch.cuda.synchronize()                            # WDDM rilascia lazy: barriera prima del report
         torch.cuda.empty_cache()
-    print(f"[ltx2] /free mode={mode}: {n} pipeline, parcheggio RAM {parked:.0f}MB "
-          f"{'DISTRUTTO' if mode == 'destroy' else 'mantenuto'}", flush=True)
-    return {"freed_pipelines": n if mode == "destroy" else 0, "mode": mode,
-            "parked_ram_mb": round(parked)}
+    free_mb = int(torch.cuda.mem_get_info()[0] / 2**20) if torch.cuda.is_available() else 0
+    print(f"[ltx2] /free mode={mode}: {n} pipeline liberate, parcheggio RAM {parked:.0f}MB "
+          f"{'DISTRUTTO' if mode == 'destroy' else 'mantenuto'}, VRAM libera {free_mb}MB", flush=True)
+    return {"busy": False, "freed_pipelines": n, "mode": mode,
+            "parked_ram_mb": round(parked), "vram_free_mb": free_mb}
 
 
 @app.get("/system_stats")
@@ -206,13 +213,16 @@ def system_stats():
             model_key = f"video:{os.path.basename(str(ckpt)) or '-'}"
     except Exception:                                       # noqa: BLE001
         pass
-    used_mb = (total - free) // 1024 // 1024
+    # VRAM PROPRIA di questo processo (allocator torch), NON total-free: quel numero includeva la
+    # memoria degli ALTRI motori e gonfiava `projected_free` nel planner (sfratti saltati a torto).
+    own_mb = int(torch.cuda.memory_reserved() / 2**20) if torch.cuda.is_available() else 0
+    busy = any(j.get("status") in ("pending", "running") for j in _jobs.values())
     try:                                                    # M-park: lista modelli parcheggiati in RAM
         parked = ltx2_infer._PARK.stats()
     except Exception:                                       # noqa: BLE001
         parked = []
-    return {"up": True, "cached_pipelines": len(ltx2_infer._PIPE_CACHE), "model_key": model_key,
-            "vram_used_mb": used_mb, "model_vram_mb": used_mb,
+    return {"up": True, "busy": busy, "cached_pipelines": len(ltx2_infer._PIPE_CACHE),
+            "model_key": model_key, "vram_used_mb": own_mb, "model_vram_mb": own_mb,
             "vram_free_mb": free // 1024 // 1024, "vram_total_mb": total // 1024 // 1024,
             "parked": parked, "parked_ram_mb": round(sum(p["mb"] for p in parked))}
 

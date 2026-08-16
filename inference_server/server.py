@@ -164,8 +164,14 @@ class _PersistentChild:
             try:
                 self._proc.wait(timeout=5)
             except Exception:                                # noqa: BLE001
-                try: self._proc.kill()
-                except Exception: pass                       # noqa: BLE001
+                try:
+                    self._proc.kill()
+                    # TerminateProcess (Windows) è ASINCRONO: senza wait() questa funzione tornava
+                    # PRIMA che il driver recuperasse la VRAM del figlio → il chiamante misurava
+                    # una VRAM ancora occupata (o caricava durante il rilascio).
+                    self._proc.wait(timeout=10)
+                except Exception:                            # noqa: BLE001
+                    pass
         self._proc = None
         try:
             if self._logf:
@@ -217,22 +223,30 @@ class _PersistentChild:
         finally:
             self._lock.release()
 
-    def free(self, timeout: float = 10, demote: bool = False):
+    def free(self, timeout: float = 10, demote: bool = False) -> bool:
         # /free = cambio-pipeline (un altro motore vuole la VRAM).
         # demote=True (unified-model-manager): il figlio RESTA VIVO e parcheggia i modelli in RAM
         # (FREE_DEMOTE → demote nel ModelManager/ComponentStore): se la pipeline successiva torna
         # alle immagini, restore da RAM senza SSD. I load sono commit-safe (st_direct nel runner),
         # che era la causa del segfault "2° load in-process". Fallback: kill come prima.
         # demote=False: KILLA il figlio (VRAM *e* RAM rilasciate all'OS; prossimo job = figlio fresco).
-        with self._lock:
+        # NON-BLOCCANTE sul lock del job: prima si bloccava fino a 1800s dietro il job in corso
+        # mentre il client HTTP mollava a 8-15s e caricava COMUNQUE → ritorna False = "busy",
+        # il chiamante lo vede nell'esito e decide (aspetta/riprova, mai caricare alla cieca).
+        if not self._lock.acquire(blocking=False):
+            return False
+        try:
             if demote and self._alive():
                 try:
                     self._send("FREE_DEMOTE", ("FREED",), timeout)
-                    return
+                    return True
                 except Exception:                            # noqa: BLE001 — figlio muto → kill
                     pass
             self._kill()
             self.model_key = "-"
+            return True
+        finally:
+            self._lock.release()
 
 
 _child = _PersistentChild() if _PERSIST else None
@@ -339,6 +353,7 @@ def system_stats():
             out["model_key"] = st.get("model_key", _child.model_key)
             out["components"] = [c.get("key") for c in st.get("components", [])]
             out["model_vram_mb"] = st.get("vram_mb", 0)
+            out["busy"] = bool(st.get("busy", False))       # job in corso: vram_mb=0 ma NON è "vuoto"
             out["loaded"] = out["components"]
         else:
             out["model_key"] = _child.model_key
@@ -356,9 +371,11 @@ def free(req: _FreeReq | None = None):
     # mode=destroy → kill del figlio (VRAM e RAM all'OS). Vedi mem_coordinator.
     mode = (req.mode if req else "demote").lower()
     if _PERSIST and _child is not None:
-        _child.free(demote=(mode != "destroy"))
-        return {"ok": True, "freed": "persistent_child_store", "mode": mode}
-    return {"ok": True, "mode": mode}
+        ok = _child.free(demote=(mode != "destroy"))
+        if not ok:                                          # job in corso: la VRAM resta al job
+            return {"ok": False, "busy": True, "mode": mode}
+        return {"ok": True, "busy": False, "freed": "persistent_child_store", "mode": mode}
+    return {"ok": True, "busy": False, "mode": mode}
 
 
 if __name__ == "__main__":

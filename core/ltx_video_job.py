@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -75,7 +76,7 @@ class VideoJobError(RuntimeError):
     """La clip non è stata prodotta. Porta con sé l'output del worker."""
 
 
-def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 40,
+def free_video_vram(timeout: int = 20, min_free_mb: int | None = None, wait_s: int = 40,
                     *, model: str = "", gguf: str = "", arch: str = "ltx") -> int:
     """Sfratta i modelli delle altre categorie E ASPETTA che la VRAM sia DAVVERO libera.
 
@@ -85,22 +86,27 @@ def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 4
     sistema, 10-20× più lento. La clip non finisce più.
     Perciò dopo il /free si aspetta il rilascio EFFETTIVO, misurato con nvidia-smi (mai torch.cuda
     nel processo app: creerebbe un contesto CUDA e farebbe crashare i worker isolati).
+
+    `min_free_mb=None` (default) → soglia DINAMICA: il fabbisogno vero del modello (`need_mb`
+    dalla cache misurata/header) + headroom, mai oltre la VRAM fisica della scheda — su una GPU
+    piccola una soglia fissa non si raggiunge mai e l'attesa degenera in uno sleep pieno.
     """
+    # F5 unified-model-manager: chiave modello VERA + need_mb dalla cache misurata/header —
+    # prima ModelKey era degenere ("video:-") e need_mb=0: il riuso video non veniva mai
+    # riconosciuto e lo sfratto size-aware non scattava.
+    # NB: _m/_need FUORI dal try del registro: servono anche alla soglia dinamica qui sotto.
+    _m = gguf or model
+    _need = 0
+    try:
+        from core import vram_estimate
+        if gguf and os.path.exists(gguf):
+            _need = int(os.path.getsize(gguf) / 2**20) + 9000         # GGUF ≈ dim file + working video
+        elif model and os.path.exists(model):
+            _need, _ = vram_estimate.estimate_mb(model, fp8_storage=True, working_mb=9000)
+    except Exception:                                        # noqa: BLE001
+        pass
     try:
         from core import gpu_registry                        # registro unico: libera le altre categorie (immagine)
-        # F5 unified-model-manager: chiave modello VERA + need_mb dalla cache misurata/header —
-        # prima ModelKey era degenere ("video:-") e need_mb=0: il riuso video non veniva mai
-        # riconosciuto e lo sfratto size-aware non scattava.
-        _m = gguf or model
-        _need = 0
-        try:
-            from core import vram_estimate
-            if gguf and os.path.exists(gguf):
-                _need = int(os.path.getsize(gguf) / 2**20) + 9000     # GGUF ≈ dim file + working video
-            elif model and os.path.exists(model):
-                _need, _ = vram_estimate.estimate_mb(model, fp8_storage=True, working_mb=9000)
-        except Exception:                                    # noqa: BLE001
-            pass
         gpu_registry.before_job("video", arch=arch or "video", model=_m, need_mb=_need, log=print)
     except Exception:                                        # noqa: BLE001 — best-effort, mai fatale
         try:
@@ -111,12 +117,17 @@ def free_video_vram(timeout: int = 20, min_free_mb: int = 24000, wait_s: int = 4
     free_mb = 0
     try:
         from core import gpu_mem
+        if min_free_mb is None:                              # soglia dinamica: fabbisogno vero + headroom
+            min_free_mb = int(_need) + 2000 if _need else 24000
+        total_mb = gpu_mem.total_vram_mb()
+        if total_mb:                                         # clamp alla scheda: soglia mai irraggiungibile
+            min_free_mb = min(min_free_mb, max(total_mb - 2048, 1024))
         for _ in range(wait_s):
             free_mb = gpu_mem.free_vram_mb()
             if free_mb >= min_free_mb:
                 break
             time.sleep(1)
-        print(f"[video] VRAM libera pre-worker: {free_mb} MB "
+        print(f"[video] VRAM libera pre-worker: {free_mb} MB (soglia {min_free_mb}) "
               f"({'ok' if free_mb >= min_free_mb else 'ATTENZIONE: sotto la soglia → rischio shared'})",
               flush=True)
     except Exception:                                        # noqa: BLE001
