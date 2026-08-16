@@ -373,11 +373,12 @@ class _VideoEditAIWorker(QThread):
 
 
 class _NativeMultiTalkWorker(QThread):
-    """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI; riporta progress e path finale."""
+    """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI legacy; riporta progress e path finale."""
     done = Signal(dict)
     progress = Signal(str)
 
-    COMFY_PY = r"E:\AI\Comfy_Nexus\ComfyUI\venv\Scripts\python.exe"
+    from core.comfy_legacy import venv_python as _cl_py
+    COMFY_PY = _cl_py() or r"E:\AI\Comfy_Nexus\ComfyUI\venv\Scripts\python.exe"
 
     def __init__(self, params: dict):
         super().__init__()

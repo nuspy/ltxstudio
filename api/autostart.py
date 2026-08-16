@@ -18,7 +18,10 @@ import urllib.request
 from api.config import BASE_URL, REPO
 
 # Python che esegue l'API (venv con fastapi + accesso a core/*). Override: LTX_API_PYTHON.
-API_PYTHON = os.environ.get("LTX_API_PYTHON", r"E:\AI\Comfy_Nexus.bak\ComfyUI\venv\Scripts\python.exe")
+# Default: lo STESSO interprete dell'app (prima puntava al venv ComfyUI legacy, poi rinominato → morto).
+_legacy_py = r"E:\AI\Comfy_Nexus.bak\ComfyUI\venv\Scripts\python.exe"
+API_PYTHON = os.environ.get("LTX_API_PYTHON") or (
+    _legacy_py if os.path.exists(_legacy_py) else sys.executable)
 _CREATE_NEW_CONSOLE = 0x00000010  # Windows: processo indipendente
 
 

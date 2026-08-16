@@ -21,7 +21,9 @@ def _run_with_timeout(*_a, **_kw):
     return _orig_run(*_a, **_kw)
 _sp.run = _run_with_timeout
 
-COMFY = os.environ.get("SKINTOKEN_COMFY_ROOT", r"E:\AI\Comfy_Nexus.bak\ComfyUI")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # repo root → core.comfy_legacy
+from core import comfy_legacy as _cl                            # noqa: E402 (stdlib-only, sicuro nel venv comfy)
+COMFY = os.environ.get("SKINTOKEN_COMFY_ROOT") or _cl.comfy_root() or _cl.CANDIDATES[0]
 SKDIR = os.path.join(COMFY, "custom_nodes", "ComfyUI-SkinToken")
 
 

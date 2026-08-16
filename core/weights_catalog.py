@@ -155,7 +155,8 @@ MODULE_CAPS: dict[str, list[str]] = {
 # vanno proposti. I moduli "core" (immagini/video/inpaint) sono sempre presenti → non elencati qui = presente.
 _TOOL_PROBES: dict[str, list[str]] = {
     "Modello 3D (TRELLIS)": [r"E:\AI\Tools\TRELLIS2"],
-    "Rig 3D": [r"E:\AI\Comfy_Nexus.bak\ComfyUI\custom_nodes\ComfyUI-SkinToken"],
+    "Rig 3D": [r"E:\AI\Comfy_Nexus.bak.bau\ComfyUI\custom_nodes\ComfyUI-SkinToken",
+               r"E:\AI\Comfy_Nexus.bak\ComfyUI\custom_nodes\ComfyUI-SkinToken"],
     "Mondo 3D (WorldGen)": [r"E:\AI\Tools\WorldGen"],
     "Musica (HeartMuLa)": [r"E:\AI\Tools\heartlib"],
     "Musica (ACE-Step)": [r"E:\AI\Tools\ACE-Step", r"E:\AI\Tools\acestep"],

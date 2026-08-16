@@ -10,7 +10,9 @@ steps, cfg, shift, seed, blocks_to_swap, lora_strength, context (bool), output.
 from __future__ import annotations
 import json, os, sys, types, subprocess, importlib
 
-COMFY = r"E:\AI\Comfy_Nexus\ComfyUI"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo → core.comfy_legacy
+from core.comfy_legacy import comfy_root as _cl_root, CANDIDATES as _CL_CAND     # noqa: E402 (stdlib-only)
+COMFY = _cl_root() or _CL_CAND[0]
 
 
 def _shim_and_import():

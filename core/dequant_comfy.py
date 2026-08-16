@@ -14,7 +14,8 @@ import os
 import subprocess
 from pathlib import Path
 
-COMFY_PY = r"E:\AI\Comfy_Nexus\ComfyUI\venv\Scripts\python.exe"
+from core import comfy_legacy as _cl
+COMFY_PY = _cl.venv_python() or r"E:\AI\Comfy_Nexus\ComfyUI\venv\Scripts\python.exe"
 WORKER = str(Path(__file__).resolve().parent.parent / "scripts" / "dequant_comfy_worker.py")
 CACHE = Path(r"E:\AI\Models\_dequant_cache")
 

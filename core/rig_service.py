@@ -13,8 +13,11 @@ from pathlib import Path
 
 from core.music_service import Job
 
-# venv ComfyUI (ha le deps skintokens) — override via SKINTOKEN_COMFY_ROOT
-COMFY_ROOT = Path(os.environ.get("SKINTOKEN_COMFY_ROOT", r"E:\AI\Comfy_Nexus.bak\ComfyUI"))
+# venv ComfyUI legacy (ha le deps skintokens) — override via SKINTOKEN_COMFY_ROOT;
+# altrimenti risolto da core.comfy_legacy (la cartella è stata rinominata più volte).
+from core import comfy_legacy as _cl
+COMFY_ROOT = Path(os.environ.get("SKINTOKEN_COMFY_ROOT") or _cl.comfy_root()
+                  or _cl.CANDIDATES[0])
 COMFY_VENV_PY = COMFY_ROOT / "venv" / "Scripts" / "python.exe"
 SK_NODE_DIR = COMFY_ROOT / "custom_nodes" / "ComfyUI-SkinToken"
 GEN_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "rig_native_skintoken.py"
