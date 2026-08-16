@@ -386,6 +386,157 @@ def _patch_cpu_prompt_encoder():
 _patch_cpu_prompt_encoder()
 
 
+# --- CACHE DEGLI EMBEDDING DI PROMPT --------------------------------------------------------
+# Contesto del job, impostato da run_generation: la preferenza utente arriva nei PARAMS, non in env,
+# perché il server persistente non erediterebbe una variabile impostata dopo il suo avvio.
+_EMB_CTX = {"enabled": True, "hits": 0, "misses": 0, "saved_s": 0.0}
+
+
+def _emb_probe(tag: str, outputs) -> None:
+    """LTX_EMB_PROBE=1: stampa il digest dei tensori usciti dal PromptEncoder.
+
+    Serve a stabilire SPERIMENTALMENTE se l'encode è deterministico — run-to-run, fra chunk, fra
+    offload_mode diversi — prima di fidarsi di una cache. La garanzia «hit ≡ miss» si misura, non si
+    assume: se due encode identici danno digest diversi, la cache resta corretta ma la promessa
+    cambia natura (output equivalente, non identico)."""
+    try:
+        import hashlib as _h
+        from core import st_direct as _sd
+        for i, trio in enumerate(outputs):
+            parts = []
+            for name, t in zip(("video", "audio", "mask"), tuple(trio)):
+                if t is None:
+                    parts.append(f"{name}=None")
+                    continue
+                parts.append(f"{name}={_h.sha256(_sd.tensor_bytes(t)).hexdigest()[:16]} "
+                             f"{tuple(t.shape)}/{str(t.dtype).replace('torch.', '')}")
+            print(f"[emb-probe] {tag} p{i}: " + " · ".join(parts), flush=True)
+    except Exception as _e:                              # noqa: BLE001 — diagnostica, mai fatale
+        print(f"[emb-probe] fallito: {_e}", flush=True)
+
+
+def _patch_emb_cache():
+    """Avvolge `PromptEncoder.__call__` con la cache su disco degli embedding.
+
+    Installata DOPO `_patch_cpu_prompt_encoder` di proposito: così avvolge qualunque `__call__` sia
+    in piedi invece di sovrascriverlo (il codice CPU resta spento e intatto). Un solo punto intercetta
+    tutte le pipeline LTX di entrambe le release — ti2vid, a2vid, distilled, ic_lora, lipdub, retake,
+    keyframe_interpolation — perché condividono la stessa classe.
+
+    `**kw` obbligatorio: la firma 1.2.0 (release 2.5) ha un kwarg in più rispetto alla 1.1.6."""
+    try:
+        import time as _t
+        import ltx_pipelines.utils.blocks as _blk
+        _orig = _blk.PromptEncoder.__call__
+
+        def _key_material(self, prompts: list) -> dict:
+            """Tutto ciò che cambia l'output, letto dagli OGGETTI REALI e mai ricostruito da costanti.
+            In particolare l'embeddings processor viene dal CHECKPOINT (e per i checkpoint parziali da
+            una tupla (bundle_aux, ckpt)): leggerlo da `builder.model_path` è l'unico modo di coprire
+            anche quel caso."""
+            from core import emb_cache as _ec
+            te_b = getattr(self, "_text_encoder_builder", None)
+            ep_b = getattr(self, "_embeddings_processor_builder", None)
+            te_p = getattr(te_b, "model_path", None) or getattr(self, "_gemma_root", None)
+            ep_p = getattr(ep_b, "model_path", None) or getattr(self, "_checkpoint_path", None)
+            try:
+                import importlib.metadata as _md
+                pkg = _md.version("ltx-pipelines")
+            except Exception:                            # noqa: BLE001
+                pkg = "?"
+            return {
+                "schema": _ec.SCHEMA,
+                "prompts": [str(p).strip() for p in prompts],   # il tokenizer fa già strip(): sicuro
+                "te": _ec.file_fp(te_p),
+                "ep": _ec.file_fp(ep_p),
+                "dtype": str(getattr(self, "_dtype", "")),
+                "release": LTX_RELEASE,
+                "pkg": pkg,
+                "torch": torch.__version__,
+                "cuda": getattr(torch.version, "cuda", "?"),
+                "gpu": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"),
+            }
+
+        def _cached_call(self, prompts, **kw):
+            probe = os.environ.get("LTX_EMB_PROBE") == "1"
+            from core import emb_cache as _ec
+            # L'enhancer riscrive prompts[0] con un LLM DENTRO Gemma: il testo finale non è noto
+            # prima del load, quindi cachare non eviterebbe nulla e la chiave sarebbe una bugia.
+            if kw.get("enhance_first_prompt"):
+                print("[embcache] BYPASS: enhance attivo", flush=True)
+                out = _orig(self, prompts, **kw)
+                if probe:
+                    _emb_probe("enhance", out)
+                return out
+            if not (_EMB_CTX.get("enabled") and _ec.enabled()):
+                out = _orig(self, prompts, **kw)
+                if probe:
+                    _emb_probe("nocache", out)
+                return out
+
+            key = None
+            try:
+                key = _ec.key_for(_key_material(self, list(prompts)))
+                hit = _ec.get(key, device=str(getattr(self, "_device", "cuda")))
+            except Exception as _e:                      # noqa: BLE001 — chiave o lettura KO → si encoda
+                print(f"[embcache] lettura saltata ({type(_e).__name__}: {_e})", flush=True)
+                hit = None
+            if hit is not None:
+                try:
+                    from ltx_core.text_encoders.gemma.embeddings_processor import EmbeddingsProcessorOutput
+                    out = [EmbeddingsProcessorOutput(*trio) for trio in hit]
+                except Exception as _e:                  # noqa: BLE001 — tipo non importabile: si encoda
+                    print(f"[embcache] tipo non ricostruibile ({_e}) → riencodo", flush=True)
+                else:
+                    saved = 0.0
+                    try:
+                        saved = float((_ec._header(_ec.path_for(key))[0]
+                                       .get("__metadata__") or {}).get("encode_s", 0) or 0)
+                    except Exception:                    # noqa: BLE001
+                        pass
+                    _EMB_CTX["hits"] += 1
+                    _EMB_CTX["saved_s"] += saved
+                    print(f"[embcache] HIT {key[:8]} ({len(out)} prompt) — "
+                          f"risparmiati {saved:.1f}s (misurati al miss)", flush=True)
+                    if probe:
+                        _emb_probe("hit", out)
+                    return out
+
+            t0 = _t.time()
+            out = _orig(self, prompts, **kw)
+            dt = _t.time() - t0
+            _EMB_CTX["misses"] += 1
+            print(f"[embcache] MISS {(key or '?')[:8]} ({len(list(prompts))} prompt) — encode {dt:.2f}s",
+                  flush=True)
+            if probe:
+                _emb_probe("miss", out)
+            if key:
+                try:
+                    _ec.put(key, [tuple(o) for o in out], [str(p).strip() for p in prompts],
+                            {"encode_s": f"{dt:.2f}", "release": LTX_RELEASE})
+                except Exception as _e:                  # noqa: BLE001
+                    print(f"[embcache] scrittura fallita: {_e}", flush=True)
+            return out
+
+        _blk.PromptEncoder.__call__ = _cached_call
+        print("[embcache] PromptEncoder avvolto dalla cache embedding", flush=True)
+    except Exception as _e:                              # noqa: BLE001 — senza cache il worker gira uguale
+        print(f"[embcache] patch non installato: {_e}", flush=True)
+
+
+def _emb_summary(tag: str = "job") -> None:
+    """Riepilogo di fine job e azzeramento dei contatori. Il risparmio è MISURATO: viene dall'
+    `encode_s` registrato nella voce al momento del miss, non da una stima."""
+    h, m, s = _EMB_CTX["hits"], _EMB_CTX["misses"], _EMB_CTX["saved_s"]
+    if h or m:
+        print(f"[embcache] {tag}: {h} hit / {m} miss — {s:.1f}s risparmiati", flush=True)
+    _EMB_CTX["hits"] = _EMB_CTX["misses"] = 0
+    _EMB_CTX["saved_s"] = 0.0
+
+
+_patch_emb_cache()
+
+
 try:
     import ltx_core.loader.single_gpu_model_builder as _sgmb
     _orig_build = _sgmb.SingleGPUModelBuilder.build
@@ -1296,6 +1447,7 @@ def _run_chunked(p: dict, chunk: int) -> str:
         if os.path.exists(last):
             prev_img = last                                  # continuità visiva
         parts.append(cp["output"])
+    _emb_summary("catena chunk")                             # quanti encode ha evitato la cache
     # CROSSFADE (join morbidi) solo se richiesto (env) e SENZA audio: l'a2v (talk/canto) resta concat netto
     # per non desincronizzare il lip-sync. Fallback automatico al concat netto se il filtergraph fallisce.
     _ov = int(p.get("overlap_frames", 0) or 0)
@@ -1560,6 +1712,7 @@ def run_generation(p: dict) -> str:
     un cancel arrivato tra un chunk e l'altro."""
     import time
     _apply_release(p.get("ltx_release"))                     # rilega i componenti alla release del job
+    _EMB_CTX["enabled"] = bool(p.get("emb_cache", True))     # preferenza dai params (vale anche col server)
     _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)
         return run_t2a(p)
@@ -1954,7 +2107,9 @@ def main() -> None:
         p = json.load(fh)
     clear_cancel()                                           # top-level: nessun cancel residuo
     _free_image_server()
-    print("OK:" + run_generation_with_oom_retry(p), flush=True)
+    _out = run_generation_with_oom_retry(p)
+    _emb_summary()                                           # no-op se la catena chunk l'ha già stampato
+    print("OK:" + _out, flush=True)
 
 
 if __name__ == "__main__":

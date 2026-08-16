@@ -44,6 +44,21 @@ def commit_floor_mb() -> float:
     return _env_chain(20480.0, "LS_COMMIT_FLOOR_MB", "NATIVE_COMMIT_FLOOR_MB", "LTX_COMMIT_FLOOR_MB")
 
 
+def emb_cache_mb() -> float:
+    """Budget massimo (MB) della cache SU DISCO degli embedding di prompt (core/emb_cache).
+    È un budget di spazio, non di RAM: le voci sono 24 MB l'una e non toccano il commit."""
+    return _env_chain(4096.0, "LS_EMB_CACHE_MB")
+
+
+def disk_free_mb(path: str) -> float:
+    """Spazio libero (MB) sul volume che ospita `path`; 1e9 se non determinabile."""
+    try:
+        import shutil
+        return shutil.disk_usage(path).free / 2**20
+    except Exception:                                   # noqa: BLE001
+        return 1e9
+
+
 def enabled() -> bool:
     """Parcheggio/cache RAM abilitati? (LS_RAM_CACHE=0 o legacy LTX_RAM_PARK=0 → off)."""
     if os.environ.get("LS_RAM_CACHE", "").strip() == "0":

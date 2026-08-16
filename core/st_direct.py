@@ -95,6 +95,47 @@ def load_file(path: str, device: str = "cpu", want=None) -> dict:
     return out
 
 
+def _dtypes_rev() -> dict:
+    """torch → nome safetensors (inverso di `_dtypes`)."""
+    return {v: k for k, v in _dtypes().items()}
+
+
+def tensor_bytes(t) -> memoryview:
+    """I byte grezzi di un tensore, senza passare da numpy (che non conosce bf16/fp8).
+    `view(torch.uint8)` su un tensore contiguo reinterpreta il buffer senza copiarlo."""
+    flat = t.detach().contiguous().cpu().flatten()
+    if flat.numel() == 0:
+        return memoryview(b"")
+    return memoryview(flat.view(torch.uint8).numpy())
+
+
+def save_file(path: str, tensors: dict, metadata: dict | None = None) -> None:
+    """Scrive un .safetensors SENZA mmap: header + un tensore alla volta.
+
+    Simmetrico di `load_file`: stesso code path, nessuna dipendenza dal writer Rust, e soprattutto
+    commit di picco = UN tensore invece dell'intero dict serializzato in un buffer unico — che è la
+    ragione d'essere di questo modulo (vedi il docstring in testa).
+    `metadata`: solo coppie stringa→stringa, come vuole il formato."""
+    rev = _dtypes_rev()
+    hdr: dict = {}
+    off = 0
+    order = list(tensors.keys())
+    for name in order:
+        t = tensors[name]
+        n = t.numel() * t.element_size()
+        hdr[name] = {"dtype": rev[t.dtype], "shape": list(t.shape), "data_offsets": [off, off + n]}
+        off += n
+    if metadata:
+        hdr["__metadata__"] = {str(k): str(v) for k, v in metadata.items()}
+    blob = json.dumps(hdr, separators=(",", ":")).encode("utf-8")
+    blob += b" " * ((8 - len(blob) % 8) % 8)             # header a multipli di 8 (come il writer ufficiale)
+    with open(path, "wb") as fh:
+        fh.write(struct.pack("<Q", len(blob)))
+        fh.write(blob)
+        for name in order:
+            fh.write(tensor_bytes(tensors[name]))
+
+
 class _LazySlice:
     """Vista pigra su un tensore (equivalente di PySafeSlice): legge dal disco solo all'indexing."""
 

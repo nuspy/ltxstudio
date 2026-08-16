@@ -192,6 +192,14 @@ def build_params(
                 f"selezionata è LTX {ltx_release}. Scegli un checkpoint {ltx_release} oppure "
                 f"cambia release (nessuna sostituzione automatica).")
         params["ltx_release"] = str(ltx_release or _det or _rel.DEFAULT_RELEASE)
+        # Cache degli embedding di prompt (core/emb_cache): la preferenza viaggia nei PARAMS, non in
+        # env, perché il server persistente non erediterebbe una variabile impostata dopo il suo avvio.
+        # Qui, punto unico, la ereditano GUI, API, Film Studio e videoclip senza doverla ripetere.
+        try:
+            from core import user_prefs as _up
+            params["emb_cache"] = bool(_up.get("emb_cache.enabled", True))
+        except Exception:                                    # noqa: BLE001 — prefs assenti: cache attiva
+            params["emb_cache"] = True
 
     if extra:
         params.update(extra)                                 # ref_strength, loras, chunk_frames, audio, lingbot_variant…
