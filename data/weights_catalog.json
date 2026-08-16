@@ -16,7 +16,9 @@
         "flux1-dev"
       ],
       "url": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
-      "repo_full_mb": 55204
+      "repo_full_mb": 55204,
+      "category": "image",
+      "arch": "flux1"
     },
     {
       "id": "flux1-fill",
@@ -33,7 +35,9 @@
         "FLUX_DEV_Fill"
       ],
       "url": "https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev",
-      "repo_full_mb": 55367
+      "repo_full_mb": 55367,
+      "category": "image",
+      "arch": "flux1"
     },
     {
       "id": "flux1-kontext",
@@ -50,7 +54,9 @@
         "Kontext"
       ],
       "url": "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev",
-      "repo_full_mb": 55209
+      "repo_full_mb": 55209,
+      "category": "image",
+      "arch": "flux1"
     },
     {
       "id": "flux2-dev",
@@ -68,7 +74,9 @@
         "FLUX_2_Dev"
       ],
       "url": "https://huggingface.co/black-forest-labs/FLUX.2-dev",
-      "repo_full_mb": 169411
+      "repo_full_mb": 169411,
+      "category": "image",
+      "arch": "flux2"
     },
     {
       "id": "mistral-flux2-te",
@@ -76,7 +84,7 @@
       "label": "Mistral-3 24B (TE FLUX.2)",
       "kind": "snapshot",
       "repo_id": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
-      "type": "text_encoders",
+      "type": "TextEncoders",
       "family": "Flux",
       "gated": true,
       "approx_gb": 48,
@@ -85,7 +93,9 @@
         "mistral_3_small_flux2"
       ],
       "url": "https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503",
-      "repo_full_mb": 91627
+      "repo_full_mb": 91627,
+      "category": "image",
+      "arch": "flux2"
     },
     {
       "id": "zimage-turbo",
@@ -102,7 +112,9 @@
         "z_image"
       ],
       "url": "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo",
-      "repo_full_mb": 31376
+      "repo_full_mb": 31376,
+      "category": "image",
+      "arch": "zimage"
     },
     {
       "id": "ernie-image",
@@ -119,7 +131,9 @@
         "ernie"
       ],
       "url": "https://huggingface.co/baidu/ERNIE-Image",
-      "repo_full_mb": 30182
+      "repo_full_mb": 30182,
+      "category": "image",
+      "arch": "ernie"
     },
     {
       "id": "ltx23",
@@ -129,7 +143,7 @@
       "repo_id": "Lightricks/LTX-2.3",
       "type": "diffusers",
       "family": "LTX",
-      "gated": true,
+      "gated": false,
       "approx_gb": 40,
       "scan_names": [
         "LTX-2.3",
@@ -137,7 +151,10 @@
         "ltx-2.3"
       ],
       "url": "https://huggingface.co/Lightricks/LTX-2.3",
-      "repo_full_mb": 149732
+      "repo_full_mb": 149732,
+      "category": "video",
+      "arch": "ltx23",
+      "note": "snapshot diffusers (40GB) — i motori NATIVI usano i file singoli (voci ltx23-*); tenerlo solo per pipeline diffusers pure"
     },
     {
       "id": "lingbot_dense",
@@ -155,7 +172,9 @@
         "lingbot_dense"
       ],
       "url": "https://huggingface.co/robbyant/lingbot-video-dense-1.3b",
-      "repo_full_mb": 13000
+      "repo_full_mb": 13000,
+      "category": "video",
+      "arch": "lingbot"
     },
     {
       "id": "lingbot_moe",
@@ -173,7 +192,9 @@
         "lingbot_moe"
       ],
       "url": "https://huggingface.co/robbyant/lingbot-video-moe-30b-a3b",
-      "repo_full_mb": 133000
+      "repo_full_mb": 133000,
+      "category": "video",
+      "arch": "lingbot"
     },
     {
       "id": "lingbot_moe_uint4",
@@ -191,7 +212,9 @@
         "sdnq-uint4"
       ],
       "url": "https://huggingface.co/WaveCut/LingBot-Video-MoE-30B-A3B-SDNQ-uint4-static",
-      "repo_full_mb": 22000
+      "repo_full_mb": 22000,
+      "category": "video",
+      "arch": "lingbot"
     },
     {
       "id": "lingbot_dense_fp8",
@@ -208,7 +231,9 @@
         "lingbot-dense-fp8"
       ],
       "url": "https://huggingface.co/ALXOPENSOURCE/lingbot-video-1.3b-fp8",
-      "repo_full_mb": 8000
+      "repo_full_mb": 8000,
+      "category": "video",
+      "arch": "lingbot"
     },
     {
       "id": "lingbot_rewriter_lora",
@@ -216,7 +241,7 @@
       "label": "LingBot Prompt Rewriter LoRA (prosa→JSON)",
       "kind": "snapshot",
       "repo_id": "robbyant/lingbot-video-rewriter-lora",
-      "type": "lora",
+      "type": "LoRA",
       "family": "LingBot",
       "gated": false,
       "approx_gb": 1,
@@ -225,7 +250,9 @@
         "lingbot-rewriter-lora"
       ],
       "url": "https://huggingface.co/robbyant/lingbot-video-rewriter-lora",
-      "repo_full_mb": 600
+      "repo_full_mb": 600,
+      "category": "video",
+      "arch": "lingbot"
     },
     {
       "id": "lingbot_rewriter_base",
@@ -233,7 +260,7 @@
       "label": "LingBot Prompt Rewriter base — Qwen3.6-27B (opzionale, grande)",
       "kind": "snapshot",
       "repo_id": "Qwen/Qwen3.6-27B",
-      "type": "text_encoder",
+      "type": "TextEncoders",
       "family": "Qwen",
       "gated": false,
       "approx_gb": 54,
@@ -242,7 +269,9 @@
         "qwen3.6-27b"
       ],
       "url": "https://huggingface.co/Qwen/Qwen3.6-27B",
-      "repo_full_mb": 54000
+      "repo_full_mb": 54000,
+      "category": "video",
+      "arch": "qwen"
     },
     {
       "id": "krea2_turbo",
@@ -260,7 +289,9 @@
         "krea2-turbo"
       ],
       "url": "https://huggingface.co/krea/Krea-2-Turbo",
-      "repo_full_mb": 61000
+      "repo_full_mb": 61000,
+      "category": "image",
+      "arch": "krea2"
     },
     {
       "id": "krea2_raw",
@@ -278,7 +309,9 @@
         "krea2-raw"
       ],
       "url": "https://huggingface.co/krea/Krea-2-Raw",
-      "repo_full_mb": 35000
+      "repo_full_mb": 35000,
+      "category": "image",
+      "arch": "krea2"
     },
     {
       "id": "krea_rt",
@@ -299,7 +332,9 @@
       "repo_full_mb": 29000,
       "deps": [
         "wan21_14b_diffusers"
-      ]
+      ],
+      "category": "video",
+      "arch": "krea_rt"
     },
     {
       "id": "wan21_14b_diffusers",
@@ -316,7 +351,9 @@
         "wan2.1-t2v-14b"
       ],
       "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-14B-Diffusers",
-      "repo_full_mb": 33000
+      "repo_full_mb": 33000,
+      "category": "video",
+      "arch": "wan"
     },
     {
       "id": "da2",
@@ -333,7 +370,9 @@
         "da2"
       ],
       "url": "https://huggingface.co/haodongli/DA-2",
-      "repo_full_mb": 1316
+      "repo_full_mb": 1316,
+      "category": "threed",
+      "arch": "worldgen"
     },
     {
       "id": "mmaudio",
@@ -350,7 +389,9 @@
         "mmaudio"
       ],
       "url": "https://huggingface.co/hkchengrex/MMAudio",
-      "repo_full_mb": 52122
+      "repo_full_mb": 52122,
+      "category": "music",
+      "arch": "mmaudio"
     },
     {
       "id": "heartmula-gen",
@@ -367,7 +408,9 @@
         "HeartMuLaGen"
       ],
       "url": "https://huggingface.co/HeartMuLa/HeartMuLaGen",
-      "repo_full_mb": 9
+      "repo_full_mb": 9,
+      "category": "music",
+      "arch": "heartmula"
     },
     {
       "id": "heartmula-3b",
@@ -384,7 +427,9 @@
         "HeartMuLa-oss-3B"
       ],
       "url": "https://huggingface.co/HeartMuLa/HeartMuLa-oss-3B-happy-new-year",
-      "repo_full_mb": 15023
+      "repo_full_mb": 15023,
+      "category": "music",
+      "arch": "heartmula"
     },
     {
       "id": "heartcodec",
@@ -401,7 +446,9 @@
         "HeartCodec"
       ],
       "url": "https://huggingface.co/HeartMuLa/HeartCodec-oss-20260123",
-      "repo_full_mb": 6331
+      "repo_full_mb": 6331,
+      "category": "music",
+      "arch": "heartmula"
     },
     {
       "id": "qwen3-8b-klein-te",
@@ -419,7 +466,9 @@
         "Qwen3-8B"
       ],
       "url": "https://huggingface.co/Qwen/Qwen3-8B",
-      "repo_full_mb": 15638
+      "repo_full_mb": 15638,
+      "category": "image",
+      "arch": "flux2"
     },
     {
       "id": "qwen3-4b-klein-te",
@@ -437,7 +486,9 @@
         "Qwen3-4B"
       ],
       "url": "https://huggingface.co/Qwen/Qwen3-4B",
-      "repo_full_mb": 7687
+      "repo_full_mb": 7687,
+      "category": "image",
+      "arch": "flux2"
     },
     {
       "id": "trellis2-4b",
@@ -455,7 +506,9 @@
         "trellis2"
       ],
       "url": "https://huggingface.co/microsoft/TRELLIS.2-4B",
-      "repo_full_mb": 15485
+      "repo_full_mb": 15485,
+      "category": "threed",
+      "arch": "trellis"
     },
     {
       "id": "dinov3-vitl16",
@@ -473,7 +526,9 @@
       ],
       "note": "facebook/dinov3-vitl16 è GATED → si usa il mirror camenduru; patch model_name in pipeline.json",
       "url": "https://huggingface.co/camenduru/dinov3-vitl16-pretrain-lvd1689m",
-      "repo_full_mb": 1156
+      "repo_full_mb": 1156,
+      "category": "threed",
+      "arch": "trellis"
     },
     {
       "id": "birefnet",
@@ -490,7 +545,9 @@
       ],
       "note": "rembg per TRELLIS (al posto di briaai/RMBG-2.0 gated). Serve pip kornia+timm nel venv TRELLIS2",
       "url": "https://huggingface.co/ZhengPeng7/BiRefNet",
-      "repo_full_mb": 424
+      "repo_full_mb": 424,
+      "category": "threed",
+      "arch": "trellis"
     },
     {
       "id": "svdq-fp4-fluxfill",
@@ -508,7 +565,9 @@
       ],
       "note": "ramo low_vram di WorldGen; evita i 24GB del FLUX-Fill bf16. Richiede patch nunchaku Windows (backslash repo-id)",
       "url": "https://huggingface.co/mit-han-lab/svdq-fp4-flux.1-fill-dev",
-      "repo_full_mb": 6715
+      "repo_full_mb": 6715,
+      "category": "threed",
+      "arch": "worldgen"
     },
     {
       "id": "worldgen-lora",
@@ -516,7 +575,7 @@
       "label": "WorldGen img2scene LoRA",
       "kind": "snapshot",
       "repo_id": "LeoXie/WorldGen",
-      "type": "lora",
+      "type": "LoRA",
       "family": "WorldGen",
       "gated": false,
       "approx_gb": 0.1,
@@ -525,7 +584,9 @@
         "worldgen_img2scene"
       ],
       "url": "https://huggingface.co/LeoXie/WorldGen",
-      "repo_full_mb": 76
+      "repo_full_mb": 76,
+      "category": "threed",
+      "arch": "worldgen"
     },
     {
       "id": "acestep-3.5b",
@@ -535,7 +596,7 @@
       "repo_id": "ACE-Step/ACE-Step-v1-3.5B",
       "type": "audio",
       "family": "ACE-Step",
-      "tool_dest": "C:\\Users\\atain\\.cache\\ace-step\\checkpoints",
+      "tool_dest": "~/.cache/ace-step/checkpoints",
       "gated": false,
       "approx_gb": 14,
       "scan_names": [
@@ -544,7 +605,9 @@
       ],
       "note": "file grosso 6.5GB → su connessione instabile usare resume/hf_xet (IncompleteRead)",
       "url": "https://huggingface.co/ACE-Step/ACE-Step-v1-3.5B",
-      "repo_full_mb": 7892
+      "repo_full_mb": 7892,
+      "category": "music",
+      "arch": "acestep"
     },
     {
       "id": "voice-fish",
@@ -552,14 +615,16 @@
       "label": "Fish/OpenAudio S1-mini",
       "kind": "snapshot",
       "repo_id": "fishaudio/openaudio-s1-mini",
-      "type": "tts",
-      "family": "voice",
+      "type": "TTS",
+      "family": "",
       "gated": true,
       "approx_gb": 3.6,
       "scan_names": [
         "openaudio",
         "fish-speech"
-      ]
+      ],
+      "category": "tts",
+      "arch": "fish"
     },
     {
       "id": "voice-vibevoice",
@@ -567,15 +632,17 @@
       "label": "VibeVoice 1.5B (multi-speaker)",
       "kind": "snapshot",
       "repo_id": "microsoft/VibeVoice-1.5B",
-      "type": "tts",
-      "family": "voice",
+      "type": "TTS",
+      "family": "",
       "gated": false,
       "approx_gb": 5.4,
       "scan_names": [
         "VibeVoice"
       ],
       "url": "https://huggingface.co/microsoft/VibeVoice-1.5B",
-      "repo_full_mb": 5158
+      "repo_full_mb": 5158,
+      "category": "tts",
+      "arch": "vibevoice"
     },
     {
       "id": "voice-cosyvoice2",
@@ -583,8 +650,8 @@
       "label": "CosyVoice2 0.5B",
       "kind": "snapshot",
       "repo_id": "FunAudioLLM/CosyVoice2-0.5B",
-      "type": "tts",
-      "family": "voice",
+      "type": "TTS",
+      "family": "",
       "gated": false,
       "approx_gb": 4.9,
       "scan_names": [
@@ -592,7 +659,9 @@
         "cosyvoice"
       ],
       "url": "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B",
-      "repo_full_mb": 4632
+      "repo_full_mb": 4632,
+      "category": "tts",
+      "arch": "cosyvoice"
     },
     {
       "id": "gfpgan-14",
@@ -600,7 +669,7 @@
       "label": "GFPGAN v1.4 (restauro volti)",
       "kind": "file",
       "type": "facerestore_models",
-      "family": "GFPGAN",
+      "family": "",
       "filename": "GFPGANv1.4.pth",
       "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.4/GFPGANv1.4.pth",
       "approx_gb": 0.3,
@@ -611,7 +680,9 @@
         "GFPGANv1.4",
         "gfpgan"
       ],
-      "gated": false
+      "gated": false,
+      "category": "aux",
+      "arch": "gfpgan"
     },
     {
       "id": "codeformer",
@@ -619,7 +690,7 @@
       "label": "CodeFormer (restauro volti)",
       "kind": "file",
       "type": "facerestore_models",
-      "family": "CodeFormer",
+      "family": "",
       "filename": "codeformer.pth",
       "url": "https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth",
       "approx_gb": 0.3,
@@ -629,7 +700,9 @@
       "scan_names": [
         "codeformer"
       ],
-      "gated": false
+      "gated": false,
+      "category": "aux",
+      "arch": "codeformer"
     },
     {
       "id": "pulid-flux",
@@ -637,7 +710,7 @@
       "label": "PuLID FLUX (identità volto)",
       "kind": "file",
       "type": "pulid",
-      "family": "Flux",
+      "family": "",
       "filename": "pulid_flux_v0.9.1.safetensors",
       "repo_id": "guozinan/PuLID",
       "approx_gb": 1.1,
@@ -651,7 +724,9 @@
       "gated": false,
       "url": "https://huggingface.co/guozinan/PuLID/resolve/main/pulid_flux_v0.9.1.safetensors",
       "sha256": "92c41c3af322b02e58e1b32842e4601e08c8f16ec1fe80089dbe957df510f51d",
-      "size_mb": 1089
+      "size_mb": 1089,
+      "category": "image",
+      "arch": "flux1"
     },
     {
       "id": "flux1-krea",
@@ -672,7 +747,9 @@
       ],
       "gated": false,
       "url": "https://huggingface.co/black-forest-labs/FLUX.1-Krea-dev",
-      "repo_full_mb": 55215
+      "repo_full_mb": 55215,
+      "category": "image",
+      "arch": "flux1"
     },
     {
       "id": "ltx-iclora-canny",
@@ -690,7 +767,12 @@
         "ic-lora-canny",
         "canny-control"
       ],
-      "gated": false
+      "gated": false,
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2-19b-IC-LoRA-Canny-Control",
+      "url": "https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Canny-Control",
+      "size_mb": 624
     },
     {
       "id": "ltx-iclora-depth",
@@ -708,7 +790,11 @@
         "ic-lora-depth",
         "depth-control"
       ],
-      "gated": false
+      "gated": false,
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2-19b-IC-LoRA-Depth-Control",
+      "url": "https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Depth-Control"
     },
     {
       "id": "ltx-iclora-pose",
@@ -726,7 +812,11 @@
         "ic-lora-pose",
         "pose-control"
       ],
-      "gated": false
+      "gated": false,
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2-19b-IC-LoRA-Pose-Control",
+      "url": "https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Pose-Control"
     },
     {
       "id": "flux-vae-ae",
@@ -743,7 +833,11 @@
       "scan_names": [
         "ae.safetensors"
       ],
-      "gated": false
+      "gated": true,
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "black-forest-labs/FLUX.1-dev",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-dev"
     },
     {
       "id": "flux2-vae",
@@ -761,7 +855,13 @@
       "scan_names": [
         "flux2-vae"
       ],
-      "gated": false
+      "gated": false,
+      "category": "image",
+      "arch": "flux2",
+      "repo_id": "Comfy-Org/flux2-dev",
+      "remote_filename": "split_files/vae/flux2-vae.safetensors",
+      "url": "https://huggingface.co/Comfy-Org/flux2-dev",
+      "size_mb": 321
     },
     {
       "id": "skintoken-grpo",
@@ -780,7 +880,11 @@
         "articulation_xl",
         "skintoken"
       ],
-      "gated": false
+      "gated": false,
+      "category": "threed",
+      "arch": "skintoken",
+      "no_remote": true,
+      "note": "fonte remota non identificata (16/08) — pesi installati da install_skintokens"
     },
     {
       "id": "ernie-ministral",
@@ -798,7 +902,11 @@
         "ministral-3-3b",
         "ministral"
       ],
-      "gated": false
+      "gated": false,
+      "category": "image",
+      "arch": "ernie",
+      "no_remote": true,
+      "note": "fonte remota non identificata (16/08) — file presente localmente"
     },
     {
       "id": "wan21_13b_diffusers",
@@ -816,7 +924,9 @@
       ],
       "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
       "repo_full_mb": 17000,
-      "note": "NON per Self-Forcing (serve il formato nativo wan21_13b_original)"
+      "note": "NON per Self-Forcing (serve il formato nativo wan21_13b_original)",
+      "category": "video",
+      "arch": "wan"
     },
     {
       "id": "self_forcing_dmd",
@@ -825,7 +935,7 @@
       "kind": "file",
       "repo_id": "gdhe17/Self-Forcing",
       "filename": "checkpoints/self_forcing_dmd.pt",
-      "type": "checkpoint",
+      "type": "Checkpoints",
       "family": "SelfForcing",
       "gated": false,
       "approx_gb": 6,
@@ -840,7 +950,9 @@
       "note": "realtime su 5090 (24GB min); runner repo Self-Forcing + base wan21_13b_diffusers",
       "deps": [
         "wan21_13b_original"
-      ]
+      ],
+      "category": "video",
+      "arch": "self_forcing"
     },
     {
       "id": "wan21_13b_original",
@@ -848,7 +960,7 @@
       "label": "Wan 2.1 T2V 1.3B (formato nativo, base per Self-Forcing realtime)",
       "kind": "snapshot",
       "repo_id": "Wan-AI/Wan2.1-T2V-1.3B",
-      "type": "checkpoint",
+      "type": "Checkpoints",
       "family": "Wan13B",
       "gated": false,
       "approx_gb": 18,
@@ -857,7 +969,1079 @@
         "wan2.1-t2v-1.3b"
       ],
       "url": "https://huggingface.co/Wan-AI/Wan2.1-T2V-1.3B",
-      "repo_full_mb": 18000
+      "repo_full_mb": 18000,
+      "category": "video",
+      "arch": "wan"
+    },
+    {
+      "id": "ltx23-dev-fp8",
+      "module": "Video",
+      "label": "LTX-2.3 22B dev fp8 (checkpoint nativo)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 27.2,
+      "scan_names": [
+        "ltx-2.3-22b-dev-fp8"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-fp8",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-fp8",
+      "filename": "ltx-2.3-22b-dev-fp8.safetensors"
+    },
+    {
+      "id": "ltx23-distilled-fp8",
+      "module": "Video",
+      "label": "LTX-2.3 22B distilled fp8 (veloce, 8 step)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 27.5,
+      "scan_names": [
+        "ltx-2.3-22b-distilled-fp8"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-fp8",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-fp8",
+      "filename": "ltx-2.3-22b-distilled-fp8.safetensors",
+      "install_role": "base"
+    },
+    {
+      "id": "ltx23-distilled-lora-384",
+      "module": "Video",
+      "label": "LTX-2.3 distilled-LoRA 384 (OBBLIGATORIA coi dev)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 7.1,
+      "scan_names": [
+        "distilled-lora-384-1.1"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3",
+      "filename": "ltx-2.3-22b-distilled-lora-384-1.1.safetensors",
+      "install_role": "base"
+    },
+    {
+      "id": "ltx23-spatial-upscaler",
+      "module": "Video",
+      "label": "LTX-2.3 spatial upscaler x2 1.1",
+      "kind": "file",
+      "type": "latent_upscale_models",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.93,
+      "scan_names": [
+        "spatial-upscaler-x2-1.1"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3",
+      "filename": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+      "install_role": "base"
+    },
+    {
+      "id": "ltx23-temporal-upscaler",
+      "module": "Video",
+      "label": "LTX-2.3 temporal upscaler x2 1.0",
+      "kind": "file",
+      "type": "latent_upscale_models",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.25,
+      "scan_names": [
+        "temporal-upscaler-x2"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3",
+      "filename": "ltx-2.3-temporal-upscaler-x2-1.0.safetensors"
+    },
+    {
+      "id": "ltx23-gemma-te",
+      "module": "Video",
+      "label": "Gemma-3 12B TE (formato ltx-core, cartella gemma-3-ltx)",
+      "kind": "snapshot",
+      "type": "misc",
+      "family": "",
+      "gated": false,
+      "approx_gb": 24.0,
+      "scan_names": [
+        "gemma-3-ltx"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2",
+      "url": "https://huggingface.co/Lightricks/LTX-2",
+      "tool_dest": "E:\\AI\\Models\\TextEncoders\\gemma-3-ltx",
+      "install_role": "base",
+      "note": "subset text_encoder/ del repo LTX-2 (formato ltx-core)",
+      "allow_patterns": [
+        "text_encoder/*",
+        "tokenizer*",
+        "*.json"
+      ]
+    },
+    {
+      "id": "ltx23-gguf-q4-distilled",
+      "module": "Video",
+      "label": "LTX-2.3 distilled GGUF Q4_K_M (GPU piccole)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 16.6,
+      "scan_names": [
+        "distilled-1.1-Q4_K_M"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "QuantStack/LTX-2.3-GGUF",
+      "url": "https://huggingface.co/QuantStack/LTX-2.3-GGUF",
+      "filename": "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
+      "remote_filename": "LTX-2.3-distilled-1.1/LTX-2.3-22B-distilled-1.1-Q4_K_M.gguf"
+    },
+    {
+      "id": "ltx-iclora-detailer",
+      "module": "Video",
+      "label": "IC-LoRA Detailer",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 2.4,
+      "scan_names": [
+        "ltx-2-19b-ic-lora-detailer.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2-19b-IC-LoRA-Detailer",
+      "url": "https://huggingface.co/Lightricks/LTX-2-19b-IC-LoRA-Detailer",
+      "filename": "ltx-2-19b-ic-lora-detailer.safetensors"
+    },
+    {
+      "id": "ltx-iclora-union",
+      "module": "ControlNet",
+      "label": "IC-LoRA Union Control ref0.5",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.66,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Union-Control",
+      "filename": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"
+    },
+    {
+      "id": "ltx-iclora-motion-track",
+      "module": "ControlNet",
+      "label": "IC-LoRA Motion-Track ref0.5",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.33,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-Motion-Track-Control",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Motion-Track-Control",
+      "filename": "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors"
+    },
+    {
+      "id": "ltx-iclora-outpaint",
+      "module": "Video",
+      "label": "IC-LoRA In/Outpainting",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": true,
+      "approx_gb": 1.3,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-outpaint.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting",
+      "filename": "ltx-2.3-22b-ic-lora-outpaint.safetensors",
+      "remote_filename": "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors"
+    },
+    {
+      "id": "ltx-iclora-refocus",
+      "module": "Video",
+      "label": "IC-LoRA ReFocus",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 1.3,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-refocus.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "oumoumad/LTX-2.3-22b-IC-LoRA-ReFocus",
+      "url": "https://huggingface.co/oumoumad/LTX-2.3-22b-IC-LoRA-ReFocus",
+      "filename": "ltx-2.3-22b-ic-lora-refocus.safetensors"
+    },
+    {
+      "id": "ltx-iclora-hdr",
+      "module": "Video",
+      "label": "IC-LoRA HDR 0.9",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": true,
+      "approx_gb": 0.33,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-HDR",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-HDR",
+      "filename": "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors"
+    },
+    {
+      "id": "ltx-iclora-lipdub",
+      "module": "Video",
+      "label": "IC-LoRA DubIt/LipDub 0.9",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": true,
+      "approx_gb": 2.5,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-DubIt",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-DubIt",
+      "filename": "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors",
+      "remote_filename": "ltx-2.3-22b-ic-lora-dubit-0.9.safetensors"
+    },
+    {
+      "id": "ltx-iclora-motiondeblur",
+      "module": "Video",
+      "label": "IC-LoRA Deblur 0.9",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": true,
+      "approx_gb": 0.9,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-motiondeblur.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-Deblur",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Deblur",
+      "filename": "ltx-2.3-22b-ic-lora-motiondeblur.safetensors",
+      "remote_filename": "ltx-2.3-22b-ic-lora-deblur-0.9.safetensors"
+    },
+    {
+      "id": "ltx-iclora-uncompress",
+      "module": "Video",
+      "label": "IC-LoRA Uncompress (fonte remota ignota)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 1.0,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-uncompress.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "ltx-2.3-22b-ic-lora-uncompress.safetensors",
+      "no_remote": true
+    },
+    {
+      "id": "ltx-iclora-deinterlace",
+      "module": "Video",
+      "label": "IC-LoRA Deinterlace (fonte remota ignota)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 1.0,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-deinterlace.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "ltx-2.3-22b-ic-lora-deinterlace.safetensors",
+      "no_remote": true
+    },
+    {
+      "id": "ltx-iclora-restyle",
+      "module": "Video",
+      "label": "IC-LoRA ReStyle (community)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.8,
+      "scan_names": [
+        "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors",
+      "no_remote": true
+    },
+    {
+      "id": "ltx23-transformer-only-fp8scaled",
+      "module": "Video",
+      "label": "LTX-2.3 distilled transformer-only fp8_scaled (comfy, fonte ignota)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTXVideo",
+      "gated": false,
+      "approx_gb": 21.0,
+      "scan_names": [
+        "ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+      "no_remote": true,
+      "note": "su disco in LTXVideo\\v2\\ — usato da extend_pipeline/ltx2_service"
+    },
+    {
+      "id": "gemma3-12b-fp8-comfy",
+      "module": "Video",
+      "label": "Gemma-3 12B it fp8_scaled (single-file comfy)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 12.3,
+      "scan_names": [
+        "gemma_3_12B_it_fp8_scaled.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Comfy-Org/ltx-2",
+      "url": "https://huggingface.co/Comfy-Org/ltx-2",
+      "filename": "gemma_3_12B_it_fp8_scaled.safetensors",
+      "remote_filename": "split_files/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors"
+    },
+    {
+      "id": "gemma-abliterated",
+      "module": "Video",
+      "label": "Gemma-3 12B abliterated (TE NSFW)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 21.9,
+      "scan_names": [
+        "abliterated"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "FusionCow/Gemma-3-12b-Abliterated-LTX2",
+      "url": "https://huggingface.co/FusionCow/Gemma-3-12b-Abliterated-LTX2",
+      "filename": "gemma_3_12B_it_abliterated.safetensors",
+      "remote_filename": "gemma_ablit_fixed_bf16.safetensors",
+      "install_role": "base",
+      "sensitivity": "adult"
+    },
+    {
+      "id": "ltx23-eros",
+      "module": "Video",
+      "label": "LTX-2.3 10Eros (checkpoint NSFW, fonte community)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 27.0,
+      "scan_names": [
+        "ltx2310eros_v1.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "ltx2310eros_v1.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true
+    },
+    {
+      "id": "ltx25-transformer-nvfp4",
+      "module": "Video",
+      "label": "LTX-2.5 22B distilled transformer nvfp4",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": true,
+      "approx_gb": 17.4,
+      "scan_names": [
+        "ltx-2.5-22b-distilled-transformer-nvfp4.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-22b-distilled-transformer-nvfp4.safetensors",
+      "remote_filename": "diffusion_models/ltx-2.5-22b-distilled-transformer-nvfp4.safetensors"
+    },
+    {
+      "id": "ltx25-transformer-int8",
+      "module": "Video",
+      "label": "LTX-2.5 22B distilled transformer int8 (comfy)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": true,
+      "approx_gb": 20.0,
+      "scan_names": [
+        "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+      "remote_filename": "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
+    },
+    {
+      "id": "ltx25-te-bf16",
+      "module": "Video",
+      "label": "LTX-2.5 Gemma-4 TE bf16",
+      "kind": "file",
+      "type": "text_encoders",
+      "family": "",
+      "gated": true,
+      "approx_gb": 24.5,
+      "scan_names": [
+        "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "remote_filename": "text_encoders/gemma4-12b-with-proj-ltx-2.5-bf16.safetensors"
+    },
+    {
+      "id": "ltx25-te-nvfp4-local",
+      "module": "Video",
+      "label": "LTX-2.5 Gemma-4 TE nvfp4-torchao (derivato localmente)",
+      "kind": "file",
+      "type": "text_encoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 6.9,
+      "scan_names": [
+        "gemma4-12b-with-proj-nvfp4-torchao.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "filename": "gemma4-12b-with-proj-nvfp4-torchao.safetensors",
+      "no_remote": true,
+      "note": "conversione locale del TE bf16 (6.9GB vs 24.5)"
+    },
+    {
+      "id": "ltx25-video-vae-conv",
+      "module": "Video",
+      "label": "LTX-2.5 video VAE Conv",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": true,
+      "approx_gb": 1.36,
+      "scan_names": [
+        "ltx-2.5-video-vae-conv-bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-video-vae-conv-bf16.safetensors",
+      "remote_filename": "vae/ltx-2.5-video-vae-conv-bf16.safetensors"
+    },
+    {
+      "id": "ltx25-audio-vae",
+      "module": "Video",
+      "label": "LTX-2.5 audio VAE (+vocoder)",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": true,
+      "approx_gb": 0.34,
+      "scan_names": [
+        "ltx-2.5-audio-vae-bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-audio-vae-bf16.safetensors",
+      "remote_filename": "vae/ltx-2.5-audio-vae-bf16.safetensors"
+    },
+    {
+      "id": "ltx25-diffusion-decoder",
+      "module": "Video",
+      "label": "LTX-2.5 video VAE (diffusion decoder)",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": true,
+      "approx_gb": 1.37,
+      "scan_names": [
+        "ltx-2.5-video-vae-bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-video-vae-bf16.safetensors",
+      "remote_filename": "vae/ltx-2.5-video-vae-bf16.safetensors"
+    },
+    {
+      "id": "ltx25-spatial-upscaler",
+      "module": "Video",
+      "label": "LTX-2.5 latent spatial upscaler x2",
+      "kind": "file",
+      "type": "latent_upscale_models",
+      "family": "",
+      "gated": true,
+      "approx_gb": 0.93,
+      "scan_names": [
+        "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "remote_filename": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+    },
+    {
+      "id": "ltx25-temporal-upscaler",
+      "module": "Video",
+      "label": "LTX-2.5 latent temporal upscaler x2",
+      "kind": "file",
+      "type": "latent_upscale_models",
+      "family": "",
+      "gated": true,
+      "approx_gb": 0.25,
+      "scan_names": [
+        "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors",
+      "remote_filename": "latent_upscale_models/ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors"
+    },
+    {
+      "id": "ltx25-distilled-lora-450",
+      "module": "Video",
+      "label": "LTX-2.5 distilled-LoRA 450",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2.5",
+      "gated": true,
+      "approx_gb": 8.3,
+      "scan_names": [
+        "ltx-2.5-22b-distilled-lora-450-bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-22b-distilled-lora-450-bf16.safetensors",
+      "remote_filename": "loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors"
+    },
+    {
+      "id": "ltx25-duration-head",
+      "module": "Video",
+      "label": "LTX-2.5 duration head",
+      "kind": "file",
+      "type": "model_patches",
+      "family": "",
+      "gated": true,
+      "approx_gb": 0.01,
+      "scan_names": [
+        "ltx-2.5-duration-head-bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "filename": "ltx-2.5-duration-head-bf16.safetensors",
+      "remote_filename": "model_patches/ltx-2.5-duration-head-bf16.safetensors"
+    },
+    {
+      "id": "ltx25-iclora-pixel-upscaler",
+      "module": "Video",
+      "label": "LTX-2.5 IC-LoRA Pixel Spatial Upscaler",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2.5",
+      "gated": true,
+      "approx_gb": 1.0,
+      "scan_names": [
+        "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
+      "url": "https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
+      "filename": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors",
+      "note": "filename remoto da verificare col resolver (repo verificato)"
+    },
+    {
+      "id": "flux1-dev-single",
+      "module": "Immagini",
+      "label": "FLUX.1 dev (single-file nativo)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 23.0,
+      "scan_names": [
+        "FLUX_Dev",
+        "flux1-dev"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "black-forest-labs/FLUX.1-dev",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
+      "filename": "FLUX_Dev.safetensors",
+      "remote_filename": "flux1-dev.safetensors"
+    },
+    {
+      "id": "flux1-fill-single",
+      "module": "Inpaint",
+      "label": "FLUX.1 Fill dev (single-file nativo)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 23.0,
+      "scan_names": [
+        "FLUX_DEV_Fill",
+        "flux1-fill"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "black-forest-labs/FLUX.1-Fill-dev",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev",
+      "filename": "FLUX_DEV_Fill.safetensors",
+      "remote_filename": "flux1-fill-dev.safetensors"
+    },
+    {
+      "id": "flux1-kontext-single",
+      "module": "Editing",
+      "label": "FLUX.1 Kontext dev (single-file nativo)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 23.0,
+      "scan_names": [
+        "FLUX_Kontext",
+        "kontext-dev"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "black-forest-labs/FLUX.1-Kontext-dev",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev",
+      "filename": "FLUX_Kontext_Dev.safetensors",
+      "remote_filename": "flux1-kontext-dev.safetensors"
+    },
+    {
+      "id": "flux1-krea-single",
+      "module": "Immagini",
+      "label": "FLUX.1 Krea dev (single-file nativo)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 23.0,
+      "scan_names": [
+        "FLUX_Krea",
+        "flux1-krea"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "black-forest-labs/FLUX.1-Krea-dev",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Krea-dev",
+      "filename": "FLUX_Krea_Dev.safetensors",
+      "remote_filename": "flux1-krea-dev.safetensors"
+    },
+    {
+      "id": "flux2-dev-fp8mixed",
+      "module": "Immagini",
+      "label": "FLUX.2 dev fp8mixed (single-file comfy)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 33.0,
+      "scan_names": [
+        "flux2_dev_fp8",
+        "FLUX_2_Dev"
+      ],
+      "category": "image",
+      "arch": "flux2",
+      "repo_id": "Comfy-Org/flux2-dev",
+      "url": "https://huggingface.co/Comfy-Org/flux2-dev",
+      "filename": "flux2_dev_fp8mixed.safetensors",
+      "remote_filename": "split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"
+    },
+    {
+      "id": "mistral-te-fp8-single",
+      "module": "Immagini",
+      "label": "Mistral-3 TE FLUX.2 fp8 (single-file)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 16.8,
+      "scan_names": [
+        "mistral_3_small_flux2"
+      ],
+      "category": "image",
+      "arch": "flux2",
+      "repo_id": "Comfy-Org/flux2-dev",
+      "url": "https://huggingface.co/Comfy-Org/flux2-dev",
+      "filename": "mistral_3_small_flux2.safetensors",
+      "remote_filename": "split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors"
+    },
+    {
+      "id": "t5xxl-fp16",
+      "module": "TextEncoder",
+      "label": "T5-XXL fp16 (FLUX.1 nativo)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 9.2,
+      "scan_names": [
+        "t5xxl_fp16.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "comfyanonymous/flux_text_encoders",
+      "url": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+      "filename": "t5xxl_fp16.safetensors",
+      "remote_filename": "t5xxl_fp16.safetensors"
+    },
+    {
+      "id": "long-clip-hi-dream",
+      "module": "TextEncoder",
+      "label": "Long-CLIP L (fonte remota ignota)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.9,
+      "scan_names": [
+        "long_clip_l_hi_dream.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "long_clip_l_hi_dream.safetensors",
+      "no_remote": true
+    },
+    {
+      "id": "sam2-hiera-large",
+      "module": "Segmentazione",
+      "label": "SAM2 Hiera Large (tracking/maschere)",
+      "kind": "snapshot",
+      "type": "Segmentation",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.9,
+      "scan_names": [
+        "sam2-hiera-large"
+      ],
+      "category": "aux",
+      "arch": "sam",
+      "repo_id": "facebook/sam2-hiera-large",
+      "url": "https://huggingface.co/facebook/sam2-hiera-large"
+    },
+    {
+      "id": "grounding-dino-base",
+      "module": "Segmentazione",
+      "label": "GroundingDINO base (detect da testo)",
+      "kind": "snapshot",
+      "type": "Segmentation",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.9,
+      "scan_names": [
+        "grounding-dino-base"
+      ],
+      "category": "aux",
+      "arch": "dino",
+      "repo_id": "IDEA-Research/grounding-dino-base",
+      "url": "https://huggingface.co/IDEA-Research/grounding-dino-base"
+    },
+    {
+      "id": "depth-anything-v2",
+      "module": "ControlNet",
+      "label": "DepthAnything V2 Large (depth control)",
+      "kind": "snapshot",
+      "type": "Segmentation",
+      "family": "hf",
+      "gated": false,
+      "approx_gb": 1.3,
+      "scan_names": [
+        "Depth-Anything-V2-Large"
+      ],
+      "category": "aux",
+      "arch": "depthanything",
+      "repo_id": "depth-anything/Depth-Anything-V2-Large-hf",
+      "url": "https://huggingface.co/depth-anything/Depth-Anything-V2-Large-hf"
+    },
+    {
+      "id": "inswapper-128",
+      "module": "Face",
+      "label": "InsightFace inswapper (face-swap)",
+      "kind": "file",
+      "type": "misc",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.5,
+      "scan_names": [
+        "inswapper_128.onnx"
+      ],
+      "category": "aux",
+      "arch": "insightface",
+      "repo_id": "ezioruan/inswapper_128.onnx",
+      "url": "https://huggingface.co/ezioruan/inswapper_128.onnx",
+      "filename": "inswapper_128.onnx",
+      "remote_filename": "inswapper_128.onnx",
+      "tool_dest": "E:\\AI\\Models\\insightface"
+    },
+    {
+      "id": "antelopev2",
+      "module": "Face",
+      "label": "InsightFace antelopev2 (detector, CDN insightface)",
+      "kind": "snapshot",
+      "type": "misc",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.4,
+      "scan_names": [],
+      "category": "aux",
+      "arch": "insightface",
+      "tool_dest": "E:\\AI\\Models\\insightface\\models\\antelopev2",
+      "no_remote": true,
+      "note": "scaricato dal CDN insightface al primo uso — FASE C lo pre-scarica"
+    },
+    {
+      "id": "gfpgan-13",
+      "module": "FaceRestore",
+      "label": "GFPGAN v1.3 (restauro volti)",
+      "kind": "file",
+      "type": "facerestore_models",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.3,
+      "scan_names": [
+        "GFPGANv1.3.pth"
+      ],
+      "category": "aux",
+      "arch": "gfpgan",
+      "filename": "GFPGANv1.3.pth",
+      "note": "url GitHub (non-HF): gestito dal downloader unico FASE B",
+      "url": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth"
+    },
+    {
+      "id": "ultrasharp-v2",
+      "module": "Upscale",
+      "label": "4x-UltraSharpV2 (ESRGAN)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.14,
+      "scan_names": [
+        "4x-UltraSharpV2.safetensors"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "repo_id": "Kim2091/UltraSharpV2",
+      "url": "https://huggingface.co/Kim2091/UltraSharpV2",
+      "filename": "4x-UltraSharpV2.safetensors",
+      "remote_filename": "4x-UltraSharpV2.safetensors"
+    },
+    {
+      "id": "nomos8k-schat-l",
+      "module": "Upscale",
+      "label": "4xNomos8kSCHAT-L (ESRGAN)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.3,
+      "scan_names": [
+        "4xNomos8kSCHAT-L.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "repo_id": "Phips/4xNomos8kSCHAT-L",
+      "url": "https://huggingface.co/Phips/4xNomos8kSCHAT-L",
+      "filename": "4xNomos8kSCHAT-L.pth",
+      "remote_filename": "4xNomos8kSCHAT-L.pth"
+    },
+    {
+      "id": "seedvr2-3b-fp8",
+      "module": "Video",
+      "label": "SeedVR2 3B fp8 (super-risoluzione video)",
+      "kind": "file",
+      "type": "SeedVR2",
+      "family": "",
+      "gated": false,
+      "approx_gb": 3.2,
+      "scan_names": [
+        "seedvr2_ema_3b_fp8_e4m3fn.safetensors"
+      ],
+      "category": "video",
+      "arch": "seedvr2",
+      "repo_id": "numz/SeedVR2_comfyUI",
+      "url": "https://huggingface.co/numz/SeedVR2_comfyUI",
+      "filename": "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+      "remote_filename": "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+      "deps": [
+        "seedvr2-vae"
+      ]
+    },
+    {
+      "id": "seedvr2-vae",
+      "module": "Video",
+      "label": "SeedVR2 VAE",
+      "kind": "file",
+      "type": "SeedVR2",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.5,
+      "scan_names": [
+        "ema_vae_fp16.safetensors"
+      ],
+      "category": "video",
+      "arch": "seedvr2",
+      "repo_id": "numz/SeedVR2_comfyUI",
+      "url": "https://huggingface.co/numz/SeedVR2_comfyUI",
+      "filename": "ema_vae_fp16.safetensors",
+      "remote_filename": "ema_vae_fp16.safetensors"
+    },
+    {
+      "id": "flashvsr-v11",
+      "module": "Video",
+      "label": "FlashVSR v1.1 (super-risoluzione video)",
+      "kind": "snapshot",
+      "type": "FlashVSR",
+      "family": "",
+      "gated": false,
+      "approx_gb": 6.5,
+      "scan_names": [
+        "FlashVSR-v1.1"
+      ],
+      "category": "video",
+      "arch": "flashvsr",
+      "repo_id": "JunhaoZhuang/FlashVSR-v1.1",
+      "url": "https://huggingface.co/JunhaoZhuang/FlashVSR-v1.1"
+    },
+    {
+      "id": "joycaption-nf4",
+      "module": "LoRA",
+      "label": "JoyCaption beta-one nf4 (caption dataset)",
+      "kind": "snapshot",
+      "type": "misc",
+      "family": "",
+      "gated": false,
+      "approx_gb": 5.6,
+      "scan_names": [],
+      "category": "aux",
+      "arch": "joycaption",
+      "repo_id": "John6666/llama-joycaption-beta-one-hf-llava-nf4",
+      "url": "https://huggingface.co/John6666/llama-joycaption-beta-one-hf-llava-nf4",
+      "tool_dest": "E:\\AI\\Models\\JoyCaption",
+      "used_by": [
+        "cap.lora_image_train",
+        "cap.lora_video_train"
+      ]
+    },
+    {
+      "id": "wav2vec2-multitalk",
+      "module": "Video",
+      "label": "wav2vec2 cinese (MultiTalk lip-sync)",
+      "kind": "snapshot",
+      "type": "audio",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.8,
+      "scan_names": [],
+      "category": "video",
+      "arch": "wan",
+      "repo_id": "TencentGameMate/chinese-wav2vec2-base",
+      "url": "https://huggingface.co/TencentGameMate/chinese-wav2vec2-base",
+      "used_by": [
+        "cap.video"
+      ]
+    },
+    {
+      "id": "f5-tts",
+      "module": "Voce (clone)",
+      "label": "F5-TTS v1 Base",
+      "kind": "snapshot",
+      "type": "TTS",
+      "family": "",
+      "gated": false,
+      "approx_gb": 1.4,
+      "scan_names": [
+        "F5-TTS",
+        "F5TTS"
+      ],
+      "category": "tts",
+      "arch": "f5",
+      "repo_id": "SWivid/F5-TTS",
+      "url": "https://huggingface.co/SWivid/F5-TTS"
+    },
+    {
+      "id": "xtts-v2",
+      "module": "Voce (clone)",
+      "label": "XTTS v2 (Coqui)",
+      "kind": "snapshot",
+      "type": "TTS",
+      "family": "",
+      "gated": false,
+      "approx_gb": 2.0,
+      "scan_names": [
+        "XTTS-v2",
+        "xtts"
+      ],
+      "category": "tts",
+      "arch": "xtts",
+      "repo_id": "coqui/XTTS-v2",
+      "url": "https://huggingface.co/coqui/XTTS-v2"
     }
-  ]
+  ],
+  "schema": 2,
+  "_comment_v2": "SCHEMA v2 — campi nuovi: category (image|video|music|tts|threed|aux), arch, install_role (base|on_demand), sensitivity (adult), remote_filename (nome nel repo se ≠ dal locale), allow_patterns (subset snapshot), no_remote (voce solo scan/link). Fonti remote verificate su HF il 2026-08-16. Gestione: tools/catalog_manager."
 }

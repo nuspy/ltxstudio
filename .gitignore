@@ -57,3 +57,5 @@ apps/studio-mobile/tsconfig.tsbuildinfo
 data/emb_cache/
 
 data/gpu.lock
+data/*.json.bak
+data/*.json.v1.bak

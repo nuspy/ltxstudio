@@ -50,9 +50,16 @@ def repo_basename(entry: dict) -> str:
 
 def dest_for(entry: dict, base: str | None = None) -> Path:
     if entry.get("tool_dest"):
-        return Path(entry["tool_dest"])
+        # v2: '~' espanso (mai profili utente hardcoded nel catalogo distribuito)
+        import os
+        return Path(os.path.expanduser(str(entry["tool_dest"])))
     base = base or get_base_dir()
-    d = Path(base) / entry.get("type", "misc") / entry.get("family", "misc")
+    # v2: family può essere "" = il file vive alla RADICE del type (es. facerestore_models\GFPGANv1.4.pth,
+    # come i motori si aspettano); Path ignora i segmenti vuoti.
+    d = Path(base) / entry.get("type", "misc")
+    fam = entry.get("family", "")
+    if fam:
+        d = d / fam
     if entry.get("kind") == "file":
         return d
     return d / repo_basename(entry)                     # snapshot → sottocartella col nome repo
@@ -210,3 +217,47 @@ def by_module(*, only_wanted: bool = False, **kw) -> dict[str, list[dict]]:
             continue
         groups.setdefault(e.get("module", "Altro"), []).append(e)
     return groups
+
+
+# ── SCHEMA v2: assi tassonomici (category/arch), ruolo d'installazione, scaricabilità ─────────
+CATEGORIES = ("image", "video", "music", "tts", "threed", "aux")
+CATEGORY_LABELS = {                                      # etichette GUI (tab Pesi v2 / CRUD)
+    "image": "Immagini", "video": "Video", "music": "Musica", "tts": "Voce/TTS",
+    "threed": "3D", "aux": "Componenti ausiliarie",
+}
+
+
+def downloadable(entry: dict) -> bool:
+    """True se la voce ha una fonte remota USABILE (repo HF o url diretto) e non è marcata
+    `no_remote`. Le voci no_remote esistono per scan/link/import — mai proposte al download
+    (prima 9 voci senza fonte finivano al downloader e morivano in KeyError silenziato)."""
+    if entry.get("no_remote"):
+        return False
+    return bool(entry.get("repo_id") or entry.get("url"))
+
+
+def install_role(entry: dict) -> str:
+    """'base' = scaricato dall'installer per l'edizione (se le sue cap sono attive);
+    'on_demand' (default) = primo uso / tab Pesi."""
+    return str(entry.get("install_role", "on_demand"))
+
+
+def by_category(*, only_wanted: bool = False, **kw) -> dict[str, dict[str, list[dict]]]:
+    """Raggruppa category → arch → [voci] (l'asse richiesto: tipo E architettura).
+    Ordine categorie stabile (CATEGORIES), voci in ordine di catalogo."""
+    out: dict[str, dict[str, list[dict]]] = {c: {} for c in CATEGORIES}
+    for e in load():
+        if only_wanted and not wanted(e, **kw):
+            continue
+        cat = e.get("category") if e.get("category") in CATEGORIES else "aux"
+        out[cat].setdefault(e.get("arch", "generic") or "generic", []).append(e)
+    return {c: g for c, g in out.items() if g}           # niente categorie vuote
+
+
+def base_weights_for_edition(*, allows_adult: bool | None = None) -> list[dict]:
+    """Le voci `install_role: base` che l'EDIZIONE corrente vuole (cap attive, modulo presente,
+    sensibilità rispettata) — è la lista che l'installer scarica davvero (FASE C: rimpiazza lo
+    stub `_download_base_models` e gli `editions[]` paralleli di install_spec.json)."""
+    return [e for e in load()
+            if install_role(e) == "base" and downloadable(e)
+            and wanted(e, check_present=False, allows_adult=allows_adult)]
