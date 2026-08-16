@@ -3969,8 +3969,47 @@ class MainWindow(QMainWindow):
                 self._log(f"[native] denoise applicato (forza {dn:.2f}).")
             except Exception as e:                           # noqa: BLE001
                 self._log(f"[native] denoise saltato: {e}")
+        # FASE D: catena restore_and_colorize — upscale ESRGAN finito → parte la colorizzazione
+        pc = getattr(self, "_pending_colorize", None)
+        self._pending_colorize = None                        # consuma una sola volta
+        if out and pc:
+            self._log(tr("mw.restore_then_colorize_log",
+                         "[restauro] upscale completato → avvio colorizzazione (catena nativa)."))
+            self._start_native_colorize(pc, out)
+            return
         if out:
             self._show_inpaint_result(out)   # dialog anteprima prima/dopo + Accetta / Revert
+
+    def _start_native_colorize(self, cfg: dict, image_path: str):
+        """Colorizzazione B&W via backend NATIVO — replica del grafo ComfyUI build_colorize
+        (era l'ULTIMA generazione GUI rimasta su ComfyUI). L'immagine è il riferimento e
+        l'istruzione descrive i colori: arch flux2_kontext (Klein); se il checkpoint scelto
+        è un FLUX.1 la guard-famiglia del backend ripiega su FluxKontextPipeline dai canali."""
+        import os
+        if not self._ensure_native_ready():
+            return
+        subject = (cfg.get("subject") or "").strip()
+        style = (cfg.get("style") or "natural realistic colors").strip()
+        prompt = (f"colorized version of this black and white photograph, "
+                  f"{subject + ', ' if subject else ''}"
+                  f"{style}, photorealistic, natural skin tones, period-accurate colors, "
+                  f"high quality colorization")
+        m = cfg["flux2_model"]
+        mp = m if os.path.isabs(m) else os.path.join(r"E:\AI\Models\diffusion_models", m)
+        seed = random.randint(0, 2**31)
+        params = {"model": mp, "arch": "flux2_kontext", "prompt": prompt, "negative": "",
+                  "image_path": image_path,
+                  "steps": int(cfg.get("color_steps", 20)),
+                  "guidance": float(cfg.get("color_guidance", 2.5)),
+                  "denoise": float(cfg.get("color_denoise", 0.85)),
+                  "seed": seed}
+        self._inpaint_mode = tr("mw.colorize_label")
+        self._log(f"Colorize (backend NATIVO, {os.path.basename(mp)}) inviato "
+                  f"(steps={params['steps']}, seed={seed})…")
+        self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.colorize", "Colorizzazione"), self._native_worker,
+                      self._on_native_inpaint_done)
 
     def _start_native_upscale(self, model, scale, image_path=None):
         """Upscale via backend NATIVO (ESRGAN/spandrel) — niente ComfyUI."""
@@ -4766,7 +4805,8 @@ class MainWindow(QMainWindow):
         if cfg.get("operation") == "faceswap":           # T5: face-swap su foto (nativo, no ComfyUI)
             return self._faceswap_photo(cfg)
         from core import backend as _backend              # #95 I2: il restauro gira nativo → non richiede ComfyUI up
-        _restore_native = (cfg.get("operation") == "restore" and _backend.is_native("image"))
+        _restore_native = (cfg.get("operation") in ("restore", "colorize", "restore_and_colorize")
+                           and _backend.is_native("image"))
         if not _restore_native and not self.driver.is_up():
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_process_msg")); return
@@ -4796,6 +4836,18 @@ class MainWindow(QMainWindow):
             from PySide6.QtWidgets import QMessageBox            # nessun modello FLUX.2 reale: non inviare il placeholder
             QMessageBox.warning(self, tr("mw.flux2_model_missing_title"),
                                 tr("mw.flux2_model_missing_integrate_msg"))
+            return
+        # ── BACKEND NATIVO (FASE D 17/08): colorize = edit-per-riferimento (Klein/Kontext, la
+        #    guard-famiglia del backend sceglie dai canali del checkpoint); restore_and_colorize =
+        #    catena upscale ESRGAN nativo → colorize sull'output (_pending_colorize, come il denoise).
+        if op in ("colorize", "restore_and_colorize") and backend.is_native("image"):
+            self._inpaint_before = image_path
+            if op == "restore_and_colorize":
+                self._pending_colorize = dict(cfg)
+                self._start_native_upscale(cfg["upscale_model"], cfg.get("target_scale", 2.0),
+                                           image_path=image_path)
+            else:
+                self._start_native_colorize(cfg, image_path)
             return
         try:
             img_name = self._upload_local(image_path)

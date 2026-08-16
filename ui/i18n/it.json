@@ -1951,6 +1951,8 @@
   "queue.job.faceswap": "Face-swap",
   "queue.job.rife": "Interpolazione FPS (RIFE)",
   "queue.job.upscale": "Upscale immagine",
+  "queue.job.colorize": "Colorizzazione",
+  "mw.restore_then_colorize_log": "[restauro] upscale completato → avvio colorizzazione (catena nativa).",
   "queue.job.video_face": "Restauro volti video",
   "queue.job.segment": "Segmentazione",
   "queue.job.faceswap_photo": "Face-swap foto",

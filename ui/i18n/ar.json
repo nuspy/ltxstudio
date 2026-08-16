@@ -1938,6 +1938,8 @@
   "queue.job.faceswap": "Face-swap",
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
+  "queue.job.colorize": "تلوين",
+  "mw.restore_then_colorize_log": "[ترميم] اكتمل التكبير → بدء التلوين (سلسلة أصلية).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",
   "queue.job.faceswap_photo": "Photo face-swap",
