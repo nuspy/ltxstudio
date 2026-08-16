@@ -19,7 +19,13 @@ REPO_DIR = Path(r"E:\AI\Tools\FlashVSR")
 WANVSR_DIR = REPO_DIR / "examples" / "WanVSR"
 _CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
 VENV_PY = _CONS if _CONS.exists() else REPO_DIR / "venv" / "Scripts" / "python.exe"
-MODEL_DIR = Path(r"E:\AI\Models\FlashVSR\FlashVSR-v1.1")
+# FASE F weights-unification: path DAL registro unico (id flashvsr-v11) — così «Cartella base»/
+# AI_MODELS_DIR valgono davvero; il letterale resta come fallback se il catalogo non risolve.
+try:
+    from core import model_paths as _mp
+    MODEL_DIR = Path(str(_mp.path_of("flashvsr-v11") or r"E:\AI\Models\FlashVSR\FlashVSR-v1.1"))
+except Exception:                                      # noqa: BLE001
+    MODEL_DIR = Path(r"E:\AI\Models\FlashVSR\FlashVSR-v1.1")
 RUNNER = Path(__file__).resolve().parents[1] / "workers" / "flashvsr_run.py"
 REPO = "https://github.com/OpenImagingLab/FlashVSR"
 

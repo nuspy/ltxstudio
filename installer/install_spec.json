@@ -2,43 +2,115 @@
   "_comment": "Spec dichiarativa dell'installer comune. I 'size_mb' sono stime per il riepilogo. 'editions' filtra cosa scaricare per edizione; i modelli 'adult' scendono solo se il manifest dell'edizione ha allows_adult. 'on_demand' = scaricato al primo uso (non in fase di install). 'mirror' = disponibile sul fallback tadamoo.",
   "mirror_base": "https://aiforge.tadamoo.com",
   "prereqs": [
-    {"id": "python", "label": "Python 3.10+", "kind": "python"},
-    {"id": "nvidia", "label": "Driver NVIDIA + CUDA", "kind": "nvidia"},
-    {"id": "torch", "label": "PyTorch compatibile con CUDA", "kind": "torch"},
-    {"id": "comfyui", "label": "ComfyUI", "kind": "comfy_root"},
-    {"id": "ffmpeg", "label": "ffmpeg", "kind": "exe"}
+    {
+      "id": "python",
+      "label": "Python 3.10+",
+      "kind": "python"
+    },
+    {
+      "id": "nvidia",
+      "label": "Driver NVIDIA + CUDA",
+      "kind": "nvidia"
+    },
+    {
+      "id": "torch",
+      "label": "PyTorch compatibile con CUDA",
+      "kind": "torch"
+    },
+    {
+      "id": "comfyui",
+      "label": "ComfyUI",
+      "kind": "comfy_root"
+    },
+    {
+      "id": "ffmpeg",
+      "label": "ffmpeg",
+      "kind": "exe"
+    }
   ],
   "custom_nodes": [
-    {"id": "segment_anything", "label": "GroundingDINO + SAM-HQ", "repo": "https://github.com/storyicon/comfyui_segment_anything", "size_mb": 60, "mirror": true},
-    {"id": "videohelpersuite", "label": "VideoHelperSuite", "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite", "size_mb": 30, "mirror": true},
-    {"id": "seedvr2", "label": "SeedVR2 upscaler", "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler", "size_mb": 40, "mirror": true},
-    {"id": "facerestore", "label": "Face Restore (CodeFormer/GFPGAN)", "repo": "https://github.com/mav-rik/facerestore_cf", "size_mb": 20, "mirror": true},
-    {"id": "rife", "label": "Frame Interpolation (RIFE)", "repo": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation", "size_mb": 30, "mirror": true},
-    {"id": "trellis2", "label": "ComfyUI-TRELLIS2", "repo": "https://github.com/PozzettiAndrea/ComfyUI-TRELLIS2", "size_mb": 200, "mirror": true, "editions": ["plus", "premium", "studio"]},
-    {"id": "skintoken", "label": "ComfyUI-SkinToken (rig)", "repo": "https://github.com/Rizzlord/ComfyUI-SkinToken", "size_mb": 150, "mirror": true, "editions": ["plus", "premium", "studio"]},
-    {"id": "cosyvoice", "label": "CosyVoice TTS", "repo": "https://github.com/AIFSH/CosyVoice-ComfyUI", "size_mb": 50, "mirror": true},
-    {"id": "comfy_compat", "label": "Patch compatibilità LTX-2.3 (ltxstudio_comfy_compat)", "repo": "bundled", "size_mb": 1, "mirror": true, "bundled": true}
+    {
+      "id": "segment_anything",
+      "label": "GroundingDINO + SAM-HQ",
+      "repo": "https://github.com/storyicon/comfyui_segment_anything",
+      "size_mb": 60,
+      "mirror": true
+    },
+    {
+      "id": "videohelpersuite",
+      "label": "VideoHelperSuite",
+      "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+      "size_mb": 30,
+      "mirror": true
+    },
+    {
+      "id": "seedvr2",
+      "label": "SeedVR2 upscaler",
+      "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
+      "size_mb": 40,
+      "mirror": true
+    },
+    {
+      "id": "facerestore",
+      "label": "Face Restore (CodeFormer/GFPGAN)",
+      "repo": "https://github.com/mav-rik/facerestore_cf",
+      "size_mb": 20,
+      "mirror": true
+    },
+    {
+      "id": "rife",
+      "label": "Frame Interpolation (RIFE)",
+      "repo": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation",
+      "size_mb": 30,
+      "mirror": true
+    },
+    {
+      "id": "trellis2",
+      "label": "ComfyUI-TRELLIS2",
+      "repo": "https://github.com/PozzettiAndrea/ComfyUI-TRELLIS2",
+      "size_mb": 200,
+      "mirror": true,
+      "editions": [
+        "plus",
+        "premium",
+        "studio"
+      ]
+    },
+    {
+      "id": "skintoken",
+      "label": "ComfyUI-SkinToken (rig)",
+      "repo": "https://github.com/Rizzlord/ComfyUI-SkinToken",
+      "size_mb": 150,
+      "mirror": true,
+      "editions": [
+        "plus",
+        "premium",
+        "studio"
+      ]
+    },
+    {
+      "id": "cosyvoice",
+      "label": "CosyVoice TTS",
+      "repo": "https://github.com/AIFSH/CosyVoice-ComfyUI",
+      "size_mb": 50,
+      "mirror": true
+    },
+    {
+      "id": "comfy_compat",
+      "label": "Patch compatibilità LTX-2.3 (ltxstudio_comfy_compat)",
+      "repo": "bundled",
+      "size_mb": 1,
+      "mirror": true,
+      "bundled": true
+    }
   ],
   "python_deps": [
-    {"id": "sageattention", "label": "SageAttention 2.2 (accelerazione Blackwell)", "pip": "sageattention", "size_mb": 20}
+    {
+      "id": "sageattention",
+      "label": "SageAttention 2.2 (accelerazione Blackwell)",
+      "pip": "sageattention",
+      "size_mb": 20
+    }
   ],
-  "models": [
-    {"id": "ltx_distilled", "label": "LTX-2.3 22B distilled (video, base SFW)", "size_mb": 22000, "editions": ["plus", "premium", "studio"], "sensitivity": "normal", "base": true},
-    {"id": "gemma_full", "label": "Gemma-3-12B encoder (SFW)", "size_mb": 24000, "editions": ["plus", "premium", "studio"], "sensitivity": "normal", "base": true},
-    {"id": "video_vae", "label": "Video/Audio VAE", "size_mb": 1200, "editions": ["plus", "premium", "studio"], "sensitivity": "normal", "base": true},
-    {"id": "ltx_eros", "label": "LTX-2.3 eros (modello sbloccato)", "size_mb": 22000, "editions": ["premium", "studio"], "sensitivity": "adult", "base": true},
-    {"id": "gemma_abliterated", "label": "Gemma abliterated encoder (sbloccato)", "size_mb": 24000, "editions": ["premium", "studio"], "sensitivity": "adult", "base": true},
-    {"id": "flux2_encoder", "label": "FLUX.2 text encoder (Qwen3)", "size_mb": 8700, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "flux_fill", "label": "FLUX Fill (inpaint)", "size_mb": 22000, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "trellis2_weights", "label": "TRELLIS.2 (immagine→3D)", "size_mb": 25000, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "skintoken_weights", "label": "SkinTokens (rig)", "size_mb": 4000, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "seedvr2_weights", "label": "SeedVR2 (upscale video)", "size_mb": 9000, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "grounding_dino", "label": "GroundingDINO", "size_mb": 938, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "sam_hq", "label": "SAM-HQ", "size_mb": 1250, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "facerestore_models", "label": "CodeFormer + GFPGAN", "size_mb": 1000, "editions": ["plus", "premium", "studio"], "on_demand": true},
-    {"id": "lingbot_dense_fp8", "label": "LingBot-Video Dense 1.3B fp8 (2ª arch video, consumer)", "size_mb": 8000, "editions": ["plus", "premium", "studio"], "sensitivity": "normal", "on_demand": true},
-    {"id": "lingbot_moe_uint4", "label": "LingBot-Video MoE 30B uint4 (2ª arch video, qualità)", "size_mb": 22000, "editions": ["premium", "studio"], "sensitivity": "normal", "on_demand": true},
-    {"id": "krea2_turbo", "label": "Krea 2 Turbo (arch immagini alternativa, veloce)", "size_mb": 35000, "editions": ["plus", "premium", "studio"], "sensitivity": "normal", "on_demand": true},
-    {"id": "krea_rt", "label": "Krea Realtime 14B (arch video alternativa, autoregressivo)", "size_mb": 29000, "editions": ["premium", "studio"], "sensitivity": "normal", "on_demand": true}
-  ]
+  "_models_note": "SEZIONE RIMOSSA (weights-unification C/F): i modelli vivono nel registro unico data/weights_catalog.json (install_role=base|on_demand × capability dell'edizione). Qui restano solo custom_nodes e python_deps."
 }

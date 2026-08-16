@@ -19,8 +19,14 @@ import os
 from pathlib import Path
 
 SEG_DIR = r"E:\AI\Models\Segmentation"
-SAM2_DIR = os.path.join(SEG_DIR, "hf", "sam2-hiera-large")
-GDINO_DIR = os.path.join(SEG_DIR, "hf", "grounding-dino-base")
+# FASE F weights-unification: dir DAL registro unico, fallback ai letterali storici.
+try:
+    from core import model_paths as _mp
+    SAM2_DIR = str(_mp.path_of("sam2-hiera-large") or os.path.join(SEG_DIR, "hf", "sam2-hiera-large"))
+    GDINO_DIR = str(_mp.path_of("grounding-dino-base") or os.path.join(SEG_DIR, "hf", "grounding-dino-base"))
+except Exception:                                        # noqa: BLE001
+    SAM2_DIR = os.path.join(SEG_DIR, "hf", "sam2-hiera-large")
+    GDINO_DIR = os.path.join(SEG_DIR, "hf", "grounding-dino-base")
 
 
 def _frames_of(video: str, out_dir: str, fps: int = 0) -> tuple[list[str], float]:

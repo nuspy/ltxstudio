@@ -2004,7 +2004,8 @@
       "url": "https://huggingface.co/TencentGameMate/chinese-wav2vec2-base",
       "used_by": [
         "cap.video"
-      ]
+      ],
+      "note": "il nodo kijai DownloadAndLoadWav2VecModel scarica nella sua dir (<comfy>/models/wav2vec2) al primo uso; MultiTalk oggi dormiente (albero ComfyUI dismesso) — voce di pre-download per quando torna attivo"
     },
     {
       "id": "f5-tts",
@@ -2041,6 +2042,44 @@
       "arch": "xtts",
       "repo_id": "coqui/XTTS-v2",
       "url": "https://huggingface.co/coqui/XTTS-v2"
+    },
+    {
+      "id": "flux2-klein-te-4b",
+      "module": "Immagini",
+      "label": "Qwen3-4B TE (FLUX.2 Klein-4B, single-file)",
+      "kind": "file",
+      "repo_id": "Comfy-Org/vae-text-encorder-for-flux-klein-4b",
+      "remote_filename": "split_files/text_encoders/qwen_3_4b.safetensors",
+      "filename": "qwen_3_4b.safetensors",
+      "type": "TextEncoders",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 8.0,
+      "scan_names": [
+        "qwen_3_4b"
+      ],
+      "category": "image",
+      "arch": "flux2",
+      "url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b"
+    },
+    {
+      "id": "flux2-klein-te-8b",
+      "module": "Immagini",
+      "label": "Qwen3-8B fp8 TE (FLUX.2 Klein-9B, single-file)",
+      "kind": "file",
+      "repo_id": "Comfy-Org/vae-text-encorder-for-flux-klein-9b",
+      "remote_filename": "split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors",
+      "filename": "qwen_3_8b_fp8mixed.safetensors",
+      "type": "TextEncoders",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 8.7,
+      "scan_names": [
+        "qwen_3_8b_fp8mixed"
+      ],
+      "category": "image",
+      "arch": "flux2",
+      "url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b"
     }
   ],
   "schema": 2,

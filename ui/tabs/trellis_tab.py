@@ -401,6 +401,15 @@ class TrellisTab(QWidget):
         return out
 
     def _on_generate(self):
+        # FASE F weights-unification: primo-uso CON CONSENSO — se i pesi TRELLIS mancano, il
+        # dialog li offre QUI (prima: auto-download silenzioso da 8GB, ora il runner li rifiuta).
+        try:
+            from core import ensure_weights as ew
+            if ew.missing(["trellis2-4b"]) and not ew.offer_download_gui(
+                    self, ["trellis2-4b"], tr("tab.trellis", "Modello 3D")):
+                return
+        except Exception:                                # noqa: BLE001 — il preflight del service protegge comunque
+            pass
         self.request_trellis.emit(self.get_config())
 
     # ---------- API ----------

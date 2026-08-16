@@ -1,37 +1,40 @@
-"""Auto-download degli encoder testo FLUX.2 mancanti (repo ufficiali Comfy-Org, via huggingface_hub).
+"""Auto-download degli encoder testo FLUX.2 mancanti — ora sul MOTORE UNICO (weights-unification F).
 
-Le varianti FLUX.2 usano encoder diversi (vedi core/flux2_encoder): se quello richiesto da un modello
-non è installato, lo scarichiamo dal repo Comfy-Org e lo copiamo nella cartella text_encoders di
-ComfyUI. Il nome locale contiene la keyword che core/flux2_encoder cerca, così dopo il download
-resolve_encoder lo trova subito.
-
-Sorgenti (verificate su HuggingFace):
-- 7680  (Qwen3-4B, Klein-4B): Comfy-Org/vae-text-encorder-for-flux-klein-4b
-- 12288 (Qwen3-8B, Klein-9B): Comfy-Org/vae-text-encorder-for-flux-klein-9b  (variante fp8mixed, 8.7GB)
+Le varianti FLUX.2 usano encoder diversi (vedi core/flux2_encoder): se quello richiesto da un
+modello non è installato, lo scarichiamo. Prima: dict hardcoded (il 4° manifesto parallelo) +
+hf_hub_download nella cache HF + copy2 verso la destinazione = doppio spazio su disco e zero
+multi-connessione. Ora: le fonti sono le voci di CATALOGO `flux2-klein-te-4b/8b` e il download
+passa da core/downloader (fast 16-connessioni, scrittura DIRETTA a destinazione, verifica
+integrità). Il dialog di consenso resta in main_window (_ensure_flux2_encoder), invariato.
 """
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
-# Root text_encoders di ComfyUI (da extra_model_paths.yaml). Sottocartella Flux per coerenza con
-# mistral_3_small_flux2.safetensors già presente lì.
+# Root text_encoders (coerente con mistral_3_small_flux2.safetensors già lì).
 TEXT_ENCODERS_DIR = Path(r"E:\AI\Models\TextEncoders\Flux")
 
-# dim txt_in → (repo_id, file_nel_repo, nome_locale, GB_approx, etichetta)
-FLUX2_ENCODER_SOURCES: dict[int, tuple[str, str, str, float, str]] = {
-    7680: ("Comfy-Org/vae-text-encorder-for-flux-klein-4b",
-           "split_files/text_encoders/qwen_3_4b.safetensors",
-           "qwen_3_4b.safetensors", 8.0, "Qwen3-4B (FLUX.2 Klein-4B)"),
-    12288: ("Comfy-Org/vae-text-encorder-for-flux-klein-9b",
-            "split_files/text_encoders/qwen_3_8b_fp8mixed.safetensors",
-            "qwen_3_8b_fp8mixed.safetensors", 8.7, "Qwen3-8B fp8 (FLUX.2 Klein-9B)"),
+# dim txt_in → id di catalogo (weights_catalog v2: repo/remote_filename/dest tutti lì)
+FLUX2_ENCODER_IDS: dict[int, str] = {
+    7680: "flux2-klein-te-4b",                      # Qwen3-4B (FLUX.2 Klein-4B)
+    12288: "flux2-klein-te-8b",                     # Qwen3-8B fp8mixed (FLUX.2 Klein-9B)
 }
 
 
+def _entry(indim: int | None) -> dict | None:
+    if indim is None:
+        return None
+    from core import model_paths
+    return model_paths.entry(FLUX2_ENCODER_IDS.get(indim, ""))
+
+
 def source_for(indim: int | None):
-    """(repo_id, file_nel_repo, nome_locale, GB, etichetta) per la dim, o None se sconosciuta."""
-    return FLUX2_ENCODER_SOURCES.get(indim) if indim is not None else None
+    """Compat storica: (repo_id, file_nel_repo, nome_locale, GB, etichetta) o None."""
+    e = _entry(indim)
+    if not e:
+        return None
+    return (e.get("repo_id", ""), e.get("remote_filename", e.get("filename", "")),
+            e.get("filename", ""), float(e.get("approx_gb", 0) or 0), e.get("label", e["id"]))
 
 
 def comfy_relative_name(local_name: str) -> str:
@@ -40,30 +43,22 @@ def comfy_relative_name(local_name: str) -> str:
 
 
 def download(indim: int, *, dest_dir: Path = TEXT_ENCODERS_DIR, log=print) -> tuple[bool, str, str | None]:
-    """Scarica l'encoder per `indim` e lo copia in `dest_dir`.
-
-    Ritorna (ok, messaggio, nome_relativo_comfy | None). Idempotente: se il file esiste già (grande),
-    non riscarica. Bloccante (chiamare da un thread): hf_hub_download è resumable.
-    """
-    src = FLUX2_ENCODER_SOURCES.get(indim)
-    if not src:
+    """Scarica l'encoder per `indim` via il motore unico. Ritorna (ok, messaggio,
+    nome_relativo_comfy | None). Idempotente; resume multi-connessione; bloccante (da thread)."""
+    e = _entry(indim)
+    if not e:
         return False, f"nessuna fonte nota per l'encoder txt_in={indim}", None
-    repo, repo_file, local_name, gb, label = src
-    dest_dir = Path(dest_dir)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / local_name
+    local_name = e.get("filename", "")
     rel = comfy_relative_name(local_name)
+    dest = Path(dest_dir) / local_name
     if dest.exists() and dest.stat().st_size > 1_000_000_000:
         return True, f"encoder già presente: {dest.name}", rel
     try:
-        from huggingface_hub import hf_hub_download
-    except Exception as e:                       # noqa: BLE001
-        return False, f"huggingface_hub non disponibile nel venv: {e}", None
-    try:
-        log(f"[FLUX.2] download {label} (~{gb:.1f} GB) da {repo} … (resumable)")
-        cached = hf_hub_download(repo_id=repo, filename=repo_file)
-        shutil.copy2(cached, dest)
-        log(f"[FLUX.2] encoder pronto: {dest}")
+        from core import downloader as dl
+        log(f"[FLUX.2] download {e.get('label', e['id'])} (~{e.get('approx_gb', '?')} GB) "
+            f"da {e.get('repo_id', '')} … (fast, resume)")
+        out = dl.download_entry(e, log=log)
+        log(f"[FLUX.2] encoder pronto: {out}")
         return True, f"scaricato: {local_name}", rel
-    except Exception as e:                        # noqa: BLE001
-        return False, f"download fallito: {e}", None
+    except Exception as ex:                       # noqa: BLE001
+        return False, f"download fallito: {ex}", None

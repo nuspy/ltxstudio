@@ -15,7 +15,12 @@ from pathlib import Path
 
 TOOLS = Path(r"E:\AI\Tools")
 VENV15_PY = TOOLS / "ACE-Step" / "venv15" / "Scripts" / "python.exe"
-JOY_DIR = Path(r"E:\AI\Models\JoyCaption")
+# FASE F weights-unification: dir DAL registro unico (id joycaption-nf4), fallback al letterale.
+try:
+    from core import model_paths as _mp
+    JOY_DIR = Path(str(_mp.path_of("joycaption-nf4") or r"E:\AI\Models\JoyCaption"))
+except Exception:                                        # noqa: BLE001
+    JOY_DIR = Path(r"E:\AI\Models\JoyCaption")
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "caption_dataset.py"
 
 MODES = ["descriptive", "tags", "sd-prompt"]

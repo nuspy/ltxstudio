@@ -115,7 +115,7 @@ class VideoDefTab(QWidget):
                                       "restauro volti e poi (se attivo) il RIFE, senza rilanciare a mano."))
         root.addWidget(self.chain_face)
         self.run_btn = QPushButton(tr("def.run.btn"))
-        self.run_btn.setObjectName("generate"); self.run_btn.clicked.connect(lambda: self.request_enhance.emit())
+        self.run_btn.setObjectName("generate"); self.run_btn.clicked.connect(self._on_run)
         self.run_btn.setToolTip(tr("def.run.tt", "Avvia il miglioramento definizione video con il motore selezionato."))
         root.addWidget(self.run_btn)
         note = QLabel(tr("def.note.lbl"))
@@ -217,6 +217,22 @@ class VideoDefTab(QWidget):
             QMessageBox.warning(self, tr("def.face.no_video.title"), tr("def.face.no_video.msg"))
             return
         self.request_face_restore.emit()
+
+    def _on_run(self):
+        """FASE F weights-unification: pesi del motore scelto offerti CON CONSENSO prima del job
+        (prima: SeedVR2 'exit N' muto / FlashVSR errore a valle)."""
+        _ids = {"seedvr2": ["seedvr2-3b-fp8", "seedvr2-vae"], "flashvsr": ["flashvsr-v11"]}
+        key = _ENGINE_KEY.get(self.engine.currentIndex(), "")
+        ids = _ids.get(key)
+        if ids:
+            try:
+                from core import ensure_weights as ew
+                if ew.missing(ids) and not ew.offer_download_gui(
+                        self, ids, self.engine.currentText()):
+                    return
+            except Exception:                            # noqa: BLE001 — il preflight del service protegge
+                pass
+        self.request_enhance.emit()
 
     def _install_facerestore(self):
         if QMessageBox.question(self, tr("def.face.install.title"),

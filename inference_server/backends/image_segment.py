@@ -10,8 +10,14 @@ import os
 from pathlib import Path
 
 SEG_DIR = r"E:\AI\Models\Segmentation\hf"
-GDINO_DIR = os.path.join(SEG_DIR, "grounding-dino-base")
-SAM2_DIR = os.path.join(SEG_DIR, "sam2-hiera-large")
+# FASE F weights-unification: dir DAL registro unico, fallback ai letterali storici.
+try:
+    from core import model_paths as _mp
+    GDINO_DIR = str(_mp.path_of("grounding-dino-base") or os.path.join(SEG_DIR, "grounding-dino-base"))
+    SAM2_DIR = str(_mp.path_of("sam2-hiera-large") or os.path.join(SEG_DIR, "sam2-hiera-large"))
+except Exception:                                        # noqa: BLE001
+    GDINO_DIR = os.path.join(SEG_DIR, "grounding-dino-base")
+    SAM2_DIR = os.path.join(SEG_DIR, "sam2-hiera-large")
 VRAM_MB = 4000
 
 

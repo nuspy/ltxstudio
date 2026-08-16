@@ -15,8 +15,15 @@ from __future__ import annotations
 import os
 import subprocess
 
-INSIGHTFACE_ROOT = r"E:\AI\Models\insightface"
-INSWAPPER = os.path.join(INSIGHTFACE_ROOT, "inswapper_128.onnx")
+# FASE F weights-unification: path DAL registro unico (id inswapper-128), fallback ai letterali.
+try:
+    from core import model_paths as _mp
+    _insw = _mp.path_of("inswapper-128")
+    INSWAPPER = str(_insw) if _insw else os.path.join(r"E:\AI\Models\insightface", "inswapper_128.onnx")
+    INSIGHTFACE_ROOT = os.path.dirname(INSWAPPER)
+except Exception:                                        # noqa: BLE001
+    INSIGHTFACE_ROOT = r"E:\AI\Models\insightface"
+    INSWAPPER = os.path.join(INSIGHTFACE_ROOT, "inswapper_128.onnx")
 # insightface NON è nel venv GUI/API (Comfy) ma è nell'inference_server_venv → se manca localmente,
 # il face-swap viene DELEGATO a un subprocess in quel venv (allineato al consolidamento #61).
 _INF_PY = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"

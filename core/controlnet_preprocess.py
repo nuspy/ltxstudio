@@ -15,7 +15,12 @@ from __future__ import annotations
 
 import os
 
-DEPTH_DIR = r"E:\AI\Models\Segmentation\hf\depth-anything-v2-large"   # da scaricare per depth
+# FASE F weights-unification: dir DAL registro unico (id depth-anything-v2), fallback al letterale.
+try:
+    from core import model_paths as _mp
+    DEPTH_DIR = str(_mp.path_of("depth-anything-v2") or r"E:\AI\Models\Segmentation\hf\depth-anything-v2-large")
+except Exception:                                        # noqa: BLE001
+    DEPTH_DIR = r"E:\AI\Models\Segmentation\hf\depth-anything-v2-large"
 POSE_DIR = r"E:\AI\Models\Segmentation\hf\dwpose"                     # da scaricare per pose
 
 KINDS = ("canny", "depth", "pose")

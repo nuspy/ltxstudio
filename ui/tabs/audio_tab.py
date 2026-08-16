@@ -442,6 +442,19 @@ class AudioTab(QWidget):
         if not text:
             QMessageBox.warning(self, tr("aud.gen.text.title"), tr("aud.gen.text.text")); return
         engine_id = self.tts_engine.currentData() or "edge"
+        # FASE F weights-unification: pesi TTS offerti CON CONSENSO prima della sintesi — i
+        # runner ora sono locale-first e senza auto-download (prima scaricavano in silenzio
+        # nella cache HF al primo uso, XTTS perfino col prompt TOS che bloccava).
+        _tts_ids = {"cosyvoice2": ["voice-cosyvoice2"], "f5tts": ["f5-tts"],
+                    "xtts2": ["xtts-v2"], "fish": ["voice-fish"], "vibevoice": ["voice-vibevoice"]}
+        ids = _tts_ids.get(engine_id)
+        if ids:
+            try:
+                from core import ensure_weights as ew
+                if ew.missing(ids) and not ew.offer_download_gui(self, ids, engine_id):
+                    return
+            except Exception:                            # noqa: BLE001 — il runner dà comunque errore chiaro
+                pass
         try:
             self.tts_status.setText(tr("aud.gen.synth_running").format(engine_id=engine_id))
             out = synthesize(engine_id, v, text)

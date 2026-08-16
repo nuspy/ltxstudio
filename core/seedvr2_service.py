@@ -21,7 +21,14 @@ CLI_DIR = Path(r"E:\AI\Tools\SeedVR2")
 _CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61 — f5_tts/seedvr2 validati su transformers 4.57 del host)
 VENV_PY = _CONS if _CONS.exists() else CLI_DIR / "venv" / "Scripts" / "python.exe"
 CLI = CLI_DIR / "inference_cli.py"
-MODEL_DIR = Path(r"E:\AI\Models\SeedVR2")
+# FASE F weights-unification: dir DAL registro unico (parent della voce seedvr2-3b-fp8);
+# fallback al letterale storico se il catalogo non risolve.
+try:
+    from core import model_paths as _mp
+    _p = _mp.path_of("seedvr2-3b-fp8")
+    MODEL_DIR = _p.parent if _p else Path(r"E:\AI\Models\SeedVR2")
+except Exception:                                        # noqa: BLE001
+    MODEL_DIR = Path(r"E:\AI\Models\SeedVR2")
 DEFAULT_MODEL = "seedvr2_ema_3b_fp8_e4m3fn.safetensors"   # ~3GB, qualità buona, entra largo su 32GB
 
 
