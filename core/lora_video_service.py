@@ -407,25 +407,38 @@ def train(preprocessed_dir: str, out_lora: str, *, trigger: str = "", rank: int 
     json.dump(overrides, open(of, "w"))
     os.makedirs(os.path.dirname(out_lora) or ".", exist_ok=True)
     log(f"Training LoRA (rank {rank}, {steps} step)…")
-    # COORDINAMENTO (mancava): training = ore con tutta la GPU → free_all HARD + attesa rilascio.
+    # LOCK GPU inter-processo + free_all HARD (training = ore, tutta la GPU) + attesa rilascio.
     try:
-        from core import mem_coordinator as _mc
-        _mc.free_and_wait("train", need_mb=22000, hard=True)
+        from core import gpu_lock as _gl
+        _gl.acquire("train:ltx-lora",
+                    on_wait=lambda h: log(f"[gpu] occupata da {h.get('tag', '?')} — attendo…"))
     except Exception:                                        # noqa: BLE001
         pass
-    cmd = [LTX2_PY, "-u", TRAIN_RUN, "--template", template, "--overrides", of,
-           "--out_lora", out_lora]
-    env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-    proc = subprocess.Popen(cmd, cwd=TRAINER_DIR, env=env, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, bufsize=1)
-    for line in proc.stdout:                     # progress live
-        line = line.rstrip()
-        if line and ("step" in line.lower() or "loss" in line.lower() or "error" in line.lower()):
-            log(line[-600:])
-    proc.wait()
-    if not os.path.exists(out_lora):
-        raise RuntimeError("training fallito (LoRA non prodotta) — vedi log")
-    return out_lora
+    try:
+        try:
+            from core import mem_coordinator as _mc
+            _mc.free_and_wait("train", need_mb=22000, hard=True)
+        except Exception:                                    # noqa: BLE001
+            pass
+        cmd = [LTX2_PY, "-u", TRAIN_RUN, "--template", template, "--overrides", of,
+               "--out_lora", out_lora]
+        env = dict(os.environ); env["HF_HUB_OFFLINE"] = "1"; env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+        proc = subprocess.Popen(cmd, cwd=TRAINER_DIR, env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, bufsize=1)
+        for line in proc.stdout:                 # progress live
+            line = line.rstrip()
+            if line and ("step" in line.lower() or "loss" in line.lower() or "error" in line.lower()):
+                log(line[-600:])
+        proc.wait()
+        if not os.path.exists(out_lora):
+            raise RuntimeError("training fallito (LoRA non prodotta) — vedi log")
+        return out_lora
+    finally:
+        try:
+            from core import gpu_lock as _gl
+            _gl.release()
+        except Exception:                                    # noqa: BLE001
+            pass
 
 
 import re as _re

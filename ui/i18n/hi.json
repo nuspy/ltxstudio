@@ -1935,6 +1935,7 @@
   "queue.st.error": "त्रुटि",
   "queue.st.cancelled": "रद्द",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU {tag} द्वारा व्यस्त है — खाली होते ही कार्य शुरू होगा।",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

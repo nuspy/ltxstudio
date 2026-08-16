@@ -1935,6 +1935,7 @@
   "queue.st.error": "오류",
   "queue.st.cancelled": "취소됨",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU가 {tag}에 의해 사용 중입니다 — 비는 즉시 작업이 시작됩니다.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

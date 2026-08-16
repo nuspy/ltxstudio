@@ -1935,6 +1935,7 @@
   "queue.st.error": "خطأ",
   "queue.st.cancelled": "أُلغي",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "وحدة GPU مشغولة بواسطة {tag} — ستبدأ المهمة فور تحررها.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

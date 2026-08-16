@@ -1935,6 +1935,7 @@
   "queue.st.error": "erreur",
   "queue.st.cancelled": "annulé",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU occupée par {tag} — la tâche démarrera dès qu'elle sera libre.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

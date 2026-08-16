@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import itertools
 
-from PySide6.QtCore import QObject, Signal, Qt
+from PySide6.QtCore import QObject, QTimer, Signal, Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QPushButton, QLabel,
 )
@@ -55,6 +55,7 @@ class GenerationQueue(QObject):
     changed = Signal()                  # la lista è cambiata (per il pannello)
     job_started = Signal(object)
     job_finished = Signal(object, dict)
+    gpu_waiting = Signal(str)           # la GPU è di un ALTRO processo (tag del proprietario)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -86,6 +87,7 @@ class GenerationQueue(QObject):
                 j.status = "cancelled"
                 if self._running is j:
                     self._running = None
+                    self._release_lock()
                 self.changed.emit()
                 self._pump()
             elif j.status == "queued":
@@ -104,6 +106,19 @@ class GenerationQueue(QObject):
         nxt = next((j for j in self._jobs if j.status == "queued"), None)
         if nxt is None:
             return
+        # LOCK GPU INTER-PROCESSO («un solo job GPU pesante alla volta», per davvero): la coda
+        # seriale copre solo la GUI, ma API :8200 / training / musica sono processi/percorsi
+        # propri. Acquisizione NON-bloccante (mai congelare il thread GUI: un training può tenere
+        # la GPU per ore) → retry ogni 2s + avviso in statusbar con CHI la tiene.
+        try:
+            from core import gpu_lock
+            if not gpu_lock.acquire(f"gui:{nxt.label}", timeout_s=0):
+                h = gpu_lock.holder() or {}
+                self.gpu_waiting.emit(str(h.get("tag", "?")))
+                QTimer.singleShot(2000, self._pump)
+                return
+        except Exception:                                    # noqa: BLE001 — senza lock: comportamento storico
+            pass
         self._running = nxt
         nxt.status = "running"
         w = nxt.worker
@@ -117,12 +132,21 @@ class GenerationQueue(QObject):
         self.changed.emit()
         w.start()
 
+    @staticmethod
+    def _release_lock() -> None:
+        try:
+            from core import gpu_lock
+            gpu_lock.release()
+        except Exception:                                    # noqa: BLE001
+            pass
+
     def _finish(self, job: _Job, result: dict) -> None:
         if job.status != "cancelled":
             job.status = "error" if result.get("status") == "error" else "done"
             job.result = result
         if self._running is job:
             self._running = None
+            self._release_lock()
         try:
             if job.on_done is not None and job.status != "cancelled":
                 job.on_done(result)

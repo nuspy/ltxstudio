@@ -129,13 +129,45 @@ class Job:
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
-        # Prima del job GPU effimero (musica/voce) libera i server persistenti (immagini/video):
-        # con FLUX 22GB residente il runner ACE-Step vedeva <12GB liberi → cpu_offload=True (lento e
-        # sospetto causa del rumore grigio #ACE). Stesso pattern di ltx2_service._free_gpu_servers;
-        # il guard di mem_coordinator evita /free ripetuti tra job musica consecutivi.
+        """Avvio ASINCRONO: lock GPU + /free + Popen girano nel THREAD (prima il free_for da 20s
+        bloccava il thread GUI dei tab; e il lock inter-processo può attendere a lungo)."""
+        self._cancelled = False
+        self._thread = threading.Thread(target=self._run_locked, daemon=True)
+        self._thread.start()
+
+    def _run_locked(self) -> None:
+        # LOCK GPU INTER-PROCESSO: i job Job (musica/TTS/3D/mondi/rig) partivano in PARALLELO alla
+        # coda GUI e all'API — due load pesanti concorrenti hanno già congelato il sistema.
+        try:
+            from core import gpu_lock
+            _tag = os.path.basename(self.cmd[1] if len(self.cmd) > 1 else self.cmd[0])
+            gpu_lock.acquire(f"job:{_tag}",
+                             on_wait=lambda h: self._emit(
+                                 f"[gpu] in attesa: GPU occupata da {h.get('tag', '?')}"),
+                             abort=lambda: getattr(self, "_cancelled", False))
+        except Exception:                                     # noqa: BLE001 — senza lock: come prima
+            pass
+        try:
+            if getattr(self, "_cancelled", False):
+                if self.on_done:
+                    self.on_done(-1)
+                return
+            self._spawn_and_pump()
+        finally:
+            try:
+                from core import gpu_lock
+                gpu_lock.release()
+            except Exception:                                 # noqa: BLE001
+                pass
+
+    def _spawn_and_pump(self) -> None:
+        # Prima del job GPU effimero (musica/voce) libera i server persistenti (immagini/video) e
+        # ASPETTA il rilascio effettivo (il /free risponde prima che il driver restituisca la
+        # VRAM): con FLUX 22GB residente il runner ACE-Step vedeva <12GB liberi →
+        # cpu_offload=True (lento e sospetto causa del rumore grigio #ACE).
         try:
             from core import mem_coordinator
-            mem_coordinator.free_for("music", timeout=20)
+            mem_coordinator.free_and_wait("music", need_mb=12000, wait_s=30)
         except Exception:                                     # noqa: BLE001
             pass
         env = os.environ.copy()
@@ -153,8 +185,7 @@ class Job:
         self._proc = subprocess.Popen(
             self.cmd, cwd=str(self.cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             env=env, bufsize=0, creationflags=flags)
-        self._thread = threading.Thread(target=self._pump, daemon=True)
-        self._thread.start()
+        self._pump()                                # siamo GIÀ nel thread di lavoro (_run_locked)
 
     def run(self) -> int:
         """Esecuzione BLOCCANTE: avvia e attende la fine (per chiamate sincrone, es. voice-clone tts_engine).
@@ -198,6 +229,7 @@ class Job:
             self.on_done(rc)
 
     def stop(self) -> None:
+        self._cancelled = True                       # aborta anche l'attesa del lock GPU (pre-Popen)
         if not self._proc or self._proc.poll() is not None:
             return
         try:

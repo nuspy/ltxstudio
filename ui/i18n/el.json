@@ -1935,6 +1935,7 @@
   "queue.st.error": "σφάλμα",
   "queue.st.cancelled": "ακυρώθηκε",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "Η GPU είναι απασχολημένη από {tag} — η εργασία θα ξεκινήσει μόλις ελευθερωθεί.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

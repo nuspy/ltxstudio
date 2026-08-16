@@ -1935,6 +1935,7 @@
   "queue.st.error": "помилка",
   "queue.st.cancelled": "скасовано",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU зайнята ({tag}) — завдання розпочнеться, щойно вона звільниться.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

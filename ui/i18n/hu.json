@@ -1935,6 +1935,7 @@
   "queue.st.error": "hiba",
   "queue.st.cancelled": "megszakítva",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "A GPU foglalt ({tag}) — a feladat elindul, amint felszabadul.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

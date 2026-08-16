@@ -238,31 +238,56 @@ class TrainingRun:
         self.total_steps = int(params.steps)
 
     def start(self) -> Path:
-        """Scrive il config e avvia il subprocess (non bloccante). Ritorna il path config."""
+        """Scrive il config e avvia (non bloccante). Lock GPU + /free + Popen girano nel THREAD:
+        il chiamante è il tab GUI e il lock inter-processo può attendere a lungo. Ritorna il path config."""
         cfg_path = write_config(self.params)
-        env = os.environ.copy()
-        if self.hf_token:
-            env["HF_TOKEN"] = self.hf_token
-            env["HUGGING_FACE_HUB_TOKEN"] = self.hf_token
-        env.setdefault("PYTHONUNBUFFERED", "1")          # output immediato per il parsing
-        env.setdefault("PYTHONIOENCODING", "utf-8")
-        # COORDINAMENTO (mancava): il training dura ORE e vuole tutta la GPU → free_all HARD
-        # (anche i parcheggi RAM: nessuno rientra a breve) + attesa del rilascio effettivo.
-        try:
-            from core import mem_coordinator as _mc
-            _mc.free_and_wait("train", need_mb=22000, hard=True)
-        except Exception:                                # noqa: BLE001
-            pass
-        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
-        self._proc = subprocess.Popen(
-            [str(VENV_PYTHON), "-u", str(RUN_PY), str(cfg_path)],
-            cwd=str(AI_TOOLKIT_DIR),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            env=env, bufsize=0, creationflags=creationflags,
-        )
-        self._thread = threading.Thread(target=self._pump, daemon=True)
+        self._thread = threading.Thread(target=self._run_locked, args=(cfg_path,), daemon=True)
         self._thread.start()
         return cfg_path
+
+    def _run_locked(self, cfg_path: Path) -> None:
+        # LOCK GPU INTER-PROCESSO: il training partiva in PARALLELO alla coda GUI/API (ore di
+        # contesa). stop() setta _stop → abort dell'attesa.
+        try:
+            from core import gpu_lock
+            gpu_lock.acquire("train:ai-toolkit",
+                             on_wait=lambda h: self.on_log and self.on_log(
+                                 f"[gpu] in attesa: GPU occupata da {h.get('tag', '?')}"),
+                             abort=lambda: self._stop)
+        except Exception:                                # noqa: BLE001 — senza lock: come prima
+            pass
+        try:
+            if self._stop:
+                if self.on_done:
+                    self.on_done(-1)
+                return
+            env = os.environ.copy()
+            if self.hf_token:
+                env["HF_TOKEN"] = self.hf_token
+                env["HUGGING_FACE_HUB_TOKEN"] = self.hf_token
+            env.setdefault("PYTHONUNBUFFERED", "1")      # output immediato per il parsing
+            env.setdefault("PYTHONIOENCODING", "utf-8")
+            # il training dura ORE e vuole tutta la GPU → free_all HARD (anche i parcheggi RAM:
+            # nessuno rientra a breve) + attesa del rilascio effettivo.
+            try:
+                from core import mem_coordinator as _mc
+                _mc.free_and_wait("train", need_mb=22000, hard=True)
+            except Exception:                            # noqa: BLE001
+                pass
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+            self._proc = subprocess.Popen(
+                [str(VENV_PYTHON), "-u", str(RUN_PY), str(cfg_path)],
+                cwd=str(AI_TOOLKIT_DIR),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                env=env, bufsize=0, creationflags=creationflags,
+            )
+            self._pump()                                 # siamo GIÀ nel thread di lavoro
+        finally:
+            try:
+                from core import gpu_lock
+                gpu_lock.release()
+            except Exception:                            # noqa: BLE001
+                pass
 
     def _emit_line(self, line: str) -> None:
         line = line.strip()

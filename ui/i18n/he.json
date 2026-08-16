@@ -1935,6 +1935,7 @@
   "queue.st.error": "שגיאה",
   "queue.st.cancelled": "בוטל",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "ה-GPU תפוס על ידי {tag} — המשימה תתחיל ברגע שיתפנה.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

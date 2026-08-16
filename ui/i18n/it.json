@@ -1948,6 +1948,7 @@
   "queue.st.error": "errore",
   "queue.st.cancelled": "annullato",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU occupata da {tag} — il job parte appena libera.",
   "queue.job.image": "Immagine",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

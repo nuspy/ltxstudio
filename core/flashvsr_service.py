@@ -64,6 +64,15 @@ def upscale_video(inp: str, out: str, *, scale: float = 2.0, target_scale: float
         raise RuntimeError("; ".join(errs))
     tgt = float(target_scale or scale or 2.0)
     run_scale = min(4.0, max(1.0, tgt))
+    # LOCK GPU inter-processo PRIMA del free (altrimenti un altro processo può prendersi la VRAM
+    # appena liberata). Rilascio nel finally del watchdog (scale/mux/stego a valle sono CPU-only).
+    _gl = None
+    try:
+        from core import gpu_lock as _gl
+        _gl.acquire("upscale:flashvsr",
+                    on_wait=lambda h: on_log and on_log(f"[gpu] occupata da {h.get('tag', '?')} — attendo…"))
+    except Exception:                                       # noqa: BLE001
+        _gl = None
     # COORDINAMENTO (mancava): FlashVSR è Wan-based (load multi-GB) — libera gli altri motori e
     # aspetta il rilascio effettivo prima di partire.
     try:
@@ -78,8 +87,13 @@ def upscale_video(inp: str, out: str, *, scale: float = 2.0, target_scale: float
     cmd = [str(VENV_PY), "-u", str(RUNNER), inp, tmp, str(MODEL_DIR),
            str(run_scale), str(seed), str(sparse), str(local_range)]
     env = dict(os.environ, PYTHONPATH=str(WANVSR_DIR) + os.pathsep + str(REPO_DIR))
-    proc = subprocess.Popen(cmd, cwd=str(WANVSR_DIR), env=env, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    try:
+        proc = subprocess.Popen(cmd, cwd=str(WANVSR_DIR), env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    except Exception:
+        if _gl:
+            _gl.release()
+        raise
     killed = {"timeout": False}
     wd = None
     if timeout_s > 0:
@@ -99,6 +113,8 @@ def upscale_video(inp: str, out: str, *, scale: float = 2.0, target_scale: float
     finally:
         if wd:
             wd.cancel()
+        if _gl:
+            _gl.release()
     if killed["timeout"]:
         raise RuntimeError(f"FlashVSR: timeout ({int(timeout_s)}s) — processo terminato.")
     if proc.returncode != 0 or not os.path.exists(tmp):

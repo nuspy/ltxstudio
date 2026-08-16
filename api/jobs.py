@@ -79,6 +79,17 @@ class JobManager:
             fn = self._fns.get(jid)
             if not job or not fn:
                 self._q.task_done(); continue
+            # LOCK GPU INTER-PROCESSO: questa coda è seriale ma è INDIPENDENTE dalla coda GUI —
+            # un job API e un job GUI potevano girare in parallelo (due load pesanti = freeze di
+            # sistema già visto). Attesa bloccante nel worker thread (mai nell'handler HTTP).
+            _locked = False
+            try:
+                from core import gpu_lock
+                _locked = gpu_lock.acquire(
+                    f"api:{job.kind}",
+                    on_wait=lambda h: job.log(f"in attesa: GPU occupata da {h.get('tag', '?')}"))
+            except Exception:                               # noqa: BLE001 — senza lock: come prima
+                pass
             job.touch(status="running", progress=0.01, message="avvio…")
             try:
                 outs = fn(job) or []
@@ -90,6 +101,12 @@ class JobManager:
             except Exception as e:                          # noqa: BLE001
                 job.touch(status="error", error=f"{e}\n{traceback.format_exc()[-1500:]}", message="errore")
             finally:
+                if _locked:
+                    try:
+                        from core import gpu_lock
+                        gpu_lock.release()
+                    except Exception:                       # noqa: BLE001
+                        pass
                 self._fns.pop(jid, None)
                 self._q.task_done()
 

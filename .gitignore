@@ -55,3 +55,5 @@ apps/studio-mobile/tsconfig.tsbuildinfo
 # log runtime (i server/_uv*.log storici restano tracciati: ignore non tocca i file già in indice)
 *.log
 data/emb_cache/
+
+data/gpu.lock

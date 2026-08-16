@@ -1935,6 +1935,7 @@
   "queue.st.error": "Fehler",
   "queue.st.cancelled": "abgebrochen",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU belegt durch {tag} — der Job startet, sobald sie frei ist.",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

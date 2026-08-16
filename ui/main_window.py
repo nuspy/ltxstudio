@@ -657,6 +657,12 @@ class MainWindow(QMainWindow):
             self._engine_err = str(e)
 
         self.jobs = GenerationQueue(self)       # coda SERIALE delle generazioni (no overlap/cancel reciproci)
+        # lock GPU inter-processo: se un ALTRO processo (API/training/musica) tiene la GPU, la coda
+        # attende e lo dice in statusbar (ereditato anche dalla variante Pro, che subclassa questa).
+        self.jobs.gpu_waiting.connect(
+            lambda tag: self.statusBar().showMessage(
+                tr("queue.gpu_busy", "GPU occupata da {tag} — il job parte appena libera.")
+                .format(tag=tag), 4000))
         self._current_pid: str | None = None
         self._inpaint_pid: str | None = None
         self._trellis_pid: str | None = None    # job TRELLIS.2 in corso

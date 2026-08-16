@@ -73,6 +73,15 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
     if errs:
         raise RuntimeError("; ".join(errs))
     model = model or DEFAULT_MODEL
+    # LOCK GPU inter-processo PRIMA del free (altrimenti un altro processo può prendersi la VRAM
+    # appena liberata). Rilascio nel finally del watchdog (mux/stego a valle sono CPU-only).
+    _gl = None
+    try:
+        from core import gpu_lock as _gl
+        _gl.acquire("upscale:seedvr2",
+                    on_wait=lambda h: on_log and on_log(f"[gpu] occupata da {h.get('tag', '?')} — attendo…"))
+    except Exception:                                       # noqa: BLE001
+        _gl = None
     # COORDINAMENTO (mancava): libera gli altri motori e aspetta il rilascio EFFETTIVO PRIMA di
     # _auto_block_swap — la taratura leggeva la VRAM con FLUX/LTX ancora residenti e si
     # auto-castrava (swap massimo) o partiva nel buco del rilascio (shared-RAM).
@@ -98,8 +107,13 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
     if timeout_s is None:
         timeout_s = float(os.environ.get("LTX_SEEDVR2_TIMEOUT_S", "3600") or 0)
     env = dict(os.environ, PYTHONPATH=str(CLI_DIR))
-    proc = subprocess.Popen(cmd, cwd=str(CLI_DIR), env=env, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    try:
+        proc = subprocess.Popen(cmd, cwd=str(CLI_DIR), env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+    except Exception:
+        if _gl:
+            _gl.release()
+        raise
     killed = {"timeout": False}
     wd = None
     if timeout_s > 0:
@@ -119,6 +133,8 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
     finally:
         if wd:
             wd.cancel()
+        if _gl:
+            _gl.release()
     if killed["timeout"]:
         raise RuntimeError(f"SeedVR2: timeout ({int(timeout_s)}s) — processo terminato.")
     if proc.returncode != 0 or not os.path.exists(out):

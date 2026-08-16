@@ -1935,6 +1935,7 @@
   "queue.st.error": "错误",
   "queue.st.cancelled": "已取消",
   "queue.st.unknown": "?",
+  "queue.gpu_busy": "GPU 正被 {tag} 占用 — 任务将在其空闲后立即开始。",
   "queue.job.image": "Image",
   "queue.job.video": "Video",
   "queue.job.video_retake": "Video ReTake",

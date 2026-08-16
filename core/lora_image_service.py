@@ -165,25 +165,39 @@ def train(dataset_dir: str, name: str, out_dir: str, *, base: str = "flux2-dev",
         raise RuntimeError("; ".join(errs))
     cfg = ts.write_config(p)
     log(f"Training FLUX.2 LoRA (ai-toolkit, rank {rank}, {steps} step)…")
-    # COORDINAMENTO (mancava): training = ore con tutta la GPU → free_all HARD + attesa rilascio.
+    # LOCK GPU inter-processo (un solo job pesante) + free_all HARD (training = ore, vuole tutta
+    # la GPU) + attesa del rilascio effettivo. Siamo in un worker thread: il blocco è corretto.
     try:
-        from core import mem_coordinator as _mc
-        _mc.free_and_wait("train", need_mb=22000, hard=True)
+        from core import gpu_lock as _gl
+        _gl.acquire("train:flux-lora",
+                    on_wait=lambda h: log(f"[gpu] occupata da {h.get('tag', '?')} — attendo…"))
     except Exception:                                        # noqa: BLE001
         pass
-    cmd = [str(ts.VENV_PYTHON), str(ts.RUN_PY), str(cfg)]
-    proc = subprocess.Popen(cmd, cwd=str(ts.AI_TOOLKIT_DIR), stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, bufsize=1)
-    for line in proc.stdout:
-        line = line.rstrip()
-        if line and ("step" in line.lower() or "loss" in line.lower() or "error" in line.lower()):
-            log(line[-600:])
-    proc.wait()
-    safet = list((p.project_dir()).rglob("*.safetensors"))
-    if not safet:
-        raise RuntimeError("training fallito (LoRA non prodotta) — vedi log")
-    final = max(safet, key=os.path.getmtime)
-    return str(final)
+    try:
+        try:
+            from core import mem_coordinator as _mc
+            _mc.free_and_wait("train", need_mb=22000, hard=True)
+        except Exception:                                    # noqa: BLE001
+            pass
+        cmd = [str(ts.VENV_PYTHON), str(ts.RUN_PY), str(cfg)]
+        proc = subprocess.Popen(cmd, cwd=str(ts.AI_TOOLKIT_DIR), stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, bufsize=1)
+        for line in proc.stdout:
+            line = line.rstrip()
+            if line and ("step" in line.lower() or "loss" in line.lower() or "error" in line.lower()):
+                log(line[-600:])
+        proc.wait()
+        safet = list((p.project_dir()).rglob("*.safetensors"))
+        if not safet:
+            raise RuntimeError("training fallito (LoRA non prodotta) — vedi log")
+        final = max(safet, key=os.path.getmtime)
+        return str(final)
+    finally:
+        try:
+            from core import gpu_lock as _gl
+            _gl.release()
+        except Exception:                                    # noqa: BLE001
+            pass
 
 
 def make_lora(subjects: list[Subject], name: str, out_dir: str, *, base: str = "flux2-dev",

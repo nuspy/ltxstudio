@@ -57,22 +57,35 @@ def train(dataset_dir: str, out_lora: str, *, trigger: str = "", rank: int = 16,
     env["HF_HUB_OFFLINE"] = "1"
     cmd = [LINGBOT_PY, "-u", TRAIN_WORKER, "--model", base, "--dataset", dj,
            "--out", out_lora, "--rank", str(rank), "--steps", str(steps), "--trigger", trigger]
-    # COORDINAMENTO (mancava): training = ore con tutta la GPU → free_all HARD + attesa rilascio.
+    # LOCK GPU inter-processo + free_all HARD (training = ore, tutta la GPU) + attesa rilascio.
     try:
-        from core import mem_coordinator as _mc
-        _mc.free_and_wait("train", need_mb=22000, hard=True)
+        from core import gpu_lock as _gl
+        _gl.acquire("train:lingbot-lora",
+                    on_wait=lambda h: log(f"[gpu] occupata da {h.get('tag', '?')} — attendo…"))
     except Exception:                                        # noqa: BLE001
         pass
-    proc = subprocess.Popen(cmd, cwd=str(REPO), env=env, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-    for line in proc.stdout:
-        line = line.rstrip()
-        if line:
-            log(line)
-    proc.wait()
-    if not os.path.exists(out_lora):
-        raise RuntimeError(f"LoRA LingBot non prodotta (exit {proc.returncode}). Training sperimentale — vedi log.")
-    return out_lora
+    try:
+        try:
+            from core import mem_coordinator as _mc
+            _mc.free_and_wait("train", need_mb=22000, hard=True)
+        except Exception:                                    # noqa: BLE001
+            pass
+        proc = subprocess.Popen(cmd, cwd=str(REPO), env=env, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+        for line in proc.stdout:
+            line = line.rstrip()
+            if line:
+                log(line)
+        proc.wait()
+        if not os.path.exists(out_lora):
+            raise RuntimeError(f"LoRA LingBot non prodotta (exit {proc.returncode}). Training sperimentale — vedi log.")
+        return out_lora
+    finally:
+        try:
+            from core import gpu_lock as _gl
+            _gl.release()
+        except Exception:                                    # noqa: BLE001
+            pass
 
 
 def make_lora(subjects: list, name: str, out_dir: str, *, rank: int = 16, steps: int = 1500,
