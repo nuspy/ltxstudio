@@ -1772,7 +1772,7 @@
       "label": "SAM2 Hiera Large (tracking/maschere)",
       "kind": "snapshot",
       "type": "Segmentation",
-      "family": "",
+      "family": "hf",
       "gated": false,
       "approx_gb": 0.9,
       "scan_names": [
@@ -1789,7 +1789,7 @@
       "label": "GroundingDINO base (detect da testo)",
       "kind": "snapshot",
       "type": "Segmentation",
-      "family": "",
+      "family": "hf",
       "gated": false,
       "approx_gb": 0.9,
       "scan_names": [
@@ -1805,8 +1805,6 @@
       "module": "ControlNet",
       "label": "DepthAnything V2 Large (depth control)",
       "kind": "snapshot",
-      "type": "Segmentation",
-      "family": "hf",
       "gated": false,
       "approx_gb": 1.3,
       "scan_names": [
@@ -1815,7 +1813,10 @@
       "category": "aux",
       "arch": "depthanything",
       "repo_id": "depth-anything/Depth-Anything-V2-Large-hf",
-      "url": "https://huggingface.co/depth-anything/Depth-Anything-V2-Large-hf"
+      "url": "https://huggingface.co/depth-anything/Depth-Anything-V2-Large-hf",
+      "type": "Segmentation",
+      "family": "hf",
+      "tool_dest": "E:\\AI\\Models\\Segmentation\\hf\\depth-anything-v2-large"
     },
     {
       "id": "inswapper-128",

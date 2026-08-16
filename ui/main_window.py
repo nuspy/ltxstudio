@@ -2755,7 +2755,12 @@ class MainWindow(QMainWindow):
             if not node_installed():
                 QMessageBox.warning(self, tr("mw.node_missing_title"),
                     tr("mw.face_restore_node_missing_msg")); return
-            ok, msg = ensure_model(cfg["model"], log=self._log)
+            ok, msg = ensure_model(cfg["model"], log=self._log,
+                                   confirm=lambda n, mb: QMessageBox.question(
+                                       self, tr("weights.missing.title", "Pesi mancanti"),
+                                       tr("weights.missing.offer_one",
+                                          "Il modello {name} (~{mb}MB) non è presente. Scaricarlo ora?")
+                                       .format(name=n, mb=mb)) == QMessageBox.Yes)
             if not ok:
                 QMessageBox.warning(self, tr("mw.restore_model_missing_title"), msg); return
             comfy_input = Path(r"E:\AI\Comfy_Nexus\ComfyUI\input"); comfy_input.mkdir(parents=True, exist_ok=True)
@@ -4675,7 +4680,12 @@ class MainWindow(QMainWindow):
                     "detection": cfg.get("detection", "retinaface_resnet50")})
                 return True
             from core.face_restore_pipeline import ensure_model
-            ok, msg = ensure_model(cfg["model"], log=self._log)
+            ok, msg = ensure_model(cfg["model"], log=self._log,
+                                   confirm=lambda n, mb: QMessageBox.question(
+                                       self, tr("weights.missing.title", "Pesi mancanti"),
+                                       tr("weights.missing.offer_one",
+                                          "Il modello {name} (~{mb}MB) non è presente. Scaricarlo ora?")
+                                       .format(name=n, mb=mb)) == QMessageBox.Yes)
             if not ok:
                 self._log(f"[Restauro volti] {msg} → mostro il video non restaurato.")
                 return False

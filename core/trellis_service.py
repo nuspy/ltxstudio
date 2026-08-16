@@ -105,6 +105,13 @@ def preflight(image_path: str) -> list[str]:
     errs = []
     if not is_installed():
         errs.append("TRELLIS non installato: usa l'installer (scripts/install_trellis.py).")
+    else:
+        # weights-unification C: prima i pesi assenti scattavano un download SILENZIOSO di ~8GB
+        # (cache HF su C:) dentro il job; ora il runner li rifiuta → il preflight lo dice PRIMA.
+        _pj = Path(r"E:\AI\Tools\TRELLIS2\models\TRELLIS.2-4B\pipeline.json")
+        if not _pj.exists():
+            errs.append("Pesi TRELLIS.2-4B assenti: scaricali dal tab «Pesi modelli» "
+                        "(voce trellis2-4b, ~25GB). Nessun download automatico al primo uso.")
     if not image_path or not Path(image_path).is_file():
         errs.append(f"Immagine inesistente: {image_path}")
     return errs

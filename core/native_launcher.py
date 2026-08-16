@@ -28,7 +28,14 @@ def launch() -> tuple[bool, str]:
         env.setdefault("NATIVE_FBCACHE", "1")               # First Block Cache ON: SCAGIONATO dalle macchie
         #   (A/B 11/07 a seed fisso: chiazze identiche con FBCache off, sage/sdpa, fp8/bf16, VAE fp32 e
         #   perfino con diffusers puro → è FLUX.1-dev sotto ~1MP, non la cache). Opt-out NATIVE_FBCACHE=0.
-        env.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
+        # OFFLINE BLINDATO (weights-unification C): il server immagini era l'UNICO processo GPU
+        # di lunga durata col network HF attivo (e perfino hf_transfer!) mentre il suo loader
+        # dichiara "NON viene scaricato da HuggingFace". I download passano SOLO dal downloader
+        # unico (tab Pesi / primo-uso con consenso). Override esplicito: NATIVE_HF_ONLINE=1.
+        if env.get("NATIVE_HF_ONLINE") != "1":
+            env.setdefault("HF_HUB_OFFLINE", "1")
+        else:
+            env.setdefault("HF_HUB_ENABLE_HF_TRANSFER", "1")
         # NB niente PYTORCH_CUDA_ALLOC_CONF=expandable_segments: su WINDOWS non è supportato (PyTorch lo
         # ignora con "expandable_segments not supported on this platform") → non è una via per la
         # frammentazione VRAM qui. L'accumulo di pipeline va evitato a monte, liberando (/free) prima di

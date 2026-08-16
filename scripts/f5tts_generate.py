@@ -25,7 +25,17 @@ def main():
     a = ap.parse_args()
 
     from f5_tts.api import F5TTS                           # import pesante: solo nel venv
-    f5 = F5TTS()                                           # modello default (F5TTS_v1_Base)
+    # LOCALE-FIRST (weights-unification C): F5TTS() senza argomenti scaricava SWivid/F5-TTS in
+    # silenzio nella cache HF al primo uso. Ora: checkpoint dal catalogo (TTS\F5-TTS) se presente;
+    # assente = errore CHIARO, niente auto-download (connessione metered).
+    _local = r"E:\AI\Models\TTS\F5-TTS"
+    _ck = os.path.join(_local, "F5TTS_v1_Base", "model_1250000.safetensors")
+    _vb = os.path.join(_local, "F5TTS_v1_Base", "vocab.txt")
+    if not os.path.exists(_ck):
+        print(f"ERRORE: pesi F5-TTS assenti ({_ck}) — scaricali dal tab «Pesi modelli» "
+              "(voce f5-tts, ~1.4GB). Nessun download automatico.", flush=True)
+        raise SystemExit(3)
+    f5 = F5TTS(ckpt_file=_ck, vocab_file=_vb if os.path.exists(_vb) else "")
     f5.infer(ref_file=a.ref_audio, ref_text=a.ref_text or "", gen_text=a.text, file_wave=a.output)
     print(f"OK:{a.output}", flush=True)
 

@@ -51,13 +51,19 @@ def _auto_block_swap(model: str) -> tuple[int, str]:
     return 32, "cpu"                       # <8GB → swap massimo
 
 
-def preflight() -> list[str]:
+def preflight(model: str = "") -> list[str]:
     errs = []
     if not CLI.exists():
         errs.append(f"SeedVR2 CLI assente: clona numz/ComfyUI-SeedVR2_VideoUpscaler in {CLI_DIR}.")
     if not VENV_PY.exists():
         errs.append(f"venv SeedVR2 assente: crea {CLI_DIR}\\venv e installa requirements.txt "
                     f"(usa scripts/install_seedvr2.py).")
+    # weights-unification C: il preflight controllava CLI+venv ma NON i pesi → "SeedVR2 fallito
+    # (exit N)" criptico al primo uso. Ora l'assenza esce PRIMA, con la voce di catalogo.
+    _m = MODEL_DIR / (model or DEFAULT_MODEL)
+    if not _m.exists():
+        errs.append(f"Pesi SeedVR2 assenti ({_m.name}): scaricali dal tab «Pesi modelli» "
+                    "(voci seedvr2-3b-fp8 + seedvr2-vae, ~3.7GB).")
     return errs
 
 
@@ -69,7 +75,7 @@ def upscale_video(inp: str, out: str, *, resolution: int = 1080, model: str = ""
     memory-bounded per video lunghi. block_swap>0 = override manuale (0 = auto sulla VRAM libera).
     `timeout_s` (o env LTX_SEEDVR2_TIMEOUT_S, default 3600) termina il processo se sfora (#156).
     Ritorna il path di output (mp4)."""
-    errs = preflight()
+    errs = preflight(model)
     if errs:
         raise RuntimeError("; ".join(errs))
     model = model or DEFAULT_MODEL

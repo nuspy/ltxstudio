@@ -49,9 +49,14 @@ def available_models() -> list[str]:
     return []
 
 
-def ensure_model(name: str, *, log=print) -> tuple[bool, str]:
+def ensure_model(name: str, *, log=print, confirm=None) -> tuple[bool, str]:
     """Garantisce che il modello `name` sia presente in models/facerestore_models; se manca e
-    ne conosciamo l'URL, lo scarica. Ritorna (ok, messaggio)."""
+    ne conosciamo l'URL, lo scarica COL CONSENSO. Ritorna (ok, messaggio).
+
+    weights-unification C: prima scaricava ~350MB da GitHub senza chiedere (connessione
+    metered). `confirm(nome, mb)` -> bool: la GUI passa il dialog; None (headless) = consenso
+    implicito del chiamante. Il download passa dal motore unico (resume + retry) invece di
+    urlretrieve (zero resume)."""
     d = models_dir()
     if d is None:
         return False, "Cartella ComfyUI/models non trovata."
@@ -62,13 +67,13 @@ def ensure_model(name: str, *, log=print) -> tuple[bool, str]:
     if not url:
         return False, (f"Modello «{name}» non presente e senza URL noto. Scaricalo a mano in "
                        f"{d}.")
+    if confirm is not None and not confirm(name, 350):
+        return False, f"Download di {name} annullato dall'utente."
     try:
-        import urllib.request
         d.mkdir(parents=True, exist_ok=True)
-        tmp = dest.with_suffix(dest.suffix + ".part")
         log(f"⬇ Scarico {name} (~350MB)…")
-        urllib.request.urlretrieve(url, tmp)
-        tmp.replace(dest)
+        from core import fast_downloader
+        fast_downloader.download_url(url, str(dest))
         return True, f"✓ {name} scaricato."
     except Exception as e:
         return False, f"❌ Download di {name} fallito: {e}"

@@ -51,6 +51,11 @@ def _gdino_box(frame0_png: str, text: str, device: str):
     import torch
     from PIL import Image
     from transformers import AutoProcessor, GroundingDinoForObjectDetection
+    # weights-unification C: errore CHIARO se i pesi mancano (prima: HFValidationError criptica).
+    if not os.path.isdir(GDINO_DIR) or not os.path.isdir(SAM2_DIR):
+        raise RuntimeError(
+            f"Pesi segmentazione assenti ({GDINO_DIR} / {SAM2_DIR}): scaricali dal tab "
+            "«Pesi modelli» (voci grounding-dino-base + sam2-hiera-large, ~1.8GB).")
     proc = AutoProcessor.from_pretrained(GDINO_DIR)
     model = GroundingDinoForObjectDetection.from_pretrained(GDINO_DIR).to(device).eval()
     img = Image.open(frame0_png).convert("RGB")

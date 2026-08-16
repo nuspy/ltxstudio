@@ -40,6 +40,10 @@ def depth(image_path: str, out_path: str) -> str:
     import numpy as np
     import cv2
     from transformers import pipeline as hf_pipeline
+    # weights-unification C: path assente → errore CHIARO (prima: HFValidationError criptica).
+    if not os.path.isdir(DEPTH_DIR):
+        raise RuntimeError(f"DepthAnything-V2 assente in {DEPTH_DIR}: scaricalo dal tab "
+                           "«Pesi modelli» (voce depth-anything-v2, ~1.3GB).")
     pipe = hf_pipeline(task="depth-estimation", model=DEPTH_DIR)
     from PIL import Image
     res = pipe(Image.open(image_path).convert("RGB"))

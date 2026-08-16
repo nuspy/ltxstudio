@@ -37,6 +37,14 @@ def _mask_to_2d(masks, scores=None):
 def _load(_model: str = "", _arch: str = "segment"):
     import torch
     from transformers import AutoProcessor, GroundingDinoForObjectDetection
+    # weights-unification C: prima un path assente finiva in from_pretrained → "HFValidationError:
+    # Repo id must be in the form…" (criptico e fuorviante). Errore CHIARO con la voce di catalogo.
+    if not os.path.isdir(GDINO_DIR):
+        raise RuntimeError(f"GroundingDINO assente in {GDINO_DIR}: scaricalo dal tab «Pesi modelli» "
+                           "(voce grounding-dino-base, ~0.9GB).")
+    if not os.path.isdir(SAM2_DIR):
+        raise RuntimeError(f"SAM2 assente in {SAM2_DIR}: scaricalo dal tab «Pesi modelli» "
+                           "(voce sam2-hiera-large, ~0.9GB).")
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     gproc = AutoProcessor.from_pretrained(GDINO_DIR)
     gmodel = GroundingDinoForObjectDetection.from_pretrained(GDINO_DIR).to(dev).eval()

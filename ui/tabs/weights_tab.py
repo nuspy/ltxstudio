@@ -67,9 +67,21 @@ class WeightsTab(QWidget):
         self._build_list()
 
         h = QHBoxLayout()
+        self.filter_txt = QLineEdit()
+        self.filter_txt.setPlaceholderText(tr("weights.filter.hint", "filtra per nome/arch/repo…"))
+        self.filter_txt.textChanged.connect(lambda *_: self._rebuild_list())
+        h.addWidget(self.filter_txt, 1)
         self.chk_all = QCheckBox(tr("weights.show_all", "Mostra tutti i moduli"))
         self.chk_all.setToolTip(tr("weights.show_all.tt", "Disattiva il filtro per edizione/moduli presenti."))
         self.chk_all.toggled.connect(self._on_show_all)
+        # weights-unification C: il «Mostra tutti» era un BYPASS del gating d'edizione a portata di
+        # click di chiunque → visibile solo in build di sviluppo (curatela/debug).
+        try:
+            from core import features as _feat
+            if _feat.edition() != "dev":
+                self.chk_all.setVisible(False)
+        except Exception:                                # noqa: BLE001
+            pass
         self.btn_refresh = QPushButton(tr("weights.refresh", "Aggiorna stato")); self.btn_refresh.clicked.connect(self._refresh)
         self.btn_missing = QPushButton(tr("weights.sel_missing", "Seleziona mancanti")); self.btn_missing.clicked.connect(self._select_missing)
         self.btn_link = QPushButton(tr("weights.link", "🔗 Collega trovati"))
@@ -92,18 +104,37 @@ class WeightsTab(QWidget):
         self._refresh()
 
     def _build_list(self):
-        # only_wanted: mostra SOLO i pesi usati dai moduli PRESENTI nell'edizione (feature_matrix). «Mostra
-        # tutti» disattiva il filtro (per curatela/debug).
-        groups = wc.by_module(only_wanted=not self._show_all)
-        if not groups and not self._show_all:            # edizione minimale / niente moduli → mostra tutto
-            groups = wc.by_module()
-        for module, entries in groups.items():
-            box = QGroupBox(module); v = QVBoxLayout(box)
-            for e in entries:
-                cb = QCheckBox()
-                self._checks[e["id"]] = (cb, e)
-                v.addWidget(cb)
-            self._list.addWidget(box)
+        # SCHEMA v2: raggruppa CATEGORIA (immagini/video/musica/voce/3D/ausiliari) → ARCHITETTURA —
+        # gli assi tassonomici veri, non più i 19 moduli piatti in ordine JSON. `only_wanted` = solo
+        # i pesi delle capability dell'edizione (feature_matrix); «Mostra tutti» esiste SOLO in dev
+        # (prima era un bypass del gating a portata di click di qualunque edizione). Filtro testo
+        # live su id/label/arch/repo.
+        q = (getattr(self, "filter_txt", None) and self.filter_txt.text().strip().lower()) or ""
+        groups = wc.by_category(only_wanted=not self._show_all)
+        for cat, arches in groups.items():
+            cat_label = tr(f"weights.cat.{cat}", wc.CATEGORY_LABELS.get(cat, cat))
+            entries_shown = 0
+            box = QGroupBox(cat_label); v = QVBoxLayout(box)
+            for arch in sorted(arches):
+                sub = [e for e in arches[arch]
+                       if not q or q in f"{e['id']} {e.get('label', '')} {arch} "
+                       f"{e.get('repo_id', '')}".lower()]
+                if not sub:
+                    continue
+                hdr = QLabel(arch)
+                hdr.setStyleSheet("font-weight:bold;color:#b7bfd0;margin-top:4px;")
+                v.addWidget(hdr)
+                for e in sub:
+                    cb = QCheckBox()
+                    if not wc.downloadable(e):
+                        cb.setEnabled(False)             # no_remote: solo Collega/Importa, mai download
+                    self._checks[e["id"]] = (cb, e)
+                    v.addWidget(cb)
+                    entries_shown += 1
+            if entries_shown:
+                self._list.addWidget(box)
+            else:
+                box.deleteLater()
         self._list.addStretch(1)
 
     def _rebuild_list(self):
@@ -120,14 +151,18 @@ class WeightsTab(QWidget):
     def _label_for(self, e: dict) -> str:
         base = self.base.text().strip() or None
         gated = " 🔒" if e.get("gated") else ""
-        fam = f"[{e.get('type','')}/{e.get('family','')}]"
+        adult = " 🔞" if e.get("sensitivity") == "adult" else ""
+        role = " [base]" if wc.install_role(e) == "base" else ""
+        fam = f"[{e.get('type','')}/{e.get('family','')}]" if e.get("family") else f"[{e.get('type','')}]"
         if wc.is_present(e, base):
             state = "✓ " + tr("weights.present", "presente")
         elif e["id"] in self._found:
             state = "⇒ " + tr("weights.found", "già presente in: {p}").format(p=self._found[e["id"]])
+        elif not wc.downloadable(e):
+            state = "∅ " + tr("weights.no_remote", "senza fonte remota: usa Collega/Importa")
         else:
             state = "• " + tr("weights.missing", "mancante")
-        return f"{e.get('label', e['id'])} {fam} · ~{e.get('approx_gb','?')}GB{gated} — {state}"
+        return f"{e.get('label', e['id'])} {fam} · ~{e.get('approx_gb','?')}GB{gated}{adult}{role} — {state}"
 
     def _refresh(self):
         for _id, (cb, e) in self._checks.items():
@@ -255,7 +290,8 @@ class WeightsTab(QWidget):
     def _select_missing(self):
         base = self.base.text().strip() or None
         for _id, (cb, e) in self._checks.items():
-            cb.setChecked(not wc.is_present(e, base) and e["id"] not in self._found)
+            cb.setChecked(wc.downloadable(e) and not wc.is_present(e, base)
+                          and e["id"] not in self._found)
 
     def _download(self):
         if self._proc is not None:

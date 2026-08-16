@@ -182,11 +182,16 @@ def main():
     ap.add_argument("--texture_size", type=int, default=1024)
     ap.add_argument("--decimation", type=int, default=150000)     # target facce (era 1_000_000)
     ap.add_argument("--simplify_cap", type=int, default=2000000)  # cap pre-to_glb (era 16.7M = nessuno)
-    # Preferisci i pesi LOCALI (scaricati via scripts/download_trellis2_curl.py) → niente cache HF/ridownload.
+    # SOLO pesi LOCALI: il vecchio fallback al repo-id "microsoft/TRELLIS.2-4B" scaricava 8GB IN
+    # SILENZIO nella cache HF di C: al primo job 3D (connessione metered!). Ora: pesi assenti =
+    # errore CHIARO col percorso e la voce di catalogo (il servizio fa comunque il preflight prima).
     _local = r"E:\AI\Tools\TRELLIS2\models\TRELLIS.2-4B"
-    _default_model = _local if os.path.isdir(_local) and os.path.exists(os.path.join(_local, "pipeline.json")) \
-        else "microsoft/TRELLIS.2-4B"
-    ap.add_argument("--model", default=_default_model)
+    if not (os.path.isdir(_local) and os.path.exists(os.path.join(_local, "pipeline.json"))):
+        print(f"ERRORE: pesi TRELLIS.2-4B assenti in {_local} — scaricali dal tab "
+              "«Pesi modelli» (voce trellis2-4b, ~25GB) o con scripts/download_trellis2_curl.py. "
+              "Nessun download automatico.", flush=True)
+        raise SystemExit(3)
+    ap.add_argument("--model", default=_local)
     ap.add_argument("--parent-pid", type=int, default=0)          # PID dell'app: se muore, ci autodistruggiamo
     # ── Parametri GUI (prima ignorati) ora cablati all'API ufficiale TRELLIS.2 ──
     ap.add_argument("--pipeline_type", default="1024_cascade",    # ← GUI "resolution": 512/1024/1024_cascade/1536_cascade

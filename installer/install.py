@@ -51,12 +51,25 @@ def _wants(item: dict, edition: str, allows_adult: bool) -> bool:
 
 
 def build_plan(edition: str, allows_adult: bool) -> dict:
+    """Nodi/deps da install_spec; MODELLI dal REGISTRO UNICO (weights_catalog v2).
+    Prima i modelli stavano in una lista PARALLELA di install_spec (id diversi dal catalogo,
+    gating a `editions[]` invece che a capability) e il download era uno stub: due manifesti
+    non sincronizzati e zero pesi scaricati. Ora: `install_role: base` + capability
+    dell'edizione (manifest bakeato via core.features) decidono cosa scarica l'installer;
+    tutto il resto è on-demand (primo uso / tab Pesi)."""
     nodes = [n for n in SPEC["custom_nodes"] if _wants(n, edition, allows_adult)]
     deps = list(SPEC.get("python_deps", []))
-    base_models = [m for m in SPEC["models"]
-                   if _wants(m, edition, allows_adult) and m.get("base") and not m.get("on_demand")]
-    on_demand = [m for m in SPEC["models"]
-                 if _wants(m, edition, allows_adult) and m.get("on_demand")]
+    from core import weights_catalog as wc
+    base_models = [
+        {"id": e["id"], "label": e.get("label", e["id"]),
+         "size_mb": int(float(e.get("approx_gb", 0)) * 1024), "_entry": e}
+        for e in wc.base_weights_for_edition(allows_adult=allows_adult)]
+    on_demand = [
+        {"id": e["id"], "label": e.get("label", e["id"]),
+         "size_mb": int(float(e.get("approx_gb", 0)) * 1024)}
+        for e in wc.load()
+        if wc.downloadable(e) and wc.install_role(e) != "base"
+        and wc.wanted(e, check_present=False, allows_adult=allows_adult)]
     total = sum(n.get("size_mb", 0) for n in nodes) + sum(d.get("size_mb", 0) for d in deps) \
         + sum(m.get("size_mb", 0) for m in base_models)
     return {"nodes": nodes, "deps": deps, "base_models": base_models,
@@ -134,10 +147,43 @@ def _git_clone(node: dict, comfy_root: str | None) -> bool:
 
 
 def _download_base_models(models: list) -> None:
-    # I downloader reali esistono già (scripts/*, core/encoder_downloader). Qui li
-    # invochiamo in modo best-effort; i modelli grandi possono richiedere tempo.
+    """Download REALE dei pesi base via il motore unico (prima era uno stub che stampava).
+    Resume attivo; un peso alla volta (connessione metered); gated → messaggio con l'url
+    della licenza; il fallito non blocca gli altri (si può rilanciare: idempotente)."""
+    import time
+    from core import downloader as dl
+    from core import weights_catalog as wc
+    fail = 0
     for m in models:
-        print(f"  [modello base] {m['label']} (~{m['size_mb']} MB) — usa il downloader dedicato.")
+        e = m.get("_entry") or next((x for x in wc.load() if x["id"] == m["id"]), None)
+        if not e:
+            continue
+        if wc.is_present(e):
+            print(f"  [modello base] ✓ {m['label']} — già presente")
+            continue
+        print(f"  [modello base] ↓ {m['label']} (~{m['size_mb']} MB)")
+        state = {"b": 0, "t0": time.monotonic(), "last": 0.0}
+
+        def _prog(n, fname, _s=state):
+            _s["b"] += n
+            now = time.monotonic()
+            if now - _s["last"] >= 3.0:
+                _s["last"] = now
+                mb = _s["b"] / 2**20
+                print(f"    … {mb:,.0f} MB ({mb / max(now - _s['t0'], 0.001):,.1f} MB/s)", flush=True)
+
+        try:
+            dest = dl.download_entry(e, progress=_prog)
+            print(f"  [modello base] ✓ {m['label']} → {dest}")
+        except dl.GatedRepoError as ex:
+            fail += 1
+            print(f"  [modello base] ✗ {m['label']}: repo GATED — accetta la licenza su "
+                  f"{ex.license_url}, imposta HF_TOKEN e rilancia l'installer.")
+        except Exception as ex:                      # noqa: BLE001
+            fail += 1
+            print(f"  [modello base] ✗ {m['label']}: {str(ex)[:200]} (rilancia: resume attivo)")
+    if fail:
+        print(f"  [modello base] {fail} download NON completati — rilancia l'installer o usa il tab Pesi.")
 
 
 if __name__ == "__main__":
