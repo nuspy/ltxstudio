@@ -761,33 +761,46 @@ class _CpuParkRegistry(_DummyReg):
 
 _PARK = _CpuParkRegistry()
 
-CHECKPOINT = r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors"
-UPSAMPLER = r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
-GEMMA = r"E:\AI\Models\TextEncoders\gemma-3-ltx"              # Gemma-3 12B UFFICIALE Lightricks (non-gated, formato ltx-core)
+# FASE G weights-unification: path DAL registro unico (fallback ai letterali storici) — il
+# catalogo è l'unica fonte di verità su DOVE vive un peso; i motori la interrogano per id.
+from core import model_paths as _mpaths                       # stdlib-only, sicuro nel worker
+
+CHECKPOINT = _mpaths.p("ltx23-dev-fp8", r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors")
+UPSAMPLER = _mpaths.p("ltx23-spatial-upscaler", r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
+GEMMA = _mpaths.p("ltx23-gemma-te", r"E:\AI\Models\TextEncoders\gemma-3-ltx")   # Gemma-3 12B Lightricks (formato ltx-core)
 LORA_DIR = r"E:\AI\Models\LoRA"
 # LoRA di DISTILLAZIONE ufficiale (Lightricks/LTX-2.3, 7.6GB): OBBLIGATORIA per usare i checkpoint DEV
 # (non-distilled) con la pipeline two-stage — senza, il dev esce "dematerializzato" (nuvole di voxel).
-DISTILLED_LORA = r"E:\AI\Models\LoRA\LTX-2\ltx-2.3-22b-distilled-lora-384-1.1.safetensors"
-# IC-LoRA di controllo (canny/depth/pose) presenti su disco — #24 ControlNet nativo, nessun download
+DISTILLED_LORA = _mpaths.p("ltx23-distilled-lora-384",
+                           r"E:\AI\Models\LoRA\LTX-2\ltx-2.3-22b-distilled-lora-384-1.1.safetensors")
+# IC-LoRA — kind → id di CATALOGO (FASE G: il registro decide il path; fallback = nome storico
+# in LoRA\LTX-2). #24 ControlNet nativo, nessun download implicito: solo quelle presenti.
 _LORA2 = r"E:\AI\Models\LoRA\LTX-2"
-IC_LORA = {
-    # ControlNet strutturale (control_video = canny/depth/pose del sorgente)
-    "canny": _LORA2 + r"\ltx-2-19b-ic-lora-canny-control.safetensors",
-    "depth": _LORA2 + r"\ltx-2-19b-ic-lora-depth-control.safetensors",
-    "pose": _LORA2 + r"\ltx-2-19b-ic-lora-pose-control.safetensors",
-    # editing/restauro per-riferimento (IC-LoRA presenti su disco, prima NON raggiungibili)
-    "detailer": _LORA2 + r"\ltx-2-19b-ic-lora-detailer.safetensors",
-    "outpaint": _LORA2 + r"\ltx-2.3-22b-ic-lora-outpaint.safetensors",
-    "refocus": _LORA2 + r"\ltx-2.3-22b-ic-lora-refocus.safetensors",
-    "uncompress": _LORA2 + r"\ltx-2.3-22b-ic-lora-uncompress.safetensors",
-    "deinterlace": _LORA2 + r"\ltx-2.3-22b-ic-lora-deinterlace.safetensors",
-    "motiondeblur": _LORA2 + r"\ltx-2.3-22b-ic-lora-motiondeblur.safetensors",
-    "hdr": _LORA2 + r"\ltx-2.3-22b-ic-lora-hdr-0.9.safetensors",
-    "lipdub": _LORA2 + r"\ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors",
-    "restyle": _LORA2 + r"\852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors",
-    "motion-track": _LORA2 + r"\ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
-    "union": _LORA2 + r"\ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+_IC_IDS = {
+    "canny": "ltx-iclora-canny", "depth": "ltx-iclora-depth", "pose": "ltx-iclora-pose",
+    "detailer": "ltx-iclora-detailer", "outpaint": "ltx-iclora-outpaint",
+    "refocus": "ltx-iclora-refocus", "uncompress": "ltx-iclora-uncompress",
+    "deinterlace": "ltx-iclora-deinterlace", "motiondeblur": "ltx-iclora-motiondeblur",
+    "hdr": "ltx-iclora-hdr", "lipdub": "ltx-iclora-lipdub", "restyle": "ltx-iclora-restyle",
+    "motion-track": "ltx-iclora-motion-track", "union": "ltx-iclora-union",
 }
+_IC_FALLBACK = {
+    "canny": "ltx-2-19b-ic-lora-canny-control.safetensors",
+    "depth": "ltx-2-19b-ic-lora-depth-control.safetensors",
+    "pose": "ltx-2-19b-ic-lora-pose-control.safetensors",
+    "detailer": "ltx-2-19b-ic-lora-detailer.safetensors",
+    "outpaint": "ltx-2.3-22b-ic-lora-outpaint.safetensors",
+    "refocus": "ltx-2.3-22b-ic-lora-refocus.safetensors",
+    "uncompress": "ltx-2.3-22b-ic-lora-uncompress.safetensors",
+    "deinterlace": "ltx-2.3-22b-ic-lora-deinterlace.safetensors",
+    "motiondeblur": "ltx-2.3-22b-ic-lora-motiondeblur.safetensors",
+    "hdr": "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors",
+    "lipdub": "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors",
+    "restyle": "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors",
+    "motion-track": "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
+    "union": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+}
+IC_LORA = {k: _mpaths.p(_IC_IDS[k], os.path.join(_LORA2, _IC_FALLBACK[k])) for k in _IC_IDS}
 IC_LORA = {k: v for k, v in IC_LORA.items() if os.path.exists(v)}   # solo quelle presenti su disco
 
 # --- RELEASE LTX (2.3 default | 2.5) --------------------------------------------------------

@@ -3257,6 +3257,20 @@ class MainWindow(QMainWindow):
             return
         if _engine == "comfy":
             self._log("[motore] comfy non copre audio/controlnet/storyboard/lungo → uso ltx2_infer")
+        # FASE G weights-unification: consenso PRIMO-USO — componenti obbligatorie della release
+        # LTX assenti (es. Gemma TE su installazione fresca) → dialog di download col motore
+        # unico. Cabla ltx_release.missing_catalog_ids (il preflight che era dead code).
+        if (params.get("arch") or "ltx").lower() == "ltx":
+            try:
+                from core import ensure_weights as ew
+                from core import ltx_release as _lr
+                _rel = params.get("ltx_release") or _lr.DEFAULT_RELEASE
+                _ids = _lr.missing_catalog_ids(_rel)
+                if _ids and not ew.offer_download_gui(self, _ids, f"LTX {_rel}"):
+                    self._log(tr("weights.missing.title", "Pesi mancanti") + f" → LTX {_rel}")
+                    return
+            except Exception:                               # noqa: BLE001 — l'errore chiaro del worker copre
+                pass
         self._ltx2_worker = _NativeLtx2Worker(params)
         # il motore nativo LTX-2 scrive la preview per-step su preview_file (#92) → mostra il dialog anteprima
         # anche qui (prima appariva solo sul ramo comfy-native).

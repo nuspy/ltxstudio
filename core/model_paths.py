@@ -45,3 +45,14 @@ def path_of(entry_id: str) -> Path | None:
 def exists(entry_id: str) -> bool:
     e = entry(entry_id)
     return bool(e and wc.is_present(e, str(models_root())))
+
+
+def p(entry_id: str, fallback: str) -> str:
+    """Risoluzione COMPATTA per la migrazione dei letterali: path dal registro se l'id esiste,
+    altrimenti il fallback storico. MAI solleva (i moduli che definiscono costanti a import-time
+    non devono morire per un catalogo assente/rotto)."""
+    try:
+        q = path_of(entry_id)
+        return str(q) if q else fallback
+    except Exception:                                    # noqa: BLE001
+        return fallback

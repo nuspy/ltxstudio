@@ -26,6 +26,11 @@ _MODELS = Path(r"E:\AI\Models")
 _TOOLS = Path(r"E:\AI\Tools")
 _REPO = Path(__file__).resolve().parents[1]
 
+# FASE G weights-unification: i path dei componenti vengono dal REGISTRO UNICO (weights_catalog
+# v2, per id) con i letterali storici come fallback — una sola fonte di verità su dove vive un
+# peso; `AI_MODELS_DIR`/«Cartella base» valgono anche qui. `model_paths.p` non solleva mai.
+from core.model_paths import p as _P                       # stdlib-only (nessun torch)
+
 # Stato di una capability. "cross" = tecnicamente possibile solo riusando un adapter dell'altra
 # release: il DiT ha la stessa topologia (48 layer, dim 4096, 128 canali latenti) e Lightricks
 # dichiara che «la grande maggioranza delle LoRA/IC-LoRA 2.3 gira su 2.5 senza modifiche», ma il
@@ -73,31 +78,33 @@ _R23 = LtxRelease(
     label="LTX 2.3",
     python=str(_TOOLS / "ltx2_venv" / "Scripts" / "python.exe"),
     worker=str(_REPO / "workers" / "ltx2_infer.py"),
-    text_encoder=str(_MODELS / "TextEncoders" / "gemma-3-ltx"),
+    text_encoder=_P("ltx23-gemma-te", str(_MODELS / "TextEncoders" / "gemma-3-ltx")),
     video_vae="",                                     # dentro il checkpoint
     audio_vae="",                                     # dentro il checkpoint
-    upsampler_spatial=str(_MODELS / "latent_upscale_models" / "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"),
+    upsampler_spatial=_P("ltx23-spatial-upscaler",
+                         str(_MODELS / "latent_upscale_models" / "ltx-2.3-spatial-upscaler-x2-1.1.safetensors")),
     upsampler_temporal="",
-    distilled_lora=str(_LORA23 / "ltx-2.3-22b-distilled-lora-384-1.1.safetensors"),
+    distilled_lora=_P("ltx23-distilled-lora-384",
+                      str(_LORA23 / "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")),
     duration_head="",
     diffusion_decoder="",
     aux_bundle="_ltx23_aux_components.safetensors",   # risolto accanto al checkpoint
     rgb_factors="ltx23",
     ic_lora={
-        "canny": str(_LORA23 / "ltx-2-19b-ic-lora-canny-control.safetensors"),
-        "depth": str(_LORA23 / "ltx-2-19b-ic-lora-depth-control.safetensors"),
-        "pose": str(_LORA23 / "ltx-2-19b-ic-lora-pose-control.safetensors"),
-        "detailer": str(_LORA23 / "ltx-2-19b-ic-lora-detailer.safetensors"),
-        "outpaint": str(_LORA23 / "ltx-2.3-22b-ic-lora-outpaint.safetensors"),
-        "refocus": str(_LORA23 / "ltx-2.3-22b-ic-lora-refocus.safetensors"),
-        "uncompress": str(_LORA23 / "ltx-2.3-22b-ic-lora-uncompress.safetensors"),
-        "deinterlace": str(_LORA23 / "ltx-2.3-22b-ic-lora-deinterlace.safetensors"),
-        "motiondeblur": str(_LORA23 / "ltx-2.3-22b-ic-lora-motiondeblur.safetensors"),
-        "hdr": str(_LORA23 / "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors"),
-        "lipdub": str(_LORA23 / "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors"),
-        "restyle": str(_LORA23 / "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors"),
-        "motion-track": str(_LORA23 / "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors"),
-        "union": str(_LORA23 / "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"),
+        "canny": _P("ltx-iclora-canny", str(_LORA23 / "ltx-2-19b-ic-lora-canny-control.safetensors")),
+        "depth": _P("ltx-iclora-depth", str(_LORA23 / "ltx-2-19b-ic-lora-depth-control.safetensors")),
+        "pose": _P("ltx-iclora-pose", str(_LORA23 / "ltx-2-19b-ic-lora-pose-control.safetensors")),
+        "detailer": _P("ltx-iclora-detailer", str(_LORA23 / "ltx-2-19b-ic-lora-detailer.safetensors")),
+        "outpaint": _P("ltx-iclora-outpaint", str(_LORA23 / "ltx-2.3-22b-ic-lora-outpaint.safetensors")),
+        "refocus": _P("ltx-iclora-refocus", str(_LORA23 / "ltx-2.3-22b-ic-lora-refocus.safetensors")),
+        "uncompress": _P("ltx-iclora-uncompress", str(_LORA23 / "ltx-2.3-22b-ic-lora-uncompress.safetensors")),
+        "deinterlace": _P("ltx-iclora-deinterlace", str(_LORA23 / "ltx-2.3-22b-ic-lora-deinterlace.safetensors")),
+        "motiondeblur": _P("ltx-iclora-motiondeblur", str(_LORA23 / "ltx-2.3-22b-ic-lora-motiondeblur.safetensors")),
+        "hdr": _P("ltx-iclora-hdr", str(_LORA23 / "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors")),
+        "lipdub": _P("ltx-iclora-lipdub", str(_LORA23 / "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors")),
+        "restyle": _P("ltx-iclora-restyle", str(_LORA23 / "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors")),
+        "motion-track": _P("ltx-iclora-motion-track", str(_LORA23 / "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors")),
+        "union": _P("ltx-iclora-union", str(_LORA23 / "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors")),
     },
     caps={
         "t2v": CAP_YES, "i2v": CAP_YES, "ti2v": CAP_YES, "a2v": CAP_YES, "audio": CAP_YES,
@@ -130,23 +137,27 @@ _R25 = LtxRelease(
     worker=str(_REPO / "workers" / "ltx2_infer.py"),
     # Text encoder nvfp4 (6,9 GiB) invece dei 24,5 GiB del bf16 ufficiale: stesso layout
     # weight/weight_scale/weight_scale_2 che sappiamo già leggere (flux2_transformer.Nvfp4Linear).
-    text_encoder=str(_TE25 / "gemma4-12b-with-proj-nvfp4-torchao.safetensors"),
-    video_vae=str(_VAE25 / "ltx-2.5-video-vae-conv-bf16.safetensors"),
-    audio_vae=str(_VAE25 / "ltx-2.5-audio-vae-bf16.safetensors"),
+    text_encoder=_P("ltx25-te-nvfp4-local", str(_TE25 / "gemma4-12b-with-proj-nvfp4-torchao.safetensors")),
+    video_vae=_P("ltx25-video-vae-conv", str(_VAE25 / "ltx-2.5-video-vae-conv-bf16.safetensors")),
+    audio_vae=_P("ltx25-audio-vae", str(_VAE25 / "ltx-2.5-audio-vae-bf16.safetensors")),
     # Lo spatial upscaler 2.5 esiste, ma il README rimanda ancora a quello 2.3 — che abbiamo già
     # su disco. `resolve()` prova prima il 2.5 e ricade sul 2.3 (stessa famiglia, non è una
     # sostituzione di modello: è un componente ausiliario dichiarato compatibile da Lightricks).
-    upsampler_spatial=str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"),
-    upsampler_temporal=str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors"),
-    distilled_lora=str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-distilled-lora-450-bf16.safetensors"),
-    duration_head=str(_MODELS / "model_patches" / "ltx-2.5-duration-head-bf16.safetensors"),
-    diffusion_decoder=str(_VAE25 / "ltx-2.5-video-vae-bf16.safetensors"),
+    upsampler_spatial=_P("ltx25-spatial-upscaler",
+                         str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors")),
+    upsampler_temporal=_P("ltx25-temporal-upscaler",
+                          str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors")),
+    distilled_lora=_P("ltx25-distilled-lora-450",
+                      str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-distilled-lora-450-bf16.safetensors")),
+    duration_head=_P("ltx25-duration-head", str(_MODELS / "model_patches" / "ltx-2.5-duration-head-bf16.safetensors")),
+    diffusion_decoder=_P("ltx25-diffusion-decoder", str(_VAE25 / "ltx-2.5-video-vae-bf16.safetensors")),
     aux_bundle="",
     rgb_factors="ltx25",
     # Unico adapter ufficiale 2.5 al 11/08/2026. Tutto il resto del controllo (canny/depth/pose/
     # union/HDR/DubIt/outpaint/…) esiste solo per 2.3 → capability "cross".
     ic_lora={
-        "pixel-upscaler": str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors"),
+        "pixel-upscaler": _P("ltx25-iclora-pixel-upscaler",
+                             str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors")),
     },
     caps={
         "t2v": CAP_YES, "i2v": CAP_YES, "ti2v": CAP_YES, "a2v": CAP_YES, "audio": CAP_YES,
@@ -208,6 +219,24 @@ def missing_components(release: str | None) -> list[str]:
         if not p or not os.path.exists(p):
             out.append(attr)
     return out
+
+
+# componente obbligatoria → id di CATALOGO scaricabile (FASE G: il consenso primo-uso della GUI
+# passa da qui). NB 2.5: il TE del path è il nvfp4 DERIVATO LOCALMENTE (no_remote) — l'id
+# scaricabile è il bf16 ufficiale, che però NON risolve il path nvfp4: il dialog lo dice.
+_COMPONENT_IDS: dict[str, dict[str, str]] = {
+    "2.3": {"text_encoder": "ltx23-gemma-te"},
+    "2.5": {"text_encoder": "ltx25-te-bf16", "video_vae": "ltx25-video-vae-conv",
+            "audio_vae": "ltx25-audio-vae"},
+}
+
+
+def missing_catalog_ids(release: str | None) -> list[str]:
+    """Id di catalogo SCARICABILI per le componenti obbligatorie mancanti (per il dialog di
+    consenso primo-uso). Componenti senza id scaricabile restano fuori: le copre l'errore chiaro."""
+    rel = get(release)
+    ids = _COMPONENT_IDS.get(rel.id, {})
+    return [ids[c] for c in missing_components(release) if c in ids]
 
 
 def resolve(release: str | None, attr: str) -> str:

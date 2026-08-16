@@ -48,19 +48,23 @@ VRAM_MB = {"flux": 24000, "flux2": 24000, "zimage": 12000, "ernie": 16000,
 # archi che richiedono una maschera (inpaint-family)
 _MASK_ARCHS = ("inpaint", "flux2_inpaint")
 
-# Text encoder convertiti (pesi locali + config/tokenizer) e VAE locale, per i file solo-transformer
+# Text encoder convertiti (pesi locali + config/tokenizer) e VAE locale, per i file solo-transformer.
+# FASE G weights-unification: path DAL registro unico dove c'è un id (fallback = letterale storico).
+from core.model_paths import p as _cat_p                     # stdlib-only, mai solleva
+
 TE_DIR = r"E:\AI\Models\diffusers\_te"
-AE_FLUX = r"E:\AI\Models\VAE\Flux\ae.safetensors"
+AE_FLUX = _cat_p("flux-vae-ae", r"E:\AI\Models\VAE\Flux\ae.safetensors")
 # Ernie: repo diffusers (config/vae/tokenizer/scheduler) + transformer e text-encoder come single-file locali
-ERNIE_REPO = r"E:\AI\Models\diffusers\Ernie\ERNIE-Image"
+ERNIE_REPO = _cat_p("ernie-image", r"E:\AI\Models\diffusers\Ernie\ERNIE-Image")
 ERNIE_TRANSFORMER = r"E:\AI\Models\diffusion_models\Ernie\ernie-image.safetensors"
-ERNIE_TE = r"E:\AI\Models\TextEncoders\Ernie\ministral-3-3b.safetensors"
+ERNIE_TE = _cat_p("ernie-ministral", r"E:\AI\Models\TextEncoders\Ernie\ministral-3-3b.safetensors")
 FLUX2_DIR = r"E:\AI\Models\diffusers\flux2"          # TE Mistral HF + tokenizer + config (gated, scaricati)
-FLUX2_VAE = r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors"
+FLUX2_VAE = _cat_p("flux2-vae", r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors")
 # FLUX.2 KLEIN (edit/inpaint): encoder Qwen3 (NON Mistral). 4B ufficiale → hidden 2560 (jad 7680),
 # miraclein NSFW 8B → hidden 4096 (jad 12288). Il dir giusto è scelto dal joint_attention_dim del
 # transformer (vedi _assemble_flux2_klein). VAE = lo stesso flux2-vae.
-KLEIN_QWEN_DIRS = {7680: os.path.join(TE_DIR, "qwen3_4b"), 12288: os.path.join(TE_DIR, "qwen3_8b")}
+KLEIN_QWEN_DIRS = {7680: _cat_p("qwen3-4b-klein-te", os.path.join(TE_DIR, "qwen3_4b")),
+                   12288: _cat_p("qwen3-8b-klein-te", os.path.join(TE_DIR, "qwen3_8b"))}
 
 
 # ── STEP LOG: timeline UNICA dal click "Genera" — timestamp + delta per OGNI passo (load, encoder, embedding,

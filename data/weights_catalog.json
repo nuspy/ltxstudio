@@ -1851,8 +1851,9 @@
       "category": "aux",
       "arch": "insightface",
       "tool_dest": "E:\\AI\\Models\\insightface\\models\\antelopev2",
-      "no_remote": true,
-      "note": "scaricato dal CDN insightface al primo uso — FASE C lo pre-scarica"
+      "note": "mirror HF (i 5 onnx alla radice); dest = insightface/models/antelopev2 dove FaceAnalysis li cerca",
+      "repo_id": "DIAMONIK7777/antelopev2",
+      "url": "https://huggingface.co/DIAMONIK7777/antelopev2"
     },
     {
       "id": "gfpgan-13",
