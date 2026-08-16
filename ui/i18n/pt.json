@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "Cena/mundo 3D a partir de foto (WorldGen)",
   "tab.weights": "Pesos dos modelos",
   "weights.intro": "Baixe os pesos UMA VEZ: depois a geração é 100% local/offline. O HF token serve apenas para os modelos gated (ex.: FLUX.1-dev).",
+  "mw.inventory_refresh": "Modelos atualizados: recarregando as listas dos menus…",
   "weights.hf": "HF token",
   "weights.hf.hint": "necessário apenas para os modelos gated",
   "weights.refresh": "Atualizar estado",

@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "사진으로 3D 장면/월드 (WorldGen)",
   "tab.weights": "모델 가중치",
   "weights.intro": "가중치를 한 번만 다운로드하세요: 이후 생성은 100% 로컬/offline으로 작동합니다. HF token은 gated 모델(예: FLUX.1-dev)에만 필요합니다.",
+  "mw.inventory_refresh": "모델이 업데이트되었습니다: 메뉴 목록을 다시 불러오는 중…",
   "weights.hf": "HF token",
   "weights.hf.hint": "gated 모델에만 필요",
   "weights.refresh": "상태 새로고침",

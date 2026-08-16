@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QProcess
+from PySide6.QtCore import QProcess, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QCheckBox, QPushButton,
     QLineEdit, QScrollArea, QPlainTextEdit, QProgressBar, QFormLayout, QFileDialog,
@@ -22,6 +22,10 @@ from core import weights_catalog as wc
 
 
 class WeightsTab(QWidget):
+    # FASE D: modelli arrivati (download/collega/importa) → chi popola i dropdown deve RIFARE
+    # l'inventario (prima serviva riavviare l'app: _inventory_set non veniva mai resettato).
+    inventory_changed = Signal()
+
     def __init__(self):
         super().__init__()
         self._proc: QProcess | None = None
@@ -235,6 +239,8 @@ class WeightsTab(QWidget):
         self._found.clear()
         self._refresh()
         self.status.setText(tr("weights.link.done", "Collegati {n} pesi (senza riscaricare).").format(n=n))
+        if n:
+            self.inventory_changed.emit()
 
     def _import_unknown(self):
         """Collega nella cartella Models i file-modello trovati nella cartella di ricerca ma NON elencati nel
@@ -286,6 +292,8 @@ class WeightsTab(QWidget):
             if r in ("hardlink", "junction", "symlink", "copy", "exists"):
                 n += 1
         self.status.setText(tr("weights.import.done", "Importati {n} modelli (collegati; il detector li rileverà).").format(n=n))
+        if n:
+            self.inventory_changed.emit()
 
     def _select_missing(self):
         base = self.base.text().strip() or None
@@ -329,3 +337,4 @@ class WeightsTab(QWidget):
         self._proc = None; self.btn_dl.setEnabled(True)
         self.status.setText(tr("weights.finished", "Completato (codice {c})").format(c=code))
         self._refresh()
+        self.inventory_changed.emit()                    # i dropdown si ripopolano senza riavvio

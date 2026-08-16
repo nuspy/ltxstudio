@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "סצנה/עולם תלת-ממד מתמונה (WorldGen)",
   "tab.weights": "משקלי מודלים",
   "weights.intro": "הורד את המשקלים פעם אחת: לאחר מכן היצירה מתבצעת 100% מקומית/offline. ה-HF token נחוץ רק עבור מודלים gated (לדוגמה FLUX.1-dev).",
+  "mw.inventory_refresh": "המודלים עודכנו: טוען מחדש את רשימות התפריטים…",
   "weights.hf": "HF token",
   "weights.hf.hint": "נחוץ רק עבור מודלים gated",
   "weights.refresh": "רענן מצב",

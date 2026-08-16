@@ -194,10 +194,8 @@ class LoraTab(QWidget):
                 continue
             if "ltx" not in low:
                 continue
-            nsfw = any(k in low for k in (
-                "nsfw", "xxx", "adult", "nude", "nudity", "naked", "erotic", "porn",
-                "sex", "deepthroat", "penile", "pussy", "anal", "blowjob",
-            ))
+            from core import nsfw_policy                 # FASE D: euristica UNIFICATA (era la 4ª lista)
+            nsfw = nsfw_policy.looks_nsfw(low)
             extra.append(LoraEntry(
                 sha256=f"comfy:{low}", filename=filename,
                 path=f"E:\\AI\\Models\\LoRA\\{comfy}", architecture="LTX",

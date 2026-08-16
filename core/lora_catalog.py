@@ -108,8 +108,14 @@ def _strip_html(text: str) -> str:
 
 
 def _looks_nsfw(*parts: Any) -> bool:
-    text = " ".join(str(p or "") for p in parts).lower()
-    return any(k in text for k in _NSFW_HINTS)
+    # FASE D weights-unification: euristica UNIFICATA (core/nsfw_policy) — la lista locale
+    # _NSFW_HINTS resta come fallback se il modulo non è importabile.
+    try:
+        from core import nsfw_policy
+        return nsfw_policy.looks_nsfw(*parts)
+    except Exception:                                    # noqa: BLE001
+        text = " ".join(str(p or "") for p in parts).lower()
+        return any(k in text for k in _NSFW_HINTS)
 
 
 def _entry_from_raw(raw: dict) -> LoraEntry:

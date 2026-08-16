@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "फ़ोटो से 3D दृश्य/विश्व (WorldGen)",
   "tab.weights": "मॉडल वेट्स",
   "weights.intro": "वेट्स एक बार डाउनलोड करें: फिर जनरेशन 100% लोकल/offline होगा। HF token केवल gated मॉडल के लिए चाहिए (जैसे FLUX.1-dev)।",
+  "mw.inventory_refresh": "मॉडल अपडेट हुए: मेनू सूचियाँ फिर से लोड हो रही हैं…",
   "weights.hf": "HF token",
   "weights.hf.hint": "केवल gated मॉडल के लिए आवश्यक",
   "weights.refresh": "स्थिति ताज़ा करें",

@@ -1438,10 +1438,17 @@ class Frame1Tab(QWidget):
                 continue
             spec = INPAINT_MODELS.get(label, {})
             unet = spec.get("unet")
+            item = self.inp_model.model().item(i) if hasattr(self.inp_model.model(), "item") else None
             if unet and unet not in self._inpaint_avail:
                 self.inp_model.setItemText(i, label + "  ⛔ non installato")
+                # FASE D: prima la voce restava SELEZIONABILE → job partito e fallito a valle;
+                # ora è disabilitata finché il peso non c'è (il ⛔ resta come spiegazione).
+                if item is not None:
+                    item.setEnabled(False)
             else:
                 self.inp_model.setItemText(i, label)
+                if item is not None:
+                    item.setEnabled(True)
 
     # ---------- API per il controller ----------
     def set_video_aspect(self, w: int, h: int):

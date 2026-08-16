@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "مشهد/عالم ثلاثي الأبعاد من صورة (WorldGen)",
   "tab.weights": "أوزان النماذج",
   "weights.intro": "نزّل الأوزان مرة واحدة: بعدها يصبح التوليد محليًا/offline بنسبة 100٪. رمز HF token مطلوب فقط للنماذج gated (مثل FLUX.1-dev).",
+  "mw.inventory_refresh": "تم تحديث النماذج: يُعاد تحميل قوائم القوائم…",
   "weights.hf": "رمز HF token",
   "weights.hf.hint": "مطلوب فقط للنماذج gated",
   "weights.refresh": "تحديث الحالة",

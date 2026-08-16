@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "Σκηνή/κόσμος 3D από φωτογραφία (WorldGen)",
   "tab.weights": "Βάρη μοντέλων",
   "weights.intro": "Κατεβάστε τα βάρη ΜΙΑ ΦΟΡΑ: μετά η δημιουργία είναι 100% τοπική/offline. Το HF token χρειάζεται μόνο για τα gated μοντέλα (π.χ. FLUX.1-dev).",
+  "mw.inventory_refresh": "Τα μοντέλα ενημερώθηκαν: επαναφόρτωση των λιστών μενού…",
   "weights.hf": "HF token",
   "weights.hf.hint": "απαιτείται μόνο για τα gated μοντέλα",
   "weights.refresh": "Ανανέωση κατάστασης",

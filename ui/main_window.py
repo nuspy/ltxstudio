@@ -866,6 +866,9 @@ class MainWindow(QMainWindow):
         # tab Rig come "ultima mesh" (stesso pattern Trellis→Rig→Anim).
         self.world_tab.mesh_ready.connect(lambda g: self.rig_tab.set_last_mesh(g))
         self.weights_tab = WeightsTab()
+        # FASE D: pesi arrivati (download/collega/importa) → l'inventario dei dropdown si RIFÀ da
+        # solo (prima _inventory_set restava True per sempre: serviva riavviare l'app).
+        self.weights_tab.inventory_changed.connect(self.refresh_model_inventory)
         self.mocap = MocapService(self)
         self.models_tab = self._make_models_tab()           # Classica o Pro (variante utente)
         self.tabs.addTab(self.frame1_tab, tr("tab.images"))
@@ -1222,6 +1225,13 @@ class MainWindow(QMainWindow):
 
     def _on_executing(self, node_id: str):
         self.gen_dialog.on_executing(node_id)
+
+    def refresh_model_inventory(self):
+        """FASE D weights-unification: RIFÀ l'inventario modelli dei dropdown (scan filesystem /
+        object_info) al prossimo tick di _refresh_status. Prima `_inventory_set` non veniva MAI
+        resettato: dopo un download/import i menu restavano vecchi fino al riavvio dell'app."""
+        self._inventory_set = False
+        self._log(tr("mw.inventory_refresh", "Modelli aggiornati: ricarico gli elenchi dei menu…"))
 
     def _cancel_gen(self):
         try:
@@ -5457,13 +5467,16 @@ class MainWindow(QMainWindow):
         self._log(f"[Restauro] Immagine canvas inviata al tab Migliora qualità → Foto: {img}")
 
     def _on_catalog_updated(self):
-        """Ricarica il catalogo LoRA dopo un ingest completato."""
+        """Ricarica il catalogo LoRA dopo un ingest completato + RIFÀ l'inventario dropdown
+        (FASE D: prima l'import Civitai aggiornava SOLO le LoRA — i checkpoint importati
+        comparivano nei menu solo al riavvio)."""
         try:
             self.lora_tab.catalog.load()
             self.lora_tab.refresh()
             self._log("[Modelli] Catalogo LoRA ricaricato dopo ingest.")
         except Exception as e:
             self._log(f"[warn] Ricarica catalogo: {e}")
+        self.refresh_model_inventory()
 
     def _slice_audio(self, src: str, start_s: float, dur_s: float) -> str | None:
         """Estrae [start_s, start_s+dur_s] dall'audio `src` → file nella input di ComfyUI (per usarlo

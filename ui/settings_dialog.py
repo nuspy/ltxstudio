@@ -187,7 +187,16 @@ class SettingsDialog(QDialog):
         for ln in loaders:
             folder = ln["folder"]
             if folder not in folder_cache:
-                folder_cache[folder] = self.driver.models_in(folder) if self.driver.is_up() else []
+                # FASE D: fallback OFFLINE — con ComfyUI giù (funzionamento nativo normale) i combo
+                # override restavano VUOTI; ora la lista arriva dal filesystem (offline_inventory).
+                if self.driver.is_up():
+                    folder_cache[folder] = self.driver.models_in(folder)
+                else:
+                    try:
+                        from core import offline_inventory
+                        folder_cache[folder] = offline_inventory.list_models(folder)
+                    except Exception:                    # noqa: BLE001
+                        folder_cache[folder] = []
             files = folder_cache[folder]
             combo = QComboBox(); combo.setEditable(True)
             opts = sorted(set(files) | {ln["current"]})

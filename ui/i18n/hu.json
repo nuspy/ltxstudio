@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "3D jelenet/világ fotóból (WorldGen)",
   "tab.weights": "Modellsúlyok",
   "weights.intro": "Töltsd le a súlyokat EGYSZER: utána a generálás 100%-ban helyi/offline. A HF token csak a gated modellekhez kell (pl. FLUX.1-dev).",
+  "mw.inventory_refresh": "A modellek frissültek: a menülisták újratöltése…",
   "weights.hf": "HF token",
   "weights.hf.hint": "csak a gated modellekhez szükséges",
   "weights.refresh": "Állapot frissítése",

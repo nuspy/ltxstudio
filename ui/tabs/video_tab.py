@@ -832,11 +832,32 @@ class VideoTab(QWidget):
         low = (name or "").lower()
         if "text_projection" in low or "lora" in low:
             return False
-        return (self._mcat.arch_of(name).upper() == "LTX") or "ltx" in low or "eros" in low
+        if (self._mcat.arch_of(name).upper() == "LTX") or "ltx" in low or "eros" in low:
+            return True
+        # FASE D weights-unification: il DETECTOR header è l'oracolo vero — un checkpoint LTX
+        # RINOMINATO (niente "ltx" nel nome, assente dal catalogo esterno) prima SPARIVA dal
+        # dropdown pur essendo riconosciuto da model_detect. Additivo: mai toglie, solo aggiunge.
+        return self._detected_family(name) in ("ltxv", "ltx")
+
+    @staticmethod
+    def _detected_family(name: str) -> str:
+        try:
+            from core import model_detect, offline_inventory
+            import os
+            for sub in ("diffusion_models", "Checkpoints"):
+                p = os.path.join(str(offline_inventory.MODELS_ROOT), sub,
+                                 (name or "").replace("/", os.sep))
+                if os.path.isfile(p):
+                    return str(model_detect.get(p).get("family") or "").lower()
+        except Exception:                               # noqa: BLE001
+            pass
+        return ""
 
     def _is_nsfw_model(self, name: str) -> bool:
-        low = (name or "").lower()
-        return self._mcat.is_nsfw(name) or any(k in low for k in ("eros", "nsfw", "xxx", "adult", "porn"))
+        # FASE D: lista keyword UNIFICATA (nsfw_policy) — prima quattro euristiche diverse in
+        # quattro file. Il flag del catalogo (che include l'override utente) resta prioritario.
+        from core import nsfw_policy
+        return self._mcat.is_nsfw(name) or nsfw_policy.looks_nsfw(name)
 
     def _on_model_changed(self, *_):
         """Aggiorna Steps/CFG/Sampler consigliati al cambio modello.

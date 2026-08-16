@@ -1424,6 +1424,7 @@
   "feat.cap.world_gen": "3D scene/world from photo (WorldGen)",
   "tab.weights": "Model weights",
   "weights.intro": "Download the weights ONCE: then generation is 100% local/offline. The HF token is only needed for gated models (e.g. FLUX.1-dev).",
+  "mw.inventory_refresh": "Models updated: reloading the menu lists…",
   "weights.hf": "HF token",
   "weights.hf.hint": "only needed for gated models",
   "weights.refresh": "Refresh status",

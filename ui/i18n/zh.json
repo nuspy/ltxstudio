@@ -1314,6 +1314,7 @@
   "feat.cap.world_gen": "从照片生成3D场景/世界 (WorldGen)",
   "tab.weights": "模型权重",
   "weights.intro": "只需下载一次权重：之后生成完全在本地/offline 进行。HF token 仅 gated 模型（如 FLUX.1-dev）需要。",
+  "mw.inventory_refresh": "模型已更新：正在重新加载菜单列表…",
   "weights.hf": "HF token",
   "weights.hf.hint": "仅 gated 模型需要",
   "weights.refresh": "刷新状态",
