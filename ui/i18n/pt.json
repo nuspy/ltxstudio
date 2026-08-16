@@ -2739,5 +2739,16 @@
   "vid.generate.btn": "🎬 Gerar vídeo",
   "vid.generate.btn.tt": "Gera o vídeo com os parâmetros definidos.",
   "vid.stop.tt": "Interrompe a geração em curso.",
-  "f1.pulid.only_kontext": "PuLID (identidade facial) só funciona com o motor Kontext (FLUX.1)."
+  "f1.pulid.only_kontext": "PuLID (identidade facial) só funciona com o motor Kontext (FLUX.1).",
+  "emb.cache.title": "Cache de embeddings de prompt",
+  "emb.cache": "Reutilizar os embeddings de prompt já calculados",
+  "emb.cache.tt": "Cada geração de vídeo recalcula a codificação do prompt relendo 24 GB de codificador de texto do disco (~13 segundos). Com a cache o mesmo prompt é reutilizado: um vídeo longo em 6 trechos calcula-o uma vez em vez de seis. O resultado é idêntico, é o mesmo tensor. As entradas contêm o texto do prompt em claro e ficam em data/emb_cache.",
+  "emb.cache.budget": "Espaço máximo",
+  "emb.cache.budget.tt": "Espaço máximo em disco. Cada entrada ocupa cerca de 24 MB, portanto 4 GB guardam cerca de 170 prompts; acima do limite descartam-se os menos usados recentemente.",
+  "emb.cache.status": "{n} entradas · {mb} MB",
+  "emb.cache.clear": "Esvaziar",
+  "emb.cache.clear.tt": "Apaga as entradas guardadas. Útil se substituiu um modelo mantendo o mesmo nome de ficheiro: a cache não consegue perceber isso sozinha.",
+  "emb.cache.cleared": "Removidas {n} entradas.",
+  "emb.cache.line": "Cache de prompt: {n} entradas · {mb} / {bud} MB",
+  "emb.cache.empty": "Cache de prompt: vazia"
 }

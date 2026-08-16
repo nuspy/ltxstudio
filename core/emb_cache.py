@@ -59,11 +59,22 @@ def cache_dir() -> Path:
 
 
 def budget_mb() -> float:
+    """Budget su disco: env (test/CLI) → preferenza utente dalla GUI → default 4 GB."""
+    v = os.environ.get("LS_EMB_CACHE_MB")
+    if v:
+        try:
+            return float(v)
+        except ValueError:
+            pass
     try:
-        from core import mem_budget
-        return mem_budget.emb_cache_mb()
-    except Exception:                                    # noqa: BLE001 — venv senza core.mem_budget
-        return float(os.environ.get("LS_EMB_CACHE_MB", 4096))
+        from core import user_prefs
+        return float(user_prefs.get("emb_cache.mb", 4096))
+    except Exception:                                    # noqa: BLE001 — prefs assenti in questo venv
+        try:
+            from core import mem_budget
+            return mem_budget.emb_cache_mb()
+        except Exception:                                # noqa: BLE001
+            return 4096.0
 
 
 # ─────────────────────────── chiave ───────────────────────────

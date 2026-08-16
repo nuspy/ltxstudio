@@ -43,7 +43,10 @@ class SettingsDialog(QDialog):
         # ── 2) Privacy / provenienza ──────────────────────────────────────────
         lay.addWidget(self._build_privacy_group())
 
-        # ── 3) Override modelli (template) ────────────────────────────────────
+        # ── 3) Cache degli embedding di prompt ────────────────────────────────
+        lay.addWidget(self._build_embcache_group())
+
+        # ── 4) Override modelli (template) ────────────────────────────────────
         lay.addWidget(self._build_overrides_group(), 1)
 
         bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -118,6 +121,54 @@ class SettingsDialog(QDialog):
         form.addRow(tr("settings.stego_text", "Testo firma (max 5)"), self.ed_stego_text)
         return grp
 
+    def _build_embcache_group(self) -> QGroupBox:
+        """Cache degli embedding di prompt LTX. Nessun import di torch qui: core.emb_cache è
+        stdlib-only all'import proprio perché il processo GUI non deve creare un contesto CUDA."""
+        from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QPushButton, QSpinBox
+        from core import emb_cache
+        grp = QGroupBox(tr("emb.cache.title", "Cache degli embedding di prompt"))
+        form = QFormLayout(grp)
+        self.cb_embcache = QCheckBox(tr("emb.cache", "Riusa gli embedding dei prompt già calcolati"))
+        self.cb_embcache.setChecked(bool(user_prefs.get("emb_cache.enabled", True)))
+        self.cb_embcache.setToolTip(tr("emb.cache.tt",
+            "Ogni generazione video ricalcola l'encoding del prompt rileggendo 24 GB di text encoder dal "
+            "disco (~13 secondi). Con la cache lo stesso prompt viene riusato: un video lungo a 6 spezzoni "
+            "lo calcola una volta invece di sei. Il risultato è identico — è lo stesso tensore. Le voci "
+            "contengono il testo del prompt in chiaro e stanno in data/emb_cache."))
+        form.addRow(self.cb_embcache)
+        self.sp_embcache = QSpinBox()
+        self.sp_embcache.setRange(1, 200)
+        self.sp_embcache.setSuffix(" GB")
+        self.sp_embcache.setValue(max(1, int(round(float(user_prefs.get("emb_cache.mb", 4096)) / 1024))))
+        self.sp_embcache.setToolTip(tr("emb.cache.budget.tt",
+            "Spazio massimo su disco. Ogni voce pesa circa 24 MB, quindi 4 GB tengono ~170 prompt; "
+            "oltre il limite si scartano i meno usati di recente."))
+        form.addRow(tr("emb.cache.budget", "Spazio massimo"), self.sp_embcache)
+        row = QHBoxLayout()
+        st = emb_cache.stats()
+        self.lbl_embcache = QLabel(tr("emb.cache.status", "{n} voci · {mb} MB")
+                                   .format(n=st["n"], mb=f"{st['mb']:.0f}"))
+        row.addWidget(self.lbl_embcache, 1)
+        btn = QPushButton(tr("emb.cache.clear", "Svuota"))
+        btn.setToolTip(tr("emb.cache.clear.tt",
+            "Cancella le voci salvate. Utile se hai sostituito un modello mantenendo lo stesso nome file: "
+            "in quel caso la cache non può accorgersene da sola."))
+        btn.clicked.connect(self._on_clear_embcache)
+        row.addWidget(btn)
+        w = QWidget(); w.setLayout(row)
+        form.addRow(w)
+        return grp
+
+    def _on_clear_embcache(self):
+        from PySide6.QtWidgets import QMessageBox
+        from core import emb_cache
+        n = emb_cache.clear()
+        st = emb_cache.stats()
+        self.lbl_embcache.setText(tr("emb.cache.status", "{n} voci · {mb} MB")
+                                  .format(n=st["n"], mb=f"{st['mb']:.0f}"))
+        QMessageBox.information(self, tr("emb.cache.title", "Cache degli embedding di prompt"),
+                                tr("emb.cache.cleared", "Rimosse {n} voci.").format(n=n))
+
     def _build_overrides_group(self) -> QGroupBox:
         grp = QGroupBox(tr("settings.overrides_group"))
         gv = QVBoxLayout(grp)
@@ -161,6 +212,9 @@ class SettingsDialog(QDialog):
             if hasattr(self, "cb_stego"):
                 user_prefs.set("stego_watermark", self.cb_stego.isChecked())
                 user_prefs.set("stego_text", self.ed_stego_text.text().strip())
+            if hasattr(self, "cb_embcache"):
+                user_prefs.set("emb_cache.enabled", self.cb_embcache.isChecked())
+                user_prefs.set("emb_cache.mb", int(self.sp_embcache.value()) * 1024)
         except Exception:
             pass
         self.accept()

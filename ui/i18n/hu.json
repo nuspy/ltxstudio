@@ -2739,5 +2739,16 @@
   "vid.generate.btn": "🎬 Videó generálása",
   "vid.generate.btn.tt": "A beállított paraméterekkel generálja a videót.",
   "vid.stop.tt": "Megszakítja a folyamatban lévő generálást.",
-  "f1.pulid.only_kontext": "A PuLID (arcazonosság) csak a Kontext motorral (FLUX.1) működik."
+  "f1.pulid.only_kontext": "A PuLID (arcazonosság) csak a Kontext motorral (FLUX.1) működik.",
+  "emb.cache.title": "Prompt-beágyazások gyorsítótára",
+  "emb.cache": "A már kiszámított prompt-beágyazások újrafelhasználása",
+  "emb.cache.tt": "Minden videógenerálás újraszámolja a prompt kódolását, ehhez 24 GB szövegkódolót olvas be újra a lemezről (kb. 13 másodperc). A gyorsítótárral ugyanaz a prompt újrahasznosul: egy 6 szakaszból álló hosszú videó egyszer számolja ki, nem hatszor. Az eredmény azonos, ugyanaz a tenzor. A bejegyzések nyílt szövegként tartalmazzák a promptot, és a data/emb_cache mappában vannak.",
+  "emb.cache.budget": "Legnagyobb méret",
+  "emb.cache.budget.tt": "Legnagyobb lemezterület. Egy bejegyzés nagyjából 24 MB, így 4 GB körülbelül 170 promptot tárol; a korlát felett a legrégebben használtak törlődnek.",
+  "emb.cache.status": "{n} bejegyzés · {mb} MB",
+  "emb.cache.clear": "Ürítés",
+  "emb.cache.clear.tt": "Törli a mentett bejegyzéseket. Akkor hasznos, ha úgy cserélt le egy modellt, hogy a fájlnév ugyanaz maradt: ezt a gyorsítótár magától nem veszi észre.",
+  "emb.cache.cleared": "{n} bejegyzés eltávolítva.",
+  "emb.cache.line": "Prompt-gyorsítótár: {n} bejegyzés · {mb} / {bud} MB",
+  "emb.cache.empty": "Prompt-gyorsítótár: üres"
 }

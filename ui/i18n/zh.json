@@ -2739,5 +2739,16 @@
   "vid.generate.btn": "🎬 生成视频",
   "vid.generate.btn.tt": "使用设定的参数生成视频。",
   "vid.stop.tt": "中止正在进行的生成。",
-  "f1.pulid.only_kontext": "PuLID（人脸身份）仅适用于 Kontext 引擎（FLUX.1）。"
+  "f1.pulid.only_kontext": "PuLID（人脸身份）仅适用于 Kontext 引擎（FLUX.1）。",
+  "emb.cache.title": "提示词嵌入缓存",
+  "emb.cache": "复用已计算过的提示词嵌入",
+  "emb.cache.tt": "每次生成视频都会重新计算提示词编码，需要从磁盘重新读取 24 GB 的文本编码器（约 13 秒）。启用缓存后相同的提示词会被复用：一段分为 6 节的长视频只需计算一次，而不是六次。结果完全相同，就是同一个张量。缓存条目以明文保存提示词文本，位于 data/emb_cache。",
+  "emb.cache.budget": "最大占用空间",
+  "emb.cache.budget.tt": "磁盘占用上限。每条约 24 MB，因此 4 GB 可保存约 170 条提示词；超出上限时会淘汰最久未使用的条目。",
+  "emb.cache.status": "{n} 条 · {mb} MB",
+  "emb.cache.clear": "清空",
+  "emb.cache.clear.tt": "删除已保存的条目。如果你替换了模型但沿用了相同的文件名，这一点缓存无法自行察觉，此时清空很有用。",
+  "emb.cache.cleared": "已删除 {n} 条。",
+  "emb.cache.line": "提示词缓存：{n} 条 · {mb} / {bud} MB",
+  "emb.cache.empty": "提示词缓存：空"
 }

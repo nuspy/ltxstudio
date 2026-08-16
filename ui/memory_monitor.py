@@ -144,6 +144,19 @@ class MemoryMonitor(QDialog):
         self._tbl.setMinimumHeight(90)
         lay.addWidget(self._models_head)
         lay.addWidget(self._tbl, 1)
+        # Cache degli embedding di prompt: sta qui perché è l'altra memoria che il software occupa
+        # per conto dell'utente — su disco invece che in VRAM. Solo os.scandir, nessun torch.
+        from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
+        _cr = QHBoxLayout()
+        _cr.setContentsMargins(0, 0, 0, 0)
+        self._emb_lbl = QLabel("—")
+        _cr.addWidget(self._emb_lbl, 1)
+        self._emb_btn = QPushButton(tr("emb.cache.clear", "Svuota"))
+        self._emb_btn.clicked.connect(self._clear_emb_cache)
+        _cr.addWidget(self._emb_btn)
+        _cw = QWidget(); _cw.setLayout(_cr)
+        lay.addWidget(_cw)
+        self._refresh_emb_cache()
         self._sampler: _Sampler | None = None   # thread di campionamento (vivo solo a finestra aperta)
 
     # apri/chiudi → avvia/ferma il polling (niente carico quando è chiusa)
@@ -168,8 +181,31 @@ class MemoryMonitor(QDialog):
             head.setFont(f)
         super().resizeEvent(e)
 
+    def _refresh_emb_cache(self):
+        """Stato della cache embedding. Nessun torch: emb_cache è stdlib-only all'import."""
+        try:
+            from core import emb_cache
+            st = emb_cache.stats()
+            self._emb_lbl.setText(
+                tr("emb.cache.line", "Cache prompt: {n} voci · {mb} / {bud} MB")
+                .format(n=st["n"], mb=f"{st['mb']:.0f}", bud=f"{st['budget_mb']:.0f}")
+                if st["n"] else tr("emb.cache.empty", "Cache prompt: vuota"))
+            self._emb_btn.setEnabled(bool(st["n"]))
+        except Exception:                                # noqa: BLE001 — il monitor non deve mai rompersi
+            self._emb_lbl.setText(tr("emb.cache.empty", "Cache prompt: vuota"))
+            self._emb_btn.setEnabled(False)
+
+    def _clear_emb_cache(self):
+        try:
+            from core import emb_cache
+            emb_cache.clear()
+        except Exception:                                # noqa: BLE001
+            pass
+        self._refresh_emb_cache()
+
     def _on_sample(self, s: dict, rows):
         """Aggiorna i widget coi dati arrivati dal thread campionatore (solo painting, mai I/O)."""
+        self._refresh_emb_cache()                        # ~0,1 ms: os.scandir su una manciata di file
         g = self._GB
 
         def _row(key, title, used, total, pct_txt=None):

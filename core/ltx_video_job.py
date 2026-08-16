@@ -225,6 +225,12 @@ def run_clip(params: dict, *, free_vram: bool = True, timeout: int | None = None
     env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     r = subprocess.run([py, "-u", worker, jf], env=env,
                        capture_output=True, text=True, timeout=timeout)
+    # Lo stdout del worker viene scartato quando il job riesce: le diagnosi della cache embedding
+    # (hit/miss e secondi risparmiati) andrebbero perse proprio nei casi che ne fanno di più —
+    # Film Studio e videoclip, che passano tutti da qui. Ripubblico solo quelle righe.
+    for _ln in (r.stdout or "").splitlines():
+        if _ln.startswith(("[embcache]", "[emb-probe]")):
+            print(_ln, flush=True)
     if not os.path.exists(out):
         tail = ((r.stdout or "")[-500:] + (r.stderr or "")[-500:]).strip()
         raise VideoJobError(f"clip non generata ({os.path.basename(out)}): {tail}")

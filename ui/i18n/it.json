@@ -2813,5 +2813,16 @@
   "vid.generate.btn": "🎬 Genera Video",
   "vid.generate.btn.tt": "Genera il video con i parametri impostati.",
   "vid.stop.tt": "Interrompi la generazione in corso.",
-  "f1.pulid.only_kontext": "PuLID (identità volto) funziona solo col motore Kontext (FLUX.1)."
+  "f1.pulid.only_kontext": "PuLID (identità volto) funziona solo col motore Kontext (FLUX.1).",
+  "emb.cache.title": "Cache degli embedding di prompt",
+  "emb.cache": "Riusa gli embedding dei prompt già calcolati",
+  "emb.cache.tt": "Ogni generazione video ricalcola l'encoding del prompt rileggendo 24 GB di text encoder dal disco (~13 secondi). Con la cache lo stesso prompt viene riusato: un video lungo a 6 spezzoni lo calcola una volta invece di sei. Il risultato è identico, è lo stesso tensore. Le voci contengono il testo del prompt in chiaro e stanno in data/emb_cache.",
+  "emb.cache.budget": "Spazio massimo",
+  "emb.cache.budget.tt": "Spazio massimo su disco. Ogni voce pesa circa 24 MB, quindi 4 GB tengono circa 170 prompt; oltre il limite si scartano i meno usati di recente.",
+  "emb.cache.status": "{n} voci · {mb} MB",
+  "emb.cache.clear": "Svuota",
+  "emb.cache.clear.tt": "Cancella le voci salvate. Utile se hai sostituito un modello mantenendo lo stesso nome file: in quel caso la cache non può accorgersene da sola.",
+  "emb.cache.cleared": "Rimosse {n} voci.",
+  "emb.cache.line": "Cache prompt: {n} voci · {mb} / {bud} MB",
+  "emb.cache.empty": "Cache prompt: vuota"
 }

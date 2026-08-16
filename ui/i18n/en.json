@@ -2813,5 +2813,16 @@
   "vid.generate.btn": "🎬 Generate Video",
   "vid.generate.btn.tt": "Generate the video with the configured parameters.",
   "vid.stop.tt": "Stop the generation in progress.",
-  "f1.pulid.only_kontext": "PuLID (face identity) only works with the Kontext engine (FLUX.1)."
+  "f1.pulid.only_kontext": "PuLID (face identity) only works with the Kontext engine (FLUX.1).",
+  "emb.cache.title": "Prompt embedding cache",
+  "emb.cache": "Reuse prompt embeddings already computed",
+  "emb.cache.tt": "Every video generation recomputes the prompt encoding by re-reading 24 GB of text encoder from disk (~13 seconds). With the cache the same prompt is reused: a long video in 6 segments computes it once instead of six times. The result is identical, it is the same tensor. Entries hold the prompt text in clear and live in data/emb_cache.",
+  "emb.cache.budget": "Maximum space",
+  "emb.cache.budget.tt": "Maximum disk space. Each entry is about 24 MB, so 4 GB holds roughly 170 prompts; past the limit the least recently used ones are dropped.",
+  "emb.cache.status": "{n} entries · {mb} MB",
+  "emb.cache.clear": "Clear",
+  "emb.cache.clear.tt": "Deletes the saved entries. Useful if you replaced a model keeping the same file name: the cache cannot notice that on its own.",
+  "emb.cache.cleared": "Removed {n} entries.",
+  "emb.cache.line": "Prompt cache: {n} entries · {mb} / {bud} MB",
+  "emb.cache.empty": "Prompt cache: empty"
 }

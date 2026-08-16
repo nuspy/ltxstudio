@@ -2739,5 +2739,16 @@
   "vid.generate.btn": "🎬 Video generieren",
   "vid.generate.btn.tt": "Generiert das Video mit den eingestellten Parametern.",
   "vid.stop.tt": "Bricht die laufende Generierung ab.",
-  "f1.pulid.only_kontext": "PuLID (Gesichtsidentität) funktioniert nur mit der Kontext-Engine (FLUX.1)."
+  "f1.pulid.only_kontext": "PuLID (Gesichtsidentität) funktioniert nur mit der Kontext-Engine (FLUX.1).",
+  "emb.cache.title": "Cache für Prompt-Embeddings",
+  "emb.cache": "Bereits berechnete Prompt-Embeddings wiederverwenden",
+  "emb.cache.tt": "Jede Videogenerierung berechnet die Prompt-Kodierung neu und liest dafür 24 GB Text-Encoder von der Festplatte (~13 Sekunden). Mit dem Cache wird derselbe Prompt wiederverwendet: ein langes Video aus 6 Abschnitten berechnet ihn einmal statt sechsmal. Das Ergebnis ist identisch, es ist derselbe Tensor. Die Einträge enthalten den Prompt-Text im Klartext und liegen in data/emb_cache.",
+  "emb.cache.budget": "Maximaler Speicherplatz",
+  "emb.cache.budget.tt": "Maximaler Speicherplatz auf der Festplatte. Jeder Eintrag belegt etwa 24 MB, 4 GB fassen also rund 170 Prompts; über dem Limit werden die am längsten ungenutzten verworfen.",
+  "emb.cache.status": "{n} Einträge · {mb} MB",
+  "emb.cache.clear": "Leeren",
+  "emb.cache.clear.tt": "Löscht die gespeicherten Einträge. Nützlich, wenn Sie ein Modell bei gleichem Dateinamen ersetzt haben: das kann der Cache nicht von selbst bemerken.",
+  "emb.cache.cleared": "{n} Einträge entfernt.",
+  "emb.cache.line": "Prompt-Cache: {n} Einträge · {mb} / {bud} MB",
+  "emb.cache.empty": "Prompt-Cache: leer"
 }
