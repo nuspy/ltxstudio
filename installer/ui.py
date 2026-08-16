@@ -12,17 +12,10 @@ def print_prereqs(pr: dict) -> None:
         v = pr.get(k, {})
         mark = "✓" if v.get("ok") else "✗"
         print(f"  [{mark}] {v.get('label', k)}: {v.get('detail', '')}")
-    cr = pr.get("comfy_root")
-    print(f"  [{'✓' if cr else '✗'}] ComfyUI: {cr or 'NON trovato (verrà chiesto)'}")
 
 
 def print_plan(plan: dict) -> None:
     print("\nPiano di installazione (download):")
-    print("  Custom nodes:")
-    for n in plan["nodes"]:
-        print(f"    - {n['label']:42s} {_sz(n.get('size_mb', 0))}")
-    for d in plan["deps"]:
-        print(f"    - {d['label']:42s} {_sz(d.get('size_mb', 0))}")
     print("  Modelli BASE dell'edizione (scaricati ora):")
     for m in plan["base_models"]:
         tag = " 🔞" if m.get("sensitivity") == "adult" else ""

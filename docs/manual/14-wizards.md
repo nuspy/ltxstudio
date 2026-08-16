@@ -38,7 +38,7 @@ Two buttons finish the wizard: **"Done ✓"** (which marks setup complete) and *
 
 **What it does** — The selective installer links your local models and downloads **only** the weights for the modules included in your edition, then produces a native, signed installer. It avoids pulling gigabytes you will never use.
 
-**Where to find it** — `installer/install.py`, driven by the declarative `installer/install_spec.json`.
+**Where to find it** — `installer/install.py`; the models come from the unified registry `data/weights_catalog.json` (`install_role` × edition capabilities). The backend is fully native: no ComfyUI prerequisite and no custom nodes (the optional `comfy_compat` shim for using LTX‑2.3 inside your own ComfyUI lives in the **Import models** tab).
 
 **How it works**
 

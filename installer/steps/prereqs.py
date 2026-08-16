@@ -1,10 +1,11 @@
-"""Verifica dei prerequisiti (idempotente) + individuazione/scelta di ComfyUI."""
+"""Verifica dei prerequisiti runtime (idempotente): python / driver NVIDIA / torch / ffmpeg.
+ComfyUI NON è più un prerequisito: il backend è nativo (lo shim comfy_compat è un extra
+opzionale installabile dal tab «Importa modelli»)."""
 from __future__ import annotations
 
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 
 def _run(cmd) -> tuple[bool, str]:
@@ -40,48 +41,10 @@ def check_ffmpeg() -> dict:
     return {"label": "ffmpeg", "ok": bool(p), "detail": p or "assente"}
 
 
-def resolve_comfy_root(override: str | None) -> str | None:
-    """Override → catalog_paths salvato → detect → chiede all'utente. Persiste la scelta."""
-    try:
-        from core import catalog_paths
-    except Exception:
-        catalog_paths = None
-    if override and (Path(override) / "main.py").exists():
-        _persist_comfy(catalog_paths, override)
-        return override
-    if catalog_paths is not None:
-        saved = catalog_paths.load().get("comfy_root")
-        if saved and (Path(saved) / "main.py").exists():
-            return saved
-        det = catalog_paths.detect_comfy_root()
-        if det:
-            _persist_comfy(catalog_paths, str(det))
-            return str(det)
-    # chiedi all'utente (ATTENZIONE: ComfyUI può essere in una cartella non standard)
-    try:
-        ans = input("ComfyUI non individuato. Inserisci la cartella di ComfyUI (con main.py): ").strip()
-    except EOFError:
-        return None
-    if ans and (Path(ans) / "main.py").exists():
-        _persist_comfy(catalog_paths, ans)
-        return ans
-    return None
-
-
-def _persist_comfy(catalog_paths, root: str) -> None:
-    if catalog_paths is None:
-        return
-    try:
-        cfg = catalog_paths.load(); cfg["comfy_root"] = root; catalog_paths.save(cfg)
-    except Exception:
-        pass
-
-
-def check_all(comfy_override: str | None = None) -> dict:
+def check_all() -> dict:
     return {
         "python": check_python(),
         "nvidia": check_nvidia(),
         "torch": check_torch(),
         "ffmpeg": check_ffmpeg(),
-        "comfy_root": resolve_comfy_root(comfy_override),
     }

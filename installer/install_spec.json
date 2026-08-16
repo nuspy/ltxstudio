@@ -1,6 +1,5 @@
 {
-  "_comment": "Spec dichiarativa dell'installer comune. I 'size_mb' sono stime per il riepilogo. 'editions' filtra cosa scaricare per edizione; i modelli 'adult' scendono solo se il manifest dell'edizione ha allows_adult. 'on_demand' = scaricato al primo uso (non in fase di install). 'mirror' = disponibile sul fallback tadamoo.",
-  "mirror_base": "https://aiforge.tadamoo.com",
+  "_comment": "Spec dichiarativa dell'installer. I MODELLI vivono nel registro unico data/weights_catalog.json (install_role=base|on_demand × capability dell'edizione). I custom nodes ComfyUI e le python_deps sono stati RIMOSSI (17/08): il backend è nativo (sageattention è installata nel venv giusto da scripts/install_inference_server.py; lo shim comfy_compat è un extra opzionale del tab «Importa modelli»).",
   "prereqs": [
     {
       "id": "python",
@@ -18,99 +17,9 @@
       "kind": "torch"
     },
     {
-      "id": "comfyui",
-      "label": "ComfyUI",
-      "kind": "comfy_root"
-    },
-    {
       "id": "ffmpeg",
       "label": "ffmpeg",
       "kind": "exe"
     }
-  ],
-  "custom_nodes": [
-    {
-      "id": "segment_anything",
-      "label": "GroundingDINO + SAM-HQ",
-      "repo": "https://github.com/storyicon/comfyui_segment_anything",
-      "size_mb": 60,
-      "mirror": true
-    },
-    {
-      "id": "videohelpersuite",
-      "label": "VideoHelperSuite",
-      "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
-      "size_mb": 30,
-      "mirror": true
-    },
-    {
-      "id": "seedvr2",
-      "label": "SeedVR2 upscaler",
-      "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
-      "size_mb": 40,
-      "mirror": true
-    },
-    {
-      "id": "facerestore",
-      "label": "Face Restore (CodeFormer/GFPGAN)",
-      "repo": "https://github.com/mav-rik/facerestore_cf",
-      "size_mb": 20,
-      "mirror": true
-    },
-    {
-      "id": "rife",
-      "label": "Frame Interpolation (RIFE)",
-      "repo": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation",
-      "size_mb": 30,
-      "mirror": true
-    },
-    {
-      "id": "trellis2",
-      "label": "ComfyUI-TRELLIS2",
-      "repo": "https://github.com/PozzettiAndrea/ComfyUI-TRELLIS2",
-      "size_mb": 200,
-      "mirror": true,
-      "editions": [
-        "plus",
-        "premium",
-        "studio"
-      ]
-    },
-    {
-      "id": "skintoken",
-      "label": "ComfyUI-SkinToken (rig)",
-      "repo": "https://github.com/Rizzlord/ComfyUI-SkinToken",
-      "size_mb": 150,
-      "mirror": true,
-      "editions": [
-        "plus",
-        "premium",
-        "studio"
-      ]
-    },
-    {
-      "id": "cosyvoice",
-      "label": "CosyVoice TTS",
-      "repo": "https://github.com/AIFSH/CosyVoice-ComfyUI",
-      "size_mb": 50,
-      "mirror": true
-    },
-    {
-      "id": "comfy_compat",
-      "label": "Patch compatibilità LTX-2.3 (ltxstudio_comfy_compat)",
-      "repo": "bundled",
-      "size_mb": 1,
-      "mirror": true,
-      "bundled": true
-    }
-  ],
-  "python_deps": [
-    {
-      "id": "sageattention",
-      "label": "SageAttention 2.2 (accelerazione Blackwell)",
-      "pip": "sageattention",
-      "size_mb": 20
-    }
-  ],
-  "_models_note": "SEZIONE RIMOSSA (weights-unification C/F): i modelli vivono nel registro unico data/weights_catalog.json (install_role=base|on_demand × capability dell'edizione). Qui restano solo custom_nodes e python_deps."
+  ]
 }
