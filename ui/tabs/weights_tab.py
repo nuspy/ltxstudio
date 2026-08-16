@@ -132,6 +132,7 @@ class WeightsTab(QWidget):
                     cb = QCheckBox()
                     if not wc.downloadable(e):
                         cb.setEnabled(False)             # no_remote: solo Collega/Importa, mai download
+                    cb.toggled.connect(lambda on, _id=e["id"]: self._on_check_toggled(_id, on))
                     self._checks[e["id"]] = (cb, e)
                     v.addWidget(cb)
                     entries_shown += 1
@@ -169,10 +170,28 @@ class WeightsTab(QWidget):
         return f"{e.get('label', e['id'])} {fam} · ~{e.get('approx_gb','?')}GB{gated}{adult}{role} — {state}"
 
     def _refresh(self):
+        from core import weights_tooltips
         for _id, (cb, e) in self._checks.items():
             cb.setText(self._label_for(e))
-            cb.setToolTip(str(wc.dest_for(e, self.base.text().strip() or None)))
+            # tooltip ESPLICATIVO (cosa fa / quando preferirlo, i18n) + destinazione — identico
+            # negli altri spazi di download (dropdown, dialog primo-uso): weights_tooltips.
+            cb.setToolTip(weights_tooltips.tooltip_for(e))
             cb.setChecked(False)
+
+    def _on_check_toggled(self, eid: str, checked: bool):
+        """CATENA: spuntare un modello spunta anche le sue dipendenze mancanti (es. LTX 2.5 →
+        encoder Gemma + VAE). Il downloader le espande comunque (plan_ids): qui si RENDE VISIBILE
+        cosa verrà scaricato, niente sorprese sui GB."""
+        if not checked:
+            return
+        e = (self._checks.get(eid) or (None, None))[1]
+        if not e:
+            return
+        base = self.base.text().strip() or None
+        for dep in wc.missing_ids_with_deps(e, base):
+            pair = self._checks.get(dep)
+            if pair and pair[0].isEnabled() and not pair[0].isChecked():
+                pair[0].setChecked(True)
 
     def _pick_base(self):
         d = QFileDialog.getExistingDirectory(self, tr("weights.base", "Cartella base"), self.base.text().strip())

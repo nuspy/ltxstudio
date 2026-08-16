@@ -563,6 +563,8 @@ class Frame1Tab(QWidget):
                 pass
             gb = e.get("approx_gb", 0)
             self.gen_model.addItem(f"{'' if present else '⬇ '}{label}  · ~{gb}GB", cat_id)
+            from core import weights_tooltips as _wt         # tooltip esplicativo unificato (i18n)
+            self.gen_model.setItemData(self.gen_model.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 self.gen_model.setItemData(self.gen_model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
         self.gen_model.blockSignals(False)

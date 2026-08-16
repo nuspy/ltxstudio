@@ -74,9 +74,11 @@ def offer_download_gui(parent, ids: list[str], feature: str = "") -> bool:
                                "dal tab «Pesi modelli»: {ids}").format(ids=", ".join(nr)))
         if not dl_ids:
             return False
+    from core import weights_tooltips
+    _lines = "\n".join("• " + weights_tooltips.short_line(e) for e in miss if not e.get("no_remote"))
     msg = tr("weights.missing.offer",
              "{feature}Servono questi pesi (~{gb}GB, dipendenze incluse):\n{ids}\n\nScaricarli ora?"
-             ).format(feature=(feature + ": ") if feature else "", gb=gb, ids=", ".join(dl_ids))
+             ).format(feature=(feature + ": ") if feature else "", gb=gb, ids=_lines)
     if QMessageBox.question(parent, tr("weights.missing.title", "Pesi mancanti"), msg) \
             != QMessageBox.Yes:
         return False

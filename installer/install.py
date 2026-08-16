@@ -153,15 +153,20 @@ def _download_base_models(models: list) -> None:
     import time
     from core import downloader as dl
     from core import weights_catalog as wc
+    from core import weights_tooltips
+    # CATENA: i pesi base tirano le loro dipendenze (deps-first) — es. il checkpoint LTX tira
+    # Gemma TE + upscaler; l'utente non deve conoscere la composizione interna.
+    entries = dl.plan_ids([m["id"] for m in models])
     fail = 0
-    for m in models:
-        e = m.get("_entry") or next((x for x in wc.load() if x["id"] == m["id"]), None)
-        if not e:
+    for e in entries:
+        if not wc.downloadable(e):
             continue
+        m = {"id": e["id"], "label": e.get("label", e["id"]),
+             "size_mb": int(float(e.get("approx_gb", 0)) * 1024)}
         if wc.is_present(e):
             print(f"  [modello base] ✓ {m['label']} — già presente")
             continue
-        print(f"  [modello base] ↓ {m['label']} (~{m['size_mb']} MB)")
+        print(f"  [modello base] ↓ {weights_tooltips.short_line(e)}")
         state = {"b": 0, "t0": time.monotonic(), "last": 0.0}
 
         def _prog(n, fname, _s=state):

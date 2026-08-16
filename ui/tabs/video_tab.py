@@ -559,10 +559,11 @@ class VideoTab(QWidget):
             self.model.addItem(f"{badge}{label}  · ~{gb}GB",
                                {"kind": "lingbot", "variant": variant, "cat_id": cat_id,
                                 "model": model_dir if present else "", "present": present, "key": f"lingbot:{cat_id}"})
-            self.model.setItemData(self.model.count() - 1,
-                                   tr("vid.lingbot.item.tt", "LingBot {v} — {s}").format(
-                                       v=variant, s=(tr("vid.present", "presente") if present else tr("vid.missing", "da scaricare"))),
-                                   Qt.ToolTipRole)
+            # tooltip ESPLICATIVO unificato (cosa fa / quando preferirlo, i18n) + stato
+            from core import weights_tooltips as _wt
+            _tt = _wt.tooltip_for(e) + "\n" + (tr("vid.present", "presente") if present
+                                               else tr("vid.missing", "da scaricare"))
+            self.model.setItemData(self.model.count() - 1, _tt, Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
         self.model.blockSignals(False)
@@ -650,6 +651,8 @@ class VideoTab(QWidget):
                                {"kind": arch, "variant": variant, "cat_id": cat_id,
                                 "model": model_dir if present else "", "present": present,
                                 "key": f"{arch}:{cat_id}"})
+            from core import weights_tooltips as _wt         # tooltip esplicativo unificato (i18n)
+            self.model.setItemData(self.model.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
         self.model.blockSignals(False)

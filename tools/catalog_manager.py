@@ -198,6 +198,21 @@ class Manager(QMainWindow):
         self.f_note = QPlainTextEdit(); self.f_note.setMaximumHeight(52); form.addRow("note", self.f_note)
         rv.addWidget(form_box)
 
+        use_box = QGroupBox("Tag d'uso (tooltip: cosa fa / quando preferirlo — i18n via weights.use.*)")
+        uv = QVBoxLayout(use_box)
+        from core.weights_tooltips import USE_TAGS as _UT
+        self.use_list = QListWidget(); self.use_list.setMaximumHeight(120)
+        for tag, phrase in _UT.items():
+            it = QListWidgetItem(f"{tag} — {phrase[:70]}")
+            it.setData(Qt.UserRole, tag)
+            it.setToolTip(phrase)
+            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+            it.setCheckState(Qt.Unchecked)
+            self.use_list.addItem(it)
+        self.use_list.itemChanged.connect(self._refresh_preview)
+        uv.addWidget(self.use_list)
+        rv.addWidget(use_box)
+
         caps_box = QGroupBox("Capability (used_by) — dalla feature matrix"
                              + ("" if self.matrix.ok else " [matrix NON caricata: fallback]"))
         cv = QVBoxLayout(caps_box)
@@ -259,6 +274,11 @@ class Manager(QMainWindow):
                         st += " [base]"
                     it = QTreeWidgetItem([f"{e['id']} — {e.get('label', '')}", st])
                     it.setData(0, Qt.UserRole, e["id"])
+                    try:
+                        from core.weights_tooltips import tooltip_for
+                        it.setToolTip(0, tooltip_for(e))
+                    except Exception:                    # noqa: BLE001
+                        pass
                     ai.addChild(it)
             ci.setExpanded(True)
 
@@ -303,6 +323,10 @@ class Manager(QMainWindow):
         for i in range(self.caps_list.count()):
             it = self.caps_list.item(i)
             it.setCheckState(Qt.Checked if it.data(Qt.UserRole) in used else Qt.Unchecked)
+        tags = set(e.get("use", []))
+        for i in range(self.use_list.count()):
+            it = self.use_list.item(i)
+            it.setCheckState(Qt.Checked if it.data(Qt.UserRole) in tags else Qt.Unchecked)
         self._refresh_preview()
 
     def _form_entry(self) -> dict:
@@ -355,6 +379,12 @@ class Manager(QMainWindow):
             e["used_by"] = used
         else:
             e.pop("used_by", None)
+        tags = [self.use_list.item(i).data(Qt.UserRole) for i in range(self.use_list.count())
+                if self.use_list.item(i).checkState() == Qt.Checked]
+        if tags:
+            e["use"] = tags
+        else:
+            e.pop("use", None)
         return e
 
     def _refresh_preview(self):
@@ -365,12 +395,15 @@ class Manager(QMainWindow):
         dest = wc.dest_for(e)
         eds = self.matrix.editions_for(e) if self.matrix.editions else []
         caps = wc.caps_for(e)
+        from core.weights_tooltips import tooltip_for
         self.preview.setText(
             f"dest → {dest}\n"
             f"caps effettive: {', '.join(caps) or '(nessuna: visibile ovunque)'}\n"
             f"edizioni che ricevono il peso: {', '.join(eds) or '(matrix non caricata)'}"
             + ("\n⚠ install_role=base → l'INSTALLER lo scarica per queste edizioni"
-               if e.get("install_role") == "base" else ""))
+               if e.get("install_role") == "base" else "")
+            + "\n─ TOOLTIP (come appare nei 3 spazi di download) ─\n"
+            + tooltip_for(e))
 
     # ---- azioni ----
     def _save_entry(self):
