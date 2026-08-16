@@ -1410,18 +1410,18 @@
       "kind": "file",
       "type": "diffusion_models",
       "family": "LTX",
-      "gated": true,
+      "gated": false,
       "approx_gb": 20.0,
       "scan_names": [
         "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
-      "remote_filename": "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-te-bf16",
@@ -1430,18 +1430,18 @@
       "kind": "file",
       "type": "text_encoders",
       "family": "",
-      "gated": true,
+      "gated": false,
       "approx_gb": 24.5,
       "scan_names": [
         "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
-      "remote_filename": "text_encoders/gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-te-nvfp4-local",
@@ -1468,18 +1468,18 @@
       "kind": "file",
       "type": "vae",
       "family": "",
-      "gated": true,
+      "gated": false,
       "approx_gb": 1.36,
       "scan_names": [
         "ltx-2.5-video-vae-conv-bf16.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-video-vae-conv-bf16.safetensors",
-      "remote_filename": "vae/ltx-2.5-video-vae-conv-bf16.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-video-vae-conv-bf16.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-audio-vae",
@@ -1488,18 +1488,18 @@
       "kind": "file",
       "type": "vae",
       "family": "",
-      "gated": true,
+      "gated": false,
       "approx_gb": 0.34,
       "scan_names": [
         "ltx-2.5-audio-vae-bf16.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-audio-vae-bf16.safetensors",
-      "remote_filename": "vae/ltx-2.5-audio-vae-bf16.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-audio-vae-bf16.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-diffusion-decoder",
@@ -1527,18 +1527,18 @@
       "kind": "file",
       "type": "latent_upscale_models",
       "family": "",
-      "gated": true,
+      "gated": false,
       "approx_gb": 0.93,
       "scan_names": [
         "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-      "remote_filename": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-temporal-upscaler",
@@ -1547,18 +1547,18 @@
       "kind": "file",
       "type": "latent_upscale_models",
       "family": "",
-      "gated": true,
+      "gated": false,
       "approx_gb": 0.25,
       "scan_names": [
         "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors",
-      "remote_filename": "latent_upscale_models/ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-distilled-lora-450",
@@ -1567,18 +1567,18 @@
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2.5",
-      "gated": true,
+      "gated": false,
       "approx_gb": 8.3,
       "scan_names": [
         "ltx-2.5-22b-distilled-lora-450-bf16.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-22b-distilled-lora-450-bf16.safetensors",
-      "remote_filename": "loras/ltx-2.5-22b-distilled-lora-450-bf16.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-22b-distilled-lora-450-bf16.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-duration-head",
@@ -1587,18 +1587,18 @@
       "kind": "file",
       "type": "model_patches",
       "family": "",
-      "gated": true,
+      "gated": false,
       "approx_gb": 0.01,
       "scan_names": [
         "ltx-2.5-duration-head-bf16.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-duration-head-bf16.safetensors",
-      "remote_filename": "model_patches/ltx-2.5-duration-head-bf16.safetensors",
-      "note": "mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)"
+      "remote_filename": "ltx-2.5-duration-head-bf16.safetensors",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5"
     },
     {
       "id": "ltx25-iclora-pixel-upscaler",
@@ -1607,17 +1607,17 @@
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2.5",
-      "gated": true,
+      "gated": false,
       "approx_gb": 1.0,
       "scan_names": [
         "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
-      "repo_id": "Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
-      "url": "https://huggingface.co/Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
+      "repo_id": "dummy9996/LTX-2.5-22b-ungate",
+      "url": "https://huggingface.co/dummy9996/LTX-2.5-22b-ungate",
       "filename": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors",
-      "note": "filename CONFERMATO (16/08, dal mirror ungate); mirror non-gated community: dummy9996/LTX-2.5-22b-ungate (file byte-identici all ufficiale, verificato 16/08)",
+      "note": "scaricato dal mirror UNGATE (file byte-identici, verificato 16/08); ufficiale gated: Lightricks/LTX-2.5",
       "remote_filename": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors"
     },
     {

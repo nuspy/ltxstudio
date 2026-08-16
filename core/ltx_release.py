@@ -224,11 +224,13 @@ def missing_components(release: str | None) -> list[str]:
 
 
 # componente obbligatoria → id di CATALOGO scaricabile (FASE G: il consenso primo-uso della GUI
-# passa da qui). NB 2.5: il TE del path è il nvfp4 DERIVATO LOCALMENTE (no_remote) — l'id
-# scaricabile è il bf16 ufficiale, che però NON risolve il path nvfp4: il dialog lo dice.
+# passa da qui). NB 2.5: il TE del path è il nvfp4 DERIVATO LOCALMENTE (no_remote); il DEFAULT
+# di DOWNLOAD è il GGUF Q5_K_M community (8.9GB, scelta utente 16/08 — il bf16 da 24.5GB non
+# serve più). ⚠ il loader del TE GGUF nel worker nativo è DA VALIDARE alla prima generazione:
+# finché non è validato NON è il default di RUNTIME (il path resta il nvfp4 locale).
 _COMPONENT_IDS: dict[str, dict[str, str]] = {
     "2.3": {"text_encoder": "ltx23-gemma-te"},
-    "2.5": {"text_encoder": "ltx25-te-bf16", "video_vae": "ltx25-video-vae-conv",
+    "2.5": {"text_encoder": "ltx25-te-gemma4-gguf", "video_vae": "ltx25-video-vae-conv",
             "audio_vae": "ltx25-audio-vae"},
 }
 
