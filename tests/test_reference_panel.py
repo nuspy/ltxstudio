@@ -92,10 +92,12 @@ def test_token_finisce_nel_prompt_del_tab(qtbot):
     t.reference_panel.enable.setChecked(True)
     assert t.reference_panel.add_path("gorilla.png")
     t.reference_panel._rows[0].ins_btn.click()
-    assert "<Picture 1>" in t.prompt.toPlainText()
+    # con LTX la convenzione è «Image 1» (la chiede la scheda della LoRA MSR); i token angolari
+    # `<Picture 1>` sono di MiniMax H3
+    assert "Image 1" in t.prompt.toPlainText(), t.prompt.toPlainText()
 
 
-@pytest.mark.parametrize("arch,expect_images", [("minimax_h3", 9), ("ltx", 5)])
+@pytest.mark.parametrize("arch,expect_images", [("minimax_h3", 9), ("ltx", 4)])
 def test_video_tab_applica_i_limiti(qtbot, arch, expect_images):
     from core.model_catalog import video_caps
     from ui.tabs.video_tab import VideoTab

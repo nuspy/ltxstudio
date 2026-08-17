@@ -202,6 +202,12 @@ class ReferencePanel(QWidget):
         self._needs_background = bool(needs_background)
         if hasattr(self, "bg_row"):
             self.bg_row.setVisible(self._needs_background)
+        for r in [r for r in self._rows if self._lim.get(r.kind, 0) <= 0]:
+            self._remove_row(r)                              # tipi non più ammessi dall'arch: via
+        # oltre il tetto per tipo (es. H3 9 immagini → LTX 4): scarta le eccedenze, dalla fine
+        for kind, lim in self._lim.items():
+            for r in [r for r in self._rows if r.kind == kind][lim:]:
+                self._remove_row(r)
         self._refresh()
 
     def set_token_style(self, style: str) -> None:
