@@ -494,9 +494,15 @@ class _NativeLtx2Worker(QThread):
         import json as _json, os as _os, subprocess as _sp, tempfile as _tf
         try:
             # arch → venv+worker dedicati (ltx/lingbot/krea_rt) dal dispatch centrale. Default LTX-2.
+            # `runner_for` (NON _ARCH_RUNNER): per l'arch 'ltx' il venv dipende dalla RELEASE del
+            # checkpoint, e _ARCH_RUNNER["ltx"] è cablato sulla 2.3 → prima la 2.5 non partiva mai
+            # da qui, contro il docstring di runner_for che dichiara questo il punto UNICO.
             _arch = (self.params.get("arch") or "ltx").lower()
-            from core.ltx_video_job import _ARCH_RUNNER as _RUN
-            py, worker = _RUN.get(_arch, _RUN["ltx"])
+            from core.ltx_video_job import runner_for as _runner_for
+            py, worker = _runner_for(self.params)
+            if _arch == "ltx":
+                self.progress.emit(f"[release] LTX {self.params.get('ltx_release') or '2.3'} "
+                                   f"→ {_os.path.basename(_os.path.dirname(_os.path.dirname(py)))}")
             if not _os.path.exists(py):
                 self.done.emit({"status": "error",
                                 "error": f"venv per arch '{_arch}' mancante: {py}. Esegui lo script install_*."})
@@ -3060,6 +3066,16 @@ class MainWindow(QMainWindow):
             params["gguf_transformer"] = vals["model_gguf"]   # base checkpoint resta default per vae/gemma
         elif vals.get("model") and vals.get("model") not in ("", "auto"):
             params["model"] = vals["model"]
+        # RELEASE LTX dal CHECKPOINT (2.3 / 2.5): le due release hanno venv incompatibili
+        # (2.5 richiede transformers>=5.8 per Gemma 4). Nessuno la impostava sul percorso GUI —
+        # build_params() è il percorso API — quindi la 2.5 era IRRAGGIUNGIBILE dalla GUI: ogni
+        # generazione finiva sul venv 2.3 e tutto il pack 2.5 scaricabile restava inerte.
+        # Nome non riconosciuto → None → resta il default (2.3): nessuna sostituzione automatica.
+        if (params.get("arch") or "ltx").lower() == "ltx":
+            from core import ltx_release as _lrel
+            _det = _lrel.detect_release(params.get("gguf_transformer") or params.get("model") or "")
+            if _det:
+                params["ltx_release"] = _det
         if (use_image or vals.get("use_image_force")) and self.frame1_tab.image_path:
             params["image_path"] = self.frame1_tab.image_path
             params["ref_strength"] = float(vals.get("ref_strength", 1.0))
