@@ -159,6 +159,16 @@ def _load_rgb(path: str):
     return np.asarray(Image.open(path).convert("RGB"), dtype=np.uint8)
 
 
+def best_frame_count(num_frames: int) -> int:
+    """Lunghezza ammessa più lunga che ENTRA nel video da generare.
+
+    La pipeline IC-LoRA legge la guida con `frame_cap=num_frames`: una guida più lunga viene
+    TRONCATA e gli ultimi soggetti spariscono senza un errore. Quindi la guida non deve mai
+    superare il video."""
+    ammesse = [f for f in FRAME_COUNTS if f <= max(1, int(num_frames))]
+    return max(ammesse) if ammesse else min(FRAME_COUNTS)
+
+
 def build_pseudo_video(subject_paths: list[str], background_path: str, out_path: str, *,
                        width: int = 736, height: int = 1280, frame_count: int = 41,
                        fps: int = 24, log=print) -> str:

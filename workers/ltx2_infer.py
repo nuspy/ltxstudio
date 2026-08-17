@@ -1878,11 +1878,19 @@ def run_generation(p: dict) -> str:
             if not _bg:
                 raise SystemExit("[msr] la variante pseudo-video (LTX 2.3) richiede un'immagine di "
                                  "SFONDO: indicane una nel pannello «Riferimenti multipli».")
+            # La guida eredita FORMATO e LUNGHEZZA del video richiesto: con aspetti diversi la
+            # pipeline la ri-scala e i soggetti si deformano (verificato live: guida 736x1280
+            # verticale su video 512x320 → poltiglia); più lunga del video, viene troncata e
+            # gli ultimi soggetti spariscono (frame_cap=num_frames).
+            _mw = int(p.get("msr_width") or p.get("width", 736))
+            _mh = int(p.get("msr_height") or p.get("height", 1280))
+            _mf = int(p.get("msr_frames") or 0) or ltx_msr.best_frame_count(
+                int(p.get("num_frames", 41)))
             _msr_guide = ltx_msr.build_pseudo_video(
                 _subs, _bg, os.path.splitext(p["output"])[0] + "_msr_guide.mp4",
-                width=int(p.get("msr_width", 736)), height=int(p.get("msr_height", 1280)),
-                frame_count=int(p.get("msr_frames", 41)), fps=int(p.get("fps", 24)))
+                width=_mw, height=_mh, frame_count=_mf, fps=int(p.get("fps", 24)))
             p["control_video"] = _msr_guide
+            p.setdefault("control_strength", 1.0)            # la guida MSR va seguita, non suggerita
     ckpt = _resolve_ckpt(p.get("model"))
     _bn = os.path.basename(ckpt).lower()
     if p.get("quant"):

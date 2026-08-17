@@ -195,9 +195,12 @@ def test_pannello_sfondo_e_limiti(qtbot):
         assert p.validation_errors() == []
         refs = p.get_references()
         assert [r.get("role") for r in refs] == [None, "background"]
+        # su LTX i riferimenti si citano «Image 1», non col token angolare di H3
+        assert refs[0]["token"] == "Image 1", refs[0]["token"]
         # H3: nessuno sfondo richiesto, riga nascosta
         t._apply_reference_limits("minimax_h3", video_caps("minimax_h3"))
         assert not p._needs_background and p._lim["image"] == 9
         assert [r.get("role") for r in p.get_references()] == [None]
+        assert p.get_references()[0]["token"] == "<Picture 1>"
     finally:
         user_prefs.set("video_arch", prev)

@@ -39,8 +39,16 @@ BACKGROUND = ("stage", "empty smoky jazz club stage at night, red curtains, warm
 def _gen_image(name: str, prompt: str, seed: int) -> str:
     """Genera e ritorna il path REALE: il backend immagini ignora `output` e usa il proprio
     schema di nomi (native_flux_<seed>.png), restituendolo in `output[0]`. Copiato poi con un
-    nome parlante, così i riferimenti del test si riconoscono in output/."""
+    nome parlante, così i riferimenti del test si riconoscono in output/.
+
+    RIUSA il file se c'è già: caricare FLUX costa ~28GB di commit e i riferimenti non cambiano
+    fra un giro e l'altro. Serve anche a poter iterare sull'MSR quando la macchina è carica
+    (il commit esaurito dà access violation 0xC0000005 al load dei safetensors)."""
     import shutil
+    dest_esistente = os.path.join(OUT, f"DIAG_msr_ref_{name}.png")
+    if os.path.exists(dest_esistente) and os.path.getsize(dest_esistente) > 10000:
+        print(f"   [riuso] {os.path.basename(dest_esistente)}", flush=True)
+        return dest_esistente
     from core import native_driver
     p = {"arch": "flux", "model": IMG_MODEL, "prompt": prompt, "negative": "text, watermark, blurry",
          "width": 768, "height": 768, "steps": 8, "guidance": 3.5, "seed": seed,
@@ -53,6 +61,29 @@ def _gen_image(name: str, prompt: str, seed: int) -> str:
     dest = os.path.join(OUT, f"DIAG_msr_ref_{name}.png")
     shutil.copyfile(src, dest)
     return dest
+
+
+def _genera(w, etichetta: str):
+    """Preme il bottone Genera della GUI e attende l'mp4 nuovo. Ritorna il path o None."""
+    import time as _t
+    from PySide6.QtWidgets import QApplication
+    prima = set(Path(OUT).glob("*.mp4"))
+    t0 = _t.time()
+    w.on_generate()
+    print(f"[gen {etichetta}] accodato, attendo…", flush=True)
+    deadline = _t.time() + 1800
+    while _t.time() < deadline:
+        QApplication.processEvents()
+        nuovi = [p for p in Path(OUT).glob("*.mp4") if p not in prima
+                 and "_msr_guide" not in p.name and p.stat().st_size > 10000]
+        if nuovi:
+            out = max(nuovi, key=lambda p: p.stat().st_mtime)
+            print(f"[out {etichetta}] {out.name} ({out.stat().st_size / 2**20:.1f} MB "
+                  f"in {_t.time() - t0:.0f}s)", flush=True)
+            return out
+        _t.sleep(1.0)
+    print(f"[out {etichetta}] NESSUN VIDEO in {_t.time() - t0:.0f}s", flush=True)
+    return None
 
 
 def main() -> int:
@@ -106,35 +137,25 @@ def main() -> int:
         "warm lanterns, cinematic")
     print(f"[prompt] {vt.prompt.toPlainText()[:110]}…", flush=True)
 
-    # 3) parametri video minimi (test meccanico: conta che giri, non la lunghezza)
-    vt.width.setValue(512); vt.height.setValue(320)
+    # 3) parametri video. RISOLUZIONE NON MINUSCOLA: sotto ~700px LTX-2.3 produce poltiglia a
+    #    prescindere dai riferimenti (verificato al 1° giro a 512x320). `length` è in SECONDI:
+    #    2s a 24fps = 49 frame, così la guida (41) ci sta dentro senza essere troncata.
+    vt.width.setValue(704); vt.height.setValue(448)
+    vt.fps.setValue(24); vt.length.setValue(2.0)
     vt.sampler_seed.steps.setValue(8)
     vt.sampler_seed.seed.setValue(7)
-    for attr, val in (("duration", 2.0), ("num_frames", 33)):
-        wdg = getattr(vt, attr, None)
-        if wdg is not None and hasattr(wdg, "setValue"):
-            wdg.setValue(val)
 
     # 4) IL BOTTONE (percorso reale della GUI, non una chiamata al servizio)
-    outs_before = set(Path(OUT).glob("*.mp4"))
-    t0 = time.time()
-    w.on_generate()
-    print("[gen] job accodato, attendo…", flush=True)
-    deadline = time.time() + 1800
-    produced = None
-    from PySide6.QtWidgets import QApplication
-    while time.time() < deadline:
-        QApplication.processEvents()
-        nuovi = [p for p in Path(OUT).glob("*.mp4") if p not in outs_before
-                 and "_msr_guide" not in p.name and p.stat().st_size > 10000]
-        if nuovi:
-            produced = max(nuovi, key=lambda p: p.stat().st_mtime)
-            break
-        time.sleep(1.0)
-    dt = time.time() - t0
-    check("video prodotto", produced is not None, f"{dt:.0f}s")
-    if produced:
-        print(f"[out] {produced}  ({produced.stat().st_size / 2**20:.1f} MB in {dt:.0f}s)", flush=True)
+    produced = _genera(w, "MSR")
+    check("video prodotto", produced is not None)
+
+    # 4b) CONTROLLO senza riferimenti, stessi parametri: se anche questo è poltiglia, il problema
+    #     sono le impostazioni e non i riferimenti. Senza questo confronto non si può concludere.
+    panel.enable.setChecked(False)
+    vt.prompt.setPlainText("an elderly bearded saxophonist plays on a smoky jazz club stage, "
+                           "warm lanterns, cinematic")
+    control = _genera(w, "CONTROLLO senza riferimenti")
+    check("controllo prodotto", control is not None)
 
     # 5) la pseudo-sequenza di guida deve esistere ed avere il layout atteso
     guide = sorted(Path(OUT).glob("*_msr_guide.mp4"), key=lambda p: p.stat().st_mtime)

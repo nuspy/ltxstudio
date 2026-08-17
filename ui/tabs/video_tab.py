@@ -496,6 +496,7 @@ class VideoTab(QWidget):
         panel = getattr(self, "reference_panel", None)
         if panel is None:
             return
+        panel.set_token_style("h3" if arch == "minimax_h3" else "ltx")
         if arch == "minimax_h3":
             panel.set_limits(images=9, videos=3, audios=3, total=12, min_items=1, clip_s=(2.0, 15.0))
         elif caps.get("multiref"):

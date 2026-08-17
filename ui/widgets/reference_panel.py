@@ -36,8 +36,13 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm", ".avi"}
 AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 
-# kind → (etichetta token nel prompt, icona)
-_KIND_TOKEN = {"image": "Picture", "video": "Video", "audio": "Audio"}
+# Come si citano i riferimenti nel prompt: la convenzione la detta il MODELLO, non noi.
+# · MiniMax H3 → token fra parentesi angolari: `<Picture 1>`, `<Video 1>`, `<Audio 1>`
+# · LTX + LoRA MSR → etichette semplici: «Use consistent labels such as Image 1, Image 2…»
+TOKEN_STYLES = {
+    "h3": {"image": "<Picture {n}>", "video": "<Video {n}>", "audio": "<Audio {n}>"},
+    "ltx": {"image": "Image {n}", "video": "Video {n}", "audio": "Audio {n}"},
+}
 _KIND_ICON = {"image": "🖼", "video": "🎞", "audio": "🎧"}
 
 
@@ -118,6 +123,7 @@ class ReferencePanel(QWidget):
         self._min_items = 1
         self._clip_s = (2.0, 15.0)
         self._needs_background = False           # LTX/MSR sì, MiniMax H3 no
+        self._token_style = "h3"                 # convenzione con cui il modello cita i riferimenti
         self._rows: list[_RefRow] = []
 
         v = QVBoxLayout(self); v.setContentsMargins(0, 0, 0, 0); v.setSpacing(4)
@@ -196,6 +202,15 @@ class ReferencePanel(QWidget):
         self._needs_background = bool(needs_background)
         if hasattr(self, "bg_row"):
             self.bg_row.setVisible(self._needs_background)
+        self._refresh()
+
+    def set_token_style(self, style: str) -> None:
+        """Convenzione dei token: 'h3' (`<Picture 1>`) o 'ltx' (`Image 1`). La detta il modello:
+        la scheda della LoRA MSR chiede «consistent labels such as Image 1, Image 2…», mentre H3
+        vuole i token fra parentesi angolari."""
+        if style in TOKEN_STYLES and style != self._token_style:
+            self._token_style = style
+            self._refresh()
         for r in [r for r in self._rows if self._lim.get(r.kind, 0) <= 0]:
             self._remove_row(r)                              # tipi non più ammessi: via
         self._refresh()
@@ -243,9 +258,10 @@ class ReferencePanel(QWidget):
     def _refresh(self):
         """Rinumera i token per tipo (l'ordine è quello di inserimento) e aggiorna contatori/limiti."""
         seq = {"image": 0, "video": 0, "audio": 0}
+        fmt = TOKEN_STYLES.get(self._token_style, TOKEN_STYLES["h3"])
         for r in self._rows:
             seq[r.kind] += 1
-            r.set_token(f"<{_KIND_TOKEN[r.kind]} {seq[r.kind]}>")
+            r.set_token(fmt[r.kind].format(n=seq[r.kind]))
         bits = [f"{seq[k]}/{self._lim[k]} {tr('vid.ref.kind.' + k, k)}"
                 for k in ("image", "video", "audio") if self._lim[k] > 0]
         self.count_lbl.setText(" · ".join(bits) + f"  ({len(self._rows)}/{self._total})")
