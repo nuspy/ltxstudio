@@ -1674,6 +1674,7 @@
   "fs.mt.export_done": "Export: {f}",
   "feat.cap.filmstudio": "AI Film Studio (testo→film)",
   "feat.cap.video_lingbot": "LingBot-Video (seconda architettura video)",
+  "feat.cap.video_minimax_h3": "MiniMax H3 (3ª architettura video: audio nativo + riferimenti multipli)",
   "fs.tab.voice": "Voce",
   "fs.voice.list": "Voci",
   "fs.voice.described": "Voce da descrizione",

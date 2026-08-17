@@ -143,6 +143,22 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "skintoken-grpo": (["threed"], []),
     "da2": (["threed", "depth_ctrl"], []),
     "worldgen-lora": (["threed", "lora_style"], []),
+    # ── MiniMax H3 (deps già scritte da catalog_v2; qui i tag d'uso) ──
+    "mmh3-fl2va-int8": (["ckpt_video", "av_joint", "q_int8"], []),
+    "mmh3-fl2va-fp8": (["ckpt_video", "av_joint"], []),
+    "mmh3-fl2va-bf16": (["ckpt_video", "av_joint", "big_quality"], []),
+    "mmh3-fl2va-gguf-q4": (["ckpt_video", "av_joint", "gguf_small"], []),
+    "mmh3-fl2va-gguf-q3": (["ckpt_video", "av_joint", "gguf_small", "q_extreme"], []),
+    "mmh3-ref2va-int8": (["ckpt_video", "av_joint", "ref_omni", "q_int8"], []),
+    "mmh3-ref2va-fp8": (["ckpt_video", "av_joint", "ref_omni"], []),
+    "mmh3-ref2va-gguf-q4": (["ckpt_video", "av_joint", "ref_omni", "gguf_small"], []),
+    "mmh3-te-nvfp4": (["te", "te_quant", "nvfp4"], []),
+    "mmh3-te-int8": (["te", "te_quant", "q_int8"], []),
+    "mmh3-te-gguf-q4": (["te", "te_quant", "gguf_small"], []),
+    "mmh3-video-vae": (["vae"], []),
+    "mmh3-audio-vae": (["audio_vae"], []),
+    "mmh3-turbo-lora-fl2v": (["distill_lora", "lora_style"], []),
+    "mmh3-turbo-lora-ref2v": (["distill_lora", "lora_style", "ref_omni"], []),
 }
 
 

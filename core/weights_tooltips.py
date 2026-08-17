@@ -43,6 +43,10 @@ USE_TAGS: dict[str, str] = {
     "caption": "Caption VLM: descrive le immagini per i dataset di training LoRA.",
     "multisubject": "Riferimenti multi-soggetto: più personaggi coerenti nello stesso video.",
     "big_quality": "Qualità massima ma file enorme: nell'uso normale preferisci le varianti quantizzate.",
+    "av_joint": "Video e audio stereo generati insieme in una sola passata: già sincronizzati.",
+    "ref_omni": "Riferimenti multipli: fino a 9 immagini, 3 video e 3 clip audio per guidare "
+                "identità, stile, movimento e voce.",
+    "q_int8": "Quantizzazione int8 (ConvRot): circa metà della memoria del bf16, qualità vicina.",
 }
 
 

@@ -2661,6 +2661,463 @@
         "ltx25-video-vae-conv",
         "ltx25-audio-vae"
       ]
+    },
+    {
+      "id": "mmh3-fl2va-int8",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA int8-ConvRot (t2v/i2v, consigliato 32GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 20.97,
+      "scan_names": [
+        "minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "remote_filename": "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "deps": [
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "il checkpoint del workflow ComfyUI ufficiale; picco ~31.8GB VRAM col TE nvfp4. Licenza MiniMax H3 Community: territori esclusi UE/UK/USA/Corea",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "q_int8"
+      ]
+    },
+    {
+      "id": "mmh3-fl2va-fp8",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA fp8-scaled (t2v/i2v)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 20.96,
+      "scan_names": [
+        "minimax_h3_fl2va_pruned_fp8_scaled.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+      "remote_filename": "diffusion_models/minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+      "deps": [
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "alternativa fp8 all'int8; licenza con territori esclusi (UE/UK/USA/Corea)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint"
+      ]
+    },
+    {
+      "id": "mmh3-fl2va-bf16",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA bf16 pruned (qualità piena, 40GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 40.23,
+      "scan_names": [
+        "minimax_h3_fl2va_pruned_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_fl2va_pruned_bf16.safetensors",
+      "remote_filename": "diffusion_models/minimax_h3_fl2va_pruned_bf16.safetensors",
+      "deps": [
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "non entra in 32GB senza offload; licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "big_quality"
+      ]
+    },
+    {
+      "id": "mmh3-fl2va-gguf-q4",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA GGUF Q4_K_M (GPU piccole)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 19.86,
+      "scan_names": [
+        "MiniMax-H3-FL2VA-Q4_K_M.gguf"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Abiray/MiniMax-H3-GGUF",
+      "url": "https://huggingface.co/Abiray/MiniMax-H3-GGUF",
+      "filename": "MiniMax-H3-FL2VA-Q4_K_M.gguf",
+      "remote_filename": "unet/MiniMax-H3-FL2VA-Q4_K_M.gguf",
+      "deps": [
+        "mmh3-te-gguf-q4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "quant community; licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "gguf_small"
+      ]
+    },
+    {
+      "id": "mmh3-fl2va-gguf-q3",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA GGUF Q3_K_M (15.6GB, minimo)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 15.57,
+      "scan_names": [
+        "MiniMax-H3-FL2VA-Q3_K_M.gguf"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Abiray/MiniMax-H3-GGUF",
+      "url": "https://huggingface.co/Abiray/MiniMax-H3-GGUF",
+      "filename": "MiniMax-H3-FL2VA-Q3_K_M.gguf",
+      "remote_filename": "unet/MiniMax-H3-FL2VA-Q3_K_M.gguf",
+      "deps": [
+        "mmh3-te-gguf-q4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "quant basso: qualità in calo; licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "gguf_small",
+        "q_extreme"
+      ]
+    },
+    {
+      "id": "mmh3-ref2va-int8",
+      "module": "Video",
+      "label": "MiniMax H3 Ref2VA int8-ConvRot (riferimenti multipli)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 20.97,
+      "scan_names": [
+        "minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "remote_filename": "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "deps": [
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "checkpoint SEPARATO dal fl2va: serve SOLO per i riferimenti multipli (9 immagini + 3 video + 3 audio). Licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "ref_omni",
+        "q_int8"
+      ]
+    },
+    {
+      "id": "mmh3-ref2va-fp8",
+      "module": "Video",
+      "label": "MiniMax H3 Ref2VA fp8-scaled (riferimenti multipli)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 20.96,
+      "scan_names": [
+        "minimax_h3_ref2va_pruned_fp8_scaled.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "remote_filename": "diffusion_models/minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      "deps": [
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "alternativa fp8 al ref2va int8; licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "ref_omni"
+      ]
+    },
+    {
+      "id": "mmh3-ref2va-gguf-q4",
+      "module": "Video",
+      "label": "MiniMax H3 Ref2VA GGUF Q4_K_M (riferimenti, GPU piccole)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 19.85,
+      "scan_names": [
+        "MiniMax-H3-Ref2VA-Q4_K_M.gguf"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Abiray/MiniMax-H3-GGUF",
+      "url": "https://huggingface.co/Abiray/MiniMax-H3-GGUF",
+      "filename": "MiniMax-H3-Ref2VA-Q4_K_M.gguf",
+      "remote_filename": "unet/MiniMax-H3-Ref2VA-Q4_K_M.gguf",
+      "deps": [
+        "mmh3-te-gguf-q4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "quant community; licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "ref_omni",
+        "gguf_small"
+      ]
+    },
+    {
+      "id": "mmh3-te-nvfp4",
+      "module": "Video",
+      "label": "MiniMax H3 TE Qwen3-VL-32B nvfp4-AWQ (15.7GB vs 51.5 bf16)",
+      "kind": "file",
+      "type": "text_encoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 15.69,
+      "scan_names": [
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "remote_filename": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "note": "TE consigliato su 32GB; è un VLM completo: legge anche le immagini di riferimento",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "te",
+        "te_quant",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "mmh3-te-int8",
+      "module": "Video",
+      "label": "MiniMax H3 TE Qwen3-VL-32B int8-ConvRot (qualità, 27GB)",
+      "kind": "file",
+      "type": "text_encoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 27.14,
+      "scan_names": [
+        "qwen3vl_32b_minimax_h3_int8_convrot.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      "remote_filename": "text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      "note": "serve parcheggio VRAM→RAM fra TE e transformer (il nostro handoff lo fa)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "te",
+        "te_quant",
+        "q_int8"
+      ]
+    },
+    {
+      "id": "mmh3-te-gguf-q4",
+      "module": "Video",
+      "label": "MiniMax H3 TE Qwen3-VL-32B GGUF Q4_K_M (14.6GB)",
+      "kind": "file",
+      "type": "text_encoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 14.58,
+      "scan_names": [
+        "qwen3vl_32b_minimax_h3-Q4_K_M.gguf"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Abiray/MiniMax-H3-GGUF",
+      "url": "https://huggingface.co/Abiray/MiniMax-H3-GGUF",
+      "filename": "qwen3vl_32b_minimax_h3-Q4_K_M.gguf",
+      "remote_filename": "text_encoders/qwen3vl_32b_minimax_h3-Q4_K_M.gguf",
+      "note": "TE quantizzato community, abbinato ai checkpoint GGUF",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "te",
+        "te_quant",
+        "gguf_small"
+      ]
+    },
+    {
+      "id": "mmh3-video-vae",
+      "module": "Video",
+      "label": "MiniMax H3 video VAE fp16 (f16t4d24)",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": false,
+      "approx_gb": 5.21,
+      "scan_names": [
+        "minimax_h3_video_vae_fp16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_video_vae_fp16.safetensors",
+      "remote_filename": "vae/minimax_h3_video_vae_fp16.safetensors",
+      "note": "16x spaziale, 4x temporale, 24 canali, decoder ViT",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "vae"
+      ]
+    },
+    {
+      "id": "mmh3-audio-vae",
+      "module": "Video",
+      "label": "MiniMax H3 audio VAE fp32 (stereo 32kHz)",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.61,
+      "scan_names": [
+        "minimax_h3_audio_vae_fp32.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_audio_vae_fp32.safetensors",
+      "remote_filename": "vae/minimax_h3_audio_vae_fp32.safetensors",
+      "note": "l'audio nasce dalla STESSA passata del video: già sincronizzato",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "audio_vae"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-lora-fl2v",
+      "module": "Video",
+      "label": "MiniMax H3 Turbo LoRA 4 step FL2V (lightx2v)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.96,
+      "scan_names": [
+        "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+      "remote_filename": "loras/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+      "note": "distillazione lightx2v/ModelTC: da ~20 step a 4 (768p)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "distill_lora",
+        "lora_style"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-lora-ref2v",
+      "module": "Video",
+      "label": "MiniMax H3 Turbo LoRA 4 step Ref2V (anteprima v0.1)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.96,
+      "scan_names": [
+        "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Comfy-Org/MiniMax-H3",
+      "url": "https://huggingface.co/Comfy-Org/MiniMax-H3",
+      "filename": "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+      "remote_filename": "loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+      "note": "anteprima: la distillazione dei riferimenti è meno matura della FL2V",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "distill_lora",
+        "lora_style",
+        "ref_omni"
+      ]
     }
   ],
   "schema": 2,
