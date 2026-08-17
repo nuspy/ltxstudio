@@ -142,12 +142,14 @@ def main() -> int:
     check("pannello valido (sfondo presente)", panel.validation_errors() == [],
           str(panel.validation_errors()))
     # i token nel prompt: è così che il modello sa a chi ci si riferisce
-    for r in panel._rows:
-        vt._insert_prompt_token(r.token)
+    # Il prompt DEVE citare i token che il pannello ha assegnato davvero (su LTX «Image 1», non
+    # i token angolari di H3): con etichette diverse il modello non collega testo e riferimento —
+    # visto live, il sassofonista anziano diventava un uomo giovane qualunque.
+    tok = [r.token for r in panel._rows]
     vt.prompt.setPlainText(
-        "<Picture 1> the saxophonist plays on stage while <Picture 2> the little copper robot "
-        "dances beside him and <Picture 3> the scarlet parrot flies over them, smoky jazz club, "
-        "warm lanterns, cinematic")
+        f"{tok[0]} the elderly bearded saxophonist in the purple velvet suit plays on stage, "
+        f"{tok[1]} the little copper robot dances beside him, "
+        f"{tok[2]} the scarlet parrot flies above them, smoky jazz club, warm lanterns, cinematic")
     print(f"[prompt] {vt.prompt.toPlainText()[:110]}…", flush=True)
 
     # 3) parametri video. RISOLUZIONE NON MINUSCOLA: sotto ~700px LTX-2.3 produce poltiglia a
