@@ -32,7 +32,9 @@ ARCH_VIDEO_CAPS = {
         "t2v": True, "i2v": True, "ti2v": True, "a2v": True, "audio": True,
         "controlnet": True, "v2v": True, "retake": True, "storyboard": True,
         "extend": True, "refiner": False, "lipsync": True, "keyframes": True,
-        "multiref": False,                       # per-release: la 2.5 con LoRA MSR lo alza a True
+        # riferimenti multipli via LoRA Multiple-Subject-Reference: esiste per ENTRAMBE le release
+        # (file diversi, non intercambiabili) → capability dell'arch; il file lo sceglie la release.
+        "multiref": True,
     },
     "lingbot": {
         "t2v": True, "i2v": True, "ti2v": True, "a2v": False, "audio": False,

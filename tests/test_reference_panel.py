@@ -80,9 +80,13 @@ def test_token_finisce_nel_prompt_del_tab(qtbot):
     from ui.tabs.video_tab import VideoTab
     t = VideoTab(); qtbot.addWidget(t)
     from PySide6.QtGui import QTextCursor
-    # gating: con l'arch di default (LTX senza LoRA MSR) il pannello è DISABILITATO
-    assert not t.reference_panel.isEnabled(), "il pannello dovrebbe essere spento senza multiref"
-    t.reference_panel.setEnabled(True)                    # come farebbe un'arch con multiref
+    from core.model_catalog import video_caps
+    # gating: LTX ha multiref (LoRA MSR) → attivo; un'arch che non ce l'ha lo spegne
+    assert t.reference_panel.isEnabled(), "con LTX il pannello dovrebbe essere attivo"
+    t._apply_reference_limits("lingbot", video_caps("lingbot"))
+    t.reference_panel.setEnabled(video_caps("lingbot").get("multiref", False))
+    assert not t.reference_panel.isEnabled(), "senza multiref il pannello va spento"
+    t.reference_panel.setEnabled(True)
     t.prompt.setPlainText("un gorilla in smoking suona il theremin,")
     cur = t.prompt.textCursor(); cur.movePosition(QTextCursor.End); t.prompt.setTextCursor(cur)
     t.reference_panel.enable.setChecked(True)

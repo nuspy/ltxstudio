@@ -324,7 +324,15 @@ NEW = [
       category="video", arch="ltx25", repo="LiconStudio/LTX-2.5-Multiple-Subject-Reference",
       remote="LTX-2.5-Licon-MSR-V1.safetensors", filename="LTX-2.5-Licon-MSR-V1.safetensors",
       type="LoRA", family="LTX-2.5", gb=1.22,
-      note="LoRA multi-riferimento soggetti (apache-2.0)"),
+      note="riferimenti multipli (max 5 immagini) per la 2.5 — apache-2.0; V1 del 14/08, molto "
+           "meno provata della V2 per 2.3. NON funziona sulla 2.3: le due LoRA sono addestrate "
+           "ciascuna sulla propria architettura"),
+    N("ltx23-lora-multisubject", "Video", "LTX-2.3 Multiple Subject Reference V2 (LiconStudio)",
+      category="video", arch="ltx23", repo="LiconStudio/LTX-2.3-Multiple-Subject-Reference",
+      remote="LTX-2.3-Licon-MSR-V2.safetensors", filename="LTX-2.3-Licon-MSR-V2.safetensors",
+      type="LoRA", family="LTX-2", gb=0.65,
+      note="riferimenti multipli (max 5 immagini) per la 2.3 — apache-2.0; 28K download dal "
+           "1/06: la variante più matura. Il file 2.5 NON è intercambiabile"),
 
     # ───────── MiniMax H3 (3ª architettura video, pesi aperti dal 3/08/2026) ─────────
     # Omni-transformer 33.1B: video + audio stereo 32kHz denoisati INSIEME. Due checkpoint

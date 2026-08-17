@@ -3176,6 +3176,24 @@ class MainWindow(QMainWindow):
                   for k in ("image", "video", "audio")}
             self._log(f"[nativo] riferimenti: {_n['image']} immagini, {_n['video']} video, "
                       f"{_n['audio']} audio")
+            # Su LTX i riferimenti arrivano dalla LoRA Multiple-Subject-Reference, che è un FILE
+            # DIVERSO per release (2.3 e 2.5 sono addestrate ciascuna sulla propria architettura):
+            # la scelta la fa la release, mai un fallback all'altra.
+            # NB: `params["arch"]` viene impostato più sotto (blocchi per architettura), qui non
+            # c'è ancora → si guarda la scelta del tab, altrimenti con H3 si cercherebbe la LoRA LTX.
+            if (vals.get("video_arch") or "ltx").lower() == "ltx":
+                from core import ltx_release as _lr
+                _rel = params.get("ltx_release") or _lr.DEFAULT_RELEASE
+                _msr = _lr.get(_rel).msr_lora
+                if not _msr or not os.path.exists(_msr):
+                    _mid = f"ltx{_rel.replace('.', '')}-lora-multisubject"
+                    from core import ensure_weights as _ew
+                    if not _ew.offer_download_gui(self, [_mid], f"LTX {_rel} — riferimenti multipli"):
+                        self._log(tr("weights.missing.title", "Pesi mancanti") + f" → {_mid}")
+                        return
+                    _msr = _lr.get(_rel).msr_lora
+                params["msr_lora"] = _msr
+                self._log(f"[msr] LoRA riferimenti LTX {_rel}: {os.path.basename(_msr)}")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         # ── 2ª ARCHITETTURA: LingBot-Video ──────────────────────────────────────────────
         # Se l'utente ha scelto LingBot nel tab Video, instrada al worker dedicato e salta tutta la

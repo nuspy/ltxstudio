@@ -143,6 +143,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "skintoken-grpo": (["threed"], []),
     "da2": (["threed", "depth_ctrl"], []),
     "worldgen-lora": (["threed", "lora_style"], []),
+    "ltx23-lora-multisubject": (["lora_style", "multisubject"], []),
     # ── MiniMax H3 (deps già scritte da catalog_v2; qui i tag d'uso) ──
     "mmh3-configs": (["te"], []),                    # config+tokenizer: componente obbligatoria
     "mmh3-fl2va-nvfp4": (["ckpt_video", "av_joint", "nvfp4"], []),

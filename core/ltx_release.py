@@ -54,6 +54,8 @@ class LtxRelease:
     upsampler_spatial: str
     upsampler_temporal: str                   # "" se la release non ce l'ha
     distilled_lora: str                       # obbligatoria coi checkpoint dev, inutile coi distilled
+    msr_lora: str                             # Multiple-Subject-Reference (riferimenti multipli): file
+    #                                           DIVERSO per release, addestrato sulla sua architettura
     duration_head: str                        # "" se assente
     diffusion_decoder: str                    # "" se assente (2.5: decoder DiT alternativo al Conv VAE)
     aux_bundle: str                           # bundle componenti ausiliarie (solo 2.3)
@@ -86,6 +88,7 @@ _R23 = LtxRelease(
     upsampler_temporal="",
     distilled_lora=_P("ltx23-distilled-lora-384",
                       str(_LORA23 / "ltx-2.3-22b-distilled-lora-384-1.1.safetensors")),
+    msr_lora=_P("ltx23-lora-multisubject", str(_LORA23 / "LTX-2.3-Licon-MSR-V2.safetensors")),
     duration_head="",
     diffusion_decoder="",
     aux_bundle="_ltx23_aux_components.safetensors",   # risolto accanto al checkpoint
@@ -111,6 +114,7 @@ _R23 = LtxRelease(
         "controlnet": CAP_YES, "v2v": CAP_YES, "retake": CAP_YES, "storyboard": CAP_YES,
         "extend": CAP_YES, "lipsync": CAP_YES, "keyframes": CAP_YES,
         "gguf": CAP_YES, "nsfw_ckpt": CAP_YES, "lora": CAP_YES,
+        "multiref": CAP_YES,                  # MSR V2 LiconStudio (dal 1/06, la più provata)
         "multishot": CAP_NO, "duration_head": CAP_NO,
         "temporal_upscale": CAP_NO, "diffusion_decoder": CAP_NO, "hdr_master": CAP_NO,
     },
@@ -149,6 +153,8 @@ _R25 = LtxRelease(
                           str(_MODELS / "latent_upscale_models" / "ltx-2.5-latent-temporal-upscaler-x2-bf16-1.0.safetensors")),
     distilled_lora=_P("ltx25-distilled-lora-450",
                       str(_MODELS / "LoRA" / "LTX-2.5" / "ltx-2.5-22b-distilled-lora-450-bf16.safetensors")),
+    msr_lora=_P("ltx25-lora-multisubject",
+                str(_MODELS / "LoRA" / "LTX-2.5" / "LTX-2.5-Licon-MSR-V1.safetensors")),
     duration_head=_P("ltx25-duration-head", str(_MODELS / "model_patches" / "ltx-2.5-duration-head-bf16.safetensors")),
     diffusion_decoder=_P("ltx25-diffusion-decoder", str(_VAE25 / "ltx-2.5-video-vae-bf16.safetensors")),
     aux_bundle="",
@@ -172,6 +178,9 @@ _R25 = LtxRelease(
         "nsfw_ckpt": CAP_NO,                  # 10Eros/Sulphur sono 2.3-only (TE heretic 2.5 esistono, ckpt no)
         "multishot": CAP_YES, "duration_head": CAP_YES,
         "temporal_upscale": CAP_YES, "diffusion_decoder": CAP_YES, "hdr_master": CAP_YES,
+        # Riferimenti multipli (MSR): LoRA community LiconStudio, una per release. La V1 per 2.5 è
+        # recente (14/08) e molto meno provata della V2 per 2.3 (dal 1/06).
+        "multiref": CAP_YES,
     },
     ckpt_hints=("ltx-2.5", "ltx2.5", "ltx25", "ltx-2-5"),
     sigma_driven=True,                        # DISTILLED_SIGMAS (9 valori = 8 step); num_inference_steps IGNORATO

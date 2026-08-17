@@ -3216,6 +3216,30 @@
         "ref_omni",
         "nvfp4"
       ]
+    },
+    {
+      "id": "ltx23-lora-multisubject",
+      "module": "Video",
+      "label": "LTX-2.3 Multiple Subject Reference V2 (LiconStudio)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.65,
+      "scan_names": [
+        "LTX-2.3-Licon-MSR-V2.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "LiconStudio/LTX-2.3-Multiple-Subject-Reference",
+      "url": "https://huggingface.co/LiconStudio/LTX-2.3-Multiple-Subject-Reference",
+      "filename": "LTX-2.3-Licon-MSR-V2.safetensors",
+      "remote_filename": "LTX-2.3-Licon-MSR-V2.safetensors",
+      "note": "riferimenti multipli (max 5 immagini) per la 2.3 — apache-2.0; 28K download dal 1/06: la variante più matura. Il file 2.5 NON è intercambiabile",
+      "use": [
+        "lora_style",
+        "multisubject"
+      ]
     }
   ],
   "schema": 2,

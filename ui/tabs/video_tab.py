@@ -499,7 +499,8 @@ class VideoTab(QWidget):
         if arch == "minimax_h3":
             panel.set_limits(images=9, videos=3, audios=3, total=12, min_items=1, clip_s=(2.0, 15.0))
         elif caps.get("multiref"):
-            panel.set_limits(images=5, videos=0, audios=0, total=5, min_items=2)
+            # LTX con la LoRA MSR: SOLO immagini, massimo 5 (limite dell'addestramento: 5 slot).
+            panel.set_limits(images=5, videos=0, audios=0, total=5, min_items=1)
 
     def _on_arch_changed(self, *_):
         arch = self._arch()

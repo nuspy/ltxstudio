@@ -1860,6 +1860,14 @@ def run_generation(p: dict) -> str:
             path = os.path.join(LORA_DIR, path)
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
                                               LTXV_LORA_COMFY_RENAMING_MAP))
+    # RIFERIMENTI MULTIPLI: la LoRA MSR va caricata nel modello OLTRE agli slot embedding che ne
+    # estraiamo (workers/ltx_msr.py). Aggiunta qui, non dalla GUI, così vale anche per l'API.
+    if p.get("references") and p.get("msr_lora") and os.path.exists(p["msr_lora"]):
+        if not any(os.path.samefile(l.path, p["msr_lora"])
+                   for l in loras if os.path.exists(l.path)):
+            loras.append(LoraPathStrengthAndSDOps(p["msr_lora"], float(p.get("msr_strength", 1.0)),
+                                                  LTXV_LORA_COMFY_RENAMING_MAP))
+            print(f"[msr] LoRA aggiunta: {os.path.basename(p['msr_lora'])}", flush=True)
     ckpt = _resolve_ckpt(p.get("model"))
     _bn = os.path.basename(ckpt).lower()
     if p.get("quant"):
@@ -2054,6 +2062,19 @@ def run_generation(p: dict) -> str:
         if p.get("listen_loop") and p.get("image_path") and not p.get("keyframes"):
             p["keyframes"] = _build_listen_keyframes(pipe, p, vg, _tc, nf, fps)
         images = []
+        # RIFERIMENTI MULTIPLI (MSR): immagini SENZA posizione temporale — vanno a frame negativi,
+        # ciascuna con lo slot embedding preso dalla LoRA. Convivono coi keyframe: gli uni occupano
+        # istanti del video, gli altri stanno fuori dalla finestra. Vedi workers/ltx_msr.py.
+        if p.get("references"):
+            from workers import ltx_msr
+            _msr_lora = p.get("msr_lora") or ""
+            if not _msr_lora or not os.path.exists(_msr_lora):
+                raise SystemExit(f"[msr] LoRA Multiple-Subject-Reference assente ({_msr_lora or 'non indicata'}): "
+                                 f"scaricala dal tab «Pesi modelli» — è una LoRA DIVERSA per release.")
+            if ltx_msr.install(_msr_lora, reference_frames=int(p.get("msr_reference_frames", 1) or 1)):
+                _refs = ltx_msr.references_to_inputs(p["references"], float(p.get("ref_strength", 1.0)))
+                images.extend(_refs)
+                print(f"[msr] {len(_refs)} riferimenti a frame {[i.frame_idx for i in _refs]}", flush=True)
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
             for kf in p["keyframes"]:
                 fr = int(kf.get("frame", 0))
@@ -2065,7 +2086,9 @@ def run_generation(p: dict) -> str:
             _ref_str = float(p.get("ref_strength", 1.0))
             if p.get("i2v_method") == "inplace":             # inplace-soft: riferimento sempre morbido
                 _ref_str = min(_ref_str, 0.6)
-            images = [ImageConditioningInput(p["image_path"], 0, _ref_str, 33)]
+            # APPEND, non assegnazione: i riferimenti MSR sono già dentro `images` e si sommano
+            # all'immagine di partenza (stanno a frame negativi, non se la contendono).
+            images.append(ImageConditioningInput(p["image_path"], 0, _ref_str, 33))
         video, audio = pipe(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),

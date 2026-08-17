@@ -64,7 +64,9 @@ def test_capability():
     assert caps["audio"] and caps["multiref"] and caps["t2v"] and caps["i2v"]
     # roba della pipeline LTX che H3 non ha: deve risultare spenta (la GUI disabilita i pannelli)
     assert not caps["controlnet"] and not caps["v2v"] and not caps["storyboard"]
-    assert video_caps("ltx")["multiref"] is False
+    # NB: dal 17/08 anche LTX ha multiref (via LoRA MSR), ma con limiti diversi — vedi
+    # tests/test_ltx_msr.py::test_limiti_pannello_per_arch. Qui basta che H3 lo dichiari nativo.
+    assert video_caps("lingbot")["multiref"] is False
 
 
 def test_selettore_arch(qtbot):
