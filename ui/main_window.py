@@ -1950,6 +1950,24 @@ class MainWindow(QMainWindow):
                 vals["storyboard"] = uploaded
             self._log(tr("mw.sb_log", "[Storyboard] {n} scene-keyframe → interpolazione multi-scena.").format(n=len(scenes)))
 
+        # ── RIFERIMENTI MULTIPLI: identità/stile/movimento/voce, SENZA posizione temporale ──
+        # (distinti dai keyframe dello storyboard: qui i file si citano nel prompt col loro token)
+        ref_panel = getattr(self.video_tab, "reference_panel", None)
+        refs = ref_panel.get_references() if ref_panel else []
+        if refs:
+            errs = ref_panel.validation_errors()
+            if errs:
+                QMessageBox.warning(self, tr("vid.ref.group", "Riferimenti multipli"),
+                                    tr("mw.ref_invalid", "Riferimenti non validi:") + "\n• " + "\n• ".join(errs))
+                return
+            vals["references"] = refs
+            _missing = [r["token"] for r in refs if r["token"] not in vals.get("prompt_positive", "")]
+            if _missing:                                     # il modello associa file↔testo SOLO via token
+                self._log(tr("mw.ref_untokened",
+                             "[Riferimenti] {toks} non compaiono nel prompt: il modello potrebbe ignorarli.")
+                          .format(toks=", ".join(_missing)))
+            self._log(tr("mw.ref_log", "[Riferimenti] {n} file di riferimento.").format(n=len(refs)))
+
         # ── VIDEO LUNGHI: auto-extend oltre la soglia ──
         # Se la durata richiesta supera la soglia (impostata in Avanzate), generiamo una
         # passata base = soglia, poi al completamento estendiamo automaticamente a spezzoni
@@ -3139,6 +3157,14 @@ class MainWindow(QMainWindow):
                 params["keyframes"] = kfs
                 params.pop("image_path", None)        # i keyframe sostituiscono il singolo frame iniziale
                 self._log(f"[nativo] storyboard: {len(kfs)} keyframe a tempo → video multi-scena")
+        # RIFERIMENTI MULTIPLI → al worker così come sono (path+tipo+token+descrizione): NON sono
+        # keyframe, quindi non diventano `keyframes` e non toccano `image_path`.
+        if vals.get("references"):
+            params["references"] = vals["references"]
+            _n = {k: sum(1 for r in vals["references"] if r["kind"] == k)
+                  for k in ("image", "video", "audio")}
+            self._log(f"[nativo] riferimenti: {_n['image']} immagini, {_n['video']} video, "
+                      f"{_n['audio']} audio")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         # ── 2ª ARCHITETTURA: LingBot-Video ──────────────────────────────────────────────
         # Se l'utente ha scelto LingBot nel tab Video, instrada al worker dedicato e salta tutta la

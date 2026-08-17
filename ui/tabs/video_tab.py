@@ -382,6 +382,17 @@ class VideoTab(QWidget):
         sb_l.addWidget(self.storyboard_panel)
         root.addWidget(sb_box)
 
+        # --- Riferimenti multipli (identità/stile/movimento/voce, SENZA posizione temporale) ---
+        # Complementare allo storyboard: lì le immagini sono keyframe a un istante, qui sono
+        # riferimenti citati nel prompt col loro token. Limiti dall'architettura (_on_arch_changed).
+        from ui.widgets.reference_panel import ReferencePanel
+        ref_box = QGroupBox(tr("vid.ref.group", "🎭 Riferimenti multipli"))
+        ref_l = QVBoxLayout(ref_box)
+        self.reference_panel = ReferencePanel()
+        self.reference_panel.insert_token.connect(self._insert_prompt_token)
+        ref_l.addWidget(self.reference_panel)
+        root.addWidget(ref_box)
+
         # --- Restauro volti automatico (post-generazione, opzionale) ---
         frbox = QGroupBox(tr("vid.face.group")); frf = QFormLayout(frbox)
         self.fr_auto = QCheckBox(tr("vid.face.auto"))
@@ -464,6 +475,28 @@ class VideoTab(QWidget):
     def _arch(self) -> str:
         return (self.video_arch.currentData() if hasattr(self, "video_arch") else "ltx") or "ltx"
 
+    def _insert_prompt_token(self, token: str) -> None:
+        """Inserisce il token del riferimento nel prompt, nel punto del cursore (con lo spazio giusto)."""
+        if not token or not hasattr(self, "prompt"):
+            return
+        cur = self.prompt.textCursor()
+        before = self.prompt.toPlainText()[:cur.position()]
+        cur.insertText(("" if (not before or before.endswith((" ", "\n"))) else " ") + token + " ")
+        self.prompt.setTextCursor(cur)
+        self.prompt.setFocus()
+
+    def _apply_reference_limits(self, arch: str, caps: dict) -> None:
+        """Limiti dei riferimenti secondo l'architettura: sono capacità del MODELLO, non preferenze.
+        MiniMax H3 (Ref2VA): 9 immagini + 3 video + 3 audio, max 12 file, clip 2–15 s.
+        LTX con la LoRA Multiple-Subject-Reference: 2–5 immagini, niente video/audio."""
+        panel = getattr(self, "reference_panel", None)
+        if panel is None:
+            return
+        if arch == "minimax_h3":
+            panel.set_limits(images=9, videos=3, audios=3, total=12, min_items=1, clip_s=(2.0, 15.0))
+        elif caps.get("multiref"):
+            panel.set_limits(images=5, videos=0, audios=0, total=5, min_items=2)
+
     def _on_arch_changed(self, *_):
         arch = self._arch()
         try:
@@ -493,10 +526,12 @@ class VideoTab(QWidget):
         # v2v/storyboard secondo le capability dell'arch). Non li nasconde: tooltip esplicativo.
         from core.model_catalog import video_caps
         caps = video_caps(arch)
+        self._apply_reference_limits(arch, caps)
         tip = tr("vid.arch.unavailable", "Non disponibile con l'architettura {a}").format(a=arch.upper())
         ltx_only = [
             (getattr(self, "v2v_panel", None), not caps["v2v"]),
             (getattr(self, "storyboard_panel", None), not caps["storyboard"]),
+            (getattr(self, "reference_panel", None), not caps.get("multiref")),
             (getattr(self, "teacache", None), not is_ltx),
             (getattr(self, "video_engine_sel", None), not is_ltx),
             (getattr(self, "engine_row_lbl", None), not is_ltx),

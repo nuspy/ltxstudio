@@ -25,16 +25,20 @@ ARCH_DEFAULTS = {
 # l'utente cambia architettura (video_tab._on_arch_changed). LingBot NON supporta audio/a2v, controlnet,
 # v2v/retake, storyboard a keyframe latenti; SUPPORTA invece il refiner (2 stadi) e l'extend a chunk.
 # Vedi [[native-video-engine]] / piano LingBot.
+# `multiref` = riferimenti SENZA posizione temporale (identità/stile/movimento/voce), distinti dai
+# keyframe di `storyboard`: su LTX arrivano solo con la LoRA Multiple-Subject-Reference (2.5).
 ARCH_VIDEO_CAPS = {
     "ltx": {
         "t2v": True, "i2v": True, "ti2v": True, "a2v": True, "audio": True,
         "controlnet": True, "v2v": True, "retake": True, "storyboard": True,
         "extend": True, "refiner": False, "lipsync": True, "keyframes": True,
+        "multiref": False,                       # per-release: la 2.5 con LoRA MSR lo alza a True
     },
     "lingbot": {
         "t2v": True, "i2v": True, "ti2v": True, "a2v": False, "audio": False,
         "controlnet": False, "v2v": False, "retake": False, "storyboard": False,
         "extend": True, "refiner": True, "lipsync": False, "keyframes": False,
+        "multiref": False,
     },
     # Krea Realtime: autoregressivo → t2v + v2v + extend/long NATIVI (num_blocks); niente audio/controlnet/
     # refiner/storyboard-latente.
@@ -42,6 +46,16 @@ ARCH_VIDEO_CAPS = {
         "t2v": True, "i2v": True, "ti2v": True, "a2v": False, "audio": False,
         "controlnet": False, "v2v": True, "retake": False, "storyboard": False,
         "extend": True, "refiner": False, "lipsync": False, "keyframes": False,
+        "multiref": False,
+    },
+    # MiniMax H3: omni-modale (video+audio stereo nella stessa passata). I riferimenti sono NATIVI
+    # (Ref2VA: 9 immagini + 3 video + 3 audio) ma richiedono il checkpoint ref2va. Niente
+    # controlnet/v2v/retake/storyboard-latente (roba della pipeline LTX).
+    "minimax_h3": {
+        "t2v": True, "i2v": True, "ti2v": True, "a2v": False, "audio": True,
+        "controlnet": False, "v2v": False, "retake": False, "storyboard": False,
+        "extend": False, "refiner": False, "lipsync": False, "keyframes": True,
+        "multiref": True,
     },
 }
 
