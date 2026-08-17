@@ -117,6 +117,7 @@ class ReferencePanel(QWidget):
         self._total = 12
         self._min_items = 1
         self._clip_s = (2.0, 15.0)
+        self._needs_background = False           # LTX/MSR sì, MiniMax H3 no
         self._rows: list[_RefRow] = []
 
         v = QVBoxLayout(self); v.setContentsMargins(0, 0, 0, 0); v.setSpacing(4)
@@ -149,18 +150,52 @@ class ReferencePanel(QWidget):
         self.count_lbl.setStyleSheet("color:#8a93a6;font-size:11px;")
         row.addWidget(self.count_lbl)
         bv.addLayout(row)
+
+        # SFONDO: su LTX (MSR pseudo-video) è OBBLIGATORIO — riempie i frame della sequenza di
+        # riferimento non occupati dai soggetti. Su MiniMax H3 non serve: lì i riferimenti sono
+        # token indipendenti.
+        self.bg_row = QWidget()
+        bgl = QHBoxLayout(self.bg_row); bgl.setContentsMargins(0, 2, 0, 0); bgl.setSpacing(6)
+        self.bg_path: str = ""
+        bg_btn = QPushButton(tr("vid.ref.bg_pick", "🖼 Sfondo…"))
+        bg_btn.setToolTip(tr("vid.ref.bg.tt",
+                             "Immagine di sfondo/scena: obbligatoria su LTX, riempie i fotogrammi "
+                             "della sequenza di riferimento non occupati dai soggetti."))
+        bg_btn.clicked.connect(self._choose_background)
+        self.bg_lbl = QLabel(tr("vid.ref.bg_none", "nessuno (obbligatorio su LTX)"))
+        self.bg_lbl.setStyleSheet("color:#c08a5a;")
+        bgl.addWidget(bg_btn); bgl.addWidget(self.bg_lbl, 1)
+        bv.addWidget(self.bg_row)
         v.addWidget(self.body)
         self._refresh()
+
+    def _choose_background(self):
+        f, _ = QFileDialog.getOpenFileName(self, tr("vid.ref.bg_pick", "🖼 Sfondo…"), "",
+                                           "Immagini (*" + " *".join(sorted(IMAGE_EXTS)) + ")")
+        if f:
+            self.set_background(f)
+
+    def set_background(self, path: str) -> None:
+        self.bg_path = path or ""
+        self.bg_lbl.setText(Path(self.bg_path).name if self.bg_path
+                            else tr("vid.ref.bg_none", "nessuno (obbligatorio su LTX)"))
+        self.bg_lbl.setStyleSheet("color:#ddd;" if self.bg_path else "color:#c08a5a;")
+        self.changed.emit()
 
     # ── configurazione per architettura ───────────────────────────────────────
     def set_limits(self, *, images: int = 9, videos: int = 3, audios: int = 3,
                    total: int = 12, min_items: int = 1,
-                   clip_s: tuple[float, float] = (2.0, 15.0)) -> None:
-        """Limiti dell'architettura attiva. `videos=0`/`audios=0` disabilitano quel tipo."""
+                   clip_s: tuple[float, float] = (2.0, 15.0),
+                   needs_background: bool = False) -> None:
+        """Limiti dell'architettura attiva. `videos=0`/`audios=0` disabilitano quel tipo;
+        `needs_background` mostra e richiede lo sfondo (serve alla pseudo-sequenza di LTX)."""
         self._lim = {"image": int(images), "video": int(videos), "audio": int(audios)}
         self._total = int(total)
         self._min_items = int(min_items)
         self._clip_s = clip_s
+        self._needs_background = bool(needs_background)
+        if hasattr(self, "bg_row"):
+            self.bg_row.setVisible(self._needs_background)
         for r in [r for r in self._rows if self._lim.get(r.kind, 0) <= 0]:
             self._remove_row(r)                              # tipi non più ammessi: via
         self._refresh()
@@ -228,15 +263,25 @@ class ReferencePanel(QWidget):
 
     # ── API ───────────────────────────────────────────────────────────────────
     def get_references(self) -> list[dict]:
+        """Riferimenti + eventuale sfondo (marcato `role='background'`: il worker lo distingue
+        dai soggetti, che non vanno mai ritagliati)."""
         if not self.enable.isChecked():
             return []
-        return [r.value() for r in self._rows]
+        out = [r.value() for r in self._rows]
+        if self._needs_background and self.bg_path:
+            out.append({"path": self.bg_path, "kind": "image", "token": "", "desc": "",
+                        "role": "background"})
+        return out
 
     def validation_errors(self) -> list[str]:
         if not self.enable.isChecked():
             return []
         refs = self.get_references()
         errs: list[str] = []
+        if self._needs_background and not self.bg_path:
+            errs.append(tr("vid.ref.err_bg",
+                           "Serve un'immagine di sfondo: su LTX i riferimenti diventano una "
+                           "sequenza e lo sfondo ne riempie i fotogrammi liberi."))
         if len(refs) < self._min_items:
             errs.append(tr("vid.ref.err_min", "Servono almeno {n} riferimenti.").format(n=self._min_items))
         for kind in ("image", "video", "audio"):

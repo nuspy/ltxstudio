@@ -1860,14 +1860,29 @@ def run_generation(p: dict) -> str:
             path = os.path.join(LORA_DIR, path)
         loras.append(LoraPathStrengthAndSDOps(path, float(lo.get("strength", 1.0)),
                                               LTXV_LORA_COMFY_RENAMING_MAP))
-    # RIFERIMENTI MULTIPLI: la LoRA MSR va caricata nel modello OLTRE agli slot embedding che ne
-    # estraiamo (workers/ltx_msr.py). Aggiunta qui, non dalla GUI, così vale anche per l'API.
+    # RIFERIMENTI MULTIPLI (MSR). Due meccanismi diversi secondo la LoRA (vedi workers/ltx_msr.py):
+    # · pseudo-video (2.3): le immagini diventano una sequenza sintetica usata come VIDEO-GUIDA
+    #   IC-LoRA → riusa il percorso 'iclora' già validato (canny/depth/pose).
+    # · slot embedding (2.5): riferimenti a posizioni temporali negative, innestati nel conditioning.
+    _msr_guide = None
+    _msr_strategy = ""
     if p.get("references") and p.get("msr_lora") and os.path.exists(p["msr_lora"]):
-        if not any(os.path.samefile(l.path, p["msr_lora"])
-                   for l in loras if os.path.exists(l.path)):
-            loras.append(LoraPathStrengthAndSDOps(p["msr_lora"], float(p.get("msr_strength", 1.0)),
-                                                  LTXV_LORA_COMFY_RENAMING_MAP))
-            print(f"[msr] LoRA aggiunta: {os.path.basename(p['msr_lora'])}", flush=True)
+        from workers import ltx_msr
+        _msr_strategy = ltx_msr.strategy_for(p["msr_lora"])
+        print(f"[msr] {os.path.basename(p['msr_lora'])} → meccanismo '{_msr_strategy}'", flush=True)
+        if _msr_strategy == "pseudo_video":
+            _subs = [r["path"] for r in p["references"]
+                     if r.get("kind", "image") == "image" and r.get("role") != "background"]
+            _bg = next((r["path"] for r in p["references"] if r.get("role") == "background"),
+                       p.get("msr_background", ""))
+            if not _bg:
+                raise SystemExit("[msr] la variante pseudo-video (LTX 2.3) richiede un'immagine di "
+                                 "SFONDO: indicane una nel pannello «Riferimenti multipli».")
+            _msr_guide = ltx_msr.build_pseudo_video(
+                _subs, _bg, os.path.splitext(p["output"])[0] + "_msr_guide.mp4",
+                width=int(p.get("msr_width", 736)), height=int(p.get("msr_height", 1280)),
+                frame_count=int(p.get("msr_frames", 41)), fps=int(p.get("fps", 24)))
+            p["control_video"] = _msr_guide
     ckpt = _resolve_ckpt(p.get("model"))
     _bn = os.path.basename(ckpt).lower()
     if p.get("quant"):
@@ -1894,6 +1909,12 @@ def run_generation(p: dict) -> str:
         ptype = "iclora"
         loras = list(loras) + [LoraPathStrengthAndSDOps(_edit, float(p.get("control_strength", 1.0)),
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
+    elif _msr_guide:                                         # MSR pseudo-video: la LoRA MSR È l'IC-LoRA
+        ptype = "iclora"
+        loras = list(loras) + [LoraPathStrengthAndSDOps(p["msr_lora"], float(p.get("msr_strength", 1.0)),
+                                                        LTXV_LORA_COMFY_RENAMING_MAP)]
+        print(f"[msr] guida={os.path.basename(_msr_guide)} + LoRA "
+              f"{os.path.basename(p['msr_lora'])} → pipeline iclora", flush=True)
     elif _ic and os.path.exists(_ic):
         ptype = "iclora"
         loras = list(loras) + [LoraPathStrengthAndSDOps(_ic, float(p.get("control_strength", 0.8)),
@@ -2065,16 +2086,18 @@ def run_generation(p: dict) -> str:
         # RIFERIMENTI MULTIPLI (MSR): immagini SENZA posizione temporale — vanno a frame negativi,
         # ciascuna con lo slot embedding preso dalla LoRA. Convivono coi keyframe: gli uni occupano
         # istanti del video, gli altri stanno fuori dalla finestra. Vedi workers/ltx_msr.py.
-        if p.get("references"):
+        # Solo la variante SLOT EMBEDDING passa di qui: la pseudo-video (2.3) è già diventata
+        # video-guida e ha preso il ramo 'iclora' più sopra.
+        if p.get("references") and _msr_strategy == "slot_embedding":
             from workers import ltx_msr
-            _msr_lora = p.get("msr_lora") or ""
-            if not _msr_lora or not os.path.exists(_msr_lora):
-                raise SystemExit(f"[msr] LoRA Multiple-Subject-Reference assente ({_msr_lora or 'non indicata'}): "
-                                 f"scaricala dal tab «Pesi modelli» — è una LoRA DIVERSA per release.")
-            if ltx_msr.install(_msr_lora, reference_frames=int(p.get("msr_reference_frames", 1) or 1)):
+            if ltx_msr.install_slot_embedding(
+                    p["msr_lora"], reference_frames=int(p.get("msr_reference_frames", 1) or 1)):
                 _refs = ltx_msr.references_to_inputs(p["references"], float(p.get("ref_strength", 1.0)))
                 images.extend(_refs)
                 print(f"[msr] {len(_refs)} riferimenti a frame {[i.frame_idx for i in _refs]}", flush=True)
+        elif p.get("references") and not _msr_strategy:
+            raise SystemExit("[msr] riferimenti richiesti ma LoRA Multiple-Subject-Reference assente: "
+                             "scaricala dal tab «Pesi modelli» — è un file DIVERSO per release.")
         if p.get("keyframes"):                               # multi-keyframe: foto a frame diversi (rotazione/angoli coerenti)
             for kf in p["keyframes"]:
                 fr = int(kf.get("frame", 0))

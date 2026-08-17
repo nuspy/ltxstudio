@@ -1,33 +1,37 @@
 """MSR — Multiple Subject Reference per LTX (riferimenti multipli SENZA posizione temporale).
 
-Le LoRA `LiconStudio/LTX-2.{3,5}-Multiple-Subject-Reference` codificano fino a 5 immagini di
-riferimento come token visivi nello STESSO spazio latente del video target. Non basta caricare
-la LoRA: ogni riferimento va (a) codificato col VAE video, (b) sommato a uno **slot embedding**
-appreso — una Fourier-MLP che vive DENTRO il file della LoRA, sotto `reference_slot_embedding.*`
-— e (c) appeso al latente a una **posizione temporale NEGATIVA** distinta. È così che il modello
-li distingue e li recupera con la self-attention, senza che occupino frame del video.
+Le LoRA `LiconStudio/LTX-2.{3,5}-Multiple-Subject-Reference` fanno vedere al modello 2–5 immagini
+di riferimento. **Le due release usano due meccanismi DIVERSI**, accertato aprendo i file e le
+implementazioni di riferimento (17/08):
 
-Ricetta replicata dal plugin di riferimento ComfyUI-LTX2.5-MSR (liconstudio), studiato prima di
-implementare come da prassi. La pipeline nativa regge gli indici negativi senza modifiche:
-`VideoConditionByKeyframeIndex.apply_to` fa `positions[:, 0, ...] += frame_idx` e concatena i
-token come clean-latent — nessun clamp, nessun controllo di bounds.
+· **2.3 → pseudo-video** (plugin `ComfyUI-Licon-MSR`, nodo `LiconMSR`). La LoRA è una IC-LoRA
+  normale: 960 tensori lora_A/lora_B, ZERO slot embedding. Le immagini diventano una sequenza
+  video sintetica — i soggetti (adattati proporzionalmente e centrati su TELA BIANCA, mai
+  ritagliati) occupano i primi frame latenti, il resto è lo sfondo — che entra come VIDEO-GUIDA
+  IC-LoRA: esattamente il meccanismo che il worker usa già per canny/depth/pose. Lo sfondo è
+  OBBLIGATORIO. In coda ComfyUI ritaglia i frame di guida (`LTXVCropGuides`).
+· **2.5 → slot embedding** (plugin `ComfyUI-LTX2.5-MSR`). Lì la LoRA porta dentro una Fourier-MLP
+  sotto `reference_slot_embedding.*`: ogni riferimento è codificato col VAE, sommato al proprio
+  embedding di slot e appeso al latente a una posizione temporale NEGATIVA.
 
-⚠ Da validare LIVE: la ricetta è corretta sulla carta ma non è mai stata eseguita qui.
+`strategy_for()` sceglie guardando il FILE, non la release: se un giorno esce una 2.3 con gli slot
+embedding (o viceversa) il codice fa la cosa giusta senza modifiche.
 
-Le due LoRA NON sono intercambiabili: ciascuna è addestrata sulla propria architettura
-(`core.ltx_release.msr_lora` sceglie il file dalla release).
+⚠ Nessuna delle due è ancora stata validata con una generazione completa.
 """
 from __future__ import annotations
 
 import os
 
 SLOT_PREFIX = "reference_slot_embedding."
-MAX_REFERENCES = 5
+MAX_REFERENCES = 5                      # 4 soggetti + 1 sfondo (2.3) · 5 slot (2.5)
+MAX_SUBJECTS = 4                        # nel nodo LiconMSR gli ingressi soggetto sono 4
+FRAME_COUNTS = (17, 25, 33, 41, 49, 57, 65)      # lunghezze ammesse della pseudo-sequenza
 
 
+# ── quale meccanismo usa questa LoRA ──────────────────────────────────────────
 def slot_state_dict(lora_path: str) -> dict:
-    """Pesi della Fourier-MLP estratti dal file della LoRA (chiavi senza il prefisso).
-    Vuoto se la LoRA non è una MSR: il chiamante deve dirlo chiaro, non tirare a indovinare."""
+    """Pesi della Fourier-MLP degli slot (chiavi senza prefisso). Vuoto se la LoRA non li ha."""
     from safetensors import safe_open
     out: dict = {}
     with safe_open(lora_path, framework="pt") as h:
@@ -38,12 +42,165 @@ def slot_state_dict(lora_path: str) -> dict:
     return out
 
 
+def strategy_for(lora_path: str) -> str:
+    """'slot_embedding' se il file porta gli slot appresi, altrimenti 'pseudo_video'."""
+    return "slot_embedding" if "frequencies" in slot_state_dict(lora_path) else "pseudo_video"
+
+
+# ── 2.3: pseudo-video (ricetta del nodo LiconMSR, replicata 1:1) ──────────────
+def ref_latent_frames(frame_count: int) -> int:
+    """Frame latenti coperti da una sequenza di `frame_count` pixel-frame (VAE temporale ×8)."""
+    if frame_count <= 1:
+        return max(1, frame_count)
+    return int(round((frame_count - 1) / 8.0)) + 1
+
+
+def latent_to_frame_range(latent_start: int, latent_end: int) -> tuple[int, int]:
+    """Intervallo di pixel-frame coperto dai latenti [start, end]. Il latente 0 è il solo frame 0."""
+    start = 0 if latent_start <= 0 else 1 + (int(latent_start) - 1) * 8
+    end = 0 if latent_end <= 0 else int(latent_end) * 8
+    return start, end
+
+
+def allocate_subject_latents(num_subjects: int, budget: int) -> list[int]:
+    """Quanti frame latenti a ciascun soggetto: 1 a testa, il primo ha priorità sugli extra."""
+    counts = [1] * num_subjects
+    extra = max(0, int(budget) - num_subjects)
+    if extra > 0:
+        counts[0] += 1
+        extra -= 1
+    i = 1
+    while extra > 0 and num_subjects > 1 and any(c < 2 for c in counts[1:]):
+        if counts[i] < 2:
+            counts[i] += 1
+            extra -= 1
+        i = i + 1 if i + 1 < num_subjects else 1
+    if extra > 0 and counts[0] < 3:
+        counts[0] += 1
+        extra -= 1
+    i = 0
+    while extra > 0:
+        counts[i] += 1
+        extra -= 1
+        i = (i + 1) % num_subjects
+    return counts
+
+
+def frame_layout(num_subjects: int, frame_count: int) -> list[int]:
+    """Per ogni pixel-frame, l'indice del soggetto che lo occupa (-1 = sfondo).
+    È la funzione `_expand_frames` del nodo, in forma verificabile senza immagini."""
+    layout = [-1] * frame_count
+    if num_subjects <= 0:
+        return layout
+    latent_count = ref_latent_frames(frame_count)
+    budget = max(0, latent_count - 1)
+    if budget >= num_subjects:
+        cursor = 0
+        for idx, count in enumerate(allocate_subject_latents(num_subjects, budget)):
+            start, end = latent_to_frame_range(cursor, cursor + count - 1)
+            cursor += count
+            for f in range(max(0, start), min(frame_count - 1, end) + 1):
+                layout[f] = idx
+    else:
+        span = max(1, latent_to_frame_range(0, max(0, latent_count - 2))[1] + 1)
+        for idx in range(num_subjects):
+            start = int(idx * span / num_subjects)
+            end = int((idx + 1) * span / num_subjects) - 1
+            if idx == num_subjects - 1:
+                end = span - 1
+            for f in range(start, min(frame_count - 1, max(start, end)) + 1):
+                layout[f] = idx
+    return layout
+
+
+def fit_on_white(img, width: int, height: int):
+    """Soggetto: scalato per stare tutto dentro e centrato su bianco. MAI ritagliato (perderebbe
+    parti del personaggio, che è esattamente ciò che il riferimento deve conservare)."""
+    import numpy as np
+    h, w = img.shape[:2]
+    if (w, h) == (width, height):
+        return np.ascontiguousarray(img)
+    scale = min(width / w, height / h)
+    rw = max(1, min(width, round(w * scale)))
+    rh = max(1, min(height, round(h * scale)))
+    canvas = np.full((height, width, 3), 255, dtype=np.uint8)
+    top, left = (height - rh) // 2, (width - rw) // 2
+    canvas[top:top + rh, left:left + rw] = _resize(img, rw, rh)
+    return np.ascontiguousarray(canvas)
+
+
+def cover_crop(img, width: int, height: int):
+    """Sfondo: scalato fino a coprire e ritagliato al centro (nessuna banda bianca)."""
+    import numpy as np
+    h, w = img.shape[:2]
+    if (w, h) == (width, height):
+        return np.ascontiguousarray(img)
+    scale = max(width / w, height / h)
+    rw, rh = max(width, round(w * scale)), max(height, round(h * scale))
+    r = _resize(img, rw, rh)
+    top, left = (rh - height) // 2, (rw - width) // 2
+    return np.ascontiguousarray(r[top:top + height, left:left + width])
+
+
+def _resize(img, width: int, height: int):
+    import numpy as np
+    try:
+        import cv2
+        interp = cv2.INTER_AREA if (width < img.shape[1] or height < img.shape[0]) else cv2.INTER_LANCZOS4
+        return cv2.resize(img, (width, height), interpolation=interp)
+    except ImportError:
+        from PIL import Image
+        return np.asarray(Image.fromarray(img).resize((width, height), Image.LANCZOS))
+
+
+def _load_rgb(path: str):
+    import numpy as np
+    from PIL import Image
+    return np.asarray(Image.open(path).convert("RGB"), dtype=np.uint8)
+
+
+def build_pseudo_video(subject_paths: list[str], background_path: str, out_path: str, *,
+                       width: int = 736, height: int = 1280, frame_count: int = 41,
+                       fps: int = 24, log=print) -> str:
+    """Costruisce la pseudo-sequenza dei riferimenti e la scrive come mp4 (video-guida IC-LoRA)."""
+    import numpy as np
+    if not background_path:
+        raise ValueError("MSR 2.3: serve un'immagine di SFONDO (ingresso 'background' del nodo "
+                         "LiconMSR è obbligatorio).")
+    if frame_count not in FRAME_COUNTS:
+        frame_count = min(FRAME_COUNTS, key=lambda v: abs(v - frame_count))
+    subs = [fit_on_white(_load_rgb(p), width, height) for p in subject_paths[:MAX_SUBJECTS]]
+    bg = cover_crop(_load_rgb(background_path), width, height)
+    layout = frame_layout(len(subs), frame_count)
+    frames = np.stack([bg if i < 0 else subs[i] for i in layout])
+    log(f"[msr] pseudo-video {width}x{height} {frame_count}f: "
+        f"{len(subs)} soggetti su frame {[layout.index(i) for i in range(len(subs))]}, resto sfondo")
+    _write_mp4(frames, out_path, fps)
+    return out_path
+
+
+def _write_mp4(frames, out_path: str, fps: int) -> None:
+    import av
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    container = av.open(out_path, mode="w")
+    stream = container.add_stream("libx264", rate=int(fps))
+    stream.height, stream.width = int(frames.shape[1]), int(frames.shape[2])
+    stream.pix_fmt = "yuv420p"
+    stream.options = {"crf": "12"}                   # guida: meglio poca compressione
+    for f in frames:
+        for packet in stream.encode(av.VideoFrame.from_ndarray(f, format="rgb24")):
+            container.mux(packet)
+    for packet in stream.encode():
+        container.mux(packet)
+    container.close()
+
+
+# ── 2.5: slot embedding a posizioni temporali negative ───────────────────────
 def slot_embedding(state: dict, slot_id: int, device, dtype):
-    """Embedding dello slot `slot_id`: Fourier features (sin/cos) → Linear+SiLU → Linear.
-    Identica al plugin: il valore dello slot è normalizzato /16 prima delle frequenze."""
+    """Fourier features (slot/16 → sin,cos) → Linear+SiLU → Linear. Ricetta del plugin 2.5."""
     import torch
 
-    def t(key):                                              # tensore fp32 sul device, None se assente
+    def t(key):
         v = state.get(key)
         return None if v is None else v.to(device=device, dtype=torch.float32)
 
@@ -58,13 +215,12 @@ def slot_embedding(state: dict, slot_id: int, device, dtype):
 
 
 def frame_offsets(num_slots: int) -> list[int]:
-    """Posizioni temporali dei riferimenti: slot i → -(num_slots - i), cioè -N … -1.
-    Negative = fuori dalla finestra del video, così non rubano frame alla generazione."""
+    """Posizioni dei riferimenti: slot i → -(N-i), cioè -N … -1 (fuori dalla finestra del video)."""
     return [-(num_slots - i) for i in range(num_slots)]
 
 
 def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = 33) -> list:
-    """`references` del pannello GUI → ImageConditioningInput con frame_idx NEGATIVI."""
+    """`references` del pannello → ImageConditioningInput a frame NEGATIVI (solo 2.5)."""
     from ltx_pipelines.utils.args import ImageConditioningInput
     refs = [r for r in references if r.get("kind", "image") == "image"][:MAX_REFERENCES]
     offs = frame_offsets(len(refs))
@@ -72,19 +228,19 @@ def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int
             for r, off in zip(refs, offs)]
 
 
-def install(lora_path: str, *, reference_frames: int = 1, log=print) -> bool:
-    """Innesta lo slot embedding nella costruzione dei conditioning della pipeline.
+def install_slot_embedding(lora_path: str, *, reference_frames: int = 1, log=print) -> bool:
+    """Innesta lo slot embedding nella costruzione dei conditioning (solo LoRA che li contengono).
 
-    `combined_image_conditionings` (usata da TI2VidTwoStagesPipeline per entrambi gli stage)
-    codifica le immagini e costruisce i ConditioningItem: la si avvolge per intercettare le voci
-    a frame NEGATIVO — i riferimenti — e sommare al loro latente l'embedding dello slot. Le altre
-    immagini (i2v, keyframe) passano invariate all'originale.
-
-    Ritorna False se la LoRA non contiene gli slot embedding (non è una MSR)."""
+    Avvolge `combined_image_conditionings` — la funzione che entrambi gli stage di
+    TI2VidTwoStagesPipeline usano — e intercetta le voci a frame NEGATIVO: le codifica, ci somma
+    l'embedding dello slot e le appende come keyframe. Le altre immagini passano all'originale.
+    La pipeline nativa regge gli indici negativi senza modifiche:
+    `VideoConditionByKeyframeIndex.apply_to` fa `positions += frame_idx` e concatena, senza clamp.
+    """
     state = slot_state_dict(lora_path)
     if "frequencies" not in state:
-        log(f"[msr] {os.path.basename(lora_path)} non contiene '{SLOT_PREFIX}*': "
-            f"non è una LoRA MSR → riferimenti NON applicati")
+        log(f"[msr] {os.path.basename(lora_path)} non contiene '{SLOT_PREFIX}*' → "
+            f"non è la variante a slot embedding")
         return False
 
     import ltx_pipelines.ti2vid_two_stages as _t2
@@ -101,18 +257,16 @@ def install(lora_path: str, *, reference_frames: int = 1, log=print) -> bool:
         refs = [im for im in images if im.frame_idx < 0]
         out = list(original(normal, height, width, video_encoder, dtype, device, color_space)) \
             if normal else []
-        # slot id = ordine di inserimento (offset -N … -1 → 0 … N-1), come nel plugin
         n = len(refs)
         for im in sorted(refs, key=lambda x: x.frame_idx):
             slot = n + im.frame_idx                          # -N→0, -1→N-1
             image = load_image_and_preprocess(
                 image_path=im.path, height=height, width=width, dtype=dtype, device=device,
                 crf=im.crf if im.crf is not None else 33, color_space=color_space)
-            if reference_frames > 1:                          # il plugin ripete il riferimento su N frame
+            if reference_frames > 1:
                 image = _repeat_frames(image, reference_frames)
             lat = video_encoder(image)
-            emb = slot_embedding(_t2._msr_state, slot, lat.device, lat.dtype)
-            lat = lat + emb.view(1, -1, 1, 1, 1)
+            lat = lat + slot_embedding(_t2._msr_state, slot, lat.device, lat.dtype).view(1, -1, 1, 1, 1)
             out.append(VideoConditionByKeyframeIndex(
                 keyframes=lat, frame_idx=im.frame_idx, strength=im.strength))
         return out
