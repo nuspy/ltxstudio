@@ -110,6 +110,38 @@ def installed() -> bool:
     return os.path.exists(LTX2_PY) and os.path.exists(os.path.join(REPO, "workers", "ltx2_server.py"))
 
 
+def _generate_direct(p: dict, release: str, timeout: int) -> dict:
+    """Esegue il worker nel venv DELLA RELEASE, senza server persistente (vedi `generate`).
+    Stessa interfaccia del percorso server: {status, output:[mp4]}."""
+    import json as _json
+    import tempfile as _tf
+    from core import ltx_video_job as _lvj
+    py, worker = _lvj.runner_for({"arch": "ltx", "ltx_release": release})
+    if not os.path.exists(py):
+        return {"status": "error",
+                "error": f"venv della release LTX {release} mancante: {py}"}
+    p.setdefault("output", os.path.join(OUTPUT_DIR, f"ltx2_{uuid.uuid4().hex[:8]}.mp4"))
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    _free_gpu_servers()
+    _wait_for_video_vram(p)
+    jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+    _json.dump(p, jf); jf.close()
+    env = dict(os.environ, HF_HUB_OFFLINE="1", PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
+    print(f"[ltx2] release {release} → worker diretto ({os.path.basename(os.path.dirname(os.path.dirname(py)))})",
+          flush=True)
+    r = subprocess.run([py, "-u", worker, jf.name], env=env, cwd=REPO,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=timeout)
+    out = ""
+    for line in (r.stdout or "").splitlines():
+        if line.startswith("OK:"):
+            out = line[3:].strip()
+    if out and os.path.exists(out):
+        return {"status": "success", "output": [out]}
+    _tail = "\n".join((r.stdout or "").splitlines()[-25:]) or (r.stderr or "")[-2000:]
+    return {"status": "error", "error": f"worker LTX {release} senza output (exit {r.returncode}):\n{_tail}"}
+
+
 def ensure_server(wait_s: int = 120) -> bool:
     """Avvia il server video persistente se non è attivo (subprocess in console separata)."""
     if is_up():
@@ -244,6 +276,16 @@ def generate(params: dict, timeout: int = 3600) -> dict:
         engine = "lightricks"
     if engine != "lightricks":
         return _generate_comfy_native(params, timeout)
+    # RELEASE ≠ default → NON passare dal server persistente: `ensure_server` lo avvia sempre con
+    # LTX2_PY (venv 2.3), quindi un job 2.5 finirebbe sul PACCHETTO 2.3, che non sa caricare un
+    # text encoder da file singolo → «No files matching pattern 'tokenizer.model'». Il worker
+    # diretto usa il venv della release (come fa la GUI da `runner_for`). Costo: nessuna
+    # residenza della pipeline fra job 2.5 consecutivi.
+    _rel = str(params.get("ltx_release") or "")
+    if _rel:
+        from core import ltx_release as _lr
+        if _rel != _lr.DEFAULT_RELEASE:
+            return _generate_direct(dict(params), _rel, timeout)
     if not ensure_server():
         return {"status": "error", "error": "server video LTX-2 non avviato (venv ltx2 mancante?)"}
     p = dict(params)

@@ -40,13 +40,28 @@ torch._scaled_mm = _scaled_mm_f32
 from ltx_core.components.guiders import MultiModalGuiderParams
 from ltx_core.loader import LoraPathStrengthAndSDOps, LTXV_LORA_COMFY_RENAMING_MAP
 from ltx_core.model.video_vae import TilingConfig, get_video_chunks_number
-from ltx_core.model.video_vae.tiling import SpatialTilingConfig, TemporalTilingConfig
+
+# Il tiling del decode è stato RIDISEGNATO fra le release: la 2.3 ha le classi
+# Spatial/TemporalTilingConfig e `TilingConfig.default()`; nella 2.5 `TilingConfig` è un alias di
+# tipo (TileSizeConfig|TileCountConfig) e la pipeline sceglie da sé con AUTO_TILING accettando
+# None. Questo worker serve ENTRAMBE le release, quindi si adatta invece di assumere una delle due.
+try:                                                          # layout 2.3
+    from ltx_core.model.video_vae.tiling import SpatialTilingConfig, TemporalTilingConfig
+    _TILING_CLASSICO = True
+except ModuleNotFoundError:                                   # layout 2.5
+    SpatialTilingConfig = TemporalTilingConfig = None
+    _TILING_CLASSICO = False
 
 
-def _tiling_config(p: dict) -> TilingConfig:
-    """TilingConfig per il decode VAE. Il decode LTX è GIÀ streaming (tile temporali → chunk → encode_video
-    scrive su disco a flusso). `decode_lowmem` (toggle GUI) usa tile più piccoli: meno VRAM di picco per film
-    lunghi / alta risoluzione (più lento, ma niente OOM). Default = preset ufficiale (768px / 80 frame)."""
+def _tiling_config(p: dict):
+    """Config del tiling per il decode VAE. Il decode LTX è GIÀ streaming (tile temporali → chunk →
+    encode_video scrive su disco a flusso). `decode_lowmem` (toggle GUI) usa tile più piccoli: meno
+    VRAM di picco per film lunghi / alta risoluzione (più lento, ma niente OOM)."""
+    if not _TILING_CLASSICO:                                  # 2.5: decide la pipeline (AUTO_TILING)
+        if p.get("decode_lowmem"):
+            print("[tiling] release 2.5: 'decode a basso consumo' lasciato ad AUTO_TILING "
+                  "(le classi Spatial/Temporal non esistono più)", flush=True)
+        return None
     if p.get("decode_lowmem"):
         return TilingConfig(
             spatial_config=SpatialTilingConfig(tile_size_in_pixels=512, tile_overlap_in_pixels=64),
