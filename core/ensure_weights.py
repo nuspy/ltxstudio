@@ -89,9 +89,15 @@ def offer_download_gui(parent, ids: list[str], feature: str = "") -> bool:
     proc = QProcess(parent)
     repo = Path(__file__).resolve().parents[1]
     proc.setWorkingDirectory(str(repo))
-    proc.readyReadStandardOutput.connect(
-        lambda: dlg.setLabelText(bytes(proc.readAllStandardOutput()).decode("utf-8", "replace")
-                                 .strip().splitlines()[-1][:110] if proc else ""))
+    def _mostra_progresso():
+        """Ultima riga utile del downloader nell'etichetta. Il chunk letto può essere VUOTO (o solo
+        spazi): `splitlines()[-1]` su lista vuota alzava IndexError a ogni tick, riempiendo il log
+        di traceback e lasciando il dialog fermo (visto live il 17/08 su un download da 1.2GB)."""
+        righe = bytes(proc.readAllStandardOutput()).decode("utf-8", "replace").strip().splitlines()
+        if righe:
+            dlg.setLabelText(righe[-1][:110])
+
+    proc.readyReadStandardOutput.connect(_mostra_progresso)
     dlg.canceled.connect(proc.kill)
     proc.start(sys.executable, ["-u", str(repo / "scripts" / "download_weights.py"),
                                 "--ids", ",".join(dl_ids)])

@@ -54,10 +54,58 @@ def _patch_blocking_dialogs() -> None:
     QMessageBox.exec_ = lambda self, *a, **k: QMessageBox.Ok
 
 
-def boot_full_app(*, wait_native: bool = True, native_timeout: float = 240.0, log=print):
+# Server GPU che CACHANO il codice dei worker: restano vivi fra un test e l'altro e continuano a
+# servire il modulo importato al loro avvio. Un test lanciato dopo aver modificato un worker
+# riceverebbe in silenzio il codice VECCHIO — successo:22:14 il server ltx2_server sopravvissuto a
+# tre run ha reso invisibili tutte le correzioni, con risultati falsati e diagnosi sbagliate.
+_SERVER_PATTERNS = ("workers.ltx2_server", "inference_server.server", "workers.krea2_server")
+
+
+def kill_gpu_servers(log=print) -> list[int]:
+    """Termina i server GPU persistenti. Da chiamare PRIMA di un test che tocca il codice dei
+    worker: `free_all()` scarica i modelli ma NON fa rileggere i sorgenti."""
+    killed = []
+    try:
+        out = subprocess.run(
+            ["wmic", "process", "where", "name='python.exe'", "get", "ProcessId,CommandLine", "/format:csv"],
+            capture_output=True, text=True, timeout=30).stdout
+    except Exception:                                        # noqa: BLE001 — wmic assente su Win recenti
+        out = ""
+    if not out.strip():                                      # fallback PowerShell (wmic deprecato)
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+             "ForEach-Object { \"$($_.ProcessId)|$($_.CommandLine)\" }"],
+            capture_output=True, text=True, timeout=60).stdout
+    for line in out.splitlines():
+        if not any(pat in line for pat in _SERVER_PATTERNS):
+            continue
+        for tok in line.replace(",", "|").split("|"):
+            if tok.strip().isdigit():
+                pid = int(tok.strip())
+                try:
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                                   capture_output=True, timeout=30)
+                    killed.append(pid)
+                except Exception:                            # noqa: BLE001
+                    pass
+                break
+    if killed:
+        log(f"[app_env] server GPU persistenti terminati (codice worker aggiornato): {killed}")
+        time.sleep(3)                                        # rilascio porte/VRAM
+    return killed
+
+
+def boot_full_app(*, wait_native: bool = True, native_timeout: float = 240.0,
+                  fresh_servers: bool = True, log=print):
     """Costruisce la MainWindow VERA (il suo __init__ avvia l'InferenceServer :8189 via
     `_maybe_autostart_native`) e attende che risponda. NON disattiva ComponentStore/mem_coordinator/autostart.
-    Ritorna la finestra. DEV: feature_gate aperto (come l'app dell'owner)."""
+    Ritorna la finestra. DEV: feature_gate aperto (come l'app dell'owner).
+
+    `fresh_servers` (default True): termina i server GPU rimasti da run precedenti, che altrimenti
+    servirebbero il codice worker vecchio rendendo invisibili le modifiche in prova."""
+    if fresh_servers:
+        kill_gpu_servers(log=log)
     app()
     _patch_blocking_dialogs()
     from ui.main_window import MainWindow

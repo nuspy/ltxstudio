@@ -145,6 +145,22 @@ def main() -> int:
     vt.sampler_seed.steps.setValue(8)
     vt.sampler_seed.seed.setValue(7)
 
+    # CHECKPOINT DISTILLED: la pipeline IC-LoRA (che l'MSR usa) prende `distilled_checkpoint_path`
+    # e il pacchetto dichiara «Both stages use distilled models». Col dev sotto-denoisa → figure
+    # "dematerializzate" in nuvole di punti (riportato dall'utente sul 1° video). Il default del
+    # worker è il dev, quindi lo si sceglie esplicitamente qui.
+    # SOLO 2.3: un checkpoint 2.5 farebbe cambiare release al dispatch e servirebbe l'altra LoRA MSR.
+    _dist = [i for i in range(vt.model.count())
+             if "distilled" in (vt.model.itemText(i) or "").lower()
+             and "2.5" not in (vt.model.itemText(i) or "")
+             and "gguf" not in (vt.model.itemText(i) or "").lower()]
+    if _dist:
+        vt.model.setCurrentIndex(_dist[0])
+        print(f"[modello] {vt.model.itemText(_dist[0])}", flush=True)
+    else:
+        print("[modello] ATTENZIONE: nessun checkpoint distilled nel dropdown → resta il dev "
+              "(atteso under-denoising)", flush=True)
+
     # 4) IL BOTTONE (percorso reale della GUI, non una chiamata al servizio)
     produced = _genera(w, "MSR")
     check("video prodotto", produced is not None)

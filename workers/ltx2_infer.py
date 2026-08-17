@@ -1212,6 +1212,25 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         except TypeError:
             return Klass(**kw)
 
+    # IC-LoRA/inpaint: il parametro si chiama `distilled_checkpoint_path` e il docstring del
+    # pacchetto dice «Both stages use distilled models» — quelle pipeline DANNO PER SCONTATO un
+    # checkpoint distillato. Con un dev, senza la LoRA di distillazione, sotto-denoisano: figure
+    # "dematerializzate" in nuvole di punti (lo stesso sintomo che la two-stage evita applicandola).
+    # Riportato dall'utente il 17/08 su un video MSR generato col dev-fp8.
+    if ptype in ("iclora", "vinpaint") and "distilled" not in os.path.basename(ckpt).lower():
+        if os.environ.get("LTX_NO_DLORA") == "1":
+            print("[dev] LTX_NO_DLORA=1 → distilled-LoRA NON applicata (diagnostica)", flush=True)
+        elif os.path.exists(DISTILLED_LORA):
+            loras = list(loras) + [LoraPathStrengthAndSDOps(DISTILLED_LORA, 1.0,
+                                                            LTXV_LORA_COMFY_RENAMING_MAP)]
+            print(f"[dev] {ptype}: checkpoint non-distilled → aggiungo la distilled-LoRA "
+                  f"({os.path.basename(DISTILLED_LORA)}). NB: il pacchetto la applica al solo "
+                  f"stage 1 (stage 2 nasce con loras=()); per la qualità piena serve il "
+                  f"checkpoint DISTILLED (voce di catalogo ltx23-distilled-fp8).", flush=True)
+        else:
+            print("[warn] checkpoint DEV su pipeline IC-LoRA senza distilled-LoRA su disco → "
+                  "video 'dematerializzato'. Scarica ltx23-distilled-lora-384 o il checkpoint "
+                  "distilled dal tab «Pesi modelli».", flush=True)
     if ptype == "vinpaint":                                  # #59 latent-inpaint VIDEO (sottoclasse ic_lora)
         from workers.ltx_inpaint_pipeline import InpaintPipeline
         pipe = _build(InpaintPipeline,
