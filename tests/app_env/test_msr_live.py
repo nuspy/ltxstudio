@@ -37,12 +37,22 @@ BACKGROUND = ("stage", "empty smoky jazz club stage at night, red curtains, warm
 
 
 def _gen_image(name: str, prompt: str, seed: int) -> str:
+    """Genera e ritorna il path REALE: il backend immagini ignora `output` e usa il proprio
+    schema di nomi (native_flux_<seed>.png), restituendolo in `output[0]`. Copiato poi con un
+    nome parlante, così i riferimenti del test si riconoscono in output/."""
+    import shutil
     from core import native_driver
-    dest = os.path.join(OUT, f"DIAG_msr_ref_{name}.png")
     p = {"arch": "flux", "model": IMG_MODEL, "prompt": prompt, "negative": "text, watermark, blurry",
-         "width": 768, "height": 768, "steps": 8, "guidance": 3.5, "seed": seed, "output": dest}
+         "width": 768, "height": 768, "steps": 8, "guidance": 3.5, "seed": seed,
+         "output": os.path.join(OUT, f"DIAG_msr_ref_{name}.png")}
     r = native_driver.run_and_wait("image", p, timeout=900)
-    return dest if r.get("status") == "success" and os.path.exists(dest) else ""
+    src = (r.get("output") or [""])[0]
+    if r.get("status") != "success" or not src or not os.path.exists(src):
+        print(f"   [gen fallita] status={r.get('status')} error={str(r.get('error'))[:200]}", flush=True)
+        return ""
+    dest = os.path.join(OUT, f"DIAG_msr_ref_{name}.png")
+    shutil.copyfile(src, dest)
+    return dest
 
 
 def main() -> int:
