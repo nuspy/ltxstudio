@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ 자동 (최적)",
   "vid.sb.group": "🎬 다중 장면 스토리보드",
   "vid.ref.group": "🎭 다중 레퍼런스",
+  "mw.sb_controlnet_conflict": "스토리보드와 ControlNet은 함께 사용할 수 없습니다: 가이드 영상을 쓰면 모델이 이미지 한 장만 받아 키프레임 {n}개가 무시됩니다.\nControlNet 또는 스토리보드를 끄세요.",
   "vid.arch.minimax_h3": "MiniMax H3 (네이티브 오디오 + 다중 레퍼런스)",
   "vid.ref.enable": "다중 레퍼런스",
   "vid.ref.enable.tt": "정체성·스타일·모션·목소리를 위한 레퍼런스로 쓰이는 이미지·영상·오디오(특정 시점의 프레임이 아님).",

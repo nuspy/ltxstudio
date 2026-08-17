@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ Αυτόματο (καλύτερο)",
   "vid.sb.group": "🎬 Storyboard πολλαπλών σκηνών",
   "vid.ref.group": "🎭 Πολλαπλές αναφορές",
+  "mw.sb_controlnet_conflict": "Το storyboard και το ControlNet δεν συνδυάζονται: με βίντεο-οδηγό το μοντέλο δέχεται μία μόνο εικόνα και τα {n} keyframes θα αγνοηθούν.\nΑπενεργοποιήστε το ControlNet ή το storyboard.",
   "vid.arch.minimax_h3": "MiniMax H3 (εγγενής ήχος + πολλαπλές αναφορές)",
   "vid.ref.enable": "Πολλαπλές αναφορές",
   "vid.ref.enable.tt": "Εικόνες, βίντεο και ήχος ως ΑΝΑΦΟΡΕΣ (ταυτότητα, στυλ, κίνηση, φωνή), όχι καρέ σε δεδομένη στιγμή.",

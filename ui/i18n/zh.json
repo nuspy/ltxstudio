@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ 自动（最佳）",
   "vid.sb.group": "🎬 多场景故事板",
   "vid.ref.group": "🎭 多重参考",
+  "mw.sb_controlnet_conflict": "分镜与 ControlNet 不能同时使用：使用引导视频时模型只接受一张图片，{n} 个关键帧会被忽略。\n请关闭 ControlNet 或分镜。",
   "vid.arch.minimax_h3": "MiniMax H3（原生音频 + 多重参考）",
   "vid.ref.enable": "多重参考",
   "vid.ref.enable.tt": "作为参考使用的图片、视频与音频（身份、风格、动作、声音），而非某一时刻的画面。",

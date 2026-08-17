@@ -1503,6 +1503,7 @@
   "f1.gen.auto": "⚡ Auto (migliore)",
   "vid.sb.group": "🎬 Storyboard multi-scena",
   "vid.ref.group": "🎭 Riferimenti multipli",
+  "mw.sb_controlnet_conflict": "Storyboard e ControlNet non si possono usare insieme: con il video-guida il modello accetta una sola immagine e i {n} keyframe verrebbero ignorati.\nDisattiva ControlNet, oppure lo storyboard.",
   "vid.ref.enable": "Riferimenti multipli",
   "vid.ref.enable.tt": "Immagini, video e audio usati come RIFERIMENTO (identità, stile, movimento, voce) — non come fotogrammi in un istante preciso.",
   "vid.ref.hint": "Ogni riferimento riceve un token: citalo nel prompt (bottone «↳ prompt») perché il modello sappia a quale file ti riferisci. I riferimenti NON sono fotogrammi: non hanno una posizione nel tempo.",

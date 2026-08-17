@@ -3154,6 +3154,17 @@ class MainWindow(QMainWindow):
             kfs = [{"path": sc["image"], "frame": max(0, min(nf - 1, int(round(float(sc["second"]) * fps)))),
                     "strength": float(sc.get("strength", 1.0))} for sc in sb if sc.get("image")]
             if kfs:
+                # ControlNet + storyboard NON convivono: col video-guida la pipeline diventa IC-LoRA,
+                # che accetta UNA sola immagine → i keyframe sparivano in silenzio. Meglio dirlo prima
+                # di occupare la GPU per una generazione che non fa quello che l'utente ha chiesto.
+                if params.get("control_video"):
+                    QMessageBox.warning(
+                        self, tr("mw.sb_title", "Storyboard"),
+                        tr("mw.sb_controlnet_conflict",
+                           "Storyboard e ControlNet non si possono usare insieme: con il video-guida "
+                           "il modello accetta una sola immagine e i {n} keyframe verrebbero ignorati.\n"
+                           "Disattiva ControlNet, oppure lo storyboard.").format(n=len(kfs)))
+                    return
                 params["keyframes"] = kfs
                 params.pop("image_path", None)        # i keyframe sostituiscono il singolo frame iniziale
                 self._log(f"[nativo] storyboard: {len(kfs)} keyframe a tempo → video multi-scena")

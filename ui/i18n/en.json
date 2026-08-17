@@ -1503,6 +1503,7 @@
   "f1.gen.auto": "⚡ Auto (best)",
   "vid.sb.group": "🎬 Multi-scene storyboard",
   "vid.ref.group": "🎭 Multiple references",
+  "mw.sb_controlnet_conflict": "Storyboard and ControlNet cannot be used together: with a guide video the model takes a single image and the {n} keyframes would be ignored.\nTurn off ControlNet, or the storyboard.",
   "vid.ref.enable": "Multiple references",
   "vid.ref.enable.tt": "Images, videos and audio used as REFERENCES (identity, style, motion, voice) — not as frames at a given moment.",
   "vid.ref.hint": "Each reference gets a token: cite it in the prompt (\"↳ prompt\" button) so the model knows which file you mean. References are NOT frames: they have no position in time.",

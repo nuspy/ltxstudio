@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ Auto (beste)",
   "vid.sb.group": "🎬 Mehrszenen-Storyboard",
   "vid.ref.group": "🎭 Mehrere Referenzen",
+  "mw.sb_controlnet_conflict": "Storyboard und ControlNet lassen sich nicht kombinieren: mit Führungsvideo nimmt das Modell nur ein Bild, die {n} Keyframes würden ignoriert.\nSchalte ControlNet oder das Storyboard aus.",
   "vid.arch.minimax_h3": "MiniMax H3 (natives Audio + mehrere Referenzen)",
   "vid.ref.enable": "Mehrere Referenzen",
   "vid.ref.enable.tt": "Bilder, Videos und Audio als REFERENZ (Identität, Stil, Bewegung, Stimme) — nicht als Einzelbild zu einem Zeitpunkt.",

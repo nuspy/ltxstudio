@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ Auto (meilleur)",
   "vid.sb.group": "🎬 Storyboard multi-scènes",
   "vid.ref.group": "🎭 Références multiples",
+  "mw.sb_controlnet_conflict": "Le storyboard et ControlNet ne peuvent pas être utilisés ensemble : avec la vidéo-guide le modèle n'accepte qu'une image et les {n} keyframes seraient ignorés.\nDésactivez ControlNet, ou le storyboard.",
   "vid.arch.minimax_h3": "MiniMax H3 (audio natif + références multiples)",
   "vid.ref.enable": "Références multiples",
   "vid.ref.enable.tt": "Images, vidéos et audio utilisés comme RÉFÉRENCES (identité, style, mouvement, voix), pas comme images à un instant donné.",

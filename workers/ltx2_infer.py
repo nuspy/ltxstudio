@@ -1465,6 +1465,23 @@ def _run_chunked(p: dict, chunk: int) -> str:
                 _bl = f"{base}_chunk{i}_anchor.png"           # blend morbido ultimo-frame↔foto come conditioning
                 if _blend_images(prev_img, orig_img, _ref_anchor, _bl):
                     cp["image_path"] = _bl
+        # STORYBOARD a blocchi: i keyframe sono in coordinate GLOBALI, il chunk ne vede solo una
+        # finestra. Prima `cp = dict(p)` li copiava TUTTI in OGNI chunk e il worker li clampava a
+        # nf-1 del blocco → le stesse immagini riapplicate ovunque, con l'ultima incollata in coda.
+        # Qui si ripartiscono e si riportano a coordinate LOCALI; il blocco che non ne contiene
+        # torna alla continuità per immagine (prev_img/anti-drift), che il ramo keyframe copriva.
+        if p.get("keyframes"):
+            _lo = i * chunk
+            _local = [{**kf, "frame": int(kf.get("frame", 0)) - _lo}
+                      for kf in p["keyframes"] if _lo <= int(kf.get("frame", 0)) < _lo + cf]
+            if _local:
+                cp["keyframes"] = _local
+                print(f"[chunk] {i}: {len(_local)} keyframe "
+                      f"(frame locali {[k['frame'] for k in _local]})", flush=True)
+            else:
+                cp.pop("keyframes", None)
+                print(f"[chunk] {i}: nessun keyframe in questa finestra → continuità per immagine",
+                      flush=True)
         # #29 durata-illimitata MULTI-PROMPT: prompt diverso per finestra temporale (prompts=[{start_s,prompt}])
         if p.get("prompts"):
             t_chunk = i * seg_dur
@@ -2003,6 +2020,14 @@ def run_generation(p: dict) -> str:
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
+        # ICLoraPipeline prende UNA sola immagine di riferimento: eventuali keyframe non hanno dove
+        # andare. Prima sparivano in SILENZIO (storyboard+controlnet = storyboard ignorato); ora si
+        # dichiara, e il primo keyframe fa almeno da immagine di riferimento invece di perdersi.
+        if p.get("keyframes"):
+            print(f"[controlnet] ⚠ {len(p['keyframes'])} keyframe IGNORATI: la pipeline IC-LoRA "
+                  f"accetta una sola immagine di riferimento. Usa lo storyboard SENZA ControlNet.",
+                  flush=True)
+            p.setdefault("image_path", p["keyframes"][0].get("path", ""))
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
         # #59 INPAINT (meccanismo ufficiale InOutpainting): conditioning_attention_mask = INVERSO della
         # maschera oggetto → dove mask oggetto=1 l'attention=0 (la IC-LoRA non vincola → genera dal prompt),

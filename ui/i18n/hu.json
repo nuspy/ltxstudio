@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ Auto (legjobb)",
   "vid.sb.group": "🎬 Többjelenetes storyboard",
   "vid.ref.group": "🎭 Több referencia",
+  "mw.sb_controlnet_conflict": "A storyboard és a ControlNet nem használható együtt: vezérlővideóval a modell egyetlen képet fogad, és a(z) {n} kulcskocka figyelmen kívül maradna.\nKapcsold ki a ControlNetet vagy a storyboardot.",
   "vid.arch.minimax_h3": "MiniMax H3 (natív hang + több referencia)",
   "vid.ref.enable": "Több referencia",
   "vid.ref.enable.tt": "Képek, videók és hangok REFERENCIAKÉNT (identitás, stílus, mozgás, hang) — nem egy adott pillanat képkockájaként.",
