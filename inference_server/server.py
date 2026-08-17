@@ -274,6 +274,7 @@ def _worker():
             env["LTX2_PREVIEW_DIR"] = _PREVIEW_DIR          # il figlio scrive preview.png/json qui
             env.pop("LTX2_SERVER_PREVIEW_DIR", None)        # nel figlio preview_bus SCRIVE, non legge
             done_persistent = False
+            proc = None
             if _PERSIST and _child is not None:
                 # FIGLIO PERSISTENTE: riusa il modello caldo tra i job (stesso modello). Il figlio ha un log
                 # PROPRIO (persistent_child.log). Fallback al per-job se non risponde/muore → nessuna regressione.
@@ -294,9 +295,14 @@ def _worker():
                 with open(rf, encoding="utf-8") as f:
                     res = json.load(f)
             else:                                           # figlio morto senza risultato = crash nativo
+                # Col figlio PERSISTENTE `proc` non esiste (nessuna Popen per-job) e il log del crash sta
+                # nel suo file, non in quello del job: leggere `proc.returncode` qui sollevava
+                # UnboundLocalError, che sostituiva l'errore VERO e faceva sparire il log utile.
+                _chi = "figlio persistente" if done_persistent else f"exit {proc.returncode}"
+                _log = _tail(_PersistentChild._LOG) if done_persistent else _tail(lf)
                 res = {"status": "error",
-                       "error": f"job '{job['module']}' terminato senza risultato (exit {proc.returncode}). "
-                                f"Log:\n{_tail(lf)}"}
+                       "error": f"job '{job['module']}' terminato senza risultato ({_chi}). "
+                                f"Log:\n{_log}"}
             job.update(res)
             job["status"] = res.get("status", "success")
         except Exception as e:                              # noqa: BLE001

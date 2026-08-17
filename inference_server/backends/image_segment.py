@@ -27,10 +27,19 @@ def _mask_to_2d(masks, scores=None):
     la MIGLIORE per box, poi unione TRA i box → contorno preciso dell'oggetto. Senza scores: fallback OR."""
     arr = masks > 0
     if arr.ndim == 4 and scores is not None:               # (n_box, n_mask, H, W) + scores (n_box, n_mask)
+        # `post_process_masks(...)[0]` toglie la dimensione di BATCH alle maschere ma non agli
+        # iou_scores, che restano (1, n_box, n_mask): con più di un box `scores[b]` era ancora 2-D e
+        # `argmax()` (sul tensore appiattito) restituiva un indice fino a n_box*n_mask-1 → IndexError
+        # sui 3 canali multimask. Si allinea la forma prima di scegliere, e se non torna si prende la
+        # prima maschera invece di sollevare.
+        s = scores
+        while getattr(s, "ndim", 0) > 2 and int(s.shape[0]) == 1:
+            s = s[0]
+        n_box, n_mask = int(arr.shape[0]), int(arr.shape[1])
+        per_box = getattr(s, "ndim", 0) == 2 and tuple(s.shape) == (n_box, n_mask) and n_mask > 1
         out = None
-        for b in range(arr.shape[0]):
-            sb = scores[b]
-            bi = int(sb.argmax()) if getattr(sb, "ndim", 0) >= 1 and int(arr.shape[1]) > 1 else 0
+        for b in range(n_box):
+            bi = int(s[b].argmax()) if per_box else 0
             mb = arr[b, bi]
             out = mb if out is None else (out | mb)
         if out is not None:
