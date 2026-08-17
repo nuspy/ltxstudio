@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "Colorização",
+  "queue.job.refine": "Refinamento FLUX",
+  "mw.upscale_then_refine_log": "[upscale] ESRGAN concluído → iniciando o refinamento FLUX (cadeia nativa).",
   "mw.restore_then_colorize_log": "[restauração] upscale concluído → iniciando a colorização (cadeia nativa).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",

@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "צביעה",
+  "queue.job.refine": "ליטוש FLUX",
+  "mw.upscale_then_refine_log": "[הגדלה] ESRGAN הושלם → מתחיל ליטוש FLUX (שרשרת נייטיב).",
   "mw.restore_then_colorize_log": "[שחזור] ההגדלה הושלמה → מתחילה הצביעה (שרשרת נייטיב).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",

@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "Колоризація",
+  "queue.job.refine": "Доведення FLUX",
+  "mw.upscale_then_refine_log": "[апскейл] ESRGAN завершено → запуск доведення FLUX (нативний ланцюжок).",
   "mw.restore_then_colorize_log": "[реставрація] апскейл завершено → запуск колоризації (нативний ланцюжок).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",

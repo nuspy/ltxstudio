@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "컬러화",
+  "queue.job.refine": "FLUX 다듬기",
+  "mw.upscale_then_refine_log": "[업스케일] ESRGAN 완료 → FLUX 다듬기 시작(네이티브 체인).",
   "mw.restore_then_colorize_log": "[복원] 업스케일 완료 → 컬러화 시작(네이티브 체인).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",

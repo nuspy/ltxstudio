@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "تلوين",
+  "queue.job.refine": "صقل FLUX",
+  "mw.upscale_then_refine_log": "[تكبير] اكتمل ESRGAN → بدء صقل FLUX (سلسلة أصلية).",
   "mw.restore_then_colorize_log": "[ترميم] اكتمل التكبير → بدء التلوين (سلسلة أصلية).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",

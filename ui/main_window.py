@@ -3977,8 +3977,55 @@ class MainWindow(QMainWindow):
                          "[restauro] upscale completato → avvio colorizzazione (catena nativa)."))
             self._start_native_colorize(pc, out)
             return
+        # catena upscale+refine — ESRGAN finito → rifinitura FLUX img2img a denoise basso
+        pr = getattr(self, "_pending_refine", None)
+        self._pending_refine = None                          # consuma una sola volta
+        if out and pr:
+            self._log(tr("mw.upscale_then_refine_log",
+                         "[upscale] ESRGAN completato → avvio rifinitura FLUX (catena nativa)."))
+            self._start_native_refine(pr, out)
+            return
         if out:
             self._show_inpaint_result(out)   # dialog anteprima prima/dopo + Accetta / Revert
+
+    def _start_native_refine(self, rcfg: dict, image_path: str):
+        """Rifinitura FLUX via backend NATIVO — replica del KSampler img2img del grafo comfy
+        (denoise basso sull'immagine ingrandita). Riusa il ramo 'inpaint' VALIDATO
+        (FluxInpaintPipeline con strength) con maschera TUTTA BIANCA + feather 0 = img2img
+        esatto, senza nuove classi server-side. Con un checkpoint FLUX.2 la guard-famiglia
+        del backend passa da sola a flux2_inpaint (Klein) dai canali."""
+        import os
+        import tempfile
+        if not self._ensure_native_ready():
+            return
+        try:
+            from PIL import Image
+            with Image.open(image_path) as im:
+                size = im.size
+            mask = tempfile.NamedTemporaryFile(suffix="_refine_mask.png", delete=False)
+            Image.new("L", size, 255).save(mask.name)
+            mask.close()
+        except Exception as e:                               # noqa: BLE001
+            self._log(f"[refine] maschera non creata ({e}) → mostro l'upscale senza rifinitura.")
+            self._show_inpaint_result(image_path)
+            return
+        m = rcfg["model"]
+        mp = m if os.path.isabs(m) else os.path.join(r"E:\AI\Models\diffusion_models", m)
+        seed = random.randint(0, 2**31)
+        params = {"model": mp, "arch": "inpaint",
+                  "prompt": rcfg.get("prompt", ""), "negative": rcfg.get("negative", ""),
+                  "image_path": image_path, "mask_path": mask.name,
+                  "steps": int(rcfg.get("steps", 12)),
+                  "guidance": float(rcfg.get("guidance", 3.5)),
+                  "denoise": float(rcfg.get("denoise", 0.3)),
+                  "feather": 0, "seed": seed}
+        self._inpaint_mode = tr("queue.job.refine", "Rifinitura FLUX")
+        self._log(f"Rifinitura FLUX (backend NATIVO, {os.path.basename(mp)}) inviata "
+                  f"(steps={params['steps']}, denoise={params['denoise']:.2f}, seed={seed})…")
+        self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.refine", "Rifinitura FLUX"), self._native_worker,
+                      self._on_native_inpaint_done)
 
     def _start_native_colorize(self, cfg: dict, image_path: str):
         """Colorizzazione B&W via backend NATIVO — replica del grafo ComfyUI build_colorize
@@ -4041,11 +4088,21 @@ class MainWindow(QMainWindow):
         if cfg.get("refine") and not cfg.get("refine_model"):
             QMessageBox.warning(self, tr("mw.refine_model_missing_title"),
                                 tr("mw.refine_model_missing_msg")); return
-        # ── BACKEND NATIVO (ESRGAN via spandrel): upscale puro senza ComfyUI.
-        #    La rifinitura FLUX resta su ComfyUI finché non migrata.
+        # ── BACKEND NATIVO (ESRGAN via spandrel): upscale puro senza ComfyUI; con refine
+        #    la rifinitura FLUX segue come 2° job in catena (_pending_refine, stesso pattern
+        #    di _pending_colorize) — era l'ultimo ramo GUI che ancora chiedeva ComfyUI.
         from core import backend
-        if backend.is_native("image") and not cfg.get("refine"):
+        if backend.is_native("image"):
             self._inpaint_before = self.frame1_tab.image_path
+            if cfg.get("refine"):
+                self._pending_refine = {
+                    "model": cfg["refine_model"],
+                    "denoise": float(cfg.get("refine_denoise", 0.3)),
+                    "steps": int(cfg.get("refine_steps", 12)),
+                    "guidance": float(cfg.get("refine_guidance", 3.5)),
+                    "prompt": self.frame1_tab.get_values().get("prompt_positive", ""),
+                    "negative": self.frame1_tab.get_values().get("prompt_negative", ""),
+                }
             self._start_native_upscale(cfg["model"], cfg.get("target_scale") or cfg.get("scale") or 2.0)
             return
         self._inpaint_before = self.frame1_tab.image_path   # confronto prima/dopo

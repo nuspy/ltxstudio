@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "Χρωματισμός",
+  "queue.job.refine": "Φινίρισμα FLUX",
+  "mw.upscale_then_refine_log": "[upscale] το ESRGAN ολοκληρώθηκε → έναρξη φινιρίσματος FLUX (εγγενής αλυσίδα).",
   "mw.restore_then_colorize_log": "[αποκατάσταση] το upscale ολοκληρώθηκε → έναρξη χρωματισμού (εγγενής αλυσίδα).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",

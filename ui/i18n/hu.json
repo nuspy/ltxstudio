@@ -1939,6 +1939,8 @@
   "queue.job.rife": "FPS interpolation (RIFE)",
   "queue.job.upscale": "Image upscale",
   "queue.job.colorize": "Színezés",
+  "queue.job.refine": "FLUX finomítás",
+  "mw.upscale_then_refine_log": "[felskálázás] ESRGAN kész → FLUX finomítás indul (natív lánc).",
   "mw.restore_then_colorize_log": "[helyreállítás] felskálázás kész → színezés indul (natív lánc).",
   "queue.job.video_face": "Video face restore",
   "queue.job.segment": "Segmentation",
