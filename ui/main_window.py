@@ -3201,6 +3201,27 @@ class MainWindow(QMainWindow):
             self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
                           on_progress=lambda s: self._log("[lingbot] " + s))
             return
+        # ── MiniMax H3: omni-modale (video + audio stereo nella STESSA passata) ─────────
+        if vals.get("video_arch") == "minimax_h3":
+            params["arch"] = "minimax_h3"
+            params.pop("gguf_transformer", None)          # il worker sceglie la variante dal catalogo
+            # CHECKPOINT DIVERSO per modalità: i riferimenti richiedono il ref2va, il resto il fl2va.
+            _ids = (["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"]
+                    + (["mmh3-ref2va-nvfp4"] if params.get("references") else ["mmh3-fl2va-nvfp4"]))
+            try:                                          # consenso primo-uso col motore unico
+                from core import ensure_weights as _ew
+                if not _ew.offer_download_gui(self, _ids, "MiniMax H3"):
+                    self._log(tr("weights.missing.title", "Pesi mancanti") + " → MiniMax H3")
+                    return
+            except Exception:                             # noqa: BLE001 — l'errore chiaro del worker copre
+                pass
+            self._log(f"[minimax_h3] {'Ref2VA (riferimenti)' if params.get('references') else 'FL2VA'}: "
+                      f"{params['width']}x{params['height']} {nf} frame, audio nativo")
+            self._ltx2_worker = _NativeLtx2Worker(params)
+            self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
+            self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
+                          on_progress=lambda s: self._log("[minimax_h3] " + s))
+            return
         # ── 3ª ARCHITETTURA: Krea Realtime (autoregressivo) ─────────────────────────────
         if vals.get("video_arch") == "krea_rt":
             params["arch"] = "krea_rt"

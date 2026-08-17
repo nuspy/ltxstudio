@@ -39,6 +39,12 @@ KREA_RT_WORKER = str(REPO / "workers" / "krea_rt_infer.py")
 # venv krea_rt_venv; il worker gira il runner del repo Self-Forcing come libreria. Vedi [[krea-arches]].
 SELF_FORCING_WORKER = str(REPO / "workers" / "self_forcing_infer.py")
 
+# 4ª architettura video: MiniMax H3 (omni-modale 33.1B: video + audio stereo nella STESSA passata,
+# riferimenti multipli nativi). Venv dedicato: serve diffusers con le classi MiniMaxH3* + transformers
+# con Qwen3-VL. Vedi workers/minimax_h3_infer.py e scripts/install_minimax_h3.py.
+MINIMAX_H3_PY = r"E:\AI\Tools\minimax_h3_venv\Scripts\python.exe"
+MINIMAX_H3_WORKER = str(REPO / "workers" / "minimax_h3_infer.py")
+
 # "Krea Realtime" nell'app = motore **Self-Forcing 1.3B** (l'unico VALIDATO: realtime ~2s di calcolo per 1s
 # di video, decode streaming-su-disco + sfratto KV-cache → durata illimitata a memoria costante, VRAM sotto
 # saturazione — confermato da log storici + mp4 reali). Il transformer **14B** (`krea_rt_infer`) è rimasto
@@ -54,6 +60,7 @@ _ARCH_RUNNER = {
     "lingbot": (LINGBOT_PY, LINGBOT_WORKER),
     "krea_rt": (KREA_RT_PY, _KREA_RT_WORKER_EFF),        # → Self-Forcing 1.3B (default) | 14B se KREA_RT_USE_14B=1
     "self_forcing": (KREA_RT_PY, SELF_FORCING_WORKER),
+    "minimax_h3": (MINIMAX_H3_PY, MINIMAX_H3_WORKER),
 }
 
 

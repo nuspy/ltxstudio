@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ 自动（最佳）",
   "vid.sb.group": "🎬 多场景故事板",
   "vid.ref.group": "🎭 多重参考",
+  "vid.arch.minimax_h3": "MiniMax H3（原生音频 + 多重参考）",
   "vid.ref.enable": "多重参考",
   "vid.ref.enable.tt": "作为参考使用的图片、视频与音频（身份、风格、动作、声音），而非某一时刻的画面。",
   "vid.ref.hint": "每个参考都有一个 token：在提示词中引用它（「↳ prompt」按钮），模型才知道你指的是哪个文件。参考不是关键帧，没有时间位置。",

@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ Auto (legjobb)",
   "vid.sb.group": "🎬 Többjelenetes storyboard",
   "vid.ref.group": "🎭 Több referencia",
+  "vid.arch.minimax_h3": "MiniMax H3 (natív hang + több referencia)",
   "vid.ref.enable": "Több referencia",
   "vid.ref.enable.tt": "Képek, videók és hangok REFERENCIAKÉNT (identitás, stílus, mozgás, hang) — nem egy adott pillanat képkockájaként.",
   "vid.ref.hint": "Minden referencia kap egy tokent: hivatkozz rá a promptban («↳ prompt» gomb), hogy a modell tudja, melyik fájlról van szó. Nem képkockák: nincs időbeli pozíciójuk.",

@@ -144,6 +144,9 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "da2": (["threed", "depth_ctrl"], []),
     "worldgen-lora": (["threed", "lora_style"], []),
     # ── MiniMax H3 (deps già scritte da catalog_v2; qui i tag d'uso) ──
+    "mmh3-configs": (["te"], []),                    # config+tokenizer: componente obbligatoria
+    "mmh3-fl2va-nvfp4": (["ckpt_video", "av_joint", "nvfp4"], []),
+    "mmh3-ref2va-nvfp4": (["ckpt_video", "av_joint", "ref_omni", "nvfp4"], []),
     "mmh3-fl2va-int8": (["ckpt_video", "av_joint", "q_int8"], []),
     "mmh3-fl2va-fp8": (["ckpt_video", "av_joint"], []),
     "mmh3-fl2va-bf16": (["ckpt_video", "av_joint", "big_quality"], []),

@@ -1393,6 +1393,7 @@
   "f1.gen.auto": "⚡ Auto (melhor)",
   "vid.sb.group": "🎬 Storyboard multicena",
   "vid.ref.group": "🎭 Referências múltiplas",
+  "vid.arch.minimax_h3": "MiniMax H3 (áudio nativo + referências múltiplas)",
   "vid.ref.enable": "Referências múltiplas",
   "vid.ref.enable.tt": "Imagens, vídeos e áudio usados como REFERÊNCIA (identidade, estilo, movimento, voz), não como quadros num instante.",
   "vid.ref.hint": "Cada referência recebe um token: cite-o no prompt (botão «↳ prompt») para o modelo saber a que ficheiro se refere. Não são fotogramas: não têm posição no tempo.",

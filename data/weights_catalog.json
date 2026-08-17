@@ -3118,6 +3118,104 @@
         "lora_style",
         "ref_omni"
       ]
+    },
+    {
+      "id": "mmh3-configs",
+      "module": "Video",
+      "label": "MiniMax H3 config + tokenizer (ufficiali, ~25MB)",
+      "kind": "snapshot",
+      "type": "misc",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.03,
+      "scan_names": [],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "MiniMaxAI/MiniMax-H3",
+      "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3",
+      "tool_dest": "E:\\AI\\Models\\configs\\minimax-h3",
+      "note": "SOLO i json (config+tokenizer) dal repo ufficiale: le classi diffusers si costruiscono da qui e i pesi arrivano dal single-file quantizzato (stesso schema di FLUX.2). Evita i 124GB dello snapshot completo",
+      "allow_patterns": [
+        "FL2VA/**/*.json",
+        "Ref2VA/**/*.json",
+        "model_index.json",
+        "modular_model_index.json"
+      ],
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "mmh3-fl2va-nvfp4",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA nvfp4 (12.5GB, ideale RTX 50xx)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 12.53,
+      "scan_names": [
+        "MiniMax_H3_FL2VA_pruned_nvfp4.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Abiray/Minimax-H3-nvfp4-INT4-INT8-Convrot",
+      "url": "https://huggingface.co/Abiray/Minimax-H3-nvfp4-INT4-INT8-Convrot",
+      "filename": "MiniMax_H3_FL2VA_pruned_nvfp4.safetensors",
+      "remote_filename": "MiniMax_H3_FL2VA_pruned_nvfp4.safetensors",
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "il più piccolo dei non-GGUF: kernel FP4 nativi su Blackwell, si carica col nostro Nvfp4Linear (già validato su FLUX.2). Licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "mmh3-ref2va-nvfp4",
+      "module": "Video",
+      "label": "MiniMax H3 Ref2VA nvfp4 (riferimenti, 12.5GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 12.53,
+      "scan_names": [
+        "MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Abiray/Minimax-H3-nvfp4-INT4-INT8-Convrot",
+      "url": "https://huggingface.co/Abiray/Minimax-H3-nvfp4-INT4-INT8-Convrot",
+      "filename": "MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors",
+      "remote_filename": "MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors",
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "variante nvfp4 del checkpoint riferimenti; licenza con territori esclusi",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "ref_omni",
+        "nvfp4"
+      ]
     }
   ],
   "schema": 2,

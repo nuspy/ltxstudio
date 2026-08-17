@@ -2745,6 +2745,7 @@
   "vid.arch_lbl": "Architettura",
   "vid.arch.ltx": "LTX-2 (tutte le funzioni)",
   "vid.arch.lingbot": "LingBot-Video (MoE, qualità SOTA)",
+  "vid.arch.minimax_h3": "MiniMax H3 (audio nativo + riferimenti multipli)",
   "vid.arch.tt": "LTX-2: audio nativo, controlnet, v2v, storyboard. LingBot-Video: T2V/I2V/TI2V + refiner, prompt JSON strutturato; niente audio/controlnet/v2v.",
   "vid.arch.unavailable": "Non disponibile con l'architettura {a}",
   "vid.lingbot.group": "Opzioni LingBot-Video",

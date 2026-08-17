@@ -139,9 +139,13 @@ class VideoTab(QWidget):
         self.video_arch.addItem(tr("vid.arch.ltx", "LTX-2 (tutte le funzioni)"), "ltx")
         self.video_arch.addItem(tr("vid.arch.lingbot", "LingBot-Video (MoE, qualità SOTA)"), "lingbot")
         self.video_arch.addItem(tr("vid.arch.krea_rt", "Krea Realtime (autoregressivo, long/extend)"), "krea_rt")
+        self.video_arch.addItem(tr("vid.arch.minimax_h3",
+                                   "MiniMax H3 (audio nativo + riferimenti multipli)"), "minimax_h3")
         self.video_arch.setToolTip(tr("vid.arch.tt",
             "LTX-2: audio nativo, controlnet, v2v, storyboard. LingBot-Video: T2V/I2V/TI2V + refiner, "
-            "prompt JSON strutturato; niente audio/controlnet/v2v."))
+            "prompt JSON strutturato; niente audio/controlnet/v2v. MiniMax H3: video e audio stereo "
+            "generati insieme + riferimenti multipli (9 immagini, 3 video, 3 audio); niente "
+            "controlnet/v2v/storyboard."))
         try:
             _ia = self.video_arch.findData(user_prefs.get("video_arch", "ltx"))
             self.video_arch.setCurrentIndex(_ia if _ia >= 0 else 0)
