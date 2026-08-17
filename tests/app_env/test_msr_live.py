@@ -115,6 +115,14 @@ def main() -> int:
         return 2
 
     w = H.boot_full_app()
+    # A fine generazione l'app apre un dialog MODALE (anteprima/risultato): l'harness non patcha
+    # QDialog.exec di proposito, ma qui ogni `processEvents()` di attesa ci finirebbe dentro e il
+    # test resterebbe appeso per sempre (visto: il video di controllo non partiva mai).
+    # ACCEPTED, non Rejected: il dialog del risultato ha «Accetta / Revert» e un rifiuto CANCELLA
+    # il file appena prodotto (visto: restava solo il sidecar json in output/sidecars).
+    from PySide6.QtWidgets import QDialog
+    QDialog.exec = lambda self, *a, **k: QDialog.Accepted
+    QDialog.exec_ = QDialog.exec
 
     # 1) riferimenti REALI (non rettangoli: serve vedere se l'identità passa)
     refs = []
