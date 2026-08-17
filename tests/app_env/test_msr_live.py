@@ -50,8 +50,10 @@ def _gen_image(name: str, prompt: str, seed: int) -> str:
         print(f"   [riuso] {os.path.basename(dest_esistente)}", flush=True)
         return dest_esistente
     from core import native_driver
+    # 28 step: FLUX dev NON è distillato — a 8 step (valore per i Turbo/Hyper) escono immagini
+    # molli, e un riferimento sfocato limita la somiglianza ottenibile dall'MSR.
     p = {"arch": "flux", "model": IMG_MODEL, "prompt": prompt, "negative": "text, watermark, blurry",
-         "width": 768, "height": 768, "steps": 8, "guidance": 3.5, "seed": seed,
+         "width": 768, "height": 768, "steps": 28, "guidance": 3.5, "seed": seed,
          "output": os.path.join(OUT, f"DIAG_msr_ref_{name}.png")}
     r = native_driver.run_and_wait("image", p, timeout=900)
     src = (r.get("output") or [""])[0]
@@ -80,6 +82,17 @@ def _genera(w, etichetta: str):
             out = max(nuovi, key=lambda p: p.stat().st_mtime)
             print(f"[out {etichetta}] {out.name} ({out.stat().st_size / 2**20:.1f} MB "
                   f"in {_t.time() - t0:.0f}s)", flush=True)
+            # Il file compare PRIMA che il worker emetta `done`: la coda è seriale, quindi se si
+            # accoda subito il job successivo resta appeso all'infinito (visto live: il controllo
+            # non è mai partito). Si aspetta che il thread del worker abbia davvero finito.
+            fine = _t.time() + 180
+            while _t.time() < fine:
+                QApplication.processEvents()
+                wk = getattr(w, "_ltx2_worker", None)
+                if wk is None or not wk.isRunning():
+                    break
+                _t.sleep(0.5)
+            QApplication.processEvents()
             return out
         _t.sleep(1.0)
     print(f"[out {etichetta}] NESSUN VIDEO in {_t.time() - t0:.0f}s", flush=True)
