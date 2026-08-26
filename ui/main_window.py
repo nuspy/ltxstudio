@@ -527,7 +527,19 @@ class _NativeLtx2Worker(QThread):
             if _arch == "ltx":
                 try:
                     from core import ltx2_service as _svc
-                    if _svc.server_enabled() and _svc.ensure_server():
+                    # Il server :8190 è avviato SEMPRE col venv 2.3 (ltx2_service.LTX2_PY). Un job
+                    # con release diversa finirebbe nel PACCHETTO 2.3, che non sa caricare un text
+                    # encoder da file singolo e muore con «No files matching pattern
+                    # 'tokenizer.model'». gen_service ha sempre avuto questa guardia; qui mancava,
+                    # e la GUI ci mandava dentro anche i job 2.5. Release ≠ default → subprocess,
+                    # che sceglie il venv giusto via runner_for().
+                    from core import ltx_release as _lrel
+                    _rel = self.params.get("ltx_release") or _lrel.DEFAULT_RELEASE
+                    if _rel != _lrel.DEFAULT_RELEASE:
+                        self.progress.emit(
+                            f"[nativo] LTX {_rel}: il server persistente monta la "
+                            f"{_lrel.DEFAULT_RELEASE} → subprocess dedicato")
+                    elif _svc.server_enabled() and _svc.ensure_server():
                         self.progress.emit("[nativo] server video persistente :8190 (residenza)")
                         out_path, _served, _err_extra = self._run_via_server(_svc)
                 except Exception as _se:                    # noqa: BLE001
@@ -551,8 +563,19 @@ class _NativeLtx2Worker(QThread):
                 proc = _sp.Popen([py, "-u", worker, jf.name], env=env,
                                  stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
                 self.proc = proc                            # #91: esposto per stop() alla chiusura
+                # Output COMPLETO su file, sovrascritto a ogni generazione. In memoria se ne
+                # tenevano le ultime 40 righe, e in un traceback lungo l'ultima — quella col TIPO
+                # di eccezione — resta fuori: si vede dove si è rotto, non perché.
+                try:
+                    _dir = _os.path.dirname(str(self.params.get("output") or "")) or str(OUTPUT_DIR)
+                    _lg = open(_os.path.join(_dir, "gui_last_worker.log"),
+                               "w", encoding="utf-8", errors="replace")
+                except (OSError, TypeError):
+                    _lg = None
                 for line in proc.stdout:
                     line = line.rstrip()
+                    if _lg is not None:
+                        _lg.write(line + "\n"); _lg.flush()
                     if line:
                         _tail.append(line)
                         if len(_tail) > 40:
@@ -563,6 +586,8 @@ class _NativeLtx2Worker(QThread):
                     if line.startswith("OK:"):
                         out_path = line[3:].strip()
                 proc.wait()
+                if _lg is not None:
+                    _lg.close()
             # #3 talk region: composita solo bocca/volto sul frame sorgente (reimagine=off)
             if out_path and _os.path.exists(out_path) and _talk["region"] and _talk["src"]:
                 from core import talk_region as _tr
@@ -579,8 +604,20 @@ class _NativeLtx2Worker(QThread):
                 _why = _err_extra or "\n".join(_tail[-18:]) or "(nessun output dal worker)"
                 _p = getattr(self, "proc", None)
                 _rc = f" (exit {_p.returncode})" if _p is not None else ""
+                # La CAUSA in cima. Il traceback è lungo e il dialog lo tronca: l'ultima riga —
+                # quella che dice il TIPO di eccezione, l'unica che serve davvero — finiva fuori
+                # dallo schermo, e restava visibile solo il punto in cui si è rotto. Qui si pesca
+                # la riga finale non vuota (formato «ValueError: messaggio») e si mette in testa.
+                _causa = ""
+                for _ln in reversed((_why or "").splitlines()):
+                    _s = _ln.strip()
+                    if _s and not _s.startswith(("File ", "  ", "Traceback")):
+                        _causa = _s
+                        break
+                _testa = f"⛔ {_causa}\n\n" if _causa else ""
                 self.done.emit({"status": "error",
-                                "error": f"LTX-2 nativo: nessun output{_rc}.\n{_why}"})
+                                "error": f"LTX-2 nativo: nessun output{_rc}.\n{_testa}{_why}\n\n"
+                                         f"Log completo: {OUTPUT_DIR}\\gui_last_worker.log"})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
 
@@ -624,7 +661,22 @@ class _NativeLtx2Worker(QThread):
                 return None, True, "generazione annullata dall'utente"
             if st == "error":
                 self._server_jid = None
-                return None, True, str(h.get("error", ""))[-1500:]
+                _err = str(h.get("error", ""))
+                # «size mismatch … shape in current model is torch.Size([3840…])» = il server ha
+                # costruito il modello con i DEFAULT del configuratore (30 teste × 128) invece che
+                # con la config del checkpoint: il suo stato è sporco, e resterà tale per ogni job
+                # successivo finché non lo si riavvia. Il subprocess, che parte pulito, carica lo
+                # stesso checkpoint senza un errore — verificato. Quindi si ricade lì invece di
+                # consegnare all'utente un traceback che non può risolvere.
+                if "size mismatch" in _err or "Error(s) in loading state_dict" in _err:
+                    self.progress.emit("[nativo] stato del server incoerente col checkpoint "
+                                       "→ lo azzero e passo al subprocess")
+                    try:
+                        svc.reset_server()
+                    except Exception:                   # noqa: BLE001
+                        pass
+                    return None, False, ""
+                return None, True, _err[-1500:]
             if st == "unknown":                         # server riavviato: job perso → fallback
                 self._server_jid = None
                 return None, False, ""
@@ -1043,8 +1095,12 @@ class MainWindow(QMainWindow):
         self._tab_nav_layout.addWidget(self._mem_btn)
         self.jobs.changed.connect(self._refresh_status)
 
+        # La riga "ComfyUI: NATIVO @ http://… | Template: …" non compare più nella barra di stato:
+        # il backend è nativo da tempo e nominare ComfyUI con l'indirizzo di un server che non si
+        # usa confondeva e basta. La label resta viva (nascosta) perché _refresh_status continua a
+        # scriverci: così lo stato è ancora interrogabile e riattivarla è una riga.
         self.status_lbl = QLabel("…")
-        self.statusBar().addWidget(self.status_lbl)
+        self.status_lbl.setVisible(False)
         if self._engine_err:
             self._log(f"[!] Template non caricato: {self._engine_err}")
             self._log("    Cattura il golden prompt (templates/README_capture.md) e riavvia.")
@@ -3535,7 +3591,33 @@ class MainWindow(QMainWindow):
             "guidance": float(self.video_tab.sampler_seed.cfg.value()), "seed": _seed,
             # niente offload forzato: 'cpu' = pinned memory ⇒ SEGFAULT col pagefile da 16GB (13/07)
             "ref_strength": 1.0, "output": cont,
+            "teacache_thresh": float(v.get("teacache_thresh", 0.0) or 0.0),
+            "decode_lowmem": bool(v.get("decode_lowmem")),
+            "native_audio": bool(v.get("native_audio")),
         }
+        # MODELLO, LoRA e RELEASE dal tab Video, come per la generazione normale. Qui non venivano
+        # passati affatto: la prolunga caricava SEMPRE il checkpoint di default (ltx-2.3-22b-dev-fp8,
+        # 23,8 GB) più la LoRA distilled (7,2 GB) — 31 GB su 31,84 di scheda, quindi OOM prima ancora
+        # di iniziare, qualunque cosa fosse selezionata nel tab. Con un checkpoint distilled la LoRA
+        # non serve e lo spazio torna.
+        if v.get("model_kind") == "gguf" and v.get("model_gguf"):
+            params["gguf_transformer"] = v["model_gguf"]
+        elif v.get("model") and v.get("model") not in ("", "auto"):
+            params["model"] = v["model"]
+        # Le LoRA NON stanno in get_values(): la generazione normale le prende dal tab LoRA
+        # (main_window:2157). Senza, la prolunga girava sempre senza LoRA — o peggio, col worker
+        # che caricava la distilled di default perché il checkpoint non era quello scelto.
+        _lrs = [{"name": l["name"], "strength": l["strength"]}
+                for l in self.lora_tab.selected_loras()] if hasattr(self, "lora_tab") else []
+        if _lrs:
+            params["loras"] = _lrs
+        from core import ltx_release as _lrel_x
+        _det_x = _lrel_x.detect_release(params.get("gguf_transformer") or params.get("model") or "")
+        if _det_x:
+            params["ltx_release"] = _det_x
+        self._log(f"[nativo] prolunga: modello={os.path.basename(str(params.get('gguf_transformer') or params.get('model') or 'default'))} "
+                  f"release={params.get('ltx_release', '2.3')} {params['width']}x{params['height']} "
+                  f"steps={ext_steps} lora={len(_lrs or [])}")
         # seg_seconds → dimensione del chunk in-process (memory-bounded) per estensioni lunghe;
         # il worker segmenta quando num_frames > chunk_frames (continuità via ultimo frame).
         seg_s = float(cfg.get("seg_seconds", 0) or 0)

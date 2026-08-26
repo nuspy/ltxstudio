@@ -28,11 +28,29 @@ _LOCK_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 _STATE = {"count": 0, "tag": ""}                        # rientranza per-processo
 
 
-def _pid_alive(pid: int) -> bool:
+def _pid_alive(pid: int, since: float = 0.0) -> bool:
+    """True se `pid` è vivo ED è ANCORA il processo che ha preso il lock.
+
+    `pid_exists` da solo non basta: Windows ricicla i numeri di pid in fretta, così un lock
+    abbandonato può risultare "vivo" perché il suo numero è finito a un processo qualunque nato
+    dopo. Successo dal vero: un lock `gui:Video` del 18/08 è stato ereditato da `postgres.exe`
+    e ha bloccato OGNI job GPU (GUI e API) finché non è stato rimosso a mano — il ramo
+    stale-safe non scattava mai. Il tempo di creazione distingue i due casi: un processo nato
+    DOPO il lock non può esserne il proprietario.
+    """
     try:
         import psutil
-        return psutil.pid_exists(pid)
-    except Exception:                                   # noqa: BLE001 — senza psutil: prudente, vivo
+        proc = psutil.Process(pid)
+        if since and proc.create_time() > since + 1.0:  # 1s di margine sulla risoluzione dei clock
+            return False
+        return True
+    except Exception as exc:                            # noqa: BLE001
+        try:
+            import psutil
+            if isinstance(exc, psutil.NoSuchProcess):
+                return False
+        except Exception:                               # noqa: BLE001 — senza psutil: prudente, vivo
+            pass
         return True
 
 
@@ -51,7 +69,7 @@ def _try_take(tag: str) -> bool:
         fd = os.open(_LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         h = holder()
-        if h and not _pid_alive(int(h.get("pid", 0) or 0)):
+        if h and not _pid_alive(int(h.get("pid", 0) or 0), float(h.get("ts", 0) or 0)):
             try:                                        # proprietario MORTO → lock orfano, rimuovi
                 os.remove(_LOCK_PATH)
                 print(f"[gpu-lock] lock orfano di pid {h.get('pid')} ({h.get('tag')}) rimosso",

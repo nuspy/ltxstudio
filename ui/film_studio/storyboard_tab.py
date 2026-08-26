@@ -396,10 +396,21 @@ class StoryboardTab(QWidget):
                     kf = str(Path(outdir) / f"shot_{sh['ord']}_kf.png")
                     kfs = [{"path": kf, "frame": 0, "strength": 1.0}] if Path(kf).exists() else []
                     audio_path = self._shot_dialogue_audio(sh, outdir)
+                    # Riferimenti dall'ASSET MANAGER, separati per tipo: gli attori/oggetti sono i
+                    # soggetti MSR, i luoghi/architetture danno l'AMBIENTE (lo slot senza il quale
+                    # il modello prende lo sfondo dai ritratti e la scena chiesta sparisce).
+                    # Col percorso LoRA nulla di tutto questo serve: gen_shot_video se ne accorge
+                    # da `loras` e passa all'inferenza diretta.
+                    _place = (refs.get("place_images") or [None])[0] or guard.get("msr_background", "")
                     _job = {"prompt": prompt, "out": out, "duration_s": sh["duration_s"] or 4,
                             "keyframes": kfs, "loras": refs["loras"], "audio_path": audio_path,
                             "model_gguf": vid_gguf, "seed": _seed, "negative": forbidden,
-                            "video_arch": guard.get("vid_arch", "ltx")}
+                            "video_arch": guard.get("vid_arch", "ltx"),
+                            "ref_images": refs.get("subject_images") or refs["ref_images"],
+                            "ltx_release": guard.get("vid_release", ""),
+                            "msr_background": _place,
+                            "msr_strength": float(guard.get("msr_strength", 1.0) or 1.0),
+                            "msr_spacing": int(guard.get("msr_spacing", 10) or 10)}
                     if chain and _prev_vid and not kfs:       # raccordo: aggancia all'ultimo frame del video prima
                         _job["chain_from"] = _prev_vid        # estratto a runtime (il precedente sarà già pronto)
                     jid = scheduler.enqueue("video", _job, owner_kind="shot", owner_id=sh["id"])

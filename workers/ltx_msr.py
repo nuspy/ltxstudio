@@ -224,16 +224,25 @@ def slot_embedding(state: dict, slot_id: int, device, dtype):
     return emb.to(dtype=dtype)
 
 
-def frame_offsets(num_slots: int) -> list[int]:
-    """Posizioni dei riferimenti: slot i → -(N-i), cioè -N … -1 (fuori dalla finestra del video)."""
-    return [-(num_slots - i) for i in range(num_slots)]
+def frame_offsets(num_slots: int, spacing: int = 1) -> list[int]:
+    """Posizioni dei riferimenti: slot i → -(N-i)·spacing, cioè fuori dalla finestra del video.
+
+    `spacing=1` è la ricetta del plugin: -N … -1, gli istanti IMMEDIATAMENTE precedenti al primo
+    fotogramma. Le posizioni non sono indici ma coordinate temporali continue (keyframe_cond:
+    `positions += frame_idx` poi `/= fps`), quindi con spacing 1 i riferimenti risultano contigui
+    alla scena e il modello genera una transizione fluida fra loro e il video — il fading
+    incrociato con i soggetti che compare a inizio o fine clip. Distanziandoli si verifica se
+    quella contiguità è la causa.
+    """
+    return [-(num_slots - i) * max(1, int(spacing)) for i in range(num_slots)]
 
 
-def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = 33) -> list:
+def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = 33,
+                         spacing: int = 1) -> list:
     """`references` del pannello → ImageConditioningInput a frame NEGATIVI (solo 2.5)."""
     from ltx_pipelines.utils.args import ImageConditioningInput
     refs = [r for r in references if r.get("kind", "image") == "image"][:MAX_REFERENCES]
-    offs = frame_offsets(len(refs))
+    offs = frame_offsets(len(refs), spacing)
     return [ImageConditioningInput(r["path"], off, float(r.get("strength", strength)), crf)
             for r, off in zip(refs, offs)]
 

@@ -42,7 +42,14 @@ def _vid(p: dict):
                                       negative=p.get("negative", ""), seed=int(p.get("seed", 7)),
                                       video_arch=p.get("video_arch", "ltx"),
                                       lingbot_variant=p.get("lingbot_variant", "dense"),
-                                      run_refiner=bool(p.get("run_refiner")), **kw)
+                                      run_refiner=bool(p.get("run_refiner")),
+                                      ltx_release=p.get("ltx_release"), model=p.get("model", ""),
+                                      references=p.get("references"),
+                                      ref_images=p.get("ref_images"),
+                                      native_audio=bool(p.get("native_audio")),
+                                      msr_strength=float(p.get("msr_strength", 1.0)),
+                                      msr_background=p.get("msr_background", ""),
+                                      msr_spacing=int(p.get("msr_spacing", 1) or 1), **kw)
 
 
 def register_default_handlers() -> None:

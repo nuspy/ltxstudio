@@ -265,8 +265,14 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
             # unificazione motori: UNICO punto di spawn del server (core.ltx2_service.ensure_server),
             # stesso usato dalla GUI — niente più Popen artigianale/doppio avvio.
             from core import ltx2_service as _svc
-            if _svc.ensure_server(wait_s=40):
+            # `server_enabled()` va CHIESTO, non saltato: chi disattiva la residenza
+            # (LTX_VIDEO_SERVER=0 / preferenza) lo fa perché il server gli mangia la RAM, e questo
+            # ramo la riaccendeva alle spalle — il server ripartiva a ogni «Genera tutti» e i
+            # worker successivi morivano di MemoryError sulla memoria pinnata.
+            if _svc.server_enabled() and _svc.ensure_server(wait_s=40):
                 print("[auto_run] worker video persistente :8190 avviato", flush=True)
+            elif not _svc.server_enabled():
+                print("[auto_run] residenza disattivata → un subprocess pulito per shot", flush=True)
     except Exception as _e:                                  # noqa: BLE001
         print(f"[auto_run] server :8190 non avviato ({_e}) → fallback subprocess per-shot", flush=True)
     vid_jids, jmap = [], {}

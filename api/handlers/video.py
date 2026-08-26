@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from api import gate
 from api.jobs import MANAGER
-from api.handlers._common import run_ltx2, parse_loras, out_path
+from api.handlers._common import run_ltx2, parse_loras, out_path, apply_ltx_release
 
 
 def _submit(kind, fn):
@@ -34,6 +34,11 @@ def _base(req) -> dict:
         p["chunk_frames"] = 121
     if getattr(req, "loras", None):
         p["loras"] = parse_loras(req.loras)
+    # Release/checkpoint e riferimenti multipli (MSR): assenti → resta il default 2.3 di sempre.
+    apply_ltx_release(p, getattr(req, "ltx_release", None), getattr(req, "model", "") or "",
+                      getattr(req, "references", None),
+                      float(getattr(req, "msr_strength", 1.0) or 1.0),
+                      getattr(req, "msr_background", "") or "")
     return p
 
 
@@ -53,6 +58,12 @@ class GenerateReq(BaseModel):
     i2v_method: str = Field("addguide", description="addguide | inplace (soft)")
     audio_path: str | None = Field(None, description="a2v: audio → video (lip-sync/canto)")
     audio_scale: float = 3.0
+    ltx_release: str | None = Field(None, description="release LTX: 2.3 (default) | 2.5")
+    model: str | None = Field(None, description="transformer esplicito; auto per release != 2.3")
+    references: list | None = Field(None, description="MSR: 2-5 riferimenti [{path,strength,role}] "
+                                                      "per la coerenza di personaggi/luoghi")
+    msr_strength: float = 1.0
+    msr_background: str = Field("", description="MSR 2.3 (pseudo-video): sfondo obbligatorio")
 
 
 class KeyframesReq(BaseModel):
@@ -67,6 +78,11 @@ class KeyframesReq(BaseModel):
     guidance: float = 3.0
     seed: int = 42
     loras: list | None = None
+    ltx_release: str | None = Field(None, description="release LTX: 2.3 (default) | 2.5")
+    model: str | None = Field(None, description="transformer esplicito; auto per release != 2.3")
+    references: list | None = Field(None, description="MSR: 2-5 riferimenti per la coerenza")
+    msr_strength: float = 1.0
+    msr_background: str = ""
 
 
 class ExtendReq(BaseModel):

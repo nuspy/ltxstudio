@@ -103,13 +103,33 @@ def free_video_vram(timeout: int = 20, min_free_mb: int | None = None, wait_s: i
     # riconosciuto e lo sfratto size-aware non scattava.
     # NB: _m/_need FUORI dal try del registro: servono anche alla soglia dinamica qui sotto.
     _m = gguf or model
+
+    def _abs(nome: str) -> str:
+        """Il NOME del checkpoint → path su disco.
+
+        La GUI passa qui il nome nudo («ltx2310eros_v1.safetensors»), come lo mette nei params: il
+        `os.path.exists` qui sotto falliva sempre, `_need` restava 0 e la soglia d'attesa degenerava
+        — il worker da 22B partiva con la VRAM ancora occupata e finiva in shared memory, che è
+        proprio ciò che questa funzione esiste per evitare.
+        """
+        if not nome:
+            return ""
+        if os.path.isabs(nome) and os.path.exists(nome):
+            return nome
+        for _base in (r"E:\AI\Models\diffusion_models", r"E:\AI\Models\diffusion_models\LTX"):
+            _p = os.path.join(_base, nome)
+            if os.path.exists(_p):
+                return _p
+        return nome
+
     _need = 0
     try:
         from core import vram_estimate
-        if gguf and os.path.exists(gguf):
-            _need = int(os.path.getsize(gguf) / 2**20) + 9000         # GGUF ≈ dim file + working video
-        elif model and os.path.exists(model):
-            _need, _ = vram_estimate.estimate_mb(model, fp8_storage=True, working_mb=9000)
+        _g_abs, _m_abs = _abs(gguf), _abs(model)
+        if _g_abs and os.path.exists(_g_abs):
+            _need = int(os.path.getsize(_g_abs) / 2**20) + 9000       # GGUF ≈ dim file + working video
+        elif _m_abs and os.path.exists(_m_abs):
+            _need, _ = vram_estimate.estimate_mb(_m_abs, fp8_storage=True, working_mb=9000)
     except Exception:                                        # noqa: BLE001
         pass
     try:
@@ -243,6 +263,17 @@ def run_clip(params: dict, *, free_vram: bool = True, timeout: int | None = None
     env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     r = subprocess.run([py, "-u", worker, jf], env=env,
                        capture_output=True, text=True, timeout=timeout)
+    # L'output COMPLETO del worker su file, sovrascritto a ogni clip. Quando un job fallisce sotto
+    # si conservano solo gli ultimi 500 caratteri: bastano ad accorgersi del guaio, non a capirlo —
+    # le righe che dicono quale modello e quale loader sono in TESTA, e sparivano sempre.
+    try:
+        with open(os.path.join(os.path.dirname(out) or ".", "worker_last.log"),
+                  "w", encoding="utf-8", errors="replace") as _lg:
+            _lg.write(r.stdout or "")
+            if r.stderr:
+                _lg.write("\n===== stderr =====\n" + r.stderr)
+    except OSError:
+        pass
     # Lo stdout del worker viene scartato quando il job riesce: le diagnosi della cache embedding
     # (hit/miss e secondi risparmiati) andrebbero perse proprio nei casi che ne fanno di più —
     # Film Studio e videoclip, che passano tutti da qui. Ripubblico solo quelle righe.

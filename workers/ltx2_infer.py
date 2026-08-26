@@ -91,7 +91,8 @@ def _torchcodec_ok() -> bool:
         return False
 
 
-def _encode_video_pyav(video, fps: int, audio, output_path: str, **_kw) -> None:
+def _encode_video_pyav(video, fps: int, audio, output_path: str, *, audio_lowpass: int | None = None,
+                       **_kw) -> None:
     """Salvataggio del video con PyAV (fallback quando torchcodec non carica le FFmpeg).
 
     Stessa semantica di encode_video: accetta un tensore [F,H,W,C] o un iteratore di chunk.
@@ -137,11 +138,57 @@ def _encode_video_pyav(video, fps: int, audio, output_path: str, **_kw) -> None:
             arr = _w.detach().cpu().float().numpy()
             if arr.ndim == 3:                                # (B,C,N) → (C,N)
                 arr = arr[0]
-            sf.write(wav, arr.T, int(audio.sampling_rate))   # soundfile vuole (N,C)
+            # NORMALIZZAZIONE: il decoder audio restituisce float NON limitati a [-1,1] e
+            # soundfile, scrivendo PCM a 16 bit, taglia tutto ciò che esce dal range. Il risultato
+            # è un segnale schiacciato contro 0 dBFS che suona METALLICO, "da radio" (misurato:
+            # peak 0.0 dB, flat factor 12.8). Si riscala lasciando ~1 dB di margine, così il
+            # livello resta pieno ma nulla viene troncato.
+            import numpy as _np
+            _peak = float(_np.max(_np.abs(arr))) if arr.size else 0.0
+            _sr = int(getattr(audio, "sampling_rate", 0) or 48000)
+            _sat = int((_np.abs(arr) >= 0.999).sum())
+            print(f"[audio] traccia: {arr.shape[0]}ch, {arr.shape[-1]} campioni @ {_sr}Hz "
+                  f"| picco {_peak:.4f} ({20 * _np.log10(max(_peak, 1e-9)):+.1f} dBFS) "
+                  f"| campioni a fondo scala: {_sat}", flush=True)
+            # -3 dBFS, non -1: fra la scrittura PCM e la codifica AAC c'è l'overshoot fra campioni
+            # (intersample peaks), che con un solo dB di margine riporta il segnale a fondo scala —
+            # misurato: picco 0.0 dB nel file finale nonostante l'array fosse sotto soglia.
+            if _peak > 0.708:                                # -3 dBFS
+                arr = arr * (0.708 / _peak)
+                print(f"[audio] normalizzato a -3 dBFS (margine per l'overshoot dell'AAC)",
+                      flush=True)
+            sf.write(wav, arr.T, _sr)                        # soundfile vuole (N,C)
             tmp = output_path + ".mux.mp4"
             ff = shutil.which("ffmpeg") or "ffmpeg"
+            # ESTENSIONE DI BANDA: la 2.5 decodifica l'audio a 16 kHz e VocoderWithBWE ricostruisce
+            # gli acuti fino a 48 kHz. Quel contenuto non viene dal modello audio, lo INVENTA il BWE
+            # dal mel, e si sente come alone metallico/"da radio". Misurato sui file GUI: prima che
+            # il BWE si attivasse (23/07) l'energia sopra gli 8 kHz era lo 0,4% del corpo del suono;
+            # dopo, il 6,2% — quindici volte tanto, a parità di livello di picco.
+            #
+            # Il BWE si riconosce dalla FREQUENZA DI CAMPIONAMENTO, non dall'oggetto: AudioDecoder
+            # (blocks.py) costruisce il vocoder dentro un `with` e lo libera subito, quindi
+            # `pipe.audio_decoder.vocoder` è sempre None e chiederglielo non funziona. Se l'audio
+            # esce sopra i 16 kHz da cui il vocoder parte, l'estensione di banda c'è stata.
+            _lp = audio_lowpass
+            if _lp is None:                                  # auto: decide la frequenza di uscita
+                _lp = 8000 if _sr > 16000 else 0
+            # Non un `lowpass`: è un biquad a 2 poli (-12 dB/oct) e ne lasciava passare metà (2,7%).
+            # Si torna invece alla frequenza di campionamento da cui il BWE è partito e si risale:
+            # l'anti-alias di soxr è ripido come serve, e il risultato è per costruzione la banda che
+            # il vocoder genera davvero, senza la parte ricostruita (misurato: 5,64% → 0,01%).
+            _af = (["-af", f"aresample={2 * _lp}:resampler=soxr:precision=28,"
+                           f"aresample=48000:resampler=soxr:precision=28"]
+                   if _lp else [])
+            if _lp:
+                print(f"[audio] {_sr} Hz in uscita da un vocoder a 16 kHz → tolgo la banda "
+                      f"sintetica sopra {_lp} Hz (round-trip a {2 * _lp} Hz)", flush=True)
+            # bitrate esplicito e alto: il default di ffmpeg per l'AAC stereo è ~128k, al limite
+            # per una traccia che contiene parlato + ambiente. 256k costa pochi KB su una clip di
+            # secondi e toglie di mezzo gli artefatti di compressione dal giudizio sulla qualità.
             subprocess.run([ff, "-y", "-loglevel", "error", "-i", output_path, "-i", wav,
-                            "-c:v", "copy", "-c:a", "aac", "-shortest", tmp], check=True)
+                            "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
+                            *_af, "-shortest", tmp], check=True)
             os.replace(tmp, output_path)
         except Exception as _ae:                             # noqa: BLE001 — meglio il video muto che nessun video
             print(f"[encode] !! AUDIO NON MUXATO ({type(_ae).__name__}: {_ae}) → video MUTO", flush=True)
@@ -150,9 +197,13 @@ def _encode_video_pyav(video, fps: int, audio, output_path: str, **_kw) -> None:
 def encode_video(video, fps, audio, output_path, video_chunks_number=None, **kw):
     """Scrive l'mp4: torchcodec se le sue DLL caricano, altrimenti PyAV."""
     if _torchcodec_ok():
+        # `audio_lowpass` è nostro: la encode_video del pacchetto non lo conosce e alzerebbe
+        # TypeError. Il filtro vive nel muxing ffmpeg del ramo PyAV — che su Windows è sempre
+        # quello attivo, perché torchcodec non carica le sue FFmpeg.
+        kw.pop("audio_lowpass", None)
         return _encode_video_torchcodec(video=video, fps=fps, audio=audio, output_path=output_path,
                                         video_chunks_number=video_chunks_number, **kw)
-    return _encode_video_pyav(video, fps, audio, output_path)
+    return _encode_video_pyav(video, fps, audio, output_path, **kw)
 
 # Fix meta-tensor: il meta-device loading di ltx-core + l'ottimizzazione SDPA-mask di transformers
 # fa `.item()` su un tensore 'meta' (crash su qualsiasi torch recente). Disabilitando lo skip,
@@ -627,8 +678,35 @@ def _patch_no_mmap_loader():
             return _SD(sd=sd, device=device, size=size, dtype=dtypes)
 
         def _metadata(self, path):
-            meta = _std.metadata(path)
-            return json.loads(meta["config"]) if "config" in meta else {}
+            """Contratto di SafetensorsModelStateDictLoader.metadata: il dict __metadata__ INTERO,
+            con ogni valore parsato se è JSON valido e lasciato stringa altrimenti.
+
+            Qui si restituiva SOLO il contenuto di `config`, buttando via il resto: `model_version`
+            e `gemma_source_checkpoint` sparivano, e la 2.5 moriva con «Checkpoint has no
+            gemma_source_checkpoint (model_version=None); expected a Gemma 3 config» — il codice,
+            non trovando la versione, presumeva LTX 2.3 e pretendeva Gemma 3 al posto di Gemma 4.
+            Come effetto secondario `read_model_config` riceveva il config e ci cercava dentro una
+            chiave "config" inesistente, quindi vedeva sempre {}.
+            """
+            parsed = {}
+            for key, value in (_std.metadata(path) or {}).items():
+                try:
+                    parsed[key] = json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    parsed[key] = value          # license, model_version: stringhe non-JSON
+            # DUE FORME, perché il pacchetto non è d'accordo con sé stesso: il loader originale
+            # restituisce il CONTENUTO di `config` (chiavi transformer/vae/scheduler/…) e chi lo usa
+            # legge `metadata["transformer"]`, mentre i configuratori dei connector fanno
+            # `metadata["config"]["transformer"]`. Restituendone una sola, l'altra vede {} e cade sui
+            # default: 30 teste × 128 = 3840, mentre i checkpoint hanno 32 × 64 = 2048 sull'audio e
+            # 32 × 128 = 4096 sul video — da cui «size mismatch … current model is [3840, 3840]» su
+            # ogni generazione con audio nativo. Si espone `config` E le sue chiavi promosse in cima:
+            # entrambi i lettori trovano ciò che cercano, nessuno dei due viene sovrascritto.
+            _cfg = parsed.get("config")
+            if isinstance(_cfg, dict):
+                for _k, _v in _cfg.items():
+                    parsed.setdefault(_k, _v)
+            return parsed
 
         _sft.SafetensorsStateDictLoader.load = _load
         _sft.SafetensorsModelStateDictLoader.metadata = _metadata
@@ -706,21 +784,48 @@ class _CpuParkRegistry(_DummyReg):
         return _SD(sd=dict(e.sd), device=e.device, size=e.size, dtype=e.dtype)
 
     def add(self, paths, sd_ops, state_dict):
+        """Parcheggia in RAM e RESTITUISCE lo state dict al chiamante.
+
+        Il ritorno NON è opzionale: `ltx_core.loader.helpers.load_state_dict` termina con
+        `return registry.add(...)`, quindi ciò che esce da qui è ciò che il chiamante riceve.
+        Uscendo a vuoto (parcheggio spento, già in cache, budget pieno) si restituiva None e chi
+        usa il valore moriva con «'NoneType' object has no attribute 'sd'» — è ciò che impediva
+        alla 2.5 di caricare il DurationHead, e quindi di generare. Il parcheggio è una CACHE:
+        deve restare trasparente, perciò si ritorna sempre lo state dict originale (sul device
+        che il chiamante ha chiesto), non la copia CPU.
+        """
         if not self._enabled():
-            return
+            return state_dict
         import time as _tm
         sid = self._gen_id(paths, sd_ops)
         if sid in self._sd:
-            return
+            return state_dict
         mb = sum(v.nbytes for v in state_dict.sd.values()) / 2**20
         from core import mem_budget                     # commit 2: budget/floor/predicato unificati
         budget = mem_budget.ram_cache_mb()
         while self._info and self._parked_mb() + mb > budget:  # LRU nel budget
             self._drop(min(self._info, key=lambda k: self._info[k]["used"]))
         if not mem_budget.fits(mb, self._parked_mb()):
+            # QUALE dei tre vincoli ha detto no, e con che numeri. Il messaggio unico
+            # «commit/RAM/budget insufficiente» era illeggibile: con la RAM al 29% sembrava un
+            # errore del programma, mentre di norma è il BUDGET della cache (48 GB) ad essere
+            # pieno — che è tutt'altra cosa e non è un problema di macchina.
+            _ram, _com = mem_budget.avail_ram_mb(), mem_budget.avail_commit_mb()
+            _res, _bud = self._parked_mb(), mem_budget.ram_cache_mb()
+            _perche = []
+            if _ram - mb <= mem_budget.ram_floor_mb():
+                _perche.append(f"RAM libera {_ram/1024:.1f}GB sotto il minimo "
+                               f"{mem_budget.ram_floor_mb()/1024:.0f}GB")
+            if _com - mb <= mem_budget.commit_floor_mb():
+                _perche.append(f"commit libero {_com/1024:.1f}GB sotto il minimo "
+                               f"{mem_budget.commit_floor_mb()/1024:.0f}GB")
+            if _res + mb > _bud:
+                _perche.append(f"budget cache pieno: {_res/1024:.1f}+{mb/1024:.1f} > "
+                               f"{_bud/1024:.0f}GB (alza LS_RAM_CACHE_MB)")
             print(f"[park] SKIP {os.path.basename(str(paths[0]))} ({mb:.0f}MB): "
-                  "commit/RAM/budget insufficiente → niente parcheggio", flush=True)
-            return
+                  f"{'; '.join(_perche) or 'parcheggio disattivato'} → niente parcheggio "
+                  f"(NON è un errore: il modello si carica lo stesso, solo senza cache)", flush=True)
+            return state_dict
         cpu_sd = {k: (v if v.device.type == "cpu" else v.to("cpu")) for k, v in state_dict.sd.items()}
         from ltx_core.loader.primitives import StateDict as _SD
         self._sd[sid] = _SD(sd=cpu_sd, device=torch.device("cpu"),
@@ -735,6 +840,7 @@ class _CpuParkRegistry(_DummyReg):
                                  category="video", state="ram_parked", path=str(paths[0]))
         except Exception:                               # noqa: BLE001
             pass
+        return state_dict
 
     def pop(self, paths, sd_ops):
         sid = self._gen_id(paths, sd_ops)
@@ -860,6 +966,20 @@ def _apply_release(rel_id: str | None) -> None:
     CHECKPOINT = _CHECKPOINT_23 if r.id == "2.3" else ""
     print(f"[release] LTX {r.id} — TE={os.path.basename(GEMMA) or GEMMA} · "
           f"IC-LoRA={len(IC_LORA)} · sigma_driven={SIGMA_DRIVEN}", flush=True)
+
+
+def _unpack_pipe(res):
+    """(video, audio, num_frames_effettivi) da un ritorno di pipeline, 2.3 o 2.5.
+
+    La 2.3 ritorna `(video, audio)`; la 2.5 ritorna
+    `(decoded_video, decoded_audio, num_frames, tiling_config)` — con `video, audio = pipe(...)`
+    esplode in «too many values to unpack (expected 2)». Il terzo elemento NON è decorativo: è la
+    lunghezza EFFETTIVA decisa dal duration head, che può non coincidere con quella richiesta.
+    """
+    if isinstance(res, tuple) and len(res) >= 3:
+        return res[0], res[1], res[2]
+    video, audio = res
+    return video, audio, None
 
 
 def _adapt_model_paths(kw: dict) -> dict:
@@ -2047,6 +2167,7 @@ def run_generation(p: dict) -> str:
     fps = float(p.get("fps", 25.0))
     _tc = _tiling_config(p)                                   # decode VAE a chunk (streaming); tile piccoli se lowmem
     tg = time.time()
+    _nf_eff = None            # lunghezza effettiva se la pipeline la restituisce (2.5, duration head)
     _stage(f"Generazione video — {int(p.get('steps', 30))} step (encode prompt + denoise)…")
     if ptype == "vinpaint":                                  # #59 inpaint: guide=video orig + attention_mask + CFG
         import glob as _glob
@@ -2064,14 +2185,14 @@ def run_generation(p: dict) -> str:
         audio = None
     elif ptype == "a2v":                                     # AUDIO→VIDEO nativo: foto + canzone → canto
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
-        video, audio = pipe(
+        video, audio, _nf_eff = _unpack_pipe(pipe(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 30)),
             video_guider_params=vg, images=imgs, audio_path=_ensure_stereo(p["audio_path"]),
             audio_start_time=float(p.get("audio_start_time", 0.0)),
             audio_max_duration=p.get("audio_max_duration"),
-            tiling_config=_tc, enhance_prompt=bool(p.get("enhance", False)))
+            tiling_config=_tc, enhance_prompt=bool(p.get("enhance", False))))
     elif ptype == "retake":                                  # #24 ReTake: rigenera [start,end] di un video sorgente
         print(f"[retake] {p['video_path']} sezione [{p.get('start_time',0)},{p.get('end_time',0)}]s", flush=True)
         _rt_src = _prep_retake_source(p["video_path"], p.get("width"), p.get("height"))
@@ -2080,14 +2201,14 @@ def run_generation(p: dict) -> str:
         # spazio contiguo all'encoder ed evitare l'OOM flaky al bordo dei 32GB.
         import gc as _gc
         _gc.collect(); torch.cuda.empty_cache()
-        video, audio = pipe(
+        video, audio, _nf_eff = _unpack_pipe(pipe(
             video_path=_rt_src, prompt=p.get("prompt", ""),
             start_time=float(p.get("start_time", 0.0)), end_time=float(p.get("end_time", 0.0)),
             seed=int(p.get("seed", 42)), negative_prompt=p.get("negative", "worst quality, blurry"),
             num_inference_steps=int(p.get("steps", 40)), video_guider_params=vg,
             regenerate_video=bool(p.get("regenerate_video", True)),
             regenerate_audio=bool(p.get("regenerate_audio", True)),
-            tiling_config=_tc)
+            tiling_config=_tc))
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
@@ -2112,13 +2233,13 @@ def run_generation(p: dict) -> str:
             cam = (1.0 - mt)[None, None].to("cuda")          # (1,1,T,H,W) inverso = inpaint
         # ICLoraPipeline.__call__: prompt/seed/height/width/num_frames/frame_rate/images/video_conditioning
         # (+ enhance_prompt/tiling/conditioning_attention_strength/conditioning_attention_mask). NO negative/steps.
-        video, audio = pipe(
+        video, audio, _nf_eff = _unpack_pipe(pipe(
             prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
             height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, images=imgs, video_conditioning=[(cv, cstr)],
             enhance_prompt=bool(p.get("enhance", False)), tiling_config=_tc,
             conditioning_attention_strength=float(p.get("conditioning_attention", 1.0)),
-            conditioning_attention_mask=cam)
+            conditioning_attention_mask=cam))
     else:
         # 'In ascolto (loop)': da una foto fissa → keyframe auto (passata-seme di movimento) per un
         # ritratto che ascolta girabile in loop. Costruiti QUI per riusare il modello già in VRAM.
@@ -2134,7 +2255,9 @@ def run_generation(p: dict) -> str:
             from workers import ltx_msr
             if ltx_msr.install_slot_embedding(
                     p["msr_lora"], reference_frames=int(p.get("msr_reference_frames", 1) or 1)):
-                _refs = ltx_msr.references_to_inputs(p["references"], float(p.get("ref_strength", 1.0)))
+                _refs = ltx_msr.references_to_inputs(
+                    p["references"], float(p.get("ref_strength", 1.0)),
+                    spacing=int(p.get("msr_spacing", 1) or 1))
                 images.extend(_refs)
                 print(f"[msr] {len(_refs)} riferimenti a frame {[i.frame_idx for i in _refs]}", flush=True)
         elif p.get("references") and not _msr_strategy:
@@ -2154,15 +2277,35 @@ def run_generation(p: dict) -> str:
             # APPEND, non assegnazione: i riferimenti MSR sono già dentro `images` e si sommano
             # all'immagine di partenza (stanno a frame negativi, non se la contendono).
             images.append(ImageConditioningInput(p["image_path"], 0, _ref_str, 33))
-        video, audio = pipe(
+        video, audio, _nf_eff = _unpack_pipe(pipe(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 512)), width=int(p.get("width", 768)),
             num_frames=nf, frame_rate=fps, num_inference_steps=int(p.get("steps", 40)),
             video_guider_params=vg, audio_guider_params=ag, images=images,
-            tiling_config=_tc, enhance_prompt=bool(p.get("enhance", False)))
+            tiling_config=_tc, enhance_prompt=bool(p.get("enhance", False))))
+    # La 2.5 può restituire una lunghezza diversa da quella richiesta (duration head): il log e
+    # l'encode devono usare quella EFFETTIVA, altrimenti fps e durata dichiarata non tornano.
+    if _nf_eff:
+        nf = int(_nf_eff)
     print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video, {ptype})", flush=True)
     out = p["output"]
     _stage("Decodifica VAE e salvataggio video…")
+    # QUALE VOCODER: la 2.5 può montare VocoderWithBWE (16kHz interni → 48kHz ricostruendo gli acuti)
+    # oppure il Vocoder base, che si ferma alla banda che genera davvero. La scelta la fa
+    # VocoderConfigurator leggendo metadata["config"]["vocoder"]["bwe"], quindi dipende dal loader.
+    # NB: qui si può solo guardare il *builder*. AudioDecoder costruisce il vocoder dentro un `with`
+    # e lo libera appena decodificato, quindi `.vocoder` è None e non dice nulla — chi deve DECIDERE
+    # guarda la frequenza di campionamento dell'audio prodotto (vedi il filtro nell'encoder).
+    if p.get("native_audio"):
+        try:
+            _ad = getattr(pipe, "audio_decoder", None)
+            _vb = getattr(_ad, "_vocoder_builder", None) if _ad is not None else None
+            print(f"[audio] decoder={type(_ad).__name__ if _ad else '?'} "
+                  f"vocoder-builder={getattr(getattr(_vb, 'target', None), '__name__', '?')}",
+                  flush=True)
+        except Exception as _de:                             # noqa: BLE001
+            print(f"[audio] diagnosi vocoder non riuscita: {_de}", flush=True)
+
     # LTX-2 restituisce SEMPRE una traccia audio anche per i2v/ti2v/iclora: senza condizionamento audio è
     # RUMORE non condizionato ("rumore grigio"). La scartiamo (video muto) tranne quando l'audio è davvero
     # richiesto — a2v (canto/parlato) o audio_path fornito. Così i video generati/editati NON hanno più rumore.
@@ -2188,8 +2331,11 @@ def run_generation(p: dict) -> str:
         video = next(_nan_guard([video]))
     else:
         video = _nan_guard(video)
+    # None (assente) = decide l'encoder dalla frequenza di uscita; 0 = nessun filtro, banda piena.
+    _lp = p.get("audio_lowpass")
     encode_video(video=video, fps=fps, audio=audio, output_path=out,
-                 video_chunks_number=get_video_chunks_number(nf, _tc))
+                 video_chunks_number=get_video_chunks_number(nf, _tc),
+                 audio_lowpass=None if _lp is None else int(_lp))
     # 'In ascolto (loop)': il render è il loop base (~8s, wrap seamless). Se l'utente ha chiesto una durata
     # maggiore, la otteniamo RIPETENDO il loop base (multipli interi → i bordi restano seamless, niente
     # crossfade/stacco). Fallback: se il ricalcolo/ripetizione fallisce, si consegna il loop base.

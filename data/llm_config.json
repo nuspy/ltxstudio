@@ -1,0 +1,6 @@
+{
+  "provider": "lmstudio",
+  "lmstudio_port": 1234,
+  "lmstudio_model": "qwen/qwen3.5-35b-a3b",
+  "temperature": 0.8
+}

@@ -158,6 +158,30 @@ def ensure_server(wait_s: int = 120) -> bool:
     return False
 
 
+def reset_server() -> bool:
+    """Svuota pipeline in cache e parcheggio RAM del server, lasciandolo vivo.
+
+    Serve quando il server costruisce un modello incoerente col checkpoint richiesto e il job muore
+    con «size mismatch … Error(s) in loading state_dict»: lo stato sporco resta e fa fallire anche
+    tutti i job successivi, mentre lo stesso checkpoint in un processo pulito carica senza errori.
+    `/free mode=destroy` butta via sia la cache sia i pesi parcheggiati, quindi il job seguente
+    ricostruisce da zero — meglio che uccidere il processo, che si porta dietro il riavvio.
+    """
+    if not is_up():
+        return True                                         # già a terra: il prossimo avvio è pulito
+    try:
+        r = requests.post(f"{BASE}/free", json={"mode": "destroy"}, timeout=30).json()
+        if r.get("busy"):
+            print("[ltx2] reset RIFIUTATO: job in corso sul server", flush=True)
+            return False
+        print(f"[ltx2] server azzerato: {r.get('freed_pipelines', 0)} pipeline, "
+              f"parcheggio RAM svuotato", flush=True)
+        return True
+    except Exception as e:                                  # noqa: BLE001
+        print(f"[ltx2] reset del server fallito ({e})", flush=True)
+        return False
+
+
 def _free_gpu_servers() -> None:
     """M1 — prima del VIDEO libera i server di categoria DIVERSA (immagini :8189 + API :8200): su single-GPU
     un solo modello pesante alla volta, altrimenti il transformer 22B non entra e sborza in shared-RAM.
@@ -286,6 +310,12 @@ def generate(params: dict, timeout: int = 3600) -> dict:
         from core import ltx_release as _lr
         if _rel != _lr.DEFAULT_RELEASE:
             return _generate_direct(dict(params), _rel, timeout)
+    # Residenza disattivata → worker diretto, come per una release non-default. Senza questo
+    # controllo `ensure_server()` riaccendeva il server anche a preferenza spenta, e il job
+    # successivo trovava la RAM già presa (misurato: 72 GB) morendo sulla memoria pinnata.
+    if not server_enabled():
+        from core import ltx_release as _lr2
+        return _generate_direct(dict(params), _rel or _lr2.DEFAULT_RELEASE, timeout)
     if not ensure_server():
         return {"status": "error", "error": "server video LTX-2 non avviato (venv ltx2 mancante?)"}
     p = dict(params)

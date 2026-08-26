@@ -139,9 +139,15 @@ _R25 = LtxRelease(
     # transformers>=5.8,<5.15 (Gemma 4) → NON può condividere il venv della 2.3, che gira su 4.x.
     python=str(_TOOLS / "lingbot_venv" / "Scripts" / "python.exe"),
     worker=str(_REPO / "workers" / "ltx2_infer.py"),
-    # Text encoder nvfp4 (6,9 GiB) invece dei 24,5 GiB del bf16 ufficiale: stesso layout
-    # weight/weight_scale/weight_scale_2 che sappiamo già leggere (flux2_transformer.Nvfp4Linear).
-    text_encoder=_P("ltx25-te-nvfp4-local", str(_TE25 / "gemma4-12b-with-proj-nvfp4-torchao.safetensors")),
+    # Text encoder bf16 UFFICIALE (24,5 GiB). Qui c'era il nvfp4 locale da 6,9 GiB, scelto
+    # assumendo che il layout weight/weight_scale/weight_scale_2 fosse leggibile come per
+    # flux2_transformer.Nvfp4Linear: NON lo è. Quel loader vale per il transformer; il TE Gemma
+    # passa da `transformers` (ltx_core.text_encoders.gemma), che non ha alcun supporto alla
+    # quantizzazione — costruisce il modello a piena larghezza e ci copia dentro i pesi. Coi pesi
+    # fp4 impacchettati a metà larghezza il caricamento muore su «size mismatch [3840,1920] vs
+    # [3840,3840]», ed è ciò che ha impedito alla 2.5 di generare. Le varianti compresse
+    # (int8-convrot 15,4 GiB, GGUF Q5_K_M 9,5 GiB) esistono solo per la strada ComfyUI.
+    text_encoder=_P("ltx25-te-bf16", str(_TE25 / "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors")),
     video_vae=_P("ltx25-video-vae-conv", str(_VAE25 / "ltx-2.5-video-vae-conv-bf16.safetensors")),
     audio_vae=_P("ltx25-audio-vae", str(_VAE25 / "ltx-2.5-audio-vae-bf16.safetensors")),
     # Lo spatial upscaler 2.5 esiste, ma il README rimanda ancora a quello 2.3 — che abbiamo già

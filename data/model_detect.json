@@ -1291,14 +1291,14 @@
    16388660768
   ]
  },
- "E:\\AI\\Models\\TextEncoders\\Flux\\mistral_3_small_flux2_fp4_mixed.safetensors": {
-  "path": "E:\\AI\\Models\\TextEncoders\\Flux\\mistral_3_small_flux2_fp4_mixed.safetensors",
-  "name": "mistral_3_small_flux2_fp4_mixed.safetensors",
-  "folder": "Flux",
-  "family": "flux1",
-  "variant": "dev",
-  "role": "t2i",
-  "kind": "image",
+ "E:\\AI\\Models\\diffusion_models\\ltx-2.5-22b-distilled-transformer-nvfp4.safetensors": {
+  "path": "E:\\AI\\Models\\diffusion_models\\ltx-2.5-22b-distilled-transformer-nvfp4.safetensors",
+  "name": "ltx-2.5-22b-distilled-transformer-nvfp4.safetensors",
+  "folder": "diffusion_models",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
   "precision": "fp4",
   "arch_meta": "",
   "source": "folder",
@@ -1306,8 +1306,8 @@
   "n_double": 0,
   "n_single": 0,
   "_sig": [
-   1784771571891868300,
-   12275678071
+   1786485029023881700,
+   18721432024
   ]
  },
  "E:\\AI\\Models\\VAE\\ae.safetensors": {
@@ -1633,6 +1633,63 @@
    995743560
   ]
  },
+ "E:\\AI\\Models\\latent_upscale_models\\ltx-2.3-temporal-upscaler-x2-1.0.safetensors": {
+  "path": "E:\\AI\\Models\\latent_upscale_models\\ltx-2.3-temporal-upscaler-x2-1.0.safetensors",
+  "name": "ltx-2.3-temporal-upscaler-x2-1.0.safetensors",
+  "folder": "latent_upscale_models",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1786885308505436500,
+   261944000
+  ]
+ },
+ "E:\\AI\\Models\\VAE\\ltx-2.5-audio-vae-bf16.safetensors": {
+  "path": "E:\\AI\\Models\\VAE\\ltx-2.5-audio-vae-bf16.safetensors",
+  "name": "ltx-2.5-audio-vae-bf16.safetensors",
+  "folder": "VAE",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1786484232438664800,
+   364866540
+  ]
+ },
+ "E:\\AI\\Models\\VAE\\ltx-2.5-video-vae-conv-bf16.safetensors": {
+  "path": "E:\\AI\\Models\\VAE\\ltx-2.5-video-vae-conv-bf16.safetensors",
+  "name": "ltx-2.5-video-vae-conv-bf16.safetensors",
+  "folder": "VAE",
+  "family": "ltxv",
+  "variant": "base",
+  "role": "video",
+  "kind": "video",
+  "precision": "fp16",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1786484220332994400,
+   1452269922
+  ]
+ },
  "E:\\AI\\Models\\TextEncoders\\LTX\\ltx2-embeddings-connector-distill.safetensors": {
   "path": "E:\\AI\\Models\\TextEncoders\\LTX\\ltx2-embeddings-connector-distill.safetensors",
   "name": "ltx2-embeddings-connector-distill.safetensors",
@@ -1782,6 +1839,25 @@
   "n_single": 0,
   "_sig": [
    1773276393159611600,
+   12275678071
+  ]
+ },
+ "E:\\AI\\Models\\TextEncoders\\Flux\\mistral_3_small_flux2_fp4_mixed.safetensors": {
+  "path": "E:\\AI\\Models\\TextEncoders\\Flux\\mistral_3_small_flux2_fp4_mixed.safetensors",
+  "name": "mistral_3_small_flux2_fp4_mixed.safetensors",
+  "folder": "Flux",
+  "family": "flux1",
+  "variant": "dev",
+  "role": "t2i",
+  "kind": "image",
+  "precision": "fp4",
+  "arch_meta": "",
+  "source": "folder",
+  "hidden": null,
+  "n_double": 0,
+  "n_single": 0,
+  "_sig": [
+   1784771571891868300,
    12275678071
   ]
  },
@@ -2372,481 +2448,6 @@
   "_sig": [
    1756237522922978600,
    253860343
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xNomos8kSCHAT-L.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4xNomos8kSCHAT-L.pth",
-  "name": "4xNomos8kSCHAT-L.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925508023306800,
-   331564661
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_dat2.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_dat2.safetensors",
-  "name": "4xRealWebPhoto_v4_dat2.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850509447757200,
-   139792588
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.safetensors",
-  "name": "4xNomos2_hq_dat2.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850485828471000,
-   139792588
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4x-UltraSharpV2.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\4x-UltraSharpV2.safetensors",
-  "name": "4x-UltraSharpV2.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850461908460300,
-   139792588
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4x-UltraSharp.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\4x-UltraSharp.safetensors",
-  "name": "4x-UltraSharp.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850438014575600,
-   66864028
-  ]
- },
- "E:\\AI\\Models\\Upscale\\2x-AnimeSharpV4_Fast_RCAN_PU.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\2x-AnimeSharpV4_Fast_RCAN_PU.safetensors",
-  "name": "2x-AnimeSharpV4_Fast_RCAN_PU.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850397774301700,
-   31359158
-  ]
- },
- "E:\\AI\\Models\\Upscale\\2xLiveActionV1_SPAN_490000.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\2xLiveActionV1_SPAN_490000.pth",
-  "name": "2xLiveActionV1_SPAN_490000.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850403607368800,
-   8947821
-  ]
- },
- "E:\\AI\\Models\\Upscale\\2xNomosUni_span_multijpg_ldl.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\2xNomosUni_span_multijpg_ldl.pth",
-  "name": "2xNomosUni_span_multijpg_ldl.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850408404615000,
-   8951347
-  ]
- },
- "E:\\AI\\Models\\Upscale\\2x_AniScale2_Omni_i16_40K.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\2x_AniScale2_Omni_i16_40K.pth",
-  "name": "2x_AniScale2_Omni_i16_40K.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850410507932300,
-   3393786
-  ]
- },
- "E:\\AI\\Models\\Upscale\\2x_Text2HD_v.1-RealPLKSR.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\2x_Text2HD_v.1-RealPLKSR.pth",
-  "name": "2x_Text2HD_v.1-RealPLKSR.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925093965327900,
-   29580290
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4x-AnimeSharp.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\4x-AnimeSharp.safetensors",
-  "name": "4x-AnimeSharp.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850425832526800,
-   66864025
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xFaceUpDAT.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4xFaceUpDAT.pth",
-  "name": "4xFaceUpDAT.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925256160592600,
-   154685037
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4xNomos2_hq_dat2.pth",
-  "name": "4xNomos2_hq_dat2.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925404589104600,
-   140196334
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xNomos2_hq_drct-l.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\4xNomos2_hq_drct-l.safetensors",
-  "name": "4xNomos2_hq_drct-l.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925440373351100,
-   242543780
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xNomos8kDAT.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4xNomos8kDAT.pth",
-  "name": "4xNomos8kDAT.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925482422198200,
-   309317507
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_drct-l.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4xRealWebPhoto_v4_drct-l.pth",
-  "name": "4xRealWebPhoto_v4_drct-l.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925345285147600,
-   242789758
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4x_NMKD-Siax_200k.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4x_NMKD-Siax_200k.pth",
-  "name": "4x_NMKD-Siax_200k.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1756331195354023600,
-   66957746
-  ]
- },
- "E:\\AI\\Models\\Upscale\\4x_RealisticRescaler_100000_G.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\4x_RealisticRescaler_100000_G.pth",
-  "name": "4x_RealisticRescaler_100000_G.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925340011675000,
-   134051293
-  ]
- },
- "E:\\AI\\Models\\Upscale\\HAT-L_SRx4_ImageNet-pretrain.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\HAT-L_SRx4_ImageNet-pretrain.safetensors",
-  "name": "HAT-L_SRx4_ImageNet-pretrain.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850537193821500,
-   165299287
-  ]
- },
- "E:\\AI\\Models\\Upscale\\LTX\\ltx-2-spatial-upscaler-x2-1.0.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\LTX\\ltx-2-spatial-upscaler-x2-1.0.safetensors",
-  "name": "ltx-2-spatial-upscaler-x2-1.0.safetensors",
-  "folder": "LTX",
-  "family": "ltxv",
-  "variant": "base",
-  "role": "video",
-  "kind": "video",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "folder",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772862589583067600,
-   995765578
-  ]
- },
- "E:\\AI\\Models\\Upscale\\RealESRGAN_x2plus.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x2plus.pth",
-  "name": "RealESRGAN_x2plus.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1756639230719107500,
-   67061725
-  ]
- },
- "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.pth": {
-  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.pth",
-  "name": "RealESRGAN_x4plus.pth",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "unknown",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1748925387338755200,
-   67040989
-  ]
- },
- "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus.safetensors",
-  "name": "RealESRGAN_x4plus.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850561276930400,
-   66857833
-  ]
- },
- "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus_anime_6B.safetensors": {
-  "path": "E:\\AI\\Models\\Upscale\\RealESRGAN_x4plus_anime_6B.safetensors",
-  "name": "RealESRGAN_x4plus_anime_6B.safetensors",
-  "folder": "Upscale",
-  "family": "unknown",
-  "variant": "",
-  "role": "unknown",
-  "kind": "unknown",
-  "precision": "fp16",
-  "arch_meta": "",
-  "source": "none",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1772850566396322100,
-   17888773
-  ]
- },
- "E:\\AI\\Models\\diffusion_models\\ltx-2.5-22b-distilled-transformer-nvfp4.safetensors": {
-  "path": "E:\\AI\\Models\\diffusion_models\\ltx-2.5-22b-distilled-transformer-nvfp4.safetensors",
-  "name": "ltx-2.5-22b-distilled-transformer-nvfp4.safetensors",
-  "folder": "diffusion_models",
-  "family": "ltxv",
-  "variant": "base",
-  "role": "video",
-  "kind": "video",
-  "precision": "fp4",
-  "arch_meta": "",
-  "source": "folder",
-  "hidden": null,
-  "n_double": 0,
-  "n_single": 0,
-  "_sig": [
-   1786485029023881700,
-   18721432024
   ]
  }
 }

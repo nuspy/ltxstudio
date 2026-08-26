@@ -36,8 +36,14 @@ def _load() -> dict:
         if PREFS_PATH.exists():
             loaded = json.loads(PREFS_PATH.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
+                # TUTTE le chiavi salvate, non solo quelle di _DEFAULT. Prima si copiava solo
+                # `for k in _DEFAULT`, quindi ogni preferenza non prevista qui veniva scritta da
+                # _save() e poi BUTTATA al caricamento successivo: `video_server` (opt-out del
+                # server video residente) non sopravviveva a un riavvio, e la GUI riaccendeva il
+                # server a ogni avvio nonostante fosse stato disattivato.
+                data.update(loaded)
                 for k, v in _DEFAULT.items():
-                    data[k] = loaded.get(k, v)
+                    data.setdefault(k, v)
     except Exception:
         pass
     # normalizza: liste → set-like (manteniamo liste per il JSON)

@@ -57,6 +57,11 @@ def resolve_refs(text: str, path_mode: str = "fast", flavor: str = "image") -> d
     #Variante ora è ONORATA (B1): immagini+LoRA della VARIAZIONE (es. @Marco#insanguinato), con fallback
     all'asset se la variante non ha propri asset."""
     refs, ref_images, loras, trigger_map = [], [], [], {}
+    # Separati per TIPO di asset: sul video i soggetti (actor/prop) sono gli slot MSR, mentre
+    # luoghi e architetture forniscono l'AMBIENTE — che sulla 2.5 è lo slot senza il quale il
+    # modello prende lo sfondo dai ritratti dei personaggi e la scena descritta sparisce.
+    subject_images: list[str] = []
+    place_images: list[str] = []
     for m in _REF_RE.finditer(text or ""):
         name, variant = m.group(1), m.group(2)
         # più recente per primo: se due film hanno un personaggio omonimo (es. Lucky Director rilanciato),
@@ -90,10 +95,16 @@ def resolve_refs(text: str, path_mode: str = "fast", flavor: str = "image") -> d
             imgs = db.query("image", "owner_kind='variation' AND owner_id=?", (var["id"],))
         if not imgs:
             imgs = db.query("image", "owner_kind='asset' AND owner_id=?", (asset["id"],))
-        ref_images += [i["file"] for i in imgs[:4] if i.get("file")]
+        _files = [i["file"] for i in imgs[:4] if i.get("file")]
+        ref_images += _files
+        if (asset.get("type") or "").lower() in ("location", "architecture"):
+            place_images += _files
+        else:
+            subject_images += _files
     clean = _REF_RE.sub(lambda m: trigger_map.get(m.group(1), m.group(1)), text or "")
     return {"refs": refs, "ref_images": ref_images, "loras": loras,
-            "trigger_map": trigger_map, "clean_text": clean}
+            "trigger_map": trigger_map, "clean_text": clean,
+            "subject_images": subject_images, "place_images": place_images}
 
 
 def style_suffix(cfg: dict) -> str:
@@ -132,7 +143,8 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
               face_ref: str = "", ref_image: str = "", ref_images: list | None = None,
               loras: list | None = None, arch: str = "flux", model: str = "", negative: str = "",
               structure: bool = True, coherence_engine: str = "flux",
-              grounding_px: int = 1024, krea2_variant: str = "turbo") -> str:
+              grounding_px: int = 1024, krea2_variant: str = "turbo",
+              face_strength: float = 0.85) -> str:
     """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali.
     arch/model: architettura+checkpoint scelti nel progetto (B5: prima hardcoded flux). negative: estende il
     negative di default (continuity elementi vietati). structure: converte il prompt in JSON strutturato.
@@ -183,7 +195,11 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
     if model:                                                # checkpoint esplicito (altrimenti default del server)
         params["model"] = model
     if face_ref:
-        params["pulid_face"] = face_ref; params["pulid_strength"] = 0.85
+        # forza PuLID regolabile: a 0.85 l'identità è fedelissima ma si porta dietro TUTTO il volto
+        # di partenza, età compresa, e il prompt non riesce più a ringiovanire o invecchiare il
+        # personaggio. Abbassandola (0.5-0.7) restano i tratti e il prompt torna a contare.
+        params["pulid_face"] = face_ref
+        params["pulid_strength"] = max(0.0, min(1.0, float(face_strength)))
     # Kontext/multi-ref SOLO se non c'è un volto PuLID (attori→PuLID; props/luoghi/architetture→Kontext ref).
     _refs = [r for r in ([ref_image] + list(ref_images or [])) if r]
     if _refs and not face_ref:
@@ -271,21 +287,138 @@ def _submit_persistent(params: dict, out_mp4: str, timeout: int = 1800) -> str:
 
 
 # ─────────────── video (shot) ───────────────
+def msr_background_for(keyframes: list | None, out_mp4: str, width: int, height: int,
+                       *, log=print) -> str:
+    """Sfondo per la variante pseudo-video (LTX 2.3), che senza non parte.
+
+    Serve il KEYFRAME dello shot: è il contesto dell'inquadratura, ha già il formato del video, e
+    nel ciclo Cinema Studio esiste quasi sempre (i keyframe si generano prima dei video).
+
+    Senza keyframe si torna a stringa vuota, cioè MSR NON si attiva. Qui c'era un ripiego con una
+    tela neutra: PROVATO E SCARTATO. La guida viene seguita con `control_strength=1.0` e uno
+    sfondo piatto non porta informazione, così il modello riproduce la tela — clip annacquate,
+    sfocate, coi soggetti che si sgranano in punti (stessa "poltiglia" che il worker documenta
+    per le guide di formato sbagliato, ltx2_infer.py:1915). Il confronto A/B è netto: con il
+    keyframe il risultato è ottimo, con la tela neutra è peggiore che senza MSR del tutto.
+    """
+    for kf in (keyframes or []):
+        p = kf.get("path") if isinstance(kf, dict) else str(kf or "")
+        if p and os.path.exists(p):
+            log(f"[msr] sfondo = keyframe dello shot ({os.path.basename(p)})")
+            return p
+    log("[msr] nessun keyframe da usare come sfondo → riferimenti multipli NON attivati "
+        "(su LTX 2.3 una guida senza sfondo reale peggiora la clip). Genera prima il keyframe, "
+        "indica msr_background, oppure usa la 2.5 che non richiede sfondo.")
+    return ""
+
+
+def _aspect_warning(ref_images: list, width: int, height: int, log=print) -> None:
+    """Avvisa se i riferimenti hanno un formato molto diverso dallo shot.
+
+    `fit_on_white` scala il soggetto DENTRO il frame e lo centra su bianco: un ritratto verticale
+    dentro un frame orizzontale lascia grosse bande bianche, che entrano nella guida e finiscono
+    nella clip. I riferimenti vanno generati nello stesso formato del video.
+    """
+    if not width or not height:
+        return
+    target = width / height
+    for p in ref_images or []:
+        try:
+            from PIL import Image
+            with Image.open(p) as im:
+                r = im.width / im.height
+        except Exception:                                    # noqa: BLE001
+            continue
+        if r and (r / target > 1.5 or target / r > 1.5):
+            log(f"[msr] ⚠ {os.path.basename(p)} è {im.width}x{im.height} ma lo shot è "
+                f"{width}x{height}: il soggetto verrà centrato fra bande bianche che entrano "
+                f"nella guida. Genera i riferimenti nel formato dello shot.")
+
+
+def msr_references(ref_images: list | None, release: str, *, background: str = "",
+                   strength: float = 1.0) -> list[dict]:
+    """Ritratti/luoghi della scena → riferimenti MSR, solo se la release li regge davvero.
+
+    I due meccanismi hanno prerequisiti diversi (vedi workers/ltx_msr.py):
+      · 2.5 → slot embedding: bastano le immagini, nessuno sfondo richiesto;
+      · 2.3 → pseudo-video IC-LoRA: lo SFONDO è obbligatorio, senza il worker esce con errore.
+    Perciò sulla 2.3 l'attivazione automatica avviene solo se uno sfondo c'è. La strategia vera la
+    determina il worker aprendo il file della LoRA: qui si decide solo se PROVARCI.
+    """
+    from core import ltx_release as lrel
+    from workers import ltx_msr
+
+    paths, seen = [], set()
+    for p in (ref_images or []):
+        p = str(p or "")
+        if p and p not in seen and os.path.exists(p):
+            seen.add(p)
+            paths.append(p)
+    if not paths:
+        return []
+    rel = lrel.get(release)
+    if rel.caps.get("multiref") != lrel.CAP_YES or not os.path.exists(rel.msr_lora or ""):
+        return []
+    if not background:
+        # Sfondo obbligatorio su LTX, come nel pannello della GUI: senza, la 2.3 non parte proprio
+        # e la 2.5 produce clip in cui l'ambiente è quello dei ritratti invece della scena chiesta.
+        # Meglio non attivare i riferimenti che consegnare una clip sbagliata in silenzio.
+        return []
+    # Quanti soggetti REGGE la release: la 2.3 ne prende 4 (il 5º slot è lo sfondo) e
+    # `build_pseudo_video` tronca in silenzio; la 2.5 ha 5 slot pieni. Il taglio va fatto qui,
+    # dove si può dirlo, invece di far sparire un personaggio senza un avviso.
+    cap = ltx_msr.MAX_SUBJECTS if rel.id == lrel.DEFAULT_RELEASE else ltx_msr.MAX_REFERENCES
+    if len(paths) > cap:
+        print(f"[msr] {len(paths)} riferimenti ma LTX {rel.id} ne regge {cap}: "
+              f"scartati {[os.path.basename(p) for p in paths[cap:]]}", flush=True)
+    # `strength` per-riferimento: sullo slot embedding (2.5) è QUESTA a decidere quanto il
+    # riferimento pesa contro il prompt — `references_to_inputs` la legge da ogni voce e il
+    # default globale non la sovrascrive. Fissarla a 1.0 rendeva `msr_strength` inefficace, e i
+    # riferimenti finivano per riprodursi tali e quali ignorando la scena descritta.
+    out = [{"path": p, "kind": "image", "strength": float(strength)} for p in paths[:cap]]
+
+    # SFONDO come riferimento, esattamente come fa il pannello della GUI (get_references: lo
+    # accoda con role='background'). Serve a ENTRAMBE le release, per motivi diversi:
+    #   · 2.3 → riempie i fotogrammi liberi della pseudo-sequenza;
+    #   · 2.5 → `references_to_inputs` filtra solo per kind, quindi lo sfondo diventa uno slot a
+    #     pieno titolo: è il riferimento che porta l'AMBIENTE. Senza, il modello l'ambiente se lo
+    #     prende dai ritratti dei soggetti e la scena descritta nel prompt viene ignorata.
+    if background and os.path.exists(background):
+        out.append({"path": background, "kind": "image", "role": "background",
+                    "strength": float(strength)})
+    return out
+
+
 def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int = 512, fps: int = 25,
                    duration_s: float = 4.0, seed: int = 7, keyframes: list | None = None,
                    loras: list | None = None, audio_path: str = "", model_gguf: str = "",
                    negative: str = "", structure: bool = True, video_arch: str = "ltx",
-                   lingbot_variant: str = "dense", run_refiner: bool = False) -> str:
+                   lingbot_variant: str = "dense", run_refiner: bool = False,
+                   ltx_release: str | None = None, model: str = "", references=None,
+                   ref_images: list | None = None, native_audio: bool = False,
+                   msr_strength: float = 1.0, msr_background: str = "",
+                   msr_spacing: int = 1, steps: int = 8, guidance: float = 3.0,
+                   audio_lowpass: int | None = None) -> str:
     """Genera il video di uno shot col worker nativo. keyframes=[{path,frame,strength}].
     model_gguf: transformer scelto nel progetto (B5), altrimenti il distilled Q4 di default.
     video_arch: 'ltx' (default) o 'lingbot' (2ª architettura, worker/venv dedicati).
-    structure: converte il prompt in JSON strutturato e lo ricompone (vedi gen_image)."""
+    structure: converte il prompt in JSON strutturato e lo ricompone (vedi gen_image).
+
+    ltx_release/model: release LTX (2.3 default | 2.5) e transformer esplicito.
+    references: riferimenti multipli (MSR) per la coerenza di cast e luoghi fra shot diversi —
+    sulla 2.5 entrano come slot embedding a frame negativi, sulla 2.3 come pseudo-video IC-LoRA
+    (che pretende anche `msr_background`). La LoRA MSR la risolve `apply_ltx_release`."""
     prompt, negative = _apply_prompt_json(prompt, negative, loras, out_mp4, kind="video", structure=structure)
     nf = max(9, int(round(duration_s * fps)) // 8 * 8 + 1)
     neg = NEG + (", " + negative if negative else "")
     video_arch = (video_arch or "ltx").lower()
     params = {"prompt": prompt, "negative": neg, "width": width,
-              "height": height, "num_frames": nf, "fps": fps, "steps": 8, "guidance": 3.0,
+              # steps/guidance NON più cablati: la GUI li prende dallo slider, qui erano fissi e il
+              # ciclo Cinema Studio non poteva alzarli. (Sull'AUDIO però non incidono: misurato a
+              # 8/20/30 passi, rumore di fondo -88,8 / -80,3 / -89,2 dB, nessun andamento. Il timbro
+              # metallico veniva dal BWE, non dal denoise — vedi `audio_lowpass`.)
+              "height": height, "num_frames": nf, "fps": fps,
+              "steps": int(steps), "guidance": float(guidance),
               "seed": seed, "output": out_mp4, "arch": video_arch}
     if video_arch == "lingbot":
         params["lingbot_variant"] = lingbot_variant
@@ -319,6 +452,76 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
         params["loras"] = loras
     if audio_path:
         params["audio_path"] = audio_path
+    if native_audio:
+        # Senza questo flag il worker BUTTA la traccia che LTX-2 produce comunque, perché non
+        # condizionata sarebbe rumore. Con il flag restano suoni e parlato ricavati dal prompt.
+        params["native_audio"] = True
+    if audio_lowpass is not None:
+        # Taglio della banda che il vocoder BWE della 2.5 sintetizza sopra i 16 kHz interni: None
+        # lascia decidere il worker (8000 Hz sulla 2.5, niente sulla 2.3), 0 disattiva il filtro.
+        params["audio_lowpass"] = int(audio_lowpass)
+    # ── Release LTX ────────────────────────────────────────────────────────────────────────────
+    # Non dichiarata → si deduce dal transformer scelto nel progetto, come fa la finestra principale
+    # (main_window: detect_release sul checkpoint). Così basta scegliere il modello 2.5 nel progetto
+    # perché Cinema Studio usi la 2.5, senza una seconda impostazione da tenere allineata a mano.
+    if video_arch == "ltx" and not ltx_release:
+        from core import ltx_release as _lr
+        ltx_release = _lr.detect_release(model or model_gguf or "") or None
+
+    # ── Riferimenti multipli (MSR) ─────────────────────────────────────────────────────────────
+    # Sulla 2.5 i ritratti del cast presenti nella scena entrano come slot embedding a frame
+    # negativi: è ciò che tiene lo stesso volto/luogo coerente da uno shot all'altro. `references`
+    # esplicite hanno la precedenza; altrimenti si derivano dai ref_images della scena.
+    # ── Percorso A: LoRA del personaggio → INFERENZA DIRETTA ───────────────────────────────────
+    # Con la LoRA video il personaggio sta nei PESI del transformer: non serve né un keyframe che
+    # lo mostri né lo slot MSR che lo descriva. Anzi, entrambi sono dannosi — il keyframe a piena
+    # forza congela la clip e i riferimenti MSR competono con la scena. Quindi t2v diretto.
+    _has_video_lora = bool(loras)
+    if _has_video_lora and (references or ref_images):
+        print(f"[film] LoRA del personaggio presenti ({len(loras)}): inferenza diretta, "
+              f"i riferimenti MSR non servono", flush=True)
+        references, ref_images = None, None
+
+    if (references or ref_images) and video_arch == "ltx":
+        from core import ltx_release as _lr
+        _rel_id = ltx_release or _lr.DEFAULT_RELEASE
+        # La 2.3 (pseudo-video IC-LoRA) pretende uno sfondo: lo si ricava dallo shot stesso invece
+        # di far fallire il job. Vale sia per i riferimenti derivati sia per quelli passati a mano
+        # (a meno che tra questi ce ne sia già uno con role='background'). La 2.5 non ne ha bisogno.
+        _has_bg = any(isinstance(r, dict) and r.get("role") == "background"
+                      for r in (references or []))
+        # Lo sfondo serve a entrambe le release (vedi msr_references): sulla 2.3 riempie la
+        # pseudo-sequenza, sulla 2.5 è lo slot che porta l'ambiente. Il pannello della GUI lo
+        # rende obbligatorio su LTX senza distinguere la release, e ha ragione.
+        if not msr_background and not _has_bg:
+            msr_background = msr_background_for(keyframes, out_mp4, width, height)
+        if not references:
+            references = msr_references(ref_images, _rel_id, background=msr_background,
+                                        strength=msr_strength)
+            if references:
+                _aspect_warning([r["path"] for r in references], width, height)
+                print(f"[film] MSR: {len(references)} riferimenti di scena → coerenza cast/luoghi "
+                      f"(LTX {_rel_id})", flush=True)
+
+    # Valida le componenti su disco e risolve la LoRA Multiple-Subject-Reference della release:
+    # senza, il worker morirebbe a metà job con un errore poco leggibile.
+    if ltx_release or model or references:
+        from api.handlers._common import apply_ltx_release
+        apply_ltx_release(params, ltx_release, model, references, msr_strength, msr_background,
+                          msr_spacing)
+
+    # ── Ancoraggio del primo fotogramma (2.5, slot embedding) ──────────────────────────────────
+    # I riferimenti stanno a frame NEGATIVI e vengono concatenati senza clamp
+    # (ltx_msr.install_slot_embedding): se nessun conditioning occupa il frame 0, affiorano nei
+    # primi ~10 fotogrammi come sagome in dissolvenza sopra la scena. Sulla 2.3 il problema non
+    # si vede perché la guida viene ritagliata (LTXVCropGuides); qui quel taglio non c'è.
+    # Con un keyframe a frame 0 la clip parte pulita — verificato confrontando le due varianti —
+    # quindi in sua assenza si usa lo SFONDO come ancora: è già l'immagine della scena.
+    # NIENTE ancoraggio automatico dello sfondo sui keyframe. Provato e RIMOSSO: la stessa
+    # immagine a frame 0 e all'ultimo frame con strength 1.0 fa interpolare il modello fra due
+    # fotogrammi identici e la clip esce FERMA (misurato: YDIF medio 0.34, cioè una foto animata).
+    # Stabilita' e immobilita' non sono la stessa cosa. La contaminazione dei riferimenti va
+    # risolta a monte, nel worker, non tenendo ferma la scena a forza.
     # chunking SOLO oltre i 20s (indicazione utente 12/07: sotto, LTX-2 genera in passata unica —
     # niente giunzioni e niente reload per-chunk). Prima la soglia era 150 frame (~6s): ogni shot
     # cinematografico da 15-18s finiva spezzato in 3-4 chunk senza necessità.
@@ -329,7 +532,12 @@ def gen_shot_video(prompt: str, out_mp4: str, *, width: int = 768, height: int =
     # ogni shot (era il collo di bottiglia di «Genera Tutti»). Il server persistente serve SOLO il modello
     # LTX-2 → ogni altra architettura (LingBot, krea_rt→Self-Forcing, self_forcing) DEVE andare al subprocess
     # dedicato via run_clip/_ARCH_RUNNER: instradarla qui produrrebbe clip col modello SBAGLIATO (LTX-2).
-    if video_arch == "ltx" and _ltx2_server_up():
+    # ⚠ Il server persistente è avviato SEMPRE col venv 2.3 (core/ltx2_service.py:279-288): un job
+    # con release diversa finirebbe sul PACCHETTO 2.3, che non sa caricare un text encoder da file
+    # singolo → «No files matching pattern 'tokenizer.model'». Release ≠ default → subprocess.
+    from core import ltx_release as _lrel
+    _rel_default = params.get("ltx_release", _lrel.DEFAULT_RELEASE) == _lrel.DEFAULT_RELEASE
+    if video_arch == "ltx" and _rel_default and _ltx2_server_up():
         # PRIMO job (server senza pipeline in cache): il SUO caricamento sceglie fp8-vs-GGUF in base
         # alla VRAM libera in quell'istante → aspetta il rilascio effettivo come per il subprocess
         # (visto live: shot_4 servito col subprocess morente = GGUF + 40GB alloc su 32). Dai job
