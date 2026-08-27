@@ -813,11 +813,15 @@ class _CpuParkRegistry(_DummyReg):
             _ram, _com = mem_budget.avail_ram_mb(), mem_budget.avail_commit_mb()
             _res, _bud = self._parked_mb(), mem_budget.ram_cache_mb()
             _perche = []
+            # Si scrive la SOTTRAZIONE, non il solo totale: «RAM libera 33GB sotto il minimo 16GB»
+            # si legge come un'assurdità, mentre il conto vero è 33 − 17 (il modello) = 16.
             if _ram - mb <= mem_budget.ram_floor_mb():
-                _perche.append(f"RAM libera {_ram/1024:.1f}GB sotto il minimo "
+                _perche.append(f"RAM: {_ram/1024:.1f}−{mb/1024:.1f} = "
+                               f"{(_ram - mb)/1024:.1f}GB, sotto il minimo "
                                f"{mem_budget.ram_floor_mb()/1024:.0f}GB")
             if _com - mb <= mem_budget.commit_floor_mb():
-                _perche.append(f"commit libero {_com/1024:.1f}GB sotto il minimo "
+                _perche.append(f"commit: {_com/1024:.1f}−{mb/1024:.1f} = "
+                               f"{(_com - mb)/1024:.1f}GB, sotto il minimo "
                                f"{mem_budget.commit_floor_mb()/1024:.0f}GB")
             if _res + mb > _bud:
                 _perche.append(f"budget cache pieno: {_res/1024:.1f}+{mb/1024:.1f} > "
@@ -1128,25 +1132,112 @@ def _auto_offload(p: dict, ckpt: str) -> str:
         # poche centinaia di MB per finire in shared-RAM (10-20× più lento) senza OOM visibile.
         _margin = float(os.environ.get("NATIVE_GPU_MARGIN", "1.06") or 1.06)
         _floor_gb = float(os.environ.get("NATIVE_GPU_FLOOR_MB", "800") or 800) / 1024.0
-        need = tr_gb * _margin + _ENC_GB + _WORK_GB + _floor_gb   # full-stack residente (solo fp8, no GGUF)
+        # LE LoRA PESANO, e qui non venivano contate affatto: `need` restava identico con o senza,
+        # il modello veniva dichiarato residente, e la memoria delle LoRA arrivava dopo — non
+        # prevista da nessuno. Con una sola LoRA il picco misurato passa da 25,7 a 29,0 GB su una
+        # scheda da 32,6: passa per un pelo. Con le sette di un preset si sfora, e sforare qui non
+        # dà un OOM pulito ma il percorso pinned, dove arriva l'access violation 0xC0000005.
+        # Fattore 4×: misurato sulla 2.5 nvfp4 a 768x1024x385 — senza LoRA il picco è 24,2 GB, con
+        # UNA LoRA da 1,11 GB sale a ~29, cioè +4,8 GB per un file da poco più di un giga. Fusione
+        # e dequant per-layer costano molto più del file, e stimare dalla dimensione sbaglierebbe di
+        # quattro volte. Meglio sovrastimare qui che scoprirlo a metà denoise: quando si sfora, il
+        # worker ripiega da solo su offload=cpu, e quel percorso muore di access violation.
+        _lora_gb = 0.0
+        try:
+            for _lo in (p.get("loras") or []):
+                _lp = _lo.get("name") if isinstance(_lo, dict) else str(_lo)
+                if not _lp:
+                    continue
+                _lp = str(_lp)
+                if not os.path.isabs(_lp) or not os.path.exists(_lp):   # nome → path in LoRA/
+                    for _b in (r"E:\AI\Models\LoRA", r"E:\AI\Models\LoRA\LTX-2",
+                               r"E:\AI\Models\LoRA\LTX-2.5"):
+                        _c = os.path.join(_b, os.path.basename(_lp))
+                        if os.path.exists(_c):
+                            _lp = _c
+                            break
+                if os.path.exists(_lp):
+                    _lora_gb += os.path.getsize(_lp) / 1e9 * 4.0
+        except Exception:                                    # noqa: BLE001
+            pass
+        # CHECKPOINT FP4 + LoRA = il transformer RADDOPPIA. Fondere una LoRA su pesi a 4 bit
+        # imporrebbe il requant e ne distruggerebbe la qualità, quindi _get_pipe passa alla dequant
+        # a fp8 (riga «[nvfp4-mm] LoRA da fondere → uso la dequant a fp8»). Misurato: il 2.5 nvfp4
+        # da 17,4 GB su disco diventa 22,4 GB residenti. Stimando dal file si sottovaluta di 5 GB,
+        # si dichiara "sta in VRAM", e si sfora a metà caricamento — con l'access violation che ne
+        # segue. Vale solo QUANDO ci sono LoRA: senza, l'FP4 resta com'è e occupa la metà.
+        # Il raddoppio da dequant vale SOLO nel retry: al primo tentativo il checkpoint resta
+        # quantizzato (regola dell'utente, 27/08: mai dequantizzare se non dopo un errore — i
+        # quantizzati sono molto più veloci). Stimarlo dequantizzato in anticipo faceva scegliere
+        # lo streaming, che il FP4 non supporta: il job moriva per colpa della stima, non della
+        # memoria.
+        if (_lora_gb > 0 and "nvfp4" in os.path.basename(ckpt).lower()
+                and p.get("_dequant_retry")):
+            _tr_deq = tr_gb * 1.30
+            print(f"[auto-offload] RETRY: dequant a fp8, il transformer passa da {tr_gb:.0f} a "
+                  f"{_tr_deq:.0f}GB", flush=True)
+            tr_gb = _tr_deq
+        need = tr_gb * _margin + _ENC_GB + _WORK_GB + _lora_gb + _floor_gb   # full-stack residente
         # I casi limite che frammentano (es. dev 768×576) restano coperti dall'OOM-RETRY con
         # offload=cpu in run_generation_with_oom_retry.
         mode = "none" if free_gb >= need else "cpu"
+        # CHECKPOINT QUANTIZZATO = SI TENTA SEMPRE RESIDENTE, al primo giro. Lo streaming non
+        # accetta il FP4, quindi mandarcelo significa o non partire affatto, o dequantizzare in
+        # anticipo — e la dequant si paga solo dopo un errore vero (regola dell'utente, 27/08).
+        # Se poi la VRAM non basta davvero, l'OOM arriva netto (il sysmem fallback dei driver è
+        # disattivato) e `run_generation_with_oom_retry` ripiega su streaming + dequant.
+        _quant_residente = ("nvfp4" in os.path.basename(ckpt).lower()
+                            and not p.get("_dequant_retry"))
+        if _quant_residente and mode == "cpu":
+            print(f"[auto-offload] checkpoint quantizzato: tento comunque RESIDENTE "
+                  f"(need {need:.0f} > free {free_gb:.0f}). Se non basta, l'errore farà scattare "
+                  f"il retry con streaming e dequant.", flush=True)
+            mode = "none"
         # F6: planner combinatorio (plan_placement) come decisore DEFAULT (scelta utente 22/07):
         # transformer residente se entra (gli encoder girano comunque per-stage), componenti dal DB
         # canonico. Kill-switch: LTX_PLAN_PLACEMENT=0 → confronto diretto storico qui sopra.
-        if os.environ.get("LTX_PLAN_PLACEMENT", "1") != "0":
+        # …ma NON quando il quantizzato deve restare residente: il planner ragiona sui GB e
+        # direbbe "offload", che per un FP4 significa non partire proprio. La scelta di tentare
+        # comunque viene prima.
+        if os.environ.get("LTX_PLAN_PLACEMENT", "1") != "0" and not _quant_residente:
             try:
                 from core import vram_calibration as _vc
-                _pl = _vc.plan_placement(int(tr_gb * 1024), "ltx2", int(free_gb * 1024),
-                                         int(_WORK_GB * 1024))
+                # Le LoRA vanno DENTRO il peso del transformer: vengono fuse in esso, quindi un
+                # transformer con LoRA è semplicemente più pesante. Passandogli il solo tr_gb, il
+                # planner rispondeva "residente" anche a need=56 su 32 GB — sovrascrivendo il
+                # calcolo qui sopra e riportando la decisione allo stato di prima del fix.
+                _pl = _vc.plan_placement(int((tr_gb + _lora_gb) * 1024), "ltx2",
+                                         int(free_gb * 1024), int(_WORK_GB * 1024))
                 mode = "none" if "transformer" in _pl.get("resident", []) else "cpu"
                 print(f"[plan] resident={_pl.get('resident')} offload={_pl.get('offload')} "
                       f"→ {mode}", flush=True)
             except Exception as _pe:                          # noqa: BLE001
                 print(f"[plan] plan_placement non disponibile ({_pe}) → euristica diretta", flush=True)
-        print(f"[auto-offload] free={free_gb:.0f}GB tr={tr_gb:.0f}({_how})+enc{_ENC_GB:.0f}+work{_WORK_GB:.0f}"
+        print(f"[auto-offload] free={free_gb:.0f}GB tr={tr_gb:.0f}({_how})+enc{_ENC_GB:.0f}"
+              f"+work{_WORK_GB:.0f}"
+              f"{f'+lora{_lora_gb:.1f}' if _lora_gb else ''}"
               f"=need{need:.0f} → {mode}", flush=True)
+        # Se a far sforare sono le LoRA, DIRLO ORA e dire quante toglierne. Altrimenti il worker
+        # ripiega in silenzio su offload=cpu (block-streaming, memoria pinnata), che su questa
+        # macchina muore di access violation 0xC0000005 — un crash che dal messaggio non si
+        # collega in alcun modo alle LoRA selezionate, ed è impossibile da diagnosticare.
+        if mode == "cpu" and _lora_gb > 0:
+            _n = len(p.get("loras") or [])
+            # Lo streaming di per sé NON è un problema: su un checkpoint 2.3 le stesse sette LoRA
+            # generano senza un intoppo (misurato). Il caso critico è il FP4, che lo streaming non
+            # sa gestire affatto — e per aggirarlo il transformer viene dequantizzato, raddoppiando.
+            print(f"[auto-offload] {_n} LoRA (+{_lora_gb:.0f}GB) → il modello non sta in VRAM "
+                  f"(need {need:.0f}GB su {free_gb:.0f}): si passa al block-streaming, più lento.",
+                  flush=True)
+            if "nvfp4" in os.path.basename(ckpt).lower():
+                print(f"[auto-offload]   ⚠ Il checkpoint è FP4, e il block-streaming NON supporta "
+                      f"il FP4: per streamarlo il transformer va dequantizzato a fp8, e passa da "
+                      f"{tr_gb / 1.30:.0f} a {tr_gb:.0f}GB. Con le LoRA conviene un checkpoint "
+                      f"fp8 non quantizzato; con l'FP4, generare senza LoRA (dove sta in VRAM e "
+                      f"va molto più veloce).", flush=True)
+            else:
+                print(f"[auto-offload]   Toglierne qualcuna riporta la generazione in VRAM, dove "
+                      f"va anche molto più veloce.", flush=True)
         return mode
     except Exception:                                        # noqa: BLE001
         return "cpu"
@@ -1257,7 +1348,8 @@ def _prepare_pipe_cache(ckpt: str, qmode: str, loras: list, ptype: str,
     return reuse_off
 
 
-def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two", ptype: str = "ti2v"):
+def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str = "two",
+              ptype: str = "ti2v", dequant_retry: bool = False):
     """Istanzia (e CACHEA) la pipeline. Nel server persistente la cache evita il ri-load da disco.
     ptype: 'ti2v' (testo/immagine→video) oppure 'a2v' (audio→video, lip-sync/canto).
     Checkpoint SOLO-transformer (comfy fp8_scaled): pipeline costruita sulla TUPLA
@@ -1307,17 +1399,37 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         # L'FP4 residente resta per i checkpoint DISTILLED-fp4 (nessuna fusione). Forza: LTX_FP4_MM=force.
         _needs_fuse = bool(loras) or ("distilled" not in os.path.basename(ckpt).lower()
                                       and os.environ.get("LTX_NO_DLORA") != "1")
-        if _needs_fuse and os.environ.get("LTX_FP4_MM", "") != "force":
+        # FP4 RESIDENTE ANCHE CON LE LoRA (scelta dell'utente, 27/08). La dequant a fp8 nasceva da
+        # un degrado misurato il 23/07 («nubi di punti» sulle parti in movimento) che oggi NON si
+        # riproduce: stessa scena e stesso seed, FP4 forzato con 2 LoRA contro FP4 senza, immagine
+        # pulita in entrambi. E costa caro: il transformer passa da 17 a 23 GB, cioè le LoRA
+        # smettono di starci in VRAM. Il checkpoint è quantization-aware, quindi quei 4 bit SONO i
+        # pesi tarati; a essere riquantizzata è solo la correzione della LoRA.
+        #
+        # SI PROVA SEMPRE IL FP4, ANCHE CON LE LoRA (scelta dell'utente, 27/08). La dequant non è
+        # più preventiva: si paga solo DOPO un errore vero, nel ramo di retry, mai "per sicurezza".
+        # È sensato perché il sysmem fallback dei driver è disattivato: un OOM arriva netto e
+        # subito, invece di degradare in silenzio in memoria di sistema.
+        # L'unica dequant obbligatoria resta quella del retry: il block-streaming NON accetta il
+        # FP4 («Block streaming is not supported with this quantization policy»), quindi quando si
+        # ripiega sullo streaming il transformer deve essere fp8 — vedi _dequant_retry.
+        _forza_fp4 = os.environ.get("LTX_FP4_MM", "") == "force"
+        if _needs_fuse and dequant_retry:
             from ltx_core.quantization import fp8_cast
             qmode = "fp8_cast"
             quant = fp8_cast.build_policy(_ckpt_pipe)
-            print("[nvfp4-mm] LoRA da fondere (distilled-LoRA/utente) → il requant FP4 degraderebbe: "
-                  "uso la dequant a fp8 (qualità piena). FP4 residente = solo checkpoint distilled-fp4.",
+            print("[nvfp4-mm] RETRY dopo errore: dequant a fp8 (il FP4 non è streamabile). "
+                  "Il transformer raddoppia, ma è l'unico modo di streamarlo.", flush=True)
+        elif _needs_fuse and not (_forza_fp4 or nvfp4_scaled_mm.available()):
+            from ltx_core.quantization import fp8_cast
+            qmode = "fp8_cast"
+            quant = fp8_cast.build_policy(_ckpt_pipe)
+            print("[nvfp4-mm] LoRA da fondere ma kernel FP4 non disponibili → dequant a fp8.",
                   flush=True)
         elif nvfp4_scaled_mm.available():
             quant = nvfp4_scaled_mm.build_policy(ckpt)
-            print("[nvfp4-mm] matmul FP4 Blackwell ATTIVO: transformer residente a 4-bit (~11GB)",
-                  flush=True)
+            print(f"[nvfp4-mm] matmul FP4 Blackwell ATTIVO: transformer residente a 4-bit"
+                  f"{' + LoRA fuse sul packed' if _needs_fuse else ''}", flush=True)
         else:                                                # niente kernel → dequant fp8 storica
             from ltx_core.quantization import fp8_cast
             qmode = "fp8_cast"
@@ -2116,11 +2228,17 @@ def run_generation(p: dict) -> str:
     except Exception as _pe:                                 # noqa: BLE001
         print(f"[park] drop fallito (ignoro): {_pe}", flush=True)
     _stage(f"Caricamento modello ({os.path.basename(ckpt)[:28]}, offload={_off})…")
-    pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype)
+    pipe = _get_pipe(ckpt, qmode, _off, loras, ptype=ptype,
+                     dequant_retry=bool(p.get("_dequant_retry")))
     print(f"[load] {time.time() - t0:.0f}s (model={os.path.basename(ckpt)} quant={qmode} pipe={ptype})", flush=True)
     if torch.cuda.is_available():
         print(f"[vram] post-load: {torch.cuda.memory_allocated()/1e9:.1f}GB alloc / "
               f"{torch.cuda.memory_reserved()/1e9:.1f}GB reserved", flush=True)
+        # Azzerato QUI per misurare le sole ATTIVAZIONI: il picco che si legge a fine denoise,
+        # meno il carico appena stampato, è quanto costano davvero. Serve a tarare _WORK_GB in
+        # _auto_offload, che oggi è un 8.0 fisso uguale per ogni risoluzione e durata — e se è
+        # sovrastimato manda in block-streaming (memoria pinnata) modelli che ci starebbero.
+        torch.cuda.reset_peak_memory_stats()
     try:                                                     # F3: ledger live — il job video dichiara il suo modello
         from core import vram_ledger as _vl
         from core import vram_estimate as _vest
@@ -2288,6 +2406,11 @@ def run_generation(p: dict) -> str:
     if _nf_eff:
         nf = int(_nf_eff)
     print(f"[gen] {time.time() - tg:.0f}s ({nf} frames @ {fps}fps = {nf / fps:.1f}s video, {ptype})", flush=True)
+    if torch.cuda.is_available():
+        # Il picco dal reset fatto dopo il load = costo REALE delle attivazioni per QUESTA
+        # geometria. Con questo numero _WORK_GB smette di essere una costante scelta a occhio.
+        print(f"[vram] picco attivazioni: {torch.cuda.max_memory_allocated()/1e9:.2f}GB "
+              f"({int(p.get('width', 0))}x{int(p.get('height', 0))}x{nf})", flush=True)
     out = p["output"]
     _stage("Decodifica VAE e salvataggio video…")
     # QUALE VOCODER: la 2.5 può montare VocoderWithBWE (16kHz interni → 48kHz ricostruendo gli acuti)
@@ -2446,6 +2569,11 @@ def run_generation_with_oom_retry(p: dict) -> str:
             pass
         p2 = dict(p)
         p2["offload"] = "cpu"
+        # Il ripiego è lo STREAMING, e lo streaming non accetta il FP4: se il checkpoint è
+        # quantizzato va dequantizzato a fp8, altrimenti il retry muore con «Block streaming is
+        # not supported with this quantization policy» — cioè fallirebbe due volte per due motivi
+        # diversi. La dequant si paga QUI, dopo un errore vero, e mai preventivamente.
+        p2["_dequant_retry"] = True
         return run_generation(p2)
 
 
