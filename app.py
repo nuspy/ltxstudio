@@ -8,6 +8,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# Verifica TLS contro lo store di certificati del sistema, non contro il bundle certifi: dietro un
+# antivirus/proxy che ispeziona HTTPS certifi non riconosce la CA e ogni connessione fallisce (nel
+# .exe compilato in modo sistematico). Prima di qualunque import che possa aprire connessioni.
+from core.net_tls import use_system_ca                       # noqa: E402
+use_system_ca()
+
 # NB: il visore 3D WebGL (WebEngine) è ATTIVO di default. Il crash 3D NON era WebEngine (era l'accesso Qt
 # cross-thread in _log, corretto): gli errori Chromium "kFatalFailure" all'avvio sono rumore innocuo (ripiega su
 # GLES2/software). Paracadute manuale se una GPU/driver desse problemi al visore: avviare con LTX_NO_WEBGL=1.

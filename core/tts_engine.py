@@ -464,20 +464,29 @@ def edge_available() -> bool:
 
 
 def edge_list_voices(language_prefix: str = "it") -> list[VoicePreset]:
-    """Elenca le voci Edge TTS disponibili (preset Microsoft). Filtrate per lingua."""
+    """Elenca le voci Edge TTS disponibili (preset Microsoft). Filtrate per lingua.
+
+    L'elenco arriva da un servizio ONLINE Microsoft: senza rete — o dietro un proxy TLS la cui CA
+    non è in certifi — la richiesta fallisce. NON deve essere fatale: questa funzione è chiamata
+    mentre si costruisce il tab Audio, quindi un'eccezione qui impedisce l'avvio dell'intera GUI.
+    Si ritorna una lista vuota e restano disponibili le voci locali."""
     if not edge_available():
         return []
     import edge_tts
     try:
-        voices = asyncio.run(edge_tts.list_voices())
-    except RuntimeError:
-        # event loop già attivo (es. dentro Qt) → run in thread
-        import threading
-        result: list = []
-        def _runner():
-            result.append(asyncio.new_event_loop().run_until_complete(edge_tts.list_voices()))
-        t = threading.Thread(target=_runner); t.start(); t.join()
-        voices = result[0]
+        try:
+            voices = asyncio.run(edge_tts.list_voices())
+        except RuntimeError:
+            # event loop già attivo (es. dentro Qt) → run in thread
+            import threading
+            result: list = []
+            def _runner():
+                result.append(asyncio.new_event_loop().run_until_complete(edge_tts.list_voices()))
+            t = threading.Thread(target=_runner); t.start(); t.join()
+            voices = result[0]
+    except Exception as e:                                   # noqa: BLE001 — rete/TLS: mai bloccare l'avvio
+        print(f"[tts] voci Edge non raggiungibili ({type(e).__name__}: {e}) → solo voci locali")
+        return []
     out: list[VoicePreset] = []
     for v in voices:
         loc = v.get("Locale", "")

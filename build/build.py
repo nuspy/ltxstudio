@@ -34,11 +34,24 @@ def load_descriptor(project: str) -> tuple[dict, Path]:
     return desc, fm_root
 
 
-def run(cmd, cwd=None, dry=False) -> int:
+def run(cmd, cwd=None, dry=False, env=None) -> int:
     print("  $", " ".join(str(c) for c in cmd))
     if dry:
         return 0
-    return subprocess.run(cmd, cwd=cwd).returncode
+    return subprocess.run(cmd, cwd=cwd, env=env).returncode
+
+
+def _clean_msvc_env() -> dict:
+    """Ambiente senza CL/_CL_: MSVC le appende a OGNI riga di comando di cl.exe. Se contengono
+    un flag C++ (es. `_CL_=/std:c++20`, usato per compilare estensioni come flash-attn) ogni
+    modulo C di Nuitka muore con `D8016: '/std:c11' and '/std:c++20' are incompatible`, che
+    Scons riporta solo come «clcache: preprocessor failed»."""
+    import os
+    env = dict(os.environ)
+    for var in ("CL", "_CL_"):
+        if env.pop(var, None):
+            print(f"  [i] {var} rimossa dall'ambiente di build (incompatibile con il C di Nuitka)")
+    return env
 
 
 def _app_name(desc: dict) -> str:
@@ -76,8 +89,9 @@ def build_one_desktop(desc: dict, fm_root: Path, project: str, edition: str, os_
     v = ver.peek(edition, major) if dry else ver.next_version(edition, major)
     print(f"\n=== [desktop] {edition} × {os_target}  →  build {v['build_number']} ===")
 
-    codegen = [python, "-m", "feature_matrix", "codegen", "--edition", edition,
-               "--build", str(v["build_number"]), "--project", project]
+    # NB: `--project` è un argomento del parser PRINCIPALE di feature_matrix → va prima del sottocomando.
+    codegen = [python, "-m", "feature_matrix", "--project", project, "codegen",
+               "--edition", edition, "--build", str(v["build_number"])]
     if run(codegen, cwd=str(fm_root), dry=dry) != 0:
         print("  [ERR] codegen fallito"); return False
 
@@ -89,7 +103,7 @@ def build_one_desktop(desc: dict, fm_root: Path, project: str, edition: str, os_
         dry_os = dry
     cmd = nuitka_command(python, app_root, desc.get("entrypoint", "app.py"),
                          out_dir, os_target, v, desc.get("build", {}), onefile)
-    if run(cmd, cwd=app_root, dry=dry_os) != 0:
+    if run(cmd, cwd=app_root, dry=dry_os, env=_clean_msvc_env()) != 0:
         print("  [ERR] Nuitka fallito"); return False
 
     ext = "exe" if os_target == "windows" else "bin"

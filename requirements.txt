@@ -4,6 +4,7 @@ requests>=2.31
 websocket-client>=1.7
 sounddevice>=0.4.7
 soundfile>=0.12
+truststore>=0.9          # verifica TLS con le CA di sistema (vedi core/net_tls.py)
 # packaging finale: pyinstaller>=6.0
 
 # ── Feature 3D (tab "Modello 3D" TRELLIS.2 + tab "Rig 3D" SkinTokens) ──
