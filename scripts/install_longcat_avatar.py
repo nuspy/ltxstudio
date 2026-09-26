@@ -41,8 +41,22 @@ DEPS = [
 ]
 
 
+def _env() -> dict:
+    """pip del venv appena creato non ha truststore: dietro antivirus/proxy TLS serve il bundle
+    combinato certifi + store di Windows (core/net_tls)."""
+    env = dict(os.environ)
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from core.net_tls import child_env
+        env.update(child_env())
+    except Exception:                                                # noqa: BLE001
+        pass
+    return env
+
+
 def run(cmd: list, **kw) -> subprocess.CompletedProcess:
     print(f"  $ {' '.join(str(c) for c in cmd)}", flush=True)
+    kw.setdefault("env", _env())
     return subprocess.run([str(c) for c in cmd], **kw)
 
 

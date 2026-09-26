@@ -26,6 +26,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from core.net_tls import use_system_ca  # noqa: E402
+use_system_ca(inject=False)            # bundle certifi+Windows: dietro antivirus/proxy TLS (core/net_tls)
 from core import downloader as dl  # noqa: E402
 from core import weights_catalog as wc  # noqa: E402
 

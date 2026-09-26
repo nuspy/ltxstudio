@@ -22,6 +22,7 @@ __pycache__/
 
 # Stato runtime / preferenze locali
 data/gui_state.json
+data/ca_bundle.pem
 data/user_prefs.json
 data/age_ack.json
 data/usage.json
