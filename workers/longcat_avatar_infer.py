@@ -481,6 +481,9 @@ def _bbox_masks(img_w: int, img_h: int, bbox: dict | None):
 
 
 def run(params: dict) -> str:
+    from core import resources
+    resources.require(commit_gb=float(params.get("need_commit_gb") or 8),
+                      vram_gb=float(params.get("need_vram_gb") or 18), what="LongCat Avatar")
     import numpy as np
     import PIL.Image
     import torch

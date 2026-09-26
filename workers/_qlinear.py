@@ -135,19 +135,38 @@ def read_safetensors(path: str, device: str = "cuda", rename=None, cast=None, sk
         header = json.loads(f.read(n))
         header.pop("__metadata__", None)
         base = 8 + n
+        on_gpu = str(device).startswith("cuda")
+        chunk = 64 << 20
+        stage = torch.empty(chunk, dtype=torch.uint8) if on_gpu else None      # UNICO buffer di transito
         for key, info in sorted(header.items(), key=lambda kv: kv[1]["data_offsets"][0]):
             if key in skip:
                 continue
             a, b = info["data_offsets"]
-            f.seek(base + a)
-            buf = bytearray(f.read(b - a))
+            n = b - a
             dt = _ST_DTYPES[info["dtype"]]
-            t = torch.frombuffer(buf, dtype=dt) if buf else torch.empty(0, dtype=dt)
-            t = t.reshape(info["shape"]).to(device)
+            f.seek(base + a)
+            if on_gpu:
+                # a blocchi da 64 MB direttamente nel tensore GPU: il commit di sistema resta 64 MB anche per
+                # tensori da GB (con f.read + bytearray serviva 2× il tensore: MemoryError a commit quasi pieno)
+                raw = torch.empty(n, dtype=torch.uint8, device=device)
+                off = 0
+                while off < n:
+                    k = min(chunk, n - off)
+                    got = f.readinto(memoryview(stage.numpy())[:k])
+                    if got != k:
+                        raise IOError(f"{path}: lettura troncata su {key}")
+                    raw[off:off + k].copy_(stage[:k])
+                    off += k
+                t = raw.view(dt).reshape(info["shape"]) if n else torch.empty(info["shape"], dtype=dt, device=device)
+            else:
+                t = torch.empty(n, dtype=torch.uint8)                         # una sola copia in RAM
+                if n and f.readinto(memoryview(t.numpy())) != n:
+                    raise IOError(f"{path}: lettura troncata su {key}")
+                t = t.view(dt).reshape(info["shape"]).to(device) if n else torch.empty(info["shape"], dtype=dt)
             if cast is not None and t.is_floating_point() and t.dtype not in (torch.float8_e4m3fn, torch.float8_e5m2):
                 t = t.to(cast)
             out[rename(key) if rename else key] = t
-            del buf, t
+            del t
     return out
 
 

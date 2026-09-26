@@ -196,6 +196,48 @@ def case_voice_panel_two_speakers(w, spy):
     assert t.turns.currentData() == "para", "dialogo generato → tracce allineate (para)"
 
 
+def case_h3_engine_params(w, spy):
+    """Motore MiniMax H3: opzioni LongCat nascoste, battute + durata 5–15 s + timbro facoltativo → worker H3."""
+    import core.ensure_weights as ew
+    saved = ew.missing
+    ew.missing = lambda ids: []
+    import core.minimax_avatar as ma
+    saved_pf = ma.preflight
+    ma.preflight = lambda p: []
+    try:
+        t = w.avatar_tab
+        t.engine.setCurrentIndex(t.engine.findData("minimax_h3"))
+        H.app().processEvents()
+        assert not t.h3_group.isHidden() and t.voice_group.isHidden() and t.adv.isHidden()
+        assert t.audio1.isHidden(), "senza timbro l'audio non serve"
+        assert not t.people.isEnabled()
+        t.set_image(_img())
+        t.prompt.setPlainText("una nonna rapper in cucina, luci al neon")
+        t.h3_dialogue.add_row("Nonna", "Italian", "Il ragù non si fa in fretta, ragazzo!")
+        t.h3_duration.setValue(6.0)
+        assert "fotogrammi" in t.lbl_duration.text() or "frames" in t.lbl_duration.text()
+        t.h3_turbo.setCurrentIndex(t.h3_turbo.findData("8"))
+        t.h3_voice_ref.setChecked(True)
+        assert not t.audio1.isHidden()
+        t.audio1.set_path(_wav("_avatar_h3_timbro.wav", 4.0))
+        t.seed_random.setChecked(False); t.seed.setValue(77)
+        spy.calls.clear()
+        t.h3_turbo.setCurrentIndex(t.h3_turbo.findData("4"))       # Ref2VA ha solo il turbo 4 passi
+        t.gen_btn.click()
+    finally:
+        ew.missing = saved
+        ma.preflight = saved_pf
+        w.avatar_tab.engine.setCurrentIndex(w.avatar_tab.engine.findData("longcat"))
+    call = next((c for c in spy.calls if c["via"] == "enqueue"), None)
+    assert call, f"nessun job accodato: {spy.calls}"
+    p = call["params"]
+    assert p["arch"] == "minimax_h3" and p["h3_turbo"] == "4" and p["seed"] == 77, p
+    assert p["num_frames"] == 158 and (p["num_frames"] - 5) % 17 == 0, p["num_frames"]
+    kinds = [r["kind"] for r in p.get("references") or []]
+    assert kinds == ["image", "audio"], f"con il timbro serve Ref2VA (foto + voce): {kinds}"
+    assert p["h3_dialogue"][0]["text"].startswith("Il ragù"), p["h3_dialogue"]
+
+
 CASES = [
     ("avatar_canvas_button_follows_canvas",
      "Con una foto nel canvas il bottone «Usa immagine da canvas» si attiva e la prende.",
@@ -222,4 +264,7 @@ CASES = [
     ("avatar_voice_panel_two_speakers",
      "«Genera voce» con copione A/B: due voci, tracce allineate caricate nei due player (para).",
      case_voice_panel_two_speakers),
+    ("avatar_h3_engine_params",
+     "Motore MiniMax H3: battute, durata 5–15 s, turbo e timbro (Ref2VA) arrivano al worker H3.",
+     case_h3_engine_params),
 ]

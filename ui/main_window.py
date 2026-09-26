@@ -445,14 +445,16 @@ class _LongCatWorker(QThread):
     done = Signal(dict)
     progress = Signal(str)
 
-    def __init__(self, params: dict):
+    def __init__(self, params: dict, service=None):
         super().__init__()
         self.params = params
+        self.service = service                          # None = LongCat; core.minimax_avatar = MiniMax H3
         self._job = None
 
     def run(self):
         try:
-            from core import longcat_service as lc
+            from core import longcat_service as _lc
+            lc = self.service or _lc
             errs = lc.preflight(self.params)
             if errs:
                 self.done.emit({"status": "error", "error": "\n".join(errs)}); return
@@ -468,7 +470,7 @@ class _LongCatWorker(QThread):
                 self.done.emit({"status": "success", "output": [out]})
             else:
                 err = next((l for l in reversed(lines) if l.startswith("ERRORE")), "") or "\n".join(lines[-12:])
-                self.done.emit({"status": "error", "error": err or f"LongCat terminato con codice {rc}"})
+                self.done.emit({"status": "error", "error": err or f"worker avatar terminato con codice {rc}"})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
 
@@ -3355,11 +3357,27 @@ class MainWindow(QMainWindow):
             return
         # ── MiniMax H3: omni-modale (video + audio stereo nella STESSA passata) ─────────
         if vals.get("video_arch") == "minimax_h3":
+            from core import minimax_h3_spec as _S
             params["arch"] = "minimax_h3"
-            params.pop("gguf_transformer", None)          # il worker sceglie la variante dal catalogo
-            # CHECKPOINT DIVERSO per modalità: i riferimenti richiedono il ref2va, il resto il fl2va.
-            _ids = (["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"]
-                    + (["mmh3-ref2va-nvfp4"] if params.get("references") else ["mmh3-fl2va-nvfp4"]))
+            params.pop("gguf_transformer", None)
+            for _k in ("h3_profile", "h3_te", "h3_turbo", "h3_canvas", "h3_dialogue", "h3_soundscape", "h3_music"):
+                if _k in vals:
+                    params[_k] = vals[_k]
+            params.setdefault("h3_profile", "nvfp4")
+            params["duration_s"] = float(vals.get("length_s") or 5.0)
+            params["num_frames"] = _S.snap_frames(params["duration_s"])
+            params["fps"] = _S.FPS
+            params["generate_audio"] = bool(vals.get("native_audio", True))
+            params.pop("negative", None)                  # guidance distillata: niente negative prompt
+            _ab = self.video_tab.attn_backend.currentData() if hasattr(self.video_tab, "attn_backend") else ""
+            params["attention_backend"] = {"flash": "flash", "sage": "sage"}.get(_ab or "", "")
+            # CHECKPOINT DIVERSO per modalità (scelta di modalità, non di modello): i riferimenti richiedono
+            # il Ref2VA, il resto il FL2VA. Profilo/TE/turbo li ha scelti l'utente.
+            try:
+                _ids = list(dict.fromkeys(_S.weight_ids(params).values()))
+            except ValueError as _e:
+                QMessageBox.warning(self, "MiniMax H3", str(_e))
+                return
             try:                                          # consenso primo-uso col motore unico
                 from core import ensure_weights as _ew
                 if not _ew.offer_download_gui(self, _ids, "MiniMax H3"):
@@ -3367,8 +3385,11 @@ class MainWindow(QMainWindow):
                     return
             except Exception:                             # noqa: BLE001 — l'errore chiaro del worker copre
                 pass
-            self._log(f"[minimax_h3] {'Ref2VA (riferimenti)' if params.get('references') else 'FL2VA'}: "
-                      f"{params['width']}x{params['height']} {nf} frame, audio nativo")
+            self._log(f"[minimax_h3] {'Ref2VA (riferimenti)' if params.get('references') else 'FL2VA'} · "
+                      f"profilo {params['h3_profile']} · {params['num_frames']} fotogrammi "
+                      f"({_S.frames_seconds(params['num_frames']):.2f}s) · audio "
+                      f"{'sì' if params['generate_audio'] else 'no'}"
+                      f"{' · turbo ' + params['h3_turbo'] + ' passi' if params.get('h3_turbo') else ''}")
             self._ltx2_worker = _NativeLtx2Worker(params)
             self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"), source="video")
             self._enqueue(tr("queue.job.video", "Video"), self._ltx2_worker, self._on_multitalk_done,
@@ -5340,6 +5361,8 @@ class MainWindow(QMainWindow):
 
     # ── Avatar parlante (LongCat 1.5) ─────────────────────────────────────────────────────────────
     def generate_avatar(self, cfg: dict):
+        if cfg.get("engine") == "minimax_h3":
+            return self._generate_avatar_h3(cfg)
         if not self._feature_gate("cap.avatar_longcat"):
             return
         from core import longcat_service as lc
@@ -5366,6 +5389,36 @@ class MainWindow(QMainWindow):
         self.avatar_tab.append_log(tr("avatar.log.start", "Avvio LongCat Avatar ({p})…").format(p=prec))
         self._log(f"[avatar] LongCat {cfg.get('mode')} {cfg.get('resolution')} {prec}")
         self._avatar_worker = _LongCatWorker(cfg)
+        self._enqueue(tr("queue.job.avatar", "Avatar parlante"), self._avatar_worker, self._on_avatar_done,
+                      on_progress=self.avatar_tab.append_log)
+
+    def _generate_avatar_h3(self, cfg: dict):
+        """2° motore avatar: MiniMax H3 (voce + video insieme, stesso worker del tab Video)."""
+        if not self._feature_gate("cap.avatar_h3"):
+            return
+        from core import minimax_avatar as ma
+        from core import minimax_h3_spec as S
+        params = ma.build_params(cfg)
+        try:
+            from core import ensure_weights as ew
+            ids = list(dict.fromkeys(S.weight_ids(params).values()))
+            if ew.missing(ids) and not ew.offer_download_gui(self, ids, "MiniMax H3"):
+                return
+        except ValueError as e:
+            QMessageBox.warning(self, tr("tab.avatar", "Avatar"), str(e))
+            return
+        except Exception:                                # noqa: BLE001 — il preflight protegge comunque
+            pass
+        errs = ma.preflight(params)
+        if errs:
+            QMessageBox.warning(self, tr("tab.avatar", "Avatar"), "\n".join(errs))
+            return
+        self._avatar_cfg = dict(cfg)
+        self.avatar_tab.set_busy(True)
+        self.avatar_tab.append_log(tr("avatar.log.start_h3", "Avvio MiniMax H3 ({p})…").format(p=params["h3_profile"]))
+        self._log(f"[avatar] MiniMax H3 {'Ref2VA' if params.get('references') else 'FL2VA'} "
+                  f"{params['num_frames']} fotogrammi")
+        self._avatar_worker = _LongCatWorker(params, service=ma)
         self._enqueue(tr("queue.job.avatar", "Avatar parlante"), self._avatar_worker, self._on_avatar_done,
                       on_progress=self.avatar_tab.append_log)
 

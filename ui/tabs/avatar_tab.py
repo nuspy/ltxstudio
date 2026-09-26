@@ -356,6 +356,11 @@ class AvatarTab(QWidget):
         self.engine = QComboBox()
         self.engine.addItem(tr("avatar.engine.longcat", "LongCat Avatar 1.5 (audio dato, durata dall'audio)"),
                             "longcat")
+        self.engine.addItem(tr("avatar.engine.h3", "MiniMax H3 (voce e video insieme, 5–15 s)"), "minimax_h3")
+        self.engine.setToolTip(tr("avatar.engine.tt",
+            "LongCat: dai tu la voce (file o «Genera voce»), la durata segue l'audio. MiniMax H3: scrivi le "
+            "battute e il modello genera voce e video insieme (5–15 s); con una registrazione come riferimento "
+            "parla con quel timbro."))
         f.addRow(tr("avatar.engine", "Motore"), self.engine)
         mrow = QHBoxLayout()
         self.mode_img = QRadioButton(tr("avatar.mode.ai2v", "Da immagine"))
@@ -507,6 +512,10 @@ class AvatarTab(QWidget):
         f.addRow(tr("avatar.seed", "Seed"), srow)
         v.addWidget(g)
 
+        # MiniMax H3 (solo con quel motore)
+        self._build_h3_group(v)
+        self.video_group = g
+
         # avanzate
         self.adv = QGroupBox(tr("avatar.adv.group", "Avanzate")); self.adv.setCheckable(True)
         self.adv.setChecked(False)
@@ -615,13 +624,78 @@ class AvatarTab(QWidget):
 
         self.mode_img.toggled.connect(self._sync_visibility)
         self.people.currentIndexChanged.connect(self._sync_visibility)
+        self.engine.currentIndexChanged.connect(self._sync_visibility)
         self._sync_visibility()
+
+    def _build_h3_group(self, v):
+        from core import minimax_h3_spec as S
+        from ui.widgets.h3_dialogue import H3DialogueEditor
+        self.h3_group = QGroupBox(tr("avatar.h3.group", "MiniMax H3"))
+        f = QFormLayout(self.h3_group); f.setLabelAlignment(Qt.AlignRight)
+        self.h3_dialogue = H3DialogueEditor()
+        f.addRow(tr("vid.h3.dialogue_lbl", "Battute"), self.h3_dialogue)
+        self.h3_voice_ref = QCheckBox(tr("avatar.h3.voiceref",
+                                         "Usa l'audio della persona 1 come timbro della voce"))
+        self.h3_voice_ref.setToolTip(tr("avatar.h3.voiceref.tt",
+            "La registrazione diventa un riferimento di timbro (modalità Ref2VA, checkpoint dei riferimenti): "
+            "la persona parla con quella voce. Spenta: la voce la inventa il modello e la foto è il primo "
+            "fotogramma."))
+        self.h3_voice_ref.toggled.connect(self._sync_visibility)
+        f.addRow("", self.h3_voice_ref)
+        self.h3_duration = QDoubleSpinBox(); self.h3_duration.setRange(S.MIN_S, S.MAX_S)
+        self.h3_duration.setValue(8.0); self.h3_duration.setSuffix(" s"); self.h3_duration.setDecimals(1)
+        self.h3_duration.valueChanged.connect(self._update_duration)
+        f.addRow(tr("avatar.h3.duration", "Durata"), self.h3_duration)
+        self.h3_profile = QComboBox()
+        for prof, key in (("nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"), ("fp8", "fp8 · 21 GB (RTX 40xx)"),
+                          ("int8", "int8-ConvRot · 21 GB (tutte le GPU)")):
+            self.h3_profile.addItem(tr(f"vid.h3.prof.{prof}", key), prof)
+        f.addRow(tr("avatar.precision", "Precisione"), self.h3_profile)
+        self.h3_te = QComboBox()
+        for tid, key, label in (("mmh3-te-nvfp4", "nvfp4", "Qwen3-VL-32B nvfp4-AWQ (15,7 GB, consigliato)"),
+                                ("mmh3-te-fp8", "fp8", "Qwen3-VL-32B fp8 (26,5 GB, RTX 40xx)"),
+                                ("mmh3-te-int8", "int8", "Qwen3-VL-32B int8-ConvRot (27 GB, qualità)")):
+            self.h3_te.addItem(tr(f"vid.h3.te.{key}", label), tid)
+        f.addRow(tr("vid.h3.te_lbl", "Text encoder"), self.h3_te)
+        self.h3_turbo = QComboBox()
+        self.h3_turbo.addItem(tr("vid.h3.turbo.off", "Spento (qualità piena, ~49 passi)"), "")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.4", "Turbo 4 passi (lightx2v)"), "4")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.8", "Turbo 8 passi (più dettaglio)"), "8")
+        self.h3_turbo.setToolTip(tr("vid.h3.turbo.tt",
+            "LoRA di distillazione lightx2v: da ~49 a 4 o 8 passi (10× più veloce). Con i riferimenti "
+            "(Ref2VA) esiste solo la 4 passi, in anteprima."))
+        f.addRow(tr("vid.h3.turbo_lbl", "Velocità"), self.h3_turbo)
+        self.h3_canvas = QComboBox()
+        self.h3_canvas.addItem(tr("vid.h3.canvas.768", "768p (nativa, massima qualità)"), "768")
+        self.h3_canvas.addItem(tr("vid.h3.canvas.544", "544p (≈2,3× più veloce)"), "544")
+        f.addRow(tr("vid.h3.canvas_lbl", "Tela"), self.h3_canvas)
+        from PySide6.QtWidgets import QLineEdit as _LE
+        self.h3_soundscape = _LE()
+        self.h3_soundscape.setPlaceholderText(tr("vid.h3.soundscape.ph", "es. pioggia leggera, traffico lontano"))
+        f.addRow(tr("vid.h3.soundscape_lbl", "Suoni d'ambiente"), self.h3_soundscape)
+        self.h3_music = _LE()
+        self.h3_music.setPlaceholderText(tr("vid.h3.music.ph", "es. jazz lento al pianoforte"))
+        f.addRow(tr("vid.h3.music_lbl", "Musica"), self.h3_music)
+        note = QLabel(tr("vid.h3.note",
+            "MiniMax H3 genera video e audio stereo nella stessa passata: 24 fps, 5–15 s, niente negative "
+            "prompt (guidance distillata). Licenza MiniMax H3 Community: territori esclusi UE, Regno Unito, "
+            "USA, Corea del Sud."))
+        note.setWordWrap(True); note.setStyleSheet("color:#e8b339;")
+        f.addRow(note)
+        v.addWidget(self.h3_group)
+
+    def _is_h3(self) -> bool:
+        return self.engine.currentData() == "minimax_h3"
 
     # ── stato ───────────────────────────────────────────────────────────────────────────────────
     def _two(self) -> bool:
         return self.people.currentData() == 2
 
     def _sync_visibility(self, *_):
+        h3 = self._is_h3() if hasattr(self, "h3_group") else False
+        if h3 and self._two():                           # H3: una persona (le battute possono essere di più)
+            self.people.setCurrentIndex(self.people.findData(1))
+        self.people.setEnabled(not h3)
         img = self.mode_img.isChecked()
         two = self._two()
         if two and not img:                              # due persone = serve la foto
@@ -632,6 +706,14 @@ class AvatarTab(QWidget):
         self.spk2.setVisible(two)
         self.aspect.setVisible(not img); self.lbl_aspect.setVisible(not img)
         self.resize_mode.setEnabled(img)
+        if hasattr(self, "h3_group"):
+            # H3 genera la voce da sé: l'audio serve solo come timbro (facoltativo); le opzioni LongCat spariscono
+            self.h3_group.setVisible(h3)
+            self.audio1.setVisible(not h3 or self.h3_voice_ref.isChecked())
+            for w in (self.voice_group, self.use_region, self.adv):
+                w.setVisible(not h3)
+            for w in (self.resolution, self.resize_mode, self.max_dur):
+                w.setEnabled(not h3)
         self._update_duration()
 
     def on_canvas_image_changed(self, path: str = ""):
@@ -703,6 +785,12 @@ class AvatarTab(QWidget):
 
     def _update_duration(self, *_):
         from core.avatar import timing
+        if hasattr(self, "h3_group") and self._is_h3():
+            from core import minimax_h3_spec as S
+            n = S.snap_frames(self.h3_duration.value())
+            self.lbl_duration.setText(tr("vid.h3.dur", "Durata effettiva: {s:.2f} s ({n} fotogrammi a 24 fps)")
+                                      .format(s=S.frames_seconds(n), n=n))
+            return
         p1 = self.audio1.value()
         if not p1 or not os.path.isfile(p1):
             self.lbl_duration.setText(tr("avatar.duration.none", "Durata: scegli un audio"))
@@ -771,6 +859,19 @@ class AvatarTab(QWidget):
 
     def get_config(self) -> dict:
         mode = "ai2v" if self.mode_img.isChecked() else "at2v"
+        if self._is_h3():
+            seed = random.randint(0, 2**31 - 1) if self.seed_random.isChecked() else self.seed.value()
+            return {
+                "engine": "minimax_h3", "mode": mode,
+                "image_path": self._image_path if mode == "ai2v" else "",
+                "prompt": self.prompt.toPlainText().strip(), "lines": self.h3_dialogue.value(),
+                "voice_ref_path": self.audio1.value() if self.h3_voice_ref.isChecked() else "",
+                "duration_s": self.h3_duration.value(), "h3_profile": self.h3_profile.currentData(),
+                "h3_te": self.h3_te.currentData(), "h3_turbo": self.h3_turbo.currentData() or "",
+                "h3_canvas": self.h3_canvas.currentData(), "soundscape": self.h3_soundscape.text().strip(),
+                "music": self.h3_music.text().strip(), "seed": seed,
+                "face_restore": self.face_restore.currentData() or "", "rife": self.rife.isChecked(),
+            }
         start = end = 0.0
         if self.use_region.isChecked() and self.audio1.region():
             start, end = self.audio1.region()
@@ -797,6 +898,21 @@ class AvatarTab(QWidget):
 
     def _on_generate(self):
         cfg = self.get_config()
+        if cfg["engine"] == "minimax_h3":
+            if cfg["mode"] == "ai2v" and not (cfg["image_path"] and os.path.isfile(cfg["image_path"])):
+                QMessageBox.information(self, tr("tab.avatar", "Avatar"),
+                                        tr("avatar.err.image", "Scegli l'immagine iniziale (canvas o file)."))
+                return
+            if not cfg["lines"] and not cfg["prompt"]:
+                QMessageBox.information(self, tr("tab.avatar", "Avatar"),
+                                        tr("avatar.err.lines", "Scrivi almeno una battuta."))
+                return
+            if self.h3_voice_ref.isChecked() and not (cfg["voice_ref_path"] and os.path.isfile(cfg["voice_ref_path"])):
+                QMessageBox.information(self, tr("tab.avatar", "Avatar"),
+                                        tr("avatar.err.audio", "Scegli l'audio o genera la voce."))
+                return
+            self.request_avatar.emit(cfg)
+            return
         if cfg["mode"] == "ai2v" and not (cfg["image_path"] and os.path.isfile(cfg["image_path"])):
             QMessageBox.information(self, tr("tab.avatar", "Avatar"),
                                     tr("avatar.err.image", "Scegli l'immagine iniziale (canvas o file)."))

@@ -170,17 +170,34 @@ def voice_from_description(description: str, language: str = "it-IT") -> str:
 
 
 def synth_line(sp: Speaker, text: str) -> str:
-    """Una battuta → wav 44.1 kHz con velocità/tono/volume applicati."""
+    """Una battuta → wav 44.1 kHz. Accetta i marcatori espressivi di core/voice_markup (pause, emozioni,
+    velocità/accelerando, tono, volume, enfasi): si sintetizza SEGMENTO PER SEGMENTO e velocità/tono/volume
+    si applicano in post quando il motore non li gestisce, così ogni motore capisce gli stessi marcatori."""
+    import numpy as np
     from core import tts_engine as T
+    from core import voice_markup as VM
     v, engine = _voice_preset(sp)
-    t = text
-    if sp.emotion and sp.emotion != "neutral" and "<emotion" not in t:
-        t = f'<emotion type="{sp.emotion}">{t}</emotion>'
     native = engine in ENGINES_NATIVE_SPEED
-    raw = T.synthesize(engine, v, t, speed=(sp.speed if native else 1.0), language=sp.language)
-    y = postprocess_voice(load(str(raw)), speed=sp.speed, pitch=sp.pitch, volume_db=sp.volume_db,
-                          native_speed=native)
-    return save(y, _uid(f"voice_{sp.name}"))
+    base = VM.Style(speed=sp.speed, pitch=sp.pitch, volume_db=sp.volume_db,
+                    emotion=sp.emotion if sp.emotion in VM.EMOTIONS else "")
+    fade = int(SR * 0.008)
+    parts = []
+    for seg in VM.parse(text, base):
+        if seg.kind == "pause":
+            parts.append(silence(seg.ms / 1000.0))
+            continue
+        for c in VM.accel_chunks(seg):
+            speed, pitch, vol = VM.effective(c.style)
+            raw = T.synthesize(engine, v, c.text, speed=(speed if native else 1.0), language=sp.language)
+            y = postprocess_voice(load(str(raw)), speed=speed, pitch=pitch, volume_db=vol, native_speed=native)
+            if len(y) > 2 * fade:                            # micro-dissolvenze: niente click fra i segmenti
+                y = y.copy()
+                y[:fade] *= np.linspace(0, 1, fade)
+                y[-fade:] *= np.linspace(1, 0, fade)
+            parts.append(y)
+    if not parts:
+        raise ValueError("battuta vuota")
+    return save(np.concatenate(parts), _uid(f"voice_{sp.name}"))
 
 
 def parse_script(text: str, speaker_names: list[str]) -> list[tuple[int, str]]:

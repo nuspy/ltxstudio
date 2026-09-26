@@ -9,6 +9,7 @@ Uso:
   python -m agents.install_skill --agent hermes --dest "D:/hermes/skills"
   python -m agents.install_skill --no-build      # non rigenerare, usa i file esistenti
   python -m agents.install_skill --list          # mostra le destinazioni
+Installa anche gli skill aggiuntivi di skills/<nome> (es. ltx-avatar-film) accanto a quello principale.
 
 Le destinazioni non-Claude sono i default noti/ragionevoli: se un agente usa un altro percorso,
 passa --dest. Claude Code usa il percorso reale ~/.claude/skills/ltxstudio.
@@ -63,6 +64,23 @@ def _install_one(agent: str, dest: Path) -> Path:
     return dest
 
 
+SKILLS_DIR = HERE.parent / "skills"          # skill aggiuntivi del repo (es. ltx-avatar-film), uno per cartella
+
+
+def _install_extra_skills(base: Path) -> list[Path]:
+    """Copia ogni skill di skills/<nome> accanto allo skill principale (<cartella skill>/<nome>)."""
+    out = []
+    if not SKILLS_DIR.is_dir():
+        return out
+    for sk in sorted(p for p in SKILLS_DIR.iterdir() if (p / "SKILL.md").is_file()):
+        dst = base / sk.name
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(sk, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        out.append(dst)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--agent", default="all", help="all | " + " | ".join(TARGETS))
@@ -88,6 +106,8 @@ def main():
         try:
             out = _install_one(ag, dest)
             print(f"[ok] {ag:13} → {out}")
+            for x in _install_extra_skills(out.parent):
+                print(f"[ok] {ag:13} → {x}")
         except Exception as e:                              # noqa: BLE001
             print(f"[err] {ag}: {e}", file=sys.stderr)
 

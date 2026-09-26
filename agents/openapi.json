@@ -1358,6 +1358,307 @@
           }
         }
       }
+    },
+    "/features": {
+      "get": {
+        "tags": [
+          "catalogo"
+        ],
+        "summary": "Features State",
+        "description": "Stato del feature matrix (STESSE attivazioni della GUI desktop) — l'app gate le funzioni con questo.",
+        "operationId": "features_state_features_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/models": {
+      "get": {
+        "tags": [
+          "catalogo"
+        ],
+        "summary": "Models",
+        "operationId": "models_models_get",
+        "parameters": [
+          {
+            "name": "task",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "image | video | upscale | restore",
+              "default": "image",
+              "title": "Task"
+            },
+            "description": "image | video | upscale | restore"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/components": {
+      "get": {
+        "tags": [
+          "catalogo"
+        ],
+        "summary": "Components",
+        "description": "Componenti AUTO per il modello scelto — cuore della 'selezione automatica'.",
+        "operationId": "components_components_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "nome file del modello scelto",
+              "title": "Model"
+            },
+            "description": "nome file del modello scelto"
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "image",
+              "title": "Task"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/loras": {
+      "get": {
+        "tags": [
+          "catalogo"
+        ],
+        "summary": "Loras",
+        "operationId": "loras_loras_get",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "se dato, solo le LoRA compatibili",
+              "title": "Model"
+            },
+            "description": "se dato, solo le LoRA compatibili"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/train/lora_image": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Train Lora Image",
+        "operationId": "train_lora_image_train_lora_image_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoraImageReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/train/lora_video": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Train Lora Video",
+        "operationId": "train_lora_video_train_lora_video_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoraVideoReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/avatar/options": {
+      "get": {
+        "tags": [
+          "avatar"
+        ],
+        "summary": "Avatar Options",
+        "operationId": "avatar_options_avatar_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/avatar/generate": {
+      "post": {
+        "tags": [
+          "avatar"
+        ],
+        "summary": "Avatar Generate",
+        "operationId": "avatar_generate_avatar_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvatarReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1394,11 +1695,36 @@
             "description": "foto identità (PuLID)",
             "default": ""
           },
+          "face_strength": {
+            "type": "number",
+            "title": "Face Strength",
+            "description": "quanto pesa il volto di `face_ref`. A 0.85 l'identità è fedelissima ma arriva con tutto il volto di partenza, ETÀ COMPRESA, e il prompt non riesce più a ringiovanire il personaggio. 0.5-0.7 tiene i tratti e lascia contare il prompt",
+            "default": 0.85
+          },
           "ref_image": {
             "type": "string",
             "title": "Ref Image",
             "description": "immagine di riferimento (Kontext)",
             "default": ""
+          },
+          "ref_images": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Images",
+            "description": "riferimenti MULTIPLI (Kontext multi-ref, o in-context con coherence_engine=krea2_edit)"
+          },
+          "coherence_engine": {
+            "type": "string",
+            "title": "Coherence Engine",
+            "description": "flux (PuLID/Kontext) | krea2_edit (in-context)",
+            "default": "flux"
           },
           "loras": {
             "anyOf": [
@@ -1416,6 +1742,12 @@
             "type": "string",
             "title": "Negative",
             "default": ""
+          },
+          "structure": {
+            "type": "boolean",
+            "title": "Structure",
+            "description": "riscrive il prompt in JSON strutturato con l'LLM locale; False = il prompt passa così com'è",
+            "default": true
           }
         },
         "type": "object",
@@ -1423,6 +1755,143 @@
           "prompt"
         ],
         "title": "AssetImageReq"
+      },
+      "AudioSpec": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "file | tts | dialogue (| generated_by_engine con minimax_h3)",
+            "default": "file"
+          },
+          "audio_path": {
+            "type": "string",
+            "title": "Audio Path",
+            "default": ""
+          },
+          "audio2_path": {
+            "type": "string",
+            "title": "Audio2 Path",
+            "description": "persona 2 (file)",
+            "default": ""
+          },
+          "trim_start": {
+            "type": "number",
+            "title": "Trim Start",
+            "default": 0.0
+          },
+          "trim_end": {
+            "type": "number",
+            "title": "Trim End",
+            "default": 0.0
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "tts: testo; dialogue: copione «A: …» / «B: …» ([pause:500ms] ammesso)",
+            "default": ""
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": ""
+          },
+          "speakers": {
+            "items": {
+              "$ref": "#/components/schemas/SpeakerSpec"
+            },
+            "type": "array",
+            "title": "Speakers"
+          },
+          "turn_mode": {
+            "type": "string",
+            "title": "Turn Mode",
+            "description": "due file: add = a turno | para = insieme",
+            "default": "add"
+          },
+          "gap_ms": {
+            "type": "integer",
+            "title": "Gap Ms",
+            "default": 350
+          },
+          "pad_start_ms": {
+            "type": "integer",
+            "title": "Pad Start Ms",
+            "default": 0
+          },
+          "pad_end_ms": {
+            "type": "integer",
+            "title": "Pad End Ms",
+            "default": 0
+          },
+          "target_duration_s": {
+            "type": "number",
+            "title": "Target Duration S",
+            "default": 0.0
+          },
+          "fit": {
+            "type": "string",
+            "title": "Fit",
+            "description": "pad | speed | error",
+            "default": "pad"
+          },
+          "music": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Music",
+            "description": "{prompt | path, engine: acestep|heartmula, volume_db, ducking}"
+          },
+          "sfx": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Sfx",
+            "description": "{mode: none|prompt|auto, prompt, volume_db}"
+          },
+          "normalize_lufs": {
+            "type": "number",
+            "title": "Normalize Lufs",
+            "default": 0.0
+          },
+          "vocal_separation": {
+            "type": "boolean",
+            "title": "Vocal Separation",
+            "default": true
+          },
+          "voice_reference_path": {
+            "type": "string",
+            "title": "Voice Reference Path",
+            "description": "minimax_h3: timbro voce di riferimento",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "AudioSpec"
+      },
+      "AvatarReq": {
+        "properties": {
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "description": "longcat | minimax_h3",
+            "default": "longcat"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageSpec"
+          },
+          "audio": {
+            "$ref": "#/components/schemas/AudioSpec"
+          },
+          "video": {
+            "$ref": "#/components/schemas/VideoSpec"
+          },
+          "return_intermediates": {
+            "type": "boolean",
+            "title": "Return Intermediates",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "AvatarReq"
       },
       "Body_files_upload_files_upload_post": {
         "properties": {
@@ -1437,6 +1906,38 @@
           "file"
         ],
         "title": "Body_files_upload_files_upload_post"
+      },
+      "CharacterSpec": {
+        "properties": {
+          "ref_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ref Images",
+            "description": "riferimenti (≤10 Qwen-Image 2.1, ≤2 Krea 2 Edit)"
+          },
+          "asset": {
+            "type": "string",
+            "title": "Asset",
+            "description": "personaggio di Film Studio: «@Nome» o «Nome»",
+            "default": ""
+          },
+          "changes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Changes",
+            "description": "hair, outfit, background, expression, pose, lighting, extra (testo libero)"
+          },
+          "keep_background": {
+            "type": "boolean",
+            "title": "Keep Background",
+            "description": "se background non è indicato, mantiene quello originale",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "CharacterSpec"
       },
       "ControlNetReq": {
         "properties": {
@@ -1534,17 +2035,45 @@
             "title": "Prompt"
           },
           "image_path": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Image Path"
           },
+          "images": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Images"
+          },
           "model": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Model"
           },
           "arch": {
             "type": "string",
             "title": "Arch",
-            "description": "kontext | flux2_kontext",
+            "description": "kontext | flux2_kontext | krea2_edit",
             "default": "kontext"
           },
           "negative": {
@@ -1577,13 +2106,21 @@
             "type": "integer",
             "title": "Max Side",
             "default": 1536
+          },
+          "grounding_px": {
+            "type": "integer",
+            "title": "Grounding Px",
+            "default": 768
+          },
+          "krea2_variant": {
+            "type": "string",
+            "title": "Krea2 Variant",
+            "default": "turbo"
           }
         },
         "type": "object",
         "required": [
-          "prompt",
-          "image_path",
-          "model"
+          "prompt"
         ],
         "title": "EditReq"
       },
@@ -1622,7 +2159,7 @@
           "scale": {
             "type": "number",
             "title": "Scale",
-            "default": 4.0
+            "default": 2.0
           }
         },
         "type": "object",
@@ -1725,6 +2262,100 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImageSpec": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "text | image | character | character_multi | none",
+            "default": "image"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "description": "A: descrizione; C/D: istruzione aggiuntiva",
+            "default": ""
+          },
+          "negative": {
+            "type": "string",
+            "title": "Negative",
+            "default": ""
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "description": "qwen_image21 | krea2_edit | krea2 | flux | flux2 | zimage",
+            "default": "qwen_image21"
+          },
+          "image_path": {
+            "type": "string",
+            "title": "Image Path",
+            "description": "B: file (via /files/upload)",
+            "default": ""
+          },
+          "character": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CharacterSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "aspect": {
+            "type": "string",
+            "title": "Aspect",
+            "description": "Qwen-Image 2.1: formato 2K 1:1 4:3 3:4 3:2 2:3 16:9 9:16",
+            "default": ""
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "default": 0
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "default": 0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": -1
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 0
+          },
+          "profile": {
+            "type": "string",
+            "title": "Profile",
+            "description": "Qwen-Image 2.1: nvfp4 | fp8 | int8 (vedi /avatar/options)",
+            "default": "fp8"
+          },
+          "turbo": {
+            "type": "string",
+            "title": "Turbo",
+            "description": "Qwen-Image 2.1: '' | '4' | '6' passi (LoRA turbo)",
+            "default": ""
+          },
+          "enhance_prompt": {
+            "type": "boolean",
+            "title": "Enhance Prompt",
+            "default": false
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "FLUX/Z-Image: checkpoint esplicito",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ImageSpec"
       },
       "ImageTo3DReq": {
         "properties": {
@@ -1909,6 +2540,53 @@
               }
             ],
             "title": "Loras"
+          },
+          "ltx_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx Release",
+            "description": "release LTX: 2.3 (default) | 2.5"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "transformer esplicito; auto per release != 2.3"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "References",
+            "description": "MSR: 2-5 riferimenti per la coerenza"
+          },
+          "msr_strength": {
+            "type": "number",
+            "title": "Msr Strength",
+            "default": 1.0
+          },
+          "msr_background": {
+            "type": "string",
+            "title": "Msr Background",
+            "default": ""
           }
         },
         "type": "object",
@@ -1993,6 +2671,90 @@
           "audio_path"
         ],
         "title": "LipsyncReq"
+      },
+      "LoraImageReq": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/_Img"
+            },
+            "type": "array",
+            "title": "Images",
+            "description": "immagini dataset già caricate (+caption)"
+          },
+          "base": {
+            "type": "string",
+            "title": "Base",
+            "default": "flux2-dev"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger",
+            "default": ""
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank",
+            "default": 16
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "images"
+        ],
+        "title": "LoraImageReq"
+      },
+      "LoraVideoReq": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "clips": {
+            "items": {
+              "$ref": "#/components/schemas/_Clip"
+            },
+            "type": "array",
+            "title": "Clips",
+            "description": "clip video già caricati"
+          },
+          "trigger": {
+            "type": "string",
+            "title": "Trigger",
+            "default": ""
+          },
+          "global_caption": {
+            "type": "string",
+            "title": "Global Caption",
+            "default": ""
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank",
+            "default": 16
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "default": 2000
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "clips"
+        ],
+        "title": "LoraVideoReq"
       },
       "MusicVideoReq": {
         "properties": {
@@ -2389,6 +3151,109 @@
             "type": "string",
             "title": "Negative",
             "default": ""
+          },
+          "ltx_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx Release",
+            "description": "release LTX: 2.3 (default) | 2.5"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "transformer esplicito; auto per release != 2.3"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "References",
+            "description": "MSR: 2-5 riferimenti [{path,strength,role}]. Sulla 2.5 entrano come slot embedding a frame negativi: coerenza di cast e luoghi fra shot"
+          },
+          "ref_images": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref Images",
+            "description": "ritratti/luoghi della scena (path). Diventano riferimenti MSR da soli, con lo sfondo ricavato dal keyframe: e' la via comoda per `references`"
+          },
+          "msr_strength": {
+            "type": "number",
+            "title": "Msr Strength",
+            "default": 1.0
+          },
+          "msr_background": {
+            "type": "string",
+            "title": "Msr Background",
+            "description": "MSR 2.3 (pseudo-video): sfondo obbligatorio",
+            "default": ""
+          },
+          "msr_spacing": {
+            "type": "integer",
+            "title": "Msr Spacing",
+            "description": "MSR 2.5: distanza temporale dei riferimenti dal primo fotogramma. 1 = ricetta del plugin (istanti contigui alla scena, il modello può generare una transizione dai riferimenti al video); valori maggiori li allontanano dalla timeline",
+            "default": 1
+          },
+          "structure": {
+            "type": "boolean",
+            "title": "Structure",
+            "description": "riscrive il prompt in JSON strutturato con l'LLM locale; False = il prompt passa così com'è",
+            "default": true
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "description": "passi di denoise. 8 bastano al video su un checkpoint distilled, ma l'AUDIO viene denoisato dagli stessi passi: alzarli (20-30) dà una traccia più pulita, al costo di tempo",
+            "default": 8
+          },
+          "guidance": {
+            "type": "number",
+            "title": "Guidance",
+            "description": "CFG del video",
+            "default": 3.0
+          },
+          "native_audio": {
+            "type": "boolean",
+            "title": "Native Audio",
+            "description": "tiene la traccia audio che LTX-2 genera insieme al video (suoni/parlato dal prompt + lip-sync). Senza, il video esce muto: la traccia non condizionata sarebbe rumore",
+            "default": false
+          },
+          "audio_lowpass": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Lowpass",
+            "description": "taglio in Hz della banda che il vocoder BWE della 2.5 sintetizza sopra i 16 kHz interni: è materiale inventato dal mel e si sente come alone metallico. None = 8000 sulla 2.5 e nessun filtro sulla 2.3; 0 disattiva e restituisce la banda piena"
           }
         },
         "type": "object",
@@ -2509,6 +3374,81 @@
         "type": "object",
         "title": "SonifyReq"
       },
+      "SpeakerSpec": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": "A"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "description": "kokoro | edge | handy_clone | cosyvoice2 | f5tts | xtts2 | fish | vibevoice",
+            "default": "edge"
+          },
+          "voice_id": {
+            "type": "string",
+            "title": "Voice Id",
+            "description": "voce della libreria o id del motore (it-IT-ElsaNeural, if_sara…)",
+            "default": ""
+          },
+          "voice_description": {
+            "type": "string",
+            "title": "Voice Description",
+            "description": "se voice_id è vuoto: l'LLM sceglie la voce dalla descrizione",
+            "default": ""
+          },
+          "clone": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clone",
+            "description": "{sample_path, transcript} per clonare da un campione"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "it-IT"
+          },
+          "speed": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.5,
+            "title": "Speed",
+            "default": 1.0
+          },
+          "pitch": {
+            "type": "number",
+            "maximum": 12.0,
+            "minimum": -12.0,
+            "title": "Pitch",
+            "description": "semitoni",
+            "default": 0.0
+          },
+          "volume_db": {
+            "type": "number",
+            "maximum": 12.0,
+            "minimum": -30.0,
+            "title": "Volume Db",
+            "default": 0.0
+          },
+          "emotion": {
+            "type": "string",
+            "title": "Emotion",
+            "description": "neutral | happy | sad | angry | whisper | calm",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "SpeakerSpec"
+      },
       "TTSReq": {
         "properties": {
           "text": {
@@ -2547,6 +3487,14 @@
             "type": "string",
             "title": "Sample Transcript",
             "default": ""
+          },
+          "speed": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.5,
+            "title": "Speed",
+            "description": "velocità (kokoro; edge → rate)",
+            "default": 1.0
           }
         },
         "type": "object",
@@ -2696,6 +3644,98 @@
         ],
         "title": "ValidationError"
       },
+      "VideoSpec": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": ""
+          },
+          "negative": {
+            "type": "string",
+            "title": "Negative",
+            "default": ""
+          },
+          "enhance_prompt": {
+            "type": "boolean",
+            "title": "Enhance Prompt",
+            "default": false
+          },
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "description": "480p | 720p",
+            "default": "480p"
+          },
+          "aspect": {
+            "type": "string",
+            "title": "Aspect",
+            "description": "senza immagine: 16:9 9:16 1:1 4:3 3:4",
+            "default": "16:9"
+          },
+          "resize_mode": {
+            "type": "string",
+            "title": "Resize Mode",
+            "description": "crop | default",
+            "default": "crop"
+          },
+          "max_duration_s": {
+            "type": "number",
+            "title": "Max Duration S",
+            "default": 0.0
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": -1
+          },
+          "ref_img_index": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Ref Img Index",
+            "default": 10
+          },
+          "mask_frame_range": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Mask Frame Range",
+            "default": 3
+          },
+          "precision_profile": {
+            "type": "string",
+            "title": "Precision Profile",
+            "description": "LongCat: int8 | fp8 | bf16 · MiniMax H3: nvfp4 | fp8 | int8",
+            "default": "int8"
+          },
+          "offload_kv_cache": {
+            "type": "boolean",
+            "title": "Offload Kv Cache",
+            "default": false
+          },
+          "multi_person": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Multi Person",
+            "description": "{bboxes: {person1:[y0,x0,y1,x1], person2:[…]}} frazioni 0–1"
+          },
+          "h3": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "H3",
+            "description": "minimax_h3: duration_s (5–15), dialogue_lines [{speaker, language, text}], soundscape, music_desc, turbo_steps ('' | '4' | '8'), text_encoder (id catalogo, es. mmh3-te-nvfp4)"
+          },
+          "postprocess": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Postprocess",
+            "description": "{face_restore: codeformer|gfpgan, interpolate_fps: 50}"
+          }
+        },
+        "type": "object",
+        "title": "VideoSpec"
+      },
       "WorldReq": {
         "properties": {
           "name": {
@@ -2744,6 +3784,42 @@
         },
         "type": "object",
         "title": "WorldReq"
+      },
+      "_Clip": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "_Clip"
+      },
+      "_Img": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "_Img"
       },
       "api__handlers__images__GenerateReq": {
         "properties": {
@@ -2938,6 +4014,54 @@
             "type": "number",
             "title": "Audio Scale",
             "default": 3.0
+          },
+          "ltx_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx Release",
+            "description": "release LTX: 2.3 (default) | 2.5"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "transformer esplicito; auto per release != 2.3"
+          },
+          "references": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "References",
+            "description": "MSR: 2-5 riferimenti [{path,strength,role}] per la coerenza di personaggi/luoghi"
+          },
+          "msr_strength": {
+            "type": "number",
+            "title": "Msr Strength",
+            "default": 1.0
+          },
+          "msr_background": {
+            "type": "string",
+            "title": "Msr Background",
+            "description": "MSR 2.3 (pseudo-video): sfondo obbligatorio",
+            "default": ""
           }
         },
         "type": "object",

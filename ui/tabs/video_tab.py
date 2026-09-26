@@ -346,6 +346,7 @@ class VideoTab(QWidget):
         _lbf.addRow(_lb_note)
         self.lingbot_box.setVisible(False)
         root.addWidget(self.lingbot_box)
+        self._build_h3_box(root)
         # #104 TeaCache: cache che salta gli step di denoising quasi-invariati (velocità). 0=off.
         # Conviene con MOLTI step (HQ/Pro); soglia più alta = più veloce ma più perdita qualità.
         self.teacache = QDoubleSpinBox()
@@ -530,6 +531,33 @@ class VideoTab(QWidget):
         # progressive disclosure del pannello LingBot (refiner/rewriter) — solo LingBot
         if hasattr(self, "lingbot_box"):
             self.lingbot_box.setVisible(is_ling)
+        is_h3 = arch == "minimax_h3"
+        if hasattr(self, "h3_box"):
+            self.h3_box.setVisible(is_h3)
+            self._sync_h3_te()
+        # controlli comuni con i vincoli di H3 (24 fps fissi, 5–15 s, niente negative/CFG)
+        self.fps.setEnabled(not is_h3)
+        self.fps.setToolTip(tr("vid.h3.fixed", "Fisso con MiniMax H3") if is_h3 else
+                            tr("vid.fps.tt", "Frame al secondo. 24 = cinematografico, 30 = TV, 60 = fluid."))
+        if is_h3:
+            if not hasattr(self, "_pre_h3_len"):
+                self._pre_h3_len = self.length.value()
+            self.fps.setValue(24)
+            self.length.setRange(5.0, 15.0)
+            self._sync_h3_duration()
+            self._sync_h3_steps()
+        else:
+            self.length.setRange(1, 86400)
+            if hasattr(self, "_pre_h3_len"):
+                self.length.setValue(self._pre_h3_len)
+                del self._pre_h3_len
+            if hasattr(self, "sampler_seed"):
+                self.sampler_seed.steps.setEnabled(True)
+        for w in (getattr(self, "neg", None), getattr(getattr(self, "sampler_seed", None), "cfg", None)):
+            if w is not None:
+                w.setEnabled(not is_h3)
+                w.setToolTip(tr("vid.h3.no_cfg", "MiniMax H3 ha la guidance distillata: niente negative "
+                                "prompt né CFG.") if is_h3 else "")
         # abilita/disabilita i controlli SOLO-LTX (teacache/motore/attention/LoRA valgono solo per LTX;
         # v2v/storyboard secondo le capability dell'arch). Non li nasconde: tooltip esplicativo.
         from core.model_catalog import video_caps
@@ -543,8 +571,8 @@ class VideoTab(QWidget):
             (getattr(self, "teacache", None), not is_ltx),
             (getattr(self, "video_engine_sel", None), not is_ltx),
             (getattr(self, "engine_row_lbl", None), not is_ltx),
-            (getattr(self, "attn_backend", None), not is_ltx),   # LingBot/Krea usano sempre FlashAttention
-            (getattr(self, "attn_row_lbl", None), not is_ltx),
+            (getattr(self, "attn_backend", None), not (is_ltx or is_h3)),   # LingBot/Krea: sempre FlashAttention
+            (getattr(self, "attn_row_lbl", None), not (is_ltx or is_h3)),
             (getattr(self, "lora", None), not is_ltx),           # le LoRA LTX non si applicano alle altre arch
         ]
         for w, disable in ltx_only:
@@ -556,18 +584,128 @@ class VideoTab(QWidget):
             except Exception:                                   # noqa: BLE001
                 pass
         # ripopola il dropdown modello per l'architettura scelta
-        if is_ling:
-            self._refilter_lingbot_models()
-        elif arch == "krea_rt":
-            # due varianti selezionabili: 14B "quality" + 1.3B Self-Forcing "realtime" (leggero, ~realtime 5090)
-            self._refilter_diffusers_arch_models([
-                ("krea_rt", "quality",
-                 tr("vid.arch.krea_rt.model", "Krea Realtime 14B (autoregressivo, qualità)")),
-                ("self_forcing_dmd", "realtime",
-                 tr("vid.arch.sf13b.model", "Self-Forcing 1.3B (realtime, leggero)")),
-            ])
-        else:
-            self._refilter_models()
+        self._refilter_models()                          # smista per architettura
+
+    # ── MiniMax H3 ─────────────────────────────────────────────────────────────────────────────
+    def _build_h3_box(self, root):
+        """Opzioni SOLO di MiniMax H3 (progressive disclosure). Tutto il resto riusa i controlli comuni:
+        formato = rapporto della risoluzione, durata 5–15 s, fps 24, «Audio nativo» = genera audio, passi."""
+        from PySide6.QtWidgets import QLineEdit as _LE
+        from ui.widgets.h3_dialogue import H3DialogueEditor
+        self.h3_box = QGroupBox(tr("vid.h3.group", "Opzioni MiniMax H3"))
+        f = QFormLayout(self.h3_box)
+        self.h3_te = QComboBox()
+        for tid, key, label in (("mmh3-te-nvfp4", "nvfp4", "Qwen3-VL-32B nvfp4-AWQ (15,7 GB, consigliato)"),
+                                ("mmh3-te-fp8", "fp8", "Qwen3-VL-32B fp8 (26,5 GB, RTX 40xx)"),
+                                ("mmh3-te-int8", "int8", "Qwen3-VL-32B int8-ConvRot (27 GB, qualità)"),
+                                ("mmh3-te-heretic-nvfp4", "heretic", "Qwen3-VL-32B Heretic nvfp4 (senza censura)")):
+            self.h3_te.addItem(tr(f"vid.h3.te.{key}", label), tid)
+        self.h3_te.setToolTip(tr("vid.h3.te.tt",
+            "Il text encoder legge il prompt (e le immagini di riferimento). Lavora da solo e viene liberato "
+            "prima del video, quindi non si somma al transformer in VRAM."))
+        f.addRow(tr("vid.h3.te_lbl", "Text encoder"), self.h3_te)
+        self.h3_turbo = QComboBox()
+        self.h3_turbo.addItem(tr("vid.h3.turbo.off", "Spento (qualità piena, ~49 passi)"), "")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.4", "Turbo 4 passi (lightx2v)"), "4")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.8", "Turbo 8 passi (più dettaglio)"), "8")
+        self.h3_turbo.setToolTip(tr("vid.h3.turbo.tt",
+            "LoRA di distillazione lightx2v: da ~49 a 4 o 8 passi (10× più veloce). Con i riferimenti "
+            "(Ref2VA) esiste solo la 4 passi, in anteprima."))
+        self.h3_turbo.currentIndexChanged.connect(self._sync_h3_steps)
+        f.addRow(tr("vid.h3.turbo_lbl", "Velocità"), self.h3_turbo)
+        self.h3_canvas = QComboBox()
+        self.h3_canvas.addItem(tr("vid.h3.canvas.768", "768p (nativa, massima qualità)"), "768")
+        self.h3_canvas.addItem(tr("vid.h3.canvas.544", "544p (≈2,3× più veloce)"), "544")
+        self.h3_canvas.setToolTip(tr("vid.h3.canvas.tt",
+            "Dimensione della tela. Il formato (16:9, 9:16…) viene dalla risoluzione scelta sopra; H3 "
+            "adatta i lati alla sua griglia (lato corto 768 o 544, multipli di 32)."))
+        f.addRow(tr("vid.h3.canvas_lbl", "Tela"), self.h3_canvas)
+        self.h3_dialogue = H3DialogueEditor()
+        f.addRow(tr("vid.h3.dialogue_lbl", "Battute"), self.h3_dialogue)
+        self.h3_soundscape = _LE()
+        self.h3_soundscape.setPlaceholderText(tr("vid.h3.soundscape.ph", "es. pioggia leggera, traffico lontano"))
+        self.h3_soundscape.setToolTip(tr("vid.h3.soundscape.tt", "Suoni d'ambiente da generare insieme al video."))
+        f.addRow(tr("vid.h3.soundscape_lbl", "Suoni d'ambiente"), self.h3_soundscape)
+        self.h3_music = _LE()
+        self.h3_music.setPlaceholderText(tr("vid.h3.music.ph", "es. jazz lento al pianoforte"))
+        self.h3_music.setToolTip(tr("vid.h3.music.tt", "Musica di sottofondo (non diegetica) da generare."))
+        f.addRow(tr("vid.h3.music_lbl", "Musica"), self.h3_music)
+        self.h3_dur_lbl = QLabel("")
+        self.h3_dur_lbl.setStyleSheet("color:#74c0fc;")
+        f.addRow("", self.h3_dur_lbl)
+        note = QLabel(tr("vid.h3.note",
+            "MiniMax H3 genera video e audio stereo nella stessa passata: 24 fps, 5–15 s, niente negative "
+            "prompt (guidance distillata). Licenza MiniMax H3 Community: territori esclusi UE, Regno Unito, "
+            "USA, Corea del Sud."))
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#e8b339;")
+        f.addRow(note)
+        self.h3_box.setVisible(False)
+        root.addWidget(self.h3_box)
+        self.length.valueChanged.connect(self._sync_h3_duration)
+        self.nsfw.currentTextChanged.connect(self._sync_h3_te)
+
+    def _sync_h3_te(self, *_):
+        """Il text encoder «heretic» (senza censura) compare solo in modalità NSFW."""
+        _i = self.h3_te.findData("mmh3-te-heretic-nvfp4")
+        nsfw = self.nsfw.currentText() == "NSFW"
+        self.h3_te.view().setRowHidden(_i, not nsfw)
+        if not nsfw and self.h3_te.currentIndex() == _i:
+            self.h3_te.setCurrentIndex(0)
+
+    def _sync_h3_duration(self, *_):
+        if not hasattr(self, "h3_dur_lbl") or self._arch() != "minimax_h3":
+            return
+        from core import minimax_h3_spec as S
+        n = S.snap_frames(self.length.value())
+        self.h3_dur_lbl.setText(tr("vid.h3.dur", "Durata effettiva: {s:.2f} s ({n} fotogrammi a 24 fps)")
+                                .format(s=S.frames_seconds(n), n=n))
+
+    def _sync_h3_steps(self, *_):
+        if self._arch() != "minimax_h3":
+            return
+        from core import minimax_h3_spec as S
+        t = self.h3_turbo.currentData() or ""
+        ss = getattr(self, "sampler_seed", None)
+        if ss is not None:
+            ss.set_suggested_steps(S.TURBO[t][1] if t else S.DEFAULT_NFE, note="MiniMax H3")
+            ss.steps.setEnabled(not t)
+
+    def _refilter_h3_models(self):
+        """Dropdown modello = profili di quantizzazione H3 (il checkpoint FL2VA o Ref2VA lo decide la
+        modalità: con i riferimenti serve il Ref2VA). Non scaricati → evidenziati, download su selezione."""
+        from core import weights_catalog as wc
+        from core import minimax_h3_spec as S
+        from core import weights_tooltips as _wt
+        from PySide6.QtGui import QColor
+        entries = {e["id"]: e for e in wc.load()}
+        prev = (self.model.currentData() or {}).get("key")
+        labels = {"nvfp4": tr("vid.h3.prof.nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"),
+                  "fp8": tr("vid.h3.prof.fp8", "fp8 · 21 GB (RTX 40xx)"),
+                  "int8": tr("vid.h3.prof.int8", "int8-ConvRot · 21 GB (tutte le GPU)")}
+        self.model.blockSignals(True)
+        self.model.clear()
+        for prof, (fl, _ref, _te) in S.PROFILES.items():
+            e = entries.get(fl)
+            if not e:
+                continue
+            try:
+                present = wc.is_present(e)
+            except Exception:                                   # noqa: BLE001
+                present = False
+            self.model.addItem(("" if present else "⬇ ") + "MiniMax H3 " + labels[prof],
+                               {"kind": "minimax_h3", "profile": prof, "cat_id": fl, "present": present,
+                                "key": f"minimax_h3:{prof}"})
+            i = self.model.count() - 1
+            self.model.setItemData(i, _wt.tooltip_for(e) + "\n" + (tr("vid.present", "presente") if present
+                                                                   else tr("vid.missing", "da scaricare")),
+                                   Qt.ToolTipRole)
+            if not present:
+                self.model.setItemData(i, QColor("#e8b339"), Qt.ForegroundRole)
+        j = next((k for k in range(self.model.count()) if (self.model.itemData(k) or {}).get("key") == prev), -1)
+        if j >= 0:
+            self.model.setCurrentIndex(j)
+        self.model.blockSignals(False)
 
     def _refilter_lingbot_models(self):
         """Popola il dropdown con le varianti LingBot (Dense/MoE) risolte dal catalogo pesi.
@@ -714,7 +852,23 @@ class VideoTab(QWidget):
                 return p
         return None
 
+    def _refilter_krea_models(self):
+        # due varianti selezionabili: 14B "quality" + 1.3B Self-Forcing "realtime" (leggero, ~realtime 5090)
+        self._refilter_diffusers_arch_models([
+            ("krea_rt", "quality", tr("vid.arch.krea_rt.model", "Krea Realtime 14B (autoregressivo, qualità)")),
+            ("self_forcing_dmd", "realtime", tr("vid.arch.sf13b.model", "Self-Forcing 1.3B (realtime, leggero)")),
+        ])
+
     def _refilter_models(self):
+        """Ripopola il dropdown modello PER L'ARCHITETTURA scelta. Lo chiamano anche l'inventario asincrono,
+        il filtro NSFW e la precisione: prima rimetteva sempre i checkpoint LTX, anche con LingBot/Krea/H3."""
+        arch = self._arch() if hasattr(self, "video_arch") else "ltx"
+        if arch == "lingbot":
+            return self._refilter_lingbot_models()
+        if arch == "krea_rt":
+            return self._refilter_krea_models()
+        if arch == "minimax_h3" and hasattr(self, "h3_box"):
+            return self._refilter_h3_models()
         nsfw = self.nsfw.currentText() == "NSFW"
         cur_data = self.model.currentData() or {}
         cur_key = cur_data.get("key")
@@ -1147,6 +1301,16 @@ class VideoTab(QWidget):
             if sel_data.get("variant") == "realtime" or sel_data.get("cat_id") == "self_forcing_dmd":
                 v["video_arch"] = "self_forcing"
                 v["krea_rt_variant"] = "realtime"
+        elif kind == "minimax_h3":
+            v["model_kind"] = "minimax_h3"
+            v["model"] = ""
+            v["h3_profile"] = sel_data.get("profile", "nvfp4")
+            v["h3_te"] = self.h3_te.currentData() or "mmh3-te-nvfp4"
+            v["h3_turbo"] = self.h3_turbo.currentData() or ""
+            v["h3_canvas"] = self.h3_canvas.currentData() or "768"
+            v["h3_dialogue"] = self.h3_dialogue.value()
+            v["h3_soundscape"] = self.h3_soundscape.text().strip()
+            v["h3_music"] = self.h3_music.text().strip()
         elif kind == "lingbot":
             # LingBot: model = cartella diffusers (vuota → il worker risolve dal catalogo), variante + refiner
             v["model_kind"] = "lingbot"

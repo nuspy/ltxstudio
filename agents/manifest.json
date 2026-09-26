@@ -113,17 +113,45 @@
         "title": "Prompt"
       },
       "image_path": {
-        "type": "string",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "title": "Image Path"
       },
+      "images": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Images"
+      },
       "model": {
-        "type": "string",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "title": "Model"
       },
       "arch": {
         "type": "string",
         "title": "Arch",
-        "description": "kontext | flux2_kontext",
+        "description": "kontext | flux2_kontext | krea2_edit",
         "default": "kontext"
       },
       "negative": {
@@ -156,12 +184,20 @@
         "type": "integer",
         "title": "Max Side",
         "default": 1536
+      },
+      "grounding_px": {
+        "type": "integer",
+        "title": "Grounding Px",
+        "default": 768
+      },
+      "krea2_variant": {
+        "type": "string",
+        "title": "Krea2 Variant",
+        "default": "turbo"
       }
     },
     "required": [
-      "prompt",
-      "image_path",
-      "model"
+      "prompt"
     ]
   },
   {
@@ -537,6 +573,54 @@
         "type": "number",
         "title": "Audio Scale",
         "default": 3.0
+      },
+      "ltx_release": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ltx Release",
+        "description": "release LTX: 2.3 (default) | 2.5"
+      },
+      "model": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Model",
+        "description": "transformer esplicito; auto per release != 2.3"
+      },
+      "references": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "References",
+        "description": "MSR: 2-5 riferimenti [{path,strength,role}] per la coerenza di personaggi/luoghi"
+      },
+      "msr_strength": {
+        "type": "number",
+        "title": "Msr Strength",
+        "default": 1.0
+      },
+      "msr_background": {
+        "type": "string",
+        "title": "Msr Background",
+        "description": "MSR 2.3 (pseudo-video): sfondo obbligatorio",
+        "default": ""
       }
     },
     "required": [
@@ -617,6 +701,53 @@
           }
         ],
         "title": "Loras"
+      },
+      "ltx_release": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ltx Release",
+        "description": "release LTX: 2.3 (default) | 2.5"
+      },
+      "model": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Model",
+        "description": "transformer esplicito; auto per release != 2.3"
+      },
+      "references": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "References",
+        "description": "MSR: 2-5 riferimenti per la coerenza"
+      },
+      "msr_strength": {
+        "type": "number",
+        "title": "Msr Strength",
+        "default": 1.0
+      },
+      "msr_background": {
+        "type": "string",
+        "title": "Msr Background",
+        "default": ""
       }
     },
     "required": [
@@ -981,7 +1112,7 @@
       "scale": {
         "type": "number",
         "title": "Scale",
-        "default": 4.0
+        "default": 2.0
       }
     },
     "required": [
@@ -1251,6 +1382,14 @@
         "type": "string",
         "title": "Sample Transcript",
         "default": ""
+      },
+      "speed": {
+        "type": "number",
+        "maximum": 2.0,
+        "minimum": 0.5,
+        "title": "Speed",
+        "description": "velocità (kokoro; edge → rate)",
+        "default": 1.0
       }
     },
     "required": [
@@ -1518,11 +1657,36 @@
         "description": "foto identità (PuLID)",
         "default": ""
       },
+      "face_strength": {
+        "type": "number",
+        "title": "Face Strength",
+        "description": "quanto pesa il volto di `face_ref`. A 0.85 l'identità è fedelissima ma arriva con tutto il volto di partenza, ETÀ COMPRESA, e il prompt non riesce più a ringiovanire il personaggio. 0.5-0.7 tiene i tratti e lascia contare il prompt",
+        "default": 0.85
+      },
       "ref_image": {
         "type": "string",
         "title": "Ref Image",
         "description": "immagine di riferimento (Kontext)",
         "default": ""
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "riferimenti MULTIPLI (Kontext multi-ref, o in-context con coherence_engine=krea2_edit)"
+      },
+      "coherence_engine": {
+        "type": "string",
+        "title": "Coherence Engine",
+        "description": "flux (PuLID/Kontext) | krea2_edit (in-context)",
+        "default": "flux"
       },
       "loras": {
         "anyOf": [
@@ -1540,6 +1704,12 @@
         "type": "string",
         "title": "Negative",
         "default": ""
+      },
+      "structure": {
+        "type": "boolean",
+        "title": "Structure",
+        "description": "riscrive il prompt in JSON strutturato con l'LLM locale; False = il prompt passa così com'è",
+        "default": true
       }
     },
     "required": [
@@ -1615,10 +1785,233 @@
         "type": "string",
         "title": "Negative",
         "default": ""
+      },
+      "ltx_release": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ltx Release",
+        "description": "release LTX: 2.3 (default) | 2.5"
+      },
+      "model": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Model",
+        "description": "transformer esplicito; auto per release != 2.3"
+      },
+      "references": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "References",
+        "description": "MSR: 2-5 riferimenti [{path,strength,role}]. Sulla 2.5 entrano come slot embedding a frame negativi: coerenza di cast e luoghi fra shot"
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {},
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "ritratti/luoghi della scena (path). Diventano riferimenti MSR da soli, con lo sfondo ricavato dal keyframe: e' la via comoda per `references`"
+      },
+      "msr_strength": {
+        "type": "number",
+        "title": "Msr Strength",
+        "default": 1.0
+      },
+      "msr_background": {
+        "type": "string",
+        "title": "Msr Background",
+        "description": "MSR 2.3 (pseudo-video): sfondo obbligatorio",
+        "default": ""
+      },
+      "msr_spacing": {
+        "type": "integer",
+        "title": "Msr Spacing",
+        "description": "MSR 2.5: distanza temporale dei riferimenti dal primo fotogramma. 1 = ricetta del plugin (istanti contigui alla scena, il modello può generare una transizione dai riferimenti al video); valori maggiori li allontanano dalla timeline",
+        "default": 1
+      },
+      "structure": {
+        "type": "boolean",
+        "title": "Structure",
+        "description": "riscrive il prompt in JSON strutturato con l'LLM locale; False = il prompt passa così com'è",
+        "default": true
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "description": "passi di denoise. 8 bastano al video su un checkpoint distilled, ma l'AUDIO viene denoisato dagli stessi passi: alzarli (20-30) dà una traccia più pulita, al costo di tempo",
+        "default": 8
+      },
+      "guidance": {
+        "type": "number",
+        "title": "Guidance",
+        "description": "CFG del video",
+        "default": 3.0
+      },
+      "native_audio": {
+        "type": "boolean",
+        "title": "Native Audio",
+        "description": "tiene la traccia audio che LTX-2 genera insieme al video (suoni/parlato dal prompt + lip-sync). Senza, il video esce muto: la traccia non condizionata sarebbe rumore",
+        "default": false
+      },
+      "audio_lowpass": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Audio Lowpass",
+        "description": "taglio in Hz della banda che il vocoder BWE della 2.5 sintetizza sopra i 16 kHz interni: è materiale inventato dal mel e si sente come alone metallico. None = 8000 sulla 2.5 e nessun filtro sulla 2.3; 0 disattiva e restituisce la banda piena"
       }
     },
     "required": [
       "prompt"
     ]
+  },
+  {
+    "name": "train_lora_image",
+    "method": "POST",
+    "path": "/train/lora_image",
+    "group": "training",
+    "summary": "Train Lora Image",
+    "params": {
+      "name": {
+        "type": "string",
+        "title": "Name"
+      },
+      "images": {
+        "items": {
+          "$ref": "#/components/schemas/_Img"
+        },
+        "type": "array",
+        "title": "Images",
+        "description": "immagini dataset già caricate (+caption)"
+      },
+      "base": {
+        "type": "string",
+        "title": "Base",
+        "default": "flux2-dev"
+      },
+      "trigger": {
+        "type": "string",
+        "title": "Trigger",
+        "default": ""
+      },
+      "rank": {
+        "type": "integer",
+        "title": "Rank",
+        "default": 16
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 2000
+      }
+    },
+    "required": [
+      "name",
+      "images"
+    ]
+  },
+  {
+    "name": "train_lora_video",
+    "method": "POST",
+    "path": "/train/lora_video",
+    "group": "training",
+    "summary": "Train Lora Video",
+    "params": {
+      "name": {
+        "type": "string",
+        "title": "Name"
+      },
+      "clips": {
+        "items": {
+          "$ref": "#/components/schemas/_Clip"
+        },
+        "type": "array",
+        "title": "Clips",
+        "description": "clip video già caricati"
+      },
+      "trigger": {
+        "type": "string",
+        "title": "Trigger",
+        "default": ""
+      },
+      "global_caption": {
+        "type": "string",
+        "title": "Global Caption",
+        "default": ""
+      },
+      "rank": {
+        "type": "integer",
+        "title": "Rank",
+        "default": 16
+      },
+      "steps": {
+        "type": "integer",
+        "title": "Steps",
+        "default": 2000
+      }
+    },
+    "required": [
+      "name",
+      "clips"
+    ]
+  },
+  {
+    "name": "avatar_generate",
+    "method": "POST",
+    "path": "/avatar/generate",
+    "group": "avatar",
+    "summary": "Avatar Generate",
+    "params": {
+      "engine": {
+        "type": "string",
+        "title": "Engine",
+        "description": "longcat | minimax_h3",
+        "default": "longcat"
+      },
+      "image": {
+        "$ref": "#/components/schemas/ImageSpec"
+      },
+      "audio": {
+        "$ref": "#/components/schemas/AudioSpec"
+      },
+      "video": {
+        "$ref": "#/components/schemas/VideoSpec"
+      },
+      "return_intermediates": {
+        "type": "boolean",
+        "title": "Return Intermediates",
+        "default": true
+      }
+    },
+    "required": []
   }
 ]

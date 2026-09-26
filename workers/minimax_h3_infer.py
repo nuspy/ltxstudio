@@ -1,262 +1,365 @@
-"""Worker MiniMax H3 — 3ª architettura video (omni-modale: video + audio stereo insieme).
+"""Worker MiniMax H3 — video + audio stereo generati INSIEME (omni-transformer 33B, pruned).
 
-H3 è un unico transformer denso da 33.1B che denoisa NELLA STESSA PASSATA i latenti video e
-quelli audio (stereo 32 kHz), condizionato da Qwen3-VL-32B. Tre modalità:
-  · T2VA / FL2VA  → testo, o primo/ultimo fotogramma, verso video+audio   (checkpoint `fl2va`)
-  · Ref2VA        → riferimenti multipli verso video+audio                (checkpoint `ref2va`)
-I riferimenti (≤9 immagini, ≤3 video, ≤3 audio, max 12 file) NON hanno posizione temporale e
-vanno citati nel prompt coi token `<Picture 1>`, `<Video 1>`, `<Audio 1>` — il pannello
-«Riferimenti multipli» della GUI li assegna e li inserisce.
+Pipeline ufficiale diffusers modular (MiniMaxH3Blocks) eseguita A FASI, così in VRAM c'è un solo modello
+grande alla volta e tutto sta in 32 GB:
+  1. before_encode + text_encoder  → Qwen3-VL-32B (nvfp4-AWQ 15,7 GB / fp8 26,5 GB / int8-ConvRot) → liberato
+  2. vae_encoder (keyframe/riferimenti) → VAE video (fp32) [+ audio VAE per Ref2VA]              → liberato
+  3. denoise → DiT pruned (nvfp4 12,5 GB / fp8 / int8-ConvRot) + LoRA turbo/utente               → liberato
+  4. decode → VAE video + audio VAE → mp4 con audio (PyAV, encode_video)
+Pesi SOLO in formato nativo (core/native_convert: i single-file ComfyUI vengono convertiti al download).
+Il transformer pruned è il MiniMaxH3PrunedTransformer3DModel ufficiale (workers/minimax_h3_pruned.py) con
+qkv e gate/up FUSI come nel file quantizzato (vedi workers/minimax_h3_convert.py).
 
-PESI: config+tokenizer ufficiali (~25MB) + single-file quantizzato, stesso schema di FLUX.2
-(`init_empty_weights` + `from_config` + set_module_tensor_to_device coi Linear quantizzati):
-evita i 124GB dello snapshot bf16 ufficiale. Il nvfp4 (12.5GB) riusa `Nvfp4Linear`, già
-validato su FLUX.2-dev-NVFP4.
-
-⚠ La chiamata di generazione (MiniMaxH3ModularPipeline) è scritta sulla documentazione
-ufficiale ma NON è ancora stata eseguita su GPU: serve la prima generazione live coi pesi
-scaricati. Finché non è validata, ogni errore risale alla GUI col traceback completo.
-
-Uso:  python minimax_h3_infer.py params.json     → stampa "OK:<path mp4>"
+Nessuna scelta automatica dei pesi: profilo, TE e turbo arrivano espliciti dai params (core/minimax_h3_spec).
+Uso:  python minimax_h3_infer.py params.json   → stampa "OK:<mp4>"
 """
 from __future__ import annotations
 
+import gc
 import json
 import os
 import sys
+import time
 import traceback
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))       # repo root
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+from core import minimax_h3_spec as S                                  # noqa: E402
 
-
-def _log(msg: str) -> None:
-    print(f"[h3] {msg}", flush=True)
-
-
-# ── risoluzione pesi dal REGISTRO UNICO (mai path hardcoded) ──────────────────
-_CKPT_IDS = {                       # (modalità, preferenza) → id di catalogo, in ordine di scelta
-    "fl2va": ["mmh3-fl2va-nvfp4", "mmh3-fl2va-int8", "mmh3-fl2va-fp8",
-              "mmh3-fl2va-gguf-q4", "mmh3-fl2va-gguf-q3", "mmh3-fl2va-bf16"],
-    "ref2va": ["mmh3-ref2va-nvfp4", "mmh3-ref2va-int8", "mmh3-ref2va-fp8",
-               "mmh3-ref2va-gguf-q4"],
-}
-_TE_IDS = ["mmh3-te-nvfp4", "mmh3-te-int8", "mmh3-te-gguf-q4"]
+DIT_FP32 = ("time_embedder", "proj_in", "proj_out", "audio_proj_in", "audio_proj_out", "folded_bias",
+            "adaln_basis", "adaln_mean")
 
 
-def _first_present(ids: list[str]) -> str | None:
-    """Primo peso PRESENTE su disco fra quelli elencati (nessuna sostituzione silenziosa:
-    l'ordine è una preferenza dichiarata, non una scelta automatica di modello)."""
+def _log(m: str) -> None:
+    print(f"[h3] {m}", flush=True)
+
+
+def _gc():
+    import torch
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def _vram() -> str:
+    import torch
+    return f"{torch.cuda.memory_allocated() / 2**30:.1f} GB (picco {torch.cuda.max_memory_allocated() / 2**30:.1f})"
+
+
+def _free_gpu_servers() -> None:
+    """Libera la VRAM dei server immagini/video dell'app prima di caricare (stdlib)."""
+    import urllib.request as u
+    for port in (8189, 8190, 8191, 8192):
+        try:
+            u.urlopen(u.Request(f"http://127.0.0.1:{port}/free", data=b'{"mode": "destroy"}',
+                                headers={"Content-Type": "application/json"}), timeout=15).read()
+        except Exception:                                            # noqa: BLE001 (server giù)
+            pass
+
+
+# ── pesi ───────────────────────────────────────────────────────────────────────────────────────
+def resolve(p: dict) -> dict:
     from core import model_paths as mp
     from core import weights_catalog as wc
-    for i in ids:
+    from core import native_convert as nc
+    ids = S.weight_ids(p)
+    out, missing = {}, []
+    for k, i in ids.items():
         e = mp.entry(i)
-        if e and wc.is_present(e):
-            return mp.p(i, "")
-    return None
-
-
-def resolve_weights(params: dict) -> dict:
-    """Path dei componenti richiesti dalla modalità. Solleva con gli ID di catalogo mancanti."""
-    from core import model_paths as mp
-    mode = "ref2va" if params.get("references") else "fl2va"
-    explicit = params.get("model") or ""
-    ckpt = explicit if explicit and os.path.exists(explicit) else _first_present(_CKPT_IDS[mode])
-    te = _first_present(_TE_IDS)
-    cfg = mp.p("mmh3-configs", "")
-    vae = _first_present(["mmh3-video-vae"])
-    avae = _first_present(["mmh3-audio-vae"])
-    missing = [name for name, val in (
-        (f"checkpoint {mode} ({'/'.join(_CKPT_IDS[mode][:2])})", ckpt),
-        ("text encoder (mmh3-te-nvfp4)", te),
-        ("config+tokenizer (mmh3-configs)", cfg and os.path.isdir(cfg) and cfg),
-        ("video VAE (mmh3-video-vae)", vae),
-        ("audio VAE (mmh3-audio-vae)", avae),
-    ) if not val]
+        if not e or not wc.is_present(e, str(mp.models_root())):
+            missing.append(i)
+            continue
+        path = mp.p(i, "")
+        if e.get("convert") and not nc.is_native(path):     # file ComfyUI non ancora convertito
+            raise RuntimeError(f"{os.path.basename(path)} non è in formato nativo: riscaricalo dal tab «Pesi»")
+        out[k] = path
     if missing:
-        raise RuntimeError(
-            "Pesi MiniMax H3 mancanti: " + "; ".join(missing) +
-            ". Scaricali dal tab «Pesi modelli» (la catena tira encoder, VAE e config).")
-    return {"mode": mode, "ckpt": ckpt, "te": te, "config_dir": cfg, "vae": vae, "audio_vae": avae}
+        raise RuntimeError("Pesi MiniMax H3 mancanti: " + ", ".join(missing) +
+                           ". Scaricali dal tab «Pesi modelli» (profilo " + str(p.get("h3_profile") or "nvfp4") + ").")
+    out["ids"] = ids
+    return out
 
 
-# ── costruzione del transformer dal single-file quantizzato ───────────────────
-def load_transformer(ckpt_path: str, config_dir: str, mode: str):
-    """MiniMaxH3Transformer3DModel dai config ufficiali + pesi dal single-file quantizzato.
-    Stesso schema di inference_server/backends/flux2_transformer.load_flux2_transformer: i Linear
-    quantizzati restano compressi in RAM e si dequantizzano un layer alla volta nel forward."""
+def _read(path: str, device: str = "cuda"):
+    import _qlinear as Q
+    return Q.read_safetensors(path, device)
+
+
+def load_text_encoder(W: dict):
     import torch
-    from torch import nn
     from accelerate import init_empty_weights
-    from accelerate.utils import set_module_tensor_to_device
-    from diffusers import MiniMaxH3Transformer3DModel
-    from safetensors import safe_open
-
-    from inference_server.backends.flux2_transformer import Fp8Linear, Nvfp4Linear
-
-    sub = "FL2VA" if mode == "fl2va" else "Ref2VA"
-    cfg_path = os.path.join(config_dir, sub, "transformer", "config.json")
-    if not os.path.exists(cfg_path):                     # snapshot parziale/rinominato
-        raise RuntimeError(f"config del transformer non trovato: {cfg_path} "
-                           f"(riscarica la voce di catalogo 'mmh3-configs')")
-    cfg = json.load(open(cfg_path, encoding="utf-8"))
-    cfg.pop("_class_name", None); cfg.pop("_diffusers_version", None)
+    from transformers import AutoConfig, Qwen3VLForConditionalGeneration
+    import _qlinear as Q
+    from minimax_h3_convert import PassthroughDecoderLayer
+    cfg = AutoConfig.from_pretrained(str(Path(W["configs"]) / "text_encoder"))
+    sd = _read(W["te"])
+    n_file = 1 + max(int(k.split(".")[3]) for k in sd if k.startswith("model.language_model.layers."))
+    # il pipeline legge hidden_states[50] e vuole più di 50 layer: 50 veri + 1 passante (vedi PassthroughDecoderLayer)
+    cfg.text_config.num_hidden_layers = n_file + 1
+    if hasattr(cfg.text_config, "layer_types") and cfg.text_config.layer_types:
+        cfg.text_config.layer_types = list(cfg.text_config.layer_types)[: n_file + 1]
     with init_empty_weights():
-        tr = MiniMaxH3Transformer3DModel.from_config(cfg)
+        te = Qwen3VLForConditionalGeneration._from_config(cfg, torch_dtype=torch.bfloat16)
+    layers = te.model.language_model.layers
+    layers[n_file] = PassthroughDecoderLayer(getattr(layers[n_file], "attention_type", "full_attention"))
+    te.lm_head = torch.nn.Identity()
+    sd = Q.quantize_from_state_dict(te, sd)
+    miss, unex = Q.load_into(te, sd)
+    del sd
+    lm = te.model.language_model
+    if "model.language_model.norm.weight" in miss:        # mai usata (si legge hidden_states[50]) ma deve esistere
+        lm.norm.weight = torch.nn.Parameter(torch.ones(lm.norm.weight.shape, dtype=torch.bfloat16, device="cuda"))
+        miss.remove("model.language_model.norm.weight")
+    miss = [m for m in miss if not m.endswith("inv_freq")]
+    if miss or unex:
+        raise RuntimeError(f"text encoder: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
+    return te.to("cuda").eval()
 
-    with safe_open(ckpt_path, framework="pt") as h:
-        keys = set(h.keys())
-        # nvfp4 = weight U8 + weight_scale a blocchi + weight_scale_2 globale; fp8/int8 = solo scala
-        nvfp4 = {k[:-len(".weight")] for k in keys
-                 if k.endswith(".weight") and (k[:-len(".weight")] + ".weight_scale_2") in keys}
-        fp8 = {k[:-len(".weight")] for k in keys
-               if k.endswith(".weight") and (k[:-len(".weight")] + ".weight_scale") in keys} - nvfp4
-        _log(f"quantizzazione: {len(nvfp4)} moduli nvfp4, {len(fp8)} fp8/int8 "
-             f"su {len(keys)} tensori")
-        # i nomi del repack sono già quelli di diffusers (nessuna conversione tipo FLUX.2 BFL)
-        modules = dict(tr.named_modules())
-        for names, cls in ((nvfp4, Nvfp4Linear), (fp8, Fp8Linear)):
-            for mod_name in names:
-                old = modules.get(mod_name)
-                if isinstance(old, nn.Linear):
-                    parent_name, child = mod_name.rsplit(".", 1)
-                    setattr(modules.get(parent_name, tr), child,
-                            cls(old.in_features, old.out_features, bias=old.bias is not None))
-        modules = dict(tr.named_modules())               # rinfresca dopo le sostituzioni
-        targets = {n for n, _ in tr.named_parameters()} | {n for n, _ in tr.named_buffers()}
 
-        assigned = skipped = 0
-        for k in sorted(keys):
-            if k.endswith((".weight_scale", ".weight_scale_2", ".input_scale")):
-                continue                                  # assegnati insieme al loro weight
-            if k not in targets:
-                skipped += 1
-                continue
-            mod = k.rsplit(".", 1)[0]
-            t = h.get_tensor(k)
-            if mod in nvfp4:                              # U8 packed: NON castare
-                set_module_tensor_to_device(tr, k, "cpu", value=t.contiguous())
-                set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
-                                            value=h.get_tensor(mod + ".weight_scale"))
-                set_module_tensor_to_device(tr, mod + ".weight_scale_2", "cpu",
-                                            value=h.get_tensor(mod + ".weight_scale_2").float())
-            elif mod in fp8:
-                set_module_tensor_to_device(tr, k, "cpu", value=t.contiguous())
-                set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
-                                            value=h.get_tensor(mod + ".weight_scale").float())
-            else:
-                set_module_tensor_to_device(tr, k, "cpu", value=t.to(torch.bfloat16),
-                                            dtype=torch.bfloat16)
-            assigned += 1
-    if skipped:
-        _log(f"⚠ {skipped} tensori del file non hanno un corrispettivo nel modello "
-             f"(formato del repack diverso da quello atteso?)")
-    _log(f"transformer costruito ({assigned} tensori assegnati)")
+def load_transformer(W: dict, mode: str, p: dict):
+    import torch
+    from accelerate import init_empty_weights
+    import _qlinear as Q
+    from minimax_h3_pruned import MiniMaxH3PrunedTransformer3DModel
+    from minimax_h3_convert import fuse_dit_projections
+    sub = "transformer_ref" if mode == "ref2va" else "transformer"
+    base = json.loads((Path(W["configs"]) / sub / "config.json").read_text("utf-8"))
+    cfg = {k: v for k, v in base.items() if not k.startswith("_")}
+    cfg.update(adaln_rank=8, time_table_size=1025)
+    with init_empty_weights():
+        tr = MiniMaxH3PrunedTransformer3DModel(**cfg)
+    fuse_dit_projections(tr)
+    sd = Q.quantize_from_state_dict(tr, _read(W["dit"]))
+    miss, unex = Q.load_into(tr, sd, keep_fp32=DIT_FP32)
+    del sd
+    miss = [m for m in miss if m not in ("adaln_basis", "adaln_mean")]   # servono solo per LoRA «released»
+    if miss or unex:
+        raise RuntimeError(f"transformer: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
+    tr = tr.to("cuda").eval()
+    loras = []
+    if W.get("turbo"):
+        loras.append((W["turbo"], 1.0))
+    for lo in p.get("loras") or []:
+        path = lo.get("path") or lo.get("name") or ""
+        if path and os.path.isfile(path):
+            loras.append((path, float(lo.get("strength", 1.0))))
+    for path, s in loras:
+        from core import native_convert as nc
+        if not nc.is_native(path):
+            raise RuntimeError(f"LoRA {os.path.basename(path)} non in formato nativo (convertila dal tab «Pesi»)")
+        n = Q.apply_lora(tr, _read(path), s)
+        _log(f"LoRA {os.path.basename(path)} ×{s}: {n} moduli")
+        if n == 0:
+            raise RuntimeError(f"LoRA {os.path.basename(path)}: nessun modulo agganciato (non è una LoRA H3?)")
+    backend = str(p.get("attention_backend") or "")
+    if backend:
+        try:
+            tr.set_attention_backend(backend)
+        except Exception as e:                                       # noqa: BLE001
+            _log(f"backend attenzione {backend} non disponibile ({e}): uso quello di default")
     return tr
 
 
-# ── generazione ───────────────────────────────────────────────────────────────
-def generate(params: dict) -> str:
+def load_vae(W: dict):
     import torch
-    from diffusers import ModularPipeline
+    from accelerate import init_empty_weights
+    from diffusers import AutoencoderKLMiniMaxH3
+    import _qlinear as Q
+    with init_empty_weights():
+        vae = AutoencoderKLMiniMaxH3.from_config(AutoencoderKLMiniMaxH3.load_config(str(Path(W["configs"]) / "vae")))
+    miss, unex = Q.load_into(vae, _read(W["vae"]), dtype=torch.float32)
+    if miss or unex:
+        raise RuntimeError(f"VAE video: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
+    return vae.to("cuda").eval()
 
-    w = resolve_weights(params)
-    _log(f"modalità {w['mode']} · checkpoint {os.path.basename(w['ckpt'])}")
 
-    # COORDINAMENTO VRAM: il TE Qwen3-VL (15.7GB) e il transformer (12.5-21GB) non stanno
-    # insieme in 32GB. Encode del prompt PRIMA, poi il TE viene parcheggiato in RAM e si carica
-    # il transformer — è il meccanismo di handoff già validato per LTX.
+def load_audio_vae(W: dict):
+    import torch
+    from accelerate import init_empty_weights
+    from diffusers import AutoencoderKLMiniMaxH3Audio
+    import _qlinear as Q
+    with init_empty_weights():
+        av = AutoencoderKLMiniMaxH3Audio.from_config(
+            AutoencoderKLMiniMaxH3Audio.load_config(str(Path(W["configs"]) / "audio_vae")))
+    miss, unex = Q.load_into(av, _read(W["audio_vae"]), dtype=torch.float32)
+    miss = [m for m in miss if not m.endswith(("filter", "zero_k_bias"))]
+    if miss or unex:
+        raise RuntimeError(f"audio VAE: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
+    return av.to("cuda").eval()
+
+
+# ── prompt ─────────────────────────────────────────────────────────────────────────────────────
+def build_prompt(p: dict, duration_s: float) -> str:
+    """Prompt nel formato ufficiale H3 (core/h3_prompt): campi strutturati, speaker (S1), <d>[Lingua] …</d>."""
+    from core import h3_prompt
+    return h3_prompt.compose(p, duration_s)
+
+
+def build_references(p: dict) -> list:
+    from diffusers.modular_pipelines.minimax_h3 import (MiniMaxH3AudioReference, MiniMaxH3ImageReference,
+                                                        MiniMaxH3VideoReference)
+    cls = {"image": MiniMaxH3ImageReference, "video": MiniMaxH3VideoReference, "audio": MiniMaxH3AudioReference}
+    out = []
+    for r in p.get("references") or []:
+        if r.get("role") == "background" and not r.get("token"):
+            continue
+        k = r.get("kind") or "image"
+        if k not in cls or not os.path.isfile(r.get("path") or ""):
+            raise RuntimeError(f"riferimento non valido: {r.get('path')} ({k})")
+        out.append(cls[k].from_file(r["path"]))
+    return out
+
+
+# ── fasi ───────────────────────────────────────────────────────────────────────────────────────
+def _stage(blocks, names: list, components: dict):
+    from diffusers.modular_pipelines import SequentialPipelineBlocks
+    from collections import OrderedDict
+    sub = OrderedDict((n, blocks.sub_blocks[n]) for n in names)
+    pipe = SequentialPipelineBlocks.from_blocks_dict(sub).init_pipeline()
+    pipe.update_components(**components)
+    return pipe
+
+
+def run(p: dict) -> str:
+    from core import resources
+    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 20),
+                      what="MiniMax H3")
+    import torch
+    from diffusers import MiniMaxH3Scheduler
+    from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3Blocks
+    from diffusers.modular_pipelines.minimax_h3.modular_pipeline import resolve_canvas_size
+    from diffusers.utils.export_utils import encode_video
+    from PIL import Image
+    from transformers import AutoTokenizer, Qwen3VLProcessor
+    torch.set_grad_enabled(False)
+    t_all = time.time()
     try:
-        from core import mem_coordinator as mc
-        mc.free_and_wait("video", need_mb=int(float(params.get("need_mb") or 20000)))
-    except Exception as e:                                   # noqa: BLE001
-        _log(f"coordinamento VRAM non disponibile ({e}) — proseguo")
+        sys.path.insert(0, str(REPO / "scripts"))
+        from _watchdog import start_watchdog
+        start_watchdog(int(p.get("parent_pid") or 0))
+    except Exception:                                                # noqa: BLE001
+        pass
+    W = resolve(p)
+    mode = S.mode_for(p)
+    _free_gpu_servers()
+    free0, total = (x / 2**30 for x in torch.cuda.mem_get_info())
+    # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema
+    torch.cuda.set_per_process_memory_fraction(max(0.2, min(1.0, (free0 - 0.4) / total)))
+    _log(f"{mode} · profilo {p.get('h3_profile') or 'nvfp4'} · VRAM libera {free0:.1f}/{total:.1f} GB")
 
-    sub = "FL2VA" if w["mode"] == "fl2va" else "Ref2VA"
-    pipe = ModularPipeline.from_pretrained(os.path.join(w["config_dir"], sub))
-    pipe.load_components(names=["text_encoder", "tokenizer", "processor", "scheduler",
-                                "audio_scheduler"])
-    pipe.update_components(transformer=load_transformer(w["ckpt"], w["config_dir"], w["mode"]))
+    cfgdir = Path(W["configs"])
+    wf = "ref2va" if mode == "ref2va" else ("fl2va" if (p.get("image_path") or p.get("last_image_path")) else "t2va")
+    blocks = MiniMaxH3Blocks().get_workflow(wf)
+    names = list(blocks.sub_blocks.keys())
+    g_text = [n for n in names if n in ("before_encode", "text_encoder")]
+    g_venc = [n for n in names if n == "vae_encoder"]
+    g_den = [n for n in names if n.startswith("denoise")]
+    g_dec = [n for n in names if n.startswith("decode")]
 
-    kw = {
-        "prompt": params.get("prompt", ""),
-        "negative_prompt": params.get("negative") or None,
-        "height": int(params.get("height", 768)),
-        "width": int(params.get("width", 1344)),
-        "num_frames": int(params.get("num_frames", 121)),
-        "num_inference_steps": int(params.get("steps", 20)),
-        "guidance_scale": float(params.get("guidance", 4.0)),
-        "generator": torch.Generator("cpu").manual_seed(int(params.get("seed", 0))),
-    }
-    # RIFERIMENTI: liste separate per tipo, nell'ordine dei token <Picture N>/<Video N>/<Audio N>
-    refs = params.get("references") or []
-    if refs:
-        kw["reference_images"] = [r["path"] for r in refs if r["kind"] == "image"] or None
-        kw["reference_videos"] = [r["path"] for r in refs if r["kind"] == "video"] or None
-        kw["reference_audios"] = [r["path"] for r in refs if r["kind"] == "audio"] or None
-        _log(f"riferimenti: {sum(1 for r in refs if r['kind'] == 'image')} immagini, "
-             f"{sum(1 for r in refs if r['kind'] == 'video')} video, "
-             f"{sum(1 for r in refs if r['kind'] == 'audio')} audio")
-    elif params.get("image_path"):                           # i2v / primo fotogramma
-        kw["image"] = params["image_path"]
-    if params.get("last_image_path"):                        # FL2V: ultimo fotogramma
-        kw["last_image"] = params["last_image_path"]
-    kw = {k: v for k, v in kw.items() if v is not None}
+    # ingressi della richiesta
+    frames = S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))
+    kw = {"prompt": build_prompt(p, S.frames_seconds(frames)), "num_frames": frames}
+    if p.get("image_path"):
+        kw["image"] = Image.open(p["image_path"]).convert("RGB")
+    if p.get("last_image_path"):
+        kw["last_image"] = Image.open(p["last_image_path"]).convert("RGB")
+    # tela: il RAPPORTO viene dal keyframe (come fa il pipeline) o dalla risoluzione scelta nel tab; i lati
+    # esatti li decide la griglia di H3 (lato corto 768 o 544, area massima, multipli di 32)
+    short, maxpx = S.CANVAS.get(str(p.get("h3_canvas") or "768"), S.CANVAS["768"])
+    key = kw.get("image") or kw.get("last_image")
+    if key is not None:
+        ratio = key.size                                             # (w, h)
+    elif str(p.get("h3_aspect") or "") in S.ASPECTS:
+        ratio = S.ASPECTS[p["h3_aspect"]]
+    elif int(p.get("width") or 0) and int(p.get("height") or 0):
+        ratio = (int(p["width"]), int(p["height"]))
+    else:
+        ratio = (16, 9)
+    kw["height"], kw["width"] = resolve_canvas_size(ratio[0], ratio[1], 32, short, maxpx)
+    if mode == "ref2va":
+        kw["references"] = build_references(p)
+        if not kw["references"]:
+            raise RuntimeError("Ref2VA senza riferimenti validi")
+    turbo = str(p.get("h3_turbo") or "")
+    nfe = S.TURBO[turbo][1] if turbo else int(p.get("steps") or S.DEFAULT_NFE)
+    vshift = S.TURBO[turbo][2] if turbo else float(p.get("h3_video_shift") or S.VIDEO_SHIFT)
+    seed = int(p.get("seed") or 0)
+    _log(f"workflow {wf}: {frames} fotogrammi ({S.frames_seconds(frames):.2f}s) · "
+         f"{kw.get('width', 'auto')}x{kw.get('height', 'auto')} · {nfe} passi"
+         f"{' turbo' if turbo else ''} · shift video {vshift} · seme {seed}")
+    _log("prompt:\n" + kw["prompt"])
 
-    _log(f"genero {kw['width']}x{kw['height']} · {kw['num_frames']} frame · "
-         f"{kw['num_inference_steps']} step")
-    out = pipe(**kw)
-    return save_output(out, params)
+    # 1) text encoder
+    t0 = time.time()
+    te = load_text_encoder(W)
+    _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
+    st = _stage(blocks, g_text, dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
+                                      processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor"))))
+    state = st(**{k: v for k, v in kw.items() if k in ("prompt", "image", "last_image", "references",
+                                                       "height", "width", "num_frames")})
+    del st, te
+    _gc()
+    _log(f"testo codificato in {time.time() - t0:.0f}s")
+
+    # 2) VAE encoder (keyframe / riferimenti)
+    if g_venc:
+        t0 = time.time()
+        comps = {"vae": load_vae(W)}
+        if mode == "ref2va":
+            comps["audio_vae"] = load_audio_vae(W)
+        st = _stage(blocks, g_venc, comps)
+        state = st(state=state)
+        del st, comps
+        _gc()
+        _log(f"condizionamenti VAE in {time.time() - t0:.0f}s")
+
+    # 3) denoise
+    t0 = time.time()
+    tr = load_transformer(W, mode, p)
+    _log(f"transformer pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
+    tname = "transformer_ref" if mode == "ref2va" else "transformer"
+    st = _stage(blocks, g_den, {tname: tr, "scheduler": MiniMaxH3Scheduler(shift=vshift),
+                                "audio_scheduler": MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)})
+    t1 = time.time()
+    state = st(state=state, num_inference_steps=nfe + 1, generator=torch.Generator("cpu").manual_seed(seed))
+    _log(f"denoise {nfe} passi in {time.time() - t1:.0f}s ({(time.time() - t1) / max(1, nfe):.1f}s/passo) — "
+         f"VRAM {_vram()}")
+    del st, tr
+    _gc()
+
+    # 4) decode
+    t0 = time.time()
+    st = _stage(blocks, g_dec, {"vae": load_vae(W), "audio_vae": load_audio_vae(W)})
+    res = st(state=state, output=["videos", "audio", "sampling_rate"])
+    del st
+    _gc()
+    _log(f"decode in {time.time() - t0:.0f}s")
+    out = p.get("output") or str(REPO / "output" / f"minimax_h3_{time.strftime('%Y%m%d_%H%M%S')}.mp4")
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    with_audio = p.get("generate_audio", True) is not False
+    encode_video(res["videos"][0], fps=S.FPS, output_path=out,
+                 audio=res["audio"][0].float().cpu() if with_audio else None,
+                 audio_sample_rate=int(res["sampling_rate"]) if with_audio else None)
+    _log(f"fatto in {time.time() - t_all:.0f}s → {out}")
+    return out
 
 
-def save_output(out, params: dict) -> str:
-    """Salva video+audio in un mp4 unico (l'audio H3 è già sincronizzato: nessun allineamento)."""
-    from diffusers.utils import export_to_video
-    dest = params.get("output") or str(REPO_ROOT / "output" / "minimax_h3.mp4")
-    Path(dest).parent.mkdir(parents=True, exist_ok=True)
-    frames = out.frames[0] if hasattr(out, "frames") else out["frames"][0]
-    audio = getattr(out, "audios", None) or (out.get("audios") if isinstance(out, dict) else None)
-    fps = int(params.get("fps", 24))
-    if audio is None:
-        export_to_video(frames, dest, fps=fps)
-        _log("nessuna traccia audio nell'output (modalità senza audio?)")
-        return dest
-    import tempfile
-    import subprocess
-    import soundfile as sf
-    tmp_v = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
-    tmp_a = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
-    export_to_video(frames, tmp_v, fps=fps)
-    wav = audio[0] if isinstance(audio, (list, tuple)) else audio
-    sf.write(tmp_a, wav.T if hasattr(wav, "T") else wav, 32000)      # 32 kHz stereo nativo
-    subprocess.run(["ffmpeg", "-y", "-i", tmp_v, "-i", tmp_a, "-c:v", "copy", "-c:a", "aac",
-                    "-shortest", dest], capture_output=True)
-    for t in (tmp_v, tmp_a):
-        try:
-            os.unlink(t)
-        except OSError:
-            pass
-    return dest
-
-
-def main(argv: list[str]) -> int:
-    if len(argv) < 2:
-        print("uso: minimax_h3_infer.py params.json", file=sys.stderr)
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("uso: minimax_h3_infer.py params.json")
         return 2
-    params = json.loads(Path(argv[1]).read_text("utf-8"))
     try:
-        dest = generate(params)
-    except Exception:                                        # noqa: BLE001
+        out = run(json.loads(Path(sys.argv[1]).read_text("utf-8")))
+        print(f"OK:{out}", flush=True)
+        return 0
+    except Exception as e:                                           # noqa: BLE001
         traceback.print_exc()
+        print(f"ERRORE: {e}", flush=True)
         return 1
-    if not os.path.exists(dest):
-        print(f"[h3] output non creato: {dest}", file=sys.stderr)
-        return 1
-    print(f"OK:{dest}", flush=True)
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main())

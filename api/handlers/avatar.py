@@ -90,10 +90,12 @@ class VideoSpec(BaseModel):
     seed: int = -1
     ref_img_index: int = Field(10, ge=0, le=30)
     mask_frame_range: int = Field(3, ge=1, le=8)
-    precision_profile: str = Field("int8", description="LongCat: int8 | fp8 | bf16")
+    precision_profile: str = Field("int8", description="LongCat: int8 | fp8 | bf16 · MiniMax H3: nvfp4 | fp8 | int8")
     offload_kv_cache: bool = False
     multi_person: dict = Field(default_factory=dict, description="{bboxes: {person1:[y0,x0,y1,x1], person2:[…]}} frazioni 0–1")
-    h3: dict = Field(default_factory=dict, description="minimax_h3: duration_s, dialogue_lines, soundscape, music_desc, turbo_steps")
+    h3: dict = Field(default_factory=dict, description=(
+        "minimax_h3: duration_s (5–15), dialogue_lines [{speaker, language, text}], soundscape, music_desc, "
+        "turbo_steps ('' | '4' | '8'), text_encoder (id catalogo, es. mmh3-te-nvfp4)"))
     postprocess: dict = Field(default_factory=dict, description="{face_restore: codeformer|gfpgan, interpolate_fps: 50}")
 
 
@@ -107,6 +109,18 @@ class AvatarReq(BaseModel):
 
 def _submit(kind, fn):
     return {"job_id": MANAGER.submit(kind, fn), "status": "pending"}
+
+
+def _h3_options(ew) -> dict:
+    import os
+    from core import minimax_h3_spec as S
+    from core.ltx_video_job import MINIMAX_H3_PY
+    profs = [p for p, (fl, _r, te) in S.PROFILES.items() if not ew.missing([fl, te, *S.COMMON_IDS])]
+    return {"installed": os.path.exists(MINIMAX_H3_PY) and bool(profs), "profiles_installed": profs,
+            "profiles": list(S.PROFILES), "duration_s": [S.MIN_S, S.MAX_S], "fps": S.FPS,
+            "dialogue_languages": list(S.DIALOGUE_LANGS), "turbo_steps": ["", *S.TURBO],
+            "voice_reference": "audio.voice_reference_path → Ref2VA (timbro della voce)",
+            "license": "MiniMax H3 Community: territori esclusi UE, UK, USA, Corea del Sud"}
 
 
 def options() -> dict:
@@ -124,7 +138,7 @@ def options() -> dict:
             "longcat": {"installed": lc.is_installed(), "precisions_installed": lc.installed_precisions(),
                         "resolutions": list(lc.RESOLUTIONS), "aspects": list(lc.ASPECTS),
                         "duration": "decisa dall'audio (nessun limite)"},
-            "minimax_h3": {"installed": False, "note": "motore disponibile dopo l'installazione del venv H3"},
+            "minimax_h3": _h3_options(ew),
         },
         "image_engines": {
             "qwen_image21": {"profiles_installed": [p for p, (d, _t) in PROFILES.items() if not ew.missing([d])],

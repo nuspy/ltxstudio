@@ -120,6 +120,10 @@ animazioni** tramite la **REST API locale di LTX Studio** su `{base}` (Swagger `
 - keyframe a tempo: `/video/keyframes`; prolunga: `/video/extend`; rigenera sezione: `/video/retake`;
   modifica da istruzione/stile: `/video/v2v_edit`; copia movimenti: `/video/controlnet`
 - lip-sync (foto+voce): `/video/lipsync` (`separate_vocals` per isolare la voce, `talk_region` mouth/face)
+- avatar parlante / filmato parlato da un testo: `POST /avatar/generate` (LongCat 1.5 o MiniMax H3; immagine da
+  testo/foto/personaggio, voce TTS/dialogo con marcatori `[pause:500ms]` `[emotion:happy]…[/emotion]`
+  `[speed:1.2]` `[accel:0.9-1.3]` `[pitch:+2]` `[volume:-6]` `[whisper]` `[emph]`); opzioni installate
+  `GET /avatar/options`. Guida completa + client: skill **ltx-avatar-film** (`skills/ltx-avatar-film`)
 - qualità video: `/video/enhance` (SeedVR2/FlashVSR), +fps `/video/rife`, volto `/video/faceswap`
 - musica/canzone: `/music/song` (engine heartmula|acestep); sonorizza video: `/music/sonify`;
   videoclip canzone→video: `/music/music_video`; voce TTS: `/audio/tts`; trascrivi: `/audio/transcribe`

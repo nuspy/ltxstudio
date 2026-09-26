@@ -40,9 +40,9 @@ KREA_RT_WORKER = str(REPO / "workers" / "krea_rt_infer.py")
 SELF_FORCING_WORKER = str(REPO / "workers" / "self_forcing_infer.py")
 
 # 4ª architettura video: MiniMax H3 (omni-modale 33.1B: video + audio stereo nella STESSA passata,
-# riferimenti multipli nativi). Venv dedicato: serve diffusers con le classi MiniMaxH3* + transformers
-# con Qwen3-VL. Vedi workers/minimax_h3_infer.py e scripts/install_minimax_h3.py.
-MINIMAX_H3_PY = r"E:\AI\Tools\minimax_h3_venv\Scripts\python.exe"
+# riferimenti multipli nativi). Venv CONDIVISO con Qwen-Image 2.1: diffusers main (classi MiniMaxH3* +
+# modular) + transformers 5 (Qwen3-VL). Vedi workers/minimax_h3_infer.py e scripts/install_diffusers_next.py.
+MINIMAX_H3_PY = r"E:\AI\Tools\diffusers_next_venv\Scripts\python.exe"
 MINIMAX_H3_WORKER = str(REPO / "workers" / "minimax_h3_infer.py")
 
 # "Krea Realtime" nell'app = motore **Self-Forcing 1.3B** (l'unico VALIDATO: realtime ~2s di calcolo per 1s
