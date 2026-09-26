@@ -110,7 +110,7 @@ def build_pipe(W: dict):
     if miss or unex:
         raise RuntimeError(f"transformer: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     del sd
-    tr.eval()
+    tr = tr.to("cuda").eval()          # buffer non persistenti (init_empty_weights li lascia in CPU)
     _log("text encoder Qwen3-VL")
     with init_empty_weights():
         te = Qwen3VLForConditionalGeneration._from_config(AutoConfig.from_pretrained(str(cfg / "text_encoder")),
@@ -125,14 +125,14 @@ def build_pipe(W: dict):
     if miss or unex:
         raise RuntimeError(f"text encoder: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     del sd
-    te.eval()
+    te = te.to("cuda").eval()          # rotary_emb.inv_freq resta in CPU altrimenti
     _log("VAE + processor + scheduler")
     with init_empty_weights():
         vae = AutoencoderKLQwenImage21.from_config(AutoencoderKLQwenImage21.load_config(str(cfg / "vae")))
     miss, unex = Q.load_into(vae, _read_sd(W["vae"]))
     if miss or unex:
         raise RuntimeError(f"VAE: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
-    vae.eval()
+    vae = vae.to("cuda").eval()
     proc = Qwen3VLProcessor.from_pretrained(str(cfg / "processor"))
     sch = FlowMatchEulerDiscreteScheduler.from_pretrained(str(cfg / "scheduler"))
     pipe = QwenImage21Pipeline(scheduler=sch, vae=vae, text_encoder=te, processor=proc, transformer=tr)

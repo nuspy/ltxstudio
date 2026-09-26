@@ -121,7 +121,11 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
     py, worker = _ARCH_RUNNER.get(arch, (None, None))
     if not py:
         return {"status": "error", "error": f"arch immagine senza worker dedicato: {arch}"}
-    out = params.get("output") or os.path.join(OUTPUT_DIR, f"krea_{arch}_{os.getpid()}.png")
+    # nome UNIVOCO: prima era krea_<arch>_<pid>.png → ogni generazione della sessione sovrascriveva la precedente
+    import time as _time
+    import uuid as _uuid
+    out = params.get("output") or os.path.join(
+        OUTPUT_DIR, f"{arch}_{_time.strftime('%Y%m%d_%H%M%S')}_{_uuid.uuid4().hex[:6]}.png")
     params = dict(params, output=out)
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     if not os.path.exists(py):
