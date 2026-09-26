@@ -22,6 +22,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(HERE))
 
 import harness as H                                           # noqa: E402
+sys.stdout.reconfigure(line_buffering=True)                  # os._exit scarta i buffer: righe subito
 
 FACE = ROOT / "output" / "film_studio" / "project_22" / "cast" / "Dorian.png"
 VOICE_TEXT = ("Signore e signori, confesso tutto: ho insegnato al mio gatto a usare il telecomando. "
@@ -100,6 +101,7 @@ def main() -> int:
     ok = _wait(lambda: t.gen_btn.isEnabled() and ("✓" in t.log.toPlainText() or "✗" in t.log.toPlainText()),
                3600, 500)
     log = t.log.toPlainText()
+    (ROOT / "output" / "DIAG_live_avatar_longcat_tablog.txt").write_text(log, "utf-8")
     out = getattr(t, "_last_video", "")
     print(f"[live] fine in {time.time() - t0:.0f}s ok={ok}", flush=True)
     print("[live] log tab (coda):\n" + log[-2500:], flush=True)

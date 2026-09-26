@@ -2995,5 +2995,6 @@
   "feat.cap.image_qwen21": "Qwen-Image 2.1 (images et édition avec 10 références)",
   "f1.gen.qwen21.nvfp4": "Qwen-Image 2.1 NVFP4 (RTX 50xx, 12.4GB au total)",
   "f1.gen.qwen21.fp8": "Qwen-Image 2.1 FP8 (RTX 40xx/50xx, 17.2GB au total)",
-  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (tout GPU, meilleure qualité, 17.3GB)"
+  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (tout GPU, meilleure qualité, 17.3GB)",
+  "avatar.offloadkv.tt": "Désactivé = le plan automatique décide selon la VRAM libre ; activé = déplace toujours en RAM le cache des continuations."
 }

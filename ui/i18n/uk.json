@@ -2995,5 +2995,6 @@
   "feat.cap.image_qwen21": "Qwen-Image 2.1 (зображення й редагування з 10 референсами)",
   "f1.gen.qwen21.nvfp4": "Qwen-Image 2.1 NVFP4 (RTX 50xx, разом 12.4GB)",
   "f1.gen.qwen21.fp8": "Qwen-Image 2.1 FP8 (RTX 40xx/50xx, разом 17.2GB)",
-  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (будь-яка GPU, найкраща якість, 17.3GB)"
+  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (будь-яка GPU, найкраща якість, 17.3GB)",
+  "avatar.offloadkv.tt": "Вимк. = автоматичний план вирішує за вільною VRAM; увімк. = завжди переносити кеш продовжень в ОЗП."
 }

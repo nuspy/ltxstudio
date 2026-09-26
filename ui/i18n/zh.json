@@ -2995,5 +2995,6 @@
   "feat.cap.image_qwen21": "Qwen-Image 2.1（图像生成与 10 张参考图编辑）",
   "f1.gen.qwen21.nvfp4": "Qwen-Image 2.1 NVFP4（RTX 50xx，共 12.4GB）",
   "f1.gen.qwen21.fp8": "Qwen-Image 2.1 FP8（RTX 40xx/50xx，共 17.2GB）",
-  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8（任意 GPU，质量最佳，17.3GB）"
+  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8（任意 GPU，质量最佳，17.3GB）",
+  "avatar.offloadkv.tt": "关闭 = 由自动方案根据空闲显存决定；开启 = 始终把续接片段的缓存移到内存。"
 }

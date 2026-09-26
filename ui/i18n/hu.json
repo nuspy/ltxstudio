@@ -2995,5 +2995,6 @@
   "feat.cap.image_qwen21": "Qwen-Image 2.1 (képek és szerkesztés 10 referenciával)",
   "f1.gen.qwen21.nvfp4": "Qwen-Image 2.1 NVFP4 (RTX 50xx, összesen 12.4GB)",
   "f1.gen.qwen21.fp8": "Qwen-Image 2.1 FP8 (RTX 40xx/50xx, összesen 17.2GB)",
-  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (bármely GPU, legjobb minőség, 17.3GB)"
+  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (bármely GPU, legjobb minőség, 17.3GB)",
+  "avatar.offloadkv.tt": "Ki = az automatikus terv a szabad VRAM alapján dönt; be = a folytatások gyorsítótárát mindig a RAM-ba helyezi."
 }

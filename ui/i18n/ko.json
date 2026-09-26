@@ -2995,5 +2995,6 @@
   "feat.cap.image_qwen21": "Qwen-Image 2.1 (이미지 생성 및 참조 10장 편집)",
   "f1.gen.qwen21.nvfp4": "Qwen-Image 2.1 NVFP4 (RTX 50xx, 총 12.4GB)",
   "f1.gen.qwen21.fp8": "Qwen-Image 2.1 FP8 (RTX 40xx/50xx, 총 17.2GB)",
-  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (모든 GPU, 최고 품질, 17.3GB)"
+  "f1.gen.qwen21.int8": "Qwen-Image 2.1 INT8 (모든 GPU, 최고 품질, 17.3GB)",
+  "avatar.offloadkv.tt": "끄기 = 여유 VRAM에 따라 자동 계획이 결정; 켜기 = 이어지는 구간의 캐시를 항상 RAM으로 이동."
 }

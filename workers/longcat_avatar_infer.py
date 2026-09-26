@@ -443,7 +443,7 @@ def save_mp4(frames, audio_path: str, out: str, fps: int = timing.FPS) -> str:
     import numpy as np
     tmp_v = out + ".noaudio.mp4"
     w = imageio.get_writer(tmp_v, fps=fps, codec="libx264", quality=8, macro_block_size=16,
-                           ffmpeg_params=["-pix_fmt", "yuv420p"])
+                           pixelformat="yuv420p")
     for fr in frames:
         w.append_data(np.asarray(fr))
     w.close()

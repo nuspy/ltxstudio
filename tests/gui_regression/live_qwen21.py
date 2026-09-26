@@ -20,6 +20,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(HERE))
 
 import harness as H                                           # noqa: E402
+sys.stdout.reconfigure(line_buffering=True)                  # os._exit scarta i buffer: righe subito
 
 FACE = ROOT / "output" / "film_studio" / "project_22" / "cast" / "Dorian.png"
 T2I = ("A retired pirate captain with a grey braided beard teaches a parrot to play chess on the deck of a "
