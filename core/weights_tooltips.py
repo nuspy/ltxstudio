@@ -47,6 +47,9 @@ USE_TAGS: dict[str, str] = {
     "ref_omni": "Riferimenti multipli: fino a 9 immagini, 3 video e 3 clip audio per guidare "
                 "identità, stile, movimento e voce.",
     "q_int8": "Quantizzazione int8 (ConvRot): circa metà della memoria del bf16, qualità vicina.",
+    "fp8": "FP8: circa metà della memoria del bf16; veloce sulle RTX 40xx/50xx.",
+    "avatar": "Avatar parlante: anima una foto sulla voce, con labiale sincronizzato.",
+    "audio_enc": "Encoder audio: estrae dal parlato i segnali che guidano il labiale.",
 }
 
 

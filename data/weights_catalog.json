@@ -3240,6 +3240,216 @@
         "lora_style",
         "multisubject"
       ]
+    },
+    {
+      "id": "lcav-configs",
+      "module": "Avatar",
+      "label": "LongCat-Video config + tokenizer (json, ~25MB)",
+      "kind": "snapshot",
+      "type": "configs",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.03,
+      "scan_names": [],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "meituan-longcat/LongCat-Video",
+      "url": "https://huggingface.co/meituan-longcat/LongCat-Video",
+      "note": "solo json e tokenizer del modello base: il worker ci costruisce text encoder e VAE",
+      "allow_patterns": [
+        "tokenizer/*",
+        "text_encoder/*.json",
+        "vae/config.json",
+        "scheduler/*",
+        "model_index.json",
+        "config.json"
+      ],
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "lcav-te",
+      "module": "Avatar",
+      "label": "LongCat-Video text encoder UMT5-XXL (fp32, caricato in bf16)",
+      "kind": "snapshot",
+      "type": "TextEncoders",
+      "family": "LongCat",
+      "gated": false,
+      "approx_gb": 22.7,
+      "scan_names": [
+        "LongCat-Video"
+      ],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "meituan-longcat/LongCat-Video",
+      "url": "https://huggingface.co/meituan-longcat/LongCat-Video",
+      "note": "lavora solo all'inizio (codifica il prompt) e poi si libera: non occupa VRAM durante la generazione",
+      "allow_patterns": [
+        "text_encoder/*.safetensors",
+        "text_encoder/*.json"
+      ],
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "lcav-vae",
+      "module": "Avatar",
+      "label": "LongCat-Video VAE (Wan 2.1)",
+      "kind": "file",
+      "type": "VAE",
+      "family": "LongCat",
+      "gated": false,
+      "approx_gb": 0.51,
+      "scan_names": [
+        "diffusion_pytorch_model.safetensors"
+      ],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "meituan-longcat/LongCat-Video",
+      "url": "https://huggingface.co/meituan-longcat/LongCat-Video",
+      "filename": "diffusion_pytorch_model.safetensors",
+      "remote_filename": "vae/diffusion_pytorch_model.safetensors",
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "vae"
+      ]
+    },
+    {
+      "id": "lcav15-core",
+      "module": "Avatar",
+      "label": "LongCat Avatar 1.5 base (LoRA DMD 8 step + Whisper + separatore voce)",
+      "kind": "snapshot",
+      "type": "LongCat",
+      "family": "",
+      "gated": false,
+      "approx_gb": 5.7,
+      "scan_names": [],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "meituan-longcat/LongCat-Video-Avatar-1.5",
+      "url": "https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5",
+      "deps": [
+        "lcav-configs",
+        "lcav-te",
+        "lcav-vae"
+      ],
+      "note": "componenti comuni a tutte le precisioni: Whisper-large-v3 SOLO fp16 (3.1GB, non i 12GB fp32/flax/bin del repo)",
+      "allow_patterns": [
+        "config.json",
+        "model_index.json",
+        "scheduler/*",
+        "lora/dmd_lora.safetensors",
+        "vocal_separator/*",
+        "whisper-large-v3/*.json",
+        "whisper-large-v3/*.txt",
+        "whisper-large-v3/model.safetensors"
+      ],
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "avatar",
+        "distill_lora",
+        "audio_enc"
+      ]
+    },
+    {
+      "id": "lcav15-int8",
+      "module": "Avatar",
+      "label": "LongCat Avatar 1.5 DiT INT8 ufficiale (15.9GB, ogni GPU)",
+      "kind": "snapshot",
+      "type": "LongCat",
+      "family": "int8",
+      "gated": false,
+      "approx_gb": 15.9,
+      "scan_names": [],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "meituan-longcat/LongCat-Video-Avatar-1.5",
+      "url": "https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5",
+      "deps": [
+        "lcav15-core"
+      ],
+      "note": "quantizzazione ufficiale weight-only per canale: gira su qualunque GPU NVIDIA; scelta consigliata su 32GB (picco ~28GB)",
+      "allow_patterns": [
+        "base_model_int8/*"
+      ],
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "avatar",
+        "ckpt_video",
+        "q_int8"
+      ]
+    },
+    {
+      "id": "lcav15-fp8",
+      "module": "Avatar",
+      "label": "LongCat Avatar 1.5 DiT FP8 e4m3 (15.9GB, RTX 40xx/50xx)",
+      "kind": "snapshot",
+      "type": "LongCat",
+      "family": "fp8",
+      "gated": false,
+      "approx_gb": 15.9,
+      "scan_names": [],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "wavespeed/LongCat-Video-Avatar-1.5-e4m3",
+      "url": "https://huggingface.co/wavespeed/LongCat-Video-Avatar-1.5-e4m3",
+      "deps": [
+        "lcav15-core"
+      ],
+      "note": "FP8 per canale (non ufficiale, MIT): matmul FP8 nativo dove supportato, altrimenti dequantizza al volo come l'INT8",
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "avatar",
+        "ckpt_video",
+        "fp8"
+      ]
+    },
+    {
+      "id": "lcav15-bf16",
+      "module": "Avatar",
+      "label": "LongCat Avatar 1.5 DiT bf16 (31.7GB, qualità di riferimento)",
+      "kind": "snapshot",
+      "type": "LongCat",
+      "family": "bf16",
+      "gated": false,
+      "approx_gb": 31.7,
+      "scan_names": [],
+      "category": "video",
+      "arch": "longcat_avatar",
+      "repo_id": "meituan-longcat/LongCat-Video-Avatar-1.5",
+      "url": "https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5",
+      "deps": [
+        "lcav15-core"
+      ],
+      "install_role": "on_demand",
+      "note": "non entra in 32GB insieme al resto: serve solo per confronti di qualità",
+      "allow_patterns": [
+        "base_model/*"
+      ],
+      "used_by": [
+        "cap.avatar_longcat"
+      ],
+      "use": [
+        "avatar",
+        "ckpt_video",
+        "big_quality"
+      ]
     }
   ],
   "schema": 2,

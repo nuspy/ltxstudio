@@ -145,6 +145,14 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "worldgen-lora": (["threed", "lora_style"], []),
     "ltx23-lora-multisubject": (["lora_style", "multisubject"], []),
     # ── MiniMax H3 (deps già scritte da catalog_v2; qui i tag d'uso) ──
+    # ── LongCat Avatar 1.5 ──
+    "lcav-configs": (["te"], []),
+    "lcav-te": (["te"], []),
+    "lcav-vae": (["vae"], []),
+    "lcav15-core": (["avatar", "distill_lora", "audio_enc"], ["lcav-configs", "lcav-te", "lcav-vae"]),
+    "lcav15-int8": (["avatar", "ckpt_video", "q_int8"], ["lcav15-core"]),
+    "lcav15-fp8": (["avatar", "ckpt_video", "fp8"], ["lcav15-core"]),
+    "lcav15-bf16": (["avatar", "ckpt_video", "big_quality"], ["lcav15-core"]),
     "mmh3-configs": (["te"], []),                    # config+tokenizer: componente obbligatoria
     "mmh3-fl2va-nvfp4": (["ckpt_video", "av_joint", "nvfp4"], []),
     "mmh3-ref2va-nvfp4": (["ckpt_video", "av_joint", "ref_omni", "nvfp4"], []),

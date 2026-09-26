@@ -141,6 +141,7 @@ MODULE_CAPS: dict[str, list[str]] = {
     "Musica (ACE-Step)": ["cap.music_song"],
     "Musica (MMAudio)": ["cap.music_sonify"],
     "Voce (clone)": ["cap.audio_tts_clone"],
+    "Avatar": ["cap.avatar_longcat"],
     "Upscale": ["cap.upscale_image"],
     "FaceRestore": ["cap.restore"],
     "Face": ["cap.gen_images"],
@@ -161,6 +162,7 @@ _TOOL_PROBES: dict[str, list[str]] = {
     "Musica (HeartMuLa)": [r"E:\AI\Tools\heartlib"],
     "Musica (ACE-Step)": [r"E:\AI\Tools\ACE-Step", r"E:\AI\Tools\acestep"],
     "Voce (clone)": [r"E:\AI\Tools\CosyVoice", r"E:\AI\Tools\F5-TTS"],
+    "Avatar": [r"E:\AI\Tools\LongCatAvatar"],
 }
 
 

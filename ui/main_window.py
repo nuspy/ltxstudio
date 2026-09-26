@@ -38,6 +38,7 @@ from ui.tabs.video_def_tab import VideoDefTab          # noqa: E402
 from ui.tabs.video_extend_tab import VideoExtendTab    # noqa: E402
 from ui.tabs.restore_tab import RestoreTab             # noqa: E402
 from ui.tabs.trellis_tab import TrellisTab             # noqa: E402
+from ui.tabs.avatar_tab import AvatarTab               # noqa: E402
 from ui.tabs.rig_tab import RigTab                     # noqa: E402
 from ui.tabs.import_models_tab import ImportModelsTab  # noqa: E402
 from ui.tabs.convert_tab import ConvertTab             # noqa: E402
@@ -437,6 +438,43 @@ class _FaceSwapWorker(QThread):
             self.done.emit({"status": "success", "output": [out]})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
+
+
+class _LongCatWorker(QThread):
+    """Avatar parlante LongCat 1.5 (subprocess nel venv dedicato) fuori dal thread UI."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, params: dict):
+        super().__init__()
+        self.params = params
+        self._job = None
+
+    def run(self):
+        try:
+            from core import longcat_service as lc
+            errs = lc.preflight(self.params)
+            if errs:
+                self.done.emit({"status": "error", "error": "\n".join(errs)}); return
+            lines: list[str] = []
+
+            def _log(s: str):
+                lines.append(s)
+                self.progress.emit(s)
+            self._job = lc.make_job(self.params, on_log=_log)
+            rc = self._job.run()
+            out = self._job.output
+            if rc == 0 and out and os.path.exists(out):
+                self.done.emit({"status": "success", "output": [out]})
+            else:
+                err = next((l for l in reversed(lines) if l.startswith("ERRORE")), "") or "\n".join(lines[-12:])
+                self.done.emit({"status": "error", "error": err or f"LongCat terminato con codice {rc}"})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+    def stop(self):
+        if self._job is not None:
+            self._job.stop()
 
 
 class _RifeWorker(QThread):
@@ -910,6 +948,7 @@ class MainWindow(QMainWindow):
         self.video_extend_tab = VideoExtendTab()
         self.restore_tab = RestoreTab()
         self.trellis_tab = TrellisTab()
+        self.avatar_tab = AvatarTab()
         self.rig_tab = RigTab()
         self.convert_tab = ConvertTab()
         self.anim_tab = AnimTab()
@@ -939,6 +978,16 @@ class MainWindow(QMainWindow):
         self.video_edit_ai_tab = VideoEditAITab()
         self.video_edit_ai_tab.request_edit.connect(self._gen_video_edit_ai)
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
+        # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
+        self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
+        self.frame1_tab.canvas.image_changed.connect(self.avatar_tab.on_canvas_image_changed)
+        self.avatar_tab.load_into_canvas.connect(
+            lambda p: self.frame1_tab.canvas.load_image(p, fit_mode="canvas"))
+        self.audio_tab.tts_generated.connect(self.avatar_tab.set_last_audio)
+        self.music_tab.music_ready.connect(self.avatar_tab.set_last_audio)
+        self.avatar_tab.request_avatar.connect(self.generate_avatar)
+        self.avatar_tab.on_canvas_image_changed(self.frame1_tab.image_path or "")
+        self.tabs.addTab(self.avatar_tab, tr("tab.avatar", "Avatar"))
         # «Migliora qualità» = unione di Restauro foto (🖼 Foto) + Definizione video (🎬 Video)
         self.quality_tab = QTabWidget()
         self.quality_tab.addTab(self.restore_tab, tr("tab.quality.photo"))
@@ -973,7 +1022,7 @@ class MainWindow(QMainWindow):
         _tab_emoji = {
             id(self.frame1_tab): "🖼️", id(self.audio_tab): "🎙️", id(self.video_tab): "🎬",
             id(self.controlnet_tab): "🎛️", id(self.video_extend_tab): "⏩",
-            id(self.video_edit_ai_tab): "✨", id(self.quality_tab): "💎",
+            id(self.video_edit_ai_tab): "✨", id(self.avatar_tab): "🗣️", id(self.quality_tab): "💎",
             id(self.trellis_tab): "🧊", id(self.rig_tab): "🦴", id(self.convert_tab): "🔄",
             id(self.anim_tab): "🕺", id(self.train_tab): "🎓", id(self.lora_video_tab): "🎞️",
             id(self.lora_image_tab): "🖌️", id(self.music_tab): "🎵", id(self.world_tab): "🌍",
@@ -5270,6 +5319,85 @@ class MainWindow(QMainWindow):
                 self.anim_tab.set_last_rig(glb)
         except Exception:  # noqa: BLE001
             pass
+
+    # ── Avatar parlante (LongCat 1.5) ─────────────────────────────────────────────────────────────
+    def generate_avatar(self, cfg: dict):
+        if not self._feature_gate("cap.avatar_longcat"):
+            return
+        from core import longcat_service as lc
+        if not lc.is_installed():
+            QMessageBox.information(self, tr("tab.avatar", "Avatar"), tr(
+                "avatar.err.not_installed",
+                "Il motore LongCat Avatar non è installato. Installalo con:\n"
+                "python scripts/install_longcat_avatar.py"))
+            return
+        prec = cfg.get("precision", "int8")
+        try:
+            from core import ensure_weights as ew
+            ids = lc.weight_ids(prec)
+            if ew.missing(ids) and not ew.offer_download_gui(self, ids, tr("tab.avatar", "Avatar")):
+                return
+        except Exception:                                # noqa: BLE001 — il preflight del worker protegge comunque
+            pass
+        errs = lc.preflight(cfg)
+        if errs:
+            QMessageBox.warning(self, tr("tab.avatar", "Avatar"), "\n".join(errs))
+            return
+        self._avatar_cfg = dict(cfg)
+        self.avatar_tab.set_busy(True)
+        self.avatar_tab.append_log(tr("avatar.log.start", "Avvio LongCat Avatar ({p})…").format(p=prec))
+        self._log(f"[avatar] LongCat {cfg.get('mode')} {cfg.get('resolution')} {prec}")
+        self._avatar_worker = _LongCatWorker(cfg)
+        self._enqueue(tr("queue.job.avatar", "Avatar parlante"), self._avatar_worker, self._on_avatar_done,
+                      on_progress=self.avatar_tab.append_log)
+
+    def _on_avatar_done(self, res: dict):
+        if res.get("status") != "success":
+            self.avatar_tab.set_busy(False)
+            self.avatar_tab.append_log("✗ " + str(res.get("error", ""))[:2000])
+            self._log(f"[avatar] errore: {str(res.get('error', ''))[:300]}")
+            QMessageBox.critical(self, tr("mw.gen_error_title", "Errore"), str(res.get("error", ""))[:1500])
+            return
+        out = (res.get("output") or [None])[0]
+        self._last_video_path = out
+        cfg = getattr(self, "_avatar_cfg", {}) or {}
+        if cfg.get("face_restore") and out:
+            self.avatar_tab.append_log(tr("avatar.log.face", "Restauro volto…"))
+            import random as _r
+            params = {"image_path": out, "model": cfg["face_restore"], "fidelity": 0.6,
+                      "seed": _r.randint(0, 2**31)}
+            self._avatar_face_worker = _NativeImageWorker(params, module="video_face")
+            self._enqueue(tr("queue.job.video_face", "Restauro volti video"), self._avatar_face_worker,
+                          lambda r, _o=out: self._avatar_after_face(r, _o))
+            return
+        self._avatar_after_face({"status": "success", "output": [out]}, out)
+
+    def _avatar_after_face(self, res: dict, fallback: str):
+        ok = res.get("status") == "success"
+        out = (res.get("output") or [None])[0] if ok else fallback
+        if not ok:
+            self.avatar_tab.append_log("✗ " + tr("avatar.log.face_err",
+                                                 "restauro volto fallito: tengo il video originale"))
+        cfg = getattr(self, "_avatar_cfg", {}) or {}
+        if cfg.get("rife") and out:
+            fluid = str(Path(out).with_name(Path(out).stem + "_rife2x.mp4"))
+            self.avatar_tab.append_log(tr("avatar.log.rife", "Fluidifico a 50 fps (RIFE)…"))
+            self._avatar_rife = _RifeWorker(out, fluid, 2)
+            self._enqueue(tr("queue.job.rife", "Interpolazione FPS (RIFE)"), self._avatar_rife,
+                          lambda r, _o=out: self._avatar_final(r, _o))
+            return
+        self._avatar_final({"status": "success", "output": [out]}, out)
+
+    def _avatar_final(self, res: dict, fallback: str):
+        ok = res.get("status") == "success"
+        out = (res.get("output") or [None])[0] if ok else fallback
+        if not ok:
+            self.avatar_tab.append_log("✗ " + tr("avatar.log.rife_err", "RIFE fallito: tengo il video a 25 fps"))
+        self._last_video_path = out
+        self.avatar_tab.set_busy(False)
+        self.avatar_tab.show_result(out)
+        self.avatar_tab.append_log(tr("avatar.log.done", "✓ Video pronto: {f}").format(f=out))
+        self._log(f"[avatar] pronto: {out}")
 
     def generate_trellis(self, cfg: dict):
         """Genera un modello 3D dall'immagine selezionata (nativo se installato, altrimenti ComfyUI)."""

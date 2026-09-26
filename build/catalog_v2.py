@@ -474,6 +474,54 @@ NEW = [
       type="LoRA", family="MiniMax-H3", gb=1.96, used_by=["cap.video_minimax_h3"],
       note="anteprima: la distillazione dei riferimenti è meno matura della FL2V"),
 
+    # ───────── LongCat-Video-Avatar 1.5 (tab Avatar: foto + voce → persona che parla) ─────────
+    # MIT. Codice ufficiale nel venv E:\AI\Tools\LongCatAvatar (scripts/install_longcat_avatar.py).
+    # Text encoder UMT5-XXL, VAE Wan e tokenizer vengono dal modello BASE LongCat-Video; il DiT
+    # avatar si sceglie per precisione (INT8 ufficiale / FP8 wavespeed / bf16). File verificati su
+    # HF il 26/09/2026 (header safetensors letti via HTTP range).
+    N("lcav-configs", "Avatar", "LongCat-Video config + tokenizer (json, ~25MB)",
+      category="video", arch="longcat_avatar", kind="snapshot", repo="meituan-longcat/LongCat-Video",
+      type="configs", gb=0.03, used_by=["cap.avatar_longcat"],
+      allow=["tokenizer/*", "text_encoder/*.json", "vae/config.json", "scheduler/*",
+             "model_index.json", "config.json"],
+      note="solo json e tokenizer del modello base: il worker ci costruisce text encoder e VAE"),
+    N("lcav-te", "Avatar", "LongCat-Video text encoder UMT5-XXL (fp32, caricato in bf16)",
+      category="video", arch="longcat_avatar", kind="snapshot", repo="meituan-longcat/LongCat-Video",
+      type="TextEncoders", family="LongCat", gb=22.7, used_by=["cap.avatar_longcat"],
+      allow=["text_encoder/*.safetensors", "text_encoder/*.json"], scan=["LongCat-Video"],
+      note="lavora solo all'inizio (codifica il prompt) e poi si libera: non occupa VRAM "
+           "durante la generazione"),
+    N("lcav-vae", "Avatar", "LongCat-Video VAE (Wan 2.1)", category="video", arch="longcat_avatar",
+      repo="meituan-longcat/LongCat-Video", remote="vae/diffusion_pytorch_model.safetensors",
+      filename="diffusion_pytorch_model.safetensors", type="VAE", family="LongCat", gb=0.51,
+      used_by=["cap.avatar_longcat"]),
+    N("lcav15-core", "Avatar", "LongCat Avatar 1.5 base (LoRA DMD 8 step + Whisper + separatore voce)",
+      category="video", arch="longcat_avatar", kind="snapshot",
+      repo="meituan-longcat/LongCat-Video-Avatar-1.5", type="LongCat", gb=5.7,
+      deps=["lcav-configs", "lcav-te", "lcav-vae"], used_by=["cap.avatar_longcat"],
+      allow=["config.json", "model_index.json", "scheduler/*", "lora/dmd_lora.safetensors",
+             "vocal_separator/*", "whisper-large-v3/*.json", "whisper-large-v3/*.txt",
+             "whisper-large-v3/model.safetensors"],
+      note="componenti comuni a tutte le precisioni: Whisper-large-v3 SOLO fp16 (3.1GB, non i "
+           "12GB fp32/flax/bin del repo)"),
+    N("lcav15-int8", "Avatar", "LongCat Avatar 1.5 DiT INT8 ufficiale (15.9GB, ogni GPU)",
+      category="video", arch="longcat_avatar", kind="snapshot",
+      repo="meituan-longcat/LongCat-Video-Avatar-1.5", type="LongCat", family="int8", gb=15.9,
+      deps=["lcav15-core"], used_by=["cap.avatar_longcat"], allow=["base_model_int8/*"],
+      note="quantizzazione ufficiale weight-only per canale: gira su qualunque GPU NVIDIA; "
+           "scelta consigliata su 32GB (picco ~28GB)"),
+    N("lcav15-fp8", "Avatar", "LongCat Avatar 1.5 DiT FP8 e4m3 (15.9GB, RTX 40xx/50xx)",
+      category="video", arch="longcat_avatar", kind="snapshot",
+      repo="wavespeed/LongCat-Video-Avatar-1.5-e4m3", type="LongCat", family="fp8", gb=15.9,
+      deps=["lcav15-core"], used_by=["cap.avatar_longcat"],
+      note="FP8 per canale (non ufficiale, MIT): matmul FP8 nativo dove supportato, altrimenti "
+           "dequantizza al volo come l'INT8"),
+    N("lcav15-bf16", "Avatar", "LongCat Avatar 1.5 DiT bf16 (31.7GB, qualità di riferimento)",
+      category="video", arch="longcat_avatar", kind="snapshot",
+      repo="meituan-longcat/LongCat-Video-Avatar-1.5", type="LongCat", family="bf16", gb=31.7,
+      deps=["lcav15-core"], used_by=["cap.avatar_longcat"], allow=["base_model/*"], role="on_demand",
+      note="non entra in 32GB insieme al resto: serve solo per confronti di qualità"),
+
     # ───────── FLUX single-file (quelli che il backend immagini carica DAVVERO) ─────────
     N("flux1-dev-single", "Immagini", "FLUX.1 dev (single-file nativo)", category="image",
       arch="flux1", repo="black-forest-labs/FLUX.1-dev", gated=True,
