@@ -21,10 +21,13 @@ OUTPUT_DIR = str(REPO / "output")
 
 # arch immagine → (python.exe del venv, worker.py). Krea 2 riusa il venv LingBot (stesse deps).
 _LINGBOT_PY = r"E:\AI\Tools\lingbot_venv311\Scripts\python.exe"
+_DIFFUSERS_NEXT_PY = r"E:\AI\Tools\diffusers_next_venv\Scripts\python.exe"   # scripts/install_diffusers_next.py
 _ARCH_RUNNER = {
     "krea2": (_LINGBOT_PY, str(REPO / "workers" / "krea2_infer.py")),
     # editing per istruzione (single/multi) — stesso worker, ramo edit scelto da params['arch']
     "krea2_edit": (_LINGBOT_PY, str(REPO / "workers" / "krea2_infer.py")),
+    # Qwen-Image 2.1: t2i + edit fino a 10 riferimenti + RGBA, nel venv condiviso con MiniMax H3 (diffusers main)
+    "qwen_image21": (_DIFFUSERS_NEXT_PY, str(REPO / "workers" / "qwen_image21_infer.py")),
 }
 
 
@@ -122,8 +125,9 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
     params = dict(params, output=out)
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     if not os.path.exists(py):
+        installer = "install_diffusers_next.py" if py == _DIFFUSERS_NEXT_PY else "install_krea.py"
         return {"status": "error",
-                "error": f"venv per '{arch}' mancante: {py}. Esegui scripts/install_krea.py"}
+                "error": f"venv per '{arch}' mancante: {py}. Esegui scripts/{installer}"}
     # libera la VRAM delle altre categorie (video) prima del modello pesante
     try:
         from core import mem_coordinator as _mc

@@ -51,9 +51,19 @@ INPAINT_MODELS = {
 GEN_ARCH = {
     "FLUX": ("Flux", ("flux", "getphat", "fuxcapacity")),   # "krea" tolto: ora ambiguo con Krea 2
     "Krea 2": ("Krea2", ("krea-2", "krea2")),               # arch immagine alternativa (Turbo/Raw)
+    "Qwen-Image 2.1": ("Qwen21", ("qwen-image-2.1", "qwen_image_2.1", "qwen21")),   # ≤10 riferimenti + RGBA
     "Z-Image": ("Z-Image", ("z-image", "z_image", "zimage")),
     "Ernie": ("Ernie", ("ernie",)),
 }
+
+
+# Qwen-Image 2.1: profili di peso che stanno in 32GB (voci di catalogo; il worker li risolve per id)
+QWEN21_PROFILES = (
+    ("qwen21-dit-nvfp4", "f1.gen.qwen21.nvfp4", "Qwen-Image 2.1 NVFP4 (RTX 50xx, 12.4GB totali)"),
+    ("qwen21-dit-fp8", "f1.gen.qwen21.fp8", "Qwen-Image 2.1 FP8 (RTX 40xx/50xx, 17.2GB totali)"),
+    ("qwen21-dit-int8", "f1.gen.qwen21.int8", "Qwen-Image 2.1 INT8 (ogni GPU, qualità migliore, 17.3GB)"),
+)
+QWEN21_ASPECTS = ("1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16")
 
 
 def _is_flux2(name: str) -> bool:
@@ -238,6 +248,7 @@ class Frame1Tab(QWidget):
         self.gen_vae = QComboBox()
         self.gen_vae.setToolTip(tr("f1.gen.vae.tt", "VAE che decodifica il latente in immagine; 'auto' usa quello del modello."))
         f.addRow(tr("f1.gen.vae_lbl"), self.gen_vae)
+        f.addRow(self._qwen21_box())
         # LoRA multi-select (come nel tab Video)
         lora_group = QGroupBox(tr("f1.gen.lora.group"))
         lora_vl = QVBoxLayout(lora_group)
@@ -405,7 +416,7 @@ class Frame1Tab(QWidget):
 
     def _sync_gen_lora_arch(self, arch_lbl: str):
         """Sincronizza l'architettura del LoraTab con quella selezionata per la generazione."""
-        arch_map = {"FLUX": "Flux", "Z-Image": "Z-Image", "Ernie": "Ernie"}
+        arch_map = {"FLUX": "Flux", "Z-Image": "Z-Image", "Ernie": "Ernie", "Qwen-Image 2.1": "Qwen21"}
         arch = arch_map.get(arch_lbl, "Flux")
         self.gen_lora_tab.set_arch(arch)
 
@@ -458,6 +469,9 @@ class Frame1Tab(QWidget):
         arch_lbl = self.gen_arch.currentText()
         if arch_lbl == "Krea 2":                              # snapshot diffusers → varianti dal catalogo (no file)
             self._reload_gen_krea2()
+            return
+        if arch_lbl == "Qwen-Image 2.1":                      # profili di peso dal catalogo (nvfp4/fp8/int8)
+            self._reload_gen_qwen21()
             return
         _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
         allow = self._allow_nsfw()
@@ -543,16 +557,71 @@ class Frame1Tab(QWidget):
         user_prefs.toggle_fav_model("inpaint:" + lbl)
         self._update_inp_star()
 
-    def _reload_gen_krea2(self, *_):
-        """Popola il dropdown con le varianti Krea 2 (Turbo/Raw) dal catalogo pesi, con badge ⬇ se non presenti
-        (Krea 2 è uno snapshot diffusers, non un checkpoint-file → download-on-select come per il video)."""
+    def _qwen21_box(self) -> QGroupBox:
+        """Opzioni proprie di Qwen-Image 2.1 (visibili solo con quell'architettura)."""
+        box = QGroupBox(tr("f1.gen.qwen21.group", "Qwen-Image 2.1"))
+        ff = QFormLayout(box)
+        self.q21_turbo = QComboBox()
+        self.q21_turbo.addItem(tr("f1.gen.qwen21.turbo.none", "Nessuna (40 passi, qualità piena)"), "")
+        self.q21_turbo.addItem(tr("f1.gen.qwen21.turbo.4", "Turbo 4 passi (LoRA Viggle)"), "4")
+        self.q21_turbo.addItem(tr("f1.gen.qwen21.turbo.6", "Turbo 6 passi (LoRA Viggle v0.2.1)"), "6")
+        self.q21_turbo.setToolTip(tr("f1.gen.qwen21.turbo.tt",
+            "LoRA di distillazione: 4–6 passi invece di 40. Imposta da sola i passi."))
+        ff.addRow(tr("f1.gen.qwen21.turbo", "Velocità"), self.q21_turbo)
+        self.q21_aspect = QComboBox()
+        self.q21_aspect.addItem(tr("f1.gen.qwen21.aspect.canvas", "Risoluzione del tab Video/canvas"), "")
+        from core.qwen21_spec import ASPECTS_2K as _A2K
+        for a in QWEN21_ASPECTS:
+            wh = _A2K.get(a)
+            self.q21_aspect.addItem(f"{a}  ({wh[0]}×{wh[1]})" if wh else a, a)
+        self.q21_aspect.setToolTip(tr("f1.gen.qwen21.aspect.tt", "Formati 2K nativi del modello."))
+        ff.addRow(tr("f1.gen.qwen21.aspect", "Formato 2K"), self.q21_aspect)
+        self.q21_rgba = QCheckBox(tr("f1.gen.qwen21.rgba", "Sfondo trasparente (PNG con alfa)"))
+        self.q21_rgba.setToolTip(tr("f1.gen.qwen21.rgba.tt",
+            "Trasparenza NATIVA: il modello genera il canale alfa (adesivi, loghi, soggetti scontornati)."))
+        ff.addRow("", self.q21_rgba)
+        self.q21_te = QComboBox()
+        self.q21_te.addItem(tr("f1.gen.qwen21.te.default", "Encoder standard"), "")
+        self.q21_te.addItem(tr("f1.gen.qwen21.te.heretic", "Encoder «heretic» (18+, senza rifiuti)"), "heretic")
+        self._q21_te_lbl = QLabel(tr("f1.gen.qwen21.te", "Text encoder"))
+        ff.addRow(self._q21_te_lbl, self.q21_te)
+        from ui.widgets.reference_panel import ReferencePanel
+        self.q21_refs = ReferencePanel()
+        self.q21_refs.set_token_style("qwen21")
+        self.q21_refs.set_limits(images=10, videos=0, audios=0, total=10, min_items=1)
+        self.q21_refs.enable.setText(tr("f1.gen.qwen21.refs", "Riferimenti (fino a 10 immagini)"))
+        self.q21_refs.enable.setToolTip(tr("f1.gen.qwen21.refs.tt",
+            "Persone, prodotti o stili da mantenere: citali nel prompt come «image 1», «image 2»… "
+            "Con riferimenti la generazione diventa editing (es. «la persona di image 1 al mare»)."))
+        self.q21_refs.insert_token.connect(lambda tok: self.gen_prompt.insertPlainText(tok + " "))
+        ff.addRow(self.q21_refs)
+        lic = QLabel(tr("f1.gen.qwen21.license",
+                        "Licenza Qwen Research: uso non commerciale. I pesi li scarichi tu dal tab Pesi."))
+        lic.setWordWrap(True); lic.setStyleSheet("color:#e8b339; font-size:11px;")
+        ff.addRow(lic)
+        self._q21_box = box
+        box.setVisible(False)
+        self.gen_arch.currentTextChanged.connect(self._sync_qwen21_box)
+        self.img_nsfw.currentTextChanged.connect(self._sync_qwen21_box)
+        return box
+
+    def _sync_qwen21_box(self, *_):
+        on = self.gen_arch.currentText() == "Qwen-Image 2.1"
+        self._q21_box.setVisible(on)
+        adult = self._allow_nsfw()
+        self.q21_te.setVisible(adult); self._q21_te_lbl.setVisible(adult)
+        if not adult:
+            self.q21_te.setCurrentIndex(0)
+
+    def _reload_gen_catalog(self, items):
+        """Popola il dropdown con voci di CATALOGO (snapshot/profili senza file-modello unico), con badge ⬇
+        e colore se non presenti → download-on-select come nel tab Video. items = [(cat_id, label)]."""
         from core import weights_catalog as wc
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
         self.gen_model.blockSignals(True)
         self.gen_model.clear()
-        for cat_id, label in (("krea2_turbo", tr("f1.gen.krea2.turbo", "Krea 2 Turbo (8 step, veloce)")),
-                              ("krea2_raw", tr("f1.gen.krea2.raw", "Krea 2 Raw (52 step, qualità)"))):
+        for cat_id, label in items:
             e = entries.get(cat_id)
             if not e:
                 continue
@@ -570,13 +639,22 @@ class Frame1Tab(QWidget):
         self.gen_model.blockSignals(False)
         self._update_gen_star()
 
+    def _reload_gen_qwen21(self, *_):
+        self._reload_gen_catalog([(cid, tr(k, fb)) for cid, k, fb in QWEN21_PROFILES])
+
+    def _reload_gen_krea2(self, *_):
+        """Popola il dropdown con le varianti Krea 2 (Turbo/Raw) dal catalogo pesi, con badge ⬇ se non presenti
+        (Krea 2 è uno snapshot diffusers, non un checkpoint-file → download-on-select come per il video)."""
+        self._reload_gen_catalog([("krea2_turbo", tr("f1.gen.krea2.turbo", "Krea 2 Turbo (8 step, veloce)")),
+                                  ("krea2_raw", tr("f1.gen.krea2.raw", "Krea 2 Raw (52 step, qualità)"))])
+
     def _maybe_offer_gen_download(self, *_):
         """Solo su click utente: se l'arch immagine è a snapshot (Krea 2) e la variante scelta non è presente,
         offre il download (con dipendenze) via download_weights, come nel tab Video."""
-        if self.gen_arch.currentText() != "Krea 2":
+        if self.gen_arch.currentText() not in ("Krea 2", "Qwen-Image 2.1"):
             return
         cat_id = self.gen_model.currentData()
-        if not isinstance(cat_id, str) or not cat_id.startswith("krea2"):
+        if not isinstance(cat_id, str) or not cat_id.startswith(("krea2", "qwen21")):
             return
         from core import weights_catalog as wc
         entries = {e["id"]: e for e in wc.load()}
@@ -613,7 +691,7 @@ class Frame1Tab(QWidget):
 
         def _fin(*_):
             dlg.close()
-            self._reload_gen_krea2()                          # riflette la nuova presenza (toglie il ⬇)
+            self._reload_gen()                                # riflette la nuova presenza (toglie il ⬇)
         proc.finished.connect(_fin)
         dlg.canceled.connect(proc.kill)
         proc.start(sys.executable, ["-u", script, "--ids", ids_arg])
@@ -622,7 +700,7 @@ class Frame1Tab(QWidget):
     def _gen_model_name(self) -> str:
         """Nome modello selezionato; risolve la voce '⚡ Auto' al miglior modello dell'arch corrente
         (stesso criterio del motore auto_select: preferiti + qualità di famiglia)."""
-        if self.gen_arch.currentText() == "Krea 2":           # snapshot: nessun file-modello (risolto dal worker)
+        if self.gen_arch.currentText() in ("Krea 2", "Qwen-Image 2.1"):   # nessun file-modello: lo risolve il worker
             return ""
         if not self.gen_model.count():
             return ""
@@ -1599,11 +1677,13 @@ class Frame1Tab(QWidget):
             "pulid_strength": (self.gen_pulid_strength.value() if hasattr(self, "gen_pulid_strength") else 0.8),
             "pulid_start_step": (self.gen_pulid_start.value() if hasattr(self, "gen_pulid_start") else 0),
             "pulid_true_cfg": (self.gen_pulid_truecfg.value() if hasattr(self, "gen_pulid_truecfg") else 1.0),
-            "arch": {"FLUX": "flux", "Krea 2": "krea2", "Z-Image": "zimage", "Ernie": "ernie"}.get(self.gen_arch.currentText(), "flux"),
+            "arch": {"FLUX": "flux", "Krea 2": "krea2", "Z-Image": "zimage", "Ernie": "ernie",
+                     "Qwen-Image 2.1": "qwen_image21"}.get(self.gen_arch.currentText(), "flux"),
             "model": self._gen_model_name(),
             # Krea 2: variante (turbo/raw) dalla voce selezionata nel dropdown → il worker risolve lo snapshot
             "krea2_variant": ("raw" if str(self.gen_model.currentData() or "").endswith("raw") else "turbo")
                              if self.gen_arch.currentText() == "Krea 2" else None,
+            **self._qwen21_config(),
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),
             "cfg": float(self.gen_cfg.value()) if hasattr(self, "gen_cfg") else None,
@@ -1617,6 +1697,21 @@ class Frame1Tab(QWidget):
             "negative": self.gen_neg.toPlainText().strip() if hasattr(self, "gen_neg") else "",
             "enhance": self.gen_enhance.isChecked() if hasattr(self, "gen_enhance") else False,
             "nsfw": self._allow_nsfw(),
+        }
+
+    def _qwen21_config(self) -> dict:
+        """Parametri propri di Qwen-Image 2.1 (vuoto con le altre architetture)."""
+        if self.gen_arch.currentText() != "Qwen-Image 2.1":
+            return {}
+        cid = str(self.gen_model.currentData() or "qwen21-dit-fp8")
+        return {
+            "qwen21_profile": cid.rsplit("-", 1)[-1],        # qwen21-dit-nvfp4 → nvfp4
+            "qwen21_weight_id": cid,
+            "qwen21_turbo": self.q21_turbo.currentData() or "",
+            "qwen21_te": self.q21_te.currentData() or "",
+            "transparent": self.q21_rgba.isChecked(),
+            "aspect_2k": self.q21_aspect.currentData() or "",
+            "ref_images": [r["path"] for r in self.q21_refs.get_references() if r.get("kind") == "image"],
         }
 
     @property

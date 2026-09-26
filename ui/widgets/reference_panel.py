@@ -42,6 +42,8 @@ AUDIO_EXTS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 TOKEN_STYLES = {
     "h3": {"image": "<Picture {n}>", "video": "<Video {n}>", "audio": "<Audio {n}>"},
     "ltx": {"image": "Image {n}", "video": "Video {n}", "audio": "Audio {n}"},
+    # · Qwen-Image 2.1 → il template numera le immagini «image1, image2…»: nel prompt si scrive «image 1»
+    "qwen21": {"image": "image {n}", "video": "video {n}", "audio": "audio {n}"},
 }
 _KIND_ICON = {"image": "🖼", "video": "🎞", "audio": "🎧"}
 

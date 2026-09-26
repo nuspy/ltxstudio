@@ -50,6 +50,7 @@ USE_TAGS: dict[str, str] = {
     "fp8": "FP8: circa metà della memoria del bf16; veloce sulle RTX 40xx/50xx.",
     "avatar": "Avatar parlante: anima una foto sulla voce, con labiale sincronizzato.",
     "audio_enc": "Encoder audio: estrae dal parlato i segnali che guidano il labiale.",
+    "multiref10": "Fino a 10 immagini di riferimento (persone, prodotti, stili) e trasparenza RGBA nativa.",
 }
 
 

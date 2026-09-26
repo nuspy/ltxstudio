@@ -145,6 +145,17 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "worldgen-lora": (["threed", "lora_style"], []),
     "ltx23-lora-multisubject": (["lora_style", "multisubject"], []),
     # ── MiniMax H3 (deps già scritte da catalog_v2; qui i tag d'uso) ──
+    # ── Qwen-Image 2.1 ──
+    "qwen21-configs": (["te"], []),
+    "qwen21-vae": (["vae"], []),
+    "qwen21-te-fp8": (["te", "te_quant", "fp8"], []),
+    "qwen21-te-nvfp4": (["te", "te_quant", "nvfp4"], []),
+    "qwen21-te-heretic-nvfp4": (["te", "te_quant", "nvfp4"], []),
+    "qwen21-dit-nvfp4": (["ckpt_image", "nvfp4", "multiref10"], ["qwen21-configs", "qwen21-vae", "qwen21-te-nvfp4"]),
+    "qwen21-dit-fp8": (["ckpt_image", "fp8", "multiref10"], ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8"]),
+    "qwen21-dit-int8": (["ckpt_image", "q_int8", "multiref10"], ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8"]),
+    "qwen21-turbo-lora-4": (["distill_lora"], []),
+    "qwen21-turbo-lora-6": (["distill_lora"], []),
     # ── LongCat Avatar 1.5 ──
     "lcav-configs": (["te"], []),
     "lcav-te": (["te"], []),

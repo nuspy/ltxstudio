@@ -19,6 +19,8 @@ ARCH_DEFAULTS = {
     "FLUX":    {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 3.5, "clip_type": "flux"},
     "Z-Image": {"sampler": "res_multistep", "scheduler": "simple", "steps": 8, "cfg": 1.0, "clip_type": "lumina2"},
     "Ernie":   {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 4.0, "clip_type": "flux2"},
+    # Qwen-Image 2.1: campionato SENZA guidance (true_cfg 1.0), 40 passi (4/6 con le LoRA turbo)
+    "Qwen-Image 2.1": {"sampler": "euler", "scheduler": "simple", "steps": 40, "cfg": 1.0, "clip_type": "qwen"},
 }
 
 # Capability per ARCHITETTURA VIDEO — usata dalla GUI per abilitare/disabilitare i controlli quando
@@ -67,6 +69,10 @@ ARCH_IMAGE_CAPS = {
     # Krea 2: t2i + editing per istruzione (single/multi, "kontext"-like) via Krea2EditPipeline.
     # inpaint mascherato/controlnet/pulid non ancora supportati.
     "krea2": {"t2i": True, "inpaint": False, "kontext": True, "edit": True, "controlnet": False, "pulid": False},
+    # Qwen-Image 2.1: t2i + editing per istruzione con ≤10 riferimenti + RGBA; l'«inpaint» è editing locale
+    # con la zona evidenziata sull'immagine (niente pipeline a maschera dedicata). Niente controlnet/PuLID.
+    "qwen_image21": {"t2i": True, "inpaint": True, "kontext": True, "edit": True, "controlnet": False,
+                     "pulid": False, "multiref": 10, "rgba": True},
 }
 
 
@@ -109,6 +115,9 @@ _RECOMMENDED: dict[str, dict] = {
     "krea2-turbo": {"steps": 8, "cfg": 0.0, "note": "krea2 turbo distilled"},
     "krea-2-raw": {"steps": 52, "cfg": 3.5, "note": "krea2 raw (qualità/LoRA)"},
     "krea2-raw": {"steps": 52, "cfg": 3.5, "note": "krea2 raw"},
+    # Qwen-Image 2.1 (immagini): 40 passi senza guidance; LoRA turbo Viggle 4/6 passi
+    "qwen-image-2.1": {"steps": 40, "cfg": 1.0, "note": "qwen-image 2.1 (true_cfg 1.0)"},
+    "qwen_image_2.1": {"steps": 40, "cfg": 1.0, "note": "qwen-image 2.1 (true_cfg 1.0)"},
     # Krea Realtime (video): distillato ~4 step, autoregressivo
     "krea-realtime": {"steps": 4, "cfg": 1.0, "note": "krea realtime autoregressivo"},
     "krea_rt": {"steps": 4, "cfg": 1.0, "note": "krea realtime 14b"},

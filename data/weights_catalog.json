@@ -3450,6 +3450,300 @@
         "ckpt_video",
         "big_quality"
       ]
+    },
+    {
+      "id": "qwen21-configs",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 config + processor + scheduler (json, ~20MB)",
+      "kind": "snapshot",
+      "type": "configs",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.02,
+      "scan_names": [],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Qwen/Qwen-Image-2.1",
+      "url": "https://huggingface.co/Qwen/Qwen-Image-2.1",
+      "note": "solo json/tokenizer dal repo ufficiale. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "allow_patterns": [
+        "model_index.json",
+        "scheduler/*",
+        "processor/*",
+        "transformer/config.json",
+        "text_encoder/config.json",
+        "text_encoder/generation_config.json",
+        "vae/config.json",
+        "LICENSE"
+      ],
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "qwen21-vae",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 VAE RGBA bf16 (0.68GB)",
+      "kind": "file",
+      "type": "VAE",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.68,
+      "scan_names": [
+        "qwen_image_2.1_vae_bf16.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "unsloth/Qwen-Image-2.1-FP8",
+      "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8",
+      "filename": "qwen_image_2.1_vae_bf16.safetensors",
+      "remote_filename": "vae/qwen_image_2.1_vae_bf16.safetensors",
+      "note": "stesse chiavi del VAE ufficiale fp32 (1.35GB), metà spazio",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "vae"
+      ]
+    },
+    {
+      "id": "qwen21-te-fp8",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 text encoder Qwen3-VL-8B FP8 (9.4GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 9.39,
+      "scan_names": [
+        "Qwen-Image-2.1-text_encoder-FP8.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "unsloth/Qwen-Image-2.1-FP8",
+      "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8",
+      "filename": "Qwen-Image-2.1-text_encoder-FP8.safetensors",
+      "remote_filename": "Qwen-Image-2.1-text_encoder-FP8.safetensors",
+      "note": "VLM: legge anche le immagini di riferimento. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "te",
+        "te_quant",
+        "fp8"
+      ]
+    },
+    {
+      "id": "qwen21-te-nvfp4",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 text encoder Qwen3-VL-8B NVFP4 (7.5GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 7.55,
+      "scan_names": [
+        "qwen3vl_8b_nvfp4.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "BennyDaBall/Qwen-Image-2.1-NVFP4",
+      "url": "https://huggingface.co/BennyDaBall/Qwen-Image-2.1-NVFP4",
+      "filename": "qwen3vl_8b_nvfp4.safetensors",
+      "remote_filename": "text_encoders/qwen3vl_8b_nvfp4.safetensors",
+      "note": "kernel FP4 delle RTX 50xx (dequant comfy-kitchen). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "te",
+        "te_quant",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "qwen21-te-heretic-nvfp4",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 text encoder «heretic» NVFP4 (18+, 6.3GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 6.31,
+      "scan_names": [
+        "qwen3vl_8b_nvfp4_heretic.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-NVFP4",
+      "url": "https://huggingface.co/pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-NVFP4",
+      "filename": "qwen3vl_8b_nvfp4_heretic.safetensors",
+      "remote_filename": "qwen3vl_8b_nvfp4_heretic.safetensors",
+      "sensitivity": "adult",
+      "note": "encoder senza rifiuti per l'edizione 18+ (non ufficiale; formato da validare al primo uso). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "te",
+        "te_quant",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "qwen21-dit-nvfp4",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 DiT NVFP4 (4.2GB, RTX 50xx)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 4.2,
+      "scan_names": [
+        "qwen_image_2.1_nvfp4.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "BennyDaBall/Qwen-Image-2.1-NVFP4",
+      "url": "https://huggingface.co/BennyDaBall/Qwen-Image-2.1-NVFP4",
+      "filename": "qwen_image_2.1_nvfp4.safetensors",
+      "remote_filename": "diffusion_models/qwen_image_2.1_nvfp4.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-nvfp4"
+      ],
+      "note": "profilo più piccolo: catena completa 12.4GB. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "ckpt_image",
+        "nvfp4",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-dit-fp8",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 DiT FP8 (7.1GB, RTX 40xx/50xx)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 7.12,
+      "scan_names": [
+        "Qwen-Image-2.1-FP8.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "unsloth/Qwen-Image-2.1-FP8",
+      "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8",
+      "filename": "Qwen-Image-2.1-FP8.safetensors",
+      "remote_filename": "Qwen-Image-2.1-FP8.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-fp8"
+      ],
+      "note": "FP8 per riga (torchao): catena completa 17.2GB. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "ckpt_image",
+        "fp8",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-dit-int8",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 DiT INT8 (7.3GB, ogni GPU, qualità migliore)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 7.26,
+      "scan_names": [
+        "Qwen-Image-2.1-INT8.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "unsloth/Qwen-Image-2.1-FP8",
+      "url": "https://huggingface.co/unsloth/Qwen-Image-2.1-FP8",
+      "filename": "Qwen-Image-2.1-INT8.safetensors",
+      "remote_filename": "Qwen-Image-2.1-INT8.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-fp8"
+      ],
+      "note": "INT8 per riga: LPIPS 0.064 contro 0.112 dell'FP8 (dati unsloth). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "ckpt_image",
+        "q_int8",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-turbo-lora-4",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 Turbo LoRA 4 passi (Viggle, 0.34GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.34,
+      "scan_names": [
+        "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Viggle/Qwen-Image-2.1-viggle-turbo",
+      "url": "https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo",
+      "filename": "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors",
+      "remote_filename": "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors",
+      "note": "4 passi invece di 40 (non ufficiale). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "qwen21-turbo-lora-6",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 Turbo LoRA 6 passi v0.2.1 (Viggle, 0.68GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.68,
+      "scan_names": [
+        "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r128.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Viggle/Qwen-Image-2.1-viggle-turbo",
+      "url": "https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo",
+      "filename": "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r128.safetensors",
+      "remote_filename": "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r128.safetensors",
+      "note": "6 passi, qualità più vicina ai 40 passi (non ufficiale). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "distill_lora"
+      ]
     }
   ],
   "schema": 2,

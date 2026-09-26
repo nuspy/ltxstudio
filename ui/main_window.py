@@ -2930,8 +2930,23 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
         # Krea 2 è uno SNAPSHOT diffusers (nessun file-modello): usa krea2_variant, non un checkpoint → salta il
         # controllo "modello obbligatorio" (il worker risolve turbo/raw dal catalogo).
-        if cfg.get("arch") != "krea2" and (not cfg["model"] or cfg["model"].startswith("(")):
+        if cfg.get("arch") not in ("krea2", "qwen_image21") and (not cfg["model"] or cfg["model"].startswith("(")):
             QMessageBox.warning(self, tr("mw.no_model_title"), tr("mw.no_model_arch_msg").format(arch=cfg['arch'])); return
+        if cfg.get("arch") == "qwen_image21":                 # profilo di peso = voce di catalogo (+ deps)
+            if not self._feature_gate("cap.image_qwen21"):
+                return
+            try:
+                from core import ensure_weights as ew
+                from core.qwen21_spec import TE_VARIANTS, TURBO
+                ids = [cfg.get("qwen21_weight_id") or "qwen21-dit-fp8"]
+                if cfg.get("qwen21_te") in TE_VARIANTS:
+                    ids.append(TE_VARIANTS[cfg["qwen21_te"]])
+                if cfg.get("qwen21_turbo") in TURBO:
+                    ids.append(TURBO[cfg["qwen21_turbo"]][0])
+                if ew.missing(ids) and not ew.offer_download_gui(self, ids, "Qwen-Image 2.1"):
+                    return
+            except Exception:                                 # noqa: BLE001 — il worker verifica comunque
+                pass
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
             return
@@ -3061,6 +3076,9 @@ class MainWindow(QMainWindow):
                   "steps": cfg["steps"], "guidance": cfg.get("cfg") or 3.5,
                   "seed": seed, "loras": loras,
                   "krea2_variant": cfg.get("krea2_variant"),   # Krea 2: turbo/raw (snapshot, no file-modello)
+                  # Qwen-Image 2.1: profilo pesi, turbo, encoder, RGBA, formato 2K, riferimenti (≤10)
+                  **{k: cfg[k] for k in ("qwen21_profile", "qwen21_turbo", "qwen21_te", "transparent",
+                                         "aspect_2k", "ref_images") if k in cfg},
                   # #95 I1: componenti scelti dall'utente (erano scartati → il backend usava i default)
                   "sampler": cfg.get("sampler"), "scheduler": cfg.get("scheduler"),
                   "encoder": cfg.get("encoder"), "clip_type": cfg.get("clip_type"), "vae": cfg.get("vae"),

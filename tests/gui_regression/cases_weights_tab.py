@@ -251,7 +251,10 @@ def _make_model_case(entry: dict):
         assert cap["starts"], f"download non avviato per {eid}"
         _prog, args = cap["starts"][-1]
         ids = _args_ids(args)
-        assert ids == [eid], f"selezionato solo {eid} ma --ids = {ids}"
+        # il tab spunta da solo le DIPENDENZE mancanti (catene deps, weights-unification): attesi il modello
+        # scelto + le sue dipendenze non presenti, nient'altro
+        allowed = {eid, *wc.missing_ids_with_deps(entry)}
+        assert eid in ids and set(ids) <= allowed, f"selezionato solo {eid} ma --ids = {ids} (ammessi {allowed})"
         assert "--base-dir" in args, f"--base-dir assente per {eid}: {args}"
 
     return case
