@@ -16,6 +16,7 @@ KNOWN_CAPS = [
     "cap.lora_image_train", "cap.lora_video_train",
     "cap.adult_mode", "cap.stego", "cap.threed", "cap.filmstudio", "cap.lucky_director",
     "cap.import_models", "cap.civitai_import",
+    "cap.avatar_longcat", "cap.avatar_h3", "cap.image_qwen21", "cap.video_minimax_h3",
 ]
 
 

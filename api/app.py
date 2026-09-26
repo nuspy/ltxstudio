@@ -17,6 +17,8 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 
+from core.net_tls import use_system_ca
+use_system_ca()          # download/Edge TTS dietro antivirus o proxy TLS (vedi core/net_tls)
 from api.config import HOST, PORT, is_allowed_path
 from api.jobs import MANAGER
 from api.download import files_payload
@@ -129,8 +131,8 @@ async def files_upload(file: UploadFile):
 
 # ─────────────────────────── capability routers ───────────────────────────
 # Ogni gruppo registra i propri endpoint POST (creano job) su questo `app`.
-from api.handlers import images, video, music, threed, film, catalog, train   # noqa: E402
-for _mod in (images, video, music, threed, film, catalog, train):
+from api.handlers import images, video, music, threed, film, catalog, train, avatar   # noqa: E402
+for _mod in (images, video, music, threed, film, catalog, train, avatar):
     if hasattr(_mod, "register"):
         _mod.register(app)
 
