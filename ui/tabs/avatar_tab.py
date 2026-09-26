@@ -543,6 +543,9 @@ class AvatarTab(QWidget):
                                      "Il labiale segue solo la voce isolata; nel video resta l'audio originale."))
         af.addRow("", self.vocal_sep)
         self.offload_kv = QCheckBox(tr("avatar.offloadkv", "Risparmia VRAM (video lunghi / 720p)"))
+        self.offload_kv.setToolTip(tr("avatar.offloadkv.tt",
+                                      "Spenta = decide il piano automatico in base alla VRAM libera; accesa = "
+                                      "sposta sempre in RAM la cache delle continuazioni."))
         af.addRow("", self.offload_kv)
         self.lbl_steps = QLabel(tr("avatar.steps.info", "Passi: 8 (distillazione DMD obbligatoria per la v1.5)"))
         af.addRow(tr("avatar.steps", "Passi"), self.lbl_steps)
@@ -786,7 +789,8 @@ class AvatarTab(QWidget):
             "trim_start": start, "trim_end": end, "max_duration": self.max_dur.value(),
             "precision": self.precision.currentData(), "seed": seed,
             "ref_img_index": self.ref_idx.value(), "mask_frame_range": self.mask_range.value(),
-            "vocal_separation": self.vocal_sep.isChecked(), "offload_kv_cache": self.offload_kv.isChecked(),
+            "vocal_separation": self.vocal_sep.isChecked(),
+            "offload_kv_cache": True if self.offload_kv.isChecked() else "auto",   # spenta = decide il piano VRAM
             "face_restore": self.face_restore.currentData() or "", "rife": self.rife.isChecked(),
         }
         return cfg

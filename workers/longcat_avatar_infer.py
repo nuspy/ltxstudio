@@ -63,7 +63,8 @@ DEFAULTS = {
     "seed": 42,
     "ref_img_index": 10, "mask_frame_range": 3,
     "vocal_separation": True,
-    "offload_kv_cache": False,
+    "offload_kv_cache": "auto",   # auto | True | False — auto = decide il piano VRAM
+    "merge_lora": "auto",         # auto | True | False — fonde la LoRA DMD nei pesi quantizzati (−2.5 GB)
     "output": "",
 }
 
@@ -284,12 +285,12 @@ def load_dit(dit_dir: str, precision: str):
     root = Path(dit_dir)
     if precision == "bf16":
         return LongCatVideoAvatarTransformer3DModel.from_pretrained(
-            str(root), subfolder="base_model", torch_dtype=torch.bfloat16).to("cuda")
+            str(root), subfolder="base_model", cp_split_hw=[1, 1], torch_dtype=torch.bfloat16).to("cuda")
     qdir = root / "base_model_int8" if precision == "int8" else root
     cfg = json.loads((qdir / "config.json").read_text("utf-8"))
     for k in ("_class_name", "architectures", "_diffusers_version", "model_max_length"):
         cfg.pop(k, None)
-    cfg["cp_split_hw"] = None
+    cfg["cp_split_hw"] = [1, 1]          # single-GPU: nessuna divisione hw (context_parallel.get_optimal_split(1))
     if precision == "int8":
         from longcat_video.modules.quantization import QuantizedLinear, DEFAULT_SKIP_PATTERNS
         qcls = QuantizedLinear
@@ -326,6 +327,91 @@ def load_dit(dit_dir: str, precision: str):
                 prm.data = prm.data.to(torch.bfloat16)
     model.eval()
     return model
+
+
+# ── VRAM: piano dinamico (regola: mai valori fissi, si tara sulla GPU del PC) ─────────────────────
+_DIT_GB = {"int8": 15.9, "fp8": 15.9, "bf16": 31.7}
+_LORA_GB, _VAE_GB, _MARGIN_GB = 2.6, 0.6, 1.5
+
+
+def _vram_gb() -> tuple[float, float]:
+    import torch
+    free, total = torch.cuda.mem_get_info()
+    return free / 2**30, total / 2**30
+
+
+def _auto(v) -> str:
+    return "auto" if str(v).lower() == "auto" else ("on" if v in (True, "true", "on", 1) else "off")
+
+
+def plan_vram(precision: str, h: int, w: int, nseg: int, free_gb: float, offload, merge) -> dict:
+    """Stima la memoria del DiT (pesi + LoRA + attivazioni + KV-cache delle continuazioni) e sceglie,
+    se serve, offload della KV-cache in RAM e fusione della LoRA. Solleva se non basta comunque:
+    meglio un errore chiaro che il driver che riversa la VRAM nella RAM (lentissimo, commit esaurito)."""
+    tok = (h // 16) * (w // 16)
+    act = tok * 24 * 4096 * 2 * 12 / 2**30               # attivazioni transitorie di un segmento (93 fotogrammi)
+    kv = tok * 5 * 48 * 2 * 4096 * 2 / 2**30 if nseg > 1 else 0.0   # 4 latenti di condizione + 1 di riferimento
+    o, m = _auto(offload), _auto(merge)
+    use_off, use_merge = o == "on", m == "on"
+
+    def need():
+        return (_DIT_GB[precision] + (0 if use_merge else _LORA_GB) + _VAE_GB + act
+                + (0 if use_off else kv) + _MARGIN_GB)
+    if need() > free_gb and o == "auto" and kv:
+        use_off = True
+    if need() > free_gb and m == "auto":
+        use_merge = True
+    n = need()
+    if n > free_gb:
+        raise RuntimeError(f"VRAM insufficiente: servono ~{n:.1f} GB (DiT {precision}, {w}×{h}, {nseg} segmenti), "
+                           f"liberi {free_gb:.1f} GB. Chiudi gli altri programmi che usano la GPU, scegli 480p "
+                           f"o una precisione più piccola.")
+    return {"offload_kv": use_off, "merge_lora": use_merge, "need_gb": round(n, 1), "act_gb": round(act, 1),
+            "kv_gb": round(kv, 1)}
+
+
+def merge_lora_into(dit, lora_path: str, multiplier: float = 1.0) -> int:
+    """Fonde la LoRA DMD nei Linear del DiT (INT8 ufficiale, FP8 per riga o bf16), riquantizzando per canale.
+    Stesso effetto dell'applicazione «al volo» dell'ufficiale, senza i 2.5 GB di LoRA in VRAM."""
+    import torch
+    from safetensors.torch import load_file
+    sd = load_file(lora_path, device="cuda")
+    names = {k[: -len(".lora_down.weight")] for k in sd if k.endswith(".lora_down.weight")}
+    mods = dict(dit.named_modules())
+    n = 0
+    for ln in names:
+        m = mods.get(ln.replace("lora___lorahyphen___", "").replace("___lorahyphen___", "."))
+        if m is None:
+            continue
+        down = sd[f"{ln}.lora_down.weight"].float()
+        a = sd.get(f"{ln}.alpha_scale")
+        scale = (float(a) if a is not None else 0.5) * multiplier
+        ups = sorted((k for k in sd if k.startswith(f"{ln}.lora_up.blocks.")),
+                     key=lambda k: int(k.split(".lora_up.blocks.")[1].split(".")[0]))
+        if ups:
+            r = down.shape[0] // len(ups)
+            delta = torch.cat([sd[u].float() @ down[i * r:(i + 1) * r] for i, u in enumerate(ups)], 0)
+        else:
+            delta = sd[f"{ln}.lora_up.weight"].float() @ down
+        delta = delta * scale
+        with torch.no_grad():
+            if hasattr(m, "weight_int8"):                    # INT8 ufficiale (per canale, simmetrico)
+                wt = m.weight_int8.float() * m.weight_scale.float().unsqueeze(1) + delta
+                sc = wt.abs().amax(dim=1).clamp(min=1e-8) / 127.0
+                m.weight_int8.copy_((wt / sc.unsqueeze(1)).round().clamp(-128, 127).to(torch.int8))
+                m.weight_scale.copy_(sc.to(m.weight_scale.dtype))
+            elif hasattr(m, "scale_weight"):                 # FP8 e4m3 per riga (wavespeed)
+                wt = m.weight.float() * m.scale_weight.float().unsqueeze(1) + delta
+                sc = wt.abs().amax(dim=1).clamp(min=1e-12) / 448.0
+                m.weight.copy_((wt / sc.unsqueeze(1)).clamp(-448, 448).to(torch.float8_e4m3fn))
+                m.scale_weight.copy_(sc.to(m.scale_weight.dtype))
+            elif isinstance(getattr(m, "weight", None), torch.Tensor):
+                m.weight.add_(delta.to(m.weight.dtype))
+            else:
+                continue
+        n += 1
+    del sd
+    return n
 
 
 # ── video ───────────────────────────────────────────────────────────────────────────────────────
@@ -401,6 +487,11 @@ def run(params: dict) -> str:
     except Exception:                                                # noqa: BLE001
         pass
     _free_gpu_servers()
+    free0, total = _vram_gb()
+    # TETTO: oltre questa quota PyTorch dà OOM invece di lasciare che il driver WDDM riversi la VRAM nella
+    # RAM di sistema (visto il 26/09: 45 GB di commit e generazione ferma). Altri programmi GPU restano fuori.
+    torch.cuda.set_per_process_memory_fraction(max(0.2, min(1.0, (free0 - 0.4) / total)))
+    _log(f"VRAM libera all'avvio {free0:.1f} / {total:.1f} GB")
 
     from transformers import AutoTokenizer, UMT5EncoderModel, WhisperModel, AutoFeatureExtractor
     from longcat_video.pipeline_longcat_video_avatar import LongCatVideoAvatarPipeline
@@ -423,6 +514,16 @@ def run(params: dict) -> str:
                                       dit=None, audio_encoder=None, audio_feature_extractor=None,
                                       model_type="avatar-v1.5")
     pipe.device = dev
+    # VAE a tasselli (256px, passo 192) + cache CUDA liberata prima di ogni decode: la decodifica di 93
+    # fotogrammi in un colpo chiedeva 7.5 GB contigui (OOM visto il 26/09 con 3.9 GB frammentati)
+    vae.enable_tiling()
+    for _name in ("decode", "encode"):
+        _orig = getattr(vae, _name)
+
+        def _wrapped(*a, __f=_orig, **k):
+            _gc()
+            return __f(*a, **k)
+        setattr(vae, _name, _wrapped)
     cache = {}
     for cfg_flag in (False, True):
         with torch.no_grad():
@@ -458,17 +559,30 @@ def run(params: dict) -> str:
     pipe.audio_encoder = None
     _gc()
 
+    image = PIL.Image.open(p["image_path"]).convert("RGB") if p["mode"] == "ai2v" else None
+    bucket = get_bucket_config(p["resolution"], scale_factor_spatial=pipe.vae_scale_factor_spatial * 2)
+    ratio = (image.height / image.width) if image is not None else _ASPECTS.get(p["aspect"], 9 / 16)
+    gh, gw = bucket[sorted(bucket, key=lambda k: abs(float(k) - ratio))[0]][0]
+    free_gb, _ = _vram_gb()
+    plan = plan_vram(p["precision"], gh, gw, nseg, free_gb, p.get("offload_kv_cache"), p.get("merge_lora"))
+    _log(f"piano VRAM: {gw}×{gh}, liberi {free_gb:.1f} GB, servono ~{plan['need_gb']} GB "
+         f"(attivazioni {plan['act_gb']}, KV {plan['kv_gb']}) → offload KV {'sì' if plan['offload_kv'] else 'no'}, "
+         f"LoRA fusa {'sì' if plan['merge_lora'] else 'no'}")
+
     _log(f"FASE 3/4 DiT {p['precision']} + LoRA DMD (8 passi)")
     dit = load_dit(W["dit"], p["precision"])
     lora = Path(W["core"]) / "lora" / "dmd_lora.safetensors"
-    dit.load_lora(str(lora), "dmd", multiplier=1.0, lora_network_dim=128, lora_network_alpha=64)
-    dit.enable_loras(["dmd"])
-    for net in getattr(dit, "lora_dict", {}).values():
-        for l_ in net.loras:
-            l_.to(dev)
+    if plan["merge_lora"]:
+        _log(f"LoRA DMD fusa nei pesi: {merge_lora_into(dit, str(lora))} moduli")
+    else:
+        dit.load_lora(str(lora), "dmd", multiplier=1.0, lora_network_dim=128, lora_network_alpha=64)
+        dit.enable_loras(["dmd"])
+        for net in getattr(dit, "lora_dict", {}).values():
+            for l_ in net.loras:
+                l_.to(dev)
     pipe.dit = dit
     _gc()
-    _log(f"modelli pronti in {time.time() - t0:.0f}s")
+    _log(f"modelli pronti in {time.time() - t0:.0f}s — VRAM usata {torch.cuda.memory_allocated() / 2**30:.1f} GB")
 
     # v1.5 = modalità distillata DMD obbligatoria (README ufficiale): 8 passi, guidance 1.0
     steps, tcfg, acfg = 8, 1.0, 1.0
@@ -485,13 +599,11 @@ def run(params: dict) -> str:
         return e[0]
 
     masks = None
-    image = None
-    if p["mode"] == "ai2v":
-        image = PIL.Image.open(p["image_path"]).convert("RGB")
-        if emb2 is not None:
-            masks = _bbox_masks(image.width, image.height, p.get("bbox")).to(dev)
+    if image is not None and emb2 is not None:
+        masks = _bbox_masks(image.width, image.height, p.get("bbox")).to(dev)
 
     _log(f"FASE 4/4 generazione — segmento 1/{nseg}")
+    ts = time.time()
     with torch.no_grad():
         if p["mode"] == "ai2v":
             kw = {"ref_target_masks": masks} if masks is not None else {}
@@ -501,22 +613,21 @@ def run(params: dict) -> str:
                 audio_guidance_scale=acfg, output_type="both", generator=gen, audio_emb=emb_window(0),
                 use_distill=True, resize_mode=p["resize_mode"], **kw)
         else:
-            bucket = get_bucket_config(p["resolution"], scale_factor_spatial=pipe.vae_scale_factor_spatial * 2)
-            ratio = _ASPECTS.get(p["aspect"], 9 / 16)
-            h, w = bucket[sorted(bucket, key=lambda k: abs(float(k) - ratio))[0]][0]
             video_np, latent = pipe.generate_at2v(
-                prompt=p["prompt"], negative_prompt=p["negative"], height=h, width=w,
+                prompt=p["prompt"], negative_prompt=p["negative"], height=gh, width=gw,
                 num_frames=timing.NUM_FRAMES, num_inference_steps=steps, text_guidance_scale=tcfg,
                 audio_guidance_scale=acfg, output_type="both", generator=gen, audio_emb=emb_window(0),
                 use_distill=True)
     frames = [PIL.Image.fromarray((f * 255).astype(np.uint8)) for f in video_np[0]]
     del video_np
     _gc()
+    _log(f"segmento 1/{nseg} in {time.time() - ts:.0f}s — picco VRAM {torch.cuda.max_memory_allocated() / 2**30:.1f} GB")
     width, height = frames[0].size
     current, ref_latent, allf = frames, latent[:, :, :1].clone(), list(frames)
     start = 0
     for seg in range(1, nseg):
         _log(f"segmento {seg + 1}/{nseg}")
+        ts = time.time()
         start += timing.NUM_FRAMES - timing.NUM_COND_FRAMES
         kw = {"ref_target_masks": masks} if masks is not None else {}
         with torch.no_grad():
@@ -525,7 +636,7 @@ def run(params: dict) -> str:
                 height=height, width=width, num_frames=timing.NUM_FRAMES,
                 num_cond_frames=timing.NUM_COND_FRAMES, num_inference_steps=steps,
                 text_guidance_scale=tcfg, audio_guidance_scale=acfg, generator=gen, output_type="both",
-                use_kv_cache=True, offload_kv_cache=bool(p["offload_kv_cache"]), enhance_hf=False,
+                use_kv_cache=True, offload_kv_cache=bool(plan["offload_kv"]), enhance_hf=False,
                 audio_emb=emb_window(start), ref_latent=ref_latent, ref_img_index=int(p["ref_img_index"]),
                 mask_frame_range=int(p["mask_frame_range"]), use_distill=True, resize_mode=p["resize_mode"],
                 **kw)
@@ -534,6 +645,8 @@ def run(params: dict) -> str:
         allf.extend(new[timing.NUM_COND_FRAMES:])
         current = new
         _gc()
+        _log(f"segmento {seg + 1}/{nseg} in {time.time() - ts:.0f}s — picco VRAM "
+             f"{torch.cuda.max_memory_allocated() / 2**30:.1f} GB")
     save_mp4(allf, audio["mux"], out)
     _log(f"fatto in {time.time() - t0:.0f}s — {len(allf)} fotogrammi, audio {audio['speech_s']:.2f}s")
     return out
