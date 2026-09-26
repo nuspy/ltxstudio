@@ -78,21 +78,6 @@ def _read_sd(path: str, device: str = "cuda", skip=()) -> dict:
     return Q.read_safetensors(path, device, skip=skip)
 
 
-def _te_keys(sd: dict) -> dict:
-    """Nomi ComfyUI del Qwen3-VL (model.layers.*, model.embed_tokens, model.norm) → transformers
-    (model.language_model.*). La torre visiva (model.visual.*) e lm_head hanno già i nomi giusti."""
-    out = {}
-    for k, v in sd.items():
-        for a, b in (("model.layers.", "model.language_model.layers."),
-                     ("model.embed_tokens.", "model.language_model.embed_tokens."),
-                     ("model.norm.", "model.language_model.norm.")):
-            if k.startswith(a):
-                k = b + k[len(a):]
-                break
-        out[k] = v
-    return out
-
-
 def build_pipe(W: dict):
     import torch
     from accelerate import init_empty_weights
@@ -115,11 +100,10 @@ def build_pipe(W: dict):
     with init_empty_weights():
         te = Qwen3VLForConditionalGeneration._from_config(AutoConfig.from_pretrained(str(cfg / "text_encoder")),
                                                           torch_dtype=torch.bfloat16)
-    # lm_head (1.2 GB) non serve: la pipeline legge solo gli stati nascosti → identità, e non la si legge
+    # lm_head (1.2 GB) non serve: la pipeline legge solo gli stati nascosti → identità (il file nativo non
+    # lo contiene; nei TE fp8 unsloth c'è e si salta in lettura)
     te.lm_head = torch.nn.Identity()
-    raw = _read_sd(W["te"], skip=("lm_head.weight",))
-    sd = Q.quantize_from_state_dict(te, _te_keys(raw))
-    del raw
+    sd = Q.quantize_from_state_dict(te, _read_sd(W["te"], skip=("lm_head.weight",)))
     miss, unex = Q.load_into(te, sd)
     miss = [m for m in miss if not m.endswith("rotary_emb.inv_freq")]
     if miss or unex:

@@ -113,7 +113,7 @@ PATCH = {
 def N(id, module, label, *, category, arch, kind="file", repo=None, filename=None,
       remote=None, type=None, family="", tool_dest=None, gated=False, gb=0.0,
       scan=None, deps=None, role=None, sens=None, no_remote=False, note=None,
-      allow=None, used_by=None):
+      allow=None, used_by=None, convert=None):
     e = {"id": id, "module": module, "label": label, "kind": kind,
          "type": type or "misc", "family": family, "gated": gated,
          "approx_gb": gb, "scan_names": scan or ([filename] if filename else []),
@@ -141,6 +141,8 @@ def N(id, module, label, *, category, arch, kind="file", repo=None, filename=Non
         e["allow_patterns"] = allow
     if used_by:
         e["used_by"] = used_by
+    if convert:                                   # file ComfyUI → convertito in nativo e cancellato
+        e["convert"] = convert                    # (core/native_convert: `filename` è il NATIVO)
     return e
 
 
@@ -345,7 +347,7 @@ NEW = [
     N("mmh3-fl2va-int8", "Video", "MiniMax H3 FL2VA int8-ConvRot (t2v/i2v, consigliato 32GB)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-      filename="minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      filename="minimax_h3_fl2va_pruned_int8_convrot-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=20.97,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
@@ -354,16 +356,17 @@ NEW = [
     N("mmh3-configs", "Video", "MiniMax H3 config + tokenizer (ufficiali, ~25MB)",
       category="video", arch="minimax_h3", kind="snapshot", repo="MiniMaxAI/MiniMax-H3",
       tool_dest=r"E:\AI\Models\configs\minimax-h3", gb=0.03,
-      allow=["FL2VA/**/*.json", "Ref2VA/**/*.json", "model_index.json",
-             "modular_model_index.json"],
+      allow=["model_index.json", "modular_model_index.json", "scheduler/*", "audio_scheduler/*",
+             "transformer/config.json", "transformer_ref/config.json", "text_encoder/config.json",
+             "vae/config.json", "audio_vae/config.json", "processor/*", "tokenizer/*", "docs/*.md"],
       used_by=["cap.video_minimax_h3"],
-      note="SOLO i json (config+tokenizer) dal repo ufficiale: le classi diffusers si costruiscono "
+      note="SOLO config/tokenizer/processor + guide ai prompt dal repo ufficiale (layout diffusers): le classi diffusers si costruiscono "
            "da qui e i pesi arrivano dal single-file quantizzato (stesso schema di FLUX.2). "
            "Evita i 124GB dello snapshot completo"),
     N("mmh3-fl2va-nvfp4", "Video", "MiniMax H3 FL2VA nvfp4 (12.5GB, ideale RTX 50xx)",
       category="video", arch="minimax_h3", repo="Abiray/Minimax-H3-nvfp4-INT4-INT8-Convrot",
       remote="MiniMax_H3_FL2VA_pruned_nvfp4.safetensors",
-      filename="MiniMax_H3_FL2VA_pruned_nvfp4.safetensors",
+      filename="MiniMax_H3_FL2VA_pruned_nvfp4-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=12.53,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
@@ -372,7 +375,7 @@ NEW = [
     N("mmh3-ref2va-nvfp4", "Video", "MiniMax H3 Ref2VA nvfp4 (riferimenti, 12.5GB)",
       category="video", arch="minimax_h3", repo="Abiray/Minimax-H3-nvfp4-INT4-INT8-Convrot",
       remote="MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors",
-      filename="MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors",
+      filename="MiniMax_H3_Ref2VA_pruned_nvfp4-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=12.53,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
@@ -380,7 +383,7 @@ NEW = [
     N("mmh3-fl2va-fp8", "Video", "MiniMax H3 FL2VA fp8-scaled (t2v/i2v)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="diffusion_models/minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
-      filename="minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
+      filename="minimax_h3_fl2va_pruned_fp8_scaled-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=20.96,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
@@ -388,29 +391,15 @@ NEW = [
     N("mmh3-fl2va-bf16", "Video", "MiniMax H3 FL2VA bf16 pruned (qualità piena, 40GB)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="diffusion_models/minimax_h3_fl2va_pruned_bf16.safetensors",
-      filename="minimax_h3_fl2va_pruned_bf16.safetensors",
+      filename="minimax_h3_fl2va_pruned_bf16-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=40.23,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
       note="non entra in 32GB senza offload; licenza con territori esclusi"),
-    N("mmh3-fl2va-gguf-q4", "Video", "MiniMax H3 FL2VA GGUF Q4_K_M (GPU piccole)",
-      category="video", arch="minimax_h3", repo="Abiray/MiniMax-H3-GGUF",
-      remote="unet/MiniMax-H3-FL2VA-Q4_K_M.gguf", filename="MiniMax-H3-FL2VA-Q4_K_M.gguf",
-      type="diffusion_models", family="MiniMax", gb=19.86,
-      deps=["mmh3-configs", "mmh3-te-gguf-q4", "mmh3-video-vae", "mmh3-audio-vae"],
-      used_by=["cap.video_minimax_h3"],
-      note="quant community; licenza con territori esclusi"),
-    N("mmh3-fl2va-gguf-q3", "Video", "MiniMax H3 FL2VA GGUF Q3_K_M (15.6GB, minimo)",
-      category="video", arch="minimax_h3", repo="Abiray/MiniMax-H3-GGUF",
-      remote="unet/MiniMax-H3-FL2VA-Q3_K_M.gguf", filename="MiniMax-H3-FL2VA-Q3_K_M.gguf",
-      type="diffusion_models", family="MiniMax", gb=15.57,
-      deps=["mmh3-configs", "mmh3-te-gguf-q4", "mmh3-video-vae", "mmh3-audio-vae"],
-      used_by=["cap.video_minimax_h3"],
-      note="quant basso: qualità in calo; licenza con territori esclusi"),
     N("mmh3-ref2va-int8", "Video", "MiniMax H3 Ref2VA int8-ConvRot (riferimenti multipli)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
-      filename="minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      filename="minimax_h3_ref2va_pruned_int8_convrot-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=20.97,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
@@ -419,60 +408,67 @@ NEW = [
     N("mmh3-ref2va-fp8", "Video", "MiniMax H3 Ref2VA fp8-scaled (riferimenti multipli)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="diffusion_models/minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
-      filename="minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
+      filename="minimax_h3_ref2va_pruned_fp8_scaled-native.safetensors", convert="mmh3_dit",
       type="diffusion_models", family="MiniMax", gb=20.96,
       deps=["mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
       note="alternativa fp8 al ref2va int8; licenza con territori esclusi"),
-    N("mmh3-ref2va-gguf-q4", "Video", "MiniMax H3 Ref2VA GGUF Q4_K_M (riferimenti, GPU piccole)",
-      category="video", arch="minimax_h3", repo="Abiray/MiniMax-H3-GGUF",
-      remote="unet/MiniMax-H3-Ref2VA-Q4_K_M.gguf", filename="MiniMax-H3-Ref2VA-Q4_K_M.gguf",
-      type="diffusion_models", family="MiniMax", gb=19.85,
-      deps=["mmh3-configs", "mmh3-te-gguf-q4", "mmh3-video-vae", "mmh3-audio-vae"],
-      used_by=["cap.video_minimax_h3"],
-      note="quant community; licenza con territori esclusi"),
     N("mmh3-te-nvfp4", "Video", "MiniMax H3 TE Qwen3-VL-32B nvfp4-AWQ (15.7GB vs 51.5 bf16)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-      filename="qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      filename="qwen3vl_32b_minimax_h3_nvfp4_awq-native.safetensors", convert="mmh3_te",
       type="text_encoders", gb=15.69, used_by=["cap.video_minimax_h3"],
       note="TE consigliato su 32GB; è un VLM completo: legge anche le immagini di riferimento"),
     N("mmh3-te-int8", "Video", "MiniMax H3 TE Qwen3-VL-32B int8-ConvRot (qualità, 27GB)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
-      filename="qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      filename="qwen3vl_32b_minimax_h3_int8_convrot-native.safetensors", convert="mmh3_te",
       type="text_encoders", gb=27.14, used_by=["cap.video_minimax_h3"],
       note="serve parcheggio VRAM→RAM fra TE e transformer (il nostro handoff lo fa)"),
-    N("mmh3-te-gguf-q4", "Video", "MiniMax H3 TE Qwen3-VL-32B GGUF Q4_K_M (14.6GB)",
-      category="video", arch="minimax_h3", repo="Abiray/MiniMax-H3-GGUF",
-      remote="text_encoders/qwen3vl_32b_minimax_h3-Q4_K_M.gguf",
-      filename="qwen3vl_32b_minimax_h3-Q4_K_M.gguf",
-      type="text_encoders", gb=14.58, used_by=["cap.video_minimax_h3"],
-      note="TE quantizzato community, abbinato ai checkpoint GGUF"),
     N("mmh3-video-vae", "Video", "MiniMax H3 video VAE fp16 (f16t4d24)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="vae/minimax_h3_video_vae_fp16.safetensors",
-      filename="minimax_h3_video_vae_fp16.safetensors", type="vae", gb=5.21,
+      filename="minimax_h3_video_vae_fp16-native.safetensors", convert="mmh3_vae", type="vae", gb=5.21,
       used_by=["cap.video_minimax_h3"],
       note="16x spaziale, 4x temporale, 24 canali, decoder ViT"),
-    N("mmh3-audio-vae", "Video", "MiniMax H3 audio VAE fp32 (stereo 32kHz)",
-      category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
-      remote="vae/minimax_h3_audio_vae_fp32.safetensors",
-      filename="minimax_h3_audio_vae_fp32.safetensors", type="vae", gb=0.61,
+    N("mmh3-audio-vae", "Video", "MiniMax H3 audio VAE (ufficiale diffusers, stereo 32kHz)",
+      category="video", arch="minimax_h3", repo="MiniMaxAI/MiniMax-H3",
+      remote="audio_vae/diffusion_pytorch_model.safetensors",
+      filename="minimax_h3_audio_vae.safetensors", type="vae", gb=0.61,
       used_by=["cap.video_minimax_h3"],
-      note="l'audio nasce dalla STESSA passata del video: già sincronizzato"),
+      note="l'audio nasce dalla STESSA passata del video: già sincronizzato. File ufficiale in formato "
+           "diffusers (nessuna conversione)"),
     N("mmh3-turbo-lora-fl2v", "Video", "MiniMax H3 Turbo LoRA 4 step FL2V (lightx2v)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="loras/minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
-      filename="minimax_h3_fl2v_turbo_4step_v1.0_768p_comfyui_bf16.safetensors",
+      filename="minimax_h3_fl2v_turbo_4step_v1.0_768p-native.safetensors", convert="mmh3_lora",
       type="LoRA", family="MiniMax-H3", gb=1.96, used_by=["cap.video_minimax_h3"],
       note="distillazione lightx2v/ModelTC: da ~20 step a 4 (768p)"),
     N("mmh3-turbo-lora-ref2v", "Video", "MiniMax H3 Turbo LoRA 4 step Ref2V (anteprima v0.1)",
       category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
       remote="loras/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
-      filename="minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors",
+      filename="minimax_h3_ref2v_turbo_4step_v0.1-native.safetensors", convert="mmh3_lora",
       type="LoRA", family="MiniMax-H3", gb=1.96, used_by=["cap.video_minimax_h3"],
       note="anteprima: la distillazione dei riferimenti è meno matura della FL2V"),
+    N("mmh3-te-fp8", "Video", "MiniMax H3 TE Qwen3-VL-32B fp8 (per GPU senza nvfp4, 26.5GB)",
+      category="video", arch="minimax_h3", repo="rzgar/qwen3-vl-32b-minimax-h3-fp8-comfyui",
+      remote="qwen3-vl-32b-minimax-h3-fp8-comfyui.safetensors",
+      filename="qwen3vl_32b_minimax_h3_fp8-native.safetensors", convert="mmh3_te",
+      type="text_encoders", gb=26.5, used_by=["cap.video_minimax_h3"],
+      note="50 layer (quelli che H3 legge), fp8 e4m3: per RTX 40xx. Si carica da solo e si libera "
+           "prima del transformer"),
+    N("mmh3-te-heretic-nvfp4", "Video", "MiniMax H3 TE Qwen3-VL-32B Heretic nvfp4 (senza censura)",
+      category="video", arch="minimax_h3", repo="sakamakismile/Qwen3-VL-32B-Heretic-MiniMax-H3-NVFP4",
+      remote="qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors",
+      filename="qwen3vl_32b_heretic_minimax_h3_nvfp4-native.safetensors", convert="mmh3_te",
+      type="text_encoders", gb=15.68, sens="adult", used_by=["cap.video_minimax_h3"],
+      note="text encoder «abliterated»: non rifiuta i prompt 18+ (solo edizioni adulte)"),
+    N("mmh3-turbo-lora-fl2v-8", "Video", "MiniMax H3 Turbo LoRA 8 step FL2V (qualità)",
+      category="video", arch="minimax_h3", repo="Comfy-Org/MiniMax-H3",
+      remote="loras/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+      filename="minimax_h3_fl2v_turbo_8step_v1.0-native.safetensors", convert="mmh3_lora",
+      type="LoRA", family="MiniMax-H3", gb=1.96, used_by=["cap.video_minimax_h3"],
+      note="8 passi: più dettaglio del 4 passi, sempre ~3x più veloce del modello base"),
 
     # ───────── LongCat-Video-Avatar 1.5 (tab Avatar: foto + voce → persona che parla) ─────────
     # MIT. Codice ufficiale nel venv E:\AI\Tools\LongCatAvatar (scripts/install_longcat_avatar.py).
@@ -543,17 +539,17 @@ NEW = [
       note="VLM: legge anche le immagini di riferimento. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente"),
     N("qwen21-te-nvfp4", "Immagini", "Qwen-Image 2.1 text encoder Qwen3-VL-8B NVFP4 (7.5GB)", category="image",
       arch="qwen_image21", repo="BennyDaBall/Qwen-Image-2.1-NVFP4",
-      remote="text_encoders/qwen3vl_8b_nvfp4.safetensors", filename="qwen3vl_8b_nvfp4.safetensors",
+      remote="text_encoders/qwen3vl_8b_nvfp4.safetensors", filename="qwen3vl_8b_nvfp4-native.safetensors", convert="qwen21_te",
       type="TextEncoders", family="Qwen21", gb=7.55, used_by=["cap.image_qwen21"],
       note="kernel FP4 delle RTX 50xx (dequant comfy-kitchen). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente"),
     N("qwen21-te-heretic-nvfp4", "Immagini", "Qwen-Image 2.1 text encoder «heretic» NVFP4 (18+, 6.3GB)",
       category="image", arch="qwen_image21", repo="pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-NVFP4",
-      remote="qwen3vl_8b_nvfp4_heretic.safetensors", filename="qwen3vl_8b_nvfp4_heretic.safetensors",
+      remote="qwen3vl_8b_nvfp4_heretic.safetensors", filename="qwen3vl_8b_nvfp4_heretic-native.safetensors", convert="qwen21_te",
       type="TextEncoders", family="Qwen21", gb=6.31, sens="adult", used_by=["cap.image_qwen21"],
       note="encoder senza rifiuti per l'edizione 18+ (non ufficiale; formato da validare al primo uso). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente"),
     N("qwen21-dit-nvfp4", "Immagini", "Qwen-Image 2.1 DiT NVFP4 (4.2GB, RTX 50xx)", category="image",
       arch="qwen_image21", repo="BennyDaBall/Qwen-Image-2.1-NVFP4",
-      remote="diffusion_models/qwen_image_2.1_nvfp4.safetensors", filename="qwen_image_2.1_nvfp4.safetensors",
+      remote="diffusion_models/qwen_image_2.1_nvfp4.safetensors", filename="qwen_image_2.1_nvfp4-native.safetensors", convert="qwen21_dit",
       type="diffusion_models", family="Qwen21", gb=4.2,
       deps=["qwen21-configs", "qwen21-vae", "qwen21-te-nvfp4"], used_by=["cap.image_qwen21"],
       note="profilo più piccolo: catena completa 12.4GB. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente"),
@@ -701,6 +697,16 @@ DEFAULT_CAT_BY_MODULE = {
 }
 
 
+# Famiglie in cui NEW è la fonte autorevole anche per le voci già nel json (campi di NEW vincono).
+REFRESH = ("mmh3-", "qwen21-", "lcav")
+
+# Voci ritirate (tolte dal catalogo alla prossima rigenerazione).
+REMOVED = {
+    # GGUF di MiniMax H3: nessun loader nativo (i profili nvfp4/fp8/int8-ConvRot coprono tutte le GPU)
+    "mmh3-fl2va-gguf-q4", "mmh3-fl2va-gguf-q3", "mmh3-ref2va-gguf-q4", "mmh3-te-gguf-q4",
+}
+
+
 def main() -> int:
     dry = "--dry" in sys.argv
     data = json.loads(CATALOG.read_text("utf-8"))
@@ -717,16 +723,34 @@ def main() -> int:
         for k, v in PATCH.get(e["id"], {}).items():
             e[k] = v
 
-    # 2) nuove voci (idempotente: non duplica id già presenti)
-    added = 0
+    # 2) voci NEW: nuove → aggiunte; esistenti → aggiornate SOLO per le famiglie in REFRESH (le altre
+    #    possono avere ritocchi a mano nel json — type/family/note — che non vanno persi)
+    added = updated = 0
     for n in NEW:
-        if n["id"] in by_id:
-            continue
         if n["id"] in GH_URLS:
             n["url"] = GH_URLS[n["id"]]
-        weights.append(n)
+        if n["id"] in by_id and not n["id"].startswith(REFRESH):
+            continue
+        if n["id"] in by_id:
+            old = by_id[n["id"]]
+            merged = dict(old)
+            merged.update(n)                                    # i campi di NEW vincono
+            for k in ("scan_names", "deps"):                    # liste: unione (curate a mano / use_deps)
+                vals = list(n.get(k) or []) + [v for v in (old.get(k) or []) if v not in (n.get(k) or [])]
+                if vals:
+                    merged[k] = vals
+            if merged != old:
+                weights[weights.index(old)] = merged
+                updated += 1
+            n = merged
+        else:
+            weights.append(n)
+            added += 1
         by_id[n["id"]] = n
-        added += 1
+
+    # 3) voci ritirate
+    removed = [e["id"] for e in weights if e["id"] in REMOVED]
+    weights = [e for e in weights if e["id"] not in REMOVED]
 
     data["schema"] = 2
     data["_comment_v2"] = ("SCHEMA v2 — campi nuovi: category (image|video|music|tts|threed|aux), "
@@ -739,7 +763,8 @@ def main() -> int:
     n_tot = len(weights)
     n_dl = sum(1 for e in weights if e.get("repo_id") or e.get("url"))
     n_nr = sum(1 for e in weights if e.get("no_remote"))
-    print(f"voci: {n_tot} (aggiunte {added}) — scaricabili {n_dl}, no_remote {n_nr}")
+    print(f"voci: {n_tot} (aggiunte {added}, aggiornate {updated}, ritirate {removed}) — "
+          f"scaricabili {n_dl}, no_remote {n_nr}")
     if dry:
         return 0
     shutil.copy2(CATALOG, CATALOG.with_suffix(".json.v1.bak"))

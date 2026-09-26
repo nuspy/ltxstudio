@@ -147,14 +147,24 @@ def download_entry(entry: dict, *, base_dir: str | None = None, token: str | Non
             raise DownloadUnavailable(f"'{entry.get('id')}': kind=file senza filename")
         out = Path(dest_dir) / fname
         remote = entry.get("remote_filename") or fname
+        # voce `convert`: si scarica il file ComfyUI col suo nome, poi diventa il file NATIVO `filename`
+        # (core/native_convert: verifica e cancella il sorgente)
+        target = out
+        if entry.get("convert"):
+            from core import native_convert as nc
+            target = nc.source_path(entry, Path(dest_dir))
         prog = (lambda n, _f=fname: progress(n, _f)) if progress else None
         if repo:
-            fd.download_hf_file(repo, remote, str(out), token=token, progress=prog)
+            fd.download_hf_file(repo, remote, str(target), token=token, progress=prog)
         elif entry.get("url"):
-            fd.download_url(entry["url"], str(out), token=token, progress=prog)
+            fd.download_url(entry["url"], str(target), token=token, progress=prog)
         else:                                            # downloadable() lo esclude, ma difendiamoci
             raise DownloadUnavailable(f"'{entry.get('id')}': nessuna fonte remota")
-        verify_file(out, sha256=entry.get("sha256"))
+        verify_file(target, sha256=entry.get("sha256"))
+        if entry.get("convert"):
+            log(f"[native] conversione in formato nativo: {target.name}")
+            nc.convert(entry["convert"], target, out, log=log)
+            verify_file(out)
         return out
     # snapshot
     if not repo:

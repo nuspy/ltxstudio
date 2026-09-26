@@ -4,7 +4,10 @@ Formati riconosciuti dalle chiavi del safetensors, modulo per modulo:
   · torchao Float8Tensor (unsloth «FP8»):  <m>._weight_qdata F8_E4M3 [out,in] + <m>._weight_scale F32 [out,1]
   · torchao Int8Tensor   (unsloth «INT8»): <m>._weight_qdata I8 + _weight_scale F32 [out,1] + _weight_zero_point
   · FP8 «pre-cast» senza scala (TE FP8):   <m>.weight F8_E4M3 (scala implicita 1)
-  · NVFP4 ComfyUI/BFL («Prism native»):    <m>.weight U8 [out,in/2] + weight_scale F8 [out,in/16] + weight_scale_2
+  · NVFP4 («Prism native» / nativo):       <m>.weight U8 [out,in/2] + weight_scale F8 [out,in/16] + weight_scale_2
+                                           (+ pre_quant_scale AWQ, applicata all'ingresso)
+  · FP8 nativo (core/native_convert):      <m>.weight F8_E4M3 + weight_scale F32 [out,1] (o scalare)
+  · embedding int8 nativo:                 <m>.weight I8 + weight_scale F32 [num,1]
 I pesi restano compressi in VRAM e si dequantizzano in bf16 un layer alla volta nel forward (matmul bf16:
 qualità identica, niente quantizzazione delle attivazioni). Ogni layer accetta LoRA «al volo»
 (y = base(x) + s·B(A(x))), perché PEFT non sa avvolgere moduli personalizzati.
@@ -50,11 +53,12 @@ class RowFp8Linear(nn.Module, _LoraMixin):
 
 
 class RowInt8Linear(nn.Module, _LoraMixin):
-    """Peso int8 per riga: w = (q - zero_point) * scale."""
+    """Peso int8 per riga: w = (q - zero_point) * scale. `convrot` > 0: il peso è ruotato (W·H a gruppi di
+    Hadamard, formato «int8_convrot») → si ruota anche l'ingresso: (x·H)(W·H)ᵀ = x·Wᵀ."""
 
-    def __init__(self, in_features: int, out_features: int, bias: bool):
+    def __init__(self, in_features: int, out_features: int, bias: bool, convrot: int = 0):
         super().__init__()
-        self.in_features, self.out_features = in_features, out_features
+        self.in_features, self.out_features, self.convrot = in_features, out_features, int(convrot)
         self.register_buffer("weight", torch.empty(out_features, in_features, dtype=torch.int8))
         self.register_buffer("scale", torch.ones(out_features, 1, dtype=torch.float32))
         self.register_buffer("zero_point", torch.zeros(out_features, 1, dtype=torch.float32))
@@ -64,8 +68,12 @@ class RowInt8Linear(nn.Module, _LoraMixin):
     def forward(self, x):
         cd = torch.bfloat16 if x.dtype == torch.float32 else x.dtype
         w = (self.weight.to(cd) - self.zero_point.to(cd)) * self.scale.to(cd)
-        y = F.linear(x.to(cd), w, self.bias.to(cd) if self.bias is not None else None)
-        return self._lora(x.to(cd), y).to(x.dtype)
+        xin = x.to(cd)
+        if self.convrot:
+            from core.native_convert import rotate
+            xin = rotate(xin, self.convrot)
+        y = F.linear(xin, w, self.bias.to(cd) if self.bias is not None else None)
+        return self._lora(x.to(cd), y).to(x.dtype)       # la LoRA legge l'ingresso NON ruotato
 
 
 class Nvfp4Linear(nn.Module, _LoraMixin):
@@ -78,6 +86,7 @@ class Nvfp4Linear(nn.Module, _LoraMixin):
         self.register_buffer("weight", torch.empty(out_features, in_features // 2, dtype=torch.uint8))
         self.register_buffer("weight_scale", torch.empty(out_features, in_features // 16, dtype=torch.float8_e4m3fn))
         self.register_buffer("weight_scale_2", torch.ones((), dtype=torch.float32))
+        self.register_buffer("pre_quant_scale", None)   # AWQ (ModelOpt): x * pre_quant_scale prima del matmul
         self.bias = nn.Parameter(torch.empty(out_features, dtype=torch.bfloat16)) if bias else None
         self._lora_init()
 
@@ -86,8 +95,22 @@ class Nvfp4Linear(nn.Module, _LoraMixin):
         w = ck.dequantize_nvfp4(self.weight, self.weight_scale_2, self.weight_scale, output_type=torch.bfloat16)
         w = w[: self.out_features, : self.in_features]
         xb = x.to(torch.bfloat16)
-        y = F.linear(xb, w, self.bias.to(torch.bfloat16) if self.bias is not None else None)
-        return self._lora(xb, y).to(x.dtype)
+        xq = xb * self.pre_quant_scale.to(torch.bfloat16) if self.pre_quant_scale is not None else xb
+        y = F.linear(xq, w, self.bias.to(torch.bfloat16) if self.bias is not None else None)
+        return self._lora(xb, y).to(x.dtype)            # la LoRA vede l'ingresso ORIGINALE (non scalato AWQ)
+
+
+class Int8RowEmbedding(nn.Module):
+    """Embedding int8 con scala per riga («int8_tensorwise» ComfyUI): dequantizza SOLO le righe cercate."""
+
+    def __init__(self, num: int, dim: int, padding_idx=None):
+        super().__init__()
+        self.num_embeddings, self.embedding_dim, self.padding_idx = num, dim, padding_idx
+        self.register_buffer("weight", torch.empty(num, dim, dtype=torch.int8))
+        self.register_buffer("scale", torch.ones(num, 1, dtype=torch.float32))
+
+    def forward(self, ids):
+        return (self.weight[ids].to(torch.bfloat16) * self.scale[ids].to(torch.bfloat16))
 
 
 QUANT_TYPES = (RowFp8Linear, RowInt8Linear, Nvfp4Linear)
@@ -184,9 +207,28 @@ def quantize_from_state_dict(model: nn.Module, sd: dict) -> dict:
             out[f"{name}.scale"] = s.reshape(outf, 1).float()
             if isinstance(new, RowInt8Linear):
                 out[f"{name}.zero_point"] = (zp if zp is not None else torch.zeros_like(s)).reshape(outf, 1).float()
+        elif sd.get(f"{name}.weight") is not None and sd[f"{name}.weight"].dtype == torch.int8                 and f"{name}.weight_scale" in sd:
+            # int8 nativo (per riga o per tensore), eventualmente ruotato ConvRot
+            g = out.pop(f"{name}.convrot_group", None)
+            with torch.device("meta"):
+                new = RowInt8Linear(inf, outf, has_bias, int(g) if g is not None else 0)
+            ws = out.pop(f"{name}.weight_scale").float()
+            out[f"{name}.scale"] = ws.reshape(-1, 1).expand(outf, 1).contiguous()
+            out[f"{name}.zero_point"] = torch.zeros(outf, 1, dtype=torch.float32, device=ws.device)
         elif f"{name}.weight_scale" in sd and sd.get(f"{name}.weight") is not None and sd[f"{name}.weight"].dtype == torch.uint8:
             with torch.device("meta"):
                 new = Nvfp4Linear(inf, outf, has_bias)
+            out.pop(f"{name}.comfy_quant", None)
+            out.pop(f"{name}.input_scale", None)
+            if f"{name}.pre_quant_scale" in sd:
+                new.pre_quant_scale = torch.empty(inf, dtype=torch.bfloat16, device="meta")
+        elif (sd.get(f"{name}.weight") is not None and sd[f"{name}.weight"].dtype == torch.float8_e4m3fn
+              and f"{name}.weight_scale" in sd and sd[f"{name}.weight_scale"].numel() in (1, outf)):
+            # fp8 con scala per riga (formato nativo) o per tensore (scalare, espanso per riga)
+            with torch.device("meta"):
+                new = RowFp8Linear(inf, outf, has_bias, True)
+            ws = out.pop(f"{name}.weight_scale").float()
+            out[f"{name}.scale"] = ws.reshape(-1, 1).expand(outf, 1).contiguous()
             out.pop(f"{name}.comfy_quant", None)
             out.pop(f"{name}.input_scale", None)
         elif sd.get(f"{name}.weight") is not None and sd[f"{name}.weight"].dtype == torch.float8_e4m3fn:
@@ -195,14 +237,26 @@ def quantize_from_state_dict(model: nn.Module, sd: dict) -> dict:
         else:
             continue
         _set_module(model, name, new)
+    for name, mod in list(model.named_modules()):
+        w = sd.get(f"{name}.weight")
+        if isinstance(mod, nn.Embedding) and w is not None and w.dtype == torch.int8:
+            with torch.device("meta"):
+                new = Int8RowEmbedding(mod.num_embeddings, mod.embedding_dim, mod.padding_idx)
+            out[f"{name}.scale"] = out.pop(f"{name}.weight_scale").float().reshape(-1, 1)
+            out.pop(f"{name}.comfy_quant", None)
+            _set_module(model, name, new)
     return out
 
 
-def load_into(model: nn.Module, sd: dict, device: str = "cuda", dtype=torch.bfloat16) -> tuple[list, list]:
-    """load_state_dict(assign) + parametri non quantizzati in `dtype` su `device`. Ritorna (missing, unexpected)."""
+def load_into(model: nn.Module, sd: dict, device: str = "cuda", dtype=torch.bfloat16,
+              keep_fp32: tuple = ()) -> tuple[list, list]:
+    """load_state_dict(assign) + parametri non quantizzati in `dtype` su `device`. Ritorna (missing, unexpected).
+    `keep_fp32`: sottostringhe dei nomi che restano float32 (es. tabelle/teste in fp32 del modello)."""
     fixed = {}
     for k, v in sd.items():
-        if v.dtype in (torch.float32, torch.float16) and not k.endswith((".scale", ".zero_point", "weight_scale_2")):
+        if any(p in k for p in keep_fp32) and v.is_floating_point() and v.dtype not in (torch.float8_e4m3fn, torch.float8_e5m2):
+            v = v.float()
+        elif v.dtype in (torch.float32, torch.float16) and not k.endswith((".scale", ".zero_point", "weight_scale_2")):
             v = v.to(dtype)
         fixed[k] = v.to(device)
     missing, unexpected = model.load_state_dict(fixed, strict=False, assign=True)
