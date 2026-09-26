@@ -214,13 +214,11 @@ def prepare_audio(p: dict, core_dir: str, tmp: Path) -> dict:
 
 # ── modelli ─────────────────────────────────────────────────────────────────────────────────────
 def _read_shard(path: Path, device: str):
-    """Shard safetensors letto in RAM (NO mmap) e spostato subito su `device`."""
-    from safetensors.torch import load as st_load
-    with open(path, "rb") as f:
-        data = f.read()
-    sd = st_load(data)
-    del data
-    return {k: v.to(device) for k, v in sd.items()}
+    """Shard safetensors letto UN TENSORE ALLA VOLTA (niente mmap, niente file intero in RAM) e spostato
+    subito su `device`: col pagefile quasi pieno il picco di memoria di sistema resta un tensore."""
+    sys.path.insert(0, str(REPO_ROOT / "workers"))
+    import _qlinear as Q
+    return Q.read_safetensors(str(path), device)
 
 
 def _fp8_linear_cls():
@@ -327,6 +325,28 @@ def load_dit(dit_dir: str, precision: str):
                 prm.data = prm.data.to(torch.bfloat16)
     model.eval()
     return model
+
+
+def load_umt5(te_dir: Path, dev: str):
+    """UMT5-XXL (5 shard fp32, 22.7 GB) costruito vuoto e riempito TENSORE PER TENSORE direttamente in GPU,
+    convertito in bf16 sul device: from_pretrained passava per mmap/RAM (commit alto, crash col pagefile pieno)."""
+    import torch
+    from accelerate import init_empty_weights
+    from transformers import UMT5Config, UMT5EncoderModel
+    sys.path.insert(0, str(REPO_ROOT / "workers"))
+    import _qlinear as Q
+    with init_empty_weights():
+        te = UMT5EncoderModel(UMT5Config.from_pretrained(str(te_dir)))
+    sd = {}
+    for shard in sorted(te_dir.glob("model-*.safetensors")):
+        sd.update(Q.read_safetensors(str(shard), dev, cast=torch.bfloat16))
+    missing, unexpected = te.load_state_dict(sd, strict=False, assign=True)
+    del sd
+    missing = [m for m in missing if m not in ("encoder.embed_tokens.weight",)]   # legato a shared.weight
+    if missing or unexpected:
+        raise RuntimeError(f"text encoder UMT5: chiavi mancanti {missing[:5]} / inattese {unexpected[:5]}")
+    te.tie_weights()
+    return te.to(dev).eval()
 
 
 # ── VRAM: piano dinamico (regola: mai valori fissi, si tara sulla GPU del PC) ─────────────────────
@@ -507,7 +527,7 @@ def run(params: dict) -> str:
 
     _log("FASE 1/4 text encoder → codifica prompt")
     tokenizer = AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer"))
-    te = UMT5EncoderModel.from_pretrained(str(te_dir), torch_dtype=torch.bfloat16).to(dev)
+    te = load_umt5(te_dir, dev)
     vae = AutoencoderKLWan.from_pretrained(str(vae_dir), torch_dtype=torch.bfloat16).to(dev)
     scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(W["core"], subfolder="scheduler")
     pipe = LongCatVideoAvatarPipeline(tokenizer=tokenizer, text_encoder=te, vae=vae, scheduler=scheduler,

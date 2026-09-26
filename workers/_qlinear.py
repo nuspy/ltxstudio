@@ -92,6 +92,41 @@ class Nvfp4Linear(nn.Module, _LoraMixin):
 
 QUANT_TYPES = (RowFp8Linear, RowInt8Linear, Nvfp4Linear)
 
+_ST_DTYPES = {
+    "F64": torch.float64, "F32": torch.float32, "F16": torch.float16, "BF16": torch.bfloat16,
+    "F8_E4M3": torch.float8_e4m3fn, "F8_E5M2": torch.float8_e5m2, "I64": torch.int64, "I32": torch.int32,
+    "I16": torch.int16, "I8": torch.int8, "U8": torch.uint8, "BOOL": torch.bool,
+}
+
+
+def read_safetensors(path: str, device: str = "cuda", rename=None, cast=None, skip=()) -> dict:
+    """Legge un .safetensors UN TENSORE ALLA VOLTA (seek + read dall'header) e lo sposta subito su `device`.
+    Niente mmap (su Windows la mappatura copy-on-write impegna il commit per l'intero file: crash «invalid
+    python storage» quando il pagefile è pieno) e niente lettura dell'intero file in RAM: il picco di memoria
+    di sistema è UN tensore. `rename(key) -> key` opzionale; `cast` converte (sul device) i float non-fp8."""
+    import json
+    import struct
+    out = {}
+    with open(path, "rb") as f:
+        n = struct.unpack("<Q", f.read(8))[0]
+        header = json.loads(f.read(n))
+        header.pop("__metadata__", None)
+        base = 8 + n
+        for key, info in sorted(header.items(), key=lambda kv: kv[1]["data_offsets"][0]):
+            if key in skip:
+                continue
+            a, b = info["data_offsets"]
+            f.seek(base + a)
+            buf = bytearray(f.read(b - a))
+            dt = _ST_DTYPES[info["dtype"]]
+            t = torch.frombuffer(buf, dtype=dt) if buf else torch.empty(0, dtype=dt)
+            t = t.reshape(info["shape"]).to(device)
+            if cast is not None and t.is_floating_point() and t.dtype not in (torch.float8_e4m3fn, torch.float8_e5m2):
+                t = t.to(cast)
+            out[rename(key) if rename else key] = t
+            del buf, t
+    return out
+
 
 def _set_module(root: nn.Module, name: str, new: nn.Module):
     *path, leaf = name.split(".")
@@ -101,9 +136,38 @@ def _set_module(root: nn.Module, name: str, new: nn.Module):
     setattr(parent, leaf, new)
 
 
+class FusedGateUpSwiGLU(nn.Module):
+    """SwiGLU con le proiezioni gate/up FUSE in un solo Linear (formato ComfyUI «gate_up»): prima metà delle
+    righe = gate_layer, seconda = proj (verificato sui pesi diffusers di Qwen-Image 2.1: coseno 0.995)."""
+
+    def __init__(self, gate_up: nn.Module, out: nn.Module):
+        super().__init__()
+        self.gate_up, self.out = gate_up, out
+
+    def forward(self, x):
+        g, u = self.gate_up(x).chunk(2, dim=-1)
+        return self.out(F.silu(g) * u)
+
+
+def _fuse_gate_up(model: nn.Module, sd: dict) -> None:
+    """Se il file ha `<mlp>.gate_up.weight` dove il modello ha `<mlp>.gate_layer` + `<mlp>.proj`, sostituisce il
+    MLP con FusedGateUpSwiGLU (gate_up = nn.Linear segnaposto su meta, quantizzato poi come gli altri)."""
+    mods = dict(model.named_modules())
+    for k in [k for k in sd if k.endswith(".gate_up.weight")]:
+        parent = k[: -len(".gate_up.weight")]
+        mlp = mods.get(parent)
+        if mlp is None or not (hasattr(mlp, "gate_layer") and hasattr(mlp, "proj") and hasattr(mlp, "out")):
+            continue
+        g, pj = mlp.gate_layer, mlp.proj
+        with torch.device("meta"):
+            gu = nn.Linear(g.in_features, g.out_features + pj.out_features, bias=False)
+        _set_module(model, parent, FusedGateUpSwiGLU(gu, mlp.out))
+
+
 def quantize_from_state_dict(model: nn.Module, sd: dict) -> dict:
     """Sostituisce (su meta-device) ogni nn.Linear col tipo quantizzato indicato dalle chiavi di `sd` e ritorna
     lo state dict riscritto nei nomi dei buffer dei nostri moduli, pronto per load_state_dict(assign=True)."""
+    _fuse_gate_up(model, sd)
     out = dict(sd)
     for name, mod in list(model.named_modules()):
         if not isinstance(mod, nn.Linear):
@@ -163,9 +227,18 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
     n = 0
     for base, g in groups.items():
         m = mods.get(base)
-        if m is None or "A" not in g or "B" not in g:
+        if "A" not in g or "B" not in g:
             continue
         a, b = g["A"], g["B"]
+        if m is None and base.endswith((".gate_layer", ".proj")):   # MLP fuso (gate_up): B nella metà giusta
+            fused = mods.get(base.rsplit(".", 1)[0] + ".gate_up")
+            if fused is not None:
+                half = b.shape[0]
+                full = torch.zeros(2 * half, b.shape[1], dtype=b.dtype, device=b.device)
+                full[(0 if base.endswith(".gate_layer") else half):][:half] = b
+                m, b = fused, full
+        if m is None:
+            continue
         rank = a.shape[0]
         alpha = float(g["alpha"]) if "alpha" in g else float(rank)
         dev = next((t.device for t in m.buffers() if t is not None), None) or \

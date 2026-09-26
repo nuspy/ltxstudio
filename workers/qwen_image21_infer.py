@@ -72,13 +72,10 @@ def resolve(p: dict) -> dict:
     return out
 
 
-def _read_sd(path: str, device: str = "cuda") -> dict:
-    from safetensors.torch import load as st_load
-    with open(path, "rb") as f:
-        data = f.read()
-    sd = st_load(data)
-    del data
-    return {k: v.to(device) for k, v in sd.items()}
+def _read_sd(path: str, device: str = "cuda", skip=()) -> dict:
+    """Un tensore alla volta, senza mmap (vedi _qlinear.read_safetensors): commit di sistema minimo."""
+    import _qlinear as Q
+    return Q.read_safetensors(path, device, skip=skip)
 
 
 def _te_keys(sd: dict) -> dict:
@@ -118,7 +115,11 @@ def build_pipe(W: dict):
     with init_empty_weights():
         te = Qwen3VLForConditionalGeneration._from_config(AutoConfig.from_pretrained(str(cfg / "text_encoder")),
                                                           torch_dtype=torch.bfloat16)
-    sd = Q.quantize_from_state_dict(te, _te_keys(_read_sd(W["te"])))
+    # lm_head (1.2 GB) non serve: la pipeline legge solo gli stati nascosti → identità, e non la si legge
+    te.lm_head = torch.nn.Identity()
+    raw = _read_sd(W["te"], skip=("lm_head.weight",))
+    sd = Q.quantize_from_state_dict(te, _te_keys(raw))
+    del raw
     miss, unex = Q.load_into(te, sd)
     miss = [m for m in miss if not m.endswith("rotary_emb.inv_freq")]
     if miss or unex:
