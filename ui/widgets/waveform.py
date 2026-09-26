@@ -146,12 +146,19 @@ class WaveformView(QWidget):
 
 
 class WaveformPlayer(QWidget):
-    """WaveformView + trasporto (play/pausa, tempo) + pulsanti regione. use_region(start,end) al click."""
-    use_region = Signal(float, float)
+    """WaveformView + trasporto (⏮ −5s, play/pausa, ⏹ stop, +5s ⏭, tempo) + pulsanti regione.
 
-    def __init__(self):
+    use_region(start,end) al click di «Usa regione» (musica). region_button=False nasconde quel pulsante
+    (tab che leggono la regione con region() / region_changed, es. Avatar per il taglio audio)."""
+    use_region = Signal(float, float)
+    region_changed = Signal(float, float)   # (0,0) = regione cancellata
+
+    SKIP_S = 5.0
+
+    def __init__(self, region_button: bool = True):
         super().__init__()
         self._path = ""
+        self._region_button = bool(region_button)
         from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
         self._audio = QAudioOutput()
         self._player = QMediaPlayer(); self._player.setAudioOutput(self._audio)
@@ -167,6 +174,18 @@ class WaveformPlayer(QWidget):
         row = QHBoxLayout()
         self.btn_play = QPushButton(tr("wave.play", "▶")); self.btn_play.setFixedWidth(40)
         self.btn_play.setCursor(Qt.PointingHandCursor); self.btn_play.clicked.connect(self._toggle)
+        self.btn_play.setToolTip(tr("wave.play.tt", "Riproduci / pausa"))
+        self.btn_rew = QPushButton(tr("wave.rew", "⏪")); self.btn_rew.setFixedWidth(40)
+        self.btn_rew.setToolTip(tr("wave.rew.tt", "Indietro di 5 secondi"))
+        self.btn_rew.clicked.connect(lambda: self._skip(-self.SKIP_S))
+        self.btn_ff = QPushButton(tr("wave.ff", "⏩")); self.btn_ff.setFixedWidth(40)
+        self.btn_ff.setToolTip(tr("wave.ff.tt", "Avanti di 5 secondi"))
+        self.btn_ff.clicked.connect(lambda: self._skip(self.SKIP_S))
+        self.btn_stop = QPushButton(tr("wave.stop", "⏹")); self.btn_stop.setFixedWidth(40)
+        self.btn_stop.setToolTip(tr("wave.stop.tt", "Ferma e torna all'inizio"))
+        self.btn_stop.clicked.connect(self.stop)
+        for _b in (self.btn_rew, self.btn_ff, self.btn_stop):
+            _b.setCursor(Qt.PointingHandCursor)
         self.lbl_time = QLabel("0.0 / 0.0 s"); self.lbl_time.setStyleSheet("color:#8a93a6;")
         self.lbl_region = QLabel(""); self.lbl_region.setStyleSheet("color:#74c0fc;")
         self.btn_use = QPushButton(tr("wave.use_region", "✂ Usa regione come sezione"))
@@ -177,8 +196,10 @@ class WaveformPlayer(QWidget):
         self.btn_clear = QPushButton(tr("wave.clear_region", "✕")); self.btn_clear.setFixedWidth(32)
         self.btn_clear.setToolTip(tr("wave.clear_region.tt", "Cancella la regione selezionata."))
         self.btn_clear.clicked.connect(self._clear_region)
-        row.addWidget(self.btn_play); row.addWidget(self.lbl_time); row.addStretch(1)
+        row.addWidget(self.btn_rew); row.addWidget(self.btn_play); row.addWidget(self.btn_stop)
+        row.addWidget(self.btn_ff); row.addWidget(self.lbl_time); row.addStretch(1)
         row.addWidget(self.lbl_region); row.addWidget(self.btn_use); row.addWidget(self.btn_clear)
+        self.btn_use.setVisible(self._region_button)
         v.addLayout(row)
         self._player.positionChanged.connect(self._upd_time)
         self._player.durationChanged.connect(self._upd_time)
@@ -188,7 +209,23 @@ class WaveformPlayer(QWidget):
         ok = self.wave.load(self._path)
         self._player.setSource(QUrl.fromLocalFile(self._path) if ok else QUrl())
         self.btn_use.setEnabled(False); self.lbl_region.setText("")
+        self.region_changed.emit(0.0, 0.0)
         self._upd_time()
+
+    def path(self) -> str:
+        return self._path
+
+    def region(self):
+        return self.wave.region()
+
+    def stop(self):
+        self._player.stop()
+        self._player.setPosition(0)
+
+    def _skip(self, delta_s: float):
+        dur_ms = self._player.duration() or int((self.wave.duration() or 0) * 1000)
+        pos = self._player.position() + int(delta_s * 1000)
+        self._player.setPosition(max(0, min(pos, dur_ms)) if dur_ms else max(0, pos))
 
     def _toggle(self):
         from PySide6.QtMultimedia import QMediaPlayer
@@ -208,11 +245,14 @@ class WaveformPlayer(QWidget):
     def _on_region(self, a: float, b: float):
         if b - a > 0.05:
             self.lbl_region.setText(f"[{a:.1f}–{b:.1f}s]"); self.btn_use.setEnabled(True)
+            self.region_changed.emit(a, b)
         else:
             self.lbl_region.setText(""); self.btn_use.setEnabled(False)
+            self.region_changed.emit(0.0, 0.0)
 
     def _clear_region(self):
         self.wave.clear_region(); self.lbl_region.setText(""); self.btn_use.setEnabled(False)
+        self.region_changed.emit(0.0, 0.0)
 
     def _emit_region(self):
         r = self.wave.region()

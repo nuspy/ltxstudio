@@ -62,6 +62,7 @@ class TTSReq(BaseModel):
     language: str = "it-IT"
     sample_path: str | None = Field(None, description="campione voce per clone (f5/xtts/fish/vibevoice)")
     sample_transcript: str = ""
+    speed: float = Field(1.0, ge=0.5, le=2.0, description="velocità (kokoro; edge → rate)")
 
 
 class SeparateVocalsReq(BaseModel):
@@ -146,7 +147,7 @@ def register(app: FastAPI):
             voice = tts.VoicePreset(name="api", engine=req.engine, voice_id=req.voice_id,
                                     language=req.language, sample_path=req.sample_path,
                                     sample_transcript=req.sample_transcript)
-            res = tts.synthesize(req.engine, voice, req.text)
+            res = tts.synthesize(req.engine, voice, req.text, speed=req.speed)
             return [str(res)] if res and os.path.exists(str(res)) else []
         return _submit("audio.tts", fn)
 
@@ -158,7 +159,14 @@ def register(app: FastAPI):
             if not vs.available():
                 raise RuntimeError("demucs non disponibile.")
             out = vs.separate_vocals(req.audio_path, on_log=job.log)
-            return [out] if out and out != req.audio_path else []
+            if not out or out == req.audio_path:
+                return []
+            # demucs scrive in una cartella temporanea (fuori da ALLOWED_ROOTS → download_url vuoto):
+            # copia il vocals.wav in output/ così il link di download funziona.
+            import shutil
+            dst = out_path("vocals", "wav")
+            shutil.copyfile(out, dst)
+            return [dst]
         return _submit("audio.separate_vocals", fn)
 
     @app.post("/audio/transcribe", tags=["musica"])

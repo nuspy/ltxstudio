@@ -575,19 +575,27 @@ def derive_edge_params(text: str) -> dict[str, str]:
 # ────────────────────────────────────────────────────────────────────────────
 
 def synthesize(engine: str, voice: VoicePreset, text: str, *,
-               output_dir: Path | None = None) -> Path:
+               output_dir: Path | None = None, speed: float = 1.0,
+               language: str | None = None) -> Path:
     """Punto d'ingresso unico per la sintesi. Sceglie il backend in base a `engine`
     (id stringa: edge / cosyvoice2 / f5tts / xtts2 / fish / vibevoice).
 
     Per gli engine "remoti" (cosyvoice2/f5tts/xtts2/fish/vibevoice) la sintesi avviene
     via REST a ComfyUI inviando un workflow ad-hoc col custom node corrispondente.
     Se il nodo non è installato, viene sollevato RuntimeError con istruzioni.
+
+    speed: velocità (Kokoro; Edge la converte in rate). language: sovrascrive voice.language
+    (es. "en-US"; XTTS usa le prime 2 lettere). Ogni chiamata scrive un file UNIVOCO: i motori clone
+    prima sovrascrivevano sempre output/audio/<slug>.wav (chiamate API concorrenti = stesso file).
     """
     ensure_dirs()
     output_dir = output_dir or OUTPUT_DIR
     import datetime as _dt
-    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    import uuid as _uuid
+    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + _uuid.uuid4().hex[:6]
     out = output_dir / f"tts_{engine}_{voice.slug()}_{stamp}.mp3"
+    lang = (language or voice.language or "it-IT")
+    uniq = f"{voice.slug()}_{stamp}"
     clean = strip_markers(_pauses_to_dots_internal(text))
     # L'UTENTE SCEGLIE il motore: ognuno usa il SUO backend. Kokoro/Handy = opzione nativa aggiuntiva;
     # gli altri restano come predisposti originariamente (edge nativo; CosyVoice venv; F5/XTTS/Fish/
@@ -599,24 +607,26 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
             r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
         else:
             r = handy_api.tts(clean, voice=(voice.voice_id or "if_sara"),
-                              lang=(voice.language or "it-IT")[:2], out_wav=wav)
+                              lang=lang[:2], speed=float(speed or 1.0), out_wav=wav)
         if r:
             return Path(r)
         raise RuntimeError("Handy-API non disponibile: avvia/installa Handy-API (:8720).")
     if engine == "edge":
         params = derive_edge_params(text)
+        if speed and abs(float(speed) - 1.0) > 1e-3 and params.get("rate", "+0%") == "+0%":
+            params["rate"] = f"{int(round((float(speed) - 1.0) * 100)):+d}%"
         return edge_synthesize(clean, voice.voice_id, out, **params)
     if engine == "cosyvoice2":                              # come predisposto: venv standalone nativo, poi (legacy) comfy
         try:
             from core import cosyvoice_service
             if cosyvoice_service.is_installed() and voice.sample_path:
                 job = cosyvoice_service.make_job(clean, voice.sample_path,
-                                                 prompt_text=voice.sample_transcript, out_name=voice.slug())
+                                                 prompt_text=voice.sample_transcript, out_name=uniq)
                 job.run() if hasattr(job, "run") else None
                 # BUG: prima cercava find_latest_audio() in globals() di QUESTO modulo (non esiste qui, sta in
                 # music_service) → sempre None → CosyVoice2 nativo FALLIVA SEMPRE anche a sintesi riuscita.
                 # Il service scrive in OUT_DIR/<safe(slug)>.wav (pattern identico a _synthesize_native_clone).
-                res = cosyvoice_service.OUT_DIR / f"{cosyvoice_service._safe(voice.slug())}.wav"
+                res = cosyvoice_service.OUT_DIR / f"{cosyvoice_service._safe(uniq)}.wav"
                 if res.exists():
                     return res
         except Exception as _e:                            # noqa: BLE001
@@ -628,7 +638,7 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
             "(scripts/install_cosyvoice*.py) e fornisci un sample_path, oppure usa un altro motore voce "
             "(f5tts/xtts2/fish/vibevoice/edge/kokoro).")
     if engine in ("f5tts", "xtts2", "fish", "vibevoice"):  # NATIVI (venv isolati, zero ComfyUI)
-        return _synthesize_native_clone(engine, voice, clean, out)
+        return _synthesize_native_clone(engine, voice, clean, out, out_name=uniq, language=lang)
     raise RuntimeError(f"Engine TTS sconosciuto: {engine}")
 
 
@@ -643,7 +653,14 @@ _NATIVE_CLONE_INSTALLER = {
 }
 
 
-def _synthesize_native_clone(engine: str, voice: VoicePreset, text: str, out: Path) -> Path:
+def _xtts_lang(lang: str) -> str:
+    """'it-IT' → 'it'; XTTS vuole 'zh-cn' per il cinese."""
+    code = (lang or "it").lower()[:2]
+    return "zh-cn" if code == "zh" else code
+
+
+def _synthesize_native_clone(engine: str, voice: VoicePreset, text: str, out: Path, *,
+                             out_name: str = "", language: str = "") -> Path:
     """Cloning NATIVO via venv isolato (F5/XTTS/Fish/VibeVoice), niente ComfyUI. Richiede un campione
     vocale (voice.sample_path). Pattern identico a CosyVoice (subprocess Job)."""
     import importlib
@@ -656,10 +673,12 @@ def _synthesize_native_clone(engine: str, voice: VoicePreset, text: str, out: Pa
                            f"python scripts/{_NATIVE_CLONE_INSTALLER[engine]}.py")
     if not voice.sample_path or not Path(voice.sample_path).is_file():
         raise RuntimeError(f"Il cloning con '{engine}' richiede un campione vocale (WAV) nella voce.")
+    name = out_name or voice.slug()
+    extra = {"language": _xtts_lang(language)} if engine == "xtts2" else {}
     job = svc.make_job(text, voice.sample_path, prompt_text=getattr(voice, "sample_transcript", "") or "",
-                       out_name=voice.slug())
+                       out_name=name, **extra)
     job.run()
-    res = svc.OUT_DIR / f"{svc._safe(voice.slug())}.wav"
+    res = svc.OUT_DIR / f"{svc._safe(name)}.wav"
     if res.exists():
         return res
     raise RuntimeError(f"Sintesi '{engine}' fallita (nessun output).")

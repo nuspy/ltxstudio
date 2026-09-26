@@ -202,6 +202,7 @@ class MaskCanvas(QWidget):
     request_outpaint = Signal()
     request_integrate = Signal()        # integra le immagini posizionate (composito + maschere)
     request_segment_region = Signal()   # selezione oggetto via click/riquadro (SAM)
+    image_changed = Signal(str)         # nuova foto base nel canvas (path) → abilita i bottoni "usa canvas"
 
     def __init__(self, store: MaskStore | None = None):
         super().__init__()
@@ -683,6 +684,7 @@ class MaskCanvas(QWidget):
             self.set_aspect(tw, th)
         self._active = 0; self._rebuild_layer_list()   # la nuova foto è la BASE
         self._image_path = path
+        self.image_changed.emit(path)
         self.img_item.setPixmap(pix)
         if fit_mode == "native":
             s = 1.0                                     # dimensione REALE (pixel 1:1), può debordare dal canvas
@@ -1317,6 +1319,7 @@ class MaskCanvas(QWidget):
         if pix.isNull():
             return
         self._image_path = path
+        self.image_changed.emit(path)
         self._drop_layers()                  # i layer sono già inglobati nel risultato
         self.img_item.setPixmap(pix)
         self.img_item.setScale(min(self.aspect_w / pix.width(), self.aspect_h / pix.height()))
@@ -1331,6 +1334,7 @@ class MaskCanvas(QWidget):
             return
         x, y, w, h = bbox
         self._image_path = path
+        self.image_changed.emit(path)
         self._drop_layers()
         self.img_item.setPixmap(pix)
         self.img_item.setScale(1.0)          # il ritaglio è già a risoluzione di scena
