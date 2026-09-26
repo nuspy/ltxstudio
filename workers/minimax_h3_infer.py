@@ -225,8 +225,9 @@ def _stage(blocks, names: list, components: dict):
 
 def run(p: dict) -> str:
     from core import resources
-    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 20),
+    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 26),
                       what="MiniMax H3")
+    resources.start_commit_guard(2.0, what="MiniMax H3")
     import torch
     from diffusers import MiniMaxH3Scheduler
     from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3Blocks

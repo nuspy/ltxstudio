@@ -49,8 +49,17 @@ def vram_free_gb() -> float:
         return float("inf")
 
 
+# Su Windows (driver WDDM) la memoria allocata in VRAM viene addebitata ANCHE al commit di sistema: un worker
+# che usa 25 GB di VRAM ne impegna altrettanti di commit (misurato 26/09: TE H3 da 15 GB → commit libero a 0).
+WDDM_VRAM_IN_COMMIT = os.name == "nt"
+PROCESS_OVERHEAD_GB = 6.0                    # python + torch + contesto CUDA + transiti
+
+
 def require(*, commit_gb: float, vram_gb: float = 0.0, what: str = "questo lavoro") -> None:
-    """Solleva NotEnoughResources se commit o VRAM liberi sono sotto il necessario (margine incluso)."""
+    """Solleva NotEnoughResources se commit o VRAM liberi sono sotto il necessario. Con WDDM il commit
+    richiesto include la VRAM che il lavoro userà."""
+    if WDDM_VRAM_IN_COMMIT:
+        commit_gb = max(commit_gb, vram_gb + PROCESS_OVERHEAD_GB)
     c = commit_free_gb()
     v = vram_free_gb() if vram_gb else float("inf")
     probs = []
@@ -62,3 +71,24 @@ def require(*, commit_gb: float, vram_gb: float = 0.0, what: str = "questo lavor
         raise NotEnoughResources(
             f"Risorse insufficienti per {what}: " + "; ".join(probs) +
             ". Altri programmi stanno usando la memoria: chiudili o attendi che finiscano, poi riprova.")
+
+
+def start_commit_guard(min_free_gb: float = 2.0, what: str = "worker", interval_s: float = 2.0) -> None:
+    """Thread di guardia: se durante il lavoro il commit libero scende sotto `min_free_gb` (altri programmi
+    crescono, o il carico è più grande del previsto) il worker si FERMA da solo con un messaggio chiaro, prima
+    che il sistema finisca il commit e cadano anche gli altri programmi. Non tocca nessun altro processo."""
+    import sys
+    import threading
+    import time
+
+    def _loop():
+        while True:
+            free = commit_free_gb()
+            if free < min_free_gb:
+                print(f"ERRORE: {what} fermato per proteggere il sistema: memoria di sistema (commit) libera "
+                      f"{free:.1f} GB, sotto la soglia di sicurezza di {min_free_gb:.0f} GB. Altri programmi "
+                      "stanno usando la memoria: riprova quando si è liberata.", flush=True)
+                sys.stdout.flush()
+                os._exit(3)
+            time.sleep(interval_s)
+    threading.Thread(target=_loop, daemon=True, name="commit-guard").start()

@@ -137,8 +137,9 @@ def _annotate(img, mask_path: str):
 
 def run(p: dict) -> str:
     from core import resources
-    resources.require(commit_gb=float(p.get("need_commit_gb") or 6), vram_gb=float(p.get("need_vram_gb") or 12),
+    resources.require(commit_gb=float(p.get("need_commit_gb") or 6), vram_gb=float(p.get("need_vram_gb") or 14),
                       what="Qwen-Image 2.1")
+    resources.start_commit_guard(2.0, what="Qwen-Image 2.1")
     import torch
     from PIL import Image
     import _qlinear as Q
