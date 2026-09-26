@@ -37,7 +37,8 @@ class Speaker:
     voice_description: str = ""
     clone_sample: str = ""
     clone_transcript: str = ""
-    language: str = "it-IT"
+    language: str = ""            # lingua del TESTO (it-IT, en-US…); '' = quella della voce della libreria
+    allow_accent: bool = False    # True = testo in una lingua diversa da quella della voce, accento voluto
     speed: float = 1.0            # 0.5–2.0
     pitch: float = 0.0            # semitoni (−12…+12)
     volume_db: float = 0.0        # guadagno
@@ -60,6 +61,8 @@ class AudioResult:
     tracks: dict[str, str] = field(default_factory=dict)   # person1/person2 → traccia voce (per LongCat)
     audio_type: str = "para"
     duration_s: float = 0.0
+    warnings: list = field(default_factory=list)            # es. voce italiana su testo inglese (accento)
+    languages: dict = field(default_factory=dict)            # speaker → lingue del testo usate
 
 
 # ── util audio (numpy/librosa/soundfile: presenti nel venv dell'app) ─────────────────────────────
@@ -140,9 +143,26 @@ def _voice_preset(sp: Speaker):
         vid = voice_from_description(sp.voice_description, sp.language)
         return T.VoicePreset(name=f"avatar_{sp.name}", engine="edge", voice_id=vid,
                              language=sp.language), "edge"
-    defaults = {"edge": "it-IT-ElsaNeural", "kokoro": "if_sara"}
-    return (T.VoicePreset(name=f"avatar_{sp.name}", engine=sp.engine,
-                          voice_id=defaults.get(sp.engine, ""), language=sp.language), sp.engine)
+    # nessuna voce indicata: quella predefinita DELLA LINGUA DEL TESTO (non sempre italiana)
+    from core import lang_codes as LC
+    lang = LC.base(sp.language) or "it"
+    vid = (DEFAULT_VOICES.get(sp.engine) or {}).get(lang, "")
+    return (T.VoicePreset(name=f"avatar_{sp.name}", engine=sp.engine, voice_id=vid,
+                          language=sp.language), sp.engine)
+
+
+# voce predefinita per motore e lingua del testo (usata SOLO se lo speaker non indica nessuna voce)
+DEFAULT_VOICES = {
+    "edge": {"it": "it-IT-ElsaNeural", "en": "en-US-AriaNeural", "es": "es-ES-ElviraNeural",
+             "fr": "fr-FR-DeniseNeural", "de": "de-DE-KatjaNeural", "pt": "pt-BR-FranciscaNeural",
+             "zh": "zh-CN-XiaoxiaoNeural", "ja": "ja-JP-NanamiNeural", "ko": "ko-KR-SunHiNeural",
+             "ru": "ru-RU-SvetlanaNeural", "ar": "ar-EG-SalmaNeural", "hi": "hi-IN-SwaraNeural",
+             "uk": "uk-UA-PolinaNeural", "el": "el-GR-AthinaNeural", "hu": "hu-HU-NoemiNeural",
+             "he": "he-IL-HilaNeural", "nl": "nl-NL-ColetteNeural", "pl": "pl-PL-ZofiaNeural",
+             "tr": "tr-TR-EmelNeural", "cs": "cs-CZ-VlastaNeural"},
+    "kokoro": {"it": "if_sara", "en": "af_heart", "es": "ef_dora", "fr": "ff_siwis", "pt": "pf_dora",
+               "hi": "hf_alpha", "ja": "jf_alpha", "zh": "zf_xiaobei"},
+}
 
 
 def voice_from_description(description: str, language: str = "it-IT") -> str:
@@ -169,26 +189,52 @@ def voice_from_description(description: str, language: str = "it-IT") -> str:
     return "it-IT-DiegoNeural" if gender == "male" else "it-IT-ElsaNeural"
 
 
-def synth_line(sp: Speaker, text: str) -> str:
+def text_language(sp: Speaker, voice=None) -> str:
+    """Lingua del TESTO dello speaker: quella dichiarata, altrimenti quella della voce della libreria /
+    dell'id Edge o Kokoro. Se non si ricava, errore chiaro: niente lingua indovinata."""
+    from core import lang_codes as LC
+    if LC.base(sp.language):
+        return LC.bcp47(sp.language)
+    if voice is not None and LC.base(getattr(voice, "language", "")) and getattr(voice, "custom", True):
+        return LC.bcp47(voice.language)
+    for engine in (sp.engine,):
+        langs = LC.voice_langs(engine, sp.voice_id)
+        if langs and len(langs) == 1:
+            return LC.bcp47(next(iter(langs)))
+    raise ValueError(f"speaker «{sp.name}»: indica la lingua del testo (language, es. it-IT / en-US): "
+                     "con questa voce non si ricava da sola")
+
+
+def synth_line(sp: Speaker, text: str, notes: list | None = None) -> str:
     """Una battuta → wav 44.1 kHz. Accetta i marcatori espressivi di core/voice_markup (pause, emozioni,
     velocità/accelerando, tono, volume, enfasi): si sintetizza SEGMENTO PER SEGMENTO e velocità/tono/volume
     si applicano in post quando il motore non li gestisce, così ogni motore capisce gli stessi marcatori."""
     import numpy as np
     from core import tts_engine as T
     from core import voice_markup as VM
+    from core import lang_codes as LC
+    if (sp.voice_description or not (sp.voice_id or sp.clone_sample)) and not LC.base(sp.language):
+        raise ValueError(f"speaker «{sp.name}»: indica la lingua del testo (language, es. it-IT / en-US): "
+                         "serve per scegliere la voce")
     v, engine = _voice_preset(sp)
     native = engine in ENGINES_NATIVE_SPEED
+    line_lang = text_language(sp, v)
     base = VM.Style(speed=sp.speed, pitch=sp.pitch, volume_db=sp.volume_db,
-                    emotion=sp.emotion if sp.emotion in VM.EMOTIONS else "")
+                    emotion=sp.emotion if sp.emotion in VM.EMOTIONS else "", lang=LC.base(line_lang))
     fade = int(SR * 0.008)
     parts = []
     for seg in VM.parse(text, base):
         if seg.kind == "pause":
             parts.append(silence(seg.ms / 1000.0))
             continue
+        seg_lang = LC.bcp47(seg.style.lang) if seg.style.lang else line_lang
+        warn = LC.check(engine, seg_lang, voice_id=v.voice_id, voice_language=v.language,
+                        cloned=bool(sp.clone_sample), allow_accent=sp.allow_accent)
+        if warn and notes is not None and f"{sp.name}: {warn}" not in notes:
+            notes.append(f"{sp.name}: {warn}")
         for c in VM.accel_chunks(seg):
             speed, pitch, vol = VM.effective(c.style)
-            raw = T.synthesize(engine, v, c.text, speed=(speed if native else 1.0), language=sp.language)
+            raw = T.synthesize(engine, v, c.text, speed=(speed if native else 1.0), language=seg_lang)
             y = postprocess_voice(load(str(raw)), speed=speed, pitch=pitch, volume_db=vol, native_speed=native)
             if len(y) > 2 * fade:                            # micro-dissolvenze: niente click fra i segmenti
                 y = y.copy()
@@ -235,9 +281,10 @@ def build_speech(text: str, speakers: list[Speaker], *, gap_ms: int = 350,
     n = min(2, len(speakers))
     tracks = [silence(pad_start_ms / 1000.0) for _ in range(n)]
     gap = silence(gap_ms / 1000.0)
+    notes: list[str] = []
     for i, (who, line) in enumerate(lines):
         who = min(who, n - 1)
-        y = load(synth_line(speakers[who], line))
+        y = load(synth_line(speakers[who], line, notes))
         for k in range(n):
             tracks[k] = np.concatenate([tracks[k], y if k == who else np.zeros_like(y)])
             if i < len(lines) - 1:
@@ -247,7 +294,18 @@ def build_speech(text: str, speakers: list[Speaker], *, gap_ms: int = 350,
     paths = {f"person{k + 1}": save(t, _uid(f"track{k + 1}")) for k, t in enumerate(tracks)}
     mix = tracks[0] if n == 1 else tracks[0] + tracks[1]
     mix_path = save(mix, _uid("speech"))
-    return AudioResult(path=mix_path, tracks=paths, audio_type="para", duration_s=len(mix) / SR)
+    from core import voice_markup as VM
+    langs = {}
+    for who, line in lines:
+        sp = speakers[min(who, n - 1)]
+        try:
+            main = text_language(sp, _voice_preset(sp)[0])
+        except ValueError:
+            main = sp.language
+        found = {main} | {s.style.lang for s in VM.parse(line) if s.kind == "text" and s.style.lang}
+        langs.setdefault(sp.name, set()).update(x for x in found if x)
+    return AudioResult(path=mix_path, tracks=paths, audio_type="para", duration_s=len(mix) / SR,
+                       warnings=notes, languages={k: sorted(v) for k, v in langs.items()})
 
 
 def trim_file(path: str, start: float = 0.0, end: float = 0.0) -> str:

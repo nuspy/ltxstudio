@@ -3043,5 +3043,9 @@
   "h3.lang.ko": "한국어",
   "h3.lang.ru": "러시아어",
   "h3.lang.ar": "아랍어",
-  "feat.cap.avatar_h3": "말하는 아바타 (MiniMax H3)"
+  "feat.cap.avatar_h3": "말하는 아바타 (MiniMax H3)",
+  "avatar.voice.textlang": "텍스트 언어",
+  "avatar.voice.accent": "목소리 억양 의도함",
+  "avatar.voice.language.tt": "이 사람이 읽는 텍스트의 언어입니다. 목소리의 언어와는 다릅니다: Edge와 Kokoro 목소리는 한 언어만 말하며(다른 언어의 텍스트는 그 억양으로 나옵니다), 복제된 목소리와 Edge «Multilingual» 목소리는 샘플의 음색으로 모든 언어를 말합니다. 대사 안에서 다른 언어 문장은 [lang:en]…[/lang]을 쓰세요.",
+  "avatar.voice.accent.tt": "이 텍스트에 일부러 다른 언어의 목소리를 쓰려면 체크하세요(예: 이탈리아 억양의 영어). 언어 불일치 경고가 나오지 않습니다."
 }

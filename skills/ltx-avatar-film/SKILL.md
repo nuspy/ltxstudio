@@ -72,7 +72,8 @@ Per un avatar parlante: soggetto frontale, bocca visibile, niente mani davanti a
 `xtts2` · `fish` · `vibevoice`), UNA sola fonte di voce fra `voice_id` (id della libreria da `--options`, o id del
 motore: `it-IT-ElsaNeural`, `it-IT-DiegoNeural`, `if_sara`, `im_nicola`…), `voice_description` (es. «uomo anziano,
 voce calda e roca»: l'LLM sceglie la voce) o `clone: {sample_path, transcript}` (clonazione, motori con clone);
-poi `language` (`it-IT`, `en-US`…), `speed` 0.5–2, `pitch` semitoni −12…+12, `volume_db` −30…+12, `emotion`
+poi **`language` = lingua del TESTO che legge** (`it-IT`, `en-US`… — vedi §4.1, scrivila SEMPRE),
+`allow_accent` (accento voluto, §4.1), `speed` 0.5–2, `pitch` semitoni −12…+12, `volume_db` −30…+12, `emotion`
 (emozione di base di tutta la voce; i marcatori la sovrascrivono localmente).
 
 Altri campi: `pad_start_ms`, `pad_end_ms` (silenzio prima/dopo), `target_duration_s` + `fit` (`pad` · `speed` ·
@@ -80,6 +81,36 @@ Altri campi: `pad_start_ms`, `pad_end_ms` (silenzio prima/dopo), `target_duratio
 (musica di sottofondo generata, si abbassa quando si parla), `sfx: {mode: "auto"|"prompt"|"none", prompt,
 volume_db}` (effetti sonori; `auto` = dedotti dal video finale), `vocal_separation` (pulisce la voce da musica
 nei file dati), `voice_reference_path` (solo H3: registrazione di cui copiare il timbro).
+
+### 4.1 Lingua del TESTO e lingua della VOCE (due cose diverse)
+
+- **Lingua del testo** = come vanno lette le parole (fonemi, numeri, sigle, intonazione). Si dichiara con
+  `speakers[].language` (LongCat) o `dialogue_lines[].language` (H3), **sempre**, anche se sembra ovvia; per una
+  frase in un'altra lingua dentro la battuta usa il marcatore `[lang:en]…[/lang]`. `audio.language` fa da
+  predefinita per gli speaker/battute che non la indicano.
+- **Lingua della voce** = proprietà della voce scelta:
+
+| Voce | Parla | Testo in un'altra lingua |
+|---|---|---|
+| Edge `xx-XX-NomeNeural` (es. `it-IT-ElsaNeural`) | solo la lingua del prefisso | letto con l'accento della voce |
+| Edge `…MultilingualNeural` | tutte | pronuncia corretta, stesso timbro |
+| Kokoro (prima lettera dell'id: `a`/`b`=inglese US/UK, `i`=it, `e`=es, `f`=fr, `p`=pt, `h`=hi, `j`=ja, `z`=zh) | solo quella lingua | letto con l'accento della voce |
+| Voce clonata (`clone`, motori `xtts2` `f5tts` `fish` `cosyvoice2` `vibevoice` `handy_clone`) | tutte quelle che il motore sa leggere | timbro del campione, pronuncia della lingua del testo |
+| MiniMax H3 | le 11 lingue delle battute | la registrazione di timbro può essere in qualsiasi lingua |
+
+- Regole: scegli una voce **della lingua del testo**, oppure multilingue/clonata; se l'accento è VOLUTO (un
+  inglese che parla italiano con accento) metti `allow_accent: true`. Senza voce indicata l'app usa la voce
+  predefinita della lingua del testo. Lingue che ogni motore sa leggere e voci predefinite: `--options` →
+  `languages`. `--dry-run` stampa `AVVISO LINGUA:` per ogni incompatibilità e blocca le richieste senza lingua
+  dove non si ricava (voice_description, clone, nessuna voce, battute H3); il job riporta `LINGUE:` usate.
+- Esempi:
+  - italiano che cita una frase inglese, voce clonata (cross-lingua):
+    `{"engine": "xtts2", "clone": {"sample_path": "…/nonno.wav", "transcript": "…"}, "language": "it-IT"}` +
+    testo `Mi ha detto: [lang:en]see you later, alligator[/lang] e se n'è andato.`
+  - testo inglese con voce italiana e accento voluto:
+    `{"engine": "edge", "voice_id": "it-IT-DiegoNeural", "language": "en-US", "allow_accent": true}`
+  - testo spagnolo senza voce indicata: `{"engine": "kokoro", "language": "es-ES"}` → voce spagnola predefinita.
+  - H3: `{"language": "Italian", "text": "Mio nipote dice sempre: [lang:en]no problem, grandma[/lang]!"}`
 
 ## 5. Marcatori espressivi della voce (uguali per tutti i motori)
 
@@ -97,6 +128,7 @@ annidare; i valori si combinano con quelli dello speaker (velocità ×, tono +, 
 | tono | `[pitch:+2]…[/pitch]` | semitoni −12…+12 |
 | volume | `[volume:-6]…[/volume]` | dB −30…+12; scorciatoie `[loud]…[/loud]` (+5 dB) e `[soft]…[/soft]` (−6 dB) |
 | enfasi | `[emph]parola[/emph]` | +3 dB e +1 semitono sulla parola |
+| altra lingua | `[lang:en]…[/lang]` | lingua del TESTO di quel tratto (§4.1); la voce resta la stessa |
 | SSML compatibile | `<prosody rate="+20%" pitch="+2st" volume="-3dB">…</prosody>` `<emotion type="sad">…</emotion>` | accettati e convertiti |
 
 ### 5.1 Come usarli bene
@@ -122,8 +154,9 @@ H3 non ha un TTS: genera lui la voce. Gli stessi marcatori vengono tradotti in *
 («angrily», «in a whisper», «speeding up», «with deliberate pauses»…) fuori dal tag `<d>` del prompt, e il testo
 detto resta pulito. Quindi: marca l'**emozione prevalente** della battuta e il ritmo; le micro-regolazioni
 (pitch di 1 semitono, pause precise al millisecondo) con H3 non hanno effetto garantito. Una battuta per riga in
-`video.h3.dialogue_lines: [{speaker, language, text}]`; lingue: Italian English Chinese Spanish French German
-Portuguese Japanese Korean Russian Arabic. Tieni il parlato entro la durata (≈ 2,5 parole al secondo).
+`video.h3.dialogue_lines: [{speaker, language, text}]` — `language` obbligatoria (lingua del testo della battuta:
+`Italian`, `it`, `it-IT` vanno tutte bene); lingue: Italian English Chinese Spanish French German Portuguese Japanese
+Korean Russian Arabic; le frasi `[lang:en]…[/lang]` diventano blocchi `<d>` separati. Tieni il parlato entro la durata (≈ 2,5 parole al secondo).
 
 ## 6. Video (`video`)
 
@@ -160,8 +193,8 @@ dettagliato), text_encoder}`; per il timbro di una voce reale: `audio.voice_refe
  "image": {"mode": "image", "image_path": "C:/Users/me/Pictures/coppia.jpg"},
  "audio": {"mode": "dialogue", "gap_ms": 300,
            "text": "Marco: [emotion:excited]Ho prenotato il viaggio![/emotion]\nGiulia: [emotion:surprised]Dove?[/emotion] [pause:400ms]\nMarco: [whisper]Al Polo Nord.[/whisper]\nGiulia: [emotion:angry][loud]Marco![/loud][/emotion]",
-           "speakers": [{"name": "Marco", "engine": "edge", "voice_id": "it-IT-DiegoNeural"},
-                        {"name": "Giulia", "engine": "edge", "voice_id": "it-IT-ElsaNeural"}]},
+           "speakers": [{"name": "Marco", "engine": "edge", "voice_id": "it-IT-DiegoNeural", "language": "it-IT"},
+                        {"name": "Giulia", "engine": "edge", "voice_id": "it-IT-ElsaNeural", "language": "it-IT"}]},
  "video": {"prompt": "A couple on a sofa talking to each other, lively expressions", "resolution": "720p"}}
 ```
 **C · personaggio con cambi (H3, voce generata dal modello):**

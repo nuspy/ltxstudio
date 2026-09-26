@@ -1794,6 +1794,7 @@
           "language": {
             "type": "string",
             "title": "Language",
+            "description": "lingua del testo predefinita per gli speaker senza language (e per le battute H3 senza language)",
             "default": ""
           },
           "speakers": {
@@ -3415,7 +3416,14 @@
           "language": {
             "type": "string",
             "title": "Language",
-            "default": "it-IT"
+            "description": "lingua del TESTO che questo speaker legge (it-IT, en-US, fr…). Vuota = quella della voce scelta (voce della libreria, id Edge 'xx-XX-…' o Kokoro 'if_…'); obbligatoria con voice_description, clone o senza voce. È distinta dalla lingua della VOCE: Edge/Kokoro sono monolingua (testo in un'altra lingua = accento), clone e voci Edge 'Multilingual' sono cross-lingua. Frasi in altra lingua: [lang:en]…[/lang]",
+            "default": ""
+          },
+          "allow_accent": {
+            "type": "boolean",
+            "title": "Allow Accent",
+            "description": "testo in una lingua diversa da quella della voce con accento VOLUTO: niente avviso",
+            "default": false
           },
           "speed": {
             "type": "number",

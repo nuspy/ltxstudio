@@ -3043,5 +3043,9 @@
   "h3.lang.ko": "Koreai",
   "h3.lang.ru": "Orosz",
   "h3.lang.ar": "Arab",
-  "feat.cap.avatar_h3": "Beszélő avatár (MiniMax H3)"
+  "feat.cap.avatar_h3": "Beszélő avatár (MiniMax H3)",
+  "avatar.voice.textlang": "A szöveg nyelve",
+  "avatar.voice.accent": "A hang akcentusa szándékos",
+  "avatar.voice.language.tt": "A SZÖVEG nyelve, amelyet ez a személy felolvas. Eltér a hang nyelvétől: az Edge és Kokoro hangok csak egy nyelven beszélnek (más nyelvű szöveg az ő akcentusukkal szól), a klónozott hangok és az Edge „Multilingual” hangok minden nyelven beszélnek a minta hangszínével. Más nyelvű mondathoz a sorban használd: [lang:en]…[/lang].",
+  "avatar.voice.accent.tt": "Jelöld be, ha szándékosan más nyelvű hangot szeretnél ehhez a szöveghez (pl. angol olasz akcentussal): nincs figyelmeztetés az eltérő nyelvre."
 }

@@ -99,11 +99,70 @@ def ensure_api(wait: float = 120.0) -> bool:
     return False
 
 
+# ── lingue (core/lang_codes del repo, se lo skill gira dentro LTX Studio) ─────────────────────
+def _load_lang_codes():
+    try:
+        root = str(_root())
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from core import lang_codes
+        return lang_codes
+    except Exception:                                    # noqa: BLE001 — skill installato fuori dal repo
+        return None
+
+
+_LC = _load_lang_codes()
+
+
+def check_languages(req: dict) -> tuple[list[str], list[str]]:
+    """(errori, avvisi) sulla lingua del TESTO di speaker e battute rispetto alla lingua della VOCE."""
+    errs, warns = [], []
+    a = req.get("audio") or {}
+    engine = req.get("engine", "longcat")
+    if engine == "longcat" and a.get("mode") in ("tts", "dialogue"):
+        default = a.get("language") or ""
+        for sp in a.get("speakers") or [{}]:
+            name, lang = sp.get("name", "A"), sp.get("language") or default
+            voice, eng = sp.get("voice_id") or "", sp.get("engine", "edge")
+            cloned = bool((sp.get("clone") or {}).get("sample_path"))
+            if not lang and (sp.get("voice_description") or cloned or not voice):
+                errs.append(f"speaker «{name}»: manca language (lingua del TESTO, es. it-IT / en-US): con "
+                            "voice_description, clone o senza voce non si ricava")
+                continue
+            if not lang:
+                warns.append(f"speaker «{name}»: language non indicata → verrà usata quella della voce {voice!r}")
+                continue
+            if _LC:
+                w = _LC.check(eng, lang, voice_id=voice, cloned=cloned, allow_accent=bool(sp.get("allow_accent")))
+                if w:
+                    warns.append(f"speaker «{name}»: {w}")
+                for m in re.finditer(r"\[lang:([^\]]+)\]", a.get("text") or "", re.I):
+                    w = _LC.check(eng, m.group(1), voice_id=voice, cloned=cloned,
+                                  allow_accent=bool(sp.get("allow_accent")))
+                    if w and f"[lang:{m.group(1)}]" not in " ".join(warns):
+                        warns.append(f"speaker «{name}» [lang:{m.group(1)}]: {w}")
+    if engine == "minimax_h3":
+        lines = ((req.get("video") or {}).get("h3") or {}).get("dialogue_lines") or []
+        if not lines and a.get("text"):
+            lines = [{"language": a.get("language") or "", "text": a["text"]}]
+        for i, d in enumerate(lines):
+            lang = d.get("language") or a.get("language") or ""
+            if not lang:
+                errs.append(f"video.h3.dialogue_lines[{i}]: manca language (lingua del testo della battuta)")
+            elif _LC and not _LC.h3_name(lang):
+                errs.append(f"video.h3.dialogue_lines[{i}]: MiniMax H3 non parla {lang!r} (lingue: "
+                            + ", ".join(_LC.LANGS[k][1] for k in _LC.H3_LANGS) + ")")
+            for m in re.finditer(r"\[lang:([^\]]+)\]", d.get("text") or "", re.I):
+                if _LC and not _LC.h3_name(m.group(1)):
+                    errs.append(f"video.h3.dialogue_lines[{i}]: [lang:{m.group(1)}] non supportata da MiniMax H3")
+    return errs, warns
+
+
 # ── controlli della richiesta ─────────────────────────────────────────────────────────────────
-_TAG = re.compile(r"\[(/?)(pause|breath|emotion|speed|accel|pitch|volume|loud|soft|whisper|emph)(?::([^\]]*))?\]", re.I)
+_TAG = re.compile(r"\[(/?)(pause|breath|emotion|speed|accel|pitch|volume|loud|soft|whisper|emph|lang)(?::([^\]]*))?\]", re.I)
 _EMOTIONS = {"neutral", "happy", "sad", "angry", "whisper", "calm", "excited", "fearful", "surprised", "tender",
              "serious"}
-_OPEN_CLOSE = {"emotion", "speed", "accel", "pitch", "volume", "loud", "soft", "whisper", "emph"}
+_OPEN_CLOSE = {"emotion", "speed", "accel", "pitch", "volume", "loud", "soft", "whisper", "emph", "lang"}
 
 
 def check_markup(text: str) -> list[str]:
@@ -132,6 +191,8 @@ def check_markup(text: str) -> list[str]:
                 errs.append(f"[pitch:{arg}] fuori da −12…+12 semitoni")
             elif tag == "volume" and not -30 <= float(arg) <= 12:
                 errs.append(f"[volume:{arg}] fuori da −30…+12 dB")
+            elif tag == "lang" and _LC and not _LC.base(arg):
+                errs.append(f"[lang:{arg}] lingua non riconosciuta (usa it, en, es, fr, de, pt, zh, ja… o it-IT)")
             elif tag == "pause" and arg and not re.fullmatch(r"\d+(\.\d+)?(ms|s)?", arg.lower()):
                 errs.append(f"[pause:{arg}] non valido (es. 500ms, 1.5s)")
         except ValueError:
@@ -227,6 +288,10 @@ def run(req: dict, poll: float = 5.0, timeout_s: float = 4 * 3600) -> int:
             print(f"[avatar-film] {msg}", flush=True)
             last = msg
         if st.get("status") == "success":
+            for w in st.get("warnings") or []:
+                print(f"AVVISO: {w}")
+            if (st.get("info") or {}).get("languages"):
+                print(f"LINGUE: {json.dumps(st['info']['languages'], ensure_ascii=False)}")
             files = st.get("files") or []
             if not files:
                 print("ERRORE: job riuscito ma senza file")
@@ -274,6 +339,10 @@ def main() -> int:
     raw = sys.stdin.read() if a.request == "-" else Path(a.request).read_text("utf-8")
     req = json.loads(raw)
     errs = validate(req)
+    lerrs, lwarns = check_languages(req)
+    errs += lerrs
+    for w in lwarns:
+        print(f"AVVISO LINGUA: {w}")
     root = _root()
     api_roots = (str((root / "output").resolve()), str((root / "output" / "api_uploads").resolve()))
     _localize(req, api_roots, a.dry_run, errs)

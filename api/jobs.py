@@ -27,6 +27,8 @@ class Job:
     message: str = ""
     outputs: list[str] = field(default_factory=list)   # path locali dei file prodotti
     error: str = ""
+    warnings: list[str] = field(default_factory=list)  # avvisi non bloccanti (es. lingua testo ≠ lingua voce)
+    info: dict = field(default_factory=dict)           # dettagli del risultato (es. lingue usate per speaker)
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
 

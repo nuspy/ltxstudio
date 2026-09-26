@@ -3043,5 +3043,9 @@
   "h3.lang.ko": "韩语",
   "h3.lang.ru": "俄语",
   "h3.lang.ar": "阿拉伯语",
-  "feat.cap.avatar_h3": "说话的虚拟形象（MiniMax H3）"
+  "feat.cap.avatar_h3": "说话的虚拟形象（MiniMax H3）",
+  "avatar.voice.textlang": "文本语言",
+  "avatar.voice.accent": "有意保留声音口音",
+  "avatar.voice.language.tt": "此人朗读的文本的语言。它不同于声音的语言：Edge 和 Kokoro 声音只说一种语言（其他语言的文本会带上它们的口音），克隆声音和 Edge「Multilingual」声音能用样本的音色说所有语言。台词中夹杂其他语言的句子请用 [lang:en]…[/lang]。",
+  "avatar.voice.accent.tt": "如果你有意让另一种语言的声音读这段文本（例如带意大利口音的英语），请勾选：不再提示语言不一致。"
 }

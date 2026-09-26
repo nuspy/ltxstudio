@@ -50,7 +50,13 @@ class SpeakerSpec(BaseModel):
     voice_id: str = Field("", description="voce della libreria o id del motore (it-IT-ElsaNeural, if_sara…)")
     voice_description: str = Field("", description="se voice_id è vuoto: l'LLM sceglie la voce dalla descrizione")
     clone: dict | None = Field(None, description="{sample_path, transcript} per clonare da un campione")
-    language: str = "it-IT"
+    language: str = Field("", description=(
+        "lingua del TESTO che questo speaker legge (it-IT, en-US, fr…). Vuota = quella della voce scelta "
+        "(voce della libreria, id Edge 'xx-XX-…' o Kokoro 'if_…'); obbligatoria con voice_description, clone o "
+        "senza voce. È distinta dalla lingua della VOCE: Edge/Kokoro sono monolingua (testo in un'altra lingua "
+        "= accento), clone e voci Edge 'Multilingual' sono cross-lingua. Frasi in altra lingua: [lang:en]…[/lang]"))
+    allow_accent: bool = Field(False, description="testo in una lingua diversa da quella della voce con accento "
+                                                  "VOLUTO: niente avviso")
     speed: float = Field(1.0, ge=0.5, le=2.0)
     pitch: float = Field(0.0, ge=-12, le=12, description="semitoni")
     volume_db: float = Field(0.0, ge=-30, le=12)
@@ -64,7 +70,8 @@ class AudioSpec(BaseModel):
     trim_start: float = 0.0
     trim_end: float = 0.0
     text: str = Field("", description="tts: testo; dialogue: copione «A: …» / «B: …» ([pause:500ms] ammesso)")
-    language: str = ""
+    language: str = Field("", description="lingua del testo predefinita per gli speaker senza language "
+                                           "(e per le battute H3 senza language)")
     speakers: list[SpeakerSpec] = Field(default_factory=list)
     turn_mode: str = Field("add", description="due file: add = a turno | para = insieme")
     gap_ms: int = 350
@@ -111,6 +118,22 @@ def _submit(kind, fn):
     return {"job_id": MANAGER.submit(kind, fn), "status": "pending"}
 
 
+def _languages() -> dict:
+    """Lingue: quelle del TESTO che ogni motore sa leggere + come si comporta la VOCE (mono/cross-lingua)."""
+    from core import lang_codes as LC
+    from core.avatar.audio_chain import DEFAULT_VOICES
+    return {
+        "codes": {k: {"bcp47": b, "name": n} for k, (b, n, _a) in LC.LANGS.items()},
+        "text_languages_by_engine": {e: list(v) for e, v in LC.ENGINE_TEXT_LANGS.items()},
+        "minimax_h3": [LC.LANGS[k][1] for k in LC.H3_LANGS],
+        "cross_lingual_voices": sorted(LC.CLONE_ENGINES) + ["edge: voci '…MultilingualNeural'"],
+        "monolingual_voices": "edge (lingua = prefisso dell'id, es. it-IT-…), kokoro (prima lettera: a/b=en, "
+                              "i=it, e=es, f=fr, p=pt, h=hi, j=ja, z=zh)",
+        "default_voice_by_language": DEFAULT_VOICES,
+        "mixed_language_markup": "[lang:en]…[/lang] dentro la battuta",
+    }
+
+
 def _h3_options(ew) -> dict:
     import os
     from core import minimax_h3_spec as S
@@ -149,7 +172,7 @@ def options() -> dict:
         "tts_engines": [{"id": e[0], "name": e[1], "clone": e[2], "emotions": e[3], "installed": e[4]}
                         for e in T.available_engines()],
         "voices": voices,
-        "languages": ["it-IT", "en-US", "es-ES", "fr-FR", "de-DE", "pt-BR", "ru-RU", "zh-CN", "ja-JP", "ko-KR", "ar-EG"],
+        "languages": _languages(),
         "emotions": ["neutral", "happy", "sad", "angry", "whisper", "calm"],
     }
 
@@ -170,6 +193,8 @@ def register(app: FastAPI) -> None:
         def fn(job):
             from core.avatar import pipeline
             res = pipeline.run(payload, log=job.log)
+            job.warnings = list(res.get("warnings") or [])
+            job.info = {"languages": res.get("languages") or {}}
             outs = [res["video"]]
             if req.return_intermediates:
                 outs += [p for p in [res.get("image"), res.get("audio")] if p and os.path.isfile(p)]

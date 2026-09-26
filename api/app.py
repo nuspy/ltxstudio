@@ -107,6 +107,10 @@ def job_status(job_id: str):
         "progress": round(job.progress, 3), "message": job.message,
         "queue_position": MANAGER.queue_position(job_id) if job.status == "pending" else 0,
     }
+    if job.warnings:
+        out["warnings"] = list(job.warnings)
+    if job.info:
+        out["info"] = dict(job.info)
     if job.status == "success":
         out["files"] = files_payload(job.outputs)
     if job.status == "error":

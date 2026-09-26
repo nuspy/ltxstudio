@@ -604,7 +604,7 @@ def synthesize(engine: str, voice: VoicePreset, text: str, *,
         from core import handy_api
         wav = str(out.with_suffix(".wav"))
         if engine == "handy_clone":                        # voce clonata per nome (registrata in Handy)
-            r = handy_api.tts(clean, voice=voice.name, out_wav=wav, model="chatterbox-multilingual")
+            r = handy_api.tts(clean, voice=voice.name, lang=lang[:2], out_wav=wav, model="chatterbox-multilingual")
         else:
             r = handy_api.tts(clean, voice=(voice.voice_id or "if_sara"),
                               lang=lang[:2], speed=float(speed or 1.0), out_wav=wav)

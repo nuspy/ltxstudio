@@ -47,8 +47,8 @@ def build_audio(a: dict, *, log=None) -> A.AudioResult:
         if not text:
             raise ValueError("audio.text vuoto")
         speakers = [A.Speaker.from_dict(s) for s in (a.get("speakers") or [{}])]
-        for s in speakers:
-            if a.get("language") and s.language == "it-IT":
+        for s in speakers:                                    # audio.language = lingua del testo di default
+            if a.get("language") and not s.language:
                 s.language = a["language"]
         if mode == "tts":
             speakers = speakers[:1]
@@ -56,6 +56,10 @@ def build_audio(a: dict, *, log=None) -> A.AudioResult:
             log(f"[avatar] voce: {len(speakers)} speaker, {len(text)} caratteri")
         res = A.build_speech(text, speakers, gap_ms=int(a.get("gap_ms", 350)),
                              pad_start_ms=int(a.get("pad_start_ms", 0)), pad_end_ms=int(a.get("pad_end_ms", 0)))
+        if log:
+            log(f"[avatar] lingue del testo: {res.languages}")
+            for w in res.warnings:
+                log(f"[avatar] ⚠ {w}")
     else:
         raise ValueError(f"audio.mode sconosciuto: {mode} (file | tts | dialogue)")
     if a.get("target_duration_s"):
@@ -173,4 +177,5 @@ def run(req: dict, *, log=None) -> dict:
             video = rife.interpolate_video(video, _p("avatar_rife", "mp4"), factor=2)
         elif log:
             log("[avatar] RIFE non disponibile: tengo 25 fps")
-    return {"video": video, "image": image, "audio": audio.path, "intermediates": inter}
+    return {"video": video, "image": image, "audio": audio.path, "intermediates": inter,
+            "warnings": list(audio.warnings), "languages": dict(audio.languages)}

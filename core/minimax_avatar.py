@@ -74,6 +74,12 @@ def preflight(p: dict) -> list[str]:
         errs.append("Pesi MiniMax H3 mancanti: " + ", ".join(miss) + " — scaricali dal tab «Pesi modelli».")
     if not (p.get("h3_dialogue") or p.get("prompt")):
         errs.append("Serve almeno una battuta o un prompt.")
+    from core import h3_prompt
+    for d in p.get("h3_dialogue") or []:
+        try:
+            h3_prompt._line_sentence(d, 1)
+        except ValueError as e:
+            errs.append(str(e))
     for r in p.get("references") or []:
         if not os.path.isfile(r.get("path") or ""):
             errs.append(f"File di riferimento inesistente: {r.get('path')}")
@@ -108,10 +114,12 @@ def run(req: dict, *, log=None) -> dict:
     h3 = dict(v.get("h3") or {})
     img_req = IS.ImageRequest.from_dict(req.get("image") or {"mode": "none"})
     image = IS.make_image(img_req, str(OUT / f"start_{uuid.uuid4().hex[:8]}.png"), log=log)
-    lines = h3.get("dialogue_lines") or []
+    from core import lang_codes as LC
+    lines = [dict(d) for d in (h3.get("dialogue_lines") or [])]
     if not lines and a.get("text"):
-        lang = a.get("language") or "Italian"
-        lines = [{"speaker": "", "language": lang if lang in S.DIALOGUE_LANGS else "Italian", "text": a["text"]}]
+        lines = [{"speaker": "", "language": a.get("language") or "", "text": a["text"]}]
+    for d in lines:                                  # lingua del testo: della battuta, se no audio.language
+        d["language"] = LC.h3_name(d.get("language") or a.get("language") or "") or (d.get("language") or "")
     cfg = {"image_path": image, "prompt": v.get("prompt", ""), "lines": lines,
            "voice_ref_path": a.get("voice_reference_path") or "",
            "duration_s": h3.get("duration_s") or v.get("max_duration_s") or 8.0,
@@ -134,4 +142,5 @@ def run(req: dict, *, log=None) -> dict:
     if rc != 0 or not os.path.isfile(p["output"]):
         err = next((x for x in reversed(lines_out) if x.startswith("ERRORE")), "") or "\n".join(lines_out[-10:])
         raise RuntimeError(err or f"MiniMax H3 terminato con codice {rc}")
-    return {"video": p["output"], "image": image, "audio": "", "intermediates": [x for x in (image,) if x]}
+    return {"video": p["output"], "image": image, "audio": "", "intermediates": [x for x in (image,) if x],
+            "warnings": [], "languages": {(d.get("speaker") or "S1"): [d["language"]] for d in p["h3_dialogue"]}}

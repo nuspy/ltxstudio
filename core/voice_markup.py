@@ -11,6 +11,8 @@ Nel testo di una battuta si possono mettere questi marcatori (maiuscole/minuscol
   volume     [volume:-6] … [/volume]         dB −30…+12   ([loud] … [/loud] = +5 dB, [soft] … [/soft] = −6 dB)
   sussurro   [whisper] … [/whisper]          (= emozione whisper)
   enfasi     [emph] … [/emph]                (+3 dB, +1 semitono)
+  lingua     [lang:en] … [/lang]             frase in un'ALTRA lingua dentro la battuta (lingua del testo;
+                                             la lingua della voce resta quella scelta: vedi core/lang_codes)
   compatibile SSML: <prosody rate="+20%" pitch="+2st" volume="-3dB"> … </prosody>
 
 I marcatori si possono annidare; i valori si combinano con quelli della voce (velocità ×, tono +, volume +).
@@ -37,7 +39,7 @@ DELIVERY_EN = {     # per MiniMax H3 (indicazioni di recitazione in inglese, com
 PAUSE_DEFAULT_MS, BREATH_MS = 500, 350
 
 _TOKEN = re.compile(
-    r"\[(?P<close>/)?(?P<tag>pause|breath|emotion|speed|accel|pitch|volume|loud|soft|whisper|emph)"
+    r"\[(?P<close>/)?(?P<tag>pause|breath|emotion|speed|accel|pitch|volume|loud|soft|whisper|emph|lang)"
     r"(?::(?P<arg>[^\]]*))?\]"
     r"|<\s*emotion\s+type\s*=\s*['\"]?(?P<emo>[a-z]+)['\"]?\s*>|<\s*/\s*emotion\s*>"
     r"|<\s*prosody(?P<pattrs>[^>]*)>|<\s*/\s*prosody\s*>", re.I)
@@ -50,6 +52,7 @@ class Style:
     volume_db: float = 0.0
     emotion: str = ""
     accel: tuple | None = None          # (da, a) della velocità, graduale lungo il segmento
+    lang: str = ""                      # lingua del testo di questo tratto ('' = quella della battuta)
 
     def combined(self, speed: float = 1.0, pitch: float = 0.0, volume_db: float = 0.0) -> "Style":
         return replace(self, speed=self.speed * speed, pitch=self.pitch + pitch, volume_db=self.volume_db + volume_db)
@@ -145,6 +148,9 @@ def parse(text: str, base: Style | None = None) -> list[Segment]:
             stack.append(cur.combined(volume_db=-6.0))
         elif tag == "emph":
             stack.append(cur.combined(pitch=1.0, volume_db=3.0))
+        elif tag == "lang":
+            from core.lang_codes import base as _lb
+            stack.append(replace(cur, lang=_lb(arg) or cur.lang))
     emit((text or "")[pos:])
     return segs
 
@@ -211,3 +217,17 @@ def delivery_en(text: str) -> str:
     if any(s.kind == "pause" for s in parse(text)):
         bits.append("with deliberate pauses")
     return ", ".join(bits)
+
+
+def split_by_lang(text: str, default_lang: str) -> list[tuple[str, str]]:
+    """Battuta → [(lingua, testo pulito)] consecutivi per lingua (per MiniMax H3: un <d> per lingua)."""
+    out: list[tuple[str, str]] = []
+    for seg in parse(text):
+        if seg.kind != "text":
+            continue
+        lang = seg.style.lang or default_lang
+        if out and out[-1][0] == lang:
+            out[-1] = (lang, out[-1][1] + " " + seg.text)
+        else:
+            out.append((lang, seg.text))
+    return [(l, re.sub(r"\s+([,.;:!?…])", lambda m: m.group(1), t).strip()) for l, t in out]

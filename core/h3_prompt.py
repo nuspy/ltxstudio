@@ -36,16 +36,38 @@ def _speakers(lines: list[dict]) -> dict[str, int]:
     return ids
 
 
+def line_language(d: dict) -> str:
+    """Lingua del TESTO della battuta come nome H3 ('Italian'…). Obbligatoria: niente lingua indovinata."""
+    from core import lang_codes as LC
+    raw = (d.get("language") or "").strip()
+    name = LC.h3_name(raw)
+    if not raw:
+        raise ValueError(f"battuta senza lingua: {VM.plain(d.get('text') or '')[:60]!r} — indica language "
+                         f"(una di: {', '.join(LC.LANGS[k][1] for k in LC.H3_LANGS)})")
+    if not name:
+        raise ValueError(f"MiniMax H3 non parla la lingua {raw!r} (supporta: "
+                         f"{', '.join(LC.LANGS[k][1] for k in LC.H3_LANGS)})")
+    return name
+
+
 def _line_sentence(d: dict, sid: int, subject: str = "") -> str:
-    text = VM.plain(d.get("text") or "").strip()
-    if text and text[-1] not in ".?!":
-        text += "."
-    lang = d.get("language") or "English"
+    from core import lang_codes as LC
+    main = line_language(d)
+    blocks = []
+    for lang, text in VM.split_by_lang(d.get("text") or "", LC.base(main)):
+        name = LC.h3_name(lang)
+        if not name:
+            raise ValueError(f"MiniMax H3 non parla la lingua {lang!r} usata in [lang:…]")
+        blocks.append([name, text])
+    if blocks:                                   # chiusura con punteggiatura forte, come chiede la guida
+        t = blocks[-1][1].rstrip(":,; ")
+        blocks[-1][1] = t if t[-1:] in ".?!…" else t + "."
+    blocks = [f"<d>[{n}] {t}</d>" for n, t in blocks]
     who = (d.get("speaker") or "").strip()
     head = f"{subject} (S{sid})" if subject else (f"{who} (S{sid})" if who else f"The speaker (S{sid})")
     how = VM.delivery_en(d.get("text") or "")
     verb = "says" + (f", {how}," if how else "")
-    return f"{head} {verb} <d>[{lang}] {text}</d>"
+    return f"{head} {verb} " + " ".join(blocks)
 
 
 def compose(p: dict, duration_s: float) -> str:

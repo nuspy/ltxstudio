@@ -3043,5 +3043,9 @@
   "h3.lang.ko": "Coréen",
   "h3.lang.ru": "Russe",
   "h3.lang.ar": "Arabe",
-  "feat.cap.avatar_h3": "Avatar parlant (MiniMax H3)"
+  "feat.cap.avatar_h3": "Avatar parlant (MiniMax H3)",
+  "avatar.voice.textlang": "Langue du texte",
+  "avatar.voice.accent": "Accent de la voix voulu",
+  "avatar.voice.language.tt": "Langue du TEXTE que lit cette personne. Elle diffère de la langue de la voix : les voix Edge et Kokoro ne parlent qu'une langue (un texte dans une autre langue sort avec leur accent), les voix clonées et les voix Edge « Multilingual » parlent toutes les langues avec le timbre de l'échantillon. Pour une phrase dans une autre langue au sein de la réplique, utilisez [lang:en]…[/lang].",
+  "avatar.voice.accent.tt": "Cochez si vous voulez volontairement une voix d'une autre langue sur ce texte (ex. anglais avec accent italien) : pas d'avertissement de langue différente."
 }

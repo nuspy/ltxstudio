@@ -3117,5 +3117,9 @@
   "h3.lang.ko": "Korean",
   "h3.lang.ru": "Russian",
   "h3.lang.ar": "Arabic",
-  "feat.cap.avatar_h3": "Talking avatar (MiniMax H3)"
+  "feat.cap.avatar_h3": "Talking avatar (MiniMax H3)",
+  "avatar.voice.textlang": "Text language",
+  "avatar.voice.accent": "Voice accent is intended",
+  "avatar.voice.language.tt": "Language of the TEXT this person reads. It differs from the voice's language: Edge and Kokoro voices speak one language only (text in another language comes out with their accent), cloned voices and Edge \"Multilingual\" voices speak every language with the sample's timbre. For a sentence in another language inside a line use [lang:en]…[/lang].",
+  "avatar.voice.accent.tt": "Tick it if you deliberately want a voice from another language on this text (e.g. English with an Italian accent): no language-mismatch warning."
 }

@@ -29,7 +29,8 @@ REPO = Path(__file__).resolve().parents[2]
 OUTPUT = REPO / "output"
 IMG_FILTER_FALLBACK = "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)"
 AUDIO_FILTER_FALLBACK = "Audio (*.wav *.mp3 *.flac *.ogg *.m4a *.aac)"
-LANGS = ["it-IT", "en-US", "es-ES", "fr-FR", "de-DE", "pt-BR", "ru-RU", "zh-CN", "ja-JP", "ko-KR", "ar-EG"]
+LANGS = ["it-IT", "en-US", "en-GB", "es-ES", "fr-FR", "de-DE", "pt-BR", "ru-RU", "zh-CN", "ja-JP", "ko-KR",
+         "ar-EG", "hi-IN", "uk-UA", "el-GR", "hu-HU", "he-IL", "nl-NL", "pl-PL", "tr-TR", "cs-CZ"]
 EMOTIONS = ["neutral", "happy", "sad", "angry", "whisper", "calm"]
 SUGGESTED_VOICES = {
     "edge": ["it-IT-ElsaNeural", "it-IT-IsabellaNeural", "it-IT-DiegoNeural", "en-US-AriaNeural",
@@ -190,7 +191,17 @@ class _SpeakerBox(QGroupBox):
                                       "Trascrizione esatta del campione: migliora molto la clonazione."))
         f.addRow(tr("avatar.voice.transcript", "Trascrizione campione"), self.transcript)
         self.language = QComboBox(); self.language.addItems(LANGS)
-        f.addRow(tr("avatar.voice.language", "Lingua"), self.language)
+        self.language.setToolTip(tr("avatar.voice.language.tt",
+            "Lingua del TESTO che questa persona legge. È diversa dalla lingua della voce: le voci Edge e "
+            "Kokoro parlano una sola lingua (un testo in un'altra lingua esce con il loro accento), le voci "
+            "clonate e quelle Edge «Multilingual» parlano tutte le lingue col timbro del campione. Per una frase "
+            "in un'altra lingua dentro la battuta usa [lang:en]…[/lang]."))
+        f.addRow(tr("avatar.voice.textlang", "Lingua del testo"), self.language)
+        self.allow_accent = QCheckBox(tr("avatar.voice.accent", "Accento della voce voluto"))
+        self.allow_accent.setToolTip(tr("avatar.voice.accent.tt",
+            "Spunta se vuoi di proposito una voce di un'altra lingua sul testo (es. inglese con accento "
+            "italiano): niente avviso di lingua diversa."))
+        f.addRow("", self.allow_accent)
         self.speed = QDoubleSpinBox(); self.speed.setRange(0.5, 2.0); self.speed.setSingleStep(0.05)
         self.speed.setValue(1.0)
         f.addRow(tr("avatar.voice.speed", "Velocità"), self.speed)
@@ -237,7 +248,8 @@ class _SpeakerBox(QGroupBox):
                 "voice_description": self.description.text().strip(),
                 "clone": ({"sample_path": self.clone.text().strip(), "transcript": self.transcript.text().strip()}
                           if self.clone.text().strip() else None),
-                "language": self.language.currentText(), "speed": self.speed.value(),
+                "language": self.language.currentText(), "allow_accent": self.allow_accent.isChecked(),
+                "speed": self.speed.value(),
                 "pitch": self.pitch.value(), "volume_db": self.volume.value(),
                 "emotion": self.emotion.currentData() or ""}
 
@@ -256,7 +268,8 @@ class _VoiceWorker(QThread):
             res = A.build_speech(text, [A.Speaker.from_dict(s) for s in speakers],
                                  gap_ms=gap, pad_start_ms=ps, pad_end_ms=pe)
             self.done.emit({"status": "success", "path": res.path, "tracks": res.tracks,
-                            "duration": res.duration_s})
+                            "duration": res.duration_s, "warnings": list(res.warnings),
+                            "languages": dict(res.languages)})
         except Exception as e:                                       # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
 
@@ -856,6 +869,8 @@ class AvatarTab(QWidget):
         else:
             self.audio1.set_path(res["path"])
         self.log.appendPlainText(tr("avatar.voice.done", "Voce pronta ({d:.1f} s).").format(d=res.get("duration", 0)))
+        for w in res.get("warnings") or []:
+            self.log.appendPlainText("⚠ " + w)
 
     def get_config(self) -> dict:
         mode = "ai2v" if self.mode_img.isChecked() else "at2v"

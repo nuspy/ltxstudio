@@ -3043,5 +3043,9 @@
   "h3.lang.ko": "Coreano",
   "h3.lang.ru": "Russo",
   "h3.lang.ar": "Árabe",
-  "feat.cap.avatar_h3": "Avatar falante (MiniMax H3)"
+  "feat.cap.avatar_h3": "Avatar falante (MiniMax H3)",
+  "avatar.voice.textlang": "Idioma do texto",
+  "avatar.voice.accent": "Sotaque da voz intencional",
+  "avatar.voice.language.tt": "Idioma do TEXTO que esta pessoa lê. É diferente do idioma da voz: as vozes Edge e Kokoro falam um só idioma (um texto noutro idioma sai com o seu sotaque); as vozes clonadas e as Edge «Multilingual» falam todos os idiomas com o timbre da amostra. Para uma frase noutro idioma dentro da fala use [lang:en]…[/lang].",
+  "avatar.voice.accent.tt": "Marque se quiser de propósito uma voz de outro idioma neste texto (ex. inglês com sotaque italiano): sem aviso de idioma diferente."
 }

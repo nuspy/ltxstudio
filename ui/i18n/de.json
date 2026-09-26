@@ -3043,5 +3043,9 @@
   "h3.lang.ko": "Koreanisch",
   "h3.lang.ru": "Russisch",
   "h3.lang.ar": "Arabisch",
-  "feat.cap.avatar_h3": "Sprechender Avatar (MiniMax H3)"
+  "feat.cap.avatar_h3": "Sprechender Avatar (MiniMax H3)",
+  "avatar.voice.textlang": "Sprache des Textes",
+  "avatar.voice.accent": "Akzent der Stimme gewollt",
+  "avatar.voice.language.tt": "Sprache des TEXTES, den diese Person liest. Sie unterscheidet sich von der Sprache der Stimme: Edge- und Kokoro-Stimmen sprechen nur eine Sprache (Text in einer anderen Sprache klingt mit ihrem Akzent), geklonte Stimmen und Edge-„Multilingual“-Stimmen sprechen alle Sprachen mit dem Klang der Probe. Für einen Satz in einer anderen Sprache innerhalb der Zeile [lang:en]…[/lang] verwenden.",
+  "avatar.voice.accent.tt": "Ankreuzen, wenn du absichtlich eine Stimme einer anderen Sprache für den Text willst (z. B. Englisch mit italienischem Akzent): keine Warnung wegen abweichender Sprache."
 }
