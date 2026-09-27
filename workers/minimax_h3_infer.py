@@ -198,6 +198,33 @@ def build_prompt(p: dict, duration_s: float) -> str:
     return h3_prompt.compose(p, duration_s)
 
 
+AUDIO_VAE_SR = 32000                     # sample rate dell'audio VAE di H3
+REF_SHORT_EDGE = 1024                    # lato corto delle immagini di riferimento Ref2VA (ufficiale 2048)
+
+
+def _decode_audio_av(path: str, sr: int = AUDIO_VAE_SR):
+    """Traccia audio → tensore (canali, campioni) float32 GIÀ a `sr`, ricampionato con PyAV (libswresample).
+    diffusers ricampionerebbe con torchaudio, che nel venv non c'è (e non serve aggiungerlo)."""
+    import av
+    import numpy as np
+    import torch
+    chunks = []
+    with av.open(path) as c:
+        if not c.streams.audio:
+            return None
+        st = c.streams.audio[0]
+        layout = "stereo" if (st.channels or 1) >= 2 else "mono"
+        rs = av.AudioResampler(format="fltp", layout=layout, rate=sr)
+        for frame in c.decode(st):
+            for f in rs.resample(frame):
+                chunks.append(f.to_ndarray())
+        for f in rs.resample(None):                      # svuota il ricampionatore
+            chunks.append(f.to_ndarray())
+    if not chunks:
+        return None
+    return torch.from_numpy(np.concatenate(chunks, axis=1).astype("float32"))
+
+
 def build_references(p: dict) -> list:
     from diffusers.modular_pipelines.minimax_h3 import (MiniMaxH3AudioReference, MiniMaxH3ImageReference,
                                                         MiniMaxH3VideoReference)
@@ -209,7 +236,19 @@ def build_references(p: dict) -> list:
         k = r.get("kind") or "image"
         if k not in cls or not os.path.isfile(r.get("path") or ""):
             raise RuntimeError(f"riferimento non valido: {r.get('path')} ({k})")
-        out.append(cls[k].from_file(r["path"]))
+        if k == "audio":
+            wav = _decode_audio_av(r["path"])
+            if wav is None:
+                raise RuntimeError(f"riferimento audio senza traccia audio: {r['path']}")
+            out.append(cls[k](audio=wav, sample_rate=AUDIO_VAE_SR))
+        elif k == "video":
+            ref = cls[k].from_file(r["path"])
+            if getattr(ref, "audio", None) is not None and ref.sample_rate != AUDIO_VAE_SR:
+                ref = cls[k](frames=ref.frames, fps=ref.fps, audio=_decode_audio_av(r["path"]),
+                             sample_rate=AUDIO_VAE_SR)
+            out.append(ref)
+        else:
+            out.append(cls[k].from_file(r["path"]))
     return out
 
 
@@ -305,10 +344,15 @@ def run(p: dict) -> str:
     t0 = time.time()
     te = load_text_encoder(W)
     _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
-    st = _stage(blocks, g_text, dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
-                                      processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor"))))
+    comps = dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
+                 processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor")))
+    st = _stage(blocks, g_text, comps)
+    if mode == "ref2va":
+        # il pipeline porta ogni immagine di riferimento a 2048 px di lato corto (anche ingrandendola): con 32 GB
+        # l'attenzione del Qwen3-VL su quei token va in OOM (visto 27/09). 1024 = 4× meno token, identità intatta.
+        st.update_components(reference_image_short_edge=int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE))
     state = st(**_inputs_for(st, kw))
-    del st, te
+    del st, te, comps                          # comps teneva ancora il TE: senza, resta in VRAM
     _gc()
     _log(f"testo codificato in {time.time() - t0:.0f}s")
 
