@@ -142,7 +142,20 @@ def tts(text: str, *, voice: str = "if_sara", lang: str = "it", speed: float = 1
     payload = {"text": text, "voice": voice, "lang": lang, "speed": speed}
     if model:
         payload["model"] = model
-    res = _post_json("/tts/test", payload, port=port)
+    res = {}
+    for attempt in range(3):
+        try:
+            res = _post_json("/tts/test", payload, port=port)
+            break
+        except (ConnectionError, TimeoutError, OSError) as e:
+            # Handy chiude a volte la connessione a metà (WinError 10054, visto 27/09 fra due battute di un
+            # dialogo): si riprova dopo aver riverificato che il servizio sia su, invece di far fallire la voce
+            if attempt == 2:
+                raise
+            print(f"[handy] TTS interrotto ({e}): nuovo tentativo {attempt + 2}/3", flush=True)
+            time.sleep(2 * (attempt + 1))
+            if not ensure(port):
+                raise
     b64 = res.get("audio_b64")
     if not b64 or not out_wav:
         return ""
