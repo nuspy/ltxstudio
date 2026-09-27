@@ -88,7 +88,10 @@ def ensure_api(wait: float = 120.0) -> bool:
     root = _root()
     py = os.environ.get("LTX_API_PYTHON") or sys.executable
     print(f"[avatar-film] API spenta: la avvio ({root})", flush=True)
-    subprocess.Popen([py, "-m", "api.autostart"], cwd=str(root))
+    # l'autostart figlio ha un suo timeout e può stampare FAILED mentre l'API sta ancora partendo: lo stato vero
+    # lo decide il polling di /health qui sotto, quindi il suo output non serve
+    subprocess.Popen([py, "-m", "api.autostart"], cwd=str(root),
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     t0 = time.time()
     while time.time() - t0 < wait:
         try:
