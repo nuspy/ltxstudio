@@ -223,6 +223,14 @@ def _stage(blocks, names: list, components: dict):
     return pipe
 
 
+def _inputs_for(stage, kw: dict) -> dict:
+    """Gli ingressi della richiesta che QUESTA fase dichiara. Ogni fase va chiamata con i suoi: il denoise ha
+    bisogno di num_frames/height/width anche se la prima fase li aveva già ricevuti (altrimenti usa i default,
+    124 fotogrammi — visto il 27/09: chiesti 158, generati 124)."""
+    names = {i.name for i in stage.blocks.inputs if i.name}
+    return {k: v for k, v in kw.items() if k in names}
+
+
 def run(p: dict) -> str:
     from core import resources
     resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 26),
@@ -299,8 +307,7 @@ def run(p: dict) -> str:
     _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
     st = _stage(blocks, g_text, dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
                                       processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor"))))
-    state = st(**{k: v for k, v in kw.items() if k in ("prompt", "image", "last_image", "references",
-                                                       "height", "width", "num_frames")})
+    state = st(**_inputs_for(st, kw))
     del st, te
     _gc()
     _log(f"testo codificato in {time.time() - t0:.0f}s")
@@ -312,7 +319,7 @@ def run(p: dict) -> str:
         if mode == "ref2va":
             comps["audio_vae"] = load_audio_vae(W)
         st = _stage(blocks, g_venc, comps)
-        state = st(state=state)
+        state = st(state=state, **_inputs_for(st, kw))
         del st, comps
         _gc()
         _log(f"condizionamenti VAE in {time.time() - t0:.0f}s")
@@ -325,7 +332,8 @@ def run(p: dict) -> str:
     st = _stage(blocks, g_den, {tname: tr, "scheduler": MiniMaxH3Scheduler(shift=vshift),
                                 "audio_scheduler": MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)})
     t1 = time.time()
-    state = st(state=state, num_inference_steps=nfe + 1, generator=torch.Generator("cpu").manual_seed(seed))
+    state = st(state=state, **_inputs_for(st, kw), num_inference_steps=nfe + 1,
+               generator=torch.Generator("cpu").manual_seed(seed))
     _log(f"denoise {nfe} passi in {time.time() - t1:.0f}s ({(time.time() - t1) / max(1, nfe):.1f}s/passo) — "
          f"VRAM {_vram()}")
     del st, tr

@@ -52,6 +52,8 @@ def _probe(path: str) -> str:
 
 def main() -> int:
     turbo, secs, image = _arg("--turbo", "8"), float(_arg("--secs", "5")), _arg("--image", "")
+    prompt, line = _arg("--prompt", PROMPT), _arg("--line", LINE)
+    speaker, label = _arg("--speaker", "The knight"), _arg("--label", "knight")
     H.patch_dialogs()
     w = H.build_window()
     vt = w.video_tab
@@ -65,9 +67,9 @@ def main() -> int:
     assert (vt.model.itemData(i) or {}).get("present"), "pesi nvfp4 non presenti"
     vt.h3_turbo.setCurrentIndex(vt.h3_turbo.findData(turbo))
     vt.h3_dialogue.clear()
-    vt.h3_dialogue.add_row("The knight", "Italian", LINE)
+    vt.h3_dialogue.add_row(speaker, "Italian", line)
     vt.h3_soundscape.setText("washing machines humming and thumping, fluorescent lights buzzing")
-    vt.prompt.setPlainText(PROMPT)
+    vt.prompt.setPlainText(prompt)
     try:
         vt.res_preset.setCurrentText("Personalizzato")
     except Exception:                                        # noqa: BLE001
@@ -75,8 +77,10 @@ def main() -> int:
     vt.width.setValue(1344); vt.height.setValue(768)
     vt.length.setValue(secs)
     vt.native_audio.setChecked(True)
-    if image:
-        w.frame1_tab.canvas.load_image(image, fit_mode="canvas") if hasattr(w.frame1_tab, "canvas") else None
+    if image:                                   # i2v: la foto nel canvas del tab Immagini = primo fotogramma
+        H.load_canvas_image(w, image)
+        H.app().processEvents()
+        assert w.frame1_tab.image_path == image, "foto non caricata nel canvas"
     t0 = time.time()
     w.on_generate()
     _spin(3.0)
@@ -94,7 +98,7 @@ def main() -> int:
     if not outs:
         print("FAIL nessun video")
         return 1
-    dst = ROOT / "output" / f"DIAG_h3_knight_{'t' + turbo if turbo else 'base'}_{int(secs)}s.mp4"
+    dst = ROOT / "output" / f"DIAG_h3_{label}_{'t' + turbo if turbo else 'base'}_{int(secs)}s.mp4"
     shutil.copyfile(outs[-1], dst)
     info = _probe(str(dst))
     print(f"[live] {dst}\n[live] ffprobe: {info}")
