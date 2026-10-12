@@ -272,9 +272,17 @@ def run(p: dict) -> str:
     w, h = int(p.get("width") or 0), int(p.get("height") or 0)
     if p.get("aspect_2k") in ASPECTS_2K:
         w, h = ASPECTS_2K[p["aspect_2k"]]
-    if init_img is not None and not (w and h):       # img2img / inpaint: proporzioni dell'immagine iniziale
+    if init_img is not None and w and h and not mask_path:
+        # img2img: si genera alla forma richiesta (il canvas della GUI); la foto di partenza si adatta a quel
+        # rapporto con un ritaglio centrato — riempie il riquadro, MAI stirata
+        from PIL import ImageOps
+        w, h = w // 32 * 32, h // 32 * 32
+        init_img = ImageOps.fit(init_img, (w, h), Image.LANCZOS)
+    elif init_img is not None:
+        # inpaint (o img2img senza dimensioni): forma della foto stessa — il canvas rimette il ritaglio al pixel
         from diffusers.pipelines.qwenimage21.pipeline_qwenimage21 import calculate_dimensions
-        w, h, _ = calculate_dimensions(out_res * out_res, init_img.size[0] / init_img.size[1])
+        area = w * h if (w and h) else out_res * out_res
+        w, h, _ = calculate_dimensions(area, init_img.size[0] / init_img.size[1])
     kw = {}
     if w and h:
         kw.update(width=w // 32 * 32, height=h // 32 * 32)
