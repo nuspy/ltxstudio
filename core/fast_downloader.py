@@ -157,7 +157,8 @@ def download_url(url: str, dest: str, *, connections: int = 16, token: str | Non
 
 # ─────────── HuggingFace ───────────
 def _hf_url(repo_id: str, filename: str) -> str:
-    return f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+    from urllib.parse import quote                      # nomi con spazi (es. LoRA «NSFW Qwen by … V2»)
+    return f"https://huggingface.co/{repo_id}/resolve/main/{quote(filename, safe='/')}"
 
 
 def download_hf_file(repo_id: str, filename: str, dest: str, *, token: str | None = None,

@@ -61,8 +61,8 @@ def _set_integrate_engine_krea2(win):
     QB.process_events()
     combo = win.frame1_tab.integrate_engine
     idx = combo.findText("Krea 2 Edit")
-    if idx < 0:                                                  # tr potrebbe tradurre: prendi l'ultimo (index 2)
-        idx = combo.count() - 1
+    if idx < 0:                                                  # tr potrebbe tradurre: Krea 2 Edit = index 2
+        idx = 2
     QB.combo_select(combo, index=idx)
     QB.process_events()
     return idx
@@ -113,7 +113,7 @@ def test_recolor_krea2_edit_routing_single(win):
     QB.process_events()
     combo = ft.color_engine
     idx = combo.findText("Krea 2 Edit")
-    QB.combo_select(combo, index=idx if idx >= 0 else combo.count() - 1)
+    QB.combo_select(combo, index=idx if idx >= 0 else 2)        # Krea 2 Edit = index 2 (3 = Qwen-Image 2.1)
     ft.color_target.setText("#1e90ff")
     ft.color_subject.setText("the jacket")
     QB.process_events()

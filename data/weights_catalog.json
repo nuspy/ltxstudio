@@ -3748,6 +3748,332 @@
         "distill_lora",
         "lora_style"
       ]
+    },
+    {
+      "id": "qwen21-turbo-dit-nvfp4",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 Turbo DiT NVFP4 (5.3GB, 8 passi, RTX 50xx)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 5.3,
+      "scan_names": [
+        "qwen_image_2.1_turbo_nvfp4-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "BennyDaBall/Qwen-Image-2.1-Turbo-NVFP4",
+      "url": "https://huggingface.co/BennyDaBall/Qwen-Image-2.1-Turbo-NVFP4",
+      "filename": "qwen_image_2.1_turbo_nvfp4-native.safetensors",
+      "remote_filename": "diffusion_models/qwen_image_2.1_turbo_nvfp4.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-nvfp4"
+      ],
+      "note": "checkpoint Turbo ufficiale distillato a 8 passi (NVFP4 misto di BennyDaBall). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "convert": "qwen21_dit",
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "nvfp4",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-turbo-dit-int8",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 Turbo DiT INT8 (6.8GB, 8 passi, ogni GPU)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 6.76,
+      "scan_names": [
+        "qwen_image_2.1_turbo_int8_convrot-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Comfy-Org/Qwen-Image-2.1",
+      "url": "https://huggingface.co/Comfy-Org/Qwen-Image-2.1",
+      "filename": "qwen_image_2.1_turbo_int8_convrot-native.safetensors",
+      "remote_filename": "diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-fp8"
+      ],
+      "note": "checkpoint Turbo ufficiale distillato a 8 passi (INT8 ConvRot di Comfy-Org). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "convert": "qwen21_dit",
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "q_int8",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-uc-dit-nvfp4",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 Uncensored DiT NVFP4 (18+, 3.9GB, RTX 50xx)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 3.91,
+      "scan_names": [
+        "qwen-image-2.1-UC-NVFP4-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized",
+      "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized",
+      "filename": "qwen-image-2.1-UC-NVFP4-native.safetensors",
+      "remote_filename": "qwen-image-2.1-UC-NVFP4.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-nvfp4"
+      ],
+      "sensitivity": "adult",
+      "note": "versione senza censura dei pesi base (abenzerps). Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "convert": "qwen21_dit",
+      "use": [
+        "ckpt_image",
+        "uncensored",
+        "nvfp4",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-uc-dit-int8",
+      "module": "Immagini",
+      "label": "Qwen-Image 2.1 Uncensored DiT INT8 (18+, 6.8GB, ogni GPU)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 6.76,
+      "scan_names": [
+        "qwen-image-2.1-UC-int8_convrot-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized",
+      "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized",
+      "filename": "qwen-image-2.1-UC-int8_convrot-native.safetensors",
+      "remote_filename": "qwen-image-2.1-UC-int8_convrot.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-fp8"
+      ],
+      "sensitivity": "adult",
+      "note": "versione senza censura dei pesi base (abenzerps), INT8 ConvRot. Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "convert": "qwen21_dit",
+      "use": [
+        "ckpt_image",
+        "uncensored",
+        "q_int8",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-noctq-v4-int8",
+      "module": "Immagini",
+      "label": "Noct-Q V4 Uncensored realismo (Qwen-Image 2.1, 18+, 6.8GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 6.76,
+      "scan_names": [
+        "NoctQ_V4_int8_convrot-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Noctaluna/Noct-Q-Uncensored-Qwen-Image-2.1",
+      "url": "https://huggingface.co/Noctaluna/Noct-Q-Uncensored-Qwen-Image-2.1",
+      "filename": "NoctQ_V4_int8_convrot-native.safetensors",
+      "remote_filename": "NoctQ_V4_int8_convrot.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-fp8"
+      ],
+      "sensitivity": "adult",
+      "note": "merge fotorealistico senza censura (Noctaluna): 25 passi, CFG 3 col negativo; prompt in prosa. Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "convert": "qwen21_dit",
+      "use": [
+        "ckpt_image",
+        "uncensored",
+        "q_int8",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-noctq-anime-int8",
+      "module": "Immagini",
+      "label": "Noct-Q Anime V1 Uncensored (Qwen-Image 2.1, 18+, 6.8GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 6.76,
+      "scan_names": [
+        "NoctQA_V1_int8_convrot-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Noctaluna/Noct-Q-Anime-Uncensored-Qwen-Image-2.1",
+      "url": "https://huggingface.co/Noctaluna/Noct-Q-Anime-Uncensored-Qwen-Image-2.1",
+      "filename": "NoctQA_V1_int8_convrot-native.safetensors",
+      "remote_filename": "NoctQA_V1_int8_convrot.safetensors",
+      "deps": [
+        "qwen21-configs",
+        "qwen21-vae",
+        "qwen21-te-fp8"
+      ],
+      "sensitivity": "adult",
+      "note": "merge anime/illustrazione senza censura (Noctaluna): 25 passi, CFG 3 col negativo. Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "convert": "qwen21_dit",
+      "use": [
+        "ckpt_image",
+        "uncensored",
+        "q_int8",
+        "multiref10"
+      ]
+    },
+    {
+      "id": "qwen21-lora-nsfw-alpacas-v1",
+      "module": "Immagini",
+      "label": "LoRA NSFW Qwen-Image 2.1 v1 (TheseAlpacas, 18+, 0.15GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.15,
+      "scan_names": [
+        "NSFW_Qwen21_TheseAlpacas_v1.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "Wickedlizerd/NSFW-Qwen-Image-2.1-LoRA",
+      "url": "https://huggingface.co/Wickedlizerd/NSFW-Qwen-Image-2.1-LoRA",
+      "filename": "NSFW_Qwen21_TheseAlpacas_v1.safetensors",
+      "remote_filename": "nsfw_qwen_21.safetensors",
+      "sensitivity": "adult",
+      "note": "rank 32, nessuna trigger word; l'autore consiglia ≥25 passi. Mirror con licenza di civitai 2958918. Licenza Qwen Research: uso NON commerciale",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "qwen21-lora-nsfw-alpacas-v2",
+      "module": "Immagini",
+      "label": "LoRA NSFW Qwen-Image 2.1 v2 (TheseAlpacas, 18+, 0.07GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.07,
+      "scan_names": [
+        "NSFW_Qwen21_TheseAlpacas_v2.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "IMOON007/qwenimage-2.1-nsfw-lora",
+      "url": "https://huggingface.co/IMOON007/qwenimage-2.1-nsfw-lora",
+      "filename": "NSFW_Qwen21_TheseAlpacas_v2.safetensors",
+      "remote_filename": "NSFW Qwen by TheseAlpacas V2.safetensors",
+      "sensitivity": "adult",
+      "note": "seconda versione (rank 16, anche sull'MLP). Licenza Qwen Research: uso NON commerciale",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "qwen21-lora-nsfw-edit",
+      "module": "Immagini",
+      "label": "LoRA NSFW Image Edit Qwen-Image 2.1 (18+, 0.08GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.08,
+      "scan_names": [
+        "Qwen21_NSFW_Image_Edit.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "RunningHubAI/rh-qwen-image-2.1-aio-nsfw-lora",
+      "url": "https://huggingface.co/RunningHubAI/rh-qwen-image-2.1-aio-nsfw-lora",
+      "filename": "Qwen21_NSFW_Image_Edit.safetensors",
+      "remote_filename": "Qwen-Image 2.1 NSFW Image Edit.safetensors",
+      "sensitivity": "adult",
+      "note": "per l'EDITING con riferimento (spogliare, pose): addestrata con istruzioni brevi in CINESE, in inglese rende poco. Licenza dell'autore",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "qwen21-lora-uncensored",
+      "module": "Immagini",
+      "label": "LoRA Uncensored Qwen-Image 2.1 (abenzerps, 18+, 0.03GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.03,
+      "scan_names": [
+        "Qwen21_Uncensored_abenzerps.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "repo_id": "abenzerps/Qwen-Image-2.1-Uncensored-Quantized",
+      "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-Quantized",
+      "filename": "Qwen21_Uncensored_abenzerps.safetensors",
+      "remote_filename": "qwen-image-2.1-uncensored-lora.safetensors",
+      "sensitivity": "adult",
+      "note": "toglie la censura a qualunque DiT base (solo attenzione, rank 16). Licenza Qwen Research: uso NON commerciale",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

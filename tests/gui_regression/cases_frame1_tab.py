@@ -191,6 +191,8 @@ def _gen_model_cases():
     cases = []
     arch_map = {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}
     for arch_lbl in GEN_ARCH.keys():
+        if arch_lbl in ("Krea 2", "Qwen-Image 2.1"):       # voci di CATALOGO, non file: casi propri
+            continue                                        # (cases_qwen21_image, test_qtbot_krea2_edit)
         for idx, m in enumerate(_gen_models_for_arch(arch_lbl)):
             safe = "".join(c if c.isalnum() else "_" for c in os.path.basename(m))[:48]
             name = f"frame1_generate_image_{arch_map.get(arch_lbl, arch_lbl)}__{idx:02d}_{safe}"

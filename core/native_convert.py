@@ -31,7 +31,9 @@ import sys
 from pathlib import Path
 
 FORMAT = "ltx-native-1"
-_DROP_SUFFIX = (".comfy_quant", ".input_scale")
+# marcatori solo-ComfyUI, niente pesi: schema di quantizzazione (letto prima), scala d'ingresso, e il suggerimento
+# di kernel d'attenzione `comfy_attention.config` ({"attention": "comfy_kitchen_int8"}, es. Turbo INT8 di Comfy-Org)
+_DROP_SUFFIX = (".comfy_quant", ".input_scale", ".comfy_attention.config")
 
 
 def _torch():

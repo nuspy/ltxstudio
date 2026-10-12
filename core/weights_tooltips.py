@@ -51,6 +51,7 @@ USE_TAGS: dict[str, str] = {
     "avatar": "Avatar parlante: anima una foto sulla voce, con labiale sincronizzato.",
     "audio_enc": "Encoder audio: estrae dal parlato i segnali che guidano il labiale.",
     "multiref10": "Fino a 10 immagini di riferimento (persone, prodotti, stili) e trasparenza RGBA nativa.",
+    "uncensored": "Senza censura (18+): nudo ed esplicito senza filtri; visibile solo in modalità NSFW.",
 }
 
 

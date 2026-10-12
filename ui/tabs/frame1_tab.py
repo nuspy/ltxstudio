@@ -57,12 +57,20 @@ GEN_ARCH = {
 }
 
 
-# Qwen-Image 2.1: profili di peso che stanno in 32GB (voci di catalogo; il worker li risolve per id)
+# Qwen-Image 2.1: DiT che stanno in 32GB (voci di catalogo; il worker li risolve per id — core/qwen21_spec.DITS).
+# Le voci 18+ (sensitivity=adult nel catalogo) compaiono solo in modalità NSFW, come le LoRA 🔞.
 QWEN21_PROFILES = (
     ("qwen21-dit-nvfp4", "f1.gen.qwen21.nvfp4", "Qwen-Image 2.1 NVFP4 (RTX 50xx, 12.4GB totali)"),
     ("qwen21-dit-fp8", "f1.gen.qwen21.fp8", "Qwen-Image 2.1 FP8 (RTX 40xx/50xx, 17.2GB totali)"),
     ("qwen21-dit-int8", "f1.gen.qwen21.int8", "Qwen-Image 2.1 INT8 (ogni GPU, qualità migliore, 17.3GB)"),
+    ("qwen21-turbo-dit-nvfp4", "f1.gen.qwen21.turbo_nvfp4", "Qwen-Image 2.1 Turbo NVFP4 (8 passi, RTX 50xx)"),
+    ("qwen21-turbo-dit-int8", "f1.gen.qwen21.turbo_int8", "Qwen-Image 2.1 Turbo INT8 (8 passi, ogni GPU)"),
+    ("qwen21-uc-dit-nvfp4", "f1.gen.qwen21.uc_nvfp4", "🔞 Qwen-Image 2.1 Uncensored NVFP4 (RTX 50xx)"),
+    ("qwen21-uc-dit-int8", "f1.gen.qwen21.uc_int8", "🔞 Qwen-Image 2.1 Uncensored INT8 (ogni GPU)"),
+    ("qwen21-noctq-v4-int8", "f1.gen.qwen21.noctq", "🔞 Noct-Q V4 realismo (25 passi, CFG 3)"),
+    ("qwen21-noctq-anime-int8", "f1.gen.qwen21.noctq_anime", "🔞 Noct-Q Anime V1 (25 passi, CFG 3)"),
 )
+QWEN21_ENGINE_IDX = 3       # posizione di «Qwen-Image 2.1» nei combo motore di Integra/Componi/Colore
 QWEN21_ASPECTS = ("1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16")
 
 
@@ -132,6 +140,7 @@ class Frame1Tab(QWidget):
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(sub)
         lay.addWidget(_placeholder)     # hidden: tiene vivi i widget back-compat
+        self._reload_qwen21_edit_combos()
         self._reload_inpaint_loras(); self._reload_gen(); self._reload_flux_combos()
 
     def _scroll(self, w: QWidget) -> QScrollArea:
@@ -426,6 +435,7 @@ class Frame1Tab(QWidget):
     def _on_img_nsfw(self, *_):
         """Cambio NSFW/SFW immagine → re-filtro istantaneo di modelli e LoRA."""
         self._reload_gen()
+        self._reload_qwen21_edit_combos()
         self._reload_inpaint_loras()
         self._reload_flux_combos()
 
@@ -467,11 +477,16 @@ class Frame1Tab(QWidget):
 
     def _reload_gen(self, *_):
         arch_lbl = self.gen_arch.currentText()
-        if arch_lbl == "Krea 2":                              # snapshot diffusers → varianti dal catalogo (no file)
-            self._reload_gen_krea2()
-            return
-        if arch_lbl == "Qwen-Image 2.1":                      # profili di peso dal catalogo (nvfp4/fp8/int8)
-            self._reload_gen_qwen21()
+        if arch_lbl in ("Krea 2", "Qwen-Image 2.1"):          # voci dal catalogo pesi (nessun file-modello)
+            if arch_lbl == "Krea 2":
+                self._reload_gen_krea2()
+            else:
+                self._reload_gen_qwen21()
+            if hasattr(self, "gen_warn_lbl"):                 # niente golden template: worker dedicato
+                self.gen_warn_lbl.setVisible(False)
+                self.gen_btn.setEnabled(True)
+            if hasattr(self, "gen_lora_tab"):                 # rifiltra le LoRA (SFW/NSFW) anche qui
+                self.gen_lora_tab.refresh()
             return
         _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
         allow = self._allow_nsfw()
@@ -595,6 +610,35 @@ class Frame1Tab(QWidget):
             "Con riferimenti la generazione diventa editing (es. «la persona di image 1 al mare»)."))
         self.q21_refs.insert_token.connect(lambda tok: self.gen_prompt.insertPlainText(tok + " "))
         ff.addRow(self.q21_refs)
+        # img2img: parte da una foto rumorata invece che dal rumore puro (forza = quanto la si ridisegna).
+        # Diverso dai riferimenti: qui composizione e colori dell'immagine restano, il prompt la reinterpreta.
+        self.q21_i2i = QCheckBox(tr("f1.gen.qwen21.i2i", "Parti da un'immagine (img2img)"))
+        self.q21_i2i.setToolTip(tr("f1.gen.qwen21.i2i.tt",
+            "Ridisegna una foto esistente seguendo il prompt: mantiene composizione e colori, cambia stile e "
+            "dettagli. Diverso dai riferimenti, che il modello reinterpreta liberamente."))
+        ff.addRow("", self.q21_i2i)
+        self.q21_i2i_photo = self._photo_field(tr("f1.photo.ph", "(vuoto = la foto nel canvas)"))
+        self._q21_i2i_photo_lbl = QLabel(tr("f1.gen.qwen21.i2i_photo", "Immagine iniziale"))
+        ff.addRow(self._q21_i2i_photo_lbl, self.q21_i2i_photo["row"])
+        srow = QHBoxLayout()
+        self.q21_strength = QSlider(Qt.Horizontal); self.q21_strength.setRange(5, 100)
+        from core.qwen21_spec import DEFAULT_STRENGTH as _DS
+        self.q21_strength.setValue(int(_DS * 100))
+        self.q21_strength_lbl = QLabel(f"{_DS:.2f}")
+        self.q21_strength.valueChanged.connect(lambda v: self.q21_strength_lbl.setText(f"{v / 100:.2f}"))
+        self.q21_strength.setToolTip(tr("f1.gen.qwen21.strength.tt",
+            "Quanto ridisegnare: 0.30 = ritocco leggero, 0.60 = nuovo stile sulla stessa scena, 1.00 = da zero."))
+        srow.addWidget(self.q21_strength, 1); srow.addWidget(self.q21_strength_lbl)
+        self._q21_strength_row = self._wrapw(srow)
+        self._q21_strength_lbl = QLabel(tr("f1.gen.qwen21.strength", "Forza img2img"))
+        ff.addRow(self._q21_strength_lbl, self._q21_strength_row)
+
+        def _sync_i2i(on: bool):
+            for w in (self.q21_i2i_photo["row"], self._q21_i2i_photo_lbl, self._q21_strength_row,
+                      self._q21_strength_lbl):
+                w.setVisible(on)
+        self.q21_i2i.toggled.connect(_sync_i2i)
+        _sync_i2i(False)
         lic = QLabel(tr("f1.gen.qwen21.license",
                         "Licenza Qwen Research: uso non commerciale. I pesi li scarichi tu dal tab Pesi."))
         lic.setWordWrap(True); lic.setStyleSheet("color:#e8b339; font-size:11px;")
@@ -603,27 +647,44 @@ class Frame1Tab(QWidget):
         box.setVisible(False)
         self.gen_arch.currentTextChanged.connect(self._sync_qwen21_box)
         self.img_nsfw.currentTextChanged.connect(self._sync_qwen21_box)
+        # passi/CFG consigliati per il DiT scelto (Turbo, Noct-Q…): DOPO i default d'arch (connessi prima)
+        self.gen_model.currentIndexChanged.connect(self._on_qwen21_dit_changed)
+        self.gen_arch.currentTextChanged.connect(self._on_qwen21_dit_changed)
         return box
 
     def _sync_qwen21_box(self, *_):
         on = self.gen_arch.currentText() == "Qwen-Image 2.1"
         self._q21_box.setVisible(on)
-        adult = self._allow_nsfw()
+        adult = self._adult_ok()
         self.q21_te.setVisible(adult); self._q21_te_lbl.setVisible(adult)
         if not adult:
             self.q21_te.setCurrentIndex(0)
 
-    def _reload_gen_catalog(self, items):
-        """Popola il dropdown con voci di CATALOGO (snapshot/profili senza file-modello unico), con badge ⬇
-        e colore se non presenti → download-on-select come nel tab Video. items = [(cat_id, label)]."""
+    def _adult_ok(self) -> bool:
+        """Voci 18+ ammesse: modalità NSFW scelta E edizione che le consente (DEV: sempre)."""
+        if not self._allow_nsfw():
+            return False
+        try:
+            from core import nsfw_policy
+            return nsfw_policy.adult_allowed()
+        except Exception:                                     # noqa: BLE001
+            return True
+
+    def _reload_gen_catalog(self, items, combo=None):
+        """Popola un dropdown con voci di CATALOGO (snapshot/profili senza file-modello unico), con badge ⬇
+        e colore se non presenti → download-on-select come nel tab Video. items = [(cat_id, label)].
+        Le voci 18+ (sensitivity=adult) passano solo se _adult_ok(). Mantiene la selezione se resta visibile."""
         from core import weights_catalog as wc
         from PySide6.QtGui import QColor
+        combo = combo if combo is not None else self.gen_model
         entries = {e["id"]: e for e in wc.load()}
-        self.gen_model.blockSignals(True)
-        self.gen_model.clear()
+        adult_ok = self._adult_ok()
+        prev = combo.currentData()
+        combo.blockSignals(True)
+        combo.clear()
         for cat_id, label in items:
             e = entries.get(cat_id)
-            if not e:
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok):
                 continue
             present = False
             try:
@@ -631,16 +692,55 @@ class Frame1Tab(QWidget):
             except Exception:                                 # noqa: BLE001
                 pass
             gb = e.get("approx_gb", 0)
-            self.gen_model.addItem(f"{'' if present else '⬇ '}{label}  · ~{gb}GB", cat_id)
+            combo.addItem(f"{'' if present else '⬇ '}{label}  · ~{gb}GB", cat_id)
             from core import weights_tooltips as _wt         # tooltip esplicativo unificato (i18n)
-            self.gen_model.setItemData(self.gen_model.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
+            combo.setItemData(combo.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
-                self.gen_model.setItemData(self.gen_model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
-        self.gen_model.blockSignals(False)
-        self._update_gen_star()
+                combo.setItemData(combo.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        i = combo.findData(prev) if prev else -1
+        if i >= 0:
+            combo.setCurrentIndex(i)
+        combo.blockSignals(False)
+        if combo is self.gen_model:
+            self._update_gen_star()
+
+    def _qwen21_items(self):
+        return [(cid, tr(k, fb)) for cid, k, fb in QWEN21_PROFILES]
 
     def _reload_gen_qwen21(self, *_):
-        self._reload_gen_catalog([(cid, tr(k, fb)) for cid, k, fb in QWEN21_PROFILES])
+        self._reload_gen_catalog(self._qwen21_items())
+        self._on_qwen21_dit_changed()
+
+    def _on_qwen21_dit_changed(self, *_):
+        """DiT Qwen scelto → passi/CFG consigliati: Turbo = 8 passi fissi a CFG 1 (niente LoRA turbo),
+        Noct-Q = 25/3 (dall'autore), altrimenti 40/1. Come per i modelli inpaint, l'utente può poi cambiarli."""
+        if not hasattr(self, "gen_cfg"):                      # chiamato durante la costruzione del form
+            return
+        if self.gen_arch.currentText() != "Qwen-Image 2.1":
+            for w in (self.gen_steps, self.gen_cfg):
+                w.setEnabled(True)
+            return
+        from core.qwen21_spec import DITS, TURBO_STEPS, DEFAULT_STEPS, DEFAULT_GUIDANCE
+        meta = DITS.get(str(self.gen_model.currentData() or ""), {})
+        turbo = bool(meta.get("turbo"))
+        if turbo:
+            self.q21_turbo.setCurrentIndex(0)
+        self.q21_turbo.setEnabled(not turbo)
+        self.gen_steps.setValue(TURBO_STEPS if turbo else int(meta.get("steps", DEFAULT_STEPS)))
+        self.gen_cfg.setValue(1.0 if turbo else float(meta.get("cfg", DEFAULT_GUIDANCE)))
+        fixed = tr("f1.gen.qwen21.turbo_fixed", "Il checkpoint Turbo usa la sua schedule: 8 passi, CFG 1.")
+        self.gen_steps.setEnabled(not turbo); self.gen_cfg.setEnabled(not turbo)
+        self.gen_steps.setToolTip(fixed if turbo else tr(
+            "f1.steps.tt", "Numero di passi di diffusione: più passi = più dettaglio e tempi più lunghi."))
+        self.gen_cfg.setToolTip(fixed if turbo else tr(
+            "f1.gen.cfg.tt", "Guidance (CFG): quanto l'immagine aderisce al prompt; valori troppo alti creano artefatti."))
+
+    def _offer_catalog_download(self, combo):
+        """Su click utente in un combo Qwen dei pannelli di editing: offre il download del DiT scelto (+ deps)."""
+        cat_id = combo.currentData()
+        if not isinstance(cat_id, str) or not cat_id.startswith("qwen21"):
+            return
+        self._offer_download_ids(cat_id)
 
     def _reload_gen_krea2(self, *_):
         """Popola il dropdown con le varianti Krea 2 (Turbo/Raw) dal catalogo pesi, con badge ⬇ se non presenti
@@ -656,6 +756,10 @@ class Frame1Tab(QWidget):
         cat_id = self.gen_model.currentData()
         if not isinstance(cat_id, str) or not cat_id.startswith(("krea2", "qwen21")):
             return
+        self._offer_download_ids(cat_id)
+
+    def _offer_download_ids(self, cat_id: str):
+        """Voce di catalogo (con le sue deps) non presente → chiede e scarica (dialog non bloccante)."""
         from core import weights_catalog as wc
         entries = {e["id"]: e for e in wc.load()}
         e = entries.get(cat_id)
@@ -692,6 +796,8 @@ class Frame1Tab(QWidget):
         def _fin(*_):
             dlg.close()
             self._reload_gen()                                # riflette la nuova presenza (toglie il ⬇)
+            self._reload_flux_combos()                        # anche nei combo Qwen dei pannelli di editing
+            self._reload_qwen21_edit_combos()
         proc.finished.connect(_fin)
         dlg.canceled.connect(proc.kill)
         proc.start(sys.executable, ["-u", script, "--ids", ids_arg])
@@ -760,6 +866,11 @@ class Frame1Tab(QWidget):
             cur = ic.currentText()
             engine = (self.integrate_engine.currentIndex()
                       if hasattr(self, "integrate_engine") else 0)
+            if engine == QWEN21_ENGINE_IDX:        # Qwen-Image 2.1 → DiT dal catalogo (18+ solo in NSFW)
+                self._reload_gen_catalog(self._qwen21_items(), combo=ic)
+                if hasattr(self, "integrate_puzzle"):
+                    self.integrate_puzzle.setEnabled(False); self.integrate_puzzle.setChecked(False)
+                return
             if engine == 2:                        # Krea 2 Edit → varianti Turbo/Raw (snapshot, no file)
                 ic.clear()
                 for cid, lbl in (("krea2_turbo", tr("f1.gen.krea2.turbo", "Krea 2 Turbo (8 step, veloce)")),
@@ -950,7 +1061,8 @@ class Frame1Tab(QWidget):
         g.addRow(tr("f1.integrate.prompt_lbl"), self.integrate_prompt)
         self.integrate_engine = QComboBox()
         self.integrate_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2"),
-                                        tr("f1.engine.krea2edit", "Krea 2 Edit")])
+                                        tr("f1.engine.krea2edit", "Krea 2 Edit"),
+                                        tr("f1.engine.qwen21", "Qwen-Image 2.1")])
         self.integrate_engine.setToolTip(tr("f1.integrate.engine.tt"))
         # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 / FLUX.2 / Krea 2 Turbo-Raw) +
         # abilitazione del puzzle_lora (LoRA FLUX.1) + visibilità dello slider grounding (solo Krea 2 Edit).
@@ -976,6 +1088,9 @@ class Frame1Tab(QWidget):
         g.addRow("", self.integrate_puzzle)
         self.integrate_model = QComboBox()
         self.integrate_model.setToolTip(tr("f1.integrate.model.tt", "Modello usato per l'integrazione (Kontext FLUX.1 o FLUX.2)."))
+        self.integrate_model.activated.connect(                # Qwen: download-on-select del DiT scelto
+            lambda *_: self.integrate_engine.currentIndex() == QWEN21_ENGINE_IDX
+            and self._offer_catalog_download(self.integrate_model))
         # Label dinamica: aggiornata da _on_integrate_engine_changed.
         self._integrate_model_label = QLabel(tr("f1.model_lbl"))
         g.addRow(self._integrate_model_label, self.integrate_model)
@@ -1089,9 +1204,18 @@ class Frame1Tab(QWidget):
         f.addRow(tr("f1.color.subject_lbl"), self.color_subject)
         self.color_engine = QComboBox()
         self.color_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2"),
-                                    tr("f1.engine.krea2edit", "Krea 2 Edit")])
-        self.color_engine.setToolTip(tr("f1.color.engine.tt", "Motore per il cambio colore: Kontext (FLUX.1), FLUX.2 o Krea 2 Edit."))
+                                    tr("f1.engine.krea2edit", "Krea 2 Edit"),
+                                    tr("f1.engine.qwen21", "Qwen-Image 2.1")])
+        self.color_engine.setToolTip(tr("f1.color.engine.tt",
+            "Motore per il cambio colore: Kontext (FLUX.1), FLUX.2, Krea 2 Edit o Qwen-Image 2.1."))
         f.addRow(tr("f1.engine_lbl"), self.color_engine)
+        # Modello Qwen-Image 2.1 (solo con quel motore): gli altri motori prendono il modello da Integra
+        self.color_model = QComboBox()
+        self.color_model.setToolTip(tr("f1.color.model.tt", "Modello Qwen-Image 2.1 usato per il cambio colore."))
+        self.color_model.activated.connect(lambda *_: self._offer_catalog_download(self.color_model))
+        self._color_model_lbl = QLabel(tr("f1.integrate.model.qwen21", "Modello (Qwen-Image 2.1)"))
+        f.addRow(self._color_model_lbl, self.color_model)
+        self.color_engine.currentIndexChanged.connect(self._on_color_engine_changed)
         self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
         self.color_steps.setToolTip(tr("f1.steps.tt", "Numero di passi di diffusione: più passi = più dettaglio e tempi più lunghi."))
         f.addRow(tr("f1.steps_lbl"), self.color_steps)
@@ -1102,7 +1226,14 @@ class Frame1Tab(QWidget):
         note = QLabel(tr("f1.color.note"))
         note.setWordWrap(True); note.setStyleSheet("color:#888;")
         f.addRow(note)
+        self._on_color_engine_changed(self.color_engine.currentIndex())
         return box
+
+    def _on_color_engine_changed(self, idx: int):
+        on = idx == QWEN21_ENGINE_IDX
+        self.color_model.setVisible(on); self._color_model_lbl.setVisible(on)
+        if on:
+            self._reload_gen_catalog(self._qwen21_items(), combo=self.color_model)
 
     def _wrapw(self, layout) -> QWidget:
         w = QWidget(); w.setLayout(layout); return w
@@ -1116,8 +1247,13 @@ class Frame1Tab(QWidget):
 
     @staticmethod
     def _engine_val(idx: int) -> str:
-        """Indice combo motore → valore backend. 0=Kontext(FLUX.1), 1=FLUX.2, 2=Krea 2 Edit."""
-        return {0: "kontext", 1: "flux2", 2: "krea2"}.get(int(idx), "kontext")
+        """Indice combo motore → valore backend. 0=Kontext(FLUX.1), 1=FLUX.2, 2=Krea 2 Edit, 3=Qwen-Image 2.1."""
+        return {0: "kontext", 1: "flux2", 2: "krea2", QWEN21_ENGINE_IDX: "qwen_image21"}.get(int(idx), "kontext")
+
+    def qwen21_edit_dit(self, combo=None) -> str:
+        """DiT Qwen scelto in un combo dei pannelli di editing (default: quello di Integra/Componi)."""
+        d = (combo if combo is not None else self.integrate_model).currentData()
+        return d if isinstance(d, str) and d.startswith("qwen21-") else ""
 
     def edit_grounding_px(self) -> int:
         return int(self.edit_grounding.value()) if hasattr(self, "edit_grounding") else 768
@@ -1134,12 +1270,20 @@ class Frame1Tab(QWidget):
             "target": self.color_target.text().strip(),
             "subject": self.color_subject.text().strip(),
             "engine": self._engine_val(self.color_engine.currentIndex()),
+            "qwen21_dit": self.qwen21_edit_dit(self.color_model),
             "grounding": self.edit_grounding_px(),
             "steps": self.color_steps.value(),
         }
 
     def _reload_inpaint_loras(self, *_):
         label = self.inp_model.currentText().split("  ⛔")[0]
+        q21 = getattr(self, "_qwen21_inp", {}).get(label)
+        if q21:                                    # Qwen-Image 2.1 → LoRA Qwen21 + passi/CFG consigliati
+            fill_lora_combo(self.inp_lora, "Qwen21", allow_nsfw=self._allow_nsfw())
+            from core.qwen21_spec import DITS, TURBO_STEPS, DEFAULT_STEPS
+            meta = DITS.get(q21, {})
+            self.inp_steps.setValue(TURBO_STEPS if meta.get("turbo") else int(meta.get("steps", DEFAULT_STEPS)))
+            return
         # Tutte le voci dinamiche FLUX (checkpoint o UNET) usano lo stesso pool LoRA Flux.
         if label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {}):
             fill_lora_combo(self.inp_lora, "Flux", allow_nsfw=self._allow_nsfw())
@@ -1199,7 +1343,9 @@ class Frame1Tab(QWidget):
 
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
-        if _idx == 2:
+        if _idx == QWEN21_ENGINE_IDX:
+            engine_label = tr("f1.integrate.model.qwen21", "Modello (Qwen-Image 2.1)")
+        elif _idx == 2:
             engine_label = tr("f1.integrate.model.krea2", "Modello (Krea 2)")
         elif _idx == 1:
             engine_label = tr("f1.integrate.model.flux2")
@@ -1513,7 +1659,8 @@ class Frame1Tab(QWidget):
             label = self.inp_model.itemText(i).split("  ⛔")[0]
             # Modelli dinamici (checkpoint Flux o UNET Flux): vengono dall'inventario
             # ComfyUI → sono per definizione installati, niente marker ⛔.
-            if label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {}):
+            if (label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {})
+                    or label in getattr(self, "_qwen21_inp", {})):     # Qwen: presenza dal catalogo pesi
                 self.inp_model.setItemText(i, label)
                 continue
             spec = INPAINT_MODELS.get(label, {})
@@ -1540,12 +1687,52 @@ class Frame1Tab(QWidget):
             "prompt_negative": self.neg.toPlainText().strip(),
         }
 
+    def _reload_qwen21_edit_combos(self, *_):
+        """Voci Qwen-Image 2.1 nei pannelli di editing: combo modello del Cambia colore e voci del combo
+        Inpaint/Outpaint (prima di «Nessuno»). Rifiltrate al cambio SFW/NSFW e dopo un download."""
+        if hasattr(self, "color_model") and self.color_engine.currentIndex() == QWEN21_ENGINE_IDX:
+            self._reload_gen_catalog(self._qwen21_items(), combo=self.color_model)
+        if not hasattr(self, "inp_model"):
+            return
+        from core import weights_catalog as wc
+        entries = {e["id"]: e for e in wc.load()}
+        cur = self._inp_label()
+        self.inp_model.blockSignals(True)
+        for label in list(getattr(self, "_qwen21_inp", {})):
+            i = self.inp_model.findText(label)
+            if i >= 0:
+                self.inp_model.removeItem(i)
+        self._qwen21_inp = {}
+        none_idx = self.inp_model.findText("Nessuno (solo LTX I2V)")
+        at = none_idx if none_idx >= 0 else self.inp_model.count()
+        adult_ok = self._adult_ok()
+        for cid, lbl in self._qwen21_items():
+            e = entries.get(cid)
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok):
+                continue
+            label = f"{lbl}  · Qwen-Image 2.1" + ("" if wc.ready_with_deps(e) else "  ⬇")
+            self._qwen21_inp[label] = cid
+            self.inp_model.insertItem(at, label)
+            at += 1
+        i = self.inp_model.findText(cur)
+        if i >= 0:
+            self.inp_model.setCurrentIndex(i)
+        self.inp_model.blockSignals(False)
+        if self.inp_model.currentText() != cur:               # la voce scelta è sparita (es. SFW)
+            self._reload_inpaint_loras()
+
     def _auto_inp_guidance(self, label: str):
         """Auto-imposta la Guidance secondo il modello inpaint: Fill dev=alta (30), distillato/Hyper=bassa (2.5),
         FLUX base=media (3.5), Klein=bassa (4). Guida l'utente al valore giusto (poi può cambiarlo)."""
         if not hasattr(self, "inp_guidance"):
             return
         l = (label or "").lower()
+        q21 = getattr(self, "_qwen21_inp", {}).get((label or "").split("  ⛔")[0])
+        if q21:                                    # Qwen-Image 2.1: CFG vera (1 = nessuna), Noct-Q 3
+            from core.qwen21_spec import DITS, DEFAULT_GUIDANCE
+            meta = DITS.get(q21, {})
+            self.inp_guidance.setValue(1.0 if meta.get("turbo") else float(meta.get("cfg", DEFAULT_GUIDANCE)))
+            return
         if "hyper" in l or "hyp8" in l or "hyp-8" in l or "distill" in l or "turbo" in l:
             g = 2.5
         elif "klein" in l or "flux.2" in l or "flux2" in l:
@@ -1564,7 +1751,10 @@ class Frame1Tab(QWidget):
         # - hardcoded (FLUX Fill / FLUX Fill GGUF):    INPAINT_MODELS
         ckpt = self._dynamic_checkpoints.get(label)
         dyn_unet = getattr(self, "_dynamic_unets", {}).get(label)
-        if ckpt:
+        q21 = getattr(self, "_qwen21_inp", {}).get(label)
+        if q21:                                    # Qwen-Image 2.1: niente unet/checkpoint, lo risolve il worker
+            spec = {"arch": "Qwen21", "unet": None, "steps": self.inp_steps.value()}
+        elif ckpt:
             spec = {"arch": "Flux", "unet": None, "steps": self.inp_steps.value()}
         elif dyn_unet:
             spec = {"arch": "Flux", "unet": dyn_unet, "steps": self.inp_steps.value()}
@@ -1582,6 +1772,7 @@ class Frame1Tab(QWidget):
             "integrate_model": imodel or None,
             "integrate_engine": self._engine_val(self.integrate_engine.currentIndex()),
             "integrate_variant": self._integrate_krea2_variant(),   # turbo/raw quando engine=krea2
+            "integrate_qwen21_dit": self.qwen21_edit_dit(),         # DiT quando engine=qwen_image21
             "grounding": self.edit_grounding_px(),
             "integrate_puzzle_lora": ("MagicQuill\\puzzle_lora.safetensors"
                                       if self.integrate_puzzle.isChecked() else None),
@@ -1612,6 +1803,7 @@ class Frame1Tab(QWidget):
             "model": label,
             "unet": unet,
             "checkpoint": ckpt,
+            "qwen21_dit": q21 or "",
             "steps": self.inp_steps.value(),
             "seed": None if self.inp_seed_rand.isChecked() else self.inp_seed.value(),
             "lora": self.inp_lora.currentData(),
@@ -1653,6 +1845,7 @@ class Frame1Tab(QWidget):
             "prompt": self.compose_prompt.toPlainText().strip(),
             "engine": self._engine_val(self.integrate_engine.currentIndex()),
             "variant": self._integrate_krea2_variant(),            # turbo/raw quando engine=krea2
+            "qwen21_dit": self.qwen21_edit_dit(),                  # DiT quando engine=qwen_image21
             "grounding": self.edit_grounding_px(),
             "model": (self.integrate_model.currentText() if self.integrate_model.count() else "") or None,
         }
@@ -1704,15 +1897,22 @@ class Frame1Tab(QWidget):
         if self.gen_arch.currentText() != "Qwen-Image 2.1":
             return {}
         cid = str(self.gen_model.currentData() or "qwen21-dit-fp8")
-        return {
-            "qwen21_profile": cid.rsplit("-", 1)[-1],        # qwen21-dit-nvfp4 → nvfp4
-            "qwen21_weight_id": cid,
+        out = {
+            "qwen21_dit": cid,                               # DiT di catalogo (il worker lo usa così com'è)
             "qwen21_turbo": self.q21_turbo.currentData() or "",
-            "qwen21_te": self.q21_te.currentData() or "",
+            "qwen21_te": self.qwen21_te(),
             "transparent": self.q21_rgba.isChecked(),
             "aspect_2k": self.q21_aspect.currentData() or "",
             "ref_images": [r["path"] for r in self.q21_refs.get_references() if r.get("kind") == "image"],
         }
+        if self.q21_i2i.isChecked():                         # img2img: campo vuoto = foto del canvas
+            out["init_image"] = self.q21_i2i_photo["edit"].text().strip() or (self.image_path or "")
+            out["strength"] = self.q21_strength.value() / 100.0
+        return out
+
+    def qwen21_te(self) -> str:
+        """Variante del text encoder (""/heretic): l'encoder 18+ vale solo se le voci 18+ sono ammesse."""
+        return (self.q21_te.currentData() or "") if self._adult_ok() else ""
 
     @property
     def image_path(self):

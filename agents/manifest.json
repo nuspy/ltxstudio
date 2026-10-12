@@ -15,20 +15,119 @@
     "group": "immagini",
     "summary": "Image Generate",
     "params": {
+      "qwen21_dit": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Dit",
+        "description": "DiT di catalogo (GET /image/qwen21/options), default qwen21-dit-fp8"
+      },
+      "qwen21_te": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Te",
+        "description": "'' | heretic (encoder 18+)"
+      },
+      "qwen21_turbo": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Turbo",
+        "description": "'' | 4 | 6 (LoRA turbo, solo DiT non Turbo)"
+      },
+      "transparent": {
+        "type": "boolean",
+        "title": "Transparent",
+        "default": false
+      },
+      "aspect_2k": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Aspect 2K",
+        "description": "1:1 | 4:3 | 3:4 | 3:2 | 2:3 | 16:9 | 9:16"
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "≤10 riferimenti, citati come «image N» nel prompt"
+      },
       "prompt": {
         "type": "string",
         "title": "Prompt"
       },
       "model": {
-        "type": "string",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "title": "Model",
-        "description": "nome file modello (es. flux1-dev.safetensors)"
+        "description": "nome file modello (es. flux1-dev.safetensors); non serve con qwen_image21"
       },
       "arch": {
         "type": "string",
         "title": "Arch",
-        "description": "flux | flux2 | zimage | ernie",
+        "description": "flux | flux2 | zimage | ernie | qwen_image21",
         "default": "flux"
+      },
+      "init_image": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Init Image",
+        "description": "img2img (qwen_image21): foto di partenza"
+      },
+      "strength": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Strength",
+        "description": "img2img: 0.05-1.0 (default 0.6)"
       },
       "negative": {
         "anyOf": [
@@ -97,8 +196,7 @@
       }
     },
     "required": [
-      "prompt",
-      "model"
+      "prompt"
     ]
   },
   {
@@ -108,6 +206,74 @@
     "group": "immagini",
     "summary": "Image Edit",
     "params": {
+      "qwen21_dit": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Dit",
+        "description": "DiT di catalogo (GET /image/qwen21/options), default qwen21-dit-fp8"
+      },
+      "qwen21_te": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Te",
+        "description": "'' | heretic (encoder 18+)"
+      },
+      "qwen21_turbo": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Turbo",
+        "description": "'' | 4 | 6 (LoRA turbo, solo DiT non Turbo)"
+      },
+      "transparent": {
+        "type": "boolean",
+        "title": "Transparent",
+        "default": false
+      },
+      "aspect_2k": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Aspect 2K",
+        "description": "1:1 | 4:3 | 3:4 | 3:2 | 2:3 | 16:9 | 9:16"
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "≤10 riferimenti, citati come «image N» nel prompt"
+      },
       "prompt": {
         "type": "string",
         "title": "Prompt"
@@ -151,7 +317,7 @@
       "arch": {
         "type": "string",
         "title": "Arch",
-        "description": "kontext | flux2_kontext | krea2_edit",
+        "description": "kontext | flux2_kontext | krea2_edit | qwen_image21",
         "default": "kontext"
       },
       "negative": {
@@ -207,6 +373,74 @@
     "group": "immagini",
     "summary": "Image Recolor",
     "params": {
+      "qwen21_dit": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Dit",
+        "description": "DiT di catalogo (GET /image/qwen21/options), default qwen21-dit-fp8"
+      },
+      "qwen21_te": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Te",
+        "description": "'' | heretic (encoder 18+)"
+      },
+      "qwen21_turbo": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Turbo",
+        "description": "'' | 4 | 6 (LoRA turbo, solo DiT non Turbo)"
+      },
+      "transparent": {
+        "type": "boolean",
+        "title": "Transparent",
+        "default": false
+      },
+      "aspect_2k": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Aspect 2K",
+        "description": "1:1 | 4:3 | 3:4 | 3:2 | 2:3 | 16:9 | 9:16"
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "≤10 riferimenti, citati come «image N» nel prompt"
+      },
       "image_path": {
         "type": "string",
         "title": "Image Path"
@@ -222,12 +456,20 @@
         "default": ""
       },
       "model": {
-        "type": "string",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "title": "Model"
       },
       "arch": {
         "type": "string",
         "title": "Arch",
+        "description": "kontext | qwen_image21",
         "default": "kontext"
       },
       "steps": {
@@ -248,8 +490,7 @@
     },
     "required": [
       "image_path",
-      "target",
-      "model"
+      "target"
     ]
   },
   {
@@ -259,6 +500,74 @@
     "group": "immagini",
     "summary": "Image Inpaint",
     "params": {
+      "qwen21_dit": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Dit",
+        "description": "DiT di catalogo (GET /image/qwen21/options), default qwen21-dit-fp8"
+      },
+      "qwen21_te": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Te",
+        "description": "'' | heretic (encoder 18+)"
+      },
+      "qwen21_turbo": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Turbo",
+        "description": "'' | 4 | 6 (LoRA turbo, solo DiT non Turbo)"
+      },
+      "transparent": {
+        "type": "boolean",
+        "title": "Transparent",
+        "default": false
+      },
+      "aspect_2k": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Aspect 2K",
+        "description": "1:1 | 4:3 | 3:4 | 3:2 | 2:3 | 16:9 | 9:16"
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "≤10 riferimenti, citati come «image N» nel prompt"
+      },
       "prompt": {
         "type": "string",
         "title": "Prompt"
@@ -272,13 +581,20 @@
         "title": "Mask Path"
       },
       "model": {
-        "type": "string",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "title": "Model"
       },
       "arch": {
         "type": "string",
         "title": "Arch",
-        "description": "inpaint | flux2_inpaint",
+        "description": "inpaint | flux2_inpaint | qwen_image21",
         "default": "inpaint"
       },
       "negative": {
@@ -306,13 +622,24 @@
         "type": "integer",
         "title": "Seed",
         "default": 0
+      },
+      "strength": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Strength",
+        "description": "qwen_image21: denoise nell'area (default 1.0)"
       }
     },
     "required": [
       "prompt",
       "image_path",
-      "mask_path",
-      "model"
+      "mask_path"
     ]
   },
   {
@@ -322,6 +649,74 @@
     "group": "immagini",
     "summary": "Image Outpaint",
     "params": {
+      "qwen21_dit": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Dit",
+        "description": "DiT di catalogo (GET /image/qwen21/options), default qwen21-dit-fp8"
+      },
+      "qwen21_te": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Te",
+        "description": "'' | heretic (encoder 18+)"
+      },
+      "qwen21_turbo": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Qwen21 Turbo",
+        "description": "'' | 4 | 6 (LoRA turbo, solo DiT non Turbo)"
+      },
+      "transparent": {
+        "type": "boolean",
+        "title": "Transparent",
+        "default": false
+      },
+      "aspect_2k": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Aspect 2K",
+        "description": "1:1 | 4:3 | 3:4 | 3:2 | 2:3 | 16:9 | 9:16"
+      },
+      "ref_images": {
+        "anyOf": [
+          {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Ref Images",
+        "description": "≤10 riferimenti, citati come «image N» nel prompt"
+      },
       "prompt": {
         "type": "string",
         "title": "Prompt"
@@ -335,13 +730,20 @@
         "title": "Mask Path"
       },
       "model": {
-        "type": "string",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
         "title": "Model"
       },
       "arch": {
         "type": "string",
         "title": "Arch",
-        "description": "inpaint | flux2_inpaint",
+        "description": "inpaint | flux2_inpaint | qwen_image21",
         "default": "inpaint"
       },
       "negative": {
@@ -369,13 +771,24 @@
         "type": "integer",
         "title": "Seed",
         "default": 0
+      },
+      "strength": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Strength",
+        "description": "qwen_image21: denoise nell'area (default 1.0)"
       }
     },
     "required": [
       "prompt",
       "image_path",
-      "mask_path",
-      "model"
+      "mask_path"
     ]
   },
   {

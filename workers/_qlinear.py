@@ -288,7 +288,8 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
     mods = dict(model.named_modules())
     groups: dict = {}
     for k, v in lora_sd.items():
-        for tag, role in ((".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_down.weight", "A"),
+        for tag, role in ((".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_A.default.weight", "A"),
+                          (".lora_B.default.weight", "B"), (".lora_down.weight", "A"),
                           (".lora_up.weight", "B"), (".alpha", "alpha")):
             if k.endswith(tag):
                 base = k[: -len(tag)]
@@ -310,20 +311,30 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
                 full = torch.zeros(2 * half, b.shape[1], dtype=b.dtype, device=b.device)
                 full[(0 if base.endswith(".gate_layer") else half):][:half] = b
                 m, b = fused, full
-        if m is None:
-            continue
         rank = a.shape[0]
-        alpha = float(g["alpha"]) if "alpha" in g else float(rank)
-        dev = next((t.device for t in m.buffers() if t is not None), None) or \
-            next((p.device for p in m.parameters()), torch.device("cuda"))
-        a, b = a.to(dev, torch.bfloat16), b.to(dev, torch.bfloat16)
-        s = strength * alpha / rank
-        if isinstance(m, QUANT_TYPES):
-            m.add_lora(a, b, s)
-        elif isinstance(m, nn.Linear):
-            with torch.no_grad():
-                m.weight += (s * (b.float() @ a.float())).to(m.weight.dtype)
-        else:
+        s = strength * (float(g["alpha"]) if "alpha" in g else float(rank)) / rank
+        if m is None and base.endswith(".gate_up"):           # LoRA sul MLP fuso, modello coi due rami separati
+            stem = base.rsplit(".", 1)[0]
+            g_m, p_m = mods.get(stem + ".gate_layer"), mods.get(stem + ".proj")
+            if g_m is not None and p_m is not None:
+                half = b.shape[0] // 2
+                n += _lora_into(g_m, a, b[:half], s) + _lora_into(p_m, a, b[half:], s)
             continue
-        n += 1
+        if m is not None:
+            n += _lora_into(m, a, b, s)
     return n
+
+
+def _lora_into(m: nn.Module, a: torch.Tensor, b: torch.Tensor, s: float) -> int:
+    """Aggancia una coppia A/B con scala `s` a un modulo: 1 se agganciata, 0 se il tipo non è supportato."""
+    dev = next((t.device for t in m.buffers() if t is not None), None) or \
+        next((p.device for p in m.parameters()), torch.device("cuda"))
+    a, b = a.to(dev, torch.bfloat16), b.to(dev, torch.bfloat16)
+    if isinstance(m, QUANT_TYPES):
+        m.add_lora(a, b, s)
+    elif isinstance(m, nn.Linear):
+        with torch.no_grad():
+            m.weight += (s * (b.float() @ a.float())).to(m.weight.dtype)
+    else:
+        return 0
+    return 1

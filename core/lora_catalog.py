@@ -158,6 +158,46 @@ def _entry_from_raw(raw: dict) -> LoraEntry:
     )
 
 
+# Architetture che lo scanner del dizionario non distingue ancora: arch richiesta → (arch del dizionario,
+# regola sul percorso/nome). Es. le LoRA di Qwen-Image 2.1 risultano «Qwen» come quelle di Qwen-Image 1.
+_ARCH_ALIASES = {
+    "QWEN21": ("QWEN", re.compile(r"[\\/]qwen21[\\/]|qwen[\s\-_]?image[\s\-_]?2[\.\-_]?1|qwen[\s\-_]?2[\.\-_]1",
+                                  re.IGNORECASE)),
+}
+
+
+def _arch_matches(raw: dict, wanted: str) -> bool:
+    arch = (raw.get("architecture") or "").upper()
+    if arch == wanted.upper():
+        return True
+    alias = _ARCH_ALIASES.get(wanted.upper())
+    return bool(alias and arch == alias[0]
+                and alias[1].search(f"{raw.get('path', '')} {raw.get('filename', '')}"))
+
+
+def _registry_loras(arch: str) -> list[LoraEntry]:
+    """LoRA del registro pesi (data/weights_catalog.json) già su disco per questa famiglia: compaiono anche
+    prima che lo scanner del dizionario le abbia viste. 18+ = `sensitivity: adult`. Le LoRA di distillazione
+    (tag `distill_lora`) restano fuori: hanno il loro selettore «Velocità»."""
+    try:
+        from core import model_paths as mp
+        from core import weights_catalog as wc
+        root = str(mp.models_root())
+        out = []
+        for e in wc.load():
+            if e.get("type") != "LoRA" or (e.get("family") or "").upper() != arch.upper():
+                continue
+            if "distill_lora" in (e.get("use") or []) or not wc.is_present(e, root):
+                continue
+            path = str(Path(wc.dest_for(e, root)) / e["filename"])
+            out.append(LoraEntry(sha256=e.get("sha256") or e["id"], filename=e["filename"], path=path,
+                                 architecture=arch, description=e.get("note") or "",
+                                 nsfw=e.get("sensitivity") == "adult" or _looks_nsfw(e["filename"])))
+        return out
+    except Exception:                                    # noqa: BLE001 — registro assente: solo il dizionario
+        return []
+
+
 class LoraCatalog:
     """Carica e filtra il catalogo. Ricarica dinamicamente quando il file cambia."""
 
@@ -183,11 +223,13 @@ class LoraCatalog:
                 continue
             if raw.get("type") != "LoRA":
                 continue
-            if (raw.get("architecture") or "").upper() != self.compatible_arch.upper():
+            if not _arch_matches(raw, self.compatible_arch):
                 continue
             if raw.get("missing"):
                 continue
             out.append(_entry_from_raw(raw))
+        seen = {os.path.normcase(e.path) for e in out}
+        out += [e for e in _registry_loras(self.compatible_arch) if os.path.normcase(e.path) not in seen]
         out.sort(key=lambda e: (e.preview_url is None, -e.downloads, e.name.lower()))
         self._entries = out
         self._mtime = self.path.stat().st_mtime
