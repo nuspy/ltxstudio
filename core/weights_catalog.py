@@ -73,6 +73,25 @@ def is_present(entry: dict, base: str | None = None) -> bool:
     return d.is_dir() and any(d.iterdir())
 
 
+def dep_alternatives(dep: str) -> list[str]:
+    """`a|b|c` = dipendenze ALTERNATIVE (basta averne una: es. text encoder NVFP4 oppure FP8)."""
+    return [x.strip() for x in str(dep).split("|") if x.strip()]
+
+
+def resolve_dep(dep: str, by_id: dict | None = None, base: str | None = None) -> str:
+    """Id concreto di una dipendenza: per le alternative, la prima già presente su disco; se non c'è nessuna,
+    la prima della lista (= quella da scaricare). Una dipendenza semplice resta com'è."""
+    alts = dep_alternatives(dep)
+    if len(alts) <= 1:
+        return alts[0] if alts else ""
+    by_id = by_id or {e["id"]: e for e in load()}
+    for a in alts:
+        e = by_id.get(a)
+        if e and is_present(e, base):
+            return a
+    return alts[0]
+
+
 def missing_ids_with_deps(entry: dict, base: str | None = None) -> list[str]:
     """id (entry + `deps` ricorsive) NON ancora presenti, in ordine di download (deps prima).
     Serve al download-on-select: es. krea_rt richiede anche la base wan → li scarica insieme."""
@@ -88,7 +107,7 @@ def missing_ids_with_deps(entry: dict, base: str | None = None) -> list[str]:
         if not e:
             return
         for dep in e.get("deps", []):               # dipendenze prima (base Wan prima del modello)
-            visit(dep)
+            visit(resolve_dep(dep, by_id, base))     # alternative «a|b»: una basta
         if not is_present(e, base) and eid not in out:
             out.append(eid)
 

@@ -63,8 +63,19 @@ def dit_for(params: dict) -> str:
 
 
 def te_for(dit_id: str, te: str = "") -> str:
-    """Voce di catalogo del text encoder: la scelta esplicita, altrimenti quello abbinato al DiT."""
-    return TE_VARIANTS.get(str(te or ""), DITS.get(dit_id, DITS["qwen21-dit-fp8"])["te"])
+    """Voce di catalogo del text encoder: la scelta esplicita; con «abbinato» ("") la stessa regola della
+    dipendenza alternativa del catalogo (`qwen21-te-nvfp4|qwen21-te-fp8`): l'encoder già presente, altrimenti
+    quello previsto dal DiT — così worker, controllo pesi e download a catena scelgono lo stesso file."""
+    if te in TE_VARIANTS:
+        return TE_VARIANTS[te]
+    paired = DITS.get(dit_id, DITS["qwen21-dit-fp8"])["te"]
+    try:
+        from core import weights_catalog as wc
+        e = next((x for x in wc.load() if x["id"] == dit_id), None)
+        alt = next((d for d in (e or {}).get("deps", []) if "|" in d and "qwen21-te-" in d), "")
+        return wc.resolve_dep(alt) if alt else paired
+    except Exception:                                        # noqa: BLE001 — catalogo non leggibile
+        return paired
 
 
 def is_turbo(dit_id: str) -> bool:

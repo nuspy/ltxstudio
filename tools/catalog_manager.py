@@ -125,8 +125,9 @@ def validate(entry: dict, all_ids: set[str], matrix: Matrix, *, is_new: bool) ->
         if matrix.ok and c not in matrix.caps:
             errs.append(f"capability '{c}' NON esiste nella feature matrix")
     for d in entry.get("deps", []):
-        if d not in all_ids and d != eid:
-            errs.append(f"dep sconosciuta: {d}")
+        for alt in wc.dep_alternatives(d):               # «a|b» = alternative: ognuna deve esistere
+            if alt not in all_ids and alt != eid:
+                errs.append(f"dep sconosciuta: {alt}")
     if entry.get("category") not in wc.CATEGORIES:
         errs.append(f"category '{entry.get('category')}' non valida {wc.CATEGORIES}")
     return errs
@@ -194,7 +195,7 @@ class Manager(QMainWindow):
         form.addRow("", self.f_no_remote)
         self.f_role = QComboBox(); self.f_role.addItems(ROLES); form.addRow("install_role", self.f_role)
         self.f_sens = QComboBox(); self.f_sens.addItems(SENS); form.addRow("sensitivity", self.f_sens)
-        self.f_deps = QLineEdit(placeholderText="id separati da virgola"); form.addRow("deps", self.f_deps)
+        self.f_deps = QLineEdit(placeholderText="id separati da virgola; a|b = alternative"); form.addRow("deps", self.f_deps)
         self.f_scan = QLineEdit(placeholderText="scan_names separati da virgola"); form.addRow("scan_names", self.f_scan)
         self.f_allow = QLineEdit(placeholderText="allow_patterns snapshot, separati da virgola")
         form.addRow("allow_patterns", self.f_allow)
@@ -455,7 +456,8 @@ class Manager(QMainWindow):
         if not self._current:
             return
         eid = self._current.get("id", "")
-        dep_of = [x["id"] for x in self.weights if eid in x.get("deps", [])]
+        dep_of = [x["id"] for x in self.weights
+                  if any(eid in wc.dep_alternatives(d) for d in x.get("deps", []))]
         msg = f"Eliminare la voce '{eid}'?"
         if dep_of:
             msg += f"\n⚠ è dipendenza di: {', '.join(dep_of)}"

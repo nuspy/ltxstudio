@@ -151,23 +151,23 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "qwen21-te-fp8": (["te", "te_quant", "fp8"], []),
     "qwen21-te-nvfp4": (["te", "te_quant", "nvfp4"], []),
     "qwen21-te-heretic-nvfp4": (["te", "te_quant", "nvfp4"], []),
-    "qwen21-dit-nvfp4": (["ckpt_image", "nvfp4", "multiref10"], ["qwen21-configs", "qwen21-vae"]),
-    "qwen21-dit-fp8": (["ckpt_image", "fp8", "multiref10"], ["qwen21-configs", "qwen21-vae"]),
-    "qwen21-dit-int8": (["ckpt_image", "q_int8", "multiref10"], ["qwen21-configs", "qwen21-vae"]),
+    "qwen21-dit-nvfp4": (["ckpt_image", "nvfp4", "multiref10"], ["qwen21-configs", "qwen21-vae", "qwen21-te-nvfp4|qwen21-te-fp8"]),
+    "qwen21-dit-fp8": (["ckpt_image", "fp8", "multiref10"], ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8|qwen21-te-nvfp4"]),
+    "qwen21-dit-int8": (["ckpt_image", "q_int8", "multiref10"], ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8|qwen21-te-nvfp4"]),
     "qwen21-turbo-lora-4": (["distill_lora"], []),
     "qwen21-turbo-lora-6": (["distill_lora"], []),
     "qwen21-turbo-dit-nvfp4": (["ckpt_image", "distilled", "nvfp4", "multiref10"],
-                               ["qwen21-configs", "qwen21-vae"]),
+                               ["qwen21-configs", "qwen21-vae", "qwen21-te-nvfp4|qwen21-te-fp8"]),
     "qwen21-turbo-dit-int8": (["ckpt_image", "distilled", "q_int8", "multiref10"],
-                              ["qwen21-configs", "qwen21-vae"]),
+                              ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8|qwen21-te-nvfp4"]),
     "qwen21-uc-dit-nvfp4": (["ckpt_image", "uncensored", "nvfp4", "multiref10"],
-                            ["qwen21-configs", "qwen21-vae"]),
+                            ["qwen21-configs", "qwen21-vae", "qwen21-te-nvfp4|qwen21-te-fp8"]),
     "qwen21-uc-dit-int8": (["ckpt_image", "uncensored", "q_int8", "multiref10"],
-                           ["qwen21-configs", "qwen21-vae"]),
+                           ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8|qwen21-te-nvfp4"]),
     "qwen21-noctq-v4-int8": (["ckpt_image", "uncensored", "q_int8", "multiref10"],
-                             ["qwen21-configs", "qwen21-vae"]),
+                             ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8|qwen21-te-nvfp4"]),
     "qwen21-noctq-anime-int8": (["ckpt_image", "uncensored", "q_int8", "multiref10"],
-                                ["qwen21-configs", "qwen21-vae"]),
+                                ["qwen21-configs", "qwen21-vae", "qwen21-te-fp8|qwen21-te-nvfp4"]),
     "qwen21-lora-nsfw-alpacas-v1": (["lora_style", "uncensored"], []),
     "qwen21-lora-nsfw-alpacas-v2": (["lora_style", "uncensored"], []),
     "qwen21-lora-nsfw-edit": (["lora_style", "uncensored"], []),
@@ -223,7 +223,7 @@ def main() -> int:
             e.pop("use", None)
         # deps: unione con quelle già presenti (krea_rt→wan ecc. restano), mai auto-riferimenti
         merged = list(dict.fromkeys((e.get("deps") or []) + deps))
-        bad = [d for d in merged if d not in ids]
+        bad = [a for d in merged for a in d.split("|") if a not in ids]   # «a|b» = alternative
         assert not bad, f"{e['id']}: deps inesistenti {bad}"
         if merged:
             e["deps"] = merged

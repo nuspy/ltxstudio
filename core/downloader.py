@@ -201,7 +201,7 @@ def plan_ids(ids: list[str]) -> list[dict]:
             return
         seen.add(eid)
         for d in by_id[eid].get("deps", []):
-            visit(d)
+            visit(wc.resolve_dep(d, by_id))          # alternative «a|b»: quella presente, o la prima
         out.append(by_id[eid])
 
     for i in ids:

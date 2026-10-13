@@ -58,7 +58,18 @@ def test_deps_risolvibili():
     ids = {e["id"] for e in _all()}
     for e in _all():
         for d in e.get("deps", []):
-            assert d in ids, f"{e['id']}: dep sconosciuta {d}"
+            for alt in d.split("|"):                     # «a|b» = dipendenze alternative
+                assert alt in ids, f"{e['id']}: dep sconosciuta {alt}"
+
+
+def test_deps_alternative():
+    """«a|b»: basta una delle due; se nessuna è presente si scarica la prima (catena di download)."""
+    from core import weights_catalog as wc
+    by = {"a": {"id": "a", "kind": "file", "filename": "assente.bin"},
+          "b": {"id": "b", "kind": "file", "filename": "assente2.bin"}}
+    assert wc.dep_alternatives("a|b") == ["a", "b"] and wc.dep_alternatives("a") == ["a"]
+    assert wc.resolve_dep("a|b", by, base=r"Z:\non_esiste") == "a"
+    assert wc.resolve_dep("b", by) == "b"
 
 
 def test_dest_allineati_ai_motori():

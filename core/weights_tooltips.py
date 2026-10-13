@@ -83,7 +83,7 @@ def tooltip_for(entry: dict, *, with_dest: bool = True) -> str:
     if deps:
         lines.append(_tr("weights.tt.deps",
                          "Richiede: {deps} — selezionati e scaricati automaticamente")
-                     .format(deps=", ".join(deps)))
+                     .format(deps=", ".join(d.replace("|", " / ") for d in deps)))
     if entry.get("gated"):
         lines.append(_tr("weights.tt.gated", "Repo gated: accetta la licenza su HF e imposta il token."))
     if entry.get("sensitivity") == "adult":

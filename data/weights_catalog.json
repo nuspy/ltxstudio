@@ -3530,7 +3530,8 @@
       "remote_filename": "diffusion_models/qwen_image_2.1_nvfp4.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-nvfp4|qwen21-te-fp8"
       ],
       "note": "profilo più piccolo: catena completa 12.4GB. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
       "used_by": [
@@ -3563,7 +3564,8 @@
       "remote_filename": "Qwen-Image-2.1-FP8.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-fp8|qwen21-te-nvfp4"
       ],
       "note": "FP8 per riga (torchao): catena completa 17.2GB. Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
       "used_by": [
@@ -3595,7 +3597,8 @@
       "remote_filename": "Qwen-Image-2.1-INT8.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-fp8|qwen21-te-nvfp4"
       ],
       "note": "INT8 per riga: LPIPS 0.064 contro 0.112 dell'FP8 (dati unsloth). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
       "used_by": [
@@ -3766,7 +3769,8 @@
       "remote_filename": "diffusion_models/qwen_image_2.1_turbo_nvfp4.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-nvfp4|qwen21-te-fp8"
       ],
       "note": "checkpoint Turbo ufficiale distillato a 8 passi (NVFP4 misto di BennyDaBall). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
       "used_by": [
@@ -3800,7 +3804,8 @@
       "remote_filename": "diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-fp8|qwen21-te-nvfp4"
       ],
       "note": "checkpoint Turbo ufficiale distillato a 8 passi (INT8 ConvRot di Comfy-Org). Licenza Qwen Research: uso NON commerciale (per usi commerciali serve una licenza Alibaba): i pesi li scarica l'utente",
       "used_by": [
@@ -3834,7 +3839,8 @@
       "remote_filename": "qwen-image-2.1-UC-NVFP4.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-nvfp4|qwen21-te-fp8"
       ],
       "sensitivity": "adult",
       "note": "versione senza censura dei pesi base (abenzerps). Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
@@ -3869,7 +3875,8 @@
       "remote_filename": "qwen-image-2.1-UC-int8_convrot.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-fp8|qwen21-te-nvfp4"
       ],
       "sensitivity": "adult",
       "note": "versione senza censura dei pesi base (abenzerps), INT8 ConvRot. Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
@@ -3904,7 +3911,8 @@
       "remote_filename": "NoctQ_V4_int8_convrot.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-fp8|qwen21-te-nvfp4"
       ],
       "sensitivity": "adult",
       "note": "merge fotorealistico senza censura (Noctaluna): 25 passi, CFG 3 col negativo; prompt in prosa. Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
@@ -3939,7 +3947,8 @@
       "remote_filename": "NoctQA_V1_int8_convrot.safetensors",
       "deps": [
         "qwen21-configs",
-        "qwen21-vae"
+        "qwen21-vae",
+        "qwen21-te-fp8|qwen21-te-nvfp4"
       ],
       "sensitivity": "adult",
       "note": "merge anime/illustrazione senza censura (Noctaluna): 25 passi, CFG 3 col negativo. Licenza Qwen Research: uso NON commerciale: i pesi li scarica l'utente",
