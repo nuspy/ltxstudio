@@ -19,16 +19,33 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def lokr_apply(x: torch.Tensor, w1: torch.Tensor, w2: torch.Tensor) -> torch.Tensor:
+    """x · kron(w1, w2)ᵀ senza materializzare il kron: con w1 [a1,a2], w2 [b1,b2] e l'ingresso visto come
+    X [..., a2, b2], l'uscita è w1 · X · w2ᵀ → [..., a1, b1] (stesso ordine di vec del prodotto di Kronecker)."""
+    a1, a2 = w1.shape
+    b1, b2 = w2.shape
+    xr = x.reshape(*x.shape[:-1], a2, b2)
+    return torch.einsum("ik,...kl,jl->...ij", w1, xr, w2).reshape(*x.shape[:-1], a1 * b1)
+
+
 class _LoraMixin:
     def _lora_init(self):
-        self.loras: list = []                        # [(A [r,in], B [out,r], scale)]
+        self.loras: list = []                        # [(A [r,in], B [out,r], scale)] o ("lokr", w1, w2, scale)
 
     def add_lora(self, a: torch.Tensor, b: torch.Tensor, scale: float):
         self.loras.append((a, b, float(scale)))
 
+    def add_lokr(self, w1: torch.Tensor, w2: torch.Tensor, scale: float):
+        self.loras.append(("lokr", w1, w2, float(scale)))
+
     def _lora(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        for a, b, s in self.loras:
-            y = y + s * F.linear(F.linear(x, a.to(x.dtype)), b.to(x.dtype))
+        for lo in self.loras:
+            if lo[0] == "lokr":
+                _, w1, w2, s = lo
+                y = y + s * lokr_apply(x, w1.to(x.dtype), w2.to(x.dtype))
+            else:
+                a, b, s = lo
+                y = y + s * F.linear(F.linear(x, a.to(x.dtype)), b.to(x.dtype))
         return y
 
 
@@ -288,7 +305,8 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
     mods = dict(model.named_modules())
     groups: dict = {}
     for k, v in lora_sd.items():
-        for tag, role in ((".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_A.default.weight", "A"),
+        for tag, role in ((".lokr_w1", "w1"), (".lokr_w2", "w2"), (".lokr_w1_a", "w1a"), (".lokr_w1_b", "w1b"),
+                          (".lokr_w2_a", "w2a"), (".lokr_w2_b", "w2b"), (".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_A.default.weight", "A"),
                           (".lora_B.default.weight", "B"), (".lora_down.weight", "A"),
                           (".lora_up.weight", "B"), (".alpha", "alpha")):
             if k.endswith(tag):
@@ -301,6 +319,9 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
     n = 0
     for base, g in groups.items():
         m = mods.get(base)
+        if any(r in g for r in ("w1", "w1a", "w2", "w2a")):          # LoKr (LyCORIS)
+            n += _lokr_into(m, g, strength, base) if m is not None else 0
+            continue
         if "A" not in g or "B" not in g:
             continue
         a, b = g["A"], g["B"]
@@ -323,6 +344,33 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
         if m is not None:
             n += _lora_into(m, a, b, s)
     return n
+
+
+def _lokr_into(m: nn.Module, g: dict, strength: float, name: str = "") -> int:
+    """LoKr: ΔW = s · kron(w1, w2), con w1/w2 pieni o a basso rango (w = a @ b). Scala come LyCORIS: entrambi
+    pieni → 1 (alpha ignorato); altrimenti alpha / rango del fattore decomposto."""
+    w1 = g["w1"] if "w1" in g else g["w1a"] @ g["w1b"]
+    w2 = g["w2"] if "w2" in g else g["w2a"] @ g["w2b"]
+    if "w1" in g and "w2" in g:
+        s = strength
+    else:
+        rank = (g["w2b"] if "w2b" in g else g["w1b"]).shape[0]
+        s = strength * (float(g["alpha"]) if "alpha" in g else float(rank)) / rank
+    out_f, in_f = w1.shape[0] * w2.shape[0], w1.shape[1] * w2.shape[1]
+    if (getattr(m, "out_features", None), getattr(m, "in_features", None)) != (out_f, in_f):
+        print(f"[lokr] {name}: forma {out_f}x{in_f} ≠ modulo {getattr(m, 'out_features', '?')}x"
+              f"{getattr(m, 'in_features', '?')} → saltato", flush=True)
+        return 0
+    dev = next((t.device for t in m.buffers() if t is not None), None) or         next((p.device for p in m.parameters()), torch.device("cuda"))
+    w1, w2 = w1.to(dev, torch.bfloat16), w2.to(dev, torch.bfloat16)
+    if isinstance(m, QUANT_TYPES):
+        m.add_lokr(w1, w2, s)
+    elif isinstance(m, nn.Linear):
+        with torch.no_grad():
+            m.weight += (s * torch.kron(w1.float(), w2.float())).to(m.weight.dtype)
+    else:
+        return 0
+    return 1
 
 
 def _lora_into(m: nn.Module, a: torch.Tensor, b: torch.Tensor, s: float) -> int:

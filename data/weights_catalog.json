@@ -4665,6 +4665,35 @@
         "fp8",
         "uncensored"
       ]
+    },
+    {
+      "id": "mmh3-lora-hmcumshot-v2",
+      "module": "Video",
+      "label": "LoKr H3 HMCumshot V2 (18+, 0.63GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.63,
+      "scan_names": [
+        "HMCumshot_V2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "lynaNSFW/minimaxH3_Collection",
+      "url": "https://huggingface.co/lynaNSFW/minimaxH3_Collection",
+      "filename": "HMCumshot_V2-native.safetensors",
+      "remote_filename": "HMCumshot_V2.safetensors",
+      "sensitivity": "adult",
+      "note": "LoKr ai-toolkit (w1 8×8 ⊗ w2 piena): applicata al volo sui Linear quantizzati da _qlinear",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,
