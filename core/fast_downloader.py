@@ -141,15 +141,25 @@ def download_url(url: str, dest: str, *, connections: int = 16, token: str | Non
         n = max(1, min(connections, size))
         base = size // n
         chunks = [(i, i * base, (size - 1 if i == n - 1 else (i + 1) * base - 1)) for i in range(n)]
-        ok = True
-        with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
-            futs = [ex.submit(_dl_chunk, sess, url, dest, cid, s, e, token, progress) for cid, s, e in chunks]
-            for f in concurrent.futures.as_completed(futs):
-                ok = ok and f.result()
-        if ok:
-            _merge(dest, n)
-            return dest
-        # se il parallelo fallisce, fallback single
+        # Il parallelo si RIPROVA prima di arrendersi: le .partN complete vengono saltate (resume), si
+        # riscarica solo il chunk fallito. Prima un solo chunk andato male (PinkCherry H3, 13/10: 15/16
+        # parti complete) faceva ripartire da zero in single-stream, lasciando ~20GB di parti orfane.
+        for _try in range(3):
+            ok = True
+            with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
+                futs = [ex.submit(_dl_chunk, sess, url, dest, cid, s, e, token, progress) for cid, s, e in chunks]
+                for f in concurrent.futures.as_completed(futs):
+                    ok = ok and f.result()
+            if ok:
+                _merge(dest, n)
+                return dest
+            time.sleep(10 * (_try + 1))
+        # fallback single-stream: le parti del parallelo non servono più (il single scrive in dest)
+        for cid, _s, _e in chunks:
+            try:
+                os.remove(f"{dest}.part{cid}")
+            except OSError:
+                pass
     if not _dl_single(sess, url, dest, size, token, progress):
         raise RuntimeError(f"download fallito: {url}")
     return dest

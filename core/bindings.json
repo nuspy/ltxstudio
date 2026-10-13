@@ -202,7 +202,7 @@
     },
     "nsfw": {
       "text_encoder": "gemma_3_12B_it_abliterated.safetensors",
-      "model_standard": "ltx2310eros_v1.safetensors",
+      "model_standard": "LTX\\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
       "_note": "AUTO encoder: NSFW usa il gemma ABLITERATED (decensurato → descrive soggetti espliciti senza ammorbidire); SFW usa il gemma full. Override manuale dal selettore Text encoder (default 'Auto').",
       "distilled_lora": "LTX-2\\ltx-2.3-22b-distilled-lora-dynamic_fro09_avg_rank_105_bf16.safetensors"
     }
@@ -210,6 +210,6 @@
   "models": {
     "_comment": "file selezionabili nel tab Video (model_standard = nodo UNETLoader 5751). GGUF richiede il golden GGUF separato.",
     "standard_1_1": "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
-    "eros": "ltx2310eros_v1.safetensors"
+    "eros": "LTX\\10Eros_v1.5_fp8mixed_experimental_learned.safetensors"
   }
 }

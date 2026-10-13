@@ -281,13 +281,15 @@ def is_ready(release: str | None) -> bool:
 # Sottostringhe che identificano un COMPONENTE, non un transformer: senza questo filtro la
 # scansione conta come "checkpoint" anche text projection, VAE, upscaler e LoRA che stanno nelle
 # stesse cartelle (es. `ltx-2.3_text_projection_bf16.safetensors` in Checkpoints\LTX).
+# DiT di altre architetture video negli stessi diffusion_models: i finetune MiniMax H3 contengono «eros»
+# nel nome (10Eros-Max, PinkCherry H3) e passerebbero per checkpoint LTX. Usato anche dal tab Video.
+OTHER_ARCH_MARKERS = ("minimax", "_h3_", "_h3.", "-h3-")
+
 _NOT_A_CKPT = (
     "text_projection", "text-projection", "text_encoder", "text-encoder",
     "vae", "upscaler", "upsampler", "lora", "_aux_", "duration-head", "duration_head",
     "connector", "vocoder", "embeddings-connector",
-    # DiT di altre architetture video negli stessi diffusion_models: i finetune MiniMax H3 contengono «eros»
-    # nel nome (10Eros-Max, PinkCherry H3) e passerebbero per checkpoint LTX-2.3
-    "minimax", "_h3_", "_h3.", "-h3-",
+    *OTHER_ARCH_MARKERS,
 )
 
 

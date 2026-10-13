@@ -55,6 +55,18 @@ def read_header(path: str | os.PathLike) -> tuple[dict, int]:
     return h, 8 + n
 
 
+def is_complete(path: str | os.PathLike) -> bool:
+    """True se il safetensors è INTERO: la dimensione su disco copre l'ultimo tensore dichiarato
+    nell'header. Un file troncato (download interrotto, fallback single-stream a metà) NON va convertito:
+    la conversione esploderebbe a metà («shape … is invalid for input of size …»)."""
+    try:
+        h, base = read_header(path)
+        end = max((v["data_offsets"][1] for k, v in h.items() if k != "__metadata__"), default=0)
+        return os.path.getsize(path) >= base + end
+    except (OSError, ValueError, KeyError, TypeError, struct.error):
+        return False
+
+
 def is_native(path: str | os.PathLike) -> bool:
     try:
         h, _ = read_header(path)
@@ -391,6 +403,9 @@ def ensure_entry(entry: dict, dest_dir: Path, log=print) -> Path | None:
     dst = Path(dest_dir) / entry["filename"]
     src = source_path(entry, dest_dir)
     if src.exists() and src.resolve() != dst.resolve():
+        if not is_complete(src):
+            log(f"[native] {src.name} è incompleto (download interrotto): niente conversione")
+            return dst if dst.exists() else None
         return convert(conv, src, dst, log=log)
     return dst if dst.exists() else None
 
@@ -403,7 +418,8 @@ def migrate_all(base_dir: str | None = None, log=print) -> list[str]:
         if not e.get("convert") or e.get("kind") != "file":
             continue
         d = wc.dest_for(e, base_dir)
-        if source_path(e, d).exists() and source_path(e, d).name != e["filename"]:
+        src = source_path(e, d)
+        if src.exists() and src.name != e["filename"] and is_complete(src):
             ensure_entry(e, d, log=log)
             done.append(e["id"])
     return done

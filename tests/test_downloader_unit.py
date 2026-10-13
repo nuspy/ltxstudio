@@ -158,3 +158,19 @@ def test_queue_scarica_e_filtra(tmp_path, monkeypatch):
     finally:
         q.stop()
         srv.shutdown()
+
+
+def test_sorgente_comfy_troncato_non_si_converte(tmp_path):
+    """Un sorgente ComfyUI troncato (download interrotto) NON va convertito né dal downloader né da
+    migrate_all: is_complete lo riconosce dall'header."""
+    from core import native_convert as nc
+    ok = tmp_path / "ok.safetensors"
+    ok.write_bytes(_mini_safetensors())
+    cut = tmp_path / "cut.safetensors"
+    cut.write_bytes(_mini_safetensors()[:-3])
+    assert nc.is_complete(ok)
+    assert not nc.is_complete(cut)
+    assert not nc.is_complete(tmp_path / "manca.safetensors")
+    entry = {"id": "x", "kind": "file", "convert": "mmh3_dit", "filename": "x-native.safetensors",
+             "remote_filename": "cut.safetensors"}
+    assert nc.ensure_entry(entry, tmp_path, log=lambda *_: None) is None

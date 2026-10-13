@@ -151,7 +151,8 @@ def download_entry(entry: dict, *, base_dir: str | None = None, token: str | Non
             # il file ComfyUI è GIÀ su disco (copiato a mano, collegato dall'installer, download interrotto dopo
             # la fine dello scarico): solo conversione nativa in locale, niente rete
             from core import native_convert as nc
-            if nc.source_path(entry, Path(dest_dir)).exists():
+            _src = nc.source_path(entry, Path(dest_dir))
+            if _src.exists() and nc.is_complete(_src):
                 done = nc.ensure_entry(entry, Path(dest_dir), log=log)
                 if done is not None and done.exists():
                     verify_file(done)

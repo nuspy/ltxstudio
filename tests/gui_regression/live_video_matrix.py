@@ -35,7 +35,7 @@ M = {
     "dev_nvfp4":     r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\nvfp4\ltx-2.3-22b-dev-nvfp4.safetensors",
     "gguf_q4":       r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
     "gguf_q6":       r"E:\AI\Models\diffusion_models\ltx-2-3-22b-dev-Q6_K.gguf",
-    "eros":          r"E:\AI\Models\diffusion_models\ltx2310eros_v1.safetensors",
+    "eros":          r"E:\AI\Models\diffusion_models\LTX\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
 }
 PROMPTS = [  # creativi e vari (regola: mai gattini/cani)
     "un fabbro forgia una spada incandescente in una bottega medievale, scintille",
