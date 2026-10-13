@@ -736,13 +736,20 @@ class _ModelAuditWorker(QThread):
             self.done.emit({"error": str(e)})
 
 
-class _NativeMigrateWorker(QThread):
+class _NativeMigrateWorker(QObject):
     """Converte in formato NATIVO i single-file ComfyUI già su disco (copiati a mano, collegati dall'installer):
     sul PC dell'utente la conversione è automatica sia al download (core/downloader) sia qui, all'avvio.
-    Solo voci di catalogo col campo `convert` il cui sorgente esiste: di norma non fa nulla. Niente GPU."""
+    Solo voci di catalogo col campo `convert` il cui sorgente esiste: di norma non fa nulla. Niente GPU.
+    Thread Python DAEMON (non QThread): chiudere l'app durante una conversione non deve abortire il processo
+    («QThread destroyed while running»); la conversione è comunque sicura (scrive un .part, il sorgente si
+    cancella solo dopo la verifica) e riparte al prossimo avvio."""
     log = Signal(str)
 
-    def run(self):
+    def start(self):
+        import threading
+        threading.Thread(target=self._run, name="native-migrate", daemon=True).start()
+
+    def _run(self):
         try:
             from core import native_convert as nc
             done = nc.migrate_all(log=self.log.emit)

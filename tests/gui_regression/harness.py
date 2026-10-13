@@ -123,6 +123,7 @@ def build_window():
     from ui.main_window import MainWindow
     MainWindow._maybe_autostart_native = lambda self: None    # no spawn server per-test (era lento/blocco)
     MainWindow._maybe_autostart_comfyui = lambda self: None
+    MainWindow._start_native_migration = lambda self: None    # niente conversioni di pesi nei test (thread)
     # neutralizza i check che fanno RETE (download encoder/pesi) → i test verificano l'ISTRUZIONE, non i download
     MainWindow._ensure_flux2_encoder = lambda self, unet=None: True
     if hasattr(MainWindow, "_feature_gate"):
