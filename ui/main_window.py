@@ -3443,7 +3443,8 @@ class MainWindow(QMainWindow):
             from core import minimax_h3_spec as _S
             params["arch"] = "minimax_h3"
             params.pop("gguf_transformer", None)
-            for _k in ("h3_profile", "h3_te", "h3_turbo", "h3_canvas", "h3_dialogue", "h3_soundscape", "h3_music"):
+            for _k in ("h3_profile", "h3_dit", "h3_te", "h3_turbo", "h3_canvas", "h3_dialogue", "h3_soundscape",
+                       "h3_music"):
                 if _k in vals:
                     params[_k] = vals[_k]
             params.setdefault("h3_profile", "nvfp4")

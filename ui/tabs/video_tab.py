@@ -702,6 +702,30 @@ class VideoTab(QWidget):
                                    Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(i, QColor("#e8b339"), Qt.ForegroundRole)
+        # DiT personalizzati (finetune 18+): solo se l'edizione e la modalità NSFW li ammettono
+        _adult = True
+        try:
+            from core import nsfw_policy
+            _adult = nsfw_policy.adult_allowed() and self.nsfw.currentText() == "NSFW"
+        except Exception:                                       # noqa: BLE001
+            pass
+        for cid, meta in S.CUSTOM_DITS.items():
+            e = entries.get(cid)
+            if not e or not wc.model_allowed(e) or (e.get("sensitivity") == "adult" and not _adult):
+                continue
+            try:
+                present = wc.is_present(e)
+            except Exception:                                   # noqa: BLE001
+                present = False
+            self.model.addItem(("" if present else "⬇ ") + "🔞 MiniMax H3 · " + meta["label"],
+                               {"kind": "minimax_h3", "profile": "int8", "h3_dit": cid, "cat_id": cid,
+                                "present": present, "key": f"minimax_h3:{cid}"})
+            i = self.model.count() - 1
+            self.model.setItemData(i, _wt.tooltip_for(e) + "\n" + (tr("vid.present", "presente") if present
+                                                                   else tr("vid.missing", "da scaricare")),
+                                   Qt.ToolTipRole)
+            if not present:
+                self.model.setItemData(i, QColor("#e8b339"), Qt.ForegroundRole)
         j = next((k for k in range(self.model.count()) if (self.model.itemData(k) or {}).get("key") == prev), -1)
         if j >= 0:
             self.model.setCurrentIndex(j)
@@ -1305,6 +1329,7 @@ class VideoTab(QWidget):
             v["model_kind"] = "minimax_h3"
             v["model"] = ""
             v["h3_profile"] = sel_data.get("profile", "nvfp4")
+            v["h3_dit"] = sel_data.get("h3_dit", "")              # DiT personalizzato (finetune), se scelto
             v["h3_te"] = self.h3_te.currentData() or "mmh3-te-nvfp4"
             v["h3_turbo"] = self.h3_turbo.currentData() or ""
             v["h3_canvas"] = self.h3_canvas.currentData() or "768"

@@ -23,6 +23,13 @@ PROFILES = {
     "fp8": ("mmh3-fl2va-fp8", "mmh3-ref2va-fp8", "mmh3-te-fp8"),
     "int8": ("mmh3-fl2va-int8", "mmh3-ref2va-int8", "mmh3-te-int8"),
 }
+# DiT PERSONALIZZATI (finetune 18+, scelti esplicitamente): un solo file «hybrid» vale per FL2VA e Ref2VA (stesse
+# chiavi del DiT pruned ufficiale). turbo_fused = turbo già nei pesi: niente LoRA turbo, passi e shift propri.
+CUSTOM_DITS = {
+    "mmh3-dit-pinkcherry18": {"label": "PinkCherry H3 v1.8", "modes": ("fl2va", "ref2va")},
+    "mmh3-dit-10erosmax-b6": {"label": "10Eros-Max beta6 Turbo", "modes": ("fl2va", "ref2va"),
+                              "turbo_fused": True, "nfe": 8, "video_shift": 10.0},
+}
 TE_IDS = ("mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8", "mmh3-te-heretic-nvfp4")
 TE_ADULT = "mmh3-te-heretic-nvfp4"
 COMMON_IDS = ("mmh3-configs", "mmh3-video-vae", "mmh3-audio-vae")
@@ -77,9 +84,19 @@ def weight_ids(params: dict) -> dict:
     fl, ref, te = PROFILES[prof]
     ids = {"dit": ref if mode == "ref2va" else fl, "te": params.get("h3_te") or te,
            "configs": "mmh3-configs", "vae": "mmh3-video-vae", "audio_vae": "mmh3-audio-vae"}
+    custom = str(params.get("h3_dit") or "")
+    if custom:                                    # DiT personalizzato al posto di quello del profilo
+        meta = CUSTOM_DITS.get(custom)
+        if meta is None:
+            raise ValueError(f"DiT MiniMax H3 sconosciuto: {custom} ({' | '.join(CUSTOM_DITS)})")
+        if mode not in meta["modes"]:
+            raise ValueError(f"{meta['label']}: modalità {mode} non supportata")
+        ids["dit"] = custom
     if ids["te"] not in TE_IDS:
         raise ValueError(f"text encoder MiniMax H3 sconosciuto: {ids['te']}")
     t = str(params.get("h3_turbo") or "")
+    if CUSTOM_DITS.get(custom, {}).get("turbo_fused"):
+        t = ""                                    # turbo già nei pesi: la LoRA turbo lo raddoppierebbe
     if t:
         if t not in TURBO or mode not in TURBO[t][0]:
             raise ValueError(f"LoRA turbo {t} passi non disponibile per {mode}")

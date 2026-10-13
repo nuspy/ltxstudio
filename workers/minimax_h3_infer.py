@@ -296,7 +296,8 @@ def run(p: dict) -> str:
     free0, total = (x / 2**30 for x in torch.cuda.mem_get_info())
     # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema
     torch.cuda.set_per_process_memory_fraction(max(0.2, min(1.0, (free0 - 0.4) / total)))
-    _log(f"{mode} · profilo {p.get('h3_profile') or 'nvfp4'} · VRAM libera {free0:.1f}/{total:.1f} GB")
+    _log(f"{mode} · {p.get('h3_dit') or 'profilo ' + str(p.get('h3_profile') or 'nvfp4')} · "
+         f"VRAM libera {free0:.1f}/{total:.1f} GB")
 
     cfgdir = Path(W["configs"])
     wf = "ref2va" if mode == "ref2va" else ("fl2va" if (p.get("image_path") or p.get("last_image_path")) else "t2va")
@@ -331,9 +332,13 @@ def run(p: dict) -> str:
         kw["references"] = build_references(p)
         if not kw["references"]:
             raise RuntimeError("Ref2VA senza riferimenti validi")
-    turbo = str(p.get("h3_turbo") or "")
-    nfe = S.TURBO[turbo][1] if turbo else int(p.get("steps") or S.DEFAULT_NFE)
-    vshift = S.TURBO[turbo][2] if turbo else float(p.get("h3_video_shift") or S.VIDEO_SHIFT)
+    fused = S.CUSTOM_DITS.get(str(p.get("h3_dit") or ""), {})
+    turbo = "" if fused.get("turbo_fused") else str(p.get("h3_turbo") or "")
+    if fused.get("turbo_fused"):                       # DiT col turbo nei pesi (10Eros-Max): passi e shift suoi
+        nfe, vshift = int(fused["nfe"]), float(fused["video_shift"])
+    else:
+        nfe = S.TURBO[turbo][1] if turbo else int(p.get("steps") or S.DEFAULT_NFE)
+        vshift = S.TURBO[turbo][2] if turbo else float(p.get("h3_video_shift") or S.VIDEO_SHIFT)
     seed = int(p.get("seed") or 0)
     _log(f"workflow {wf}: {frames} fotogrammi ({S.frames_seconds(frames):.2f}s) · "
          f"{kw.get('width', 'auto')}x{kw.get('height', 'auto')} · {nfe} passi"

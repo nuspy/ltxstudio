@@ -566,6 +566,27 @@ CASES = [
      case_model_selection_reaches_backend),
 ]
 
+def case_h3_custom_dit(w, spy):
+    """DiT MiniMax H3 personalizzati (finetune 18+): solo in NSFW, e la scelta arriva come h3_dit."""
+    t = w.video_tab
+    t.nsfw.setCurrentText("SFW")
+    t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+    keys = lambda: [(t.model.itemData(i) or {}).get("h3_dit") for i in range(t.model.count())]
+    assert not any(keys()), f"DiT 18+ visibili in SFW: {keys()}"
+    t.nsfw.setCurrentText("NSFW")
+    i = next((i for i in range(t.model.count())
+              if (t.model.itemData(i) or {}).get("h3_dit") == "mmh3-dit-10erosmax-b6"), -1)
+    assert i >= 0, f"10Eros-Max assente in NSFW: {keys()}"
+    t.model.setCurrentIndex(i)
+    v = t.get_values()
+    assert v.get("model_kind") == "minimax_h3" and v.get("h3_dit") == "mmh3-dit-10erosmax-b6", v
+    t.nsfw.setCurrentText("SFW")
+    t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+
+
+CASES.append(("video_h3_custom_dit", "DiT MiniMax H3 personalizzati (18+): visibili solo in NSFW, arrivano come h3_dit.",
+              case_h3_custom_dit))
+
 # Un caso per OGNI modello concreto del dropdown (scopre 'funziona solo un modello' / kind rotti).
 for _kind, _model, _nsfw in _enumerate_model_specs():
     CASES.append((
