@@ -721,6 +721,13 @@ NEW = [
       family="MiniMax-H3", gb=1.19, sens="adult", used_by=["cap.video_minimax_h3"],
       note="solo modalità Ref2VA; l'autore usa euler + scheduler beta"),
     # Krea 2: LoRA ai-toolkit (diffusion_model.blocks… + txtfusion → text_fusion)
+    # Krea 2 single-file community: convertito in nativo (nomi diffusers, Linear int8 ConvRot compressi) e montato
+    # sul text encoder/VAE dello snapshot Turbo (workers/krea2_custom).
+    N("krea2-noct-v4", "Immagini", "Krea Noct V4 (18+, INT8, Turbo 8 passi, 13.5GB)", category="image", arch="krea2",
+      repo="Noctaluna/Krea2-Noct-Uncensored", remote="KreaNoct_V4_int8_convrot.safetensors",
+      filename="KreaNoct_V4_int8_convrot-native.safetensors", convert="krea2_dit", type="diffusion_models",
+      family="Krea2", gb=13.49, sens="adult", deps=["krea2_turbo"],
+      note="merge fotorealistico NSFW su Krea 2 Turbo, niente LoRA di sblocco: 8 passi, CFG 1. Krea 2 Community License"),
     N("krea2-lora-knp-v4", "Immagini", "LoRA Krea 2 NSFW V4 (KNP, 18+, 0.46GB)", category="image", arch="krea2",
       repo="randomforest/krea-2-nsfw-v4", remote="KNP_000003000.safetensors",
       filename="Krea2_NSFW_KNP_v4.safetensors", type="LoRA", family="Krea2", gb=0.46, sens="adult",

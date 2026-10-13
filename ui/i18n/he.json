@@ -3099,5 +3099,6 @@
   "upsell.available_in": "זמין רק בגרסאות: {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (עד 10 דמויות)",
   "fs.sb.qwen21_dit": "Qwen:",
-  "fs.sb.qwen21_dit.tt": "מודל Qwen-Image 2.1 לפריימי מפתח ולדיוקנאות הליהוק."
+  "fs.sb.qwen21_dit.tt": "מודל Qwen-Image 2.1 לפריימי מפתח ולדיוקנאות הליהוק.",
+  "f1.gen.krea2.noct": "Krea Noct V4 (‏+18, int8, 8 צעדים)"
 }

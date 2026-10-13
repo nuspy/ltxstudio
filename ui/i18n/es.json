@@ -3099,5 +3099,6 @@
   "upsell.available_in": "Disponible solo en las versiones: {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (hasta 10 personajes)",
   "fs.sb.qwen21_dit": "Qwen:",
-  "fs.sb.qwen21_dit.tt": "Modelo Qwen-Image 2.1 para los fotogramas clave y los retratos del reparto."
+  "fs.sb.qwen21_dit.tt": "Modelo Qwen-Image 2.1 para los fotogramas clave y los retratos del reparto.",
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 pasos)"
 }

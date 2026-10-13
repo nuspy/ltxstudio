@@ -681,6 +681,8 @@ class Frame1Tab(QWidget):
         # passi/CFG consigliati per il DiT scelto (Turbo, Noct-Q…): DOPO i default d'arch (connessi prima)
         self.gen_model.currentIndexChanged.connect(self._on_qwen21_dit_changed)
         self.gen_arch.currentTextChanged.connect(self._on_qwen21_dit_changed)
+        self.gen_model.currentIndexChanged.connect(self._on_krea2_model_changed)
+        self.gen_arch.currentTextChanged.connect(self._on_krea2_model_changed)
         return box
 
     def _sync_qwen21_box(self, *_):
@@ -839,11 +841,29 @@ class Frame1Tab(QWidget):
             return
         self._offer_download_ids(cat_id)
 
+    def _on_krea2_model_changed(self, *_):
+        """Krea 2 scelto → passi/guidance della variante: Turbo e i finetune Turbo (Noct) sono guidance-distillati,
+        8 passi a guidance 0 (con i valori FLUX esce un reticolo sul volto); Raw 52/3.5. Restano modificabili."""
+        if not hasattr(self, "gen_cfg") or self.gen_arch.currentText() != "Krea 2":
+            return
+        raw = str(self.gen_model.currentData() or "").endswith("raw")
+        self.gen_steps.setValue(52 if raw else 8)
+        self.gen_cfg.setValue(3.5 if raw else 0.0)
+
+    def _krea2_dit(self):
+        """Id del transformer single-file Krea 2 scelto (None = transformer dello snapshot Turbo/Raw)."""
+        if self.gen_arch.currentText() != "Krea 2":
+            return None
+        cid = self.gen_model.currentData()
+        return cid if isinstance(cid, str) and cid.startswith("krea2-") else None
+
     def _reload_gen_krea2(self, *_):
         """Popola il dropdown con le varianti Krea 2 (Turbo/Raw) dal catalogo pesi, con badge ⬇ se non presenti
         (Krea 2 è uno snapshot diffusers, non un checkpoint-file → download-on-select come per il video)."""
         self._reload_gen_catalog([("krea2_turbo", tr("f1.gen.krea2.turbo", "Krea 2 Turbo (8 step, veloce)")),
-                                  ("krea2_raw", tr("f1.gen.krea2.raw", "Krea 2 Raw (52 step, qualità)"))])
+                                  ("krea2_raw", tr("f1.gen.krea2.raw", "Krea 2 Raw (52 step, qualità)")),
+                                  # finetune single-file (18+: il filtro adult del catalogo lo nasconde in SFW)
+                                  ("krea2-noct-v4", tr("f1.gen.krea2.noct", "Krea Noct V4 (18+, int8, 8 step)"))])
 
     def _maybe_offer_gen_download(self, *_):
         """Solo su click utente: se l'arch immagine è a snapshot (Krea 2) e la variante scelta non è presente,
@@ -1975,6 +1995,8 @@ class Frame1Tab(QWidget):
             # Krea 2: variante (turbo/raw) dalla voce selezionata nel dropdown → il worker risolve lo snapshot
             "krea2_variant": ("raw" if str(self.gen_model.currentData() or "").endswith("raw") else "turbo")
                              if self.gen_arch.currentText() == "Krea 2" else None,
+            # Krea 2 single-file (finetune community): id di catalogo del transformer, sopra lo snapshot Turbo
+            "krea2_dit": self._krea2_dit(),
             **self._qwen21_config(),
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),

@@ -227,6 +227,19 @@ def _mmh3_lora():
     return _renamer(rename)
 
 
+def _krea2_dit():
+    """Krea 2 single-file ComfyUI (es. Krea Noct V4 int8 ConvRot) → nomi Krea2Transformer2DModel; i Linear int8
+    restano compressi (+ .convrot_group), `blocks.N.mod.lin` piatto → scale_shift_table [6, dim]."""
+    _workers_path()
+    import krea2_custom as K
+
+    def extra(key, info, header):
+        if K.is_block_modulation(key):
+            return [(K.dit_key(key), lambda t: t.reshape(6, -1))]
+        return None
+    return _renamer(K.dit_key, extra=extra)
+
+
 def _qwen21_te():
     def rename(k):
         if k == "lm_head.weight":                         # 1,2 GB mai usati (la pipeline legge gli hidden state)
@@ -245,6 +258,7 @@ CONVERTERS = {
     "mmh3_te": _mmh3_te,              # MiniMax H3 TE Qwen3-VL-32B (nvfp4-AWQ / fp8) → Qwen3VLForConditionalGeneration
     "mmh3_vae": _mmh3_vae,            # MiniMax H3 VAE video fp16 → AutoencoderKLMiniMaxH3
     "mmh3_lora": _mmh3_lora,          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
+    "krea2_dit": _krea2_dit,          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
     "qwen21_dit": lambda: _renamer(lambda k: k),   # Qwen-Image 2.1 nvfp4 «Prism»: nomi già diffusers
     "qwen21_te": _qwen21_te,          # Qwen-Image 2.1 TE Qwen3-VL-8B (nvfp4 ComfyUI) → transformers
     "qwen21_cn": lambda: _renamer(lambda k: k),    # Qwen-Image 2.1 ControlNet Union Fun (INT8 ConvRot): nomi già diffusers

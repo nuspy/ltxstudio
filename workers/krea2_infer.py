@@ -118,8 +118,48 @@ def _demote_pipes() -> float:
     return mb
 
 
-def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
-    key = (model_dir, variant, tuple(loras))
+def _resolve_dit(p: dict) -> str:
+    """Transformer single-file scelto dall'utente (`krea2_dit`: id di catalogo o path), "" = quello dello
+    snapshot. Mancante su disco → errore chiaro, MAI ripiego silenzioso sul transformer ufficiale."""
+    d = str(p.get("krea2_dit") or "").strip()
+    if not d:
+        return ""
+    if os.path.isfile(d):
+        return d
+    from core import weights_catalog as wc
+    e = {x["id"]: x for x in wc.load()}.get(d)
+    if e and e.get("filename"):
+        path = os.path.join(str(wc.dest_for(e)), e["filename"])
+        if os.path.isfile(path):
+            return path
+    raise RuntimeError(f"Transformer Krea 2 «{d}» non trovato su disco: scaricalo dal tab «Pesi modelli».")
+
+
+def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: str):
+    """Transformer da file singolo nativo (int8 ConvRot / fp8: già compresso, niente layerwise casting) su
+    text encoder, VAE e scheduler dello snapshot `model_dir`. LoRA agganciate ai Linear quantizzati."""
+    from diffusers import DiffusionPipeline
+    from workers import krea2_custom as K
+    print(f"[krea2] transformer single-file: {os.path.basename(dit)} (base {os.path.basename(model_dir)})", flush=True)
+    tr = K.build_transformer(dit, os.path.join(model_dir, "transformer"))
+    if loras:
+        K.apply_loras(tr, list(loras), log=lambda m: print(m, flush=True))
+    pipe = DiffusionPipeline.from_pretrained(model_dir, transformer=tr, torch_dtype=torch.bfloat16)
+    free = _free_vram_mb()
+    if free < 26000:                       # TE+VAE dello snapshot (~9GB) accanto al transformer int8 (~13GB)
+        pipe.enable_model_cpu_offload()
+        print(f"[krea2] model_cpu_offload (VRAM libera {free}MB)", flush=True)
+    else:
+        pipe = pipe.to("cuda")
+    try:
+        pipe.vae.enable_tiling()
+    except Exception:                                          # noqa: BLE001
+        pass
+    return pipe
+
+
+def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = ""):
+    key = (model_dir, variant, tuple(loras), dit)
     if key in _PIPE_CACHE:
         pipe = _PIPE_CACHE[key]
         if getattr(pipe, "_ls_parked_cpu", False):             # M-park: rientro VRAM dalla RAM (no SSD)
@@ -141,6 +181,9 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = ()):
     # one-shot c'è comunque una sola chiave, quindi è un no-op.
     if _PIPE_CACHE:
         _evict_pipes()
+    if dit:
+        _PIPE_CACHE[key] = _load_pipeline_single_file(model_dir, variant, tuple(loras), dit)
+        return _PIPE_CACHE[key]
     from diffusers import DiffusionPipeline
     print(f"[krea2] carico Krea2Pipeline: {model_dir} (variant={variant})", flush=True)
     try:
@@ -334,7 +377,7 @@ def run_edit(p: dict) -> str:
     if not imgs:
         raise RuntimeError("Krea 2 Edit: nessuna immagine sorgente (image_path/images).")
     model_dir, variant = _resolve_model_dir(p)
-    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=True)))
+    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=True)), _resolve_dit(p))
     # trasforma la pipeline t2i caricata in quella di edit (stessi componenti, aggiunge edit())
     from workers.krea2_edit_pipeline import Krea2EditPipeline
     from diffusers.pipelines.krea2.pipeline_krea2 import Krea2Pipeline as _Base
@@ -377,7 +420,8 @@ def run_generation(p: dict) -> str:
     out = p["output"]
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     model_dir, variant = _resolve_model_dir(p)
-    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=False)))  # t2i ora applica le LoRA
+    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=False)),  # t2i ora applica le LoRA
+                          _resolve_dit(p))
     # ATTENZIONE T2I DETERMINISTICA: forza 'native' (SDPA). Il t2i NON ha attn_mask di padding, quindi
     # flash_varlen/flash/sage danno griglie/strisce colorate (macchie seed-dipendenti). Sul server
     # PERSISTENTE il pipe è condiviso: un run_edit precedente lo lascia in flash_varlen → il t2i successivo

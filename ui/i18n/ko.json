@@ -3099,5 +3099,6 @@
   "upsell.available_in": "다음 버전에서만 사용 가능: {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (최대 10명의 캐릭터)",
   "fs.sb.qwen21_dit": "Qwen:",
-  "fs.sb.qwen21_dit.tt": "키프레임과 출연진 초상화용 Qwen-Image 2.1 모델."
+  "fs.sb.qwen21_dit.tt": "키프레임과 출연진 초상화용 Qwen-Image 2.1 모델.",
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8단계)"
 }

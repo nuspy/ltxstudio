@@ -3099,5 +3099,6 @@
   "upsell.available_in": "केवल इन संस्करणों में उपलब्ध: {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (10 पात्रों तक)",
   "fs.sb.qwen21_dit": "Qwen:",
-  "fs.sb.qwen21_dit.tt": "की-फ़्रेम और कलाकारों के पोर्ट्रेट के लिए Qwen-Image 2.1 मॉडल।"
+  "fs.sb.qwen21_dit.tt": "की-फ़्रेम और कलाकारों के पोर्ट्रेट के लिए Qwen-Image 2.1 मॉडल।",
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 चरण)"
 }

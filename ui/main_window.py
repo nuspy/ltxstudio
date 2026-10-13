@@ -3156,9 +3156,12 @@ class MainWindow(QMainWindow):
             return
         params = {"model": cfg["model"], "arch": cfg["arch"], "prompt": cfg["prompt"],
                   "negative": negative, "width": v["width"], "height": v["height"],
-                  "steps": cfg["steps"], "guidance": cfg.get("cfg") or 3.5,
+                  "steps": cfg["steps"],
+                  # 0.0 è un valore VERO (Krea 2 Turbo è guidance-distillato): `or 3.5` lo trasformava in 3.5 → reticolo
+                  "guidance": cfg["cfg"] if cfg.get("cfg") is not None else 3.5,
                   "seed": seed, "loras": loras,
                   "krea2_variant": cfg.get("krea2_variant"),   # Krea 2: turbo/raw (snapshot, no file-modello)
+                  "krea2_dit": cfg.get("krea2_dit"),           # Krea 2: transformer single-file (es. Noct V4)
                   # Qwen-Image 2.1: DiT, turbo, encoder, RGBA, formato 2K, riferimenti (≤10), img2img
                   **{k: cfg[k] for k in ("qwen21_dit", "qwen21_turbo", "qwen21_te", "transparent",
                                          "aspect_2k", "ref_images", "init_image", "strength",

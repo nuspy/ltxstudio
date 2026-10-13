@@ -185,6 +185,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "mmh3-dit-10erosmax-b6": (["ckpt_video", "distilled", "q_int8", "uncensored"], []),
     "mmh3-lora-unlocked-v2": (["lora_style", "uncensored"], []),
     "mmh3-lora-aftermidnight": (["lora_style", "uncensored"], []),
+    "krea2-noct-v4": (["ckpt_image", "distilled", "q_int8", "uncensored"], []),
     "krea2-lora-knp-v4": (["lora_style", "uncensored"], []),
     "krea2-lora-mysticxxx-v3": (["lora_style", "uncensored"], []),
     "zimage-lora-pussy": (["lora_style", "uncensored"], []),

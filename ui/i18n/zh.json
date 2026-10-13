@@ -3099,5 +3099,6 @@
   "upsell.available_in": "仅在以下版本中提供：{editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1（最多 10 个角色）",
   "fs.sb.qwen21_dit": "Qwen：",
-  "fs.sb.qwen21_dit.tt": "用于关键帧和演员肖像的 Qwen-Image 2.1 模型。"
+  "fs.sb.qwen21_dit.tt": "用于关键帧和演员肖像的 Qwen-Image 2.1 模型。",
+  "f1.gen.krea2.noct": "Krea Noct V4（18+，int8，8 步）"
 }

@@ -3099,5 +3099,6 @@
   "upsell.available_in": "Disponible uniquement dans les versions : {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (jusqu'à 10 personnages)",
   "fs.sb.qwen21_dit": "Qwen :",
-  "fs.sb.qwen21_dit.tt": "Modèle Qwen-Image 2.1 pour les images clés et les portraits du casting."
+  "fs.sb.qwen21_dit.tt": "Modèle Qwen-Image 2.1 pour les images clés et les portraits du casting.",
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 étapes)"
 }

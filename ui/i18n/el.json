@@ -3099,5 +3099,6 @@
   "upsell.available_in": "Διαθέσιμο μόνο στις εκδόσεις: {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (έως 10 χαρακτήρες)",
   "fs.sb.qwen21_dit": "Qwen:",
-  "fs.sb.qwen21_dit.tt": "Μοντέλο Qwen-Image 2.1 για τα βασικά καρέ και τα πορτρέτα του καστ."
+  "fs.sb.qwen21_dit.tt": "Μοντέλο Qwen-Image 2.1 για τα βασικά καρέ και τα πορτρέτα του καστ.",
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 βήματα)"
 }

@@ -4604,6 +4604,37 @@
         "int8_comfy",
         "uncensored"
       ]
+    },
+    {
+      "id": "krea2-noct-v4",
+      "module": "Immagini",
+      "label": "Krea Noct V4 (18+, INT8, Turbo 8 passi, 13.5GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 13.49,
+      "scan_names": [
+        "KreaNoct_V4_int8_convrot-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "repo_id": "Noctaluna/Krea2-Noct-Uncensored",
+      "url": "https://huggingface.co/Noctaluna/Krea2-Noct-Uncensored",
+      "filename": "KreaNoct_V4_int8_convrot-native.safetensors",
+      "remote_filename": "KreaNoct_V4_int8_convrot.safetensors",
+      "deps": [
+        "krea2_turbo"
+      ],
+      "sensitivity": "adult",
+      "note": "merge fotorealistico NSFW su Krea 2 Turbo, niente LoRA di sblocco: 8 passi, CFG 1. Krea 2 Community License",
+      "convert": "krea2_dit",
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "q_int8",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

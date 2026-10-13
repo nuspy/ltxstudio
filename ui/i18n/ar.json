@@ -3099,5 +3099,6 @@
   "upsell.available_in": "متاح فقط في الإصدارات: {editions}",
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (حتى 10 شخصيات)",
   "fs.sb.qwen21_dit": "Qwen:",
-  "fs.sb.qwen21_dit.tt": "نموذج Qwen-Image 2.1 للإطارات المفتاحية وصور طاقم الممثلين."
+  "fs.sb.qwen21_dit.tt": "نموذج Qwen-Image 2.1 للإطارات المفتاحية وصور طاقم الممثلين.",
+  "f1.gen.krea2.noct": "Krea Noct V4 (‏+18، int8، 8 خطوات)"
 }
