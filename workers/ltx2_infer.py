@@ -1304,10 +1304,33 @@ def _uses_aux_bundle(ckpt: str) -> bool:
             and os.path.normcase(ckpt) != os.path.normcase(CHECKPOINT))
 
 
+_INPUT_SCALE_CACHE: dict = {}
+
+
+def _has_input_scale(ckpt: str) -> bool:
+    """True se il checkpoint porta le `.input_scale` che fp8_scaled_mm richiede. I monoliti fp8 in formato
+    ComfyUI (es. 10Eros v1.5, PinkCherry: `weight_scale` scalare + `comfy_quant`, attivazioni quantizzate al
+    volo) non le hanno: con fp8_scaled_mm FP8Linear.input_scale resterebbe non inizializzato. Solo header."""
+    if ckpt in _INPUT_SCALE_CACHE:
+        return _INPUT_SCALE_CACHE[ckpt]
+    out = True                                               # header illeggibile: comportamento storico
+    try:
+        if str(ckpt).lower().endswith(".safetensors"):
+            from core import st_direct
+            hdr, _ = st_direct.read_header(ckpt)
+            out = any(k.endswith(".input_scale") for k in hdr)
+    except Exception:                                        # noqa: BLE001
+        out = True
+    _INPUT_SCALE_CACHE[ckpt] = out
+    return out
+
+
 def _key_qmode(ckpt: str, qmode: str) -> str:
     """Il qmode che finisce nella CHIAVE cache di _get_pipe (i comfy fp8_scaled degradano a
     fp8_cast PRIMA del calcolo della chiave; gli altri downgrade interni avvengono dopo)."""
-    return "fp8_cast" if (_uses_aux_bundle(ckpt) and qmode == "fp8_scaled_mm") else qmode
+    if qmode == "fp8_scaled_mm" and (_uses_aux_bundle(ckpt) or not _has_input_scale(ckpt)):
+        return "fp8_cast"
+    return qmode
 
 
 def _prepare_pipe_cache(ckpt: str, qmode: str, loras: list, ptype: str,
@@ -1365,6 +1388,10 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
             # FP8Linear resterebbe senza parametro → si passa al percorso fp8_cast (fold delle
             # weight_scale scalari + storage fp8, upcast in inference). Stessa VRAM, niente crash.
             qmode = "fp8_cast"
+    if qmode == "fp8_scaled_mm" and not _has_input_scale(ckpt):
+        # monolite fp8 ComfyUI SENZA input_scale (10Eros v1.5, PinkCherry…): stesso ripiego dei parziali
+        print(f"[fp8] '{os.path.basename(ckpt)}' senza input_scale → fp8_cast (fold delle scale)", flush=True)
+        qmode = "fp8_cast"
     lkey = tuple((lo.path, lo.strength) for lo in loras)
     key = (ckpt, qmode, offload_str, lkey, stages, ptype)
     if key in _PIPE_CACHE:

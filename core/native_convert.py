@@ -195,12 +195,19 @@ def _mmh3_vae():
 
 
 def _mmh3_lora():
-    """LoRA H3 in nomi ComfyUI (diffusion_model.blocks.N.attn.qkv_proj.lora_A…) → nomi nativi del modello
-    montato (transformer_blocks.N.attn.to_qkv…, ff.gate_up/ff.out): stesse matrici, qkv e gate/up già fusi."""
+    """LoRA H3 in nomi ComfyUI (diffusion_model.blocks.N.attn.qkv_proj.lora_A…) o kohya
+    (lora_unet_blocks_N_attn_qkv_proj.lora_down + alpha) → nomi nativi del modello montato
+    (transformer_blocks.N.attn.to_qkv…, ff.gate_up/ff.out): stesse matrici, qkv e gate/up già fusi."""
     _workers_path()
     import minimax_h3_convert as M
 
+    import re
+    kohya = re.compile(r"^lora_unet_(token_refiner_)?blocks_(\d+)_(attn|mlp)_([a-z0-9_]+?)\.(.+)$")
+
     def rename(k):
+        m = kohya.match(k)                               # kohya (lynaNSFW, AfterMidnight…): lora_unet_blocks_N_attn_qkv_proj
+        if m:
+            k = f"{'token_refiner.' if m.group(1) else ''}blocks.{m.group(2)}.{m.group(3)}.{m.group(4)}.{m.group(5)}"
         for pre in ("diffusion_model.", "model.diffusion_model.", "transformer."):
             if k.startswith(pre):
                 k = k[len(pre):]

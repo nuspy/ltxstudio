@@ -1601,27 +1601,6 @@
       ]
     },
     {
-      "id": "ltx23-eros",
-      "module": "Video",
-      "label": "LTX-2.3 10Eros (checkpoint NSFW, fonte community)",
-      "kind": "file",
-      "type": "diffusion_models",
-      "family": "LTX",
-      "gated": false,
-      "approx_gb": 27.0,
-      "scan_names": [
-        "ltx2310eros_v1.safetensors"
-      ],
-      "category": "video",
-      "arch": "ltx23",
-      "filename": "ltx2310eros_v1.safetensors",
-      "sensitivity": "adult",
-      "no_remote": true,
-      "use": [
-        "ckpt_video"
-      ]
-    },
-    {
       "id": "ltx25-transformer-nvfp4",
       "module": "Video",
       "label": "LTX-2.5 22B distilled transformer nvfp4",
@@ -4223,6 +4202,375 @@
       "use": [
         "prompt_enhancer",
         "q_int8"
+      ]
+    },
+    {
+      "id": "ltx23-eros15",
+      "module": "Video",
+      "label": "10Eros v1.5 LTX-2.3 (18+, fp8, 30.2GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 30.24,
+      "scan_names": [
+        "10Eros_v1.5_fp8mixed_experimental_learned.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "LokkenJP/10EROS_1.5_fp8_exp_learned",
+      "url": "https://huggingface.co/LokkenJP/10EROS_1.5_fp8_exp_learned",
+      "filename": "10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
+      "remote_filename": "10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
+      "sha256": "192c8f544fe1694bd974e30217ca0f006be9d629b502313921989ee101bfe483",
+      "deps": [
+        "ltx23-gemma-te",
+        "ltx23-distilled-lora-384",
+        "ltx23-spatial-upscaler"
+      ],
+      "sensitivity": "adult",
+      "note": "aggiornamento di 10Eros v1 (TenStrip): finetune NSFW con VAE inclusi; blocchi 0,1,46,47 in bf16. Licenza LTX-2 Community",
+      "use": [
+        "ckpt_video",
+        "dev_quality",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "ltx23-pinkcherry18",
+      "module": "Video",
+      "label": "PinkCherry v1.8 LTX-2.3 (18+, fp8, 27.6GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 27.62,
+      "scan_names": [
+        "PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "SexGod1979/PinkCherry_NSFW_LTX23",
+      "url": "https://huggingface.co/SexGod1979/PinkCherry_NSFW_LTX23",
+      "filename": "PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors",
+      "remote_filename": "v1.8/PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors",
+      "deps": [
+        "ltx23-gemma-te",
+        "ltx23-distilled-lora-384",
+        "ltx23-spatial-upscaler"
+      ],
+      "sensitivity": "adult",
+      "note": "finetune NSFW con VAE inclusi; l'autore consiglia la distilled-LoRA 384 ufficiale. Derivato LTX-2",
+      "use": [
+        "ckpt_video",
+        "dev_quality",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-dit-pinkcherry18",
+      "module": "Video",
+      "label": "PinkCherry H3 v1.8 hybrid (18+, INT8, 21.1GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 21.06,
+      "scan_names": [
+        "PinkCherry_hybrid_v1.8_int8_minimax_h3_pruned-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "SexGod1979/PinkCherry-NSFW_MiniMax-H3",
+      "url": "https://huggingface.co/SexGod1979/PinkCherry-NSFW_MiniMax-H3",
+      "filename": "PinkCherry_hybrid_v1.8_int8_minimax_h3_pruned-native.safetensors",
+      "remote_filename": "1.8-hybrid/PinkCherry_hybrid_v1.8_int8_minimax_h3_pruned.safetensors",
+      "sensitivity": "adult",
+      "note": "finetune NSFW per FL2VA e Ref2VA (stesse chiavi del DiT ufficiale pruned). Licenza H3 Community (no UE/UK/USA/Corea)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "use": [
+        "ckpt_video",
+        "q_int8",
+        "uncensored"
+      ],
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ]
+    },
+    {
+      "id": "mmh3-dit-10erosmax-b6",
+      "module": "Video",
+      "label": "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 21.71,
+      "scan_names": [
+        "10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "TenStrip/10Eros-Max",
+      "url": "https://huggingface.co/TenStrip/10Eros-Max",
+      "filename": "10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors",
+      "remote_filename": "10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors",
+      "sensitivity": "adult",
+      "note": "turbo già fuso: 8-12 passi, shift 10/3, NIENTE LoRA turbo. Licenza H3 Community (no UE/UK/USA/Corea)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "use": [
+        "ckpt_video",
+        "distilled",
+        "q_int8",
+        "uncensored"
+      ],
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ]
+    },
+    {
+      "id": "mmh3-lora-unlocked-v2",
+      "module": "Video",
+      "label": "LoRA H3 NSFW Unlocked V2 (18+, 0.3GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.3,
+      "scan_names": [
+        "Minimax_H3_Unlocked_V2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "lynaNSFW/minimaxH3_Collection",
+      "url": "https://huggingface.co/lynaNSFW/minimaxH3_Collection",
+      "filename": "Minimax_H3_Unlocked_V2-native.safetensors",
+      "remote_filename": "Minimax_H3_Unlocked_V2.safetensors",
+      "sensitivity": "adult",
+      "note": "la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-lora-aftermidnight",
+      "module": "Video",
+      "label": "LoRA H3 AfterMidnight Ref2VA (18+, 1.2GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.19,
+      "scan_names": [
+        "AfterMidnight_ref2va_h3_rank64_v1.2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "SexGod1979/AfterMidnight-MiniMax-H3-NSFW",
+      "url": "https://huggingface.co/SexGod1979/AfterMidnight-MiniMax-H3-NSFW",
+      "filename": "AfterMidnight_ref2va_h3_rank64_v1.2-native.safetensors",
+      "remote_filename": "AfterMidnight_ref2va_h3_sexytime_rank64-v1.2.safetensors",
+      "sensitivity": "adult",
+      "note": "solo modalità Ref2VA; l'autore usa euler + scheduler beta",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "krea2-lora-knp-v4",
+      "module": "Immagini",
+      "label": "LoRA Krea 2 NSFW V4 (KNP, 18+, 0.46GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.46,
+      "scan_names": [
+        "Krea2_NSFW_KNP_v4.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "repo_id": "randomforest/krea-2-nsfw-v4",
+      "url": "https://huggingface.co/randomforest/krea-2-nsfw-v4",
+      "filename": "Krea2_NSFW_KNP_v4.safetensors",
+      "remote_filename": "KNP_000003000.safetensors",
+      "sensitivity": "adult",
+      "note": "Civitai 2725430 (105k download), rank 64. Apache-2.0",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "krea2-lora-mysticxxx-v3",
+      "module": "Immagini",
+      "label": "LoRA Krea 2 Mystic XXX v3 (18+, 0.23GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.23,
+      "scan_names": [
+        "Krea2_MysticXXX_v3.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "repo_id": "yufusoft/MysticXXX_KREA2_v3",
+      "url": "https://huggingface.co/yufusoft/MysticXXX_KREA2_v3",
+      "filename": "Krea2_MysticXXX_v3.safetensors",
+      "remote_filename": "MysticXXX_KREA2_v3.safetensors",
+      "sensitivity": "adult",
+      "note": "Civitai 2728644 (54k download), rank 32",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-lora-pussy",
+      "module": "Immagini",
+      "label": "LoRA Z-Image NSFW anatomia (18+, 0.34GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 0.34,
+      "scan_names": [
+        "ZIT_NSFW_pussy.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "repo_id": "qqnyanddld/nsfw-z-image-lora",
+      "url": "https://huggingface.co/qqnyanddld/nsfw-z-image-lora",
+      "filename": "ZIT_NSFW_pussy.safetensors",
+      "remote_filename": "lora-pussy.safetensors",
+      "sensitivity": "adult",
+      "note": "Civitai 41k download",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-lora-bukkake",
+      "module": "Immagini",
+      "label": "LoRA Z-Image NSFW bukkake (18+, 0.17GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 0.17,
+      "scan_names": [
+        "ZIT_NSFW_bukkake.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "repo_id": "qqnyanddld/nsfw-z-image-lora",
+      "url": "https://huggingface.co/qqnyanddld/nsfw-z-image-lora",
+      "filename": "ZIT_NSFW_bukkake.safetensors",
+      "remote_filename": "lora-bukkake.safetensors",
+      "sensitivity": "adult",
+      "note": "trigger «pornmaster bukkake,»",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-lora-open-pussy",
+      "module": "Immagini",
+      "label": "LoRA Z-Image NSFW anatomia aperta (18+, 0.34GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 0.34,
+      "scan_names": [
+        "ZIT_NSFW_open-pussy.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "repo_id": "qqnyanddld/nsfw-z-image-lora",
+      "url": "https://huggingface.co/qqnyanddld/nsfw-z-image-lora",
+      "filename": "ZIT_NSFW_open-pussy.safetensors",
+      "remote_filename": "lora-open-pussy.safetensors",
+      "sensitivity": "adult",
+      "note": "trigger «zitpussy»",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-lora-tentacled",
+      "module": "Immagini",
+      "label": "LoRA Z-Image NSFW tentacoli (18+, 0.17GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 0.17,
+      "scan_names": [
+        "ZIT_NSFW_tentacled.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "repo_id": "qqnyanddld/nsfw-z-image-lora",
+      "url": "https://huggingface.co/qqnyanddld/nsfw-z-image-lora",
+      "filename": "ZIT_NSFW_tentacled.safetensors",
+      "remote_filename": "lora-tentacled.safetensors",
+      "sensitivity": "adult",
+      "note": "versione Turbo",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "wan-umt5-nsfw-bf16",
+      "module": "Video",
+      "label": "Wan UMT5-XXL NSFW (18+, bf16, 11.4GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 11.36,
+      "scan_names": [
+        "nsfw_wan_umt5-xxl_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "repo_id": "NSFW-API/NSFW-Wan-UMT5-XXL",
+      "url": "https://huggingface.co/NSFW-API/NSFW-Wan-UMT5-XXL",
+      "filename": "nsfw_wan_umt5-xxl_bf16.safetensors",
+      "remote_filename": "nsfw_wan_umt5-xxl_bf16.safetensors",
+      "sensitivity": "adult",
+      "note": "sostituisce l'umt5 di MultiTalk (stesse chiavi). ⚠ MultiTalk oggi non parte: dipende da WanVideoWrapper, spostato in ToTrash",
+      "use": [
+        "te",
+        "uncensored"
       ]
     }
   ],

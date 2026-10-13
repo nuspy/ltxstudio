@@ -113,7 +113,7 @@ PATCH = {
 def N(id, module, label, *, category, arch, kind="file", repo=None, filename=None,
       remote=None, type=None, family="", tool_dest=None, gated=False, gb=0.0,
       scan=None, deps=None, role=None, sens=None, no_remote=False, note=None,
-      allow=None, used_by=None, convert=None):
+      allow=None, used_by=None, convert=None, sha256=None):
     e = {"id": id, "module": module, "label": label, "kind": kind,
          "type": type or "misc", "family": family, "gated": gated,
          "approx_gb": gb, "scan_names": scan or ([filename] if filename else []),
@@ -127,6 +127,8 @@ def N(id, module, label, *, category, arch, kind="file", repo=None, filename=Non
         e["remote_filename"] = remote
     if tool_dest:
         e["tool_dest"] = tool_dest
+    if sha256:                                      # verificato da core/downloader.verify_file dopo il download
+        e["sha256"] = sha256
     if deps:
         e["deps"] = deps
     if role:
@@ -669,6 +671,70 @@ NEW = [
       type="LoRA", family="Qwen21", gb=0.03, sens="adult", used_by=["cap.image_qwen21"],
       note="toglie la censura a qualunque DiT base (solo attenzione, rank 16). Licenza Qwen Research: uso NON commerciale"),
 
+    # ───────── 18+ (13/10/2026, scelti dall'utente con domanda a scelta multipla) — header verificati via Range ─────────
+    # LTX-2.3: monoliti fp8 ComfyUI (weight_scale scalare + comfy_quant, NIENTE input_scale → ltx2_infer usa
+    # fp8_cast). Modelli DEV: la distilled-LoRA della release resta automatica.
+    N("ltx23-eros15", "Video", "10Eros v1.5 LTX-2.3 (18+, fp8, 30.2GB)", category="video", arch="ltx23",
+      repo="LokkenJP/10EROS_1.5_fp8_exp_learned", remote="10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
+      filename="10Eros_v1.5_fp8mixed_experimental_learned.safetensors", type="diffusion_models", family="LTX",
+      gb=30.24, sens="adult", sha256="192c8f544fe1694bd974e30217ca0f006be9d629b502313921989ee101bfe483",
+      deps=["ltx23-gemma-te", "ltx23-distilled-lora-384", "ltx23-spatial-upscaler"],
+      note="aggiornamento di 10Eros v1 (TenStrip): finetune NSFW con VAE inclusi; blocchi 0,1,46,47 in bf16. Licenza LTX-2 Community"),
+    N("ltx23-pinkcherry18", "Video", "PinkCherry v1.8 LTX-2.3 (18+, fp8, 27.6GB)", category="video", arch="ltx23",
+      repo="SexGod1979/PinkCherry_NSFW_LTX23", remote="v1.8/PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors",
+      filename="PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors", type="diffusion_models", family="LTX",
+      gb=27.62, sens="adult", deps=["ltx23-gemma-te", "ltx23-distilled-lora-384", "ltx23-spatial-upscaler"],
+      note="finetune NSFW con VAE inclusi; l'autore consiglia la distilled-LoRA 384 ufficiale. Derivato LTX-2"),
+    # MiniMax H3: DiT «hybrid» (fl2va+ref2va fusi, stesso layout pruned int8 ConvRot) e LoRA kohya.
+    # ⚠ licenza H3 Community: territori esclusi UE/UK/USA/Corea, anche per i derivati.
+    N("mmh3-dit-pinkcherry18", "Video", "PinkCherry H3 v1.8 hybrid (18+, INT8, 21.1GB)", category="video",
+      arch="minimax_h3", repo="SexGod1979/PinkCherry-NSFW_MiniMax-H3",
+      remote="1.8-hybrid/PinkCherry_hybrid_v1.8_int8_minimax_h3_pruned.safetensors",
+      filename="PinkCherry_hybrid_v1.8_int8_minimax_h3_pruned-native.safetensors", convert="mmh3_dit",
+      type="diffusion_models", family="MiniMax-H3", gb=21.06, sens="adult", deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8", "mmh3-video-vae", "mmh3-audio-vae"],
+      used_by=["cap.video_minimax_h3"],
+      note="finetune NSFW per FL2VA e Ref2VA (stesse chiavi del DiT ufficiale pruned). Licenza H3 Community (no UE/UK/USA/Corea)"),
+    N("mmh3-dit-10erosmax-b6", "Video", "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)", category="video",
+      arch="minimax_h3", repo="TenStrip/10Eros-Max", remote="10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors",
+      filename="10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors", convert="mmh3_dit",
+      type="diffusion_models", family="MiniMax-H3", gb=21.71, sens="adult", deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8", "mmh3-video-vae", "mmh3-audio-vae"],
+      used_by=["cap.video_minimax_h3"],
+      note="turbo già fuso: 8-12 passi, shift 10/3, NIENTE LoRA turbo. Licenza H3 Community (no UE/UK/USA/Corea)"),
+    N("mmh3-lora-unlocked-v2", "Video", "LoRA H3 NSFW Unlocked V2 (18+, 0.3GB)", category="video", arch="minimax_h3",
+      repo="lynaNSFW/minimaxH3_Collection", remote="Minimax_H3_Unlocked_V2.safetensors",
+      filename="Minimax_H3_Unlocked_V2-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3",
+      gb=0.3, sens="adult", used_by=["cap.video_minimax_h3"],
+      note="la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16"),
+    N("mmh3-lora-aftermidnight", "Video", "LoRA H3 AfterMidnight Ref2VA (18+, 1.2GB)", category="video",
+      arch="minimax_h3", repo="SexGod1979/AfterMidnight-MiniMax-H3-NSFW",
+      remote="AfterMidnight_ref2va_h3_sexytime_rank64-v1.2.safetensors",
+      filename="AfterMidnight_ref2va_h3_rank64_v1.2-native.safetensors", convert="mmh3_lora", type="LoRA",
+      family="MiniMax-H3", gb=1.19, sens="adult", used_by=["cap.video_minimax_h3"],
+      note="solo modalità Ref2VA; l'autore usa euler + scheduler beta"),
+    # Krea 2: LoRA ai-toolkit (diffusion_model.blocks… + txtfusion → text_fusion)
+    N("krea2-lora-knp-v4", "Immagini", "LoRA Krea 2 NSFW V4 (KNP, 18+, 0.46GB)", category="image", arch="krea2",
+      repo="randomforest/krea-2-nsfw-v4", remote="KNP_000003000.safetensors",
+      filename="Krea2_NSFW_KNP_v4.safetensors", type="LoRA", family="Krea2", gb=0.46, sens="adult",
+      note="Civitai 2725430 (105k download), rank 64. Apache-2.0"),
+    N("krea2-lora-mysticxxx-v3", "Immagini", "LoRA Krea 2 Mystic XXX v3 (18+, 0.23GB)", category="image",
+      arch="krea2", repo="yufusoft/MysticXXX_KREA2_v3", remote="MysticXXX_KREA2_v3.safetensors",
+      filename="Krea2_MysticXXX_v3.safetensors", type="LoRA", family="Krea2", gb=0.23, sens="adult",
+      note="Civitai 2728644 (54k download), rank 32"),
+    # Z-Image Turbo: LoRA ai-toolkit con nomi diffusers (le «ZIB» sono per Z-Image Base: escluse)
+    *[N(f"zimage-lora-{lid}", "Immagini", f"LoRA Z-Image NSFW {lbl} (18+, {gb}GB)", category="image",
+        arch="zimage", repo="qqnyanddld/nsfw-z-image-lora", remote=f"{rem}.safetensors",
+        filename=f"ZIT_NSFW_{lid}.safetensors", type="LoRA", family="Z-Image", gb=gb, sens="adult", note=note)
+      for lid, rem, lbl, gb, note in (
+          ("pussy", "lora-pussy", "anatomia", 0.34, "Civitai 41k download"),
+          ("bukkake", "lora-bukkake", "bukkake", 0.17, "trigger «pornmaster bukkake,»"),
+          ("open-pussy", "lora-open-pussy", "anatomia aperta", 0.34, "trigger «zitpussy»"),
+          ("tentacled", "lora-tentacled", "tentacoli", 0.17, "versione Turbo"))],
+    # Wan 2.1: encoder UMT5 senza censura (bf16: il loader MultiTalk rifiuta l'fp8 «scaled»)
+    N("wan-umt5-nsfw-bf16", "Video", "Wan UMT5-XXL NSFW (18+, bf16, 11.4GB)", category="video", arch="wan21",
+      repo="NSFW-API/NSFW-Wan-UMT5-XXL", remote="nsfw_wan_umt5-xxl_bf16.safetensors",
+      filename="nsfw_wan_umt5-xxl_bf16.safetensors", type="TextEncoders", gb=11.36, sens="adult",
+      note="sostituisce l'umt5 di MultiTalk (stesse chiavi). ⚠ MultiTalk oggi non parte: dipende da WanVideoWrapper, spostato in ToTrash"),
+
     # ───────── FLUX single-file (quelli che il backend immagini carica DAVVERO) ─────────
     N("flux1-dev-single", "Immagini", "FLUX.1 dev (single-file nativo)", category="image",
       arch="flux1", repo="black-forest-labs/FLUX.1-dev", gated=True,
@@ -798,6 +864,8 @@ REFRESH = ("mmh3-", "qwen21-", "lcav")
 REMOVED = {
     # GGUF di MiniMax H3: nessun loader nativo (i profili nvfp4/fp8/int8-ConvRot coprono tutte le GPU)
     "mmh3-fl2va-gguf-q4", "mmh3-fl2va-gguf-q3", "mmh3-ref2va-gguf-q4", "mmh3-te-gguf-q4",
+    # 10Eros v1 (LTX-2.3) sostituito da 10Eros v1.5 (ltx23-eros15): il file vecchio va cancellato
+    "ltx23-eros",
 }
 
 

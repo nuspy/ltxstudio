@@ -271,9 +271,11 @@ def _convert_comfy_krea2_lora(sd: dict) -> dict:
       diffusion_model.  → transformer.          | .blocks.  → .transformer_blocks.
       attn.wq/wk/wv/wo  → attn.to_q/to_k/to_v/to_out.0   | attn.gate → attn.to_gate
       mlp.gate/up/down  → ff.gate/up/down
+      txtfusion.        → text_fusion.   (LoRA NSFW KNP/Mystic/SNOFS: senza, 64 tensori scartati in silenzio)
     """
     reps = [
-        ("diffusion_model.", "transformer."), (".blocks.", ".transformer_blocks."),
+        ("diffusion_model.", "transformer."), ("transformer.txtfusion.", "transformer.text_fusion."),
+        (".blocks.", ".transformer_blocks."),
         (".attn.wq.", ".attn.to_q."), (".attn.wk.", ".attn.to_k."), (".attn.wv.", ".attn.to_v."),
         (".attn.wo.", ".attn.to_out.0."), (".attn.gate.", ".attn.to_gate."),
         (".mlp.gate.", ".ff.gate."), (".mlp.up.", ".ff.up."), (".mlp.down.", ".ff.down."),
