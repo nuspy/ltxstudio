@@ -781,7 +781,7 @@ class Frame1Tab(QWidget):
         combo.clear()
         for cat_id, label in items:
             e = entries.get(cat_id)
-            if not e or (e.get("sensitivity") == "adult" and not adult_ok):
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.model_allowed(e):
                 continue
             present = False
             try:
@@ -1805,11 +1805,13 @@ class Frame1Tab(QWidget):
         adult_ok = self._adult_ok()
         for cid, lbl in self._qwen21_items():
             e = entries.get(cid)
-            if not e or (e.get("sensitivity") == "adult" and not adult_ok):
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.model_allowed(e):
                 continue
             label = f"{lbl}  · Qwen-Image 2.1" + ("" if wc.ready_with_deps(e) else "  ⬇")
             self._qwen21_inp[label] = cid
             self.inp_model.insertItem(at, label)
+            from core import weights_tooltips as _wt         # tooltip esplicativo unificato (i18n)
+            self.inp_model.setItemData(at, _wt.tooltip_for(e), Qt.ToolTipRole)
             at += 1
         i = self.inp_model.findText(cur)
         if i >= 0:

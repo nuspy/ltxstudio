@@ -89,11 +89,14 @@ class Matrix:
         """Edizioni che RICEVONO questo peso: almeno una delle sue cap attiva, e se il peso è
         adult solo le edizioni con allows_adult (stessa logica di weights_catalog.wanted)."""
         caps = wc.caps_for(entry)
+        row = wc.model_feature_id(entry)                   # riga model.<id> creata dalla sync del feature_matrix
         out = []
         for ed in self.editions:
             eid = ed.get("id", "")
             if entry.get("sensitivity") == "adult" and not ed.get("allows_adult"):
                 continue
+            if f"{row}|{eid}" in self.cells and not self.enabled(row, eid):
+                continue                                   # modello escluso a mano da questa edizione
             if not caps or any(self.enabled(c, eid) for c in caps):
                 out.append(eid)
         return out

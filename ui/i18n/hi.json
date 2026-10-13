@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "ControlNet को संदर्भों के साथ नहीं जोड़ा जा सकता: दोनों में से एक बंद करें।",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (फ़ोटो से संरचना)",
   "feat.cap.qwen21_prompt_enhancer": "Qwen-Image 2.1 के आधिकारिक प्रॉम्प्ट संवर्धक",
-  "weights.use.prompt_enhancer": "प्रॉम्प्ट संवर्धक: एक LLM जनरेट करने से पहले आपके अनुरोध को विस्तृत प्रॉम्प्ट में फिर से लिखता है।"
+  "weights.use.prompt_enhancer": "प्रॉम्प्ट संवर्धक: एक LLM जनरेट करने से पहले आपके अनुरोध को विस्तृत प्रॉम्प्ट में फिर से लिखता है।",
+  "upsell.available_in": "केवल इन संस्करणों में उपलब्ध: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (10 पात्रों तक)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "की-फ़्रेम और कलाकारों के पोर्ट्रेट के लिए Qwen-Image 2.1 मॉडल।"
 }

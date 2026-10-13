@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "El ControlNet no se combina con las Referencias: desactiva uno de los dos.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (estructura desde una foto)",
   "feat.cap.qwen21_prompt_enhancer": "Enriquecedores de prompt oficiales de Qwen-Image 2.1",
-  "weights.use.prompt_enhancer": "Enriquecedor de prompt: un LLM reescribe tu petición en un prompt detallado antes de generar."
+  "weights.use.prompt_enhancer": "Enriquecedor de prompt: un LLM reescribe tu petición en un prompt detallado antes de generar.",
+  "upsell.available_in": "Disponible solo en las versiones: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (hasta 10 personajes)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "Modelo Qwen-Image 2.1 para los fotogramas clave y los retratos del reparto."
 }

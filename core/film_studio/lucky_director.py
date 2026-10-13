@@ -108,7 +108,8 @@ def make_film(spec: dict, *, on_progress=None, cancel=None) -> dict:
     # progetto (auto, riapribile in Cinema Studio)
     cfg = {"img_arch": spec.get("img_arch", "flux"), "img_model": "", "vid_gguf": "",
            "vid_arch": spec.get("vid_arch", "ltx"),          # 2ª architettura video (LTX/LingBot)
-           "coherence_engine": spec.get("coherence_engine", "flux"),   # coerenza volto (FLUX/Krea 2 Edit)
+           "coherence_engine": spec.get("coherence_engine", "flux"),   # coerenza volto (FLUX/Krea 2 Edit/Qwen)
+           "qwen21_dit": spec.get("qwen21_dit", ""),                    # DiT Qwen-Image 2.1 scelto nel dialog
            "forbidden": "", "required": "",
            "style_bible": {}, "lucky_director": True}
     pid = db.insert("project", name=name, kind="film", duration_s=duration_s, genres="", styles="",
@@ -139,7 +140,8 @@ def make_film(spec: dict, *, on_progress=None, cancel=None) -> dict:
     try:
         from core.film_studio import cast_auto
         cast_auto.build_cast(pid, img_arch=cfg.get("img_arch", "flux"),
-                             model=cfg.get("img_model", ""), progress=on_progress)
+                             model=cfg.get("img_model", ""), progress=on_progress,
+                             qwen21_dit=cfg.get("qwen21_dit", ""))
     except Exception as _ce:                                      # noqa: BLE001 — il film prosegue anche senza cast
         print(f"[lucky] cast_auto fallito ({_ce}) → shot senza coerenza", flush=True)
 

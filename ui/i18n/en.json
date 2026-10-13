@@ -3169,5 +3169,9 @@
   "mw.qwen21_control_refs": "ControlNet can't be combined with References: turn one of them off.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (structure from a photo)",
   "feat.cap.qwen21_prompt_enhancer": "Qwen-Image 2.1 official prompt enhancers",
-  "weights.use.prompt_enhancer": "Prompt enhancer: an LLM rewrites your request into a detailed prompt before generating."
+  "weights.use.prompt_enhancer": "Prompt enhancer: an LLM rewrites your request into a detailed prompt before generating.",
+  "upsell.available_in": "Available only in: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (up to 10 characters)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "Qwen-Image 2.1 model for keyframes and cast portraits."
 }

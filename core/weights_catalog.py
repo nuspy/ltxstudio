@@ -190,10 +190,28 @@ def _cap_enabled(cap: str) -> bool:
         return True                                         # dev/fail-open: tutto attivo
 
 
+def model_feature_id(entry: dict) -> str:
+    """Riga della feature matrix che governa QUESTO modello: `model.<id catalogo>` (la crea la sync del
+    feature_matrix per ogni modello del registro)."""
+    return f"model.{entry.get('id', '')}"
+
+
+def model_allowed(entry: dict) -> bool:
+    """True se l'edizione include il modello. Decide la riga `model.<id>` del manifest SOLO se presente;
+    assente (dev senza manifest, build precedente alla riga, modello aggiunto dopo il build) = permesso,
+    e restano a decidere le capability (`caps_for`)."""
+    try:
+        from core import features
+        info = features.manifest().get("features", {}).get(model_feature_id(entry))
+    except Exception:                                       # noqa: BLE001
+        return True                                         # dev/fail-open
+    return True if info is None else bool(info.get("enabled", False))
+
+
 def wanted(entry: dict, *, check_edition: bool = True, check_present: bool = True,
            allows_adult: bool | None = None) -> bool:
-    """Il peso serve a QUESTA installazione? (edizione: una sua cap attiva) AND (modulo presente) AND
-    (sensibilità: adult solo se l'edizione lo consente)."""
+    """Il peso serve a QUESTA installazione? (edizione: una sua cap attiva E la sua riga `model.<id>` della
+    matrice, se c'è, accesa) AND (modulo presente) AND (sensibilità: adult solo se l'edizione lo consente)."""
     if entry.get("sensitivity") == "adult":
         if allows_adult is None:
             try:
@@ -206,6 +224,8 @@ def wanted(entry: dict, *, check_edition: bool = True, check_present: bool = Tru
     if check_present and not module_present(entry.get("module", "")):
         return False
     if check_edition:
+        if not model_allowed(entry):
+            return False
         caps = caps_for(entry)
         if caps and not any(_cap_enabled(c) for c in caps):
             return False

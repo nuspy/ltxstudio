@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "Το ControlNet δεν συνδυάζεται με τις Αναφορές: απενεργοποίησε ένα από τα δύο.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (δομή από φωτογραφία)",
   "feat.cap.qwen21_prompt_enhancer": "Επίσημοι εμπλουτιστές prompt του Qwen-Image 2.1",
-  "weights.use.prompt_enhancer": "Εμπλουτιστής prompt: ένα LLM ξαναγράφει το αίτημά σου σε λεπτομερές prompt πριν τη δημιουργία."
+  "weights.use.prompt_enhancer": "Εμπλουτιστής prompt: ένα LLM ξαναγράφει το αίτημά σου σε λεπτομερές prompt πριν τη δημιουργία.",
+  "upsell.available_in": "Διαθέσιμο μόνο στις εκδόσεις: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (έως 10 χαρακτήρες)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "Μοντέλο Qwen-Image 2.1 για τα βασικά καρέ και τα πορτρέτα του καστ."
 }

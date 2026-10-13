@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "ControlNet не поєднується з Референсами: вимкніть одне з двох.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (структура з фото)",
   "feat.cap.qwen21_prompt_enhancer": "Офіційні покращувачі промпту Qwen-Image 2.1",
-  "weights.use.prompt_enhancer": "Покращувач промпту: LLM переписує ваш запит у детальний промпт перед генерацією."
+  "weights.use.prompt_enhancer": "Покращувач промпту: LLM переписує ваш запит у детальний промпт перед генерацією.",
+  "upsell.available_in": "Доступно лише у версіях: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (до 10 персонажів)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "Модель Qwen-Image 2.1 для ключових кадрів і портретів акторів."
 }

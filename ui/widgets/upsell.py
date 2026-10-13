@@ -28,15 +28,26 @@ def _title_for(fid: str, i18n_key: str = "") -> str:
     return fid.split(".", 1)[-1].replace("_", " ").title()
 
 
+def available_text(up: dict) -> str:
+    """«Disponibile solo nelle versioni: A, B, C» — TUTTE le edizioni che includono la feature (le versioni
+    non sono una scala unica). Manifest vecchi senza `available_in`: ricade sul piano minimo."""
+    eds = up.get("available_in") or []
+    if eds:
+        names = ", ".join(e.get("name") or e.get("id", "") for e in eds)
+        return tr("upsell.available_in", "Disponibile solo nelle versioni: {editions}").format(editions=names)
+    return tr("upsell.available_on", "Disponibile nel piano {tier}").format(
+        tier=up.get("tier_name") or up.get("tier", ""))
+
+
 def _unlock_row(fid: str, up: dict) -> QWidget:
-    """Riga 'Available on <tier> (<price>)' + bottone di sblocco (condivisa da panel e dialog)."""
+    """Riga «Disponibile solo nelle versioni: …» + bottone di sblocco (condivisa da panel e dialog)."""
     w = QWidget(); h = QVBoxLayout(w); h.setSpacing(10); h.setContentsMargins(0, 0, 0, 0)
     tier = up.get("tier_name") or up.get("tier", "")
     price = up.get("price", "")
-    line = tr("upsell.available_on", "Disponibile nel piano {tier}").format(tier=tier)
-    if price:
+    line = available_text(up)
+    if price and not up.get("available_in"):
         line += f"  ·  {price}"
-    lab = QLabel(line); lab.setAlignment(Qt.AlignCenter)
+    lab = QLabel(line); lab.setAlignment(Qt.AlignCenter); lab.setWordWrap(True)
     lab.setStyleSheet(f"color:{_ACCENT}; font-size:15px; font-weight:bold;")
     h.addWidget(lab)
     if up.get("url"):
@@ -136,8 +147,7 @@ def lock_inline_item(combo, index: int, fid: str) -> None:
     item = combo.model().item(index) if hasattr(combo.model(), "item") else None
     if item is not None:
         item.setFlags(item.flags() & ~_Qt.ItemIsEnabled)      # non selezionabile
-    combo.setItemData(index, tr("upsell.available_on", "Disponibile nel piano {tier}").format(tier=tier),
-                      _Qt.ToolTipRole)
+    combo.setItemData(index, available_text(up), _Qt.ToolTipRole)
 
 
 class UpsellDialog(QDialog):

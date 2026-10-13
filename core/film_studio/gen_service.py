@@ -139,12 +139,36 @@ def compose_shot_prompt(sh: dict, state: dict, guard: dict, *, path_mode: str = 
 
 
 # ─────────────── immagini (keyframe / asset sheet) ───────────────
+def _gen_image_qwen21(prompt, out_png, negative, width, height, seed, dit, loras, refs) -> str:
+    """Keyframe con Qwen-Image 2.1 (worker dedicato). Riferimenti dei personaggi della scena, in ordine e senza
+    doppioni, come «image 1…10»: la coerenza viene dal modello stesso (niente PuLID, che è solo FLUX)."""
+    from core.qwen21_spec import DITS, MAX_REFS, TURBO_STEPS, DEFAULT_STEPS, DEFAULT_GUIDANCE
+    if dit not in DITS:
+        raise RuntimeError("Film Studio: scegli il modello Qwen-Image 2.1 nella barra dei modelli del progetto")
+    meta = DITS[dit]
+    uniq = list(dict.fromkeys(refs))[:MAX_REFS]
+    params = {"arch": "qwen_image21", "qwen21_dit": dit, "prompt": prompt, "negative": negative,
+              "width": width, "height": height, "seed": seed, "output": out_png, "ref_images": uniq,
+              "steps": TURBO_STEPS if meta.get("turbo") else int(meta.get("steps", DEFAULT_STEPS)),
+              "guidance": 1.0 if meta.get("turbo") else float(meta.get("cfg", DEFAULT_GUIDANCE))}
+    if loras:
+        params["loras"] = loras
+    res = native_driver.run_and_wait("image", params, timeout=1800)
+    p = (res.get("output") or [out_png]); p = p[0] if isinstance(p, list) else p
+    if p and os.path.exists(p) and p != out_png:
+        import shutil; shutil.copyfile(p, out_png)
+    if res.get("status") != "success" and not os.path.exists(out_png):
+        raise RuntimeError(res.get("error", "gen_image qwen_image21 fallita"))
+    return out_png
+
+
+
 def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 1024, seed: int = 7,
               face_ref: str = "", ref_image: str = "", ref_images: list | None = None,
               loras: list | None = None, arch: str = "flux", model: str = "", negative: str = "",
               structure: bool = True, coherence_engine: str = "flux",
               grounding_px: int = 1024, krea2_variant: str = "turbo",
-              face_strength: float = 0.85) -> str:
+              face_strength: float = 0.85, qwen21_dit: str = "") -> str:
     """Genera UNA immagine col motore nativo. face_ref→PuLID; ref_image→Kontext; loras opzionali.
     arch/model: architettura+checkpoint scelti nel progetto (B5: prima hardcoded flux). negative: estende il
     negative di default (continuity elementi vietati). structure: converte il prompt in JSON strutturato.
@@ -155,9 +179,16 @@ def gen_image(prompt: str, out_png: str, *, width: int = 1024, height: int = 102
       • "krea2_edit" → Krea 2 Edit in-context: usa i riferimenti dei personaggi DI QUESTA scena
         (face_ref+ref_images, già risolti per-scena da resolve_refs → ogni scena porta l'attore giusto)
         come immagini di riferimento; il prompt dello shot è l'istruzione. Fino a 2 personaggi (multi-ref);
-        con 3+ riferimenti ricade su FLUX per quella scena (log)."""
+        con 3+ riferimenti ricade su FLUX per quella scena (log);
+      • "qwen_image21" → Qwen-Image 2.1: i riferimenti della scena (fino a 10) entrano come «image N».
+    arch "qwen_image21": keyframe con Qwen-Image 2.1; il DiT è `qwen21_dit` (scelto nel progetto, mai d'ufficio)."""
     prompt, negative = _apply_prompt_json(prompt, negative, loras, out_png, kind="image", structure=structure)
     neg = NEG + (", " + negative if negative else "")
+
+    # ── Qwen-Image 2.1: keyframe (arch) e/o coerenza personaggi (riferimenti della scena ≤10) ────────
+    if str(arch).lower() == "qwen_image21" or str(coherence_engine).lower() == "qwen_image21":
+        return _gen_image_qwen21(prompt, out_png, neg, width, height, seed, qwen21_dit, loras,
+                                 [r for r in ([face_ref] + list(ref_images or []) + [ref_image]) if r])
 
     # ── Coerenza personaggio via Krea 2 Edit (in-context) ─────────────────────────────────────────
     _krefs = []

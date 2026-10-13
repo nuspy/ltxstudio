@@ -74,7 +74,7 @@ def _project_asset(pid: int, name: str) -> dict | None:
 
 
 def build_cast(pid: int, *, img_arch: str = "flux", model: str = "", width: int = 768, height: int = 768,
-               progress=None) -> dict:
+               progress=None, qwen21_dit: str = "") -> dict:
     """Per ogni `@Nome` del progetto: asset character (se manca) + UNA foto ritratto di riferimento (t2i).
     Idempotente. Ritorna {Nome: path|'exists'}. Il ritratto è pura t2i (è la SORGENTE dei riferimenti);
     la coerenza vera avviene poi negli shot via gen_service.gen_image(coherence_engine=…)."""
@@ -120,7 +120,7 @@ def build_cast(pid: int, *, img_arch: str = "flux", model: str = "", width: int 
                   f"soft studio lighting, plain background, sharp focus")
         try:
             gen_service.gen_image(prompt, out, width=width, height=height, arch=img_arch, model=model,
-                                  structure=False, seed=1000 + i)
+                                  structure=False, seed=1000 + i, qwen21_dit=qwen21_dit)
             db.insert("image", owner_kind="asset", owner_id=aid, angle="front", repr="front",
                       file=out, seed=1000 + i, prompt=prompt, version=1)
             made[name] = out

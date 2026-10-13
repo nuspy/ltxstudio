@@ -129,13 +129,18 @@ class LuckyDirectorDialog(QDialog):
         self.img_arch = QComboBox()
         self.img_arch.addItem(tr("ld.arch_flux", "FLUX"), "flux")
         self.img_arch.addItem(tr("ld.arch_krea2", "Krea 2"), "krea2")
+        self.img_arch.addItem(tr("f1.engine.qwen21", "Qwen-Image 2.1"), "qwen_image21")
         form.addRow(tr("ld.image_arch", "Image architecture"), self.img_arch)
         # coerenza volto negli shot con personaggi @Nome (NON sostituisce FLUX: switch)
         self.coherence = QComboBox()
         self.coherence.addItem(tr("ld.coh_flux", "FLUX (PuLID/Kontext)"), "flux")
         self.coherence.addItem(tr("ld.coh_krea2edit", "Krea 2 Edit (coerenza volto)"), "krea2_edit")
+        self.coherence.addItem(tr("fs.sb.coh_qwen21", "Qwen-Image 2.1 (fino a 10 personaggi)"), "qwen_image21")
         self.coherence.setToolTip(tr("ld.coh.tt", "Ogni scena usa i riferimenti dei suoi personaggi."))
         form.addRow(tr("ld.coherence", "Face coherence"), self.coherence)
+        from ui.film_studio.qwen21_combo import make_qwen21_dit_combo
+        self.qwen_dit = make_qwen21_dit_combo()
+        form.addRow(tr("fs.sb.qwen21_dit", "Qwen:"), self.qwen_dit)
         # 2ª architettura video: LTX-2 vs LingBot-Video
         self.vid_arch = QComboBox()
         self.vid_arch.addItem(tr("ld.arch_ltx", "LTX-2"), "ltx")
@@ -193,6 +198,7 @@ class LuckyDirectorDialog(QDialog):
             "img_arch": self.img_arch.currentData() or "flux",
             "vid_arch": self.vid_arch.currentData() or "ltx",
             "coherence_engine": self.coherence.currentData() or "flux",
+            "qwen21_dit": self.qwen_dit.currentData() or "",
         }
 
     # ── esecuzione ──────────────────────────────────────────────────────

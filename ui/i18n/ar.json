@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "لا يمكن الجمع بين ControlNet والمراجع: أوقف أحدهما.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (البنية من صورة)",
   "feat.cap.qwen21_prompt_enhancer": "مُحسِّنات الوصف الرسمية لـ Qwen-Image 2.1",
-  "weights.use.prompt_enhancer": "مُحسِّن الوصف: نموذج لغوي يعيد كتابة طلبك في وصف مفصّل قبل التوليد."
+  "weights.use.prompt_enhancer": "مُحسِّن الوصف: نموذج لغوي يعيد كتابة طلبك في وصف مفصّل قبل التوليد.",
+  "upsell.available_in": "متاح فقط في الإصدارات: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (حتى 10 شخصيات)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "نموذج Qwen-Image 2.1 للإطارات المفتاحية وصور طاقم الممثلين."
 }

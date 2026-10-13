@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "ControlNet 不能与参考图同时使用：请关闭其中之一。",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet（从照片获取结构）",
   "feat.cap.qwen21_prompt_enhancer": "Qwen-Image 2.1 官方提示词增强器",
-  "weights.use.prompt_enhancer": "提示词增强器：生成前由大语言模型把你的请求改写成详细的提示词。"
+  "weights.use.prompt_enhancer": "提示词增强器：生成前由大语言模型把你的请求改写成详细的提示词。",
+  "upsell.available_in": "仅在以下版本中提供：{editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1（最多 10 个角色）",
+  "fs.sb.qwen21_dit": "Qwen：",
+  "fs.sb.qwen21_dit.tt": "用于关键帧和演员肖像的 Qwen-Image 2.1 模型。"
 }

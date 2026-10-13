@@ -244,6 +244,7 @@ def run(pid: int, *, aspect: str = "", scene_trans: str = "", shot_trans: str = 
                                           "coherence_engine": guard.get("coherence_engine", "flux"),
                                           "grounding_px": guard.get("grounding_px", 1024),
                                           "krea2_variant": guard.get("krea2_variant", "turbo"),
+                                          "qwen21_dit": guard.get("qwen21_dit", ""),
                                           "seed": seed, "negative": forbidden,
                                           "width": width or 0, "height": height or 0},
                                 owner_kind="shot", owner_id=sh["id"])

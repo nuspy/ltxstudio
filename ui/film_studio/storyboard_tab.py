@@ -67,11 +67,17 @@ class StoryboardTab(QWidget):
         self.img_arch = QComboBox(); self.img_arch.setMinimumWidth(120)
         self.img_arch.addItem(tr("fs.sb.arch_flux", "FLUX"), "flux")
         self.img_arch.addItem(tr("fs.sb.arch_krea2", "Krea 2"), "krea2")
+        self.img_arch.addItem(tr("f1.engine.qwen21", "Qwen-Image 2.1"), "qwen_image21")
         # COERENZA VOLTO/personaggio quando lo shot ha riferimenti (@Nome): FLUX (PuLID/Kontext) o Krea 2 Edit
         # (in-context, usa i riferimenti dei personaggi di QUELLA scena). NON sostituisce FLUX: è uno switch.
         self.coherence = QComboBox(); self.coherence.setMinimumWidth(150)
         self.coherence.addItem(tr("fs.sb.coh_flux", "FLUX (PuLID/Kontext)"), "flux")
         self.coherence.addItem(tr("fs.sb.coh_krea2edit", "Krea 2 Edit (coerenza volto)"), "krea2_edit")
+        self.coherence.addItem(tr("fs.sb.coh_qwen21", "Qwen-Image 2.1 (fino a 10 personaggi)"), "qwen_image21")
+        # DiT Qwen-Image 2.1 (scelto esplicitamente, visibile solo se Qwen è arch o motore di coerenza)
+        from ui.film_studio.qwen21_combo import make_qwen21_dit_combo
+        self.qwen_dit = make_qwen21_dit_combo()
+        self.qwen_dit.currentIndexChanged.connect(self._save_models)
         self.coherence.setToolTip(tr("fs.sb.coh.tt",
             "Motore per la coerenza del volto/personaggio negli shot con riferimenti @Nome. "
             "Krea 2 Edit preserva meglio l'identità; ogni scena usa i riferimenti dei suoi personaggi."))
@@ -89,6 +95,11 @@ class StoryboardTab(QWidget):
         mrow.addWidget(QLabel(tr("fs.sb.mdl_img", "Modello immagine:"))); mrow.addWidget(self.mdl_img)
         mrow.addWidget(QLabel(tr("fs.sb.arch_img", "Arch. img:"))); mrow.addWidget(self.img_arch)
         mrow.addWidget(QLabel(tr("fs.sb.coh_lbl", "Coerenza volto:"))); mrow.addWidget(self.coherence)
+        self._qwen_dit_lbl = QLabel(tr("fs.sb.qwen21_dit", "Qwen:"))
+        mrow.addWidget(self._qwen_dit_lbl); mrow.addWidget(self.qwen_dit)
+        self.img_arch.currentIndexChanged.connect(self._sync_qwen_dit)
+        self.coherence.currentIndexChanged.connect(self._sync_qwen_dit)
+        self._sync_qwen_dit()
         mrow.addWidget(QLabel(tr("fs.sb.mdl_vid", "Modello video:"))); mrow.addWidget(self.mdl_vid)
         mrow.addWidget(QLabel(tr("fs.sb.arch_vid", "Arch. video:"))); mrow.addWidget(self.vid_arch)
         from PySide6.QtWidgets import QCheckBox as _CkB
@@ -311,9 +322,10 @@ class StoryboardTab(QWidget):
         if img_arch == "flux":                       # FLUX: usa arch+file del checkpoint scelto
             cfg["img_arch"] = (im or {}).get("arch", "flux") if im else "flux"
             cfg["img_model"] = (im or {}).get("path", "") if im else ""
-        else:                                        # Krea 2: snapshot diffusers, nessun file
+        else:                                        # Krea 2 / Qwen-Image 2.1: nessun file-modello
             cfg["img_arch"] = img_arch
             cfg["img_model"] = ""
+        cfg["qwen21_dit"] = self.qwen_dit.currentData() or ""
         cfg["vid_gguf"] = (vd or {}).get("path", "") if vd else ""
         cfg["vid_arch"] = self.vid_arch.currentData() or "ltx"
         cfg["coherence_engine"] = self.coherence.currentData() or "flux"
@@ -350,6 +362,16 @@ class StoryboardTab(QWidget):
         _ic = self.coherence.findData(cfg.get("coherence_engine", "flux"))
         self.coherence.setCurrentIndex(_ic if _ic >= 0 else 0)
         self.coherence.blockSignals(False)
+        self.qwen_dit.blockSignals(True)
+        _iq = self.qwen_dit.findData(cfg.get("qwen21_dit", ""))
+        if _iq >= 0:
+            self.qwen_dit.setCurrentIndex(_iq)
+        self.qwen_dit.blockSignals(False)
+        self._sync_qwen_dit()
+
+    def _sync_qwen_dit(self, *_):
+        on = "qwen_image21" in (self.img_arch.currentData(), self.coherence.currentData())
+        self.qwen_dit.setVisible(on); self._qwen_dit_lbl.setVisible(on)
 
     def _gen(self, what: str):
         pid = self._get_project()
@@ -497,7 +519,8 @@ class StoryboardTab(QWidget):
                                         "model": _cfg.get("img_model", ""),
                                         "coherence_engine": _cfg.get("coherence_engine", "flux"),
                                         "grounding_px": _cfg.get("grounding_px", 1024),
-                                        "krea2_variant": _cfg.get("krea2_variant", "turbo")},
+                                        "krea2_variant": _cfg.get("krea2_variant", "turbo"),
+                                        "qwen21_dit": _cfg.get("qwen21_dit", "")},
                               owner_kind="shot", owner_id=sh["id"])
         else:
             out = str(Path(outdir) / f"shot_{sh['ord']}.mp4")

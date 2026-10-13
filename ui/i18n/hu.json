@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "A ControlNet nem kombinálható a Referenciákkal: kapcsold ki az egyiket.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (szerkezet fotóból)",
   "feat.cap.qwen21_prompt_enhancer": "A Qwen-Image 2.1 hivatalos prompt-bővítői",
-  "weights.use.prompt_enhancer": "Prompt-bővítő: egy LLM a generálás előtt részletes promptra írja át a kérésedet."
+  "weights.use.prompt_enhancer": "Prompt-bővítő: egy LLM a generálás előtt részletes promptra írja át a kérésedet.",
+  "upsell.available_in": "Csak ezekben a verziókban érhető el: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (legfeljebb 10 szereplő)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "Qwen-Image 2.1 modell a kulcskockákhoz és a szereplők portréihoz."
 }

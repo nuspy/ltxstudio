@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "ControlNet lässt sich nicht mit Referenzen kombinieren: schalte eines davon aus.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (Struktur aus einem Foto)",
   "feat.cap.qwen21_prompt_enhancer": "Offizielle Prompt-Verbesserer von Qwen-Image 2.1",
-  "weights.use.prompt_enhancer": "Prompt-Verbesserer: Ein LLM schreibt deine Anfrage vor dem Generieren in einen ausführlichen Prompt um."
+  "weights.use.prompt_enhancer": "Prompt-Verbesserer: Ein LLM schreibt deine Anfrage vor dem Generieren in einen ausführlichen Prompt um.",
+  "upsell.available_in": "Nur verfügbar in den Versionen: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (bis zu 10 Figuren)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "Qwen-Image-2.1-Modell für Keyframes und Darstellerporträts."
 }

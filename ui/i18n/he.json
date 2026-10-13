@@ -3095,5 +3095,9 @@
   "mw.qwen21_control_refs": "אי אפשר לשלב ControlNet עם הפניות: כבה אחד מהם.",
   "feat.cap.qwen21_controlnet": "Qwen-Image 2.1 ControlNet (מבנה מתוך תמונה)",
   "feat.cap.qwen21_prompt_enhancer": "משפרי ההנחיה הרשמיים של Qwen-Image 2.1",
-  "weights.use.prompt_enhancer": "משפר הנחיה: מודל שפה משכתב את הבקשה שלך להנחיה מפורטת לפני היצירה."
+  "weights.use.prompt_enhancer": "משפר הנחיה: מודל שפה משכתב את הבקשה שלך להנחיה מפורטת לפני היצירה.",
+  "upsell.available_in": "זמין רק בגרסאות: {editions}",
+  "fs.sb.coh_qwen21": "Qwen-Image 2.1 (עד 10 דמויות)",
+  "fs.sb.qwen21_dit": "Qwen:",
+  "fs.sb.qwen21_dit.tt": "מודל Qwen-Image 2.1 לפריימי מפתח ולדיוקנאות הליהוק."
 }

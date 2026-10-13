@@ -20,7 +20,8 @@ def _img(p: dict):
                                  negative=p.get("negative", ""), seed=int(p.get("seed", 7)),
                                  coherence_engine=p.get("coherence_engine", "flux"),
                                  grounding_px=int(p.get("grounding_px", 1024)),
-                                 krea2_variant=p.get("krea2_variant", "turbo"), **kw)
+                                 krea2_variant=p.get("krea2_variant", "turbo"),
+                                 qwen21_dit=p.get("qwen21_dit", ""), **kw)
 
 
 def _vid(p: dict):

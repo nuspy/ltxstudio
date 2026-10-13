@@ -1,9 +1,9 @@
 """Upsell delle feature bloccate — dati dal manifest bakeato (feature_matrix).
 
 Il codegen del builder aggiunge, a ogni feature DISABILITATA nell'edizione, il blocco
-`upsell = {tier, tier_name, price, url}` calcolato come tier MINIMO (per rank) in cui la
-feature è abilitata. Qui lo esponiamo alla GUI: invece di nascondere, si mostra
-"Available on <tier>" + link Patreon. In DEV (manifest assente) tutto è abilitato →
+`upsell = {tier, tier_name, price, url, available_in}`: `available_in` = TUTTE le edizioni che la includono
+(per rank), `tier` = la più economica. Qui lo esponiamo alla GUI: invece di nascondere, si mostra
+«Disponibile solo nelle versioni: …» + link. In DEV (manifest assente) tutto è abilitato →
 nessun upsell, GUI invariata (serve per testare).
 """
 from __future__ import annotations
@@ -12,7 +12,7 @@ from core import features
 
 
 def info(fid: str) -> dict | None:
-    """{tier, tier_name, price, url} se la feature è bloccata e sbloccabile in un tier superiore."""
+    """{tier, tier_name, price, url, available_in} se la feature è bloccata e sbloccabile in altre versioni."""
     feat = features.manifest().get("features", {}).get(fid)
     if not feat or feat.get("enabled", True):
         return None
