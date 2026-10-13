@@ -334,6 +334,75 @@ def _ltx25_dit():
     return plan
 
 
+# ── dequant generico ComfyUI → bf16 standard (ex scripts/dequant_comfy_worker.py, che girava nel venv ComfyUI) ──
+_FP4_VALUES = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, -0.0, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -6.0)
+
+
+def _from_blocked(stored, rows: int, cols: int):
+    """Inversa del layout «to_blocked» di cublas per le scale nvfp4 (righe paddate a 128, colonne a 4)."""
+    nrb, ncb = -(-rows // 128), -(-cols // 4)
+    x = stored.reshape(-1, 32, 16).reshape(-1, 32, 4, 4).transpose(1, 2)
+    x = x.reshape(nrb, ncb, 128, 4).permute(0, 2, 1, 3)
+    return x.reshape(nrb * 128, ncb * 4)[:rows, :cols]
+
+
+def dequant_nvfp4(packed, block_scale, scale2):
+    """U8 [out, in/2] (primo valore nel nibble ALTO) + scale e4m3 swizzled [out, in/16] + scala globale → bf16."""
+    torch = _torch()
+    out_f, in_f = packed.shape[0], packed.shape[1] * 2
+    lut = torch.tensor(_FP4_VALUES, dtype=torch.float32)
+    idx = packed.to(torch.int32)
+    w = torch.stack([lut[(idx >> 4) & 0xF], lut[idx & 0xF]], dim=-1).reshape(out_f, in_f)
+    bs = _from_blocked(block_scale, out_f, in_f // 16).float() * scale2.float().reshape(())
+    return (w.reshape(out_f, in_f // 16, 16) * bs.unsqueeze(-1)).reshape(out_f, in_f).to(torch.bfloat16)
+
+
+def _remap_gemma(k: str) -> str:
+    """Naming Gemma 3 ComfyUI → quello di ltx-core/transformers (come il vecchio worker --remap gemma)."""
+    if k.startswith(("model.layers.", "model.embed_tokens.", "model.norm.")):
+        return "model.model.language_model." + k[len("model."):]
+    if k.startswith("vision_model."):
+        return "model.model.vision_tower." + k
+    return "model.model." + k
+
+
+def _comfy_bf16(remap: str = "none"):
+    """Single-file quantizzato ComfyUI (comfy_quant fp8 / nvfp4 / int8±ConvRot) → bf16 STANDARD con gli stessi nomi
+    (o rimappati per Gemma): per i loader che vogliono pesi pieni (diffusers from_single_file, transformers).
+    Formati non riconosciuti (es. mxfp8) → errore chiaro, mai pesi crudi scambiati per bf16."""
+    torch = _torch()
+    rn = _remap_gemma if remap == "gemma" else (lambda k: k)
+    drop = (".weight_scale", ".weight_scale_2", ".pre_quant_scale") + _DROP_SUFFIX
+
+    def plan(key, info, header):
+        if key.endswith(drop):
+            return []
+        mod = _module_of(key)
+        conf = header.get("__qconf__", {}).get(mod)
+        get = header["__ctx__"]["get"]
+        if conf is None or key != mod + ".weight":
+            return [(rn(key), lambda t: t)]
+        fmt = str(conf.get("format", ""))
+
+        def fn(t, _m=mod, _fmt=fmt, _g=int(conf.get("convrot_groupsize", 256)) if conf.get("convrot") else 0):
+            if t.device.type == "meta":
+                shp = (t.shape[0], t.shape[1] * 2) if _fmt == "nvfp4" else tuple(t.shape)
+                return torch.empty(shp, dtype=torch.bfloat16, device="meta")
+            if _fmt.startswith("float8"):
+                sc = get(_m + ".weight_scale").float()
+                return (t.float() * (sc.reshape(()) if sc.numel() == 1 else sc.reshape(-1, 1))).to(torch.bfloat16)
+            if _fmt == "nvfp4":
+                return dequant_nvfp4(t, get(_m + ".weight_scale"), get(_m + ".weight_scale_2"))
+            if _fmt.startswith("int8"):
+                sc = get(_m + ".weight_scale").float()
+                w = t.float() * (sc.reshape(()) if sc.numel() == 1 else sc.reshape(-1, 1))
+                return (rotate(w, _g) if _g else w).to(torch.bfloat16)
+            raise ValueError(f"formato comfy_quant non supportato dal dequant nativo: {_fmt} ({_m})")
+        return [(rn(key), fn)]
+    plan.keep_meta = True
+    return plan
+
+
 def _qwen21_te():
     def rename(k):
         if k == "lm_head.weight":                         # 1,2 GB mai usati (la pipeline legge gli hidden state)
@@ -355,7 +424,9 @@ CONVERTERS = {
     "krea2_dit": _krea2_dit,
     "krea2_te": _krea2_te,
     "ltx25_te": _ltx25_te,
-    "ltx25_dit": _ltx25_dit,          # transformer LTX-2.5 int8 senza prefisso → model.diffusion_model.* (+ config)            # TE LTX-2.5 Gemma 4 int8 per-tensore ComfyUI (es. uncensored) → bf16 ufficiale            # TE Krea 2 Qwen3-VL-4B fp8 «scaled» ComfyUI (es. uncensored) → Qwen3VLModel          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
+    "ltx25_dit": _ltx25_dit,
+    "comfy_bf16": _comfy_bf16,        # qualunque single-file comfy_quant → bf16 standard (core/dequant_comfy)
+    "comfy_bf16_gemma": lambda: _comfy_bf16("gemma"),   # idem + naming Gemma 3 di ltx-core/transformers          # transformer LTX-2.5 int8 senza prefisso → model.diffusion_model.* (+ config)            # TE LTX-2.5 Gemma 4 int8 per-tensore ComfyUI (es. uncensored) → bf16 ufficiale            # TE Krea 2 Qwen3-VL-4B fp8 «scaled» ComfyUI (es. uncensored) → Qwen3VLModel          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
     "qwen21_dit": lambda: _renamer(lambda k: k),   # Qwen-Image 2.1 nvfp4 «Prism»: nomi già diffusers
     "qwen21_te": _qwen21_te,          # Qwen-Image 2.1 TE Qwen3-VL-8B (nvfp4 ComfyUI) → transformers
     "qwen21_cn": lambda: _renamer(lambda k: k),    # Qwen-Image 2.1 ControlNet Union Fun (INT8 ConvRot): nomi già diffusers
