@@ -3183,5 +3183,8 @@
   "vid.ltx_te.lbl": "Text encoder",
   "vid.ltx_te.official": "Official (Gemma 4)",
   "vid.ltx_te.uncensored": "Gemma 4 Uncensored v1.1 (18+)",
-  "vid.ltx_te.tt": "Encoder that reads the prompt for LTX 2.5. “Uncensored” describes explicit content without softening it; works with every 2.5 transformer."
+  "vid.ltx_te.tt": "Encoder that reads the prompt for LTX 2.5. “Uncensored” describes explicit content without softening it; works with every 2.5 transformer.",
+  "weights.civitai": "Civitai API key",
+  "weights.civitai.hint": "civitai.com → Account settings → API Keys (stays on this PC only)",
+  "weights.civitai.tt": "Needed for models sourced from Civitai: without a key Civitai redirects to the login page and the download fails."
 }

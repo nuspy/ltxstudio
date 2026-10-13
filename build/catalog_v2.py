@@ -113,7 +113,7 @@ PATCH = {
 def N(id, module, label, *, category, arch, kind="file", repo=None, filename=None,
       remote=None, type=None, family="", tool_dest=None, gated=False, gb=0.0,
       scan=None, deps=None, role=None, sens=None, no_remote=False, note=None,
-      allow=None, used_by=None, convert=None, sha256=None):
+      allow=None, used_by=None, convert=None, sha256=None, url=None):
     e = {"id": id, "module": module, "label": label, "kind": kind,
          "type": type or "misc", "family": family, "gated": gated,
          "approx_gb": gb, "scan_names": scan or ([filename] if filename else []),
@@ -121,6 +121,8 @@ def N(id, module, label, *, category, arch, kind="file", repo=None, filename=Non
     if repo:
         e["repo_id"] = repo
         e["url"] = "https://huggingface.co/" + repo
+    elif url:                                       # fonte diretta (es. Civitai: chiave API nel tab Pesi)
+        e["url"] = url
     if filename:
         e["filename"] = filename
     if remote:
@@ -764,6 +766,31 @@ NEW = [
       arch="krea2", repo="yufusoft/MysticXXX_KREA2_v3", remote="MysticXXX_KREA2_v3.safetensors",
       filename="Krea2_MysticXXX_v3.safetensors", type="LoRA", family="Krea2", gb=0.23, sens="adult",
       note="Civitai 2728644 (54k download), rank 32"),
+    # ── fonte CIVITAI (login obbligatorio: chiave API nel tab «Pesi modelli»; sha256 dall'API pubblica) ──
+    N("krea2-lora-snofs-v15", "Immagini", "LoRA Krea 2 SNOFS v1.5 (18+, 1.5GB)", category="image", arch="krea2",
+      url="https://civitai.com/api/download/models/3390681?fileId=3280058", filename="snofs_krea_v1_5.safetensors", type="LoRA", family="Krea2",
+      gb=1.53, sens="adult", sha256="326a1f23ed4f728238d37d5c84b02086871d2a1e4c5c2d9e2b8b17ae17e14d1c",
+      note="Civitai 1972981 «Sex, Nudes, Other Fun Stuff» per Krea 2 (bf16)"),
+    N("krea2-lora-refusal-v2", "Immagini", "LoRA Krea 2 TextFusion Refusal-Reduction v2 (18+, 0.03GB)",
+      category="image", arch="krea2", url="https://civitai.com/api/download/models/3359021?fileId=3246655", filename="refusal_reduction_v2.safetensors",
+      type="LoRA", family="Krea2", gb=0.03, sens="adult",
+      sha256="2b5ce7ce81a5b6f407e7aa6f5b631527abadb89c0a90a3cdec1da2ff18173f40",
+      note="Civitai 2775340: agisce sul TextFusion, toglie i rifiuti sui prompt espliciti"),
+    N("flux2-klein-realdream-v2", "Immagini", "Real Dream Klein 9B V2 (18+, fp8, 9.2GB)", category="image",
+      arch="flux2", url="https://civitai.com/api/download/models/3108757?fileId=2988715", filename="realDream_klein9BV2.safetensors",
+      type="diffusion_models", family="Flux", gb=9.21, sens="adult",
+      sha256="346273ab9bc9b535689b42af7a597d7e2bad32ef11a06a4140196a0b311764d4",
+      note="Civitai 153568: finetune fotorealistico di FLUX.2 Klein 9B"),
+    N("zimage-biglove-zora1", "Immagini", "Big Love Zora1 Z-Image Turbo (18+, bf16, 12GB)", category="image",
+      arch="zimage", url="https://civitai.com/api/download/models/3296380?fileId=3184279", filename="bigLove_zora1_bf16.safetensors",
+      type="diffusion_models", family="Z-Image", gb=12.02, sens="adult",
+      sha256="85bd0540418b01bb03115502cd060fbc39e094eb4b12ac5ed3f88ee4981dc7a5",
+      note="Civitai 897413, file bf16 (il primario è fp8_mixed)"),
+    N("zimage-lora-zitnsfw-v3", "Immagini", "LoRA Z-Image Turbo NSFW v3 (18+, 0.01GB)", category="image",
+      arch="zimage", url="https://civitai.com/api/download/models/2898951?fileId=2776902", filename="ZITnsfwLoRAv3.safetensors", type="LoRA",
+      family="Z-Image", gb=0.01, sens="adult",
+      sha256="a3425142dcbe76bb5bbd226a0f23fe51b28c5c3c53c56a2e7aa20c8706a03042",
+      note="Civitai 2279079: aggiorna la v2 (ZITnsfwLoRAv2, da cancellare dopo il download)"),
     # Z-Image Turbo: LoRA ai-toolkit con nomi diffusers (le «ZIB» sono per Z-Image Base: escluse)
     *[N(f"zimage-lora-{lid}", "Immagini", f"LoRA Z-Image NSFW {lbl} (18+, {gb}GB)", category="image",
         arch="zimage", repo="qqnyanddld/nsfw-z-image-lora", remote=f"{rem}.safetensors",

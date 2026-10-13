@@ -63,6 +63,20 @@ class WeightsTab(QWidget):
         self.hf = QLineEdit(); self.hf.setEchoMode(QLineEdit.Password)
         self.hf.setPlaceholderText(tr("weights.hf.hint", "necessario solo per i modelli gated"))
         f.addRow(tr("weights.hf", "HF token"), self.hf)
+        # chiave API Civitai: Civitai chiede il login per scaricare (anche via API). Resta SOLO in locale
+        # (user_prefs) e va solo verso civitai.com; serve per le voci del catalogo con fonte Civitai.
+        self.civitai = QLineEdit(); self.civitai.setEchoMode(QLineEdit.Password)
+        self.civitai.setPlaceholderText(tr("weights.civitai.hint",
+            "civitai.com → Impostazioni account → API Keys (resta solo su questo PC)"))
+        self.civitai.setToolTip(tr("weights.civitai.tt",
+            "Serve per i modelli con fonte Civitai: senza chiave Civitai rimanda al login e il download fallisce."))
+        try:
+            from core import user_prefs as _up
+            self.civitai.setText(str(_up.get("civitai_api_key", "") or ""))
+        except Exception:                                # noqa: BLE001
+            pass
+        self.civitai.editingFinished.connect(self._save_civitai_key)
+        f.addRow(tr("weights.civitai", "Chiave API Civitai"), self.civitai)
         root.addLayout(f)
 
         scroll = QScrollArea(); scroll.setWidgetResizable(True)
@@ -106,6 +120,13 @@ class WeightsTab(QWidget):
         self.logview.setStyleSheet("font-family:Consolas,monospace;font-size:11px;")
         root.addWidget(self.bar); root.addWidget(self.status); root.addWidget(self.logview)
         self._refresh()
+
+    def _save_civitai_key(self):
+        try:
+            from core import user_prefs as _up
+            _up.set("civitai_api_key", self.civitai.text().strip())
+        except Exception:                                # noqa: BLE001
+            pass
 
     def _build_list(self):
         # SCHEMA v2: raggruppa CATEGORIA (immagini/video/musica/voce/3D/ausiliari) → ARCHITETTURA —
@@ -335,6 +356,10 @@ class WeightsTab(QWidget):
         tok = self.hf.text().strip()
         if tok:
             qenv.insert("HF_TOKEN", tok); qenv.insert("HUGGING_FACE_HUB_TOKEN", tok)
+        ckey = self.civitai.text().strip()
+        if ckey:
+            self._save_civitai_key()
+            qenv.insert("CIVITAI_TOKEN", ckey)
         p.setProcessEnvironment(qenv)
         p.readyReadStandardOutput.connect(lambda: self._on_out(p))
         p.finished.connect(self._on_done)

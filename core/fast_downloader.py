@@ -35,9 +35,27 @@ def _session() -> requests.Session:
     return s
 
 
+def civitai_key() -> str | None:
+    """Chiave API Civitai: env CIVITAI_TOKEN → preferenze utente. Mai stampata nei log."""
+    v = os.environ.get("CIVITAI_TOKEN", "").strip()
+    if v:
+        return v
+    try:
+        from core import user_prefs
+        return (str(user_prefs.get("civitai_api_key", "") or "")).strip() or None
+    except Exception:                                       # noqa: BLE001
+        return None
+
+
 def _auth(url: str, token: str | None) -> dict:
-    if token and urllib.parse.urlparse(url).hostname and "huggingface" in urllib.parse.urlparse(url).hostname:
+    host = urllib.parse.urlparse(url).hostname or ""
+    if token and "huggingface" in host:
         return {"Authorization": f"Bearer {token}"}
+    if host == "civitai.com" or host.endswith(".civitai.com"):
+        # solo verso civitai.com: il redirect al CDN firmato non riceve la chiave (requests la toglie
+        # cambiando host)
+        key = civitai_key()
+        return {"Authorization": f"Bearer {key}"} if key else {}
     return {}
 
 

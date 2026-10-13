@@ -3109,5 +3109,8 @@
   "vid.ltx_te.lbl": "Codificador de texto",
   "vid.ltx_te.official": "Oficial (Gemma 4)",
   "vid.ltx_te.uncensored": "Gemma 4 sin censura v1.1 (18+)",
-  "vid.ltx_te.tt": "Codificador que lee el prompt para LTX 2.5. «Sin censura» describe el contenido explícito sin suavizarlo; funciona con cualquier transformer 2.5."
+  "vid.ltx_te.tt": "Codificador que lee el prompt para LTX 2.5. «Sin censura» describe el contenido explícito sin suavizarlo; funciona con cualquier transformer 2.5.",
+  "weights.civitai": "Clave API de Civitai",
+  "weights.civitai.hint": "civitai.com → Configuración de la cuenta → API Keys (se queda solo en este PC)",
+  "weights.civitai.tt": "Necesaria para los modelos de Civitai: sin clave, Civitai redirige al inicio de sesión y la descarga falla."
 }

@@ -3109,5 +3109,8 @@
   "vid.ltx_te.lbl": "Szövegkódoló",
   "vid.ltx_te.official": "Hivatalos (Gemma 4)",
   "vid.ltx_te.uncensored": "Gemma 4 cenzúrázatlan v1.1 (18+)",
-  "vid.ltx_te.tt": "Az LTX 2.5 promptját olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; minden 2.5-ös transformerrel működik."
+  "vid.ltx_te.tt": "Az LTX 2.5 promptját olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; minden 2.5-ös transformerrel működik.",
+  "weights.civitai": "Civitai API-kulcs",
+  "weights.civitai.hint": "civitai.com → Fiókbeállítások → API Keys (csak ezen a gépen marad)",
+  "weights.civitai.tt": "A Civitai-ról származó modellekhez kell: kulcs nélkül a Civitai a bejelentkezésre irányít, és a letöltés sikertelen."
 }

@@ -4753,6 +4753,127 @@
         "int8_comfy",
         "uncensored"
       ]
+    },
+    {
+      "id": "krea2-lora-snofs-v15",
+      "module": "Immagini",
+      "label": "LoRA Krea 2 SNOFS v1.5 (18+, 1.5GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 1.53,
+      "scan_names": [
+        "snofs_krea_v1_5.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3390681?fileId=3280058",
+      "filename": "snofs_krea_v1_5.safetensors",
+      "sha256": "326a1f23ed4f728238d37d5c84b02086871d2a1e4c5c2d9e2b8b17ae17e14d1c",
+      "sensitivity": "adult",
+      "note": "Civitai 1972981 «Sex, Nudes, Other Fun Stuff» per Krea 2 (bf16)",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "krea2-lora-refusal-v2",
+      "module": "Immagini",
+      "label": "LoRA Krea 2 TextFusion Refusal-Reduction v2 (18+, 0.03GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.03,
+      "scan_names": [
+        "refusal_reduction_v2.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3359021?fileId=3246655",
+      "filename": "refusal_reduction_v2.safetensors",
+      "sha256": "2b5ce7ce81a5b6f407e7aa6f5b631527abadb89c0a90a3cdec1da2ff18173f40",
+      "sensitivity": "adult",
+      "note": "Civitai 2775340: agisce sul TextFusion, toglie i rifiuti sui prompt espliciti",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "flux2-klein-realdream-v2",
+      "module": "Immagini",
+      "label": "Real Dream Klein 9B V2 (18+, fp8, 9.2GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 9.21,
+      "scan_names": [
+        "realDream_klein9BV2.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux2",
+      "url": "https://civitai.com/api/download/models/3108757?fileId=2988715",
+      "filename": "realDream_klein9BV2.safetensors",
+      "sha256": "346273ab9bc9b535689b42af7a597d7e2bad32ef11a06a4140196a0b311764d4",
+      "sensitivity": "adult",
+      "note": "Civitai 153568: finetune fotorealistico di FLUX.2 Klein 9B",
+      "use": [
+        "ckpt_image",
+        "fp8",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-biglove-zora1",
+      "module": "Immagini",
+      "label": "Big Love Zora1 Z-Image Turbo (18+, bf16, 12GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 12.02,
+      "scan_names": [
+        "bigLove_zora1_bf16.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "url": "https://civitai.com/api/download/models/3296380?fileId=3184279",
+      "filename": "bigLove_zora1_bf16.safetensors",
+      "sha256": "85bd0540418b01bb03115502cd060fbc39e094eb4b12ac5ed3f88ee4981dc7a5",
+      "sensitivity": "adult",
+      "note": "Civitai 897413, file bf16 (il primario è fp8_mixed)",
+      "use": [
+        "ckpt_image",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-lora-zitnsfw-v3",
+      "module": "Immagini",
+      "label": "LoRA Z-Image Turbo NSFW v3 (18+, 0.01GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 0.01,
+      "scan_names": [
+        "ZITnsfwLoRAv3.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "url": "https://civitai.com/api/download/models/2898951?fileId=2776902",
+      "filename": "ZITnsfwLoRAv3.safetensors",
+      "sha256": "a3425142dcbe76bb5bbd226a0f23fe51b28c5c3c53c56a2e7aa20c8706a03042",
+      "sensitivity": "adult",
+      "note": "Civitai 2279079: aggiorna la v2 (ZITnsfwLoRAv2, da cancellare dopo il download)",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

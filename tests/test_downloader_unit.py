@@ -210,3 +210,18 @@ def test_chunk_con_offset_guasto_sul_cdn(tmp_path, monkeypatch):
         assert (tmp_path / "f.bin.part0").read_bytes() == payload[bad:]
     finally:
         srv.shutdown()
+
+
+def test_civitai_chiave(monkeypatch):
+    """Civitai chiede il login: senza chiave errore chiaro PRIMA della rete; la chiave va solo a civitai.com."""
+    from core import fast_downloader as fd
+    monkeypatch.delenv("CIVITAI_TOKEN", raising=False)
+    monkeypatch.setattr(fd, "civitai_key", lambda: None)
+    e = {"id": "x", "kind": "file", "filename": "x.safetensors", "type": "LoRA", "family": "T",
+         "url": "https://civitai.com/api/download/models/1?fileId=2"}
+    with pytest.raises(dl.DownloadUnavailable, match="Civitai"):
+        dl.download_entry(e)
+    monkeypatch.setattr(fd, "civitai_key", lambda: "K")
+    assert fd._auth("https://civitai.com/api/download/models/1", None) == {"Authorization": "Bearer K"}
+    assert fd._auth("https://b2.civitai-cdn.example/file", None) == {}
+    assert fd._auth("https://huggingface.co/a/b/resolve/main/c", "T") == {"Authorization": "Bearer T"}

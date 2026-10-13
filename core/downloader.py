@@ -136,6 +136,12 @@ def download_entry(entry: dict, *, base_dir: str | None = None, token: str | Non
             f"{entry.get('note') or 'usa scan/link o l’import manuale.'}")
     token = resolve_token(token)
     repo = entry.get("repo_id", "")
+    if not repo and "civitai.com" in str(entry.get("url") or ""):
+        from core import fast_downloader as _fd
+        if not _fd.civitai_key():
+            raise DownloadUnavailable(
+                f"'{entry.get('id')}' si scarica da Civitai, che chiede il login: inserisci la chiave API "
+                f"Civitai nel tab «Pesi modelli» (civitai.com → Impostazioni account → API Keys).")
     if repo and entry.get("gated"):
         check_gated(repo, token)
 

@@ -3109,5 +3109,8 @@
   "vid.ltx_te.lbl": "Text-Encoder",
   "vid.ltx_te.official": "Offiziell (Gemma 4)",
   "vid.ltx_te.uncensored": "Gemma 4 Unzensiert v1.1 (18+)",
-  "vid.ltx_te.tt": "Encoder, der den Prompt für LTX 2.5 liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit jedem 2.5-Transformer."
+  "vid.ltx_te.tt": "Encoder, der den Prompt für LTX 2.5 liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit jedem 2.5-Transformer.",
+  "weights.civitai": "Civitai-API-Schlüssel",
+  "weights.civitai.hint": "civitai.com → Kontoeinstellungen → API Keys (bleibt nur auf diesem PC)",
+  "weights.civitai.tt": "Nötig für Modelle aus Civitai: ohne Schlüssel leitet Civitai zur Anmeldung um und der Download schlägt fehl."
 }

@@ -3109,5 +3109,8 @@
   "vid.ltx_te.lbl": "מקודד טקסט",
   "vid.ltx_te.official": "רשמי (Gemma 4)",
   "vid.ltx_te.uncensored": "Gemma 4 ללא צנזורה v1.1 (‏+18)",
-  "vid.ltx_te.tt": "המקודד שקורא את ההנחיה עבור LTX 2.5. «ללא צנזורה» מתאר תוכן מפורש בלי לרכך אותו; עובד עם כל טרנספורמר 2.5."
+  "vid.ltx_te.tt": "המקודד שקורא את ההנחיה עבור LTX 2.5. «ללא צנזורה» מתאר תוכן מפורש בלי לרכך אותו; עובד עם כל טרנספורמר 2.5.",
+  "weights.civitai": "מפתח API של Civitai",
+  "weights.civitai.hint": "civitai.com ← הגדרות חשבון ← API Keys (נשמר רק במחשב הזה)",
+  "weights.civitai.tt": "נדרש למודלים ממקור Civitai: בלי מפתח Civitai מפנה להתחברות וההורדה נכשלת."
 }
