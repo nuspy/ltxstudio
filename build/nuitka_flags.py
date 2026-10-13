@@ -17,9 +17,10 @@ NOFOLLOW_PACKAGES = (
 
 def nuitka_command(python: str, app_root: str, entrypoint: str, out_dir: str,
                    os_target: str, version: dict, build_cfg: dict,
-                   onefile: bool) -> list[str]:
+                   onefile: bool, runtime_dirs: list | None = None) -> list[str]:
     """Comando Nuitka completo. ComfyUI/nodi/modelli NON sono importati da app.py
-    → non entrano nel binario (li scarica l'installer)."""
+    → non entrano nel binario (li scarica l'installer). `runtime_dirs` = [(cartella, nome)] da
+    build/runtime_bundle.stage: sorgenti in chiaro dei processi figli (worker, server, script dei venv)."""
     app = Path(app_root)
     company = build_cfg.get("company_name", "LTX Studio")
     product = build_cfg.get("product_name", "LTX Studio")
@@ -41,7 +42,7 @@ def nuitka_command(python: str, app_root: str, entrypoint: str, out_dir: str,
         "--include-package=comfy_compat",
         # dati bundlati
         f"--include-data-dir={app / 'ui' / 'i18n'}=ui/i18n",
-        f"--include-data-files={app / 'core' / 'bindings.json'}=core/bindings.json",
+        *([] if runtime_dirs else [f"--include-data-files={app / 'core' / 'bindings.json'}=core/bindings.json"]),
         # metadati (riducono i falsi positivi AV / SmartScreen)
         f"--company-name={company}",
         f"--product-name={product}",
@@ -51,6 +52,9 @@ def nuitka_command(python: str, app_root: str, entrypoint: str, out_dir: str,
         f"--output-dir={out_dir}",
     ]
     cmd += [f"--nofollow-import-to={pkg}" for pkg in NOFOLLOW_PACKAGES]
+    # runtime dei processi figli: --include-raw-dir perché --include-data-dir scarterebbe i .py
+    # (core/ in chiaro porta con sé anche bindings.json, per questo sopra non lo si include due volte)
+    cmd += [f"--include-raw-dir={d}={name}" for d, name in (runtime_dirs or [])]
     if onefile:
         cmd.append("--onefile")
     if os_target == "windows":

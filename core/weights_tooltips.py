@@ -52,6 +52,7 @@ USE_TAGS: dict[str, str] = {
     "audio_enc": "Encoder audio: estrae dal parlato i segnali che guidano il labiale.",
     "multiref10": "Fino a 10 immagini di riferimento (persone, prodotti, stili) e trasparenza RGBA nativa.",
     "uncensored": "Senza censura (18+): nudo ed esplicito senza filtri; visibile solo in modalità NSFW.",
+    "prompt_enhancer": "Arricchitore di prompt: un LLM riscrive la tua richiesta in un prompt dettagliato prima di generare.",
 }
 
 

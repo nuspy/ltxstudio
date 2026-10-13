@@ -595,11 +595,25 @@ class Frame1Tab(QWidget):
         self.q21_rgba.setToolTip(tr("f1.gen.qwen21.rgba.tt",
             "Trasparenza NATIVA: il modello genera il canale alfa (adesivi, loghi, soggetti scontornati)."))
         ff.addRow("", self.q21_rgba)
+        # Text encoder scelto ESPLICITAMENTE: qualunque encoder va con qualunque DiT (su RTX 50xx l'NVFP4 anche
+        # coi DiT INT8) → niente 9 GB di encoder FP8 scaricati senza che l'utente l'abbia chiesto
         self.q21_te = QComboBox()
-        self.q21_te.addItem(tr("f1.gen.qwen21.te.default", "Encoder standard"), "")
-        self.q21_te.addItem(tr("f1.gen.qwen21.te.heretic", "Encoder «heretic» (18+, senza rifiuti)"), "heretic")
+        self.q21_te.setToolTip(tr("f1.gen.qwen21.te.tt",
+            "Encoder che legge prompt e riferimenti. «Abbinato» = quello previsto dal modello scelto; "
+            "NVFP4 va con qualunque modello sulle RTX 50xx e risparmia memoria."))
         self._q21_te_lbl = QLabel(tr("f1.gen.qwen21.te", "Text encoder"))
         ff.addRow(self._q21_te_lbl, self.q21_te)
+        self._fill_qwen21_te()
+        # Arricchitore UFFICIALE (Qwen3.5-VL 9B): si accende con «✨ Arricchisci prompt» (qui in Genera e nel
+        # pannello Modifica); qui si sceglie solo QUANTO lavora. Sostituisce l'LLM locale quando il motore è Qwen.
+        self.q21_pe_mode = QComboBox()
+        self.q21_pe_mode.addItem(tr("f1.gen.qwen21.pe.fast", "Rapido (~40 s)"), "fast")
+        self.q21_pe_mode.addItem(tr("f1.gen.qwen21.pe.think", "Approfondito, con ragionamento (~3 min)"), "think")
+        self.q21_pe_mode.setToolTip(tr("f1.gen.qwen21.pe.tt",
+            "Con «✨ Arricchisci prompt» attivo, Qwen-Image 2.1 usa i suoi arricchitori ufficiali: riscrivono la "
+            "richiesta (in qualunque lingua) in un prompt inglese dettagliato; in editing guardano anche le "
+            "immagini. «Approfondito» ragiona prima di scrivere: più accurato, molto più lento."))
+        ff.addRow(tr("f1.gen.qwen21.pe", "Arricchitore ✨"), self.q21_pe_mode)
         from ui.widgets.reference_panel import ReferencePanel
         self.q21_refs = ReferencePanel()
         self.q21_refs.set_token_style("qwen21")
@@ -632,13 +646,30 @@ class Frame1Tab(QWidget):
         self._q21_strength_row = self._wrapw(srow)
         self._q21_strength_lbl = QLabel(tr("f1.gen.qwen21.strength", "Forza img2img"))
         ff.addRow(self._q21_strength_lbl, self._q21_strength_row)
+        # Suggerimento SEMPRE visibile con l'img2img attivo: Qwen-Image 2.1 è un modello da editing, l'img2img
+        # tiene molto dell'originale; per cambiare stile mantenendo il soggetto la via giusta sono i Riferimenti.
+        self._q21_i2i_hint = QLabel(tr("f1.gen.qwen21.i2i.hint",
+            "💡 L'img2img conserva composizione, colori e aspetto fotografico: 0.30-0.60 ritocca, 0.85-1.00 "
+            "ridisegna di più. Per cambiare STILE mantenendo il soggetto (es. «la persona di image 1 come "
+            "stampa giapponese») usa i Riferimenti: è il modo per cui Qwen-Image 2.1 è addestrato."))
+        self._q21_i2i_hint.setWordWrap(True)
+        self._q21_i2i_hint.setStyleSheet("color:#9bd; font-size:11px; padding:4px 6px; "
+                                         "border:1px solid #3a4a5a; border-radius:4px;")
+        self._q21_i2i_to_ref = QPushButton(tr("f1.gen.qwen21.i2i.to_ref", "Usa la foto come riferimento"))
+        self._q21_i2i_to_ref.setToolTip(tr("f1.gen.qwen21.i2i.to_ref.tt",
+            "Sposta l'immagine iniziale nei Riferimenti (image 1) e disattiva l'img2img: poi scrivi nel prompt "
+            "come trasformarla."))
+        self._q21_i2i_to_ref.clicked.connect(self._qwen21_i2i_to_reference)
+        ff.addRow(self._q21_i2i_hint)
+        ff.addRow("", self._q21_i2i_to_ref)
 
         def _sync_i2i(on: bool):
             for w in (self.q21_i2i_photo["row"], self._q21_i2i_photo_lbl, self._q21_strength_row,
-                      self._q21_strength_lbl):
+                      self._q21_strength_lbl, self._q21_i2i_hint, self._q21_i2i_to_ref):
                 w.setVisible(on)
         self.q21_i2i.toggled.connect(_sync_i2i)
         _sync_i2i(False)
+        ff.addRow(self._qwen21_control_box())
         lic = QLabel(tr("f1.gen.qwen21.license",
                         "Licenza Qwen Research: uso non commerciale. I pesi li scarichi tu dal tab Pesi."))
         lic.setWordWrap(True); lic.setStyleSheet("color:#e8b339; font-size:11px;")
@@ -655,10 +686,76 @@ class Frame1Tab(QWidget):
     def _sync_qwen21_box(self, *_):
         on = self.gen_arch.currentText() == "Qwen-Image 2.1"
         self._q21_box.setVisible(on)
-        adult = self._adult_ok()
-        self.q21_te.setVisible(adult); self._q21_te_lbl.setVisible(adult)
-        if not adult:
-            self.q21_te.setCurrentIndex(0)
+        self._fill_qwen21_te()
+
+    def _qwen21_control_box(self) -> QGroupBox:
+        """ControlNet-Union ufficiale (port nativo): la STRUTTURA dell'immagine (contorni, profondità, posa) viene
+        da una foto o da una mappa già pronta; prompt e stile restano liberi."""
+        box = QGroupBox(tr("f1.gen.qwen21.cn.group", "Controllo struttura (ControlNet)"))
+        box.setCheckable(True); box.setChecked(False)
+        box.setToolTip(tr("f1.gen.qwen21.cn.tt",
+            "L'immagine segue la composizione di una foto (bordi, profondità, linee) mentre prompt e stile "
+            "decidono il resto. Funziona con testo→immagine e img2img, non insieme ai Riferimenti."))
+        f = QFormLayout(box)
+        self.q21_cn_photo = self._photo_field(tr("f1.photo.ph", "(vuoto = la foto nel canvas)"))
+        f.addRow(tr("f1.gen.qwen21.cn.photo", "Foto guida"), self.q21_cn_photo["row"])
+        self.q21_cn_kind = QComboBox()
+        for data, key, fb in (("canny", "f1.gen.qwen21.cn.canny", "Bordi (Canny)"),
+                              ("lineart", "f1.gen.qwen21.cn.lineart", "Contorni (line art)"),
+                              ("depth", "f1.gen.qwen21.cn.depth", "Profondità (DepthAnything, +1.3 GB)"),
+                              ("gray", "f1.gen.qwen21.cn.gray", "Luminosità (bianco e nero)"),
+                              ("none", "f1.gen.qwen21.cn.none", "Già una mappa (posa, scribble, HED…)")):
+            self.q21_cn_kind.addItem(tr(key, fb), data)
+        self.q21_cn_kind.setToolTip(tr("f1.gen.qwen21.cn.kind.tt",
+            "Come estrarre la struttura dalla foto guida. «Già una mappa» usa l'immagine così com'è: per uno "
+            "scheletro di posa, uno schizzo o una mappa preparata altrove."))
+        f.addRow(tr("f1.gen.qwen21.cn.kind", "Guida da"), self.q21_cn_kind)
+        srow = QHBoxLayout()
+        self.q21_cn_scale = QSlider(Qt.Horizontal); self.q21_cn_scale.setRange(10, 100); self.q21_cn_scale.setValue(100)
+        self._q21_cn_scale_lbl = QLabel("1.00")
+        self.q21_cn_scale.valueChanged.connect(lambda v: self._q21_cn_scale_lbl.setText(f"{v / 100:.2f}"))
+        self.q21_cn_scale.setToolTip(tr("f1.gen.qwen21.cn.scale.tt",
+            "Quanto rispettare la struttura: 1.00 = fedele (valore ufficiale), più basso = più libertà al prompt."))
+        srow.addWidget(self.q21_cn_scale, 1); srow.addWidget(self._q21_cn_scale_lbl)
+        f.addRow(tr("f1.gen.qwen21.cn.scale", "Forza"), self._wrapw(srow))
+        self.q21_cn_box = box
+        return box
+
+    def qwen21_control_params(self) -> dict:
+        """Parametri ControlNet (vuoto se il riquadro è spento). Foto guida vuota = foto del canvas."""
+        if not getattr(self, "q21_cn_box", None) or not self.q21_cn_box.isChecked():
+            return {}
+        return {"control_image": self.q21_cn_photo["edit"].text().strip() or (self.image_path or ""),
+                "control_preprocess": self.q21_cn_kind.currentData() or "canny",
+                "control_scale": self.q21_cn_scale.value() / 100.0}
+
+    def _qwen21_i2i_to_reference(self):
+        """Immagine iniziale → riferimento «image 1» (in testa), img2img spento: è la via giusta per lo stile."""
+        path = self.q21_i2i_photo["edit"].text().strip() or (self.image_path or "")
+        if not path:
+            return
+        self.q21_refs.enable.setChecked(True)
+        refs = [r["path"] for r in self.q21_refs.get_references() if r.get("kind") == "image" and r["path"] != path]
+        self.q21_refs.clear()
+        for p in [path] + refs:
+            self.q21_refs.add_path(p)
+        self.q21_i2i.setChecked(False)
+
+    def _fill_qwen21_te(self):
+        """Voci del combo encoder: abbinato / NVFP4 / FP8, più «heretic» solo se le voci 18+ sono ammesse."""
+        cur = self.q21_te.currentData() or ""
+        items = [("", tr("f1.gen.qwen21.te.paired", "Abbinato al modello")),
+                 ("nvfp4", tr("f1.gen.qwen21.te.nvfp4", "NVFP4 (RTX 50xx, 6 GB)")),
+                 ("fp8", tr("f1.gen.qwen21.te.fp8", "FP8 (RTX 40xx/50xx, 9.4 GB)"))]
+        if self._adult_ok():
+            items.append(("heretic", tr("f1.gen.qwen21.te.heretic", "Encoder «heretic» (18+, senza rifiuti)")))
+        self.q21_te.blockSignals(True)
+        self.q21_te.clear()
+        for data, label in items:
+            self.q21_te.addItem(label, data)
+        i = self.q21_te.findData(cur)
+        self.q21_te.setCurrentIndex(i if i >= 0 else 0)
+        self.q21_te.blockSignals(False)
 
     def _adult_ok(self) -> bool:
         """Voci 18+ ammesse: modalità NSFW scelta E edizione che le consente (DEV: sempre)."""
@@ -1908,11 +2005,20 @@ class Frame1Tab(QWidget):
         if self.q21_i2i.isChecked():                         # img2img: campo vuoto = foto del canvas
             out["init_image"] = self.q21_i2i_photo["edit"].text().strip() or (self.image_path or "")
             out["strength"] = self.q21_strength.value() / 100.0
+        if self.gen_enhance.isChecked():                      # ✨ → arricchitore ufficiale (T2I o I2I da sé)
+            out.update(self.qwen21_pe_params("auto"))
+        out.update(self.qwen21_control_params())
         return out
+
+    def qwen21_pe_params(self, kind: str) -> dict:
+        """Parametri dell'arricchitore ufficiale (kind = auto | t2i | i2i) con la modalità scelta nel riquadro Qwen."""
+        return {"qwen21_pe": kind, "qwen21_pe_think": self.q21_pe_mode.currentData() == "think"}
 
     def qwen21_te(self) -> str:
         """Variante del text encoder (""/heretic): l'encoder 18+ vale solo se le voci 18+ sono ammesse."""
-        return (self.q21_te.currentData() or "") if self._adult_ok() else ""
+        te = self.q21_te.currentData() or ""
+        from core.qwen21_spec import ADULT_TE
+        return "" if te in ADULT_TE and not self._adult_ok() else te
 
     @property
     def image_path(self):

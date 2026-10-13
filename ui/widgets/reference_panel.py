@@ -253,6 +253,11 @@ class ReferencePanel(QWidget):
         self._refresh()
         return True
 
+    def clear(self) -> None:
+        """Toglie tutti i riferimenti (lo sfondo resta)."""
+        for row in list(self._rows):
+            self._remove_row(row)
+
     def _remove_row(self, row: _RefRow):
         if row in self._rows:
             self._rows.remove(row)

@@ -101,8 +101,17 @@ def build_one_desktop(desc: dict, fm_root: Path, project: str, edition: str, os_
         dry_os = True
     else:
         dry_os = dry
+    # Runtime dei processi figli (worker, server, installer dei venv) in chiaro dentro la distribuzione, SOLO
+    # con i componenti delle feature accese in questa edizione (feature matrix → `components`)
+    import runtime_bundle
+    comp = runtime_bundle.edition_components(fm_root, project, edition, python)
+    miss = runtime_bundle.missing_entries(app_root, comp["include"])
+    if miss:
+        print(f"  [ERR] runtime incompleto: {miss}"); return False
+    print(f"  [runtime] componenti: {len(comp['include'])} accesi, {len(comp['exclude'])} esclusi")
+    runtime = [] if dry else runtime_bundle.stage(app_root, exclude=comp["exclude"])
     cmd = nuitka_command(python, app_root, desc.get("entrypoint", "app.py"),
-                         out_dir, os_target, v, desc.get("build", {}), onefile)
+                         out_dir, os_target, v, desc.get("build", {}), onefile, runtime_dirs=runtime)
     if run(cmd, cwd=app_root, dry=dry_os, env=_clean_msvc_env()) != 0:
         print("  [ERR] Nuitka fallito"); return False
 

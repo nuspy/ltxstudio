@@ -101,10 +101,44 @@ def case_qwen21_heretic_only_nsfw(w, spy):
     f = w.frame1_tab
     f.gen_arch.setCurrentText("Qwen-Image 2.1")
     f.img_nsfw.setCurrentText("SFW")
-    assert f.q21_te.isHidden(), "encoder 18+ nascosto in SFW"
+    assert _ids(f.q21_te) == ["", "nvfp4", "fp8"], f"encoder in SFW: {_ids(f.q21_te)}"
     if f.img_nsfw.findText("NSFW") >= 0:
         f.img_nsfw.setCurrentText("NSFW")
-        assert not f.q21_te.isHidden(), "encoder 18+ visibile in NSFW"
+        assert "heretic" in _ids(f.q21_te), "encoder 18+ assente in NSFW"
+        f.q21_te.setCurrentIndex(f.q21_te.findData("heretic"))
+        f.img_nsfw.setCurrentText("SFW")
+        assert f.qwen21_te() == "" and "heretic" not in _ids(f.q21_te), "heretic ancora attivo in SFW"
+
+
+def case_qwen21_controlnet_pe_params(w, spy):
+    f = w.frame1_tab
+    f.gen_arch.setCurrentText("Qwen-Image 2.1")
+    f.q21_refs.enable.setChecked(False)
+    f.q21_cn_box.setChecked(True)
+    f.q21_cn_photo["edit"].setText(_img("_q21_cn.png"))
+    f.q21_cn_kind.setCurrentIndex(f.q21_cn_kind.findData("lineart"))
+    f.q21_cn_scale.setValue(80)
+    f.gen_enhance.setChecked(True)
+    f.q21_pe_mode.setCurrentIndex(f.q21_pe_mode.findData("think"))
+    f.q21_te.setCurrentIndex(f.q21_te.findData("nvfp4"))
+    f.gen_model.setCurrentIndex(f.gen_model.findData("qwen21-dit-int8"))
+    f.gen_prompt.setPlainText("una cattedrale gotica fatta di ghiaccio, aurora boreale")
+    p = _run(w, spy, w.generate_image)
+    assert p["control_image"].endswith("_q21_cn.png") and p["control_preprocess"] == "lineart", p
+    assert abs(p["control_scale"] - 0.8) < 1e-6 and p["qwen21_pe"] == "auto" and p["qwen21_pe_think"] is True, p
+    assert p["qwen21_te"] == "nvfp4" and p["qwen21_dit"] == "qwen21-dit-int8", p
+    f.q21_cn_box.setChecked(False); f.gen_enhance.setChecked(False)
+
+
+def case_qwen21_i2i_to_reference(w, spy):
+    f = w.frame1_tab
+    f.gen_arch.setCurrentText("Qwen-Image 2.1")
+    f.q21_i2i.setChecked(True)
+    assert not f._q21_i2i_hint.isHidden(), "suggerimento img2img non visibile"
+    f.q21_i2i_photo["edit"].setText(_img("_q21_toref.png"))
+    f._q21_i2i_to_ref.click()
+    refs = [r["path"] for r in f.q21_refs.get_references()]
+    assert not f.q21_i2i.isChecked() and refs and refs[0].endswith("_q21_toref.png"), refs
 
 
 def case_qwen21_refs_limit_and_tokens(w, spy):
@@ -205,7 +239,8 @@ CASES = [
      "Noct-Q imposta 25 passi/CFG 3.", case_qwen21_adult_dits_only_nsfw),
     ("qwen21_turbo_locks_steps", "Il Turbo ufficiale blocca 8 passi/CFG 1 e disattiva la LoRA turbo.",
      case_qwen21_turbo_locks_steps),
-    ("qwen21_heretic_only_nsfw", "L'encoder «heretic» si vede solo in modalità NSFW.", case_qwen21_heretic_only_nsfw),
+    ("qwen21_heretic_only_nsfw", "Encoder scelto esplicitamente (abbinato/NVFP4/FP8); «heretic» solo in NSFW.",
+     case_qwen21_heretic_only_nsfw),
     ("qwen21_refs_limit_and_tokens", "Riferimenti: massimo 10, token «image 1»…«image 10».",
      case_qwen21_refs_limit_and_tokens),
     ("qwen21_generate_params", "Genera: DiT, turbo, formato 2K, RGBA e riferimenti arrivano al worker.",
@@ -217,6 +252,10 @@ CASES = [
      case_qwen21_compose_refs),
     ("qwen21_recolor", "Cambia colore: motore Qwen col suo combo modello; istruzione di recolor sull'immagine 1.",
      case_qwen21_recolor),
+    ("qwen21_controlnet_pe_params", "ControlNet (foto, preprocessore, forza), arricchitore e encoder esplicito "
+     "arrivano al worker.", case_qwen21_controlnet_pe_params),
+    ("qwen21_i2i_to_reference", "Il suggerimento img2img è visibile e «usa come riferimento» sposta la foto in image 1.",
+     case_qwen21_i2i_to_reference),
     ("qwen21_inpaint_mask", "Inpaint: voce Qwen nel combo modelli → foto + maschera + forza al worker.",
      case_qwen21_inpaint_mask),
 ]

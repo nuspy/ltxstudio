@@ -63,3 +63,4 @@ data/*.json.v1.bak
 
 # materiale promozionale Patreon (media pesanti + bozze marketing): fuori dal repo
 patreon/
+build/_runtime_stage/

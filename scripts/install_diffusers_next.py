@@ -30,6 +30,7 @@ DEPS = [
     "transformers>=5.17", "accelerate", "safetensors>=0.4.5", "sentencepiece", "protobuf", "pillow",
     "huggingface_hub", "einops", "ftfy", "imageio", "imageio-ffmpeg", "soundfile", "av", "numpy<2.3",
     "comfy-kitchen", "peft",
+    "opencv-python-headless",            # preprocessori ControlNet di Qwen-Image 2.1 (canny, contorni)
 ]
 
 

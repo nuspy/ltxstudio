@@ -736,6 +736,22 @@ class _ModelAuditWorker(QThread):
             self.done.emit({"error": str(e)})
 
 
+class _NativeMigrateWorker(QThread):
+    """Converte in formato NATIVO i single-file ComfyUI già su disco (copiati a mano, collegati dall'installer):
+    sul PC dell'utente la conversione è automatica sia al download (core/downloader) sia qui, all'avvio.
+    Solo voci di catalogo col campo `convert` il cui sorgente esiste: di norma non fa nulla. Niente GPU."""
+    log = Signal(str)
+
+    def run(self):
+        try:
+            from core import native_convert as nc
+            done = nc.migrate_all(log=self.log.emit)
+            if done:
+                self.log.emit(f"[native] convertiti in formato nativo: {', '.join(done)}")
+        except Exception as e:                          # noqa: BLE001 — non blocca l'avvio
+            self.log.emit(f"[native] conversione all'avvio non riuscita: {e}")
+
+
 class MainWindow(QMainWindow):
     # anteprime risultato pronte (dal thread di decode) → dialog sul thread GUI (queued connection)
     _result_prev_ready = Signal(str, object, object)
@@ -848,6 +864,7 @@ class MainWindow(QMainWindow):
         # Thread in background (solo header+JSON, zero torch/GPU): verifica se i modelli locali sono
         # tutti classificati; il risultato (self._audit_result) alimenta il calibratore livello-2 (F7).
         QTimer.singleShot(2000, self._start_model_audit)
+        QTimer.singleShot(5000, self._start_native_migration)   # single-file ComfyUI su disco → nativi
 
         # ── Ripristino impostazioni GUI salvate (tutti i tab, automatico) ──
         # I campi statici si ripristinano subito; i menu popolati dall'inventario live di
@@ -868,6 +885,11 @@ class MainWindow(QMainWindow):
             self._log(f"[gating] errore non bloccante: {e}")
 
     # ---------- F2: audit registro dimensioni modelli (avvio) ----------
+    def _start_native_migration(self):
+        self._migrate_worker = _NativeMigrateWorker()
+        self._migrate_worker.log.connect(self._log)
+        self._migrate_worker.start()
+
     def _start_model_audit(self):
         self._log(tr("audit.running", "Verifica registro modelli…"))
         self._audit_worker = _ModelAuditWorker()
@@ -2397,7 +2419,8 @@ class MainWindow(QMainWindow):
             return
         ptxt = (cfg["inpaint_prompt"] if mode == "inpaint" else cfg["outpaint_prompt"]) \
             or self.frame1_tab.get_values().get("prompt_positive", "")
-        if cfg.get("enhance") and (ptxt or "").strip():         # arricchimento prompt invisibile (opzionale)
+        qwen_edit = bool(cfg.get("qwen21_dit") or cfg.get("integrate_engine") == "qwen_image21")
+        if cfg.get("enhance") and (ptxt or "").strip() and not qwen_edit:   # Qwen: arricchitore ufficiale
             try:
                 from core import prompt_enhance as pe
                 if pe.available():
@@ -2431,7 +2454,7 @@ class MainWindow(QMainWindow):
                                                  if cfg.get("integrate_engine") == "qwen_image21" else "")
                 if q21:                                           # Qwen-Image 2.1 (modello inpaint o motore Integra)
                     self._start_native_qwen21_edit(q21, ptxt, refs=[exp["image"]], negative=negative, seed=seed,
-                                                   loras=self._inp_loras(cfg))
+                                                   loras=self._inp_loras(cfg), enhance=cfg.get("enhance", False))
                     return
                 if cfg.get("integrate_engine") == "krea2":        # motore Krea 2 Edit selezionato in Integra
                     self._start_native_krea2_edit([exp["image"]], ptxt, negative,
@@ -2458,7 +2481,8 @@ class MainWindow(QMainWindow):
                 self._start_native_qwen21_edit(cfg["qwen21_dit"], ptxt, init_image=exp["image"], mask=exp["mask"],
                                                strength=denoise, negative=negative, seed=seed, steps=steps,
                                                guidance=guidance_ui, loras=self._inp_loras(cfg),
-                                               feather=cfg.get("feather", 0), mode=mode)
+                                               feather=cfg.get("feather", 0), mode=mode,
+                                               enhance=cfg.get("enhance", False))
                 return
             from core import backend
             _unet = cfg.get("unet") or ""
@@ -2511,7 +2535,7 @@ class MainWindow(QMainWindow):
         if not self._ensure_flux2_encoder(model):
             return
         ptxt = cfg.get("integrate_prompt") or ""        # opzionale: default auto in KontextPipeline
-        if cfg.get("enhance") and ptxt.strip():             # arricchimento prompt invisibile (opzionale)
+        if cfg.get("enhance") and ptxt.strip() and engine != "qwen_image21":   # Qwen: arricchitore ufficiale
             try:
                 from core import prompt_enhance as pe
                 if pe.available():
@@ -2538,7 +2562,8 @@ class MainWindow(QMainWindow):
                     cfg.get("integrate_qwen21_dit"), ptxt or self._QWEN21_INTEGRATE_PROMPT,
                     init_image=exp["image"], mask=exp.get("mask") or "", strength=1.0 if exp.get("mask") else None,
                     refs=[] if exp.get("mask") else [exp["image"]], negative=negative, seed=seed,
-                    mode="integrazione", label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"))
+                    mode="integrazione", label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"),
+                    enhance=bool(cfg.get("enhance") and ptxt.strip()))
                 return
             if engine == "krea2":                             # motore Krea 2 Edit → edit del composito (single)
                 self._start_native_krea2_edit([exp["image"]], ptxt, negative,
@@ -2653,7 +2678,8 @@ class MainWindow(QMainWindow):
             self._inpaint_before = None
             self._start_native_qwen21_edit(cfg.get("qwen21_dit"), cfg.get("prompt") or "",
                                            refs=imgs, mode="composizione",
-                                           label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"))
+                                           label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"),
+                                           enhance=self.frame1_tab.get_inpaint_config().get("enhance", False))
             return
         if engine == "krea2":                             # Krea 2 Edit → multi-reference VERO (scena+soggetto,
             # 2 latenti separati ai frame RoPE 1/2 — non lo stitch di FLUX.1). Il modello ne gestisce max 2.
@@ -2972,12 +2998,25 @@ class MainWindow(QMainWindow):
         if cfg.get("arch") == "qwen_image21":                 # DiT = voce di catalogo (+ deps)
             if not self._feature_gate("cap.image_qwen21"):
                 return
+            if cfg.get("qwen21_pe") and not self._feature_gate("cap.qwen21_prompt_enhancer"):
+                return
+            if "control_image" in cfg:
+                if not self._feature_gate("cap.qwen21_controlnet"):
+                    return
+                if not os.path.isfile(cfg["control_image"] or ""):
+                    QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.qwen21_no_control",
+                        "ControlNet: carica una foto nel canvas o scegline una nel campo «Foto guida».")); return
+                if cfg.get("ref_images"):
+                    QMessageBox.information(self, tr("f1.gen.qwen21.cn.group", "Controllo struttura (ControlNet)"),
+                        tr("mw.qwen21_control_refs", "Il ControlNet non si combina con i Riferimenti: disattiva "
+                           "l'uno o l'altro.")); return
             if "init_image" in cfg and not os.path.isfile(cfg["init_image"] or ""):
                 QMessageBox.warning(self, tr("mw.no_image_title"),
                                     tr("mw.qwen21_no_init", "img2img: carica una foto nel canvas o scegline una "
                                        "nel campo «Immagine iniziale».")); return
             if not self._ensure_qwen21_weights(cfg.get("qwen21_dit") or "qwen21-dit-fp8", cfg.get("qwen21_te"),
-                                               cfg.get("qwen21_turbo")):
+                                               cfg.get("qwen21_turbo"), pe=cfg.get("qwen21_pe", ""),
+                                               control=bool(cfg.get("control_image"))):
                 return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
@@ -3110,7 +3149,9 @@ class MainWindow(QMainWindow):
                   "krea2_variant": cfg.get("krea2_variant"),   # Krea 2: turbo/raw (snapshot, no file-modello)
                   # Qwen-Image 2.1: DiT, turbo, encoder, RGBA, formato 2K, riferimenti (≤10), img2img
                   **{k: cfg[k] for k in ("qwen21_dit", "qwen21_turbo", "qwen21_te", "transparent",
-                                         "aspect_2k", "ref_images", "init_image", "strength") if k in cfg},
+                                         "aspect_2k", "ref_images", "init_image", "strength",
+                                         "qwen21_pe", "qwen21_pe_think", "control_image", "control_type",
+                                         "control_scale", "control_preprocess") if k in cfg},
                   # #95 I1: componenti scelti dall'utente (erano scartati → il backend usava i default)
                   "sampler": cfg.get("sampler"), "scheduler": cfg.get("scheduler"),
                   "encoder": cfg.get("encoder"), "clip_type": cfg.get("clip_type"), "vae": cfg.get("vae"),
@@ -4165,16 +4206,21 @@ class MainWindow(QMainWindow):
     _QWEN21_INTEGRATE_PROMPT = ("Blend the pasted elements naturally into the scene: match lighting, shadows, "
                                 "perspective and color grading, keep their identity and shape.")
 
-    def _ensure_qwen21_weights(self, dit: str, te: str = "", turbo: str = "") -> bool:
-        """DiT Qwen scelto (+ deps, encoder 18+ e LoRA turbo se scelti) presente, o scaricato col consenso."""
+    def _ensure_qwen21_weights(self, dit: str, te: str = "", turbo: str = "", *, pe: str = "",
+                               control: bool = False) -> bool:
+        """DiT Qwen scelto (+ deps, encoder scelto, LoRA turbo, arricchitore e ControlNet se richiesti)
+        presente, o scaricato col consenso."""
         try:
             from core import ensure_weights as ew
-            from core.qwen21_spec import TE_VARIANTS, TURBO, is_turbo
-            ids = [dit]
-            if te in TE_VARIANTS:
-                ids.append(TE_VARIANTS[te])
+            from core.qwen21_spec import TURBO, PE, CONTROLNET, is_turbo, te_for
+            ids = [dit, te_for(dit, te)]                      # il TE non è più una dipendenza del DiT
             if turbo in TURBO and not is_turbo(dit):
                 ids.append(TURBO[turbo][0])
+            ids += [PE[k][0] for k in (("t2i", "i2i") if pe == "auto" else (pe,)) if k in PE]
+            if control:
+                ids.append(CONTROLNET)
+                if self.frame1_tab.qwen21_control_params().get("control_preprocess") == "depth":
+                    ids.append("depth-anything-v2")
             if ew.missing(ids) and not ew.offer_download_gui(self, ids, "Qwen-Image 2.1"):
                 return False
         except Exception:                                     # noqa: BLE001 — il worker verifica comunque
@@ -4187,7 +4233,7 @@ class MainWindow(QMainWindow):
 
     def _start_native_qwen21_edit(self, dit, prompt, *, refs=(), init_image="", mask="", strength=None,
                                   negative="", seed=None, steps=None, guidance=None, loras=None, feather=0,
-                                  mode="qwen21_edit", label=None):
+                                  mode="qwen21_edit", label=None, enhance=False, extra=None):
         """Qwen-Image 2.1 nei pannelli di editing (Inpaint/Outpaint, Integra, Componi, Colore). Con `refs` è
         editing per istruzione (≤10 immagini, «image N» nel prompt); con `init_image`+`mask` rifà SOLO l'area
         mascherata (il resto resta l'originale al pixel). Passi/CFG: quelli consigliati per il DiT se non dati."""
@@ -4205,7 +4251,13 @@ class MainWindow(QMainWindow):
         if not refs and not init_image:
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
         te = self.frame1_tab.qwen21_te()
-        if not self._ensure_qwen21_weights(dit, te) or not self._ensure_native_ready():
+        if enhance and not self._feature_gate("cap.qwen21_prompt_enhancer"):
+            enhance = False                                   # edizione senza arricchitori: si procede senza
+        pe = self.frame1_tab.qwen21_pe_params("i2i") if enhance else {}
+        extra = dict(extra or {})
+        if not self._ensure_qwen21_weights(dit, te, pe=pe.get("qwen21_pe", ""),
+                                           control=bool(extra.get("control_image"))) \
+                or not self._ensure_native_ready():
             return
         from core.qwen21_spec import DITS, TURBO_STEPS, DEFAULT_STEPS, DEFAULT_GUIDANCE, MAX_REFS
         meta = DITS.get(dit, {})
@@ -4216,7 +4268,7 @@ class MainWindow(QMainWindow):
                   "steps": TURBO_STEPS if turbo else int(steps or meta.get("steps", DEFAULT_STEPS)),
                   "guidance": 1.0 if turbo else float(guidance if guidance is not None
                                                       else meta.get("cfg", DEFAULT_GUIDANCE)),
-                  "ref_images": refs[:MAX_REFS], "loras": list(loras or [])}
+                  "ref_images": refs[:MAX_REFS], "loras": list(loras or []), **pe, **extra}
         if init_image:
             params["init_image"] = init_image
         if mask:

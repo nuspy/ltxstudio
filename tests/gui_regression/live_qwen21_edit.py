@@ -6,6 +6,8 @@ generazione reale su GPU col DiT NVFP4 già installato):
      deve restare IDENTICO all'originale e il risultato avere la risoluzione del ritaglio
   C. Componi con 2 riferimenti (motore Qwen-Image 2.1)
   D. Cambia colore (motore Qwen-Image 2.1)
+  E. ControlNet-Union (canny da una foto)   F. arricchitore ufficiale (rapido)
+  G. Turbo NVFP4 (8 passi)                  H. Noct-Q V4 18+ con una LoRA NSFW (solo caricamento)
 
 Copia i risultati in output/DIAG_qwen21_<prova>.png.
 Uso: QT_QPA_PLATFORM=offscreen python tests/gui_regression/live_qwen21_edit.py [--only A,B,C,D] [--dit qwen21-dit-nvfp4]
@@ -154,13 +156,63 @@ def test_recolor(w, dit):
     return _finish("colore", got, t0)
 
 
+def _t2i(w, label, prompt, *, dit, nsfw=False, control=None, enhance=False, lora=None, te="nvfp4"):
+    """Generazione dal sotto-tab Genera con le opzioni dei test E-H (bottone vero)."""
+    f = w.frame1_tab
+    f.sub.setCurrentIndex(0)
+    f.img_nsfw.setCurrentText("NSFW" if nsfw else "SFW")
+    f.gen_arch.setCurrentText("Qwen-Image 2.1")
+    i = f.gen_model.findData(dit)
+    assert i >= 0, f"{dit} assente dal menu"
+    f.gen_model.setCurrentIndex(i)
+    f.q21_te.setCurrentIndex(f.q21_te.findData(te))
+    f.q21_refs.enable.setChecked(False); f.q21_i2i.setChecked(False)
+    f.q21_cn_box.setChecked(bool(control))
+    if control:
+        f.q21_cn_photo["edit"].setText(str(control[0]))
+        f.q21_cn_kind.setCurrentIndex(f.q21_cn_kind.findData(control[1]))
+    f.gen_enhance.setChecked(enhance)
+    f.q21_pe_mode.setCurrentIndex(f.q21_pe_mode.findData("fast"))
+    f.gen_lora_tab.refresh()
+    for name, row in f.gen_lora_tab._rows.items():
+        row["cb"].setChecked(bool(lora) and lora in name)
+    f.gen_prompt.setPlainText(prompt)
+    f.gen_seed_rand.setChecked(False); f.gen_seed.setValue(20261013)
+    got = _hook(w); t0 = time.time()
+    f.gen_btn.click()
+    out = _finish(label, got, t0)
+    f.q21_cn_box.setChecked(False); f.gen_enhance.setChecked(False)
+    return out
+
+
+def test_controlnet(w, dit):
+    return _t2i(w, "controlnet", "A weathered bronze statue of a scholar with round glasses in a moss-covered "
+                "temple garden, soft morning fog, cinematic", dit=dit, control=(MAN, "canny"))
+
+
+def test_pe(w, dit):
+    return _t2i(w, "arricchitore", "un astronauta in pensione che coltiva pomodori giganti sulla Luna, "
+                "luce del tramonto terrestre", dit=dit, enhance=True)
+
+
+def test_turbo(w, _dit):
+    return _t2i(w, "turbo", "A tiny fox librarian stamping books in a cozy treehouse library, warm lamplight, "
+                "storybook illustration", dit="qwen21-turbo-dit-nvfp4")
+
+
+def test_noctq_lora(w, _dit):
+    return _t2i(w, "noctq_lora", "A woman in her thirties in a sunlit art studio, fine-art portrait photography, "
+                "natural window light", dit="qwen21-noctq-v4-int8", nsfw=True, lora="TheseAlpacas_v2")
+
+
 def main() -> int:
     dit = _arg("--dit", "qwen21-dit-nvfp4")
     only = set((_arg("--only", "A,B,C,D")).split(","))
     w = H.build_window()
     w.tabs.setCurrentWidget(w.frame1_tab)
     res = {}
-    for key, fn in (("A", test_img2img), ("B", test_inpaint), ("C", test_compose), ("D", test_recolor)):
+    for key, fn in (("A", test_img2img), ("B", test_inpaint), ("C", test_compose), ("D", test_recolor),
+                    ("E", test_controlnet), ("F", test_pe), ("G", test_turbo), ("H", test_noctq_lora)):
         if key in only:
             res[key] = fn(w, dit)
     print("RISULTATI:", res)

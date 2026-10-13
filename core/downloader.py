@@ -147,6 +147,15 @@ def download_entry(entry: dict, *, base_dir: str | None = None, token: str | Non
             raise DownloadUnavailable(f"'{entry.get('id')}': kind=file senza filename")
         out = Path(dest_dir) / fname
         remote = entry.get("remote_filename") or fname
+        if entry.get("convert"):
+            # il file ComfyUI è GIÀ su disco (copiato a mano, collegato dall'installer, download interrotto dopo
+            # la fine dello scarico): solo conversione nativa in locale, niente rete
+            from core import native_convert as nc
+            if nc.source_path(entry, Path(dest_dir)).exists():
+                done = nc.ensure_entry(entry, Path(dest_dir), log=log)
+                if done is not None and done.exists():
+                    verify_file(done)
+                    return done
         # voce `convert`: si scarica il file ComfyUI col suo nome, poi diventa il file NATIVO `filename`
         # (core/native_convert: verifica e cancella il sorgente)
         target = out

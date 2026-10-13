@@ -24,11 +24,13 @@ class Qwen21Opts(BaseModel):
     """Campi propri di Qwen-Image 2.1 (ignorati dalle altre architetture)."""
     qwen21_dit: str | None = Field(None, description="DiT di catalogo (GET /image/qwen21/options), "
                                                      "default qwen21-dit-fp8")
-    qwen21_te: str | None = Field(None, description="'' | heretic (encoder 18+)")
+    qwen21_te: str | None = Field(None, description="'' (abbinato al DiT) | nvfp4 | fp8 | heretic (18+)")
     qwen21_turbo: str | None = Field(None, description="'' | 4 | 6 (LoRA turbo, solo DiT non Turbo)")
     transparent: bool = False
     aspect_2k: str | None = Field(None, description="1:1 | 4:3 | 3:4 | 3:2 | 2:3 | 16:9 | 9:16")
     ref_images: list[str] | None = Field(None, description="≤10 riferimenti, citati come «image N» nel prompt")
+    qwen21_pe: str | None = Field(None, description="arricchitore ufficiale: auto | t2i | i2i")
+    qwen21_pe_think: bool = Field(False, description="arricchitore in modalità approfondita (~3 min invece di ~40 s)")
 
 
 class GenerateReq(Qwen21Opts):
@@ -37,6 +39,9 @@ class GenerateReq(Qwen21Opts):
                                                 "non serve con qwen_image21")
     arch: str = Field("flux", description="flux | flux2 | zimage | ernie | qwen_image21")
     init_image: str | None = Field(None, description="img2img (qwen_image21): foto di partenza")
+    control_image: str | None = Field(None, description="ControlNet (qwen_image21): foto guida della struttura")
+    control_preprocess: str | None = Field(None, description="canny | lineart | depth | gray | none")
+    control_scale: float | None = Field(None, description="forza del controllo 0.1-1.0 (default 1.0)")
     strength: float | None = Field(None, description="img2img: 0.05-1.0 (default 0.6)")
     negative: str | None = None
     width: int = 1024
@@ -124,14 +129,20 @@ def _qwen21(p: dict, req: BaseModel | None = None) -> dict:
             f = type(req).model_fields.get(k)
             if f is not None and p.get(k) == f.default:
                 p.pop(k, None)
-    from core.qwen21_spec import DITS, TE_VARIANTS, TURBO_STEPS, DEFAULT_STEPS, DEFAULT_GUIDANCE, MAX_REFS
+    from core.qwen21_spec import DITS, ADULT_TE, TE_VARIANTS, TURBO_STEPS, DEFAULT_STEPS, DEFAULT_GUIDANCE, MAX_REFS
     gate.require("cap.image_qwen21")
     dit = p.setdefault("qwen21_dit", "qwen21-dit-fp8")
     if dit not in DITS:
         raise HTTPException(422, f"qwen21_dit sconosciuto: {dit} ({', '.join(DITS)})")
     meta = DITS[dit]
-    if meta.get("adult") or p.get("qwen21_te") in TE_VARIANTS:
+    if p.get("qwen21_te") and p["qwen21_te"] not in TE_VARIANTS:
+        raise HTTPException(422, f"qwen21_te sconosciuto: {p['qwen21_te']} ({', '.join(TE_VARIANTS)})")
+    if meta.get("adult") or p.get("qwen21_te") in ADULT_TE:
         gate.require("cap.adult_mode")
+    if p.get("qwen21_pe"):
+        gate.require("cap.qwen21_prompt_enhancer")
+    if p.get("control_image"):
+        gate.require("cap.qwen21_controlnet")
     if p.get("steps") is None:
         p["steps"] = TURBO_STEPS if meta.get("turbo") else int(meta.get("steps", DEFAULT_STEPS))
     if meta.get("turbo") or p.get("guidance") is None:

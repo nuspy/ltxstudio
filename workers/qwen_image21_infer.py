@@ -45,9 +45,9 @@ if sys.platform == "win32":
     if not _pac:
         os.environ.pop("PYTORCH_CUDA_ALLOC_CONF", None)
 
-from core.qwen21_spec import (DITS, TE_VARIANTS, TURBO, TURBO_SIGMAS, ASPECTS_2K, MAX_REFS,  # noqa: E402
+from core.qwen21_spec import (DITS, TURBO, TURBO_SIGMAS, ASPECTS_2K, MAX_REFS, PE, CONTROLNET,  # noqa: E402
                               RGBA_TEMPLATE, MASK_HINT, DEFAULT_STEPS, DEFAULT_GUIDANCE, DEFAULT_STRENGTH,
-                              dit_for, is_turbo)
+                              dit_for, is_turbo, te_for)
 
 
 def _log(m: str) -> None:
@@ -62,12 +62,19 @@ def resolve(p: dict) -> dict:
         dit_id = dit_for(p)
     except ValueError as e:
         raise RuntimeError(str(e)) from None
-    te_id = TE_VARIANTS.get(str(p.get("qwen21_te") or ""), DITS[dit_id]["te"])
+    te_id = te_for(dit_id, p.get("qwen21_te"))
     prof = dit_id.removeprefix("qwen21-")
     ids = {"configs": "qwen21-configs", "vae": "qwen21-vae", "dit": dit_id, "te": te_id}
     turbo = str(p.get("qwen21_turbo") or "")
     if turbo in TURBO and not is_turbo(dit_id):           # il Turbo distillato non vuole la LoRA turbo
         ids["turbo"] = TURBO[turbo][0]
+    pe = pe_kind(p)
+    if pe:                                                 # arricchitore di prompt ufficiale (T2I / I2I)
+        ids["pe"], ids["pe_cfg"] = PE[pe]
+    if p.get("control_image"):                             # ControlNet Union (struttura)
+        ids["controlnet"] = CONTROLNET
+        if p.get("control_preprocess") == "depth":
+            ids["depth"] = "depth-anything-v2"
     out, missing = {}, []
     for k, i in ids.items():
         e = mp.entry(i)
@@ -81,6 +88,15 @@ def resolve(p: dict) -> dict:
     out["profile"] = prof
     out["turbo_ckpt"] = is_turbo(dit_id)
     return out
+
+
+def pe_kind(p: dict) -> str:
+    """Arricchitore richiesto: t2i | i2i | "" — «auto» sceglie i2i quando ci sono immagini in ingresso."""
+    k = str(p.get("qwen21_pe") or "").lower()
+    if k == "auto":
+        has_img = bool(p.get("ref_images") or p.get("image_path") or p.get("init_image"))
+        return "i2i" if has_img else "t2i"
+    return k if k in PE else ""
 
 
 def _read_sd(path: str, device: str = "cuda", skip=()) -> dict:
@@ -224,24 +240,12 @@ def run(p: dict) -> str:
         start_watchdog(int(p.get("parent_pid") or 0))
     except Exception:                                                # noqa: BLE001
         pass
-    pipe = build_pipe(W)
-    turbo_ckpt = bool(W.get("turbo_ckpt"))
-    steps = len(TURBO_SIGMAS) if turbo_ckpt else int(p.get("steps") or DEFAULT_STEPS)
-    if "turbo" in W:
-        from safetensors.torch import load_file
-        n = Q.apply_lora(pipe.transformer, load_file(W["turbo"]), 1.0)
-        steps = TURBO[str(p["qwen21_turbo"])][1]
-        _log(f"LoRA turbo: {n} moduli, {steps} passi")
-    for lo in p.get("loras") or []:
+    lora_paths = []
+    for lo in p.get("loras") or []:                        # prima del caricamento: errore subito se manca
         path = _lora_path(lo.get("path") or lo.get("name") or "")
         if not path:
             raise RuntimeError(f"LoRA non trovata: {lo.get('path') or lo.get('name')}")
-        from safetensors.torch import load_file
-        n = Q.apply_lora(pipe.transformer, load_file(path), float(lo.get("strength", 1.0)))
-        _log(f"LoRA {os.path.basename(path)}: {n} moduli")
-        if not n:
-            raise RuntimeError(f"LoRA {os.path.basename(path)}: nessun modulo riconosciuto "
-                               "(non è una LoRA per Qwen-Image 2.1?)")
+        lora_paths.append((path, float(lo.get("strength", 1.0))))
 
     # ── ingressi: riferimenti (editing), immagine iniziale (img2img / inpaint), maschera ──
     refs = [x for x in (p.get("ref_images") or []) if x]
@@ -264,9 +268,34 @@ def run(p: dict) -> str:
         images = [_annotate(init_img, mask_path)] + images
         prompt = f"{prompt} {MASK_HINT}"
     images = images[:MAX_REFS]
+    pe = pe_kind(p)
+    if pe and prompt.strip():
+        # arricchitore ufficiale: vede il prompt dell'utente (e, in editing, le immagini — l'annotazione rossa
+        # compresa); si carica e si libera PRIMA del DiT. L'indicazione della maschera si riaggiunge dopo.
+        import qwen21_pe
+        user_prompt = prompt.replace(f" {MASK_HINT}", "")
+        pe_imgs = images if images else ([init_img] if init_img is not None else [])
+        new = qwen21_pe.enhance(pe, W["pe"], W["pe_cfg"], user_prompt, pe_imgs, seed=int(p.get("seed") or 0),
+                                think=bool(p.get("qwen21_pe_think")))
+        prompt = f"{new} {MASK_HINT}" if (init_img is not None and mask_path) else new
     transparent = bool(p.get("transparent"))
     if transparent and "RGBA image" not in prompt:
         prompt = RGBA_TEMPLATE.format(p=prompt)
+
+    pipe = build_pipe(W)
+    turbo_ckpt = bool(W.get("turbo_ckpt"))
+    steps = len(TURBO_SIGMAS) if turbo_ckpt else int(p.get("steps") or DEFAULT_STEPS)
+    from safetensors.torch import load_file
+    if "turbo" in W:
+        n = Q.apply_lora(pipe.transformer, load_file(W["turbo"]), 1.0)
+        steps = TURBO[str(p["qwen21_turbo"])][1]
+        _log(f"LoRA turbo: {n} moduli, {steps} passi")
+    for path, strength in lora_paths:
+        n = Q.apply_lora(pipe.transformer, load_file(path), strength)
+        _log(f"LoRA {os.path.basename(path)}: {n} moduli")
+        if not n:
+            raise RuntimeError(f"LoRA {os.path.basename(path)}: nessun modulo riconosciuto "
+                               "(non è una LoRA per Qwen-Image 2.1?)")
 
     out_res = int(p.get("output_resolution") or 1024)
     w, h = int(p.get("width") or 0), int(p.get("height") or 0)
@@ -289,6 +318,25 @@ def run(p: dict) -> str:
     guidance = 1.0 if turbo_ckpt else float(p.get("guidance") if p.get("guidance") is not None
                                              else DEFAULT_GUIDANCE)
     gen = torch.Generator("cuda").manual_seed(int(p.get("seed") or 0))
+
+    if W.get("controlnet"):
+        # ControlNet-Union (port nativo VideoX-Fun): mappa di controllo alla forma finale, ramo di controllo
+        # agganciato al DiT, niente cache KV e niente riferimenti — come la pipeline ufficiale
+        import qwen21_control as C
+        if images:
+            raise RuntimeError("ControlNet: non si combina con le immagini di riferimento (solo testo→immagine "
+                               "e img2img). Disattiva i riferimenti o il controllo.")
+        kw.setdefault("width", out_res // 32 * 32)
+        kw.setdefault("height", out_res // 32 * 32)
+        kind = str(p.get("control_preprocess") or "none")
+        cimg = C.preprocess(p["control_image"], kind, kw["width"], kw["height"], W.get("depth", ""))
+        if p.get("output"):                                # la mappa usata, accanto al risultato (per capire)
+            cimg.save(str(Path(p["output"]).with_suffix("")) + "_control.png")
+        C.attach(pipe.transformer, W["controlnet"])
+        scale = float(p.get("control_scale") if p.get("control_scale") is not None else 1.0)
+        C.set_context(pipe.transformer, C.build_context(pipe, cimg, kw["width"], kw["height"], gen), scale)
+        kw["use_kv_cache"] = False
+        _log(f"ControlNet: preprocessore {kind}, forza {scale:.2f}")
 
     mode = "edit" if images else "t2i"
     if init_img is not None:

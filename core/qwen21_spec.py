@@ -23,7 +23,17 @@ DITS = {
     "qwen21-noctq-v4-int8": {"te": "qwen21-te-fp8", "adult": True, "steps": 25, "cfg": 3.0},
     "qwen21-noctq-anime-int8": {"te": "qwen21-te-fp8", "adult": True, "steps": 25, "cfg": 3.0},
 }
-TE_VARIANTS = {"heretic": "qwen21-te-heretic-nvfp4"}
+# text encoder scelto ESPLICITAMENTE (combo «Text encoder»); "" = quello abbinato al DiT (DITS[...]["te"]).
+# Il TE NON è una dipendenza del DiT nel catalogo: qualunque TE va con qualunque DiT (es. su RTX 50xx l'NVFP4
+# anche coi DiT INT8), così scaricando un DiT non arrivano 9 GB di encoder che l'utente non ha scelto.
+TE_VARIANTS = {"nvfp4": "qwen21-te-nvfp4", "fp8": "qwen21-te-fp8", "heretic": "qwen21-te-heretic-nvfp4"}
+ADULT_TE = {"heretic"}
+# arricchitori di prompt ufficiali (Qwen3.5-VL 9B): riscrivono il prompt prima della generazione
+PE = {"t2i": ("qwen21-pe-t2i-int8", "qwen21-pe-t2i-configs"), "i2i": ("qwen21-pe-i2i-int8", "qwen21-pe-i2i-configs")}
+PE_MAX_NEW_TOKENS = 8192
+# ControlNet-Union ufficiale (alibaba-pai «Fun»): 8 condizioni + inpaint in un solo ramo di controllo
+CONTROLNET = "qwen21-controlnet-int8"
+CONTROL_TYPES = ("canny", "depth", "pose", "lineart", "hed", "mlsd", "scribble", "gray")
 TURBO = {"4": ("qwen21-turbo-lora-4", 4), "6": ("qwen21-turbo-lora-6", 6)}
 # schedule ufficiale di Qwen-Image-2.1-Turbo (model_index.json «sample_sigmas»; lo 0 finale lo aggiunge lo scheduler)
 TURBO_SIGMAS = [1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568]
@@ -50,6 +60,11 @@ def dit_for(params: dict) -> str:
     if prof not in PROFILES:
         raise ValueError(f"Profilo Qwen-Image 2.1 sconosciuto: {prof} ({' | '.join(PROFILES)})")
     return PROFILES[prof][0]
+
+
+def te_for(dit_id: str, te: str = "") -> str:
+    """Voce di catalogo del text encoder: la scelta esplicita, altrimenti quello abbinato al DiT."""
+    return TE_VARIANTS.get(str(te or ""), DITS.get(dit_id, DITS["qwen21-dit-fp8"])["te"])
 
 
 def is_turbo(dit_id: str) -> bool:

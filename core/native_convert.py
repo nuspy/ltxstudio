@@ -228,6 +228,8 @@ CONVERTERS = {
     "mmh3_lora": _mmh3_lora,          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
     "qwen21_dit": lambda: _renamer(lambda k: k),   # Qwen-Image 2.1 nvfp4 «Prism»: nomi già diffusers
     "qwen21_te": _qwen21_te,          # Qwen-Image 2.1 TE Qwen3-VL-8B (nvfp4 ComfyUI) → transformers
+    "qwen21_cn": lambda: _renamer(lambda k: k),    # Qwen-Image 2.1 ControlNet Union Fun (INT8 ConvRot): nomi già diffusers
+    "qwen21_pe": lambda: _renamer(lambda k: k),    # arricchitori PE Qwen3.5-VL 9B (INT8 ConvRot): nomi già transformers
 }
 
 
