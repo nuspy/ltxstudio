@@ -3112,5 +3112,6 @@
   "vid.ltx_te.tt": "Codificador que lee el prompt para LTX 2.5. «Sin censura» describe el contenido explícito sin suavizarlo; funciona con cualquier transformer 2.5.",
   "weights.civitai": "Clave API de Civitai",
   "weights.civitai.hint": "civitai.com → Configuración de la cuenta → API Keys (se queda solo en este PC)",
-  "weights.civitai.tt": "Necesaria para los modelos de Civitai: sin clave, Civitai redirige al inicio de sesión y la descarga falla."
+  "weights.civitai.tt": "Necesaria para los modelos de Civitai: sin clave, Civitai redirige al inicio de sesión y la descarga falla.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 pasos)"
 }

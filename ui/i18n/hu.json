@@ -3112,5 +3112,6 @@
   "vid.ltx_te.tt": "Az LTX 2.5 promptját olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; minden 2.5-ös transformerrel működik.",
   "weights.civitai": "Civitai API-kulcs",
   "weights.civitai.hint": "civitai.com → Fiókbeállítások → API Keys (csak ezen a gépen marad)",
-  "weights.civitai.tt": "A Civitai-ról származó modellekhez kell: kulcs nélkül a Civitai a bejelentkezésre irányít, és a letöltés sikertelen."
+  "weights.civitai.tt": "A Civitai-ról származó modellekhez kell: kulcs nélkül a Civitai a bejelentkezésre irányít, és a letöltés sikertelen.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 lépés)"
 }

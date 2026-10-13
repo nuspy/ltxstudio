@@ -3112,5 +3112,6 @@
   "vid.ltx_te.tt": "المُرمِّز الذي يقرأ الموجّه لـ LTX 2.5. «بلا رقابة» يصف المحتوى الصريح دون تلطيفه؛ يعمل مع كل محوّلات 2.5.",
   "weights.civitai": "مفتاح API لـ Civitai",
   "weights.civitai.hint": "civitai.com ← إعدادات الحساب ← API Keys (يبقى على هذا الجهاز فقط)",
-  "weights.civitai.tt": "مطلوب للنماذج المصدرة من Civitai: من دون مفتاح يعيد Civitai التوجيه إلى تسجيل الدخول ويفشل التنزيل."
+  "weights.civitai.tt": "مطلوب للنماذج المصدرة من Civitai: من دون مفتاح يعيد Civitai التوجيه إلى تسجيل الدخول ويفشل التنزيل.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 خطوات)"
 }

@@ -3112,5 +3112,6 @@
   "vid.ltx_te.tt": "המקודד שקורא את ההנחיה עבור LTX 2.5. «ללא צנזורה» מתאר תוכן מפורש בלי לרכך אותו; עובד עם כל טרנספורמר 2.5.",
   "weights.civitai": "מפתח API של Civitai",
   "weights.civitai.hint": "civitai.com ← הגדרות חשבון ← API Keys (נשמר רק במחשב הזה)",
-  "weights.civitai.tt": "נדרש למודלים ממקור Civitai: בלי מפתח Civitai מפנה להתחברות וההורדה נכשלת."
+  "weights.civitai.tt": "נדרש למודלים ממקור Civitai: בלי מפתח Civitai מפנה להתחברות וההורדה נכשלת.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 צעדים)"
 }

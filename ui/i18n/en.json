@@ -3186,5 +3186,6 @@
   "vid.ltx_te.tt": "Encoder that reads the prompt for LTX 2.5. “Uncensored” describes explicit content without softening it; works with every 2.5 transformer.",
   "weights.civitai": "Civitai API key",
   "weights.civitai.hint": "civitai.com → Account settings → API Keys (stays on this PC only)",
-  "weights.civitai.tt": "Needed for models sourced from Civitai: without a key Civitai redirects to the login page and the download fails."
+  "weights.civitai.tt": "Needed for models sourced from Civitai: without a key Civitai redirects to the login page and the download fails.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 steps)"
 }

@@ -3112,5 +3112,6 @@
   "vid.ltx_te.tt": "LTX 2.5용 프롬프트를 읽는 인코더입니다. ‘무검열’은 노골적인 내용을 순화하지 않고 묘사하며 모든 2.5 트랜스포머와 함께 작동합니다.",
   "weights.civitai": "Civitai API 키",
   "weights.civitai.hint": "civitai.com → 계정 설정 → API Keys (이 PC에만 저장됨)",
-  "weights.civitai.tt": "Civitai에서 받는 모델에 필요합니다. 키가 없으면 Civitai가 로그인으로 보내 다운로드가 실패합니다."
+  "weights.civitai.tt": "Civitai에서 받는 모델에 필요합니다. 키가 없으면 Civitai가 로그인으로 보내 다운로드가 실패합니다.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8단계)"
 }

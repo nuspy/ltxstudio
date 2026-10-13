@@ -3112,5 +3112,6 @@
   "vid.ltx_te.tt": "Encoder, der den Prompt für LTX 2.5 liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit jedem 2.5-Transformer.",
   "weights.civitai": "Civitai-API-Schlüssel",
   "weights.civitai.hint": "civitai.com → Kontoeinstellungen → API Keys (bleibt nur auf diesem PC)",
-  "weights.civitai.tt": "Nötig für Modelle aus Civitai: ohne Schlüssel leitet Civitai zur Anmeldung um und der Download schlägt fehl."
+  "weights.civitai.tt": "Nötig für Modelle aus Civitai: ohne Schlüssel leitet Civitai zur Anmeldung um und der Download schlägt fehl.",
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 Schritte)"
 }

@@ -752,6 +752,13 @@ NEW = [
       filename="KreaNoct_V4_int8_convrot-native.safetensors", convert="krea2_dit", type="diffusion_models",
       family="Krea2", gb=13.49, sens="adult", deps=["krea2_turbo"],
       note="merge fotorealistico NSFW su Krea 2 Turbo, niente LoRA di sblocco: 8 passi, CFG 1. Krea 2 Community License"),
+    N("krea2-kroma-v031", "Immagini", "Krea Kroma v0.3.1 Turbo OPD (INT8 ConvRot, 8 passi, 14.1GB)", category="image",
+      arch="krea2", repo="jakethessmake/Krea-Kroma-v0.3.1-Turbo-OPD-ComfyUI-Quants",
+      remote="krea_kroma_v0.3.1_turbo_opd_int8_convrot.safetensors",
+      filename="krea_kroma_v0.3.1_turbo_opd_int8_convrot-native.safetensors", convert="krea2_dit",
+      type="diffusion_models", family="Krea2", gb=14.14, deps=["krea2_turbo"],
+      note="finetune Kroma (lodestones) di Krea 2, quant ComfyUI int8 ConvRot: stesso layout di Krea Noct V4. "
+           "8-12 passi, CFG 1-1.5. Krea 2 Community License"),
     N("krea2-te-uncensored", "Immagini", "Krea 2 text encoder Uncensored v1.1 (18+, fp8, 4.9GB)", category="image",
       arch="krea2", repo="ChrisColeTech/krea2-turbo-uncensored-v1.1-FP8",
       remote="split/text_encoders/qwen3vl_4b_uncensored-fp8_scaled.safetensors",

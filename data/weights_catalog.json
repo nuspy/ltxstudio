@@ -4874,6 +4874,35 @@
         "lora_style",
         "uncensored"
       ]
+    },
+    {
+      "id": "krea2-kroma-v031",
+      "module": "Immagini",
+      "label": "Krea Kroma v0.3.1 Turbo OPD (INT8 ConvRot, 8 passi, 14.1GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 14.14,
+      "scan_names": [
+        "krea_kroma_v0.3.1_turbo_opd_int8_convrot-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "repo_id": "jakethessmake/Krea-Kroma-v0.3.1-Turbo-OPD-ComfyUI-Quants",
+      "url": "https://huggingface.co/jakethessmake/Krea-Kroma-v0.3.1-Turbo-OPD-ComfyUI-Quants",
+      "filename": "krea_kroma_v0.3.1_turbo_opd_int8_convrot-native.safetensors",
+      "remote_filename": "krea_kroma_v0.3.1_turbo_opd_int8_convrot.safetensors",
+      "deps": [
+        "krea2_turbo"
+      ],
+      "note": "finetune Kroma (lodestones) di Krea 2, quant ComfyUI int8 ConvRot: stesso layout di Krea Noct V4. 8-12 passi, CFG 1-1.5. Krea 2 Community License",
+      "convert": "krea2_dit",
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "q_int8"
+      ]
     }
   ],
   "schema": 2,
