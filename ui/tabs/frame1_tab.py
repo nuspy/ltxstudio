@@ -258,6 +258,7 @@ class Frame1Tab(QWidget):
         self.gen_vae.setToolTip(tr("f1.gen.vae.tt", "VAE che decodifica il latente in immagine; 'auto' usa quello del modello."))
         f.addRow(tr("f1.gen.vae_lbl"), self.gen_vae)
         f.addRow(self._qwen21_box())
+        f.addRow(self._krea2_box())
         # LoRA multi-select (come nel tab Video)
         lora_group = QGroupBox(tr("f1.gen.lora.group"))
         lora_vl = QVBoxLayout(lora_group)
@@ -684,6 +685,42 @@ class Frame1Tab(QWidget):
         self.gen_model.currentIndexChanged.connect(self._on_krea2_model_changed)
         self.gen_arch.currentTextChanged.connect(self._on_krea2_model_changed)
         return box
+
+    def _krea2_box(self) -> QGroupBox:
+        """Opzioni proprie di Krea 2: oggi il text encoder. L'unica alternativa all'encoder dello snapshot è 18+
+        (uncensored), quindi il riquadro compare solo con Krea 2 e voci 18+ ammesse."""
+        box = QGroupBox(tr("f1.gen.krea2.group", "Krea 2"))
+        ff = QFormLayout(box)
+        self.k2_te = QComboBox()
+        self.k2_te.addItem(tr("f1.gen.krea2.te.official", "Ufficiale (incluso nel modello)"), "")
+        self.k2_te.addItem(tr("f1.gen.krea2.te.uncensored", "Uncensored v1.1 (18+, fp8, 4.9 GB)"), "krea2-te-uncensored")
+        self.k2_te.setToolTip(tr("f1.gen.krea2.te.tt",
+            "Encoder che legge il prompt. «Uncensored» descrive i contenuti espliciti senza ammorbidirli; "
+            "vale con Turbo, Raw e Krea Noct."))
+        self.k2_te.activated.connect(lambda *_: self._offer_catalog_download_any(self.k2_te))
+        ff.addRow(tr("f1.gen.krea2.te", "Text encoder"), self.k2_te)
+        self._k2_box = box
+        box.setVisible(False)
+        self.gen_arch.currentTextChanged.connect(self._sync_krea2_box)
+        self.img_nsfw.currentTextChanged.connect(self._sync_krea2_box)
+        return box
+
+    def _sync_krea2_box(self, *_):
+        on = self.gen_arch.currentText() == "Krea 2" and self._adult_ok()
+        self._k2_box.setVisible(on)
+        if not on:
+            self.k2_te.setCurrentIndex(0)                      # SFW: mai l'encoder 18+ «nascosto» ma attivo
+
+    def _offer_catalog_download_any(self, combo):
+        cid = combo.currentData()
+        if isinstance(cid, str) and cid:
+            self._offer_download_ids(cid)
+
+    def _krea2_te(self):
+        """Id del text encoder single-file Krea 2 (None = encoder dello snapshot). 18+ solo se ammesso."""
+        if self.gen_arch.currentText() != "Krea 2" or not self._adult_ok():
+            return None
+        return self.k2_te.currentData() or None
 
     def _sync_qwen21_box(self, *_):
         on = self.gen_arch.currentText() == "Qwen-Image 2.1"
@@ -1997,6 +2034,7 @@ class Frame1Tab(QWidget):
                              if self.gen_arch.currentText() == "Krea 2" else None,
             # Krea 2 single-file (finetune community): id di catalogo del transformer, sopra lo snapshot Turbo
             "krea2_dit": self._krea2_dit(),
+            "krea2_te": self._krea2_te(),
             **self._qwen21_config(),
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),

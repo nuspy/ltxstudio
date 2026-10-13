@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (최대 10명의 캐릭터)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "키프레임과 출연진 초상화용 Qwen-Image 2.1 모델.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8단계)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8단계)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "텍스트 인코더",
+  "f1.gen.krea2.te.official": "공식 (모델에 포함)",
+  "f1.gen.krea2.te.uncensored": "무검열 v1.1 (18+, fp8, 4.9 GB)",
+  "f1.gen.krea2.te.tt": "프롬프트를 읽는 인코더입니다. ‘무검열’은 노골적인 내용을 순화하지 않고 묘사하며 Turbo, Raw, Krea Noct와 함께 작동합니다."
 }

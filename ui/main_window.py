@@ -3162,6 +3162,7 @@ class MainWindow(QMainWindow):
                   "seed": seed, "loras": loras,
                   "krea2_variant": cfg.get("krea2_variant"),   # Krea 2: turbo/raw (snapshot, no file-modello)
                   "krea2_dit": cfg.get("krea2_dit"),           # Krea 2: transformer single-file (es. Noct V4)
+                  "krea2_te": cfg.get("krea2_te"),             # Krea 2: text encoder single-file (uncensored)
                   # Qwen-Image 2.1: DiT, turbo, encoder, RGBA, formato 2K, riferimenti (≤10), img2img
                   **{k: cfg[k] for k in ("qwen21_dit", "qwen21_turbo", "qwen21_te", "transparent",
                                          "aspect_2k", "ref_images", "init_image", "strength",

@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (10 पात्रों तक)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "की-फ़्रेम और कलाकारों के पोर्ट्रेट के लिए Qwen-Image 2.1 मॉडल।",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 चरण)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 चरण)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "टेक्स्ट एन्कोडर",
+  "f1.gen.krea2.te.official": "आधिकारिक (मॉडल में शामिल)",
+  "f1.gen.krea2.te.uncensored": "अनसेंसर्ड v1.1 (18+, fp8, 4.9 GB)",
+  "f1.gen.krea2.te.tt": "प्रॉम्प्ट पढ़ने वाला एन्कोडर। «अनसेंसर्ड» स्पष्ट सामग्री को नरम किए बिना बताता है; Turbo, Raw और Krea Noct के साथ काम करता है।"
 }

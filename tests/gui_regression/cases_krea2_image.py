@@ -49,7 +49,28 @@ def case_krea2_noct_params(w, spy):
     f.img_nsfw.setCurrentText("SFW")
 
 
+def case_krea2_te_only_nsfw(w, spy):
+    f = w.frame1_tab
+    f.img_nsfw.setCurrentText("SFW")
+    f.gen_arch.setCurrentText("Krea 2")
+    assert f._k2_box.isHidden(), "riquadro encoder Krea 2 visibile in SFW (unica alternativa è 18+)"
+    f.gen_prompt.setPlainText("una cattedrale di ghiaccio abitata da pinguini monaci")
+    p = _run(w, spy, w.generate_image)
+    assert not p.get("krea2_te"), f"encoder 18+ inviato in SFW: {p}"
+    if f.img_nsfw.findText("NSFW") < 0:
+        return
+    f.img_nsfw.setCurrentText("NSFW")
+    assert not f._k2_box.isHidden(), "riquadro encoder Krea 2 assente in NSFW"
+    f.k2_te.setCurrentIndex(f.k2_te.findData("krea2-te-uncensored"))
+    p = _run(w, spy, w.generate_image)
+    assert p.get("krea2_te") == "krea2-te-uncensored", p
+    f.img_nsfw.setCurrentText("SFW")                              # torna SFW: l'encoder 18+ si azzera
+    assert f.k2_te.currentData() == "" and f._k2_box.isHidden()
+
+
 CASES = [
+    ("krea2_te_only_nsfw", "Krea 2: encoder uncensored selezionabile solo in NSFW e azzerato tornando in SFW.",
+     case_krea2_te_only_nsfw),
     ("krea2_noct_only_nsfw", "Krea 2: Turbo/Raw sempre, Krea Noct V4 (18+) solo in NSFW.", case_krea2_noct_only_nsfw),
     ("krea2_steps_guidance", "Krea 2: Raw 52/3.5, Turbo 8/0 — la guidance 0 arriva al worker come 0.",
      case_krea2_steps_guidance),

@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (jusqu'à 10 personnages)",
   "fs.sb.qwen21_dit": "Qwen :",
   "fs.sb.qwen21_dit.tt": "Modèle Qwen-Image 2.1 pour les images clés et les portraits du casting.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 étapes)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 étapes)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "Encodeur de texte",
+  "f1.gen.krea2.te.official": "Officiel (inclus dans le modèle)",
+  "f1.gen.krea2.te.uncensored": "Non censuré v1.1 (18+, fp8, 4,9 Go)",
+  "f1.gen.krea2.te.tt": "Encodeur qui lit le prompt. « Non censuré » décrit les contenus explicites sans les adoucir ; fonctionne avec Turbo, Raw et Krea Noct."
 }

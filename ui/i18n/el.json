@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (έως 10 χαρακτήρες)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "Μοντέλο Qwen-Image 2.1 για τα βασικά καρέ και τα πορτρέτα του καστ.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 βήματα)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 βήματα)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "Κωδικοποιητής κειμένου",
+  "f1.gen.krea2.te.official": "Επίσημος (περιλαμβάνεται στο μοντέλο)",
+  "f1.gen.krea2.te.uncensored": "Χωρίς λογοκρισία v1.1 (18+, fp8, 4,9 GB)",
+  "f1.gen.krea2.te.tt": "Κωδικοποιητής που διαβάζει το prompt. Το «Χωρίς λογοκρισία» περιγράφει ρητό περιεχόμενο χωρίς να το αμβλύνει· λειτουργεί με Turbo, Raw και Krea Noct."
 }

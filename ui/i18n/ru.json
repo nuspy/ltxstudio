@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (до 10 персонажей)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "Модель Qwen-Image 2.1 для ключевых кадров и портретов актёров.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 шагов)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 шагов)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "Текстовый энкодер",
+  "f1.gen.krea2.te.official": "Официальный (входит в модель)",
+  "f1.gen.krea2.te.uncensored": "Без цензуры v1.1 (18+, fp8, 4,9 ГБ)",
+  "f1.gen.krea2.te.tt": "Энкодер, который читает промпт. «Без цензуры» описывает откровенный контент, не смягчая его; работает с Turbo, Raw и Krea Noct."
 }

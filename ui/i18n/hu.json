@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (legfeljebb 10 szereplő)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "Qwen-Image 2.1 modell a kulcskockákhoz és a szereplők portréihoz.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 lépés)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 lépés)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "Szövegkódoló",
+  "f1.gen.krea2.te.official": "Hivatalos (a modell része)",
+  "f1.gen.krea2.te.uncensored": "Cenzúrázatlan v1.1 (18+, fp8, 4,9 GB)",
+  "f1.gen.krea2.te.tt": "A promptot olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; Turbo, Raw és Krea Noct modellel is működik."
 }

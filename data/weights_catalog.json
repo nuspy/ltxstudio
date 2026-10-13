@@ -4635,6 +4635,36 @@
         "q_int8",
         "uncensored"
       ]
+    },
+    {
+      "id": "krea2-te-uncensored",
+      "module": "Immagini",
+      "label": "Krea 2 text encoder Uncensored v1.1 (18+, fp8, 4.9GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 4.85,
+      "scan_names": [
+        "qwen3vl_4b_uncensored-fp8-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "repo_id": "ChrisColeTech/krea2-turbo-uncensored-v1.1-FP8",
+      "url": "https://huggingface.co/ChrisColeTech/krea2-turbo-uncensored-v1.1-FP8",
+      "filename": "qwen3vl_4b_uncensored-fp8-native.safetensors",
+      "remote_filename": "split/text_encoders/qwen3vl_4b_uncensored-fp8_scaled.safetensors",
+      "deps": [
+        "krea2_turbo|krea2_raw"
+      ],
+      "sensitivity": "adult",
+      "note": "Qwen3-VL-4B senza rifiuti: stesse chiavi del TE ufficiale, Linear fp8 (scala per-tensore)",
+      "convert": "krea2_te",
+      "use": [
+        "te",
+        "fp8",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

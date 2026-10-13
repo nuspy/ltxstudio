@@ -118,10 +118,10 @@ def _demote_pipes() -> float:
     return mb
 
 
-def _resolve_dit(p: dict) -> str:
-    """Transformer single-file scelto dall'utente (`krea2_dit`: id di catalogo o path), "" = quello dello
-    snapshot. Mancante su disco → errore chiaro, MAI ripiego silenzioso sul transformer ufficiale."""
-    d = str(p.get("krea2_dit") or "").strip()
+def _resolve_dit(p: dict, key: str = "krea2_dit", what: str = "Transformer") -> str:
+    """File singolo scelto dall'utente (`krea2_dit` transformer / `krea2_te` text encoder: id di catalogo o path),
+    "" = quello dello snapshot. Mancante su disco → errore chiaro, MAI ripiego silenzioso sull'ufficiale."""
+    d = str(p.get(key) or "").strip()
     if not d:
         return ""
     if os.path.isfile(d):
@@ -132,10 +132,19 @@ def _resolve_dit(p: dict) -> str:
         path = os.path.join(str(wc.dest_for(e)), e["filename"])
         if os.path.isfile(path):
             return path
-    raise RuntimeError(f"Transformer Krea 2 «{d}» non trovato su disco: scaricalo dal tab «Pesi modelli».")
+    raise RuntimeError(f"{what} Krea 2 «{d}» non trovato su disco: scaricalo dal tab «Pesi modelli».")
 
 
-def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: str):
+def _te_kwargs(model_dir: str, te: str) -> dict:
+    """`text_encoder=` per from_pretrained quando l'utente ha scelto un TE single-file (es. uncensored fp8)."""
+    if not te:
+        return {}
+    from workers import krea2_custom as K
+    print(f"[krea2] text encoder single-file: {os.path.basename(te)}", flush=True)
+    return {"text_encoder": K.build_text_encoder(te, os.path.join(model_dir, "text_encoder"))}
+
+
+def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: str, te: str = ""):
     """Transformer da file singolo nativo (int8 ConvRot / fp8: già compresso, niente layerwise casting) su
     text encoder, VAE e scheduler dello snapshot `model_dir`. LoRA agganciate ai Linear quantizzati."""
     from diffusers import DiffusionPipeline
@@ -144,7 +153,8 @@ def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: 
     tr = K.build_transformer(dit, os.path.join(model_dir, "transformer"))
     if loras:
         K.apply_loras(tr, list(loras), log=lambda m: print(m, flush=True))
-    pipe = DiffusionPipeline.from_pretrained(model_dir, transformer=tr, torch_dtype=torch.bfloat16)
+    pipe = DiffusionPipeline.from_pretrained(model_dir, transformer=tr, torch_dtype=torch.bfloat16,
+                                             **_te_kwargs(model_dir, te))
     free = _free_vram_mb()
     if free < 26000:                       # TE+VAE dello snapshot (~9GB) accanto al transformer int8 (~13GB)
         pipe.enable_model_cpu_offload()
@@ -158,8 +168,8 @@ def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: 
     return pipe
 
 
-def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = ""):
-    key = (model_dir, variant, tuple(loras), dit)
+def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = "", te: str = ""):
+    key = (model_dir, variant, tuple(loras), dit, te)
     if key in _PIPE_CACHE:
         pipe = _PIPE_CACHE[key]
         if getattr(pipe, "_ls_parked_cpu", False):             # M-park: rientro VRAM dalla RAM (no SSD)
@@ -182,15 +192,17 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = "
     if _PIPE_CACHE:
         _evict_pipes()
     if dit:
-        _PIPE_CACHE[key] = _load_pipeline_single_file(model_dir, variant, tuple(loras), dit)
+        _PIPE_CACHE[key] = _load_pipeline_single_file(model_dir, variant, tuple(loras), dit, te)
         return _PIPE_CACHE[key]
     from diffusers import DiffusionPipeline
     print(f"[krea2] carico Krea2Pipeline: {model_dir} (variant={variant})", flush=True)
+    _te = _te_kwargs(model_dir, te)
     try:
         from krea2 import Krea2Pipeline as _Pipe                # se il pacchetto è installato
-        pipe = _Pipe.from_pretrained(model_dir, torch_dtype=torch.bfloat16)
+        pipe = _Pipe.from_pretrained(model_dir, torch_dtype=torch.bfloat16, **_te)
     except Exception:                                          # noqa: BLE001 — fallback custom-code HF
-        pipe = DiffusionPipeline.from_pretrained(model_dir, torch_dtype=torch.bfloat16, trust_remote_code=True)
+        pipe = DiffusionPipeline.from_pretrained(model_dir, torch_dtype=torch.bfloat16, trust_remote_code=True,
+                                                 **_te)
 
     # LoRA PRIMA del fp8: si caricano e si FONDONO nei pesi bf16, poi si casta a fp8 (altrimenti la matmul
     # della LoRA su pesi Float8_e4m3fn non è implementata).
@@ -377,7 +389,8 @@ def run_edit(p: dict) -> str:
     if not imgs:
         raise RuntimeError("Krea 2 Edit: nessuna immagine sorgente (image_path/images).")
     model_dir, variant = _resolve_model_dir(p)
-    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=True)), _resolve_dit(p))
+    pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=True)), _resolve_dit(p),
+                          _resolve_dit(p, "krea2_te", "Text encoder"))
     # trasforma la pipeline t2i caricata in quella di edit (stessi componenti, aggiunge edit())
     from workers.krea2_edit_pipeline import Krea2EditPipeline
     from diffusers.pipelines.krea2.pipeline_krea2 import Krea2Pipeline as _Base
@@ -421,7 +434,7 @@ def run_generation(p: dict) -> str:
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     model_dir, variant = _resolve_model_dir(p)
     pipe = _load_pipeline(model_dir, variant, tuple(_resolve_lora_paths(p, edit=False)),  # t2i ora applica le LoRA
-                          _resolve_dit(p))
+                          _resolve_dit(p), _resolve_dit(p, "krea2_te", "Text encoder"))
     # ATTENZIONE T2I DETERMINISTICA: forza 'native' (SDPA). Il t2i NON ha attn_mask di padding, quindi
     # flash_varlen/flash/sage danno griglie/strisce colorate (macchie seed-dipendenti). Sul server
     # PERSISTENTE il pipe è condiviso: un run_edit precedente lo lascia in flash_varlen → il t2i successivo

@@ -82,6 +82,24 @@ def build_transformer(dit_path: str, config_dir: str, device: str = "cuda"):
     return tr.to(device).eval()
 
 
+def build_text_encoder(te_path: str, config_dir: str, device: str = "cpu"):
+    """Qwen3VLModel (text encoder di Krea 2) da file nativo «krea2_te»: Linear fp8 compressi (RowFp8Linear), resto
+    bf16. Caricato su `device` (CPU di default): lo sposta la pipeline col suo placement (GPU o cpu_offload)."""
+    import torch
+    from accelerate import init_empty_weights
+    from transformers import AutoConfig, Qwen3VLModel
+    import _qlinear as Q
+    with init_empty_weights():
+        te = Qwen3VLModel._from_config(AutoConfig.from_pretrained(config_dir), torch_dtype=torch.bfloat16)
+    sd = Q.quantize_from_state_dict(te, Q.read_safetensors(te_path, device))
+    miss, unex = Q.load_into(te, sd, device=device, dtype=torch.bfloat16)
+    del sd
+    if miss or unex:
+        raise RuntimeError(f"text encoder Krea 2 {os.path.basename(te_path)}: chiavi mancanti {miss[:6]} "
+                           f"/ inattese {unex[:6]}")
+    return te.eval()
+
+
 def apply_loras(tr, loras: list[tuple[str, float]], log=print) -> int:
     """LoRA (nomi ComfyUI o diffusers) agganciate ai Linear del transformer, quantizzati o no."""
     from safetensors.torch import load_file

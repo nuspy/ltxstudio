@@ -134,7 +134,7 @@ def _quant_common(key: str, info: dict, header: dict):
         elif key == mod + ".weight" and wi.get("dtype") == "I8":
             # Linear int8 ruotato: resta int8, il worker ruota l'ingresso (marcatore .convrot_group)
             return [(key, lambda t: t), (mod + ".convrot_group", lambda t, _g=g: torch.tensor(_g, dtype=torch.int32))]
-    if key.endswith(".weight_scale") and info["shape"] == [] and info["dtype"] == "F32":
+    if key.endswith(".weight_scale") and info["shape"] in ([], [1]) and info["dtype"] == "F32":
         w = header.get(key[: -len("_scale")])            # <m>.weight
         if w and w["dtype"] in ("F8_E4M3", "F8_E5M2"):
             out = w["shape"][0]
@@ -240,6 +240,34 @@ def _krea2_dit():
     return _renamer(K.dit_key, extra=extra)
 
 
+def _krea2_te():
+    """TE Krea 2 (Qwen3VLModel 4B) fp8 «scaled» ComfyUI → nomi transformers del text_encoder dello snapshot: i Linear
+    restano fp8 (scala per-tensore espansa per riga, _qlinear.RowFp8Linear), l'embedding torna bf16 (×scala)."""
+    torch = _torch()
+    emb = "model.language_model.embed_tokens"
+
+    def rename(k):
+        return k[len("model."):] if k.startswith("model.") else k
+
+    def extra(key, info, header):
+        if key == emb + ".weight_scale":
+            return []
+        if key == emb + ".weight" and info["dtype"].startswith("F8"):
+            get = header["__ctx__"]["get"]
+
+            def fn(t):
+                if t.device.type == "meta":
+                    return torch.empty(t.shape, dtype=torch.bfloat16, device="meta")
+                sc = get(emb + ".weight_scale").float().reshape(())
+                out = torch.empty(t.shape, dtype=torch.bfloat16)
+                for a in range(0, t.shape[0], 16384):           # a blocchi: RAM limitata
+                    out[a:a + 16384] = (t[a:a + 16384].float() * sc).to(torch.bfloat16)
+                return out
+            return [(rename(key), fn)]
+        return None
+    return _renamer(rename, extra=extra)
+
+
 def _qwen21_te():
     def rename(k):
         if k == "lm_head.weight":                         # 1,2 GB mai usati (la pipeline legge gli hidden state)
@@ -258,7 +286,8 @@ CONVERTERS = {
     "mmh3_te": _mmh3_te,              # MiniMax H3 TE Qwen3-VL-32B (nvfp4-AWQ / fp8) → Qwen3VLForConditionalGeneration
     "mmh3_vae": _mmh3_vae,            # MiniMax H3 VAE video fp16 → AutoencoderKLMiniMaxH3
     "mmh3_lora": _mmh3_lora,          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
-    "krea2_dit": _krea2_dit,          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
+    "krea2_dit": _krea2_dit,
+    "krea2_te": _krea2_te,            # TE Krea 2 Qwen3-VL-4B fp8 «scaled» ComfyUI (es. uncensored) → Qwen3VLModel          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
     "qwen21_dit": lambda: _renamer(lambda k: k),   # Qwen-Image 2.1 nvfp4 «Prism»: nomi già diffusers
     "qwen21_te": _qwen21_te,          # Qwen-Image 2.1 TE Qwen3-VL-8B (nvfp4 ComfyUI) → transformers
     "qwen21_cn": lambda: _renamer(lambda k: k),    # Qwen-Image 2.1 ControlNet Union Fun (INT8 ConvRot): nomi già diffusers

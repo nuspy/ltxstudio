@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (حتى 10 شخصيات)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "نموذج Qwen-Image 2.1 للإطارات المفتاحية وصور طاقم الممثلين.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (‏+18، int8، 8 خطوات)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (‏+18، int8، 8 خطوات)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "مُرمِّز النص",
+  "f1.gen.krea2.te.official": "الرسمي (مضمّن في النموذج)",
+  "f1.gen.krea2.te.uncensored": "بلا رقابة v1.1 (‏+18، fp8، 4.9 GB)",
+  "f1.gen.krea2.te.tt": "المُرمِّز الذي يقرأ الموجّه. «بلا رقابة» يصف المحتوى الصريح دون تلطيفه؛ يعمل مع Turbo وRaw وKrea Noct."
 }

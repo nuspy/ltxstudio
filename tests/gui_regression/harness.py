@@ -124,6 +124,9 @@ def build_window():
     MainWindow._maybe_autostart_native = lambda self: None    # no spawn server per-test (era lento/blocco)
     MainWindow._maybe_autostart_comfyui = lambda self: None
     MainWindow._start_native_migration = lambda self: None    # niente conversioni di pesi nei test (thread)
+    # niente ripristino dello stato GUI salvato dall'utente: è un QTimer.singleShot(0) che nei test scatta al primo
+    # processEvents DENTRO il caso (es. durante la generazione) e rimette arch/NSFW della sessione dell'utente
+    MainWindow._restore_gui_state = lambda self: None
     # neutralizza i check che fanno RETE (download encoder/pesi) → i test verificano l'ISTRUZIONE, non i download
     MainWindow._ensure_flux2_encoder = lambda self, unet=None: True
     if hasattr(MainWindow, "_feature_gate"):

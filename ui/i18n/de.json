@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (bis zu 10 Figuren)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "Qwen-Image-2.1-Modell für Keyframes und Darstellerporträts.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 Schritte)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (18+, int8, 8 Schritte)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "Text-Encoder",
+  "f1.gen.krea2.te.official": "Offiziell (im Modell enthalten)",
+  "f1.gen.krea2.te.uncensored": "Unzensiert v1.1 (18+, fp8, 4,9 GB)",
+  "f1.gen.krea2.te.tt": "Encoder, der den Prompt liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit Turbo, Raw und Krea Noct."
 }

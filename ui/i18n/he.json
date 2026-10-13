@@ -3100,5 +3100,10 @@
   "fs.sb.coh_qwen21": "Qwen-Image 2.1 (עד 10 דמויות)",
   "fs.sb.qwen21_dit": "Qwen:",
   "fs.sb.qwen21_dit.tt": "מודל Qwen-Image 2.1 לפריימי מפתח ולדיוקנאות הליהוק.",
-  "f1.gen.krea2.noct": "Krea Noct V4 (‏+18, int8, 8 צעדים)"
+  "f1.gen.krea2.noct": "Krea Noct V4 (‏+18, int8, 8 צעדים)",
+  "f1.gen.krea2.group": "Krea 2",
+  "f1.gen.krea2.te": "מקודד טקסט",
+  "f1.gen.krea2.te.official": "רשמי (כלול במודל)",
+  "f1.gen.krea2.te.uncensored": "ללא צנזורה v1.1 (‏+18, fp8, 4.9 GB)",
+  "f1.gen.krea2.te.tt": "המקודד שקורא את ההנחיה. «ללא צנזורה» מתאר תוכן מפורש בלי לרכך אותו; עובד עם Turbo, Raw ו-Krea Noct."
 }
