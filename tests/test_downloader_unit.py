@@ -174,3 +174,39 @@ def test_sorgente_comfy_troncato_non_si_converte(tmp_path):
     entry = {"id": "x", "kind": "file", "convert": "mmh3_dit", "filename": "x-native.safetensors",
              "remote_filename": "cut.safetensors"}
     assert nc.ensure_entry(entry, tmp_path, log=lambda *_: None) is None
+
+
+def test_chunk_con_offset_guasto_sul_cdn(tmp_path, monkeypatch):
+    """CDN che non risponde a UNA richiesta Range che inizia a un offset preciso (visto su HF xet-bridge):
+    il chunk ritenta partendo qualche KB prima, scarta i byte in più e il risultato è identico."""
+    from core import fast_downloader as fd
+    payload = bytes(range(256)) * 400                    # 102400 byte
+    bad = 40000
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            a, b = self.headers["Range"].removeprefix("bytes=").split("-")
+            a, b = int(a), int(b)
+            if a == bad:
+                self.close_connection = True             # niente risposta: come il timeout del CDN
+                return
+            body = payload[a:b + 1]
+            self.send_response(206)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setitem(fd.CFG, "retry_delay", 0)
+    monkeypatch.setitem(fd.CFG, "timeout", 5)
+    url = f"http://127.0.0.1:{srv.server_address[1]}/f"
+    dest = str(tmp_path / "f.bin")
+    try:
+        assert fd._dl_chunk(fd._session(), url, dest, 0, bad, len(payload) - 1, None, None)
+        assert (tmp_path / "f.bin.part0").read_bytes() == payload[bad:]
+    finally:
+        srv.shutdown()

@@ -69,13 +69,20 @@ def _dl_chunk(sess, url, dest, cid, start, end, token, prog) -> bool:
         if resume > want:
             os.remove(part); resume = 0
     for attempt in range(CFG["max_retries"]):
+        # Dal 2° tentativo la richiesta parte qualche KB PRIMA e i byte in più si scartano: il CDN di HF
+        # (xet-bridge) può avere in cache una risposta guasta per UNA richiesta che inizia a un offset
+        # preciso (PinkCherry H3, 13/10: timeout fisso a inizio part3, mentre +1 byte o -1MB rispondono).
+        skew = min(start + resume, 4096 * attempt)
         try:
-            hdr = {**_auth(url, token), "Range": f"bytes={start + resume}-{end}"}
+            hdr = {**_auth(url, token), "Range": f"bytes={start + resume - skew}-{end}"}
             r = sess.get(url, headers=hdr, timeout=CFG["timeout"], stream=True, allow_redirects=True)
-            if r.status_code not in (206, 200):
-                raise RuntimeError(f"HTTP {r.status_code}")
+            if r.status_code != 206:
+                raise RuntimeError(f"HTTP {r.status_code}")      # 200 = file intero: non è il chunk
             with open(part, "ab" if resume else "wb") as fh:
                 for data in r.iter_content(CFG["chunk_size"]):
+                    if data and skew:
+                        cut = min(skew, len(data))
+                        data, skew = data[cut:], skew - cut
                     if data:
                         fh.write(data)
                         if prog:
