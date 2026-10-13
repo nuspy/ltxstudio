@@ -722,11 +722,16 @@ class _NativeLtx2Worker(QThread):
                 return None, False, ""
 
 
-class _ModelAuditWorker(QThread):
+class _ModelAuditWorker(QObject):
     """F2 unified-model-manager: audit del registro dimensioni modelli in background all'avvio.
     Solo header safetensors + JSON (model_detect.scan + calibrate_all livello-1): nessun torch,
-    nessuna GPU — sicuro nel processo GUI."""
+    nessuna GPU — sicuro nel processo GUI. Thread Python DAEMON (non QThread): chiudere l'app mentre
+    l'audit gira non deve abortire il processo («QThread destroyed while running»)."""
     done = Signal(dict)
+
+    def start(self):
+        import threading
+        threading.Thread(target=self.run, name="model-audit", daemon=True).start()
 
     def run(self):
         try:
