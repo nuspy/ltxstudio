@@ -16,7 +16,14 @@ KEYWORDS = ("nsfw", "eros", "xxx", "adult", "porn", "porno", "hentai", "nude", "
 def looks_nsfw(*parts: object) -> bool:
     """Euristica keyword sull'unione dei testi (nome file, path, tag…)."""
     text = " ".join(str(p or "") for p in parts).lower()
-    return any(k in text for k in KEYWORDS)
+    if any(k in text for k in KEYWORDS):
+        return True
+    # finetune 18+ senza keyword nel nome (PinkCherry, Stubelius…): vale la sensitivity del registro pesi
+    try:
+        from core import weights_catalog as _wc
+        return any(_wc.is_adult_file(p) for p in parts if isinstance(p, str) and p)
+    except Exception:                                    # noqa: BLE001
+        return False
 
 
 def is_nsfw(name: str, *, catalog_flag: bool | None = None, extra: object = "") -> bool:

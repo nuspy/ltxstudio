@@ -587,6 +587,23 @@ def case_h3_custom_dit(w, spy):
 CASES.append(("video_h3_custom_dit", "DiT MiniMax H3 personalizzati (18+): visibili solo in NSFW, arrivano come h3_dit.",
               case_h3_custom_dit))
 
+
+def case_sfw_hides_registry_adult(w, spy):
+    """SFW: nessun checkpoint marcato 18+ nel registro pesi nel dropdown, anche senza keyword nel nome
+    (PinkCherry, Stubelius)."""
+    from core import weights_catalog as wc
+    t = w.video_tab
+    t.nsfw.setCurrentText("NSFW")
+    t.nsfw.setCurrentText("SFW")
+    models = [(t.model.itemData(i) or {}).get("model") or "" for i in range(t.model.count())]
+    bad = [m for m in models if m and wc.is_adult_file(m)]
+    assert not bad, f"modelli 18+ del registro visibili in SFW: {bad}"
+
+
+CASES.append(("video_sfw_hides_registry_adult",
+              "SFW: i checkpoint 18+ del registro pesi restano nascosti anche senza keyword nel nome.",
+              case_sfw_hides_registry_adult))
+
 # Un caso per OGNI modello concreto del dropdown (scopre 'funziona solo un modello' / kind rotti).
 for _kind, _model, _nsfw in _enumerate_model_specs():
     CASES.append((

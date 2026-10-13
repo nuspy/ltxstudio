@@ -4572,6 +4572,38 @@
         "te",
         "uncensored"
       ]
+    },
+    {
+      "id": "ltx25-stubelius-remix-v1",
+      "module": "Video",
+      "label": "Stubelius Remix v1 LTX-2.5 (18+, INT8, distilled, 21.5GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 21.5,
+      "scan_names": [
+        "ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "Stuubs/Stubelius_Remix_Ltx2.5",
+      "url": "https://huggingface.co/Stuubs/Stubelius_Remix_Ltx2.5",
+      "filename": "ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors",
+      "remote_filename": "ltx2.5-Stubelius_remix_v1_int8_convrot.safetensors",
+      "deps": [
+        "ltx25-te-gemma4-gguf|ltx25-te-bf16",
+        "ltx25-video-vae-conv",
+        "ltx25-audio-vae"
+      ],
+      "sensitivity": "adult",
+      "note": "10Eros v1.5 + distilled-LoRA 450 + OmniNFT RL fusi: 8 passi, CFG 1. Licenza LTX-2.x Community",
+      "use": [
+        "ckpt_video",
+        "distilled",
+        "int8_comfy",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

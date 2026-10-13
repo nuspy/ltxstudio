@@ -140,3 +140,12 @@ def test_model_paths_resolver():
     assert p is not None and p.name == "ltx-2.3-22b-dev-fp8.safetensors"
     assert model_paths.path_of("id-inesistente") is None
     assert model_paths.models_root()                     # mai vuoto
+
+
+def test_filtro_18_senza_keyword_nel_nome():
+    """I finetune 18+ senza keyword nel nome (PinkCherry, Stubelius) restano fuori dalla modalità SFW:
+    vale la sensitivity del registro pesi, sia per nome locale sia per percorso completo."""
+    from core import nsfw_policy
+    assert wc.is_adult_file("PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors")
+    assert nsfw_policy.looks_nsfw(r"E:\AI\Models\diffusion_models\LTX\ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors")
+    assert not nsfw_policy.looks_nsfw("ltx-2.3-22b-dev-fp8.safetensors")

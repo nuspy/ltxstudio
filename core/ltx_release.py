@@ -181,7 +181,7 @@ _R25 = LtxRelease(
         # GGUF 2.5: ESISTONO dal 12/08 (community: Abiray 28K dl Q3-Q8, realrebelai Q2-Q8) — a
         # catalogo le voci ltx25-gguf-*; 1a generazione GGUF 2.5 col worker nativo da validare live.
         "gguf": CAP_YES,
-        "nsfw_ckpt": CAP_NO,                  # 10Eros/Sulphur sono 2.3-only (TE heretic 2.5 esistono, ckpt no)
+        "nsfw_ckpt": CAP_YES,                 # Stubelius Remix v1 (13/10: 10Eros 1.5 + distill fusi, int8 ConvRot)
         "multishot": CAP_YES, "duration_head": CAP_YES,
         "temporal_upscale": CAP_YES, "diffusion_decoder": CAP_YES, "hdr_master": CAP_YES,
         # Riferimenti multipli (MSR): LoRA community LiconStudio, una per release. La V1 per 2.5 è

@@ -685,6 +685,15 @@ NEW = [
       filename="PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors", type="diffusion_models", family="LTX",
       gb=27.62, sens="adult", deps=["ltx23-gemma-te", "ltx23-distilled-lora-384", "ltx23-spatial-upscaler"],
       note="finetune NSFW con VAE inclusi; l'autore consiglia la distilled-LoRA 384 ufficiale. Derivato LTX-2"),
+    # LTX-2.5: solo transformer, int8 per-riga + ConvRot ComfyUI (fold nativo in ltx_core fp8_cast). Distill
+    # già fuso → nome locale con «distilled»: il worker NON aggiunge la distilled-LoRA.
+    N("ltx25-stubelius-remix-v1", "Video", "Stubelius Remix v1 LTX-2.5 (18+, INT8, distilled, 21.5GB)",
+      category="video", arch="ltx25", repo="Stuubs/Stubelius_Remix_Ltx2.5",
+      remote="ltx2.5-Stubelius_remix_v1_int8_convrot.safetensors",
+      filename="ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors", type="diffusion_models",
+      family="LTX", gb=21.5, sens="adult",
+      deps=["ltx25-te-gemma4-gguf|ltx25-te-bf16", "ltx25-video-vae-conv", "ltx25-audio-vae"],
+      note="10Eros v1.5 + distilled-LoRA 450 + OmniNFT RL fusi: 8 passi, CFG 1. Licenza LTX-2.x Community"),
     # MiniMax H3: DiT «hybrid» (fl2va+ref2va fusi, stesso layout pruned int8 ConvRot) e LoRA kohya.
     # ⚠ licenza H3 Community: territori esclusi UE/UK/USA/Corea, anche per i derivati.
     N("mmh3-dit-pinkcherry18", "Video", "PinkCherry H3 v1.8 hybrid (18+, INT8, 21.1GB)", category="video",

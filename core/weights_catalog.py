@@ -24,6 +24,35 @@ def load() -> list[dict]:
         return []
 
 
+_ADULT_CACHE: tuple[float, frozenset] = (-1.0, frozenset())
+
+
+def adult_names() -> frozenset:
+    """Nomi file (minuscoli: locale, remoto, scan_names) delle voci con sensitivity «adult».
+    Serve ai filtri SFW/NSFW per nome file: molti finetune 18+ non hanno keyword nel nome
+    (PinkCherry, Stubelius…). Cache invalidata dal mtime del catalogo."""
+    global _ADULT_CACHE
+    try:
+        mt = CATALOG.stat().st_mtime
+    except OSError:
+        return frozenset()
+    if mt != _ADULT_CACHE[0]:
+        out = set()
+        for e in load():
+            if e.get("sensitivity") != "adult":
+                continue
+            for n in (e.get("filename"), e.get("remote_filename"), *(e.get("scan_names") or ())):
+                if n:
+                    out.add(Path(str(n).replace("\\", "/")).name.lower())
+        _ADULT_CACHE = (mt, frozenset(out))
+    return _ADULT_CACHE[1]
+
+
+def is_adult_file(name: str) -> bool:
+    """True se il file (path o nome) è una voce 18+ del registro pesi."""
+    return Path(str(name or "").replace("\\", "/")).name.lower() in adult_names()
+
+
 # ── cartella base configurabile ──────────────────────────────────────────────
 def get_base_dir() -> str:
     try:
