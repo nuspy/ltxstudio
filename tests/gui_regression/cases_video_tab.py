@@ -600,6 +600,34 @@ def case_sfw_hides_registry_adult(w, spy):
     assert not bad, f"modelli 18+ del registro visibili in SFW: {bad}"
 
 
+def case_ltx25_te_uncensored(w, spy):
+    """Text encoder LTX-2.5 alternativo: riga visibile solo con un transformer 2.5 in NSFW; la scelta arriva al worker
+    come ltx_te (con ltx_release 2.5); con un modello 2.3 o in SFW la riga sparisce e torna l'ufficiale."""
+    t = w.video_tab
+    t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+    t.nsfw.setCurrentText("NSFW")
+    m25 = "LTX\\ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors"
+    t.model.addItem("Stubelius 2.5 (test)", {"kind": "diffusion", "model": m25, "key": "test:25"})
+    t.model.setCurrentIndex(t.model.count() - 1)
+    assert not t.ltx_te.isHidden(), "riga encoder LTX-2.5 assente con un transformer 2.5 in NSFW"
+    t.ltx_te.setCurrentIndex(t.ltx_te.findData("ltx25-te-uncensored"))
+    assert t.get_values()["ltx_te"] == "ltx25-te-uncensored"
+    _set_prompt(w)
+    w.on_generate()
+    c = _last_native_call(spy)
+    assert c, "generazione non dispacciata"
+    p = c["params"]
+    assert p.get("ltx_release") == "2.5" and p.get("ltx_te") == "ltx25-te-uncensored", p
+    t.nsfw.setCurrentText("SFW")
+    assert t.ltx_te.isHidden() and t.get_values()["ltx_te"] == "", "encoder 18+ ancora attivo in SFW"
+    t.nsfw.setCurrentText("NSFW")
+    _select_model(t.model, "diffusion", "LTX\\ltx-2.3-22b-dev-fp8.safetensors")
+    assert t.ltx_te.isHidden(), "riga encoder 2.5 visibile con un modello 2.3"
+
+
+CASES.append(("video_ltx25_te_uncensored",
+              "LTX 2.5: encoder Gemma 4 uncensored solo con transformer 2.5 in NSFW, arriva al worker come ltx_te.",
+              case_ltx25_te_uncensored))
 CASES.append(("video_sfw_hides_registry_adult",
               "SFW: i checkpoint 18+ del registro pesi restano nascosti anche senza keyword nel nome.",
               case_sfw_hides_registry_adult))

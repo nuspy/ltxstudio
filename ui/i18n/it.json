@@ -3146,5 +3146,9 @@
   "f1.gen.krea2.te": "Text encoder",
   "f1.gen.krea2.te.official": "Ufficiale (incluso nel modello)",
   "f1.gen.krea2.te.uncensored": "Uncensored v1.1 (18+, fp8, 4.9 GB)",
-  "f1.gen.krea2.te.tt": "Encoder che legge il prompt. «Uncensored» descrive i contenuti espliciti senza ammorbidirli; vale con Turbo, Raw e Krea Noct."
+  "f1.gen.krea2.te.tt": "Encoder che legge il prompt. «Uncensored» descrive i contenuti espliciti senza ammorbidirli; vale con Turbo, Raw e Krea Noct.",
+  "vid.ltx_te.lbl": "Text encoder",
+  "vid.ltx_te.official": "Ufficiale (Gemma 4)",
+  "vid.ltx_te.uncensored": "Gemma 4 Uncensored v1.1 (18+)",
+  "vid.ltx_te.tt": "Encoder che legge il prompt per LTX 2.5. «Uncensored» descrive i contenuti espliciti senza ammorbidirli; vale con ogni transformer 2.5."
 }

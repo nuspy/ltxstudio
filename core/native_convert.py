@@ -268,6 +268,72 @@ def _krea2_te():
     return _renamer(rename, extra=extra)
 
 
+def _ltx25_te_assets() -> tuple[dict, dict]:
+    """(metadata, {nome: tensore uint8}) che ltx-core esige in un TE Gemma 4 da file singolo: `gemma_config` e i
+    tensori `hf_asset__*`. Dal TE ufficiale bf16 se è su disco, altrimenti solo quei pochi MB via Range."""
+    torch = _torch()
+    try:
+        from core.model_paths import p as _mp
+        off = _mp("ltx25-te-bf16", "")
+    except Exception:                                        # noqa: BLE001
+        off = ""
+    if off and os.path.isfile(off) and is_complete(off):
+        h, base = read_header(off)
+        md = dict(h.get("__metadata__") or {})
+        out = {}
+        with open(off, "rb") as f:
+            for k, info in h.items():
+                if k.startswith("hf_asset__"):
+                    a, b = info["data_offsets"]
+                    f.seek(base + a)
+                    out[k] = torch.frombuffer(bytearray(f.read(b - a)), dtype=torch.uint8).clone()
+        return md, out
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    import ltx25_te_fix_assets as A
+    md, out = A.fetch_assets(A.SOURCE_URL)
+    return dict(md), {k: v for k, v in out.items() if k.startswith("hf_asset__")}
+
+
+def _ltx25_te():
+    """TE LTX-2.5 (Gemma 4 + proiezioni) int8 per-tensore ComfyUI (es. uncensored v1.1) → bf16 col layout del TE
+    ufficiale, l'unico che il loader Gemma di ltx-core sa leggere (niente quantizzazione lato transformers).
+    Stesse chiavi dell'ufficiale; si innestano `gemma_config` e i tensori `hf_asset__*` che il file non ha."""
+    torch = _torch()
+
+    def extra(key, info, header):
+        if key.endswith(".weight_scale"):
+            w = header.get(key[: -len("_scale")])
+            return [] if w and w["dtype"] == "I8" else None
+        if key.endswith(".weight") and info["dtype"] == "I8":
+            get = header["__ctx__"]["get"]
+
+            def fn(t, _k=key):
+                if t.device.type == "meta":
+                    return torch.empty(t.shape, dtype=torch.bfloat16, device="meta")
+                sc = get(_k + "_scale").float()
+                sc = sc.reshape(()) if sc.numel() == 1 else sc.reshape(-1, *([1] * (t.dim() - 1)))
+                out = torch.empty(t.shape, dtype=torch.bfloat16)
+                for a in range(0, t.shape[0], 8192):           # a blocchi: RAM limitata
+                    s_ = sc if sc.dim() == 0 else sc[a:a + 8192]
+                    out[a:a + 8192] = (t[a:a + 8192].float() * s_).to(torch.bfloat16)
+                return out
+            return [(key, fn)]
+        return None
+    plan = _renamer(lambda k: k, extra=extra)
+    plan.extras = _ltx25_te_assets                          # vedi convert(): tensori + metadata in coda
+    return plan
+
+
+def _ltx25_dit():
+    """Transformer LTX-2.5 single-file int8_tensorwise SENZA prefisso (es. ChrisColeTech uncensored v1.1) → nomi
+    `model.diffusion_model.*` che il loader di ltx-core si aspetta. Gli int8 restano tali (scala per-tensore): il
+    fold a bf16→fp8 lo fa ltx-core al caricamento (fp8_cast). Il metadata (config del modello) si conserva."""
+    pre = "model.diffusion_model."
+    plan = _renamer(lambda k: k if k.startswith(pre) else pre + k)
+    plan.keep_meta = True
+    return plan
+
+
 def _qwen21_te():
     def rename(k):
         if k == "lm_head.weight":                         # 1,2 GB mai usati (la pipeline legge gli hidden state)
@@ -287,7 +353,9 @@ CONVERTERS = {
     "mmh3_vae": _mmh3_vae,            # MiniMax H3 VAE video fp16 → AutoencoderKLMiniMaxH3
     "mmh3_lora": _mmh3_lora,          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
     "krea2_dit": _krea2_dit,
-    "krea2_te": _krea2_te,            # TE Krea 2 Qwen3-VL-4B fp8 «scaled» ComfyUI (es. uncensored) → Qwen3VLModel          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
+    "krea2_te": _krea2_te,
+    "ltx25_te": _ltx25_te,
+    "ltx25_dit": _ltx25_dit,          # transformer LTX-2.5 int8 senza prefisso → model.diffusion_model.* (+ config)            # TE LTX-2.5 Gemma 4 int8 per-tensore ComfyUI (es. uncensored) → bf16 ufficiale            # TE Krea 2 Qwen3-VL-4B fp8 «scaled» ComfyUI (es. uncensored) → Qwen3VLModel          # Krea 2 single-file ComfyUI (int8 ConvRot / fp8 / bf16) → Krea2Transformer2DModel
     "qwen21_dit": lambda: _renamer(lambda k: k),   # Qwen-Image 2.1 nvfp4 «Prism»: nomi già diffusers
     "qwen21_te": _qwen21_te,          # Qwen-Image 2.1 TE Qwen3-VL-8B (nvfp4 ComfyUI) → transformers
     "qwen21_cn": lambda: _renamer(lambda k: k),    # Qwen-Image 2.1 ControlNet Union Fun (INT8 ConvRot): nomi già diffusers
@@ -368,7 +436,17 @@ def convert(converter: str, src: str | os.PathLike, dst: str | os.PathLike, *, d
             items.append((nk, fn))
         if items:
             plan.append((key, info, items))
-    out_header["__metadata__"] = {"ltx_native": FORMAT, "converter": converter, "source": src.name}
+    # converter con `extras`: tensori aggiuntivi (scritti in coda) e metadata da innestare (es. TE LTX-2.5)
+    extra_md, extra_t = plan_fn.extras() if hasattr(plan_fn, "extras") else ({}, {})
+    added = [(nk, t) for nk, t in extra_t.items() if nk not in out_header]   # se il sorgente ce l'ha, vince lui
+    for nk, t in added:
+        size = t.numel() * t.element_size()
+        out_header[nk] = {"dtype": rev[t.dtype], "shape": list(t.shape), "data_offsets": [off, off + size]}
+        off += size
+    if getattr(plan_fn, "keep_meta", False):               # es. transformer LTX: la config del modello sta qui
+        extra_md = {**{k: v for k, v in meta.items() if k != "_quantization_metadata"}, **extra_md}
+    out_header["__metadata__"] = {**{str(k): str(v) for k, v in extra_md.items()},
+                                  "ltx_native": FORMAT, "converter": converter, "source": src.name}
     hb = json.dumps(out_header, separators=(",", ":")).encode()
     hb += b" " * ((8 - len(hb) % 8) % 8)
     part = dst.with_name(dst.name + ".part")
@@ -391,6 +469,8 @@ def convert(converter: str, src: str | os.PathLike, dst: str | os.PathLike, *, d
                     raise ValueError(f"{nk}: {len(data)} byte, attesi {exp[1] - exp[0]}")
                 fo.write(data)
             del buf, t
+        for _nk, t in added:                                  # stesso ordine degli offset assegnati sopra
+            fo.write(_to_bytes(t))
     try:
         _verify(src, part, plan, out_header)
     finally:

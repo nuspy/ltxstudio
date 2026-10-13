@@ -3105,5 +3105,9 @@
   "f1.gen.krea2.te": "텍스트 인코더",
   "f1.gen.krea2.te.official": "공식 (모델에 포함)",
   "f1.gen.krea2.te.uncensored": "무검열 v1.1 (18+, fp8, 4.9 GB)",
-  "f1.gen.krea2.te.tt": "프롬프트를 읽는 인코더입니다. ‘무검열’은 노골적인 내용을 순화하지 않고 묘사하며 Turbo, Raw, Krea Noct와 함께 작동합니다."
+  "f1.gen.krea2.te.tt": "프롬프트를 읽는 인코더입니다. ‘무검열’은 노골적인 내용을 순화하지 않고 묘사하며 Turbo, Raw, Krea Noct와 함께 작동합니다.",
+  "vid.ltx_te.lbl": "텍스트 인코더",
+  "vid.ltx_te.official": "공식 (Gemma 4)",
+  "vid.ltx_te.uncensored": "Gemma 4 무검열 v1.1 (18+)",
+  "vid.ltx_te.tt": "LTX 2.5용 프롬프트를 읽는 인코더입니다. ‘무검열’은 노골적인 내용을 순화하지 않고 묘사하며 모든 2.5 트랜스포머와 함께 작동합니다."
 }

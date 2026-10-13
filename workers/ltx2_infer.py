@@ -972,6 +972,26 @@ def _apply_release(rel_id: str | None) -> None:
           f"IC-LoRA={len(IC_LORA)} · sigma_driven={SIGMA_DRIVEN}", flush=True)
 
 
+def _apply_te_override(p: dict) -> None:
+    """Text encoder alternativo scelto dall'utente (`ltx_te`: id di catalogo della STESSA release, es. il Gemma 4
+    uncensored per la 2.5) al posto dell'ufficiale rilegato da _apply_release. Da chiamare SUBITO DOPO di essa.
+    Id sconosciuto, di un'altra release o file assente → errore chiaro, mai ripiego silenzioso sull'ufficiale."""
+    global GEMMA
+    tid = str(p.get("ltx_te") or "").strip()
+    if not tid:
+        return
+    from core import weights_catalog as wc
+    e = {x["id"]: x for x in wc.load()}.get(tid)
+    want = "ltx25" if LTX_RELEASE == "2.5" else "ltx23"
+    if not e or e.get("arch") != want or not e.get("filename"):
+        raise RuntimeError(f"Text encoder «{tid}» non valido per LTX {LTX_RELEASE}.")
+    path = os.path.join(str(wc.dest_for(e)), e["filename"])
+    if not os.path.isfile(path):
+        raise RuntimeError(f"Text encoder «{tid}» non trovato su disco: scaricalo dal tab «Pesi modelli».")
+    GEMMA = path
+    print(f"[release] text encoder scelto: {os.path.basename(path)}", flush=True)
+
+
 def _unpack_pipe(res):
     """(video, audio, num_frames_effettivi) da un ritorno di pipeline, 2.3 o 2.5.
 
@@ -1350,7 +1370,8 @@ def _prepare_pipe_cache(ckpt: str, qmode: str, loras: list, ptype: str,
     reuse_off: str | None = None
     stale = []
     for k in list(_PIPE_CACHE):
-        _same = (k[0] == ckpt and k[1] == q_eff and k[3] == lkey and k[4] == stages and k[5] == ptype)
+        _same = (k[0] == ckpt and k[1] == q_eff and k[3] == lkey and k[4] == stages and k[5] == ptype
+                 and k[6:7] == (GEMMA,))
         if _same and (not want_offload or k[2] == want_offload):
             reuse_off = k[2]
         else:
@@ -1393,7 +1414,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         print(f"[fp8] '{os.path.basename(ckpt)}' senza input_scale → fp8_cast (fold delle scale)", flush=True)
         qmode = "fp8_cast"
     lkey = tuple((lo.path, lo.strength) for lo in loras)
-    key = (ckpt, qmode, offload_str, lkey, stages, ptype)
+    key = (ckpt, qmode, offload_str, lkey, stages, ptype, GEMMA)   # GEMMA: il TE può cambiare a parità di ckpt
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     # M5-fix: fai spazio PRIMA di costruire (com'era, la vecchia pipe restava in cache DURANTE la
@@ -1863,6 +1884,7 @@ def run_t2a(p: dict) -> str:
     from ltx_pipelines.t2a_one_stage import T2AOneStagePipeline
     from ltx_pipelines.utils.media_io import encode_audio
     _apply_release(p.get("ltx_release"))
+    _apply_te_override(p)
     ckpt = _resolve_ckpt(p.get("model") or CHECKPOINT)
     # Il block-streaming (offload CPU) della T2AOneStagePipeline supporta SOLO bf16/fp8_cast
     # (fp8_scaled_mm non è ammesso) → default a fp8_cast, che entra nei 32GB col cast on-the-fly.
@@ -2093,6 +2115,7 @@ def run_generation(p: dict) -> str:
     un cancel arrivato tra un chunk e l'altro."""
     import time
     _apply_release(p.get("ltx_release"))                     # rilega i componenti alla release del job
+    _apply_te_override(p)                                    # TE alternativo scelto (es. Gemma 4 uncensored)
     _EMB_CTX["enabled"] = bool(p.get("emb_cache", True))     # preferenza dai params (vale anche col server)
     _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)

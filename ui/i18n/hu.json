@@ -3105,5 +3105,9 @@
   "f1.gen.krea2.te": "Szövegkódoló",
   "f1.gen.krea2.te.official": "Hivatalos (a modell része)",
   "f1.gen.krea2.te.uncensored": "Cenzúrázatlan v1.1 (18+, fp8, 4,9 GB)",
-  "f1.gen.krea2.te.tt": "A promptot olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; Turbo, Raw és Krea Noct modellel is működik."
+  "f1.gen.krea2.te.tt": "A promptot olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; Turbo, Raw és Krea Noct modellel is működik.",
+  "vid.ltx_te.lbl": "Szövegkódoló",
+  "vid.ltx_te.official": "Hivatalos (Gemma 4)",
+  "vid.ltx_te.uncensored": "Gemma 4 cenzúrázatlan v1.1 (18+)",
+  "vid.ltx_te.tt": "Az LTX 2.5 promptját olvasó kódoló. A „Cenzúrázatlan” tompítás nélkül írja le az explicit tartalmat; minden 2.5-ös transformerrel működik."
 }

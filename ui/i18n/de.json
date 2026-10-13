@@ -3105,5 +3105,9 @@
   "f1.gen.krea2.te": "Text-Encoder",
   "f1.gen.krea2.te.official": "Offiziell (im Modell enthalten)",
   "f1.gen.krea2.te.uncensored": "Unzensiert v1.1 (18+, fp8, 4,9 GB)",
-  "f1.gen.krea2.te.tt": "Encoder, der den Prompt liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit Turbo, Raw und Krea Noct."
+  "f1.gen.krea2.te.tt": "Encoder, der den Prompt liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit Turbo, Raw und Krea Noct.",
+  "vid.ltx_te.lbl": "Text-Encoder",
+  "vid.ltx_te.official": "Offiziell (Gemma 4)",
+  "vid.ltx_te.uncensored": "Gemma 4 Unzensiert v1.1 (18+)",
+  "vid.ltx_te.tt": "Encoder, der den Prompt für LTX 2.5 liest. „Unzensiert“ beschreibt explizite Inhalte, ohne sie abzuschwächen; funktioniert mit jedem 2.5-Transformer."
 }

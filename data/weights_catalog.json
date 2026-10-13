@@ -4694,6 +4694,65 @@
         "lora_style",
         "uncensored"
       ]
+    },
+    {
+      "id": "ltx25-te-uncensored",
+      "module": "Video",
+      "label": "LTX-2.5 Gemma-4 TE Uncensored v1.1 (18+, 13.2GB → bf16 24.5GB)",
+      "kind": "file",
+      "type": "text_encoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 13.16,
+      "scan_names": [
+        "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      "url": "https://huggingface.co/ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      "filename": "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors",
+      "remote_filename": "split/text_encoders/gemma4_12b_ltx25_uncensored-int8.safetensors",
+      "sensitivity": "adult",
+      "note": "Gemma 4 12B senza rifiuti con le proiezioni LTX: int8 → bf16 (il loader Gemma di ltx-core non legge pesi quantizzati), asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5",
+      "convert": "ltx25_te",
+      "use": [
+        "te",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "ltx25-uncensored-v11-int8",
+      "module": "Video",
+      "label": "LTX-2.5 Uncensored Turbo v1.1 (18+, INT8, distilled, 21.5GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 21.47,
+      "scan_names": [
+        "ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      "url": "https://huggingface.co/ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      "filename": "ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors",
+      "remote_filename": "split/diffusion_models/ltx25_uncensored_v1.1-int8.safetensors",
+      "deps": [
+        "ltx25-te-uncensored|ltx25-te-bf16",
+        "ltx25-video-vae-conv",
+        "ltx25-audio-vae"
+      ],
+      "sensitivity": "adult",
+      "note": "10Eros (0.7) + DMD distill + IC-LoRA + detailer + img2vid fusi: 4-8 passi, CFG 1. Prompt opzionale [VISUAL]/[SPEECH]/[SOUNDS]",
+      "convert": "ltx25_dit",
+      "use": [
+        "ckpt_video",
+        "distilled",
+        "int8_comfy",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

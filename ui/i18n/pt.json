@@ -3105,5 +3105,9 @@
   "f1.gen.krea2.te": "Codificador de texto",
   "f1.gen.krea2.te.official": "Oficial (incluído no modelo)",
   "f1.gen.krea2.te.uncensored": "Sem censura v1.1 (18+, fp8, 4,9 GB)",
-  "f1.gen.krea2.te.tt": "Codificador que lê o prompt. «Sem censura» descreve conteúdo explícito sem suavizá-lo; funciona com Turbo, Raw e Krea Noct."
+  "f1.gen.krea2.te.tt": "Codificador que lê o prompt. «Sem censura» descreve conteúdo explícito sem suavizá-lo; funciona com Turbo, Raw e Krea Noct.",
+  "vid.ltx_te.lbl": "Codificador de texto",
+  "vid.ltx_te.official": "Oficial (Gemma 4)",
+  "vid.ltx_te.uncensored": "Gemma 4 sem censura v1.1 (18+)",
+  "vid.ltx_te.tt": "Codificador que lê o prompt para o LTX 2.5. «Sem censura» descreve conteúdo explícito sem suavizá-lo; funciona com qualquer transformer 2.5."
 }

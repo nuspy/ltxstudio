@@ -3105,5 +3105,9 @@
   "f1.gen.krea2.te": "Encodeur de texte",
   "f1.gen.krea2.te.official": "Officiel (inclus dans le modèle)",
   "f1.gen.krea2.te.uncensored": "Non censuré v1.1 (18+, fp8, 4,9 Go)",
-  "f1.gen.krea2.te.tt": "Encodeur qui lit le prompt. « Non censuré » décrit les contenus explicites sans les adoucir ; fonctionne avec Turbo, Raw et Krea Noct."
+  "f1.gen.krea2.te.tt": "Encodeur qui lit le prompt. « Non censuré » décrit les contenus explicites sans les adoucir ; fonctionne avec Turbo, Raw et Krea Noct.",
+  "vid.ltx_te.lbl": "Encodeur de texte",
+  "vid.ltx_te.official": "Officiel (Gemma 4)",
+  "vid.ltx_te.uncensored": "Gemma 4 non censuré v1.1 (18+)",
+  "vid.ltx_te.tt": "Encodeur qui lit le prompt pour LTX 2.5. « Non censuré » décrit les contenus explicites sans les adoucir ; fonctionne avec tous les transformers 2.5."
 }

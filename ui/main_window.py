@@ -3306,6 +3306,8 @@ class MainWindow(QMainWindow):
             _det = _lrel.detect_release(params.get("gguf_transformer") or params.get("model") or "")
             if _det:
                 params["ltx_release"] = _det
+            if _det == "2.5" and vals.get("ltx_te"):          # TE alternativo scelto (es. Gemma 4 uncensored)
+                params["ltx_te"] = vals["ltx_te"]
         if (use_image or vals.get("use_image_force")) and self.frame1_tab.image_path:
             params["image_path"] = self.frame1_tab.image_path
             params["ref_strength"] = float(vals.get("ref_strength", 1.0))

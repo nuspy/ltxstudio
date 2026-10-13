@@ -201,6 +201,19 @@ class VideoTab(QWidget):
         self.model_star.clicked.connect(self._toggle_fav_model_current)
         mrow.addWidget(self.model_star)
         form.addRow(tr("vid.model_lbl"), self._wrap(mrow))
+        # Text encoder LTX-2.5: l'unica alternativa all'ufficiale è 18+ (Gemma 4 uncensored) → riga visibile solo con
+        # un transformer 2.5 scelto e voci 18+ ammesse; altrove (o tornando in SFW) resta l'ufficiale.
+        self.ltx_te = QComboBox()
+        self.ltx_te.addItem(tr("vid.ltx_te.official", "Ufficiale (Gemma 4)"), "")
+        self.ltx_te.addItem(tr("vid.ltx_te.uncensored", "Gemma 4 Uncensored v1.1 (18+)"), "ltx25-te-uncensored")
+        self.ltx_te.setToolTip(tr("vid.ltx_te.tt",
+            "Encoder che legge il prompt per LTX 2.5. «Uncensored» descrive i contenuti espliciti senza "
+            "ammorbidirli; vale con ogni transformer 2.5."))
+        self.ltx_te_lbl = QLabel(tr("vid.ltx_te.lbl", "Text encoder"))
+        form.addRow(self.ltx_te_lbl, self.ltx_te)
+        self.model.currentIndexChanged.connect(self._sync_ltx_te)
+        self.nsfw.currentTextChanged.connect(self._sync_ltx_te)
+        self._sync_ltx_te()
         self.res_preset = QComboBox(); self.res_preset.addItems(list(RES_PRESETS.keys()))
         self.res_preset.currentTextChanged.connect(self._on_preset)
         self.res_preset.setToolTip(tr("vid.res_preset.tt", "Aspect ratio e risoluzione del video. 'Personalizzato' abilita W/H manuali."))
@@ -644,6 +657,25 @@ class VideoTab(QWidget):
         root.addWidget(self.h3_box)
         self.length.valueChanged.connect(self._sync_h3_duration)
         self.nsfw.currentTextChanged.connect(self._sync_h3_te)
+
+    def _ltx_te_allowed(self) -> bool:
+        """Riga encoder LTX visibile: transformer LTX 2.5 scelto + NSFW + edizione che ammette il 18+."""
+        if self.nsfw.currentText() != "NSFW":
+            return False
+        d = self.model.currentData() if hasattr(self, "model") else None
+        m = (d or {}).get("model") if isinstance(d, dict) else ""
+        try:
+            from core import ltx_release, nsfw_policy
+            return ltx_release.detect_release(m or "") == "2.5" and nsfw_policy.adult_allowed()
+        except Exception:                                        # noqa: BLE001
+            return False
+
+    def _sync_ltx_te(self, *_):
+        on = self._ltx_te_allowed()
+        self.ltx_te.setVisible(on)
+        self.ltx_te_lbl.setVisible(on)
+        if not on:
+            self.ltx_te.setCurrentIndex(0)
 
     def _sync_h3_te(self, *_):
         """Il text encoder «heretic» (senza censura) compare solo in modalità NSFW."""
@@ -1301,6 +1333,8 @@ class VideoTab(QWidget):
             "prompt_positive": self.prompt.toPlainText().strip(),
             "prompt_negative": self.neg.toPlainText().strip(),
             "nsfw_mode": "nsfw" if self.nsfw.currentText() == "NSFW" else "sfw",
+            # TE LTX-2.5 alternativo (id di catalogo) solo se ammesso: altrimenti l'ufficiale della release
+            "ltx_te": (self.ltx_te.currentData() or "") if self._ltx_te_allowed() else "",
             "width": round32(self.width.value()),
             "height": round32(self.height.value()),
             "fps": self.fps.value(),

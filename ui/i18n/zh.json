@@ -3105,5 +3105,9 @@
   "f1.gen.krea2.te": "文本编码器",
   "f1.gen.krea2.te.official": "官方（随模型提供）",
   "f1.gen.krea2.te.uncensored": "无审查 v1.1（18+，fp8，4.9 GB）",
-  "f1.gen.krea2.te.tt": "读取提示词的编码器。“无审查”会如实描述露骨内容而不加淡化；适用于 Turbo、Raw 和 Krea Noct。"
+  "f1.gen.krea2.te.tt": "读取提示词的编码器。“无审查”会如实描述露骨内容而不加淡化；适用于 Turbo、Raw 和 Krea Noct。",
+  "vid.ltx_te.lbl": "文本编码器",
+  "vid.ltx_te.official": "官方（Gemma 4）",
+  "vid.ltx_te.uncensored": "Gemma 4 无审查 v1.1（18+）",
+  "vid.ltx_te.tt": "为 LTX 2.5 读取提示词的编码器。“无审查”会如实描述露骨内容而不加淡化；适用于所有 2.5 transformer。"
 }

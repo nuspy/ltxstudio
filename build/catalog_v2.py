@@ -687,6 +687,23 @@ NEW = [
       note="finetune NSFW con VAE inclusi; l'autore consiglia la distilled-LoRA 384 ufficiale. Derivato LTX-2"),
     # LTX-2.5: solo transformer, int8 per-riga + ConvRot ComfyUI (fold nativo in ltx_core fp8_cast). Distill
     # già fuso → nome locale con «distilled»: il worker NON aggiunge la distilled-LoRA.
+    N("ltx25-te-uncensored", "Video", "LTX-2.5 Gemma-4 TE Uncensored v1.1 (18+, 13.2GB → bf16 24.5GB)",
+      category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      remote="split/text_encoders/gemma4_12b_ltx25_uncensored-int8.safetensors",
+      filename="gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors", convert="ltx25_te",
+      type="text_encoders", gb=13.16, sens="adult",
+      note="Gemma 4 12B senza rifiuti con le proiezioni LTX: int8 → bf16 (il loader Gemma di ltx-core non legge "
+           "pesi quantizzati), asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5"),
+    # Stesso modello del GGUF Q8_0 del repo, ma in safetensors int8: passa dal fold nativo di ltx-core (fp8_cast) e
+    # porta i connector degli embedding nello stesso file (il percorso GGUF 2.5 non li sa leggere).
+    N("ltx25-uncensored-v11-int8", "Video", "LTX-2.5 Uncensored Turbo v1.1 (18+, INT8, distilled, 21.5GB)",
+      category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      remote="split/diffusion_models/ltx25_uncensored_v1.1-int8.safetensors",
+      filename="ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors", convert="ltx25_dit",
+      type="diffusion_models", family="LTX", gb=21.47, sens="adult",
+      deps=["ltx25-te-uncensored|ltx25-te-bf16", "ltx25-video-vae-conv", "ltx25-audio-vae"],
+      note="10Eros (0.7) + DMD distill + IC-LoRA + detailer + img2vid fusi: 4-8 passi, CFG 1. Prompt opzionale "
+           "[VISUAL]/[SPEECH]/[SOUNDS]"),
     N("ltx25-stubelius-remix-v1", "Video", "Stubelius Remix v1 LTX-2.5 (18+, INT8, distilled, 21.5GB)",
       category="video", arch="ltx25", repo="Stuubs/Stubelius_Remix_Ltx2.5",
       remote="ltx2.5-Stubelius_remix_v1_int8_convrot.safetensors",
