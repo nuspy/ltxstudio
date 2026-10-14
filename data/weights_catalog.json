@@ -5073,6 +5073,34 @@
       "use": [
         "distill_lora"
       ]
+    },
+    {
+      "id": "flux1-schnell-fp8",
+      "module": "Immagini",
+      "label": "FLUX.1 schnell fp8 (4 passi, veloce, 17.2GB)",
+      "kind": "file",
+      "type": "Checkpoints",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 17.24,
+      "scan_names": [
+        "flux1-schnell-fp8.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "Comfy-Org/flux1-schnell",
+      "url": "https://huggingface.co/Comfy-Org/flux1-schnell",
+      "filename": "flux1-schnell-fp8.safetensors",
+      "remote_filename": "flux1-schnell-fp8.safetensors",
+      "note": "Apache-2.0 (uso commerciale libero). Checkpoint completo: non servono TE/VAE a parte",
+      "used_by": [
+        "cap.image_gen"
+      ],
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "fp8"
+      ]
     }
   ],
   "schema": 2,

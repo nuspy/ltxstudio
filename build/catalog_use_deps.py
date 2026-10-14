@@ -82,6 +82,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "zimage-turbo": (["ckpt_image", "distilled"], []),
     "ernie-image": (["ckpt_image"], []),
     "krea2_turbo": (["ckpt_image", "distilled"], []),
+    "flux1-schnell-fp8": (["ckpt_image", "distilled", "fp8"], []),
     "krea2_raw": (["ckpt_image"], []),
     "mistral-flux2-te": (["te", "big_quality"], []),
     "mistral-te-fp8-single": (["te", "te_quant"], []),

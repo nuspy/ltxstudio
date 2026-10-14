@@ -673,6 +673,13 @@ NEW = [
       type="LoRA", family="Qwen21", gb=0.03, sens="adult", used_by=["cap.image_qwen21"],
       note="toglie la censura a qualunque DiT base (solo attenzione, rank 16). Licenza Qwen Research: uso NON commerciale"),
 
+    # FLUX.1 schnell fp8 (checkpoint completo: transformer + TE + VAE): 4 passi, guidance 0 — il FLUX più veloce.
+    # Il loader nativo lo carica con fp8 layerwise (image_flux, ramo checkpoint completo).
+    N("flux1-schnell-fp8", "Immagini", "FLUX.1 schnell fp8 (4 passi, veloce, 17.2GB)", category="image", arch="flux1",
+      repo="Comfy-Org/flux1-schnell", remote="flux1-schnell-fp8.safetensors", filename="flux1-schnell-fp8.safetensors",
+      type="Checkpoints", family="Flux", gb=17.24, used_by=["cap.gen_images"],
+      note="Apache-2.0 (uso commerciale libero). Checkpoint completo: non servono TE/VAE a parte"),
+
     # ───────── 18+ (13/10/2026, scelti dall'utente con domanda a scelta multipla) — header verificati via Range ─────────
     # LTX-2.3: monoliti fp8 ComfyUI (weight_scale scalare + comfy_quant, NIENTE input_scale → ltx2_infer usa
     # fp8_cast). Modelli DEV: la distilled-LoRA della release resta automatica.
