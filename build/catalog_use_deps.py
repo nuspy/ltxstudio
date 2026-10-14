@@ -45,6 +45,9 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx-iclora-hdr": (["iclora_edit"], []),
     "ltx-iclora-lipdub": (["iclora_edit"], []),
     "ltx-iclora-restyle": (["iclora_edit"], []),
+    "ltx-iclora-cameraman": (["iclora_edit"], []),
+    "ltx-iclora-cameraman-v2": (["iclora_edit"], []),
+    "ltx-iclora-hdr-scene-emb": (["iclora_edit"], []),
     # ── LTX 2.5 (catena: transformer → TE gguf + VAE video/audio) ──
     "ltx25-transformer-nvfp4": (["ckpt_video", "distilled", "nvfp4"],
                                 ["ltx25-te-gemma4-gguf", "ltx25-video-vae-conv", "ltx25-audio-vae"]),

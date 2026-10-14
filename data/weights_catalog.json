@@ -1367,21 +1367,20 @@
     {
       "id": "ltx-iclora-outpaint",
       "module": "Video",
-      "label": "IC-LoRA In/Outpainting",
+      "label": "IC-LoRA Outpaint (oumoumad)",
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2",
-      "gated": true,
+      "gated": false,
       "approx_gb": 1.3,
       "scan_names": [
         "ltx-2.3-22b-ic-lora-outpaint.safetensors"
       ],
       "category": "video",
       "arch": "ltx23",
-      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting",
-      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting",
+      "repo_id": "oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint",
+      "url": "https://huggingface.co/oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint",
       "filename": "ltx-2.3-22b-ic-lora-outpaint.safetensors",
-      "remote_filename": "ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
       "use": [
         "iclora_edit"
       ]
@@ -1453,21 +1452,20 @@
     {
       "id": "ltx-iclora-motiondeblur",
       "module": "Video",
-      "label": "IC-LoRA Deblur 0.9",
+      "label": "IC-LoRA Motion Deblur (oumoumad)",
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2",
-      "gated": true,
-      "approx_gb": 0.9,
+      "gated": false,
+      "approx_gb": 1.3,
       "scan_names": [
         "ltx-2.3-22b-ic-lora-motiondeblur.safetensors"
       ],
       "category": "video",
       "arch": "ltx23",
-      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-Deblur",
-      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Deblur",
+      "repo_id": "oumoumad/LTX-2.3-22b-IC-LoRA-MotionDeblur",
+      "url": "https://huggingface.co/oumoumad/LTX-2.3-22b-IC-LoRA-MotionDeblur",
       "filename": "ltx-2.3-22b-ic-lora-motiondeblur.safetensors",
-      "remote_filename": "ltx-2.3-22b-ic-lora-deblur-0.9.safetensors",
       "use": [
         "iclora_edit"
       ]
@@ -1475,47 +1473,49 @@
     {
       "id": "ltx-iclora-uncompress",
       "module": "Video",
-      "label": "IC-LoRA Uncompress (fonte remota ignota)",
+      "label": "IC-LoRA Uncompress (oumoumad)",
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2",
       "gated": false,
-      "approx_gb": 1.0,
+      "approx_gb": 1.3,
       "scan_names": [
         "ltx-2.3-22b-ic-lora-uncompress.safetensors"
       ],
       "category": "video",
       "arch": "ltx23",
       "filename": "ltx-2.3-22b-ic-lora-uncompress.safetensors",
-      "no_remote": true,
       "use": [
         "iclora_edit"
-      ]
+      ],
+      "repo_id": "oumoumad/LTX-2.3-22b-IC-LoRA-Uncompress",
+      "url": "https://huggingface.co/oumoumad/LTX-2.3-22b-IC-LoRA-Uncompress"
     },
     {
       "id": "ltx-iclora-deinterlace",
       "module": "Video",
-      "label": "IC-LoRA Deinterlace (fonte remota ignota)",
+      "label": "IC-LoRA Deinterlace (oumoumad, preview)",
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2",
       "gated": false,
-      "approx_gb": 1.0,
+      "approx_gb": 1.3,
       "scan_names": [
         "ltx-2.3-22b-ic-lora-deinterlace.safetensors"
       ],
       "category": "video",
       "arch": "ltx23",
       "filename": "ltx-2.3-22b-ic-lora-deinterlace.safetensors",
-      "no_remote": true,
       "use": [
         "iclora_edit"
-      ]
+      ],
+      "repo_id": "oumoumad/LTX-2.3-22b-IC-LoRA-Deinterlace",
+      "url": "https://huggingface.co/oumoumad/LTX-2.3-22b-IC-LoRA-Deinterlace"
     },
     {
       "id": "ltx-iclora-restyle",
       "module": "Video",
-      "label": "IC-LoRA ReStyle (community)",
+      "label": "IC-LoRA ReStyle v0.1 (community, Civitai)",
       "kind": "file",
       "type": "LoRA",
       "family": "LTX-2",
@@ -1530,7 +1530,9 @@
       "no_remote": true,
       "use": [
         "iclora_edit"
-      ]
+      ],
+      "note": "Civitai 2604134 v0.1 · prompt «Make it {stile} style.» · l'immagine di stile sostituisce il frame 0 del video di controllo · forza 1.0",
+      "page": "https://civitai.com/models/2604134"
     },
     {
       "id": "ltx23-transformer-only-fp8scaled",
@@ -7039,6 +7041,72 @@
       "note": "Letto da image_flux (TE_DIR). Doppione di TextEncoders/t5xxl_fp16: dedup SOLO con hardlink, mai cancellare.",
       "use": [
         "te"
+      ]
+    },
+    {
+      "id": "ltx-iclora-cameraman",
+      "module": "Video",
+      "label": "IC-LoRA Cameraman v1 (10500 step, Civitai)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.33,
+      "scan_names": [
+        "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors",
+      "no_remote": true,
+      "note": "Civitai 2525197 v1 · video di riferimento del movimento camera · image strength 0.5-0.7, risoluzione >= 960x512",
+      "page": "https://civitai.com/models/2525197",
+      "use": [
+        "iclora_edit"
+      ]
+    },
+    {
+      "id": "ltx-iclora-cameraman-v2",
+      "module": "Video",
+      "label": "IC-LoRA Cameraman v2 (14000 step, Civitai)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.65,
+      "scan_names": [
+        "LTX2.3-22B_IC-LoRA-Cameraman_v2_14000.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "url": "https://civitai.com/api/download/models/3068448?fileId=2947174",
+      "filename": "LTX2.3-22B_IC-LoRA-Cameraman_v2_14000.safetensors",
+      "sha256": "4e3bf4284158620cfb0874bd6774f5cc6fc8fc5b9a5474892efb2e31f696bacc",
+      "note": "Civitai 2525197 v2.0 (14000 step, dataset piu' ampio). Alternativa alla v1: il worker usa la v1 (kind cameraman) finche' l'utente non sceglie la v2.",
+      "page": "https://civitai.com/models/2525197?modelVersionId=3068448",
+      "use": [
+        "iclora_edit"
+      ]
+    },
+    {
+      "id": "ltx-iclora-hdr-scene-emb",
+      "module": "Video",
+      "label": "IC-LoRA HDR · scene embedding (12.6 MB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": true,
+      "approx_gb": 0.012,
+      "scan_names": [
+        "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-22b-IC-LoRA-HDR",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-HDR",
+      "filename": "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors",
+      "use": [
+        "iclora_edit"
       ]
     }
   ],

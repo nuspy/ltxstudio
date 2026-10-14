@@ -194,9 +194,9 @@ NEW = [
       arch="ltx23", repo="Lightricks/LTX-2.3-22b-IC-LoRA-Motion-Track-Control",
       filename="ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
       type="LoRA", family="LTX-2", gb=0.33),
-    N("ltx-iclora-outpaint", "Video", "IC-LoRA In/Outpainting", category="video", arch="ltx23",
-      repo="Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting", gated=True,
-      remote="ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors",
+    # oumoumad/*: repo PUBBLICI, file byte-identici ai locali (1 308 756 416 B, verificato via HF 14/10/2026)
+    N("ltx-iclora-outpaint", "Video", "IC-LoRA Outpaint (oumoumad)", category="video", arch="ltx23",
+      repo="oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint",
       filename="ltx-2.3-22b-ic-lora-outpaint.safetensors", type="LoRA", family="LTX-2", gb=1.3),
     N("ltx-iclora-refocus", "Video", "IC-LoRA ReFocus", category="video", arch="ltx23",
       repo="oumoumad/LTX-2.3-22b-IC-LoRA-ReFocus",
@@ -208,19 +208,39 @@ NEW = [
       repo="Lightricks/LTX-2.3-22b-IC-LoRA-DubIt", gated=True,
       remote="ltx-2.3-22b-ic-lora-dubit-0.9.safetensors",
       filename="ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors", type="LoRA", family="LTX-2", gb=2.5),
-    N("ltx-iclora-motiondeblur", "Video", "IC-LoRA Deblur 0.9", category="video", arch="ltx23",
-      repo="Lightricks/LTX-2.3-22b-IC-LoRA-Deblur", gated=True,
-      remote="ltx-2.3-22b-ic-lora-deblur-0.9.safetensors",
-      filename="ltx-2.3-22b-ic-lora-motiondeblur.safetensors", type="LoRA", family="LTX-2", gb=0.9),
-    N("ltx-iclora-uncompress", "Video", "IC-LoRA Uncompress (fonte remota ignota)",
-      category="video", arch="ltx23", filename="ltx-2.3-22b-ic-lora-uncompress.safetensors",
-      type="LoRA", family="LTX-2", gb=1.0, no_remote=True),
-    N("ltx-iclora-deinterlace", "Video", "IC-LoRA Deinterlace (fonte remota ignota)",
-      category="video", arch="ltx23", filename="ltx-2.3-22b-ic-lora-deinterlace.safetensors",
-      type="LoRA", family="LTX-2", gb=1.0, no_remote=True),
-    N("ltx-iclora-restyle", "Video", "IC-LoRA ReStyle (community)", category="video",
+    N("ltx-iclora-motiondeblur", "Video", "IC-LoRA Motion Deblur (oumoumad)", category="video", arch="ltx23",
+      repo="oumoumad/LTX-2.3-22b-IC-LoRA-MotionDeblur",
+      filename="ltx-2.3-22b-ic-lora-motiondeblur.safetensors", type="LoRA", family="LTX-2", gb=1.3),
+    N("ltx-iclora-uncompress", "Video", "IC-LoRA Uncompress (oumoumad)", category="video", arch="ltx23",
+      repo="oumoumad/LTX-2.3-22b-IC-LoRA-Uncompress",
+      filename="ltx-2.3-22b-ic-lora-uncompress.safetensors", type="LoRA", family="LTX-2", gb=1.3),
+    N("ltx-iclora-deinterlace", "Video", "IC-LoRA Deinterlace (oumoumad, preview)", category="video", arch="ltx23",
+      repo="oumoumad/LTX-2.3-22b-IC-LoRA-Deinterlace",
+      filename="ltx-2.3-22b-ic-lora-deinterlace.safetensors", type="LoRA", family="LTX-2", gb=1.3),
+    N("ltx-iclora-restyle", "Video", "IC-LoRA ReStyle v0.1 (community, Civitai)", category="video",
       arch="ltx23", filename="852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors",
-      type="LoRA", family="LTX-2", gb=0.8, no_remote=True),
+      type="LoRA", family="LTX-2", gb=0.8, no_remote=True,
+      page="https://civitai.com/models/2604134",
+      note="Civitai 2604134 v0.1 · prompt «Make it {stile} style.» · l'immagine di stile sostituisce il frame 0 "
+           "del video di controllo · forza 1.0"),
+    # Cameraman (Civitai 2525197): IC-LoRA con video di RIFERIMENTO del movimento camera
+    N("ltx-iclora-cameraman", "Video", "IC-LoRA Cameraman v1 (10500 step, Civitai)", category="video",
+      arch="ltx23", filename="LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors",
+      type="LoRA", family="LTX-2", gb=0.33, no_remote=True,
+      page="https://civitai.com/models/2525197",
+      note="Civitai 2525197 v1 · video di riferimento del movimento camera · image strength 0.5-0.7, "
+           "risoluzione >= 960x512"),
+    N("ltx-iclora-cameraman-v2", "Video", "IC-LoRA Cameraman v2 (14000 step, Civitai)", category="video",
+      arch="ltx23", url="https://civitai.com/api/download/models/3068448?fileId=2947174",
+      filename="LTX2.3-22B_IC-LoRA-Cameraman_v2_14000.safetensors",
+      type="LoRA", family="LTX-2", gb=0.65, page="https://civitai.com/models/2525197?modelVersionId=3068448",
+      sha256="4e3bf4284158620cfb0874bd6774f5cc6fc8fc5b9a5474892efb2e31f696bacc",
+      note="Civitai 2525197 v2.0 (14000 step, dataset piu' ampio). Alternativa alla v1: il worker usa la v1 "
+           "(kind cameraman) finche' l'utente non sceglie la v2."),
+    # HDR: embedding testo pre-calcolato richiesto da HDRICLoraPipeline (fase 1c)
+    N("ltx-iclora-hdr-scene-emb", "Video", "IC-LoRA HDR · scene embedding (12.6 MB)", category="video",
+      arch="ltx23", repo="Lightricks/LTX-2.3-22b-IC-LoRA-HDR", gated=True,
+      filename="ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors", type="LoRA", family="LTX-2", gb=0.012),
     N("ltx23-transformer-only-fp8scaled", "Video",
       "LTX-2.3 distilled transformer-only fp8_scaled (comfy, fonte ignota)",
       category="video", arch="ltx23",
@@ -1004,7 +1024,12 @@ DEFAULT_CAT_BY_MODULE = {
 
 # Famiglie in cui NEW è la fonte autorevole anche per le voci già nel json (campi di NEW vincono).
 REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "ltx23-lora-civ", "ltx25-lora-civ",
-           "ltx23-eros14", "ltx25-te-uncensored") + _LOCAL_REFRESH
+           "ltx23-eros14", "ltx25-te-uncensored",
+           # IC-LoRA Fase 1 (14/10): fonte corretta ai repo pubblici oumoumad + note Civitai
+           "ltx-iclora-outpaint", "ltx-iclora-motiondeblur", "ltx-iclora-uncompress", "ltx-iclora-deinterlace",
+           "ltx-iclora-restyle", "ltx-iclora-cameraman") + _LOCAL_REFRESH
+# chiavi della vecchia voce da NON ereditare quando la voce viene aggiornata (merged.update non le toglie)
+_STALE_ON_REFRESH = ("remote_filename", "no_remote", "note", "page")
 
 # Voci ritirate (tolte dal catalogo alla prossima rigenerazione).
 REMOVED = {
@@ -1043,6 +1068,10 @@ def main() -> int:
             old = by_id[n["id"]]
             merged = dict(old)
             merged.update(n)                                    # i campi di NEW vincono
+            if n["id"].startswith("ltx-iclora-"):               # correzione fonte: via i residui della vecchia voce
+                for _k in _STALE_ON_REFRESH:
+                    if _k not in n:
+                        merged.pop(_k, None)
             for k in ("scan_names", "deps"):                    # liste: unione (curate a mano / use_deps)
                 vals = list(n.get(k) or []) + [v for v in (old.get(k) or []) if v not in (n.get(k) or [])]
                 if vals:
