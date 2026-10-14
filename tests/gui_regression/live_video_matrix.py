@@ -33,7 +33,7 @@ M = {
     "distilled_fp8": r"E:\AI\Models\diffusion_models\LTXVideo\v2\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
     "dev_fp8":       r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors",
     "dev_nvfp4":     r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\nvfp4\ltx-2.3-22b-dev-nvfp4.safetensors",
-    "gguf_q4":       r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
+    "gguf_q4":       r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\unsloth\distilled-1.1\ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf",
     "gguf_q6":       r"E:\AI\Models\diffusion_models\ltx-2-3-22b-dev-Q6_K.gguf",
     "eros":          r"E:\AI\Models\diffusion_models\LTX\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
     "pinkcherry":    r"E:\AI\Models\diffusion_models\LTX\PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors",

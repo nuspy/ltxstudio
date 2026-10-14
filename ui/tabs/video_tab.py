@@ -31,7 +31,7 @@ MODEL_FILES = {
     "10EROS v1.5 (NSFW)":             "LTX\\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
 }
 _MODEL_NSFW = {"10EROS v1.5 (NSFW)"}      # voci modello considerate NSFW (nascoste in SFW)
-GGUF_FALLBACK_FILE = "LTXVideo\\LTX-2\\quantstack\\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf"
+GGUF_FALLBACK_FILE = "LTXVideo\\LTX-2\\unsloth\\distilled-1.1\\ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf"
 
 RES_PRESETS = {
     "Verticale 9:16 (704x1280)":          (704, 1280),
