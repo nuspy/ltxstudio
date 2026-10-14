@@ -6778,7 +6778,7 @@
       "filename": "zimageTurboNSFWBy_2602NSFWBF16.safetensors",
       "sensitivity": "adult",
       "no_remote": true,
-      "note": "Finetune NSFW di Z-Image Turbo (import locale); accanto sta la cache .normalized generata dal motore.",
+      "note": "Finetune NSFW di Z-Image Turbo (import locale).",
       "use": [
         "ckpt_image",
         "distilled",

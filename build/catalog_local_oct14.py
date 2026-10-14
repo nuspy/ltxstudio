@@ -38,9 +38,8 @@ def entries(N):
         N("zimage-turbo-nsfw-2602", "Immagini", "Z-Image Turbo NSFW 2602 (18+, bf16, 11.46GB)",
           category="image", arch="zimage", type="diffusion_models", family="Z-Image",
           filename="zimageTurboNSFWBy_2602NSFWBF16.safetensors", gb=11.46, sens="adult", no_remote=True,
-          scan=["zimageTurboNSFWBy_2602NSFWBF16.safetensors",
-                "zimageTurboNSFWBy_2602NSFWBF16.safetensors.normalized.safetensors"],
-          note="Finetune NSFW di Z-Image Turbo (import locale); accanto sta la cache .normalized generata dal motore."),
+          scan=["zimageTurboNSFWBy_2602NSFWBF16.safetensors"],
+          note="Finetune NSFW di Z-Image Turbo (import locale)."),
 
         # ───────── FLUX.1 ─────────
         N("flux1-fuxcapacity-nsfw-fp8", "Immagini", "fuxCapacity NSFW Porn Flux 2.0 (FLUX.1 dev, 18+, fp8, 11.08GB)",
