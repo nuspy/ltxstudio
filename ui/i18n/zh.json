@@ -3134,5 +3134,9 @@
   "v2v.wanlora_title": "Wan 2.1 LoRA（MultiTalk 口型同步）",
   "v2v.wanlora_note": "“说话”和“唱歌”基于 Wan 2.1 + MultiTalk：在此选择 Wan 的 LoRA（风格、细节、概念）。它们叠加在内置蒸馏 LoRA 之上；LTX 面板中的 LoRA 不适用于 Wan。",
   "weights.dep.blocked.title": "您的版本不包含此依赖项",
-  "weights.dep.blocked.msg": "模型“{m}”需要 {dep},但您的版本不包含它:已取消下载。"
+  "weights.dep.blocked.msg": "模型“{m}”需要 {dep},但您的版本不包含它:已取消下载。",
+  "vid.model.placeholder": "— 请选择模型 —",
+  "f1.gen.model.placeholder": "— 请选择模型 —",
+  "mw.pick_model_title": "请选择模型",
+  "mw.pick_model_msg": "所选模型在您的版本中已不可用:请从“模型”菜单中另选一个。"
 }

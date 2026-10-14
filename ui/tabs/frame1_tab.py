@@ -807,6 +807,11 @@ class Frame1Tab(QWidget):
         except Exception:                                     # noqa: BLE001
             return True
 
+    GEN_PLACEHOLDER = "__placeholder__"
+
+    def gen_model_is_placeholder(self) -> bool:
+        return self.gen_model.currentData() == self.GEN_PLACEHOLDER
+
     def _reload_gen_catalog(self, items, combo=None):
         """Popola un dropdown con voci di CATALOGO (snapshot/profili senza file-modello unico), con badge ⬇
         e colore se non presenti → download-on-select come nel tab Video. items = [(cat_id, label)].
@@ -837,6 +842,11 @@ class Frame1Tab(QWidget):
         i = combo.findData(prev) if prev else -1
         if i >= 0:
             combo.setCurrentIndex(i)
+        elif combo is self.gen_model and prev in {c for c, _l in items}:
+            # il modello scelto e' sparito dal menu (matrice dell'edizione / modalita' NSFW): NON ricadere sul
+            # primo elemento, restare su un segnaposto che blocca la generazione
+            combo.insertItem(0, tr("f1.gen.model.placeholder", "— scegli un modello —"), self.GEN_PLACEHOLDER)
+            combo.setCurrentIndex(0)
         combo.blockSignals(False)
         if combo is self.gen_model:
             self._update_gen_star()

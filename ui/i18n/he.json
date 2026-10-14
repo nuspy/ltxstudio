@@ -3134,5 +3134,9 @@
   "v2v.wanlora_title": "‏LoRA ל-Wan 2.1 (סנכרון שפתיים MultiTalk)",
   "v2v.wanlora_note": "מצבי «דיבור» ו«שירה» רצים על Wan 2.1 + MultiTalk: כאן בוחרים LoRA של Wan (סגנון, פרטים, מושגים). הן נוספות ל-LoRA הזיקוק הפנימית; ה-LoRA של לוח LTX אינן חלות על Wan.",
   "weights.dep.blocked.title": "תלות שאינה כלולה במהדורה שלך",
-  "weights.dep.blocked.msg": "המודל '{m}' דורש {dep}, שאינו כלול במהדורה שלך: ההורדה בוטלה."
+  "weights.dep.blocked.msg": "המודל '{m}' דורש {dep}, שאינו כלול במהדורה שלך: ההורדה בוטלה.",
+  "vid.model.placeholder": "— בחר מודל —",
+  "f1.gen.model.placeholder": "— בחר מודל —",
+  "mw.pick_model_title": "בחר מודל",
+  "mw.pick_model_msg": "המודל שבחרת אינו זמין עוד במהדורה שלך: בחר מודל מתפריט המודל."
 }

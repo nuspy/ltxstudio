@@ -259,3 +259,36 @@ CASES = [
     ("qwen21_inpaint_mask", "Inpaint: voce Qwen nel combo modelli → foto + maschera + forza al worker.",
      case_qwen21_inpaint_mask),
 ]
+
+
+def case_qwen21_model_disappears_placeholder(w, spy):
+    """Il DiT scelto sparisce dal menu (riga della matrice spenta): il combo NON ricade sul primo elemento ma resta
+    su «— scegli un modello —» e generate_image si ferma senza inviare nulla."""
+    from core import features
+    f = w.frame1_tab
+    saved = (features._MANIFEST, features._FEATURES)
+    try:
+        f.img_nsfw.setCurrentText("SFW")
+        f.gen_arch.setCurrentText("Qwen-Image 2.1")
+        i = f.gen_model.findData("qwen21-dit-fp8")
+        assert i >= 0, _ids(f.gen_model)
+        f.gen_model.setCurrentIndex(i)
+        feats = {"cap.image_qwen21": {"enabled": True, "params": {}},
+                 "model.qwen21-dit-fp8": {"enabled": False, "params": {}}}
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        f._reload_gen_qwen21()
+        assert f.gen_model_is_placeholder(), f"atteso segnaposto, trovato {f.gen_model.currentData()}"
+        assert f.gen_model.currentIndex() == 0 and "qwen21-dit-fp8" not in _ids(f.gen_model)
+        f.gen_prompt.setPlainText("una medusa di cristallo sopra una citta' in tempesta")
+        before = len(spy.calls)
+        w.generate_image()
+        assert len(spy.calls) == before, "con il segnaposto la generazione NON deve partire"
+    finally:
+        features._MANIFEST, features._FEATURES = saved
+        f._reload_gen_qwen21()
+
+
+CASES.append(("qwen21_model_disappears_placeholder",
+              "DiT Qwen sparito dal menu (matrice): segnaposto «scegli un modello», generazione bloccata.",
+              case_qwen21_model_disappears_placeholder))

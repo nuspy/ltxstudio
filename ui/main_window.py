@@ -2006,6 +2006,12 @@ class MainWindow(QMainWindow):
                 vals[key] = max_px
 
     # ---------- generazione ----------
+    def _warn_pick_model(self):
+        """Segnaposto «— scegli un modello —» selezionato: la generazione si ferma con un messaggio chiaro."""
+        QMessageBox.warning(self, tr("mw.pick_model_title", "Scegli un modello"),
+                            tr("mw.pick_model_msg", "Il modello scelto non è più disponibile nella tua edizione: "
+                               "selezionane uno dal menu Modello."))
+
     def on_generate(self):
         if not self.engine:
             QMessageBox.warning(self, tr("mw.template_missing_title"), self._engine_err or tr("mw.golden_prompt_not_loaded"))
@@ -2017,6 +2023,8 @@ class MainWindow(QMainWindow):
         if not vals.get("prompt_positive"):
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_prompt_msg"))
             return
+        if self.video_tab.model_is_placeholder():            # modello scelto sparito dal menu: mai sceglierne un altro
+            return self._warn_pick_model()
         if not self.video_tab.wants_fixed_seed():
             vals["seed"] = random.randint(0, 2**31)
 
@@ -3014,6 +3022,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
         if not self._gen_limit_ok():
             return
+        if self.frame1_tab.gen_model_is_placeholder():       # modello scelto sparito dal menu: mai sceglierne un altro
+            return self._warn_pick_model()
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return

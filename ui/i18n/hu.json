@@ -3134,5 +3134,9 @@
   "v2v.wanlora_title": "Wan 2.1 LoRA (MultiTalk szájszinkron)",
   "v2v.wanlora_note": "A Beszéd és az Ének Wan 2.1 + MultiTalk alapon fut: itt választhatod a Wan LoRA-kat (stílus, részletesség, fogalmak). A beépített desztillációs LoRA mellé kerülnek; az LTX panel LoRA-i nem érvényesek a Wanra.",
   "weights.dep.blocked.title": "A függőség nem része a kiadásodnak",
-  "weights.dep.blocked.msg": "A(z) '{m}' modellhez szükség van erre: {dep}, de a kiadásod nem tartalmazza: a letöltés megszakítva."
+  "weights.dep.blocked.msg": "A(z) '{m}' modellhez szükség van erre: {dep}, de a kiadásod nem tartalmazza: a letöltés megszakítva.",
+  "vid.model.placeholder": "— válassz modellt —",
+  "f1.gen.model.placeholder": "— válassz modellt —",
+  "mw.pick_model_title": "Válassz modellt",
+  "mw.pick_model_msg": "A választott modell már nem érhető el a kiadásodban: válassz egyet a Modell menüből."
 }

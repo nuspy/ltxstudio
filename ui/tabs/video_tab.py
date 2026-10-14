@@ -754,6 +754,26 @@ class VideoTab(QWidget):
             ss.set_suggested_steps(S.TURBO[t][1] if t else S.DEFAULT_NFE, note="MiniMax H3")
             ss.steps.setEnabled(not t)
 
+    PLACEHOLDER_KEY = "__placeholder__"
+
+    def _finish_model_menu(self, prev_key, candidates: set):
+        """Dopo aver ripopolato il menu modelli: se la voce scelta prima c'e' ancora la riseleziona; se e'
+        SPARITA (la matrice dell'edizione non la include piu', modalita' NSFW...) NON ricade sul primo
+        elemento ma resta su un segnaposto «— scegli un modello —» che blocca la generazione."""
+        keys = [(self.model.itemData(k) or {}).get("key") for k in range(self.model.count())]
+        scope = next(iter(candidates), ":").split(":", 1)[0]
+        sticky = isinstance(prev_key, str) and prev_key == f"{self.PLACEHOLDER_KEY}:{scope}"   # segnaposto gia' attivo
+        if prev_key in keys:
+            self.model.setCurrentIndex(keys.index(prev_key))
+        elif prev_key in candidates or sticky:
+            self.model.insertItem(0, tr("vid.model.placeholder", "— scegli un modello —"),
+                                  {"kind": "placeholder", "placeholder": True,
+                                   "key": f"{self.PLACEHOLDER_KEY}:{scope}"})
+            self.model.setCurrentIndex(0)
+
+    def model_is_placeholder(self) -> bool:
+        return bool((self.model.currentData() or {}).get("placeholder"))
+
     def _refilter_h3_models(self):
         """Dropdown modello = profili di quantizzazione H3 (il checkpoint FL2VA o Ref2VA lo decide la
         modalità: con i riferimenti serve il Ref2VA). Non scaricati → evidenziati, download su selezione."""
@@ -810,9 +830,8 @@ class VideoTab(QWidget):
                                    Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(i, QColor("#e8b339"), Qt.ForegroundRole)
-        j = next((k for k in range(self.model.count()) if (self.model.itemData(k) or {}).get("key") == prev), -1)
-        if j >= 0:
-            self.model.setCurrentIndex(j)
+        self._finish_model_menu(prev, {f"minimax_h3:{p}" for p in S.PROFILES}
+                                | {f"minimax_h3:{c}" for c in S.CUSTOM_DITS})
         self.model.blockSignals(False)
 
     def _refilter_lingbot_models(self):
@@ -823,6 +842,7 @@ class VideoTab(QWidget):
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
         _free_gb = _mp.gpu_free_gb()
+        prev = (self.model.currentData() or {}).get("key")
         self.model.blockSignals(True)
         self.model.clear()
         # (id_catalogo, variante, etichetta)
@@ -855,6 +875,7 @@ class VideoTab(QWidget):
             self.model.setItemData(self.model.count() - 1, _tt, Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self._finish_model_menu(prev, {f"lingbot:{c}" for c, _v, _l in variants})
         self.model.blockSignals(False)
         # NB: NON offrire il download qui (refilter è anche programmatico) — l'offerta parte solo su
         # selezione ESPLICITA dell'utente (model.activated → _on_model_activated), mai in automatico.
@@ -930,6 +951,7 @@ class VideoTab(QWidget):
         from PySide6.QtGui import QColor
         arch = self._arch()
         entries = {e["id"]: e for e in wc.load()}
+        prev = (self.model.currentData() or {}).get("key")
         self.model.blockSignals(True)
         self.model.clear()
         for cat_id, variant, label in items:
@@ -952,6 +974,7 @@ class VideoTab(QWidget):
             self.model.setItemData(self.model.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self._finish_model_menu(prev, {f"{arch}:{c}" for c, _v, _l in items})
         self.model.blockSignals(False)
 
     def _resolve_model_path(self, name: str) -> str | None:

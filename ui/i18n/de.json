@@ -3134,5 +3134,9 @@
   "v2v.wanlora_title": "Wan-2.1-LoRA (MultiTalk-Lippensynchronisation)",
   "v2v.wanlora_note": "Sprechen und Singen laufen mit Wan 2.1 + MultiTalk: Wählen Sie hier die Wan-LoRAs (Stil, Detail, Konzepte). Sie kommen zur internen Destillations-LoRA hinzu; die LoRAs des LTX-Panels gelten nicht für Wan.",
   "weights.dep.blocked.title": "Abhängigkeit nicht in deiner Edition enthalten",
-  "weights.dep.blocked.msg": "Das Modell '{m}' benötigt {dep}, was deine Edition nicht enthält: Download abgebrochen."
+  "weights.dep.blocked.msg": "Das Modell '{m}' benötigt {dep}, was deine Edition nicht enthält: Download abgebrochen.",
+  "vid.model.placeholder": "— Modell wählen —",
+  "f1.gen.model.placeholder": "— Modell wählen —",
+  "mw.pick_model_title": "Modell wählen",
+  "mw.pick_model_msg": "Das gewählte Modell ist in deiner Edition nicht mehr verfügbar: wähle eines im Menü Modell."
 }

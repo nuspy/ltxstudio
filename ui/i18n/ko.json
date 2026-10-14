@@ -3134,5 +3134,9 @@
   "v2v.wanlora_title": "Wan 2.1 LoRA (MultiTalk 립싱크)",
   "v2v.wanlora_note": "말하기와 노래하기는 Wan 2.1 + MultiTalk로 동작합니다. 여기서 Wan용 LoRA(스타일, 디테일, 콘셉트)를 고르세요. 내장 증류 LoRA에 추가로 적용되며, LTX 패널의 LoRA는 Wan에 적용되지 않습니다.",
   "weights.dep.blocked.title": "에디션에 포함되지 않은 종속성",
-  "weights.dep.blocked.msg": "모델 '{m}'에는 {dep}이(가) 필요하지만 사용 중인 에디션에 포함되어 있지 않습니다. 다운로드를 취소했습니다."
+  "weights.dep.blocked.msg": "모델 '{m}'에는 {dep}이(가) 필요하지만 사용 중인 에디션에 포함되어 있지 않습니다. 다운로드를 취소했습니다.",
+  "vid.model.placeholder": "— 모델을 선택하세요 —",
+  "f1.gen.model.placeholder": "— 모델을 선택하세요 —",
+  "mw.pick_model_title": "모델 선택",
+  "mw.pick_model_msg": "선택한 모델은 현재 에디션에서 더 이상 사용할 수 없습니다. 모델 메뉴에서 다른 모델을 선택하세요."
 }

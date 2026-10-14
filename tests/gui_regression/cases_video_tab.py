@@ -762,3 +762,43 @@ def case_h3_menu_follows_edition_matrix(w, spy):
 CASES.append(("video_h3_menu_follows_matrix",
               "Menu H3: i profili compaiono solo con cella modello accesa E capability attiva (regola di wanted).",
               case_h3_menu_follows_edition_matrix))
+
+
+def case_h3_model_disappears_placeholder(w, spy):
+    """Se il modello H3 scelto sparisce dal menu (riga della matrice spenta) il combo NON ricade sul primo
+    elemento: resta su «— scegli un modello —» e on_generate si ferma senza inviare nulla."""
+    from core import features
+    from core import minimax_h3_spec as S
+    t = w.video_tab
+    ids = {prof: fl for prof, (fl, _r, _te) in S.PROFILES.items()}
+    saved = (features._MANIFEST, features._FEATURES)
+
+    def edition(off: set):
+        feats = {f"model.{fl}": {"enabled": prof not in off, "params": {}} for prof, fl in ids.items()}
+        feats["cap.video_minimax_h3"] = {"enabled": True, "params": {}}
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        t._refilter_h3_models()
+    try:
+        t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+        edition(set())
+        j = next(k for k in range(t.model.count()) if (t.model.itemData(k) or {}).get("key") == "minimax_h3:fp8")
+        t.model.setCurrentIndex(j)
+        edition({"fp8"})                                   # la matrice toglie il profilo scelto
+        assert t.model_is_placeholder(), "il combo doveva restare sul segnaposto"
+        assert t.model.currentIndex() == 0 and t.model.count() >= 2, "segnaposto + altri profili"
+        assert "—" in t.model.itemText(0)
+        _set_prompt(w)
+        before = len(spy.calls)
+        w.on_generate()
+        assert len(spy.calls) == before, "con il segnaposto la generazione NON deve partire"
+        edition({"fp8"})                                   # ricarica col segnaposto selezionato: resta tale
+        assert t.model_is_placeholder()
+    finally:
+        features._MANIFEST, features._FEATURES = saved
+        t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+
+
+CASES.append(("video_h3_model_disappears_placeholder",
+              "Modello scelto sparito dal menu (matrice): segnaposto «scegli un modello», generazione bloccata.",
+              case_h3_model_disappears_placeholder))

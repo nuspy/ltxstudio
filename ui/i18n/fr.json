@@ -3134,5 +3134,9 @@
   "v2v.wanlora_title": "LoRA Wan 2.1 (lip-sync MultiTalk)",
   "v2v.wanlora_note": "Parler et Chanter utilisent Wan 2.1 + MultiTalk : choisissez ici les LoRA Wan (style, détail, concepts). Elles s'ajoutent à la LoRA de distillation interne ; les LoRA du panneau LTX ne s'appliquent pas à Wan.",
   "weights.dep.blocked.title": "Dépendance non incluse dans votre édition",
-  "weights.dep.blocked.msg": "Le modèle '{m}' nécessite {dep}, que votre édition n'inclut pas : téléchargement annulé."
+  "weights.dep.blocked.msg": "Le modèle '{m}' nécessite {dep}, que votre édition n'inclut pas : téléchargement annulé.",
+  "vid.model.placeholder": "— choisissez un modèle —",
+  "f1.gen.model.placeholder": "— choisissez un modèle —",
+  "mw.pick_model_title": "Choisir un modèle",
+  "mw.pick_model_msg": "Le modèle choisi n’est plus disponible dans votre édition : sélectionnez-en un dans le menu Modèle."
 }
