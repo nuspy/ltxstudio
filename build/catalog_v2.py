@@ -698,6 +698,14 @@ NEW = [
            "pesi quantizzati), asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5"),
     # Stesso modello del GGUF Q8_0 del repo, ma in safetensors int8: passa dal fold nativo di ltx-core (fp8_cast) e
     # porta i connector degli embedding nello stesso file (il percorso GGUF 2.5 non li sa leggere).
+    # GGUF Q8_0 (scelta dell'utente): transformer dequantizzato al volo; config e connector degli embedding da un
+    # «compagno» safetensors generato una volta dal GGUF stesso (workers/gguf_native.gguf_companion)
+    N("ltx25-uncensored-v11-q8", "Video", "LTX-2.5 Uncensored Turbo v1.1 (18+, GGUF Q8_0, distilled, 22.3GB)",
+      category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      remote="split/diffusion_models/ltx25_uncensored_v1.1-Q8_0.gguf",
+      filename="ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf", type="diffusion_models", family="LTX", gb=22.33,
+      sens="adult", deps=["ltx25-te-uncensored|ltx25-te-bf16", "ltx25-video-vae-conv", "ltx25-audio-vae"],
+      note="10Eros (0.7) + DMD distill + IC-LoRA + detailer + img2vid fusi: 4-8 passi, CFG 1"),
     N("ltx25-uncensored-v11-int8", "Video", "LTX-2.5 Uncensored Turbo v1.1 (18+, INT8, distilled, 21.5GB)",
       category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
       remote="split/diffusion_models/ltx25_uncensored_v1.1-int8.safetensors",
@@ -733,6 +741,19 @@ NEW = [
       filename="Minimax_H3_Unlocked_V2-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3",
       gb=0.3, sens="adult", used_by=["cap.video_minimax_h3"],
       note="la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16"),
+    # Turbo v4 8 passi di larryvrh (quella con cui è addestrato Veda): addestrata sul modello COMPLETO, la sua adaLN
+    # si proietta sul DiT pruned con base/media del ramo (adaln_affine di multimodalart, tabelle verificate identiche)
+    *[N(f"mmh3-adaln-affine-{k}", "Video", f"MiniMax H3 adaLN affine {lbl} (proiezione LoRA sul pruned, 0.1MB)",
+        category="video", arch="minimax_h3", repo="multimodalart/MiniMax-H3-Pruned", remote=f"{sub}/adaln_affine.safetensors",
+        filename=f"minimax_h3_adaln_affine_{k}.safetensors", type="model_patches", family="MiniMax-H3", gb=0.0001,
+        used_by=["cap.video_minimax_h3"], note="base [8,2688] e media [2688] della curva temporale del DiT pruned")
+      for k, lbl, sub in (("fl", "FL2VA", "transformer"), ("ref", "Ref2VA", "transformer_ref"))],
+    *[N(f"mmh3-turbo-v4-{k}", "Video", f"LoRA H3 Turbo v4 8 passi {lbl} (larryvrh, 0.78GB)", category="video",
+        arch="minimax_h3", repo="larryvrh/MiniMax-H3-Turbo-Lora", remote="minimax_h3_turbo_v4_step600_ema.safetensors",
+        filename=f"minimax_h3_turbo_v4_step600_ema_{mode}-native.safetensors", convert=f"mmh3_lora_{aff}",
+        type="LoRA", family="MiniMax-H3", gb=0.78, deps=[f"mmh3-adaln-affine-{aff}"], used_by=["cap.video_minimax_h3"],
+        note="v4 step600 EMA: 4-8 passi (meglio 6-8), forza 1.0, shift video 12 / audio 3. Apache-2.0")
+      for k, lbl, mode, aff in (("fl2v", "FL2VA", "fl2va", "fl"), ("ref2v", "Ref2VA", "ref2va", "ref"))],
     N("mmh3-veda-r2va", "Video", "Veda attenzione sparsa H3 Ref2VA (predittore fp8, 0.28GB)", category="video",
       arch="minimax_h3", repo="Veda-Sparse/Minimax-H3-R2VA-Veda-Preview",
       remote="minimax_h3_r2va_veda_preview_fp8.safetensors",
@@ -799,7 +820,8 @@ NEW = [
       arch="zimage", url="https://civitai.com/api/download/models/3296380?fileId=3184279", filename="bigLove_zora1_bf16.safetensors",
       type="diffusion_models", family="Z-Image", gb=12.02, sens="adult",
       sha256="85bd0540418b01bb03115502cd060fbc39e094eb4b12ac5ed3f88ee4981dc7a5",
-      note="Civitai 897413, file bf16 (il primario è fp8_mixed)"),
+      note="Civitai 897413, file bf16 (il primario è fp8_mixed). 14/10: in «Early Access» a pagamento (Buzz) — "
+           "Civitai risponde 403 anche con la chiave finché l'accesso anticipato non scade"),
     N("zimage-lora-zitnsfw-v3", "Immagini", "LoRA Z-Image Turbo NSFW v3 (18+, 0.01GB)", category="image",
       arch="zimage", url="https://civitai.com/api/download/models/2898951?fileId=2776902", filename="ZITnsfwLoRAv3.safetensors", type="LoRA",
       family="Z-Image", gb=0.01, sens="adult",

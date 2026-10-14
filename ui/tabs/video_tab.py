@@ -624,6 +624,7 @@ class VideoTab(QWidget):
         self.h3_turbo.addItem(tr("vid.h3.turbo.off", "Spento (qualità piena, ~49 passi)"), "")
         self.h3_turbo.addItem(tr("vid.h3.turbo.4", "Turbo 4 passi (lightx2v)"), "4")
         self.h3_turbo.addItem(tr("vid.h3.turbo.8", "Turbo 8 passi (più dettaglio)"), "8")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.v4", "Turbo v4 8 passi (larryvrh, anche coi riferimenti)"), "v4")
         self.h3_turbo.setToolTip(tr("vid.h3.turbo.tt",
             "LoRA di distillazione lightx2v: da ~49 a 4 o 8 passi (10× più veloce). Con i riferimenti "
             "(Ref2VA) esiste solo la 4 passi, in anteprima."))

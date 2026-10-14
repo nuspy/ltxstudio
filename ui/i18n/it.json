@@ -3158,5 +3158,6 @@
   "weights.use.veda_sparse": "Attenzione sparsa Veda: un piccolo predittore calcola solo i blocchi d'attenzione che contano — video H3 più veloce, stessi pesi.",
   "feat.cap.video_h3_veda": "MiniMax H3 — attenzione sparsa Veda",
   "vid.h3.veda": "Attenzione sparsa Veda (più veloce)",
-  "vid.h3.veda.tt": "Calcola solo i blocchi d'attenzione che un predittore addestrato segna come utili: circa 1,4–2,2× più veloce sul denoise. Vale con i riferimenti (Ref2VA) e il Turbo 8 passi; i pesi del modello non cambiano. Se qualcosa non torna, il video usa da solo l'attenzione piena."
+  "vid.h3.veda.tt": "Calcola solo i blocchi d'attenzione che un predittore addestrato segna come utili: circa 1,4–2,2× più veloce sul denoise. Vale con i riferimenti (Ref2VA) e il Turbo 8 passi; i pesi del modello non cambiano. Se qualcosa non torna, il video usa da solo l'attenzione piena.",
+  "vid.h3.turbo.v4": "Turbo v4 8 passi (larryvrh, anche coi riferimenti)"
 }

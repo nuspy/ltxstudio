@@ -38,6 +38,8 @@ COMMON_IDS = ("mmh3-configs", "mmh3-video-vae", "mmh3-audio-vae")
 TURBO = {
     "4": ({"fl2va": "mmh3-turbo-lora-fl2v", "ref2va": "mmh3-turbo-lora-ref2v"}, 4, 12.0),
     "8": ({"fl2va": "mmh3-turbo-lora-fl2v-8"}, 8, 6.0),
+    # larryvrh v4 step600 EMA (con cui è addestrato Veda): sampler a griglia uniforme, shift video 12 / audio 3
+    "v4": ({"fl2va": "mmh3-turbo-v4-fl2v", "ref2va": "mmh3-turbo-v4-ref2v"}, 8, 12.0),
 }
 
 # formati: rapporto → (larghezza, altezza) del rapporto; la tela esatta la calcola il pipeline

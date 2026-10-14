@@ -206,14 +206,10 @@ def _mmh3_vae():
     return plan
 
 
-def _mmh3_lora():
-    """LoRA H3 in nomi ComfyUI (diffusion_model.blocks.N.attn.qkv_proj.lora_A…) o kohya
-    (lora_unet_blocks_N_attn_qkv_proj.lora_down + alpha) → nomi nativi del modello montato
-    (transformer_blocks.N.attn.to_qkv…, ff.gate_up/ff.out): stesse matrici, qkv e gate/up già fusi."""
+def _mmh3_lora_rename():
+    """Rinomina chiave per chiave delle LoRA H3 (ComfyUI, kohya, diffusers) → nomi del DiT nativo montato."""
     _workers_path()
     import minimax_h3_convert as M
-
-    import re
     kohya = re.compile(r"^lora_unet_(token_refiner_)?blocks_(\d+)_(attn|mlp)_([a-z0-9_]+?)\.(.+)$")
 
     def rename(k):
@@ -224,7 +220,14 @@ def _mmh3_lora():
             if k.startswith(pre):
                 k = k[len(pre):]
         return M.dit_key(k)
-    return _renamer(rename)
+    return rename
+
+
+def _mmh3_lora():
+    """LoRA H3 in nomi ComfyUI (diffusion_model.blocks.N.attn.qkv_proj.lora_A…) o kohya
+    (lora_unet_blocks_N_attn_qkv_proj.lora_down + alpha) → nomi nativi del modello montato
+    (transformer_blocks.N.attn.to_qkv…, ff.gate_up/ff.out): stesse matrici, qkv e gate/up già fusi."""
+    return _renamer(_mmh3_lora_rename())
 
 
 def _krea2_dit():
@@ -403,6 +406,55 @@ def _comfy_bf16(remap: str = "none"):
     return plan
 
 
+def _mmh3_lora_released(partition: str):
+    """LoRA H3 addestrata sul modello COMPLETO (adaLN larga 2688, es. Turbo v4 di larryvrh) → nomi nativi del DiT
+    pruned. Le coppie adaLN si proiettano sulle coordinate pruned come in MiniMaxH3PrunedTransformer3DModel.
+    project_adaln_lora, salvate come delta pieni: `.diff` = B·(A·baseᵀ) [out, 8] sul peso, `.diff_b` = B·(A·media)
+    [out] sul folded_bias. Base e media del ramo (`fl2va`/`ref2va`) da adaln_affine.safetensors (verificato il
+    14/10: tabelle temporali identiche ai nostri DiT nvfp4, diff 0.0)."""
+    torch = _torch()
+    rename = _mmh3_lora_rename()
+    adaln = re.compile(r"(?:^|\.)((?:blocks\.\d+|final_layer)\.adaln_proj\.linear)\.lora_([AB])\.weight$")
+    aff = {}
+
+    def affine():
+        if not aff:
+            from core import model_paths as mp
+            path = mp.p(f"mmh3-adaln-affine-{'ref' if partition == 'ref2va' else 'fl'}", "")
+            if not path or not os.path.isfile(path):
+                raise FileNotFoundError(f"adaln_affine {partition} assente: serve per proiettare la LoRA adaLN")
+            from safetensors.torch import load_file
+            d = load_file(path)
+            aff["basis"], aff["mean"] = d["adaln_basis"].double(), d["adaln_mean"].double()
+        return aff["basis"], aff["mean"]
+
+    def plan(key, info, header):
+        m = adaln.search(key)
+        if m is None:
+            nk = rename(key)
+            return [] if nk is None else [(nk, lambda t: t)]
+        if m.group(2) == "B":
+            return []                                   # consumata insieme alla sua lora_A
+        mod, ctx = m.group(1), header.get("__ctx__", {})
+        b_key = key[: -len("lora_A.weight")] + "lora_B.weight"
+        base = rename(mod + ".lora_A.weight")[: -len(".lora_A.weight")]
+        out_f = header[b_key]["shape"][0]
+
+        def diff(t, _bk=b_key, _o=out_f):
+            if t.device.type == "meta":
+                return torch.empty((_o, 8), dtype=torch.float32, device="meta")
+            basis, _mean = affine()
+            return (ctx["get"](_bk).double() @ (t.double() @ basis.T)).float().contiguous()
+
+        def diff_b(t, _bk=b_key, _o=out_f):
+            if t.device.type == "meta":
+                return torch.empty((_o,), dtype=torch.float32, device="meta")
+            _basis, mean = affine()
+            return (ctx["get"](_bk).double() @ (t.double() @ mean)).float().contiguous()
+        return [(base + ".diff", diff), (base + ".diff_b", diff_b)]
+    return plan
+
+
 def _qwen21_te():
     def rename(k):
         if k == "lm_head.weight":                         # 1,2 GB mai usati (la pipeline legge gli hidden state)
@@ -420,7 +472,9 @@ CONVERTERS = {
     "mmh3_dit": _mmh3_dit,            # MiniMax H3 DiT pruned (bf16/fp8/nvfp4) → MiniMaxH3PrunedTransformer3DModel
     "mmh3_te": _mmh3_te,              # MiniMax H3 TE Qwen3-VL-32B (nvfp4-AWQ / fp8) → Qwen3VLForConditionalGeneration
     "mmh3_vae": _mmh3_vae,            # MiniMax H3 VAE video fp16 → AutoencoderKLMiniMaxH3
-    "mmh3_lora": _mmh3_lora,          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
+    "mmh3_lora": _mmh3_lora,
+    "mmh3_lora_fl": lambda: _mmh3_lora_released("fl2va"),    # LoRA H3 del modello completo → DiT pruned FL2VA
+    "mmh3_lora_ref": lambda: _mmh3_lora_released("ref2va"),  # idem per il DiT pruned Ref2VA          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
     "krea2_dit": _krea2_dit,
     "krea2_te": _krea2_te,
     "ltx25_te": _ltx25_te,

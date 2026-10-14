@@ -103,7 +103,7 @@
 |---|---|---|---|
 | ✅ **Qwen-Image-Lightning 8-step** (1.6GB) | Qwen | acceleratore 12-25× (lightx2v) | **TIENI** se usi Qwen |
 | ✅ Qwen_Real_Nud3s (281MB) | Qwen | NSFW fotoreale | TIENI se NSFW Qwen, altrimenti 🗑️ |
-| ✅ **ZITnsfwLoRAv2** (15MB) | Z-Image | NSFW Z-Image Turbo | **TIENI** (costo zero) |
+| ✅ **ZITnsfwLoRAv3** (14MB) | Z-Image | NSFW Z-Image Turbo (v3, 14/10 sostituisce la v2) | **TIENI** (costo zero) |
 | ✅ **DreamO quality_lora pos/neg** | FLUX.1 | anti-plastic (coppia) | **TIENI** (necessarie a DreamO) |
 | ✅ **MagicQuill** (color/edge/local/puzzle/removal) | editing | editing interattivo locale/removal (SOTA) | **TIENI** (set, insieme) |
 | 🗑️ **CineStyle5, MoXinV1, blindbox** | SD1.5 | stili SD1.5 legacy | **CANCELLA** (fuori stack) |

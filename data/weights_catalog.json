@@ -4929,6 +4929,150 @@
       "use": [
         "veda_sparse"
       ]
+    },
+    {
+      "id": "ltx25-uncensored-v11-q8",
+      "module": "Video",
+      "label": "LTX-2.5 Uncensored Turbo v1.1 (18+, GGUF Q8_0, distilled, 22.3GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 22.33,
+      "scan_names": [
+        "ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "repo_id": "ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      "url": "https://huggingface.co/ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
+      "filename": "ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf",
+      "remote_filename": "split/diffusion_models/ltx25_uncensored_v1.1-Q8_0.gguf",
+      "deps": [
+        "ltx25-te-uncensored|ltx25-te-bf16",
+        "ltx25-video-vae-conv",
+        "ltx25-audio-vae"
+      ],
+      "sensitivity": "adult",
+      "note": "10Eros (0.7) + DMD distill + IC-LoRA + detailer + img2vid fusi: 4-8 passi, CFG 1",
+      "use": [
+        "ckpt_video",
+        "distilled",
+        "gguf_small",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-adaln-affine-fl",
+      "module": "Video",
+      "label": "MiniMax H3 adaLN affine FL2VA (proiezione LoRA sul pruned, 0.1MB)",
+      "kind": "file",
+      "type": "model_patches",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.0001,
+      "scan_names": [
+        "minimax_h3_adaln_affine_fl.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "multimodalart/MiniMax-H3-Pruned",
+      "url": "https://huggingface.co/multimodalart/MiniMax-H3-Pruned",
+      "filename": "minimax_h3_adaln_affine_fl.safetensors",
+      "remote_filename": "transformer/adaln_affine.safetensors",
+      "note": "base [8,2688] e media [2688] della curva temporale del DiT pruned",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "mmh3-adaln-affine-ref",
+      "module": "Video",
+      "label": "MiniMax H3 adaLN affine Ref2VA (proiezione LoRA sul pruned, 0.1MB)",
+      "kind": "file",
+      "type": "model_patches",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.0001,
+      "scan_names": [
+        "minimax_h3_adaln_affine_ref.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "multimodalart/MiniMax-H3-Pruned",
+      "url": "https://huggingface.co/multimodalart/MiniMax-H3-Pruned",
+      "filename": "minimax_h3_adaln_affine_ref.safetensors",
+      "remote_filename": "transformer_ref/adaln_affine.safetensors",
+      "note": "base [8,2688] e media [2688] della curva temporale del DiT pruned",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-v4-fl2v",
+      "module": "Video",
+      "label": "LoRA H3 Turbo v4 8 passi FL2VA (larryvrh, 0.78GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.78,
+      "scan_names": [
+        "minimax_h3_turbo_v4_step600_ema_fl2va-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "larryvrh/MiniMax-H3-Turbo-Lora",
+      "url": "https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora",
+      "filename": "minimax_h3_turbo_v4_step600_ema_fl2va-native.safetensors",
+      "remote_filename": "minimax_h3_turbo_v4_step600_ema.safetensors",
+      "deps": [
+        "mmh3-adaln-affine-fl"
+      ],
+      "note": "v4 step600 EMA: 4-8 passi (meglio 6-8), forza 1.0, shift video 12 / audio 3. Apache-2.0",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_fl",
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-v4-ref2v",
+      "module": "Video",
+      "label": "LoRA H3 Turbo v4 8 passi Ref2VA (larryvrh, 0.78GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.78,
+      "scan_names": [
+        "minimax_h3_turbo_v4_step600_ema_ref2va-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "larryvrh/MiniMax-H3-Turbo-Lora",
+      "url": "https://huggingface.co/larryvrh/MiniMax-H3-Turbo-Lora",
+      "filename": "minimax_h3_turbo_v4_step600_ema_ref2va-native.safetensors",
+      "remote_filename": "minimax_h3_turbo_v4_step600_ema.safetensors",
+      "deps": [
+        "mmh3-adaln-affine-ref"
+      ],
+      "note": "v4 step600 EMA: 4-8 passi (meglio 6-8), forza 1.0, shift video 12 / audio 3. Apache-2.0",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_ref",
+      "use": [
+        "distill_lora"
+      ]
     }
   ],
   "schema": 2,

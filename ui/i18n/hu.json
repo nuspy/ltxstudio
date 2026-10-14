@@ -3117,5 +3117,6 @@
   "weights.use.veda_sparse": "Veda ritka figyelem: egy kis prediktor csak a lényeges figyelemblokkokat számolja — gyorsabb H3 videó, ugyanazok a súlyok.",
   "feat.cap.video_h3_veda": "MiniMax H3 — Veda ritka figyelem",
   "vid.h3.veda": "Veda ritka figyelem (gyorsabb)",
-  "vid.h3.veda.tt": "Csak azokat a figyelemblokkokat számolja, amelyeket egy betanított prediktor hasznosnak jelöl: kb. 1,4–2,2× gyorsabb zajtalanítás. Referenciákkal (Ref2VA) és Turbo 8 lépéssel működik; a modell súlyai nem változnak. Ha valami nem illik, a videó magától teljes figyelemre vált."
+  "vid.h3.veda.tt": "Csak azokat a figyelemblokkokat számolja, amelyeket egy betanított prediktor hasznosnak jelöl: kb. 1,4–2,2× gyorsabb zajtalanítás. Referenciákkal (Ref2VA) és Turbo 8 lépéssel működik; a modell súlyai nem változnak. Ha valami nem illik, a videó magától teljes figyelemre vált.",
+  "vid.h3.turbo.v4": "Turbo v4 8 lépés (larryvrh, referenciákkal is)"
 }

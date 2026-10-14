@@ -1572,6 +1572,19 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     return pipe
 
 
+def _gguf_companion(gguf_path: str) -> str:
+    """Path del compagno safetensors (config + connector bf16) di un GGUF LTX-2.5, creato al primo uso in
+    <modelli>/_gguf_companion (fuori da diffusion_models: non compare tra i checkpoint dei menu)."""
+    try:
+        from workers import gguf_native as _GG
+    except ModuleNotFoundError:
+        import gguf_native as _GG
+    from core import model_paths as _mp
+    stem = os.path.splitext(os.path.basename(gguf_path))[0]
+    out = os.path.join(str(_mp.models_root()), "_gguf_companion", stem + ".companion.safetensors")
+    return _GG.gguf_companion(gguf_path, out, log=lambda m: print(m, flush=True))
+
+
 def _auto_gguf() -> str | None:
     """Trova il miglior GGUF transformer LTX disponibile (Q4 distilled di default). Permette al 22B di
     entrare nei 32GB col dequant on-the-fly (come ComfyUI). Restituisce None se nessun .gguf."""
@@ -2164,6 +2177,10 @@ def run_generation(p: dict) -> str:
         p["gguf_transformer"] = _gp
         if str(p.get("model", "")).lower().endswith(".gguf"):
             p.pop("model", None)                             # il transformer arriva dal GGUF
+        if LTX_RELEASE == "2.5" and not p.get("model"):
+            # 2.5 = split pack senza checkpoint di base: config e connector degli embedding dal «compagno»
+            # generato una volta dal GGUF stesso (mai da un altro modello: nessuna sostituzione)
+            p["model"] = _gguf_companion(_gp)
     # Con l'offload attivo (Gemma CPU + transformer per-blocco) il picco è ~31GB su 32: lasciamo
     # che PyTorch usi tutta la VRAM + sysmem-fallback per il piccolo surplus (lento ma genera).
     # (Il memory_fraction era solo per la diagnosi VRAM, ora rimosso.)

@@ -302,3 +302,39 @@ def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
     if getattr(stage, "_quantization", None) is not None:
         stage._quantization = None
     stage._gguf_patched = True
+
+
+# ───────────────────────── «compagno» safetensors di un GGUF LTX-2.5 ─────────────────────────
+_COMPANION_PREFIXES = ("audio_embeddings_connector.", "video_embeddings_connector.", "embeddings_connector.")
+_COMPANION_META = ("config", "model_version", "gemma_source_checkpoint", "license")
+
+
+def gguf_companion(gguf_path: str, out_path: str, log=print) -> str:
+    """Safetensors piccolo accanto a un GGUF LTX-2.5 (split pack): la config del modello (metadata) e i connector
+    degli embedding dequantizzati in bf16, coi nomi `model.diffusion_model.*`. La pipeline 2.5 lo usa come
+    checkpoint di base — l'embeddings processor legge i connector SOLO da safetensors e la config serve al
+    builder — mentre il transformer arriva dal GGUF (patch_stage_to_gguf). Generato una volta, poi riusato."""
+    import os
+    from safetensors.torch import save_file
+    if os.path.isfile(out_path):
+        return out_path
+    reader = gguf.GGUFReader(gguf_path)
+    meta = {}
+    for k in _COMPANION_META:
+        f = reader.get_field(k)
+        if f is not None:
+            meta[k] = bytes(f.parts[f.data[0]]).decode("utf-8")
+    if "config" not in meta:
+        raise RuntimeError(f"{os.path.basename(gguf_path)}: niente config del modello nei metadati GGUF")
+    sd = gguf_state_dict(gguf_path)
+    out = {"model.diffusion_model." + k: dequantize_tensor(v, torch.bfloat16).contiguous().clone()
+           for k, v in sd.items() if k.startswith(_COMPANION_PREFIXES)}
+    del sd
+    if not out:
+        raise RuntimeError(f"{os.path.basename(gguf_path)}: nessun connector degli embedding nel GGUF")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    tmp = out_path + ".part"
+    save_file(out, tmp, metadata=meta)
+    os.replace(tmp, out_path)
+    log(f"[gguf] compagno 2.5: {os.path.basename(out_path)} ({len(out)} tensori connector + config)")
+    return out_path

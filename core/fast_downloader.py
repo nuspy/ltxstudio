@@ -35,6 +35,10 @@ def _session() -> requests.Session:
     return s
 
 
+class DownloadRefused(RuntimeError):
+    """Il server ha risposto con un errore (4xx/5xx): niente file, il messaggio dice perché."""
+
+
 def civitai_key() -> str | None:
     """Chiave API Civitai: env CIVITAI_TOKEN → preferenze utente. Mai stampata nei log."""
     v = os.environ.get("CIVITAI_TOKEN", "").strip()
@@ -140,6 +144,8 @@ def _dl_single(sess, url, dest, size, token, prog) -> bool:
     for attempt in range(CFG["max_retries"]):
         try:
             r = sess.get(url, headers=hdr, timeout=CFG["timeout"], stream=True, allow_redirects=True)
+            if r.status_code >= 400:                      # pagina d'errore (es. Civitai «Early Access»): mai su disco
+                raise DownloadRefused(f"HTTP {r.status_code}: {r.text[:300].strip()}")
             with open(dest, "ab" if resume else "wb") as fh:
                 for data in r.iter_content(CFG["chunk_size"]):
                     if data:
@@ -147,6 +153,8 @@ def _dl_single(sess, url, dest, size, token, prog) -> bool:
                         if prog:
                             prog(len(data))
             return (not size) or os.path.getsize(dest) >= size
+        except DownloadRefused:
+            raise                                          # rifiuto del server: riprovare non serve
         except Exception:                                  # noqa: BLE001
             time.sleep(min(CFG["retry_delay"] * (2 ** attempt), CFG["max_retry_delay"]))
             resume = os.path.getsize(dest) if os.path.exists(dest) else 0

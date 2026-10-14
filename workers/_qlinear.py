@@ -305,7 +305,7 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
     mods = dict(model.named_modules())
     groups: dict = {}
     for k, v in lora_sd.items():
-        for tag, role in ((".lokr_w1", "w1"), (".lokr_w2", "w2"), (".lokr_w1_a", "w1a"), (".lokr_w1_b", "w1b"),
+        for tag, role in ((".diff_b", "diff_b"), (".diff", "diff"), (".lokr_w1", "w1"), (".lokr_w2", "w2"), (".lokr_w1_a", "w1a"), (".lokr_w1_b", "w1b"),
                           (".lokr_w2_a", "w2a"), (".lokr_w2_b", "w2b"), (".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_A.default.weight", "A"),
                           (".lora_B.default.weight", "B"), (".lora_down.weight", "A"),
                           (".lora_up.weight", "B"), (".alpha", "alpha")):
@@ -319,6 +319,9 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
     n = 0
     for base, g in groups.items():
         m = mods.get(base)
+        if "diff" in g or "diff_b" in g:                             # delta pieni (es. adaLN proiettata sul pruned)
+            n += _diff_into(mods, base, g, strength)
+            continue
         if any(r in g for r in ("w1", "w1a", "w2", "w2a")):          # LoKr (LyCORIS)
             n += _lokr_into(m, g, strength, base) if m is not None else 0
             continue
@@ -343,6 +346,39 @@ def apply_lora(model: nn.Module, lora_sd: dict, strength: float = 1.0) -> int:
             continue
         if m is not None:
             n += _lora_into(m, a, b, s)
+    return n
+
+
+def _diff_into(mods: dict, base: str, g: dict, strength: float) -> int:
+    """Delta pieni `.diff` (peso [out,in]) e `.diff_b` (bias [out]). Il bias va nel `bias` del Linear o, se il
+    Linear non ne ha, nel `folded_bias` del modulo padre (AdaLN dei DiT H3 pruned). Ritorna i pezzi agganciati."""
+    m = mods.get(base)
+    n = 0
+    if "diff" in g and m is not None:
+        d = g["diff"]
+        if tuple(d.shape) != (getattr(m, "out_features", -1), getattr(m, "in_features", -1)):
+            print(f"[diff] {base}: forma {tuple(d.shape)} incompatibile → saltato", flush=True)
+        elif isinstance(m, QUANT_TYPES):                      # come LoRA con A = identità: y += s·diff·x
+            dev = next((t.device for t in m.buffers() if t is not None), torch.device("cuda"))
+            m.add_lora(torch.eye(m.in_features, device=dev, dtype=torch.bfloat16),
+                       d.to(dev, torch.bfloat16), strength)
+            n += 1
+        elif isinstance(m, nn.Linear):
+            with torch.no_grad():
+                m.weight += (strength * d.float().to(m.weight.device)).to(m.weight.dtype)
+            n += 1
+    if "diff_b" in g:
+        db = strength * g["diff_b"].float()
+        parent = mods.get(base.rsplit(".", 1)[0]) if "." in base else None
+        with torch.no_grad():
+            if m is not None and getattr(m, "bias", None) is not None:
+                m.bias += db.to(m.bias.device, m.bias.dtype)
+                n += 1
+            elif parent is not None and isinstance(getattr(parent, "folded_bias", None), torch.Tensor):
+                parent.folded_bias += db.to(parent.folded_bias.device, parent.folded_bias.dtype)
+                n += 1
+            else:
+                print(f"[diff] {base}: nessun bias dove sommare diff_b → saltato", flush=True)
     return n
 
 

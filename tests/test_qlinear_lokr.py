@@ -44,3 +44,16 @@ def test_lokr_forma_sbagliata_saltata():
     m = nn.Module()
     m.a = nn.Linear(8, 16, bias=False)
     assert Q.apply_lora(m, {"a.lokr_w1": torch.randn(3, 3), "a.lokr_w2": torch.randn(4, 4)}, 1.0) == 0
+
+
+def test_diff_su_linear_e_folded_bias():
+    """Delta pieni `.diff`/`.diff_b`: peso del Linear e folded_bias del modulo AdaLN padre (H3 pruned)."""
+    m = nn.Module()
+    m.adaln = nn.Module()
+    m.adaln.linear = nn.Linear(8, 6, bias=False)
+    m.adaln.register_buffer("folded_bias", torch.zeros(6))
+    w0 = m.adaln.linear.weight.detach().clone()
+    d, db = torch.randn(6, 8), torch.randn(6)
+    assert Q.apply_lora(m, {"adaln.linear.diff": d, "adaln.linear.diff_b": db}, 0.5) == 2
+    assert torch.allclose(m.adaln.linear.weight, w0 + 0.5 * d, atol=1e-6)
+    assert torch.allclose(m.adaln.folded_bias, 0.5 * db, atol=1e-6)
