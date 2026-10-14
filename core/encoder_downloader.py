@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# Root text_encoders (coerente con mistral_3_small_flux2.safetensors già lì).
+# Root text_encoders (coerente con mistral_3_small_flux2_fp4_mixed.safetensors già lì).
 TEXT_ENCODERS_DIR = Path(r"E:\AI\Models\TextEncoders\Flux")
 
 # dim txt_in → id di catalogo (weights_catalog v2: repo/remote_filename/dest tutti lì)

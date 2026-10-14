@@ -1,6 +1,6 @@
 """FLUX.2 text encoder (Mistral Small 3, pruned) su 32GB — dequant NVFP4 → bf16 in PURO torch.
 
-Perché: ComfyUI carica il TE FLUX.2 dal file fp4 locale `mistral_3_small_flux2.safetensors` (~12GB,
+Perché: ComfyUI carica il TE FLUX.2 dal file fp4 locale `mistral_3_small_flux2_fp4_mixed.safetensors` (~12GB,
 formato **nvfp4**: weight uint8 packed e2m1 + weight_scale fp8_e4m3 a blocchi di 16 in layout cublas
 "blocked"/swizzled + weight_scale_2 global float32) usando kernel compilati `comfy_kitchen` (non
 portabili). Alternativa percorribile SENZA download (no repo bf16 da 48GB) e senza kernel ComfyUI:
@@ -59,7 +59,7 @@ def dequant_nvfp4_weight(packed: torch.Tensor, block_scale_fp8: torch.Tensor,
     return w.to(torch.bfloat16)
 
 
-FLUX2_TE_FILE = r"E:\AI\Models\TextEncoders\Flux\mistral_3_small_flux2.safetensors"
+FLUX2_TE_FILE = r"E:\AI\Models\TextEncoders\Flux\mistral_3_small_flux2_fp4_mixed.safetensors"
 
 
 class Nvfp4Linear(torch.nn.Module):

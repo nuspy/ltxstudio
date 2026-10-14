@@ -21,7 +21,7 @@ DEFAULTS = {
 # L'inpaint NON è basato su un modello Fill (canali extra), ma su edit-instruct:
 # l'immagine intera è data come RIFERIMENTO (ReferenceLatent, stile Kontext) e la
 # maschera limita la ri-pittura alla sola regione (SetLatentNoiseMask).
-FLUX2_CLIP = "Flux\\mistral_3_small_flux2.safetensors"
+FLUX2_CLIP = "Flux\\mistral_3_small_flux2_fp4_mixed.safetensors"
 FLUX2_VAE = "Flux\\flux2-vae.safetensors"
 
 

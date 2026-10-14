@@ -36,11 +36,11 @@ INDIM_KEYWORDS: dict[int, tuple[str, ...]] = {
 INDIM_LABEL: dict[int, str] = {15360: "Mistral-3 24B", 12288: "Qwen3-8B", 7680: "Qwen3-4B"}
 # nome-file atteso per il download (hint nel messaggio d'errore)
 INDIM_FILE_HINT: dict[int, str] = {
-    15360: "mistral_3_small_flux2.safetensors", 12288: "qwen_3_8b.safetensors",
+    15360: "mistral_3_small_flux2_fp4_mixed.safetensors", 12288: "qwen_3_8b.safetensors",
     7680: "qwen_3_4b.safetensors",
 }
 
-DEFAULT_ENCODER = "Flux\\mistral_3_small_flux2.safetensors"
+DEFAULT_ENCODER = "Flux\\mistral_3_small_flux2_fp4_mixed.safetensors"
 
 
 def _resolve_model_path(name: str | None) -> Path | None:

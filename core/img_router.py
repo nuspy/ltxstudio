@@ -28,7 +28,7 @@ _DM_ROOT = r"E:\AI\Models\diffusion_models"
 
 # componenti di default per arch (ComfyUI folder-relative): clip(+clip2), type, vae
 _ARCH_COMPONENTS = {
-    "flux2": {"clip1": "Flux/mistral_3_small_flux2.safetensors", "clip2": "", "clip_type": "flux2",
+    "flux2": {"clip1": "Flux/mistral_3_small_flux2_fp4_mixed.safetensors", "clip2": "", "clip_type": "flux2",
               "vae": "Flux/flux2-vae.safetensors"},
     "flux":  {"clip1": "clip_l.safetensors", "clip2": "t5xxl_fp16.safetensors", "clip_type": "flux",
               "vae": "ae.safetensors"},

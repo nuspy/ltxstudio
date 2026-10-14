@@ -126,7 +126,7 @@ class RestorePipeline:
 
         # CLIP FLUX.2
         p["5"] = {"class_type": "CLIPLoader",
-                  "inputs": {"clip_name": "Flux\\mistral_3_small_flux2.safetensors", "type": "flux2"}}
+                  "inputs": {"clip_name": "Flux\\mistral_3_small_flux2_fp4_mixed.safetensors", "type": "flux2"}}
 
         # Encoding testo
         p["6"] = {"class_type": "CLIPTextEncode",
@@ -200,7 +200,7 @@ class RestorePipeline:
         p["7"] = {"class_type": "UNETLoader",
                   "inputs": {"unet_name": flux2_model, "weight_dtype": "default"}}
         p["8"] = {"class_type": "CLIPLoader",
-                  "inputs": {"clip_name": "Flux\\mistral_3_small_flux2.safetensors", "type": "flux2"}}
+                  "inputs": {"clip_name": "Flux\\mistral_3_small_flux2_fp4_mixed.safetensors", "type": "flux2"}}
         p["9"] = {"class_type": "CLIPTextEncode",
                   "inputs": {"text": color_prompt, "clip": ["8", 0]}}
         p["10"] = {"class_type": "FluxGuidance",

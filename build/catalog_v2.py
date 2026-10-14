@@ -888,11 +888,13 @@ NEW = [
       remote="split_files/diffusion_models/flux2_dev_fp8mixed.safetensors",
       filename="flux2_dev_fp8mixed.safetensors", type="diffusion_models", family="Flux",
       gb=33.0, scan=["flux2_dev_fp8", "FLUX_2_Dev"]),
-    N("mistral-te-fp8-single", "Immagini", "Mistral-3 TE FLUX.2 fp8 (single-file)",
+    # id storico «fp8»: il file su disco è sempre stato il fp4-mixed (12.28 GB, U8 impacchettato + fp8). 14/10: il
+    # doppione col nome corto è stato cancellato, codice e voce puntano al nome del repo
+    N("mistral-te-fp8-single", "Immagini", "Mistral-3 TE FLUX.2 fp4-mixed (single-file, 12.3GB)",
       category="image", arch="flux2", repo="Comfy-Org/flux2-dev",
-      remote="split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
-      filename="mistral_3_small_flux2.safetensors", type="TextEncoders", family="Flux",
-      gb=16.8, scan=["mistral_3_small_flux2"]),
+      remote="split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
+      filename="mistral_3_small_flux2_fp4_mixed.safetensors", type="TextEncoders", family="Flux",
+      gb=12.28, scan=["mistral_3_small_flux2"]),
     N("t5xxl-fp16", "TextEncoder", "T5-XXL fp16 (FLUX.1 nativo)", category="image",
       arch="flux1", repo="comfyanonymous/flux_text_encoders",
       remote="t5xxl_fp16.safetensors", filename="t5xxl_fp16.safetensors",

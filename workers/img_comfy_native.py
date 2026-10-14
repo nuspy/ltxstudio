@@ -78,7 +78,7 @@ def run(p: dict) -> str:
         model = _unwrap(nodes.UNETLoader().load_unet(model_name, p.get("weight_dtype", "default")))
         # CLIP: flux = (clip_l, t5xxl, 'flux'); flux2 = encoder mistral/qwen, type 'flux2'
         ctype = p.get("clip_type") or ("flux2" if arch == "flux2" else "flux")
-        c1 = p.get("clip1") or ("mistral_3_small_flux2.safetensors" if arch == "flux2" else "clip_l.safetensors")
+        c1 = p.get("clip1") or ("mistral_3_small_flux2_fp4_mixed.safetensors" if arch == "flux2" else "clip_l.safetensors")
         c2 = p.get("clip2") or ("" if arch == "flux2" else "t5xxl_fp16.safetensors")
         if c2:
             clip = _unwrap(nodes.DualCLIPLoader().load_clip(c1, c2, ctype))

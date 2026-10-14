@@ -25,7 +25,7 @@ FLUX_DEFAULTS = {"t5": "t5xxl_fp16.safetensors", "clip_l": "long_clip_l_hi_dream
                  "vae": "Flux\\ae.safetensors"}
 # FLUX.2 usa VAE/encoder/latent diversi da FLUX.1
 FLUX2_VAE = "Flux\\flux2-vae.safetensors"
-FLUX2_CLIP = "Flux\\mistral_3_small_flux2.safetensors"
+FLUX2_CLIP = "Flux\\mistral_3_small_flux2_fp4_mixed.safetensors"
 
 # Architetture hand-built: nessun golden necessario.
 HANDBUILT_ARCHS = ("flux", "flux2", "zimage", "ernie")

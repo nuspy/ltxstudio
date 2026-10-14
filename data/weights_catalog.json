@@ -2026,12 +2026,12 @@
     {
       "id": "mistral-te-fp8-single",
       "module": "Immagini",
-      "label": "Mistral-3 TE FLUX.2 fp8 (single-file)",
+      "label": "Mistral-3 TE FLUX.2 fp4-mixed (single-file, 12.3GB)",
       "kind": "file",
       "type": "TextEncoders",
       "family": "Flux",
       "gated": false,
-      "approx_gb": 16.8,
+      "approx_gb": 12.28,
       "scan_names": [
         "mistral_3_small_flux2"
       ],
@@ -2039,8 +2039,8 @@
       "arch": "flux2",
       "repo_id": "Comfy-Org/flux2-dev",
       "url": "https://huggingface.co/Comfy-Org/flux2-dev",
-      "filename": "mistral_3_small_flux2.safetensors",
-      "remote_filename": "split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
+      "filename": "mistral_3_small_flux2_fp4_mixed.safetensors",
+      "remote_filename": "split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
       "use": [
         "te",
         "te_quant"
