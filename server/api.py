@@ -178,7 +178,7 @@ def download(path: str = Query(..., description="Path locale del file sul server
 def image_generate(
     prompt: str = Form(..., description="Prompt testuale"),
     arch: str = Form("flux", description="flux | z-image | ernie"),
-    model: str = Form(..., description="Nome file modello (es. Flux\\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors)"),
+    model: str = Form(..., description="Nome file modello (es. Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors)"),
     negative: str = Form(""), width: int = Form(1024), height: int = Form(1024),
     steps: int = Form(20), guidance: float = Form(3.5), seed: int = Form(0),
     loras: str = Form("[]", description='JSON: [{"name":"...","strength":1.0}]'),

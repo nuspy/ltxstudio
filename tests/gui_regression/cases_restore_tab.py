@@ -37,9 +37,9 @@ def _real_flux2_models() -> list[str]:
         from core import offline_inventory as oi
         diff = oi.list_models("diffusion_models")
         fl = [m for m in diff if "flux2" in m.lower() or "flux_2" in m.lower() or "flux 2" in m.lower()]
-        return fl or ["Flux\\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors"]
+        return fl or ["Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors"]
     except Exception:                                       # noqa: BLE001
-        return ["Flux\\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors"]
+        return ["Flux\\nvfp4\\flux2-dev-nvfp4-mixed.safetensors"]
 
 
 # ── helper di precondizione ──────────────────────────────────────────────────────
