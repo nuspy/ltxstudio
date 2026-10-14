@@ -27,8 +27,14 @@ _CATS = {
 _CLIP_TYPES = ["flux", "flux2", "ltxv", "sd3", "stable_diffusion", "sdxl", "qwen_image", "lumina2"]
 
 
+# sottocartelle che NON contengono modelli del tipo della categoria (es. Upscale\LTX = upscaler LATENTI di LTX,
+# non caricabili da spandrel: non devono finire nel picker dell'upscaler immagini)
+_SKIP_SUBDIRS = {"upscale_models": {"ltx"}}
+
+
 def list_models(category: str) -> list[str]:
     subs, exts = _CATS.get(category, ([], ()))
+    skip = _SKIP_SUBDIRS.get(category, set())
     out: list[str] = []
     for sub in subs:
         base = MODELS_ROOT / sub
@@ -36,6 +42,8 @@ def list_models(category: str) -> list[str]:
             continue
         for f in base.rglob("*"):
             if f.is_file() and f.suffix.lower() in exts:
+                if skip and any(part.lower() in skip for part in f.relative_to(base).parts[:-1]):
+                    continue
                 out.append(str(f.relative_to(base)).replace("/", "\\"))
     # dedup mantenendo l'ordine
     seen: set[str] = set()

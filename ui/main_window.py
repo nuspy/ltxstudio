@@ -4122,6 +4122,8 @@ class MainWindow(QMainWindow):
             "talk_mask_offset": int(v2v.get("talk_mask_offset", 0) or 0) if mode == "talk" else 0,
             "talk_reimagine": bool(v2v.get("talk_reimagine", False)) if mode == "talk" else False,
             "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
+            # LoRA Wan 2.1 scelte nella sezione «LoRA Wan» di Talk/Canta (si sommano alla distill lightx2v)
+            "loras": list(v2v.get("wan_loras") or []),
         }
         self._start_native_multitalk(params)
         return True

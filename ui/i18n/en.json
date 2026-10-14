@@ -3204,5 +3204,7 @@
   "f1.inpaint.klein_te.official": "Official Qwen3-8B",
   "f1.inpaint.klein_te.uncensored": "Uncensored Qwen3-8B (18+)",
   "f1.inpaint.klein_te.tt": "Text encoder of FLUX.2 Klein 9B. The uncensored version is the same Qwen3-8B with the tendency to refuse removed: it follows explicit prompts instead of softening them. It applies to all jobs made with Klein 9B (inpaint, Integrate, Compose, Color); it is not used with Klein 4B.",
-  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 steps (better audio, experimental)"
+  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 steps (better audio, experimental)",
+  "v2v.wanlora_title": "Wan 2.1 LoRA (MultiTalk lip-sync)",
+  "v2v.wanlora_note": "Talk and Sing run on Wan 2.1 + MultiTalk: pick the Wan LoRAs here (style, detail, concepts). They are added on top of the built-in distillation LoRA; the LTX panel LoRAs do not apply to Wan."
 }

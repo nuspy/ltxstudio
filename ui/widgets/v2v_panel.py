@@ -57,8 +57,10 @@ class CollapsibleSection(QWidget):
 class V2VPanel(QWidget):
     mode_changed = Signal(str)   # "normal" | "talk" | "sing" | "retake" | "listen"
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, nsfw_getter=None):
         super().__init__(parent)
+        self._nsfw_getter = nsfw_getter or (lambda: True)   # filtro 18+ delle LoRA Wan (come il pannello LoRA video)
+        self._wan_lora = None                                # LoraTab «Wan21», creato alla prima visualizzazione
         self._video_path: str | None = None
         self._duration_s: float = 0.0
         self._last_generation: str | None = None
@@ -207,6 +209,15 @@ class V2VPanel(QWidget):
         self.sec_sing.setVisible(False)
         root.addWidget(self.sec_sing)
 
+        # --- LoRA Wan 2.1 per MultiTalk (Talk e Canta): le LoRA del pannello LTX NON valgono per Wan ---
+        self.sec_wanlora = CollapsibleSection(tr("v2v.wanlora_title"))
+        wl = QVBoxLayout(self.sec_wanlora.content)
+        _wn = QLabel(tr("v2v.wanlora_note")); _wn.setWordWrap(True); _wn.setStyleSheet("color:#74c0fc; padding:4px;")
+        wl.addWidget(_wn)
+        self._wanlora_layout = wl
+        self.sec_wanlora.setVisible(False)
+        root.addWidget(self.sec_wanlora)
+
         # --- sezione In ascolto (loop) — foto fissa -> ritratto che ascolta, girabile in loop ---
         self.sec_listen = CollapsibleSection(tr("v2v.listen_section_title"))
         ll = QVBoxLayout(self.sec_listen.content)
@@ -258,6 +269,9 @@ class V2VPanel(QWidget):
         self.sec_retake.setVisible(m == "retake")
         self.sec_talk.setVisible(m == "talk")
         self.sec_sing.setVisible(m == "sing")
+        self.sec_wanlora.setVisible(m in ("talk", "sing"))
+        if m in ("talk", "sing"):
+            self._ensure_wan_lora()
         self.sec_listen.setVisible(m == "listen")
         if m == "retake":
             self.sec_retake.set_expanded(True)
@@ -378,6 +392,23 @@ class V2VPanel(QWidget):
     def v2v_end(self) -> float:
         return self._slider_to_s(self.sl_end.value())
 
+    def _ensure_wan_lora(self):
+        """Crea il selettore LoRA Wan 2.1 (catalogo caricato solo quando serve)."""
+        if self._wan_lora is not None:
+            return
+        try:
+            from ui.tabs.lora_tab import LoraTab
+            self._wan_lora = LoraTab(allow_nsfw_getter=self._nsfw_getter, embedded=True, arch="Wan21")
+            self._wan_lora.setMinimumHeight(220)
+            self._wanlora_layout.addWidget(self._wan_lora)
+        except Exception:                                # noqa: BLE001 — catalogo assente: sezione vuota, niente crash
+            self._wan_lora = None
+
+    def refresh_wan_loras(self):
+        """Ri-filtra le LoRA Wan (cambio SFW/NSFW della sezione video)."""
+        if self._wan_lora is not None:
+            self._wan_lora.refresh()
+
     # ---------------- API per l'app ----------------
     def get_v2v_config(self) -> dict:
         """Valori V2V da fondere nei `vals` di generazione (vuoto/normal se modalità Normal)."""
@@ -389,16 +420,23 @@ class V2VPanel(QWidget):
             cfg.update({"v2v_start": round(self.v2v_start(), 2), "v2v_end": round(self.v2v_end(), 2),
                         "v2v_regen_audio": self.rb_audio_regen.isChecked()})
         if m == "talk":
+            cfg["wan_loras"] = self._selected_wan_loras()
             cfg.update({"talk_region": self.cmb_region.currentData(),
                         "talk_mask_offset": self.sp_offset.value(),
                         "talk_reimagine": self.cb_reimagine.isChecked()})
         if m == "sing":
+            cfg["wan_loras"] = self._selected_wan_loras()
             cfg.update({"sing_audio_path": self._sing_audio_path,
                         "sing_separate_vocals": self.cb_sing_vocals.isChecked(),
                         "sing_audio_scale": round(self.sl_sing_scale.value() / 10.0, 1)})
         if m == "listen":
             cfg.update(self.get_listen_config())
         return cfg
+
+    def _selected_wan_loras(self) -> list[dict]:
+        if self._wan_lora is None:
+            return []
+        return [{"name": l["name"], "strength": l["strength"]} for l in self._wan_lora.selected_loras()]
 
     def get_listen_config(self) -> dict:
         """Config della modalità 'In ascolto (loop)': durata (multipli seamless), intensità

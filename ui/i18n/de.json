@@ -3130,5 +3130,7 @@
   "f1.inpaint.klein_te.official": "Offizieller Qwen3-8B",
   "f1.inpaint.klein_te.uncensored": "Qwen3-8B unzensiert (18+)",
   "f1.inpaint.klein_te.tt": "Text-Encoder von FLUX.2 Klein 9B. Die unzensierte Version ist derselbe Qwen3-8B ohne die Neigung zu verweigern: Er folgt expliziten Prompts, statt sie abzuschwächen. Gilt für alle Aufträge mit Klein 9B (Inpaint, Integrieren, Komponieren, Farbe); mit Klein 4B wird er nicht verwendet.",
-  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 Schritte (besseres Audio, experimentell)"
+  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 Schritte (besseres Audio, experimentell)",
+  "v2v.wanlora_title": "Wan-2.1-LoRA (MultiTalk-Lippensynchronisation)",
+  "v2v.wanlora_note": "Sprechen und Singen laufen mit Wan 2.1 + MultiTalk: Wählen Sie hier die Wan-LoRAs (Stil, Detail, Konzepte). Sie kommen zur internen Destillations-LoRA hinzu; die LoRAs des LTX-Panels gelten nicht für Wan."
 }

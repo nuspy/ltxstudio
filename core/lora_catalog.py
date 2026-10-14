@@ -79,10 +79,11 @@ class LoraEntry:
     tags: list[str] = field(default_factory=list)
     downloads: int = 0
     civitai_url: str | None = None
+    display_name: str = ""          # nome mostrato se il file ha un nome generico (es. diffusion_pytorch_model)
 
     @property
     def name(self) -> str:
-        return os.path.splitext(self.filename)[0]
+        return self.display_name or os.path.splitext(self.filename)[0]
 
     @property
     def comfy_name(self) -> str:
@@ -92,6 +93,10 @@ class LoraEntry:
             i = pl.lower().find(marker.lower())
             if i != -1:
                 return pl[i + len(marker):]
+        # file fuori dalla cartella LoRA (es. Checkpoints\DreamO\...): il solo nome non si risolve → path assoluto
+        # (i motori FLUX/Krea2/Qwen21 accettano path assoluti)
+        if os.path.isabs(self.path) and os.path.isfile(self.path):
+            return self.path
         return self.filename
 
     @property
@@ -148,7 +153,8 @@ def _entry_from_raw(raw: dict) -> LoraEntry:
         triggers=triggers,
         description=_strip_html(civ.get("description") or raw.get("instructions") or ""),
         nsfw=bool(raw.get("nsfw") or civ.get("nsfw") or nsfw_level >= 4
-                  or _looks_nsfw(raw.get("filename"), raw.get("path"), civ.get("tags"))),
+                  or _looks_nsfw(raw.get("filename"), raw.get("path"), civ.get("tags"))
+                  or (raw.get("filename") or "").lower() in _overrides()["adult"]),
         preview_url=purl,
         preview_is_video=pvid,
         preview_nsfw_level=plevel,
@@ -167,6 +173,11 @@ _ARCH_ALIASES = {
 
 
 def _arch_matches(raw: dict, wanted: str) -> bool:
+    if wanted.upper() in ("WAN21", "WAN22"):
+        return False                       # le LoRA Wan vengono dalla scansione cartelle (_folder_loras)
+    ovr = _overrides()["arch"].get((raw.get("filename") or "").lower())
+    if ovr:
+        return ovr.upper() == wanted.upper()
     arch = (raw.get("architecture") or "").upper()
     if arch == wanted.upper():
         return True
@@ -205,6 +216,104 @@ def _registry_loras(arch: str) -> list[LoraEntry]:
         return []
 
 
+# ── correzioni locali al dizionario (data/lora_overrides.json) ──────────────────────────────────────────
+_OVR_PATH = Path(__file__).resolve().parents[1] / "data" / "lora_overrides.json"
+_OVR_CACHE: tuple[float, dict] = (-1.0, {})
+
+
+def _overrides() -> dict:
+    """adult (nomi file 18+), arch (nome file → arch pannello), extra (file fuori cartella LoRA). Cache per mtime."""
+    global _OVR_CACHE
+    try:
+        mt = _OVR_PATH.stat().st_mtime
+        if mt != _OVR_CACHE[0]:
+            d = json.loads(_OVR_PATH.read_text(encoding="utf-8"))
+            _OVR_CACHE = (mt, {"adult": {str(n).lower() for n in d.get("adult", [])},
+                               "arch": {str(k).lower(): v for k, v in (d.get("arch") or {}).items()},
+                               "extra": list(d.get("extra") or [])})
+        return _OVR_CACHE[1]
+    except (OSError, ValueError):
+        return {"adult": set(), "arch": {}, "extra": []}
+
+
+# Pannelli le cui LoRA NON si fidano solo del dizionario (scanner esterno, spesso indietro sui file spostati):
+# arch → sottocartelle di <radice>\LoRA da scandire. Wan: «Wan21» = MultiTalk/Wan 2.1, «Wan22» = Wan 2.2
+# (le LoRA «Wan2_2-…» stanno in LoRA\Wan ma sono 2.2: le distingue il nome, vedi _wan_arch_of).
+_FOLDERS = {"FLUX": ("Flux",), "WAN21": ("Wan",), "WAN22": ("Wan", "Wan2.2")}
+_LORA_EXT = (".safetensors", ".pt", ".ckpt")
+_WAN22_NAME = re.compile(r"wan2[_.\-]?2|high[_-]?noise|low[_-]?noise", re.IGNORECASE)
+
+
+def _wan_arch_of(path: str, filename: str) -> str:
+    ovr = _overrides()["arch"].get(filename.lower())
+    if ovr:
+        return ovr
+    if f"{os.sep}wan2.2{os.sep}" in path.lower() or _WAN22_NAME.search(filename):
+        return "Wan22"
+    return "Wan21"
+
+
+def _is_adult(filename: str, *extra: Any) -> bool:
+    return filename.lower() in _overrides()["adult"] or _looks_nsfw(filename, *extra)
+
+
+def _models_root() -> Path:
+    try:
+        from core import model_paths as mp
+        return Path(mp.models_root())
+    except Exception:                                    # noqa: BLE001
+        return Path(r"E:\AI\Models")
+
+
+def _folder_loras(arch: str, seen: set[str], meta: dict[str, dict]) -> list[LoraEntry]:
+    """LoRA presenti su disco nelle cartelle dell'arch ma assenti dal dizionario (o con arch sbagliata lì).
+    `meta` = voci del dizionario per nome file (trigger/descrizione/preview quando esistono)."""
+    folders = _FOLDERS.get(arch.upper())
+    if not folders:
+        return []
+    out: list[LoraEntry] = []
+    for sub in folders:
+        d = _models_root() / "LoRA" / sub
+        if not d.is_dir():
+            continue
+        for f in sorted(d.iterdir()):
+            if not f.is_file() or f.suffix.lower() not in _LORA_EXT:
+                continue
+            if arch.upper().startswith("WAN") and _wan_arch_of(str(f), f.name).upper() != arch.upper():
+                continue
+            key = os.path.normcase(str(f))
+            if key in seen:
+                continue
+            raw = meta.get(f.name.lower())
+            if raw:
+                e = _entry_from_raw(dict(raw, path=str(f), architecture=arch))
+            else:
+                e = LoraEntry(sha256=f"disk:{key}", filename=f.name, path=str(f), architecture=arch)
+            e.nsfw = e.nsfw or _is_adult(f.name, str(f))
+            out.append(e)
+            seen.add(key)
+    return out
+
+
+def _extra_loras(arch: str, seen: set[str]) -> list[LoraEntry]:
+    """File fuori dalle cartelle LoRA che valgono come LoRA di questo pannello (es. FLUX.1-Turbo-Alpha, finito
+    in Checkpoints\\DreamO): vale il primo percorso candidato esistente."""
+    root = _models_root()
+    out: list[LoraEntry] = []
+    for x in _overrides()["extra"]:
+        if str(x.get("arch", "")).upper() != arch.upper():
+            continue
+        f = next((root / c for c in x.get("paths", []) if (root / c).is_file()), None)
+        if f is None or os.path.normcase(str(f)) in seen:
+            continue
+        seen.add(os.path.normcase(str(f)))
+        out.append(LoraEntry(sha256=f"extra:{x.get('id', f.name)}", filename=f.name, path=str(f), architecture=arch,
+                             display_name=x.get("display_name", ""), description=x.get("description", ""),
+                             triggers=_clean_triggers(x.get("triggers")),
+                             nsfw=bool(x.get("nsfw")) or _is_adult(f.name)))
+    return out
+
+
 class LoraCatalog:
     """Carica e filtra il catalogo. Ricarica dinamicamente quando il file cambia."""
 
@@ -225,18 +334,26 @@ class LoraCatalog:
         else:
             raw_iter = raw_entries
         out: list[LoraEntry] = []
+        meta: dict[str, dict] = {}           # voci LoRA del dizionario per nome file (metadati per la scansione cartelle)
         for raw in raw_iter:
             if not isinstance(raw, dict):
                 continue
             if raw.get("type") != "LoRA":
                 continue
-            if not _arch_matches(raw, self.compatible_arch):
-                continue
             if raw.get("missing"):
+                continue
+            # il dizionario può restare indietro sui file spostati/rinominati: voce fantasma = file inesistente
+            if not os.path.isfile(raw.get("path", "")):
+                continue
+            meta.setdefault((raw.get("filename") or "").lower(), raw)
+            if not _arch_matches(raw, self.compatible_arch):
                 continue
             out.append(_entry_from_raw(raw))
         seen = {os.path.normcase(e.path) for e in out}
         out += [e for e in _registry_loras(self.compatible_arch) if os.path.normcase(e.path) not in seen]
+        seen = {os.path.normcase(e.path) for e in out}
+        out += _folder_loras(self.compatible_arch, seen, meta)
+        out += _extra_loras(self.compatible_arch, seen)
         out.sort(key=lambda e: (e.preview_url is None, -e.downloads, e.name.lower()))
         self._entries = out
         self._mtime = self.path.stat().st_mtime

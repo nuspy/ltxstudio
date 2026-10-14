@@ -5,7 +5,8 @@ WanVideoWrapper importati come libreria (shim `server` per girare headless, nien
 con WanVideoContextOptions per i video lunghi (memory-bounded). Pesi tutti locali.
 
 Param JSON (argv[1]): image_path, audio_path, prompt, negative, width, height, num_frames, fps,
-steps, cfg, shift, seed, blocks_to_swap, lora_strength, context (bool), output.
+steps, cfg, shift, seed, blocks_to_swap, lora_strength, loras ([{name, strength}] extra, opz.),
+context (bool), output.
 """
 from __future__ import annotations
 import json, os, sys, types, subprocess, importlib
@@ -43,7 +44,7 @@ def _shim_and_import():
     add("vae", os.path.join(M, "VAE"))
     add("text_encoders", os.path.join(M, "TextEncoders"))
     add("clip_vision", os.path.join(M, "VisionEncoders"))
-    for sub in ("LoRA\\Wan2.1", "LoRA\\Wan", "LoRA\\Wan2.2"):
+    for sub in ("LoRA\\Wan2.1", "LoRA\\Wan", "LoRA\\Wan2.2", "LoRA"):   # «LoRA» = radice: la GUI manda «Wan\x.safetensors»
         add("loras", os.path.join(M, sub))
 
     sys.path.insert(0, os.path.join(COMFY, "custom_nodes"))
@@ -196,9 +197,21 @@ def run(p: dict) -> str:
                model=p.get("multitalk", "WanVideo_2_1_Multitalk_14B_fp32.safetensors"))
     bs = _call(NM["WanVideoBlockSwap"],
                blocks_to_swap=bts, offload_img_emb=False, offload_txt_emb=False)
-    lora = _call(NM["WanVideoLoraSelect"],
-                 lora=p.get("lora", "Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64_fixed.safetensors"),
-                 strength=float(p.get("lora_strength", 0.6)), merge_loras=False)
+    # catena LoRA: distillazione lightx2v (default) + le LoRA Wan 2.1 scelte dall'utente nella sezione Talk/Canta
+    # (`loras` = [{name, strength}], nome relativo alla cartella LoRA o path assoluto). Ogni nodo riceve la
+    # precedente come `prev_lora` (schema del WanVideoLoraSelect concatenabile di kijai).
+    lora_chain = [(p.get("lora", "Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64_fixed.safetensors"),
+                   float(p.get("lora_strength", 0.6)))]
+    for lo in (p.get("loras") or []):
+        nm = lo.get("path") or lo.get("name")
+        if nm:
+            lora_chain.append((nm, float(lo.get("strength", 1.0))))
+    lora = None
+    for nm, st in lora_chain:
+        kw = dict(lora=nm, strength=st, merge_loras=False)
+        if lora is not None:
+            kw["prev_lora"] = lora
+        lora = _call(NM["WanVideoLoraSelect"], **kw)
     model = _call(NM["WanVideoModelLoader"],
                   model=model_name,
                   base_precision="fp16_fast", quantization="disabled", load_device="offload_device",

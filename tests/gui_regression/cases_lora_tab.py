@@ -273,6 +273,34 @@ def case_generate_auto_insert_trigger(w, spy):
 
 
 # ───────────────────────── PER-LoRA: un caso per OGNI modello concreto ─────────────────────────
+def case_wan_lora_in_talk_sing(w, spy):
+    """Sezione «LoRA Wan» di Talk/Canta: compare in entrambe le modalità, elenca le LoRA Wan 2.1 (non quelle LTX)
+    e la selezione arriva in get_v2v_config()['wan_loras'] (→ params['loras'] del worker MultiTalk)."""
+    panel = w.video_tab.v2v_panel
+    try:
+        w.video_tab.nsfw.setCurrentText("NSFW")
+        for rb, mode in ((panel.rb_talk, "talk"), (panel.rb_sing, "sing")):
+            rb.setChecked(True); panel._on_mode()
+            assert not panel.sec_wanlora.isHidden(), f"sezione LoRA Wan nascosta in {mode}"
+        rows = panel._wan_lora._rows
+        assert rows, "nessuna LoRA Wan 2.1 elencata (cartella LoRA/Wan non scandita?)"
+        assert not any("ltx" in n.lower() for n in rows), "LoRA LTX finite nel pannello Wan"
+        name = next(iter(rows)); rows[name]["cb"].setChecked(True)
+        cfg = panel.get_v2v_config()
+        assert [l["name"] for l in cfg["wan_loras"]] == [rows[name]["entry"].comfy_name], cfg.get("wan_loras")
+    finally:
+        panel.rb_normal.setChecked(True); panel._on_mode()
+
+
+def case_flux_panel_has_turbo_alpha(w, spy):
+    """Il pannello LoRA FLUX elenca FLUX.1-Turbo-Alpha (file in Checkpoints/DreamO) come LoRA FLUX."""
+    f1 = w.frame1_tab
+    f1.img_nsfw.setCurrentText("NSFW")
+    f1._sync_gen_lora_arch("FLUX")
+    names = list(f1.gen_lora_tab._rows)
+    assert any("Turbo-Alpha" in n for n in names), "FLUX.1-Turbo-Alpha non elencata tra le LoRA FLUX"
+
+
 def _make_lora_case(name, comfy):
     def _case(w, spy):
         _show_all(w)
@@ -328,6 +356,10 @@ CASES = [
      case_set_available_extra),
     ("lora_generate_includes_lora", "on_generate passa la LoRA selezionata nei params['loras'] del worker nativo.",
      case_generate_includes_lora),
+    ("lora_wan_in_talk_sing", "Talk/Canta mostrano la sezione LoRA Wan 2.1 e la selezione arriva in wan_loras.",
+     case_wan_lora_in_talk_sing),
+    ("lora_flux_turbo_alpha", "Il pannello LoRA FLUX elenca FLUX.1-Turbo-Alpha (file in Checkpoints/DreamO).",
+     case_flux_panel_has_turbo_alpha),
     ("lora_generate_auto_insert_trigger", "auto-trigger ON: on_generate procede senza dialog e invia la richiesta.",
      case_generate_auto_insert_trigger),
 ]

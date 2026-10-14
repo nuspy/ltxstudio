@@ -3130,5 +3130,7 @@
   "f1.inpaint.klein_te.official": "आधिकारिक Qwen3-8B",
   "f1.inpaint.klein_te.uncensored": "अनसेंसर्ड Qwen3-8B (18+)",
   "f1.inpaint.klein_te.tt": "FLUX.2 Klein 9B का टेक्स्ट एनकोडर। अनसेंसर्ड संस्करण वही Qwen3-8B है जिसमें मना करने की प्रवृत्ति हटा दी गई है: यह स्पष्ट प्रॉम्प्ट को नरम करने के बजाय उनका पालन करता है। Klein 9B से किए गए सभी कामों (inpaint, एकीकृत करें, रचना, रंग) पर लागू; Klein 4B के साथ उपयोग नहीं होता।",
-  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 चरण (बेहतर ऑडियो, प्रायोगिक)"
+  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 चरण (बेहतर ऑडियो, प्रायोगिक)",
+  "v2v.wanlora_title": "Wan 2.1 LoRA (MultiTalk लिप-सिंक)",
+  "v2v.wanlora_note": "बोलना और गाना Wan 2.1 + MultiTalk पर चलते हैं: यहाँ Wan के LoRA (शैली, विवरण, अवधारणाएँ) चुनें। ये अंतर्निहित डिस्टिलेशन LoRA के ऊपर जुड़ते हैं; LTX पैनल के LoRA Wan पर लागू नहीं होते।"
 }

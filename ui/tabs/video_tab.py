@@ -388,7 +388,7 @@ class VideoTab(QWidget):
         from ui.widgets.v2v_panel import V2VPanel
         v2v_box = QGroupBox(tr("vid.v2v.group"))
         v2v_l = QVBoxLayout(v2v_box)
-        self.v2v_panel = V2VPanel()
+        self.v2v_panel = V2VPanel(nsfw_getter=lambda: self.nsfw.currentText() == "NSFW")
         v2v_l.addWidget(self.v2v_panel)
         root.addWidget(v2v_box)
 
@@ -491,6 +491,8 @@ class VideoTab(QWidget):
     def _on_nsfw(self, *_):
         self._refilter_models()      # riselezione istantanea modelli utilizzabili
         self.lora.refresh()          # re-filtro LoRA per NSFW
+        if hasattr(self, "v2v_panel"):
+            self.v2v_panel.refresh_wan_loras()   # LoRA Wan di Talk/Canta
 
     # ── architettura video (LTX ↔ LingBot) ───────────────────────────────────
     def _arch(self) -> str:
@@ -1196,7 +1198,7 @@ class VideoTab(QWidget):
     # mappa famiglia rilevata → (arch LoRA, encoder consigliato per la voce 'auto')
     _VID_FAMILY = {
         "ltxv": ("LTX", "Gemma/T5 (LTX-2)"),
-        "wan21": ("Wan", "umt5-xxl"), "wan22": ("Wan", "umt5-xxl"),
+        "wan21": ("Wan21", "umt5-xxl"), "wan22": ("Wan22", "umt5-xxl"),
         "hunyuan_video": ("Hunyuan", "llava/llama (HunyuanVideo)"),
     }
 
