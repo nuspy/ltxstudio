@@ -908,6 +908,7 @@ _IC_IDS = {
     "deinterlace": "ltx-iclora-deinterlace", "motiondeblur": "ltx-iclora-motiondeblur",
     "hdr": "ltx-iclora-hdr", "lipdub": "ltx-iclora-lipdub", "restyle": "ltx-iclora-restyle",
     "motion-track": "ltx-iclora-motion-track", "union": "ltx-iclora-union",
+    "cameraman": "ltx-iclora-cameraman",
 }
 _IC_FALLBACK = {
     "canny": "ltx-2-19b-ic-lora-canny-control.safetensors",
@@ -924,6 +925,7 @@ _IC_FALLBACK = {
     "restyle": "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors",
     "motion-track": "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
     "union": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+    "cameraman": "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors",
 }
 IC_LORA = {k: _mpaths.p(_IC_IDS[k], os.path.join(_LORA2, _IC_FALLBACK[k])) for k in _IC_IDS}
 IC_LORA = {k: v for k, v in IC_LORA.items() if os.path.exists(v)}   # solo quelle presenti su disco
@@ -1891,6 +1893,71 @@ def _run_chunked(p: dict, chunk: int) -> str:
     return p["output"]
 
 
+def _ic_chunkable(p: dict) -> bool:
+    """True se il job con control_video si puo' spezzare in segmenti del GUIDE: niente maschere per-frame
+    (inpaint/attention mask), niente ReTake, niente riferimenti MSR (stanno fuori dalla finestra del clip)."""
+    return bool(p.get("control_video")) and not (
+        p.get("inpaint_masks_dir") or p.get("attention_mask_dir") or p.get("retake") or p.get("references"))
+
+
+def _run_chunked_ic(p: dict, chunk: int) -> str:
+    """Video con IC-LoRA (control_video) a SEGMENTI in-process (Fase 1 IC-LoRA, DESIGN 4.3).
+
+    Differenza da `_run_chunked` (i2v/a2v): li' ogni chunk riceveva `control_video` INTERO (bug: stessa guida su
+    ogni chunk, o OOM). Qui il guide e' TAGLIATO in segmenti da `chunk` frame (8n+1) con overlap, ogni segmento e'
+    un `run_generation` (la pipeline resta in `_PIPE_CACHE`: nessun reload del modello fra segmenti) e i risultati
+    sono uniti con crossfade lineare sugli overlap (`core.video_ic_prep.concat_segments`).
+    Params usati: control_video, num_frames (totale richiesto), overlap_frames (default 9, min 8 per il restauro),
+    ic_frame0_image (restyle: sostituisce il frame 0 di OGNI segmento con l'immagine di stile), resume.
+    image_path vale solo per il PRIMO segmento. L'audio generato dai segmenti NON viene unito (concat senza audio):
+    la GUI rimette l'audio originale con _mux_audio_from."""
+    from core import video_ic_prep as prep
+    fps = float(p.get("fps", 25.0))
+    src = p["control_video"]
+    info = prep.probe(src, count_frames=True)
+    total = min(int(p["num_frames"]), int(info.nb_frames))
+    if total < int(p["num_frames"]):
+        print(f"[iclora] il guide ha {info.nb_frames} frame < num_frames {p['num_frames']}: uso {total}", flush=True)
+    ov = max(0, int(p.get("overlap_frames", 0) or 0)) or prep.DEFAULT_OVERLAP
+    segs = prep.plan_segments(total, chunk, ov)
+    ovs = prep.overlaps_of(segs)
+    base = os.path.splitext(p["output"])[0]
+    work = f"{base}_icseg"
+    os.makedirs(work, exist_ok=True)
+    resume = bool(p.get("resume", False))
+    print(f"[iclora] segmentazione: {len(segs)} segmenti da {segs[0].count} frame, overlap {ovs} "
+          f"(guide {info.width}x{info.height} {info.nb_frames}f, tot {total}f)", flush=True)
+    parts: list[str] = []
+    for sg in segs:
+        sub = os.path.join(work, f"guide_{sg.index:03d}.mp4")
+        outp = f"{base}_icchunk{sg.index}.mp4"
+        if resume and os.path.exists(outp) and _probe_frames(outp) >= sg.count - 2:
+            print(f"[iclora] segmento {sg.index + 1}/{len(segs)} gia' valido -> riuso (resume)", flush=True)
+            parts.append(outp)
+            continue
+        prep.extract_segment(src, sub, sg.start, sg.count)
+        if p.get("ic_frame0_image"):
+            _s0 = os.path.join(work, f"guide_{sg.index:03d}_f0.mp4")
+            sub = prep.replace_first_frame(sub, p["ic_frame0_image"], _s0)
+        cp = dict(p)
+        for k in ("chunk_frames", "overlap_frames", "ic_frame0_image"):
+            cp.pop(k, None)
+        cp.update(control_video=sub, num_frames=sg.count, output=outp)
+        if sg.index > 0:
+            cp.pop("image_path", None)
+        print(f"[iclora] segmento {sg.index + 1}/{len(segs)}: frame {sg.start}-{sg.end - 1} ({sg.count}f)",
+              flush=True)
+        run_generation(cp)                                   # GenerationCancelled propaga; NIENTE retry silenzioso
+        import gc as _gc
+        _gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        parts.append(outp)
+    prep.concat_segments(parts, p["output"], ovs, fps=fps)
+    print(f"[iclora] concat {len(parts)} segmenti -> {p['output']}", flush=True)
+    return p["output"]
+
+
 def run_t2a(p: dict) -> str:
     """#29 text→audio NATIVO (T2AOneStagePipeline, audio-only). Genera audio dal prompt → wav. ≤10s test."""
     import time
@@ -2145,7 +2212,29 @@ def run_generation(p: dict) -> str:
     # Video lungo → chunking in-process (memory-bounded, niente sborzo stage_2). Attiva con
     # chunk_frames>0 (o auto sotto). Ricorsione sicura: i chunk hanno num_frames<=chunk.
     _chunk = int(p.get("chunk_frames", 0))
+    # TETTI IC-LoRA (core/video_edit_modes.py): con `_strict_ic` (GUI/API nuovi) il lato lungo e' ridotto al tetto
+    # della modalita' e, se chunkable, il clip lungo e' spezzato in segmenti del GUIDE (prima: nessun limite -> OOM).
+    if p.get("_strict_ic") and p.get("control_video"):
+        from core import video_edit_modes as _vem
+        _sp = _vem.spec_for_kind(str(p.get("control_type", "")))
+        if _sp is not None:
+            _w2, _h2, _red = _vem.clamp_resolution(p["width"], p["height"], _sp)
+            if (_w2, _h2) != (p["width"], p["height"]):
+                print(f"[iclora] tetto {_sp.key}: {p['width']}x{p['height']} -> {_w2}x{_h2} "
+                      f"(max lato lungo {_sp.max_long_edge})", flush=True)
+                p["width"], p["height"] = _w2, _h2
+            if _sp.chunkable and _ic_chunkable(p) and int(p.get("num_frames", 0)) > _sp.max_frames_per_segment:
+                if not _chunk or _chunk > _sp.max_frames_per_segment:
+                    _chunk = _sp.max_frames_per_segment
+                    print(f"[iclora] tetto {_sp.key}: {p['num_frames']} frame > {_sp.max_frames_per_segment} "
+                          f"-> segmenti da {_chunk}", flush=True)
+            elif not _sp.chunkable and int(p.get("num_frames", 0)) > _sp.max_frames_per_segment:
+                raise SystemExit(f"[iclora] {_sp.key}: {p['num_frames']} frame oltre il tetto "
+                                 f"{_sp.max_frames_per_segment} e la modalita' non si puo' spezzare in segmenti: "
+                                 "accorcia il clip.")
     if _chunk and int(p.get("num_frames", 0)) > _chunk:
+        if _ic_chunkable(p):                                 # control_video: spezza il GUIDE, non copiarlo intero
+            return _run_chunked_ic(p, _chunk)
         return _run_chunked(p, _chunk)
     # ── GGUF VIDEO: RIMOSSO DAL PRODOTTO (13/07) ─────────────────────────────────────────────
     # Il loader GGUF dequantizza in Python A OGNI forward (1660 Linear × step) → ~500 s/step contro
@@ -2264,6 +2353,11 @@ def run_generation(p: dict) -> str:
         ptype = "a2v" if p.get("audio_path") else "ti2v"      # audio dato → lip-sync/canto NATIVO
         # #102 GUARDIA: control_video presente ma NESSUN IC-LoRA risolto → il ControlNet/replace_char verrebbe
         # ignorato IN SILENZIO (degrado a ti2v). Il GUI fa già hard-error sul peso mancante; qui almeno lo urlo.
+        if p.get("control_video") and p.get("_strict_ic"):   # GUI/API nuovi: errore invece del degrado silenzioso
+            raise SystemExit(
+                f"[iclora] control_video presente ma IC-LoRA non risolto (control_type={p.get('control_type')!r}, "
+                f"edit_lora={p.get('edit_lora')!r}). IC-LoRA presenti su disco: {sorted(IC_LORA) or 'nessuna'}. "
+                "Scarica il peso (tab Pesi modelli) o scegli un'altra modalita'.")
         if p.get("control_video"):
             print(f"[warn] control_video presente ma IC-LoRA non risolto (edit_lora={p.get('edit_lora')!r}, "
                   f"control_type={p.get('control_type')!r}) → guida IGNORATA, degrado a {ptype}. "
@@ -2397,6 +2491,11 @@ def run_generation(p: dict) -> str:
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
+        print(f"[iclora] kind={p.get('control_type') or p.get('edit_lora')} frames={nf} "
+              f"{int(p.get('width', 0))}x{int(p.get('height', 0))} fps={fps} strength={cstr} "
+              f"image={'si' if p.get('image_path') else 'no'} "
+              f"distilled={'distilled' in os.path.basename(ckpt).lower()} "
+              f"(ref_downscale: metadata della LoRA, letto dalla pipeline)", flush=True)
         # ICLoraPipeline prende UNA sola immagine di riferimento: eventuali keyframe non hanno dove
         # andare. Prima sparivano in SILENZIO (storyboard+controlnet = storyboard ignorato); ora si
         # dichiara, e il primo keyframe fa almeno da immagine di riferimento invece di perdersi.

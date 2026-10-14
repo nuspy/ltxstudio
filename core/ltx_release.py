@@ -108,6 +108,8 @@ _R23 = LtxRelease(
         "restyle": _P("ltx-iclora-restyle", str(_LORA23 / "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors")),
         "motion-track": _P("ltx-iclora-motion-track", str(_LORA23 / "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors")),
         "union": _P("ltx-iclora-union", str(_LORA23 / "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors")),
+        # Cameraman (Civitai 2525197): IC-LoRA con video di RIFERIMENTO del movimento camera (v1, 10500 step)
+        "cameraman": _P("ltx-iclora-cameraman", str(_LORA23 / "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors")),
     },
     caps={
         "t2v": CAP_YES, "i2v": CAP_YES, "ti2v": CAP_YES, "a2v": CAP_YES, "audio": CAP_YES,
@@ -203,6 +205,20 @@ _R25 = LtxRelease(
 
 LTX_RELEASES: dict[str, LtxRelease] = {"2.3": _R23, "2.5": _R25}
 DEFAULT_RELEASE = "2.3"
+
+
+def is_distilled(path_or_name: str | None) -> bool:
+    """True se il checkpoint e' un DISTILLED (stessa euristica del worker, workers/ltx2_infer.py: la
+    parola «distilled» nel NOME del file; la cartella non conta). Vuoto/None/«auto» -> False."""
+    if not path_or_name:
+        return False
+    return "distilled" in os.path.basename(str(path_or_name).replace("\\", "/")).lower()
+
+
+def ic_lora_supported(release: str | None) -> bool:
+    """True se le IC-LoRA di editing/restauro locali si possono usare con la release: oggi solo la 2.3
+    (tutti i pesi locali sono per 2.3; con la 2.5 l'unico adapter ufficiale e' il pixel-upscaler)."""
+    return str(release or "") == "2.3"
 
 
 def get(release: str | None) -> LtxRelease:
