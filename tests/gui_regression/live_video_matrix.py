@@ -37,10 +37,11 @@ M = {
     "gguf_q6":       r"E:\AI\Models\diffusion_models\ltx-2-3-22b-dev-Q6_K.gguf",
     "eros":          r"E:\AI\Models\diffusion_models\LTX\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
     "pinkcherry":    r"E:\AI\Models\diffusion_models\LTX\PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors",
+    "eros14":        r"E:\AI\Models\diffusion_models\LTX\ltx10eros_v14_2989669.safetensors",   # Civitai: vs v1.5
     # LTX-2.5 int8 ConvRot (fold nativo in ltx-core), distill già fuso
     "stubelius":     r"E:\AI\Models\diffusion_models\LTX\ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors",
 }
-NSFW_KEYS = ("eros", "pinkcherry", "stubelius")
+NSFW_KEYS = ("eros", "eros14", "pinkcherry", "stubelius")
 PROMPTS = [  # creativi e vari (regola: mai gattini/cani)
     "un fabbro forgia una spada incandescente in una bottega medievale, scintille",
     "una ballerina di flamenco danza su un tetto all'alba, vestito rosso al vento",
@@ -331,6 +332,7 @@ for key in ("dev_fp8", "dev_nvfp4", "gguf_q4", "gguf_q6", "eros"):
 # 18+ importati il 13/10 (LTX-2.3 fp8 ComfyUI, LTX-2.5 int8 ConvRot, TE Gemma 4 uncensored)
 CASES += [
     ("ltx_pinkcherry_t2v",          1200, case_t2v("pinkcherry")),
+    ("ltx_eros14_t2v",              1200, case_t2v("eros14")),         # 14/10: confronto con ltx_eros_t2v
     ("ltx25_stubelius_t2v",         1500, case_t2v("stubelius")),
     ("ltx25_stubelius_te_unc_t2v",  1500, case_t2v_te("stubelius", "ltx25-te-uncensored")),
 ]

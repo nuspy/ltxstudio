@@ -8,6 +8,7 @@ Uso:  QT_QPA_PLATFORM=offscreen python tests/gui_regression/live_h3_video.py [--
       [--image PATH] (i2v: foto come primo fotogramma) [--ref PATH] (Ref2VA: foto di riferimento <Picture 1>)
       [--veda] (attenzione sparsa Veda: richiede --ref) [--profile nvfp4|fp8|int8|int4]
       [--dit ID] (DiT personalizzato 18+, es. mmh3-dit-dasiwa-v4: passa a NSFW) [--lightvae dec|encdec]
+      [--lora PEZZO_DEL_NOME_FILE] (spunta la LoRA H3 nel pannello LoRA vero; passa a NSFW)
 """
 from __future__ import annotations
 
@@ -75,6 +76,14 @@ def main() -> int:
     vt.model.setCurrentIndex(i)
     assert data(i).get("present"), f"pesi non presenti: {dit or profile}"
     vt.h3_lightvae.setCurrentIndex(vt.h3_lightvae.findData(lightvae))
+    lora = _arg("--lora", "")
+    if lora:
+        vt.nsfw.setCurrentText("NSFW")
+        vt.lora.refresh()
+        hit = [r for r in vt.lora._rows.values() if lora.lower() in r["entry"].filename.lower()]
+        assert hit, f"LoRA «{lora}» assente dal pannello H3"
+        hit[0]["cb"].setChecked(True); hit[0]["sp"].setValue(1.0)
+        print(f"[live] LoRA: {hit[0]['entry'].filename} trigger={hit[0]['entry'].triggers}", flush=True)
     vt.h3_turbo.setCurrentIndex(vt.h3_turbo.findData(turbo))
     vt.h3_dialogue.clear()
     vt.h3_dialogue.add_row(speaker, "Italian", line)
@@ -112,7 +121,7 @@ def main() -> int:
     if not outs:
         print("FAIL nessun video")
         return 1
-    tag = ("_ref" if ref else "") + ("_veda" if veda else "") + (f"_{dit}" if dit else f"_{profile}") +         (f"_lvae-{lightvae}" if lightvae else "")
+    tag = ("_ref" if ref else "") + ("_veda" if veda else "") + (f"_{dit}" if dit else f"_{profile}") +         (f"_lvae-{lightvae}" if lightvae else "") + (f"_lora-{_arg('--lora', '')}" if _arg("--lora", "") else "")
     dst = ROOT / "output" / f"DIAG_h3_{label}_{'t' + turbo if turbo else 'base'}_{int(secs)}s{tag}.mp4"
     shutil.copyfile(outs[-1], dst)
     info = _probe(str(dst))

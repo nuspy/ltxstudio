@@ -31,12 +31,15 @@ def _vae(layers=None):
         return AutoencoderKLMiniMaxH3.from_config(cfg)
 
 
-def test_merge_state_sostituisce_solo_il_prefisso():
-    base = {"decoder.a": 1, "decoder.b": 2, "encoder.c": 3, "quant_conv.w": 4, "latents_mean": 5}
-    out = LV.merge_state(base, dec={"decoder.x": 9})
-    assert out == {"decoder.x": 9, "encoder.c": 3, "quant_conv.w": 4, "latents_mean": 5}
-    out = LV.merge_state(base, enc={"encoder.y": 8})
-    assert "encoder.c" not in out and out["encoder.y"] == 8 and out["decoder.a"] == 1
+def test_merge_state_sostituisce_solo_il_componente():
+    base = {"decoder.a": 1, "decoder.b": 2, "encoder.c": 3, "quant_conv.w": 4, "post_quant_conv.w": 6}
+    # il file Lite reale porta anche latents_mean/std: nel VAE diffusers sono config → ignorati
+    out = LV.merge_state(base, dec={"decoder.x": 9, "post_quant_conv.w": 7, "latents_mean": 0, "latents_std": 0})
+    assert out == {"decoder.x": 9, "encoder.c": 3, "quant_conv.w": 4, "post_quant_conv.w": 7}
+    out = LV.merge_state(base, enc={"encoder.y": 8, "latents_std": 0})
+    assert "encoder.c" not in out and out["encoder.y"] == 8 and out["decoder.a"] == 1 and "latents_std" not in out
+    with pytest.raises(ValueError):
+        LV.merge_state(base, dec={"encoder.z": 1})                     # file dell'altro componente
 
 
 def test_prune_encoder_e_decoder_ridotto():

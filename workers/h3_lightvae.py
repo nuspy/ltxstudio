@@ -63,13 +63,22 @@ def prune_encoder(vae, kept: list[int]) -> int:
     return pruned
 
 
+# chiavi che un file Lite porta per il suo componente (come load_h3_component del codice ufficiale); il resto
+# del file (es. latents_mean/latents_std, che nel VAE diffusers sono config e non tensori) si ignora
+_PARTS = {"dec": ("decoder.", "post_quant_conv."), "enc": ("encoder.", "quant_conv.")}
+
+
 def merge_state(base: dict, dec: dict | None = None, enc: dict | None = None) -> dict:
     """State dict del VAE originale con decoder e/o encoder sostituiti da quelli Lite."""
     out = dict(base)
-    for prefix, sd in (("decoder.", dec), ("encoder.", enc)):
+    for part, sd in (("dec", dec), ("enc", enc)):
         if sd is None:
             continue
-        for k in [k for k in out if k.startswith(prefix)]:
+        pre = _PARTS[part]
+        mine = {k: v for k, v in sd.items() if k.startswith(pre)}
+        if not any(k.startswith(pre[0]) for k in mine):
+            raise ValueError(f"file LightVAE senza chiavi {pre[0]}* (componente sbagliato?)")
+        for k in [k for k in out if k.startswith(pre[0]) or (k.startswith(pre[1]) and k in mine)]:
             del out[k]
-        out.update(sd)
+        out.update(mine)
     return out
