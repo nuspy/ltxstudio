@@ -40,8 +40,11 @@ M = {
     "eros14":        r"E:\AI\Models\diffusion_models\LTX\ltx10eros_v14_2989669.safetensors",   # Civitai: vs v1.5
     # LTX-2.5 int8 ConvRot (fold nativo in ltx-core), distill già fuso
     "stubelius":     r"E:\AI\Models\diffusion_models\LTX\ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors",
+    # LTX-2.5 uncensored v1.1 GGUF Q8: config e connector dal «compagno» estratto dal GGUF (workers/gguf_native)
+    "unc25_q8":      r"E:\AI\Models\diffusion_models\LTX\ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf",
+    "unc25_int8":    r"E:\AI\Models\diffusion_models\LTX\ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors",
 }
-NSFW_KEYS = ("eros", "eros14", "pinkcherry", "stubelius")
+NSFW_KEYS = ("eros", "eros14", "pinkcherry", "stubelius", "unc25_q8", "unc25_int8")
 PROMPTS = [  # creativi e vari (regola: mai gattini/cani)
     "un fabbro forgia una spada incandescente in una bottega medievale, scintille",
     "una ballerina di flamenco danza su un tetto all'alba, vestito rosso al vento",
@@ -90,6 +93,25 @@ def _wait_done(w, app, timeout_s: int) -> bool:
                 return True
         _spin(app, 1.0)
     return False
+
+
+# Fotogramma di rumore ↔ immagine: |differenza fra pixel adiacenti| / deviazione standard. Tarato il 14/10 sui video
+# veri (0.02–0.08: LTX 2.3/2.5, H3) e su quello di rumore del GGUF 2.5 (0.22).
+NOISE_MAX = 0.15
+
+
+def _noise_ratio(mp4: str) -> float | None:
+    import io
+    import subprocess
+    try:
+        import numpy as np
+        from PIL import Image
+        b = subprocess.run(["ffmpeg", "-v", "error", "-ss", "1", "-i", mp4, "-frames:v", "1", "-f", "image2pipe",
+                            "-vcodec", "png", "-"], capture_output=True, timeout=60).stdout
+        x = np.asarray(Image.open(io.BytesIO(b)).convert("L")).astype(float)
+        return float(np.abs(np.diff(x, axis=1)).mean() / (x.std() + 1e-6))
+    except Exception:                                       # noqa: BLE001 — niente ffmpeg/PIL: non si giudica
+        return None
 
 
 def _new_outputs(before: set) -> list[str]:
@@ -336,6 +358,8 @@ CASES += [
     ("ltx_eros14_t2v",              1200, case_t2v("eros14")),         # 14/10: confronto con ltx_eros_t2v
     ("ltx25_stubelius_t2v",         1500, case_t2v("stubelius")),
     ("ltx25_stubelius_te_unc_t2v",  1500, case_t2v_te("stubelius", "ltx25-te-uncensored")),
+    ("ltx25_unc_q8_gguf_t2v",       1800, case_t2v("unc25_q8")),       # 14/10: esce RUMORE (non è un PASS)
+    ("ltx25_unc_int8_t2v",          1500, case_t2v("unc25_int8")),
 ]
 # altre architetture
 CASES += [
@@ -378,6 +402,11 @@ def run_case(name: str, timeout_s: int, fn) -> tuple[bool, str]:
     if not done:
         return False, f"TIMEOUT dopo {dt:.0f}s (coda ancora occupata)\n--- log GUI ---\n{log_tail}"
     good = [o for o in outs if os.path.getsize(o) > 50_000]
+    if good:                                                # >50KB non basta: il GGUF 2.5 dava un mp4 di RUMORE
+        nr = _noise_ratio(good[-1])
+        if nr is not None and nr > NOISE_MAX:
+            return False, (f"RUMORE nel video (indice {nr:.3f} > {NOISE_MAX}) in {dt:.0f}s → "
+                           f"{os.path.basename(good[-1])}\n--- log GUI ---\n{log_tail}")
     if good:
         return True, f"OK in {dt:.0f}s → {os.path.basename(good[-1])} ({os.path.getsize(good[-1])//1024}KB)"
     return False, f"NESSUN OUTPUT (>50KB) in {dt:.0f}s — outs={outs}\n--- log GUI ---\n{log_tail}"
