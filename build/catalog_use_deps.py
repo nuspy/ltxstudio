@@ -272,6 +272,23 @@ MAP.update({
 CIV_LORA = (["lora_style", "uncensored"], [])
 
 
+# MiniMax H3: il TE non dipende dalla DiT. Il worker legge SOLO W["te"] (workers/minimax_h3_infer.py load_text_encoder)
+# e ne riconosce il formato dal contenuto del file (_qlinear.quantize_from_state_dict: nvfp4/int8/fp8), e
+# core/minimax_h3_spec.weight_ids accetta qualunque TE di TE_IDS con qualunque DiT (h3_te libero). Quindi ogni DiT H3
+# ha il gruppo di alternative; il primo e' quello scaricato se nessuno e' presente (= TE del profilo in PROFILES).
+H3_TE_STD = ("mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8")
+H3_TE_FIRST = {"fp8": "mmh3-te-fp8", "int8": "mmh3-te-int8"}      # dalla suffisso dell'id; altri: nvfp4
+
+
+def h3_te_group(dit_id: str) -> str:
+    first = next((v for k, v in H3_TE_FIRST.items() if dit_id.endswith("-" + k)), H3_TE_STD[0])
+    return "|".join([first] + [t for t in H3_TE_STD if t != first])
+
+
+def is_h3_dit(e: dict) -> bool:
+    return e.get("arch") == "minimax_h3" and e.get("type") == "diffusion_models"
+
+
 def main() -> int:
     data = json.loads(CATALOG.read_text("utf-8"))
     unknown = []
@@ -290,6 +307,9 @@ def main() -> int:
             e.pop("use", None)
         # deps: unione con quelle già presenti (krea_rt→wan ecc. restano), mai auto-riferimenti
         merged = list(dict.fromkeys((e.get("deps") or []) + deps))
+        if is_h3_dit(e):                              # TE singolo/vecchio gruppo -> gruppo completo di alternative
+            merged = [d for d in merged if not d.startswith("mmh3-te-")]
+            merged.insert(min(1, len(merged)), h3_te_group(e["id"]))
         bad = [a for d in merged for a in d.split("|") if a not in ids]   # «a|b» = alternative
         assert not bad, f"{e['id']}: deps inesistenti {bad}"
         if merged:

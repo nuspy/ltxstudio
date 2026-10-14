@@ -37,7 +37,9 @@ def test_catalogo_h3_completo_e_nativo():
         assert need in ids, f"manca la voce {need}"
     for e in ids.values():
         assert wc.downloadable(e), f"{e['id']} non scaricabile"
-        assert e.get("used_by") == ["cap.video_minimax_h3"], f"{e['id']}: gating errato"
+        # il predittore Veda ha una sua capability (attenzione sparsa opzionale), non quella base di H3
+        want = ["cap.video_h3_veda"] if e["id"] == "mmh3-veda-r2va" else ["cap.video_minimax_h3"]
+        assert e.get("used_by") == want, f"{e['id']}: gating errato"
         assert "gguf" not in e["id"], "i GGUF H3 sono ritirati (nessun loader nativo)"
         if e.get("kind") == "file" and "Comfy" in (e.get("repo_id") or "") or e.get("convert"):
             # file ComfyUI → convertito al download: il nome locale è quello NATIVO
@@ -52,8 +54,20 @@ def test_catene_per_modalita():
     for ckpt in ("mmh3-fl2va-nvfp4", "mmh3-ref2va-nvfp4"):
         plan = [x["id"] for x in dl.plan_ids([ckpt])]
         assert plan[-1] == ckpt, f"{ckpt} deve venire dopo le sue dipendenze"
-        for dep in ("mmh3-configs", "mmh3-te-nvfp4", "mmh3-video-vae", "mmh3-audio-vae"):
+        for dep in ("mmh3-configs", "mmh3-video-vae", "mmh3-audio-vae"):
             assert dep in plan, f"{ckpt}: manca {dep}"
+        assert any(t in plan for t in ("mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8")), f"{ckpt}: manca un TE"
+
+
+def test_ogni_dit_h3_ha_tutte_le_alternative_te():
+    """Il TE e' indipendente dalla DiT (worker legge solo W['te']; spec accetta ogni TE_IDS): tutte le DiT H3 ->
+    gruppo con nvfp4, fp8 e int8 (prova in build/catalog_use_deps.py)."""
+    dits = [e for e in wc.load() if e.get("arch") == "minimax_h3" and e.get("type") == "diffusion_models"]
+    assert len(dits) >= 12
+    for e in dits:
+        groups = [d for d in e["deps"] if d.startswith("mmh3-te-")]
+        assert len(groups) == 1, (e["id"], e["deps"])
+        assert set(wc.dep_alternatives(groups[0])) == {"mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8"}, e["id"]
     gb = sum(float(mp.entry(i).get("approx_gb", 0)) for i in [x["id"] for x in dl.plan_ids(["mmh3-fl2va-nvfp4"])])
     assert 30 < gb < 40, f"scarico minimo inatteso: {gb:.1f} GB"
 

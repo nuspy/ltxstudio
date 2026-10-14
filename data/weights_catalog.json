@@ -2639,7 +2639,7 @@
       "remote_filename": "diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-int8|mmh3-te-nvfp4|mmh3-te-fp8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -2675,7 +2675,7 @@
       "remote_filename": "diffusion_models/minimax_h3_fl2va_pruned_fp8_scaled.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-fp8|mmh3-te-nvfp4|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -2711,7 +2711,7 @@
       "remote_filename": "diffusion_models/minimax_h3_fl2va_pruned_bf16.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -2747,7 +2747,7 @@
       "remote_filename": "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-int8|mmh3-te-nvfp4|mmh3-te-fp8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -2784,7 +2784,7 @@
       "remote_filename": "diffusion_models/minimax_h3_ref2va_pruned_fp8_scaled.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-fp8|mmh3-te-nvfp4|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -3032,7 +3032,7 @@
       "remote_filename": "MiniMax_H3_FL2VA_pruned_nvfp4.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -3068,7 +3068,7 @@
       "remote_filename": "MiniMax_H3_Ref2VA_pruned_nvfp4.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -4275,7 +4275,7 @@
       ],
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4|mmh3-te-fp8",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ]
@@ -4312,7 +4312,7 @@
       ],
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4|mmh3-te-fp8",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ]
@@ -5507,7 +5507,7 @@
       "sha256": "3ce15eaaa714ef407ca67541baa4a6f186d853649fd877d94504fe5bf80ec1bc",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4|mmh3-te-fp8",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -6584,7 +6584,7 @@
       "remote_filename": "minimaxH3INT8INT6INT4_flREF2VAPruned_3089623.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
@@ -6618,7 +6618,7 @@
       "remote_filename": "minimaxH3INT8INT6INT4_flREF2VAPruned_3091888.safetensors",
       "deps": [
         "mmh3-configs",
-        "mmh3-te-nvfp4",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
