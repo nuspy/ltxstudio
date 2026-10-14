@@ -305,6 +305,7 @@ class _VideoEditAIWorker(QThread):
                 params["original_frames_dir"] = _os.path.join(track_dir, "frames")
                 params["inpaint_masks_dir"] = _os.path.join(track_dir, "masks")
                 params["skip_stage_2"] = False
+                params["control_video"] = src                  # guide = video sorgente: senza, il worker degrada a ti2v (bug c6f8529, 14/10)
                 self.progress.emit("[edit] maschera tracciata → latent-inpaint")
             elif cfg["mode"] == "replace_char":                # #102 Sostituisci personaggio (union-control-ref)
                 from core import controlnet_preprocess as _cp
