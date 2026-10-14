@@ -3113,5 +3113,9 @@
   "weights.civitai": "Civitai API 密钥",
   "weights.civitai.hint": "civitai.com → 账户设置 → API Keys（仅保存在本机）",
   "weights.civitai.tt": "从 Civitai 获取的模型需要它：没有密钥时 Civitai 会跳转到登录页，下载会失败。",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 步)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 步)",
+  "weights.use.veda_sparse": "Veda 稀疏注意力：小型预测器只计算关键的注意力块——同样的权重，更快的 H3 视频。",
+  "feat.cap.video_h3_veda": "MiniMax H3 — Veda 稀疏注意力",
+  "vid.h3.veda": "Veda 稀疏注意力（更快）",
+  "vid.h3.veda.tt": "只计算训练好的预测器标为有用的注意力块：去噪约快 1.4–2.2 倍。适用于参考（Ref2VA）和 Turbo 8 步；模型权重不变。如有不匹配，视频会自动改用完整注意力。"
 }

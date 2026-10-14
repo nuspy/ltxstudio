@@ -3113,5 +3113,9 @@
   "weights.civitai": "מפתח API של Civitai",
   "weights.civitai.hint": "civitai.com ← הגדרות חשבון ← API Keys (נשמר רק במחשב הזה)",
   "weights.civitai.tt": "נדרש למודלים ממקור Civitai: בלי מפתח Civitai מפנה להתחברות וההורדה נכשלת.",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 צעדים)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 צעדים)",
+  "weights.use.veda_sparse": "קשב דליל Veda: מנבא קטן מחשב רק את בלוקי הקשב החשובים — וידאו H3 מהיר יותר, אותם משקלים.",
+  "feat.cap.video_h3_veda": "MiniMax H3 — קשב דליל Veda",
+  "vid.h3.veda": "קשב דליל Veda (מהיר יותר)",
+  "vid.h3.veda.tt": "מחשב רק את בלוקי הקשב שמנבא מאומן מסמן כשימושיים: ניקוי רעש מהיר פי 1.4–2.2 בערך. עובד עם הפניות (Ref2VA) ועם Turbo של 8 צעדים; משקלי המודל לא משתנים. אם משהו לא מתאים, הווידאו חוזר לבד לקשב מלא."
 }

@@ -4903,6 +4903,32 @@
         "distilled",
         "q_int8"
       ]
+    },
+    {
+      "id": "mmh3-veda-r2va",
+      "module": "Video",
+      "label": "Veda attenzione sparsa H3 Ref2VA (predittore fp8, 0.28GB)",
+      "kind": "file",
+      "type": "model_patches",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.28,
+      "scan_names": [
+        "minimax_h3_r2va_veda_preview_fp8.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Veda-Sparse/Minimax-H3-R2VA-Veda-Preview",
+      "url": "https://huggingface.co/Veda-Sparse/Minimax-H3-R2VA-Veda-Preview",
+      "filename": "minimax_h3_r2va_veda_preview_fp8.safetensors",
+      "remote_filename": "minimax_h3_r2va_veda_preview_fp8.safetensors",
+      "note": "predittore di attenzione sparsa appresa (Veda, ICML 2026): ~1.4-2.2× sul denoise in Ref2VA + Turbo 8 passi. Non è una LoRA: i pesi del DiT non cambiano. Licenza H3 Community",
+      "used_by": [
+        "cap.video_h3_veda"
+      ],
+      "use": [
+        "veda_sparse"
+      ]
     }
   ],
   "schema": 2,

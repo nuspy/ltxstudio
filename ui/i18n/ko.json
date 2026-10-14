@@ -3113,5 +3113,9 @@
   "weights.civitai": "Civitai API 키",
   "weights.civitai.hint": "civitai.com → 계정 설정 → API Keys (이 PC에만 저장됨)",
   "weights.civitai.tt": "Civitai에서 받는 모델에 필요합니다. 키가 없으면 Civitai가 로그인으로 보내 다운로드가 실패합니다.",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8단계)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8단계)",
+  "weights.use.veda_sparse": "Veda 희소 어텐션: 작은 예측기가 중요한 어텐션 블록만 계산합니다 — 같은 가중치로 더 빠른 H3 영상.",
+  "feat.cap.video_h3_veda": "MiniMax H3 — Veda 희소 어텐션",
+  "vid.h3.veda": "Veda 희소 어텐션 (더 빠름)",
+  "vid.h3.veda.tt": "학습된 예측기가 유용하다고 표시한 어텐션 블록만 계산합니다: 디노이즈가 약 1.4–2.2배 빨라집니다. 레퍼런스(Ref2VA)와 Turbo 8단계에서 작동하며 모델 가중치는 바뀌지 않습니다. 맞지 않는 부분이 있으면 영상은 자동으로 전체 어텐션으로 돌아갑니다."
 }

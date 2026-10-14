@@ -3187,5 +3187,9 @@
   "weights.civitai": "Civitai API key",
   "weights.civitai.hint": "civitai.com → Account settings → API Keys (stays on this PC only)",
   "weights.civitai.tt": "Needed for models sourced from Civitai: without a key Civitai redirects to the login page and the download fails.",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 steps)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 steps)",
+  "weights.use.veda_sparse": "Veda sparse attention: a small predictor computes only the attention blocks that matter — faster H3 video, same weights.",
+  "feat.cap.video_h3_veda": "MiniMax H3 — Veda sparse attention",
+  "vid.h3.veda": "Veda sparse attention (faster)",
+  "vid.h3.veda.tt": "Computes only the attention blocks a trained predictor marks as useful: about 1.4–2.2× faster denoising. Works with references (Ref2VA) and Turbo 8 steps; the model weights do not change. If anything does not fit, the video falls back to full attention on its own."
 }

@@ -31,6 +31,9 @@ DEPS = [
     "huggingface_hub", "einops", "ftfy", "imageio", "imageio-ffmpeg", "soundfile", "av", "numpy<2.3",
     "comfy-kitchen", "peft",
     "opencv-python-headless",            # preprocessori ControlNet di Qwen-Image 2.1 (canny, contorni)
+    # kernel Triton INT8 block-sparse dell'attenzione Veda (MiniMax H3): 3.5.x è la serie di torch 2.9
+    "triton-windows>=3.5,<3.6; platform_system == 'Windows'",
+    "triton>=3.5,<3.6; platform_system == 'Linux'",
 ]
 
 

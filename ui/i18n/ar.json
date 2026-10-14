@@ -3113,5 +3113,9 @@
   "weights.civitai": "مفتاح API لـ Civitai",
   "weights.civitai.hint": "civitai.com ← إعدادات الحساب ← API Keys (يبقى على هذا الجهاز فقط)",
   "weights.civitai.tt": "مطلوب للنماذج المصدرة من Civitai: من دون مفتاح يعيد Civitai التوجيه إلى تسجيل الدخول ويفشل التنزيل.",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 خطوات)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 خطوات)",
+  "weights.use.veda_sparse": "انتباه Veda المتناثر: مُتنبِّئ صغير يحسب فقط كتل الانتباه المهمة — فيديو H3 أسرع بالأوزان نفسها.",
+  "feat.cap.video_h3_veda": "MiniMax H3 — انتباه Veda المتناثر",
+  "vid.h3.veda": "انتباه Veda المتناثر (أسرع)",
+  "vid.h3.veda.tt": "يحسب فقط كتل الانتباه التي يحددها مُتنبِّئ مدرَّب على أنها مفيدة: إزالة ضوضاء أسرع بنحو 1.4–2.2 مرة. يعمل مع المراجع (Ref2VA) ومع Turbo بـ8 خطوات؛ أوزان النموذج لا تتغير. إذا لم يتوافق شيء، يعود الفيديو تلقائيًا إلى الانتباه الكامل."
 }

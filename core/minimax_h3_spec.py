@@ -49,6 +49,12 @@ DIALOGUE_LANGS = ("Italian", "English", "Chinese", "Spanish", "French", "German"
                   "Japanese", "Korean", "Russian", "Arabic")
 
 
+# Predittore Veda (attenzione sparsa appresa, workers/veda_h3): addestrato su Ref2VA + Turbo 8 passi, clip ~5 s,
+# geometrie 16:9 / 9:16 / 4:3 / 1:1; fuori da lì il piano a tile è approssimato. Budget come la release: 32 tile.
+VEDA_R2VA = "mmh3-veda-r2va"
+VEDA_BUDGET = "32"
+
+
 def mode_for(params: dict) -> str:
     return "ref2va" if params.get("references") else "fl2va"
 
@@ -101,4 +107,8 @@ def weight_ids(params: dict) -> dict:
         if t not in TURBO or mode not in TURBO[t][0]:
             raise ValueError(f"LoRA turbo {t} passi non disponibile per {mode}")
         ids["turbo"] = TURBO[t][0][mode]
+    if params.get("h3_veda"):                     # attenzione sparsa Veda: predittore addestrato per Ref2VA
+        if mode != "ref2va":
+            raise ValueError("Attenzione sparsa Veda: il predittore disponibile è per Ref2VA (servono riferimenti)")
+        ids["veda"] = VEDA_R2VA
     return ids

@@ -3454,6 +3454,11 @@ class MainWindow(QMainWindow):
                 if _k in vals:
                     params[_k] = vals[_k]
             params.setdefault("h3_profile", "nvfp4")
+            # Veda: predittore Ref2VA → solo coi riferimenti (senza, la casella non ha effetto)
+            if vals.get("h3_veda") and params.get("references"):
+                if not self._feature_gate("cap.video_h3_veda"):
+                    return
+                params["h3_veda"] = True
             params["duration_s"] = float(vals.get("length_s") or 5.0)
             params["num_frames"] = _S.snap_frames(params["duration_s"])
             params["fps"] = _S.FPS

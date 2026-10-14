@@ -3113,5 +3113,9 @@
   "weights.civitai": "Chave de API do Civitai",
   "weights.civitai.hint": "civitai.com → Configurações da conta → API Keys (fica só neste PC)",
   "weights.civitai.tt": "Necessária para modelos do Civitai: sem chave, o Civitai redireciona para o login e o download falha.",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 passos)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 passos)",
+  "weights.use.veda_sparse": "Atenção esparsa Veda: um pequeno preditor calcula só os blocos de atenção que importam — vídeo H3 mais rápido, mesmos pesos.",
+  "feat.cap.video_h3_veda": "MiniMax H3 — atenção esparsa Veda",
+  "vid.h3.veda": "Atenção esparsa Veda (mais rápida)",
+  "vid.h3.veda.tt": "Calcula só os blocos de atenção que um preditor treinado marca como úteis: remoção de ruído cerca de 1,4–2,2× mais rápida. Funciona com referências (Ref2VA) e Turbo 8 passos; os pesos do modelo não mudam. Se algo não se encaixar, o vídeo volta sozinho à atenção completa."
 }

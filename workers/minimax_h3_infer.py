@@ -160,6 +160,11 @@ def load_transformer(W: dict, mode: str, p: dict):
             tr.set_attention_backend(backend)
         except Exception as e:                                       # noqa: BLE001
             _log(f"backend attenzione {backend} non disponibile ({e}): uso quello di default")
+    if W.get("veda"):                                  # DOPO il backend: i processor originali restano il ripiego
+        import veda_h3
+        if not (W.get("turbo") or S.CUSTOM_DITS.get(str(p.get("h3_dit") or ""), {}).get("turbo_fused")):
+            _log("Veda: il predittore è addestrato col Turbo 8 passi; senza Turbo la qualità va verificata")
+        veda_h3.enable(tr, W["veda"], generated=S.VEDA_BUDGET, reference=S.VEDA_BUDGET, log=_log)
     return tr
 
 
@@ -385,6 +390,8 @@ def run(p: dict) -> str:
                generator=torch.Generator("cpu").manual_seed(seed))
     _log(f"denoise {nfe} passi in {time.time() - t1:.0f}s ({(time.time() - t1) / max(1, nfe):.1f}s/passo) — "
          f"VRAM {_vram()}")
+    if getattr(tr, "_veda_state", None) is not None:
+        _log(f"Veda: {tr._veda_state.summary()}")
     del st, tr
     _gc()
 

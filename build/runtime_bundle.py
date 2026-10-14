@@ -52,6 +52,9 @@ def stage(app_root: str | Path, dest: str | Path | None = None,
             if f.is_file():
                 f.unlink()
                 removed += 1
+            elif f.is_dir():                         # componente-cartella (es. workers/veda): via tutta
+                removed += sum(1 for x in f.rglob("*") if x.is_file())
+                shutil.rmtree(f)
     if exclude:
         print(f"  [runtime] {removed} file di feature spente nell'edizione esclusi")
     return pairs

@@ -626,6 +626,14 @@ class VideoTab(QWidget):
             "(Ref2VA) esiste solo la 4 passi, in anteprima."))
         self.h3_turbo.currentIndexChanged.connect(self._sync_h3_steps)
         f.addRow(tr("vid.h3.turbo_lbl", "Velocità"), self.h3_turbo)
+        # Attenzione sparsa Veda (workers/veda_h3): il predittore è Ref2VA → vale solo coi riferimenti; senza, il
+        # worker non la riceve (main_window). Il riepilogo «sparse/piena» finisce nel log del job.
+        self.h3_veda = QCheckBox(tr("vid.h3.veda", "Attenzione sparsa Veda (più veloce)"))
+        self.h3_veda.setToolTip(tr("vid.h3.veda.tt",
+            "Calcola solo i blocchi d'attenzione che un predittore addestrato segna come utili: circa 1,4–2,2× "
+            "più veloce sul denoise. Vale con i riferimenti (Ref2VA) e il Turbo 8 passi; i pesi del modello non "
+            "cambiano. Se qualcosa non torna, il video usa da solo l'attenzione piena."))
+        f.addRow("", self.h3_veda)
         self.h3_canvas = QComboBox()
         self.h3_canvas.addItem(tr("vid.h3.canvas.768", "768p (nativa, massima qualità)"), "768")
         self.h3_canvas.addItem(tr("vid.h3.canvas.544", "544p (≈2,3× più veloce)"), "544")
@@ -1369,6 +1377,7 @@ class VideoTab(QWidget):
             v["h3_dit"] = sel_data.get("h3_dit", "")              # DiT personalizzato (finetune), se scelto
             v["h3_te"] = self.h3_te.currentData() or "mmh3-te-nvfp4"
             v["h3_turbo"] = self.h3_turbo.currentData() or ""
+            v["h3_veda"] = self.h3_veda.isChecked()
             v["h3_canvas"] = self.h3_canvas.currentData() or "768"
             v["h3_dialogue"] = self.h3_dialogue.value()
             v["h3_soundscape"] = self.h3_soundscape.text().strip()

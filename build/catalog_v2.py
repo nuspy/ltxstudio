@@ -733,6 +733,13 @@ NEW = [
       filename="Minimax_H3_Unlocked_V2-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3",
       gb=0.3, sens="adult", used_by=["cap.video_minimax_h3"],
       note="la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16"),
+    N("mmh3-veda-r2va", "Video", "Veda attenzione sparsa H3 Ref2VA (predittore fp8, 0.28GB)", category="video",
+      arch="minimax_h3", repo="Veda-Sparse/Minimax-H3-R2VA-Veda-Preview",
+      remote="minimax_h3_r2va_veda_preview_fp8.safetensors",
+      filename="minimax_h3_r2va_veda_preview_fp8.safetensors", type="model_patches", family="MiniMax-H3",
+      gb=0.28, used_by=["cap.video_h3_veda"],
+      note="predittore di attenzione sparsa appresa (Veda, ICML 2026): ~1.4-2.2× sul denoise in Ref2VA + Turbo 8 "
+           "passi. Non è una LoRA: i pesi del DiT non cambiano. Licenza H3 Community"),
     N("mmh3-lora-hmcumshot-v2", "Video", "LoKr H3 HMCumshot V2 (18+, 0.63GB)", category="video", arch="minimax_h3",
       repo="lynaNSFW/minimaxH3_Collection", remote="HMCumshot_V2.safetensors",
       filename="HMCumshot_V2-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3",

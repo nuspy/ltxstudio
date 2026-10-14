@@ -3113,5 +3113,9 @@
   "weights.civitai": "Civitai API-kulcs",
   "weights.civitai.hint": "civitai.com → Fiókbeállítások → API Keys (csak ezen a gépen marad)",
   "weights.civitai.tt": "A Civitai-ról származó modellekhez kell: kulcs nélkül a Civitai a bejelentkezésre irányít, és a letöltés sikertelen.",
-  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 lépés)"
+  "f1.gen.krea2.kroma": "Krea Kroma v0.3.1 Turbo (int8, 8 lépés)",
+  "weights.use.veda_sparse": "Veda ritka figyelem: egy kis prediktor csak a lényeges figyelemblokkokat számolja — gyorsabb H3 videó, ugyanazok a súlyok.",
+  "feat.cap.video_h3_veda": "MiniMax H3 — Veda ritka figyelem",
+  "vid.h3.veda": "Veda ritka figyelem (gyorsabb)",
+  "vid.h3.veda.tt": "Csak azokat a figyelemblokkokat számolja, amelyeket egy betanított prediktor hasznosnak jelöl: kb. 1,4–2,2× gyorsabb zajtalanítás. Referenciákkal (Ref2VA) és Turbo 8 lépéssel működik; a modell súlyai nem változnak. Ha valami nem illik, a videó magától teljes figyelemre vált."
 }
