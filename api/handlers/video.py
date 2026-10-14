@@ -133,6 +133,38 @@ class ControlNetReq(BaseModel):
     seed: int = 42
 
 
+class IcLoraReq(BaseModel):
+    """Modalita' IC-LoRA di «Modifica Video AI» (stessa logica della GUI: core/video_edit_ic.py)."""
+    kind: str = Field(..., description="refocus | uncompress | deinterlace | motiondeblur | detailer | "
+                                       "outpaint | restyle | cameraman")
+    video_path: str = Field(..., description="video sorgente (cameraman: video di RIFERIMENTO del movimento)")
+    prompt: str = ""
+    strength: float = 1.0
+    attention: float = Field(1.0, ge=0.1, le=1.0, description="attenzione della guida")
+    keep_audio: bool = True
+    res_mode: str = Field("source", description="source | half | custom (restauro/restyle)")
+    res_long: int = 0
+    # restyle
+    style_image: str | None = None
+    style_text: str = Field("", description="stile a parole: prompt «Make it {style} style.» se prompt vuoto")
+    # outpaint
+    canvas: str = Field("16:9", description="16:9 | 9:16 | 1:1 | 4:3 | 3:4 | 21:9 | custom")
+    anchor: str = "center"
+    margins: list[int] | None = Field(None, description="custom: [sopra, destra, sotto, sinistra] px sorgente")
+    dark_source: bool = False
+    paste_original: bool = True
+    # cameraman
+    image_path: str | None = None
+    image_strength: float = 0.7
+    width: int = 960
+    height: int = 576
+    seconds: float = 0.0
+    # checkpoint: ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)
+    model: str | None = None
+    ltx_release: str | None = None
+    seed: int = 42
+
+
 class LipsyncReq(BaseModel):
     image_path: str
     audio_path: str
@@ -251,6 +283,72 @@ def register(app: FastAPI):
         if req.image_path:
             p["image_path"] = req.image_path
         return _submit("video.controlnet", lambda job: run_ltx2(p, job))
+
+    @app.post("/video/ic_lora", tags=["video"])
+    def video_ic_lora(req: IcLoraReq):
+        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman.
+        Risposta: job_id + `warnings` (es. checkpoint non distilled: MAI sostituito)."""
+        from fastapi import HTTPException
+        from core import ltx_release as lrel
+        from core import video_edit_ic as vic
+        from core import video_edit_modes as vem
+        from core.video_ic_prep import OUTPAINT_FORMATS, ANCHORS
+        spec = vem.spec_for_kind(req.kind)
+        if spec is None or not spec.cap or req.kind == "union":
+            valid = sorted(s.kind for s in vem.MODE_SPECS.values() if s.enabled and s.cap)
+            raise HTTPException(422, {"error": "invalid_kind", "kind": req.kind, "valid": valid})
+        gate.require(spec.cap)
+        if req.kind == "outpaint":
+            if req.canvas != "custom" and req.canvas not in OUTPAINT_FORMATS:
+                raise HTTPException(422, {"error": "invalid_canvas", "valid": [*OUTPAINT_FORMATS, "custom"]})
+            if req.anchor not in ANCHORS:
+                raise HTTPException(422, {"error": "invalid_anchor", "valid": list(ANCHORS)})
+            if req.canvas == "custom" and not (req.margins and len(req.margins) == 4 and any(req.margins)):
+                raise HTTPException(422, {"error": "margins_required",
+                                          "detail": "custom richiede 4 margini [sopra,destra,sotto,sinistra], almeno uno > 0"})
+        if req.kind == "restyle" and not (req.style_image and os.path.exists(req.style_image)):
+            raise HTTPException(422, {"error": "style_image_required"})
+        if not os.path.exists(req.video_path):
+            raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
+        warnings: list[str] = []
+        model = (req.model or "").strip()
+        rel = (req.ltx_release or (lrel.detect_release(model) if model else None) or "")
+        if rel and not lrel.ic_lora_supported(rel):
+            raise HTTPException(422, {"error": "release_unsupported", "release": rel,
+                                      "detail": "le IC-LoRA locali sono per LTX 2.3"})
+        if not lrel.is_distilled(model):
+            if spec.distilled == vem.DISTILLED_REQUIRED:
+                raise HTTPException(422, {"error": "distilled_required", "mode": spec.key})
+            warnings.append("checkpoint non distilled" + ("" if model else " (default del worker: dev)")
+                            + ": qualita' ridotta, la distilled-LoRA vale solo per lo stage 1")
+        miss = vic.missing_weight(spec)
+        if miss:
+            raise HTTPException(409, {"error": "weight_missing", "detail": miss})
+        prompt = req.prompt.strip()
+        if req.kind == "restyle" and not prompt and req.style_text.strip():
+            prompt = f"Make it {req.style_text.strip()} style."
+        cfg = {"mode": spec.key, "video": req.video_path, "prompt": prompt, "strength": req.strength,
+               "conditioning_attention": req.attention, "keep_audio": req.keep_audio,
+               "res_mode": req.res_mode, "res_long": req.res_long, "style_image": req.style_image,
+               "out_format": req.canvas, "out_anchor": req.anchor,
+               "out_margins": tuple(req.margins or (0, 0, 0, 0)), "out_dark": req.dark_source,
+               "out_paste": req.paste_original, "cam_ref": req.video_path, "cam_img": req.image_path or "",
+               "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
+               "width": req.width, "height": req.height, "seed": req.seed}
+        if model:
+            cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
+        if rel:
+            cfg["ltx_release"] = rel
+
+        def fn(job):
+            import time as _t
+            output = out_path(f"video_ic_{spec.key}")
+            ij = vic.build_job(cfg, os.path.dirname(output), int(_t.time()), output, log=lambda m: job.log(m))
+            outs = run_ltx2(ij.params, job)
+            return [vic.finalize(ij, outs[0], log=lambda m: job.log(m))]
+        r = _submit("video.ic_lora", fn)
+        r["warnings"] = warnings
+        return r
 
     @app.post("/video/lipsync", tags=["video"])
     def video_lipsync(req: LipsyncReq):

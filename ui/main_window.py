@@ -31,6 +31,7 @@ from core.video_enhance_pipeline import VideoEnhancePipeline  # noqa: E402
 from core.extend_pipeline import ExtendPipeline         # noqa: E402
 from core.face_restore_pipeline import FaceRestorePipeline  # noqa: E402
 from core import gui_state                                # noqa: E402  (persistenza impostazioni GUI)
+from core import video_edit_modes as vem                  # noqa: E402  (modalità Modifica Video AI)
 from core import features, gating_apply, watermark        # noqa: E402  (feature-gating per edizione)
 from core import user_prefs                                # noqa: E402  (varianti UI Classica/Pro + preferenze)
 from core import backend                                  # noqa: E402  (router backend nativo/ComfyUI)
@@ -247,6 +248,7 @@ class _VideoEditAIWorker(QThread):
         super().__init__()
         self.cfg = cfg
         self.out_dir = out_dir
+        self._ic_job = None                                    # IcJob (Fase 1 IC-LoRA), se la modalità lo usa
 
     def _probe_wh(self, video: str) -> tuple[int, int]:
         """Risoluzione (w, h) del video via ffprobe. (0, 0) se illeggibile."""
@@ -282,6 +284,9 @@ class _VideoEditAIWorker(QThread):
                       # niente offload forzato: 'cpu' = block-streaming = pinned memory ⇒ SEGFAULT
                       # col pagefile da 16GB. In auto il worker sceglie residente (più veloce). (13/07)
                       "seed": 42, "output": out}
+            for _k in ("model", "gguf_transformer", "ltx_release"):   # checkpoint ESATTAMENTE come scelto nel tab Video
+                if cfg.get(_k):
+                    params[_k] = cfg[_k]
             if cfg["mode"] == "inpaint":                       # #59 parametri inpaint dalla GUI
                 params["control_strength"] = float(cfg.get("guide", 0.4))
                 params["cfg_scale"] = float(cfg.get("cfg_scale", 6.0))
@@ -353,6 +358,18 @@ class _VideoEditAIWorker(QThread):
                         params["mask_blur"] = float(cfg.get("mask_blur", 6.0))
                     else:
                         self.progress.emit("[replace] ⚠ tracking SAM2 fallito → sostituzione su tutto il frame.")
+            elif cfg["mode"] in vem.MODE_SPECS and vem.MODE_SPECS[cfg["mode"]].cap:
+                # Fase 1 IC-LoRA (restauro/outpaint/restyle/cameraman): logica condivisa con la REST API
+                # (core/video_edit_ic.py): preflight peso, tetti, segmenti, preprocess, checkpoint come scelto.
+                from core import video_edit_ic as _vic
+                try:
+                    _ij = _vic.build_job(cfg, self.out_dir, stamp, out, log=lambda m: self.progress.emit(m))
+                except _vic.IcJobError as _e:
+                    self.done.emit({"status": "error", "error": str(_e)}); return
+                for _n in _ij.notes:
+                    self.progress.emit(f"[edit] {_n}")
+                params = _ij.params                            # sostituisce i params storici (incl. _strict_ic, model)
+                self._ic_job = _ij
             else:
                 params["control_video"] = src                  # edit/style: video sorgente come guide
             jf = _os.path.join(self.out_dir, f"_editp_{stamp}.json")
@@ -367,7 +384,14 @@ class _VideoEditAIWorker(QThread):
                 pass
             r2 = _sp.run([self.LTX2_PY, "-u", worker, jf], capture_output=True, text=True,
                          encoding="utf-8", errors="replace")
-            if _os.path.exists(out):
+            if _os.path.exists(out) and getattr(self, "_ic_job", None) is not None:
+                try:                                           # post IC-LoRA: outpaint (gamma+originale) e audio originale
+                    from core import video_edit_ic as _vic2
+                    out = _vic2.finalize(self._ic_job, out, log=lambda m: self.progress.emit(m))
+                except Exception as _e2:                       # noqa: BLE001
+                    self.done.emit({"status": "error", "error": f"post-processo fallito: {_e2}"}); return
+                self.done.emit({"status": "success", "output": [out]})
+            elif _os.path.exists(out):
                 _mux = params.get("_mux_audio_from")           # #102 rimetti l'audio originale sul video rigenerato
                 if _mux and _os.path.exists(_mux):
                     muxed = out[:-4] + "_audio.mp4"
@@ -1027,6 +1051,10 @@ class MainWindow(QMainWindow):
         from ui.tabs.video_edit_ai_tab import VideoEditAITab          # #24/#59/#60 editing video AI
         self.video_edit_ai_tab = VideoEditAITab()
         self.video_edit_ai_tab.request_edit.connect(self._gen_video_edit_ai)
+        # checkpoint scelto nel tab Video: lo si MOSTRA (e si avvisa/blocca) nel tab Modifica Video AI, mai cambiato
+        self.video_edit_ai_tab.set_model_getter(self.video_tab.get_values)
+        self.video_tab.model.currentIndexChanged.connect(self.video_edit_ai_tab.refresh_checkpoint_hint)
+        self.video_edit_ai_tab.request_open_video_tab.connect(lambda: self.tabs.setCurrentWidget(self.video_tab))
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
@@ -3662,6 +3690,9 @@ class MainWindow(QMainWindow):
 
     def _gen_video_edit_ai(self, cfg: dict):
         """#24/#59/#60 Modifica Video AI: edit-anything / inpaint (SAM2 track) / style — worker async."""
+        _spec = vem.MODE_SPECS.get(cfg.get("mode", ""))
+        if _spec is not None and _spec.cap and not self._feature_gate(_spec.cap):
+            return                                           # edizione senza la funzione: upsell mostrato dal gate
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
         _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64

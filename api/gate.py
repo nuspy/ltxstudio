@@ -18,6 +18,8 @@ KNOWN_CAPS = [
     "cap.import_models", "cap.civitai_import",
     "cap.avatar_longcat", "cap.avatar_h3", "cap.image_qwen21", "cap.video_minimax_h3",
     "cap.qwen21_controlnet", "cap.qwen21_prompt_enhancer",
+    "cap.video_restore_iclora", "cap.video_outpaint", "cap.video_restyle", "cap.video_camera_ic",
+    "cap.video_lipdub", "cap.video_hdr_ic",
 ]
 
 

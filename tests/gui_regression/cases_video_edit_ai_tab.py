@@ -29,6 +29,12 @@ def _tab(w):
     return w.video_edit_ai_tab
 
 
+def _ack_dev(v: bool):
+    """«Non ripetere in questa sessione» dell'avviso sul checkpoint dev (attributo di classe, solo sessione)."""
+    from ui.tabs.video_edit_ai_tab import VideoEditAITab
+    VideoEditAITab._dev_ack_session = bool(v)
+
+
 def _set_video(w, name: str = "_vedit_test_input.mp4") -> str:
     """Precondizione: imposta un video sorgente (file dummy: il worker NON viene eseguito)."""
     path = str(H.OUT_DIR / name)
@@ -39,18 +45,16 @@ def _set_video(w, name: str = "_vedit_test_input.mp4") -> str:
         except Exception:                                # noqa: BLE001
             pass
     _tab(w).set_video(path)
+    _ack_dev(True)                                   # casi storici: niente dialog modale sul checkpoint dev
     return path
 
 
 def _select_mode(w, key: str) -> str:
-    """Seleziona la modalità (combo `mode`) per chiave; ritorna il testo visibile."""
+    """Seleziona la modalità per chiave (famiglia + modalità, UI a due livelli); ritorna il testo visibile."""
     t = _tab(w)
-    for i in range(t.mode.count()):
-        if t.mode.itemData(i) == key:
-            t.mode.setCurrentIndex(i)
-            return t.mode.itemText(i)
-    raise AssertionError(f"modalità '{key}' non presente nel combo (trovate: "
-                         f"{[t.mode.itemData(i) for i in range(t.mode.count())]})")
+    t.select_mode(key)
+    assert t.mode.currentData() == key, f"select_mode({key}) non ha selezionato la modalità: {t.mode.currentData()}"
+    return t.mode.currentText()
 
 
 def _cfg_of(w) -> dict:

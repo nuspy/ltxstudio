@@ -1,0 +1,441 @@
+"""Casi GUI della Fase 1a IC-LoRA del tab «Modifica Video AI» (famiglie/modalità, campi, checkpoint, tetti, gate,
+esclusione IC-LoRA dal pannello LoRA). Complemento di cases_video_edit_ai_tab.py (stesso stile e helper).
+
+Nessuna GPU: i worker NON vengono eseguiti (lo Spy intercetta _enqueue; la config reale è in w._edit_ai_worker.cfg).
+I dialog Qt sono già non-bloccanti (harness.patch_dialogs); il dialog sul checkpoint è comunque sovrascritto
+dai casi (`t._ask_checkpoint`).
+"""
+from __future__ import annotations
+
+import harness as H
+from cases_video_edit_ai_tab import _ack_dev, _cfg_of, _select_mode, _set_video, _tab
+
+_DIST = {"model_kind": "diffusion", "model":
+         r"E:\AI\Models\diffusion_models\LTXVideo\v2\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors"}
+_DEV = {"model_kind": "diffusion", "model": r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors"}
+_AUTO = {"model_kind": "auto", "model": "auto"}
+_REL25 = {"model_kind": "diffusion", "model": r"E:\AI\Models\diffusion_models\ltx-2.5-distilled.safetensors"}
+
+
+def _getter(w, vals):
+    _tab(w)._model_getter = (lambda: vals)
+    _tab(w).refresh_checkpoint_hint()
+
+
+def _mk_image(name: str = "_vedit_style.png") -> str:
+    path = str(H.OUT_DIR / name)
+    H.make_test_image(path, 128, 96)
+    return path
+
+
+def _dummy_video(name: str) -> str:
+    path = str(H.OUT_DIR / name)
+    with open(path, "wb") as fh:
+        fh.write(b"\x00\x00\x00\x18ftypmp42")
+    return path
+
+
+def _fill_mode(w, key: str):
+    """Imposta i campi minimi validi per `key` e ritorna la tab."""
+    from ui.tabs.video_edit_ai_tab import VideoEditAITab
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _keep = VideoEditAITab._dev_ack_session
+    _set_video(w)                                        # (gli helper storici impostano l'ack: qui si ripristina)
+    VideoEditAITab._dev_ack_session = _keep
+    _select_mode(w, key)
+    if key == "restyle":
+        t.ref_img.setText(_mk_image())
+        t.style_text.setText("Disney 2D Animation")
+        t.prompt.setPlainText("")
+    elif key == "cameraman":
+        t.cam_ref.setText(_dummy_video("_vedit_camref.mp4"))
+    return t
+
+
+_NEW_MODES = {          # key -> (kind atteso, cap atteso)
+    "restyle": ("restyle", "cap.video_restyle"),
+    "refocus": ("refocus", "cap.video_restore_iclora"),
+    "uncompress": ("uncompress", "cap.video_restore_iclora"),
+    "deinterlace": ("deinterlace", "cap.video_restore_iclora"),
+    "motiondeblur": ("motiondeblur", "cap.video_restore_iclora"),
+    "detailer": ("detailer", "cap.video_restore_iclora"),
+    "outpaint": ("outpaint", "cap.video_outpaint"),
+    "cameraman": ("cameraman", "cap.video_camera_ic"),
+}
+
+
+def _make_new_mode_case(key: str):
+    kind, cap = _NEW_MODES[key]
+
+    def _case(w, spy):
+        from core import video_edit_modes as vem
+        _ack_dev(False)
+        t = _fill_mode(w, key)
+        _getter(w, _DIST)                                # distilled scelto nel tab Video: nessun dialog
+        t._go()
+        assert spy.calls, f"{key}: nessuna richiesta accodata (log: {t.log.toPlainText()[-300:]})"
+        cfg = _cfg_of(w)
+        assert cfg.get("mode") == key, cfg.get("mode")
+        sp = vem.get_spec(key)
+        assert sp.kind == kind and sp.cap == cap, (sp.kind, sp.cap)
+        assert (cfg.get("edit_lora") or "") == "", f"edit_lora deve restare vuota per i kind a registro: {cfg.get('edit_lora')}"
+        assert cfg.get("model") == _DIST["model"], f"model non inoltrato ESATTAMENTE come scelto: {cfg.get('model')}"
+        assert cfg.get("ckpt_state") == "distilled", cfg.get("ckpt_state")
+        assert "conditioning_attention" in cfg
+        if key == "restyle":
+            assert cfg["style_image"] and cfg["prompt"] == "Make it Disney 2D Animation style.", cfg["prompt"]
+        if key == "outpaint":
+            assert cfg["out_format"] == "16:9" and cfg["out_paste"] is True and "out_margins" in cfg
+        if key == "cameraman":
+            assert cfg["cam_ref"] and cfg["width"] == 960 and 0.3 <= cfg["cam_img_strength"] <= 1.0
+        if sp.family == vem.FAMILY_REPAIR:
+            assert cfg["res_mode"] == "source" and cfg["prompt"], "il restauro parte col prompt-guida precompilato"
+            assert "keep_audio" in cfg
+    return _case
+
+
+def case_families_and_modes(w, spy):
+    """Due livelli: famiglie (Lip dub assente: fase 1b), modalità per famiglia, derivate da video_edit_modes."""
+    from core import video_edit_modes as vem
+    t = _tab(w)
+    fams = [t.family.itemData(i) for i in range(t.family.count())]
+    assert fams == ["edit", "style", "repair", "outpaint", "camera"], fams
+    expect = {"edit": ["edit", "inpaint", "replace_char"], "style": ["anime2real", "real2anime", "restyle"],
+              "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer"],
+              "outpaint": ["outpaint"], "camera": ["cameraman"]}
+    for fam, modes in expect.items():
+        t.family.setCurrentIndex(t.family.findData(fam))
+        got = [t.mode.itemData(i) for i in range(t.mode.count())]
+        assert got == modes, f"{fam}: {got} != {modes}"
+    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char"):
+        t.select_mode(k)                                 # da qualunque famiglia
+        assert t.mode.currentData() == k and t.family.currentData() == vem.family_of(k)
+    for k in ("lipdub", "hdr"):                          # fasi 1b/1c: non selezionabili
+        try:
+            t.select_mode(k)
+        except KeyError:
+            continue
+        raise AssertionError(f"{k} non deve essere selezionabile (enabled=False)")
+    from ui.tabs.video_edit_ai_tab import MODES
+    assert MODES == vem.legacy_modes()
+
+
+def case_fields_per_mode(w, spy):
+    """Campi abilitati/visibili per modalità."""
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _select_mode(w, "restyle")
+    assert t.ref_img.isEnabled() and not t.ref_strength.isEnabled() and not t.style_text.isHidden()
+    _select_mode(w, "replace_char")
+    assert t.ref_img.isEnabled() and t.ref_strength.isEnabled() and t.style_text.isHidden()
+    _select_mode(w, "refocus")
+    assert not t.ref_img.isEnabled() and not t.obj.isEnabled() and t.cam_ref.parentWidget().isHidden()
+    assert not t.res_mode.parentWidget().isHidden() and not t.attn.isHidden() and not t.keep_audio.isHidden()
+    _select_mode(w, "outpaint")
+    assert not t.out_format.isHidden() and t.res_mode.parentWidget().isHidden() and t.out_m["top"].parentWidget().isHidden()
+    t.out_format.setCurrentIndex(t.out_format.findData("custom"))
+    assert not t.out_m["top"].parentWidget().isHidden() and not t.out_anchor.isEnabled()
+    _select_mode(w, "cameraman")
+    assert not t.cam_ref.parentWidget().isHidden() and not t.cam_img_strength.isHidden()
+    assert t.note.text(), "ogni modalità ha una nota"
+    _select_mode(w, "edit")
+    assert t.cam_ref.parentWidget().isHidden() and t.attn.isHidden()
+
+
+def case_repair_no_prompt_ok(w, spy):
+    """Restauro: prompt vuoto accettato (opzionale); edit con prompt vuoto blocca (esistente)."""
+    _ack_dev(False)
+    t = _fill_mode(w, "uncompress")
+    _getter(w, _DIST)
+    t.prompt.setPlainText("")
+    t._go()
+    assert spy.calls, "il restauro con prompt vuoto deve accodare"
+    n = len(spy.calls)
+    _select_mode(w, "edit")
+    t.prompt.setPlainText("")
+    t._go()
+    assert len(spy.calls) == n, "edit senza prompt deve bloccare"
+
+
+def case_ckpt_hint_states(w, spy):
+    """Riga di stato del checkpoint: distilled / dev / auto / release 2.5 / modello non LTX, con icona+testo."""
+    t = _tab(w)
+    _select_mode(w, "refocus")
+    rows = [(_DIST, "✔", "distilled"), (_DEV, "⚠", "dev"), (_AUTO, "ℹ", ""),
+            (_REL25, "⛔", ""), ({"model_kind": "minimax_h3", "model": ""}, "ℹ", "")]
+    for vals, icon, word in rows:
+        _getter(w, vals)
+        txt = t.ckpt_lbl.text()
+        assert icon in txt and word in txt, f"{vals['model_kind']} {vals['model'][-30:]}: «{txt}»"
+        assert not t.ckpt_lbl.isHidden()
+    _getter(w, _DIST)
+    assert "ltx-2.3-22b-distilled" in t.ckpt_lbl.text(), "il nome del checkpoint scelto deve comparire"
+
+
+def case_dev_warning_dialog_choices(w, spy):
+    """Checkpoint dev + modalità `recommended`: dialog a 3 scelte. Annulla non accoda; Apri tab Video emette il
+    segnale e non accoda; Continua accoda con model esattamente come scelto (mai cambiato)."""
+    _ack_dev(False)
+    t = _fill_mode(w, "refocus")
+    _getter(w, _DEV)
+    asked, opened = [], []
+    t.request_open_video_tab.connect(lambda: opened.append(1))
+    for ans in ("cancel", "open", "continue"):
+        t._ask_checkpoint = (lambda sp, info, blocking, _a=ans: asked.append((sp.key, blocking)) or _a)
+        before = len(spy.calls)
+        t._go()
+        grew = len(spy.calls) - before
+        assert grew == (1 if ans == "continue" else 0), f"{ans}: richieste accodate +{grew}"
+    assert asked == [("refocus", False)] * 3, asked
+    assert opened == [1], f"'open' deve emettere request_open_video_tab una volta: {opened}"
+    assert _cfg_of(w).get("model") == _DEV["model"], "il checkpoint dev scelto non va sostituito"
+    asked.clear()
+    _getter(w, _DIST)                                    # con distilled: nessun dialog
+    t._go()
+    assert not asked, "con un distilled non deve comparire alcun dialog"
+    _getter(w, _DEV)
+    _ack_dev(True)                                       # «non ripetere»: niente dialog neanche col dev
+    t._go()
+    assert not asked, "con ack di sessione non deve richiedere di nuovo"
+
+
+def case_required_distilled_blocks(w, spy):
+    """Modalità con distilled=required (simulata su refocus): col dev BLOCCA con spiegazione (nessuna richiesta),
+    col distilled passa. Mai cambio automatico del checkpoint."""
+    import dataclasses
+    from core import video_edit_modes as vem
+    _ack_dev(False)
+    orig = vem.MODE_SPECS["refocus"]
+    vem.MODE_SPECS["refocus"] = dataclasses.replace(orig, distilled=vem.DISTILLED_REQUIRED)
+    try:
+        t = _fill_mode(w, "refocus")
+        _getter(w, _DEV)
+        assert "⛔" in t.ckpt_lbl.text(), t.ckpt_lbl.text()
+        got = []
+        t._ask_checkpoint = lambda sp, info, blocking: got.append(blocking) or "cancel"
+        t._go()
+        assert got == [True] and not spy.calls, f"blocco atteso: {got} {spy.calls}"
+        _getter(w, _DIST)
+        t._go()
+        assert len(spy.calls) == 1
+    finally:
+        vem.MODE_SPECS["refocus"] = orig
+
+
+def case_release25_blocks(w, spy):
+    """Checkpoint di release 2.5: le IC-LoRA locali sono per 2.3 → blocco con messaggio, nessuna richiesta."""
+    _ack_dev(True)
+    t = _fill_mode(w, "refocus")
+    _getter(w, _REL25)
+    t._go()
+    assert not spy.calls, "release 2.5 deve bloccare le modalità IC-LoRA nuove"
+    assert "2.3" in t.log.toPlainText()
+
+
+def case_restyle_requires_image(w, spy):
+    """ReStyle senza immagine di stile blocca; con immagine (+ stile a parole) accoda con style_image."""
+    _ack_dev(True)
+    t = _fill_mode(w, "restyle")
+    t.ref_img.setText("")
+    t._go()
+    assert not spy.calls, "restyle senza immagine di stile deve bloccare"
+    t.ref_img.setText(_mk_image())
+    t.style_text.setText("")
+    t.prompt.setPlainText("")
+    t._go()
+    assert not spy.calls, "restyle senza stile né prompt deve bloccare"
+    t.style_text.setText("watercolor")
+    t._go()
+    assert spy.calls and _cfg_of(w)["prompt"] == "Make it watercolor style."
+
+
+def case_outpaint_canvas_and_margins(w, spy):
+    """Outpaint: anteprima/canvas dal sorgente noto (multipli di 64, area nuova>0), margini personalizzati,
+    avviso area troppo grande, blocco senza area nuova."""
+    from types import SimpleNamespace
+    _ack_dev(True)
+    t = _fill_mode(w, "outpaint")
+    t._vinfo = SimpleNamespace(width=1080, height=1920, nb_frames=100, fps=25.0)   # verticale
+    t.out_format.setCurrentIndex(t.out_format.findData("16:9"))
+    t._on_outpaint_change()                              # (il sorgente è stato impostato a mano dopo la selezione)
+    lay = t._outpaint_layout()
+    assert lay.canvas_w % 64 == 0 and lay.canvas_h % 64 == 0 and lay.canvas_w > lay.canvas_h
+    assert lay.new_area > 0.5 and lay.src_w <= lay.canvas_w and lay.src_h <= lay.canvas_h
+    assert "canvas" in t.out_info.text().lower()
+    assert lay.too_much_new_area and "60" in t.out_info.text(), "avviso area nuova > 60% atteso"
+    t._go()
+    assert spy.calls and "60" in t.log.toPlainText()
+    n = len(spy.calls)
+    t.out_format.setCurrentIndex(t.out_format.findData("custom"))   # tutti i margini a 0 → blocca
+    t._go()
+    assert len(spy.calls) == n, "margini tutti a zero: deve bloccare"
+    t.out_m["left"].setValue(200)
+    t.out_m["right"].setValue(200)
+    lay = t._outpaint_layout()
+    assert lay.canvas_w > lay.src_w and lay.x > 0 and lay.canvas_w % 64 == 0
+    t._go()
+    cfg = _cfg_of(w)
+    assert len(spy.calls) == n + 1 and cfg["out_format"] == "custom" and cfg["out_margins"][1] == 200
+
+
+def case_outpaint_dark_autodetect(w, spy):
+    """Sorgente scuro (video sintetico nero) → il checkbox gamma è suggerito in automatico (e dichiarato nel log)."""
+    import subprocess
+    from core import video_ic_prep as prep
+    dark = str(H.OUT_DIR / "_vedit_dark.mp4")
+    light = str(H.OUT_DIR / "_vedit_light.mp4")
+    for path, col in ((dark, "black"), (light, "white")):
+        subprocess.run([prep.ffmpeg_path(), "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c={col}:s=160x96:r=25:d=2",
+                        "-pix_fmt", "yuv420p", path], check=True, capture_output=True)
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _select_mode(w, "outpaint")
+    t.out_dark.setChecked(False)
+    t.set_video(dark)
+    assert t.out_dark.isChecked(), "video scuro: gamma suggerito"
+    assert "gamma" in t.log.toPlainText().lower()
+    t.out_dark.setChecked(False)
+    t.set_video(light)
+    assert not t.out_dark.isChecked(), "video chiaro: nessun suggerimento"
+
+
+def case_cameraman_validation(w, spy):
+    """Cameraman: senza riferimento blocca (anche con video principale); sotto 960x512 avvisa ma non blocca."""
+    _ack_dev(True)
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _set_video(w)
+    _select_mode(w, "cameraman")
+    t.cam_ref.setText("")
+    t._go()
+    assert not spy.calls, "cameraman senza riferimento deve bloccare"
+    ref = _dummy_video("_vedit_camref.mp4")
+    t.cam_ref.setText(ref)
+    t._video = ""                                         # il video principale è opzionale per cameraman
+    t.cam_w.setValue(640)
+    t.cam_h.setValue(384)
+    t._go()
+    assert spy.calls, "sotto 960x512: avviso, non blocco"
+    assert "960" in t.log.toPlainText()
+    cfg = _cfg_of(w)
+    assert cfg["video"] == ref and cfg["cam_ref"] == ref and (cfg["width"], cfg["height"]) == (640, 384)
+
+
+def case_weight_missing_blocks(w, spy):
+    """Peso IC-LoRA assente: il worker GUI dà errore chiaro (nessun degrado a ti2v, nessuna esecuzione)."""
+    from core import mem_coordinator, video_edit_ic as vic
+    from ui.main_window import _VideoEditAIWorker
+    _ack_dev(True)
+    t = _fill_mode(w, "refocus")
+    _getter(w, _DIST)
+    t._go()
+    cfg = _cfg_of(w)
+    cfg["video"] = _dummy_video("_vedit_test_input.mp4")
+    got = {}
+    orig_missing, orig_fw = vic.missing_weight, mem_coordinator.free_and_wait
+    vic.missing_weight = lambda spec: "Peso «refocus» mancante: X:\\nope.safetensors"
+    mem_coordinator.free_and_wait = lambda *a, **k: None
+    try:
+        wk = _VideoEditAIWorker(cfg, str(H.OUT_DIR))
+        wk.done.connect(lambda r: got.update(r))
+        wk.run()                                         # sincrono: build_job fallisce PRIMA di lanciare il worker
+    finally:
+        vic.missing_weight, mem_coordinator.free_and_wait = orig_missing, orig_fw
+    assert got.get("status") == "error" and "mancante" in got.get("error", ""), got
+
+
+def case_gate_blocks_when_cap_off(w, spy):
+    """Edizione senza la cap: nessun accodamento (l'upsell lo mostra il gate); le storiche non sono gated.
+    (L'harness sostituisce `_feature_gate` con un sì incondizionato: qui lo si rimpiazza con uno che nega le cap.video_*
+    e registra l'id richiesto, per verificare il COLLEGAMENTO modalità → cap → blocco.)"""
+    _ack_dev(True)
+    t = _fill_mode(w, "refocus")
+    _getter(w, _DIST)
+    seen = []
+    w._feature_gate = lambda fid: (seen.append(fid) or False)
+    t._go()
+    assert not spy.calls, "cap spenta: nessun accodamento"
+    assert seen == ["cap.video_restore_iclora"], seen
+    for key, cap in (("outpaint", "cap.video_outpaint"), ("restyle", "cap.video_restyle")):
+        seen.clear()
+        _fill_mode(w, key)
+        t._go()
+        assert seen == [cap] and not spy.calls, (key, seen)
+    seen.clear()
+    _select_mode(w, "edit")                              # le modalità storiche non sono gated
+    t.prompt.setPlainText("rain")
+    t._go()
+    assert not seen and len(spy.calls) == 1, "edit (storica) non deve essere gated"
+
+
+def case_legacy_modes_pass_model(w, spy):
+    """Anche le modalità storiche inoltrano il checkpoint scelto (prima il tab non passava `model`)."""
+    _ack_dev(True)
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _set_video(w)
+    _select_mode(w, "edit")
+    _getter(w, _DEV)
+    t.prompt.setPlainText("make it night")
+    t._go()
+    assert spy.calls and _cfg_of(w).get("model") == _DEV["model"]
+    assert _cfg_of(w).get("ckpt_state") == "dev"
+
+
+def case_ic_lora_hidden_from_lora_panel(w, spy):
+    """Le IC-LoRA (ltx-*ic-lora*, Cameraman, ReStyle, scene-emb) NON compaiono nel pannello LoRA normale; le LoRA
+    camera-control / CameraControls restano visibili."""
+    from pathlib import Path
+    from core.lora_catalog import is_ic_lora_file
+    w.video_tab.nsfw.setCurrentText("NSFW")
+    w.lora_tab.refresh()
+    names = [r["entry"].filename for r in w.lora_tab._rows.values()]
+    assert names, "il pannello LoRA LTX non deve essere vuoto"
+    bad = [n for n in names if is_ic_lora_file(n)]
+    assert not bad, f"IC-LoRA visibili nel pannello LoRA normale: {bad}"
+    cat = [e.filename for e in w.lora_tab.catalog.loras(allow_nsfw=True)]
+    assert not [n for n in cat if is_ic_lora_file(n)], "nemmeno nel catalogo"
+    for ic in ("ltx-2.3-22b-ic-lora-outpaint.safetensors", "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors",
+               "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors", "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors"):
+        assert is_ic_lora_file(ic), ic
+    for ok in ("ltx-2-19b-lora-camera-control-dolly-left.safetensors", "LTX2.3_CameraControls.safetensors"):
+        assert not is_ic_lora_file(ok), ok
+        if (Path(r"E:\AI\Models\LoRA\LTX-2") / ok).exists():
+            assert ok in cat, f"{ok} (LoRA normale) deve restare visibile"
+
+
+CASES = (
+    [("vedit_family_modes", "Due livelli famiglia/modalità: contenuti, select_mode, lipdub/hdr assenti.",
+      case_families_and_modes),
+     ("vedit_fields_per_mode", "Campi abilitati/visibili per modalità (restyle, restauro, outpaint, cameraman).",
+      case_fields_per_mode),
+     ("vedit_repair_no_prompt_ok", "Restauro con prompt vuoto accoda; edit con prompt vuoto blocca.",
+      case_repair_no_prompt_ok),
+     ("vedit_ckpt_hint_states", "Riga checkpoint: distilled/dev/auto/2.5/non-LTX con icona e testo.",
+      case_ckpt_hint_states),
+     ("vedit_dev_warning_dialog", "Dialog a 3 scelte col dev: Annulla/Apri tab Video/Procedi; ack di sessione.",
+      case_dev_warning_dialog_choices),
+     ("vedit_required_distilled_blocks", "distilled=required col dev: blocco con spiegazione, nessun cambio modello.",
+      case_required_distilled_blocks),
+     ("vedit_release25_blocks", "Checkpoint release 2.5: modalità IC-LoRA bloccate con messaggio.",
+      case_release25_blocks),
+     ("vedit_restyle_requires_image", "ReStyle: immagine di stile obbligatoria; prompt «Make it … style.».",
+      case_restyle_requires_image),
+     ("vedit_outpaint_canvas_margins", "Outpaint: canvas multipli di 64, area nuova, margini, avviso e blocchi.",
+      case_outpaint_canvas_and_margins),
+     ("vedit_outpaint_dark_autodetect", "Outpaint: sorgente scuro → gamma suggerito (e dichiarato nel log).",
+      case_outpaint_dark_autodetect),
+     ("vedit_cameraman_validation", "Cameraman: riferimento obbligatorio, <960x512 avvisa, video principale opzionale.",
+      case_cameraman_validation),
+     ("vedit_weight_missing_blocks", "Peso IC-LoRA assente: errore chiaro dal worker GUI, niente degrado.",
+      case_weight_missing_blocks),
+     ("vedit_gate_blocks_when_cap_off", "Cap spenta: nessun accodamento; le storiche non sono gated.",
+      case_gate_blocks_when_cap_off),
+     ("vedit_legacy_modes_pass_model", "Le modalità storiche inoltrano il checkpoint scelto.",
+      case_legacy_modes_pass_model),
+     ("vedit_ic_lora_hidden_from_lora_panel", "IC-LoRA escluse dal pannello LoRA normale; camera-control visibili.",
+      case_ic_lora_hidden_from_lora_panel)]
+    + [(f"vedit_newmode_{k}", f"Modalità IC-LoRA {k}: cfg emessa (kind a registro, model come scelto, campi).",
+        _make_new_mode_case(k)) for k in _NEW_MODES]
+)
