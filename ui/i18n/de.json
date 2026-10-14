@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "Videostil per Bild (ReStyle)",
   "feat.cap.video_camera_ic": "Kamera nach Referenz (Cameraman)",
   "feat.cap.video_lipdub": "Lip-Dub / Nachsynchronisation (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 Bit + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 Bit + EXR",
+  "vedit.out.narrow_bar": "Neuer Streifen zu schmal (< 15 % der Leinwand): das Modell füllt ihn womöglich nicht. Nutze breitere Ränder."
 }

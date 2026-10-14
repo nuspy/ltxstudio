@@ -544,6 +544,10 @@ class VideoEditAITab(QWidget):
         except ValueError:
             return None
 
+    @staticmethod
+    def _narrow_bar_text() -> str:
+        return tr("vedit.out.narrow_bar", "barra nuova troppo stretta (< 15% del canvas): il modello potrebbe non riempirla. Usa margini più larghi.")
+
     def _on_outpaint_change(self, *_):
         custom = self.out_format.currentData() == "custom"
         self._set_row_visible_for(self.out_m["top"], self.mode.currentData() == "outpaint" and custom)
@@ -555,6 +559,8 @@ class VideoEditAITab(QWidget):
             self.out_preview.setPixmap(pm); return
         warn = ("  ⚠ " + tr("vedit.out.too_big", "area nuova molto grande (> 60%): il modello inventerà molto.")) \
             if lay.too_much_new_area else ""
+        if lay.narrow_bar:
+            warn += "  ⚠ " + self._narrow_bar_text()
         self.out_info.setText(tr("vedit.out.canvas_info", "Canvas: {w}x{h} (area nuova {p}%)").format(
             w=lay.canvas_w, h=lay.canvas_h, p=int(round(lay.new_area * 100))) + warn)
         # anteprima: canvas scalato nel box, sorgente grigio chiaro, area nuova nera tratteggiata
@@ -637,6 +643,8 @@ class VideoEditAITab(QWidget):
                 self._block("vedit.err_no_new_area", "Outpaint: nessuna area nuova da generare con questo formato."); return
             if lay is not None and lay.too_much_new_area:
                 self.log.appendPlainText(tr("vedit.out.too_big", "area nuova molto grande (> 60%): il modello inventerà molto."))
+            if lay is not None and lay.narrow_bar:
+                self.log.appendPlainText("⚠ " + self._narrow_bar_text())
         if is_cam:
             w, h = int(self.cam_w.value()), int(self.cam_h.value())
             cfg.update(width=w, height=h, cam_ref=cfg["video"], cam_img=self.cam_img.text().strip(),

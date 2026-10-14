@@ -1922,15 +1922,22 @@ def _run_chunked_ic(p: dict, chunk: int) -> str:
     segs = prep.plan_segments(total, chunk, ov)
     ovs = prep.overlaps_of(segs)
     base = os.path.splitext(p["output"])[0]
-    work = f"{base}_icseg"
+    # Intermedi (guide tagliati + _icchunkN.mp4) in una cartella di lavoro DEDICATA sotto la temp di sistema, NON in
+    # output\ . Nome stabile per output (basename + hash del percorso assoluto) cosi' il `resume` ritrova i segmenti.
+    # Nessuna cancellazione qui: la pulizia e' lasciata al sistema (cartella temp).
+    import hashlib as _hl
+    import tempfile as _tf
+    _job = f"{os.path.basename(base)}_{_hl.sha1(os.path.abspath(base).encode('utf-8')).hexdigest()[:8]}"
+    work = os.path.join(_tf.gettempdir(), "ltxstudio_icwork", _job)
     os.makedirs(work, exist_ok=True)
+    print(f"[iclora] cartella intermedi: {work} (non cancellata: pulizia lasciata al sistema)", flush=True)
     resume = bool(p.get("resume", False))
     print(f"[iclora] segmentazione: {len(segs)} segmenti da {segs[0].count} frame, overlap {ovs} "
           f"(guide {info.width}x{info.height} {info.nb_frames}f, tot {total}f)", flush=True)
     parts: list[str] = []
     for sg in segs:
         sub = os.path.join(work, f"guide_{sg.index:03d}.mp4")
-        outp = f"{base}_icchunk{sg.index}.mp4"
+        outp = os.path.join(work, f"chunk_{sg.index:03d}.mp4")
         if resume and os.path.exists(outp) and _probe_frames(outp) >= sg.count - 2:
             print(f"[iclora] segmento {sg.index + 1}/{len(segs)} gia' valido -> riuso (resume)", flush=True)
             parts.append(outp)

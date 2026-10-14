@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "以图像设定视频风格（ReStyle）",
   "feat.cap.video_camera_ic": "参考镜头运动（Cameraman）",
   "feat.cap.video_lipdub": "口型配音 / 重新配音（LipDub）",
-  "feat.cap.video_hdr_ic": "HDR 16 位 + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 位 + EXR",
+  "vedit.out.narrow_bar": "新增的边条太窄（小于画布的 15%）：模型可能无法填充。请使用更宽的边距。"
 }

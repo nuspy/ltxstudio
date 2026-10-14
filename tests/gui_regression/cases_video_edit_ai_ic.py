@@ -279,6 +279,29 @@ def case_outpaint_canvas_and_margins(w, spy):
     assert len(spy.calls) == n + 1 and cfg["out_format"] == "custom" and cfg["out_margins"][1] == 200
 
 
+def case_outpaint_narrow_bar_warning(w, spy):
+    """Barre nuove strette (< 15% del canvas): avviso in info e nel log; con margini larghi niente avviso;
+    il sorgente non viene rimpicciolito (512x288 -> 21:9 = canvas 704x320, scala 1.0)."""
+    from types import SimpleNamespace
+    from core import video_ic_prep as prep
+    _ack_dev(True)
+    t = _fill_mode(w, "outpaint")
+    t._vinfo = SimpleNamespace(width=512, height=288, nb_frames=49, fps=25.0)
+    t.out_format.setCurrentIndex(t.out_format.findData("21:9"))
+    t._on_outpaint_change()
+    lay = t._outpaint_layout()
+    assert lay.canvas == (704, 320) and lay.scale == 1.0 and lay.narrow_bar
+    assert t._narrow_bar_text() in t.out_info.text(), "avviso barra stretta atteso nell'info"
+    n = len(spy.calls)
+    t._go()
+    assert len(spy.calls) == n + 1 and t._narrow_bar_text() in t.log.toPlainText(), "avviso nel log (non blocca)"
+    t.out_format.setCurrentIndex(t.out_format.findData("custom"))
+    t.out_m["left"].setValue(200)
+    t.out_m["right"].setValue(200)
+    t._on_outpaint_change()
+    assert not t._outpaint_layout().narrow_bar and t._narrow_bar_text() not in t.out_info.text()
+
+
 def case_outpaint_dark_autodetect(w, spy):
     """Sorgente scuro (video sintetico nero) → il checkbox gamma è suggerito in automatico (e dichiarato nel log)."""
     import subprocess
@@ -424,6 +447,8 @@ CASES = (
       case_restyle_requires_image),
      ("vedit_outpaint_canvas_margins", "Outpaint: canvas multipli di 64, area nuova, margini, avviso e blocchi.",
       case_outpaint_canvas_and_margins),
+     ("vedit_outpaint_narrow_bar", "Outpaint: barra nuova < 15% del canvas avvisa (info+log); sorgente a scala 1.0.",
+      case_outpaint_narrow_bar_warning),
      ("vedit_outpaint_dark_autodetect", "Outpaint: sorgente scuro → gamma suggerito (e dichiarato nel log).",
       case_outpaint_dark_autodetect),
      ("vedit_cameraman_validation", "Cameraman: riferimento obbligatorio, <960x512 avvisa, video principale opzionale.",

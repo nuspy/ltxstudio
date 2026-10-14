@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "Стиль відео за зразком (ReStyle)",
   "feat.cap.video_camera_ic": "Камера за зразком (Cameraman)",
   "feat.cap.video_lipdub": "Ліпдаб / передубляж (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 біт + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 біт + EXR",
+  "vedit.out.narrow_bar": "нова смуга занадто вузька (< 15% полотна): модель може її не заповнити. Збільште поля."
 }

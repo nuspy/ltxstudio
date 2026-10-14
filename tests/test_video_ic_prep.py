@@ -59,7 +59,7 @@ def test_layout_aspect_916_to_169_contains_source_and_multiple_of_64():
     assert lo.x + lo.src_w <= lo.canvas_w and lo.y + lo.src_h <= lo.canvas_h
     assert lo.new_area > 0.4 and lo.clamped
     assert abs(lo.x - (lo.canvas_w - lo.src_w) / 2) <= 2                   # centrato
-    assert abs(lo.canvas_w / lo.canvas_h - 16 / 9) < 0.1
+    assert abs(lo.canvas_w / lo.canvas_h - 16 / 9) < 0.15                 # arrotondamento in su: aspetto approssimato
 
 
 def test_layout_same_aspect_no_new_area():
@@ -93,6 +93,39 @@ def test_layout_needs_exactly_one_mode():
         P.compute_outpaint_layout(100, 100)
     with pytest.raises(ValueError):
         P.compute_outpaint_layout(100, 100, aspect="1:1", margins=(1, 1, 1, 1))
+
+
+def test_layout_rounds_up_and_never_shrinks_source():
+    """Live 14/10: 512x288 -> 21:9 rimpiccioliva il sorgente (456x256). Ora canvas arrotondato IN SU, scala 1.0."""
+    for kw in (dict(aspect=(21, 9)), dict(aspect="9:16"), dict(margins=(0, 192, 0, 192)), dict(margins=(30, 0, 50, 0))):
+        lo = P.compute_outpaint_layout(512, 288, **kw)
+        assert (lo.src_w, lo.src_h) == (512, 288) and lo.scale == 1.0 and not lo.clamped, (kw, lo)
+        assert lo.canvas_w % 64 == 0 and lo.canvas_h % 64 == 0
+        assert lo.canvas_w >= 512 and lo.canvas_h >= 288
+        assert lo.x + lo.src_w <= lo.canvas_w and lo.y + lo.src_h <= lo.canvas_h
+    assert P.compute_outpaint_layout(512, 288, aspect=(21, 9)).canvas == (704, 320)
+    assert P.compute_outpaint_layout(512, 288, margins=(0, 192, 0, 192)).canvas == (896, 320)
+    lo = P.compute_outpaint_layout(500, 281, aspect="16:9")                    # dispari: mai sotto 1.0
+    assert lo.scale >= 1.0 and lo.src_w >= 500 and lo.src_h >= 281
+
+
+def test_layout_over_cap_reduces_canvas_then_scales():
+    lo = P.compute_outpaint_layout(1280, 720, aspect="9:16", max_long_edge=1280)    # canvas ideale 1280x2276 > tetto
+    assert lo.clamped and max(lo.canvas) <= 1280 and lo.scale < 1.0
+    assert lo.src_w <= lo.canvas_w and lo.src_h <= lo.canvas_h
+    lo2 = P.compute_outpaint_layout(1000, 500, margins=(0, 100, 0, 0), max_long_edge=1280)   # 1100 -> 1152 entro il tetto
+    assert not lo2.clamped and lo2.scale == 1.0 and lo2.canvas_w == 1152
+
+
+def test_narrow_bar_detection():
+    assert P.compute_outpaint_layout(512, 288, aspect=(21, 9)).narrow_bar            # barre 96 su 704 = 13.6%
+    assert P.compute_outpaint_layout(512, 288, margins=(0, 60, 0, 60)).narrow_bar
+    assert not P.compute_outpaint_layout(512, 288, margins=(0, 192, 0, 192)).narrow_bar
+    assert not P.compute_outpaint_layout(512, 288, aspect="9:16").narrow_bar
+    lo = P.compute_outpaint_layout(1280, 704, aspect=(1280, 704))
+    assert lo.narrow_bar_fraction == 1.0 and not lo.narrow_bar                       # nessuna barra
+    # lo slop di arrotondamento (asse con <=64 px totali) non conta come barra
+    assert P.compute_outpaint_layout(512, 288, margins=(0, 192, 0, 192)).narrow_bar_fraction > 0.2
 
 
 def test_too_much_new_area_flag():

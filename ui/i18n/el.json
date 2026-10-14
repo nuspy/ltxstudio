@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "Στυλ βίντεο με εικόνα (ReStyle)",
   "feat.cap.video_camera_ic": "Κάμερα από αναφορά (Cameraman)",
   "feat.cap.video_lipdub": "Lip dub / μεταγλώττιση (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 bit + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 bit + EXR",
+  "vedit.out.narrow_bar": "η νέα λωρίδα είναι πολύ στενή (< 15% του καμβά): το μοντέλο ίσως δεν τη γεμίσει. Χρησιμοποιήστε μεγαλύτερα περιθώρια."
 }

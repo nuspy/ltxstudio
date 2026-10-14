@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "Стиль видео по образцу (ReStyle)",
   "feat.cap.video_camera_ic": "Камера по образцу (Cameraman)",
   "feat.cap.video_lipdub": "Липдаб / передубляж (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 бит + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 бит + EXR",
+  "vedit.out.narrow_bar": "новая полоса слишком узкая (< 15% холста): модель может её не заполнить. Увеличьте поля."
 }

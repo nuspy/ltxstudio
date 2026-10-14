@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "סגנון וידאו מתמונה (ReStyle)",
   "feat.cap.video_camera_ic": "מצלמה מייחוס (Cameraman)",
   "feat.cap.video_lipdub": "דיבוב שפתיים / דיבוב מחדש (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 סיביות + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 סיביות + EXR",
+  "vedit.out.narrow_bar": "הפס החדש צר מדי (פחות מ-15% מהקנבס): ייתכן שהמודל לא ימלא אותו. השתמשו בשוליים רחבים יותר."
 }

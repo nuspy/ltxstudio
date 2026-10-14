@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "Estilo de vídeo con imagen (ReStyle)",
   "feat.cap.video_camera_ic": "Cámara desde referencia (Cameraman)",
   "feat.cap.video_lipdub": "Lip dub / redoblaje (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 bits + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 bits + EXR",
+  "vedit.out.narrow_bar": "barra nueva demasiado estrecha (< 15 % del lienzo): el modelo puede no rellenarla. Usa márgenes más anchos."
 }

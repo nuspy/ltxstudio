@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "Videóstílus képpel (ReStyle)",
   "feat.cap.video_camera_ic": "Kamera referenciából (Cameraman)",
   "feat.cap.video_lipdub": "Lip dub / újraszinkron (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 bit + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 bit + EXR",
+  "vedit.out.narrow_bar": "az új sáv túl keskeny (< 15%-a a vászonnak): a modell nem biztos, hogy kitölti. Használj szélesebb margókat."
 }

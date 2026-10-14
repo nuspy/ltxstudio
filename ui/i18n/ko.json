@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "이미지로 영상 스타일 (ReStyle)",
   "feat.cap.video_camera_ic": "참조 기반 카메라 (Cameraman)",
   "feat.cap.video_lipdub": "립 더빙 / 재더빙 (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16비트 + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16비트 + EXR",
+  "vedit.out.narrow_bar": "새 영역 띠가 너무 좁습니다(캔버스의 15% 미만): 모델이 채우지 못할 수 있습니다. 여백을 더 넓게 설정하세요."
 }

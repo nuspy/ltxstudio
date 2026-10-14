@@ -167,6 +167,9 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
             raise IcJobError("nessuna area nuova da generare: scegli un formato/margini diversi")
         if layout.too_much_new_area:
             notes.append(f"area nuova {layout.new_area:.0%} > {prep.MAX_NEW_AREA:.0%}: il modello inventera' molto")
+        if layout.narrow_bar:
+            notes.append(f"barra nuova stretta ({layout.narrow_bar_fraction:.0%} del canvas < {prep.MIN_BAR_FRACTION:.0%}): "
+                         "il modello potrebbe NON riempirla; usa margini piu' larghi")
         if layout.clamped:
             notes.append(f"canvas ridotto al tetto {spec.max_long_edge}px")
         if cfg.get("out_dark"):

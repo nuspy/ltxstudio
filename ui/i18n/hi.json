@@ -3234,5 +3234,6 @@
   "feat.cap.video_restyle": "छवि से वीडियो शैली (ReStyle)",
   "feat.cap.video_camera_ic": "संदर्भ से कैमरा (Cameraman)",
   "feat.cap.video_lipdub": "लिप डब / री-डबिंग (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 बिट + EXR"
+  "feat.cap.video_hdr_ic": "HDR 16 बिट + EXR",
+  "vedit.out.narrow_bar": "नई पट्टी बहुत संकरी है (कैनवास के 15% से कम): मॉडल इसे नहीं भर सकता। चौड़े मार्जिन चुनें।"
 }

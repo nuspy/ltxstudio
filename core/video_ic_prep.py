@@ -31,6 +31,7 @@ API pubblica (firme)
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -40,6 +41,7 @@ from pathlib import Path
 from typing import Iterator, Sequence
 
 DARK_LUMA_THRESHOLD = 0.16         # luma media (0..1) sotto cui la sorgente e' «scura» (~41/255)
+MIN_BAR_FRACTION = 0.15            # barra nuova piu' stretta di questa frazione del canvas: il modello NON la riempie (live 14/10)
 MAX_NEW_AREA = 0.60                # oltre, il modello inventa troppo (DESIGN §2.2: da validare dal vivo)
 DEFAULT_OVERLAP = 9                # frame di overlap fra segmenti (>= 8: restauro, DESIGN §4.3)
 OUTPAINT_FORMATS: dict[str, tuple[int, int]] = {
@@ -269,6 +271,23 @@ class OutpaintLayout:
     clamped: bool           # il tetto max_long_edge ha ridotto il canvas
 
     @property
+    def narrow_bar_fraction(self) -> float:
+        """Frazione (sul proprio asse del canvas) della barra nuova PIU' STRETTA; 1.0 se non ci sono barre.
+        Un asse con meno di 64 px totali di spazio nuovo e' solo slop dell'arrotondamento a multipli di 64
+        (non una barra voluta) e non conta; barre <= 4 px neppure."""
+        fr = []
+        for lo, hi, dim in ((self.x, self.canvas_w - self.x - self.src_w, self.canvas_w),
+                            (self.y, self.canvas_h - self.y - self.src_h, self.canvas_h)):
+            if lo + hi <= 64:
+                continue
+            fr.extend(b / float(dim) for b in (lo, hi) if b > 4)
+        return min(fr) if fr else 1.0
+
+    @property
+    def narrow_bar(self) -> bool:
+        return self.narrow_bar_fraction < MIN_BAR_FRACTION
+
+    @property
     def too_much_new_area(self) -> bool:
         return self.new_area > MAX_NEW_AREA
 
@@ -281,8 +300,13 @@ def _even(v: float) -> int:
     return max(2, int(round(v / 2.0)) * 2)
 
 
-def _r_mult(v: float, m: int) -> int:
-    return max(m, int(round(v / m)) * m)
+def _even_up(v: float) -> int:
+    return max(2, int(math.ceil(v / 2.0 - 1e-9)) * 2)
+
+
+def _c_mult(v: float, m: int) -> int:
+    """Arrotonda IN SU al multiplo di m (tolleranza 1e-6 contro il rumore in virgola mobile)."""
+    return max(m, int(math.ceil(v / m - 1e-6)) * m)
 
 
 def compute_outpaint_layout(src_w: int, src_h: int, *,
@@ -295,8 +319,9 @@ def compute_outpaint_layout(src_w: int, src_h: int, *,
     - `aspect` ("16:9" oppure (16, 9)): canvas con quell'aspetto che CONTIENE il sorgente (no crop), con
       sorgente ancorato (`anchor`: center|left|right|top|bottom; conta solo sull'asse con spazio libero).
     - `margins` = (sopra, destra, sotto, sinistra) in px del SORGENTE: il canvas e' sorgente+margini.
-    Entrambi: il lato lungo del canvas e' ridotto a `max_long_edge` se serve (mai ingrandito), il canvas e'
-    arrotondato a multipli di `multiple` e il sorgente scalato sta sempre dentro. Esattamente uno fra
+    Entrambi: il canvas e' arrotondato IN SU a multipli di `multiple`, il sorgente resta a scala 1.0 (mai
+    rimpicciolito) salvo che il canvas superi `max_long_edge`: solo allora si riduce il canvas e il sorgente con lui.
+    Il sorgente scalato sta sempre dentro. Esattamente uno fra
     `aspect` e `margins` va dato."""
     if (aspect is None) == (margins is None):
         raise ValueError("indica esattamente uno fra aspect e margins")
@@ -317,14 +342,16 @@ def compute_outpaint_layout(src_w: int, src_h: int, *,
         mt, mr, mb, ml = (max(0, int(v)) for v in margins)
         ideal_w, ideal_h = float(sw0 + ml + mr), float(sh0 + mt + mb)
     s_cap = min(1.0, max_long_edge / max(ideal_w, ideal_h))
-    cw, ch = _r_mult(ideal_w * s_cap, multiple), _r_mult(ideal_h * s_cap, multiple)
+    # canvas arrotondato IN SU a multipli di `multiple` (cosi' il sorgente non va rimpicciolito)
+    cw = _c_mult(ideal_w * s_cap, multiple)
+    ch = _c_mult(ideal_h * s_cap, multiple)
     while max(cw, ch) > max_long_edge and max(cw, ch) > multiple:      # arrotondamento oltre il tetto
         if cw >= ch:
             cw -= multiple
         else:
             ch -= multiple
-    k = min(cw / sw0, ch / sh0, s_cap)                         # il sorgente scalato sta sempre nel canvas
-    sw, sh = min(_even(sw0 * k), cw // 2 * 2), min(_even(sh0 * k), ch // 2 * 2)
+    k = min(cw / sw0, ch / sh0, s_cap)                         # <= 1: scala solo se il tetto lo impone
+    sw, sh = min(_even_up(sw0 * k), cw // 2 * 2), min(_even_up(sh0 * k), ch // 2 * 2)
     if aspect is not None:
         fx = {"left": 0.0, "right": 1.0}.get(anchor, 0.5)
         fy = {"top": 0.0, "bottom": 1.0}.get(anchor, 0.5)
