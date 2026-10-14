@@ -4705,8 +4705,7 @@
       "gated": false,
       "approx_gb": 13.16,
       "scan_names": [
-        "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-int8-native.safetensors",
-        "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors"
+        "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-int8-native.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",

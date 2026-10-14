@@ -59,12 +59,13 @@ def _prompt() -> str:
 
 
 def _user_busy() -> bool:
-    """True se ci sono job dell'UTENTE in corso (mai testare sopra una generazione reale)."""
+    """True se ci sono job dell'UTENTE in corso (mai testare sopra una generazione reale). «app.py» non preceduto
+    da lettere/«_»: `tray_app.py` (vllm_gui) non è LTX Studio e faceva saltare ogni caso con «SKIP»."""
     import subprocess
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-Command",
                             "(Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
-                            "Where-Object { $_.CommandLine -match 'app\\.py' }).Count"],
+                            "Where-Object { $_.CommandLine -match '(?<![\\w])app\\.py' }).Count"],
                            capture_output=True, text=True, timeout=30)
         return int((r.stdout or "0").strip() or 0) > 0
     except Exception:                                       # noqa: BLE001
