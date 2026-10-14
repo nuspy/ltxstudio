@@ -5101,6 +5101,29 @@
         "distilled",
         "fp8"
       ]
+    },
+    {
+      "id": "rife-flownet-v4",
+      "module": "Video",
+      "label": "RIFE v4 interpolazione fotogrammi (pesi, 25MB)",
+      "kind": "file",
+      "type": "Interpolation",
+      "family": "RIFE",
+      "gated": false,
+      "approx_gb": 0.025,
+      "scan_names": [
+        "flownet.pkl"
+      ],
+      "category": "video",
+      "arch": "rife",
+      "repo_id": "MonsterMMORPG/Practical-RIFE",
+      "url": "https://huggingface.co/MonsterMMORPG/Practical-RIFE",
+      "filename": "flownet.pkl",
+      "remote_filename": "train_log/flownet.pkl",
+      "note": "Practical-RIFE (hzwer, MIT): fluidifica i video e alza gli fps",
+      "use": [
+        "upscale_video"
+      ]
     }
   ],
   "schema": 2,

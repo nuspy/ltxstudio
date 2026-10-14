@@ -673,6 +673,11 @@ NEW = [
       type="LoRA", family="Qwen21", gb=0.03, sens="adult", used_by=["cap.image_qwen21"],
       note="toglie la censura a qualunque DiT base (solo attenzione, rank 16). Licenza Qwen Research: uso NON commerciale"),
 
+    # RIFE (interpolazione fotogrammi, core/rife.py): codice in workers/rife_pr, qui solo i pesi
+    N("rife-flownet-v4", "Video", "RIFE v4 interpolazione fotogrammi (pesi, 25MB)", category="video", arch="rife",
+      repo="MonsterMMORPG/Practical-RIFE", remote="train_log/flownet.pkl", filename="flownet.pkl",
+      type="Interpolation", family="RIFE", gb=0.025,
+      note="Practical-RIFE (hzwer, MIT): fluidifica i video e alza gli fps"),
     # FLUX.1 schnell fp8 (checkpoint completo: transformer + TE + VAE): 4 passi, guidance 0 — il FLUX più veloce.
     # Il loader nativo lo carica con fp8 layerwise (image_flux, ramo checkpoint completo).
     N("flux1-schnell-fp8", "Immagini", "FLUX.1 schnell fp8 (4 passi, veloce, 17.2GB)", category="image", arch="flux1",

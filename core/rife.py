@@ -19,13 +19,27 @@ import os
 import sys
 import subprocess
 
-RIFE_REPO = r"E:\AI\Framepack\FramePack\Practical-RIFE"
+# Codice di Practical-RIFE incluso nel progetto (workers/rife_pr, MIT): prima stava dentro la cartella FramePack,
+# cancellata il 14/10/2026 → l'interpolazione si rompeva. I pesi sono la voce di catalogo «rife-flownet-v4».
+RIFE_REPO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "workers", "rife_pr")
+
+
+def weights_dir() -> str:
+    """Cartella con flownet.pkl (voce di catalogo rife-flownet-v4); "" se il catalogo non la risolve."""
+    try:
+        from core import model_paths as _mp
+        p = _mp.p("rife-flownet-v4", "")
+        return os.path.dirname(p) if p else ""
+    except Exception:                                    # noqa: BLE001
+        return ""
 _INF_PY = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"
 _CACHE: dict = {}
 
 
 def available() -> bool:
-    return os.path.exists(os.path.join(RIFE_REPO, "train_log", "RIFE_HDv3.py"))
+    w = weights_dir()
+    return (os.path.exists(os.path.join(RIFE_REPO, "train_log", "RIFE_HDv3.py"))
+            and bool(w) and os.path.isfile(os.path.join(w, "flownet.pkl")))
 
 
 def _load():
@@ -36,7 +50,7 @@ def _load():
         sys.path.insert(0, RIFE_REPO)
     from train_log.RIFE_HDv3 import Model    # architettura + loader di Practical-RIFE
     m = Model()
-    m.load_model(os.path.join(RIFE_REPO, "train_log"), -1)
+    m.load_model(weights_dir(), -1)
     m.eval()
     m.device()
     _CACHE["m"] = m
