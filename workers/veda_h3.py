@@ -16,6 +16,7 @@ Aggancio (equivalente a `veda_comfy/comfy_patch.py`, che usa l'override d'attenz
 from __future__ import annotations
 
 import collections
+import functools
 import os
 import sys
 
@@ -202,6 +203,9 @@ def enable(transformer, predictor_path: str, *, generated: str = "32", reference
         blk.attn.set_processor(VedaH3Processor(st, i, blk.attn.processor))
     orig = transformer.forward
 
+    # la pipeline modulare filtra gli argomenti del layout con inspect.signature(transformer.forward): il wrapper
+    # deve esporre la firma ORIGINALE (functools.wraps → __wrapped__), o position_ids & co. vengono scartati
+    @functools.wraps(orig)
     def forward(*args, **kwargs):
         st.prepare(kwargs.get("position_ids"), kwargs.get("token_tags"))
         return orig(*args, **kwargs)

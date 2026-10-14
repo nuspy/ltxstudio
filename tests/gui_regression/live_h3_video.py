@@ -5,7 +5,8 @@ emozione + suoni d'ambiente. Controlla: mp4 prodotto CON traccia audio, durata â
 Copia il risultato in output/DIAG_h3_*.mp4 e il log GUI in output/DIAG_live_h3_guilog.txt.
 
 Uso:  QT_QPA_PLATFORM=offscreen python tests/gui_regression/live_h3_video.py [--turbo 8|4|""] [--secs 5]
-      [--image PATH] (i2v: foto come primo fotogramma)
+      [--image PATH] (i2v: foto come primo fotogramma) [--ref PATH] (Ref2VA: foto di riferimento <Picture 1>)
+      [--veda] (attenzione sparsa Veda: richiede --ref)
 """
 from __future__ import annotations
 
@@ -52,6 +53,7 @@ def _probe(path: str) -> str:
 
 def main() -> int:
     turbo, secs, image = _arg("--turbo", "8"), float(_arg("--secs", "5")), _arg("--image", "")
+    ref, veda = _arg("--ref", ""), "--veda" in sys.argv
     prompt, line = _arg("--prompt", PROMPT), _arg("--line", LINE)
     speaker, label = _arg("--speaker", "The knight"), _arg("--label", "knight")
     H.patch_dialogs()
@@ -77,6 +79,10 @@ def main() -> int:
     vt.width.setValue(1344); vt.height.setValue(768)
     vt.length.setValue(secs)
     vt.native_audio.setChecked(True)
+    if ref:                                     # Ref2VA: riferimento citabile nel prompt come <Picture 1>
+        vt.reference_panel.enable.setChecked(True)
+        assert vt.reference_panel.add_path(ref), "riferimento non aggiunto"
+    vt.h3_veda.setChecked(veda)
     if image:                                   # i2v: la foto nel canvas del tab Immagini = primo fotogramma
         H.load_canvas_image(w, image)
         H.app().processEvents()
@@ -98,7 +104,8 @@ def main() -> int:
     if not outs:
         print("FAIL nessun video")
         return 1
-    dst = ROOT / "output" / f"DIAG_h3_{label}_{'t' + turbo if turbo else 'base'}_{int(secs)}s.mp4"
+    tag = ("_ref" if ref else "") + ("_veda" if veda else "")
+    dst = ROOT / "output" / f"DIAG_h3_{label}_{'t' + turbo if turbo else 'base'}_{int(secs)}s{tag}.mp4"
     shutil.copyfile(outs[-1], dst)
     info = _probe(str(dst))
     print(f"[live] {dst}\n[live] ffprobe: {info}")
