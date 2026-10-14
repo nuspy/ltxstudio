@@ -754,25 +754,20 @@ class VideoTab(QWidget):
             ss.set_suggested_steps(S.TURBO[t][1] if t else S.DEFAULT_NFE, note="MiniMax H3")
             ss.steps.setEnabled(not t)
 
-    PLACEHOLDER_KEY = "__placeholder__"
+    @staticmethod
+    def _model_key(combo, i):
+        return (combo.itemData(i) or {}).get("key")
 
     def _finish_model_menu(self, prev_key, candidates: set):
-        """Dopo aver ripopolato il menu modelli: se la voce scelta prima c'e' ancora la riseleziona; se e'
-        SPARITA (la matrice dell'edizione non la include piu', modalita' NSFW...) NON ricade sul primo
-        elemento ma resta su un segnaposto «— scegli un modello —» che blocca la generazione."""
-        keys = [(self.model.itemData(k) or {}).get("key") for k in range(self.model.count())]
-        scope = next(iter(candidates), ":").split(":", 1)[0]
-        sticky = isinstance(prev_key, str) and prev_key == f"{self.PLACEHOLDER_KEY}:{scope}"   # segnaposto gia' attivo
-        if prev_key in keys:
-            self.model.setCurrentIndex(keys.index(prev_key))
-        elif prev_key in candidates or sticky:
-            self.model.insertItem(0, tr("vid.model.placeholder", "— scegli un modello —"),
-                                  {"kind": "placeholder", "placeholder": True,
-                                   "key": f"{self.PLACEHOLDER_KEY}:{scope}"})
-            self.model.setCurrentIndex(0)
+        """Dopo aver ripopolato il menu modelli: riseleziona la scelta di prima; se e' SPARITA (matrice
+        dell'edizione, modalita' NSFW...) resta il segnaposto «scegli un modello» (ui/model_menu.py)."""
+        from ui import model_menu as mm
+        mm.settle(self.model, prev_key, candidates, key_of=lambda i: self._model_key(self.model, i),
+                  data={"kind": "placeholder", "placeholder": True, "key": mm.PLACEHOLDER})
 
     def model_is_placeholder(self) -> bool:
-        return bool((self.model.currentData() or {}).get("placeholder"))
+        from ui import model_menu as mm
+        return mm.is_placeholder(self.model)
 
     def _refilter_h3_models(self):
         """Dropdown modello = profili di quantizzazione H3 (il checkpoint FL2VA o Ref2VA lo decide la
@@ -782,7 +777,8 @@ class VideoTab(QWidget):
         from core import weights_tooltips as _wt
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
-        prev = (self.model.currentData() or {}).get("key")
+        from ui import model_menu as _mm
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         labels = {"nvfp4": tr("vid.h3.prof.nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"),
                   "fp8": tr("vid.h3.prof.fp8", "fp8 · 21 GB (RTX 40xx)"),
                   "int8": tr("vid.h3.prof.int8", "int8-ConvRot · 21 GB (tutte le GPU)"),
@@ -842,7 +838,8 @@ class VideoTab(QWidget):
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
         _free_gb = _mp.gpu_free_gb()
-        prev = (self.model.currentData() or {}).get("key")
+        from ui import model_menu as _mm
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         self.model.blockSignals(True)
         self.model.clear()
         # (id_catalogo, variante, etichetta)
@@ -951,7 +948,8 @@ class VideoTab(QWidget):
         from PySide6.QtGui import QColor
         arch = self._arch()
         entries = {e["id"]: e for e in wc.load()}
-        prev = (self.model.currentData() or {}).get("key")
+        from ui import model_menu as _mm
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         self.model.blockSignals(True)
         self.model.clear()
         for cat_id, variant, label in items:

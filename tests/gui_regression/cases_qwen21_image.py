@@ -292,3 +292,71 @@ def case_qwen21_model_disappears_placeholder(w, spy):
 CASES.append(("qwen21_model_disappears_placeholder",
               "DiT Qwen sparito dal menu (matrice): segnaposto «scegli un modello», generazione bloccata.",
               case_qwen21_model_disappears_placeholder))
+
+
+def case_model_placeholder_other_combos(w, spy):
+    """Regola «mai il primo elemento al posto della scelta»: vale anche per Integra (Qwen), Cambia colore, Inpaint, Upscale e
+    Restauro. Il modello scelto sparisce → segnaposto + azione bloccata (nessuna richiesta al backend)."""
+    from core import features
+    from ui import model_menu as mm
+    f = w.frame1_tab
+    saved = (features._MANIFEST, features._FEATURES)
+    try:
+        f.img_nsfw.setCurrentText("SFW")
+        # --- Integra con Qwen-Image 2.1 ---
+        f.integrate_engine.setCurrentIndex(3)
+        f._reload_flux_combos()
+        f.integrate_model.setCurrentIndex(f.integrate_model.findData("qwen21-dit-fp8"))
+        assert f.integrate_model.currentData() == "qwen21-dit-fp8", _ids(f.integrate_model)
+        feats = {"cap.image_qwen21": {"enabled": True, "params": {}},
+                 "model.qwen21-dit-fp8": {"enabled": False, "params": {}}}
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        f._reload_flux_combos()
+        assert mm.is_placeholder(f.integrate_model) and f.integrate_model.currentIndex() == 0
+        before = len(spy.calls)
+        w.generate_integrate()
+        assert len(spy.calls) == before, "Integra: con il segnaposto non deve partire nulla"
+        # --- Cambia colore (Qwen) ---
+        f.color_engine.setCurrentIndex(3)
+        f._reload_qwen21_edit_combos()
+        w.generate_recolor()
+        assert len(spy.calls) == before, "Colore: con il segnaposto non deve partire nulla"
+        # --- Inpaint: voce Qwen scelta poi sparita ---
+        features._MANIFEST, features._FEATURES = saved
+        f._reload_qwen21_edit_combos()
+        lab = next(l for l, c in f._qwen21_inp.items() if c == "qwen21-dit-fp8")
+        f.inp_model.setCurrentIndex(f.inp_model.findText(lab))
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        f._reload_qwen21_edit_combos()
+        assert mm.is_placeholder(f.inp_model), f.inp_model.currentText()
+        w.generate_inpaint("inpaint")
+        assert len(spy.calls) == before, "Inpaint: con il segnaposto non deve partire nulla"
+        # --- Upscale: file spariti dall'inventario ---
+        f.set_upscale_models(["a_x4.pth", "b_x4.pth"])
+        f.up_model.setCurrentIndex(1)
+        f.set_upscale_models(["a_x4.pth"])
+        assert mm.is_placeholder(f.up_model) and f.up_model.currentIndex() == 0
+        w.generate_upscale()
+        assert len(spy.calls) == before, "Upscale: con il segnaposto non deve partire nulla"
+        # --- Restauro ---
+        r = w.restore_tab
+        got = []
+        r.request_restore.connect(got.append)
+        r.set_upscale_models(["u1.pth", "u2.pth"])
+        r.upscale_model.setCurrentIndex(1)
+        r.set_upscale_models(["u1.pth"])
+        assert mm.is_placeholder(r.upscale_model)
+        r.radio_restore.setChecked(True)
+        r._on_process()
+        assert not got, "Restauro: con il segnaposto non deve partire nulla"
+        r.set_upscale_models(["u1.pth", "u2.pth"])               # il segnaposto resta finche' l'utente non sceglie
+        assert mm.is_placeholder(r.upscale_model)
+    finally:
+        features._MANIFEST, features._FEATURES = saved
+
+
+CASES.append(("model_placeholder_other_combos",
+              "Integra/Colore/Inpaint/Upscale/Restauro: scelta sparita → segnaposto e azione bloccata (mai il primo).",
+              case_model_placeholder_other_combos))

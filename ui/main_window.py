@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 
 from ui.i18n_manager import tr, i18n, LANGUAGES, LANG_FLAGS
 from ui.job_queue import GenerationQueue, JobQueuePanel
+from ui import model_menu as mm
+from ui.tabs.frame1_tab import QWEN21_ENGINE_IDX
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.comfy_driver import ComfyDriver           # noqa: E402
@@ -2006,12 +2008,6 @@ class MainWindow(QMainWindow):
                 vals[key] = max_px
 
     # ---------- generazione ----------
-    def _warn_pick_model(self):
-        """Segnaposto «— scegli un modello —» selezionato: la generazione si ferma con un messaggio chiaro."""
-        QMessageBox.warning(self, tr("mw.pick_model_title", "Scegli un modello"),
-                            tr("mw.pick_model_msg", "Il modello scelto non è più disponibile nella tua edizione: "
-                               "selezionane uno dal menu Modello."))
-
     def on_generate(self):
         if not self.engine:
             QMessageBox.warning(self, tr("mw.template_missing_title"), self._engine_err or tr("mw.golden_prompt_not_loaded"))
@@ -2023,8 +2019,8 @@ class MainWindow(QMainWindow):
         if not vals.get("prompt_positive"):
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_prompt_msg"))
             return
-        if self.video_tab.model_is_placeholder():            # modello scelto sparito dal menu: mai sceglierne un altro
-            return self._warn_pick_model()
+        if mm.blocked(self, self.video_tab.model):           # modello scelto sparito dal menu: mai sceglierne un altro
+            return
         if not self.video_tab.wants_fixed_seed():
             vals["seed"] = random.randint(0, 2**31)
 
@@ -2443,6 +2439,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
+        if mm.blocked(self, self.frame1_tab.inp_model):
+            return
         cfg = self.frame1_tab.get_inpaint_config()
         if cfg.get("unet") and not cfg.get("available", True):
             QMessageBox.warning(self, tr("mw.model_not_installed_title"),
@@ -2550,6 +2548,8 @@ class MainWindow(QMainWindow):
         from core import backend
         if not backend.is_native("image") and not self.driver.is_up():
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
+        if mm.blocked(self, self.frame1_tab.integrate_model):
+            return
         # Foto di base: dal nuovo campo della tab, oppure — se vuoto — quella già nel canvas.
         if not self._resolve_photo(self.frame1_tab.get_inpaint_config().get("integrate_photo", "")):
             return
@@ -2682,6 +2682,8 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.comfy_offline_title"), tr("mw.comfy_offline_generate_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
+        if mm.blocked(self, self.frame1_tab.integrate_model):
+            return
         cfg = self.frame1_tab.get_compose_config()
         imgs = cfg.get("images") or []
         # LISTA VUOTA ⇒ usa il CANVAS: base = foto del canvas, elementi = i suoi LAYER, ognuno con la
@@ -2785,6 +2787,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_or_gen_image_canvas_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
+        _ft = self.frame1_tab
+        if mm.blocked(self, _ft.color_model if _ft.color_engine.currentIndex() == QWEN21_ENGINE_IDX
+                      else _ft.integrate_model):
+            return
         cc = self.frame1_tab.get_color_config()
         if not cc["target"]:
             QMessageBox.warning(self, tr("mw.color_missing_title"),
@@ -3022,8 +3028,8 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.image_gen_in_progress_msg")); return
         if not self._gen_limit_ok():
             return
-        if self.frame1_tab.gen_model_is_placeholder():       # modello scelto sparito dal menu: mai sceglierne un altro
-            return self._warn_pick_model()
+        if mm.blocked(self, self.frame1_tab.gen_model):      # modello scelto sparito dal menu: mai sceglierne un altro
+            return
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
@@ -4549,6 +4555,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_or_gen_image_canvas_msg")); return
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.operation_in_progress_msg")); return
+        _ft = self.frame1_tab
+        if mm.blocked(self, _ft.up_model, _ft.up_refine_model if _ft.up_mode.currentIndex() == 1 else None):
+            return
         cfg = self.frame1_tab.get_upscale_config()
         if not cfg.get("model"):
             QMessageBox.warning(self, tr("mw.no_upscale_model_title"),
