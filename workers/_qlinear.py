@@ -8,6 +8,8 @@ Formati riconosciuti dalle chiavi del safetensors, modulo per modulo:
                                            (+ pre_quant_scale AWQ, applicata all'ingresso)
   · FP8 nativo (core/native_convert):      <m>.weight F8_E4M3 + weight_scale F32 [out,1] (o scalare)
   · embedding int8 nativo:                 <m>.weight I8 + weight_scale F32 [num,1]
+  · W4A8/W6A8 comfy-kitchen (H3 DaSiWa):   <m>.weight I8 impacchettato + weight_s_rel F8 + weight_s_channel F32
+                                           (+ weight_codebook / weight_correction) + marcatore nativo <m>.w4a8
 I pesi restano compressi in VRAM e si dequantizzano in bf16 un layer alla volta nel forward (matmul bf16:
 qualità identica, niente quantizzazione delle attivazioni). Ogni layer accetta LoRA «al volo»
 (y = base(x) + s·B(A(x))), perché PEFT non sa avvolgere moduli personalizzati.
@@ -117,6 +119,42 @@ class Nvfp4Linear(nn.Module, _LoraMixin):
         return self._lora(xb, y).to(x.dtype)            # la LoRA vede l'ingresso ORIGINALE (non scalato AWQ)
 
 
+class W4A8Linear(nn.Module, _LoraMixin):
+    """W4A8 / W6A8 di comfy-kitchen (DiT H3 «DaSiWa» int4/int6): codici a 4 bit (codebook a 16 livelli) o 6 bit
+    uniformi impacchettati in int8 [out, in·bits/8], scala per gruppo e4m3 `s_rel` [out, in/gruppo], scala per riga
+    `s_channel` e peso ruotato ConvRot. Kernel fuso decode→GEMM int8 di comfy-kitchen ≥ 0.2.37 (attivazioni
+    int8: è il formato per cui il checkpoint è stato quantizzato); se il backend manca, dequant bf16 + matmul."""
+
+    def __init__(self, in_features: int, out_features: int, bias: bool, packed_cols: int, group: int,
+                 convrot: int, codebook: bool, correction: bool):
+        super().__init__()
+        self.in_features, self.out_features = in_features, out_features
+        self.group, self.convrot = int(group), int(convrot)
+        self.register_buffer("weight", torch.empty(out_features, packed_cols, dtype=torch.int8))
+        self.register_buffer("s_rel", torch.empty(out_features, in_features // self.group, dtype=torch.float8_e4m3fn))
+        self.register_buffer("s_channel", torch.empty(out_features, dtype=torch.float32))
+        self.register_buffer("codebook", torch.empty(16, dtype=torch.float32) if codebook else None)
+        self.register_buffer("correction", torch.empty(in_features // self.group, out_features, dtype=torch.float32)
+                             if correction else None)
+        self.bias = nn.Parameter(torch.empty(out_features, dtype=torch.bfloat16)) if bias else None
+        self._lora_init()
+
+    def forward(self, x):
+        import comfy_kitchen as ck
+        cd = torch.bfloat16 if x.dtype == torch.float32 else x.dtype
+        xb = x.to(cd)
+        b = self.bias.to(cd) if self.bias is not None else None
+        args = (self.weight, self.s_rel, self.s_channel, self.codebook, self.correction)
+        try:
+            y = ck.w4a8_int8_linear(xb, *args, bias=b, group_size=self.group, convrot_groupsize=self.convrot,
+                                    out_dtype=cd)
+        except Exception:  # noqa: BLE001  (nessun backend capace: forma/GPU non supportate)
+            w = ck.dequantize_w4a8_int8_weight(*args, group_size=self.group, convrot_groupsize=self.convrot,
+                                               output_dtype=cd)
+            y = F.linear(xb, w, b)
+        return self._lora(xb, y).to(x.dtype)
+
+
 class Int8RowEmbedding(nn.Module):
     """Embedding int8 con scala per riga («int8_tensorwise» ComfyUI): dequantizza SOLO le righe cercate."""
 
@@ -130,7 +168,7 @@ class Int8RowEmbedding(nn.Module):
         return (self.weight[ids].to(torch.bfloat16) * self.scale[ids].to(torch.bfloat16))
 
 
-QUANT_TYPES = (RowFp8Linear, RowInt8Linear, Nvfp4Linear)
+QUANT_TYPES = (RowFp8Linear, RowInt8Linear, Nvfp4Linear, W4A8Linear)
 
 _ST_DTYPES = {
     "F64": torch.float64, "F32": torch.float32, "F16": torch.float16, "BF16": torch.bfloat16,
@@ -233,7 +271,16 @@ def quantize_from_state_dict(model: nn.Module, sd: dict) -> dict:
             continue
         has_bias = mod.bias is not None
         inf, outf = mod.in_features, mod.out_features
-        if f"{name}._weight_qdata" in sd:
+        if f"{name}.weight_s_rel" in sd:
+            # W4A8/W6A8 (comfy-kitchen): marcatore nativo `.w4a8` = [gruppo, gruppo ConvRot]
+            gs, cr = (int(v) for v in out.pop(f"{name}.w4a8").tolist())
+            with torch.device("meta"):
+                new = W4A8Linear(inf, outf, has_bias, sd[f"{name}.weight"].shape[1], gs, cr,
+                                 f"{name}.weight_codebook" in sd, f"{name}.weight_correction" in sd)
+            for suf in ("s_rel", "s_channel", "codebook", "correction"):
+                if f"{name}.weight_{suf}" in out:
+                    out[f"{name}.{suf}"] = out.pop(f"{name}.weight_{suf}")
+        elif f"{name}._weight_qdata" in sd:
             q = out.pop(f"{name}._weight_qdata")
             s = out.pop(f"{name}._weight_scale")
             zp = out.pop(f"{name}._weight_zero_point", None)
@@ -292,7 +339,8 @@ def load_into(model: nn.Module, sd: dict, device: str = "cuda", dtype=torch.bflo
     for k, v in sd.items():
         if any(p in k for p in keep_fp32) and v.is_floating_point() and v.dtype not in (torch.float8_e4m3fn, torch.float8_e5m2):
             v = v.float()
-        elif v.dtype in (torch.float32, torch.float16) and not k.endswith((".scale", ".zero_point", "weight_scale_2")):
+        elif v.dtype in (torch.float32, torch.float16) and not k.endswith((".scale", ".zero_point", "weight_scale_2",
+                                                                            ".s_channel", ".codebook", ".correction")):
             v = v.to(dtype)
         fixed[k] = v.to(device)
     missing, unexpected = model.load_state_dict(fixed, strict=False, assign=True)

@@ -192,6 +192,8 @@ def _registry_loras(arch: str) -> list[LoraEntry]:
             path = str(Path(wc.dest_for(e, root)) / e["filename"])
             out.append(LoraEntry(sha256=e.get("sha256") or e["id"], filename=e["filename"], path=path,
                                  architecture=arch, description=e.get("note") or "",
+                                 triggers=_clean_triggers(e.get("triggers")),    # catalogo: anche più d'una
+                                 civitai_url=e.get("page"),
                                  nsfw=e.get("sensitivity") == "adult" or _looks_nsfw(e["filename"])))
         return out
     except Exception:                                    # noqa: BLE001 — registro assente: solo il dizionario

@@ -5124,6 +5124,1330 @@
       "use": [
         "upscale_video"
       ]
+    },
+    {
+      "id": "ltx23-eros14",
+      "module": "Video",
+      "label": "10Eros LTX-2.3 fp8 · v1.4 (18+, 28.478GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 28.478,
+      "scan_names": [
+        "ltx10eros_v14_2989669.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "url": "https://civitai.com/api/download/models/3109610?fileId=2989669",
+      "filename": "ltx10eros_v14_2989669.safetensors",
+      "sha256": "54bcb40427ff1a3e54cfa6087df765b617bee238d58aa49947c517a727722ad2",
+      "deps": [
+        "ltx23-gemma-te",
+        "ltx23-distilled-lora-384",
+        "ltx23-spatial-upscaler"
+      ],
+      "sensitivity": "adult",
+      "note": "Civitai 2447875 · LTXV 2.3",
+      "page": "https://civitai.red/models/2447875?modelVersionId=3109610"
+    },
+    {
+      "id": "ltx25-lora-civ-bfs-best-face-swap-ltx-2-5-head-v1-1",
+      "module": "Video",
+      "label": "BFS - Best Face Swap · LTX 2.5 Head v1.1 (18+, 1.205GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2.5",
+      "gated": false,
+      "approx_gb": 1.205,
+      "scan_names": [
+        "head_swap_ltx25_v1_1_r64.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx25",
+      "url": "https://civitai.com/api/download/models/3228916?fileId=3145279",
+      "filename": "head_swap_ltx25_v1_1_r64.safetensors",
+      "sha256": "a47dd09d7a04bd281b6650b4f9387a41dc3999a0659e77b1b37f878ac5069a89",
+      "sensitivity": "adult",
+      "note": "Civitai 2027766 · LTXV 2.5",
+      "triggers": [
+        "head_swap: FACE: [Face Description]"
+      ],
+      "page": "https://civitai.red/models/2027766?modelVersionId=3228916"
+    },
+    {
+      "id": "krea2-lora-civ-bfs-best-face-swap-krea-2-body-swap-exp",
+      "module": "Immagini",
+      "label": "BFS - Best Face Swap · Krea 2 Body Swap Exp. V1 (18+, 0.893GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.893,
+      "scan_names": [
+        "krea2_bodyswap_v1.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3188610?fileId=3069574",
+      "filename": "krea2_bodyswap_v1.safetensors",
+      "sha256": "0b3d043714c912c55c525ac68a53f50dbfaa6a024d735c28dfed12cd214a0d79",
+      "sensitivity": "adult",
+      "note": "Civitai 2027766 · Krea 2",
+      "triggers": [
+        "body_swap: replace the person with the reference person."
+      ],
+      "page": "https://civitai.red/models/2027766?modelVersionId=3188610"
+    },
+    {
+      "id": "mmh3-lora-civ-bfs-best-face-swap-h3-head-swap-ref2va",
+      "module": "Video",
+      "label": "BFS - Best Face Swap · H3 Head Swap - Ref2VA (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "minimax_h3_head_swap_v1.0_r32-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3352167?fileId=3239422",
+      "filename": "minimax_h3_head_swap_v1.0_r32-native.safetensors",
+      "remote_filename": "minimax_h3_head_swap_v1.0_r32.safetensors",
+      "sha256": "ea97bd1a8178460661055784d63b4cb560732196fd15d5d7f33bfd214b65ab00",
+      "sensitivity": "adult",
+      "note": "Civitai 2027766 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "Use the workflow auto-prompt."
+      ],
+      "page": "https://civitai.red/models/2027766?modelVersionId=3352167",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-bfs-best-face-swap-h3-character-swap-v1",
+      "module": "Video",
+      "label": "BFS - Best Face Swap · H3 Character Swap V1.0 (18+, 0.606GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.606,
+      "scan_names": [
+        "minimax_h3_character_swap_v1.0_ref2va_r64_gl-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3401556?fileId=3293741",
+      "filename": "minimax_h3_character_swap_v1.0_ref2va_r64_gl-native.safetensors",
+      "remote_filename": "minimax_h3_character_swap_v1.0_ref2va_r64_gl.safetensors",
+      "sha256": "643a3fe63646fee5aebb181a7e1c9f8a1feb5f472709f37e22eeec290cbb75e3",
+      "sensitivity": "adult",
+      "note": "Civitai 2027766 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "body_swap:  subject_definitions: <Subject 1> is the {details} shown in <Picture 1>, whose identity, face, head, hair or fur, skin, body shape, proportions and clothing define the character in the target video. The guide video provides the scene and the performance: its background, environment, lighting, camera, framing, body pose, hand and arm movement, head rotation, gaze direction, lip movement and facial expression, frame by frame; only the main subject of the guide video is replaced: its face, hair, body and clothing become <Subject 1>.  summary: [video generation + reference] Replace the guide subject with <Subject 1>, keeping the scene, camera and the complete motion and performance of the guide video.  detailed_description: [Shot 1] <Subject 1> takes the exact place of the guide subject and moves with the same timing, body pose, gestures, head motion, gaze, speech and facial expressions, while keeping the complete look from <Picture 1>: head, face, skin, hair or fur, body shape and clothing stay stable in every frame, with no trace of the original subject's face, hair or clothing. The background, lighting, colors and camera of the guide video are preserved. Prevent identity drift, clothing changes, texture crawling and flicker. The result is a real, photographic video.",
+        "body_swap:  subject_definitions: <Subject 1> is the {details} shown in <Picture 1>, whose identity, face, head, hair or fur, skin, body shape, proportions and clothing define the character in the target video. The guide video provides the scene and the performance: its background, environment, lighting, camera, framing, body pose, hand and arm movement, head rotation, gaze direction, lip movement and facial expression, frame by frame; only {target} is replaced: their face, hair, body and clothing become <Subject 1>.  summary: [video generation + reference] Replace {target} in the guide video with <Subject 1>, keeping the scene, camera and the complete motion and performance of the guide video.  detailed_description: [Shot 1] <Subject 1> takes the exact place of {target} and moves with the same timing, body pose, gestures, head motion, gaze, speech and facial expressions, while keeping the complete look from <Picture 1>: head, face, skin, hair or fur, body shape and clothing stay stable in every frame, with no trace of the original subject's face, hair or clothing. The background, lighting, colors and camera of the guide video are preserved. Prevent identity drift, clothing changes, texture crawling and flicker. The result is a real, photographic video."
+      ],
+      "page": "https://civitai.red/models/2027766?modelVersionId=3401556",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "ltx23-lora-civ-bfs-best-face-swap-ltx-2-3-v3-focus-head",
+      "module": "Video",
+      "label": "BFS - Best Face Swap · LTX-2.3 -  V3 Focus Head (18+, 1.327GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 1.327,
+      "scan_names": [
+        "head_swap_v3_rank_adaptive_fro_098.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "url": "https://civitai.com/api/download/models/2783974?fileId=2670080",
+      "filename": "head_swap_v3_rank_adaptive_fro_098.safetensors",
+      "sha256": "78083ede0004c500ac0ae7b8fee43d28a1c3b503bac4a21edfeba7c60da8460d",
+      "sensitivity": "adult",
+      "note": "Civitai 2027766 · LTXV 2.3",
+      "triggers": [
+        "head_swap: FACE: [describe the new face here] ACTION: [describe the action from original video here]"
+      ],
+      "page": "https://civitai.red/models/2027766?modelVersionId=2783974"
+    },
+    {
+      "id": "mmh3-lora-civ-free-pussy-minimax-h3",
+      "module": "Video",
+      "label": "Free Pussy · Minimax H3 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "MM-H3_-_Pussy_Lora-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3321019?fileId=3206654",
+      "filename": "MM-H3_-_Pussy_Lora-native.safetensors",
+      "remote_filename": "MM-H3 - Pussy Lora.safetensors",
+      "sha256": "bf704e5e6f1c860370e830d882933b78dc2699c6bcf6d8bc7c764ef8250303cc",
+      "sensitivity": "adult",
+      "note": "Civitai 2934054 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "pussy"
+      ],
+      "page": "https://civitai.red/models/2934054?modelVersionId=3321019",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-h3-ltx-2-3-i2v-t2v-video-reasoning-lora",
+      "module": "Video",
+      "label": "H3 - LTX 2.3 - I2V T2V Video Reasoning lora VBVR · H3 VBVR Pro (18+, 0.064GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.064,
+      "scan_names": [
+        "H3_VBVR_Pro_attn_only-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3306139?fileId=3191174",
+      "filename": "H3_VBVR_Pro_attn_only-native.safetensors",
+      "remote_filename": "H3_VBVR_Pro_attn_only.safetensors",
+      "sha256": "9c20efa6d207f1a843443b741a2f6bc0d1993f938cef743e7e8a250d62baa1e0",
+      "sensitivity": "adult",
+      "note": "Civitai 2497207 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2497207?modelVersionId=3306139",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-h3-ass-jiggle-i2v-fl2va-i2v-v1-0",
+      "module": "Video",
+      "label": "H3 Ass jiggle (I2V) · fl2va - i2v v1.0 (18+, 0.241GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.241,
+      "scan_names": [
+        "ass_jiggle_H3_i2v_v1.0-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3255024?fileId=3138092",
+      "filename": "ass_jiggle_H3_i2v_v1.0-native.safetensors",
+      "remote_filename": "ass_jiggle_H3_i2v_v1.0.safetensors",
+      "sha256": "384ae177b1545b2d5782420de12395d9ec50455b9f245965b7b28be4c7e12273",
+      "sensitivity": "adult",
+      "note": "Civitai 2880033 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "rear-entry pose",
+        "reverse cowgirl",
+        "doggy style pose",
+        "her ass jiggles from impact",
+        "creating ass jiggle",
+        "causing her body to jiggle with each movement",
+        "causing her buttocks to jiggle",
+        "creating an ass ripple/jiggle effect",
+        "jiggle with each thrust",
+        "creating a noticeable ass ripple/jiggle",
+        "causing her buttocks to jiggle and ripple with each impact"
+      ],
+      "page": "https://civitai.red/models/2880033?modelVersionId=3255024",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-daring-s-deepthroat-h3-ltx2-3-minimax-h3",
+      "module": "Video",
+      "label": "Daring's Deepthroat H3/LTX2.3 · MiniMax H3 FL2VA v0.2 (18+, 0.291GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.291,
+      "scan_names": [
+        "deepthroat_v02-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3226989?fileId=3109184",
+      "filename": "deepthroat_v02-native.safetensors",
+      "remote_filename": "deepthroat_v02.safetensors",
+      "sha256": "1fd239662f6290255b0bb3a220764fb53aab2859378f7fd3024030c1e1991cb2",
+      "sensitivity": "adult",
+      "note": "Civitai 2476698 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2476698?modelVersionId=3226989",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-faster-harder-shake-harder-h3-motion-boo",
+      "module": "Video",
+      "label": "Faster! Harder! Shake Harder! | H3 Motion Booste · V0.2 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "H3_Motion_BoosterV2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3228867?fileId=3111185",
+      "filename": "H3_Motion_BoosterV2-native.safetensors",
+      "remote_filename": "H3_Motion_BoosterV2.safetensors",
+      "sha256": "f6a6897162b921d2b74abe1fdebcd80c8189147e70e0e0738200756c250336c3",
+      "sensitivity": "adult",
+      "note": "Civitai 2840146 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "dynv2"
+      ],
+      "page": "https://civitai.red/models/2840146?modelVersionId=3228867",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-can-t-stop-shaking-h3-ending-reaction-bo",
+      "module": "Video",
+      "label": "Can't Stop Shaking! | H3 Ending Reaction Booster · v1.0 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "Ending_Reaction_Booster-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3239680?fileId=3122218",
+      "filename": "Ending_Reaction_Booster-native.safetensors",
+      "remote_filename": "Ending_Reaction_Booster.safetensors",
+      "sha256": "0b5eca00e8c1a80eea01e41f0cac7ef495a46915ebd0eb1a62786007e0a79cfc",
+      "sensitivity": "adult",
+      "note": "Civitai 2867574 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "endface1",
+        "endbody1"
+      ],
+      "page": "https://civitai.red/models/2867574?modelVersionId=3239680",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-dit-dasiwa-v4",
+      "module": "Video",
+      "label": "DaSiWa MiniMax H3 · DaSiWa Hybrid v4 (18+, 12.247GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 12.247,
+      "scan_names": [
+        "DasiwaMinimaxH3_dasiwaHybridV4_3281517-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3391862?fileId=3281517",
+      "filename": "DasiwaMinimaxH3_dasiwaHybridV4_3281517-native.safetensors",
+      "remote_filename": "DasiwaMinimaxH3_dasiwaHybridV4_3281517.safetensors",
+      "sha256": "3ce15eaaa714ef407ca67541baa4a6f186d853649fd877d94504fe5bf80ec1bc",
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "sensitivity": "adult",
+      "note": "Civitai 2877206 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2877206?modelVersionId=3391862",
+      "convert": "mmh3_dit"
+    },
+    {
+      "id": "mmh3-lora-civ-better-human-motion-minimax-h3-v1-0-mh3",
+      "module": "Video",
+      "label": "Better Human Motion Minimax H3 · v1.0-MH3 (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "mvmt_h3_lora_v1_500-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3256084?fileId=3139271",
+      "filename": "mvmt_h3_lora_v1_500-native.safetensors",
+      "remote_filename": "mvmt_h3_lora_v1_500.safetensors",
+      "sha256": "285f9ed3fbb735c3625fca0d22166c7450ad7acb552a869fcbbd8e86e79d1f4c",
+      "sensitivity": "adult",
+      "note": "Civitai 2734359 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2734359?modelVersionId=3256084",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "ltx23-lora-civ-better-human-motion-minimax-h3-v2-0-ltx2",
+      "module": "Video",
+      "label": "Better Human Motion Minimax H3 · v2.0-LTX23 (18+, 0.658GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.658,
+      "scan_names": [
+        "mvmt_lora_v2_600.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "url": "https://civitai.com/api/download/models/3087364?fileId=2966847",
+      "filename": "mvmt_lora_v2_600.safetensors",
+      "sha256": "3cd5aeeff4e079510527650af4c45c1ec8a51495996de34c8d155fe35b6ed6a5",
+      "sensitivity": "adult",
+      "note": "Civitai 2734359 · LTXV 2.3",
+      "page": "https://civitai.red/models/2734359?modelVersionId=3087364"
+    },
+    {
+      "id": "mmh3-lora-civ-deeper-hold-it-h3-deep-motion-booster-v1",
+      "module": "Video",
+      "label": "Deeper... Hold It. | H3 Deep Motion Booster · V1 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "H3_Deeper-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3254522?fileId=3137584",
+      "filename": "H3_Deeper-native.safetensors",
+      "remote_filename": "H3_Deeper.safetensors",
+      "sha256": "e85ab40e9b7267f92cab8f9e066e7b448791290146518c0e8414a87168218a4f",
+      "sensitivity": "adult",
+      "note": "Civitai 2879661 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2879661?modelVersionId=3254522",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-breast-play-jiggle-for-minimax-h3-v2-0",
+      "module": "Video",
+      "label": "Breast Play & Jiggle for MiniMax H3 · v2.0 (18+, 0.291GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.291,
+      "scan_names": [
+        "breastplayjiggle_h3_v2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3278283?fileId=3162350",
+      "filename": "breastplayjiggle_h3_v2-native.safetensors",
+      "remote_filename": "breastplayjiggle_h3_v2.safetensors",
+      "sha256": "18832302cd509749b5c6925f5593c2265bf3d9ee1e4f2a8599b576b835aa61c3",
+      "sensitivity": "adult",
+      "note": "Civitai 2856004 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2856004?modelVersionId=3278283",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-breast-play-jiggle-for-minimax-h3-v1-0",
+      "module": "Video",
+      "label": "Breast Play & Jiggle for MiniMax H3 · v1.0 (18+, 0.291GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.291,
+      "scan_names": [
+        "breastplayjiggle_h3_v1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3225638?fileId=3107724",
+      "filename": "breastplayjiggle_h3_v1-native.safetensors",
+      "remote_filename": "breastplayjiggle_h3_v1.safetensors",
+      "sha256": "f9cbcaa596b6b281f154388e407e7b4c4ee97ba9917614ab36bc5e86edf374f5",
+      "sensitivity": "adult",
+      "note": "Civitai 2856004 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2856004?modelVersionId=3225638",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m",
+      "module": "Video",
+      "label": "Minimax H3 Turbo LoRas · dmad_larryvrhv4_merge (18+, 0.934GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.934,
+      "scan_names": [
+        "minimax_h3_dmad_full_dareties_v4_step600_comfy_fro-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3391964?fileId=3281483",
+      "filename": "minimax_h3_dmad_full_dareties_v4_step600_comfy_fro-native.safetensors",
+      "remote_filename": "minimax_h3_dmad_full_dareties_v4_step600_comfy_fro.safetensors",
+      "sha256": "4d4ea608992d72303e4971f78728f587f43ecb72490f365a042ed82e37a907ce",
+      "sensitivity": "adult",
+      "note": "Civitai 2837571 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2837571?modelVersionId=3391964",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-minimax-h3-combat-base-fight-motion-impa",
+      "module": "Video",
+      "label": "MiniMax H3 Combat BASE ｜Fight Motion / Impact /  · V2 BASE (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "H3_Combat_V2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3246572?fileId=3129355",
+      "filename": "H3_Combat_V2-native.safetensors",
+      "remote_filename": "H3_Combat_V2.safetensors",
+      "sha256": "5b3edb09e9d6029439badf9bc9db4ba4a355ae679b0810888de82c4793c0bac8",
+      "sensitivity": "adult",
+      "note": "Civitai 2853878 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "prfight2",
+        "prfin1"
+      ],
+      "page": "https://civitai.red/models/2853878?modelVersionId=3246572",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-lora-civ-cinematic-shot-krea-2",
+      "module": "Immagini",
+      "label": "Cinematic Shot ✨ · KREA 2 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "zy_Cinematic_Shot_K2.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3085969?fileId=2965389",
+      "filename": "zy_Cinematic_Shot_K2.safetensors",
+      "sha256": "1fdd66058bb285256a9848929879022583c904c5dc6d4eac95afc1c4946124ec",
+      "sensitivity": "adult",
+      "note": "Civitai 432586 · Krea 2",
+      "triggers": [
+        "zy_cinematic"
+      ],
+      "page": "https://civitai.red/models/432586?modelVersionId=3085969"
+    },
+    {
+      "id": "mmh3-lora-civ-minimaxh3-blowjob-nsfw-int8-convrot-v1-0",
+      "module": "Video",
+      "label": "[MinimaxH3] Blowjob (NSFW) INT8 Convrot · v1.0 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "MinimaxH3-Blowjob-512_000000510-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3315548?fileId=3201006",
+      "filename": "MinimaxH3-Blowjob-512_000000510-native.safetensors",
+      "remote_filename": "MinimaxH3-Blowjob-512_000000510.safetensors",
+      "sha256": "7f0c1b2e35cee261edc9a99432d9e88610fdda2e929ca275f6d1a173702dc72b",
+      "sensitivity": "adult",
+      "note": "Civitai 2929639 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "blowjob",
+        "sucking penis"
+      ],
+      "page": "https://civitai.red/models/2929639?modelVersionId=3315548",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-lora-civ-breast-sucking-krea-v1",
+      "module": "Immagini",
+      "label": "BREAST SUCKING KREA · V1 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "breastSUCKINGKREA_v1.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3370739?fileId=3260454",
+      "filename": "breastSUCKINGKREA_v1.safetensors",
+      "sha256": "2e009fc88cc462937f0bc8233385163ccbdd0e3b7d44af1d30e3d904e9fd3ef8",
+      "sensitivity": "adult",
+      "note": "Civitai 2974216 · Krea 2",
+      "triggers": [
+        "he is sucking on her right nipple"
+      ],
+      "page": "https://civitai.red/models/2974216?modelVersionId=3370739"
+    },
+    {
+      "id": "mmh3-lora-civ-minimax-h3-rimjob-ass-licking-anal-v1-0",
+      "module": "Video",
+      "label": "Minimax H3_rimjob_ass licking_anal · v1.0 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "rimjob_h3_v1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3356109?fileId=3243639",
+      "filename": "rimjob_h3_v1-native.safetensors",
+      "remote_filename": "rimjob_h3_v1_.safetensors",
+      "sha256": "101f6695819d4dcfe333529b0cbdc08c1aba7e7c465bea4211b6e3326d3f6dd1",
+      "sensitivity": "adult",
+      "note": "Civitai 2962318 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2962318?modelVersionId=3356109",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-doggy-style-sex-minimax-h3-v1",
+      "module": "Video",
+      "label": "Doggy Style Sex · Minimax H3 - V1 (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "MM-H3_-_Doggy_Style_v1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3317042?fileId=3202556",
+      "filename": "MM-H3_-_Doggy_Style_v1-native.safetensors",
+      "remote_filename": "MM-H3 - Doggy Style v1.safetensors",
+      "sha256": "3e8c1f2cb7702fcd0f92a51e070d0b50eb372e9620b79e879ad1d5bdfd3fb7b5",
+      "sensitivity": "adult",
+      "note": "Civitai 2920568 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2920568?modelVersionId=3317042",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-lora-civ-realistic-detailed-penis-krea-2-v1",
+      "module": "Immagini",
+      "label": "Realistic & Detailed Penis [Krea 2] · V1 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "realisticAvaragePenisKREA2_v1.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3367178?fileId=3256621",
+      "filename": "realisticAvaragePenisKREA2_v1.safetensors",
+      "sha256": "bd8337eda0371ac7078c056c1e3c8f42260a8c7744f6cac7891b2bd6ccdbb75b",
+      "sensitivity": "adult",
+      "note": "Civitai 2971337 · Krea 2",
+      "triggers": [
+        "crd1ck"
+      ],
+      "page": "https://civitai.red/models/2971337?modelVersionId=3367178"
+    },
+    {
+      "id": "krea2-lora-civ-real-beauty-krea-2-krea-2",
+      "module": "Immagini",
+      "label": "Real Beauty (Krea 2) · Krea 2 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "Real_beauty_2_krea2_3267534_epoch_9.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3278683?fileId=3162751",
+      "filename": "Real_beauty_2_krea2_3267534_epoch_9.safetensors",
+      "sha256": "482682dab89f794759a73d044b0a729543693a5cd4f9e6f60638fc25affb8377",
+      "sensitivity": "adult",
+      "note": "Civitai 2899741 · Krea 2",
+      "triggers": [
+        "Real_beauty"
+      ],
+      "page": "https://civitai.red/models/2899741?modelVersionId=3278683"
+    },
+    {
+      "id": "mmh3-lora-civ-h3bjhjsmilev1-a-lineup-bj-hj-smiles-v1",
+      "module": "Video",
+      "label": "H3BJHJSmileV1 · A lineup BJ HJ Smiles V1 (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "h3lineupbjhjsmilev1_v1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3378264?fileId=3268550",
+      "filename": "h3lineupbjhjsmilev1_v1-native.safetensors",
+      "remote_filename": "h3lineupbjhjsmilev1_v1.safetensors",
+      "sha256": "77a6b152213f87964481eb3d6d4932099846270772066006eeb85b81e2a4624e",
+      "sensitivity": "adult",
+      "note": "Civitai 2980221 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2980221?modelVersionId=3378264",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-lora-civ-krea-2-missionary-position-lora-v1-0",
+      "module": "Immagini",
+      "label": "Krea 2 Missionary Position LoRA | 传教士体位 · v1.0 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "Missionary_Position_Krea2.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3371260?fileId=3259580",
+      "filename": "Missionary_Position_Krea2.safetensors",
+      "sha256": "85aa2e8d9ae70ce76c0decf4d1d874d2b4b315fc39f8eac49c15cfde64d4817b",
+      "sensitivity": "adult",
+      "note": "Civitai 2974642 · Krea 2",
+      "triggers": [
+        "missionary position"
+      ],
+      "page": "https://civitai.red/models/2974642?modelVersionId=3371260"
+    },
+    {
+      "id": "krea2-lora-civ-erotic-photography-erotic-phot-v1-krea2",
+      "module": "Immagini",
+      "label": "Erotic Photography · Erotic Phot. v1 - Krea2 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "eroticPhotography_v1.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3361321?fileId=3249660",
+      "filename": "eroticPhotography_v1.safetensors",
+      "sha256": "17480b17fff20140e2b1985771232219d70c09c7036ef7796dc3a92ccefcbb10",
+      "sensitivity": "adult",
+      "note": "Civitai 2966553 · Krea 2",
+      "page": "https://civitai.red/models/2966553?modelVersionId=3361321"
+    },
+    {
+      "id": "krea2-lora-civ-penis-on-face-krea2",
+      "module": "Immagini",
+      "label": "Penis on face · Krea2 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "K_cockonface.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3312847?fileId=3198110",
+      "filename": "K_cockonface.safetensors",
+      "sha256": "353d37f95c177764b3bdd378308d435048cba77cf4567b6d6738e57d2e7c68f3",
+      "sensitivity": "adult",
+      "note": "Civitai 2927477 · Krea 2",
+      "triggers": [
+        "large penis pressed on face, penis against face,"
+      ],
+      "page": "https://civitai.red/models/2927477?modelVersionId=3312847"
+    },
+    {
+      "id": "krea2-lora-civ-pressed-down-deepthroat-krea2",
+      "module": "Immagini",
+      "label": "Pressed Down Deepthroat · Krea2 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "k_forceddeepthroat.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3325478?fileId=3211248",
+      "filename": "k_forceddeepthroat.safetensors",
+      "sha256": "66bc39acecf9da03c7bda93dc0a2c768877b884c41d43babead3e24463127df8",
+      "sensitivity": "adult",
+      "note": "Civitai 2937576 · Krea 2",
+      "triggers": [
+        "deepthroat, rough deepthroat, struggling, blush, forceful head grab,",
+        "wide eyes, frown,",
+        "close up, from side,"
+      ],
+      "page": "https://civitai.red/models/2937576?modelVersionId=3325478"
+    },
+    {
+      "id": "krea2-lora-civ-fit-body-round-ass-v1-0-krea2",
+      "module": "Immagini",
+      "label": "Fit Body, Round Ass · v1.0-Krea2 (18+, 0.057GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.057,
+      "scan_names": [
+        "gs_ass_v1_krea2.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3337382?fileId=3223898",
+      "filename": "gs_ass_v1_krea2.safetensors",
+      "sha256": "f0ed88da03ef46144b3a6de2b8a63a0ae0519a71a3fb0c6101bb41893ad3a187",
+      "sensitivity": "adult",
+      "note": "Civitai 2947122 · Krea 2",
+      "page": "https://civitai.red/models/2947122?modelVersionId=3337382"
+    },
+    {
+      "id": "mmh3-lora-civ-messy-blowjob-h3-v1-0",
+      "module": "Video",
+      "label": "Messy Blowjob H3 · v1.0 (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "MessyBlowjob_v1_H3-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3399472?fileId=3289886",
+      "filename": "MessyBlowjob_v1_H3-native.safetensors",
+      "remote_filename": "MessyBlowjob_v1_H3.safetensors",
+      "sha256": "52552d607b9e989005214dca16b42e7efcf0984439c4a868502c98ed21785679",
+      "sensitivity": "adult",
+      "note": "Civitai 2997232 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2997232?modelVersionId=3399472",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-h3-throat-time-v2-0",
+      "module": "Video",
+      "label": "H3 Throat Time · v2.0 (18+, 0.146GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.146,
+      "scan_names": [
+        "thr0at_H3_AV_v2-000100-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3399886?fileId=3290337",
+      "filename": "thr0at_H3_AV_v2-000100-native.safetensors",
+      "remote_filename": "thr0at_H3_AV_v2-000100.safetensors",
+      "sha256": "af6a2069554297a18e4715d40ddbda23b5c22e9bb18296ce29b1ec38412efadf",
+      "sensitivity": "adult",
+      "note": "Civitai 2992566 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2992566?modelVersionId=3399886",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-cum-shots-minimax-h3",
+      "module": "Video",
+      "label": "Cum Shots · Minimax H3 (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "MM-H3_-_Cumshots_v1.2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3386680?fileId=3275557",
+      "filename": "MM-H3_-_Cumshots_v1.2-native.safetensors",
+      "remote_filename": "MM-H3 - Cumshots v1.2.safetensors",
+      "sha256": "be0e236cb45866de736acf3398d0c556e49b80cbdd54377e4bb1b3103d0dee19",
+      "sensitivity": "adult",
+      "note": "Civitai 2987064 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2987064?modelVersionId=3386680",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-face-slap-motion-lora-minimax-h3-ref2va",
+      "module": "Video",
+      "label": "Face Slap Motion LoRA - MiniMax H3 Ref2VA · v1.0 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "f4c3sl4p_lora_v1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3398038?fileId=3289593",
+      "filename": "f4c3sl4p_lora_v1-native.safetensors",
+      "remote_filename": "f4c3sl4p_lora_v1.safetensors",
+      "sha256": "985807529a11817fa0418efe30d20baa1ae8ebdfbdc2645b5c6a0b656cde8cfa",
+      "sensitivity": "adult",
+      "note": "Civitai 2996117 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "f4c3sl4p"
+      ],
+      "page": "https://civitai.red/models/2996117?modelVersionId=3398038",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-nipple-sucking-minimax-h3",
+      "module": "Video",
+      "label": "Nipple Sucking · Minimax H3 (18+, 0.37GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.37,
+      "scan_names": [
+        "MM-H3_-_Nipple_Sucking-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3384367?fileId=3273112",
+      "filename": "MM-H3_-_Nipple_Sucking-native.safetensors",
+      "remote_filename": "MM-H3 - Nipple Sucking.safetensors",
+      "sha256": "101741b1e922e00dfcd11a5bcfe8240ab9135ba29810e0943c790f2283ece721",
+      "sensitivity": "adult",
+      "note": "Civitai 2985148 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2985148?modelVersionId=3384367",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-lora-civ-horror-and-creepy-atmosphere-krea-2",
+      "module": "Immagini",
+      "label": "Horror and creepy atmosphere · ✨ Krea 2 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "horror-and-creepy-atmosphere-epoch-09.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3393346?fileId=3282950",
+      "filename": "horror-and-creepy-atmosphere-epoch-09.safetensors",
+      "sha256": "d60382c44c74b787950b3871f6a1cf8ed21154d23d524ccae10eb51fd7780453",
+      "sensitivity": "adult",
+      "note": "Civitai 2992349 · Krea 2",
+      "page": "https://civitai.red/models/2992349?modelVersionId=3393346"
+    },
+    {
+      "id": "mmh3-lora-civ-mosaic-restoration-v1-0",
+      "module": "Video",
+      "label": "mosaic restoration · v1.0 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "DecensoreH3_000002500-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3390424?fileId=3280455",
+      "filename": "DecensoreH3_000002500-native.safetensors",
+      "remote_filename": "DecensoreH3_000002500.safetensors",
+      "sha256": "8c693023caa51063738cd961de1f4623ad274b003bcf6eedf677a7adbf456586",
+      "sensitivity": "adult",
+      "note": "Civitai 2990026 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2990026?modelVersionId=3390424",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "qwen21-lora-civ-qwen-2-1-fellatio-v2-0",
+      "module": "Immagini",
+      "label": "qwen 2.1 FELLATIO · v2.0 (18+, 0.082GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Qwen21",
+      "gated": false,
+      "approx_gb": 0.082,
+      "scan_names": [
+        "FELLATIO-v2.safetensors"
+      ],
+      "category": "image",
+      "arch": "qwen_image21",
+      "url": "https://civitai.com/api/download/models/3382947?fileId=3271643",
+      "filename": "FELLATIO-v2.safetensors",
+      "sha256": "a8de3bc52ed3eccf575a9d8baca137cac6022dbeae2414df2d1cdce93f13796a",
+      "sensitivity": "adult",
+      "note": "Civitai 2981555 · Qwen 2.1",
+      "used_by": [
+        "cap.image_qwen21"
+      ],
+      "page": "https://civitai.red/models/2981555?modelVersionId=3382947"
+    },
+    {
+      "id": "krea2-lora-civ-perky-breasts-v1-0",
+      "module": "Immagini",
+      "label": "PERKY BREASTS · v1.0 (18+, 0.229GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.229,
+      "scan_names": [
+        "Perkybreasts26017_430step.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3399448?fileId=3289859",
+      "filename": "Perkybreasts26017_430step.safetensors",
+      "sha256": "9e6c808df064005866c335a832167b4aa4c57cbede192d4a54fb81df8fa668a4",
+      "sensitivity": "adult",
+      "note": "Civitai 2997219 · Krea 2",
+      "triggers": [
+        "perkybreasts"
+      ],
+      "page": "https://civitai.red/models/2997219?modelVersionId=3399448"
+    },
+    {
+      "id": "krea2-lora-civ-facial-expressions-krea-v1",
+      "module": "Immagini",
+      "label": "Facial expressions Krea · v1 (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "facialExpressions_v1.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3401507?fileId=3292158",
+      "filename": "facialExpressions_v1.safetensors",
+      "sha256": "767981f9ab3a54885790eaf2b054ff6e643c17ad73857c966c72a87217a5c887",
+      "sensitivity": "adult",
+      "note": "Civitai 2998861 · Krea 2",
+      "page": "https://civitai.red/models/2998861?modelVersionId=3401507"
+    },
+    {
+      "id": "mmh3-lora-civ-nsfw-posing-touching-round-breasts-h3-lo",
+      "module": "Video",
+      "label": "NSFW | Posing + Touching + Round Breasts | H3 Lo · nsfw-round-breasts-posing (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "nsfwPosingTouchingRoundBreasts_v1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3385163?fileId=3273978",
+      "filename": "nsfwPosingTouchingRoundBreasts_v1-native.safetensors",
+      "remote_filename": "nsfwPosingTouchingRoundBreasts_v1.safetensors",
+      "sha256": "1da46c1f32aa5ab2ffccf9d2f4677840d2234dc9313c2480c8fdcf01ee24a7b8",
+      "sensitivity": "adult",
+      "note": "Civitai 2985832 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2985832?modelVersionId=3385163",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "mmh3-lora-civ-minimax-cumshot-v1-0",
+      "module": "Video",
+      "label": "Minimax - Cumshot · v1.0 (18+, 0.303GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.303,
+      "scan_names": [
+        "cum_facial_000005400-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3290361?fileId=3174815",
+      "filename": "cum_facial_000005400-native.safetensors",
+      "remote_filename": "cum_facial_000005400.safetensors",
+      "sha256": "d500f1b6cd639ea50b1a481247f9bf0e952c0a6624e5db42e122e6d471ff8d49",
+      "sensitivity": "adult",
+      "note": "Civitai 2909163 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2909163?modelVersionId=3290361",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-lora-civ-realistic-snapshot-z-image-turbo-krea-2",
+      "module": "Immagini",
+      "label": "Realistic Snapshot (Z-Image-Turbo + Krea 2) · Krea2 (v0.5) (18+, 0.223GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.223,
+      "scan_names": [
+        "RealisticSnapshotKrea2.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3084537?fileId=2963911",
+      "filename": "RealisticSnapshotKrea2.safetensors",
+      "sha256": "dfd67eb881bec4caeb9409e5b7c127adcb9fb724e6007e1e77165af51e6f908d",
+      "sensitivity": "adult",
+      "note": "Civitai 2268008 · Krea 2",
+      "page": "https://civitai.red/models/2268008?modelVersionId=3084537"
+    },
+    {
+      "id": "krea2-lora-civ-realism-engine-ideogram-4-krea-2-krea2-v",
+      "module": "Immagini",
+      "label": "Realism Engine Ideogram 4 + Krea 2 · Krea2 v3.0 (18+, 1.526GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 1.526,
+      "scan_names": [
+        "realism_engine_krea2_v3.1.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3109006?fileId=2988982",
+      "filename": "realism_engine_krea2_v3.1.safetensors",
+      "sha256": "a6712629445a2e91a616568e82befa8c8c7518e891a0f7c9918138634b5b54a5",
+      "sensitivity": "adult",
+      "note": "Civitai 2688234 · Krea 2",
+      "page": "https://civitai.red/models/2688234?modelVersionId=3109006"
+    },
+    {
+      "id": "mmh3-lora-civ-fingering-minimax-h3",
+      "module": "Video",
+      "label": "Fingering · Minimax H3 (18+, 0.151GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.151,
+      "scan_names": [
+        "MM-H3_-_Fingering-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3307530?fileId=3192684",
+      "filename": "MM-H3_-_Fingering-native.safetensors",
+      "remote_filename": "MM-H3 - Fingering.safetensors",
+      "sha256": "fe7f35b2bc3ac52527236451e4340c4b7bdaf85b4063f8076a0ef2f6e09ffe24",
+      "sensitivity": "adult",
+      "note": "Civitai 2923170 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2923170?modelVersionId=3307530",
+      "convert": "mmh3_lora"
+    },
+    {
+      "id": "krea2-sickrealism-v2",
+      "module": "Immagini",
+      "label": "Krea2 SickRealism · v2.0 fp8 (18+, 12.83GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 12.83,
+      "scan_names": [
+        "krea2Sickrealism_v20_fp8-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3367838?fileId=3255937",
+      "filename": "krea2Sickrealism_v20_fp8-native.safetensors",
+      "remote_filename": "krea2Sickrealism_v20_3255937.safetensors",
+      "sensitivity": "adult",
+      "note": "Civitai 2970908 · Krea 2",
+      "page": "https://civitai.red/models/2970908?modelVersionId=3367838",
+      "convert": "krea2_dit",
+      "sha256": "cf938ca5543fe20b453cb856b8f20dfc57a1cddfdbc833cb56818324310cac4a",
+      "deps": [
+        "krea2_turbo"
+      ]
+    },
+    {
+      "id": "mmh3-fl2va-int4",
+      "module": "Video",
+      "label": "MiniMax H3 FL2VA · int4 AsymW4A8 (12.25GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 12.25,
+      "scan_names": [
+        "MiniMax_H3_fl2va_pruned_w4a8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3207975?fileId=3089623",
+      "filename": "MiniMax_H3_fl2va_pruned_w4a8-native.safetensors",
+      "remote_filename": "minimaxH3INT8INT6INT4_flREF2VAPruned_3089623.safetensors",
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "Civitai 2830065 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2830065?modelVersionId=3207975",
+      "convert": "mmh3_dit"
+    },
+    {
+      "id": "mmh3-ref2va-int4",
+      "module": "Video",
+      "label": "MiniMax H3 Ref2VA · int4 AsymW4A8 (11.49GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax",
+      "gated": false,
+      "approx_gb": 11.49,
+      "scan_names": [
+        "MiniMax_H3_ref2va_pruned_w4a8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3207975?fileId=3091888",
+      "filename": "MiniMax_H3_ref2va_pruned_w4a8-native.safetensors",
+      "remote_filename": "minimaxH3INT8INT6INT4_flREF2VAPruned_3091888.safetensors",
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "Civitai 2830065 · MiniMax H3",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2830065?modelVersionId=3207975",
+      "convert": "mmh3_dit"
     }
   ],
   "schema": 2,

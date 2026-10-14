@@ -3159,5 +3159,7 @@
   "feat.cap.video_h3_veda": "MiniMax H3 — attenzione sparsa Veda",
   "vid.h3.veda": "Attenzione sparsa Veda (più veloce)",
   "vid.h3.veda.tt": "Calcola solo i blocchi d'attenzione che un predittore addestrato segna come utili: circa 1,4–2,2× più veloce sul denoise. Vale con i riferimenti (Ref2VA) e il Turbo 8 passi; i pesi del modello non cambiano. Se qualcosa non torna, il video usa da solo l'attenzione piena.",
-  "vid.h3.turbo.v4": "Turbo v4 8 passi (larryvrh, anche coi riferimenti)"
+  "vid.h3.turbo.v4": "Turbo v4 8 passi (larryvrh, anche coi riferimenti)",
+  "vid.h3.prof.int4": "int4 W4A8 · 12 GB (tutte le GPU)",
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 step)"
 }

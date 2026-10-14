@@ -29,7 +29,7 @@ DIFFUSERS_SRC = TOOLS / "diffusers_src"
 DEPS = [
     "transformers>=5.17", "accelerate", "safetensors>=0.4.5", "sentencepiece", "protobuf", "pillow",
     "huggingface_hub", "einops", "ftfy", "imageio", "imageio-ffmpeg", "soundfile", "av", "numpy<2.3",
-    "comfy-kitchen", "peft",
+    "comfy-kitchen>=0.2.37", "peft",      # 0.2.37: W4A8/W6A8 (DiT H3 DaSiWa int4/int6)
     "opencv-python-headless",            # preprocessori ControlNet di Qwen-Image 2.1 (canny, contorni)
     # kernel Triton INT8 block-sparse dell'attenzione Veda (MiniMax H3): 3.5.x è la serie di torch 2.9
     "triton-windows>=3.5,<3.6; platform_system == 'Windows'",

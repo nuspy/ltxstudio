@@ -3192,5 +3192,7 @@
   "feat.cap.video_h3_veda": "MiniMax H3 — Veda sparse attention",
   "vid.h3.veda": "Veda sparse attention (faster)",
   "vid.h3.veda.tt": "Computes only the attention blocks a trained predictor marks as useful: about 1.4–2.2× faster denoising. Works with references (Ref2VA) and Turbo 8 steps; the model weights do not change. If anything does not fit, the video falls back to full attention on its own.",
-  "vid.h3.turbo.v4": "Turbo v4 8 steps (larryvrh, also with references)"
+  "vid.h3.turbo.v4": "Turbo v4 8 steps (larryvrh, also with references)",
+  "vid.h3.prof.int4": "int4 W4A8 · 12 GB (all GPUs)",
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 steps)"
 }

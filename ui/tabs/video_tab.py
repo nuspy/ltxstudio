@@ -739,7 +739,8 @@ class VideoTab(QWidget):
         prev = (self.model.currentData() or {}).get("key")
         labels = {"nvfp4": tr("vid.h3.prof.nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"),
                   "fp8": tr("vid.h3.prof.fp8", "fp8 · 21 GB (RTX 40xx)"),
-                  "int8": tr("vid.h3.prof.int8", "int8-ConvRot · 21 GB (tutte le GPU)")}
+                  "int8": tr("vid.h3.prof.int8", "int8-ConvRot · 21 GB (tutte le GPU)"),
+                  "int4": tr("vid.h3.prof.int4", "int4 W4A8 · 12 GB (tutte le GPU)")}
         self.model.blockSignals(True)
         self.model.clear()
         for prof, (fl, _ref, _te) in S.PROFILES.items():

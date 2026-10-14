@@ -661,7 +661,7 @@ class AvatarTab(QWidget):
         f.addRow(tr("avatar.h3.duration", "Durata"), self.h3_duration)
         self.h3_profile = QComboBox()
         for prof, key in (("nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"), ("fp8", "fp8 · 21 GB (RTX 40xx)"),
-                          ("int8", "int8-ConvRot · 21 GB (tutte le GPU)")):
+                          ("int8", "int8-ConvRot · 21 GB (tutte le GPU)"), ("int4", "int4 W4A8 · 12 GB (tutte le GPU)")):
             self.h3_profile.addItem(tr(f"vid.h3.prof.{prof}", key), prof)
         f.addRow(tr("avatar.precision", "Precisione"), self.h3_profile)
         self.h3_te = QComboBox()

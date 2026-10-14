@@ -54,8 +54,21 @@ def is_block_modulation(k: str) -> bool:
     return bool(_BLOCK_MOD.match(k))
 
 
+_KOHYA = re.compile(r"^lora_unet_(.+?)\.(lora_down\.weight|lora_up\.weight|alpha|lokr_\w+|diff|diff_b)$")
+
+
+def _kohya_module(m: str) -> str:
+    """`blocks_12_attn_gate` → `blocks.12.attn.gate`, `txtfusion_refiner_blocks_0_mlp_up` → `txtfusion.refiner_blocks.0.mlp.up`."""
+    m = re.sub(r"^txtfusion_", "txtfusion.", m)
+    m = re.sub(r"(blocks|layerwise_blocks|refiner_blocks)_(\d+)_", r"\1.\2.", m)
+    return re.sub(r"\.(attn|mlp)_", r".\1.", m)
+
+
 def lora_key(k: str) -> str:
-    """Chiave LoRA ComfyUI/ai-toolkit → nome del modulo diffusers (suffisso lora_A/lora_B/alpha invariato)."""
+    """Chiave LoRA ComfyUI/ai-toolkit/kohya → nome del modulo diffusers (suffisso lora_A/lora_B/alpha invariato)."""
+    m = _KOHYA.match(k)
+    if m:
+        k = f"{_kohya_module(m.group(1))}.{m.group(2)}"
     for pre in ("transformer.", "model.diffusion_model.", "diffusion_model."):
         if k.startswith(pre):
             k = k[len(pre):]

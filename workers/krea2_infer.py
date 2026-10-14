@@ -345,6 +345,17 @@ def _convert_comfy_krea2_lora(sd: dict) -> dict:
 
 
 def _apply_loras(pipe, loras: list[tuple[str, float]]) -> None:
+    """LoRA fuse nei pesi bf16 del transformer PRIMA del cast fp8, con _qlinear (workers/krea2_custom): oltre a
+    lora_A/B ComfyUI/diffusers legge kohya (lora_unet_*), LoKr e delta pieni, che PEFT scartava o rifiutava
+    (14/10: LoRA Civitai «Fit Body» kohya, «Realism Engine» LoKr)."""
+    if not loras:
+        return
+    from workers import krea2_custom as K
+    K.apply_loras(pipe.transformer, list(loras), log=lambda m: print(m, flush=True))
+
+
+def _apply_loras_peft(pipe, loras: list[tuple[str, float]]) -> None:
+    """Percorso PEFT storico (non più usato: tenuto per confronto/diagnosi)."""
     if not loras:
         return
     from safetensors.torch import load_file

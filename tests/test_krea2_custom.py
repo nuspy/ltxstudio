@@ -37,3 +37,10 @@ def test_lora_e_idempotenza():
         "text_fusion.layerwise_blocks.0.attn.to_k.lora_B.weight"
     d = "transformer_blocks.5.attn.to_out.0.weight"                       # nomi diffusers: invariati
     assert K.dit_key(d) == d
+
+
+def test_lora_kohya():
+    assert K.lora_key("lora_unet_blocks_12_attn_gate.lora_down.weight") == "transformer_blocks.12.attn.to_gate.lora_down.weight"
+    assert K.lora_key("lora_unet_blocks_3_mlp_up.alpha") == "transformer_blocks.3.ff.up.alpha"
+    assert K.lora_key("lora_unet_txtfusion_refiner_blocks_0_attn_wq.lora_up.weight") == \
+        "text_fusion.refiner_blocks.0.attn.to_q.lora_up.weight"

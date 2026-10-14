@@ -661,3 +661,28 @@ for _kind, _model, _nsfw in _enumerate_model_specs():
         f"generazione dispacciata.",
         _make_model_case(_kind, _model, _nsfw),
     ))
+
+
+def case_h3_int4_profile_dasiwa(w, spy):
+    """Profilo H3 «int4» (W4A8, base: visibile anche in SFW) arriva come h3_profile; DaSiWa v4 int4 solo in NSFW."""
+    t = w.video_tab
+    t.nsfw.setCurrentText("SFW")
+    t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+    data = lambda: [t.model.itemData(i) or {} for i in range(t.model.count())]
+    i = next((k for k, d in enumerate(data()) if d.get("profile") == "int4" and not d.get("h3_dit")), -1)
+    assert i >= 0, f"profilo int4 assente: {data()}"
+    t.model.setCurrentIndex(i)
+    v = t.get_values()
+    assert v.get("model_kind") == "minimax_h3" and v.get("h3_profile") == "int4" and not v.get("h3_dit"), v
+    assert not any(d.get("h3_dit") == "mmh3-dit-dasiwa-v4" for d in data()), "DaSiWa (18+) visibile in SFW"
+    t.nsfw.setCurrentText("NSFW")
+    j = next((k for k, d in enumerate(data()) if d.get("h3_dit") == "mmh3-dit-dasiwa-v4"), -1)
+    assert j >= 0, f"DaSiWa v4 assente in NSFW: {data()}"
+    t.model.setCurrentIndex(j)
+    assert t.get_values().get("h3_dit") == "mmh3-dit-dasiwa-v4"
+    t.nsfw.setCurrentText("SFW")
+    t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+
+
+CASES.append(("video_h3_int4_dasiwa", "H3: profilo int4 W4A8 (anche SFW) e DaSiWa v4 int4 (solo NSFW) al worker.",
+              case_h3_int4_profile_dasiwa))

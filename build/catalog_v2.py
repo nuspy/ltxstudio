@@ -113,7 +113,7 @@ PATCH = {
 def N(id, module, label, *, category, arch, kind="file", repo=None, filename=None,
       remote=None, type=None, family="", tool_dest=None, gated=False, gb=0.0,
       scan=None, deps=None, role=None, sens=None, no_remote=False, note=None,
-      allow=None, used_by=None, convert=None, sha256=None, url=None):
+      allow=None, used_by=None, convert=None, sha256=None, url=None, triggers=None, page=None):
     e = {"id": id, "module": module, "label": label, "kind": kind,
          "type": type or "misc", "family": family, "gated": gated,
          "approx_gb": gb, "scan_names": scan or ([filename] if filename else []),
@@ -145,6 +145,10 @@ def N(id, module, label, *, category, arch, kind="file", repo=None, filename=Non
         e["allow_patterns"] = allow
     if used_by:
         e["used_by"] = used_by
+    if triggers:                                  # parole trigger (anche più d'una): pannello LoRA, mostra/inserisce
+        e["triggers"] = list(triggers)
+    if page:                                      # pagina del modello (Civitai/HF) mostrata come link
+        e["page"] = page
     if convert:                                   # file ComfyUI → convertito in nativo e cancellato
         e["convert"] = convert                    # (core/native_convert: `filename` è il NATIVO)
     return e
@@ -956,6 +960,11 @@ NEW = [
       kind="snapshot", repo="coqui/XTTS-v2", type="TTS", gb=2.0, scan=["XTTS-v2", "xtts"]),
 ]
 
+# lista Civitai dell'utente del 14/10/2026 (generata da metadati/header remoti: trigger, sha256, pagina)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from catalog_civitai_oct14 import entries as _civitai_oct14  # noqa: E402
+NEW += _civitai_oct14(N)
+
 # url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {
     "gfpgan-13": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
@@ -977,7 +986,8 @@ DEFAULT_CAT_BY_MODULE = {
 
 
 # Famiglie in cui NEW è la fonte autorevole anche per le voci già nel json (campi di NEW vincono).
-REFRESH = ("mmh3-", "qwen21-", "lcav")
+REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "ltx23-lora-civ", "ltx25-lora-civ",
+           "ltx23-eros14")
 
 # Voci ritirate (tolte dal catalogo alla prossima rigenerazione).
 REMOVED = {

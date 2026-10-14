@@ -3118,5 +3118,7 @@
   "feat.cap.video_h3_veda": "MiniMax H3 — atenção esparsa Veda",
   "vid.h3.veda": "Atenção esparsa Veda (mais rápida)",
   "vid.h3.veda.tt": "Calcula só os blocos de atenção que um preditor treinado marca como úteis: remoção de ruído cerca de 1,4–2,2× mais rápida. Funciona com referências (Ref2VA) e Turbo 8 passos; os pesos do modelo não mudam. Se algo não se encaixar, o vídeo volta sozinho à atenção completa.",
-  "vid.h3.turbo.v4": "Turbo v4 8 passos (larryvrh, também com referências)"
+  "vid.h3.turbo.v4": "Turbo v4 8 passos (larryvrh, também com referências)",
+  "vid.h3.prof.int4": "int4 W4A8 · 12 GB (todas as GPUs)",
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 passos)"
 }

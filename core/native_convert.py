@@ -97,10 +97,14 @@ def rotate(t, group: int):
 
 
 def _module_of(key: str) -> str:
-    for suf in (".weight_scale_2", ".weight_scale", ".pre_quant_scale", ".weight", ".comfy_quant", ".input_scale"):
+    for suf in (".weight_scale_2", ".weight_scale", ".pre_quant_scale", ".weight", ".comfy_quant", ".input_scale",
+                ".weight_s_rel", ".weight_s_channel", ".weight_codebook", ".weight_correction"):
         if key.endswith(suf):
             return key[: -len(suf)]
     return key
+
+
+W4A8_FORMATS = ("asym_w4a8_int8", "w6a8_int8")       # comfy-kitchen ≥ 0.2.37 (DiT H3 DaSiWa int4 / int6)
 
 
 # ── regole comuni ──────────────────────────────────────────────────────────────────────────────
@@ -111,6 +115,13 @@ def _quant_common(key: str, info: dict, header: dict):
         return []
     mod = _module_of(key)
     conf = header.get("__qconf__", {}).get(mod, {})
+    if conf.get("format") in W4A8_FORMATS:
+        # W4A8/W6A8 comfy-kitchen: tutto invariato (kernel fuso nel worker) + marcatore [gruppo, gruppo ConvRot]
+        if key == mod + ".weight":
+            gs, cr = int(conf.get("group_size", 16)), int(conf.get("convrot_groupsize", 256))
+            return [(key, lambda t: t),
+                    (mod + ".w4a8", lambda t, _v=(gs, cr): torch.tensor(_v, dtype=torch.int32))]
+        return [(key, lambda t: t)]
     if conf.get("convrot"):
         g = int(conf.get("convrot_groupsize", 256))
         wi = header.get(mod + ".weight", {})

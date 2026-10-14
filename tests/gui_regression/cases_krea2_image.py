@@ -68,7 +68,26 @@ def case_krea2_te_only_nsfw(w, spy):
     assert f.k2_te.currentData() == "" and f._k2_box.isHidden()
 
 
+def case_krea2_sickrealism(w, spy):
+    """Krea SickRealism v2 fp8 (Civitai, 18+): solo in NSFW, 8 passi / guidance 0, arriva come krea2_dit."""
+    f = w.frame1_tab
+    f.img_nsfw.setCurrentText("SFW")
+    f.gen_arch.setCurrentText("Krea 2")
+    assert "krea2-sickrealism-v2" not in _ids(f.gen_model), "SickRealism (18+) visibile in SFW"
+    if f.img_nsfw.findText("NSFW") < 0:
+        return
+    f.img_nsfw.setCurrentText("NSFW")
+    f.gen_model.setCurrentIndex(f.gen_model.findData("krea2-sickrealism-v2"))
+    assert f.gen_model.currentData() == "krea2-sickrealism-v2", _ids(f.gen_model)
+    assert f.gen_steps.value() == 8 and f.gen_cfg.value() == 0.0
+    f.gen_prompt.setPlainText("foto analogica di un astronauta che fa surf su una nebulosa, grana 35mm")
+    p = _run(w, spy, w.generate_image)
+    assert p["krea2_dit"] == "krea2-sickrealism-v2" and p["krea2_variant"] == "turbo", p
+    f.img_nsfw.setCurrentText("SFW")
+
+
 CASES = [
+    ("krea2_sickrealism", "Krea SickRealism v2 fp8: solo NSFW, 8/0, krea2_dit al worker.", case_krea2_sickrealism),
     ("krea2_te_only_nsfw", "Krea 2: encoder uncensored selezionabile solo in NSFW e azzerato tornando in SFW.",
      case_krea2_te_only_nsfw),
     ("krea2_noct_only_nsfw", "Krea 2: Turbo/Raw sempre, Krea Noct V4 (18+) solo in NSFW.", case_krea2_noct_only_nsfw),

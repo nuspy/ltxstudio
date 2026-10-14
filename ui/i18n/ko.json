@@ -3118,5 +3118,7 @@
   "feat.cap.video_h3_veda": "MiniMax H3 — Veda 희소 어텐션",
   "vid.h3.veda": "Veda 희소 어텐션 (더 빠름)",
   "vid.h3.veda.tt": "학습된 예측기가 유용하다고 표시한 어텐션 블록만 계산합니다: 디노이즈가 약 1.4–2.2배 빨라집니다. 레퍼런스(Ref2VA)와 Turbo 8단계에서 작동하며 모델 가중치는 바뀌지 않습니다. 맞지 않는 부분이 있으면 영상은 자동으로 전체 어텐션으로 돌아갑니다.",
-  "vid.h3.turbo.v4": "Turbo v4 8단계 (larryvrh, 레퍼런스와 함께도)"
+  "vid.h3.turbo.v4": "Turbo v4 8단계 (larryvrh, 레퍼런스와 함께도)",
+  "vid.h3.prof.int4": "int4 W4A8 · 12 GB (모든 GPU)",
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8단계)"
 }

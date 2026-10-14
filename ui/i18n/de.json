@@ -3118,5 +3118,7 @@
   "feat.cap.video_h3_veda": "MiniMax H3 — Veda Sparse Attention",
   "vid.h3.veda": "Veda Sparse Attention (schneller)",
   "vid.h3.veda.tt": "Berechnet nur die Attention-Blöcke, die ein trainierter Prädiktor als nützlich markiert: etwa 1,4–2,2× schnelleres Entrauschen. Gilt mit Referenzen (Ref2VA) und Turbo 8 Schritte; die Modellgewichte bleiben gleich. Passt etwas nicht, nutzt das Video automatisch volle Attention.",
-  "vid.h3.turbo.v4": "Turbo v4 8 Schritte (larryvrh, auch mit Referenzen)"
+  "vid.h3.turbo.v4": "Turbo v4 8 Schritte (larryvrh, auch mit Referenzen)",
+  "vid.h3.prof.int4": "int4 W4A8 · 12 GB (alle GPUs)",
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 Schritte)"
 }

@@ -22,6 +22,8 @@ PROFILES = {
     "nvfp4": ("mmh3-fl2va-nvfp4", "mmh3-ref2va-nvfp4", "mmh3-te-nvfp4"),
     "fp8": ("mmh3-fl2va-fp8", "mmh3-ref2va-fp8", "mmh3-te-fp8"),
     "int8": ("mmh3-fl2va-int8", "mmh3-ref2va-int8", "mmh3-te-int8"),
+    # W4A8 comfy-kitchen (pesi int4 a codebook + GEMM int8): metà memoria dell'int8, kernel int8 su ogni GPU
+    "int4": ("mmh3-fl2va-int4", "mmh3-ref2va-int4", "mmh3-te-nvfp4"),
 }
 # DiT PERSONALIZZATI (finetune 18+, scelti esplicitamente): un solo file «hybrid» vale per FL2VA e Ref2VA (stesse
 # chiavi del DiT pruned ufficiale). turbo_fused = turbo già nei pesi: niente LoRA turbo, passi e shift propri.
@@ -29,6 +31,8 @@ CUSTOM_DITS = {
     "mmh3-dit-pinkcherry18": {"label": "PinkCherry H3 v1.8", "modes": ("fl2va", "ref2va")},
     "mmh3-dit-10erosmax-b6": {"label": "10Eros-Max beta6 Turbo", "modes": ("fl2va", "ref2va"),
                               "turbo_fused": True, "nfe": 8, "video_shift": 10.0},
+    # base Ref2VA (adaln_t_table e norme identici al pruned Ref2VA ufficiale), «Hybrid» per l'autore: int4 W4A8
+    "mmh3-dit-dasiwa-v4": {"label": "DaSiWa Hybrid v4 (int4)", "modes": ("fl2va", "ref2va")},
 }
 TE_IDS = ("mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8", "mmh3-te-heretic-nvfp4")
 TE_ADULT = "mmh3-te-heretic-nvfp4"
