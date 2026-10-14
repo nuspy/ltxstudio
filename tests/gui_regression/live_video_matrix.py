@@ -36,7 +36,11 @@ M = {
     "gguf_q4":       r"E:\AI\Models\diffusion_models\LTXVideo\LTX-2\quantstack\ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
     "gguf_q6":       r"E:\AI\Models\diffusion_models\ltx-2-3-22b-dev-Q6_K.gguf",
     "eros":          r"E:\AI\Models\diffusion_models\LTX\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
+    "pinkcherry":    r"E:\AI\Models\diffusion_models\LTX\PinkCherry_FineTune_fp8scaled_v1_8_LTX23.safetensors",
+    # LTX-2.5 int8 ConvRot (fold nativo in ltx-core), distill già fuso
+    "stubelius":     r"E:\AI\Models\diffusion_models\LTX\ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors",
 }
+NSFW_KEYS = ("eros", "pinkcherry", "stubelius")
 PROMPTS = [  # creativi e vari (regola: mai gattini/cani)
     "un fabbro forgia una spada incandescente in una bottega medievale, scintille",
     "una ballerina di flamenco danza su un tetto all'alba, vestito rosso al vento",
@@ -136,8 +140,21 @@ def _base_setup(w, prompt: str, width=704, height=448, secs=2.0, nsfw=False):
 # ── definizione casi ─────────────────────────────────────────────────────────────
 def case_t2v(model_key):
     def run(w, app):
-        _base_setup(w, _prompt(), nsfw=(model_key == "eros"))
+        _base_setup(w, _prompt(), nsfw=(model_key in NSFW_KEYS))
         assert _select_model(w, M[model_key]), f"modello {model_key} assente dal dropdown"
+        w.on_generate()
+    return run
+
+
+def case_t2v_te(model_key, te_id):
+    """t2v con il text encoder alternativo della release (riga «Text encoder», solo 2.5 + NSFW)."""
+    def run(w, app):
+        _base_setup(w, _prompt(), nsfw=True)
+        assert _select_model(w, M[model_key]), f"modello {model_key} assente dal dropdown"
+        vt = w.video_tab
+        i = vt.ltx_te.findData(te_id)
+        assert i >= 0 and not vt.ltx_te.isHidden(), "riga Text encoder LTX-2.5 non disponibile"
+        vt.ltx_te.setCurrentIndex(i)
         w.on_generate()
     return run
 
@@ -311,6 +328,12 @@ CASES += [
 for key in ("dev_fp8", "dev_nvfp4", "gguf_q4", "gguf_q6", "eros"):
     CASES.append((f"ltx_{key}_t2v", 1200, case_t2v(key)))
     CASES.append((f"ltx_{key}_i2v", 1200, case_i2v(key)))
+# 18+ importati il 13/10 (LTX-2.3 fp8 ComfyUI, LTX-2.5 int8 ConvRot, TE Gemma 4 uncensored)
+CASES += [
+    ("ltx_pinkcherry_t2v",          1200, case_t2v("pinkcherry")),
+    ("ltx25_stubelius_t2v",         1500, case_t2v("stubelius")),
+    ("ltx25_stubelius_te_unc_t2v",  1500, case_t2v_te("stubelius", "ltx25-te-uncensored")),
+]
 # altre architetture
 CASES += [
     ("arch_self_forcing_t2v", 1200, case_arch("krea_rt")),   # default krea_rt→self_forcing worker

@@ -408,6 +408,9 @@ class VideoTab(QWidget):
         ref_l = QVBoxLayout(ref_box)
         self.reference_panel = ReferencePanel()
         self.reference_panel.insert_token.connect(self._insert_prompt_token)
+        # H3 Ref2VA (riferimenti attivi): niente LoRA turbo 8 passi (esiste solo per FL2VA) e Veda disponibile
+        self.reference_panel.enable.toggled.connect(self._sync_h3_refs)
+        self._sync_h3_refs()
         ref_l.addWidget(self.reference_panel)
         root.addWidget(ref_box)
 
@@ -684,6 +687,19 @@ class VideoTab(QWidget):
         self.ltx_te_lbl.setVisible(on)
         if not on:
             self.ltx_te.setCurrentIndex(0)
+
+    def _sync_h3_refs(self, *_):
+        """Coi riferimenti H3 lavora in Ref2VA: la LoRA turbo 8 passi esiste solo per FL2VA (sceglierla faceva
+        fallire Genera) e il predittore Veda è Ref2VA, quindi la sua casella ha senso solo qui."""
+        refs = self.reference_panel.enable.isChecked()
+        i8 = self.h3_turbo.findData("8")
+        if i8 >= 0:
+            self.h3_turbo.view().setRowHidden(i8, refs)
+            if refs and self.h3_turbo.currentIndex() == i8:
+                self.h3_turbo.setCurrentIndex(self.h3_turbo.findData("4"))
+        self.h3_veda.setEnabled(refs)
+        if not refs:
+            self.h3_veda.setChecked(False)
 
     def _sync_h3_te(self, *_):
         """Il text encoder «heretic» (senza censura) compare solo in modalità NSFW."""

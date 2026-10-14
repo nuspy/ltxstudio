@@ -625,6 +625,27 @@ def case_ltx25_te_uncensored(w, spy):
     assert t.ltx_te.isHidden(), "riga encoder 2.5 visibile con un modello 2.3"
 
 
+def case_h3_refs_veda(w, spy):
+    """H3 coi riferimenti (Ref2VA): turbo 8 nascosto (solo FL2VA), casella Veda attiva e h3_veda al worker;
+    senza riferimenti la casella si spegne e non viene inviata."""
+    t = w.video_tab
+    t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+    t.reference_panel.enable.setChecked(False)
+    t.h3_turbo.setCurrentIndex(t.h3_turbo.findData("8"))
+    assert not t.h3_veda.isEnabled(), "Veda attivabile senza riferimenti"
+    t.reference_panel.enable.setChecked(True)
+    i8 = t.h3_turbo.findData("8")
+    assert t.h3_turbo.view().isRowHidden(i8) and t.h3_turbo.currentData() == "4", "turbo 8 ancora scelto in Ref2VA"
+    assert t.h3_veda.isEnabled()
+    t.h3_veda.setChecked(True)
+    assert t.get_values().get("h3_veda") is True
+    t.reference_panel.enable.setChecked(False)
+    assert not t.h3_veda.isChecked() and not t.h3_turbo.view().isRowHidden(i8)
+    t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+
+
+CASES.append(("video_h3_refs_veda", "H3 Ref2VA: turbo 8 nascosto, Veda attivabile solo coi riferimenti.",
+              case_h3_refs_veda))
 CASES.append(("video_ltx25_te_uncensored",
               "LTX 2.5: encoder Gemma 4 uncensored solo con transformer 2.5 in NSFW, arriva al worker come ltx_te.",
               case_ltx25_te_uncensored))
