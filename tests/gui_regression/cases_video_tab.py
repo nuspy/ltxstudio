@@ -636,6 +636,7 @@ def case_h3_refs_veda(w, spy):
     t.reference_panel.enable.setChecked(True)
     i8 = t.h3_turbo.findData("8")
     assert t.h3_turbo.view().isRowHidden(i8) and t.h3_turbo.currentData() == "4", "turbo 8 ancora scelto in Ref2VA"
+    assert t.h3_turbo.view().isRowHidden(t.h3_turbo.findData("dmad")), "turbo dmad (solo FL2VA) visibile in Ref2VA"
     assert t.h3_veda.isEnabled()
     t.h3_veda.setChecked(True)
     assert t.get_values().get("h3_veda") is True
@@ -707,3 +708,23 @@ def case_h3_lightvae(w, spy):
 
 CASES.append(("video_h3_lightvae", "H3: VAE video LightVAE (decoder / encoder+decoder Lite) fino agli id dei pesi.",
               case_h3_lightvae))
+
+
+def case_h3_lora_panel(w, spy):
+    """H3: il pannello LoRA è attivo e mostra le LoRA H3 del registro (family MiniMax-H3), non quelle LTX; le turbo
+    (distill_lora, compreso il merge dmad) restano fuori: hanno il selettore «Velocità». Tornando a LTX, LoRA LTX."""
+    t = w.video_tab
+    t.nsfw.setCurrentText("NSFW")
+    t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+    assert t.lora.isEnabled(), "pannello LoRA disabilitato con H3"
+    names = [r["entry"].filename for r in t.lora._rows.values()]
+    assert any("Unlocked" in n for n in names), f"LoRA H3 assenti: {names[:5]}"
+    assert not any("dmad" in n.lower() or "turbo" in n.lower() for n in names), "LoRA turbo nel pannello di stile"
+    assert not any("ltx" in n.lower() and "h3" not in n.lower() for n in names), "LoRA LTX col modello H3"
+    t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+    assert t.lora._arch_label == "LTX"
+    t.nsfw.setCurrentText("SFW")
+
+
+CASES.append(("video_h3_lora_panel", "H3: pannello LoRA attivo con le LoRA H3 (non LTX, non turbo).",
+              case_h3_lora_panel))

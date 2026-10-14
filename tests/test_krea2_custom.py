@@ -17,6 +17,7 @@ def test_blocchi():
     assert K.dit_key("blocks.3.prenorm.scale") == "transformer_blocks.3.norm1.weight"
     assert K.dit_key("blocks.3.mod.lin") == "transformer_blocks.3.scale_shift_table"
     assert K.is_block_modulation("blocks.3.mod.lin") and not K.is_block_modulation("last.modulation.lin")
+    assert K.is_block_modulation("model.diffusion_model.blocks.3.mod.lin")         # prefisso ComfyUI (SickRealism)
 
 
 def test_testa_coda_e_text_fusion():

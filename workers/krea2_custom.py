@@ -33,6 +33,7 @@ _INNER = (
     (".mod.lin", ".scale_shift_table"),
 )
 _BLOCK_MOD = re.compile(r"^blocks\.\d+\.mod\.lin$")
+_FLAT_TABLE = re.compile(r"^transformer_blocks\.\d+\.scale_shift_table$")
 
 
 def dit_key(k: str) -> str:
@@ -50,7 +51,12 @@ def dit_key(k: str) -> str:
 
 
 def is_block_modulation(k: str) -> bool:
-    """`blocks.N.mod.lin` è piatto [6·dim]: in diffusers è `scale_shift_table` [6, dim]."""
+    """`blocks.N.mod.lin` è piatto [6·dim]: in diffusers è `scale_shift_table` [6, dim]. Anche col prefisso
+    `model.diffusion_model.` (es. Krea SickRealism v2)."""
+    for pre in ("model.diffusion_model.", "diffusion_model."):
+        if k.startswith(pre):
+            k = k[len(pre):]
+            break
     return bool(_BLOCK_MOD.match(k))
 
 
@@ -85,7 +91,10 @@ def build_transformer(dit_path: str, config_dir: str, device: str = "cuda"):
     import _qlinear as Q
     with init_empty_weights():
         tr = Krea2Transformer2DModel.from_config(Krea2Transformer2DModel.load_config(config_dir))
-    sd = Q.quantize_from_state_dict(tr, Q.read_safetensors(dit_path, device))
+    sd = Q.read_safetensors(dit_path, device)
+    for k in [k for k in sd if _FLAT_TABLE.match(k) and sd[k].dim() == 1]:
+        sd[k] = sd[k].reshape(6, -1)          # file convertiti prima del fix del prefisso (SickRealism v2, 14/10)
+    sd = Q.quantize_from_state_dict(tr, sd)
     miss, unex = Q.load_into(tr, sd, device=device, dtype=torch.bfloat16,
                              keep_fp32=("norm",))      # = _keep_in_fp32_modules di Krea2Transformer2DModel
     del sd

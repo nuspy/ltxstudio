@@ -3129,5 +3129,6 @@
   "f1.inpaint.klein_te_lbl": "Klein 编码器",
   "f1.inpaint.klein_te.official": "官方 Qwen3-8B",
   "f1.inpaint.klein_te.uncensored": "无审查 Qwen3-8B（18+）",
-  "f1.inpaint.klein_te.tt": "FLUX.2 Klein 9B 的文本编码器。无审查版本是去除了拒绝倾向的同一个 Qwen3-8B：它会照做露骨的提示词，而不是将其弱化。适用于所有使用 Klein 9B 的任务（局部重绘、融合、合成、上色）；Klein 4B 不使用。"
+  "f1.inpaint.klein_te.tt": "FLUX.2 Klein 9B 的文本编码器。无审查版本是去除了拒绝倾向的同一个 Qwen3-8B：它会照做露骨的提示词，而不是将其弱化。适用于所有使用 Klein 9B 的任务（局部重绘、融合、合成、上色）；Klein 4B 不使用。",
+  "vid.h3.turbo.dmad": "Turbo DMAD + v4，8 步（音频更好，实验性）"
 }

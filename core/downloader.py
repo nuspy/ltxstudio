@@ -53,7 +53,9 @@ class IntegrityError(RuntimeError):
 
 # ─────────────────────────── token ───────────────────────────
 def resolve_token(explicit: str | None = None) -> str | None:
-    """Token HF: esplicito → env → user_prefs('hf_token'). Mai stampato nei log."""
+    """Token HF: esplicito → env → user_prefs('hf_token') → quello salvato da `hf auth login` (lo usa già
+    hf_hub_download da sé; senza, il preflight dei repo gated rifiutava un accesso in realtà valido).
+    Mai stampato nei log."""
     if explicit:
         return explicit
     for k in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"):
@@ -63,7 +65,13 @@ def resolve_token(explicit: str | None = None) -> str | None:
     try:
         from core import user_prefs
         v = str(user_prefs.get("hf_token", "") or "").strip()
-        return v or None
+        if v:
+            return v
+    except Exception:                                    # noqa: BLE001
+        pass
+    try:
+        from huggingface_hub import get_token
+        return get_token() or None
     except Exception:                                    # noqa: BLE001
         return None
 

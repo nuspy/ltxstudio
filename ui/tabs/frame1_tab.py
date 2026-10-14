@@ -426,7 +426,8 @@ class Frame1Tab(QWidget):
 
     def _sync_gen_lora_arch(self, arch_lbl: str):
         """Sincronizza l'architettura del LoraTab con quella selezionata per la generazione."""
-        arch_map = {"FLUX": "Flux", "Z-Image": "Z-Image", "Ernie": "Ernie", "Qwen-Image 2.1": "Qwen21"}
+        arch_map = {"FLUX": "Flux", "Z-Image": "Z-Image", "Ernie": "Ernie", "Qwen-Image 2.1": "Qwen21",
+                    "Krea 2": "Krea2"}            # = family del registro pesi (core/lora_catalog)
         arch = arch_map.get(arch_lbl, "Flux")
         self.gen_lora_tab.set_arch(arch)
 

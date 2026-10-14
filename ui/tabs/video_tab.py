@@ -589,8 +589,15 @@ class VideoTab(QWidget):
             (getattr(self, "engine_row_lbl", None), not is_ltx),
             (getattr(self, "attn_backend", None), not (is_ltx or is_h3)),   # LingBot/Krea: sempre FlashAttention
             (getattr(self, "attn_row_lbl", None), not (is_ltx or is_h3)),
-            (getattr(self, "lora", None), not is_ltx),           # le LoRA LTX non si applicano alle altre arch
+            (getattr(self, "lora", None), not (is_ltx or is_h3)),  # LTX e H3 (worker H3: LoRA al volo)
         ]
+        # il pannello LoRA mostra le LoRA dell'arch attiva (registro: family «MiniMax-H3» / LTX-2 / LTX-2.5)
+        _lora_arch = "MiniMax-H3" if is_h3 else ("LTX" if is_ltx else None)
+        if _lora_arch and hasattr(self, "lora") and getattr(self.lora, "_arch_label", None) != _lora_arch:
+            try:
+                self.lora.set_arch(_lora_arch)
+            except Exception:                                   # noqa: BLE001
+                pass
         for w, disable in ltx_only:
             if w is None:
                 continue
@@ -625,6 +632,7 @@ class VideoTab(QWidget):
         self.h3_turbo.addItem(tr("vid.h3.turbo.4", "Turbo 4 passi (lightx2v)"), "4")
         self.h3_turbo.addItem(tr("vid.h3.turbo.8", "Turbo 8 passi (più dettaglio)"), "8")
         self.h3_turbo.addItem(tr("vid.h3.turbo.v4", "Turbo v4 8 passi (larryvrh, anche coi riferimenti)"), "v4")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.dmad", "Turbo DMAD + v4 8 passi (audio migliore, sperimentale)"), "dmad")
         self.h3_turbo.setToolTip(tr("vid.h3.turbo.tt",
             "LoRA di distillazione lightx2v: da ~49 a 4 o 8 passi (10× più veloce). Con i riferimenti "
             "(Ref2VA) esiste solo la 4 passi, in anteprima."))
@@ -703,11 +711,16 @@ class VideoTab(QWidget):
     def _sync_h3_refs(self, *_):
         """Coi riferimenti H3 lavora in Ref2VA: la LoRA turbo 8 passi esiste solo per FL2VA (sceglierla faceva
         fallire Genera) e il predittore Veda è Ref2VA, quindi la sua casella ha senso solo qui."""
+        from core import minimax_h3_spec as S
         refs = self.reference_panel.enable.isChecked()
-        i8 = self.h3_turbo.findData("8")
-        if i8 >= 0:
-            self.h3_turbo.view().setRowHidden(i8, refs)
-            if refs and self.h3_turbo.currentIndex() == i8:
+        for key, (modes, _nfe, _shift) in S.TURBO.items():     # turbo senza versione Ref2VA (8 passi, dmad)
+            if "ref2va" in modes:
+                continue
+            i = self.h3_turbo.findData(key)
+            if i < 0:
+                continue
+            self.h3_turbo.view().setRowHidden(i, refs)
+            if refs and self.h3_turbo.currentIndex() == i:
                 self.h3_turbo.setCurrentIndex(self.h3_turbo.findData("4"))
         self.h3_veda.setEnabled(refs)
         if not refs:

@@ -3203,5 +3203,6 @@
   "f1.inpaint.klein_te_lbl": "Klein encoder",
   "f1.inpaint.klein_te.official": "Official Qwen3-8B",
   "f1.inpaint.klein_te.uncensored": "Uncensored Qwen3-8B (18+)",
-  "f1.inpaint.klein_te.tt": "Text encoder of FLUX.2 Klein 9B. The uncensored version is the same Qwen3-8B with the tendency to refuse removed: it follows explicit prompts instead of softening them. It applies to all jobs made with Klein 9B (inpaint, Integrate, Compose, Color); it is not used with Klein 4B."
+  "f1.inpaint.klein_te.tt": "Text encoder of FLUX.2 Klein 9B. The uncensored version is the same Qwen3-8B with the tendency to refuse removed: it follows explicit prompts instead of softening them. It applies to all jobs made with Klein 9B (inpaint, Integrate, Compose, Color); it is not used with Klein 4B.",
+  "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 steps (better audio, experimental)"
 }

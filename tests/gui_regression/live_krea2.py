@@ -6,7 +6,7 @@ encoder alternativo (es. krea2-te-uncensored). Le voci 18+ richiedono la modalit
 Copia i risultati in output/DIAG_krea2_<modello>[_<te>].png.
 
 Uso: QT_QPA_PLATFORM=offscreen python tests/gui_regression/live_krea2.py --models krea2-noct-v4,krea2-kroma-v031
-     [--te krea2-te-uncensored]
+     [--te krea2-te-uncensored] [--lora PEZZO_DEL_NOME_FILE] (spunta la LoRA nel pannello LoRA vero)
 """
 from __future__ import annotations
 
@@ -57,6 +57,14 @@ def run_one(w, model: str, te: str) -> str:
         j = f.k2_te.findData(te)
         assert j >= 0 and not f._k2_box.isHidden(), "encoder Krea 2 alternativo non selezionabile"
         f.k2_te.setCurrentIndex(j)
+    lora = _arg("--lora", "")
+    if lora:
+        f.gen_lora_tab.refresh()
+        hit = [r for r in f.gen_lora_tab._rows.values()
+               if lora.lower() in (r["entry"].filename or r["entry"].name).lower()]
+        assert hit, f"LoRA «{lora}» assente dal pannello Krea 2"
+        hit[0]["cb"].setChecked(True); hit[0]["sp"].setValue(1.0)
+        print(f"[live] LoRA: {hit[0]['entry'].filename} trigger={hit[0]['entry'].triggers}", flush=True)
     f.gen_prompt.setPlainText(PROMPT)
     f.gen_seed_rand.setChecked(False); f.gen_seed.setValue(20261014)
     print(f"[live] {model}: passi={f.gen_steps.value()} guidance={f.gen_cfg.value()} te={te or 'ufficiale'}",
@@ -79,7 +87,8 @@ def run_one(w, model: str, te: str) -> str:
     out = got.get("out") or r.get("output") or ""
     if not out or not os.path.isfile(out):
         return ""
-    dst = ROOT / "output" / f"DIAG_krea2_{model}{'_' + te if te else ''}.png"
+    lo = _arg("--lora", "")
+    dst = ROOT / "output" / f"DIAG_krea2_{model}{'_' + te if te else ''}{'_lora-' + lo if lo else ''}.png"
     shutil.copyfile(out, dst)
     return str(dst)
 

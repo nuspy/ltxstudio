@@ -6,7 +6,8 @@ Copia il risultato in output/DIAG_h3_*.mp4 e il log GUI in output/DIAG_live_h3_g
 
 Uso:  QT_QPA_PLATFORM=offscreen python tests/gui_regression/live_h3_video.py [--turbo 8|4|""] [--secs 5]
       [--image PATH] (i2v: foto come primo fotogramma) [--ref PATH] (Ref2VA: foto di riferimento <Picture 1>)
-      [--veda] (attenzione sparsa Veda: richiede --ref)
+      [--veda] (attenzione sparsa Veda: richiede --ref) [--profile nvfp4|fp8|int8|int4]
+      [--dit ID] (DiT personalizzato 18+, es. mmh3-dit-dasiwa-v4: passa a NSFW) [--lightvae dec|encdec]
 """
 from __future__ import annotations
 
@@ -61,12 +62,19 @@ def main() -> int:
     vt = w.video_tab
     w.tabs.setCurrentWidget(vt)
     _spin(5.0)                       # il ripristino differito dello stato GUI rimette l'arch salvata: aspetto
+    profile, dit, lightvae = _arg("--profile", "nvfp4"), _arg("--dit", ""), _arg("--lightvae", "")
+    if dit:
+        vt.nsfw.setCurrentText("NSFW")
     vt.video_arch.setCurrentIndex(vt.video_arch.findData("minimax_h3"))
     _spin(1.0)
-    i = next((j for j in range(vt.model.count()) if (vt.model.itemData(j) or {}).get("profile") == "nvfp4"), -1)
-    assert i >= 0, "profilo nvfp4 assente dal dropdown"
+    data = lambda j: vt.model.itemData(j) or {}
+    i = next((j for j in range(vt.model.count())
+              if (data(j).get("h3_dit") == dit if dit else (data(j).get("profile") == profile
+                                                             and not data(j).get("h3_dit")))), -1)
+    assert i >= 0, f"voce H3 assente dal dropdown: {dit or profile}"
     vt.model.setCurrentIndex(i)
-    assert (vt.model.itemData(i) or {}).get("present"), "pesi nvfp4 non presenti"
+    assert data(i).get("present"), f"pesi non presenti: {dit or profile}"
+    vt.h3_lightvae.setCurrentIndex(vt.h3_lightvae.findData(lightvae))
     vt.h3_turbo.setCurrentIndex(vt.h3_turbo.findData(turbo))
     vt.h3_dialogue.clear()
     vt.h3_dialogue.add_row(speaker, "Italian", line)
@@ -104,7 +112,7 @@ def main() -> int:
     if not outs:
         print("FAIL nessun video")
         return 1
-    tag = ("_ref" if ref else "") + ("_veda" if veda else "")
+    tag = ("_ref" if ref else "") + ("_veda" if veda else "") + (f"_{dit}" if dit else f"_{profile}") +         (f"_lvae-{lightvae}" if lightvae else "")
     dst = ROOT / "output" / f"DIAG_h3_{label}_{'t' + turbo if turbo else 'base'}_{int(secs)}s{tag}.mp4"
     shutil.copyfile(outs[-1], dst)
     info = _probe(str(dst))

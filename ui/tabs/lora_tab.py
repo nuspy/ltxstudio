@@ -204,13 +204,20 @@ class LoraTab(QWidget):
         self._extra_entries = extra
         self.refresh()
 
+    # arch con una cartella LoRA propria: le LoRA «extra» dell'inventario (file su disco fuori dal dizionario)
+    # valgono solo se stanno lì, altrimenti col modello H3/Krea comparivano anche le LoRA LTX
+    _EXTRA_DIR = {"MiniMax-H3": "minimax-h3\\", "Krea2": "krea2\\"}
+
     def _merged_loras(self, allow_nsfw: bool) -> list[LoraEntry]:
         out = self.catalog.loras(allow_nsfw=allow_nsfw)
         seen = {e.comfy_name.replace("/", "\\").lower() for e in out}
+        only = self._EXTRA_DIR.get(getattr(self, "_arch_label", ""))
         for e in self._extra_entries:
             if not allow_nsfw and e.nsfw:
                 continue
             key = e.comfy_name.replace("/", "\\").lower()
+            if only and not key.startswith(only):
+                continue
             if key not in seen:
                 out.append(e)
                 seen.add(key)

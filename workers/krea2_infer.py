@@ -314,9 +314,16 @@ def _resolve_lora_paths(p: dict, edit: bool) -> list[tuple[str, float]]:
         else:
             print("[krea2] LoRA krea2_identity_edit NON trovata (edit ok, identità meno preservata)", flush=True)
     for lo in (p.get("loras") or []):
-        path = lo.get("path") or lo.get("name")
-        if path and os.path.isfile(path):
-            out.append((path, float(lo.get("strength", 1.0))))
+        name = lo.get("path") or lo.get("name")
+        if not name:
+            continue
+        # dalla GUI arriva il nome relativo alla cartella LoRA (es. «Krea2\\file.safetensors»): prima veniva
+        # scartato in silenzio e la generazione partiva senza la LoRA scelta
+        from core import model_paths as mp
+        path = name if os.path.isabs(name) else os.path.join(str(mp.models_root()), "LoRA", name)
+        if not os.path.isfile(path):
+            raise RuntimeError(f"LoRA non trovata su disco: {name}")
+        out.append((path, float(lo.get("strength", 1.0))))
     return out
 
 

@@ -175,6 +175,10 @@ def _arch_matches(raw: dict, wanted: str) -> bool:
                 and alias[1].search(f"{raw.get('path', '')} {raw.get('filename', '')}"))
 
 
+# arch del pannello LoRA → family del registro pesi: il pannello video dice «LTX» per 2.3 e 2.5
+_REGISTRY_FAMILIES = {"LTX": ("LTX", "LTX-2", "LTX-2.5")}
+
+
 def _registry_loras(arch: str) -> list[LoraEntry]:
     """LoRA del registro pesi (data/weights_catalog.json) già su disco per questa famiglia: compaiono anche
     prima che lo scanner del dizionario le abbia viste. 18+ = `sensitivity: adult`. Le LoRA di distillazione
@@ -184,8 +188,9 @@ def _registry_loras(arch: str) -> list[LoraEntry]:
         from core import weights_catalog as wc
         root = str(mp.models_root())
         out = []
+        fams = {f.upper() for f in _REGISTRY_FAMILIES.get(arch.upper(), (arch,))}
         for e in wc.load():
-            if e.get("type") != "LoRA" or (e.get("family") or "").upper() != arch.upper():
+            if e.get("type") != "LoRA" or (e.get("family") or "").upper() not in fams:
                 continue
             if "distill_lora" in (e.get("use") or []) or not wc.is_present(e, root):
                 continue

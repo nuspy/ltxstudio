@@ -237,13 +237,28 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
 }
 
 
+# richiesta del 14/10/2026: checkpoint/VAE/encoder nuovi; le LoRA della lista Civitai (id «-lora-civ-», tutte 18+)
+# sono di stile, tranne il merge turbo dmad che ha il suo posto nel selettore «Velocità» di H3
+MAP.update({
+    "ltx23-eros14": (["ckpt_video", "dev_quality", "uncensored"], []),
+    "mmh3-dit-dasiwa-v4": (["ckpt_video", "av_joint", "uncensored"], []),
+    "mmh3-fl2va-int4": (["ckpt_video", "av_joint"], []),
+    "mmh3-ref2va-int4": (["ckpt_video", "av_joint", "ref_omni"], []),
+    "krea2-sickrealism-v2": (["ckpt_image", "distilled", "fp8", "uncensored"], []),
+    "mmh3-lightvae-dec": (["vae"], []), "mmh3-lightvae-enc": (["vae"], []),
+    "klein9b-te-uncensored": (["te", "uncensored"], []),
+    "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m": (["distill_lora"], []),
+})
+CIV_LORA = (["lora_style", "uncensored"], [])
+
+
 def main() -> int:
     data = json.loads(CATALOG.read_text("utf-8"))
     unknown = []
     n_use = n_deps = 0
     ids = {e["id"] for e in data["weights"]}
     for e in data["weights"]:
-        got = MAP.get(e["id"])
+        got = MAP.get(e["id"]) or (CIV_LORA if "-lora-civ-" in e["id"] else None)
         if got is None:
             unknown.append(e["id"])
             continue

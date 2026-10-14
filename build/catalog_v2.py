@@ -1006,7 +1006,7 @@ DEFAULT_CAT_BY_MODULE = {
 
 # Famiglie in cui NEW è la fonte autorevole anche per le voci già nel json (campi di NEW vincono).
 REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "ltx23-lora-civ", "ltx25-lora-civ",
-           "ltx23-eros14")
+           "ltx23-eros14", "ltx25-te-uncensored")
 
 # Voci ritirate (tolte dal catalogo alla prossima rigenerazione).
 REMOVED = {

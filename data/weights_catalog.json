@@ -4698,23 +4698,24 @@
     {
       "id": "ltx25-te-uncensored",
       "module": "Video",
-      "label": "LTX-2.5 Gemma-4 TE Uncensored v1.1 (18+, 13.2GB → bf16 24.5GB)",
+      "label": "LTX-2.5 Gemma-4 TE Uncensored v1.1 (18+, int8, 13.2GB)",
       "kind": "file",
       "type": "text_encoders",
       "family": "",
       "gated": false,
       "approx_gb": 13.16,
       "scan_names": [
+        "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-int8-native.safetensors",
         "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors"
       ],
       "category": "video",
       "arch": "ltx25",
       "repo_id": "ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
       "url": "https://huggingface.co/ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
-      "filename": "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors",
+      "filename": "gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-int8-native.safetensors",
       "remote_filename": "split/text_encoders/gemma4_12b_ltx25_uncensored-int8.safetensors",
       "sensitivity": "adult",
-      "note": "Gemma 4 12B senza rifiuti con le proiezioni LTX: int8 → bf16 (il loader Gemma di ltx-core non legge pesi quantizzati), asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5",
+      "note": "Gemma 4 12B senza rifiuti con le proiezioni LTX: resta int8 su disco, ltx-core lo porta a bf16 al caricamento (with_int8_fold); asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5",
       "convert": "ltx25_te",
       "use": [
         "te",
@@ -5149,7 +5150,12 @@
       ],
       "sensitivity": "adult",
       "note": "Civitai 2447875 · LTXV 2.3",
-      "page": "https://civitai.red/models/2447875?modelVersionId=3109610"
+      "page": "https://civitai.red/models/2447875?modelVersionId=3109610",
+      "use": [
+        "ckpt_video",
+        "dev_quality",
+        "uncensored"
+      ]
     },
     {
       "id": "ltx25-lora-civ-bfs-best-face-swap-ltx-2-5-head-v1-1",
@@ -5173,7 +5179,11 @@
       "triggers": [
         "head_swap: FACE: [Face Description]"
       ],
-      "page": "https://civitai.red/models/2027766?modelVersionId=3228916"
+      "page": "https://civitai.red/models/2027766?modelVersionId=3228916",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-bfs-best-face-swap-krea-2-body-swap-exp",
@@ -5197,7 +5207,11 @@
       "triggers": [
         "body_swap: replace the person with the reference person."
       ],
-      "page": "https://civitai.red/models/2027766?modelVersionId=3188610"
+      "page": "https://civitai.red/models/2027766?modelVersionId=3188610",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-bfs-best-face-swap-h3-head-swap-ref2va",
@@ -5226,7 +5240,11 @@
         "Use the workflow auto-prompt."
       ],
       "page": "https://civitai.red/models/2027766?modelVersionId=3352167",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-bfs-best-face-swap-h3-character-swap-v1",
@@ -5256,7 +5274,11 @@
         "body_swap:  subject_definitions: <Subject 1> is the {details} shown in <Picture 1>, whose identity, face, head, hair or fur, skin, body shape, proportions and clothing define the character in the target video. The guide video provides the scene and the performance: its background, environment, lighting, camera, framing, body pose, hand and arm movement, head rotation, gaze direction, lip movement and facial expression, frame by frame; only {target} is replaced: their face, hair, body and clothing become <Subject 1>.  summary: [video generation + reference] Replace {target} in the guide video with <Subject 1>, keeping the scene, camera and the complete motion and performance of the guide video.  detailed_description: [Shot 1] <Subject 1> takes the exact place of {target} and moves with the same timing, body pose, gestures, head motion, gaze, speech and facial expressions, while keeping the complete look from <Picture 1>: head, face, skin, hair or fur, body shape and clothing stay stable in every frame, with no trace of the original subject's face, hair or clothing. The background, lighting, colors and camera of the guide video are preserved. Prevent identity drift, clothing changes, texture crawling and flicker. The result is a real, photographic video."
       ],
       "page": "https://civitai.red/models/2027766?modelVersionId=3401556",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "ltx23-lora-civ-bfs-best-face-swap-ltx-2-3-v3-focus-head",
@@ -5280,7 +5302,11 @@
       "triggers": [
         "head_swap: FACE: [describe the new face here] ACTION: [describe the action from original video here]"
       ],
-      "page": "https://civitai.red/models/2027766?modelVersionId=2783974"
+      "page": "https://civitai.red/models/2027766?modelVersionId=2783974",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-free-pussy-minimax-h3",
@@ -5309,7 +5335,11 @@
         "pussy"
       ],
       "page": "https://civitai.red/models/2934054?modelVersionId=3321019",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-h3-ltx-2-3-i2v-t2v-video-reasoning-lora",
@@ -5335,7 +5365,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2497207?modelVersionId=3306139",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-h3-ass-jiggle-i2v-fl2va-i2v-v1-0",
@@ -5374,7 +5408,11 @@
         "causing her buttocks to jiggle and ripple with each impact"
       ],
       "page": "https://civitai.red/models/2880033?modelVersionId=3255024",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-daring-s-deepthroat-h3-ltx2-3-minimax-h3",
@@ -5400,7 +5438,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2476698?modelVersionId=3226989",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-faster-harder-shake-harder-h3-motion-boo",
@@ -5429,7 +5471,11 @@
         "dynv2"
       ],
       "page": "https://civitai.red/models/2840146?modelVersionId=3228867",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-can-t-stop-shaking-h3-ending-reaction-bo",
@@ -5459,7 +5505,11 @@
         "endbody1"
       ],
       "page": "https://civitai.red/models/2867574?modelVersionId=3239680",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-dit-dasiwa-v4",
@@ -5491,7 +5541,12 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2877206?modelVersionId=3391862",
-      "convert": "mmh3_dit"
+      "convert": "mmh3_dit",
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-better-human-motion-minimax-h3-v1-0-mh3",
@@ -5517,7 +5572,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2734359?modelVersionId=3256084",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "ltx23-lora-civ-better-human-motion-minimax-h3-v2-0-ltx2",
@@ -5538,7 +5597,11 @@
       "sha256": "3cd5aeeff4e079510527650af4c45c1ec8a51495996de34c8d155fe35b6ed6a5",
       "sensitivity": "adult",
       "note": "Civitai 2734359 · LTXV 2.3",
-      "page": "https://civitai.red/models/2734359?modelVersionId=3087364"
+      "page": "https://civitai.red/models/2734359?modelVersionId=3087364",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-deeper-hold-it-h3-deep-motion-booster-v1",
@@ -5564,7 +5627,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2879661?modelVersionId=3254522",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-breast-play-jiggle-for-minimax-h3-v2-0",
@@ -5590,7 +5657,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2856004?modelVersionId=3278283",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-breast-play-jiggle-for-minimax-h3-v1-0",
@@ -5616,7 +5687,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2856004?modelVersionId=3225638",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m",
@@ -5642,7 +5717,10 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2837571?modelVersionId=3391964",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "distill_lora"
+      ]
     },
     {
       "id": "mmh3-lora-civ-minimax-h3-combat-base-fight-motion-impa",
@@ -5672,7 +5750,11 @@
         "prfin1"
       ],
       "page": "https://civitai.red/models/2853878?modelVersionId=3246572",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-cinematic-shot-krea-2",
@@ -5696,7 +5778,11 @@
       "triggers": [
         "zy_cinematic"
       ],
-      "page": "https://civitai.red/models/432586?modelVersionId=3085969"
+      "page": "https://civitai.red/models/432586?modelVersionId=3085969",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-minimaxh3-blowjob-nsfw-int8-convrot-v1-0",
@@ -5726,7 +5812,11 @@
         "sucking penis"
       ],
       "page": "https://civitai.red/models/2929639?modelVersionId=3315548",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-breast-sucking-krea-v1",
@@ -5750,7 +5840,11 @@
       "triggers": [
         "he is sucking on her right nipple"
       ],
-      "page": "https://civitai.red/models/2974216?modelVersionId=3370739"
+      "page": "https://civitai.red/models/2974216?modelVersionId=3370739",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-minimax-h3-rimjob-ass-licking-anal-v1-0",
@@ -5776,7 +5870,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2962318?modelVersionId=3356109",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-doggy-style-sex-minimax-h3-v1",
@@ -5802,7 +5900,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2920568?modelVersionId=3317042",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-realistic-detailed-penis-krea-2-v1",
@@ -5826,7 +5928,11 @@
       "triggers": [
         "crd1ck"
       ],
-      "page": "https://civitai.red/models/2971337?modelVersionId=3367178"
+      "page": "https://civitai.red/models/2971337?modelVersionId=3367178",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-real-beauty-krea-2-krea-2",
@@ -5850,7 +5956,11 @@
       "triggers": [
         "Real_beauty"
       ],
-      "page": "https://civitai.red/models/2899741?modelVersionId=3278683"
+      "page": "https://civitai.red/models/2899741?modelVersionId=3278683",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-h3bjhjsmilev1-a-lineup-bj-hj-smiles-v1",
@@ -5876,7 +5986,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2980221?modelVersionId=3378264",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-krea-2-missionary-position-lora-v1-0",
@@ -5900,7 +6014,11 @@
       "triggers": [
         "missionary position"
       ],
-      "page": "https://civitai.red/models/2974642?modelVersionId=3371260"
+      "page": "https://civitai.red/models/2974642?modelVersionId=3371260",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-erotic-photography-erotic-phot-v1-krea2",
@@ -5921,7 +6039,11 @@
       "sha256": "17480b17fff20140e2b1985771232219d70c09c7036ef7796dc3a92ccefcbb10",
       "sensitivity": "adult",
       "note": "Civitai 2966553 · Krea 2",
-      "page": "https://civitai.red/models/2966553?modelVersionId=3361321"
+      "page": "https://civitai.red/models/2966553?modelVersionId=3361321",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-penis-on-face-krea2",
@@ -5945,7 +6067,11 @@
       "triggers": [
         "large penis pressed on face, penis against face,"
       ],
-      "page": "https://civitai.red/models/2927477?modelVersionId=3312847"
+      "page": "https://civitai.red/models/2927477?modelVersionId=3312847",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-pressed-down-deepthroat-krea2",
@@ -5971,7 +6097,11 @@
         "wide eyes, frown,",
         "close up, from side,"
       ],
-      "page": "https://civitai.red/models/2937576?modelVersionId=3325478"
+      "page": "https://civitai.red/models/2937576?modelVersionId=3325478",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-fit-body-round-ass-v1-0-krea2",
@@ -5992,7 +6122,11 @@
       "sha256": "f0ed88da03ef46144b3a6de2b8a63a0ae0519a71a3fb0c6101bb41893ad3a187",
       "sensitivity": "adult",
       "note": "Civitai 2947122 · Krea 2",
-      "page": "https://civitai.red/models/2947122?modelVersionId=3337382"
+      "page": "https://civitai.red/models/2947122?modelVersionId=3337382",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-messy-blowjob-h3-v1-0",
@@ -6018,7 +6152,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2997232?modelVersionId=3399472",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-h3-throat-time-v2-0",
@@ -6044,7 +6182,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2992566?modelVersionId=3399886",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-cum-shots-minimax-h3",
@@ -6070,7 +6212,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2987064?modelVersionId=3386680",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-face-slap-motion-lora-minimax-h3-ref2va",
@@ -6099,7 +6245,11 @@
         "f4c3sl4p"
       ],
       "page": "https://civitai.red/models/2996117?modelVersionId=3398038",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-nipple-sucking-minimax-h3",
@@ -6125,7 +6275,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2985148?modelVersionId=3384367",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-horror-and-creepy-atmosphere-krea-2",
@@ -6146,7 +6300,11 @@
       "sha256": "d60382c44c74b787950b3871f6a1cf8ed21154d23d524ccae10eb51fd7780453",
       "sensitivity": "adult",
       "note": "Civitai 2992349 · Krea 2",
-      "page": "https://civitai.red/models/2992349?modelVersionId=3393346"
+      "page": "https://civitai.red/models/2992349?modelVersionId=3393346",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-mosaic-restoration-v1-0",
@@ -6172,7 +6330,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2990026?modelVersionId=3390424",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "qwen21-lora-civ-qwen-2-1-fellatio-v2-0",
@@ -6196,7 +6358,11 @@
       "used_by": [
         "cap.image_qwen21"
       ],
-      "page": "https://civitai.red/models/2981555?modelVersionId=3382947"
+      "page": "https://civitai.red/models/2981555?modelVersionId=3382947",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-perky-breasts-v1-0",
@@ -6220,7 +6386,11 @@
       "triggers": [
         "perkybreasts"
       ],
-      "page": "https://civitai.red/models/2997219?modelVersionId=3399448"
+      "page": "https://civitai.red/models/2997219?modelVersionId=3399448",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-facial-expressions-krea-v1",
@@ -6241,7 +6411,11 @@
       "sha256": "767981f9ab3a54885790eaf2b054ff6e643c17ad73857c966c72a87217a5c887",
       "sensitivity": "adult",
       "note": "Civitai 2998861 · Krea 2",
-      "page": "https://civitai.red/models/2998861?modelVersionId=3401507"
+      "page": "https://civitai.red/models/2998861?modelVersionId=3401507",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-nsfw-posing-touching-round-breasts-h3-lo",
@@ -6267,7 +6441,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2985832?modelVersionId=3385163",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-minimax-cumshot-v1-0",
@@ -6293,7 +6471,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2909163?modelVersionId=3290361",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-realistic-snapshot-z-image-turbo-krea-2",
@@ -6314,7 +6496,11 @@
       "sha256": "dfd67eb881bec4caeb9409e5b7c127adcb9fb724e6007e1e77165af51e6f908d",
       "sensitivity": "adult",
       "note": "Civitai 2268008 · Krea 2",
-      "page": "https://civitai.red/models/2268008?modelVersionId=3084537"
+      "page": "https://civitai.red/models/2268008?modelVersionId=3084537",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-lora-civ-realism-engine-ideogram-4-krea-2-krea2-v",
@@ -6335,7 +6521,11 @@
       "sha256": "a6712629445a2e91a616568e82befa8c8c7518e891a0f7c9918138634b5b54a5",
       "sensitivity": "adult",
       "note": "Civitai 2688234 · Krea 2",
-      "page": "https://civitai.red/models/2688234?modelVersionId=3109006"
+      "page": "https://civitai.red/models/2688234?modelVersionId=3109006",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "mmh3-lora-civ-fingering-minimax-h3",
@@ -6361,7 +6551,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2923170?modelVersionId=3307530",
-      "convert": "mmh3_lora"
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     },
     {
       "id": "krea2-sickrealism-v2",
@@ -6387,6 +6581,12 @@
       "sha256": "cf938ca5543fe20b453cb856b8f20dfc57a1cddfdbc833cb56818324310cac4a",
       "deps": [
         "krea2_turbo"
+      ],
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "fp8",
+        "uncensored"
       ]
     },
     {
@@ -6417,7 +6617,11 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2830065?modelVersionId=3207975",
-      "convert": "mmh3_dit"
+      "convert": "mmh3_dit",
+      "use": [
+        "ckpt_video",
+        "av_joint"
+      ]
     },
     {
       "id": "mmh3-ref2va-int4",
@@ -6447,7 +6651,12 @@
         "cap.video_minimax_h3"
       ],
       "page": "https://civitai.red/models/2830065?modelVersionId=3207975",
-      "convert": "mmh3_dit"
+      "convert": "mmh3_dit",
+      "use": [
+        "ckpt_video",
+        "av_joint",
+        "ref_omni"
+      ]
     },
     {
       "id": "mmh3-lightvae-dec",
@@ -6469,6 +6678,9 @@
       "note": "12 dei 36 blocchi del decoder ViT: decode ~3× più veloce, metà VRAM; stessa interfaccia latente del VAE ufficiale (nomi diffusers, nessuna conversione). Apache-2.0",
       "used_by": [
         "cap.video_minimax_h3"
+      ],
+      "use": [
+        "vae"
       ]
     },
     {
@@ -6491,6 +6703,9 @@
       "note": "6 dei 12 blocchi residui: codifica di prima/ultima immagine e riferimenti più veloce; stessa interfaccia latente del VAE ufficiale (nomi diffusers, nessuna conversione). Apache-2.0",
       "used_by": [
         "cap.video_minimax_h3"
+      ],
+      "use": [
+        "vae"
       ]
     },
     {
@@ -6517,6 +6732,10 @@
         "tokenizer.json",
         "tokenizer_config.json",
         "chat_template.jinja"
+      ],
+      "use": [
+        "te",
+        "uncensored"
       ]
     }
   ],

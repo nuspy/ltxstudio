@@ -44,6 +44,8 @@ TURBO = {
     "8": ({"fl2va": "mmh3-turbo-lora-fl2v-8"}, 8, 6.0),
     # larryvrh v4 step600 EMA (con cui è addestrato Veda): sampler a griglia uniforme, shift video 12 / audio 3
     "v4": ({"fl2va": "mmh3-turbo-v4-fl2v", "ref2va": "mmh3-turbo-v4-ref2v"}, 8, 12.0),
+    # merge DARE-TIES di DMAD 4 passi «full critic» e larryvrh v4 (Civitai 2837571): 6-8 passi, shift 12/3
+    "dmad": ({"fl2va": "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m"}, 8, 12.0),
 }
 
 # formati: rapporto → (larghezza, altezza) del rapporto; la tela esatta la calcola il pipeline
