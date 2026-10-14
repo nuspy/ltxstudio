@@ -230,7 +230,7 @@ def _auto_calibrate_video_model(model_rel: str) -> str:
     if free >= 36.0:
         return model_rel                                    # fp8 distilled (24GB) — solo 40/48GB (24+attivazioni)
     if free >= 13.0:                                        # Q4_K_M distilled (14GB) — entra su 32GB/24GB, veloce
-        g = _first(_os.path.join(_DM_ROOT, "LTXVideo", "LTX-2", "quantstack", "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf"),
+        g = _first(_os.path.join(_DM_ROOT, "LTXVideo", "LTX-2", "unsloth", "distilled-1.1", "ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf"),
                    *glob.glob(_os.path.join(_DM_ROOT, "**", "*distilled*Q4_K_M.gguf"), recursive=True))
         if g:
             print(f"[auto-calibra] VRAM~{free:.0f}GB → Q4 distilled (14GB)", flush=True); return _to_dm_relative(g)
