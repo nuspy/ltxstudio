@@ -6448,6 +6448,50 @@
       ],
       "page": "https://civitai.red/models/2830065?modelVersionId=3207975",
       "convert": "mmh3_dit"
+    },
+    {
+      "id": "mmh3-lightvae-dec",
+      "module": "Video",
+      "label": "MiniMax H3 LightVAE Lite decoder (lightx2v, 3.1GB)",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": false,
+      "approx_gb": 3.1,
+      "scan_names": [
+        "lightvae-lite-h3-decoder.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "lightx2v/LightVAE",
+      "url": "https://huggingface.co/lightx2v/LightVAE",
+      "filename": "lightvae-lite-h3-decoder.safetensors",
+      "note": "12 dei 36 blocchi del decoder ViT: decode ~3× più veloce, metà VRAM; stessa interfaccia latente del VAE ufficiale (nomi diffusers, nessuna conversione). Apache-2.0",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ]
+    },
+    {
+      "id": "mmh3-lightvae-enc",
+      "module": "Video",
+      "label": "MiniMax H3 LightVAE Lite encoder (lightx2v, 0.39GB)",
+      "kind": "file",
+      "type": "vae",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.39,
+      "scan_names": [
+        "lightvae-lite-h3-encoder.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "lightx2v/LightVAE",
+      "url": "https://huggingface.co/lightx2v/LightVAE",
+      "filename": "lightvae-lite-h3-encoder.safetensors",
+      "note": "6 dei 12 blocchi residui: codifica di prima/ultima immagine e riferimenti più veloce; stessa interfaccia latente del VAE ufficiale (nomi diffusers, nessuna conversione). Apache-2.0",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ]
     }
   ],
   "schema": 2,

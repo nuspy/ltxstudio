@@ -3120,5 +3120,10 @@
   "vid.h3.veda.tt": "Calcula solo los bloques de atención que un predictor entrenado marca como útiles: eliminación de ruido unas 1,4–2,2× más rápida. Funciona con referencias (Ref2VA) y Turbo 8 pasos; los pesos del modelo no cambian. Si algo no encaja, el vídeo vuelve solo a la atención completa.",
   "vid.h3.turbo.v4": "Turbo v4 8 pasos (larryvrh, también con referencias)",
   "vid.h3.prof.int4": "int4 W4A8 · 12 GB (todas las GPU)",
-  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 pasos)"
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 pasos)",
+  "vid.h3.vae_lbl": "VAE de vídeo",
+  "vid.h3.vae.orig": "Original (calidad completa)",
+  "vid.h3.vae.dec": "LightVAE: decodificador Lite (decodificación 3× más rápida)",
+  "vid.h3.vae.encdec": "LightVAE: codificador + decodificador Lite",
+  "vid.h3.vae.tt": "Versión podada del VAE de vídeo de H3 (lightx2v): mismos latentes, así que el modelo no cambia. El decodificador Lite convierte los latentes en fotogramas unas 3 veces más rápido con la mitad de memoria de vídeo; el codificador Lite también acelera la codificación de la primera/última imagen y de las referencias. Puede perder algo de detalle fino: compáralo con el original."
 }

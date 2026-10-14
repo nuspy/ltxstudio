@@ -3120,5 +3120,10 @@
   "vid.h3.veda.tt": "Csak azokat a figyelemblokkokat számolja, amelyeket egy betanított prediktor hasznosnak jelöl: kb. 1,4–2,2× gyorsabb zajtalanítás. Referenciákkal (Ref2VA) és Turbo 8 lépéssel működik; a modell súlyai nem változnak. Ha valami nem illik, a videó magától teljes figyelemre vált.",
   "vid.h3.turbo.v4": "Turbo v4 8 lépés (larryvrh, referenciákkal is)",
   "vid.h3.prof.int4": "int4 W4A8 · 12 GB (minden GPU)",
-  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 lépés)"
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 lépés)",
+  "vid.h3.vae_lbl": "Videó-VAE",
+  "vid.h3.vae.orig": "Eredeti (teljes minőség)",
+  "vid.h3.vae.dec": "LightVAE: Lite dekóder (3× gyorsabb dekódolás)",
+  "vid.h3.vae.encdec": "LightVAE: Lite enkóder + dekóder",
+  "vid.h3.vae.tt": "A H3 videó-VAE nyesett változata (lightx2v): ugyanazok a latensek, így a modell nem változik. A Lite dekóder kb. 3-szor gyorsabban, fele videómemóriával alakítja képkockákká a latenseket; a Lite enkóder az első/utolsó kép és a referenciák kódolását is gyorsítja. Kissé veszíthet a finom részletekből: hasonlítsd össze az eredetivel."
 }

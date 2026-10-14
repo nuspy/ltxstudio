@@ -3120,5 +3120,10 @@
   "vid.h3.veda.tt": "只计算训练好的预测器标为有用的注意力块：去噪约快 1.4–2.2 倍。适用于参考（Ref2VA）和 Turbo 8 步；模型权重不变。如有不匹配，视频会自动改用完整注意力。",
   "vid.h3.turbo.v4": "Turbo v4 8 步（larryvrh，也支持参考）",
   "vid.h3.prof.int4": "int4 W4A8 · 12 GB（所有 GPU）",
-  "f1.gen.krea2.sickreal": "Krea SickRealism v2（18+，fp8，8 步）"
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2（18+，fp8，8 步）",
+  "vid.h3.vae_lbl": "视频 VAE",
+  "vid.h3.vae.orig": "原版（完整画质）",
+  "vid.h3.vae.dec": "LightVAE：精简解码器（解码快 3 倍）",
+  "vid.h3.vae.encdec": "LightVAE：精简编码器 + 解码器",
+  "vid.h3.vae.tt": "H3 视频 VAE 的剪枝版本（lightx2v）：潜变量相同，因此模型不变。精简解码器将潜变量转为画面的速度约快 3 倍，显存减半；精简编码器还能加快首/尾帧和参考素材的编码。可能损失少量细节：请与原版对比。"
 }

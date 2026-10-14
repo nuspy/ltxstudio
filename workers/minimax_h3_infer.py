@@ -173,9 +173,22 @@ def load_vae(W: dict):
     from accelerate import init_empty_weights
     from diffusers import AutoencoderKLMiniMaxH3
     import _qlinear as Q
+    import h3_lightvae as LV
+    cfg = AutoencoderKLMiniMaxH3.load_config(str(Path(W["configs"]) / "vae"))
+    if W.get("vae_dec_lite"):                          # LightVAE: decoder con 12 dei 36 blocchi (rinumerati)
+        cfg = {**cfg, "decoder_num_layers": LV.decoder_layers(W["vae_dec_lite"])}
     with init_empty_weights():
-        vae = AutoencoderKLMiniMaxH3.from_config(AutoencoderKLMiniMaxH3.load_config(str(Path(W["configs"]) / "vae")))
-    miss, unex = Q.load_into(vae, _read(W["vae"]), dtype=torch.float32)
+        vae = AutoencoderKLMiniMaxH3.from_config(cfg)
+    if W.get("vae_enc_lite"):
+        LV.prune_encoder(vae, LV.kept_residuals(W["vae_enc_lite"]))
+    sd = LV.merge_state(_read(W["vae"]),
+                        dec=_read(W["vae_dec_lite"]) if W.get("vae_dec_lite") else None,
+                        enc=_read(W["vae_enc_lite"]) if W.get("vae_enc_lite") else None)
+    if W.get("vae_dec_lite") or W.get("vae_enc_lite"):
+        _log("VAE video LightVAE Lite: " + " + ".join(n for n, k in (("decoder", "vae_dec_lite"),
+                                                                    ("encoder", "vae_enc_lite")) if W.get(k)))
+    miss, unex = Q.load_into(vae, sd, dtype=torch.float32)
+    del sd
     if miss or unex:
         raise RuntimeError(f"VAE video: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     return vae.to("cuda").eval()

@@ -638,6 +638,17 @@ class VideoTab(QWidget):
             "più veloce sul denoise. Vale con i riferimenti (Ref2VA) e il Turbo 8 passi; i pesi del modello non "
             "cambiano. Se qualcosa non torna, il video usa da solo l'attenzione piena."))
         f.addRow("", self.h3_veda)
+        # LightVAE (lightx2v): VAE video potato con la stessa interfaccia latente → nessun effetto sul denoise
+        self.h3_lightvae = QComboBox()
+        self.h3_lightvae.addItem(tr("vid.h3.vae.orig", "Originale (qualità piena)"), "")
+        self.h3_lightvae.addItem(tr("vid.h3.vae.dec", "LightVAE: decoder Lite (decodifica 3× più veloce)"), "dec")
+        self.h3_lightvae.addItem(tr("vid.h3.vae.encdec", "LightVAE: encoder + decoder Lite"), "encdec")
+        self.h3_lightvae.setToolTip(tr("vid.h3.vae.tt",
+            "Versione potata del VAE video di H3 (lightx2v): stessi latenti, quindi il modello non cambia. Il "
+            "decoder Lite trasforma i latenti in fotogrammi circa 3 volte più in fretta con metà della memoria "
+            "video; l'encoder Lite accelera anche la codifica di prima/ultima immagine e riferimenti. Può "
+            "perdere un po' di dettaglio fine: confrontalo con l'originale."))
+        f.addRow(tr("vid.h3.vae_lbl", "VAE video"), self.h3_lightvae)
         self.h3_canvas = QComboBox()
         self.h3_canvas.addItem(tr("vid.h3.canvas.768", "768p (nativa, massima qualità)"), "768")
         self.h3_canvas.addItem(tr("vid.h3.canvas.544", "544p (≈2,3× più veloce)"), "544")
@@ -1396,6 +1407,7 @@ class VideoTab(QWidget):
             v["h3_te"] = self.h3_te.currentData() or "mmh3-te-nvfp4"
             v["h3_turbo"] = self.h3_turbo.currentData() or ""
             v["h3_veda"] = self.h3_veda.isChecked()
+            v["h3_lightvae"] = self.h3_lightvae.currentData() or ""
             v["h3_canvas"] = self.h3_canvas.currentData() or "768"
             v["h3_dialogue"] = self.h3_dialogue.value()
             v["h3_soundscape"] = self.h3_soundscape.text().strip()

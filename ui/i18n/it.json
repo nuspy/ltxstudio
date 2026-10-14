@@ -3161,5 +3161,10 @@
   "vid.h3.veda.tt": "Calcola solo i blocchi d'attenzione che un predittore addestrato segna come utili: circa 1,4–2,2× più veloce sul denoise. Vale con i riferimenti (Ref2VA) e il Turbo 8 passi; i pesi del modello non cambiano. Se qualcosa non torna, il video usa da solo l'attenzione piena.",
   "vid.h3.turbo.v4": "Turbo v4 8 passi (larryvrh, anche coi riferimenti)",
   "vid.h3.prof.int4": "int4 W4A8 · 12 GB (tutte le GPU)",
-  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 step)"
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 step)",
+  "vid.h3.vae_lbl": "VAE video",
+  "vid.h3.vae.orig": "Originale (qualità piena)",
+  "vid.h3.vae.dec": "LightVAE: decoder Lite (decodifica 3× più veloce)",
+  "vid.h3.vae.encdec": "LightVAE: encoder + decoder Lite",
+  "vid.h3.vae.tt": "Versione potata del VAE video di H3 (lightx2v): stessi latenti, quindi il modello non cambia. Il decoder Lite trasforma i latenti in fotogrammi circa 3 volte più in fretta con metà della memoria video; l'encoder Lite accelera anche la codifica di prima/ultima immagine e riferimenti. Può perdere un po' di dettaglio fine: confrontalo con l'originale."
 }

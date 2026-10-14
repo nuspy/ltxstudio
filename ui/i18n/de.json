@@ -3120,5 +3120,10 @@
   "vid.h3.veda.tt": "Berechnet nur die Attention-Blöcke, die ein trainierter Prädiktor als nützlich markiert: etwa 1,4–2,2× schnelleres Entrauschen. Gilt mit Referenzen (Ref2VA) und Turbo 8 Schritte; die Modellgewichte bleiben gleich. Passt etwas nicht, nutzt das Video automatisch volle Attention.",
   "vid.h3.turbo.v4": "Turbo v4 8 Schritte (larryvrh, auch mit Referenzen)",
   "vid.h3.prof.int4": "int4 W4A8 · 12 GB (alle GPUs)",
-  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 Schritte)"
+  "f1.gen.krea2.sickreal": "Krea SickRealism v2 (18+, fp8, 8 Schritte)",
+  "vid.h3.vae_lbl": "Video-VAE",
+  "vid.h3.vae.orig": "Original (volle Qualität)",
+  "vid.h3.vae.dec": "LightVAE: Lite-Decoder (3× schnelleres Dekodieren)",
+  "vid.h3.vae.encdec": "LightVAE: Lite-Encoder + -Decoder",
+  "vid.h3.vae.tt": "Beschnittene Version des H3-Video-VAE (lightx2v): gleiche Latents, das Modell ändert sich also nicht. Der Lite-Decoder wandelt Latents etwa 3-mal schneller und mit halbem Videospeicher in Frames um; der Lite-Encoder beschleunigt auch das Kodieren von erstem/letztem Bild und Referenzen. Feine Details können etwas verloren gehen: mit dem Original vergleichen."
 }

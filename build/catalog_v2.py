@@ -439,6 +439,14 @@ NEW = [
       filename="minimax_h3_video_vae_fp16-native.safetensors", convert="mmh3_vae", type="vae", gb=5.21,
       used_by=["cap.video_minimax_h3"],
       note="16x spaziale, 4x temporale, 24 canali, decoder ViT"),
+    *[N(f"mmh3-lightvae-{k}", "Video", f"MiniMax H3 LightVAE Lite {lbl} (lightx2v, {gb}GB)", category="video",
+        arch="minimax_h3", repo="lightx2v/LightVAE", filename=f"lightvae-lite-h3-{part}.safetensors", type="vae",
+        gb=gb, used_by=["cap.video_minimax_h3"],
+        note=f"{what}; stessa interfaccia latente del VAE ufficiale (nomi diffusers, nessuna conversione). Apache-2.0")
+      for k, lbl, part, gb, what in (
+          ("dec", "decoder", "decoder", 3.1, "12 dei 36 blocchi del decoder ViT: decode ~3× più veloce, metà VRAM"),
+          ("enc", "encoder", "encoder", 0.39, "6 dei 12 blocchi residui: codifica di prima/ultima immagine e "
+                                             "riferimenti più veloce"))],
     N("mmh3-audio-vae", "Video", "MiniMax H3 audio VAE (ufficiale diffusers, stereo 32kHz)",
       category="video", arch="minimax_h3", repo="MiniMaxAI/MiniMax-H3",
       remote="audio_vae/diffusion_pytorch_model.safetensors",

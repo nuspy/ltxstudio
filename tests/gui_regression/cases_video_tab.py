@@ -686,3 +686,24 @@ def case_h3_int4_profile_dasiwa(w, spy):
 
 CASES.append(("video_h3_int4_dasiwa", "H3: profilo int4 W4A8 (anche SFW) e DaSiWa v4 int4 (solo NSFW) al worker.",
               case_h3_int4_profile_dasiwa))
+
+
+def case_h3_lightvae(w, spy):
+    """H3: «VAE video» LightVAE → h3_lightvae nei valori del tab e id dei pesi Lite nella richiesta al worker."""
+    from core import minimax_h3_spec as S
+    t = w.video_tab
+    t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+    assert t.get_values().get("h3_lightvae") == "", "di default il VAE originale"
+    for key, ids in (("dec", {"vae_dec_lite": "mmh3-lightvae-dec"}),
+                     ("encdec", {"vae_dec_lite": "mmh3-lightvae-dec", "vae_enc_lite": "mmh3-lightvae-enc"})):
+        t.h3_lightvae.setCurrentIndex(t.h3_lightvae.findData(key))
+        v = t.get_values()
+        assert v.get("h3_lightvae") == key, v
+        got = S.weight_ids({"h3_profile": v.get("h3_profile"), "h3_lightvae": key})
+        assert all(got.get(k) == i for k, i in ids.items()), got
+    t.h3_lightvae.setCurrentIndex(0)
+    t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+
+
+CASES.append(("video_h3_lightvae", "H3: VAE video LightVAE (decoder / encoder+decoder Lite) fino agli id dei pesi.",
+              case_h3_lightvae))

@@ -58,6 +58,9 @@ DIALOGUE_LANGS = ("Italian", "English", "Chinese", "Spanish", "French", "German"
 # Predittore Veda (attenzione sparsa appresa, workers/veda_h3): addestrato su Ref2VA + Turbo 8 passi, clip ~5 s,
 # geometrie 16:9 / 9:16 / 4:3 / 1:1; fuori da lì il piano a tile è approssimato. Budget come la release: 32 tile.
 VEDA_R2VA = "mmh3-veda-r2va"
+# LightVAE (lightx2v): VAE video potato, stessa interfaccia latente. "dec" = decoder Lite (decode ~3×, metà VRAM),
+# "encdec" = anche l'encoder Lite (prima/ultima immagine e riferimenti codificati più in fretta)
+LIGHTVAE = {"dec": ("mmh3-lightvae-dec",), "encdec": ("mmh3-lightvae-dec", "mmh3-lightvae-enc")}
 VEDA_BUDGET = "32"
 
 
@@ -117,4 +120,10 @@ def weight_ids(params: dict) -> dict:
         if mode != "ref2va":
             raise ValueError("Attenzione sparsa Veda: il predittore disponibile è per Ref2VA (servono riferimenti)")
         ids["veda"] = VEDA_R2VA
+    lv = str(params.get("h3_lightvae") or "")
+    if lv:
+        if lv not in LIGHTVAE:
+            raise ValueError(f"LightVAE sconosciuto: {lv} ({' | '.join(LIGHTVAE)})")
+        for k, cid in zip(("vae_dec_lite", "vae_enc_lite"), LIGHTVAE[lv]):
+            ids[k] = cid
     return ids
