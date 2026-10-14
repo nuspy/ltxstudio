@@ -3132,5 +3132,7 @@
   "f1.inpaint.klein_te.tt": "מקודד הטקסט של FLUX.2 Klein 9B. הגרסה ללא צנזורה היא אותו Qwen3-8B בלי הנטייה לסרב: הוא מציית לפרומפטים מפורשים במקום לרכך אותם. חל על כל העבודות עם Klein 9B (inpaint, שילוב, קומפוזיציה, צבע); עם Klein 4B אינו בשימוש.",
   "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 צעדים (שמע טוב יותר, ניסיוני)",
   "v2v.wanlora_title": "‏LoRA ל-Wan 2.1 (סנכרון שפתיים MultiTalk)",
-  "v2v.wanlora_note": "מצבי «דיבור» ו«שירה» רצים על Wan 2.1 + MultiTalk: כאן בוחרים LoRA של Wan (סגנון, פרטים, מושגים). הן נוספות ל-LoRA הזיקוק הפנימית; ה-LoRA של לוח LTX אינן חלות על Wan."
+  "v2v.wanlora_note": "מצבי «דיבור» ו«שירה» רצים על Wan 2.1 + MultiTalk: כאן בוחרים LoRA של Wan (סגנון, פרטים, מושגים). הן נוספות ל-LoRA הזיקוק הפנימית; ה-LoRA של לוח LTX אינן חלות על Wan.",
+  "weights.dep.blocked.title": "תלות שאינה כלולה במהדורה שלך",
+  "weights.dep.blocked.msg": "המודל '{m}' דורש {dep}, שאינו כלול במהדורה שלך: ההורדה בוטלה."
 }

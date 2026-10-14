@@ -107,23 +107,47 @@ def dep_alternatives(dep: str) -> list[str]:
     return [x.strip() for x in str(dep).split("|") if x.strip()]
 
 
-def resolve_dep(dep: str, by_id: dict | None = None, base: str | None = None) -> str:
-    """Id concreto di una dipendenza: per le alternative, la prima già presente su disco; se non c'è nessuna,
-    la prima della lista (= quella da scaricare). Una dipendenza semplice resta com'è."""
+class DepNotAllowedError(RuntimeError):
+    """Una dipendenza obbligatoria di `owner` non e' inclusa nell'edizione (riga `model.<id>` spenta nella
+    matrice): il download NON parte in silenzio, l'errore dice quale modello e quale dipendenza."""
+
+    def __init__(self, owner: str, alternatives: list[str]):
+        self.owner, self.alternatives = owner, list(alternatives)
+        super().__init__(
+            f"Il modello '{owner}' richiede {' oppure '.join(alternatives)}, ma la tua edizione non include "
+            f"{'questa dipendenza' if len(alternatives) == 1 else 'nessuna di queste alternative'}: "
+            f"download annullato.")
+
+
+def resolve_dep(dep: str, by_id: dict | None = None, base: str | None = None, *,
+                strict: bool = False, owner: str = "") -> str:
+    """Id concreto di una dipendenza: per le alternative, la prima gia' presente su disco fra quelle
+    CONSENTITE dall'edizione (riga `model.<id>` della matrice); se nessuna e' presente, la prima consentita
+    (= quella da scaricare). Una dipendenza semplice resta com'e'.
+    Se nessuna alternativa e' consentita: `strict=True` solleva DepNotAllowedError (download), altrimenti
+    (menu/stato) si comporta come prima ignorando la matrice."""
     alts = dep_alternatives(dep)
-    if len(alts) <= 1:
-        return alts[0] if alts else ""
+    if not alts:
+        return ""
     by_id = by_id or {e["id"]: e for e in load()}
-    for a in alts:
+    ok = [a for a in alts if a not in by_id or model_allowed(by_id[a])]
+    if not ok:
+        if strict:
+            raise DepNotAllowedError(owner or "?", alts)
+        ok = alts
+    if len(ok) == 1:
+        return ok[0]
+    for a in ok:
         e = by_id.get(a)
         if e and is_present(e, base):
             return a
-    return alts[0]
+    return ok[0]
 
 
-def missing_ids_with_deps(entry: dict, base: str | None = None) -> list[str]:
+def missing_ids_with_deps(entry: dict, base: str | None = None, *, strict: bool = False) -> list[str]:
     """id (entry + `deps` ricorsive) NON ancora presenti, in ordine di download (deps prima).
-    Serve al download-on-select: es. krea_rt richiede anche la base wan → li scarica insieme."""
+    Serve al download-on-select: es. krea_rt richiede anche la base wan → li scarica insieme.
+    `strict=True`: una dipendenza non consentita dall'edizione solleva DepNotAllowedError."""
     by_id = {e["id"]: e for e in load()}
     out: list[str] = []
     seen: set[str] = set()
@@ -136,7 +160,7 @@ def missing_ids_with_deps(entry: dict, base: str | None = None) -> list[str]:
         if not e:
             return
         for dep in e.get("deps", []):               # dipendenze prima (base Wan prima del modello)
-            visit(resolve_dep(dep, by_id, base))     # alternative «a|b»: una basta
+            visit(resolve_dep(dep, by_id, base, strict=strict, owner=eid))   # «a|b»: una basta, consentita
         if not is_present(e, base) and eid not in out:
             out.append(eid)
 
@@ -254,6 +278,14 @@ def model_allowed(entry: dict) -> bool:
     except Exception:                                       # noqa: BLE001
         return True                                         # dev/fail-open
     return True if info is None else bool(info.get("enabled", False))
+
+
+def menu_allowed(entry: dict) -> bool:
+    """Un modello compare nei MENU di scelta se l'edizione lo vuole: stessa regola di `wanted` (riga
+    `model.<id>` accesa E una sua capability attiva; 18+ solo se l'edizione lo consente), senza il probe di
+    presenza dei tool. Fail-open in dev (nessun manifest). Non sceglie nulla al posto dell'utente: nasconde
+    soltanto cio' che l'edizione non include."""
+    return wanted(entry, check_present=False)
 
 
 def wanted(entry: dict, *, check_edition: bool = True, check_present: bool = True,

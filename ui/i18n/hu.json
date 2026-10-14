@@ -3132,5 +3132,7 @@
   "f1.inpaint.klein_te.tt": "A FLUX.2 Klein 9B szöveges enkódere. A cenzúrázatlan változat ugyanaz a Qwen3-8B, elutasítási hajlam nélkül: követi a kifejezett promptokat ahelyett, hogy tompítaná őket. Minden Klein 9B-vel végzett munkára érvényes (inpaint, Beillesztés, Kompozíció, Szín); Klein 4B-vel nem használatos.",
   "vid.h3.turbo.dmad": "Turbo DMAD + v4, 8 lépés (jobb hang, kísérleti)",
   "v2v.wanlora_title": "Wan 2.1 LoRA (MultiTalk szájszinkron)",
-  "v2v.wanlora_note": "A Beszéd és az Ének Wan 2.1 + MultiTalk alapon fut: itt választhatod a Wan LoRA-kat (stílus, részletesség, fogalmak). A beépített desztillációs LoRA mellé kerülnek; az LTX panel LoRA-i nem érvényesek a Wanra."
+  "v2v.wanlora_note": "A Beszéd és az Ének Wan 2.1 + MultiTalk alapon fut: itt választhatod a Wan LoRA-kat (stílus, részletesség, fogalmak). A beépített desztillációs LoRA mellé kerülnek; az LTX panel LoRA-i nem érvényesek a Wanra.",
+  "weights.dep.blocked.title": "A függőség nem része a kiadásodnak",
+  "weights.dep.blocked.msg": "A(z) '{m}' modellhez szükség van erre: {dep}, de a kiadásod nem tartalmazza: a letöltés megszakítva."
 }

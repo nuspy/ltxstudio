@@ -728,3 +728,37 @@ def case_h3_lora_panel(w, spy):
 
 CASES.append(("video_h3_lora_panel", "H3: pannello LoRA attivo con le LoRA H3 (non LTX, non turbo).",
               case_h3_lora_panel))
+
+
+def case_h3_menu_follows_edition_matrix(w, spy):
+    """Menu modelli H3: compare solo con riga `model.<id>` accesa E capability attiva (stessa regola di `wanted`),
+    non solo con la cella del modello. Cella accesa + funzione spenta → nessun profilo; tutto acceso → i profili;
+    il menu non sceglie nulla al posto dell'utente (nessuna voce = combo vuoto, niente fallback)."""
+    from core import features
+    from core import minimax_h3_spec as S
+    t = w.video_tab
+    ids = {prof: fl for prof, (fl, _r, _te) in S.PROFILES.items()}
+    saved = (features._MANIFEST, features._FEATURES)
+
+    def edition(rows_on: bool, cap_on: bool):
+        feats = {f"model.{fl}": {"enabled": rows_on, "params": {}} for fl in ids.values()}
+        feats["cap.video_minimax_h3"] = {"enabled": cap_on, "params": {}}
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        t._refilter_h3_models()
+        return [t.model.itemData(i)["profile"] for i in range(t.model.count())
+                if (t.model.itemData(i) or {}).get("kind") == "minimax_h3" and t.model.itemData(i).get("profile")
+                and not t.model.itemData(i).get("h3_dit")]
+    try:
+        t.video_arch.setCurrentIndex(t.video_arch.findData("minimax_h3"))
+        assert set(edition(True, True)) == set(ids), "profili H3 assenti con cella e funzione accese"
+        assert edition(True, False) == [], "cella accesa ma funzione spenta: il menu deve nascondere i profili"
+        assert edition(False, True) == [], "funzione accesa ma cella modello spenta: il menu deve nascondere i profili"
+    finally:
+        features._MANIFEST, features._FEATURES = saved
+        t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
+
+
+CASES.append(("video_h3_menu_follows_matrix",
+              "Menu H3: i profili compaiono solo con cella modello accesa E capability attiva (regola di wanted).",
+              case_h3_menu_follows_edition_matrix))

@@ -821,7 +821,7 @@ class Frame1Tab(QWidget):
         combo.clear()
         for cat_id, label in items:
             e = entries.get(cat_id)
-            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.model_allowed(e):
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.menu_allowed(e):
                 continue
             present = False
             try:
@@ -922,7 +922,15 @@ class Frame1Tab(QWidget):
         e = entries.get(cat_id)
         if not e:
             return
-        missing = wc.missing_ids_with_deps(e)
+        try:
+            missing = wc.missing_ids_with_deps(e, strict=True)
+        except wc.DepNotAllowedError as ex:                    # dipendenza non inclusa nell'edizione
+            from PySide6.QtWidgets import QMessageBox as _QMB
+            _QMB.warning(self, tr("weights.dep.blocked.title", "Dipendenza non inclusa nell'edizione"),
+                         tr("weights.dep.blocked.msg",
+                            "Il modello '{m}' richiede {dep}, che la tua edizione non include: "
+                            "download annullato.").format(m=ex.owner, dep=" / ".join(ex.alternatives)))
+            return
         if not missing:
             return
         gb = sum(int(entries.get(m, {}).get("approx_gb", 0) or 0) for m in missing)
@@ -1880,7 +1888,7 @@ class Frame1Tab(QWidget):
         adult_ok = self._adult_ok()
         for cid, lbl in self._qwen21_items():
             e = entries.get(cid)
-            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.model_allowed(e):
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.menu_allowed(e):
                 continue
             label = f"{lbl}  · Qwen-Image 2.1" + ("" if wc.ready_with_deps(e) else "  ⬇")
             self._qwen21_inp[label] = cid

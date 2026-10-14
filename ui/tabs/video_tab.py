@@ -771,7 +771,7 @@ class VideoTab(QWidget):
         self.model.clear()
         for prof, (fl, _ref, _te) in S.PROFILES.items():
             e = entries.get(fl)
-            if not e or not wc.model_allowed(e):        # riga model.<id> dell'edizione
+            if not e or not wc.menu_allowed(e):        # riga model.<id> dell'edizione
                 continue
             try:
                 present = wc.is_present(e)
@@ -795,7 +795,7 @@ class VideoTab(QWidget):
             pass
         for cid, meta in S.CUSTOM_DITS.items():
             e = entries.get(cid)
-            if not e or not wc.model_allowed(e) or (e.get("sensitivity") == "adult" and not _adult):
+            if not e or not wc.menu_allowed(e) or (e.get("sensitivity") == "adult" and not _adult):
                 continue
             try:
                 present = wc.is_present(e)
@@ -834,7 +834,7 @@ class VideoTab(QWidget):
         ]
         for cat_id, variant, label in variants:
             e = entries.get(cat_id)
-            if not e or not wc.model_allowed(e):        # riga model.<id> dell'edizione
+            if not e or not wc.menu_allowed(e):        # riga model.<id> dell'edizione
                 continue
             present = False
             model_dir = ""
@@ -877,7 +877,15 @@ class VideoTab(QWidget):
         e = entries.get(cat_id)
         if not e:
             return
-        missing = wc.missing_ids_with_deps(e)                 # modello + dipendenze mancanti (base Wan inclusa)
+        try:
+            missing = wc.missing_ids_with_deps(e, strict=True)   # modello + dipendenze mancanti (base Wan inclusa)
+        except wc.DepNotAllowedError as ex:                    # dipendenza non inclusa nell'edizione
+            from PySide6.QtWidgets import QMessageBox as _QMB
+            _QMB.warning(self, tr("weights.dep.blocked.title", "Dipendenza non inclusa nell'edizione"),
+                         tr("weights.dep.blocked.msg",
+                            "Il modello '{m}' richiede {dep}, che la tua edizione non include: "
+                            "download annullato.").format(m=ex.owner, dep=" / ".join(ex.alternatives)))
+            return
         if not missing:
             return
         gb = sum(int(entries.get(m, {}).get("approx_gb", 0) or 0) for m in missing)
@@ -926,7 +934,7 @@ class VideoTab(QWidget):
         self.model.clear()
         for cat_id, variant, label in items:
             e = entries.get(cat_id)
-            if not e or not wc.model_allowed(e):        # riga model.<id> dell'edizione
+            if not e or not wc.menu_allowed(e):        # riga model.<id> dell'edizione
                 continue
             present, model_dir = False, ""
             try:
