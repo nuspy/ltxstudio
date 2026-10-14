@@ -1,49 +1,59 @@
 {
- "_comment": "Correzioni al dizionario LoRA (E:\\AI\\dictionary, scanner esterno e talvolta in ritardo sui file spostati). adult = nomi file (minuscoli) 18+ da trattare NSFW anche se il dizionario dice SFW; arch = nome file -> arch del pannello (override del dizionario); extra = file fuori dalle cartelle LoRA che vanno mostrati come LoRA (paths = candidati relativi alla radice modelli, vale il primo esistente).",
- "adult": [
-  "deepthroat_epoch_80_(loras).safetensors",
-  "fingering_i2v_e248_(loras).safetensors",
-  "grinding_pussyjob_e130_(loras).safetensors",
-  "masturbation_cumshot_wani2v480p_v1.safetensors",
-  "nipplesuckwan_e40.safetensors",
-  "oiledskin_fluxdev_(swarmui).safetensors",
-  "pov_fist.safetensors",
-  "realunderboob_fl.safetensors",
-  "sexy_festival_goers.safetensors",
-  "sgmkfluxreality.safetensors",
-  "steepslopetiddies_v1-2_rank16_bf16.safetensors",
-  "t2v-pov_bj-14b_(loras).safetensors",
-  "tan-lines-01.safetensors",
-  "underland-alice-000012.safetensors",
-  "vmorflux.safetensors",
-  "wan-facefuck-epoch110 fast speed full insertion man has sex with womans mouth.safetensors",
-  "wan-nsfw-e14-fixed.safetensors",
-  "wan-t2v-i2v-anal-combined-e50.safetensors",
-  "wan2.2-i2v-high-cumshot-v1.0.safetensors",
-  "wan2.2-i2v-low-cumshot-v1.0.safetensors",
-  "wan_cumshot_i2v.safetensors",
-  "wan_dr34mj0b.safetensors",
-  "yanjfluxreality hardcore.safetensors",
-  "yanjfluxreality softcore.safetensors",
-  "yschfluxreality softcore v11.safetensors"
- ],
- "arch": {
-  "wan2_2-i2v-a14b-4steps-lora-rank64-seko-v1_high.safetensors": "Wan22",
-  "wan2_2-i2v-a14b-4steps-lora-rank64-seko-v1_low.safetensors": "Wan22",
-  "wan2_2-t2v-a14b-4steps-lora-rank64-seko-v1_1_high.safetensors": "Wan22",
-  "wan2_2-t2v-a14b-4steps-lora-rank64-seko-v1_1_low.safetensors": "Wan22"
- },
- "extra": [
-  {
-   "id": "flux1-turbo-alpha",
-   "arch": "Flux",
-   "display_name": "FLUX.1-Turbo-Alpha (8 step)",
-   "paths": [
-    "Checkpoints/DreamO/diffusion_pytorch_model.safetensors",
-    "LoRA/Flux/FLUX.1-Turbo-Alpha.safetensors"
-   ],
-   "nsfw": false,
-   "description": "LoRA di distillazione alimama FLUX.1-Turbo-Alpha (non è DreamO): 8 passi, guidance ~3.5, forza 1.0. Funziona su FLUX.1 dev."
-  }
- ]
+  "_comment": "Correzioni al dizionario LoRA (E:\\AI\\dictionary, scanner esterno e talvolta in ritardo sui file spostati). adult = nomi file (minuscoli) 18+ da trattare NSFW anche se il dizionario dice SFW; arch = nome file -> arch del pannello (override del dizionario); extra = file fuori dalle cartelle LoRA che vanno mostrati come LoRA (paths = candidati relativi alla radice modelli, vale il primo esistente).",
+  "adult": [
+    "deepthroat_epoch_80_(loras).safetensors",
+    "fingering_i2v_e248_(loras).safetensors",
+    "grinding_pussyjob_e130_(loras).safetensors",
+    "masturbation_cumshot_wani2v480p_v1.safetensors",
+    "nipplesuckwan_e40.safetensors",
+    "oiledskin_fluxdev_(swarmui).safetensors",
+    "pov_fist.safetensors",
+    "realunderboob_fl.safetensors",
+    "sexy_festival_goers.safetensors",
+    "sgmkfluxreality.safetensors",
+    "steepslopetiddies_v1-2_rank16_bf16.safetensors",
+    "t2v-pov_bj-14b_(loras).safetensors",
+    "tan-lines-01.safetensors",
+    "underland-alice-000012.safetensors",
+    "vmorflux.safetensors",
+    "wan-facefuck-epoch110 fast speed full insertion man has sex with womans mouth.safetensors",
+    "wan-nsfw-e14-fixed.safetensors",
+    "wan-t2v-i2v-anal-combined-e50.safetensors",
+    "wan2.2-i2v-high-cumshot-v1.0.safetensors",
+    "wan2.2-i2v-low-cumshot-v1.0.safetensors",
+    "wan_cumshot_i2v.safetensors",
+    "wan_dr34mj0b.safetensors",
+    "yanjfluxreality hardcore.safetensors",
+    "yanjfluxreality softcore.safetensors",
+    "yschfluxreality softcore v11.safetensors"
+  ],
+  "arch": {
+    "wan2_2-i2v-a14b-4steps-lora-rank64-seko-v1_high.safetensors": "Wan22",
+    "wan2_2-i2v-a14b-4steps-lora-rank64-seko-v1_low.safetensors": "Wan22",
+    "wan2_2-t2v-a14b-4steps-lora-rank64-seko-v1_1_high.safetensors": "Wan22",
+    "wan2_2-t2v-a14b-4steps-lora-rank64-seko-v1_1_low.safetensors": "Wan22"
+  },
+  "extra": [
+    {
+      "id": "flux1-turbo-alpha",
+      "arch": "Flux",
+      "display_name": "FLUX.1-Turbo-Alpha (8 step)",
+      "paths": [
+        "Checkpoints/DreamO/diffusion_pytorch_model.safetensors",
+        "LoRA/Flux/FLUX.1-Turbo-Alpha.safetensors"
+      ],
+      "nsfw": false,
+      "description": "LoRA di distillazione alimama FLUX.1-Turbo-Alpha (non è DreamO): 8 passi, guidance ~3.5, forza 1.0. Funziona su FLUX.1 dev."
+    },
+    {
+      "id": "ltx23-dr34ml4y-preview",
+      "arch": "LTX",
+      "display_name": "DR34ML4Y LTX preview RC1 (18+)",
+      "paths": [
+        "LoRA/LTX-2/DR34ML4Y_LTXXX_PREVIEW_RC1.safetensors"
+      ],
+      "nsfw": true,
+      "description": "LoRA LTX-2.x 18+ (rank 64, video+audio, header verificato 14/10)."
+    }
+  ]
 }
