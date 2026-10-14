@@ -3125,5 +3125,9 @@
   "vid.h3.vae.orig": "原版（完整画质）",
   "vid.h3.vae.dec": "LightVAE：精简解码器（解码快 3 倍）",
   "vid.h3.vae.encdec": "LightVAE：精简编码器 + 解码器",
-  "vid.h3.vae.tt": "H3 视频 VAE 的剪枝版本（lightx2v）：潜变量相同，因此模型不变。精简解码器将潜变量转为画面的速度约快 3 倍，显存减半；精简编码器还能加快首/尾帧和参考素材的编码。可能损失少量细节：请与原版对比。"
+  "vid.h3.vae.tt": "H3 视频 VAE 的剪枝版本（lightx2v）：潜变量相同，因此模型不变。精简解码器将潜变量转为画面的速度约快 3 倍，显存减半；精简编码器还能加快首/尾帧和参考素材的编码。可能损失少量细节：请与原版对比。",
+  "f1.inpaint.klein_te_lbl": "Klein 编码器",
+  "f1.inpaint.klein_te.official": "官方 Qwen3-8B",
+  "f1.inpaint.klein_te.uncensored": "无审查 Qwen3-8B（18+）",
+  "f1.inpaint.klein_te.tt": "FLUX.2 Klein 9B 的文本编码器。无审查版本是去除了拒绝倾向的同一个 Qwen3-8B：它会照做露骨的提示词，而不是将其弱化。适用于所有使用 Klein 9B 的任务（局部重绘、融合、合成、上色）；Klein 4B 不使用。"
 }

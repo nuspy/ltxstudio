@@ -3125,5 +3125,9 @@
   "vid.h3.vae.orig": "Eredeti (teljes minőség)",
   "vid.h3.vae.dec": "LightVAE: Lite dekóder (3× gyorsabb dekódolás)",
   "vid.h3.vae.encdec": "LightVAE: Lite enkóder + dekóder",
-  "vid.h3.vae.tt": "A H3 videó-VAE nyesett változata (lightx2v): ugyanazok a latensek, így a modell nem változik. A Lite dekóder kb. 3-szor gyorsabban, fele videómemóriával alakítja képkockákká a latenseket; a Lite enkóder az első/utolsó kép és a referenciák kódolását is gyorsítja. Kissé veszíthet a finom részletekből: hasonlítsd össze az eredetivel."
+  "vid.h3.vae.tt": "A H3 videó-VAE nyesett változata (lightx2v): ugyanazok a latensek, így a modell nem változik. A Lite dekóder kb. 3-szor gyorsabban, fele videómemóriával alakítja képkockákká a latenseket; a Lite enkóder az első/utolsó kép és a referenciák kódolását is gyorsítja. Kissé veszíthet a finom részletekből: hasonlítsd össze az eredetivel.",
+  "f1.inpaint.klein_te_lbl": "Klein enkóder",
+  "f1.inpaint.klein_te.official": "Hivatalos Qwen3-8B",
+  "f1.inpaint.klein_te.uncensored": "Cenzúrázatlan Qwen3-8B (18+)",
+  "f1.inpaint.klein_te.tt": "A FLUX.2 Klein 9B szöveges enkódere. A cenzúrázatlan változat ugyanaz a Qwen3-8B, elutasítási hajlam nélkül: követi a kifejezett promptokat ahelyett, hogy tompítaná őket. Minden Klein 9B-vel végzett munkára érvényes (inpaint, Beillesztés, Kompozíció, Szín); Klein 4B-vel nem használatos."
 }

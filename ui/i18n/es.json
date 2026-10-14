@@ -3125,5 +3125,9 @@
   "vid.h3.vae.orig": "Original (calidad completa)",
   "vid.h3.vae.dec": "LightVAE: decodificador Lite (decodificación 3× más rápida)",
   "vid.h3.vae.encdec": "LightVAE: codificador + decodificador Lite",
-  "vid.h3.vae.tt": "Versión podada del VAE de vídeo de H3 (lightx2v): mismos latentes, así que el modelo no cambia. El decodificador Lite convierte los latentes en fotogramas unas 3 veces más rápido con la mitad de memoria de vídeo; el codificador Lite también acelera la codificación de la primera/última imagen y de las referencias. Puede perder algo de detalle fino: compáralo con el original."
+  "vid.h3.vae.tt": "Versión podada del VAE de vídeo de H3 (lightx2v): mismos latentes, así que el modelo no cambia. El decodificador Lite convierte los latentes en fotogramas unas 3 veces más rápido con la mitad de memoria de vídeo; el codificador Lite también acelera la codificación de la primera/última imagen y de las referencias. Puede perder algo de detalle fino: compáralo con el original.",
+  "f1.inpaint.klein_te_lbl": "Codificador Klein",
+  "f1.inpaint.klein_te.official": "Qwen3-8B oficial",
+  "f1.inpaint.klein_te.uncensored": "Qwen3-8B sin censura (18+)",
+  "f1.inpaint.klein_te.tt": "Codificador de texto de FLUX.2 Klein 9B. La versión sin censura es el mismo Qwen3-8B sin la tendencia a negarse: sigue los prompts explícitos en lugar de suavizarlos. Se aplica a todos los trabajos hechos con Klein 9B (inpaint, Integrar, Componer, Color); con Klein 4B no se usa."
 }

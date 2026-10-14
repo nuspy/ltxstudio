@@ -237,8 +237,33 @@ def _mmh3_lora_rename():
 def _mmh3_lora():
     """LoRA H3 in nomi ComfyUI (diffusion_model.blocks.N.attn.qkv_proj.lora_A…) o kohya
     (lora_unet_blocks_N_attn_qkv_proj.lora_down + alpha) → nomi nativi del modello montato
-    (transformer_blocks.N.attn.to_qkv…, ff.gate_up/ff.out): stesse matrici, qkv e gate/up già fusi."""
-    return _renamer(_mmh3_lora_rename())
+    (transformer_blocks.N.attn.to_qkv…, ff.gate_up/ff.out): stesse matrici, qkv e gate/up già fusi.
+
+    Alcuni file portano PIÙ LoRA diverse sullo stesso modulo sotto convenzioni diverse (es. «Nipple Sucking»
+    Civitai 2985148: tre LoRA scorrelate in kohya, diffusion_model. e nomi nudi). ComfyUI ne applica UNA per
+    modulo, l'ultima della sua mappa chiavi (comfy/lora.py: lora_unet_ < diffusion_model. < nomi nudi per
+    MiniMaxH3): stessa precedenza qui, così l'effetto è quello delle immagini d'esempio."""
+    rename = _mmh3_lora_rename()
+
+    def prio(k):
+        if k.startswith("lora_unet_"):
+            return 0
+        return 1 if k.startswith(("diffusion_model.", "model.diffusion_model.", "transformer.")) else 2
+
+    def extra(key, info, header):
+        pick = header.get("__mmh3_pick__")
+        if pick is None:
+            pick = {}
+            for k in header:
+                if k.startswith("__"):
+                    continue
+                t = rename(k)
+                if t is not None and (t not in pick or prio(k) > prio(pick[t])):
+                    pick[t] = k
+            header["__mmh3_pick__"] = pick
+        t = rename(key)
+        return [] if t is not None and pick.get(t) != key else None
+    return _renamer(rename, extra=extra)
 
 
 def _krea2_dit():
@@ -309,31 +334,11 @@ def _ltx25_te_assets() -> tuple[dict, dict]:
 
 
 def _ltx25_te():
-    """TE LTX-2.5 (Gemma 4 + proiezioni) int8 per-tensore ComfyUI (es. uncensored v1.1) → bf16 col layout del TE
-    ufficiale, l'unico che il loader Gemma di ltx-core sa leggere (niente quantizzazione lato transformers).
-    Stesse chiavi dell'ufficiale; si innestano `gemma_config` e i tensori `hf_asset__*` che il file non ha."""
-    torch = _torch()
-
-    def extra(key, info, header):
-        if key.endswith(".weight_scale"):
-            w = header.get(key[: -len("_scale")])
-            return [] if w and w["dtype"] == "I8" else None
-        if key.endswith(".weight") and info["dtype"] == "I8":
-            get = header["__ctx__"]["get"]
-
-            def fn(t, _k=key):
-                if t.device.type == "meta":
-                    return torch.empty(t.shape, dtype=torch.bfloat16, device="meta")
-                sc = get(_k + "_scale").float()
-                sc = sc.reshape(()) if sc.numel() == 1 else sc.reshape(-1, *([1] * (t.dim() - 1)))
-                out = torch.empty(t.shape, dtype=torch.bfloat16)
-                for a in range(0, t.shape[0], 8192):           # a blocchi: RAM limitata
-                    s_ = sc if sc.dim() == 0 else sc[a:a + 8192]
-                    out[a:a + 8192] = (t[a:a + 8192].float() * s_).to(torch.bfloat16)
-                return out
-            return [(key, fn)]
-        return None
-    plan = _renamer(lambda k: k, extra=extra)
+    """TE LTX-2.5 (Gemma 4 + proiezioni) int8 per-tensore ComfyUI (es. uncensored v1.1) → stesso file con gli int8
+    INTATTI (13 GB invece dei 24.5 del bf16) e l'innesto di `gemma_config` e dei tensori `hf_asset__*` che il loader
+    Gemma di ltx-core esige in un TE single-file. Il fold int8 → bf16 lo fa ltx-core al caricamento
+    (with_int8_fold sul text encoder, repo LTX-2.5)."""
+    plan = _renamer(lambda k: k)
     plan.extras = _ltx25_te_assets                          # vedi convert(): tensori + metadata in coda
     return plan
 

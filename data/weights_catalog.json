@@ -6492,6 +6492,32 @@
       "used_by": [
         "cap.video_minimax_h3"
       ]
+    },
+    {
+      "id": "klein9b-te-uncensored",
+      "module": "Inpaint",
+      "label": "Qwen3-8B uncensored (TE FLUX.2 Klein 9B, ponpoke, 18+, 16.4GB)",
+      "kind": "snapshot",
+      "type": "diffusers",
+      "family": "_te",
+      "gated": true,
+      "approx_gb": 16.39,
+      "scan_names": [],
+      "category": "image",
+      "arch": "flux2",
+      "repo_id": "ponpoke/flux2-klein-9b-uncensored-text-encoder",
+      "url": "https://huggingface.co/ponpoke/flux2-klein-9b-uncensored-text-encoder",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\qwen3_8b_uncensored",
+      "sensitivity": "adult",
+      "note": "Qwen3-8B di FLUX.2-klein-9B con la direzione di rifiuto rimossa (strati 14-24, o_proj/down_proj). Licenza FLUX non commerciale v2.1 (quella di Klein 9B). Accesso con conferma su Hugging Face",
+      "allow_patterns": [
+        "model.safetensors",
+        "config.json",
+        "generation_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "chat_template.jinja"
+      ]
     }
   ],
   "schema": 2,

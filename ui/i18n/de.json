@@ -3125,5 +3125,9 @@
   "vid.h3.vae.orig": "Original (volle Qualität)",
   "vid.h3.vae.dec": "LightVAE: Lite-Decoder (3× schnelleres Dekodieren)",
   "vid.h3.vae.encdec": "LightVAE: Lite-Encoder + -Decoder",
-  "vid.h3.vae.tt": "Beschnittene Version des H3-Video-VAE (lightx2v): gleiche Latents, das Modell ändert sich also nicht. Der Lite-Decoder wandelt Latents etwa 3-mal schneller und mit halbem Videospeicher in Frames um; der Lite-Encoder beschleunigt auch das Kodieren von erstem/letztem Bild und Referenzen. Feine Details können etwas verloren gehen: mit dem Original vergleichen."
+  "vid.h3.vae.tt": "Beschnittene Version des H3-Video-VAE (lightx2v): gleiche Latents, das Modell ändert sich also nicht. Der Lite-Decoder wandelt Latents etwa 3-mal schneller und mit halbem Videospeicher in Frames um; der Lite-Encoder beschleunigt auch das Kodieren von erstem/letztem Bild und Referenzen. Feine Details können etwas verloren gehen: mit dem Original vergleichen.",
+  "f1.inpaint.klein_te_lbl": "Klein-Encoder",
+  "f1.inpaint.klein_te.official": "Offizieller Qwen3-8B",
+  "f1.inpaint.klein_te.uncensored": "Qwen3-8B unzensiert (18+)",
+  "f1.inpaint.klein_te.tt": "Text-Encoder von FLUX.2 Klein 9B. Die unzensierte Version ist derselbe Qwen3-8B ohne die Neigung zu verweigern: Er folgt expliziten Prompts, statt sie abzuschwächen. Gilt für alle Aufträge mit Klein 9B (Inpaint, Integrieren, Komponieren, Farbe); mit Klein 4B wird er nicht verwendet."
 }

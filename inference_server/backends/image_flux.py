@@ -65,6 +65,18 @@ FLUX2_VAE = _cat_p("flux2-vae", r"E:\AI\Models\VAE\Flux\flux2-vae.safetensors")
 # transformer (vedi _assemble_flux2_klein). VAE = lo stesso flux2-vae.
 KLEIN_QWEN_DIRS = {7680: _cat_p("qwen3-4b-klein-te", os.path.join(TE_DIR, "qwen3_4b")),
                    12288: _cat_p("qwen3-8b-klein-te", os.path.join(TE_DIR, "qwen3_8b"))}
+# encoder alternativi per Klein 9B scelti dall'utente (params["klein_te"] = id di catalogo): stessa architettura
+# Qwen3-8B dell'ufficiale, quindi valgono SOLO col transformer da 12288 (joint_attention_dim)
+KLEIN_TE_ALT = {"klein9b-te-uncensored": 12288}
+
+
+def _klein_te_dir(tid: str) -> str | None:
+    """Cartella dell'encoder Klein alternativo `tid` (None = quello ufficiale). Id sconosciuto → errore chiaro."""
+    if not tid:
+        return None
+    if tid not in KLEIN_TE_ALT:
+        raise RuntimeError(f"encoder FLUX.2 Klein sconosciuto: {tid}")
+    return _cat_p(tid, os.path.join(TE_DIR, "qwen3_8b_uncensored"))
 
 
 # ── STEP LOG: timeline UNICA dal click "Genera" — timestamp + delta per OGNI passo (load, encoder, embedding,
@@ -819,7 +831,7 @@ def _assemble_zimage(transformer_path: str):
     return ZImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
-def _assemble_flux2_klein(Pipe, transformer_path: str):
+def _assemble_flux2_klein(Pipe, transformer_path: str, te_dir: str | None = None):
     """Assembla una pipeline FLUX.2 KLEIN (edit/inpaint/kontext) — variante DISTILLATA, encoder Qwen3
     (NON Mistral), transformer fp8 puro col prefisso `model.diffusion_model.`. Config transformer
     DEDOTTA dai dim del file → 4B (jad 7680, qwen3_4b) o miraclein 8B (jad 12288, qwen3_8b). VAE = flux2-vae.
@@ -835,6 +847,11 @@ def _assemble_flux2_klein(Pipe, transformer_path: str):
     cfg = klein_config_from_header(transformer_path)
     jad = cfg["joint_attention_dim"]
     qdir = KLEIN_QWEN_DIRS.get(jad)
+    if te_dir:                                          # encoder scelto dall'utente (es. uncensored per il 9B)
+        if jad != 12288:
+            raise RuntimeError("L'encoder Klein scelto è un Qwen3-8B: vale solo con FLUX.2 Klein 9B, non con "
+                               "questo modello (encoder Qwen3-4B).")
+        qdir = te_dir
     # l'encoder può essere single-file (model.safetensors) O SHARDATO (model.safetensors.index.json +
     # model-0000X-of-0000N.safetensors) — Qwen3-8B è shardato. from_pretrained gestisce entrambi.
     _te_present = bool(qdir) and (os.path.exists(os.path.join(qdir, "model.safetensors"))
@@ -859,7 +876,7 @@ def _assemble_flux2_klein(Pipe, transformer_path: str):
     return Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
-def _assemble_flux2(Pipe, transformer_path: str):
+def _assemble_flux2(Pipe, transformer_path: str, klein_te_dir: str | None = None):
     """Assembla una pipeline FLUX.2 (t2i/inpaint/kontext) da: transformer LOCALE (single_file) +
     VAE FLUX.2 LOCALE + TE Mistral HF + tokenizer (scaricati gated, solo questi). Pipe è la
     classe diffusers concreta (Flux2Pipeline, Flux2KleinInpaintPipeline, …)."""
@@ -867,7 +884,7 @@ def _assemble_flux2(Pipe, transformer_path: str):
     import torch
     # Klein è un'architettura DISTILLATA con encoder Qwen3 (≠ Dev/Mistral): instradata a parte.
     if "Klein" in getattr(Pipe, "__name__", ""):
-        return _assemble_flux2_klein(Pipe, transformer_path)
+        return _assemble_flux2_klein(Pipe, transformer_path, klein_te_dir)
     from diffusers import Flux2Transformer2DModel, AutoencoderKLFlux2, FlowMatchEulerDiscreteScheduler
     from transformers import AutoModel, AutoTokenizer
     bf16 = torch.bfloat16
@@ -1017,7 +1034,7 @@ def preload_shared_components() -> None:
             print(f"[preload] '{key}' non precaricato ({type(_e).__name__}: {_e}) — non fatale", flush=True)
 
 
-def _load(model_path: str, arch: str, mm=None):
+def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     """Loader per il ModelManager: ritorna (pipe, vram_mb)."""
     import torch
     import diffusers
@@ -1117,7 +1134,7 @@ def _load(model_path: str, arch: str, mm=None):
         pipe = _assemble_ernie()                            # assemblaggio locale (shim transformers <5)
     elif arch.startswith("flux2") and is_file:
         # FLUX.2: transformer locale + VAE locale + TE Mistral HF (assemblaggio, anche inpaint/kontext)
-        pipe = _assemble_flux2(Pipe, model_path)
+        pipe = _assemble_flux2(Pipe, model_path, _klein_te_dir(klein_te))
     elif is_file and not supports_sf:
         raise RuntimeError(
             f"{cls_name} non supporta from_single_file: per '{arch}' serve un repo diffusers "
@@ -1302,9 +1319,9 @@ def _load(model_path: str, arch: str, mm=None):
     return pipe, (50 if getattr(pipe, "_ls_shared", False) else VRAM_MB.get(arch, 16000))
 
 
-def register(mm, model: str, arch: str) -> str:
-    key = f"{arch}:{model}"
-    mm.register(key, lambda: _load(model, arch, mm))
+def register(mm, model: str, arch: str, klein_te: str = "") -> str:
+    key = f"{arch}:{model}" + (f"|te={klein_te}" if klein_te else "")      # encoder diverso = pipeline diversa
+    mm.register(key, lambda: _load(model, arch, mm, klein_te))
     return key
 
 
@@ -1536,7 +1553,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
     model = params.get("model") or _default_model(arch)   # fix KeyError 'model' (music-video/LoRA/API)
     if not params.get("model"):
         print(f"[image] modello non specificato → default {os.path.basename(model)}", flush=True)
-    key = register(mm, model, arch)
+    # encoder Klein alternativo: solo per FLUX.2 (gli altri arch lo ignorano, la chiave resta quella di sempre)
+    key = register(mm, model, arch, str(params.get("klein_te") or "") if arch.startswith("flux2") else "")
     _step(f"register modello ({os.path.basename(str(model))})")
     preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
     # CAMBIO MODELLO — sfratta il PRECEDENTE *prima* di caricare il nuovo. Col caricamento in-RAM (no-mmap

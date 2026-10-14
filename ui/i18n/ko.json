@@ -3125,5 +3125,9 @@
   "vid.h3.vae.orig": "원본 (최고 품질)",
   "vid.h3.vae.dec": "LightVAE: Lite 디코더 (디코딩 3배 빠름)",
   "vid.h3.vae.encdec": "LightVAE: Lite 인코더 + 디코더",
-  "vid.h3.vae.tt": "H3 비디오 VAE의 경량화(가지치기) 버전(lightx2v): 잠재 표현이 같아 모델은 바뀌지 않습니다. Lite 디코더는 잠재 표현을 약 3배 빠르게, 비디오 메모리 절반으로 프레임으로 변환합니다. Lite 인코더는 첫/마지막 이미지와 참조의 인코딩도 빠르게 합니다. 미세한 디테일이 약간 손실될 수 있으니 원본과 비교해 보세요."
+  "vid.h3.vae.tt": "H3 비디오 VAE의 경량화(가지치기) 버전(lightx2v): 잠재 표현이 같아 모델은 바뀌지 않습니다. Lite 디코더는 잠재 표현을 약 3배 빠르게, 비디오 메모리 절반으로 프레임으로 변환합니다. Lite 인코더는 첫/마지막 이미지와 참조의 인코딩도 빠르게 합니다. 미세한 디테일이 약간 손실될 수 있으니 원본과 비교해 보세요.",
+  "f1.inpaint.klein_te_lbl": "Klein 인코더",
+  "f1.inpaint.klein_te.official": "공식 Qwen3-8B",
+  "f1.inpaint.klein_te.uncensored": "무검열 Qwen3-8B (18+)",
+  "f1.inpaint.klein_te.tt": "FLUX.2 Klein 9B의 텍스트 인코더입니다. 무검열 버전은 거절 성향을 제거한 동일한 Qwen3-8B로, 노골적인 프롬프트를 순화하지 않고 그대로 따릅니다. Klein 9B로 하는 모든 작업(인페인트, 통합, 합성, 색상)에 적용되며 Klein 4B에는 사용되지 않습니다."
 }

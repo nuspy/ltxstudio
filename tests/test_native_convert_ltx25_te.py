@@ -1,5 +1,5 @@
-"""Convertitore «ltx25_te»: TE LTX-2.5 int8 per-tensore ComfyUI → bf16 + asset/metadata innestati in coda (gancio
-`extras` del motore di conversione). File sintetico, niente rete."""
+"""Convertitore «ltx25_te»: TE LTX-2.5 int8 per-tensore ComfyUI → stesso file con gli int8 intatti (il fold a bf16
+lo fa ltx-core al caricamento) + asset/metadata innestati in coda (gancio `extras`). File sintetico, niente rete."""
 import json
 import os
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import native_convert as nc  # noqa: E402
 
 
-def test_ltx25_te_dequant_e_asset(tmp_path, monkeypatch):
+def test_ltx25_te_int8_intatto_e_asset(tmp_path, monkeypatch):
     torch.manual_seed(0)
     q = torch.randint(-127, 128, (64, 32), dtype=torch.int8)
     sc = torch.tensor([0.01], dtype=torch.float32)
@@ -26,16 +26,13 @@ def test_ltx25_te_dequant_e_asset(tmp_path, monkeypatch):
     monkeypatch.setattr(nc, "_ltx25_te_assets", lambda: ({"gemma_config": json.dumps({"a": 1})},
                                                          {"hf_asset__chat_template.jinja": asset,
                                                           "tokenizer_json": torch.zeros(3, dtype=torch.uint8)}))
-    dst = tmp_path / "te_bf16.safetensors"
+    dst = tmp_path / "te_int8_native.safetensors"
     nc.convert("ltx25_te", src, dst, log=lambda *_: None)
     assert nc.is_native(dst) and not src.exists()
     with safe_open(str(dst), "pt") as f:
-        keys = set(f.keys())
         md = f.metadata()
-        w = f.get_tensor("model.layers.0.mlp.up_proj.weight")
-        assert w.dtype == torch.bfloat16
-        assert torch.allclose(w.float(), (q.float() * 0.01).to(torch.bfloat16).float())
+        assert torch.equal(f.get_tensor("model.layers.0.mlp.up_proj.weight"), q)
+        assert torch.equal(f.get_tensor("model.layers.0.mlp.up_proj.weight_scale"), sc)
         assert bytes(f.get_tensor("hf_asset__chat_template.jinja").tolist()) == b"{{ chat }}"
         assert bytes(f.get_tensor("tokenizer_json").tolist()) == b'{"t":1}'        # quello del sorgente vince
-    assert "model.layers.0.mlp.up_proj.weight_scale" not in keys
     assert json.loads(md["gemma_config"]) == {"a": 1}

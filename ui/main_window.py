@@ -135,10 +135,22 @@ class _NativeImageWorker(QThread):
     """Esegue una generazione immagine sul backend NATIVO (InferenceServer) fuori dal thread UI."""
     done = Signal(dict)
 
+    # encoder FLUX.2 Klein scelto nella GUI (callable → id di catalogo o ""): lo collega MainWindow, così vale per
+    # tutti i job Klein (inpaint, Integra, Componi, Colore) senza toccare ogni punto che li crea
+    klein_te_source = None
+
     def __init__(self, params: dict, module: str = "image"):
         super().__init__()
         import time as _t
         params.setdefault("_t_button", _t.time())           # timeline unica dal click "Genera" (wall-clock)
+        if (module == "image" and str(params.get("arch") or "").startswith("flux2") and "klein_te" not in params
+                and _NativeImageWorker.klein_te_source is not None):
+            try:
+                _kte = _NativeImageWorker.klein_te_source()
+            except Exception:                                   # noqa: BLE001
+                _kte = ""
+            if _kte:
+                params["klein_te"] = _kte
         print(f"[gen-timeline] t0 = click Genera (module={module}, arch={params.get('arch','')})", flush=True)
         self.params = params
         self.module = module
@@ -968,6 +980,7 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.video_tab = VideoTab()
         self.frame1_tab = Frame1Tab()
+        _NativeImageWorker.klein_te_source = self.frame1_tab.klein_te_choice      # encoder Klein scelto in Inpaint
         self.video_tab.request_pulid_keyframe.connect(self._gen_pulid_keyframe_for_video)
         # I widget Prompt globale / Prompt negativo sono stati spostati nel tab Video.
         # Aliasiamo i nomi `frame1_tab.prompt` / `frame1_tab.neg` ai widget reali in

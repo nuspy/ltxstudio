@@ -888,6 +888,27 @@ def case_segment_empty_text_guard(w, spy):
 
 
 # ════════════════════════ REGISTRO CASI ════════════════════════
+
+def case_klein_te_uncensored(w, spy):
+    """Inpaint con FLUX.2 Klein 9B: menu «Encoder Klein» visibile, la scelta uncensored arriva come klein_te a ogni
+    job Klein (aggancio unico in _NativeImageWorker); con un modello non Klein il menu sparisce e non si invia."""
+    from ui.main_window import _NativeImageWorker
+    f = w.frame1_tab
+    i = next((k for k in range(f.inp_model.count()) if "miraclein" in f.inp_model.itemText(k).lower()), -1)
+    if i < 0:
+        return                                                    # Klein 9B non installato: niente da verificare
+    f.inp_model.setCurrentIndex(i)
+    assert not f.inp_klein_te.isHidden(), "menu encoder Klein nascosto con un Klein 9B"
+    f.inp_klein_te.setCurrentIndex(f.inp_klein_te.findData("klein9b-te-uncensored"))
+    assert _NativeImageWorker({"arch": "flux2_inpaint"}).params.get("klein_te") == "klein9b-te-uncensored"
+    assert "klein_te" not in _NativeImageWorker({"arch": "inpaint"}).params, "klein_te inviato a FLUX.1"
+    j = next((k for k in range(f.inp_model.count()) if "klein" not in f.inp_model.itemText(k).lower()
+              and "flux.2" not in f.inp_model.itemText(k).lower()), -1)
+    f.inp_model.setCurrentIndex(j)
+    assert f.inp_klein_te.isHidden() and f.klein_te_choice() == ""
+    assert "klein_te" not in _NativeImageWorker({"arch": "flux2_inpaint"}).params
+
+
 CASES = (
     _gen_model_cases()
     + [
@@ -999,5 +1020,8 @@ CASES = (
         ("frame1_segment_empty_text_guard",
          "Selezione da testo senza testo: nessuna richiesta (guardia).",
          case_segment_empty_text_guard),
+        ("frame1_klein_te_uncensored",
+         "Klein 9B: encoder uncensored scelto in Inpaint arriva come klein_te a ogni job Klein, non altrove.",
+         case_klein_te_uncensored),
     ]
 )

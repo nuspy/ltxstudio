@@ -1174,6 +1174,21 @@ class Frame1Tab(QWidget):
         self.inp_star.clicked.connect(self._toggle_inp_fav)
         imrow.addWidget(self.inp_star)
         imw = QWidget(); imw.setLayout(imrow); f.addRow(tr("f1.model_lbl"), imw)
+        # Encoder di FLUX.2 Klein 9B (Qwen3-8B): ufficiale o uncensored (18+). Visibile solo con un Klein 9B e
+        # un'edizione che ammette i contenuti 18+; vale per tutti i job Klein (inpaint, Integra, Componi, Colore).
+        self.inp_klein_te = QComboBox()
+        self.inp_klein_te.addItem(tr("f1.inpaint.klein_te.official", "Qwen3-8B ufficiale"), "")
+        self.inp_klein_te.addItem(tr("f1.inpaint.klein_te.uncensored", "Qwen3-8B uncensored (18+)"),
+                                  "klein9b-te-uncensored")
+        self.inp_klein_te.setToolTip(tr("f1.inpaint.klein_te.tt",
+            "Text encoder di FLUX.2 Klein 9B. La versione uncensored è lo stesso Qwen3-8B con la tendenza a "
+            "rifiutare rimossa: segue i prompt espliciti invece di ammorbidirli. Vale per tutti i lavori fatti con "
+            "Klein 9B (inpaint, Integra, Componi, Colore); con Klein 4B non si usa."))
+        self.inp_klein_te.activated.connect(self._maybe_offer_klein_te_download)
+        self._klein_te_row = QLabel(tr("f1.inpaint.klein_te_lbl", "Encoder Klein"))
+        f.addRow(self._klein_te_row, self.inp_klein_te)
+        self.inp_klein_te.setVisible(False); self._klein_te_row.setVisible(False)   # _sync_klein_te decide
+        self.inp_model.currentTextChanged.connect(self._sync_klein_te)
         self.inp_lora = QComboBox()
         self.inp_lora.setToolTip(tr("f1.inpaint.lora.tt", "LoRA opzionale applicata durante inpaint/outpaint per stile o soggetto."))
         f.addRow(tr("f1.inpaint.lora_lbl"), self.inp_lora)
@@ -1878,6 +1893,35 @@ class Frame1Tab(QWidget):
         self.inp_model.blockSignals(False)
         if self.inp_model.currentText() != cur:               # la voce scelta è sparita (es. SFW)
             self._reload_inpaint_loras()
+
+    def _sync_klein_te(self, *_):
+        """Menu encoder Klein visibile solo con un FLUX.2 Klein 9B (encoder Qwen3-8B) e l'edizione 18+."""
+        if not hasattr(self, "inp_klein_te"):
+            return
+        show = False
+        try:
+            from core import nsfw_policy
+            from core.flux2_encoder import txt_in_indim
+            from core.gen_pipeline import is_flux2
+            unet = self.get_inpaint_config().get("unet")
+            show = bool(unet and is_flux2(unet) and txt_in_indim(unet) == 12288 and nsfw_policy.adult_allowed())
+        except Exception:                                       # noqa: BLE001
+            show = False
+        self.inp_klein_te.setVisible(show)
+        self._klein_te_row.setVisible(show)
+        if not show:
+            self.inp_klein_te.setCurrentIndex(0)
+
+    def _maybe_offer_klein_te_download(self, *_):
+        cid = self.inp_klein_te.currentData()
+        if cid:
+            self._offer_download_ids(cid)
+
+    def klein_te_choice(self) -> str:
+        """Id di catalogo dell'encoder Klein scelto ("" = ufficiale), solo se il menu è attivo."""
+        if not hasattr(self, "inp_klein_te") or self.inp_klein_te.isHidden():
+            return ""
+        return self.inp_klein_te.currentData() or ""
 
     def _auto_inp_guidance(self, label: str):
         """Auto-imposta la Guidance secondo il modello inpaint: Fill dev=alta (30), distillato/Hyper=bassa (2.5),

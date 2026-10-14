@@ -713,13 +713,13 @@ NEW = [
       note="finetune NSFW con VAE inclusi; l'autore consiglia la distilled-LoRA 384 ufficiale. Derivato LTX-2"),
     # LTX-2.5: solo transformer, int8 per-riga + ConvRot ComfyUI (fold nativo in ltx_core fp8_cast). Distill
     # già fuso → nome locale con «distilled»: il worker NON aggiunge la distilled-LoRA.
-    N("ltx25-te-uncensored", "Video", "LTX-2.5 Gemma-4 TE Uncensored v1.1 (18+, 13.2GB → bf16 24.5GB)",
+    N("ltx25-te-uncensored", "Video", "LTX-2.5 Gemma-4 TE Uncensored v1.1 (18+, int8, 13.2GB)",
       category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
       remote="split/text_encoders/gemma4_12b_ltx25_uncensored-int8.safetensors",
-      filename="gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-bf16-native.safetensors", convert="ltx25_te",
+      filename="gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-int8-native.safetensors", convert="ltx25_te",
       type="text_encoders", gb=13.16, sens="adult",
-      note="Gemma 4 12B senza rifiuti con le proiezioni LTX: int8 → bf16 (il loader Gemma di ltx-core non legge "
-           "pesi quantizzati), asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5"),
+      note="Gemma 4 12B senza rifiuti con le proiezioni LTX: resta int8 su disco, ltx-core lo porta a bf16 al "
+           "caricamento (with_int8_fold); asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5"),
     # Stesso modello del GGUF Q8_0 del repo, ma in safetensors int8: passa dal fold nativo di ltx-core (fp8_cast) e
     # porta i connector degli embedding nello stesso file (il percorso GGUF 2.5 non li sa leggere).
     # GGUF Q8_0 (scelta dell'utente): transformer dequantizzato al volo; config e connector degli embedding da un
@@ -967,6 +967,17 @@ NEW = [
     N("xtts-v2", "Voce (clone)", "XTTS v2 (Coqui)", category="tts", arch="xtts",
       kind="snapshot", repo="coqui/XTTS-v2", type="TTS", gb=2.0, scan=["XTTS-v2", "xtts"]),
 ]
+
+# FLUX.2 Klein 9B: encoder Qwen3-8B «abliterated» (rifiuti rimossi per ortogonalizzazione, nessun fine-tuning su
+# immagini). Scelto dall'utente nel pannello Inpaint al posto del Qwen3-8B ufficiale (KLEIN_QWEN_DIRS 12288).
+NEW.append(N("klein9b-te-uncensored", "Inpaint", "Qwen3-8B uncensored (TE FLUX.2 Klein 9B, ponpoke, 18+, 16.4GB)",
+             category="image", arch="flux2", kind="snapshot", repo="ponpoke/flux2-klein-9b-uncensored-text-encoder",
+             allow=["model.safetensors", "config.json", "generation_config.json", "tokenizer.json",
+                    "tokenizer_config.json", "chat_template.jinja"],
+             type="diffusers", family="_te", tool_dest=r"E:\AI\Models\diffusers\_te\qwen3_8b_uncensored",
+             gated=True, gb=16.39, sens="adult",
+             note="Qwen3-8B di FLUX.2-klein-9B con la direzione di rifiuto rimossa (strati 14-24, o_proj/down_proj). "
+                  "Licenza FLUX non commerciale v2.1 (quella di Klein 9B). Accesso con conferma su Hugging Face"))
 
 # lista Civitai dell'utente del 14/10/2026 (generata da metadati/header remoti: trigger, sha256, pagina)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
