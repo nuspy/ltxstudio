@@ -74,7 +74,7 @@ def build_transformer(dit_path: str, config_dir: str, device: str = "cuda"):
         tr = Krea2Transformer2DModel.from_config(Krea2Transformer2DModel.load_config(config_dir))
     sd = Q.quantize_from_state_dict(tr, Q.read_safetensors(dit_path, device))
     miss, unex = Q.load_into(tr, sd, device=device, dtype=torch.bfloat16,
-                             keep_fp32=("scale_shift_table", "norm", "projector"))
+                             keep_fp32=("norm",))      # = _keep_in_fp32_modules di Krea2Transformer2DModel
     del sd
     if miss or unex:
         raise RuntimeError(f"Krea 2 single-file {os.path.basename(dit_path)}: chiavi mancanti {miss[:6]} "

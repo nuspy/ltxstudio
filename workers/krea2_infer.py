@@ -156,7 +156,7 @@ def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: 
     pipe = DiffusionPipeline.from_pretrained(model_dir, transformer=tr, torch_dtype=torch.bfloat16,
                                              **_te_kwargs(model_dir, te))
     free = _free_vram_mb()
-    if free < 26000:                       # TE+VAE dello snapshot (~9GB) accanto al transformer int8 (~13GB)
+    if free < 26000:                       # TE (8.8GB bf16) + VAE + attivazioni accanto al transformer int8: su 32GB → offload sequenziale (verificato 14/10)
         pipe.enable_model_cpu_offload()
         print(f"[krea2] model_cpu_offload (VRAM libera {free}MB)", flush=True)
     else:

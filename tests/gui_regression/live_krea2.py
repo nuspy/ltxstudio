@@ -89,8 +89,8 @@ def main() -> int:
     te = _arg("--te", "")
     w = H.build_window()
     w.tabs.setCurrentWidget(w.frame1_tab)
-    try:                                              # 1024x1536 (verticale): formato consigliato dai finetune
-        w.video_tab.width.setValue(1024); w.video_tab.height.setValue(1536)
+    try:                                              # 1024x1024 (--h 1536: verticale consigliato dai finetune)
+        w.video_tab.width.setValue(1024); w.video_tab.height.setValue(int(_arg("--h", "1024")))
     except Exception:                                        # noqa: BLE001
         pass
     res = [run_one(w, m, te) for m in models]
