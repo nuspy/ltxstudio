@@ -353,6 +353,17 @@ def case_model_placeholder_other_combos(w, spy):
         assert not got, "Restauro: con il segnaposto non deve partire nulla"
         r.set_upscale_models(["u1.pth", "u2.pth"])               # il segnaposto resta finche' l'utente non sceglie
         assert mm.is_placeholder(r.upscale_model)
+        # --- Inpaint: checkpoint FLUX da inventario scelto poi sparito ---
+        features._MANIFEST, features._FEATURES = saved
+        f._refresh_inpaint_checkpoints(["flux_aaa.safetensors", "flux_bbb.safetensors"])
+        j = f.inp_model.findText("flux_bbb  · checkpoint Flux")
+        assert j >= 0, [f.inp_model.itemText(i) for i in range(f.inp_model.count())]
+        f.inp_model.setCurrentIndex(j)
+        f._refresh_inpaint_checkpoints(["flux_aaa.safetensors"])
+        assert mm.is_placeholder(f.inp_model) and f.inp_model.currentIndex() == 0, f.inp_model.currentText()
+        w.generate_inpaint("inpaint")
+        assert len(spy.calls) == before, "Inpaint (inventario): con il segnaposto non deve partire nulla"
+        f._refresh_inpaint_checkpoints([])                       # ripulisce le voci dinamiche del test
     finally:
         features._MANIFEST, features._FEATURES = saved
 

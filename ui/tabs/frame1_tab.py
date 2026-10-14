@@ -1803,6 +1803,8 @@ class Frame1Tab(QWidget):
         ckpts = [c for c in checkpoint_models if is_flux_like(c)]
         # in più: prendi anche i UNET Flux da diffusion_models (Fill, Dev, ecc.)
         unets = [m for m in (self._models or []) if is_flux_like(m)]
+        from ui import model_menu as mm
+        prev_key = mm.current_key(self.inp_model)          # per il segnaposto se il file scelto e' sparito
         # rimuovi voci dinamiche precedenti
         for label in list(self._dynamic_checkpoints.keys()):
             idx = self.inp_model.findText(label)
@@ -1839,6 +1841,11 @@ class Frame1Tab(QWidget):
             self._dynamic_unets[label] = u
             self.inp_model.insertItem(insert_at, label)
             insert_at += 1
+        self.inp_model.blockSignals(True)
+        try:                                                # scelta sparita dall'inventario → segnaposto, mai il primo
+            mm.settle(self.inp_model, prev_key)
+        finally:
+            self.inp_model.blockSignals(False)
 
     def set_inpaint_availability(self, unet_names: list[str]):
         """Marca nel menu i modelli inpaint NON ancora presenti in ComfyUI (es. in download)."""
