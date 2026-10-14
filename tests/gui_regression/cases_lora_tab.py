@@ -293,7 +293,7 @@ def case_wan_lora_in_talk_sing(w, spy):
 
 
 def case_flux_panel_has_turbo_alpha(w, spy):
-    """Il pannello LoRA FLUX elenca FLUX.1-Turbo-Alpha (file in Checkpoints/DreamO) come LoRA FLUX."""
+    """Il pannello LoRA FLUX elenca FLUX.1-Turbo-Alpha (file in LoRA/Flux, già Checkpoints/DreamO) come LoRA FLUX."""
     f1 = w.frame1_tab
     f1.img_nsfw.setCurrentText("NSFW")
     f1._sync_gen_lora_arch("FLUX")
@@ -358,7 +358,7 @@ CASES = [
      case_generate_includes_lora),
     ("lora_wan_in_talk_sing", "Talk/Canta mostrano la sezione LoRA Wan 2.1 e la selezione arriva in wan_loras.",
      case_wan_lora_in_talk_sing),
-    ("lora_flux_turbo_alpha", "Il pannello LoRA FLUX elenca FLUX.1-Turbo-Alpha (file in Checkpoints/DreamO).",
+    ("lora_flux_turbo_alpha", "Il pannello LoRA FLUX elenca FLUX.1-Turbo-Alpha (file in LoRA/Flux, già Checkpoints/DreamO).",
      case_flux_panel_has_turbo_alpha),
     ("lora_generate_auto_insert_trigger", "auto-trigger ON: on_generate procede senza dialog e invia la richiesta.",
      case_generate_auto_insert_trigger),
