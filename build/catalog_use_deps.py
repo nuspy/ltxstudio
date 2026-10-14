@@ -73,7 +73,6 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "flux1-fill-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
     "flux1-kontext-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
     "flux1-krea-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux2-dev-fp8mixed": (["ckpt_image"], ["flux2-vae", "mistral-te-fp8-single"]),
     "flux1-dev": (["ckpt_image", "big_quality"], []),
     "flux1-fill": (["ckpt_image", "big_quality"], []),
     "flux1-kontext": (["ckpt_image", "big_quality"], []),
@@ -248,6 +247,24 @@ MAP.update({
     "mmh3-lightvae-dec": (["vae"], []), "mmh3-lightvae-enc": (["vae"], []),
     "klein9b-te-uncensored": (["te", "uncensored"], []),
     "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m": (["distill_lora"], []),
+})
+# pesi già sul disco (pulizia modelli 14/10/2026): checkpoint 18+ / varianti / TE letti dal codice
+MAP.update({
+    "zimage-biglove-zt1-fp8": (["ckpt_image", "fp8", "uncensored"], []),
+    "zimage-turbo-bf16-single": (["ckpt_image", "distilled"], []),
+    "zimage-turbo-nsfw-2602": (["ckpt_image", "distilled", "uncensored"], []),
+    "flux1-fuxcapacity-nsfw-fp8": (["ckpt_image", "fp8", "uncensored"], ["flux-vae-ae", "t5xxl-fp16"]),
+    "flux1-getphat-v23-softcore-fp8": (["ckpt_image", "fp8", "uncensored"], ["flux-vae-ae", "t5xxl-fp16"]),
+    "flux1-dev-nunchaku-fp4": (["ckpt_image", "nvfp4"], ["flux-vae-ae", "t5xxl-fp16"]),
+    "flux1-kontext-nunchaku-fp4": (["ckpt_image", "nvfp4"], ["flux-vae-ae", "t5xxl-fp16"]),
+    "flux2-dev-nvfp4": (["ckpt_image", "nvfp4"], ["flux2-vae", "mistral-te-fp8-single"]),
+    "ltx23-dev-gguf-q6k": (["ckpt_video", "dev_quality", "gguf_small"],
+                           ["ltx23-gemma-te", "ltx23-distilled-lora-384", "ltx23-spatial-upscaler"]),
+    "ltx23-dev-nvfp4": (["ckpt_video", "dev_quality", "nvfp4"],
+                        ["ltx23-gemma-te", "ltx23-distilled-lora-384", "ltx23-spatial-upscaler"]),
+    "te-gemma3-lyrics": (["te"], []),
+    "te-flux1-clip-l-diffusers": (["te"], []),
+    "te-flux1-t5xxl-diffusers": (["te"], []),
 })
 CIV_LORA = (["lora_style", "uncensored"], [])
 

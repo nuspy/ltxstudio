@@ -181,11 +181,7 @@ NEW = [
       tool_dest=r"E:\AI\Models\TextEncoders\gemma-3-ltx",
       allow=["text_encoder/*", "tokenizer*", "*.json"], gb=24.0, role="base",
       scan=["gemma-3-ltx"], note="subset text_encoder/ del repo LTX-2 (formato ltx-core)"),
-    N("ltx23-gguf-q4-distilled", "Video", "LTX-2.3 distilled GGUF Q4_K_M (GPU piccole)",
-      category="video", arch="ltx23", repo="QuantStack/LTX-2.3-GGUF",
-      remote="LTX-2.3-distilled-1.1/LTX-2.3-22B-distilled-1.1-Q4_K_M.gguf",
-      filename="ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
-      type="diffusion_models", family="LTX", gb=16.6, scan=["distilled-1.1-Q4_K_M"]),
+# (ltx23-gguf-q4-distilled: ora in catalog_local_oct14 — versione unsloth UD-Q4_K_M)
     # IC-LoRA effetto (module Video → cap.video) e controllo (ControlNet → cap.controlnet)
     N("ltx-iclora-detailer", "Video", "IC-LoRA Detailer", category="video", arch="ltx23",
       repo="Lightricks/LTX-2-19b-IC-LoRA-Detailer",
@@ -883,11 +879,7 @@ NEW = [
       arch="flux1", repo="black-forest-labs/FLUX.1-Krea-dev",
       remote="flux1-krea-dev.safetensors", filename="FLUX_Krea_Dev.safetensors",
       type="diffusion_models", family="Flux", gb=23.0, scan=["FLUX_Krea", "flux1-krea"]),
-    N("flux2-dev-fp8mixed", "Immagini", "FLUX.2 dev fp8mixed (single-file comfy)",
-      category="image", arch="flux2", repo="Comfy-Org/flux2-dev",
-      remote="split_files/diffusion_models/flux2_dev_fp8mixed.safetensors",
-      filename="flux2_dev_fp8mixed.safetensors", type="diffusion_models", family="Flux",
-      gb=33.0, scan=["flux2_dev_fp8", "FLUX_2_Dev"]),
+# (flux2-dev-fp8mixed ritirata 14/10: sostituita da flux2-dev-nvfp4 in catalog_local_oct14)
     # id storico «fp8»: il file su disco è sempre stato il fp4-mixed (12.28 GB, U8 impacchettato + fp8). 14/10: il
     # doppione col nome corto è stato cancellato, codice e voce puntano al nome del repo
     N("mistral-te-fp8-single", "Immagini", "Mistral-3 TE FLUX.2 fp4-mixed (single-file, 12.3GB)",
@@ -986,6 +978,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from catalog_civitai_oct14 import entries as _civitai_oct14  # noqa: E402
 NEW += _civitai_oct14(N)
 
+# pesi già sul disco usati dall'app / da integrare (pulizia modelli 14/10/2026): file nelle cartelle reali
+from catalog_local_oct14 import entries as _local_oct14, REFRESH_IDS as _LOCAL_REFRESH, REMOVED_IDS as _LOCAL_REMOVED  # noqa: E402
+NEW += _local_oct14(N)
+
 # url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {
     "gfpgan-13": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
@@ -1008,7 +1004,7 @@ DEFAULT_CAT_BY_MODULE = {
 
 # Famiglie in cui NEW è la fonte autorevole anche per le voci già nel json (campi di NEW vincono).
 REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "ltx23-lora-civ", "ltx25-lora-civ",
-           "ltx23-eros14", "ltx25-te-uncensored")
+           "ltx23-eros14", "ltx25-te-uncensored") + _LOCAL_REFRESH
 
 # Voci ritirate (tolte dal catalogo alla prossima rigenerazione).
 REMOVED = {
@@ -1016,7 +1012,7 @@ REMOVED = {
     "mmh3-fl2va-gguf-q4", "mmh3-fl2va-gguf-q3", "mmh3-ref2va-gguf-q4", "mmh3-te-gguf-q4",
     # 10Eros v1 (LTX-2.3) sostituito da 10Eros v1.5 (ltx23-eros15): il file vecchio va cancellato
     "ltx23-eros",
-}
+} | set(_LOCAL_REMOVED)
 
 
 def main() -> int:

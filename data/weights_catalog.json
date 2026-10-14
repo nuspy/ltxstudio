@@ -1274,21 +1274,22 @@
     {
       "id": "ltx23-gguf-q4-distilled",
       "module": "Video",
-      "label": "LTX-2.3 distilled GGUF Q4_K_M (GPU piccole)",
+      "label": "LTX-2.3 distilled GGUF UD-Q4_K_M (unsloth, GPU piccole)",
       "kind": "file",
       "type": "diffusion_models",
-      "family": "LTX",
+      "family": "LTXVideo/LTX-2/unsloth/distilled-1.1",
       "gated": false,
-      "approx_gb": 16.6,
+      "approx_gb": 15.26,
       "scan_names": [
+        "ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf",
         "distilled-1.1-Q4_K_M"
       ],
       "category": "video",
       "arch": "ltx23",
-      "repo_id": "QuantStack/LTX-2.3-GGUF",
-      "url": "https://huggingface.co/QuantStack/LTX-2.3-GGUF",
-      "filename": "ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf",
-      "remote_filename": "LTX-2.3-distilled-1.1/LTX-2.3-22B-distilled-1.1-Q4_K_M.gguf",
+      "repo_id": "unsloth/LTX-2.3-GGUF",
+      "url": "https://huggingface.co/unsloth/LTX-2.3-GGUF",
+      "filename": "ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf",
+      "remote_filename": "distilled-1.1/ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf",
       "use": [
         "ckpt_video",
         "distilled",
@@ -1297,7 +1298,8 @@
       "deps": [
         "ltx23-gemma-te",
         "ltx23-spatial-upscaler"
-      ]
+      ],
+      "note": "Versione migliore della QuantStack Q4_K_M (quant dinamica UD). Trovata dall'auto-calibrazione VRAM via glob '*distilled*Q4_K_M.gguf' (core/ltx2_service.py)."
     },
     {
       "id": "ltx-iclora-detailer",
@@ -1994,33 +1996,6 @@
       "deps": [
         "flux-vae-ae",
         "t5xxl-fp16"
-      ]
-    },
-    {
-      "id": "flux2-dev-fp8mixed",
-      "module": "Immagini",
-      "label": "FLUX.2 dev fp8mixed (single-file comfy)",
-      "kind": "file",
-      "type": "diffusion_models",
-      "family": "Flux",
-      "gated": false,
-      "approx_gb": 33.0,
-      "scan_names": [
-        "flux2_dev_fp8",
-        "FLUX_2_Dev"
-      ],
-      "category": "image",
-      "arch": "flux2",
-      "repo_id": "Comfy-Org/flux2-dev",
-      "url": "https://huggingface.co/Comfy-Org/flux2-dev",
-      "filename": "flux2_dev_fp8mixed.safetensors",
-      "remote_filename": "split_files/diffusion_models/flux2_dev_fp8mixed.safetensors",
-      "use": [
-        "ckpt_image"
-      ],
-      "deps": [
-        "flux2-vae",
-        "mistral-te-fp8-single"
       ]
     },
     {
@@ -6735,6 +6710,335 @@
       "use": [
         "te",
         "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-biglove-zt1-fp8",
+      "module": "Immagini",
+      "label": "Big Love Z · ZT1 (Z-Image Turbo, 18+, fp8, 5.73GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 5.73,
+      "scan_names": [
+        "bigLoveZ_zt1_pruned_fp8.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "filename": "bigLoveZ_zt1_pruned_fp8.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "Civitai Big Love Z ZT1, fp8 E4M3 (chiavi cap_embedder = Z-Image). Import locale: il formato fp8 è già quello che _assemble_zimage carica. Diversa dalla Zora1 bf16 (zimage-biglove-zora1).",
+      "use": [
+        "ckpt_image",
+        "fp8",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "zimage-turbo-bf16-single",
+      "module": "Immagini",
+      "label": "Z-Image Turbo bf16 (single-file, 11.46GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 11.46,
+      "scan_names": [
+        "Z_Image_BF16.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "repo_id": "Comfy-Org/z_image_turbo",
+      "url": "https://huggingface.co/Comfy-Org/z_image_turbo",
+      "filename": "Z_Image_BF16.safetensors",
+      "remote_filename": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+      "note": "Variante single-file di zimage-turbo (caricabile senza lo snapshot diffusers).",
+      "use": [
+        "ckpt_image",
+        "distilled"
+      ]
+    },
+    {
+      "id": "zimage-turbo-nsfw-2602",
+      "module": "Immagini",
+      "label": "Z-Image Turbo NSFW 2602 (18+, bf16, 11.46GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 11.46,
+      "scan_names": [
+        "zimageTurboNSFWBy_2602NSFWBF16.safetensors",
+        "zimageTurboNSFWBy_2602NSFWBF16.safetensors.normalized.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "filename": "zimageTurboNSFWBy_2602NSFWBF16.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "Finetune NSFW di Z-Image Turbo (import locale); accanto sta la cache .normalized generata dal motore.",
+      "use": [
+        "ckpt_image",
+        "distilled",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "flux1-fuxcapacity-nsfw-fp8",
+      "module": "Immagini",
+      "label": "fuxCapacity NSFW Porn Flux 2.0 (FLUX.1 dev, 18+, fp8, 11.08GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 11.08,
+      "scan_names": [
+        "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors",
+        "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors.normalized.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors",
+      "deps": [
+        "flux-vae-ae",
+        "t5xxl-fp16"
+      ],
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "Checkpoint FLUX.1 dev NSFW (import locale). Il .normalized accanto è la cache generata da image_flux.",
+      "use": [
+        "ckpt_image",
+        "fp8",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "flux1-getphat-v23-softcore-fp8",
+      "module": "Immagini",
+      "label": "getphat Flux Reality v23 Softcore (FLUX.1 dev, 18+, fp8, 11.08GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 11.08,
+      "scan_names": [
+        "getphat Flux Reality v23 Softcore FP8.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "getphat Flux Reality v23 Softcore FP8.safetensors",
+      "deps": [
+        "flux-vae-ae",
+        "t5xxl-fp16"
+      ],
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "Checkpoint FLUX.1 dev NSFW fp8 (780 tensori F8_E4M3). Nome senza parole chiave: il flag 18+ viene da qui.",
+      "use": [
+        "ckpt_image",
+        "fp8",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "flux1-dev-nunchaku-fp4",
+      "module": "Immagini",
+      "label": "FLUX.1 dev nunchaku SVDQ fp4 r32 (Blackwell, 6.56GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux/nunchaku",
+      "gated": false,
+      "approx_gb": 6.56,
+      "scan_names": [
+        "svdq-fp4_r32-flux.1-dev.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "nunchaku-ai/nunchaku-flux.1-dev",
+      "url": "https://huggingface.co/nunchaku-ai/nunchaku-flux.1-dev",
+      "filename": "svdq-fp4_r32-flux.1-dev.safetensors",
+      "deps": [
+        "flux-vae-ae",
+        "t5xxl-fp16"
+      ],
+      "note": "Caricato dal motore nunchaku (image_flux._load_nunchaku_flux_tr): richiede la wheel nunchaku e una RTX 50xx.",
+      "use": [
+        "ckpt_image",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "flux1-kontext-nunchaku-fp4",
+      "module": "Immagini",
+      "label": "FLUX.1 Kontext dev nunchaku SVDQ fp4 r32 (Blackwell, 6.56GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux/nunchaku",
+      "gated": false,
+      "approx_gb": 6.56,
+      "scan_names": [
+        "svdq-fp4_r32-flux.1-kontext-dev.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "nunchaku-ai/nunchaku-flux.1-kontext-dev",
+      "url": "https://huggingface.co/nunchaku-ai/nunchaku-flux.1-kontext-dev",
+      "filename": "svdq-fp4_r32-flux.1-kontext-dev.safetensors",
+      "deps": [
+        "flux-vae-ae",
+        "t5xxl-fp16"
+      ],
+      "note": "Come flux1-dev-nunchaku-fp4, per l'editing Kontext.",
+      "use": [
+        "ckpt_image",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "flux2-dev-nvfp4",
+      "module": "Immagini",
+      "label": "FLUX.2 dev NVFP4 mixed (22.8GB, kernel FP4 Blackwell)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux/nvfp4",
+      "gated": false,
+      "approx_gb": 21.21,
+      "scan_names": [
+        "flux2-dev-nvfp4-mixed.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux2",
+      "repo_id": "black-forest-labs/FLUX.2-dev-NVFP4",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.2-dev-NVFP4",
+      "filename": "flux2-dev-nvfp4-mixed.safetensors",
+      "deps": [
+        "flux2-vae",
+        "mistral-te-fp8-single"
+      ],
+      "note": "Ufficiale BFL (byte identici: 22772036568). Entra nei 32 GB; sostituisce flux2-dev-fp8mixed (35 GB).",
+      "use": [
+        "ckpt_image",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "ltx23-dev-gguf-q6k",
+      "module": "Video",
+      "label": "LTX-2.3 22B dev GGUF Q6_K (16.55GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "",
+      "gated": false,
+      "approx_gb": 16.55,
+      "scan_names": [
+        "ltx-2-3-22b-dev-Q6_K.gguf"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "unsloth/LTX-2.3-GGUF",
+      "url": "https://huggingface.co/unsloth/LTX-2.3-GGUF",
+      "filename": "ltx-2-3-22b-dev-Q6_K.gguf",
+      "remote_filename": "ltx-2.3-22b-dev-Q6_K.gguf",
+      "deps": [
+        "ltx23-gemma-te",
+        "ltx23-distilled-lora-384",
+        "ltx23-spatial-upscaler"
+      ],
+      "note": "Caricato da workers/gguf_native.py (dequant GPU). Il file locale differisce di 24 byte dal repo unsloth (stesso modello, header riscritto): niente sha256.",
+      "use": [
+        "ckpt_video",
+        "dev_quality",
+        "gguf_small"
+      ]
+    },
+    {
+      "id": "ltx23-dev-nvfp4",
+      "module": "Video",
+      "label": "LTX-2.3 22B dev NVFP4 (20.21GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "LTXVideo/LTX-2/nvfp4",
+      "gated": false,
+      "approx_gb": 20.21,
+      "scan_names": [
+        "ltx-2.3-22b-dev-nvfp4.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "repo_id": "Lightricks/LTX-2.3-nvfp4",
+      "url": "https://huggingface.co/Lightricks/LTX-2.3-nvfp4",
+      "filename": "ltx-2.3-22b-dev-nvfp4.safetensors",
+      "deps": [
+        "ltx23-gemma-te",
+        "ltx23-distilled-lora-384",
+        "ltx23-spatial-upscaler"
+      ],
+      "note": "Ufficiale Lightricks (byte identici: 21701367310). Variante di precisione del dev: da validare dal vivo prima di preferirla al dev-fp8.",
+      "use": [
+        "ckpt_video",
+        "dev_quality",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "te-gemma3-lyrics",
+      "module": "TextEncoder",
+      "label": "Gemma-3 12B IT (testi canzoni, cartella gemma3, 12.8GB)",
+      "kind": "snapshot",
+      "type": "TextEncoders",
+      "family": "gemma3",
+      "gated": false,
+      "approx_gb": 12.77,
+      "scan_names": [],
+      "category": "aux",
+      "arch": "gemma3",
+      "no_remote": true,
+      "note": "Letto da core/lyrics_llm.py (GEMMA_DIRS); fallback al TE LTX gemma-3-ltx. Import locale.",
+      "used_by": [
+        "cap.music_song"
+      ],
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "te-flux1-clip-l-diffusers",
+      "module": "TextEncoder",
+      "label": "CLIP-L FLUX.1 (formato diffusers, cartella _te/clip_l, 0.23GB)",
+      "kind": "snapshot",
+      "type": "diffusers",
+      "family": "_te",
+      "gated": false,
+      "approx_gb": 0.23,
+      "scan_names": [],
+      "category": "image",
+      "arch": "flux1",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\clip_l",
+      "no_remote": true,
+      "note": "Letto da image_flux (TE_DIR). Non cancellare.",
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "te-flux1-t5xxl-diffusers",
+      "module": "TextEncoder",
+      "label": "T5-XXL FLUX.1 (formato diffusers, cartella _te/t5xxl, 9.1GB)",
+      "kind": "snapshot",
+      "type": "diffusers",
+      "family": "_te",
+      "gated": false,
+      "approx_gb": 9.12,
+      "scan_names": [],
+      "category": "image",
+      "arch": "flux1",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\_te\\t5xxl",
+      "no_remote": true,
+      "note": "Letto da image_flux (TE_DIR). Doppione di TextEncoders/t5xxl_fp16: dedup SOLO con hardlink, mai cancellare.",
+      "use": [
+        "te"
       ]
     }
   ],

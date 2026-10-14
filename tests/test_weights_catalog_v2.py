@@ -90,7 +90,7 @@ def test_dest_allineati_ai_motori():
         # immagini (inference_server/backends/image_flux.py, flux2_te.py)
         "flux1-dev-single": BASE + r"\diffusion_models\Flux\FLUX_Dev.safetensors",
         "flux1-fill-single": BASE + r"\diffusion_models\Flux\FLUX_DEV_Fill.safetensors",
-        "mistral-te-fp8-single": BASE + r"\TextEncoders\Flux\mistral_3_small_flux2.safetensors",
+        "mistral-te-fp8-single": BASE + r"\TextEncoders\Flux\mistral_3_small_flux2_fp4_mixed.safetensors",
         # aux (engine constants)
         "gfpgan-14": BASE + r"\facerestore_models\GFPGANv1.4.pth",
         "pulid-flux": BASE + r"\pulid\pulid_flux_v0.9.1.safetensors",

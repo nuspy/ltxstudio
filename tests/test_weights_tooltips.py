@@ -47,8 +47,9 @@ def test_deps_solo_scaricabili():
     """Mai una dep verso una voce no_remote (il download a catena morirebbe)."""
     by_id = {e["id"]: e for e in wc.load()}
     for e in wc.load():
-        for d in e.get("deps", []):
-            assert not by_id[d].get("no_remote"), f"{e['id']}: dep no_remote '{d}'"
+        for dep in e.get("deps", []):
+            for d in wc.dep_alternatives(dep):  # "a|b" = alternative: ognuna deve esistere
+                assert not by_id[d].get("no_remote"), f"{e['id']}: dep no_remote '{d}'"
 
 
 def test_short_line():
