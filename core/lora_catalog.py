@@ -190,6 +190,17 @@ def _arch_matches(raw: dict, wanted: str) -> bool:
 _REGISTRY_FAMILIES = {"LTX": ("LTX", "LTX-2", "LTX-2.5")}
 
 
+# IC-LoRA (guidate da un video di controllo) e file ausiliari: NON sono LoRA «normali» da applicare a un t2v/i2v
+# (senza la guida producono rumore). Si usano dal tab «Modifica Video AI» / ControlNet, non dal pannello LoRA.
+# Restano visibili le LoRA camera-control / CameraControls (LoRA normali t2v/i2v).
+_IC_LORA_MARKERS = ("ic-lora", "iclora", "ic_lora", "scene-emb")
+
+
+def is_ic_lora_file(*names: str) -> bool:
+    """True se nome/percorso indica una IC-LoRA (ltx-*ic-lora*, Cameraman, ReStyle, ...) o il file scene-emb HDR."""
+    return any(m in (n or "").lower() for n in names for m in _IC_LORA_MARKERS)
+
+
 def _registry_loras(arch: str) -> list[LoraEntry]:
     """LoRA del registro pesi (data/weights_catalog.json) già su disco per questa famiglia: compaiono anche
     prima che lo scanner del dizionario le abbia viste. 18+ = `sensitivity: adult`. Le LoRA di distillazione
@@ -354,6 +365,7 @@ class LoraCatalog:
         seen = {os.path.normcase(e.path) for e in out}
         out += _folder_loras(self.compatible_arch, seen, meta)
         out += _extra_loras(self.compatible_arch, seen)
+        out = [e for e in out if not is_ic_lora_file(e.filename, e.path)]    # le IC-LoRA non sono LoRA normali
         out.sort(key=lambda e: (e.preview_url is None, -e.downloads, e.name.lower()))
         self._entries = out
         self._mtime = self.path.stat().st_mtime

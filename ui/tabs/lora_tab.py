@@ -194,6 +194,9 @@ class LoraTab(QWidget):
                 continue
             if "ltx" not in low:
                 continue
+            from core.lora_catalog import is_ic_lora_file
+            if is_ic_lora_file(low):                     # IC-LoRA: non sono LoRA normali (servono a «Modifica Video AI»)
+                continue
             from core import nsfw_policy                 # FASE D: euristica UNIFICATA (era la 4ª lista)
             nsfw = nsfw_policy.looks_nsfw(low)
             extra.append(LoraEntry(
