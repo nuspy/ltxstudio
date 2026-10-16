@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
 
 from core import video_edit_ic as vic
 from core import video_edit_modes as vem
+from core import video_ic_prep as prep_mod
 from ui.i18n_manager import tr
 
 _LORA = "LTX-2/"
@@ -165,12 +166,19 @@ class VideoEditAITab(QWidget):
         self.out_format_lbl = QLabel(tr("vedit.out.canvas_lbl", "Formato del canvas"))
         f.addRow(self.out_format_lbl, self.out_format)
         self.out_anchor = QComboBox()
-        for key, i18n, dflt in (("center", "vedit.out.anchor.center", "Centro"), ("left", "vedit.out.anchor.left", "Sinistra"),
-                                ("right", "vedit.out.anchor.right", "Destra"), ("top", "vedit.out.anchor.top", "Alto"),
-                                ("bottom", "vedit.out.anchor.bottom", "Basso")):
+        # «Estendi verso»: il dato resta l'ancora del sorgente (center|left|right|top|bottom), ma l'etichetta dice
+        # DOVE si aggiunge area nuova (video a sinistra = si estende a destra).
+        for key, i18n, dflt in (("center", "vedit.out.dir.center", "Tutti i lati (video al centro)"),
+                                ("left", "vedit.out.dir.right", "Solo a destra (video a sinistra)"),
+                                ("right", "vedit.out.dir.left", "Solo a sinistra (video a destra)"),
+                                ("top", "vedit.out.dir.down", "Solo in basso (video in alto)"),
+                                ("bottom", "vedit.out.dir.up", "Solo in alto (video in basso)")):
             self.out_anchor.addItem(tr(i18n, dflt), key)
+        self.out_anchor.setToolTip(tr("vedit.out.dir.tt",
+            "Dove aggiungere l'area nuova. Con un formato più largo del video si estende ai lati, con uno più alto "
+            "sopra/sotto; «solo in alto/in basso» (o a destra/sinistra) la mette tutta da una parte."))
         self.out_anchor.currentIndexChanged.connect(self._on_outpaint_change)
-        self.out_anchor_lbl = QLabel(tr("vedit.out.anchor_lbl", "Posizione del video"))
+        self.out_anchor_lbl = QLabel(tr("vedit.out.dir_lbl", "Estendi verso"))
         f.addRow(self.out_anchor_lbl, self.out_anchor)
         self.out_m = {}
         mrow = QHBoxLayout()
@@ -191,6 +199,24 @@ class VideoEditAITab(QWidget):
         self.out_paste.setToolTip(tr("vedit.out.paste.tt",
             "Dopo la generazione incolla i pixel originali al centro (bordo di 2 px escluso): la parte originale resta identica."))
         f.addRow("", self.out_paste)
+        self.out_paste.toggled.connect(self._on_outpaint_change)
+        self.out_feather = QSpinBox(); self.out_feather.setRange(0, prep_mod.MAX_FEATHER)
+        self.out_feather.setSingleStep(4); self.out_feather.setSuffix(" px")
+        self.out_feather.setValue(prep_mod.DEFAULT_FEATHER)
+        self.out_feather.setSpecialValueText(tr("vedit.out.feather.off", "0 (taglio netto)"))
+        self.out_feather.setToolTip(tr("vedit.out.feather.tt",
+            "Larghezza della sfumatura fra l'originale incollato e la parte generata (dentro il bordo del video, solo "
+            "dove confina con area nuova). Nasconde la giunta quando il centro generato differisce dall'originale; "
+            "uguale per ogni fotogramma, quindi senza sfarfallio. 0 = taglio netto."))
+        self.out_feather_lbl = QLabel(tr("vedit.out.feather_lbl", "Sfumatura del bordo"))
+        f.addRow(self.out_feather_lbl, self.out_feather)
+        self.out_minbar = QCheckBox(tr("vedit.out.minbar_lbl", "Barre larghe almeno 15% (rimpicciolisce il video)"))
+        self.out_minbar.setToolTip(tr("vedit.out.minbar.tt",
+            "Sperimentale. Il modello non riempie le barre nuove sotto il ~15% del canvas: con questa opzione il video "
+            "viene rimpicciolito dentro lo stesso canvas finché ogni barra è larga almeno il 15%. Costa risoluzione "
+            "dell'originale e aumenta l'area da generare."))
+        self.out_minbar.toggled.connect(self._on_outpaint_change)
+        f.addRow("", self.out_minbar)
         self.out_info = QLabel(""); self.out_info.setWordWrap(True)
         self.out_info_lbl = QLabel("")
         f.addRow(self.out_info_lbl, self.out_info)
@@ -471,7 +497,8 @@ class VideoEditAITab(QWidget):
         self._set_row_visible_for(self.cam_w, is_cam)
         for w in (self.cam_img_strength, self.cam_seconds):
             self._show_row(w, is_cam)
-        for w in (self.out_format, self.out_anchor, self.out_dark, self.out_paste, self.out_info, self.out_preview):
+        for w in (self.out_format, self.out_anchor, self.out_dark, self.out_paste, self.out_feather, self.out_minbar,
+                  self.out_info, self.out_preview):
             self._show_row(w, is_out)
         self._set_row_visible_for(self.out_m["top"], is_out and self.out_format.currentData() == "custom")
         self.out_anchor.setEnabled(is_out and self.out_format.currentData() != "custom")
@@ -551,10 +578,24 @@ class VideoEditAITab(QWidget):
                              self.out_m["bottom"].value(), self.out_m["left"].value())
         else:
             kw["aspect"] = fmt
+            if self.out_minbar.isChecked():
+                kw["min_bar"] = prep.MIN_BAR_FRACTION
         try:
             return prep.compute_outpaint_layout(self._vinfo.width, self._vinfo.height, **kw)
         except ValueError:
             return None
+
+    @staticmethod
+    def _adds_text(lay) -> str:
+        """«  ·  Aggiunge: sopra 96 px, sotto 96 px»: dice con chiarezza in quale direzione si estende il video."""
+        sides = (("top", "vedit.out.side.top", "sopra {n} px", lay.y),
+                 ("bottom", "vedit.out.side.bottom", "sotto {n} px", lay.canvas_h - lay.y - lay.src_h),
+                 ("left", "vedit.out.side.left", "a sinistra {n} px", lay.x),
+                 ("right", "vedit.out.side.right", "a destra {n} px", lay.canvas_w - lay.x - lay.src_w))
+        parts = [tr(k, d).format(n=n) for _s, k, d, n in sides if n > 4]
+        if not parts:
+            return ""
+        return "  ·  " + tr("vedit.out.adds", "Aggiunge: {where}").format(where=", ".join(parts))
 
     @staticmethod
     def _narrow_bar_text() -> str:
@@ -564,6 +605,9 @@ class VideoEditAITab(QWidget):
         custom = self.out_format.currentData() == "custom"
         self._set_row_visible_for(self.out_m["top"], self.mode.currentData() == "outpaint" and custom)
         self.out_anchor.setEnabled(not custom)
+        self.out_minbar.setEnabled(not custom)
+        self.out_feather.setEnabled(self.out_paste.isChecked())
+        self.out_feather_lbl.setEnabled(self.out_paste.isChecked())
         lay = self._outpaint_layout()
         pm = QPixmap(self.out_preview.size()); pm.fill(QColor("#101010"))
         if lay is None:
@@ -574,7 +618,7 @@ class VideoEditAITab(QWidget):
         if lay.narrow_bar:
             warn += "  ⚠ " + self._narrow_bar_text()
         self.out_info.setText(tr("vedit.out.canvas_info", "Canvas: {w}x{h} (area nuova {p}%)").format(
-            w=lay.canvas_w, h=lay.canvas_h, p=int(round(lay.new_area * 100))) + warn)
+            w=lay.canvas_w, h=lay.canvas_h, p=int(round(lay.new_area * 100))) + self._adds_text(lay) + warn)
         # anteprima: canvas scalato nel box, sorgente grigio chiaro, area nuova nera tratteggiata
         W, H = pm.width(), pm.height()
         s = min((W - 8) / lay.canvas_w, (H - 8) / lay.canvas_h)
@@ -647,7 +691,10 @@ class VideoEditAITab(QWidget):
             cfg.update(out_format=self.out_format.currentData(), out_anchor=self.out_anchor.currentData(),
                        out_margins=(self.out_m["top"].value(), self.out_m["right"].value(),
                                     self.out_m["bottom"].value(), self.out_m["left"].value()),
-                       out_dark=self.out_dark.isChecked(), out_paste=self.out_paste.isChecked())
+                       out_dark=self.out_dark.isChecked(), out_paste=self.out_paste.isChecked(),
+                       out_feather=int(self.out_feather.value()),
+                       out_min_bar=(prep_mod.MIN_BAR_FRACTION if self.out_minbar.isChecked()
+                                    and self.out_format.currentData() != "custom" else 0.0))
             if cfg["out_format"] == "custom" and not any(cfg["out_margins"]):
                 self._block("vedit.err_no_margins", "Outpaint: indica almeno un margine (o scegli un formato)."); return
             lay = self._outpaint_layout()

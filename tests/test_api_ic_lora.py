@@ -93,3 +93,24 @@ def test_known_caps_include_new():
     from api import gate
     for c in ("cap.video_restore_iclora", "cap.video_outpaint", "cap.video_restyle", "cap.video_camera_ic"):
         assert c in gate.KNOWN_CAPS
+
+
+def test_outpaint_feather_and_min_bar_validation_and_passthrough(video, no_run, monkeypatch):
+    base = {"kind": "outpaint", "video_path": video}
+    assert client.post("/video/ic_lora", json={**base, "feather_px": -1}).status_code == 422
+    assert client.post("/video/ic_lora", json={**base, "feather_px": 999}).status_code == 422
+    assert client.post("/video/ic_lora", json={**base, "min_bar": 0.9}).status_code == 422
+    r = client.post("/video/ic_lora", json={**base, "canvas": "4:3", "anchor": "bottom", "feather_px": 40,
+                                            "min_bar": 0.15, "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"})
+    assert r.status_code == 200, r.text
+    from core import video_edit_ic as vic
+    seen = {}
+
+    def fake_build(cfg, out_dir, stamp, output, log=None):
+        seen.update(cfg)
+        raise RuntimeError("stop")
+    monkeypatch.setattr(vic, "build_job", fake_build)
+    with pytest.raises(RuntimeError, match="stop"):
+        no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert seen["out_feather"] == 40 and seen["out_min_bar"] == 0.15
+    assert seen["out_format"] == "4:3" and seen["out_anchor"] == "bottom" and seen["out_paste"] is True

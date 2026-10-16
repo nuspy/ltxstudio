@@ -149,10 +149,16 @@ class IcLoraReq(BaseModel):
     style_text: str = Field("", description="stile a parole: prompt «Make it {style} style.» se prompt vuoto")
     # outpaint
     canvas: str = Field("16:9", description="16:9 | 9:16 | 1:1 | 4:3 | 3:4 | 21:9 | custom")
-    anchor: str = "center"
+    anchor: str = Field("center", description="dove sta il video nel canvas: center (si estende su tutti i lati) | "
+                        "left (area nuova a destra) | right (a sinistra) | top (in basso) | bottom (in alto)")
     margins: list[int] | None = Field(None, description="custom: [sopra, destra, sotto, sinistra] px sorgente")
     dark_source: bool = False
     paste_original: bool = True
+    feather_px: int = Field(24, ge=0, le=256, description="outpaint: sfumatura (px) del bordo fra originale incollato "
+                            "e parte generata, uguale per ogni fotogramma; 0 = taglio netto. Conta se paste_original")
+    min_bar: float = Field(0.0, ge=0.0, le=0.45, description="outpaint (opt-in, solo canvas non custom): se una barra "
+                           "nuova e' piu' stretta, rimpicciolisce il video nel canvas finche' ogni barra e' >= questa "
+                           "frazione (consigliato 0.15); 0 = spento")
     # cameraman
     image_path: str | None = None
     image_strength: float = 0.7
@@ -336,7 +342,8 @@ def register(app: FastAPI):
                "res_mode": req.res_mode, "res_long": req.res_long, "style_image": req.style_image,
                "out_format": req.canvas, "out_anchor": req.anchor,
                "out_margins": tuple(req.margins or (0, 0, 0, 0)), "out_dark": req.dark_source,
-               "out_paste": req.paste_original, "cam_ref": req.video_path, "cam_img": req.image_path or "",
+               "out_paste": req.paste_original, "out_feather": req.feather_px, "out_min_bar": req.min_bar,
+               "cam_ref": req.video_path, "cam_img": req.image_path or "",
                "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
                "width": req.width, "height": req.height, "seed": req.seed}
         if model:

@@ -359,6 +359,62 @@ def case_outpaint_narrow_bar_warning(w, spy):
     assert not t._outpaint_layout().narrow_bar and t._narrow_bar_text() not in t.out_info.text()
 
 
+def case_outpaint_formats_direction_feather(w, spy):
+    """Outpaint: tutti i formati (21:9, 1:1, 4:3, 3:4, 9:16) danno canvas validi; la riga info dice DOVE si aggiunge
+    (sopra/sotto/lati); «Estendi verso» sposta l'area nuova da una parte; sfumatura e barre minime finiscono nella cfg."""
+    from types import SimpleNamespace
+    _ack_dev(True)
+    from ui.i18n_manager import tr
+
+    def side(name):                                   # frammento localizzato «sopra {n} px» senza il numero
+        return tr(f"vedit.out.side.{name}", name).split("{n}")[0]
+    t = _fill_mode(w, "outpaint")
+    t._vinfo = SimpleNamespace(width=1280, height=720, nb_frames=49, fps=25.0)
+    for fmt in ("21:9", "1:1", "4:3", "3:4", "9:16"):
+        t.out_format.setCurrentIndex(t.out_format.findData(fmt))
+        t._on_outpaint_change()
+        lay = t._outpaint_layout()
+        assert lay is not None and lay.canvas_w % 64 == 0 and lay.canvas_h % 64 == 0 and lay.new_area > 0, fmt
+        assert "canvas" in t.out_info.text().lower(), fmt
+    # 4:3 da 16:9: barre SOPRA e SOTTO, dette nell'info
+    t.out_format.setCurrentIndex(t.out_format.findData("4:3"))
+    t._on_outpaint_change()
+    txt = t.out_info.text()
+    assert side("top") in txt and side("bottom") in txt and side("left") not in txt and "120 px" in txt, txt
+    # «Estendi verso» in alto: tutta l'area nuova sopra (video in basso)
+    t.out_anchor.setCurrentIndex(t.out_anchor.findData("bottom"))
+    t._on_outpaint_change()
+    lay = t._outpaint_layout()
+    txt = t.out_info.text()
+    assert lay.y > 0 and lay.y + lay.src_h == lay.canvas_h and side("top") in txt and side("bottom") not in txt, txt
+    # 21:9 da 16:9: lati
+    t.out_anchor.setCurrentIndex(t.out_anchor.findData("center"))
+    t.out_format.setCurrentIndex(t.out_format.findData("21:9"))
+    t._on_outpaint_change()
+    assert side("left") in t.out_info.text() and side("right") in t.out_info.text()
+    # sfumatura: default 24, attiva solo con «rimetti l'originale»; barre minime opt-in
+    assert t.out_feather.value() == 24 and t.out_feather.isEnabled() and not t.out_minbar.isChecked()
+    t.out_paste.setChecked(False)
+    assert not t.out_feather.isEnabled()
+    t.out_paste.setChecked(True)
+    t.out_feather.setValue(40)
+    n = len(spy.calls)
+    t._go()
+    cfg = _cfg_of(w)
+    assert len(spy.calls) == n + 1 and cfg["out_feather"] == 40 and cfg["out_min_bar"] == 0.0 and cfg["out_paste"] is True
+    t.out_format.setCurrentIndex(t.out_format.findData("4:3"))
+    plain = t._outpaint_layout()
+    t.out_minbar.setChecked(True)
+    t._on_outpaint_change()
+    shrunk = t._outpaint_layout()
+    assert plain.narrow_bar and not shrunk.narrow_bar and shrunk.scale < 1.0
+    t._go()
+    assert _cfg_of(w)["out_min_bar"] == 0.15
+    t.out_format.setCurrentIndex(t.out_format.findData("custom"))
+    assert not t.out_minbar.isEnabled()
+    t.out_minbar.setChecked(False)
+
+
 def case_outpaint_dark_autodetect(w, spy):
     """Sorgente scuro (video sintetico nero) → il checkbox gamma è suggerito in automatico (e dichiarato nel log)."""
     import subprocess
@@ -510,6 +566,8 @@ CASES = (
       case_outpaint_canvas_and_margins),
      ("vedit_outpaint_narrow_bar", "Outpaint: barra nuova < 15% del canvas avvisa (info+log); sorgente a scala 1.0.",
       case_outpaint_narrow_bar_warning),
+     ("vedit_outpaint_formats_dir_feather", "Outpaint: tutti i formati, info «Aggiunge: sopra/sotto/lati», Estendi verso, sfumatura e barre minime in cfg.",
+      case_outpaint_formats_direction_feather),
      ("vedit_outpaint_dark_autodetect", "Outpaint: sorgente scuro → gamma suggerito (e dichiarato nel log).",
       case_outpaint_dark_autodetect),
      ("vedit_cameraman_validation", "Cameraman: riferimento obbligatorio, <960x512 avvisa, video principale opzionale.",
