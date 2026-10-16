@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Чекпоинт dev",
   "vedit.ckpt.dlg_missing": "Для чекпоинта dev нужна официальная distilled-LoRA, и её нет на диске: без неё IC-LoRA дают недоочищенное видео. Скачайте её во вкладке «Веса моделей» (сам я ничего не скачиваю).",
   "vedit.ckpt.dlg_body2": "Чекпоинт — dev: будет добавлена официальная distilled-LoRA (сила 0,5, стадии 1 и 2, distilled-шаги), как в workflow Lightricks. Чекпоинт остаётся тем, что вы выбрали.",
-  "vedit.ckpt.btn_open_weights_tab": "Открыть вкладку Веса моделей"
+  "vedit.ckpt.btn_open_weights_tab": "Открыть вкладку Веса моделей",
+  "weights.dep.blocked.title": "Зависимость не входит в вашу редакцию",
+  "weights.dep.blocked.msg": "Модели '{m}' требуется {dep}, которого нет в вашей редакции: загрузка отменена.",
+  "vid.model.placeholder": "— выберите модель —",
+  "f1.gen.model.placeholder": "— выберите модель —",
+  "mw.pick_model_title": "Выберите модель",
+  "mw.pick_model_msg": "Выбранная модель больше недоступна в вашей редакции: выберите другую в меню «Модель»."
 }

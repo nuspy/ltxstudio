@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Checkpoint dev",
   "vedit.ckpt.dlg_missing": "Com o checkpoint dev é necessária a LoRA distilled oficial e ela não está no disco: sem ela as IC-LoRA geram vídeos sub-denoisados. Baixe-a na aba «Pesos dos modelos» (eu não baixo nada).",
   "vedit.ckpt.dlg_body2": "O checkpoint é um dev: será adicionada a LoRA distilled oficial (força 0,5, estágio 1 e estágio 2, passos distilled) como nos workflows da Lightricks. O checkpoint continua o que você escolheu.",
-  "vedit.ckpt.btn_open_weights_tab": "Abrir aba Pesos dos modelos"
+  "vedit.ckpt.btn_open_weights_tab": "Abrir aba Pesos dos modelos",
+  "weights.dep.blocked.title": "Dependência não incluída na sua edição",
+  "weights.dep.blocked.msg": "O modelo '{m}' requer {dep}, que a sua edição não inclui: download cancelado.",
+  "vid.model.placeholder": "— escolha um modelo —",
+  "f1.gen.model.placeholder": "— escolha um modelo —",
+  "mw.pick_model_title": "Escolha um modelo",
+  "mw.pick_model_msg": "O modelo escolhido já não está disponível na sua edição: selecione um no menu Modelo."
 }

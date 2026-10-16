@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Dev 检查点",
   "vedit.ckpt.dlg_missing": "dev 检查点需要官方 distilled LoRA，但磁盘上没有：没有它，IC-LoRA 会生成去噪不足的视频。请在「模型权重」标签页下载（我不会自行下载任何东西）。",
   "vedit.ckpt.dlg_body2": "检查点是 dev：将按 Lightricks 工作流添加官方 distilled LoRA（强度 0.5，第 1 和第 2 阶段，distilled 步数）。检查点仍是你选择的那个。",
-  "vedit.ckpt.btn_open_weights_tab": "打开模型权重标签页"
+  "vedit.ckpt.btn_open_weights_tab": "打开模型权重标签页",
+  "weights.dep.blocked.title": "您的版本不包含此依赖项",
+  "weights.dep.blocked.msg": "模型“{m}”需要 {dep},但您的版本不包含它:已取消下载。",
+  "vid.model.placeholder": "— 请选择模型 —",
+  "f1.gen.model.placeholder": "— 请选择模型 —",
+  "mw.pick_model_title": "请选择模型",
+  "mw.pick_model_msg": "所选模型在您的版本中已不可用:请从“模型”菜单中另选一个。"
 }

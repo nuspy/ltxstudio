@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Dev 체크포인트",
   "vedit.ckpt.dlg_missing": "dev 체크포인트에는 공식 distilled LoRA가 필요하지만 디스크에 없습니다. 없으면 IC-LoRA가 노이즈가 덜 제거된 영상을 만듭니다. «모델 가중치» 탭에서 내려받으세요(저는 아무것도 내려받지 않습니다).",
   "vedit.ckpt.dlg_body2": "체크포인트가 dev입니다. Lightricks 워크플로처럼 공식 distilled LoRA가 추가됩니다(강도 0.5, 1단계와 2단계 모두, distilled 스텝). 체크포인트는 선택한 그대로 유지됩니다.",
-  "vedit.ckpt.btn_open_weights_tab": "모델 가중치 탭 열기"
+  "vedit.ckpt.btn_open_weights_tab": "모델 가중치 탭 열기",
+  "weights.dep.blocked.title": "에디션에 포함되지 않은 종속성",
+  "weights.dep.blocked.msg": "모델 '{m}'에는 {dep}이(가) 필요하지만 사용 중인 에디션에 포함되어 있지 않습니다. 다운로드를 취소했습니다.",
+  "vid.model.placeholder": "— 모델을 선택하세요 —",
+  "f1.gen.model.placeholder": "— 모델을 선택하세요 —",
+  "mw.pick_model_title": "모델 선택",
+  "mw.pick_model_msg": "선택한 모델은 현재 에디션에서 더 이상 사용할 수 없습니다. 모델 메뉴에서 다른 모델을 선택하세요."
 }

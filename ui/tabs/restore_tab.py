@@ -211,6 +211,12 @@ class RestoreTab(QWidget):
         return "" if v == tr("res.color.no_model") else v
 
     def _on_process(self):
+        from ui import model_menu as mm
+        _need = [self.upscale_model] if (self.radio_restore.isChecked() or self.radio_both.isChecked()) else []
+        if self.radio_colorize.isChecked() or self.radio_both.isChecked():
+            _need.append(self.flux2_model)
+        if mm.blocked(self, *_need):
+            return
         if self.radio_restore.isChecked():
             op = "restore"
         elif self.radio_colorize.isChecked():
@@ -242,7 +248,8 @@ class RestoreTab(QWidget):
     # ---------- API inventory ----------
     def set_upscale_models(self, models: list[str]):
         """Popola il combo modelli upscale (chiamato da main_window al caricamento inventario)."""
-        prev = self.upscale_model.currentText()
+        from ui import model_menu as mm
+        prev = mm.current_key(self.upscale_model)
         self.upscale_model.clear()
         preferred = [m for m in models if "ultra" in m.lower() or "real" in m.lower() or "nomos" in m.lower()]
         rest = [m for m in models if m not in preferred]
@@ -255,9 +262,7 @@ class RestoreTab(QWidget):
                            name_to_path=lambda n: str(_r / n) if not Path(n).is_file() else n)
         except Exception:                                          # noqa: BLE001
             pass
-        idx = self.upscale_model.findText(prev)
-        if idx >= 0:
-            self.upscale_model.setCurrentIndex(idx)
+        mm.settle(self.upscale_model, prev)          # modello sparito: segnaposto, non il primo
 
     def set_flux2_models(self, models: list[str]):
         """Popola il combo modelli FLUX.2 per colorizzazione + COLORI VRAM (verde/giallo/rosso),
@@ -265,7 +270,8 @@ class RestoreTab(QWidget):
         from PySide6.QtGui import QColor
         from PySide6.QtCore import Qt as _Qt
         from core import model_precision as mp
-        prev = self.flux2_model.currentText()
+        from ui import model_menu as mm
+        prev = mm.current_key(self.flux2_model)
         self.flux2_model.clear()
         flux2 = [m for m in models if "flux2" in m.lower() or "flux_2" in m.lower() or "flux 2" in m.lower()]
         if not flux2:
@@ -283,9 +289,7 @@ class RestoreTab(QWidget):
                     self.flux2_model.setItemData(i, QColor(col), _Qt.ForegroundRole)
                     self.flux2_model.setItemData(
                         i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB", _Qt.ToolTipRole)
-        idx = self.flux2_model.findText(prev)
-        if idx >= 0:
-            self.flux2_model.setCurrentIndex(idx)
+        mm.settle(self.flux2_model, prev)
 
     def get_config(self) -> dict:
         """Ritorna la configurazione corrente (per lettura esterna senza cliccare il pulsante)."""

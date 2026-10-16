@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Dev चेकपॉइंट",
   "vedit.ckpt.dlg_missing": "dev चेकपॉइंट के साथ आधिकारिक distilled LoRA ज़रूरी है और वह डिस्क पर नहीं है: इसके बिना IC-LoRA अधूरे डीनॉइज़ वाले वीडियो देते हैं। इसे «मॉडल वेट्स» टैब से डाउनलोड करें (मैं खुद कुछ डाउनलोड नहीं करता)।",
   "vedit.ckpt.dlg_body2": "चेकपॉइंट dev है: Lightricks के workflow की तरह आधिकारिक distilled LoRA जोड़ा जाएगा (ताकत 0.5, स्टेज 1 और स्टेज 2, distilled स्टेप)। चेकपॉइंट वही रहेगा जो आपने चुना।",
-  "vedit.ckpt.btn_open_weights_tab": "मॉडल वेट्स टैब खोलें"
+  "vedit.ckpt.btn_open_weights_tab": "मॉडल वेट्स टैब खोलें",
+  "weights.dep.blocked.title": "निर्भरता आपके संस्करण में शामिल नहीं है",
+  "weights.dep.blocked.msg": "मॉडल '{m}' को {dep} चाहिए, जो आपके संस्करण में शामिल नहीं है: डाउनलोड रद्द किया गया।",
+  "vid.model.placeholder": "— कोई मॉडल चुनें —",
+  "f1.gen.model.placeholder": "— कोई मॉडल चुनें —",
+  "mw.pick_model_title": "मॉडल चुनें",
+  "mw.pick_model_msg": "आपने जो मॉडल चुना था वह अब आपके संस्करण में उपलब्ध नहीं है: मॉडल मेनू से कोई दूसरा चुनें।"
 }

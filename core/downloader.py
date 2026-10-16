@@ -205,8 +205,11 @@ def download_entry(entry: dict, *, base_dir: str | None = None, token: str | Non
     return Path(dest_dir)
 
 
-def plan_ids(ids: list[str]) -> list[dict]:
-    """Espande gli id con le dipendenze ricorsive (deps PRIMA), dedup, in ordine di download."""
+def plan_ids(ids: list[str], *, enforce_matrix: bool = True) -> list[dict]:
+    """Espande gli id con le dipendenze ricorsive (deps PRIMA), dedup, in ordine di download.
+    Le dipendenze rispettano la matrice dell'edizione: per «a|b» si sceglie l'alternativa consentita; se
+    nessuna lo e' → `wc.DepNotAllowedError` (mai un download silenzioso di cio' che l'edizione non include).
+    `enforce_matrix=False` per gli strumenti di sviluppo."""
     by_id = {e["id"]: e for e in wc.load()}
     out: list[dict] = []
     seen: set[str] = set()
@@ -216,7 +219,7 @@ def plan_ids(ids: list[str]) -> list[dict]:
             return
         seen.add(eid)
         for d in by_id[eid].get("deps", []):
-            visit(wc.resolve_dep(d, by_id))          # alternative «a|b»: quella presente, o la prima
+            visit(wc.resolve_dep(d, by_id, strict=enforce_matrix, owner=eid))   # «a|b»: presente/consentita
         out.append(by_id[eid])
 
     for i in ids:

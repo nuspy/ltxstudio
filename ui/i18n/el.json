@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Checkpoint dev",
   "vedit.ckpt.dlg_missing": "Με το checkpoint dev χρειάζεται το επίσημο distilled LoRA και δεν υπάρχει στον δίσκο: χωρίς αυτό τα IC-LoRA δίνουν βίντεο με ανεπαρκή αποθορυβοποίηση. Κατέβασέ το από την καρτέλα «Βάρη μοντέλων» (δεν κατεβάζω τίποτα μόνος μου).",
   "vedit.ckpt.dlg_body2": "Το checkpoint είναι dev: θα προστεθεί το επίσημο distilled LoRA (ένταση 0,5, στάδιο 1 και στάδιο 2, distilled βήματα) όπως στα workflow της Lightricks. Το checkpoint μένει αυτό που επέλεξες.",
-  "vedit.ckpt.btn_open_weights_tab": "Άνοιγμα καρτέλας Βάρη μοντέλων"
+  "vedit.ckpt.btn_open_weights_tab": "Άνοιγμα καρτέλας Βάρη μοντέλων",
+  "weights.dep.blocked.title": "Εξάρτηση που δεν περιλαμβάνεται στην έκδοσή σου",
+  "weights.dep.blocked.msg": "Το μοντέλο '{m}' απαιτεί {dep}, το οποίο η έκδοσή σου δεν περιλαμβάνει: η λήψη ακυρώθηκε.",
+  "vid.model.placeholder": "— επίλεξε μοντέλο —",
+  "f1.gen.model.placeholder": "— επίλεξε μοντέλο —",
+  "mw.pick_model_title": "Επίλεξε μοντέλο",
+  "mw.pick_model_msg": "Το μοντέλο που επέλεξες δεν είναι πλέον διαθέσιμο στην έκδοσή σου: διάλεξε ένα από το μενού Μοντέλο."
 }

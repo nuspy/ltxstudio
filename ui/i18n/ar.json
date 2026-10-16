@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "نقطة تحقق dev",
   "vedit.ckpt.dlg_missing": "مع نقطة تحقق dev تلزم distilled LoRA الرسمية وهي غير موجودة على القرص: بدونها تنتج IC-LoRA فيديو غير مُزال الضجيج بالكامل. نزّلها من تبويب «أوزان النماذج» (لا أنزّل شيئًا بنفسي).",
   "vedit.ckpt.dlg_body2": "نقطة التحقق هي dev: ستُضاف distilled LoRA الرسمية (القوة 0.5، المرحلتان 1 و2، خطوات distilled) كما في workflows شركة Lightricks. تبقى نقطة التحقق هي التي اخترتها.",
-  "vedit.ckpt.btn_open_weights_tab": "فتح تبويب أوزان النماذج"
+  "vedit.ckpt.btn_open_weights_tab": "فتح تبويب أوزان النماذج",
+  "weights.dep.blocked.title": "تبعية غير مضمّنة في إصدارك",
+  "weights.dep.blocked.msg": "يتطلب النموذج '{m}' العنصر {dep}، وهو غير مضمّن في إصدارك: تم إلغاء التنزيل.",
+  "vid.model.placeholder": "— اختر نموذجًا —",
+  "f1.gen.model.placeholder": "— اختر نموذجًا —",
+  "mw.pick_model_title": "اختر نموذجًا",
+  "mw.pick_model_msg": "النموذج الذي اخترته لم يعد متاحًا في إصدارك: اختر نموذجًا من قائمة النموذج."
 }

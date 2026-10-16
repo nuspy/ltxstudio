@@ -807,6 +807,10 @@ class Frame1Tab(QWidget):
         except Exception:                                     # noqa: BLE001
             return True
 
+    def gen_model_is_placeholder(self) -> bool:
+        from ui import model_menu as mm
+        return mm.is_placeholder(self.gen_model)
+
     def _reload_gen_catalog(self, items, combo=None):
         """Popola un dropdown con voci di CATALOGO (snapshot/profili senza file-modello unico), con badge ⬇
         e colore se non presenti → download-on-select come nel tab Video. items = [(cat_id, label)].
@@ -816,12 +820,13 @@ class Frame1Tab(QWidget):
         combo = combo if combo is not None else self.gen_model
         entries = {e["id"]: e for e in wc.load()}
         adult_ok = self._adult_ok()
-        prev = combo.currentData()
+        from ui import model_menu as mm
+        prev = mm.current_key(combo)
         combo.blockSignals(True)
         combo.clear()
         for cat_id, label in items:
             e = entries.get(cat_id)
-            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.model_allowed(e):
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.menu_allowed(e):
                 continue
             present = False
             try:
@@ -834,9 +839,8 @@ class Frame1Tab(QWidget):
             combo.setItemData(combo.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 combo.setItemData(combo.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
-        i = combo.findData(prev) if prev else -1
-        if i >= 0:
-            combo.setCurrentIndex(i)
+        # scelta sparita (matrice / NSFW): segnaposto «scegli un modello», mai il primo elemento
+        mm.settle(combo, prev, {c for c, _l in items})
         combo.blockSignals(False)
         if combo is self.gen_model:
             self._update_gen_star()
@@ -922,7 +926,15 @@ class Frame1Tab(QWidget):
         e = entries.get(cat_id)
         if not e:
             return
-        missing = wc.missing_ids_with_deps(e)
+        try:
+            missing = wc.missing_ids_with_deps(e, strict=True)
+        except wc.DepNotAllowedError as ex:                    # dipendenza non inclusa nell'edizione
+            from PySide6.QtWidgets import QMessageBox as _QMB
+            _QMB.warning(self, tr("weights.dep.blocked.title", "Dipendenza non inclusa nell'edizione"),
+                         tr("weights.dep.blocked.msg",
+                            "Il modello '{m}' richiede {dep}, che la tua edizione non include: "
+                            "download annullato.").format(m=ex.owner, dep=" / ".join(ex.alternatives)))
+            return
         if not missing:
             return
         gb = sum(int(entries.get(m, {}).get("approx_gb", 0) or 0) for m in missing)
@@ -1008,19 +1020,20 @@ class Frame1Tab(QWidget):
         flux2 = [m for m in self._models
                  if _is_flux2(m) and "fill" not in m.lower()
                  and (allow or not self._mcat.is_nsfw(m))]
+        from ui import model_menu as mm
+        flux2_all = [m for m in self._models if _is_flux2(m) and "fill" not in m.lower()]
         refine_combo = getattr(self, "up_refine_model", None)
         if refine_combo is not None:
-            cur = refine_combo.currentText()
+            cur = mm.current_key(refine_combo)
             refine_combo.clear()
             refine_combo.addItems(flux2) if flux2 else refine_combo.addItem(tr("f1.flux2.none"))
             if flux2:
                 self._color_name_combo(refine_combo)
-            if cur in flux2:
-                refine_combo.setCurrentText(cur)
+            mm.settle(refine_combo, cur, flux2_all)
         # integra: liste separate per engine
         ic = getattr(self, "integrate_model", None)
         if ic is not None:
-            cur = ic.currentText()
+            cur = mm.current_key(ic)
             engine = (self.integrate_engine.currentIndex()
                       if hasattr(self, "integrate_engine") else 0)
             if engine == QWEN21_ENGINE_IDX:        # Qwen-Image 2.1 → DiT dal catalogo (18+ solo in NSFW)
@@ -1037,20 +1050,18 @@ class Frame1Tab(QWidget):
                     self.integrate_puzzle.setEnabled(False); self.integrate_puzzle.setChecked(False)
                 return
             if engine == 1:                        # FLUX.2
-                pool = flux2
+                pool, cand = flux2, flux2_all
                 empty = tr("f1.flux2.none")
             else:                                  # Kontext (FLUX.1)
-                pool = [m for m in self._models
-                        if "kontext" in m.lower() and "fill" not in m.lower()
-                        and not _is_flux2(m)
-                        and (allow or not self._mcat.is_nsfw(m))]
+                cand = [m for m in self._models
+                        if "kontext" in m.lower() and "fill" not in m.lower() and not _is_flux2(m)]
+                pool = [m for m in cand if allow or not self._mcat.is_nsfw(m)]
                 empty = tr("f1.kontext.none")
             ic.clear()
             ic.addItems(pool) if pool else ic.addItem(empty)
             if pool:
                 self._color_name_combo(ic)
-            if cur in pool:
-                ic.setCurrentText(cur)
+            mm.settle(ic, cur, cand)
         # puzzle_lora è una LoRA FLUX.1 → disabilita in modalità FLUX.2
         if hasattr(self, "integrate_puzzle") and hasattr(self, "integrate_engine"):
             is_flux2_mode = (self.integrate_engine.currentIndex() == 1)
@@ -1625,13 +1636,18 @@ class Frame1Tab(QWidget):
             w.setEnabled(refine)
 
     def set_upscale_models(self, models: list[str]):
+        from ui import model_menu as mm
+        prev = mm.current_key(self.up_model)
         self.up_model.clear()
         if not models:
-            self.up_model.addItem(tr("f1.upscale.none")); return
+            self.up_model.addItem(tr("f1.upscale.none"))
+            mm.settle(self.up_model, prev)                         # file spariti: segnaposto
+            return
         pref = [m for m in _UPSCALE_PREFERRED if m in models]      # preferiti (più potenti) davanti
         rest = [m for m in models if m not in pref]
         for m in pref + rest:
             self.up_model.addItem(m)
+        mm.settle(self.up_model, prev)
         try:                                                       # colori VRAM (header-aware)
             from ui.widgets.precision_combo import color_existing
             from pathlib import Path as _P
@@ -1787,6 +1803,8 @@ class Frame1Tab(QWidget):
         ckpts = [c for c in checkpoint_models if is_flux_like(c)]
         # in più: prendi anche i UNET Flux da diffusion_models (Fill, Dev, ecc.)
         unets = [m for m in (self._models or []) if is_flux_like(m)]
+        from ui import model_menu as mm
+        prev_key = mm.current_key(self.inp_model)          # per il segnaposto se il file scelto e' sparito
         # rimuovi voci dinamiche precedenti
         for label in list(self._dynamic_checkpoints.keys()):
             idx = self.inp_model.findText(label)
@@ -1823,6 +1841,11 @@ class Frame1Tab(QWidget):
             self._dynamic_unets[label] = u
             self.inp_model.insertItem(insert_at, label)
             insert_at += 1
+        self.inp_model.blockSignals(True)
+        try:                                                # scelta sparita dall'inventario → segnaposto, mai il primo
+            mm.settle(self.inp_model, prev_key)
+        finally:
+            self.inp_model.blockSignals(False)
 
     def set_inpaint_availability(self, unet_names: list[str]):
         """Marca nel menu i modelli inpaint NON ancora presenti in ComfyUI (es. in download)."""
@@ -1868,7 +1891,9 @@ class Frame1Tab(QWidget):
             return
         from core import weights_catalog as wc
         entries = {e["id"]: e for e in wc.load()}
+        from ui import model_menu as mm
         cur = self._inp_label()
+        prev_key = mm.current_key(self.inp_model)
         self.inp_model.blockSignals(True)
         for label in list(getattr(self, "_qwen21_inp", {})):
             i = self.inp_model.findText(label)
@@ -1880,7 +1905,7 @@ class Frame1Tab(QWidget):
         adult_ok = self._adult_ok()
         for cid, lbl in self._qwen21_items():
             e = entries.get(cid)
-            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.model_allowed(e):
+            if not e or (e.get("sensitivity") == "adult" and not adult_ok) or not wc.menu_allowed(e):
                 continue
             label = f"{lbl}  · Qwen-Image 2.1" + ("" if wc.ready_with_deps(e) else "  ⬇")
             self._qwen21_inp[label] = cid
@@ -1891,8 +1916,10 @@ class Frame1Tab(QWidget):
         i = self.inp_model.findText(cur)
         if i >= 0:
             self.inp_model.setCurrentIndex(i)
+        else:                                                 # voce spostata/sparita (matrice, SFW, download)
+            mm.settle(self.inp_model, prev_key)                # sparita → segnaposto, mai il primo elemento
         self.inp_model.blockSignals(False)
-        if self.inp_model.currentText() != cur:               # la voce scelta è sparita (es. SFW)
+        if self.inp_model.currentText() != cur:
             self._reload_inpaint_loras()
 
     def _sync_klein_te(self, *_):

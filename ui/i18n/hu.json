@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "Dev checkpoint",
   "vedit.ckpt.dlg_missing": "A dev checkpointhoz a hivatalos distilled LoRA kell, és nincs a lemezen: nélküle az IC-LoRA-k alulzajtalanított videót adnak. Töltsd le a «Modellsúlyok» fülön (én nem töltök le semmit).",
   "vedit.ckpt.dlg_body2": "A checkpoint dev: a hivatalos distilled LoRA hozzáadódik (erősség 0,5, 1. és 2. szakasz, distilled lépések), mint a Lightricks workflow-kban. A checkpoint az marad, amit választottál.",
-  "vedit.ckpt.btn_open_weights_tab": "Modellsúlyok fül megnyitása"
+  "vedit.ckpt.btn_open_weights_tab": "Modellsúlyok fül megnyitása",
+  "weights.dep.blocked.title": "A függőség nem része a kiadásodnak",
+  "weights.dep.blocked.msg": "A(z) '{m}' modellhez szükség van erre: {dep}, de a kiadásod nem tartalmazza: a letöltés megszakítva.",
+  "vid.model.placeholder": "— válassz modellt —",
+  "f1.gen.model.placeholder": "— válassz modellt —",
+  "mw.pick_model_title": "Válassz modellt",
+  "mw.pick_model_msg": "A választott modell már nem érhető el a kiadásodban: válassz egyet a Modell menüből."
 }

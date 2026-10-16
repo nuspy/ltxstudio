@@ -3243,5 +3243,11 @@
   "vedit.ckpt.dlg_title2": "נקודת בדיקה dev",
   "vedit.ckpt.dlg_missing": "עם נקודת בדיקה dev נדרש distilled LoRA רשמי והוא לא נמצא בדיסק: בלעדיו IC-LoRA מפיקים וידאו עם הסרת רעש חלקית. הורד אותו מהלשונית «משקלי מודלים» (אני לא מוריד דבר בעצמי).",
   "vedit.ckpt.dlg_body2": "נקודת הבדיקה היא dev: יתווסף distilled LoRA רשמי (עוצמה 0.5, שלב 1 ושלב 2, צעדי distilled) כמו ב-workflows של Lightricks. נקודת הבדיקה נשארת זו שבחרת.",
-  "vedit.ckpt.btn_open_weights_tab": "פתח את לשונית משקלי מודלים"
+  "vedit.ckpt.btn_open_weights_tab": "פתח את לשונית משקלי מודלים",
+  "weights.dep.blocked.title": "תלות שאינה כלולה במהדורה שלך",
+  "weights.dep.blocked.msg": "המודל '{m}' דורש {dep}, שאינו כלול במהדורה שלך: ההורדה בוטלה.",
+  "vid.model.placeholder": "— בחר מודל —",
+  "f1.gen.model.placeholder": "— בחר מודל —",
+  "mw.pick_model_title": "בחר מודל",
+  "mw.pick_model_msg": "המודל שבחרת אינו זמין עוד במהדורה שלך: בחר מודל מתפריט המודל."
 }

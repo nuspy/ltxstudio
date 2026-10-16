@@ -259,3 +259,115 @@ CASES = [
     ("qwen21_inpaint_mask", "Inpaint: voce Qwen nel combo modelli → foto + maschera + forza al worker.",
      case_qwen21_inpaint_mask),
 ]
+
+
+def case_qwen21_model_disappears_placeholder(w, spy):
+    """Il DiT scelto sparisce dal menu (riga della matrice spenta): il combo NON ricade sul primo elemento ma resta
+    su «— scegli un modello —» e generate_image si ferma senza inviare nulla."""
+    from core import features
+    f = w.frame1_tab
+    saved = (features._MANIFEST, features._FEATURES)
+    try:
+        f.img_nsfw.setCurrentText("SFW")
+        f.gen_arch.setCurrentText("Qwen-Image 2.1")
+        i = f.gen_model.findData("qwen21-dit-fp8")
+        assert i >= 0, _ids(f.gen_model)
+        f.gen_model.setCurrentIndex(i)
+        feats = {"cap.image_qwen21": {"enabled": True, "params": {}},
+                 "model.qwen21-dit-fp8": {"enabled": False, "params": {}}}
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        f._reload_gen_qwen21()
+        assert f.gen_model_is_placeholder(), f"atteso segnaposto, trovato {f.gen_model.currentData()}"
+        assert f.gen_model.currentIndex() == 0 and "qwen21-dit-fp8" not in _ids(f.gen_model)
+        f.gen_prompt.setPlainText("una medusa di cristallo sopra una citta' in tempesta")
+        before = len(spy.calls)
+        w.generate_image()
+        assert len(spy.calls) == before, "con il segnaposto la generazione NON deve partire"
+    finally:
+        features._MANIFEST, features._FEATURES = saved
+        f._reload_gen_qwen21()
+
+
+CASES.append(("qwen21_model_disappears_placeholder",
+              "DiT Qwen sparito dal menu (matrice): segnaposto «scegli un modello», generazione bloccata.",
+              case_qwen21_model_disappears_placeholder))
+
+
+def case_model_placeholder_other_combos(w, spy):
+    """Regola «mai il primo elemento al posto della scelta»: vale anche per Integra (Qwen), Cambia colore, Inpaint, Upscale e
+    Restauro. Il modello scelto sparisce → segnaposto + azione bloccata (nessuna richiesta al backend)."""
+    from core import features
+    from ui import model_menu as mm
+    f = w.frame1_tab
+    saved = (features._MANIFEST, features._FEATURES)
+    try:
+        f.img_nsfw.setCurrentText("SFW")
+        # --- Integra con Qwen-Image 2.1 ---
+        f.integrate_engine.setCurrentIndex(3)
+        f._reload_flux_combos()
+        f.integrate_model.setCurrentIndex(f.integrate_model.findData("qwen21-dit-fp8"))
+        assert f.integrate_model.currentData() == "qwen21-dit-fp8", _ids(f.integrate_model)
+        feats = {"cap.image_qwen21": {"enabled": True, "params": {}},
+                 "model.qwen21-dit-fp8": {"enabled": False, "params": {}}}
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        f._reload_flux_combos()
+        assert mm.is_placeholder(f.integrate_model) and f.integrate_model.currentIndex() == 0
+        before = len(spy.calls)
+        w.generate_integrate()
+        assert len(spy.calls) == before, "Integra: con il segnaposto non deve partire nulla"
+        # --- Cambia colore (Qwen) ---
+        f.color_engine.setCurrentIndex(3)
+        f._reload_qwen21_edit_combos()
+        w.generate_recolor()
+        assert len(spy.calls) == before, "Colore: con il segnaposto non deve partire nulla"
+        # --- Inpaint: voce Qwen scelta poi sparita ---
+        features._MANIFEST, features._FEATURES = saved
+        f._reload_qwen21_edit_combos()
+        lab = next(l for l, c in f._qwen21_inp.items() if c == "qwen21-dit-fp8")
+        f.inp_model.setCurrentIndex(f.inp_model.findText(lab))
+        features._MANIFEST = {"features": feats, "allows_adult": False}
+        features._FEATURES = feats
+        f._reload_qwen21_edit_combos()
+        assert mm.is_placeholder(f.inp_model), f.inp_model.currentText()
+        w.generate_inpaint("inpaint")
+        assert len(spy.calls) == before, "Inpaint: con il segnaposto non deve partire nulla"
+        # --- Upscale: file spariti dall'inventario ---
+        f.set_upscale_models(["a_x4.pth", "b_x4.pth"])
+        f.up_model.setCurrentIndex(1)
+        f.set_upscale_models(["a_x4.pth"])
+        assert mm.is_placeholder(f.up_model) and f.up_model.currentIndex() == 0
+        w.generate_upscale()
+        assert len(spy.calls) == before, "Upscale: con il segnaposto non deve partire nulla"
+        # --- Restauro ---
+        r = w.restore_tab
+        got = []
+        r.request_restore.connect(got.append)
+        r.set_upscale_models(["u1.pth", "u2.pth"])
+        r.upscale_model.setCurrentIndex(1)
+        r.set_upscale_models(["u1.pth"])
+        assert mm.is_placeholder(r.upscale_model)
+        r.radio_restore.setChecked(True)
+        r._on_process()
+        assert not got, "Restauro: con il segnaposto non deve partire nulla"
+        r.set_upscale_models(["u1.pth", "u2.pth"])               # il segnaposto resta finche' l'utente non sceglie
+        assert mm.is_placeholder(r.upscale_model)
+        # --- Inpaint: checkpoint FLUX da inventario scelto poi sparito ---
+        features._MANIFEST, features._FEATURES = saved
+        f._refresh_inpaint_checkpoints(["flux_aaa.safetensors", "flux_bbb.safetensors"])
+        j = f.inp_model.findText("flux_bbb  · checkpoint Flux")
+        assert j >= 0, [f.inp_model.itemText(i) for i in range(f.inp_model.count())]
+        f.inp_model.setCurrentIndex(j)
+        f._refresh_inpaint_checkpoints(["flux_aaa.safetensors"])
+        assert mm.is_placeholder(f.inp_model) and f.inp_model.currentIndex() == 0, f.inp_model.currentText()
+        w.generate_inpaint("inpaint")
+        assert len(spy.calls) == before, "Inpaint (inventario): con il segnaposto non deve partire nulla"
+        f._refresh_inpaint_checkpoints([])                       # ripulisce le voci dinamiche del test
+    finally:
+        features._MANIFEST, features._FEATURES = saved
+
+
+CASES.append(("model_placeholder_other_combos",
+              "Integra/Colore/Inpaint/Upscale/Restauro: scelta sparita → segnaposto e azione bloccata (mai il primo).",
+              case_model_placeholder_other_combos))

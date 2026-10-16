@@ -754,6 +754,21 @@ class VideoTab(QWidget):
             ss.set_suggested_steps(S.TURBO[t][1] if t else S.DEFAULT_NFE, note="MiniMax H3")
             ss.steps.setEnabled(not t)
 
+    @staticmethod
+    def _model_key(combo, i):
+        return (combo.itemData(i) or {}).get("key")
+
+    def _finish_model_menu(self, prev_key, candidates: set):
+        """Dopo aver ripopolato il menu modelli: riseleziona la scelta di prima; se e' SPARITA (matrice
+        dell'edizione, modalita' NSFW...) resta il segnaposto «scegli un modello» (ui/model_menu.py)."""
+        from ui import model_menu as mm
+        mm.settle(self.model, prev_key, candidates, key_of=lambda i: self._model_key(self.model, i),
+                  data={"kind": "placeholder", "placeholder": True, "key": mm.PLACEHOLDER})
+
+    def model_is_placeholder(self) -> bool:
+        from ui import model_menu as mm
+        return mm.is_placeholder(self.model)
+
     def _refilter_h3_models(self):
         """Dropdown modello = profili di quantizzazione H3 (il checkpoint FL2VA o Ref2VA lo decide la
         modalità: con i riferimenti serve il Ref2VA). Non scaricati → evidenziati, download su selezione."""
@@ -762,7 +777,8 @@ class VideoTab(QWidget):
         from core import weights_tooltips as _wt
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
-        prev = (self.model.currentData() or {}).get("key")
+        from ui import model_menu as _mm
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         labels = {"nvfp4": tr("vid.h3.prof.nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"),
                   "fp8": tr("vid.h3.prof.fp8", "fp8 · 21 GB (RTX 40xx)"),
                   "int8": tr("vid.h3.prof.int8", "int8-ConvRot · 21 GB (tutte le GPU)"),
@@ -771,7 +787,7 @@ class VideoTab(QWidget):
         self.model.clear()
         for prof, (fl, _ref, _te) in S.PROFILES.items():
             e = entries.get(fl)
-            if not e or not wc.model_allowed(e):        # riga model.<id> dell'edizione
+            if not e or not wc.menu_allowed(e):        # riga model.<id> dell'edizione
                 continue
             try:
                 present = wc.is_present(e)
@@ -795,7 +811,7 @@ class VideoTab(QWidget):
             pass
         for cid, meta in S.CUSTOM_DITS.items():
             e = entries.get(cid)
-            if not e or not wc.model_allowed(e) or (e.get("sensitivity") == "adult" and not _adult):
+            if not e or not wc.menu_allowed(e) or (e.get("sensitivity") == "adult" and not _adult):
                 continue
             try:
                 present = wc.is_present(e)
@@ -810,9 +826,8 @@ class VideoTab(QWidget):
                                    Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(i, QColor("#e8b339"), Qt.ForegroundRole)
-        j = next((k for k in range(self.model.count()) if (self.model.itemData(k) or {}).get("key") == prev), -1)
-        if j >= 0:
-            self.model.setCurrentIndex(j)
+        self._finish_model_menu(prev, {f"minimax_h3:{p}" for p in S.PROFILES}
+                                | {f"minimax_h3:{c}" for c in S.CUSTOM_DITS})
         self.model.blockSignals(False)
 
     def _refilter_lingbot_models(self):
@@ -823,6 +838,8 @@ class VideoTab(QWidget):
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
         _free_gb = _mp.gpu_free_gb()
+        from ui import model_menu as _mm
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         self.model.blockSignals(True)
         self.model.clear()
         # (id_catalogo, variante, etichetta)
@@ -834,7 +851,7 @@ class VideoTab(QWidget):
         ]
         for cat_id, variant, label in variants:
             e = entries.get(cat_id)
-            if not e or not wc.model_allowed(e):        # riga model.<id> dell'edizione
+            if not e or not wc.menu_allowed(e):        # riga model.<id> dell'edizione
                 continue
             present = False
             model_dir = ""
@@ -855,6 +872,7 @@ class VideoTab(QWidget):
             self.model.setItemData(self.model.count() - 1, _tt, Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self._finish_model_menu(prev, {f"lingbot:{c}" for c, _v, _l in variants})
         self.model.blockSignals(False)
         # NB: NON offrire il download qui (refilter è anche programmatico) — l'offerta parte solo su
         # selezione ESPLICITA dell'utente (model.activated → _on_model_activated), mai in automatico.
@@ -877,7 +895,15 @@ class VideoTab(QWidget):
         e = entries.get(cat_id)
         if not e:
             return
-        missing = wc.missing_ids_with_deps(e)                 # modello + dipendenze mancanti (base Wan inclusa)
+        try:
+            missing = wc.missing_ids_with_deps(e, strict=True)   # modello + dipendenze mancanti (base Wan inclusa)
+        except wc.DepNotAllowedError as ex:                    # dipendenza non inclusa nell'edizione
+            from PySide6.QtWidgets import QMessageBox as _QMB
+            _QMB.warning(self, tr("weights.dep.blocked.title", "Dipendenza non inclusa nell'edizione"),
+                         tr("weights.dep.blocked.msg",
+                            "Il modello '{m}' richiede {dep}, che la tua edizione non include: "
+                            "download annullato.").format(m=ex.owner, dep=" / ".join(ex.alternatives)))
+            return
         if not missing:
             return
         gb = sum(int(entries.get(m, {}).get("approx_gb", 0) or 0) for m in missing)
@@ -922,11 +948,13 @@ class VideoTab(QWidget):
         from PySide6.QtGui import QColor
         arch = self._arch()
         entries = {e["id"]: e for e in wc.load()}
+        from ui import model_menu as _mm
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         self.model.blockSignals(True)
         self.model.clear()
         for cat_id, variant, label in items:
             e = entries.get(cat_id)
-            if not e or not wc.model_allowed(e):        # riga model.<id> dell'edizione
+            if not e or not wc.menu_allowed(e):        # riga model.<id> dell'edizione
                 continue
             present, model_dir = False, ""
             try:
@@ -944,6 +972,7 @@ class VideoTab(QWidget):
             self.model.setItemData(self.model.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 self.model.setItemData(self.model.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        self._finish_model_menu(prev, {f"{arch}:{c}" for c, _v, _l in items})
         self.model.blockSignals(False)
 
     def _resolve_model_path(self, name: str) -> str | None:

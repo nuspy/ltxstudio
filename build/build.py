@@ -34,6 +34,19 @@ def load_descriptor(project: str) -> tuple[dict, Path]:
     return desc, fm_root
 
 
+def validate_matrix(python: str, fm_root: Path, project: str) -> bool:
+    """Pre-flight: `feature_matrix validate` (integrita' + coerenza funzioni/modelli/dipendenze). Gli ERRORI
+    fermano il build; i warning no. Sola lettura: gira anche con --dry-run. Correzione: `validate --fix`."""
+    print("\n=== validate matrice (coerenza funzioni <-> modelli) ===")
+    rc = subprocess.run([python, "-m", "feature_matrix", "--project", project, "validate"],
+                        cwd=str(fm_root)).returncode
+    if rc != 0:
+        print("  [ERR] la matrice ha errori: build fermato. Correggi dall'editor (Riconcilia) o con "
+              "`python -m feature_matrix validate --fix` in feature_matrix, poi rilancia.")
+        return False
+    return True
+
+
 def run(cmd, cwd=None, dry=False, env=None) -> int:
     print("  $", " ".join(str(c) for c in cmd))
     if dry:
@@ -214,6 +227,8 @@ def main(argv=None) -> int:
 
     print(f"Pipeline build: profili={editions} × target={targets} "
           f"(desktop OS={os_targets})  dry-run={args.dry_run}")
+    if not validate_matrix(args.python, fm_root, args.project):
+        return 1
     ok = True
     for e in editions:
         if "desktop" in targets:
