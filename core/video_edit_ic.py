@@ -6,7 +6,8 @@ Modulo senza Qt e senza torch. Dato un `cfg` (stesse chiavi del segnale `request
 
 cfg (oltre alle chiavi storiche del tab): mode, video, prompt, strength, conditioning_attention, keep_audio,
 res_mode (source|half|custom) + res_long, out_format (16:9|9:16|1:1|4:3|3:4|21:9|custom) + out_anchor +
-out_margins (sopra,destra,sotto,sinistra) + out_dark + out_paste, style_image, cam_ref/cam_img/cam_img_strength/
+out_margins (sopra,destra,sotto,sinistra) + out_dark + out_paste + out_feather (px, default 24; 0 = taglio netto)
++ out_min_bar (0 = spento; barre minime in frazione del canvas, rimpicciolisce il sorgente), style_image, cam_ref/cam_img/cam_img_strength/
 cam_seconds/width/height (cameraman), model / gguf_transformer / ltx_release (checkpoint ESATTAMENTE come scelto
 dall'utente: mai sostituito qui).
 """
@@ -106,6 +107,7 @@ class IcJob:
     layout: object | None = None             # OutpaintLayout (outpaint)
     gamma: float = 1.0
     paste_original: bool = False
+    feather: int = 0                         # outpaint: px di sfumatura del bordo nel paste (0 = taglio netto)
     source: str = ""
     notes: list = field(default_factory=list)
     segments: int = 1
@@ -170,10 +172,14 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
     layout = None
     gamma = 1.0
     paste = False
+    feather = 0
 
     if spec.preprocess == vem.PRE_OUTPAINT:
         fmt = cfg.get("out_format", "16:9")
         kw = {"anchor": cfg.get("out_anchor", "center"), "max_long_edge": spec.max_long_edge}
+        min_bar = float(cfg.get("out_min_bar", 0.0) or 0.0)
+        if min_bar > 0 and fmt != "custom":
+            kw["min_bar"] = min_bar                                    # opt-in: sorgente rimpicciolito, barre >= min_bar
         if fmt == "custom":
             kw["margins"] = tuple(int(v) for v in cfg.get("out_margins", (0, 0, 0, 0)))
         else:
@@ -199,6 +205,7 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
         prep.build_outpaint_canvas(src, guide, layout, gamma)
         p["width"], p["height"] = layout.canvas_w, layout.canvas_h
         paste = bool(cfg.get("out_paste", True))
+        feather = max(0, min(int(cfg.get("out_feather", prep.DEFAULT_FEATHER)), prep.MAX_FEATHER)) if paste else 0
         mux = src if cfg.get("keep_audio", True) and info.has_audio else ""
     else:
         if spec.key == "cameraman":
@@ -242,7 +249,7 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
             prep.replace_first_frame(src, img, guide)
     p["control_video"] = guide
     return IcJob(params=p, spec=spec, work_dir=work, mux_audio_from=mux, layout=layout, gamma=gamma,
-                 paste_original=paste, source=src, notes=notes, segments=nseg)
+                 paste_original=paste, feather=feather, source=src, notes=notes, segments=nseg)
 
 
 def mux_audio(video: str, audio_src: str) -> str:
@@ -271,8 +278,9 @@ def finalize(job: IcJob, result: str, log=None, cleanup: bool = True) -> str:
             cur = inv
         if job.paste_original:
             pasted = out[:-4] + "_paste.mp4"
-            log("[outpaint] rimetto l'originale al centro…")
-            prep.paste_original(cur, job.source, pasted, job.layout)
+            log("[outpaint] rimetto l'originale al centro"
+                + (f" (bordo sfumato {job.feather} px)…" if job.feather > 0 else "…"))
+            prep.paste_original(cur, job.source, pasted, job.layout, feather=job.feather)
             cur = pasted
         out = cur
     if job.mux_audio_from and os.path.exists(job.mux_audio_from):

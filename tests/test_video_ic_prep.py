@@ -197,6 +197,85 @@ def test_paste_original_restores_center(tmp_path):
                   - orig[6:-6, 6:-6].mean()) < 25
 
 
+# ── outpaint: tutti i formati, feather, min_bar ───────────────────────────────────────────────────
+@pytest.mark.parametrize("fmt", ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"])
+@pytest.mark.parametrize("anchor", ["center", "left", "right", "top", "bottom"])
+@pytest.mark.parametrize("src", [(1280, 720), (720, 1280), (960, 540)])
+def test_layout_all_formats_and_anchors_are_valid(fmt, anchor, src):
+    lo = P.compute_outpaint_layout(src[0], src[1], aspect=fmt, anchor=anchor)
+    assert lo.canvas_w % 64 == 0 and lo.canvas_h % 64 == 0 and max(lo.canvas) <= 1280
+    assert lo.x >= 0 and lo.y >= 0 and lo.x + lo.src_w <= lo.canvas_w and lo.y + lo.src_h <= lo.canvas_h
+    assert lo.x % 2 == 0 and lo.y % 2 == 0 and lo.src_w % 2 == 0 and lo.src_h % 2 == 0
+    assert 0.0 <= lo.new_area < 1.0
+
+
+def test_layout_vertical_only_extension():
+    """16:9 -> 4:3 con sorgente in basso: tutta l'area nuova sta SOPRA (estensione verticale, una sola barra)."""
+    lo = P.compute_outpaint_layout(1280, 720, aspect="4:3", anchor="bottom")
+    assert lo.x == 0 and lo.y > 0 and lo.y + lo.src_h == lo.canvas_h
+    up = P.compute_outpaint_layout(1280, 720, aspect="4:3", anchor="top")
+    assert up.y == 0 and up.canvas_h - up.src_h > 0
+    m = P.compute_outpaint_layout(1280, 720, margins=(256, 0, 0, 0))             # solo sopra, margini
+    assert m.y > 0 and m.x == 0 and m.canvas_h > m.src_h and m.canvas_w == 1280
+
+
+def test_min_bar_off_by_default_and_only_when_narrow():
+    base = P.compute_outpaint_layout(1280, 720, aspect="4:3")
+    assert base.narrow_bar and base.scale == 1.0
+    mb = P.compute_outpaint_layout(1280, 720, aspect="4:3", min_bar=0.15)
+    assert not mb.narrow_bar and mb.scale < 1.0 and mb.new_area > base.new_area
+    wide = P.compute_outpaint_layout(1280, 720, aspect="9:16")                     # barre larghe: nessun effetto
+    assert P.compute_outpaint_layout(1280, 720, aspect="9:16", min_bar=0.15) == wide
+    one = P.compute_outpaint_layout(1280, 720, aspect="4:3", anchor="bottom", min_bar=0.15)
+    assert one.scale == 1.0                                                        # barra unica del 25 %: gia' larga
+
+
+def test_feather_mask_shape_and_sides():
+    lo = P.compute_outpaint_layout(512, 288, aspect="4:3")                         # barre sopra/sotto, lati a filo
+    m = P.feather_mask(lo, 24)
+    assert m.shape == (lo.canvas_h, lo.canvas_w) and m.dtype == np.float32
+    assert m.min() == 0.0 and m.max() == 1.0
+    mid = lo.x + lo.src_w // 2
+    col = m[lo.y: lo.y + 40, mid]
+    assert col[0] == 0.0 and np.all(np.diff(col) >= -1e-6) and col[-1] == 1.0       # rampa monotona 0 -> 1
+    assert m[lo.y + lo.src_h // 2, 0] == 1.0 and m[lo.y + lo.src_h // 2, lo.canvas_w - 1] == 1.0   # lati a filo
+    assert m[: lo.y, :].max() == 0.0 and m[lo.y + lo.src_h:, :].max() == 0.0        # fuori dal sorgente
+    assert P.feather_mask(lo, 0)[lo.y + lo.src_h // 2, mid] == 1.0
+    sharp = P.feather_mask(lo, 0)
+    assert sharp[lo.y + 2, mid] == 1.0 and sharp[lo.y + 1, mid] == 0.0              # taglio netto con bordo 2 px
+
+
+def test_feather_mask_clamps_to_small_source():
+    lo = P.compute_outpaint_layout(128, 72, aspect="9:16", max_long_edge=256)
+    m = P.feather_mask(lo, 9999)
+    assert m.shape == (lo.canvas_h, lo.canvas_w) and 0.0 <= m.min() and m.max() <= 1.0
+
+
+def test_paste_feathered_blends_seam_and_is_static(tmp_path):
+    src = _ffgen(tmp_path / "s.mp4", "color=c=white", 9, size="128x72")
+    lo = P.compute_outpaint_layout(128, 72, aspect="9:16", max_long_edge=256)
+    gen = _ffgen(tmp_path / "g.mp4", "color=c=black", 9, size=f"{lo.canvas_w}x{lo.canvas_h}")
+    hard = _frames(P.paste_original(gen, src, str(tmp_path / "h.mp4"), lo, border=2))
+    soft = _frames(P.paste_original(gen, src, str(tmp_path / "f.mp4"), lo, border=2, feather=16))
+    mid = lo.x + lo.src_w // 2
+    col_h = hard[3][lo.y: lo.y + 20, mid, 0].astype(int)
+    col_f = soft[3][lo.y: lo.y + 20, mid, 0].astype(int)
+    assert np.abs(np.diff(col_h)).max() > 150                                        # taglio netto: salto enorme
+    assert np.abs(np.diff(col_f)).max() < 60                                         # sfumato: nessun salto
+    assert col_f[0] < 40 and col_f[-1] > 215 and np.all(np.diff(col_f) >= -3)        # 0 -> 255 progressivo
+    assert max(float(np.abs(a.astype(int) - soft[0].astype(int)).max()) for a in soft) <= 3   # stessa maschera, nessun flicker
+    assert len(soft) == 9 and soft[0].shape == (lo.canvas_h, lo.canvas_w, 3)
+
+
+def test_paste_feather_zero_equals_legacy_path(tmp_path):
+    src = _ffgen(tmp_path / "s.mp4", "testsrc2", 9, size="72x128")
+    lo = P.compute_outpaint_layout(72, 128, aspect="16:9", max_long_edge=256)
+    gen = _ffgen(tmp_path / "g.mp4", "color=c=red", 9, size=f"{lo.canvas_w}x{lo.canvas_h}")
+    a = _frames(P.paste_original(gen, src, str(tmp_path / "a.mp4"), lo))
+    b = _frames(P.paste_original(gen, src, str(tmp_path / "b.mp4"), lo, feather=0))
+    assert all(np.array_equal(x, y) for x, y in zip(a, b))
+
+
 # ── restyle: frame 0 ──────────────────────────────────────────────────────────────────────────────
 def test_replace_first_frame(tmp_path, clip):
     from PIL import Image

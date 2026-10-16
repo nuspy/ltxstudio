@@ -89,7 +89,7 @@ def test_outpaint_and_finalize(tmp_path):
     guide = ij.params["control_video"]
     gi = P.probe(guide, count_frames=True)
     assert (gi.width, gi.height, gi.nb_frames) == (lay.canvas_w, lay.canvas_h, 25)
-    assert ij.gamma == 2.0 and ij.paste_original
+    assert ij.gamma == 2.0 and ij.paste_original and ij.feather == P.DEFAULT_FEATHER      # feather di default attivo
     # il «risultato del worker» simulato = la guida stessa: finalize applica gamma inverso + originale incollato
     shutil_out = str(tmp_path / "gen.mp4")
     shutil.copy(guide, shutil_out)
@@ -140,3 +140,20 @@ def test_disabled_and_unknown_modes_rejected(tmp_path):
     for m in ("lipdub", "hdr", "nope", "edit"):
         with pytest.raises(vic.IcJobError):
             vic.build_job({"mode": m, "video": src}, str(tmp_path), 1, str(tmp_path / "o.mp4"))
+
+
+def test_outpaint_feather_cfg_and_min_bar(tmp_path):
+    src = _gen(tmp_path / "v.mp4", 17, size="640x384")
+    out = str(tmp_path / "o.mp4")
+    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False}
+    a = vic.build_job({**base, "out_feather": 40}, str(tmp_path), 1, out)
+    assert a.feather == 40 and a.layout.scale == 1.0
+    b = vic.build_job({**base, "out_feather": 0}, str(tmp_path), 2, out)
+    assert b.feather == 0
+    c = vic.build_job({**base, "out_feather": 5000, "out_paste": True}, str(tmp_path), 3, out)
+    assert c.feather == P.MAX_FEATHER
+    d = vic.build_job({**base, "out_paste": False}, str(tmp_path), 4, out)
+    assert d.feather == 0 and not d.paste_original
+    e = vic.build_job({**base, "out_min_bar": 0.15}, str(tmp_path), 5, out)
+    assert e.layout.scale < 1.0 and not e.layout.narrow_bar and e.layout.new_area > a.layout.new_area
+    assert a.layout.narrow_bar and any("stretta" in n for n in a.notes)

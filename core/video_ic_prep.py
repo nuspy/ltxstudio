@@ -18,10 +18,11 @@ API pubblica (firme)
     mean_luma(path, seconds=1.0) -> float                   # 0..1 sul primo secondo (rilevamento sorgente scura)
     looks_dark(path, threshold=DARK_LUMA_THRESHOLD) -> bool
     compute_outpaint_layout(src_w, src_h, *, aspect=None, margins=None, anchor="center",
-                            max_long_edge=1280, multiple=64) -> OutpaintLayout
+                            max_long_edge=1280, multiple=64, min_bar=0.0) -> OutpaintLayout
     build_outpaint_canvas(src, out, layout, gamma=1.0) -> str       # barre NERE pure (0,0,0)
     inverse_gamma(src, out, gamma) -> str
-    paste_original(generated, original, out, layout, border=2) -> str
+    paste_original(generated, original, out, layout, border=2, feather=0) -> str   # feather>0: bordo sfumato
+    feather_mask(layout, feather, border=2) -> ndarray (h,w) float32 0..1          # maschera statica
     replace_first_frame(src, image, out) -> str                      # restyle: frame 0 = immagine di stile
     plan_segments(total_frames, seg_frames, overlap=9) -> list[Segment]
     extract_segment(src, out, start, count) -> str
@@ -42,6 +43,8 @@ from typing import Iterator, Sequence
 
 DARK_LUMA_THRESHOLD = 0.16         # luma media (0..1) sotto cui la sorgente e' «scura» (~41/255)
 MIN_BAR_FRACTION = 0.15            # barra nuova piu' stretta di questa frazione del canvas: il modello NON la riempie (live 14/10)
+DEFAULT_FEATHER = 24               # px di sfumatura del bordo originale/generato nel paste (0 = taglio netto)
+MAX_FEATHER = 256
 MAX_NEW_AREA = 0.60                # oltre, il modello inventa troppo (DESIGN §2.2: da validare dal vivo)
 DEFAULT_OVERLAP = 9                # frame di overlap fra segmenti (>= 8: restauro, DESIGN §4.3)
 OUTPAINT_FORMATS: dict[str, tuple[int, int]] = {
@@ -309,11 +312,35 @@ def _c_mult(v: float, m: int) -> int:
     return max(m, int(math.ceil(v / m - 1e-6)) * m)
 
 
+def _k_for_min_bar(sw0: int, sh0: int, cw: int, ch: int, anchor: str, min_bar: float, k0: float) -> float:
+    """Scala del sorgente (<= k0) con cui OGNI lato del canvas ha una barra nuova >= min_bar del canvas, ma SOLO se
+    con k0 c'e' gia' una barra voluta piu' stretta (asse con > 64 px liberi e barra < min_bar): altrimenti k0.
+    I lati su cui il sorgente e' a filo per l'`anchor` non contano. Solo per `aspect`.
+    Rimpicciolire il sorgente crea barre anche sull'asse che prima combaciava: per questo il vincolo e' su entrambi."""
+    min_bar = min(max(min_bar, 0.0), 0.45)
+    axes = ((sw0, cw, "left", "right"), (sh0, ch, "top", "bottom"))
+    narrow = False
+    for dim0, c, lo_a, hi_a in axes:
+        free = c - dim0 * k0
+        if free <= 64:
+            continue
+        side = free * (1.0 if anchor in (lo_a, hi_a) else 0.5)
+        if side / c < min_bar - 1e-9:
+            narrow = True
+    if not narrow:
+        return k0
+    ks = [k0]
+    for dim0, c, lo_a, hi_a in axes:
+        one_side = anchor in (lo_a, hi_a)
+        ks.append(((1.0 - min_bar) if one_side else (1.0 - 2.0 * min_bar)) * c / dim0)
+    return min(ks)
+
+
 def compute_outpaint_layout(src_w: int, src_h: int, *,
                             aspect: tuple[int, int] | str | None = None,
                             margins: tuple[int, int, int, int] | None = None,
                             anchor: str = "center", max_long_edge: int = 1280,
-                            multiple: int = 64) -> OutpaintLayout:
+                            multiple: int = 64, min_bar: float = 0.0) -> OutpaintLayout:
     """Calcola canvas e posizione del sorgente.
 
     - `aspect` ("16:9" oppure (16, 9)): canvas con quell'aspetto che CONTIENE il sorgente (no crop), con
@@ -322,7 +349,12 @@ def compute_outpaint_layout(src_w: int, src_h: int, *,
     Entrambi: il canvas e' arrotondato IN SU a multipli di `multiple`, il sorgente resta a scala 1.0 (mai
     rimpicciolito) salvo che il canvas superi `max_long_edge`: solo allora si riduce il canvas e il sorgente con lui.
     Il sorgente scalato sta sempre dentro. Esattamente uno fra
-    `aspect` e `margins` va dato."""
+    `aspect` e `margins` va dato.
+
+    `min_bar` (0 = spento, default): frazione minima (del canvas) delle barre nuove; se una barra e' piu' stretta
+    il SORGENTE viene rimpicciolito dentro lo stesso canvas finche' ogni barra raggiunge la frazione (le barre
+    sotto ~15 % non vengono riempite dal modello, live 14/10). Costa risoluzione del sorgente e aumenta l'area
+    nuova: opt-in, solo con `aspect`."""
     if (aspect is None) == (margins is None):
         raise ValueError("indica esattamente uno fra aspect e margins")
     if anchor not in ANCHORS:
@@ -351,6 +383,8 @@ def compute_outpaint_layout(src_w: int, src_h: int, *,
         else:
             ch -= multiple
     k = min(cw / sw0, ch / sh0, s_cap)                         # <= 1: scala solo se il tetto lo impone
+    if min_bar > 0.0 and aspect is not None:
+        k = _k_for_min_bar(sw0, sh0, cw, ch, anchor, float(min_bar), k)
     sw, sh = min(_even_up(sw0 * k), cw // 2 * 2), min(_even_up(sh0 * k), ch // 2 * 2)
     if aspect is not None:
         fx = {"left": 0.0, "right": 1.0}.get(anchor, 0.5)
@@ -378,10 +412,77 @@ def build_outpaint_canvas(src: str, out: str, layout: OutpaintLayout, gamma: flo
     return _out_check(out)
 
 
-def paste_original(generated: str, original: str, out: str, layout: OutpaintLayout, border: int = 2) -> str:
+def _ramp(n: int, feather: int, lo: bool, hi: bool):
+    """Profilo 1-D lungo n px del sorgente: 1.0 al centro; sui lati `lo`/`hi` (dove confina area NUOVA) sale da 0 a 1
+    in `feather` px con smoothstep (derivata nulla agli estremi: niente bordo percepibile)."""
+    import numpy as np
+    v = np.ones(n, np.float32)
+    f = min(int(feather), n // 2)
+    if f > 0:
+        t = (np.arange(f, dtype=np.float32) + 0.5) / f
+        r = t * t * (3.0 - 2.0 * t)
+        if lo:
+            v[:f] = np.minimum(v[:f], r)
+        if hi:
+            v[n - f:] = np.minimum(v[n - f:], r[::-1])
+    return v
+
+
+def feather_mask(layout: OutpaintLayout, feather: int, border: int = 2):
+    """Maschera statica (canvas_h, canvas_w) float32 0..1 del paste con bordo sfumato.
+    1 = pixel ORIGINALE, 0 = generato. Fuori dal sorgente = 0. La sfumatura sta DENTRO il sorgente (fuori non ci
+    sono pixel originali) e solo sui lati che confinano con area nuova (barra > 4 px): sui lati a filo col canvas
+    l'originale arriva fino al bordo. Sui lati con area nuova un bordo di `border` px resta generato (come il taglio netto).
+    E' la STESSA per ogni fotogramma: nessuno sfarfallio temporale."""
+    import numpy as np
+    L = layout
+    b = max(0, int(border))
+    f = max(0, min(int(feather), MAX_FEATHER))
+    bar_l, bar_r = L.x, L.canvas_w - L.x - L.src_w
+    bar_t, bar_b = L.y, L.canvas_h - L.y - L.src_h
+    lo_x, hi_x, lo_y, hi_y = bar_l > 4, bar_r > 4, bar_t > 4, bar_b > 4
+    bl, br, bt, bb = (b if v else 0 for v in (lo_x, hi_x, lo_y, hi_y))     # bordo escluso solo dove c'e' area nuova
+    iw, ih = L.src_w - bl - br, L.src_h - bt - bb
+    if iw < 2 or ih < 2:
+        bl = br = bt = bb = 0
+        iw, ih = L.src_w, L.src_h
+    rx = _ramp(iw, f, lo_x, hi_x)
+    ry = _ramp(ih, f, lo_y, hi_y)
+    m = np.zeros((L.canvas_h, L.canvas_w), np.float32)
+    m[L.y + bt:L.y + bt + ih, L.x + bl:L.x + bl + iw] = ry[:, None] * rx[None, :]
+    return m
+
+
+def _read_frames_scaled(path: str, w: int, h: int) -> Iterator["np.ndarray"]:      # noqa: F821
+    """Come `_read_frames` ma ridimensiona con lanczos a (w, h) (ffmpeg)."""
+    import numpy as np
+    p = subprocess.Popen([ffmpeg_path(), "-v", "error", "-i", str(path), "-vf", f"scale={w}:{h}:flags=lanczos",
+                          "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    size = w * h * 3
+    try:
+        while True:
+            buf = p.stdout.read(size)
+            if len(buf) < size:
+                break
+            yield np.frombuffer(buf, np.uint8).reshape(h, w, 3)
+    finally:
+        try:
+            p.stdout.close()
+        except Exception:                                    # noqa: BLE001
+            pass
+        p.kill()
+        p.wait()
+
+
+def paste_original(generated: str, original: str, out: str, layout: OutpaintLayout, border: int = 2,
+                   feather: int = 0) -> str:
     """Rimette i pixel ORIGINALI al centro (zona del sorgente) sul video generato di dimensione canvas.
-    Un bordo interno di `border` px del sorgente e' tagliato per evitare la cucitura. La lunghezza segue il
-    piu' corto dei due; senza audio."""
+    `feather` = 0: taglio netto, con un bordo interno di `border` px del sorgente escluso (cucitura minima).
+    `feather` > 0 (px): fusione sfumata fra originale e generato su `feather` px dentro il sorgente, solo sui lati che
+    confinano con area nuova, con UNA maschera statica uguale per ogni fotogramma (coerente nel tempo).
+    La lunghezza segue il piu' corto dei due; senza audio."""
+    if int(feather) > 0:
+        return _paste_feathered(generated, original, out, layout, border, int(feather))
     b = max(0, int(border))
     iw, ih = layout.src_w - 2 * b, layout.src_h - 2 * b
     if iw < 2 or ih < 2:
@@ -390,6 +491,28 @@ def paste_original(generated: str, original: str, out: str, layout: OutpaintLayo
           f"[0:v]scale={layout.canvas_w}:{layout.canvas_h}[g];"
           f"[g][o]overlay={layout.x + b}:{layout.y + b}:shortest=1,format=yuv420p[v]")
     _ff(["-i", str(generated), "-i", str(original), "-filter_complex", fc, "-map", "[v]", *_ENC, str(out)])
+    return _out_check(out)
+
+
+def _paste_feathered(generated: str, original: str, out: str, layout: OutpaintLayout, border: int, feather: int) -> str:
+    import numpy as np
+    L = layout
+    mask = feather_mask(L, feather, border)[..., None]                       # (H, W, 1)
+    y0, y1, x0, x1 = L.y, L.y + L.src_h, L.x, L.x + L.src_w
+    m_src = mask[y0:y1, x0:x1]
+    fps = probe(generated).fps or 25.0
+    n = 0
+    with _Writer(out, L.canvas_w, L.canvas_h, fps, crf=10) as wr:
+        for g, o in zip(_read_frames_scaled(generated, L.canvas_w, L.canvas_h),
+                        _read_frames_scaled(original, L.src_w, L.src_h)):
+            blk = g[y0:y1, x0:x1].astype(np.float32)
+            blk = blk + (o.astype(np.float32) - blk) * m_src
+            fr = g.copy()
+            fr[y0:y1, x0:x1] = np.clip(blk + 0.5, 0, 255).astype(np.uint8)
+            wr.write(fr)
+            n += 1
+    if n == 0:
+        raise RuntimeError(f"nessun frame da fondere ({generated})")
     return _out_check(out)
 
 
