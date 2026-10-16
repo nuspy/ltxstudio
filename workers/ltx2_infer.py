@@ -1514,16 +1514,24 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # checkpoint distillato. Con un dev, senza la LoRA di distillazione, sotto-denoisano: figure
     # "dematerializzate" in nuvole di punti (lo stesso sintomo che la two-stage evita applicandola).
     # Riportato dall'utente il 17/08 su un video MSR generato col dev-fp8.
+    # Ricetta UFFICIALE Lightricks (ComfyUI-LTXVideo, example_workflows/2.3: ICLoRA_Union_Control/
+    # Motion_Track/HDR/Lipdub «_Distilled» e T2V_I2V_Two_Stage_Distilled): CheckpointLoaderSimple =
+    # ltx-2.3-22b-DEV + distilled-lora-384-1.1 a strength 0.5, CFG 1, sigma distilled. Nel workflow
+    # two-stage la stessa LoRA 0.5 alimenta ENTRAMBI i sampler. Il pacchetto applica `loras` al solo
+    # stage 1 (stage_2 nasce con loras=()) → col dev ricostruiamo lo stage 2 con la stessa LoRA
+    # (vedi _dev_stage2_dlora). Il checkpoint resta quello scelto dall'utente.
+    _dev_dlora = None
     if ptype in ("iclora", "vinpaint") and "distilled" not in os.path.basename(ckpt).lower():
         if os.environ.get("LTX_NO_DLORA") == "1":
             print("[dev] LTX_NO_DLORA=1 → distilled-LoRA NON applicata (diagnostica)", flush=True)
         elif os.path.exists(DISTILLED_LORA):
-            loras = list(loras) + [LoraPathStrengthAndSDOps(DISTILLED_LORA, 1.0,
-                                                            LTXV_LORA_COMFY_RENAMING_MAP)]
-            print(f"[dev] {ptype}: checkpoint non-distilled → aggiungo la distilled-LoRA "
-                  f"({os.path.basename(DISTILLED_LORA)}). NB: il pacchetto la applica al solo "
-                  f"stage 1 (stage 2 nasce con loras=()); per la qualità piena serve il "
-                  f"checkpoint DISTILLED (voce di catalogo ltx23-distilled-fp8).", flush=True)
+            # vinpaint: stage 1 con CFG/30 step, nessuno stage 2 → resta a strength 1.0 (storico).
+            _st = float(os.environ.get("LTX_DLORA_STRENGTH", "0.5" if ptype == "iclora" else "1.0"))
+            _dev_dlora = LoraPathStrengthAndSDOps(DISTILLED_LORA, _st, LTXV_LORA_COMFY_RENAMING_MAP)
+            loras = list(loras) + [_dev_dlora]
+            print(f"[dev] {ptype}: checkpoint non-distilled → distilled-LoRA ufficiale "
+                  f"({os.path.basename(DISTILLED_LORA)}, strength {_st}) su stage 1"
+                  f"{' e stage 2' if ptype == 'iclora' else ''}", flush=True)
         else:
             print("[warn] checkpoint DEV su pipeline IC-LoRA senza distilled-LoRA su disco → "
                   "video 'dematerializzato'. Scarica ltx23-distilled-lora-384 o il checkpoint "
@@ -1538,6 +1546,8 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         pipe = _build(ICLoraPipeline,
                       distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+        if _dev_dlora is not None:
+            _dev_stage2_dlora(pipe, _ckpt_pipe, _dev_dlora, quant, offload)
     elif ptype == "retake":                                  # #24 ReTake: rigenera sezione [start,end] di un video
         from ltx_pipelines.retake import RetakePipeline
         pipe = _build(RetakePipeline,
@@ -1572,6 +1582,19 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # (lo sfratto LRU avviene PRIMA della build, vedi sopra — qui si registra e basta)
     _PIPE_CACHE[key] = pipe
     return pipe
+
+
+def _dev_stage2_dlora(pipe, ckpt_path, dlora, quant, offload) -> None:
+    """ICLoraPipeline costruisce lo stage 2 con loras=(): col checkpoint DEV resterebbe non-distilled
+    (sotto-denoisa). Lo ricostruiamo con la distilled-LoRA, come fanno i workflow ufficiali (la stessa
+    LoRA alimenta i due sampler) e come la two-stage del pacchetto per il suo stage 2."""
+    from ltx_pipelines.utils.blocks import DiffusionStage
+    kw = dict(loras=(dlora,), quantization=quant, offload_mode=offload)
+    try:
+        pipe.stage_2 = DiffusionStage(ckpt_path, pipe.dtype, pipe.device, registry=_PARK, **kw)
+    except TypeError:
+        pipe.stage_2 = DiffusionStage(ckpt_path, pipe.dtype, pipe.device, **kw)
+    print("[dev] stage 2 ricostruito con la distilled-LoRA", flush=True)
 
 
 def _gguf_companion(gguf_path: str) -> str:
