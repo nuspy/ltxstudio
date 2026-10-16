@@ -265,7 +265,9 @@ def case_dev_dlora_missing_warns_with_weights_link(w, spy):
     vic.checkpoint_info = lambda vals: {**real_info(vals), "dlora_ok": False}
     try:
         _getter(w, _DEV)
-        assert "⚠" in t.ckpt_lbl.text() and "Pesi modelli" in t.ckpt_lbl.text(), t.ckpt_lbl.text()
+        from ui.i18n_manager import tr
+        want = tr("vedit.ckpt.dlora_missing", "").split("{f}")[0][:20]   # testo nella lingua della GUI
+        assert "⚠" in t.ckpt_lbl.text() and want and want in t.ckpt_lbl.text(), t.ckpt_lbl.text()
         asked, opened = [], []
         t.request_open_weights_tab.connect(lambda: opened.append(1))
         t._ask_checkpoint = lambda sp, info, blocking=False: asked.append(info["dlora_ok"]) or "weights"
