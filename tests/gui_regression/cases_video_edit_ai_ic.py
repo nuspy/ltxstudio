@@ -162,7 +162,7 @@ def case_ckpt_hint_states(w, spy):
     """Riga di stato del checkpoint: distilled / dev / auto / release 2.5 / modello non LTX, con icona+testo."""
     t = _tab(w)
     _select_mode(w, "refocus")
-    rows = [(_DIST, "✔", "distilled"), (_DEV, "⚠", "dev"), (_AUTO, "ℹ", ""),
+    rows = [(_DIST, "✔", "distilled"), (_DEV, "ℹ", "dev"), (_AUTO, "ℹ", ""),
             (_REL25, "⛔", ""), ({"model_kind": "minimax_h3", "model": ""}, "ℹ", "")]
     for vals, icon, word in rows:
         _getter(w, vals)
@@ -174,7 +174,7 @@ def case_ckpt_hint_states(w, spy):
 
 
 def case_dev_warning_dialog_choices(w, spy):
-    """Checkpoint dev + modalità `recommended`: dialog a 3 scelte. Annulla non accoda; Apri tab Video emette il
+    """Checkpoint dev: dialog a 3 scelte. Annulla non accoda; Apri tab Video emette il
     segnale e non accoda; Continua accoda con model esattamente come scelto (mai cambiato)."""
     _ack_dev(False)
     t = _fill_mode(w, "refocus")
@@ -200,9 +200,10 @@ def case_dev_warning_dialog_choices(w, spy):
     assert not asked, "con ack di sessione non deve richiedere di nuovo"
 
 
-def case_required_distilled_blocks(w, spy):
-    """Modalità con distilled=required (simulata su refocus): col dev BLOCCA con spiegazione (nessuna richiesta),
-    col distilled passa. Mai cambio automatico del checkpoint."""
+def case_dev_never_blocks_adds_dlora(w, spy):
+    """Col dev NESSUNA modalità blocca, nemmeno una con distilled=required (simulata su refocus): il dialog AVVISA e la
+    generazione parte («Procedi»); il checkpoint scelto non viene mai sostituito; il testo dice che verrà aggiunta
+    la LoRA distilled."""
     import dataclasses
     from core import video_edit_modes as vem
     _ack_dev(False)
@@ -211,16 +212,72 @@ def case_required_distilled_blocks(w, spy):
     try:
         t = _fill_mode(w, "refocus")
         _getter(w, _DEV)
-        assert "⛔" in t.ckpt_lbl.text(), t.ckpt_lbl.text()
+        txt = t.ckpt_lbl.text()
+        assert "⛔" not in txt and "LoRA" in txt and "distilled" in txt, txt
         got = []
-        t._ask_checkpoint = lambda sp, info, blocking: got.append(blocking) or "cancel"
+        t._ask_checkpoint = lambda sp, info, blocking=False: got.append((blocking, info.get("dlora_ok"))) or "continue"
         t._go()
-        assert got == [True] and not spy.calls, f"blocco atteso: {got} {spy.calls}"
-        _getter(w, _DIST)
-        t._go()
-        assert len(spy.calls) == 1
+        assert got and got[0][0] is False, f"deve solo avvisare (blocking=False): {got}"
+        assert len(spy.calls) == 1, "col dev 'Procedi' deve far partire la generazione"
+        assert _cfg_of(w).get("model") == _DEV["model"], "il checkpoint scelto non va sostituito"
     finally:
         vem.MODE_SPECS["refocus"] = orig
+
+
+def case_dev_real_dialog_warns_and_runs(w, spy):
+    """Dialog REALE (non sovrascritto): QMessageBox di sola informazione con testo «verrà aggiunta la LoRA distilled»,
+    bottone «Procedi comunque» → la generazione parte. Bottoni: Procedi / Apri tab Video / Annulla (niente «blocca»)."""
+    from PySide6.QtWidgets import QMessageBox
+    _ack_dev(False)
+    t = _fill_mode(w, "uncompress")
+    _getter(w, _DEV)
+    seen = {}
+    orig_exec = QMessageBox.exec
+
+    def fake_exec(box):
+        seen["text"] = box.text()
+        seen["icon"] = box.icon()
+        seen["buttons"] = [b.text() for b in box.buttons()]
+        for b in box.buttons():
+            if box.buttonRole(b) == QMessageBox.AcceptRole:
+                b.click()
+        return 0
+    QMessageBox.exec = fake_exec
+    try:
+        before = len(spy.calls)
+        t._go()
+    finally:
+        QMessageBox.exec = orig_exec
+    assert seen, "il dialog sul checkpoint dev deve comparire"
+    assert "distilled" in seen["text"] and "LoRA" in seen["text"], seen["text"]
+    assert seen["icon"] == QMessageBox.Information, "con la LoRA su disco è solo un'informazione"
+    assert len(seen["buttons"]) == 3, seen["buttons"]
+    assert len(spy.calls) == before + 1, "«Procedi comunque» deve far partire la generazione"
+
+
+def case_dev_dlora_missing_warns_with_weights_link(w, spy):
+    """LoRA distilled ASSENTE su disco: riga di stato e dialog avvisano (icona warning) con bottone «Apri tab Pesi
+    modelli» che emette il segnale; nessun download; «Procedi comunque» fa partire comunque la generazione."""
+    from core import video_edit_ic as vic
+    _ack_dev(True)                                       # con la LoRA mancante l'avviso compare SEMPRE
+    t = _fill_mode(w, "refocus")
+    real_info = vic.checkpoint_info
+    vic.checkpoint_info = lambda vals: {**real_info(vals), "dlora_ok": False}
+    try:
+        _getter(w, _DEV)
+        assert "⚠" in t.ckpt_lbl.text() and "Pesi modelli" in t.ckpt_lbl.text(), t.ckpt_lbl.text()
+        asked, opened = [], []
+        t.request_open_weights_tab.connect(lambda: opened.append(1))
+        t._ask_checkpoint = lambda sp, info, blocking=False: asked.append(info["dlora_ok"]) or "weights"
+        before = len(spy.calls)
+        t._go()
+        assert asked == [False], "avviso anche con «non ripetere»"
+        assert opened == [1] and len(spy.calls) == before, "«Apri tab Pesi» emette il segnale e non accoda"
+        t._ask_checkpoint = lambda sp, info, blocking=False: "continue"
+        t._go()
+        assert len(spy.calls) == before + 1, "«Procedi comunque» accoda comunque"
+    finally:
+        vic.checkpoint_info = real_info
 
 
 def case_release25_blocks(w, spy):
@@ -439,8 +496,12 @@ CASES = (
       case_ckpt_hint_states),
      ("vedit_dev_warning_dialog", "Dialog a 3 scelte col dev: Annulla/Apri tab Video/Procedi; ack di sessione.",
       case_dev_warning_dialog_choices),
-     ("vedit_required_distilled_blocks", "distilled=required col dev: blocco con spiegazione, nessun cambio modello.",
-      case_required_distilled_blocks),
+     ("vedit_dev_never_blocks", "Col dev nessuna modalità blocca (anche distilled=required): avviso e via; modello invariato.",
+      case_dev_never_blocks_adds_dlora),
+     ("vedit_dev_real_dialog", "Dialog dev reale: informazione «verrà aggiunta la LoRA distilled», Procedi → parte.",
+      case_dev_real_dialog_warns_and_runs),
+     ("vedit_dev_dlora_missing", "LoRA distilled assente: avviso con «Apri tab Pesi», nessun download, Procedi parte.",
+      case_dev_dlora_missing_warns_with_weights_link),
      ("vedit_release25_blocks", "Checkpoint release 2.5: modalità IC-LoRA bloccate con messaggio.",
       case_release25_blocks),
      ("vedit_restyle_requires_image", "ReStyle: immagine di stile obbligatoria; prompt «Make it … style.».",

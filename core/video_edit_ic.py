@@ -29,11 +29,30 @@ class IcJobError(Exception):
 OTHER_ARCH_KINDS = ("krea_rt", "minimax_h3", "lingbot")
 
 
+def distilled_lora_path(release: str | None = None) -> str:
+    """Percorso della distilled-LoRA ufficiale (quella che il worker aggiunge ai checkpoint dev)."""
+    return str(_rel.get(release or "2.3").distilled_lora)
+
+
+def distilled_lora_ok(release: str | None = None) -> bool:
+    """True se la distilled-LoRA e' su disco (nessun download automatico: se manca la GUI avvisa)."""
+    return os.path.exists(distilled_lora_path(release))
+
+
 def checkpoint_info(vals: dict | None) -> dict:
     """Interpreta `video_tab.get_values()` SENZA scegliere nulla. Ritorna:
     state: distilled | dev | auto | release25 | other_arch | unknown
     name: nome file (o ""), distilled: bool, release: str|None, params: {model|gguf_transformer, ltx_release}
-    `auto`/`other_arch` => il worker usera' il suo default (dev): per l'avviso valgono come NON distilled."""
+    `auto`/`other_arch` => il worker usera' il suo default (dev): per l'avviso valgono come NON distilled.
+    Col dev il worker AGGIUNGE la distilled-LoRA (ricetta ufficiale Lightricks, strength 0.5, stage 1+2):
+    `dlora_ok` dice se il file e' su disco (assente: la GUI avvisa e rimanda al tab Pesi, nessun download)."""
+    info = _checkpoint_info(vals)
+    info["dlora_ok"] = distilled_lora_ok(info.get("release") or "2.3")
+    info["dlora_path"] = distilled_lora_path(info.get("release") or "2.3")
+    return info
+
+
+def _checkpoint_info(vals: dict | None) -> dict:
     if not vals:
         return {"state": "unknown", "name": "", "distilled": False, "release": None, "params": {}}
     kind = vals.get("model_kind") or ""

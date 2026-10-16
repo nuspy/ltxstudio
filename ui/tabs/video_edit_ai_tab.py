@@ -15,6 +15,7 @@ Emette `request_edit` con la config; l'orchestrazione (tracking + worker) è in 
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -65,6 +66,7 @@ _RESTORE_PROMPT_DEFAULT = "Sharp, clean, high-quality footage, natural colors."
 class VideoEditAITab(QWidget):
     request_edit = Signal(dict)
     request_open_video_tab = Signal()       # «Apri tab Video» dal dialog sul checkpoint
+    request_open_weights_tab = Signal()     # «Apri tab Pesi modelli» (distilled-LoRA mancante)
     # «Non ripetere» dell'avviso dev: SOLO per la sessione (non persistente)
     _dev_ack_session = False
 
@@ -370,18 +372,22 @@ class VideoEditAITab(QWidget):
                 "⛔ release 2.5: le IC-LoRA locali sono per LTX 2.3. Scegli un checkpoint 2.3 nel tab Video.")
         if st == "distilled":
             return "ok", head + " — " + tr("vedit.ckpt.distilled", "✔ distilled")
-        if spec.distilled == vem.DISTILLED_REQUIRED:
-            return "blocked", head + " — " + tr("vedit.ckpt.unusable",
-                "⛔ non utilizzabile per questa modalità: serve un checkpoint distilled (scegline uno nel tab Video).")
+        if not info.get("dlora_ok", True):
+            return "warn", head + " — " + tr("vedit.ckpt.dlora_missing",
+                "⚠ dev: serve la LoRA distilled ({f}) e non è su disco. Scaricala dal tab «Pesi modelli» "
+                "(nessun download automatico): senza, il video esce «dematerializzato».").format(
+                    f=os.path.basename(str(info.get("dlora_path", ""))))
         if st == "auto":
-            return "warn", head + " — " + tr("vedit.ckpt.auto",
-                "ℹ automatico: il worker userà il checkpoint di default (dev), qualità ridotta con le IC-LoRA. "
-                "Per il distilled sceglilo nel tab Video.")
+            return "warn", head + " — " + tr("vedit.ckpt.auto2",
+                "ℹ automatico: il worker userà il checkpoint di default (dev) e col dev verrà aggiunta la LoRA "
+                "distilled ufficiale. Il checkpoint resta quello scelto.")
         if st == "other_arch":
-            return "warn", head + " — " + tr("vedit.ckpt.other_arch",
-                "ℹ il modello scelto nel tab Video non è LTX: qui si userà il checkpoint di default (dev).")
-        return "warn", head + " — " + tr("vedit.ckpt.dev",
-            "⚠ dev: qualità ridotta (la distilled-LoRA vale solo per lo stage 1). Meglio un checkpoint distilled.")
+            return "warn", head + " — " + tr("vedit.ckpt.other_arch2",
+                "ℹ il modello scelto nel tab Video non è LTX: qui si userà il checkpoint di default (dev) "
+                "con la LoRA distilled ufficiale aggiunta.")
+        return "warn", head + " — " + tr("vedit.ckpt.dev2",
+            "ℹ dev: col dev verrà aggiunta la LoRA distilled ufficiale (forza 0,5, passi distilled). "
+            "Il checkpoint resta quello scelto.")
 
     def refresh_checkpoint_hint(self, *_):
         spec = self.current_spec() if self.mode.count() else None
@@ -392,34 +398,40 @@ class VideoEditAITab(QWidget):
         self.ckpt_lbl.setVisible(bool(text))
         self.ckpt_lbl.setProperty("state", st)
 
-    def _ask_checkpoint(self, spec: vem.ModeSpec, info: dict, blocking: bool) -> str:
-        """Dialog sul checkpoint. Ritorna 'continue' | 'cancel' | 'open' (apri tab Video). Sovrascrivibile nei test."""
+    def _ask_checkpoint(self, spec: vem.ModeSpec, info: dict, blocking: bool = False) -> str:
+        """Dialog sul checkpoint dev: AVVISA, non blocca mai (`blocking` è ignorato, resta per compatibilità).
+        Ritorna 'continue' | 'cancel' | 'open' (tab Video) | 'weights' (tab Pesi modelli).
+        Sovrascrivibile nei test."""
         box = QMessageBox(self)
-        box.setIcon(QMessageBox.Warning)
-        box.setWindowTitle(tr("vedit.ckpt.dlg_title", "Checkpoint non distilled"))
+        missing = not info.get("dlora_ok", True)
+        box.setIcon(QMessageBox.Warning if missing else QMessageBox.Information)
+        box.setWindowTitle(tr("vedit.ckpt.dlg_title2", "Checkpoint dev"))
         _, text = self.checkpoint_state_text(spec, info)
-        if blocking:
-            box.setText(tr("vedit.ckpt.required_block",
-                "Questa modalità richiede un checkpoint distilled. Scegline uno nel tab Video: non lo cambio io.")
+        cb = None
+        if missing:
+            box.setText(tr("vedit.ckpt.dlg_missing",
+                "Col checkpoint dev serve la LoRA distilled ufficiale e non è su disco: senza, le IC-LoRA danno "
+                "video sotto-denoisati. Scaricala dal tab «Pesi modelli» (non scarico nulla io).") + "\n\n" + text)
+        else:
+            box.setText(tr("vedit.ckpt.dlg_body2",
+                "Il checkpoint è un dev: verrà aggiunta la LoRA distilled ufficiale (forza 0,5, sia stage 1 che "
+                "stage 2, passi distilled) come nei workflow Lightricks. Il checkpoint resta quello che hai scelto.")
                 + "\n\n" + text)
-            b_open = box.addButton(tr("vedit.ckpt.btn_open_video_tab", "Apri tab Video"), QMessageBox.AcceptRole)
-            box.addButton(tr("vedit.ckpt.btn_cancel", "Annulla"), QMessageBox.RejectRole)
-            box.exec()
-            return "open" if box.clickedButton() is b_open else "cancel"
-        box.setText(tr("vedit.ckpt.dlg_body",
-            "Con un checkpoint dev (o automatico) le IC-LoRA danno risultati peggiori: la distilled-LoRA vale solo "
-            "per lo stage 1. Consiglio un checkpoint distilled, da scegliere nel tab Video.") + "\n\n" + text)
-        cb = QCheckBox(tr("vedit.ckpt.dont_repeat", "Non ripetere in questa sessione"))
-        box.setCheckBox(cb)
+            cb = QCheckBox(tr("vedit.ckpt.dont_repeat", "Non ripetere in questa sessione"))
+            box.setCheckBox(cb)
         b_go = box.addButton(tr("vedit.ckpt.btn_continue", "Procedi comunque"), QMessageBox.AcceptRole)
+        b_w = (box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+               if missing else None)
         b_open = box.addButton(tr("vedit.ckpt.btn_open_video_tab", "Apri tab Video"), QMessageBox.ActionRole)
         box.addButton(tr("vedit.ckpt.btn_cancel", "Annulla"), QMessageBox.RejectRole)
         box.exec()
         clicked = box.clickedButton()
         if clicked is b_go:
-            if cb.isChecked():
+            if cb is not None and cb.isChecked():
                 VideoEditAITab._dev_ack_session = True
             return "continue"
+        if b_w is not None and clicked is b_w:
+            return "weights"
         return "open" if clicked is b_open else "cancel"
 
     # ── UI per modalità ──────────────────────────────────────────────────────────────────────
@@ -661,14 +673,14 @@ class VideoEditAITab(QWidget):
                         "⛔ release 2.5: le IC-LoRA locali sono per LTX 2.3. Scegli un checkpoint 2.3 nel tab Video.")
             return
         if st != "unknown" and not info["distilled"] and st != "release25":
-            if sp.distilled == vem.DISTILLED_REQUIRED:
-                if self._ask_checkpoint(sp, info, True) == "open":
-                    self.request_open_video_tab.emit()
-                return
-            if sp.distilled == vem.DISTILLED_RECOMMENDED and not VideoEditAITab._dev_ack_session:
+            # dev/auto/non-LTX: AVVISO, mai blocco (il worker aggiunge la distilled-LoRA). Se la LoRA manca su
+            # disco l'avviso compare sempre (anche con «non ripetere»); altrimenti una volta per sessione.
+            if not info.get("dlora_ok", True) or not VideoEditAITab._dev_ack_session:
                 ans = self._ask_checkpoint(sp, info, False)
                 if ans == "open":
                     self.request_open_video_tab.emit(); return
+                if ans == "weights":
+                    self.request_open_weights_tab.emit(); return
                 if ans != "continue":
                     return
         cfg.update(info["params"])

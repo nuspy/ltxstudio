@@ -39,6 +39,17 @@ def test_checkpoint_info_states():
     assert vic.checkpoint_info({"model_kind": "minimax_h3", "model": ""})["state"] == "other_arch"
 
 
+def test_checkpoint_info_dlora_flag(monkeypatch):
+    """Col dev il worker aggiunge la distilled-LoRA: `dlora_ok` dice se il file e' su disco (mai download)."""
+    dev = {"model_kind": "diffusion", "model": r"E:\m\ltx-2.3-22b-dev-fp8.safetensors"}
+    monkeypatch.setattr(vic.os.path, "exists", lambda p: True)
+    assert vic.checkpoint_info(dev)["dlora_ok"] is True
+    monkeypatch.setattr(vic.os.path, "exists", lambda p: False)
+    i = vic.checkpoint_info(dev)
+    assert i["dlora_ok"] is False and i["dlora_path"].endswith(".safetensors") and "distilled-lora" in i["dlora_path"]
+    assert vic.checkpoint_info(dev)["state"] == "dev", "il checkpoint scelto non cambia"
+
+
 def test_restore_job_no_copy_and_audio(tmp_path):
     src = _gen(tmp_path / "s.mp4", 50, audio=True)
     ij = vic.build_job({"mode": "refocus", "video": src, "prompt": ""}, str(tmp_path), 1, str(tmp_path / "o.mp4"))

@@ -1055,6 +1055,7 @@ class MainWindow(QMainWindow):
         self.video_edit_ai_tab.set_model_getter(self.video_tab.get_values)
         self.video_tab.model.currentIndexChanged.connect(self.video_edit_ai_tab.refresh_checkpoint_hint)
         self.video_edit_ai_tab.request_open_video_tab.connect(lambda: self.tabs.setCurrentWidget(self.video_tab))
+        self.video_edit_ai_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")

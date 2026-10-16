@@ -3235,5 +3235,13 @@
   "feat.cap.video_camera_ic": "Cámara desde referencia (Cameraman)",
   "feat.cap.video_lipdub": "Lip dub / redoblaje (LipDub)",
   "feat.cap.video_hdr_ic": "HDR 16 bits + EXR",
-  "vedit.out.narrow_bar": "barra nueva demasiado estrecha (< 15 % del lienzo): el modelo puede no rellenarla. Usa márgenes más anchos."
+  "vedit.out.narrow_bar": "barra nueva demasiado estrecha (< 15 % del lienzo): el modelo puede no rellenarla. Usa márgenes más anchos.",
+  "vedit.ckpt.dlora_missing": "⚠ dev: hace falta la LoRA distilled ({f}) y no está en el disco. Descárgala desde la pestaña «Pesos de modelos» (sin descarga automática): sin ella el vídeo sale «desmaterializado».",
+  "vedit.ckpt.auto2": "ℹ automático: el worker usará el checkpoint por defecto (dev) y con el dev se añadirá la LoRA distilled oficial. El checkpoint sigue siendo el elegido.",
+  "vedit.ckpt.other_arch2": "ℹ el modelo elegido en la pestaña Vídeo no es LTX: aquí se usará el checkpoint por defecto (dev) con la LoRA distilled oficial añadida.",
+  "vedit.ckpt.dev2": "ℹ dev: con el dev se añadirá la LoRA distilled oficial (fuerza 0,5, pasos distilled). El checkpoint sigue siendo el elegido.",
+  "vedit.ckpt.dlg_title2": "Checkpoint dev",
+  "vedit.ckpt.dlg_missing": "Con el checkpoint dev hace falta la LoRA distilled oficial y no está en el disco: sin ella las IC-LoRA dan vídeos sub-denoisados. Descárgala desde la pestaña «Pesos de modelos» (yo no descargo nada).",
+  "vedit.ckpt.dlg_body2": "El checkpoint es un dev: se añadirá la LoRA distilled oficial (fuerza 0,5, etapa 1 y etapa 2, pasos distilled) como en los workflows de Lightricks. El checkpoint sigue siendo el que elegiste.",
+  "vedit.ckpt.btn_open_weights_tab": "Abrir pestaña Pesos de modelos"
 }

@@ -3235,5 +3235,13 @@
   "feat.cap.video_camera_ic": "الكاميرا من مرجع (Cameraman)",
   "feat.cap.video_lipdub": "دبلجة الشفاه / إعادة الدبلجة (LipDub)",
   "feat.cap.video_hdr_ic": "HDR 16 بت + EXR",
-  "vedit.out.narrow_bar": "الشريط الجديد ضيق جدًا (أقل من 15% من اللوحة): قد لا يملأه النموذج. استخدم هوامش أوسع."
+  "vedit.out.narrow_bar": "الشريط الجديد ضيق جدًا (أقل من 15% من اللوحة): قد لا يملأه النموذج. استخدم هوامش أوسع.",
+  "vedit.ckpt.dlora_missing": "⚠ dev: مطلوب distilled LoRA ‏({f}) وهو غير موجود على القرص. نزّله من تبويب «أوزان النماذج» (بدون تنزيل تلقائي): بدونه يخرج الفيديو «متلاشيًا».",
+  "vedit.ckpt.auto2": "ℹ تلقائي: سيستخدم الـ worker نقطة التحقق الافتراضية (dev) ومع dev ستُضاف distilled LoRA الرسمية. تبقى نقطة التحقق هي المختارة.",
+  "vedit.ckpt.other_arch2": "ℹ النموذج المختار في تبويب الفيديو ليس LTX: سيُستخدم هنا نقطة التحقق الافتراضية (dev) مع إضافة distilled LoRA الرسمية.",
+  "vedit.ckpt.dev2": "ℹ dev: مع dev ستُضاف distilled LoRA الرسمية (القوة 0.5، خطوات distilled). تبقى نقطة التحقق هي المختارة.",
+  "vedit.ckpt.dlg_title2": "نقطة تحقق dev",
+  "vedit.ckpt.dlg_missing": "مع نقطة تحقق dev تلزم distilled LoRA الرسمية وهي غير موجودة على القرص: بدونها تنتج IC-LoRA فيديو غير مُزال الضجيج بالكامل. نزّلها من تبويب «أوزان النماذج» (لا أنزّل شيئًا بنفسي).",
+  "vedit.ckpt.dlg_body2": "نقطة التحقق هي dev: ستُضاف distilled LoRA الرسمية (القوة 0.5، المرحلتان 1 و2، خطوات distilled) كما في workflows شركة Lightricks. تبقى نقطة التحقق هي التي اخترتها.",
+  "vedit.ckpt.btn_open_weights_tab": "فتح تبويب أوزان النماذج"
 }

@@ -317,10 +317,14 @@ def register(app: FastAPI):
             raise HTTPException(422, {"error": "release_unsupported", "release": rel,
                                       "detail": "le IC-LoRA locali sono per LTX 2.3"})
         if not lrel.is_distilled(model):
-            if spec.distilled == vem.DISTILLED_REQUIRED:
-                raise HTTPException(422, {"error": "distilled_required", "mode": spec.key})
-            warnings.append("checkpoint non distilled" + ("" if model else " (default del worker: dev)")
-                            + ": qualita' ridotta, la distilled-LoRA vale solo per lo stage 1")
+            # col dev il worker aggiunge la distilled-LoRA ufficiale (strength 0.5, stage 1+2): si avvisa, non si blocca
+            if vic.distilled_lora_ok(rel or "2.3"):
+                warnings.append("checkpoint non distilled" + ("" if model else " (default del worker: dev)")
+                                + ": verra' aggiunta la distilled-LoRA ufficiale (il checkpoint resta quello scelto)")
+            else:
+                warnings.append("checkpoint non distilled" + ("" if model else " (default del worker: dev)")
+                                + f": la distilled-LoRA manca su disco ({vic.distilled_lora_path(rel or '2.3')}), "
+                                  "qualita' molto ridotta; scaricala dal tab Pesi modelli (id ltx23-distilled-lora-384)")
         miss = vic.missing_weight(spec)
         if miss:
             raise HTTPException(409, {"error": "weight_missing", "detail": miss})
