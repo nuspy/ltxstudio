@@ -22,3 +22,16 @@ def test_nucleo_h3_upsampler_nel_venv_diffusers():
     out = (r.stdout or "") + (r.stderr or "")
     assert r.returncode == 0, out[-4000:]
     assert "verifiche passate" in out and " FAIL " not in out
+
+
+@pytest.mark.skipif(not VENV_PY.is_file(), reason="venv diffusers_next assente")
+def test_worker_h3_upsampler_smoke_cpu_modelli_minuscoli():
+    """process() del worker su CPU: video vero con audio, 2 segmenti, perno, guida, tile, decodifica, audio originale."""
+    env = dict(os.environ, CUDA_VISIBLE_DEVICES="", PYTHONIOENCODING="utf-8")
+    for k in ("PYTHONPATH", "PYTHONHOME"):
+        env.pop(k, None)
+    r = subprocess.run([str(VENV_PY), str(ROOT / "tests" / "h3_upsample_worker_smoke.py")], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", env=env, timeout=1800)
+    out = (r.stdout or "") + (r.stderr or "")
+    assert r.returncode == 0, out[-4000:]
+    assert "verifiche passate" in out

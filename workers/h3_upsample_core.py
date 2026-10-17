@@ -133,7 +133,7 @@ def load_upscaler(path: str, dtype=torch.float16) -> LatentUpscaler:
     return net
 
 
-def upscale_chunk(net: LatentUpscaler, video, w_px: int, h_px: int, device, dtype=torch.float16):
+def upscale_chunk(net: LatentUpscaler, video, w_px: int, h_px: int, device, dtype=None):
     """Il latente (normalizzato) di un segmento portato a (w_px, h_px) dalla rete; la rete sa la scala davvero
     ottenuta (media dei due assi) e gira in fp16 per intero, come nella ricetta."""
     _, _, t, h_in, w_in = video.shape
@@ -145,6 +145,7 @@ def upscale_chunk(net: LatentUpscaler, video, w_px: int, h_px: int, device, dtyp
                            "questa funzione ingrandisce soltanto. Alza i megapixel.")
     if (h_out, w_out) == (h_in, w_in):
         return video
+    dtype = dtype or next(net.parameters()).dtype       # fp16 come nella ricetta (la rete vive in fp16)
     net.to(device)
     try:
         with torch.inference_mode():

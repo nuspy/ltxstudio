@@ -44,6 +44,14 @@ def _gc():
         torch.cuda.empty_cache()
 
 
+def _peak_gb() -> float:
+    import torch
+    try:
+        return torch.cuda.max_memory_allocated() / 2**30 if torch.cuda.is_available() else 0.0
+    except Exception:                                                # noqa: BLE001
+        return 0.0
+
+
 def _free_gpu_servers() -> None:
     import urllib.request as u
     for port in (8189, 8190, 8191, 8192):
@@ -236,6 +244,34 @@ class _Writer:
 
 
 # ── il lavoro ──────────────────────────────────────────────────────────────────────────────────────────────────
+class Loaders:
+    """I punti dove si caricano i modelli grandi: sostituibili (i test su CPU ci mettono modelli minuscoli)."""
+
+    @staticmethod
+    def embeds(W, dev):
+        return prompt_embeds(W, dev)
+
+    @staticmethod
+    def vae(W):
+        import minimax_h3_infer as H
+        return H.load_vae(W)
+
+    @staticmethod
+    def audio_vae(W):
+        import minimax_h3_infer as H
+        return H.load_audio_vae(W)
+
+    @staticmethod
+    def upscaler(path):
+        import h3_upsample_core as C
+        return C.load_upscaler(path)
+
+    @staticmethod
+    def transformer(W, p):
+        import minimax_h3_infer as H
+        return H.load_transformer(W, "ref2va", p)
+
+
 def run(p: dict) -> str:
     from core import resources
     resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 24),
@@ -249,13 +285,18 @@ def run(p: dict) -> str:
         start_watchdog(int(p.get("parent_pid") or 0))
     except Exception:                                                # noqa: BLE001
         pass
-    t_all = time.time()
     W = resolve(p)
     _free_gpu_servers()
-    dev = "cuda"
     free0, total = (x / 2**30 for x in torch.cuda.mem_get_info())
+    # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema
     torch.cuda.set_per_process_memory_fraction(max(0.2, min(1.0, (free0 - 0.4) / total)))
+    return process(p, W, Loaders, "cuda")
 
+
+def process(p: dict, W: dict, L, dev: str) -> str:
+    """Il lavoro vero, su pesi già risolti (W) e caricatori `L`; `dev` = «cuda» (produzione) o «cpu» (test)."""
+    import torch
+    t_all = time.time()
     src, out = p["video"], p["output"]
     mp_ = float(p.get("megapixels") or P.MEGAPIXELS)
     denoise = float(p.get("denoise") if p.get("denoise") is not None else P.DENOISE_DEFAULT)
@@ -296,13 +337,12 @@ def run(p: dict) -> str:
         # 1) didascalia (solo se c'è un ri-disegno)
         emb = tags = None
         if sigma is not None:
-            emb, tags = prompt_embeds(W, dev)
+            emb, tags = L.embeds(W, dev)
 
         # 2) VAE: sorgente, guida, audio
-        import minimax_h3_infer as H
         import h3_upsample_core as C
         t0 = time.time()
-        vae = H.load_vae(W)
+        vae = L.vae(W)
         pm, ps = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
         lm, ls = tuple(vae.config.latents_mean), tuple(vae.config.latents_std)
         kw = dict(pixel_mean=pm, pixel_std=ps, latents_mean=lm, latents_std=ls, device=dev)
@@ -317,7 +357,7 @@ def run(p: dict) -> str:
         _gc()
         audio = None
         if sigma is not None:
-            av_ = H.load_audio_vae(W)
+            av_ = L.audio_vae(W)
             audio = encode_audio(av_, wav, n, length, dev)
             del av_
             _gc()
@@ -325,7 +365,7 @@ def run(p: dict) -> str:
 
         # 3) upscaler latente su ogni segmento
         t0 = time.time()
-        net = C.load_upscaler(W["upscaler"])
+        net = L.upscaler(W["upscaler"])
         ups = []
         for (k0, f0, k1, f1) in plan:
             ups.append(C.upscale_chunk(net, video[:, :, k0:k1].contiguous(), w_px, h_px, dev))
@@ -344,7 +384,7 @@ def run(p: dict) -> str:
             pp = dict(p)
             pp["loras"] = [{"path": W["guide_lora"], "strength": float(p.get("lora_strength") or 1.0)}] if guided else []
             Wd = {k: v for k, v in W.items() if k not in ("turbo", "veda")}
-            tr = H.load_transformer(Wd, "ref2va", pp)
+            tr = L.transformer(Wd, pp)
             _log(f"transformer pronto in {time.time() - t0:.0f}s")
             ta_total = int(audio.shape[-1])
             for i, ((k0, f0, k1, f1), cv) in enumerate(zip(plan, ups)):
@@ -367,13 +407,13 @@ def run(p: dict) -> str:
                                     on_tile=lambda a, b, i=i: _log(f"segmento {i + 1}/{len(plan)} · tile {a}/{b}"))
                 done_v, done_a = P.join_chunk(done_v, done_a, ov, ca, k0, f0)
                 _log(f"segmento {i + 1}/{len(plan)} fatto in {time.time() - t1:.0f}s · picco VRAM "
-                     f"{torch.cuda.max_memory_allocated() / 2**30:.1f} GB")
+                     f"{_peak_gb():.1f} GB")
             del tr
             _gc()
 
         # 5) decodifica a pezzi → file
         t0 = time.time()
-        vae = H.load_vae(W)
+        vae = L.vae(W)
         wr = _Writer(out, w_px, h_px, fps, n)
         C.decode_stream(vae, done_v, wr.write, pixel_mean=pm, pixel_std=ps, latents_mean=lm, latents_std=ls,
                         device=dev)
