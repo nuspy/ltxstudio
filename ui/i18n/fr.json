@@ -3388,5 +3388,8 @@
   "vedit.mt.audio": "Générer aussi l'audio (parole/sons du prompt)",
   "vedit.mt.audio_tt": "Comme dans le workflow officiel, le modèle génère l'audio avec la vidéo : voix et sons viennent du prompt. Désactivez-le si le prompt ne parle pas (sinon l'audio peut être du bruit).",
   "vedit.track.tip_shift": "Maj+clic : ajoute un point même sur un autre point (pour fermer une boucle).",
-  "feat.cap.video_motion_track": "Mouvement par tracés (Motion-Track)"
+  "feat.cap.video_motion_track": "Mouvement par tracés (Motion-Track)",
+  "vedit.out.fill_lbl": "Garantir le remplissage (réduit la vidéo)",
+  "vedit.out.fill.tt": "Avec deux bandes opposées (haut+bas ou gauche+droite), le modèle les prend pour un letterbox et les laisse noires. Avec cette option, dans ce cas, la vidéo d'origine est réduite au centre jusqu'à ce que la zone nouvelle atteigne au moins 60 % : les bandes sont remplies, mais l'original collé est plus petit (moins de résolution). Désactivez-la pour garder l'original à son échelle (les bandes peuvent rester noires).",
+  "vedit.out.fill_scaled": "original réduit à {p} % pour que les bandes soient remplies"
 }

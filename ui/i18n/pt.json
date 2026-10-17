@@ -3388,5 +3388,8 @@
   "vedit.mt.audio": "Gerar também o áudio (fala/sons do prompt)",
   "vedit.mt.audio_tt": "Como no workflow oficial, o modelo gera o áudio junto com o vídeo: voz e sons vêm do prompt. Desligue se o prompt não fala (senão o áudio pode ser ruído).",
   "vedit.track.tip_shift": "Shift+clique: adiciona um ponto mesmo sobre outro ponto (para fechar um laço).",
-  "feat.cap.video_motion_track": "Movimento por trajetórias (Motion-Track)"
+  "feat.cap.video_motion_track": "Movimento por trajetórias (Motion-Track)",
+  "vedit.out.fill_lbl": "Garantir o preenchimento (reduz o vídeo)",
+  "vedit.out.fill.tt": "Com duas barras opostas (em cima+embaixo ou esquerda+direita) o modelo as confunde com letterbox e as deixa pretas. Com esta opção, nesse caso, o vídeo original é reduzido no centro até a área nova ter pelo menos 60%: as barras são preenchidas, mas o original colado fica menor (menos resolução). Desative para manter o original na sua escala (as barras podem ficar pretas).",
+  "vedit.out.fill_scaled": "original reduzido a {p}% para as barras serem preenchidas"
 }

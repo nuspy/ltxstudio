@@ -3388,5 +3388,8 @@
   "vedit.mt.audio": "同时生成音频（来自提示词的语音/声音）",
   "vedit.mt.audio_tt": "与官方工作流一样，模型会与视频一起生成音频：语音和声音来自提示词。如果提示词里没有说话内容请关闭（否则音频可能是噪声）。",
   "vedit.track.tip_shift": "Shift+点击：即使在另一个点上也会添加新点（用于闭合环路）。",
-  "feat.cap.video_motion_track": "轨迹运动 (Motion-Track)"
+  "feat.cap.video_motion_track": "轨迹运动 (Motion-Track)",
+  "vedit.out.fill_lbl": "保证填充（会缩小视频）",
+  "vedit.out.fill.tt": "当出现两条相对的黑边（上+下或左+右）时，模型会把它们当作宽银幕黑边而保持为黑色。启用此选项后，在这种情况下，原视频会围绕中心缩小，直到新区域至少占 60%：黑边会被填充，但贴回的原视频会变小（分辨率降低）。关闭则保持原视频的比例（黑边可能保持为黑色）。",
+  "vedit.out.fill_scaled": "原视频缩小到 {p}%，以便填充黑边"
 }

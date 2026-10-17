@@ -3388,5 +3388,8 @@
   "vedit.mt.audio": "A hang generálása is (beszéd/hangok a promptból)",
   "vedit.mt.audio_tt": "A hivatalos workflow-hoz hasonlóan a modell a videóval együtt generálja a hangot: a hang és a zajok a promptból jönnek. Kapcsold ki, ha a prompt nem beszél (különben a hang zaj lehet).",
   "vedit.track.tip_shift": "Shift+kattintás: akkor is ad hozzá pontot, ha egy másik pont fölé kattintasz (hurok lezárásához).",
-  "feat.cap.video_motion_track": "Mozgás nyomvonalakból (Motion-Track)"
+  "feat.cap.video_motion_track": "Mozgás nyomvonalakból (Motion-Track)",
+  "vedit.out.fill_lbl": "Kitöltés garantálása (kicsinyíti a videót)",
+  "vedit.out.fill.tt": "Két szemközti sáv esetén (fent+lent vagy balra+jobbra) a modell letterboxnak nézi őket, és feketén hagyja. Ezzel az opcióval ilyenkor az eredeti videót a közepe körül kicsinyítjük, amíg az új terület legalább 60%: a sávok kitöltődnek, de a beillesztett eredeti kisebb lesz (kisebb felbontás). Kapcsolja ki, ha az eredetit a saját méretarányában szeretné megtartani (a sávok feketék maradhatnak).",
+  "vedit.out.fill_scaled": "az eredeti {p}%-ra kicsinyítve, hogy a sávok kitöltődjenek"
 }

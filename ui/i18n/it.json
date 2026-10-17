@@ -3429,5 +3429,8 @@
   "vedit.mt.audio": "Genera anche l'audio (parlato/suoni dal prompt)",
   "vedit.mt.audio_tt": "Come nel workflow ufficiale il modello genera l'audio insieme al video: voce e suoni vengono dal prompt. Spegnilo se il prompt non parla (altrimenti l'audio può essere rumore).",
   "vedit.track.tip_shift": "Maiusc+clic: aggiunge un punto anche sopra un altro punto (per chiudere un anello).",
-  "feat.cap.video_motion_track": "Movimento da tracce (Motion-Track)"
+  "feat.cap.video_motion_track": "Movimento da tracce (Motion-Track)",
+  "vedit.out.fill_lbl": "Garantisci riempimento (rimpicciolisce il video)",
+  "vedit.out.fill.tt": "Con due barre opposte (sopra+sotto o sinistra+destra) il modello le scambia per un letterbox e le lascia nere. Con questa opzione, in quel caso, il video originale viene rimpicciolito al centro finché l'area nuova è almeno il 60%: le barre vengono riempite, ma l'originale incollato risulta più piccolo (meno risoluzione). Disattivala per tenere l'originale alla sua scala (le barre possono restare nere).",
+  "vedit.out.fill_scaled": "originale ridotto al {p}% per far riempire le barre"
 }

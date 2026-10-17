@@ -162,6 +162,10 @@ class IcLoraReq(BaseModel):
     min_bar: float = Field(0.0, ge=0.0, le=0.45, description="outpaint (opt-in, solo canvas non custom): se una barra "
                            "nuova e' piu' stretta, rimpicciolisce il video nel canvas finche' ogni barra e' >= questa "
                            "frazione (consigliato 0.15); 0 = spento")
+    fill_coverage: bool = Field(True, description="outpaint «garantisci riempimento» (default SI): se le barre nuove sono "
+                                "simmetriche sullo stesso asse (due barre opposte) e l'area nuova e' < 60%, il video "
+                                "originale viene rimpicciolito (cornice su 4 lati) perche' il modello altrimenti le "
+                                "lascia nere; false = layout letterale (originale piu' grande, barre forse non riempite)")
     # lipdub = «Doppiaggio da testo» (JUST-DUB-IT): il video CON audio e' il riferimento; la NUOVA battuta (testo) genera
     # voce e labbra nuove, per la stessa durata del video. `prompt` (se presente) vince su line/language/scene.
     line: str = Field("", description="lipdub: la nuova battuta, nell'alfabeto della lingua parlata (il modello non traduce)")
@@ -436,6 +440,7 @@ def register(app: FastAPI):
                "out_format": req.canvas, "out_anchor": req.anchor,
                "out_margins": tuple(req.margins or (0, 0, 0, 0)), "out_dark": req.dark_source,
                "out_paste": req.paste_original, "out_feather": req.feather_px, "out_min_bar": req.min_bar,
+               "out_fill": req.fill_coverage,
                "cam_ref": req.video_path, "cam_img": req.image_path or "",
                "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
                "width": req.width, "height": req.height, "seed": req.seed,

@@ -3388,5 +3388,8 @@
   "vedit.mt.audio": "Ton mit erzeugen (Sprache/Geräusche aus dem Prompt)",
   "vedit.mt.audio_tt": "Wie im offiziellen Workflow erzeugt das Modell den Ton zusammen mit dem Video: Stimme und Geräusche kommen aus dem Prompt. Ausschalten, wenn der Prompt nicht spricht (sonst kann der Ton Rauschen sein).",
   "vedit.track.tip_shift": "Umschalt+Klick: fügt auch über einem anderen Punkt einen Punkt hinzu (um eine Schleife zu schließen).",
-  "feat.cap.video_motion_track": "Bewegung aus Spuren (Motion-Track)"
+  "feat.cap.video_motion_track": "Bewegung aus Spuren (Motion-Track)",
+  "vedit.out.fill_lbl": "Füllung garantieren (verkleinert das Video)",
+  "vedit.out.fill.tt": "Bei zwei gegenüberliegenden Balken (oben+unten oder links+rechts) hält das Modell sie für Letterboxing und lässt sie schwarz. Mit dieser Option wird das Originalvideo in diesem Fall um die Mitte verkleinert, bis die neue Fläche mindestens 60 % beträgt: Die Balken werden gefüllt, aber das eingefügte Original wird kleiner (weniger Auflösung). Ausschalten, um das Original in seinem Maßstab zu behalten (die Balken können schwarz bleiben).",
+  "vedit.out.fill_scaled": "Original auf {p} % verkleinert, damit die Balken gefüllt werden"
 }

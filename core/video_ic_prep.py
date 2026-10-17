@@ -18,7 +18,7 @@ API pubblica (firme)
     mean_luma(path, seconds=1.0) -> float                   # 0..1 sul primo secondo (rilevamento sorgente scura)
     looks_dark(path, threshold=DARK_LUMA_THRESHOLD) -> bool
     compute_outpaint_layout(src_w, src_h, *, aspect=None, margins=None, anchor="center",
-                            max_long_edge=1280, multiple=64, min_bar=0.0) -> OutpaintLayout
+                            max_long_edge=1280, multiple=64, min_bar=0.0, fill_area=0.0) -> OutpaintLayout
     build_outpaint_canvas(src, out, layout, gamma=1.0) -> str       # barre NERE pure (0,0,0)
     inverse_gamma(src, out, gamma) -> str
     paste_original(generated, original, out, layout, border=2, feather=0) -> str   # feather>0: bordo sfumato
@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Iterator, Sequence
 
 DARK_LUMA_THRESHOLD = 0.16         # luma media (0..1) sotto cui la sorgente e' «scura» (~41/255)
+FILL_AREA = 0.60                  # «garantisci riempimento»: area nuova minima (barre simmetriche), live 17/10: 33-45% = barre nere, 61% = riempite
 MIN_BAR_FRACTION = 0.15            # barra nuova piu' stretta di questa frazione del canvas: il modello NON la riempie (live 14/10)
 DEFAULT_FEATHER = 24               # px di sfumatura del bordo originale/generato nel paste (0 = taglio netto)
 MAX_FEATHER = 256
@@ -369,11 +370,20 @@ def _k_for_min_bar(sw0: int, sh0: int, cw: int, ch: int, anchor: str, min_bar: f
     return min(ks)
 
 
+def _symmetric_bars(cw: int, ch: int, sw: int, sh: int, x: int, y: int) -> bool:
+    """True se almeno un asse ha una barra nuova su ENTRAMBI i lati (>4 px, con piu' di 64 px liberi in totale):
+    il caso letterbox/pillarbox che il modello non riempie. Una barra sola (anchor) non conta."""
+    for lo, hi in ((x, cw - x - sw), (y, ch - y - sh)):
+        if lo > 4 and hi > 4 and lo + hi > 64:
+            return True
+    return False
+
+
 def compute_outpaint_layout(src_w: int, src_h: int, *,
                             aspect: tuple[int, int] | str | None = None,
                             margins: tuple[int, int, int, int] | None = None,
                             anchor: str = "center", max_long_edge: int = 1280,
-                            multiple: int = 64, min_bar: float = 0.0) -> OutpaintLayout:
+                            multiple: int = 64, min_bar: float = 0.0, fill_area: float = 0.0) -> OutpaintLayout:
     """Calcola canvas e posizione del sorgente.
 
     - `aspect` ("16:9" oppure (16, 9)): canvas con quell'aspetto che CONTIENE il sorgente (no crop), con
@@ -387,7 +397,11 @@ def compute_outpaint_layout(src_w: int, src_h: int, *,
     `min_bar` (0 = spento, default): frazione minima (del canvas) delle barre nuove; se una barra e' piu' stretta
     il SORGENTE viene rimpicciolito dentro lo stesso canvas finche' ogni barra raggiunge la frazione (le barre
     sotto ~15 % non vengono riempite dal modello, live 14/10). Costa risoluzione del sorgente e aumenta l'area
-    nuova: opt-in, solo con `aspect`."""
+    nuova: opt-in, solo con `aspect`.
+
+    `fill_area` (0 = spento, default; consigliato FILL_AREA=0.60): «garantisci riempimento». Se le barre sono
+    SIMMETRICHE sullo stesso asse (due barre opposte) e l'area nuova e' sotto `fill_area`, il sorgente viene
+    rimpicciolito attorno al suo centro finche' l'area nuova la raggiunge. Vale sia con `aspect` sia con `margins`."""
     if (aspect is None) == (margins is None):
         raise ValueError("indica esattamente uno fra aspect e margins")
     if anchor not in ANCHORS:
@@ -427,6 +441,18 @@ def compute_outpaint_layout(src_w: int, src_h: int, *,
         x, y = ml * k, mt * k
     x = max(0, min(cw - sw, int(round(x / 2.0)) * 2))
     y = max(0, min(ch - sh, int(round(y / 2.0)) * 2))
+    if fill_area > 0.0 and _symmetric_bars(cw, ch, sw, sh, x, y) and 1.0 - (sw * sh) / float(cw * ch) < fill_area - 1e-9:
+        # «Garantisci riempimento»: due barre simmetriche sullo stesso asse sembrano un letterbox/pillarbox e la LoRA
+        # outpaint le lascia nere (live 17/10: area nuova 33-45% = nere, 61% = riempite). Si rimpicciolisce il sorgente
+        # (stesso centro) finche' l'area nuova raggiunge `fill_area`: cornice su 4 lati.
+        fa = min(max(float(fill_area), 0.0), 0.9)
+        kk = math.sqrt((1.0 - fa) * cw * ch / float(sw0 * sh0))
+        nsw, nsh = min(_even_up(sw0 * kk), cw // 2 * 2), min(_even_up(sh0 * kk), ch // 2 * 2)
+        if nsw * nsh < sw * sh:
+            cx, cy = x + sw / 2.0, y + sh / 2.0
+            x = max(0, min(cw - nsw, int(round((cx - nsw / 2.0) / 2.0)) * 2))
+            y = max(0, min(ch - nsh, int(round((cy - nsh / 2.0) / 2.0)) * 2))
+            sw, sh = nsw, nsh
     return OutpaintLayout(cw, ch, sw, sh, x, y, sw / sw0, 1.0 - (sw * sh) / float(cw * ch),
                           s_cap < 1.0)
 

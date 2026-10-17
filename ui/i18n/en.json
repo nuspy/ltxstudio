@@ -3462,5 +3462,8 @@
   "vedit.mt.audio": "Also generate the audio (speech/sounds from the prompt)",
   "vedit.mt.audio_tt": "As in the official workflow the model generates the audio together with the video: voice and sounds come from the prompt. Turn it off if the prompt has no speech (otherwise the audio may be noise).",
   "vedit.track.tip_shift": "Shift+click: adds a point even on top of another point (to close a loop).",
-  "feat.cap.video_motion_track": "Motion from tracks (Motion-Track)"
+  "feat.cap.video_motion_track": "Motion from tracks (Motion-Track)",
+  "vedit.out.fill_lbl": "Guarantee fill (shrinks the video)",
+  "vedit.out.fill.tt": "With two opposite bars (top+bottom or left+right) the model mistakes them for letterboxing and leaves them black. With this option, in that case, the original video is shrunk around the centre until the new area is at least 60%: the bars get filled, but the pasted original ends up smaller (less resolution). Turn it off to keep the original at its own scale (bars may stay black).",
+  "vedit.out.fill_scaled": "original reduced to {p}% so the bars get filled"
 }

@@ -145,7 +145,7 @@ def test_disabled_and_unknown_modes_rejected(tmp_path):
 def test_outpaint_feather_cfg_and_min_bar(tmp_path):
     src = _gen(tmp_path / "v.mp4", 17, size="640x384")
     out = str(tmp_path / "o.mp4")
-    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False}
+    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False, "out_fill": False}
     a = vic.build_job({**base, "out_feather": 40}, str(tmp_path), 1, out)
     assert a.feather == 40 and a.layout.scale == 1.0
     b = vic.build_job({**base, "out_feather": 0}, str(tmp_path), 2, out)
@@ -157,6 +157,23 @@ def test_outpaint_feather_cfg_and_min_bar(tmp_path):
     e = vic.build_job({**base, "out_min_bar": 0.15}, str(tmp_path), 5, out)
     assert e.layout.scale < 1.0 and not e.layout.narrow_bar and e.layout.new_area > a.layout.new_area
     assert a.layout.narrow_bar and any("stretta" in n for n in a.notes)
+
+
+def test_outpaint_fill_default_on_shrinks_symmetric_bars(tmp_path):
+    """«Garantisci riempimento» (17/10): ATTIVO di default; due barre simmetriche -> sorgente rimpicciolito, area nuova >= 60%."""
+    src = _gen(tmp_path / "v.mp4", 17, size="640x384")
+    out = str(tmp_path / "o.mp4")
+    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False}
+    on = vic.build_job(base, str(tmp_path), 1, out)                                   # default: attivo
+    off = vic.build_job({**base, "out_fill": False}, str(tmp_path), 2, out)
+    assert off.layout.scale == 1.0 and off.layout.new_area < 0.45
+    assert on.layout.scale < 1.0 and on.layout.new_area >= P.FILL_AREA - 0.01
+    assert any("garantisci riempimento" in n for n in on.notes) and not any("stretta" in n for n in on.notes)
+    one = vic.build_job({**base, "out_anchor": "bottom"}, str(tmp_path), 3, out)       # UNA barra: nessun rimpicciolimento
+    assert one.layout.scale == 1.0
+    cust = vic.build_job({"mode": "outpaint", "video": src, "out_format": "custom", "out_margins": (160, 0, 160, 0),
+                          "keep_audio": False}, str(tmp_path), 4, out)                 # margini simmetrici: vale anche per custom
+    assert cust.layout.scale < 1.0 and cust.layout.new_area >= P.FILL_AREA - 0.01
 
 
 # ── lip dub (fase 1b) ────────────────────────────────────────────────────────────────────────────

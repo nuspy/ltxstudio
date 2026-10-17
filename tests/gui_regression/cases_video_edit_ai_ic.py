@@ -342,6 +342,7 @@ def case_outpaint_narrow_bar_warning(w, spy):
     _ack_dev(True)
     t = _fill_mode(w, "outpaint")
     t._vinfo = SimpleNamespace(width=512, height=288, nb_frames=49, fps=25.0)
+    t.out_fill.setChecked(False)                         # «garantisci riempimento» spento: layout letterale (avviso barra stretta)
     t.out_format.setCurrentIndex(t.out_format.findData("21:9"))
     t._on_outpaint_change()
     lay = t._outpaint_layout()
@@ -368,6 +369,7 @@ def case_outpaint_formats_direction_feather(w, spy):
         return tr(f"vedit.out.side.{name}", name).split("{n}")[0]
     t = _fill_mode(w, "outpaint")
     t._vinfo = SimpleNamespace(width=1280, height=720, nb_frames=49, fps=25.0)
+    t.out_fill.setChecked(False)                         # layout letterale: «garantisci riempimento» ha un caso suo
     for fmt in ("21:9", "1:1", "4:3", "3:4", "9:16"):
         t.out_format.setCurrentIndex(t.out_format.findData(fmt))
         t._on_outpaint_change()
@@ -411,6 +413,37 @@ def case_outpaint_formats_direction_feather(w, spy):
     t.out_format.setCurrentIndex(t.out_format.findData("custom"))
     assert not t.out_minbar.isEnabled()
     t.out_minbar.setChecked(False)
+
+
+def case_outpaint_fill_guarantee(w, spy):
+    """«Garantisci riempimento» (live 17/10): ATTIVO di default; due barre simmetriche (21:9, 4:3, 1:1) -> il video si
+    rimpicciolisce e l'area nuova arriva al 60% (riga info lo dice); UNA barra (Estendi verso) o area gia' grande: invariato;
+    spento: layout letterale; la scelta finisce nella cfg (out_fill)."""
+    from types import SimpleNamespace
+    from core import video_ic_prep as prep
+    _ack_dev(True)
+    t = _fill_mode(w, "outpaint")
+    t._vinfo = SimpleNamespace(width=704, height=384, nb_frames=49, fps=24.0)
+    assert t.out_fill.isChecked(), "attivo di default"
+    for fmt in ("21:9", "4:3", "1:1"):
+        t.out_format.setCurrentIndex(t.out_format.findData(fmt)); t._on_outpaint_change()
+        lay = t._outpaint_layout()
+        assert lay.scale < 1.0 and abs(lay.new_area - prep.FILL_AREA) < 0.02, (fmt, lay)
+        assert str(int(round(lay.scale * 100))) in t.out_info.text() and "⚠" not in t.out_info.text(), t.out_info.text()
+    t.out_format.setCurrentIndex(t.out_format.findData("4:3"))
+    t.out_anchor.setCurrentIndex(t.out_anchor.findData("bottom")); t._on_outpaint_change()
+    assert t._outpaint_layout().scale == 1.0, "una barra sola: nessun rimpicciolimento"
+    t.out_anchor.setCurrentIndex(t.out_anchor.findData("center"))
+    t.out_format.setCurrentIndex(t.out_format.findData("9:16")); t._on_outpaint_change()
+    assert t._outpaint_layout().scale == 1.0, "area nuova gia' grande: invariato"
+    t.out_format.setCurrentIndex(t.out_format.findData("1:1")); t._on_outpaint_change()
+    n = len(spy.calls)
+    t._go()
+    assert len(spy.calls) == n + 1 and _cfg_of(w)["out_fill"] is True
+    t.out_fill.setChecked(False); t._on_outpaint_change()
+    assert t._outpaint_layout().scale == 1.0
+    t._go()
+    assert _cfg_of(w)["out_fill"] is False
 
 
 def case_outpaint_dark_autodetect(w, spy):
@@ -1229,6 +1262,8 @@ CASES = (
       case_outpaint_narrow_bar_warning),
      ("vedit_outpaint_formats_dir_feather", "Outpaint: tutti i formati, info «Aggiunge: sopra/sotto/lati», Estendi verso, sfumatura e barre minime in cfg.",
       case_outpaint_formats_direction_feather),
+     ("vedit_outpaint_fill_guarantee", "Outpaint: «Garantisci riempimento» attivo di default, rimpicciola solo con barre simmetriche (area nuova 60%), info e cfg out_fill.",
+      case_outpaint_fill_guarantee),
      ("vedit_outpaint_dark_autodetect", "Outpaint: sorgente scuro → gamma suggerito (e dichiarato nel log).",
       case_outpaint_dark_autodetect),
      ("vedit_cameraman_validation", "Cameraman: riferimento obbligatorio, <960x512 avvisa, video principale opzionale.",
