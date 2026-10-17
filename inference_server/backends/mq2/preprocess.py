@@ -1,8 +1,7 @@
 """Preprocessing delle modalità MagicQuill V2 (maschere, condizioni locali/colore/bordi, prompt). Solo numpy/PIL/cv2.
 
-Derivato da MagicQuillV2 `edit.py` (KontextEditModel.*_edit), `utils_node.py` (GrowMask, BlendInpaint) e `app.py`
-(scelta modalità e prompt) — CC BY-NC 4.0, (c) Zichen Liu et al. Vedi `NOTICE.md` (cartella del componente) per
-attribuzione e avvertenza di licenza (NON commerciale). Riscritto in numpy/cv2 senza torch/scipy/ComfyUI.
+Ispirato a MagicQuillV2 `edit.py` (KontextEditModel.*_edit), `utils_node.py` (GrowMask, BlendInpaint) e `app.py`
+(scelta modalità e prompt) — (c) Zichen Liu et al. Vedi `docs/THIRD_PARTY_NOTICES_MAGICQUILL.md` per i crediti. Riscritto in numpy/cv2 senza torch/scipy/ComfyUI.
 
 Convenzioni: maschere = uint8 H x W con 255 = area (bianco). Immagini = uint8 H x W x 3 RGB.
 """

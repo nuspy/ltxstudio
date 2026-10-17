@@ -1,9 +1,8 @@
 """MagicQuill V2 NATIVO su FLUX.1 Kontext (diffusers 0.38): modifica locale / rimozione / bordi / colore / integrazione.
 
-LICENZA: il codice di riferimento MagicQuill V2 (https://github.com/zliucz/MagicQuillV2, (c) Zichen Liu et al.) è CC BY-NC 4.0 =
-USO NON COMMERCIALE (il README upstream porta anche un badge CC BY-SA 4.0; il catalogo pesi dice CC BY-NC-SA 4.0): questo
-modulo e i pesi `*_lora.safetensors` NON vanno distribuiti in un'edizione commerciale senza una decisione di licenza
-dell'utente. Dettagli e attribuzione: `NOTICE.md` (cartella del componente).
+Crediti: idea e algoritmo di MagicQuill V2 (https://github.com/zliucz/MagicQuillV2, Zichen Liu et al.); codice scritto da
+zero per diffusers 0.38. I pesi `*_lora.safetensors` (CC BY-NC-SA 4.0) li scarica l'utente dal tab Pesi, con conferma di
+licenza. Attribuzioni: `docs/THIRD_PARTY_NOTICES_MAGICQUILL.md`.
 
 Handler `image_mq` (job_runner / persistent_runner): `run(params, mm, output_dir)` -> {"status","output":[png]} | {"status":"error","error"}.
 Gira SOLO nel processo figlio del server (importa torch): mai dal GUI.

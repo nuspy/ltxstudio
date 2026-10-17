@@ -257,8 +257,8 @@ def case_mq_guards_and_visibility(w, spy):
 
 
 def case_mq_component_missing_warns_no_crash(w, spy):
-    """Componente MagicQuill (codice, licenza NC) non installato: avviso «non installato» + Apri tab Pesi, nessun job,
-    nessun crash; vale per le 4 modalita' e per l'integrazione (casella puzzle di Integra)."""
+    """Edizione senza il codice MagicQuill (file esclusi dalla build): avviso «non inclusa», nessun job, nessun crash;
+    vale per le 4 modalita' e per l'integrazione (casella puzzle di Integra)."""
     import os
     from PySide6.QtWidgets import QMessageBox
     _populate_inventory(w)
@@ -269,8 +269,8 @@ def case_mq_component_missing_warns_no_crash(w, spy):
     H.load_canvas_image(w)
     _draw_center_mask(f.canvas)
     seen = []
-    old_exec = QMessageBox.exec
-    QMessageBox.exec = lambda self, *a, **k: seen.append(self.text()) or 0
+    old_info = QMessageBox.information
+    QMessageBox.information = staticmethod(lambda *a, **k: seen.append(a[2] if len(a) > 2 else "") or QMessageBox.Ok)
     os.environ["LTX_OPTIONAL_DISABLE"] = "magicquill"
     n0 = len(spy.calls)
     try:
@@ -280,8 +280,8 @@ def case_mq_component_missing_warns_no_crash(w, spy):
         w._start_native_mq_foreground({"image": "a.png", "mask": "b.png"}, m, "x", 20, 1, 2.5)
     finally:
         os.environ.pop("LTX_OPTIONAL_DISABLE", None)
-        QMessageBox.exec = old_exec
-    assert len(seen) == 2 and all("non \u00e8 installato" in t and "mq2-code" in t for t in seen), seen
+        QMessageBox.information = old_info
+    assert len(seen) == 2 and all('inclusa' in t for t in seen), seen
     assert len(spy.calls) == n0, "job partito senza il componente"
 
 

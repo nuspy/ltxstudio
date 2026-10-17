@@ -3518,6 +3518,6 @@
   "weights.license.ack.title": "Licence non commerciale",
   "weights.license.ack.body": "Ces poids ont une licence qui N'AUTORISE PAS l'usage commercial ({license}). Ne les téléchargez que pour votre usage personnel/non commercial, en respectant les conditions de l'auteur (attribution et partage dans les mêmes conditions). Ils ne font pas partie de l'installateur : vous les téléchargez vous-même, sous votre responsabilité.\n\n{names}\n\nAvez-vous lu la licence et voulez-vous les télécharger ?",
   "weights.license.declined": "Téléchargement annulé : licence non confirmée.",
-  "mq.pack.title": "Composant MagicQuill non installé",
-  "mq.pack.missing": "Le composant MagicQuill V2 n'est pas installé. Il contient du code sous licence non commerciale (CC BY-NC 4.0) et n'est pas inclus dans l'application : téléchargez-le depuis l'onglet « Poids des modèles » (entrée « mq2-code »), avec les LoRA MagicQuill."
+  "mq.pack.title": "MagicQuill indisponible",
+  "mq.pack.missing": "La fonction MagicQuill V2 n'est pas incluse dans cette édition de l'application (composant absent)."
 }

@@ -20,14 +20,10 @@ from diffusers import FluxTransformer2DModel
 from diffusers.models.embeddings import apply_rotary_emb
 
 from core.resources import commit_free_gb
-from core import optional_components as _oc  # noqa: E402
-import pytest as _pt  # noqa: E402
-if _oc.load_magicquill() is None:                # componente opzionale (optional/magicquill o cartella installata)
-    _pt.skip(_oc.last_error(), allow_module_level=True)
-from ltx_magicquill.mq2 import attention as mqa
-from ltx_magicquill.mq2.attention import MQState, patch_transformer
-from ltx_magicquill.mq2.control_lora import ControlLoRA, ControlSpec
-from ltx_magicquill.mq2.pipeline import cond_latent_ids, control_session
+from inference_server.backends.mq2 import attention as mqa
+from inference_server.backends.mq2.attention import MQState, patch_transformer
+from inference_server.backends.mq2.control_lora import ControlLoRA, ControlSpec
+from inference_server.backends.mq2.pipeline import cond_latent_ids, control_session
 
 DIM = 64            # 4 teste x 16
 T, N, K = 6, 16, 16  # token testo / rumore / Kontext

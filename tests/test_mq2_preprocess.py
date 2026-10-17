@@ -7,12 +7,8 @@ import pytest
 from PIL import Image
 
 from core.resources import commit_free_gb
-from core import optional_components as _oc  # noqa: E402
-import pytest as _pt  # noqa: E402
-if _oc.load_magicquill() is None:                # componente opzionale (optional/magicquill o cartella installata)
-    _pt.skip(_oc.last_error(), allow_module_level=True)
-from ltx_magicquill import magicquill_v2 as mq
-from ltx_magicquill.mq2 import preprocess as pp
+from inference_server.backends import magicquill_v2 as mq
+from inference_server.backends.mq2 import preprocess as pp
 
 
 @pytest.fixture(autouse=True)

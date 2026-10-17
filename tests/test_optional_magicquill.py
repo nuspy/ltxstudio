@@ -1,5 +1,4 @@
-"""MagicQuill V2 = componente OPZIONALE: se manca (build/edizione) nessun crash, errore chiaro «non installato»;
-il codice derivato (CC BY-NC) non entra MAI nelle build."""
+"""MagicQuill V2: se un'edizione ESCLUDE i file (cap spenta) il motore immagini non si rompe: errore chiaro, nessun crash."""
 from __future__ import annotations
 
 import json
@@ -15,28 +14,25 @@ sys.path.insert(0, str(ROOT))
 from core import optional_components as oc  # noqa: E402
 
 
-def test_pack_found_in_repo_and_override(monkeypatch, tmp_path):
-    assert oc.pack_dir() == ROOT / "optional" / "magicquill"
-    monkeypatch.setenv(oc.ENV_DISABLE, "magicquill")
-    assert oc.pack_dir() is None and not oc.magicquill_installed()
-    monkeypatch.delenv(oc.ENV_DISABLE)
-    # cartella installata dall'utente: stessa struttura, trovata quando il repo non ce l'ha
-    (tmp_path / "mq2").mkdir()
-    (tmp_path / "magicquill_v2.py").write_text("def run(p, mm, o):\n    return {'status': 'success', 'output': []}\n")
-    (tmp_path / "mq2" / "__init__.py").write_text("")
-    monkeypatch.setattr(oc, "repo_dir", lambda: tmp_path / "assente")
-    monkeypatch.setenv(oc.ENV, str(tmp_path))
-    assert oc.pack_dir() == tmp_path
-    assert oc.load_magicquill().run({}, None, "") == {"status": "success", "output": []}
+def test_module_present_in_normal_location():
+    assert (ROOT / "inference_server" / "backends" / "magicquill_v2.py").is_file()
+    assert oc.magicquill_installed()
 
 
 def test_missing_component_gives_clear_error_not_crash(monkeypatch):
     monkeypatch.setenv(oc.ENV_DISABLE, "magicquill")
-    assert oc.load_magicquill() is None
+    assert not oc.magicquill_installed() and oc.load_magicquill() is None
     res = oc.image_mq_handler()({"mode": "local"}, None, "")
-    assert res["status"] == "error" and "non installato" in res["error"] and "mq2-code" in res["error"]
-    with pytest.raises(ModuleNotFoundError):
-        oc.require_magicquill()
+    assert res["status"] == "error" and "non è inclusa" in res["error"]
+
+
+def test_really_absent_file_is_handled(monkeypatch):
+    """Il modulo non c'è DAVVERO (come in un'edizione senza il file): find_spec None → handler «non inclusa»."""
+    import importlib.util
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a, **k: None if name == oc.MODULE else real(name, *a, **k))
+    assert oc.load_magicquill() is None
+    assert oc.image_mq_handler() is oc.missing_run
 
 
 def test_job_runner_survives_without_component(tmp_path):
@@ -48,4 +44,4 @@ def test_job_runner_survives_without_component(tmp_path):
                        capture_output=True, text=True, timeout=300)
     assert rj.is_file(), p.stdout[-800:] + p.stderr[-800:]
     res = json.loads(rj.read_text("utf-8"))
-    assert res["status"] == "error" and "non installato" in res["error"], res
+    assert res["status"] == "error" and "non è inclusa" in res["error"], res

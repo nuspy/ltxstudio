@@ -3518,6 +3518,6 @@
   "weights.license.ack.title": "Nichtkommerzielle Lizenz",
   "weights.license.ack.body": "Diese Gewichte haben eine Lizenz, die die kommerzielle Nutzung NICHT erlaubt ({license}). Lade sie nur für den persönlichen/nichtkommerziellen Gebrauch herunter und beachte die Bedingungen des Autors (Namensnennung und Weitergabe unter gleichen Bedingungen). Sie sind nicht Teil des Installers: Du lädst sie selbst auf eigene Verantwortung herunter.\n\n{names}\n\nHast Du die Lizenz gelesen und möchtest sie herunterladen?",
   "weights.license.declined": "Download abgebrochen: Lizenz nicht bestätigt.",
-  "mq.pack.title": "MagicQuill-Komponente nicht installiert",
-  "mq.pack.missing": "Die MagicQuill-V2-Komponente ist nicht installiert. Sie enthält Code unter einer nichtkommerziellen Lizenz (CC BY-NC 4.0) und ist nicht in der App enthalten: Lade sie im Tab „Modellgewichte“ herunter (Eintrag „mq2-code“), zusammen mit den MagicQuill-LoRAs."
+  "mq.pack.title": "MagicQuill nicht verfügbar",
+  "mq.pack.missing": "Die Funktion MagicQuill V2 ist in dieser Edition der App nicht enthalten (Komponente fehlt)."
 }

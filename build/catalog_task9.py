@@ -42,14 +42,6 @@ def entries(N):
           category="aux", arch="openpose", repo="lllyasviel/Annotators", remote="body_pose_model.pth",
           filename="body_pose_model.pth", type="ControlNet", family="Openpose", gb=0.209,
           used_by=["cap.image_controlnet"], note="mappa di posa (scheletro a 18 punti) per i ControlNet"),
-        # CODICE derivato di MagicQuill V2 (CC BY-NC 4.0): componente opzionale, mai nella build; lo scarica l'utente. Hosting
-        # DA DECIDERE: finche' manca la fonte e' `no_remote` (scripts/package_magicquill_code.py crea lo zip da pubblicare).
-        N("mq2-code", "Immagini", "MagicQuill V2 · componente codice (CC BY-NC 4.0, ~0.1MB)",
-          category="image", arch="flux1", kind="snapshot", tool_dest=r"E:\AI\Models\LoRA\MagicQuill\_code", gb=0.001,
-          no_remote=True, used_by=["cap.image_magicquill"],
-          note="codice derivato di MagicQuill V2 (opera derivata, CC BY-NC 4.0, uso NON commerciale): non e' incluso nell'app "
-               "ne' nell'installer. Fonte in attesa di hosting: pubblica lo zip creato da scripts/package_magicquill_code.py "
-               "(es. repo HF pubblico) e imposta repo/togli no_remote in build/catalog_task9.py"),
     ] + [
         N(f"mq2-{m}-lora", "Immagini", f"MagicQuill V2 · {lbl} (LoRA di controllo FLUX.1 Kontext, 0.3GB)",
           category="image", arch="flux1", repo="LiuZichen/MagicQuillV2-models", remote=f"v2_ckpt/{m}_lora.safetensors",
@@ -63,10 +55,7 @@ def entries(N):
             ("puzzle", "integrazione (foreground)", 0.345, "fonde un oggetto incollato nella scena (LoRA PEFT normale)."))
     ]
     for e in out:
-        if e["id"] == "mq2-code":
-            e["license"] = "CC BY-NC 4.0"
-            e["license_ack"] = "cc_by_nc"
-        elif e["id"].startswith("mq2-"):                # mai in silenzio: dialog con avviso di licenza + conferma (core/license_ack)
+        if e["id"].startswith("mq2-"):                # mai in silenzio: dialog con avviso di licenza + conferma (core/license_ack)
             e["license"] = "CC BY-NC-SA 4.0"
             e["license_ack"] = "cc_by_nc_sa"
     return out
@@ -85,7 +74,6 @@ USE = {
     "mq2-edge-lora": (["lora_style", "control_lora"], []),
     "mq2-color-lora": (["lora_style", "control_lora"], []),
     "mq2-puzzle-lora": (["lora_style", "control_lora"], []),
-    "mq2-code": (["control_lora"], []),
 }
 NEW_USE_TAGS = {
     "controlnet_image": "ControlNet immagini: la struttura (bordi, profondità, posa) di una foto guida decide la composizione.",

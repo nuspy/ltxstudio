@@ -1,8 +1,7 @@
 """Loader delle LoRA di controllo MagicQuill V2 (formato EasyControl).
 
-Derivato da MagicQuillV2 `src/lora_helper.py` / `src/layers_cache.py` (CC BY-NC 4.0, (c) Zichen Liu et al.; da
-EasyControl). Vedi `NOTICE.md` (cartella del componente) per attribuzione e avvertenza di licenza (uso NON
-commerciale).
+Ispirato a MagicQuillV2 `src/lora_helper.py` / `src/layers_cache.py` ((c) Zichen Liu et al.; da
+EasyControl). Vedi `docs/THIRD_PARTY_NOTICES_MAGICQUILL.md` per i crediti.
 
 Chiavi attese (per ogni file, rank 128, network_alpha = rank -> scala 1):
     transformer_blocks.{0..18}.attn.processor.{q,k,v,proj}_loras.0.{down,up}.weight    (blocchi doppi)

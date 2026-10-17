@@ -4644,23 +4644,12 @@ class MainWindow(QMainWindow):
         return model if os.path.isabs(model) else os.path.join(r"E:\AI\Models\diffusion_models", model)
 
     def _magicquill_component_ok(self) -> bool:
-        """Il CODICE di MagicQuill V2 e' un componente opzionale (licenza non commerciale, fuori dalle build): se non c'e'
-        avviso «componente non installato» + «Apri tab Pesi modelli», mai un crash. True = installato."""
+        """Se l'edizione non include il codice di MagicQuill V2 (file esclusi dalla build) → avviso chiaro, mai un crash."""
         from core import optional_components as oc
         if oc.magicquill_installed():
             return True
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Warning)
-        box.setWindowTitle(tr("mq.pack.title", "Componente MagicQuill non installato"))
-        box.setText(tr("mq.pack.missing",
-                       "Il componente MagicQuill V2 non è installato. Contiene codice con licenza non commerciale "
-                       "(CC BY-NC 4.0) e non è incluso nell'app: scaricalo dal tab «Pesi modelli» (voce «mq2-code»), "
-                       "insieme alle LoRA MagicQuill."))
-        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
-        box.addButton(tr("common.cancel", "Annulla"), QMessageBox.RejectRole)
-        box.exec()
-        if box.clickedButton() is b_w:
-            self.tabs.setCurrentWidget(self.weights_tab)
+        QMessageBox.information(self, tr("mq.pack.title", "MagicQuill non disponibile"),
+                                tr("mq.pack.missing", oc.NOT_INSTALLED_MSG))
         return False
 
     def generate_magicquill(self):

@@ -7636,30 +7636,6 @@
       ],
       "license": "CC BY-NC-SA 4.0",
       "license_ack": "cc_by_nc_sa"
-    },
-    {
-      "id": "mq2-code",
-      "module": "Immagini",
-      "label": "MagicQuill V2 · componente codice (CC BY-NC 4.0, ~0.1MB)",
-      "kind": "snapshot",
-      "type": "misc",
-      "family": "",
-      "gated": false,
-      "approx_gb": 0.001,
-      "scan_names": [],
-      "category": "image",
-      "arch": "flux1",
-      "tool_dest": "E:\\AI\\Models\\LoRA\\MagicQuill\\_code",
-      "no_remote": true,
-      "note": "codice derivato di MagicQuill V2 (opera derivata, CC BY-NC 4.0, uso NON commerciale): non e' incluso nell'app ne' nell'installer. Fonte in attesa di hosting: pubblica lo zip creato da scripts/package_magicquill_code.py (es. repo HF pubblico) e imposta repo/togli no_remote in build/catalog_task9.py",
-      "used_by": [
-        "cap.image_magicquill"
-      ],
-      "license": "CC BY-NC 4.0",
-      "license_ack": "cc_by_nc",
-      "use": [
-        "control_lora"
-      ]
     }
   ],
   "schema": 2,
