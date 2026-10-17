@@ -1931,7 +1931,7 @@
       ],
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ]
     },
     {
@@ -1958,7 +1958,7 @@
       ],
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ]
     },
     {
@@ -1985,7 +1985,7 @@
       ],
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ]
     },
     {
@@ -2012,7 +2012,7 @@
       ],
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ]
     },
     {
@@ -6820,7 +6820,7 @@
       "filename": "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors",
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ],
       "sensitivity": "adult",
       "no_remote": true,
@@ -6848,7 +6848,7 @@
       "filename": "getphat Flux Reality v23 Softcore FP8.safetensors",
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ],
       "sensitivity": "adult",
       "no_remote": true,
@@ -6878,7 +6878,7 @@
       "filename": "svdq-fp4_r32-flux.1-dev.safetensors",
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ],
       "note": "Caricato dal motore nunchaku (image_flux._load_nunchaku_flux_tr): richiede la wheel nunchaku e una RTX 50xx.",
       "use": [
@@ -6905,7 +6905,7 @@
       "filename": "svdq-fp4_r32-flux.1-kontext-dev.safetensors",
       "deps": [
         "flux-vae-ae",
-        "t5xxl-fp16"
+        "t5xxl-fp16|t5xxl-enconly-fp8"
       ],
       "note": "Come flux1-dev-nunchaku-fp4, per l'editing Kontext.",
       "use": [
@@ -7127,6 +7127,31 @@
         "cap.video_hdr_ic"
       ],
       "note": "Embedding testo pre-calcolato (video_context/audio_context) che la pipeline HDR usa al posto di Gemma: senza questo file la modalita' HDR non parte (nessun prompt)"
+    },
+    {
+      "id": "t5xxl-enconly-fp8",
+      "module": "TextEncoder",
+      "label": "T5-XXL fp8 e4m3 solo-encoder (FLUX.1, alternativa a t5xxl-fp16, 4.9GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 4.9,
+      "scan_names": [
+        "t5xxl_enconly",
+        "t5xxl_fp8_e4m3fn"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "comfyanonymous/flux_text_encoders",
+      "url": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+      "filename": "t5xxl_enconly.safetensors",
+      "remote_filename": "t5xxl_fp8_e4m3fn.safetensors",
+      "note": "Letto da inference_server/backends/t5_single_file (pesi fp8 residenti, upcast per layer): usato solo se manca la cartella HF _te/t5xxl con i pesi fp16. Stessi tensori di t5xxl_enconly (Civitai): 8/8 campioni da 1 MB identici.",
+      "use": [
+        "te",
+        "fp8"
+      ]
     }
   ],
   "schema": 2,

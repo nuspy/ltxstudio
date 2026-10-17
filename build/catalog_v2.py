@@ -921,6 +921,12 @@ NEW = [
       arch="flux1", repo="comfyanonymous/flux_text_encoders",
       remote="t5xxl_fp16.safetensors", filename="t5xxl_fp16.safetensors",
       type="TextEncoders", gb=9.2),
+    N("t5xxl-enconly-fp8", "TextEncoder", "T5-XXL fp8 e4m3 solo-encoder (FLUX.1, alternativa a t5xxl-fp16, 4.9GB)",
+      category="image", arch="flux1", repo="comfyanonymous/flux_text_encoders",
+      remote="t5xxl_fp8_e4m3fn.safetensors", filename="t5xxl_enconly.safetensors",
+      type="TextEncoders", gb=4.9, scan=["t5xxl_enconly", "t5xxl_fp8_e4m3fn"],
+      note="Letto da inference_server/backends/t5_single_file (pesi fp8 residenti, upcast per layer): usato solo se "
+           "manca la cartella HF _te/t5xxl con i pesi fp16. Stessi tensori di t5xxl_enconly (Civitai): 8/8 campioni da 1 MB identici."),
     N("long-clip-hi-dream", "TextEncoder", "Long-CLIP L (fonte remota ignota)",
       category="image", arch="flux1", filename="long_clip_l_hi_dream.safetensors",
       type="TextEncoders", gb=0.9, no_remote=True),
@@ -1037,7 +1043,7 @@ REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "l
            "ltx23-eros14", "ltx25-te-uncensored",
            # IC-LoRA Fase 1 (14/10): fonte corretta ai repo pubblici oumoumad + note Civitai
            "ltx-iclora-outpaint", "ltx-iclora-motiondeblur", "ltx-iclora-uncompress", "ltx-iclora-deinterlace",
-           "ltx-iclora-restyle", "ltx-iclora-cameraman") + _LOCAL_REFRESH
+           "ltx-iclora-restyle", "ltx-iclora-cameraman") + ("t5xxl-enconly",) + _LOCAL_REFRESH
 # chiavi della vecchia voce da NON ereditare quando la voce viene aggiornata (merged.update non le toglie)
 _STALE_ON_REFRESH = ("remote_filename", "no_remote", "note", "page")
 
