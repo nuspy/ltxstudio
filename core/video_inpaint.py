@@ -28,6 +28,9 @@ INF_PY = r"E:\AI\Tools\inference_server_venv\Scripts\python.exe"
 
 # Modalita' di aggancio della foto (DECISIONE: ipotesi piu' semplice, come replace_char). Cambia in una riga.
 R2V_MODE = "frame0"
+FULL_RES_DEFAULT = True           # secondo stadio (upsampler + raffinamento): uscita a risoluzione PIENA invece che a meta'
+KEEP_BACKGROUND_DEFAULT = True    # fuori dalla maschera = sorgente originale a piena risoluzione (bordo sfumato)
+FULL_RES_MAX_LONG_EDGE = 1280     # tetto del lato lungo con lo stage 2 (come gli altri modi IC: oltre, OOM a 97 frame)
 R2V_FIT = "pad"                   # "pad" = foto intera con bordi (default) | "crop" = ritaglio centrale del worker
 R2V_FRAME = 0                     # frame del clip a cui si aggancia la foto (0 = primo; -1 = ultimo); env LTX_R2V_FRAME
 R2V_DEFAULT_STRENGTH = 0.8        # = default del campo «Forza identita'» del tab (replace_char); da tarare dal vivo
@@ -86,6 +89,16 @@ def inpaint_params(cfg: dict, out: str) -> dict:
     for k in ("model", "gguf_transformer", "ltx_release"):     # checkpoint ESATTAMENTE come scelto nel tab Video
         if cfg.get(k):
             p[k] = cfg[k]
+    full = bool(cfg.get("full_res", FULL_RES_DEFAULT))
+    p["inpaint_stage2"] = full
+    p["inpaint_composite"] = bool(cfg.get("keep_background", KEEP_BACKGROUND_DEFAULT))
+    if full:                                                   # stage 2: la risoluzione d'uscita e' quella piena richiesta
+        longest = max(p["width"], p["height"])
+        if longest > FULL_RES_MAX_LONG_EDGE:
+            k = FULL_RES_MAX_LONG_EDGE / float(longest)
+            p["width"], p["height"] = (max(64, int(round(p[d] * k / 64.0)) * 64) for d in ("width", "height"))
+    if cfg.get("video") and cfg.get("keep_audio", True):       # l'inpaint non genera audio: si rimette quello originale
+        p["_mux_audio_from"] = str(cfg["video"])
     if r2v:
         p["image_path"] = str(cfg["ref_image"])
         p["ref_strength"] = float(cfg.get("ref_strength", R2V_DEFAULT_STRENGTH))

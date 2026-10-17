@@ -257,3 +257,96 @@ def test_api_il_job_costruisce_i_params_come_la_gui(video, photo, no_run, monkey
 def test_cap_nota_al_gate():
     from api import gate
     assert "cap.video_inpaint_r2v" in gate.KNOWN_CAPS
+
+
+# ── qualita' d'uscita: piena risoluzione, sfondo originale, audio originale (task 8 bis) ───────────
+def test_default_piena_risoluzione_sfondo_e_audio():
+    p = vi.inpaint_params({"video": "C:/x/clip.mp4", "width": 1280, "height": 704}, "o.mp4")
+    assert p["inpaint_stage2"] is True and p["inpaint_composite"] is True
+    assert p["_mux_audio_from"] == "C:/x/clip.mp4" and (p["width"], p["height"]) == (1280, 704)
+
+
+def test_opzioni_si_spengono_in_una_riga():
+    p = vi.inpaint_params({"video": "c.mp4", "full_res": False, "keep_background": False, "keep_audio": False,
+                           "width": 1920, "height": 1088}, "o.mp4")
+    assert p["inpaint_stage2"] is False and p["inpaint_composite"] is False and "_mux_audio_from" not in p
+    assert (p["width"], p["height"]) == (1920, 1088)            # senza stage 2 nessun tetto (uscita = meta' come prima)
+
+
+def test_stage2_tetto_sul_lato_lungo():
+    p = vi.inpaint_params({"width": 1920, "height": 1088}, "o.mp4")
+    assert (p["width"], p["height"]) == (1280, 704) and p["width"] % 64 == 0 and p["height"] % 64 == 0
+
+
+def _rgb_video(path, w, h, n, rgb):
+    import subprocess
+    import numpy as np
+    raw = np.tile(np.array(rgb, np.uint8), (n, h, w, 1)).tobytes()
+    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", "25",
+                        "-i", "-", "-c:v", "libx264", "-crf", "5", "-pix_fmt", "yuv444p", str(path)], input=raw, capture_output=True)
+    assert r.returncode == 0, r.stderr[-200:]
+
+
+def test_composite_fuori_maschera_e_il_sorgente(tmp_path):
+    torch = pytest.importorskip("torch")
+    from workers.ltx_inpaint_composite import composite_outside_mask
+    src = tmp_path / "s.mp4"
+    _rgb_video(src, 160, 96, 12, (200, 30, 30))                       # sorgente rosso
+    gen = torch.zeros(12, 96, 160, 3)
+    gen[..., 1] = 1.0                                                 # generato verde
+    masks = torch.zeros(12, 96, 160)
+    masks[:, :, :80] = 1.0                                            # maschera = meta' sinistra
+    out = list(composite_outside_mask(iter([gen[:7], gen[7:]]), str(src), masks))
+    assert [c.shape[0] for c in out] == [7, 5]
+    f = torch.cat(out)
+    assert f[0, 48, 20, 1] > 0.95 and f[0, 48, 20, 0] < 0.1           # dentro la maschera: generato (verde)
+    assert f[0, 48, 140, 0] > 0.7 and f[0, 48, 140, 1] < 0.25         # fuori: sorgente (rosso)
+    assert f[11, 48, 140, 0] > 0.7                                    # anche nel secondo chunk
+
+
+def test_composite_aspetto_e_risoluzione_diversi(tmp_path):
+    torch = pytest.importorskip("torch")
+    from workers.ltx_inpaint_composite import composite_outside_mask
+    src = tmp_path / "s.mp4"
+    _rgb_video(src, 160, 96, 8, (30, 30, 200))
+    gen = torch.zeros(8, 48, 64, 3)                                   # chunk piu' piccolo e di aspetto diverso
+    masks = torch.zeros(8, 96, 160)                                   # maschera a risoluzione diversa: viene ridimensionata
+    f = torch.cat(list(composite_outside_mask(iter([gen]), str(src), masks)))
+    assert f.shape == (8, 48, 64, 3) and f[0, 24, 32, 2] > 0.7        # tutto fuori maschera = sorgente (blu)
+
+
+def test_composite_sorgente_piu_corto_lascia_il_generato(tmp_path):
+    torch = pytest.importorskip("torch")
+    from workers.ltx_inpaint_composite import composite_outside_mask
+    src = tmp_path / "s.mp4"
+    _rgb_video(src, 64, 64, 4, (200, 30, 30))
+    gen = torch.ones(8, 64, 64, 3) * 0.5
+    f = torch.cat(list(composite_outside_mask(iter([gen]), str(src), torch.zeros(8, 64, 64))))
+    assert torch.allclose(f, gen)                                     # 4 < 8 frame sorgente: nessuna composizione, nessun crash
+
+
+def test_worker_cabla_stage2_composite_e_dev_stage2():
+    assert 'stage2=bool(p.get("inpaint_stage2"' in WORKER and "composite_outside_mask(video" in WORKER
+    assert "LoraPathStrengthAndSDOps(DISTILLED_LORA, 0.5, LTXV_LORA_COMFY_RENAMING_MAP), quant, offload)" in WORKER
+    pipe_src = (ROOT / "workers" / "ltx_inpaint_pipeline.py").read_text(encoding="utf-8")
+    assert "STAGE_2_DISTILLED_SIGMAS" in pipe_src and "initial_latent=upscaled" in pipe_src and "if not stage2:" in pipe_src
+
+
+def test_api_mux_audio_originale(video, photo, no_run, monkeypatch, tmp_path):
+    from api.handlers import video as h
+    from core import video_edit_ic as vic
+    from core import video_ic_prep as prep
+    monkeypatch.setattr(prep, "probe", lambda p, count_frames=False: types.SimpleNamespace(
+        width=1280, height=704, fps=25.0, nb_frames=97))
+    monkeypatch.setattr(vi, "attach_tracking", lambda params, *a, **k: params)
+    monkeypatch.setattr(h, "run_ltx2", lambda params, job=None: [str(tmp_path / "out.mp4")])
+    monkeypatch.setattr(h, "out_path", lambda prefix, ext="mp4": str(tmp_path / f"{prefix}.{ext}"))
+    muxed = []
+    monkeypatch.setattr(vic, "mux_audio", lambda v, a: muxed.append((v, a)) or v[:-4] + "_audio.mp4")
+    client.post("/video/inpaint", json=_body(video))
+    outs = no_run["fn"](types.SimpleNamespace(log=lambda *a, **k: None))
+    assert muxed == [(str(tmp_path / "out.mp4"), video)] and outs[0].endswith("out_audio.mp4")
+    client.post("/video/inpaint", json=_body(video, keep_audio=False))
+    muxed.clear()
+    outs = no_run["fn"](types.SimpleNamespace(log=lambda *a, **k: None))
+    assert muxed == [] and outs[0].endswith("out.mp4")
