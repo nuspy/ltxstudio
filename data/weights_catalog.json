@@ -7204,6 +7204,32 @@
       "use": [
         "prompt_enhancer"
       ]
+    },
+    {
+      "id": "gemma3-abliterated-lora",
+      "module": "Video",
+      "label": "LoRA Gemma-3 abliterata (encoder LTX 2.3, rank 64, 0.59GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "LTX",
+      "gated": false,
+      "approx_gb": 0.59,
+      "scan_names": [
+        "gemma-3-12b-it-abliterated_lora"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
+      "deps": [
+        "ltx23-gemma-te"
+      ],
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "Fusa sul ramo TESTO del Gemma-3 al caricamento (core/gemma_lora); solo LTX 2.3. Origine Civitai (nessuna fonte remota verificata). NON nella cartella LoRA: lì il filtro la scambierebbe per una LoRA video.",
+      "use": [
+        "te",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

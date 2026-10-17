@@ -510,7 +510,14 @@ def _patch_emb_cache():
                 pkg = _md.version("ltx-pipelines")
             except Exception:                            # noqa: BLE001
                 pkg = "?"
+            _lf = None
+            try:
+                from core import gemma_lora as _gl
+                _lf = _gl.key_fragment(te_b, _ec.file_fp)        # LoRA fusa sull'encoder: cambia gli embedding
+            except Exception:                            # noqa: BLE001
+                pass
             return {
+                **({"te_loras": _lf} if _lf else {}),            # presente SOLO con LoRA: le chiavi esistenti restano
                 "schema": _ec.SCHEMA,
                 "prompts": [str(p).strip() for p in prompts],   # il tokenizer fa già strip(): sicuro
                 "te": _ec.file_fp(te_p),
@@ -904,6 +911,7 @@ from core import model_paths as _mpaths                       # stdlib-only, sic
 CHECKPOINT = _mpaths.p("ltx23-dev-fp8", r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors")
 UPSAMPLER = _mpaths.p("ltx23-spatial-upscaler", r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
 GEMMA = _mpaths.p("ltx23-gemma-te", r"E:\AI\Models\TextEncoders\gemma-3-ltx")   # Gemma-3 12B Lightricks (formato ltx-core)
+GEMMA_LORA = ""        # LoRA «abliterata» fusa sul ramo testo del Gemma-3 (solo LTX 2.3); "" = encoder standard
 LORA_DIR = r"E:\AI\Models\LoRA"
 # LoRA di DISTILLAZIONE ufficiale (Lightricks/LTX-2.3, 7.6GB): OBBLIGATORIA per usare i checkpoint DEV
 # (non-distilled) con la pipeline two-stage — senza, il dev esce "dematerializzato" (nuvole di voxel).
@@ -1005,6 +1013,33 @@ def _apply_te_override(p: dict) -> None:
         raise RuntimeError(f"Text encoder «{tid}» non trovato su disco: scaricalo dal tab «Pesi modelli».")
     GEMMA = path
     print(f"[release] text encoder scelto: {os.path.basename(path)}", flush=True)
+
+
+def _apply_te_lora(p: dict) -> None:
+    """LoRA Gemma «abliterata» scelta dall'utente (`ltx_te_lora` = id di catalogo): fusa sul ramo testo dell'encoder
+    al caricamento (core/gemma_lora). Parametro assente/vuoto = encoder standard. Mai ripiego silenzioso: id
+    sconosciuto, release diversa dalla 2.3 o file assente → errore chiaro."""
+    global GEMMA_LORA
+    lid = str(p.get("ltx_te_lora") or "").strip()
+    if not lid:
+        GEMMA_LORA = ""
+        return
+    from core import gemma_lora as _gl
+    GEMMA_LORA = _gl.resolve_lora_path(lid, LTX_RELEASE)
+    print(f"[release] LoRA encoder Gemma (fusa sul ramo testo): {os.path.basename(GEMMA_LORA)}", flush=True)
+
+
+def _attach_gemma_lora(pipe, ptype: str) -> None:
+    """Aggancia la LoRA Gemma ai PromptEncoder della pipeline appena costruita (prima di metterla in cache)."""
+    from core import gemma_lora as _gl
+    n = _gl.attach(pipe, GEMMA_LORA)
+    if n == 0:
+        if ptype == "hdr":                                   # la pipeline HDR non usa Gemma (scene-emb): niente da fare
+            print("[release] LoRA encoder ignorata: la pipeline HDR non codifica prompt", flush=True)
+            return
+        raise RuntimeError("LoRA encoder Gemma richiesta, ma la pipeline non ha un PromptEncoder: non genero con "
+                           "l'encoder standard al suo posto.")
+    print(f"[release] LoRA encoder agganciata a {n} PromptEncoder", flush=True)
 
 
 def _unpack_pipe(res):
@@ -1429,7 +1464,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         print(f"[fp8] '{os.path.basename(ckpt)}' senza input_scale → fp8_cast (fold delle scale)", flush=True)
         qmode = "fp8_cast"
     lkey = tuple((lo.path, lo.strength) for lo in loras)
-    key = (ckpt, qmode, offload_str, lkey, stages, ptype, GEMMA)   # GEMMA: il TE può cambiare a parità di ckpt
+    key = (ckpt, qmode, offload_str, lkey, stages, ptype, GEMMA, GEMMA_LORA)   # TE e sua LoRA possono cambiare a parità di ckpt
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     # M5-fix: fai spazio PRIMA di costruire (com'era, la vecchia pipe restava in cache DURANTE la
@@ -1619,6 +1654,8 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # componenti condivisi (gemma/VAE tra pipeline diverse) richiede di iniettarli nei costruttori del package
     # esterno ltx_pipelines → va fatto con ispezione + test live (rimandato).
     # (lo sfratto LRU avviene PRIMA della build, vedi sopra — qui si registra e basta)
+    if GEMMA_LORA:
+        _attach_gemma_lora(pipe, ptype)
     _PIPE_CACHE[key] = pipe
     return pipe
 
@@ -2296,6 +2333,7 @@ def run_generation(p: dict) -> str:
     import time
     _apply_release(p.get("ltx_release"))                     # rilega i componenti alla release del job
     _apply_te_override(p)                                    # TE alternativo scelto (es. Gemma 4 uncensored)
+    _apply_te_lora(p)                                        # LoRA Gemma abliterata (2.3) sul ramo testo, se scelta
     _EMB_CTX["enabled"] = bool(p.get("emb_cache", True))     # preferenza dai params (vale anche col server)
     _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)

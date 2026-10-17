@@ -13,7 +13,7 @@ REFRESH_IDS = (
     "flux1-fuxcapacity", "flux1-getphat", "flux1-dev-nunchaku-fp4", "flux1-kontext-nunchaku-fp4",
     "flux2-dev-nvfp4", "ltx23-dev-gguf-q6k", "ltx23-dev-nvfp4", "ltx23-gguf-q4-distilled",
     "te-gemma3-lyrics", "te-flux1-clip-l-diffusers", "te-flux1-t5xxl-diffusers",
-    "ernie-image-turbo", "ernie-image-pe",
+    "ernie-image-turbo", "ernie-image-pe", "gemma3-abliterated-lora",
 )
 
 # voci ritirate da questo giro (sostituite da una versione migliore)
@@ -125,4 +125,12 @@ def entries(N):
           note="Caricato SOLO con «Migliora prompt» su ERNIE-Image e scaricato subito dopo (inference_server/backends/"
                "ernie_pe). Il file locale ernie-image-prompt-enhancer.safetensors (6.4GB, senza lm_head) va spostato in "
                "pe/model.safetensors."),
+
+        # ───────── LTX-2.3: LoRA Gemma-3 «abliterata» fusa sul ramo testo dell'encoder ─────────
+        N("gemma3-abliterated-lora", "Video", "LoRA Gemma-3 abliterata (encoder LTX 2.3, rank 64, 0.59GB)",
+          category="video", arch="ltx23", type="TextEncoders", family="LTX",
+          filename="gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", gb=0.59, sens="adult",
+          no_remote=True, deps=["ltx23-gemma-te"], scan=["gemma-3-12b-it-abliterated_lora"],
+          note="Fusa sul ramo TESTO del Gemma-3 al caricamento (core/gemma_lora); solo LTX 2.3. Origine Civitai (nessuna "
+               "fonte remota verificata). NON nella cartella LoRA: lì il filtro la scambierebbe per una LoRA video."),
     ]
