@@ -11,7 +11,7 @@ Env (in ordine di precedenza, primo trovato vince):
   LS_RAM_FLOOR_MB   → NATIVE_RAM_FLOOR_MB                     → 16384  (RAM fisica da non intaccare)
   LS_COMMIT_FLOOR_MB→ NATIVE_COMMIT_FLOOR_MB → LTX_COMMIT_FLOOR_MB → 20480 (commit: il limite VERO
                       su Windows — sforarlo = access violation, vedi pagefile-commit-mmap-crash)
-  LS_PARK_VRAM_PEAK_MB → 30720 (picco di VRAM che il worker video porterà ANCORA sul commit: su Windows/WDDM la
+  LS_PARK_VRAM_PEAK_MB → VRAM totale GPU via NVML (fallback 30720; picco di VRAM che il worker video porterà ANCORA sul commit: su Windows/WDDM la
                       VRAM allocata è addebitata al commit, vedi `commit_reserve_mb`)
   LS_RAM_CACHE=0    → disabilita il parcheggio/cache RAM (legacy: LTX_RAM_PARK=0)
 """
@@ -47,8 +47,20 @@ def commit_floor_mb() -> float:
 
 
 def vram_peak_mb() -> float:
-    """Picco di VRAM (MB) di una generazione video: su Windows/WDDM viene addebitato anche al commit."""
-    return _env_chain(30720.0, "LS_PARK_VRAM_PEAK_MB")
+    """Picco di VRAM (MB) che una generazione video puo' raggiungere — addebitato anche al commit su WDDM.
+    DINAMICO (regola «VRAM tarata per PC»): la VRAM totale della GPU letta via NVML/nvidia-smi
+    (core.gpu_mem, nessun contesto CUDA); 30720 solo se la lettura fallisce. Override: LS_PARK_VRAM_PEAK_MB."""
+    v = _env_chain(0.0, "LS_PARK_VRAM_PEAK_MB")
+    if v > 0:
+        return v
+    try:
+        from core import gpu_mem
+        t = float(gpu_mem.total_vram_mb())
+        if t > 0:
+            return t
+    except Exception:                                   # noqa: BLE001
+        pass
+    return 30720.0
 
 
 def commit_reserve_mb(vram_charged_mb: float = 0.0) -> float:

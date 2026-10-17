@@ -66,7 +66,14 @@ def run() -> int:
         check("fits con riserva VRAM 30GB: 76-24-30=22GB ok (soglia 20GB)", M.fits(24000, 0, reserve_mb=30000) is True)
         M.avail_commit_mb = lambda: 60000.0
         check("fits con riserva VRAM: 60-24-30=6GB NEGA (era il caso del crash)", M.fits(24000, 0, reserve_mb=30000) is False)
-        check("commit_reserve_mb: picco 30GB meno VRAM gia' allocata", M.commit_reserve_mb(0) == 30720 and M.commit_reserve_mb(26000) == 4720 and M.commit_reserve_mb(99999) == 0)
+        from core import gpu_mem as _gm
+        _ot = _gm.total_vram_mb
+        _gm.total_vram_mb = lambda: 16384          # GPU da 16 GB: il picco segue la scheda (dinamico), non 30 GB fissi
+        check("vram_peak_mb dinamico: 16GB -> 16384", M.vram_peak_mb() == 16384)
+        check("commit_reserve_mb: picco meno VRAM gia' allocata", M.commit_reserve_mb(0) == 16384 and M.commit_reserve_mb(10000) == 6384 and M.commit_reserve_mb(99999) == 0)
+        _gm.total_vram_mb = lambda: 0              # lettura fallita -> fallback 30720
+        check("vram_peak_mb fallback 30720 se NVML non legge", M.vram_peak_mb() == 30720)
+        _gm.total_vram_mb = _ot
         os.environ["LS_PARK_VRAM_PEAK_MB"] = "10000"
         check("LS_PARK_VRAM_PEAK_MB letto", M.vram_peak_mb() == 10000)
         _clean()
