@@ -3388,5 +3388,13 @@
   "vedit.mt.audio": "A hang generálása is (beszéd/hangok a promptból)",
   "vedit.mt.audio_tt": "A hivatalos workflow-hoz hasonlóan a modell a videóval együtt generálja a hangot: a hang és a zajok a promptból jönnek. Kapcsold ki, ha a prompt nem beszél (különben a hang zaj lehet).",
   "vedit.track.tip_shift": "Shift+kattintás: akkor is ad hozzá pontot, ha egy másik pont fölé kattintasz (hurok lezárásához).",
-  "feat.cap.video_motion_track": "Mozgás nyomvonalakból (Motion-Track)"
+  "feat.cap.video_motion_track": "Mozgás nyomvonalakból (Motion-Track)",
+  "vedit.r2v.use": "Tárgy beillesztése fotóról (r2v LoRA)",
+  "vedit.r2v.use.tt": "Bekapcsolva: válaszd ki a maszkolt területre kerülő tárgy vagy személy FOTÓJÁT, és az «r2v» LoRA (rang 32) kerül használatra. Kikapcsolva: «t2v» LoRA (rang 128), az új tárgyat csak szavakkal írod le a promptban.",
+  "vedit.r2v.img_lbl": "A beillesztendő tárgy fotója",
+  "vedit.r2v.img_ph": "a maszkolt helyére kerülő tárgy vagy személy fotója",
+  "vedit.note_inpaint_r2v": "A fotóval (r2v LoRA) az új tárgy a fotóból származik; a promptban írd le a jelenetet és hogy mit csinál. A hosszú klipek szegmensekben készülnek, mindegyikben ugyanazzal a fotóval.",
+  "vedit.err_no_ref_inpaint": "Inpaint fotóval: válaszd ki a beillesztendő tárgy fotóját (vagy kapcsold ki a jelölőnégyzetet).",
+  "vedit.r2v.missing_body": "Hiányzik a referenciafotós inpaint súlya (r2v LoRA, kb. 0,33 GB). Én magam nem töltök le semmit: nyisd meg a «Modellsúlyok» fülön, vagy kapcsold ki a jelölőnégyzetet, hogy szavakkal inpaintelj.",
+  "feat.cap.video_inpaint_r2v": "Videó-inpaint referenciafotóval (r2v LoRA)"
 }

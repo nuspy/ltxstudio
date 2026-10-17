@@ -3429,5 +3429,13 @@
   "vedit.mt.audio": "Genera anche l'audio (parlato/suoni dal prompt)",
   "vedit.mt.audio_tt": "Come nel workflow ufficiale il modello genera l'audio insieme al video: voce e suoni vengono dal prompt. Spegnilo se il prompt non parla (altrimenti l'audio può essere rumore).",
   "vedit.track.tip_shift": "Maiusc+clic: aggiunge un punto anche sopra un altro punto (per chiudere un anello).",
-  "feat.cap.video_motion_track": "Movimento da tracce (Motion-Track)"
+  "feat.cap.video_motion_track": "Movimento da tracce (Motion-Track)",
+  "vedit.r2v.use": "Inserisci un oggetto da una foto (LoRA r2v)",
+  "vedit.r2v.use.tt": "Acceso: scegli la FOTO dell'oggetto o della persona da inserire nell'area mascherata e si usa la LoRA «r2v» (rank 32). Spento: LoRA «t2v» (rank 128), il nuovo oggetto si descrive solo a parole nel prompt.",
+  "vedit.r2v.img_lbl": "Foto dell'oggetto da inserire",
+  "vedit.r2v.img_ph": "foto dell'oggetto o della persona da mettere al posto di quello mascherato",
+  "vedit.note_inpaint_r2v": "Con la foto (LoRA r2v) il nuovo oggetto viene preso dalla foto; nel prompt descrivi la scena e cosa fa. I clip lunghi vengono girati a segmenti, con la stessa foto su ognuno.",
+  "vedit.err_no_ref_inpaint": "Inpaint con foto: scegli la foto dell'oggetto da inserire (o spegni la casella).",
+  "vedit.r2v.missing_body": "Manca il peso dell'inpaint con foto di riferimento (LoRA r2v, circa 0,33 GB). Non scarico nulla io: aprilo dal tab «Pesi modelli», oppure spegni la casella per usare l'inpaint a parole.",
+  "feat.cap.video_inpaint_r2v": "Inpaint video con foto di riferimento (LoRA r2v)"
 }

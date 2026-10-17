@@ -3462,5 +3462,13 @@
   "vedit.mt.audio": "Also generate the audio (speech/sounds from the prompt)",
   "vedit.mt.audio_tt": "As in the official workflow the model generates the audio together with the video: voice and sounds come from the prompt. Turn it off if the prompt has no speech (otherwise the audio may be noise).",
   "vedit.track.tip_shift": "Shift+click: adds a point even on top of another point (to close a loop).",
-  "feat.cap.video_motion_track": "Motion from tracks (Motion-Track)"
+  "feat.cap.video_motion_track": "Motion from tracks (Motion-Track)",
+  "vedit.r2v.use": "Insert an object from a photo (r2v LoRA)",
+  "vedit.r2v.use.tt": "On: pick the PHOTO of the object or person to put into the masked area and the \"r2v\" LoRA (rank 32) is used. Off: \"t2v\" LoRA (rank 128), the new object is described in words only, in the prompt.",
+  "vedit.r2v.img_lbl": "Photo of the object to insert",
+  "vedit.r2v.img_ph": "photo of the object or person to put in place of the masked one",
+  "vedit.note_inpaint_r2v": "With the photo (r2v LoRA) the new object is taken from the photo; in the prompt describe the scene and what it does. Long clips are run in segments, with the same photo on each one.",
+  "vedit.err_no_ref_inpaint": "Inpaint with photo: pick the photo of the object to insert (or turn the box off).",
+  "vedit.r2v.missing_body": "The weight for inpainting with a reference photo (r2v LoRA, about 0.33 GB) is missing. I download nothing myself: open it from the \"Model weights\" tab, or turn the box off to inpaint with words only.",
+  "feat.cap.video_inpaint_r2v": "Video inpaint with a reference photo (r2v LoRA)"
 }

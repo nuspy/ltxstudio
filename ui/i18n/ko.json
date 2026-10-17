@@ -3388,5 +3388,13 @@
   "vedit.mt.audio": "오디오도 생성 (프롬프트의 음성/소리)",
   "vedit.mt.audio_tt": "공식 워크플로처럼 모델이 영상과 함께 오디오를 생성합니다. 음성과 소리는 프롬프트에서 나옵니다. 프롬프트에 말이 없다면 끄세요(그렇지 않으면 오디오가 잡음일 수 있습니다).",
   "vedit.track.tip_shift": "Shift+클릭: 다른 점 위에도 점을 추가합니다(고리를 닫을 때).",
-  "feat.cap.video_motion_track": "궤적으로 움직임 만들기 (Motion-Track)"
+  "feat.cap.video_motion_track": "궤적으로 움직임 만들기 (Motion-Track)",
+  "vedit.r2v.use": "사진으로 객체 삽입 (r2v LoRA)",
+  "vedit.r2v.use.tt": "켜짐: 마스크 영역에 넣을 객체나 인물의 사진을 선택하면 «r2v» LoRA(랭크 32)가 사용됩니다. 꺼짐: «t2v» LoRA(랭크 128), 새 객체는 프롬프트에서 말로만 설명합니다.",
+  "vedit.r2v.img_lbl": "삽입할 객체의 사진",
+  "vedit.r2v.img_ph": "마스크된 대상을 대체할 객체나 인물의 사진",
+  "vedit.note_inpaint_r2v": "사진(r2v LoRA)을 쓰면 새 객체를 사진에서 가져옵니다. 프롬프트에는 장면과 동작을 설명하세요. 긴 클립은 세그먼트로 생성되며 각 세그먼트에 같은 사진이 쓰입니다.",
+  "vedit.err_no_ref_inpaint": "사진 인페인트: 삽입할 객체의 사진을 선택하세요(또는 체크를 끄세요).",
+  "vedit.r2v.missing_body": "참조 사진 인페인트용 가중치(r2v LoRA, 약 0.33GB)가 없습니다. 제가 직접 내려받지는 않습니다. «모델 가중치» 탭에서 열거나, 체크를 꺼서 말로만 인페인트하세요.",
+  "feat.cap.video_inpaint_r2v": "참조 사진을 쓰는 비디오 인페인트 (r2v LoRA)"
 }

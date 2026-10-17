@@ -3388,5 +3388,13 @@
   "vedit.mt.audio": "同时生成音频（来自提示词的语音/声音）",
   "vedit.mt.audio_tt": "与官方工作流一样，模型会与视频一起生成音频：语音和声音来自提示词。如果提示词里没有说话内容请关闭（否则音频可能是噪声）。",
   "vedit.track.tip_shift": "Shift+点击：即使在另一个点上也会添加新点（用于闭合环路）。",
-  "feat.cap.video_motion_track": "轨迹运动 (Motion-Track)"
+  "feat.cap.video_motion_track": "轨迹运动 (Motion-Track)",
+  "vedit.r2v.use": "用照片插入物体（r2v LoRA）",
+  "vedit.r2v.use.tt": "开启：选择要放入遮罩区域的物体或人物的照片，使用“r2v”LoRA（rank 32）。关闭：使用“t2v”LoRA（rank 128），新物体只在提示词中用文字描述。",
+  "vedit.r2v.img_lbl": "要插入的物体照片",
+  "vedit.r2v.img_ph": "要替换遮罩物体的物体或人物的照片",
+  "vedit.note_inpaint_r2v": "使用照片（r2v LoRA）时，新物体取自照片；在提示词中描述场景及其动作。长片段分段生成，每段使用同一张照片。",
+  "vedit.err_no_ref_inpaint": "照片修补：请选择要插入的物体照片（或关闭该选项）。",
+  "vedit.r2v.missing_body": "缺少参考照片修补的权重（r2v LoRA，约 0.33 GB）。我不会自行下载：请在“模型权重”标签页中打开，或关闭该选项以仅用文字修补。",
+  "feat.cap.video_inpaint_r2v": "带参考照片的视频修补（r2v LoRA）"
 }

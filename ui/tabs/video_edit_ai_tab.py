@@ -33,6 +33,7 @@ from core import video_dub_translate as vdt
 from core import motion_tracks as mt
 from core import video_edit_ic as vic
 from core import video_edit_modes as vem
+from core import video_inpaint as vinp
 from core import video_ic_prep as prep_mod
 from ui.i18n_manager import tr
 from ui.widgets.track_editor import TrackEditor
@@ -151,7 +152,16 @@ class VideoEditAITab(QWidget):
         self.obj = QLineEdit(); self.obj.setPlaceholderText(tr("vedit.obj_ph", "oggetto da selezionare (es. car, person) — per Inpaint"))
         f.addRow(tr("vedit.obj_lbl", "Oggetto (a parole)"), self.obj)
 
-        # Sostituisci personaggio / ReStyle: immagine di riferimento (replace_char) o di stile (restyle).
+        # Inpaint con FOTO di riferimento (LoRA r2v): scelta ESPLICITA dell'utente (mai automatica dal solo campo
+        # foto, che e' condiviso con replace_char/restyle). Spenta = LoRA t2v, l'oggetto nuovo si descrive a parole.
+        self.inp_use_ref = QCheckBox(tr("vedit.r2v.use", "Inserisci un oggetto da una foto (LoRA r2v)"))
+        self.inp_use_ref.setToolTip(tr("vedit.r2v.use.tt",
+            "Acceso: scegli la FOTO dell'oggetto o della persona da inserire nell'area mascherata e si usa la LoRA "
+            "«r2v» (rank 32). Spento: LoRA «t2v» (rank 128), il nuovo oggetto si descrive solo a parole nel prompt."))
+        self.inp_use_ref.toggled.connect(self._on_mode)
+        f.addRow("", self.inp_use_ref)
+
+        # Sostituisci personaggio / ReStyle / Inpaint r2v: immagine di riferimento, di stile o dell'oggetto.
         rrow = QHBoxLayout()
         self.ref_img = QLineEdit(); self.ref_img.setPlaceholderText(
             tr("vedit.ref.ph", "immagine sostitutiva: = primo frame del video ma con l'altro personaggio"))
@@ -894,6 +904,22 @@ class VideoEditAITab(QWidget):
             return "weights"
         return "open" if clicked is b_open else "cancel"
 
+    def _ask_missing_r2v(self, msg: str) -> str:
+        """Peso della LoRA inpaint r2v assente: avviso con «Apri tab Pesi modelli» (nessun download automatico).
+        Ritorna 'weights' | 'cancel'. Sovrascrivibile nei test."""
+        self.log.appendPlainText("⚠ " + msg)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle(tr("vedit.weight.missing_title", "Peso mancante"))
+        box.setText(tr("vedit.r2v.missing_body",
+                       "Manca il peso dell'inpaint con foto di riferimento (LoRA r2v, circa 0,33 GB). Non scarico nulla io: "
+                       "aprilo dal tab «Pesi modelli», oppure spegni la casella per usare l'inpaint a parole.")
+                    + "\n\n" + msg)
+        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+        box.addButton(tr("vedit.ckpt.btn_cancel", "Annulla"), QMessageBox.RejectRole)
+        box.exec()
+        return "weights" if box.clickedButton() is b_w else "cancel"
+
     def _ask_missing_weight(self, spec: vem.ModeSpec, msg: str) -> str:
         """Peso IC-LoRA della modalità assente su disco: avviso con «Apri tab Pesi modelli» (nessun download
         automatico). Ritorna 'weights' | 'cancel'. Sovrascrivibile nei test."""
@@ -932,19 +958,24 @@ class VideoEditAITab(QWidget):
         self.obj.setPlaceholderText(
             tr("vedit.obj_ph_rc", "personaggio da sostituire (es. person) — opz., limita al soggetto") if is_rc
             else tr("vedit.obj_ph", "oggetto da selezionare (es. car, person) — per Inpaint"))
+        is_inp = (key == "inpaint")
+        inp_ref = is_inp and self.inp_use_ref.isChecked()      # inpaint con foto di riferimento (LoRA r2v)
         for w in (self.ref_img, self.ref_btn, self.ref_row_lbl):
-            w.setEnabled(is_rc or is_restyle)
+            w.setEnabled(is_rc or is_restyle or inp_ref)
         for w in (self.ref_strength, self.ref_strength_lbl):
-            w.setEnabled(is_rc)
+            w.setEnabled(is_rc or inp_ref)
+        self._show_row(self.inp_use_ref, is_inp)
         self.ref_row_lbl.setText(tr("vedit.style.image_lbl", "Immagine di stile") if is_restyle
+                                 else tr("vedit.r2v.img_lbl", "Foto dell'oggetto da inserire") if inp_ref
                                  else tr("vedit.ref_lbl", "Immagine sostitutiva (personaggio)"))
         self.ref_img.setPlaceholderText(
             tr("vedit.style.image_ph", "immagine che definisce lo stile (diventa il frame 0 della guida)") if is_restyle
+            else tr("vedit.r2v.img_ph", "foto dell'oggetto o della persona da mettere al posto di quello mascherato") if inp_ref
             else tr("vedit.ref.ph", "immagine sostitutiva: = primo frame del video ma con l'altro personaggio"))
         # visibilità righe
         self._show_row(self.obj, not is_ic_new)
-        self._set_ref_row_visible(is_rc or is_restyle)
-        self._show_row(self.ref_strength, is_rc)
+        self._set_ref_row_visible(is_rc or is_restyle or inp_ref)
+        self._show_row(self.ref_strength, is_rc or inp_ref)
         self._show_row(self.style_text, is_restyle)
         self._set_row_visible_for(self.cam_ref, is_cam)
         self._set_row_visible_for(self.cam_img, is_cam)
@@ -1007,7 +1038,11 @@ class VideoEditAITab(QWidget):
         nd = _NOTE_DEFAULT.get(sp.note_key, "")
         if key == "inpaint":
             self.note.setText(tr("vedit.note_inpaint",
-                "⚠ Inpaint sperimentale: SAM2 traccia l'oggetto su tutto il clip e ne rigenera l'area."))
+                "⚠ Inpaint sperimentale: SAM2 traccia l'oggetto su tutto il clip e ne rigenera l'area.")
+                + (" " + tr("vedit.note_inpaint_r2v",
+                            "Con la foto (LoRA r2v) il nuovo oggetto viene preso dalla foto; nel prompt descrivi la scena "
+                            "e cosa fa. I clip lunghi vengono girati a segmenti, con la stessa foto su ognuno.")
+                   if inp_ref else ""))
         elif is_rc:
             self.note.setText(tr("vedit.note_replace_char",
                 "Sostituisci personaggio: carica un'immagine = primo frame del video ma con SOLO il personaggio "
@@ -1170,8 +1205,23 @@ class VideoEditAITab(QWidget):
                "enhance": self.vedit_enhance.isChecked(),
                "ref_image": self.ref_img.text().strip(),
                "ref_strength": float(self.ref_strength.value())}   # #102 forza identità del riferimento
+        if key == "inpaint":                                 # foto = scelta esplicita (casella r2v), non il solo campo
+            if self.inp_use_ref.isChecked():
+                if not cfg["ref_image"] or not os.path.isfile(cfg["ref_image"]):
+                    self._block("vedit.err_no_ref_inpaint",
+                                "Inpaint con foto: scegli la foto dell'oggetto da inserire (o spegni la casella)."); return
+                cfg["edit_lora"] = vinp.INPAINT_R2V_LORA     # LoRA r2v rank32 (con foto)
+                cfg["r2v"] = True
+            else:
+                cfg["ref_image"] = ""                        # senza casella: LoRA t2v come sempre
         if key == "inpaint" and not cfg["object"]:
             self._block("vedit.err_no_obj", "Inpaint: indica l'oggetto da selezionare (a parole)."); return
+        if key == "inpaint" and cfg.get("r2v"):              # peso r2v assente: avviso + «Apri tab Pesi», nessun download
+            _miss = vinp.missing_weight(cfg)
+            if _miss:
+                if self._ask_missing_r2v(_miss) == "weights":
+                    self.request_open_weights_tab.emit()
+                return
         if key == "replace_char" and not cfg["ref_image"]:
             self._block("vedit.err_no_ref", "Sostituisci personaggio: scegli l'immagine sostitutiva del personaggio."); return
         if key == "restyle":
