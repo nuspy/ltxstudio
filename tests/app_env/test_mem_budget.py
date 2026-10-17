@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 _ENVS = ("LS_RAM_CACHE_MB", "NATIVE_CPU_CACHE_MB", "LTX_RAM_PARK_MB", "LS_RAM_FLOOR_MB",
          "NATIVE_RAM_FLOOR_MB", "LS_COMMIT_FLOOR_MB", "NATIVE_COMMIT_FLOOR_MB",
-         "LTX_COMMIT_FLOOR_MB", "LS_RAM_CACHE", "LTX_RAM_PARK")
+         "LTX_COMMIT_FLOOR_MB", "LS_RAM_CACHE", "LTX_RAM_PARK", "LS_PARK_VRAM_PEAK_MB")
 
 
 def _clean():
@@ -60,6 +60,16 @@ def run() -> int:
         check("fits nega sotto floor RAM", M.fits(14000, 0) is False)          # 30000-14000=16000 !> 16384
         M.avail_ram_mb = lambda: 100000.0
         check("fits nega sotto floor commit", M.fits(20000, 0) is False)       # 40000-20000 !> 20480
+        # 17/10: riserva di commit per la VRAM che il worker impegnera' ancora (WDDM): crash 0xC0000005 dev+IC-LoRA
+        M.avail_commit_mb = lambda: 76000.0
+        check("fits senza riserva: 24GB con 76GB liberi ok", M.fits(24000, 0) is True)
+        check("fits con riserva VRAM 30GB: 76-24-30=22GB ok (soglia 20GB)", M.fits(24000, 0, reserve_mb=30000) is True)
+        M.avail_commit_mb = lambda: 60000.0
+        check("fits con riserva VRAM: 60-24-30=6GB NEGA (era il caso del crash)", M.fits(24000, 0, reserve_mb=30000) is False)
+        check("commit_reserve_mb: picco 30GB meno VRAM gia' allocata", M.commit_reserve_mb(0) == 30720 and M.commit_reserve_mb(26000) == 4720 and M.commit_reserve_mb(99999) == 0)
+        os.environ["LS_PARK_VRAM_PEAK_MB"] = "10000"
+        check("LS_PARK_VRAM_PEAK_MB letto", M.vram_peak_mb() == 10000)
+        _clean()
         M.avail_commit_mb = lambda: 100000.0
         check("fits nega oltre il budget", M.fits(10000, 45000) is False)      # 55000 > 49152
         os.environ["LS_RAM_CACHE"] = "0"
