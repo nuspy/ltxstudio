@@ -134,6 +134,11 @@ class InpaintReq(BaseModel):
     guide: float = Field(0.4, ge=0.1, le=1.0, description="forza della guida (ancoraggio al video originale)")
     mask_dilate: int = Field(24, ge=0, le=64)
     mask_blur: float = Field(6.0, ge=0.0, le=30.0)
+    full_resolution: bool = Field(True, description="secondo stadio (upsampler + raffinamento): uscita a risoluzione piena del "
+                                  "sorgente (tetto 1280 sul lato lungo); False = meta' risoluzione come prima")
+    keep_background: bool = Field(True, description="fuori dalla maschera il video e' il SORGENTE originale a risoluzione piena "
+                                  "(bordo sfumato come `mask_blur`); False = tutto generato")
+    keep_audio: bool = Field(True, description="rimette l'audio originale sul risultato (l'inpaint non genera audio)")
     seed: int = 42
     model: str | None = Field(None, description="checkpoint ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)")
     ltx_release: str | None = None
@@ -374,7 +379,8 @@ def register(app: FastAPI):
                                       "detail": "le LoRA dell'inpaint locali sono per LTX 2.3"})
         cfg = {"prompt": req.prompt.strip(), "ref_image": ref, "ref_strength": req.reference_strength,
                "cfg_scale": req.cfg_scale, "guide": req.guide, "mask_dilate": req.mask_dilate,
-               "mask_blur": req.mask_blur, "seed": req.seed}
+               "mask_blur": req.mask_blur, "seed": req.seed, "video": req.video_path, "full_res": req.full_resolution,
+               "keep_background": req.keep_background, "keep_audio": req.keep_audio}
         miss = vi.missing_weight(cfg)
         if miss:
             raise HTTPException(409, {"error": "weight_missing", "detail": miss})
@@ -406,7 +412,10 @@ def register(app: FastAPI):
                     job.log("[inpaint] " + note)
             gpath = out_path("_inpaint_guide")
             vi.attach_tracking(params, req.video_path, req.object.strip(), gpath, req.mask_dilate, log=job.log)
-            return run_ltx2(params, job)
+            outs = run_ltx2(params, job)
+            if params.get("_mux_audio_from") and outs:           # l'inpaint non genera audio: si rimette quello originale
+                outs = [vic.mux_audio(outs[0], params["_mux_audio_from"])] + list(outs[1:])
+            return outs
         r = _submit("video.inpaint", fn)
         r["warnings"] = warnings
         return r

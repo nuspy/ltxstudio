@@ -186,7 +186,37 @@ def case_t2v_worker_params_unchanged(w, spy):
     assert cap["cfg_scale"] == 6.0 and cap["mask_dilate"] == 24 and cap["control_strength"] == 0.4
 
 
+def case_inpaint_quality_options_default_on_and_visibility(w, spy):
+    """Piena risoluzione / sfondo originale: accese di default, solo in inpaint; arrivano al worker (stage 2, composizione, audio)."""
+    t, _img = _prep(w, use_ref=False)
+    assert t.inp_full_res.isChecked() and t.inp_keep_bg.isChecked()
+    assert not t.inp_full_res.isHidden() and not t.inp_keep_bg.isHidden()
+    for key in ("edit", "restyle", "replace_char", "outpaint"):
+        t.select_mode(key)
+        assert t.inp_full_res.isHidden() and t.inp_keep_bg.isHidden(), f"opzioni inpaint visibili in {key}"
+    t.select_mode("inpaint")
+    t._go()
+    cfg = _cfg_of(w)
+    assert cfg["full_res"] is True and cfg["keep_background"] is True
+    t.inp_full_res.setChecked(False)
+    t.inp_keep_bg.setChecked(False)
+    t._go()
+    cfg = _cfg_of(w)
+    assert cfg["full_res"] is False and cfg["keep_background"] is False
+
+
+def case_inpaint_worker_params_full_res_composite_audio(w, spy):
+    cap, done, _img = _run_worker(w, use_ref=False, nb_frames=97)
+    assert cap["inpaint_stage2"] is True and cap["inpaint_composite"] is True
+    assert cap["_mux_audio_from"].endswith("_vedit_test_input.mp4"), cap.get("_mux_audio_from")
+    assert (cap["width"], cap["height"]) == (1280, 704)
+
+
 CASES = [
+    ("vinpaint_quality_options", "inpaint: piena risoluzione e sfondo originale, default accesi, solo in inpaint.",
+     case_inpaint_quality_options_default_on_and_visibility),
+    ("vinpaint_worker_params_quality", "inpaint: params stage 2 + composizione + audio originale al worker.",
+     case_inpaint_worker_params_full_res_composite_audio),
     ("vinpaint_r2v_off_uses_t2v", "r2v: casella spenta = LoRA t2v anche con foto residua nel campo.",
      case_r2v_off_uses_t2v_even_with_stale_photo),
     ("vinpaint_r2v_on_uses_r2v", "r2v: casella accesa + foto = LoRA r2v, foto e forza in cfg.",

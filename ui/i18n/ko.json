@@ -3423,5 +3423,9 @@
   "vedit.note_inpaint_r2v": "사진(r2v LoRA)을 쓰면 새 객체를 사진에서 가져옵니다. 프롬프트에는 장면과 동작을 설명하세요. 긴 클립은 세그먼트로 생성되며 각 세그먼트에 같은 사진이 쓰입니다.",
   "vedit.err_no_ref_inpaint": "사진 인페인트: 삽입할 객체의 사진을 선택하세요(또는 체크를 끄세요).",
   "vedit.r2v.missing_body": "참조 사진 인페인트용 가중치(r2v LoRA, 약 0.33GB)가 없습니다. 제가 직접 내려받지는 않습니다. «모델 가중치» 탭에서 열거나, 체크를 꺼서 말로만 인페인트하세요.",
-  "feat.cap.video_inpaint_r2v": "참조 사진을 쓰는 비디오 인페인트 (r2v LoRA)"
+  "feat.cap.video_inpaint_r2v": "참조 사진을 쓰는 비디오 인페인트 (r2v LoRA)",
+  "vedit.inpaint.fullres": "전체 해상도(2단계)",
+  "vedit.inpaint.fullres.tt": "켜짐: 출력이 영상의 해상도(긴 변 최대 1280)로 나오며 정교화 단계가 추가됩니다(시간과 VRAM 증가). 꺼짐: 출력이 절반 해상도입니다.",
+  "vedit.inpaint.keepbg": "마스크 밖은 원본 배경",
+  "vedit.inpaint.keepbg.tt": "켜짐: 마스크(와 확장) 밖은 원본 영상을 전체 해상도로 사용하고 가장자리를 부드럽게 처리합니다. 객체 영역만 바뀝니다. 꺼짐: 프레임 전체를 생성합니다."
 }

@@ -3423,5 +3423,9 @@
   "vedit.note_inpaint_r2v": "使用照片（r2v LoRA）时，新物体取自照片；在提示词中描述场景及其动作。长片段分段生成，每段使用同一张照片。",
   "vedit.err_no_ref_inpaint": "照片修补：请选择要插入的物体照片（或关闭该选项）。",
   "vedit.r2v.missing_body": "缺少参考照片修补的权重（r2v LoRA，约 0.33 GB）。我不会自行下载：请在“模型权重”标签页中打开，或关闭该选项以仅用文字修补。",
-  "feat.cap.video_inpaint_r2v": "带参考照片的视频修补（r2v LoRA）"
+  "feat.cap.video_inpaint_r2v": "带参考照片的视频修补（r2v LoRA）",
+  "vedit.inpaint.fullres": "全分辨率（第二阶段）",
+  "vedit.inpaint.fullres.tt": "开启：输出为视频的分辨率（长边上限 1280），并多一次精修（耗时和显存更多）。关闭：输出为半分辨率。",
+  "vedit.inpaint.keepbg": "遮罩外保留原始背景",
+  "vedit.inpaint.keepbg.tt": "开启：遮罩（加上扩张）之外是你的原始全分辨率视频，边缘柔化；只有物体区域会变化。关闭：整帧都由模型生成。"
 }

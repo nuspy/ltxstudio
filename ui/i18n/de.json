@@ -3423,5 +3423,9 @@
   "vedit.note_inpaint_r2v": "Mit dem Foto (r2v-LoRA) wird das neue Objekt aus dem Foto übernommen; beschreibe im Prompt die Szene und was geschieht. Lange Clips werden in Segmenten erzeugt, mit demselben Foto in jedem.",
   "vedit.err_no_ref_inpaint": "Inpaint mit Foto: Wähle das Foto des einzusetzenden Objekts (oder schalte das Kästchen aus).",
   "vedit.r2v.missing_body": "Das Gewicht für Inpainting mit Referenzfoto (r2v-LoRA, etwa 0,33 GB) fehlt. Ich lade nichts selbst herunter: Öffne es im Tab „Modellgewichte“ oder schalte das Kästchen aus, um nur mit Worten zu inpainten.",
-  "feat.cap.video_inpaint_r2v": "Video-Inpaint mit Referenzfoto (r2v-LoRA)"
+  "feat.cap.video_inpaint_r2v": "Video-Inpaint mit Referenzfoto (r2v-LoRA)",
+  "vedit.inpaint.fullres": "Volle Auflösung (zweite Stufe)",
+  "vedit.inpaint.fullres.tt": "An: Die Ausgabe hat die Auflösung des Videos (Obergrenze 1280 an der langen Seite), mit einem zusätzlichen Verfeinerungsschritt (mehr Zeit und VRAM). Aus: Die Ausgabe hat halbe Auflösung.",
+  "vedit.inpaint.keepbg": "Originalhintergrund außerhalb der Maske",
+  "vedit.inpaint.keepbg.tt": "An: Außerhalb der Maske (plus Erweiterung) ist das Video dein Original in voller Auflösung, mit weichem Rand; nur der Objektbereich ändert sich. Aus: Das ganze Bild wird generiert."
 }
