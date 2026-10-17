@@ -601,7 +601,7 @@ def case_integrate_flux2(w, spy):
 
 
 def case_integrate_puzzle_lora_flux1(w, spy):
-    """Integra Kontext + puzzle_lora ON: forza il ramo ComfyUI (LoRA FLUX.1) → richiesta inviata."""
+    """Integra Kontext + puzzle_lora ON: da task 9 e' NATIVO (MagicQuill foreground, modulo image_mq), non più ComfyUI."""
     _force_native_up()
     _populate_inventory(w)
     f = w.frame1_tab
@@ -615,6 +615,9 @@ def case_integrate_puzzle_lora_flux1(w, spy):
     f.integrate_prompt.setPlainText("integrate with puzzle lora")
     w.generate_integrate()
     assert spy.calls, "integrate puzzle_lora: nessuna richiesta inviata"
+    c = spy.calls[-1]
+    if c["via"] == "enqueue":
+        assert c["module"] == "image_mq" and c["params"]["mode"] == "foreground" and c["params"]["prepared"] is True, c
 
 
 def case_integrate_no_layer_guard(w, spy):

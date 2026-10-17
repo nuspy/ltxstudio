@@ -886,6 +886,7 @@ class MainWindow(QMainWindow):
         # Bottone «Integra immagini» spostato dal canvas al tab Inpaint/Outpaint
         self.frame1_tab.request_integrate.connect(self.generate_integrate)
         self.frame1_tab.request_compose.connect(self.generate_compose)
+        self.frame1_tab.request_magicquill.connect(self.generate_magicquill)
         self.frame1_tab.request_generate.connect(self.generate_image)
         self.frame1_tab.request_upscale.connect(self.generate_upscale)
         self.frame1_tab.request_recolor.connect(self.generate_recolor)
@@ -2703,8 +2704,11 @@ class MainWindow(QMainWindow):
                                               cfg.get("integrate_variant", "turbo"), seed,
                                               label=tr("queue.job.krea2edit", "Krea 2 Edit"))
                 return
-            # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. FLUX.2 e puzzle_lora → ComfyUI.
+            # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. «Integrazione MagicQuill» (puzzle_lora) = mode foreground.
             from core import backend
+            if backend.is_native("image") and engine == "kontext" and aux:
+                self._start_native_mq_foreground(exp, model, ptxt, steps, seed, guidance)
+                return
             if backend.is_native("image") and engine == "kontext" and not aux:
                 # PuLID DEDICATO all'Image to Image (container proprio nel pannello, separato da
                 # quello di «Genera immagine» che agisce solo sulla generazione).
@@ -4632,6 +4636,88 @@ class MainWindow(QMainWindow):
                   f"{'maschera' if mask else 'senza maschera'}, {params['steps']} passi) inviato…")
         self._enqueue(label or tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"), self._native_worker,
                       self._on_native_inpaint_done)
+
+    # ── MagicQuill V2 (task 9): backend image_mq (Kontext + LoRA di controllo) ─────────────────────────────────
+    _MQ_LABEL = "MagicQuill V2"
+
+    def _mq_model_path(self, model: str) -> str:
+        return model if os.path.isabs(model) else os.path.join(r"E:\AI\Models\diffusion_models", model)
+
+    def generate_magicquill(self):
+        """Modifica locale / rimozione / bordi guidati / colore guidato con le LoRA MagicQuill V2 su FLUX.1 Kontext."""
+        if not self._feature_gate("cap.image_magicquill"):
+            return
+        ft = self.frame1_tab
+        if mm.blocked(self, ft.mq_model):
+            return
+        cfg = ft.get_magicquill_config()
+        mode = cfg["mode"]
+        if not cfg["model"]:
+            QMessageBox.warning(self, tr("mw.no_model_title"), tr("f1.mq.no_model",
+                "MagicQuill: scegli un checkpoint FLUX.1 Kontext nel menu del pannello.")); return
+        if not ft.image_path:
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
+        if self._inpaint_pid:
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
+        if not ft.canvas.has_mask():
+            QMessageBox.information(self, tr("mw.no_mask_title"), tr("f1.mq.no_mask",
+                "Disegna prima sul canvas con il pennello maschera: l'area da modificare/rimuovere/colorare, "
+                "oppure i tratti dei bordi.")); return
+        if mode == "local" and not cfg["prompt"]:
+            QMessageBox.information(self, tr("mw.no_mask_title"), tr("f1.mq.no_prompt",
+                "Scrivi nel prompt cosa deve diventare l'area disegnata.")); return
+        if not self._missing_weights_notice([f"mq2-{mode}-lora"], f"{self._MQ_LABEL} ({mode})"):
+            return
+        if not self._ensure_native_ready():
+            return
+        try:
+            exp = ft.canvas.export_inpaint(OUTPUT_DIR, "inpaint")
+        except Exception as e:                                     # noqa: BLE001
+            QMessageBox.warning(self, tr("mw.error_title", "Errore"), str(e)); return
+        self._inpaint_bbox = exp.get("bbox")
+        self._inpaint_before = exp.get("image")
+        seed = cfg["seed"] if cfg["seed"] is not None else random.randint(0, 2**31)
+        params = {"arch": "kontext", "mode": mode, "model": self._mq_model_path(cfg["model"]),
+                  "image_path": exp["image"], "prompt": cfg["prompt"], "steps": cfg["steps"],
+                  "guidance": cfg["guidance"], "seed": seed}
+        if mode in ("local", "removal"):
+            params["mask_path"] = exp["mask"]
+            params["grow"] = cfg["grow"]
+            params["strength_local"] = cfg["strength"]
+        elif mode == "edge":
+            params["erase_path" if cfg["erase"] else "edge_path"] = exp["mask"]
+            params["strength_edge"] = cfg["strength"]
+        else:                                                       # color: l'area disegnata prende il colore scelto
+            params["mask_path"] = exp["mask"]
+            params["color_rgb"] = cfg["color_rgb"]
+            params["strength_color"] = cfg["strength"]
+        self._inpaint_mode = "magicquill"
+        self._log(f"{self._MQ_LABEL} ({mode}, NATIVO): modello={os.path.basename(cfg['model'])} · passi={cfg['steps']} · "
+                  f"guida={cfg['strength']:.2f} · seed={seed}")
+        self._native_worker = _NativeImageWorker(params, module="image_mq")
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.magicquill", "MagicQuill V2"), self._native_worker, self._on_native_inpaint_done)
+
+    def _start_native_mq_foreground(self, exp, model, prompt, steps, seed, guidance):
+        """«Integrazione MagicQuill» (casella puzzle_lora di Integra) = mode foreground: l'immagine di Integra è già
+        preparata (oggetto incollato + alone bianco), la maschera è la zona di edit."""
+        if not self._feature_gate("cap.image_magicquill"):
+            return
+        if not self._missing_weights_notice(["mq2-puzzle-lora"], f"{self._MQ_LABEL} (integrazione)"):
+            return
+        if not self._ensure_native_ready():
+            return
+        from core.kontext_pipeline import KONTEXT_MODEL
+        mp = self._mq_model_path(model or KONTEXT_MODEL)
+        params = {"arch": "kontext", "mode": "foreground", "model": mp, "image_path": exp["image"],
+                  "mask_path": exp["mask"], "prepared": True, "prompt": prompt or
+                  "Fill in the white region naturally and adapt the foreground into the background.",
+                  "steps": steps, "guidance": guidance, "seed": seed}
+        self._inpaint_mode = "integrazione"
+        self._log(f"Integra {self._MQ_LABEL} (foreground, NATIVO): modello={os.path.basename(mp)} · passi={steps} · seed={seed}")
+        self._native_worker = _NativeImageWorker(params, module="image_mq")
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.integrate", "Image to Image (Kontext)"), self._native_worker, self._on_native_inpaint_done)
 
     def _start_native_klein_multiref(self, imgs, prompt, model):
         """Componi con FLUX.2 Klein: le N foto sono N riferimenti VERI (latenti separati con id di posizione propri,

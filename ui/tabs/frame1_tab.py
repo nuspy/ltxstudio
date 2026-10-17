@@ -115,6 +115,7 @@ class Frame1Tab(QWidget):
     request_restore_photo = Signal()    # restaura / colora foto (invia al tab Restauro)
     request_integrate = Signal()        # integra immagini (spostato qui dal canvas)
     request_compose = Signal()          # componi più foto (multi-reference / stitch)
+    request_magicquill = Signal()       # MagicQuill V2: modifica locale / rimozione / bordi / colore (Kontext)
 
     def __init__(self):
         super().__init__()
@@ -1327,6 +1328,7 @@ class Frame1Tab(QWidget):
             if pool:
                 self._color_name_combo(ic)
             mm.settle(ic, cur, cand)
+        self._reload_mq_models()
         # puzzle_lora è una LoRA FLUX.1 → disabilita in modalità FLUX.2
         if hasattr(self, "integrate_puzzle") and hasattr(self, "integrate_engine"):
             is_flux2_mode = (self.integrate_engine.currentIndex() == 1)
@@ -1603,6 +1605,12 @@ class Frame1Tab(QWidget):
         g.addRow(b_int)
         wv.addWidget(int_box)
 
+        # ============ SEZIONE 2b: MAGICQUILL V2 (Kontext + LoRA di controllo) ============
+        sep_mq = QFrame(); sep_mq.setFrameShape(QFrame.HLine); sep_mq.setFrameShadow(QFrame.Sunken)
+        sep_mq.setStyleSheet("color: #444; margin: 6px 0;")
+        wv.addWidget(sep_mq)
+        wv.addWidget(self._magicquill_box())
+
         # ============ SEZIONE 3: COMPONI PIÙ FOTO (senza incollare → niente occlusione) ============
         sep2 = QFrame(); sep2.setFrameShape(QFrame.HLine); sep2.setFrameShadow(QFrame.Sunken)
         sep2.setStyleSheet("color: #444; margin: 6px 0;")
@@ -1653,6 +1661,137 @@ class Frame1Tab(QWidget):
         self._compose_masks: dict[str, str] = {}
 
         return wrap
+
+    # ---------- MagicQuill V2 (task 9): 4 LoRA di controllo su FLUX.1 Kontext ----------
+    MQ_MODES = (("local", "f1.mq.mode.local", "Modifica locale (area + prompt)"),
+                ("removal", "f1.mq.mode.removal", "Rimuovi oggetto"),
+                ("edge", "f1.mq.mode.edge", "Bordi guidati"),
+                ("color", "f1.mq.mode.color", "Colore guidato"))
+    MQ_STRENGTH = {"local": 1.0, "removal": 1.0, "edge": 0.6, "color": 1.5}      # default dell'originale (app.py)
+
+    def _magicquill_box(self) -> QGroupBox:
+        """MagicQuill V2: la maschera/i tratti disegnati sul canvas guidano FLUX.1 Kontext tramite una LoRA di controllo
+        (locale, rimozione, bordi, colore). Il modello Kontext lo sceglie sempre l'utente."""
+        box = QGroupBox(tr("f1.mq.group", "MagicQuill V2 (FLUX.1 Kontext)"))
+        g = QFormLayout(box)
+        info = QLabel(tr("f1.mq.info",
+            "Disegna sul canvas con il pennello maschera: l'area (modifica locale, rimozione, colore) oppure i tratti "
+            "(bordi guidati). Funziona solo con FLUX.1 Kontext. Licenza non commerciale (CC BY-NC)."))
+        info.setWordWrap(True); info.setStyleSheet("color:#9bd; font-size:11px;")
+        g.addRow(info)
+        self.mq_mode = QComboBox()
+        for data, key, fb in self.MQ_MODES:
+            self.mq_mode.addItem(tr(key, fb), data)
+        self.mq_mode.setToolTip(tr("f1.mq.mode.tt",
+            "Locale: rifà l'area disegnata secondo il prompt. Rimuovi: toglie l'oggetto e ricostruisce lo sfondo. "
+            "Bordi: la foto segue i contorni originali più i tratti che disegni. Colore: ricolora l'area col colore scelto."))
+        self.mq_mode.currentIndexChanged.connect(self._on_mq_mode)
+        g.addRow(tr("f1.mq.mode", "Modalità"), self.mq_mode)
+        self.mq_model = QComboBox()
+        self.mq_model.setToolTip(tr("f1.mq.model.tt", "Checkpoint FLUX.1 Kontext su cui lavorano le LoRA MagicQuill."))
+        g.addRow(tr("f1.mq.model", "Modello (Kontext)"), self.mq_model)
+        self.mq_prompt = QPlainTextEdit(); self.mq_prompt.setMaximumHeight(36)
+        self.mq_prompt.setPlaceholderText(tr("f1.mq.prompt.ph", "Cosa deve diventare l'area / la foto (in inglese rende meglio)"))
+        self._mq_prompt_lbl = QLabel(tr("f1.mq.prompt", "Prompt"))
+        g.addRow(self._mq_prompt_lbl, self.mq_prompt)
+        srow = QHBoxLayout()
+        self.mq_strength = QDoubleSpinBox(); self.mq_strength.setRange(0.0, 5.0); self.mq_strength.setSingleStep(0.05)
+        self.mq_strength.setValue(1.0)
+        self.mq_strength.setToolTip(tr("f1.mq.strength.tt",
+            "Quanto la condizione (area, bordi, colore) pesa sulla generazione. Valori dell'autore: locale 1.0, bordi 0.6, colore 1.5."))
+        self._mq_strength_lbl = QLabel(tr("f1.mq.strength", "Forza della guida"))
+        g.addRow(self._mq_strength_lbl, self.mq_strength)
+        crow = QHBoxLayout()
+        self.mq_color = QLineEdit("#d4af37"); self.mq_color.setMaximumWidth(90)
+        self.mq_swatch = QLabel(); self.mq_swatch.setFixedSize(26, 26)
+        cbtn = QPushButton(tr("f1.color.pick.btn")); cbtn.clicked.connect(self._mq_pick_color)
+        self.mq_color.textChanged.connect(self._mq_update_swatch)
+        crow.addWidget(self.mq_color); crow.addWidget(self.mq_swatch); crow.addWidget(cbtn); crow.addStretch(1)
+        self._mq_color_row = self._wrapw(crow)
+        self._mq_color_lbl = QLabel(tr("f1.mq.color", "Colore dell'area"))
+        g.addRow(self._mq_color_lbl, self._mq_color_row)
+        self.mq_erase = QCheckBox(tr("f1.mq.erase", "I tratti RIMUOVONO bordi (invece di aggiungerli)"))
+        self.mq_erase.setToolTip(tr("f1.mq.erase.tt",
+            "Bordi guidati: di norma i tratti disegnati si AGGIUNGONO ai contorni della foto; con questa casella cancellano "
+            "i contorni che attraversano."))
+        g.addRow("", self.mq_erase)
+        self.mq_grow = QSpinBox(); self.mq_grow.setRange(0, 100); self.mq_grow.setValue(10)
+        self.mq_grow.setToolTip(tr("f1.mq.grow.tt", "Quanto allargare l'area disegnata (px): lascia margine alla ricostruzione."))
+        self._mq_grow_lbl = QLabel(tr("f1.mq.grow", "Margine area (px)"))
+        g.addRow(self._mq_grow_lbl, self.mq_grow)
+        self.mq_steps = QSpinBox(); self.mq_steps.setRange(1, 80); self.mq_steps.setValue(20)
+        g.addRow(tr("f1.steps_lbl"), self.mq_steps)
+        self.mq_cfg = QDoubleSpinBox(); self.mq_cfg.setRange(0.0, 20.0); self.mq_cfg.setSingleStep(0.1); self.mq_cfg.setValue(3.5)
+        self.mq_cfg.setToolTip(tr("f1.gen.cfg.tt", "Guidance (CFG): quanto l'immagine aderisce al prompt; valori troppo alti creano artefatti."))
+        g.addRow(tr("f1.cfg_lbl"), self.mq_cfg)
+        seedrow = QHBoxLayout()
+        self.mq_seed = QSpinBox(); self.mq_seed.setRange(0, 2_147_483_647); self.mq_seed.setEnabled(False)
+        self.mq_seed_rand = QCheckBox(tr("f1.seed_rand")); self.mq_seed_rand.setChecked(True)
+        self.mq_seed_rand.toggled.connect(lambda on: self.mq_seed.setEnabled(not on))
+        seedrow.addWidget(self.mq_seed, 1); seedrow.addWidget(self.mq_seed_rand)
+        g.addRow(tr("f1.seed_lbl"), self._wrapw(seedrow))
+        b = QPushButton(tr("f1.mq.btn", "Genera con MagicQuill"))
+        b.setObjectName("generate")
+        b.setToolTip(tr("f1.mq.btn.tt", "Applica la modalità scelta alla foto del canvas usando la maschera disegnata."))
+        b.clicked.connect(lambda: self.request_magicquill.emit())
+        g.addRow(b)
+        self._mq_box = box
+        self._mq_update_swatch()
+        self._on_mq_mode()
+        return box
+
+    def _mq_update_swatch(self, *_):
+        c = self.mq_color.text().strip()
+        ok = len(c) == 7 and c.startswith("#")
+        self.mq_swatch.setStyleSheet(f"background:{c if ok else '#000'}; border:1px solid #555; border-radius:5px;")
+
+    def _mq_pick_color(self):
+        from PySide6.QtWidgets import QColorDialog
+        c = QColorDialog.getColor()
+        if c.isValid():
+            self.mq_color.setText(c.name())
+
+    def _on_mq_mode(self, *_):
+        m = self.mq_mode.currentData() or "local"
+        self.mq_strength.setValue(self.MQ_STRENGTH.get(m, 1.0))
+        for w in (self._mq_prompt_lbl, self.mq_prompt):
+            w.setVisible(m != "removal")                 # la rimozione usa il prompt dell'originale («remove the instance»)
+        for w in (self._mq_color_lbl, self._mq_color_row):
+            w.setVisible(m == "color")
+        self.mq_erase.setVisible(m == "edge")
+        for w in (self._mq_grow_lbl, self.mq_grow):
+            w.setVisible(m in ("local", "removal"))
+
+    def _reload_mq_models(self):
+        """Modelli Kontext (FLUX.1) per MagicQuill: dall'header (core.arch_filter.is_kontext); 18+ solo in NSFW."""
+        if not hasattr(self, "mq_model"):
+            return
+        from core import arch_filter as af
+        from ui import model_menu as mm
+        allow = self._allow_nsfw()
+        cand = [m for m in (self._models or []) if af.is_kontext(m)]
+        pool = [m for m in cand if allow or not self._mcat.is_nsfw(m)]
+        cur = mm.current_key(self.mq_model)
+        self.mq_model.clear()
+        self.mq_model.addItems(pool) if pool else self.mq_model.addItem(tr("f1.kontext.none"))
+        if pool:
+            self._color_name_combo(self.mq_model)
+        mm.settle(self.mq_model, cur, cand)
+
+    def get_magicquill_config(self) -> dict:
+        import re
+        mode = self.mq_mode.currentData() or "local"
+        col = self.mq_color.text().strip()
+        rgb = [int(col[i:i + 2], 16) for i in (1, 3, 5)] if re.fullmatch(r"#[0-9a-fA-F]{6}", col) else [212, 175, 55]
+        model = self.mq_model.currentText() if self.mq_model.count() else ""
+        return {"mode": mode,
+                "model": "" if model.startswith("(") else model,
+                "prompt": self.mq_prompt.toPlainText().strip(),
+                "strength": float(self.mq_strength.value()),
+                "color_rgb": rgb, "erase": bool(self.mq_erase.isChecked()),
+                "grow": int(self.mq_grow.value()),
+                "steps": int(self.mq_steps.value()), "guidance": float(self.mq_cfg.value()),
+                "seed": None if self.mq_seed_rand.isChecked() else int(self.mq_seed.value())}
 
     # ---------- cambia colore (Kontext prompt-based, stile MagicQuill) ----------
     def _color_box(self) -> QGroupBox:

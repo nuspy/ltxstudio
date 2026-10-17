@@ -21,6 +21,7 @@ KNOWN_CAPS = [
     "cap.video_restore_iclora", "cap.video_outpaint", "cap.video_restyle", "cap.video_camera_ic",
     "cap.video_lipdub", "cap.video_hdr_ic", "cap.video_motion_track", "cap.video_h3_upsampler",
     "cap.video_inpaint_r2v",
+    "cap.image_controlnet", "cap.image_redux", "cap.image_cn_inpaint", "cap.image_magicquill",
 ]
 
 

@@ -173,6 +173,89 @@ def case_ctl_cn_inpaint_only_with_flux1_base(w, spy):
     assert os.path.isfile(p["image_path"]) and os.path.isfile(p["mask_path"]) and abs(p["control_scale"] - 0.75) < 1e-6, p
 
 
+def _mq_ready(f):
+    f.img_nsfw.setCurrentText("NSFW")
+    for i in range(f.mq_model.count()):
+        if not f.mq_model.itemText(i).startswith("("):
+            f.mq_model.setCurrentIndex(i)
+            return f.mq_model.itemText(i)
+    return None
+
+
+def case_mq_modes_and_params(w, spy):
+    _populate_inventory(w)
+    f = w.frame1_tab
+    m = _mq_ready(f)
+    if not m:
+        return
+    H.load_canvas_image(w)
+    _draw_center_mask(f.canvas)
+    seen = {}
+    for mode, strength_key, want in (("local", "strength_local", 1.0), ("removal", "strength_local", 1.0),
+                                     ("edge", "strength_edge", 0.6), ("color", "strength_color", 1.5)):
+        f.mq_mode.setCurrentIndex(f.mq_mode.findData(mode))
+        assert abs(f.mq_strength.value() - want) < 1e-6, f"{mode}: forza di default {f.mq_strength.value()} != {want}"
+        f.mq_prompt.setPlainText("una corona d'alloro dorata" if mode != "removal" else "")
+        f.mq_color.setText("#cc2244")
+        p = _run(w, spy, w.generate_magicquill)
+        call = spy.calls[-1]
+        assert call["module"] == "image_mq" and p["mode"] == mode and p["arch"] == "kontext" and p["model"].endswith(m), p
+        assert abs(p[strength_key] - want) < 1e-6, p
+        seen[mode] = p
+    assert "mask_path" in seen["local"] and seen["local"]["grow"] == 10
+    assert "edge_path" in seen["edge"] and "erase_path" not in seen["edge"]
+    assert seen["color"]["color_rgb"] == [204, 34, 68] and "mask_path" in seen["color"]
+    f.mq_mode.setCurrentIndex(f.mq_mode.findData("edge")); f.mq_erase.setChecked(True)
+    p = _run(w, spy, w.generate_magicquill)
+    assert "erase_path" in p and "edge_path" not in p, p
+
+
+def case_mq_guards_and_visibility(w, spy):
+    from PySide6.QtWidgets import QMessageBox
+    import core.ensure_weights as ew
+    from core import native_driver
+    from core import arch_filter as af
+    _populate_inventory(w)
+    f = w.frame1_tab
+    m = _mq_ready(f)
+    for i in range(f.mq_model.count()):                 # il menu contiene SOLO Kontext FLUX.1 (header)
+        t = f.mq_model.itemText(i)
+        if not t.startswith("("):
+            assert af.is_kontext(t), f"{t} nel menu MagicQuill ma non e' un Kontext FLUX.1"
+    f.mq_mode.setCurrentIndex(f.mq_mode.findData("removal"))
+    assert f.mq_prompt.isHidden() and f._mq_color_row.isHidden() and not f.mq_grow.isHidden()
+    f.mq_mode.setCurrentIndex(f.mq_mode.findData("color"))
+    assert not f._mq_color_row.isHidden() and f.mq_grow.isHidden() and not f.mq_prompt.isHidden()
+    f.mq_mode.setCurrentIndex(f.mq_mode.findData("edge"))
+    assert not f.mq_erase.isHidden()
+    if not m:
+        return
+    H.load_canvas_image(w)                              # senza maschera: avviso, nessun job
+    f.canvas.clear_mask(silent=True)
+    n0 = len(spy.calls)
+    shown = []
+    old = QMessageBox.information
+    QMessageBox.information = staticmethod(lambda *a, **k: shown.append(a[2] if len(a) > 2 else "") or QMessageBox.Ok)
+    try:
+        w.generate_magicquill()
+    finally:
+        QMessageBox.information = old
+    assert shown and len(spy.calls) == n0, "senza maschera: serve l'avviso e nessun job"
+    _draw_center_mask(f.canvas)                         # pesi LoRA mancanti: avviso con nome, nessun job
+    seen = []
+    se, sm, su = QMessageBox.exec, ew.missing, native_driver.is_up
+    QMessageBox.exec = lambda self, *a, **k: seen.append(self.text()) or 0
+    ew.missing = lambda ids: [{"id": i, "label": i, "approx_gb": 0.3} for i in ids]
+    native_driver.is_up = lambda: True
+    try:
+        w.generate_magicquill()
+    finally:
+        QMessageBox.exec, ew.missing, native_driver.is_up = se, sm, su
+    assert seen and "mq2-edge-lora" in seen[0] and len(spy.calls) == n0, seen
+
+
+
+
 CASES = [
     ("ctl_visibility_by_arch_and_family", "ControlNet/Redux solo con FLUX.1 e Z-Image (Redux solo FLUX.1); mai con FLUX.2, Krea 2, "
      "Qwen, Ernie.", case_ctl_visibility_by_arch_and_family),
@@ -186,4 +269,8 @@ CASES = [
      case_ctl_missing_weights_warns_and_does_not_generate),
     ("ctl_cn_inpaint_flux1_base_only", "ControlNet Inpainting solo con un FLUX.1 base (non Fill/Klein); params verso image_control.",
      case_ctl_cn_inpaint_only_with_flux1_base),
+    ("mq_modes_and_params", "MagicQuill: 4 modalita' con forza di default dell'autore (0.6/1.5/1.0), parametri e file verso image_mq.",
+     case_mq_modes_and_params),
+    ("mq_guards_and_visibility", "MagicQuill: menu solo Kontext FLUX.1, controlli per modalita', avvisi senza maschera e pesi mancanti.",
+     case_mq_guards_and_visibility),
 ]
