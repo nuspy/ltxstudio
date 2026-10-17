@@ -3427,5 +3427,6 @@
   "vid.motion_tracks.btn": "Guida il movimento con tracce…",
   "vid.motion_tracks.tt": "Apre Modifica Video AI nella modalità «Movimento da tracce» con l'immagine di partenza già impostata: disegni dove si muovono soggetto e sfondo e il video segue le tracce.",
   "vedit.mt.audio": "Genera anche l'audio (parlato/suoni dal prompt)",
-  "vedit.mt.audio_tt": "Come nel workflow ufficiale il modello genera l'audio insieme al video: voce e suoni vengono dal prompt. Spegnilo se il prompt non parla (altrimenti l'audio può essere rumore)."
+  "vedit.mt.audio_tt": "Come nel workflow ufficiale il modello genera l'audio insieme al video: voce e suoni vengono dal prompt. Spegnilo se il prompt non parla (altrimenti l'audio può essere rumore).",
+  "vedit.track.tip_shift": "Maiusc+clic: aggiunge un punto anche sopra un altro punto (per chiudere un anello)."
 }

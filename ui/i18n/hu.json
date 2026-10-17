@@ -3386,5 +3386,6 @@
   "vid.motion_tracks.btn": "A mozgás irányítása nyomvonalakkal…",
   "vid.motion_tracks.tt": "Megnyitja az «MI videószerkesztést» a «Mozgás nyomvonalakból» módban, a kiinduló képpel már beállítva: megrajzolod, merre mozog az alany és a háttér, a videó pedig követi a nyomvonalakat.",
   "vedit.mt.audio": "A hang generálása is (beszéd/hangok a promptból)",
-  "vedit.mt.audio_tt": "A hivatalos workflow-hoz hasonlóan a modell a videóval együtt generálja a hangot: a hang és a zajok a promptból jönnek. Kapcsold ki, ha a prompt nem beszél (különben a hang zaj lehet)."
+  "vedit.mt.audio_tt": "A hivatalos workflow-hoz hasonlóan a modell a videóval együtt generálja a hangot: a hang és a zajok a promptból jönnek. Kapcsold ki, ha a prompt nem beszél (különben a hang zaj lehet).",
+  "vedit.track.tip_shift": "Shift+kattintás: akkor is ad hozzá pontot, ha egy másik pont fölé kattintasz (hurok lezárásához)."
 }

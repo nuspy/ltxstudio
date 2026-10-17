@@ -3386,5 +3386,6 @@
   "vid.motion_tracks.btn": "Guiar o movimento com trajetórias…",
   "vid.motion_tracks.tt": "Abre Edição de vídeo com IA no modo «Movimento por trajetórias» com a imagem inicial já definida: você desenha para onde se movem sujeito e fundo e o vídeo segue as trajetórias.",
   "vedit.mt.audio": "Gerar também o áudio (fala/sons do prompt)",
-  "vedit.mt.audio_tt": "Como no workflow oficial, o modelo gera o áudio junto com o vídeo: voz e sons vêm do prompt. Desligue se o prompt não fala (senão o áudio pode ser ruído)."
+  "vedit.mt.audio_tt": "Como no workflow oficial, o modelo gera o áudio junto com o vídeo: voz e sons vêm do prompt. Desligue se o prompt não fala (senão o áudio pode ser ruído).",
+  "vedit.track.tip_shift": "Shift+clique: adiciona um ponto mesmo sobre outro ponto (para fechar um laço)."
 }

@@ -6,7 +6,7 @@ il soggetto al primo frame, l'ultimo dove arriva; una traccia con un solo punto 
 ufficiale) e' in core/motion_tracks.TrackEditorModel: qui c'e' solo la parte grafica.
 
 Interazione (tutto raggiungibile anche da tastiera; bersagli dei punti 24 px):
-- clic sull'immagine: aggiunge un punto alla traccia corrente · trascina un punto: lo sposta · tasto destro / «Annulla»: toglie
+- clic sull'immagine: aggiunge un punto alla traccia corrente (Maiusc+clic anche sopra un altro punto) · trascina un punto: lo sposta · tasto destro / «Annulla»: toglie
   l'ultimo punto · «Nuova traccia»: chiude la corrente · «Cancella tutto»
 - tastiera (canvas con il fuoco): frecce = sposta il punto selezionato (Maiusc = 10 px), Tab/Maiusc+Tab = punto successivo/precedente (finiti i punti il fuoco esce),
   Canc = elimina il punto, N = nuova traccia, Ctrl+Z = annulla, Invio = aggiunge un punto al centro
@@ -37,7 +37,8 @@ def _tip() -> str:
               "«Annulla»: toglie l'ultimo punto. L'ORDINE DEI PUNTI È IL TEMPO: il primo punto è dove si trova il soggetto "
               "all'inizio, l'ultimo dove arriva; una traccia con un solo punto resta ferma (utile per tenere fermo uno sfondo). "
               "Tastiera: frecce = sposta il punto selezionato (Maiusc = 10 px), Tab = punto successivo, Canc = elimina il punto, "
-              "N = nuova traccia, Ctrl+Z = annulla, Invio = aggiunge un punto al centro.")
+              "N = nuova traccia, Ctrl+Z = annulla, Invio = aggiunge un punto al centro.") + " " + tr(
+        "vedit.track.tip_shift", "Maiusc+clic: aggiunge un punto anche sopra un altro punto (per chiudere un anello).")
 
 
 class _Canvas(QWidget):
@@ -115,7 +116,7 @@ class _Canvas(QWidget):
             return
         if e.button() != Qt.LeftButton:
             return
-        hit = self._hit(e.position())
+        hit = None if (e.modifiers() & Qt.ShiftModifier) else self._hit(e.position())   # Maiusc+clic: aggiunge anche sopra un punto
         if hit:
             self.set_selection(hit)
             self._drag = True

@@ -163,3 +163,15 @@ def test_empty_state_and_no_image(app):
     assert w.set_reference("", 960, 544) and w.model.width == 960        # solo spazio, nessuno sfondo
     assert not w.set_reference("/non/esiste.png", 960, 544)
     w.close()
+
+
+def test_shift_click_adds_point_on_top_of_existing_one(ed):
+    """Un clic su un punto lo afferra; Maiusc+clic ne aggiunge uno nuovo nello stesso posto (chiude un anello)."""
+    _click(ed, 300, 200); _click(ed, 600, 300)
+    c = ed.canvas.to_screen(300, 200)
+    pt = QPoint(int(round(c.x())), int(round(c.y())))
+    QTest.mouseClick(ed.canvas, Qt.LeftButton, Qt.NoModifier, pt)
+    assert ed.model.n_points == 2
+    QTest.mouseClick(ed.canvas, Qt.LeftButton, Qt.ShiftModifier, pt)
+    assert ed.model.n_points == 3 and ed.model.splines[0][2] == pytest.approx(ed.model.splines[0][0], abs=2.5)
+    assert "Maiusc" in ed.canvas.toolTip() or "Shift" in ed.canvas.toolTip()
