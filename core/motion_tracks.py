@@ -266,6 +266,16 @@ def write_video(tracks, width: int, height: int, fps: float, out: str, num_frame
     raise RuntimeError(f"ffmpeg non ha scritto il video delle tracce: {last_err}")
 
 
+def extract_first_frame(video: str, out_png: str) -> str:
+    """Primo fotogramma di un video come PNG (ffmpeg). RuntimeError se non riesce."""
+    os.makedirs(os.path.dirname(os.path.abspath(out_png)), exist_ok=True)
+    r = subprocess.run([_ffmpeg(), "-v", "error", "-y", "-i", str(video), "-frames:v", "1", str(out_png)],
+                       capture_output=True, text=True, timeout=120)
+    if r.returncode != 0 or not os.path.exists(out_png) or os.path.getsize(out_png) == 0:
+        raise RuntimeError(f"primo fotogramma non estratto da {video}: {(r.stderr or '')[-300:]}")
+    return str(out_png)
+
+
 # ── dimensioni e frame ────────────────────────────────────────────────────────────────────────────
 def _r64(x: float) -> int:
     return max(64, int(np.floor(x / 64.0 + 0.5)) * 64)

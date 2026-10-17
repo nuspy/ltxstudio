@@ -7,6 +7,8 @@ dai casi (`t._ask_checkpoint`).
 """
 from __future__ import annotations
 
+import os
+
 import harness as H
 from cases_video_edit_ai_tab import _ack_dev, _cfg_of, _select_mode, _set_video, _tab
 
@@ -103,12 +105,12 @@ def case_families_and_modes(w, spy):
     assert fams == ["edit", "style", "repair", "outpaint", "lipdub", "camera"], fams
     expect = {"edit": ["edit", "inpaint", "replace_char"], "style": ["anime2real", "real2anime", "restyle"],
               "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer", "hdr"],
-              "outpaint": ["outpaint"], "lipdub": ["lipdub", "lipdub_audio"], "camera": ["cameraman"]}
+              "outpaint": ["outpaint"], "lipdub": ["lipdub", "lipdub_audio"], "camera": ["cameraman", "motion_track"]}
     for fam, modes in expect.items():
         t.family.setCurrentIndex(t.family.findData(fam))
         got = [t.mode.itemData(i) for i in range(t.mode.count())]
         assert got == modes, f"{fam}: {got} != {modes}"
-    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub", "lipdub_audio", "hdr"):
+    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub", "lipdub_audio", "hdr", "motion_track"):
         t.select_mode(k)                                 # da qualunque famiglia
         assert t.mode.currentData() == k and t.family.currentData() == vem.family_of(k)
     from ui.tabs.video_edit_ai_tab import MODES
@@ -971,6 +973,234 @@ def case_hdr_info_10bit_and_segments(w, spy):
     assert "⚠" in t.hdr_info.text() and "yuv420p10le" in t.hdr_info.text(), t.hdr_info.text()
 
 
+# ── Movimento da tracce (motion-track, fase 1d) ────────────────────────────────────────────────────
+def _mt_tab(w, with_image: bool = True, name: str = "_vedit_mt_start.png"):
+    """Tab in modalità motion_track con un'immagine di partenza vera (16:9) e nessuna traccia."""
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    _select_mode(w, "motion_track")
+    t.mt_editor.clear_all()
+    t.prompt.setPlainText("")
+    if with_image:
+        path = str(H.OUT_DIR / name)
+        H.make_test_image(path, 640, 360)
+        t.set_track_image(path)
+    else:
+        t.set_track_image("")
+    return t
+
+
+def _mt_click(t, x: float, y: float):
+    """Clic sul punto (x,y) dello spazio di lavoro dell'editor, come farebbe l'utente."""
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    p = t.mt_editor.canvas.to_screen(x, y)
+    QTest.mouseClick(t.mt_editor.canvas, Qt.LeftButton, Qt.NoModifier, QPoint(int(round(p.x())), int(round(p.y()))))
+
+
+def _mt_draw(t):
+    """Due tracce: una curva a 3 punti e un punto fermo."""
+    t.mt_editor.canvas.resize(900, 560)                                    # geometria utile anche se la finestra non e' mostrata
+    for xy in ((200, 400), (500, 250), (800, 330)):
+        _mt_click(t, *xy)
+    t.mt_editor.new_track()
+    _mt_click(t, 300, 100)
+
+
+def case_motion_fields(w, spy):
+    """Motion-track: immagine+editor+dimensioni/durata/seme visibili; niente video obbligatorio, forza/oggetto/camera nascosti;
+    famiglia «Camera / Movimento»; tornando a un'altra modalità i campi spariscono."""
+    t = _mt_tab(w)
+    assert t.family.currentData() == "camera" and t.note.text(), "famiglia e nota"
+    for fld in (t.mt_editor, t.mt_info, t.mt_img_strength, t.mt_seed):
+        assert not fld.isHidden(), fld
+    for fld in (t.mt_img.parentWidget(), t.mt_w.parentWidget(), t.mt_seconds.parentWidget()):
+        assert not fld.isHidden(), fld
+    for fld in (t.strength, t.obj, t.cam_ref.parentWidget(), t.lip_line, t.keep_audio, t.cfg):
+        assert fld.isHidden(), f"nascosto in motion_track: {fld}"
+    assert not t.prompt.isHidden() and not t.attn.isHidden()
+    assert (t.mt_w.value(), t.mt_h.value()) == (1024, 576), "dimensioni dall'aspetto dell'immagine 16:9"
+    assert t.mt_fps.currentData() == 24 and abs(t.mt_seconds.value() - 5.0) < 1e-6 and t._mt_frames() == 121
+    assert "121" in t.mt_info.text() and "5.0" in t.mt_info.text(), t.mt_info.text()
+    assert t.mt_editor.model.width == 1024 and t.mt_editor.canvas.bg is not None, "sfondo dell'editor = l'immagine"
+    assert t.mt_editor.canvas.toolTip() and "TEMPO" in t.mt_editor.canvas.toolTip(), "il tooltip spiega l'ordine = tempo"
+    _select_mode(w, "refocus")
+    for fld in (t.mt_editor, t.mt_info, t.mt_img_strength, t.mt_seed, t.mt_img.parentWidget()):
+        assert fld.isHidden(), fld
+    assert not t.strength.isHidden()
+    _select_mode(w, "cameraman")
+    assert t.mt_editor.isHidden() and not t.cam_ref.parentWidget().isHidden()
+    assert [t.mode.itemData(i) for i in range(t.mode.count())] == ["cameraman", "motion_track"]
+
+
+def case_motion_image_sources(w, spy):
+    """Immagine di partenza: da file, dal canvas del Frame 1, dal primo fotogramma del video caricato; portrait → 576x1024."""
+    t = _mt_tab(w, with_image=False)
+    assert t.mt_editor.canvas.bg is None and "disegna" in t.mt_info.text().lower(), t.mt_info.text()
+    # dal canvas
+    cv = str(H.OUT_DIR / "_vedit_mt_canvas.png")
+    H.make_test_image(cv, 400, 700)                                       # verticale
+    t.set_canvas_image_getter(lambda: cv)
+    t._mt_from_canvas()
+    assert t.mt_img.text() == cv and (t.mt_w.value(), t.mt_h.value()) == (576, 1024), (t.mt_w.value(), t.mt_h.value())
+    assert t.mt_editor.model.width == 576 and t.mt_editor.canvas.bg is not None
+    # canvas vuoto: nessuna modifica, messaggio nel log
+    t.set_canvas_image_getter(lambda: "")
+    t._mt_from_canvas()
+    assert t.mt_img.text() == cv and "canvas" in t.log.toPlainText().lower()
+    # dal primo fotogramma del video (160x96 → aspetto 5:3 → lato corto 576)
+    t.set_video(_lipdub_video("_vedit_mt_src.mp4", audio=False, frames=30))
+    assert t.mt_img_frame.isEnabled()
+    t._mt_from_video()
+    assert t.mt_img.text().endswith("_frame0.png") and os.path.isfile(t.mt_img.text())
+    assert t.mt_h.value() == 576 and t.mt_w.value() in (960, 896, 1024), (t.mt_w.value(), t.mt_h.value())
+    # tracce già disegnate seguono il cambio di risoluzione/immagine (proporzionali)
+    _mt_draw(t)
+    x0 = t.mt_editor.model.splines[0][0][0]
+    w0 = t.mt_editor.model.width
+    t.mt_w.setValue(w0 + 64)
+    assert abs(t.mt_editor.model.splines[0][0][0] - x0 * (w0 + 64) / w0) < 0.5
+    t.set_video("")
+
+
+def case_motion_cfg(w, spy):
+    """Motion-track col distilled: la cfg porta immagine, tracce (JSON nel formato del nodo con size), 121 frame a 24 fps,
+    dimensioni 1024x576, seme, forza immagine; model come scelto; prompt libero; nessun video richiesto."""
+    import json
+    _ack_dev(False)
+    t = _mt_tab(w)
+    _mt_draw(t)
+    t.prompt.setPlainText("A paper boat drifts across a neon puddle while two drones circle above")
+    t.mt_seed.setValue(1234)
+    _getter(w, _DIST)
+    t._go()
+    assert spy.calls, f"nessuna richiesta accodata (log: {t.log.toPlainText()[-300:]})"
+    cfg = _cfg_of(w)
+    assert cfg["mode"] == "motion_track" and cfg["track_image"] == t.mt_img.text() == cfg["video"], cfg
+    assert (cfg["width"], cfg["height"], cfg["fps"], cfg["num_frames"], cfg["seed"]) == (1024, 576, 24, 121, 1234), cfg
+    assert cfg["strength"] == 1.0 and cfg["image_strength"] == 1.0 and cfg["tracks_size"] == [1024, 576]
+    assert cfg["model"] == _DIST["model"] and cfg["ckpt_state"] == "distilled" and "paper boat" in cfg["prompt"]
+    d = json.loads(cfg["tracks"])
+    assert len(d["points_store"]) == 2 and len(d["points_store"][0]) == 3 and d["points_store"][1] == [{"x": d["points_store"][1][0]["x"], "y": d["points_store"][1][0]["y"]}]
+    assert len(d["coordinates"][0]) == 121 and d["size"] == [1024, 576]
+    from core import video_edit_ic as vic
+    ij = vic.build_job(dict(cfg), str(H.OUT_DIR), 77, str(H.OUT_DIR / "_vedit_mt_out.mp4"))   # la stessa cfg e' valida per il job
+    assert ij.params["control_type"] == "motion-track" and ij.params["num_frames"] == 121 and os.path.isfile(ij.params["control_video"])
+    # durata 10 s a 24 fps = 241 frame (clip lunghi)
+    t.mt_seconds.setValue(10.0)
+    assert t._mt_frames() == 241 and "241" in t.mt_info.text() and "10.0" in t.mt_info.text()
+    t._go()
+    cfg = _cfg_of(w)
+    assert cfg["num_frames"] == 241 and len(json.loads(cfg["tracks"])["coordinates"][0]) == 241
+    t.mt_fps.setCurrentIndex(t.mt_fps.findData(30))
+    assert t.mt_seconds.maximum() <= 8.6 and t._mt_frames() <= 257, "tetto sui frame: i secondi massimi scendono con gli fps"
+    t.mt_fps.setCurrentIndex(t.mt_fps.findData(24)); t.mt_seconds.setValue(5.0)
+
+
+def case_motion_validation(w, spy):
+    """Senza immagine o senza tracce il pulsante blocca (nessun accodamento) con messaggio chiaro."""
+    _ack_dev(True)
+    t = _mt_tab(w, with_image=False)
+    _getter(w, _DIST)
+    before = len(spy.calls)
+    t._go()
+    assert len(spy.calls) == before and "immagine" in t.log.toPlainText().lower()
+    t = _mt_tab(w)
+    t.log.clear()
+    t._go()
+    assert len(spy.calls) == before and "traccia" in t.log.toPlainText().lower()
+    _mt_draw(t)
+    t.mt_editor.clear_all()
+    t._go()
+    assert len(spy.calls) == before
+
+
+def case_motion_dev_weight_gate(w, spy):
+    """Col dev: avviso (distilled-LoRA 0.5) e parte; peso assente → avviso + «Apri tab Pesi modelli», niente accodamento;
+    gate spento → niente accodamento."""
+    from core import video_edit_ic as vic
+    _ack_dev(False)
+    t = _mt_tab(w); _mt_draw(t)
+    _getter(w, _DEV)
+    asked = []
+    t._ask_checkpoint = lambda sp, info, blocking=False: asked.append(sp.key) or "continue"
+    t._go()
+    assert asked == ["motion_track"] and spy.calls and _cfg_of(w)["model"] == _DEV["model"]
+    del t._ask_checkpoint
+    # peso mancante
+    _ack_dev(True)
+    _getter(w, _DIST)
+    orig = vic.missing_weight
+    vic.missing_weight = lambda spec: "Peso «motion-track» mancante: X:\\nope.safetensors"
+    try:
+        asked2, opened = [], []
+        t.request_open_weights_tab.connect(lambda: opened.append(1))
+        t._ask_missing_weight = lambda sp, msg: asked2.append((sp.key, msg)) or "weights"
+        before = len(spy.calls)
+        t._go()
+        assert [a[0] for a in asked2] == ["motion_track"] and opened == [1] and len(spy.calls) == before
+    finally:
+        vic.missing_weight = orig
+    # gate
+    seen = []
+    w._feature_gate = lambda fid: (seen.append(fid) or False)
+    before = len(spy.calls)
+    t._go()
+    assert seen == ["cap.video_camera_ic"] and len(spy.calls) == before, (seen,)
+
+
+def case_motion_video_tab_handoff(w, spy):
+    """Tab Video → «Guida il movimento con tracce…»: apre Modifica Video AI in motion_track con l'immagine del canvas Frame 1
+    già impostata (e senza immagine avvisa); il resto del tab Video non cambia."""
+    img = str(H.OUT_DIR / "_vedit_mt_handoff.png")
+    H.make_test_image(img, 800, 450)
+    w.frame1_tab.canvas.load_image(img, fit_mode="canvas")
+    w.tabs.setCurrentWidget(w.video_tab)
+    n_before = (w.video_tab.length.value(), w.video_tab.fps.currentText() if hasattr(w.video_tab.fps, "currentText") else None)
+    assert w.video_tab.motion_tracks_btn.isEnabled() and w.video_tab.motion_tracks_btn.minimumHeight() >= 32
+    w.video_tab.motion_tracks_btn.click()
+    t = _tab(w)
+    assert w.tabs.currentWidget() is t and t.mode.currentData() == "motion_track" and t.family.currentData() == "camera"
+    assert t.mt_img.text() == w.frame1_tab.image_path and t.mt_editor.canvas.bg is not None
+    assert (w.video_tab.length.value(), w.video_tab.fps.currentText() if hasattr(w.video_tab.fps, "currentText") else None) == n_before
+    # senza immagine nel canvas: apre comunque la modalità e lo dice nel log
+    w.frame1_tab.canvas._image_path = ""
+    t.set_track_image("")
+    w.tabs.setCurrentWidget(w.video_tab)
+    w.video_tab.motion_tracks_btn.click()
+    assert t.mode.currentData() == "motion_track" and w.tabs.currentWidget() is t
+
+
+def case_track_editor_in_tab_save_load(w, spy):
+    """Editor dentro il tab: clic/annulla/nuova traccia/cancella; salva e ricarica le tracce (JSON del nodo) anche in un'altra
+    risoluzione; carica il JSON del workflow ufficiale Lightricks, se presente."""
+    import json
+    t = _mt_tab(w)
+    _mt_draw(t)
+    m = t.mt_editor.model
+    assert len(m.splines) == 2 and m.n_points == 4 and "4" in t.mt_editor.status.text()
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    QTest.mouseClick(t.mt_editor.canvas, Qt.RightButton, Qt.NoModifier, t.mt_editor.canvas.rect().center())
+    assert m.n_points == 3
+    t.mt_editor.btn_undo.click()
+    assert m.n_points == 2 and len(m.splines) == 1
+    f = str(H.OUT_DIR / "_vedit_mt_tracks.json")
+    assert t.mt_editor.save_file(f)
+    t.mt_editor.btn_clear.click()
+    assert not t.mt_editor.has_tracks()
+    t.mt_w.setValue(1280)                                                  # altra risoluzione: le tracce caricate si riscalano
+    assert t.mt_editor.load_file(f) and t.mt_editor.has_tracks()
+    d = json.load(open(f, encoding="utf-8"))
+    assert abs(t.mt_editor.model.splines[0][0][0] - d["points_store"][0][0]["x"] * 1280 / 1024) < 0.6
+    wf = r"E:\AI\workflows\LTX-2.3-curated\_Lightricks-official\example_workflows\2.3\LTX-2.3_ICLoRA_Motion_Track_Distilled.json"
+    if os.path.exists(wf):
+        t.mt_editor.btn_clear.click()
+        assert t.mt_editor.load_file(wf) and len(t.mt_editor.model.splines) == 2
+    assert not t.mt_editor.load_file(str(H.OUT_DIR / "_vedit_mt_nonesiste.json"))
+    t.mt_editor.clear_all()
+
+
 CASES = (
     [("vedit_family_modes", "Due livelli famiglia/modalità: contenuti, select_mode (lipdub e hdr compresi).",
       case_families_and_modes),
@@ -1039,7 +1269,20 @@ CASES = (
       case_hdr_weight_missing_dialog),
      ("vedit_hdr_gate", "HDR: cap.video_hdr_ic spenta blocca l'accodamento.", case_hdr_gate),
      ("vedit_hdr_info_10bit_segments", "HDR: avviso sorgente 10 bit e info segmenti per clip lunghi.",
-      case_hdr_info_10bit_and_segments)]
+      case_hdr_info_10bit_and_segments),
+     ("vedit_motion_fields", "Motion-track: campi propri (immagine, editor, dimensioni, durata, seme), niente forza/camera, tooltip tempo.",
+      case_motion_fields),
+     ("vedit_motion_image_sources", "Motion-track: immagine da canvas / primo fotogramma del video / file; verticale 576x1024; riscala le tracce.",
+      case_motion_image_sources),
+     ("vedit_motion_cfg", "Motion-track: cfg con immagine, tracce JSON del nodo, 121 frame 24 fps, 241 a 10 s, seme, model come scelto.",
+      case_motion_cfg),
+     ("vedit_motion_validation", "Motion-track: senza immagine o senza tracce blocca con messaggio.", case_motion_validation),
+     ("vedit_motion_dev_weight_gate", "Motion-track: dev avvisa e parte, peso mancante → Pesi modelli, gate cap spento blocca.",
+      case_motion_dev_weight_gate),
+     ("vedit_motion_video_tab_handoff", "Tab Video → «Guida il movimento con tracce…» apre la modalità con l'immagine del canvas.",
+      case_motion_video_tab_handoff),
+     ("vedit_track_editor_save_load", "Editor nel tab: clic/annulla/cancella, salva e ricarica JSON, altra risoluzione, workflow ufficiale.",
+      case_track_editor_in_tab_save_load)]
     + [(f"vedit_newmode_{k}", f"Modalità IC-LoRA {k}: cfg emessa (kind a registro, model come scelto, campi).",
         _make_new_mode_case(k)) for k in _NEW_MODES]
 )

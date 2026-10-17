@@ -1061,6 +1061,9 @@ class MainWindow(QMainWindow):
         # Doppiaggio da testo: «ho un mio audio» → Talk/Canta del tab Video (esistenti, non toccate); «ultimo audio»
         self.video_edit_ai_tab.request_open_v2v.connect(self._open_v2v_from_vedit)
         self.video_edit_ai_tab.set_last_audio_getter(lambda: self.avatar_tab._last_audio())
+        # Movimento da tracce: immagine dal canvas del Frame 1, e rimando dal tab Video («Guida il movimento con tracce…»)
+        self.video_edit_ai_tab.set_canvas_image_getter(lambda: (self.frame1_tab.image_path or ""))
+        self.video_tab.request_motion_tracks.connect(self._open_motion_tracks_from_video)
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
@@ -3741,6 +3744,19 @@ class MainWindow(QMainWindow):
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
                       self._on_video_edit_ai_done, on_progress=self.video_edit_ai_tab.log.appendPlainText)
+
+    def _open_motion_tracks_from_video(self):
+        """Dal tab Video a Modifica Video AI nella modalita' «Movimento da tracce», con l'immagine di partenza del tab Video
+        (quella del canvas Frame 1) gia' impostata. Il tab Video non viene toccato."""
+        t = self.video_edit_ai_tab
+        self.tabs.setCurrentWidget(t)
+        t.select_mode("motion_track")
+        img = self.frame1_tab.image_path or ""
+        if img and os.path.isfile(img):
+            t.set_track_image(img)
+            self._log("[Movimento da tracce] immagine di partenza dal canvas: disegna le tracce e genera.")
+        else:
+            self._log("[Movimento da tracce] nessuna immagine nel canvas del Frame 1: scegli un'immagine di partenza.")
 
     def _open_v2v_from_vedit(self, mode: str, video: str, audio: str):
         """Dal «Doppiaggio da testo» di Modifica Video AI a Talk (video + audio) o Canta (foto + canzone) del pannello

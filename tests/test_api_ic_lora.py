@@ -239,3 +239,103 @@ def test_hdr_gate_off_403(video, monkeypatch):
     monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_hdr_ic")
     r = client.post("/video/ic_lora", json={"kind": "hdr", "video_path": video})
     assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_hdr_ic"
+
+
+# ── motion_track ────────────────────────────────────────────────────────────────────────────────────
+_CTRL = [[{"x": 100, "y": 100}, {"x": 300, "y": 180}, {"x": 520, "y": 120}], [{"x": 320, "y": 300}]]
+
+
+@pytest.fixture()
+def image(tmp_path):
+    from PIL import Image
+    p = tmp_path / "start.png"
+    Image.new("RGB", (640, 360), (90, 120, 160)).save(p)
+    return str(p)
+
+
+def test_motion_track_is_a_valid_kind(video):
+    r = client.post("/video/ic_lora", json={"kind": "nope", "video_path": video})
+    assert "motion_track" in r.json()["detail"]["valid"]
+
+
+def test_motion_track_validation(image, no_run):
+    base = {"kind": "motion_track", "image_path": image, "tracks": _CTRL}
+    ok = client.post("/video/ic_lora", json=base)                              # nessun video_path richiesto
+    assert ok.status_code == 200, ok.text
+    for body, err in (({**base, "image_path": None}, "image_required"),
+                      ({**base, "image_path": "Z:/nope.png"}, "image_required"),
+                      ({**base, "tracks": None}, "tracks_required"),
+                      ({**base, "tracks": []}, "tracks_required"),
+                      ({**base, "tracks": "[]"}, "invalid_tracks"),
+                      ({**base, "tracks": "non json"}, "invalid_tracks"),
+                      ({**base, "tracks_format": "boh"}, "invalid_tracks_format"),
+                      ({**base, "tracks": None, "tracks_video_path": "Z:/nope.mp4"}, "tracks_video_not_found"),
+                      ({**base, "fps": 2}, "invalid_fps"),
+                      ({**base, "seconds": 12}, "too_long"),
+                      ({**base, "num_frames": 400}, "too_long")):
+        r = client.post("/video/ic_lora", json=body)
+        assert r.status_code == 422 and r.json()["detail"]["error"] == err, (err, r.status_code, r.text)
+    r = client.post("/video/ic_lora", json={**base, "seconds": 10, "fps": 24})
+    assert r.status_code == 200, r.text                                         # 10 s a 24 fps = 241 frame, dentro il tetto
+
+
+def test_motion_track_gate_and_weight(image, monkeypatch):
+    from api import gate
+    from core import video_edit_ic as vic
+    monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_camera_ic")
+    r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL})
+    assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_camera_ic"
+    monkeypatch.setattr(gate, "is_on", lambda fid: True)
+    monkeypatch.setattr(vic, "missing_weight", lambda spec: "Peso mancante X")
+    r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL})
+    assert r.status_code == 409 and r.json()["detail"]["error"] == "weight_missing"
+
+
+def test_motion_track_cfg_passthrough(image, no_run, monkeypatch):
+    from core import video_edit_ic as vic
+    seen = {}
+
+    def fake_build(cfg, out_dir, stamp, output, log=None):
+        seen.update(cfg)
+        raise RuntimeError("stop")
+    monkeypatch.setattr(vic, "build_job", fake_build)
+    r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL, "prompt": "p",
+                                            "seed": 9, "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"})
+    assert r.status_code == 200 and r.json()["warnings"] == []                  # distilled: nessun avviso
+    with pytest.raises(RuntimeError, match="stop"):
+        no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert seen["mode"] == "motion_track" and seen["track_image"] == image and seen["tracks"] == _CTRL
+    assert seen["fps"] == 24 and seen["image_strength"] == 1.0 and seen["seed"] == 9 and seen["prompt"] == "p"
+    assert "width" not in seen and "height" not in seen, "senza valori espliciti: dall'aspetto dell'immagine"
+    assert seen["model"].endswith("distilled-1.1_fp8.safetensors") and seen["keep_audio"] is False
+    # valori espliciti passano invariati
+    seen.clear()
+    r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL, "width": 768,
+                                            "height": 448, "image_strength": 0.8, "num_frames": 49, "fps": 25,
+                                            "tracks_size": [768, 448]})
+    assert r.status_code == 200
+    with pytest.raises(RuntimeError, match="stop"):
+        no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert (seen["width"], seen["height"], seen["image_strength"], seen["num_frames"], seen["fps"], seen["tracks_size"]) == \
+           (768, 448, 0.8, 49, 25, [768, 448])
+
+
+def test_motion_track_job_runs_through_build_and_returns_video_plus_tracks(image, no_run, monkeypatch, tmp_path):
+    """Parita' con la GUI: stessa build_job; il worker e' finto (nessuna GPU). Output scaricabili: video + video delle tracce."""
+    import os
+    from api.handlers import video as h
+    seen = {}
+
+    def fake_run(p, job):
+        seen.update(p)
+        open(p["output"], "wb").write(b"x")
+        return [p["output"]]
+    monkeypatch.setattr(h, "run_ltx2", fake_run)
+    monkeypatch.setattr(h, "out_path", lambda name, ext="mp4": str(tmp_path / f"{name}.{ext}"))
+    r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL, "seconds": 2,
+                                            "width": 512, "height": 320})
+    assert r.status_code == 200, r.text
+    outs = no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert len(outs) == 2 and outs[0].endswith("video_ic_motion_track.mp4") and outs[1].endswith("_tracks.mp4")
+    assert all(os.path.isfile(o) for o in outs)
+    assert seen["control_type"] == "motion-track" and seen["num_frames"] == 49 and (seen["width"], seen["height"]) == (512, 320)
