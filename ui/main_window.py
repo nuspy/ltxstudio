@@ -1058,6 +1058,9 @@ class MainWindow(QMainWindow):
         self.video_tab.model.currentIndexChanged.connect(self.video_edit_ai_tab.refresh_checkpoint_hint)
         self.video_edit_ai_tab.request_open_video_tab.connect(lambda: self.tabs.setCurrentWidget(self.video_tab))
         self.video_edit_ai_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
+        # Doppiaggio da testo: «ho un mio audio» → Talk/Canta del tab Video (esistenti, non toccate); «ultimo audio»
+        self.video_edit_ai_tab.request_open_v2v.connect(self._open_v2v_from_vedit)
+        self.video_edit_ai_tab.set_last_audio_getter(lambda: self.avatar_tab._last_audio())
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
@@ -3738,6 +3741,33 @@ class MainWindow(QMainWindow):
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
                       self._on_video_edit_ai_done, on_progress=self.video_edit_ai_tab.log.appendPlainText)
+
+    def _open_v2v_from_vedit(self, mode: str, video: str, audio: str):
+        """Dal «Doppiaggio da testo» di Modifica Video AI a Talk (video + audio) o Canta (foto + canzone) del pannello
+        V2V del tab Video, con la modalita' selezionata e video/audio gia' compilati quando noti. Le due modalita' e il
+        loro codice restano intatti: qui si impostano solo i loro controlli esistenti."""
+        panel = self.video_tab.v2v_panel
+        self.tabs.setCurrentWidget(self.video_tab)
+        name = Path(audio).name if audio else ""
+        if mode == "sing":
+            panel.rb_sing.setChecked(True)
+            if audio and os.path.isfile(audio):
+                panel._sing_audio_path = audio
+                panel.lbl_sing_audio.setText(f"🎵 {name}")
+                panel.lbl_sing_audio.setStyleSheet("")
+            self._log("[Doppiaggio] aperto «Canta» nel tab Video: serve la foto del Frame 1 e la canzone."
+                      + (f" Audio impostato: {name}." if name else ""))
+            return
+        panel.rb_talk.setChecked(True)
+        if video and os.path.isfile(video):
+            panel._set_video(video)
+        if audio and os.path.isfile(audio):                  # Talk prende l'audio dal tab Audio («Audio fornito da me»)
+            self.audio_tab._audio_file = audio
+            self.audio_tab.file_lbl.setText(name)
+            self.audio_tab.rb_user.setChecked(True)
+            self.audio_tab._on_mode()
+        self._log("[Doppiaggio] aperto «Talk» nel tab Video."
+                  + (f" Video e audio ({name}) già impostati." if audio else " Scegli l'audio nel tab Audio."))
 
     def _on_video_edit_ai_done(self, res: dict):
         if res.get("status") == "success":

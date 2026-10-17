@@ -147,3 +147,46 @@ def test_lipdub_gate_off_403(video, monkeypatch):
     monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_lipdub")
     r = client.post("/video/ic_lora", json={"kind": "lipdub", "video_path": video, "line": "x"})
     assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_lipdub"
+
+
+def test_lipdub_translate_and_language_warning(video, no_run, monkeypatch):
+    from core import video_ic_prep as prep
+    monkeypatch.setattr(prep, "has_audio", lambda p: True)
+    base = {"kind": "lipdub", "video_path": video, "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"}
+    r = client.post("/video/ic_lora", json={**base, "translate_to": "klingon"})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "invalid_translate_to" and "it" in r.json()["detail"]["valid"]
+    r = client.post("/video/ic_lora", json={**base, "translate_to": "en"})            # senza line: ok, traduce nel job
+    assert r.status_code == 200 and r.json()["warnings"] == [], r.text
+    r = client.post("/video/ic_lora", json={**base, "line": "x", "language": "ar"})   # lingua senza prove: avviso, non blocco
+    assert r.status_code == 200 and any("senza prove" in w for w in r.json()["warnings"])
+    from core import video_edit_ic as vic
+    from core import video_dub_translate as vdt
+    seen = {}
+    monkeypatch.setattr(vdt, "fill_cfg", lambda cfg, log=None: seen.update(called=dict(cfg)) or {})
+    monkeypatch.setattr(vic, "build_job", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop")))
+    client.post("/video/ic_lora", json={**base, "translate_to": "en", "source_text": "Ciao"})
+    with pytest.raises(RuntimeError, match="stop"):
+        no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert seen["called"]["translate_to"] == "en" and seen["called"]["source_text"] == "Ciao"
+
+
+def test_lipdub_audio_api(video, no_run, monkeypatch, tmp_path):
+    from core import video_ic_prep as prep
+    aud = tmp_path / "a.wav"
+    aud.write_bytes(b"RIFF")
+    base = {"kind": "lipdub_audio", "video_path": video, "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"}
+    monkeypatch.setattr(prep, "has_audio", lambda p: True)
+    assert client.post("/video/ic_lora", json=base).json()["detail"]["error"] == "audio_not_found"
+    r = client.post("/video/ic_lora", json={**base, "audio_path": str(aud), "audio_reference": "mix"})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "invalid_audio_reference"
+    monkeypatch.setattr(prep, "has_audio", lambda p: p != str(aud))
+    r = client.post("/video/ic_lora", json={**base, "audio_path": str(aud)})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "audio_no_stream"
+    monkeypatch.setattr(prep, "has_audio", lambda p: p == str(aud))                   # video muto
+    r = client.post("/video/ic_lora", json={**base, "audio_path": str(aud), "audio_reference": "original"})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "video_no_audio"
+    r = client.post("/video/ic_lora", json={**base, "audio_path": str(aud)})
+    assert r.status_code == 200 and any("SPERIMENTALE" in w for w in r.json()["warnings"]), r.text
+    from api import gate
+    monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_lipdub")
+    assert client.post("/video/ic_lora", json={**base, "audio_path": str(aud)}).status_code == 403

@@ -210,3 +210,157 @@ def test_lipdub_rejects(tmp_path):
     longv = _gen(tmp_path / "l.mp4", 300, audio=True)                # 300 frame > 249: non si spezza
     with pytest.raises(vic.IcJobError, match="tetto"):
         vic.build_job({"mode": "lipdub", "video": longv, "lipdub_line": "x"}, str(tmp_path), 3, str(tmp_path / "o.mp4"))
+
+
+# ── lip dub: lingue, variante da audio (B), traduzione (C) ───────────────────────────────────────
+def test_spoken_languages_table():
+    codes = [c for c, _n, _e in vic.LIPDUB_SPOKEN_LANGS]
+    assert {"en", "es", "fr", "de", "ru", "zh", "it", "pt", "ja", "ko"} == set(codes) and tuple(codes) == vic.SPOKEN_CODES
+    assert all(e for _c, _n, e in vic.LIPDUB_SPOKEN_LANGS), "ogni lingua ha la sua prova"
+    assert vic.LIPDUB_LANGUAGES[0] == ("", "") and len(vic.LIPDUB_LANGUAGES) == len(codes) + 1
+
+
+def test_compose_lipdub_audio_prompt():
+    assert vic.compose_lipdub_audio_prompt() == "A person, speaking"
+    assert vic.compose_lipdub_audio_prompt(scene="a singer on stage,") == "a singer on stage, speaking"
+    assert vic.compose_lipdub_audio_prompt("la la", "it", "x") == 'x, speaking in Italian saying: "la la"'
+
+
+def _gen_audio(out, seconds):
+    subprocess.run([P.ffmpeg_path(), "-v", "error", "-y", "-f", "lavfi", "-i",
+                    f"sine=frequency=300:sample_rate=22050:duration={seconds}", str(out)], check=True, capture_output=True)
+    return str(out)
+
+
+def test_lipdub_audio_job_equal_and_policies(tmp_path):
+    src = _gen(tmp_path / "v.mp4", 49, audio=True)                   # 1.96 s
+    out = str(tmp_path / "o.mp4")
+    a = _gen_audio(tmp_path / "a.wav", 2.0)
+    ij = vic.build_job({"mode": "lipdub_audio", "video": src, "lipdub_audio": a, "lipdub_scene": "a singer"},
+                       str(tmp_path), 1, out)
+    p = ij.params
+    assert p["control_type"] == "lipdub" and p["control_video"] == src and p["_strict_ic"] is True
+    assert p["lipdub_audio"].endswith("ext_audio.wav") and p["lipdub_audio_ref"] == "external"
+    assert p["prompt"] == "a singer, speaking" and p["num_frames"] == 49 and ij.mux_audio_from == ""
+    assert abs(P.audio_duration(p["lipdub_audio"]) - 49 / 25.0) < 0.08, "audio preparato alla durata del video"
+    assert any("SPERIMENTALE" in n for n in ij.notes)
+    # audio PIU' CORTO del video (1 s su ~4 s): l'audio comanda, il video e' tagliato (8k+1) e la guida e' il taglio
+    src2 = _gen(tmp_path / "v2.mp4", 97, audio=True)                 # 3.88 s
+    a2 = _gen_audio(tmp_path / "a2.wav", 1.0)
+    ij2 = vic.build_job({"mode": "lipdub_audio", "video": src2, "lipdub_audio": a2}, str(tmp_path), 2, out)
+    assert ij2.params["num_frames"] == 25 and ij2.params["control_video"].endswith("guide_cut.mp4")
+    assert P.probe(ij2.params["control_video"], count_frames=True).nb_frames == 25
+    assert any("tagliato" in n for n in ij2.notes)
+    # audio PIU' LUNGO (6 s su ~2 s): audio tagliato alla durata del video, il video non cambia
+    a3 = _gen_audio(tmp_path / "a3.wav", 6.0)
+    ij3 = vic.build_job({"mode": "lipdub_audio", "video": src, "lipdub_audio": a3, "lipdub_audio_ref": "original"},
+                        str(tmp_path), 3, out)
+    assert ij3.params["control_video"] == src and ij3.params["lipdub_audio_ref"] == "original"
+    assert abs(P.audio_duration(ij3.params["lipdub_audio"]) - 49 / 25.0) < 0.08 and any("tagliato" in n for n in ij3.notes)
+
+
+def test_lipdub_audio_rejects(tmp_path):
+    src = _gen(tmp_path / "v.mp4", 49, audio=False)
+    out = str(tmp_path / "o.mp4")
+    with pytest.raises(vic.IcJobError, match="audio mancante"):
+        vic.build_job({"mode": "lipdub_audio", "video": src}, str(tmp_path), 1, out)
+    a = _gen_audio(tmp_path / "a.wav", 2.0)
+    ij = vic.build_job({"mode": "lipdub_audio", "video": src, "lipdub_audio": a}, str(tmp_path), 2, out)   # video muto: ok (ref external)
+    assert ij.params["lipdub_audio_ref"] == "external"
+    with pytest.raises(vic.IcJobError, match="originale"):
+        vic.build_job({"mode": "lipdub_audio", "video": src, "lipdub_audio": a, "lipdub_audio_ref": "original"},
+                      str(tmp_path), 3, out)
+    with pytest.raises(vic.IcJobError, match="traccia audio"):
+        vic.build_job({"mode": "lipdub_audio", "video": src, "lipdub_audio": src}, str(tmp_path), 4, out)   # un video muto non e' audio
+
+
+# C: traduzione automatica (mock di STT e LLM: nessuna GPU)
+class _FakeLLM:
+    def __init__(self, answers, up=True, provider="lmstudio"):
+        self.answers, self.up, self.provider, self.calls, self.unloaded = list(answers), up, provider, [], 0
+
+    def available(self):
+        return self.up
+
+    def get_config(self):
+        return {"provider": self.provider, "lmstudio_port": 1234}
+
+    def ensure_lmstudio(self):
+        return False
+
+    def complete_json(self, system, user, **kw):
+        self.calls.append(user)
+        return self.answers.pop(0)
+
+    def unload(self):
+        self.unloaded += 1
+
+
+def _patch_llm(monkeypatch, fake):
+    import core.llm_service as real
+    for n in ("available", "get_config", "ensure_lmstudio", "complete_json", "unload"):
+        monkeypatch.setattr(real, n, getattr(fake, n))
+
+
+def test_translate_fit_retry_and_unload(monkeypatch):
+    from core import video_dub_translate as vdt
+    long_t = " ".join(["parola"] * 30)
+    fake = _FakeLLM([{"source_language": "it", "translation": long_t},
+                     {"source_language": "it", "translation": "Tonight our guest is a very special toaster"}])
+    _patch_llm(monkeypatch, fake)
+    r = vdt.translate("Stasera ospite d'eccezione: un tostapane!", "en", 4.0)
+    assert len(fake.calls) == 2 and "HARD LIMIT" in fake.calls[1] and "English" in fake.calls[0]
+    assert r["text"].startswith("Tonight") and r["source_language"] == "it" and r["warning"] == "" and fake.unloaded == 1
+    # ancora troppo lungo dopo il secondo giro: avviso
+    fake2 = _FakeLLM([{"translation": long_t}, {"translation": long_t}])
+    _patch_llm(monkeypatch, fake2)
+    assert vdt.translate("ciao a tutti", "es", 4.0)["warning"] == "long"
+
+
+def test_translate_errors(monkeypatch):
+    from core import video_dub_translate as vdt
+    _patch_llm(monkeypatch, _FakeLLM([], up=False))
+    with pytest.raises(vdt.DubTranslateError) as e:
+        vdt.translate("ciao", "en", 3.0)
+    assert e.value.key == "vedit.dub.err_llm" and "LM Studio" in str(e.value)
+    _patch_llm(monkeypatch, _FakeLLM([{"translation": "  "}]))
+    with pytest.raises(vdt.DubTranslateError) as e:
+        vdt.translate("ciao", "en", 3.0)
+    assert e.value.key == "vedit.dub.err_translate"
+    with pytest.raises(vdt.DubTranslateError) as e:
+        vdt.translate("ciao", "xx", 3.0)                              # lingua non tra quelle parlabili
+    assert e.value.key == "vedit.dub.err_no_target"
+
+
+def test_extract_speech_backends(monkeypatch, tmp_path):
+    from core import video_dub_translate as vdt
+    from core import handy_api
+    src = _gen(tmp_path / "a.mp4", 25, audio=True)
+    monkeypatch.setattr(handy_api, "available", lambda: True)
+    monkeypatch.setattr(handy_api, "transcribe", lambda p, **k: "Stasera ospite d'eccezione")
+    r = vdt.extract_speech(src)
+    assert r["text"].startswith("Stasera") and r["backend"] in ("handy", "faster-whisper")
+    if r["backend"] == "handy":
+        monkeypatch.setattr(handy_api, "transcribe", lambda p, **k: "")
+        with pytest.raises(vdt.DubTranslateError) as e:
+            vdt.extract_speech(src)
+        assert e.value.key == "vedit.dub.err_no_speech"
+        monkeypatch.setattr(handy_api, "available", lambda: False)
+        monkeypatch.setattr(handy_api, "ensure", lambda *a, **k: False)
+        with pytest.raises(vdt.DubTranslateError) as e2:
+            vdt.extract_speech(src)
+        assert e2.value.key == "vedit.dub.err_stt" and "Handy-API" in str(e2.value)
+
+
+def test_run_and_fill_cfg(monkeypatch, tmp_path):
+    from core import video_dub_translate as vdt
+    src = _gen(tmp_path / "a.mp4", 49, audio=True)
+    _patch_llm(monkeypatch, _FakeLLM([{"source_language": "it", "translation": "Hello everyone"}]))
+    r = vdt.run(src, "en", source_text="Ciao a tutti")                 # testo dato: niente STT
+    assert r["text"] == "Hello everyone" and r["original_text"] == "Ciao a tutti"
+    assert r["original_language"] == "it" and r["backend"] == "testo dato"
+    _patch_llm(monkeypatch, _FakeLLM([{"source_language": "it", "translation": "Hello everyone"}]))
+    cfg = {"video": src, "translate_to": "en", "source_text": "Ciao a tutti", "lipdub_line": "", "prompt": ""}
+    assert vdt.fill_cfg(cfg)["text"] == "Hello everyone" and cfg["lipdub_line"] == "Hello everyone" and cfg["lipdub_lang"] == "en"
+    cfg2 = {"video": src, "translate_to": "en", "lipdub_line": "gia' scritta"}
+    assert vdt.fill_cfg(cfg2) == {} and cfg2["lipdub_line"] == "gia' scritta"          # battuta presente: niente traduzione

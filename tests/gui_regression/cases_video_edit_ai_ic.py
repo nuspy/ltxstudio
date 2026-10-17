@@ -103,12 +103,12 @@ def case_families_and_modes(w, spy):
     assert fams == ["edit", "style", "repair", "outpaint", "lipdub", "camera"], fams
     expect = {"edit": ["edit", "inpaint", "replace_char"], "style": ["anime2real", "real2anime", "restyle"],
               "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer"],
-              "outpaint": ["outpaint"], "lipdub": ["lipdub"], "camera": ["cameraman"]}
+              "outpaint": ["outpaint"], "lipdub": ["lipdub", "lipdub_audio"], "camera": ["cameraman"]}
     for fam, modes in expect.items():
         t.family.setCurrentIndex(t.family.findData(fam))
         got = [t.mode.itemData(i) for i in range(t.mode.count())]
         assert got == modes, f"{fam}: {got} != {modes}"
-    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub"):
+    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub", "lipdub_audio"):
         t.select_mode(k)                                 # da qualunque famiglia
         assert t.mode.currentData() == k and t.family.currentData() == vem.family_of(k)
     for k in ("hdr",):                                   # fase 1c: non selezionabile
@@ -586,7 +586,13 @@ def case_lipdub_fields(w, spy):
     assert not t.strength.isHidden() and not t.vedit_enhance.isHidden() and not t.attn.isHidden()
     assert t.prompt.placeholderText() != ph_lip, "il segnaposto del prompt torna quello normale"
     codes = [t.lip_lang.itemData(i) for i in range(t.lip_lang.count())]
-    assert codes[0] == "" and {"it", "en", "es", "zh"} <= set(codes), codes
+    from core import video_edit_ic as vic
+    assert codes == [""] + list(vic.SPOKEN_CODES), codes            # SOLO le lingue con prove di supporto
+    assert not t.lip_lang.isEditable()
+    _select_mode(w, "lipdub")
+    assert not t.lip_translate.isHidden() and not t.lip_src_text.isHidden() and not t.lip_open_talk.parentWidget().isHidden()
+    assert t.lip_audio.parentWidget().isHidden() and t.lip_exp.isHidden() and t.lip_audio_ref.isHidden()
+    assert "Doppiaggio" in t.mode.currentText() or t.mode.currentText(), t.mode.currentText()
 
 
 def case_lipdub_cfg(w, spy):
@@ -607,10 +613,6 @@ def case_lipdub_cfg(w, spy):
     assert cfg["enhance"] is False and cfg["keep_audio"] is False
     assert cfg["model"] == _DIST["model"] and cfg["ckpt_state"] == "distilled"
     assert cfg["prompt"] == "" and (cfg.get("edit_lora") or "") == ""
-    # lingua scritta a mano: passa invariata
-    t.lip_lang.setEditText("Klingon")
-    t._go()
-    assert _cfg_of(w)["lipdub_lang"] == "Klingon"
     # prompt libero: viene inoltrato e il core lo usera' al posto della composizione
     t.prompt.setPlainText("custom full prompt")
     t._go()
@@ -698,6 +700,164 @@ def case_lipdub_gate(w, spy):
     assert seen == ["cap.video_lipdub"] and not spy.calls, (seen, len(spy.calls))
 
 
+def case_lipdub_audio_fields(w, spy):
+    """Doppiaggio da audio (sperimentale): riga audio, riferimento voce e banner visibili; niente traduzione/Talk-Canta."""
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    _select_mode(w, "lipdub_audio")
+    assert not t.lip_audio.parentWidget().isHidden() and not t.lip_audio_ref.isHidden() and not t.lip_exp.isHidden()
+    assert t.lip_translate.isHidden() and t.lip_src_text.isHidden() and t.lip_open_talk.parentWidget().isHidden()
+    assert "SPERIMENTAL" in t.lip_exp.text().upper() or "EXPERIMENTAL" in t.lip_exp.text().upper(), t.lip_exp.text()
+    assert not t.lip_scene.isHidden() and not t.lip_line.isHidden() and t.strength.isHidden() and t.keep_audio.isHidden()
+    assert "sperimental" in t.mode.currentText().lower() or "experimental" in t.mode.currentText().lower(), t.mode.currentText()
+    _select_mode(w, "lipdub")
+    assert t.lip_audio.parentWidget().isHidden() and t.lip_exp.isHidden() and not t.lip_translate.isHidden()
+
+
+def _lipdub_wav(name: str, seconds: float) -> str:
+    import subprocess
+    from core import video_ic_prep as prep
+    path = str(H.OUT_DIR / name)
+    subprocess.run([prep.ffmpeg_path(), "-v", "error", "-y", "-f", "lavfi", "-i",
+                    f"sine=frequency=300:sample_rate=22050:duration={seconds}", path], check=True, capture_output=True)
+    return path
+
+
+def case_lipdub_audio_cfg_validation(w, spy):
+    """Da audio: serve il file; durate (audio piu' corto/lungo) avvisano; cfg con audio e riferimento voce; ultimo audio."""
+    _ack_dev(False)
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))        # 2 s
+    _select_mode(w, "lipdub_audio")
+    _getter(w, _DIST)
+    t._go()
+    assert not spy.calls and t.log.toPlainText().strip(), "senza audio: blocco con messaggio"
+    t.log.clear()
+    t.lip_audio.setText(_lipdub_wav("_vedit_lipdub_short.wav", 0.8))
+    assert "⚠" in t.lip_info.text(), t.lip_info.text()
+    t.lip_audio.setText(_lipdub_wav("_vedit_lipdub_long.wav", 5.0))
+    assert "⚠" in t.lip_info.text(), t.lip_info.text()
+    ok = _lipdub_wav("_vedit_lipdub_ok.wav", 2.0)
+    t.lip_audio.setText(ok)
+    assert "⚠" not in t.lip_info.text() and "2.0" in t.lip_info.text(), t.lip_info.text()
+    t.lip_audio_ref.setCurrentIndex(t.lip_audio_ref.findData("original"))
+    t.lip_scene.setText("a singer")
+    t._go()
+    assert spy.calls, t.log.toPlainText()
+    cfg = _cfg_of(w)
+    assert cfg["mode"] == "lipdub_audio" and cfg["lipdub_audio"] == ok and cfg["lipdub_audio_ref"] == "original", cfg
+    assert cfg["lipdub_scene"] == "a singer" and cfg["enhance"] is False and cfg["keep_audio"] is False
+    assert cfg["model"] == _DIST["model"] and cfg["ckpt_state"] == "distilled"
+    # «ultimo audio generato» dal getter di main_window
+    t.lip_audio.setText("")
+    t.set_last_audio_getter(lambda: ok)
+    t._use_last_audio()
+    assert t.lip_audio.text() == ok
+    t.set_last_audio_getter(lambda: "")
+    t.lip_audio.setText("")
+    t._use_last_audio()
+    assert t.lip_audio.text() == "" and t.log.toPlainText().strip()
+    # video muto + riferimento «originale»: blocco (con «audio scelto» e' ammesso)
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_mute.mp4", audio=False))
+    _select_mode(w, "lipdub_audio")
+    t.lip_audio.setText(ok)
+    t.lip_audio_ref.setCurrentIndex(t.lip_audio_ref.findData("external"))
+    n = len(spy.calls)
+    t._go()
+    assert len(spy.calls) == n + 1, "video muto + riferimento «audio scelto»: ammesso"
+    t.lip_audio_ref.setCurrentIndex(t.lip_audio_ref.findData("original"))
+    t._go()
+    assert len(spy.calls) == n + 1, "video muto + riferimento «originale»: blocco"
+
+
+def case_lipdub_open_talk_sing(w, spy):
+    """«Hai un tuo audio?»: i bottoni emettono (modalita', video, audio); l'handler di main_window apre Talk/Canta nel tab
+    Video con video/audio impostati. Talk/Canta non sono modificate: si usano i loro controlli esistenti."""
+    from ui.tabs.video_edit_ai_tab import VideoEditAITab  # noqa: F401
+    vid = _lipdub_video("_vedit_lipdub_a.mp4")
+    wav = _lipdub_wav("_vedit_lipdub_ok.wav", 2.0)
+    t = _lipdub_tab(w, vid)
+    got = []
+    t.request_open_v2v.connect(lambda m, v, a: got.append((m, v, a)))
+    t.set_last_audio_getter(lambda: wav)
+    t.lip_open_talk.click()
+    t.lip_open_sing.click()
+    assert got == [("talk", vid, wav), ("sing", vid, wav)], got
+    # handler reale di main_window (collegato dal costruttore)
+    panel = w.video_tab.v2v_panel
+    w.tabs.setCurrentWidget(t)
+    w._open_v2v_from_vedit("talk", vid, wav)
+    assert w.tabs.currentWidget() is w.video_tab and panel.current_mode() == "talk"
+    assert panel._video_path == vid and w.audio_tab._audio_file == wav and w.audio_tab.rb_user.isChecked()
+    w.tabs.setCurrentWidget(t)
+    w._open_v2v_from_vedit("sing", vid, wav)
+    assert w.tabs.currentWidget() is w.video_tab and panel.current_mode() == "sing" and panel._sing_audio_path == wav
+    panel.rb_normal.setChecked(True)
+    w._open_v2v_from_vedit("talk", "", "")                              # senza video/audio: apre solo la modalita'
+    assert panel.current_mode() == "talk"
+    panel.rb_normal.setChecked(True)
+
+
+def case_lipdub_translate_flow(w, spy):
+    """Estrai e traduci (STT+LLM MOCK): riempie battuta/testo originale/lingua rilevata; riuso del testo originale; errori
+    chiari senza toccare la battuta; senza lingua o video blocca."""
+    from core import video_dub_translate as vdt
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    calls = []
+    real = vdt.run
+
+    def fake_run(video, target, *, source_text="", video_seconds=0.0, log=None):
+        calls.append((target, source_text, round(video_seconds, 1)))
+        return {"text": "Hello everybody, welcome!", "original_text": "Ciao a tutti, benvenuti!", "original_language": "it",
+                "source_language": "it", "backend": "mock", "fit": "ok", "est_s": 1.6, "warning": ""}
+    vdt.run = fake_run
+    try:
+        t.lip_lang.setCurrentIndex(0)
+        t._translate_start(sync=True)
+        assert not calls and t.log.toPlainText().strip(), "senza lingua di destinazione: blocco"
+        t.log.clear()
+        t.lip_lang.setCurrentIndex(t.lip_lang.findData("en"))
+        t.lip_line.setPlainText("vecchio testo")
+        t._translate_start(sync=True)
+        assert calls == [("en", "", 2.0)], calls
+        assert t.lip_line.toPlainText() == "Hello everybody, welcome!" and t.lip_src_text.toPlainText().startswith("Ciao")
+        assert "Italian" in t.lip_src_lang.text() and t.lip_translate.isEnabled()
+        # secondo giro, altra lingua: riusa il testo originale (niente nuovo STT) anche se corretto a mano
+        t.lip_src_text.setPlainText("Ciao a tutti!")
+        t.lip_lang.setCurrentIndex(t.lip_lang.findData("es"))
+        t._translate_start(sync=True)
+        assert calls[-1] == ("es", "Ciao a tutti!", 2.0), calls
+        # il testo e' modificabile e finisce nella cfg
+        _ack_dev(False)
+        _getter(w, _DIST)
+        t.lip_line.setPlainText("Hola a todos")
+        t._go()
+        assert _cfg_of(w)["lipdub_line"] == "Hola a todos" and _cfg_of(w)["lipdub_lang"] == "es"
+        # video cambiato: l'STT riparte (testo originale non riusato)
+        t.set_video(_lipdub_video("_vedit_lipdub_b.mp4"))
+        t._translate_start(sync=True)
+        assert calls[-1][1] == "", calls
+        # errore chiaro: la battuta resta com'e'
+        def boom(*a, **k):
+            raise vdt.DubTranslateError("vedit.dub.err_llm", "LLM locale non attivo")
+        vdt.run = boom
+        t.lip_line.setPlainText("resta cosi'")
+        t.log.clear()
+        t._translate_start(sync=True)
+        assert t.lip_line.toPlainText() == "resta cosi'" and "⚠" in t.log.toPlainText() and t.lip_translate.isEnabled()
+        # percorso con THREAD vero (stesso mock)
+        vdt.run = fake_run
+        t._translate_clicked()
+        import time
+        end = time.time() + 10
+        while t.lip_line.toPlainText() != "Hello everybody, welcome!" and time.time() < end:
+            H.app().processEvents(); time.sleep(0.05)
+        assert t.lip_line.toPlainText() == "Hello everybody, welcome!", "il thread non ha consegnato il risultato"
+    finally:
+        vdt.run = real
+    t2 = _tab(w)
+    t2._video = ""
+    t2._translate_start(sync=True)                                      # senza video: blocco
+
+
 CASES = (
     [("vedit_family_modes", "Due livelli famiglia/modalità: contenuti, select_mode, lipdub/hdr assenti.",
       case_families_and_modes),
@@ -747,7 +907,15 @@ CASES = (
       case_lipdub_info_fit),
      ("vedit_lipdub_weight_missing_dialog", "Lip dub: LoRA assente → avviso + «Apri tab Pesi» (segnale), nessun accodamento.",
       case_lipdub_weight_missing_dialog),
-     ("vedit_lipdub_gate", "Lip dub: cap.video_lipdub spenta blocca l'accodamento.", case_lipdub_gate)]
+     ("vedit_lipdub_gate", "Lip dub: cap.video_lipdub spenta blocca l'accodamento.", case_lipdub_gate),
+     ("vedit_lipdub_audio_fields", "Doppiaggio da audio (sperimentale): campi, banner, alternanza con da-testo.",
+      case_lipdub_audio_fields),
+     ("vedit_lipdub_audio_cfg_validation", "Da audio: file obbligatorio, avvisi durata, cfg, ultimo audio, video muto.",
+      case_lipdub_audio_cfg_validation),
+     ("vedit_lipdub_open_talk_sing", "Rimando a Talk/Canta: segnale e handler main_window (modalita', video, audio).",
+      case_lipdub_open_talk_sing),
+     ("vedit_lipdub_translate_flow", "Estrai e traduci (mock): riempie battuta, riuso testo, errori chiari, thread.",
+      case_lipdub_translate_flow)]
     + [(f"vedit_newmode_{k}", f"Modalità IC-LoRA {k}: cfg emessa (kind a registro, model come scelto, campi).",
         _make_new_mode_case(k)) for k in _NEW_MODES]
 )

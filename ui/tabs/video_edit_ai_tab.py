@@ -20,13 +20,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from ui import theme  # noqa: E402
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox,
                                QVBoxLayout, QWidget)
 
+from core import video_dub_translate as vdt
 from core import video_edit_ic as vic
 from core import video_edit_modes as vem
 from core import video_ic_prep as prep_mod
@@ -44,9 +45,10 @@ _MODE_DEFAULT = {
     "uncompress": "Togli artefatti di compressione", "deinterlace": "Deinterlaccia",
     "motiondeblur": "Riduci il mosso (motion blur)", "detailer": "Aggiungi dettaglio (detailer)",
     "outpaint": "Outpaint video", "cameraman": "Cameraman (movimento di camera da riferimento)",
+    "lipdub": "Doppiaggio da testo", "lipdub_audio": "Doppiaggio da audio (sperimentale)",
 }
 _FAMILY_DEFAULT = {"edit": "Modifica", "style": "Stile", "repair": "Ripara video", "outpaint": "Outpaint video",
-                   "lipdub": "Lip dub", "camera": "Camera / Movimento"}
+                   "lipdub": "Doppiaggio labiale", "camera": "Camera / Movimento"}
 _NOTE_DEFAULT = {
     "vedit.note_edit": "Modifica globale del video da istruzione testuale.",
     "vedit.note_style": "Trasferimento di stile sull'intero video.",
@@ -64,17 +66,39 @@ _NOTE_DEFAULT = {
                          "NUOVA battuta e il modello genera voce e labbra nuove, per la stessa durata del video. Un solo "
                          "parlante; scrivi nell'alfabeto della lingua parlata (non traduce). Battuta di lunghezza simile "
                          "all'originale: troppo lunga = parole saltate, troppo corta = voce lenta. Non si fornisce un file "
-                         "audio: per sincronizzare un audio già esistente usa «Talk» nel pannello V2V del tab Video.",
+                         "audio qui: per usare un tuo audio (canzone, TTS, file) usa i bottoni Talk/Canta sotto, oppure la variante "
+                         "sperimentale «Doppiaggio da audio».",
+    "vedit.note_lipdub_audio": "SPERIMENTALE (non è nella ricetta ufficiale): il TUO audio viene tenuto fisso e si rigenera "
+                               "solo il video, con la LoRA del doppiaggio. Qualità non garantita; per canzoni e voci la via "
+                               "collaudata è Talk/Canta del tab Video. L'audio comanda la durata: se è più corto il video "
+                               "viene tagliato, se è più lungo l'audio viene tagliato.",
     "vedit.note_cameraman": "Il movimento di camera viene copiato dal video di riferimento. Se il risultato "
                             "ricalca troppo il riferimento, abbassa la forza dell'immagine o cambia seme.",
 }
 _RESTORE_PROMPT_DEFAULT = "Sharp, clean, high-quality footage, natural colors."
 
 
+class _FnThread(QThread):
+    """Esegue `fn()` fuori dal thread UI (STT/LLM locali: lenti e su GPU)."""
+    finished_ok = Signal(object)
+    failed = Signal(object)
+
+    def __init__(self, fn):
+        super().__init__()
+        self._fn = fn
+
+    def run(self):
+        try:
+            self.finished_ok.emit(self._fn())
+        except Exception as e:                               # noqa: BLE001
+            self.failed.emit(e)
+
+
 class VideoEditAITab(QWidget):
     request_edit = Signal(dict)
     request_open_video_tab = Signal()       # «Apri tab Video» dal dialog sul checkpoint
     request_open_weights_tab = Signal()     # «Apri tab Pesi modelli» (distilled-LoRA mancante)
+    request_open_v2v = Signal(str, str, str)  # (modalita' 'talk'|'sing', video, audio) → tab Video, pannello V2V
     # «Non ripetere» dell'avviso dev: SOLO per la sessione (non persistente)
     _dev_ack_session = False
 
@@ -83,6 +107,9 @@ class VideoEditAITab(QWidget):
         self._video = ""
         self._vinfo = None                  # VideoInfo del sorgente (ffprobe veloce) o None
         self._model_getter = None
+        self._last_audio_getter = None      # fn() -> path dell'ultimo audio/TTS/canzone generato (main_window)
+        self._dub_thread = None
+        self._dub_src_video = ""            # video da cui viene il «testo originale» mostrato (riuso STT)
         self._auto_prompt = ""              # ultimo testo di prompt precompilato dalla modalità
         v = QVBoxLayout(self)
         top = QHBoxLayout()
@@ -162,25 +189,74 @@ class VideoEditAITab(QWidget):
         self.cam_seconds_lbl = QLabel(tr("vedit.cam.dur_lbl", "Durata (s)"))
         f.addRow(self.cam_seconds_lbl, self.cam_seconds)
 
-        # Lip dub: scena (opz.) + NUOVA battuta + lingua (opz.) → prompt «<scena>, speaking in <Lingua> saying: "<battuta>"»
+        # Doppiaggio (lipdub): scena (opz.) + battuta + lingua. Da testo: la battuta NUOVA genera voce+labbra
+        # («<scena>, speaking in <Lingua> saying: "<battuta>"»); da audio (sperimentale): audio dell'utente fisso.
         self.lip_scene = QLineEdit()
         self.lip_scene.setPlaceholderText(tr("vedit.lipdub.scene_ph",
             "opzionale, in inglese: es. A woman in a red jacket, close-up in a kitchen"))
         self.lip_scene_lbl = QLabel(tr("vedit.lipdub.scene_lbl", "Scena / chi parla (opz.)"))
         f.addRow(self.lip_scene_lbl, self.lip_scene)
+        # B: audio dell'utente (file o ultimo audio generato) + riferimento voce
+        arow = QHBoxLayout()
+        self.lip_audio = QLineEdit(); self.lip_audio.setPlaceholderText(
+            tr("vedit.lipdub.audio_ph", "file audio (canzone, voce, TTS)"))
+        self.lip_audio.textChanged.connect(self._refresh_lipdub_info)
+        self.lip_audio_btn = QPushButton(tr("vedit.ref.browse", "Sfoglia…")); self.lip_audio_btn.clicked.connect(self._pick_lip_audio)
+        self.lip_audio_last = QPushButton(tr("vedit.lipdub.audio_last", "Ultimo audio generato"))
+        self.lip_audio_last.clicked.connect(self._use_last_audio)
+        arow.addWidget(self.lip_audio, 1); arow.addWidget(self.lip_audio_btn); arow.addWidget(self.lip_audio_last)
+        self.lip_audio_lbl = QLabel(tr("vedit.lipdub.audio_lbl", "Audio da usare"))
+        f.addRow(self.lip_audio_lbl, self._wrap_ref(arow))
+        self.lip_audio_ref = QComboBox()
+        self.lip_audio_ref.addItem(tr("vedit.lipdub.audio_ref_ext", "l'audio scelto"), "external")
+        self.lip_audio_ref.addItem(tr("vedit.lipdub.audio_ref_orig", "la voce del video originale"), "original")
+        self.lip_audio_ref.setToolTip(tr("vedit.lipdub.audio_ref_tt",
+            "Quale audio fa da riferimento di voce per la LoRA. Sperimentale: «l'audio scelto» imita lo stage 2 ufficiale; "
+            "«la voce del video» lo stage 1 (serve una traccia audio nel video)."))
+        self.lip_audio_ref_lbl = QLabel(tr("vedit.lipdub.audio_ref_lbl", "Riferimento voce"))
+        f.addRow(self.lip_audio_ref_lbl, self.lip_audio_ref)
+        self.lip_exp = QLabel(tr("vedit.lipdub.exp_banner",
+            "⚠ SPERIMENTALE: qualità non garantita. Per canzoni e voci la via collaudata è Talk/Canta del tab Video."))
+        self.lip_exp.setWordWrap(True)
+        self.lip_exp_lbl = QLabel("")
+        f.addRow(self.lip_exp_lbl, self.lip_exp)
         self.lip_line = QPlainTextEdit(); self.lip_line.setFixedHeight(70)
         self.lip_line.setPlaceholderText(tr("vedit.lipdub.line_ph",
             "la NUOVA battuta, nell'alfabeto della lingua parlata (il modello non traduce)"))
         self.lip_line.textChanged.connect(self._refresh_lipdub_info)
         self.lip_line_lbl = QLabel(tr("vedit.lipdub.line_lbl", "Nuova battuta (testo)"))
         f.addRow(self.lip_line_lbl, self.lip_line)
-        self.lip_lang = QComboBox(); self.lip_lang.setEditable(True)
+        self.lip_lang = QComboBox()                       # SOLO le lingue parlabili (core/video_edit_ic.LIPDUB_SPOKEN_LANGS)
         for code, name in vic.LIPDUB_LANGUAGES:
             self.lip_lang.addItem(name if code else tr("vedit.lipdub.lang_none", "(non specificata)"), code)
         self.lip_lang.setToolTip(tr("vedit.lipdub.lang_tt",
-            "Lingua parlata nella nuova battuta (nome inglese nel prompt). Puoi anche scriverne una a mano."))
-        self.lip_lang_lbl = QLabel(tr("vedit.lipdub.lang_lbl", "Lingua parlata (opz.)"))
+            "Lingua che il modello parla nella nuova battuta (solo lingue con prove di supporto)."))
+        self.lip_lang_lbl = QLabel(tr("vedit.lipdub.lang_dest_lbl", "Lingua di destinazione"))
         f.addRow(self.lip_lang_lbl, self.lip_lang)
+        # C: estrai il parlato dal video e traducilo (STT + LLM locali) nel campo battuta, modificabile
+        self.lip_translate = QPushButton(tr("vedit.dub.translate_btn", "Estrai e traduci"))
+        self.lip_translate.setToolTip(tr("vedit.dub.translate_tt",
+            "Estrae il parlato del video (STT locale), lo traduce nella lingua di destinazione con l'LLM locale e mette "
+            "il testo nel campo battuta, modificabile. Chiede una lunghezza simile all'originale."))
+        self.lip_translate.clicked.connect(self._translate_clicked)
+        self.lip_translate_lbl = QLabel("")
+        f.addRow(self.lip_translate_lbl, self.lip_translate)
+        self.lip_src_lang = QLabel(""); self.lip_src_lang.setWordWrap(True)
+        self.lip_src_lang_lbl = QLabel("")
+        f.addRow(self.lip_src_lang_lbl, self.lip_src_lang)
+        self.lip_src_text = QPlainTextEdit(); self.lip_src_text.setFixedHeight(54); self.lip_src_text.setReadOnly(False)
+        self.lip_src_text.setPlaceholderText(tr("vedit.dub.src_ph", "testo originale riconosciuto (modificabile: se lo correggi, la traduzione parte da qui)"))
+        self.lip_src_text_lbl = QLabel(tr("vedit.dub.src_text_lbl", "Testo originale"))
+        f.addRow(self.lip_src_text_lbl, self.lip_src_text)
+        # A: l'utente vuole un SUO audio → rimando a Talk/Canta (esistono gia', collaudate)
+        orow = QHBoxLayout()
+        self.lip_open_talk = QPushButton(tr("vedit.lipdub.open_talk", "Apri Talk (video + audio)"))
+        self.lip_open_talk.clicked.connect(lambda: self._open_v2v("talk"))
+        self.lip_open_sing = QPushButton(tr("vedit.lipdub.open_sing", "Apri Canta (foto + canzone)"))
+        self.lip_open_sing.clicked.connect(lambda: self._open_v2v("sing"))
+        orow.addWidget(self.lip_open_talk); orow.addWidget(self.lip_open_sing); orow.addStretch(1)
+        self.lip_own_lbl = QLabel(tr("vedit.lipdub.own_audio_lbl", "Vuoi usare un TUO audio (canzone, TTS, file)?"))
+        f.addRow(self.lip_own_lbl, self._wrap_ref(orow))
         self.lip_info = QLabel(""); self.lip_info.setWordWrap(True)
         self.lip_info_lbl = QLabel("")
         f.addRow(self.lip_info_lbl, self.lip_info)
@@ -393,18 +469,64 @@ class VideoEditAITab(QWidget):
         return self.lip_line.toPlainText().strip()
 
     def _lipdub_lang_value(self) -> str:
-        """Codice breve se la voce scelta e' una di quelle in elenco, altrimenti il testo scritto a mano."""
-        txt = self.lip_lang.currentText().strip()
-        i = self.lip_lang.findText(txt)
-        return str(self.lip_lang.itemData(i) or "") if i >= 0 else txt
+        """Codice breve della lingua scelta ('' = non specificata)."""
+        return str(self.lip_lang.currentData() or "")
+
+    def set_last_audio_getter(self, fn):
+        """`fn()` -> path dell'ultimo audio generato (TTS/canzone) o ''. Collegato da main_window."""
+        self._last_audio_getter = fn
+
+    def _pick_lip_audio(self):
+        p, _ = QFileDialog.getOpenFileName(self, tr("vedit.lipdub.audio_lbl", "Audio da usare"), "",
+                                           "Audio (*.wav *.mp3 *.flac *.m4a *.ogg *.aac)")
+        if p:
+            self.lip_audio.setText(p)
+
+    def _use_last_audio(self):
+        p = ""
+        if self._last_audio_getter is not None:
+            try:
+                p = self._last_audio_getter() or ""
+            except Exception:                                # noqa: BLE001
+                p = ""
+        if p and os.path.isfile(p):
+            self.lip_audio.setText(p)
+        else:
+            self._block("vedit.lipdub.no_last_audio", "Nessun audio generato di recente: scegli un file.")
+
+    def _open_v2v(self, mode: str):
+        """Rimando a Talk/Canta del tab Video (esistono gia': non vengono toccate). Passa video e audio se noti."""
+        audio = self.lip_audio.text().strip()
+        if not audio and self._last_audio_getter is not None:
+            try:
+                audio = self._last_audio_getter() or ""
+            except Exception:                                # noqa: BLE001
+                audio = ""
+        self.request_open_v2v.emit(mode, self._video, audio if audio and os.path.isfile(audio) else "")
 
     def _refresh_lipdub_info(self, *_):
-        """Riga informativa del lip dub: durata del video, stima del parlato della battuta, avvisi (mai blocchi)."""
+        """Riga informativa del doppiaggio: durata del video, stima del parlato / durata dell'audio, avvisi (mai blocchi)."""
         if not hasattr(self, "lip_info"):
             return
         vi = self._vinfo
-        if self.mode.currentData() != "lipdub" or vi is None or not getattr(vi, "duration", 0):
+        key = self.mode.currentData()
+        if key not in ("lipdub", "lipdub_audio") or vi is None or not getattr(vi, "duration", 0):
             self.lip_info.setText(""); return
+        if key == "lipdub_audio":
+            parts = [tr("vedit.lipdub.audio_dur_video", "Video: {v} s").format(v=f"{vi.duration:.1f}")]
+            ap = self.lip_audio.text().strip()
+            if ap and os.path.isfile(ap):
+                from core import video_ic_prep as _prep
+                ad = _prep.audio_duration(ap)
+                if ad:
+                    parts.append(tr("vedit.lipdub.audio_dur_audio", "audio: {a} s").format(a=f"{ad:.1f}"))
+                    if ad + 0.3 < vi.duration:
+                        parts.append("⚠ " + tr("vedit.lipdub.audio_shorter",
+                                               "audio più corto: il video verrà tagliato (l'audio comanda la durata)."))
+                    elif ad > vi.duration + 0.3:
+                        parts.append("⚠ " + tr("vedit.lipdub.audio_longer",
+                                               "audio più lungo: verrà tagliato alla durata del video."))
+            self.lip_info.setText("  ·  ".join(parts)); return
         parts = [tr("vedit.lipdub.info_dur", "Video: {v} s (la voce nuova dura quanto il video)").format(
             v=f"{vi.duration:.1f}")]
         if not vi.has_audio:
@@ -421,6 +543,61 @@ class VideoEditAITab(QWidget):
                 parts.append("⚠ " + tr("vedit.lipdub.fit_short",
                     "battuta corta: la voce potrebbe risultare lenta e innaturale. Allungala."))
         self.lip_info.setText("  ·  ".join(parts))
+
+    # ── C: estrai e traduci (STT + LLM locali, in un thread) ─────────────────────────────────
+    def _translate_clicked(self):
+        self._translate_start(sync=False)
+
+    def _translate_start(self, sync: bool = False):
+        if not self._video:
+            self._block("vedit.err_no_video", "Scegli prima un video."); return
+        target = self._lipdub_lang_value()
+        if not target:
+            self._block("vedit.dub.need_target", "Scegli la lingua di destinazione."); return
+        if self._dub_thread is not None and self._dub_thread.isRunning():
+            return
+        src_text = self.lip_src_text.toPlainText().strip() if self._dub_src_video == self._video else ""
+        dur = float(getattr(self._vinfo, "duration", 0.0) or 0.0)
+        video = self._video
+        self.lip_translate.setEnabled(False)
+        self.log.appendPlainText(tr("vedit.dub.busy", "Estrazione del parlato e traduzione in corso (STT e LLM locali)…"))
+
+        def work():
+            return vdt.run(video, target, source_text=src_text, video_seconds=dur,
+                           log=lambda m: None)
+        if sync:                                             # test/script: nessun thread
+            try:
+                res, err = work(), None
+            except Exception as e:                           # noqa: BLE001
+                res, err = None, e
+            self._translate_done(res, err, video, target)
+            return
+        th = _FnThread(work)
+        th.finished_ok.connect(lambda r: self._translate_done(r, None, video, target))
+        th.failed.connect(lambda e: self._translate_done(None, e, video, target))
+        self._dub_thread = th
+        th.start()
+
+    def _translate_done(self, res, err, video: str, target: str):
+        self.lip_translate.setEnabled(True)
+        if err is not None:
+            if isinstance(err, vdt.DubTranslateError):
+                self.log.appendPlainText("⚠ " + tr(err.key, str(err)))
+            else:
+                self.log.appendPlainText("⚠ " + tr("vedit.dub.err_generic", "Estrai e traduci non riuscito: {e}").format(e=err))
+            return
+        self._dub_src_video = video
+        self.lip_line.setPlainText(res["text"])
+        self.lip_src_text.setPlainText(res.get("original_text", ""))
+        ol = (res.get("original_language") or "").lower()
+        name = dict(vic.LIPDUB_LANGUAGES).get(ol) or ol or tr("vedit.dub.lang_unknown", "non rilevata")
+        self.lip_src_lang.setText(tr("vedit.dub.src_lang", "Lingua rilevata dell'originale: {l}").format(l=name))
+        self.log.appendPlainText(tr("vedit.dub.done",
+            "Traduzione pronta: controlla e correggi il testo prima di generare.") + f" [{res.get('backend', '')}]")
+        if res.get("warning") == "long":
+            self.log.appendPlainText("⚠ " + tr("vedit.lipdub.fit_long",
+                "battuta lunga: il modello potrebbe saltare delle parole. Accorciala."))
+        self._refresh_lipdub_info()
 
     def _probe_source(self):
         """ffprobe veloce del sorgente (dimensioni/fps/frame): serve ad anteprima outpaint e info segmenti."""
@@ -549,7 +726,9 @@ class VideoEditAITab(QWidget):
         is_restyle = (key == "restyle")
         is_cam = (key == "cameraman")
         is_out = (key == "outpaint")
-        is_lip = (key == "lipdub")
+        is_lipt = (key == "lipdub")                          # doppiaggio da TESTO (ricetta ufficiale)
+        is_lipa = (key == "lipdub_audio")                    # doppiaggio da AUDIO (sperimentale)
+        is_lip = is_lipt or is_lipa
         is_repair = (sp.family == vem.FAMILY_REPAIR)
         is_ic_new = bool(sp.cap)                              # modalità IC-LoRA a registro (non storiche)
         # #102: il campo «oggetto» serve all'inpaint E a replace_char (= personaggio da sostituire, per la
@@ -584,6 +763,15 @@ class VideoEditAITab(QWidget):
         self.out_anchor.setEnabled(is_out and self.out_format.currentData() != "custom")
         for w in (self.lip_scene, self.lip_line, self.lip_lang, self.lip_info):
             self._show_row(w, is_lip)
+        for w in (self.lip_translate, self.lip_src_lang, self.lip_src_text, self.lip_exp):
+            self._show_row(w, is_lipt if w is not self.lip_exp else is_lipa)
+        self._set_row_visible_for(self.lip_audio, is_lipa)
+        self._show_row(self.lip_audio_ref, is_lipa)
+        self._set_row_visible_for(self.lip_open_talk, is_lipt)
+        self.lip_line_lbl.setText(tr("vedit.lipdub.line_opt_lbl", "Testo detto nell'audio (opz.)") if is_lipa
+                                  else tr("vedit.lipdub.line_lbl", "Nuova battuta (testo)"))
+        self.lip_lang_lbl.setText(tr("vedit.lipdub.lang_lbl", "Lingua parlata (opz.)") if is_lipa
+                                  else tr("vedit.lipdub.lang_dest_lbl", "Lingua di destinazione"))
         self.prompt.setPlaceholderText(
             tr("vedit.lipdub.prompt_ph", "avanzato (opzionale): prompt completo; se lo scrivi, scena/battuta/lingua "
                                          "sopra vengono ignorate") if is_lip else self._prompt_ph)
@@ -764,13 +952,23 @@ class VideoEditAITab(QWidget):
             if not prompt:
                 self._block("vedit.err_no_style_text", "ReStyle: scrivi lo stile (es. «Disney 2D Animation») o un prompt."); return
             cfg["style_image"] = cfg["ref_image"]
-        if key == "lipdub":
-            if not cfg["prompt"] and not self._lipdub_line_text():
-                self._block("vedit.err_no_line", "Lip dub: scrivi la nuova battuta (o un prompt completo)."); return
+        if key in ("lipdub", "lipdub_audio"):
             vi = self._vinfo
-            if vi is not None and not vi.has_audio:
-                self._block("vedit.err_lipdub_no_audio",
-                            "Lip dub: il video non ha una traccia audio (serve come riferimento della voce)."); return
+            if key == "lipdub":
+                if not cfg["prompt"] and not self._lipdub_line_text():
+                    self._block("vedit.err_no_line", "Lip dub: scrivi la nuova battuta (o un prompt completo)."); return
+                if vi is not None and not vi.has_audio:
+                    self._block("vedit.err_lipdub_no_audio",
+                                "Lip dub: il video non ha una traccia audio (serve come riferimento della voce)."); return
+            else:
+                ap = self.lip_audio.text().strip()
+                if not ap or not os.path.isfile(ap):
+                    self._block("vedit.err_lipdub_no_audio_file",
+                                "Doppiaggio da audio: scegli il file audio da usare."); return
+                if self.lip_audio_ref.currentData() == "original" and vi is not None and not vi.has_audio:
+                    self._block("vedit.err_lipdub_no_audio",
+                                "Lip dub: il video non ha una traccia audio (serve come riferimento della voce)."); return
+                cfg.update(lipdub_audio=ap, lipdub_audio_ref=self.lip_audio_ref.currentData())
             n = int(getattr(vi, "nb_frames", 0) or 0) if vi is not None else 0
             if n and vem.snap_frames(n) > sp.max_frames_per_segment:
                 self._block("vedit.err_lipdub_too_long",

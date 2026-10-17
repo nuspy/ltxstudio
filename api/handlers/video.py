@@ -136,7 +136,8 @@ class ControlNetReq(BaseModel):
 class IcLoraReq(BaseModel):
     """Modalita' IC-LoRA di «Modifica Video AI» (stessa logica della GUI: core/video_edit_ic.py)."""
     kind: str = Field(..., description="refocus | uncompress | deinterlace | motiondeblur | detailer | "
-                                       "outpaint | restyle | cameraman | lipdub")
+                                       "outpaint | restyle | cameraman | lipdub (Doppiaggio da testo) | "
+                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE)")
     video_path: str = Field(..., description="video sorgente (cameraman: video di RIFERIMENTO del movimento)")
     prompt: str = ""
     strength: float = 1.0
@@ -159,11 +160,17 @@ class IcLoraReq(BaseModel):
     min_bar: float = Field(0.0, ge=0.0, le=0.45, description="outpaint (opt-in, solo canvas non custom): se una barra "
                            "nuova e' piu' stretta, rimpicciolisce il video nel canvas finche' ogni barra e' >= questa "
                            "frazione (consigliato 0.15); 0 = spento")
-    # lipdub (JUST-DUB-IT): il video CON audio e' il riferimento; la NUOVA battuta (testo) genera voce e labbra nuove,
-    # per la stessa durata del video. NON si fornisce un file audio. `prompt` (se presente) vince su line/language/scene.
+    # lipdub = «Doppiaggio da testo» (JUST-DUB-IT): il video CON audio e' il riferimento; la NUOVA battuta (testo) genera
+    # voce e labbra nuove, per la stessa durata del video. `prompt` (se presente) vince su line/language/scene.
     line: str = Field("", description="lipdub: la nuova battuta, nell'alfabeto della lingua parlata (il modello non traduce)")
-    language: str = Field("", description="lipdub: lingua parlata (it, en, es, fr, de, pt, ru, zh, ja, ko, ... o nome inglese)")
+    language: str = Field("", description="lipdub: lingua parlata (codice: en es fr de ru zh it pt ja ko). Altre: avviso nei warnings")
     scene: str = Field("", description="lipdub: scena / chi parla, in inglese (opzionale)")
+    translate_to: str = Field("", description="lipdub: se `line` e' vuota, estrae il parlato del video (STT locale), lo traduce "
+                              "in questa lingua (codice di `language`) con l'LLM locale e lo usa come battuta; richiede STT e LLM attivi")
+    source_text: str = Field("", description="lipdub + translate_to: testo originale gia' noto (salta l'STT)")
+    # lipdub_audio = «Doppiaggio da audio» SPERIMENTALE: l'audio dell'utente e' tenuto fisso nei latenti (l'audio comanda la durata)
+    audio_path: str | None = Field(None, description="lipdub_audio: file audio da usare (canzone, voce, TTS)")
+    audio_reference: str = Field("external", description="lipdub_audio: external (l'audio scelto fa da riferimento voce) | original (la voce del video)")
     # cameraman
     image_path: str | None = None
     image_strength: float = 0.7
@@ -304,9 +311,9 @@ def register(app: FastAPI):
         from core import video_edit_ic as vic
         from core import video_edit_modes as vem
         from core.video_ic_prep import OUTPAINT_FORMATS, ANCHORS
-        spec = vem.spec_for_kind(req.kind)
-        if spec is None or not spec.cap or req.kind == "union":
-            valid = sorted(s.kind for s in vem.MODE_SPECS.values() if s.enabled and s.cap)
+        spec = vem.MODE_SPECS.get(req.kind)                       # `kind` = chiave della modalita' (lipdub_audio inclusa)
+        if spec is None or not spec.enabled or not spec.cap or req.kind == "union":
+            valid = sorted(s.key for s in vem.MODE_SPECS.values() if s.enabled and s.cap)
             raise HTTPException(422, {"error": "invalid_kind", "kind": req.kind, "valid": valid})
         gate.require(spec.cap)
         if req.kind == "outpaint":
@@ -321,15 +328,33 @@ def register(app: FastAPI):
             raise HTTPException(422, {"error": "style_image_required"})
         if not os.path.exists(req.video_path):
             raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
-        if req.kind == "lipdub":
-            from core import video_ic_prep as _prep
-            if not (req.prompt.strip() or req.line.strip()):
-                raise HTTPException(422, {"error": "line_required",
-                                          "detail": "lipdub: indica `line` (la nuova battuta) o un `prompt` completo"})
-            if not _prep.has_audio(req.video_path):
-                raise HTTPException(422, {"error": "video_no_audio",
-                                          "detail": "lipdub: il video deve avere una traccia audio (riferimento della voce)"})
         warnings: list[str] = []
+        if req.kind in ("lipdub", "lipdub_audio"):
+            from core import video_ic_prep as _prep
+            if req.kind == "lipdub":
+                if not (req.prompt.strip() or req.line.strip() or req.translate_to.strip()):
+                    raise HTTPException(422, {"error": "line_required",
+                                              "detail": "lipdub: indica `line` (la nuova battuta), `translate_to` o un `prompt` completo"})
+                if not _prep.has_audio(req.video_path):
+                    raise HTTPException(422, {"error": "video_no_audio",
+                                              "detail": "lipdub: il video deve avere una traccia audio (riferimento della voce)"})
+                if req.translate_to.strip() and req.translate_to.strip().lower() not in vic.SPOKEN_CODES:
+                    raise HTTPException(422, {"error": "invalid_translate_to", "valid": list(vic.SPOKEN_CODES)})
+            else:
+                if not (req.audio_path and os.path.exists(req.audio_path)):
+                    raise HTTPException(422, {"error": "audio_not_found", "path": req.audio_path})
+                if not _prep.has_audio(req.audio_path):
+                    raise HTTPException(422, {"error": "audio_no_stream", "path": req.audio_path})
+                if req.audio_reference not in ("external", "original"):
+                    raise HTTPException(422, {"error": "invalid_audio_reference", "valid": ["external", "original"]})
+                if req.audio_reference == "original" and not _prep.has_audio(req.video_path):
+                    raise HTTPException(422, {"error": "video_no_audio",
+                                              "detail": "audio_reference=original richiede una traccia audio nel video"})
+                warnings.append("SPERIMENTALE: audio dell'utente tenuto fisso nei latenti, qualita' non garantita; per "
+                                "canzoni/voci la via collaudata e' Talk/Canta del tab Video")
+            if req.language.strip() and req.language.strip().lower() not in vic.SPOKEN_CODES:
+                warnings.append(f"lingua «{req.language}» senza prove di supporto (note: {', '.join(vic.SPOKEN_CODES)}): "
+                                "il modello potrebbe parlarla male")
         model = (req.model or "").strip()
         rel = (req.ltx_release or (lrel.detect_release(model) if model else None) or "")
         if rel and not lrel.ic_lora_supported(rel):
@@ -359,7 +384,9 @@ def register(app: FastAPI):
                "cam_ref": req.video_path, "cam_img": req.image_path or "",
                "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
                "width": req.width, "height": req.height, "seed": req.seed,
-               "lipdub_line": req.line, "lipdub_lang": req.language, "lipdub_scene": req.scene}
+               "lipdub_line": req.line, "lipdub_lang": req.language, "lipdub_scene": req.scene,
+               "translate_to": req.translate_to, "source_text": req.source_text,
+               "lipdub_audio": req.audio_path or "", "lipdub_audio_ref": req.audio_reference}
         if model:
             cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
         if rel:
@@ -368,6 +395,12 @@ def register(app: FastAPI):
         def fn(job):
             import time as _t
             output = out_path(f"video_ic_{spec.key}")
+            if cfg.get("translate_to"):                          # lipdub: estrai il parlato e traduci (STT+LLM locali)
+                from core import video_dub_translate as vdt
+                try:
+                    vdt.fill_cfg(cfg, log=lambda m: job.log(m))
+                except vdt.DubTranslateError as e:
+                    raise RuntimeError(str(e)) from None
             ij = vic.build_job(cfg, os.path.dirname(output), int(_t.time()), output, log=lambda m: job.log(m))
             outs = run_ltx2(ij.params, job)
             return [vic.finalize(ij, outs[0], log=lambda m: job.log(m))]
