@@ -79,7 +79,7 @@ from inference_server import preview_bus                    # leggero: nessun im
 app = FastAPI(title="LTX Studio — Native Inference Server")
 
 # moduli validi (l'esecuzione avviene in job_runner, non qui — nessun handler/torch importato nel server)
-_MODULES = {"image", "upscale", "segment", "video_upscale", "video_face", "video_fps"}
+_MODULES = {"image", "image_control", "image_mq", "upscale", "segment", "video_upscale", "video_face", "video_fps"}
 _jobs: dict[str, dict] = {}
 _q: "queue.Queue[str]" = queue.Queue()
 
@@ -125,7 +125,9 @@ def _job_model_key(module: str, params: dict) -> str:
 # chiave diversa, UCCIDEVANO il modello immagini (flusso inpaint = segment → FLUX ricaricato due volte).
 # Ora girano in un processo isolato (job_runner, già nel codice) e il figlio resta com'è; se manca VRAM
 # per l'ausiliario il figlio viene PARCHEGGIATO in RAM (demote), mai ucciso. Rollback: NATIVE_HELPERS_ISOLATED=0.
-_RESIDENT_MODULES = {"image"}
+# image_control (ControlNet/Redux FLUX.1 e Z-Image) e image_mq (MagicQuill V2 su Kontext) usano gli STESSI pesi base di
+# «image» (chiave di residenza = arch+file passati dal GUI): restano nel figlio persistente, nessun reload crea<->modifica
+_RESIDENT_MODULES = {"image", "image_control", "image_mq"}
 _HELPERS_ISOLATED = os.environ.get("NATIVE_HELPERS_ISOLATED", "1") != "0"
 # VRAM libera MINIMA (MB) per far girare l'ausiliario accanto al modello residente: sotto → demote del figlio.
 # Misurata a ogni job (NVML), non fissa per scheda; per-modulo perché SAM2+DINO pesa più di ESRGAN.
