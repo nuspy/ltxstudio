@@ -198,10 +198,10 @@ MODE_SPECS: dict[str, ModeSpec] = {s.key: s for s in (
     # (core/motion_tracks.py: porta nativa di LTXVDrawTracks) entra come IC-LoRA `motion-track-control-ref0.5` (forza 1.0),
     # l'immagine e' il frame 0. Pipeline = ICLoraPipeline generica del pacchetto ltx (nessuna dedicata): ptype `iclora`.
     # Frame/fps ufficiali 121 @ 24; tetto 257 frame (~10,7 s @ 24, 8*32+1) PRUDENTE, NON MISURATO (TESTS.md lo fissa):
-    # il video non si puo' spezzare (le tracce coprono tutto il tempo). Gate PROVVISORIO su cap.video_camera_ic:
-    # la motion-track non e' ancora sotto nessuna capability in matrice (DECISIONE RICHIESTA: cap nuova o questa).
+    # il video non si puo' spezzare (le tracce coprono tutto il tempo). Gate: cap.video_motion_track
+    # (capability propria in feature matrix, decisione del 17/10/2026).
     _s(key="motion_track", family=FAMILY_CAMERA, i18n_key="vedit.mode.motion_track", kind="motion-track",
-       catalog_id="ltx-iclora-motion-track", note_key="vedit.note_motion_track", cap="cap.video_camera_ic",
+       catalog_id="ltx-iclora-motion-track", note_key="vedit.note_motion_track", cap="cap.video_motion_track",
        needs_prompt=NEEDS_OPTIONAL, needs_video=False, needs_source_image=True, needs_tracks=True,
        distilled=DISTILLED_RECOMMENDED, default_strength=1.0, min_long_edge=0, max_long_edge=1280,
        max_frames_per_segment=257, chunkable=False, keep_audio=False, phase="1d", enabled=True,

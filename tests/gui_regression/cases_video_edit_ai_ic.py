@@ -1147,7 +1147,7 @@ def case_motion_dev_weight_gate(w, spy):
     w._feature_gate = lambda fid: (seen.append(fid) or False)
     before = len(spy.calls)
     t._go()
-    assert seen == ["cap.video_camera_ic"] and len(spy.calls) == before, (seen,)
+    assert seen == ["cap.video_motion_track"] and len(spy.calls) == before, (seen,)
 
 
 def case_motion_video_tab_handoff(w, spy):

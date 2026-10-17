@@ -3387,5 +3387,6 @@
   "vid.motion_tracks.tt": "Öffnet «KI-Videobearbeitung» im Modus «Bewegung aus Spuren» mit bereits gesetztem Startbild: Du zeichnest, wohin sich Motiv und Hintergrund bewegen, und das Video folgt den Spuren.",
   "vedit.mt.audio": "Ton mit erzeugen (Sprache/Geräusche aus dem Prompt)",
   "vedit.mt.audio_tt": "Wie im offiziellen Workflow erzeugt das Modell den Ton zusammen mit dem Video: Stimme und Geräusche kommen aus dem Prompt. Ausschalten, wenn der Prompt nicht spricht (sonst kann der Ton Rauschen sein).",
-  "vedit.track.tip_shift": "Umschalt+Klick: fügt auch über einem anderen Punkt einen Punkt hinzu (um eine Schleife zu schließen)."
+  "vedit.track.tip_shift": "Umschalt+Klick: fügt auch über einem anderen Punkt einen Punkt hinzu (um eine Schleife zu schließen).",
+  "feat.cap.video_motion_track": "Bewegung aus Spuren (Motion-Track)"
 }

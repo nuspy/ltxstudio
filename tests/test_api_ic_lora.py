@@ -93,7 +93,7 @@ def test_weight_missing_409(video, monkeypatch):
 
 def test_known_caps_include_new():
     from api import gate
-    for c in ("cap.video_restore_iclora", "cap.video_outpaint", "cap.video_restyle", "cap.video_camera_ic"):
+    for c in ("cap.video_restore_iclora", "cap.video_outpaint", "cap.video_restyle", "cap.video_camera_ic", "cap.video_motion_track"):
         assert c in gate.KNOWN_CAPS
 
 
@@ -282,9 +282,9 @@ def test_motion_track_validation(image, no_run):
 def test_motion_track_gate_and_weight(image, monkeypatch):
     from api import gate
     from core import video_edit_ic as vic
-    monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_camera_ic")
+    monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_motion_track")
     r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL})
-    assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_camera_ic"
+    assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_motion_track"
     monkeypatch.setattr(gate, "is_on", lambda fid: True)
     monkeypatch.setattr(vic, "missing_weight", lambda spec: "Peso mancante X")
     r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL})

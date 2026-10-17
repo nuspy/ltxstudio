@@ -3387,5 +3387,6 @@
   "vid.motion_tracks.tt": "Abre Edición de vídeo con IA en el modo «Movimiento con trazas» con la imagen de partida ya puesta: dibujas hacia dónde se mueven sujeto y fondo y el vídeo sigue las trazas.",
   "vedit.mt.audio": "Generar también el audio (voz/sonidos del prompt)",
   "vedit.mt.audio_tt": "Como en el workflow oficial, el modelo genera el audio junto con el vídeo: la voz y los sonidos salen del prompt. Desactívalo si el prompt no habla (si no, el audio puede ser ruido).",
-  "vedit.track.tip_shift": "Mayús+clic: añade un punto incluso sobre otro punto (para cerrar un bucle)."
+  "vedit.track.tip_shift": "Mayús+clic: añade un punto incluso sobre otro punto (para cerrar un bucle).",
+  "feat.cap.video_motion_track": "Movimiento con trazas (Motion-Track)"
 }

@@ -3461,5 +3461,6 @@
   "vid.motion_tracks.tt": "Opens AI Video Edit in «Motion from tracks» mode with the starting image already set: you draw where subject and background move and the video follows the tracks.",
   "vedit.mt.audio": "Also generate the audio (speech/sounds from the prompt)",
   "vedit.mt.audio_tt": "As in the official workflow the model generates the audio together with the video: voice and sounds come from the prompt. Turn it off if the prompt has no speech (otherwise the audio may be noise).",
-  "vedit.track.tip_shift": "Shift+click: adds a point even on top of another point (to close a loop)."
+  "vedit.track.tip_shift": "Shift+click: adds a point even on top of another point (to close a loop).",
+  "feat.cap.video_motion_track": "Motion from tracks (Motion-Track)"
 }

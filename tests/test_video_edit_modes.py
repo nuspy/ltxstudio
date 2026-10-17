@@ -166,6 +166,6 @@ def test_motion_track_spec():
     sp = M.get_spec("motion_track")
     assert sp.kind == "motion-track" and sp.catalog_id == "ltx-iclora-motion-track"
     assert sp.needs_source_image and sp.needs_tracks and not sp.needs_video and not sp.chunkable
-    assert sp.cap and sp.max_frames_per_segment == 257 and (sp.max_frames_per_segment - 1) % 8 == 0
+    assert sp.cap == "cap.video_motion_track" and sp.max_frames_per_segment == 257 and (sp.max_frames_per_segment - 1) % 8 == 0
     assert M.spec_for_kind("motion-track").key == "motion_track"
     assert M.segments_needed(1000, "motion_track") == 1      # non spezzabile: la GUI/API devono rifiutare
