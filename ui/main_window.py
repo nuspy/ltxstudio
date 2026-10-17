@@ -2151,12 +2151,19 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, tr("vid.ref.group", "Riferimenti multipli"),
                                     tr("mw.ref_invalid", "Riferimenti non validi:") + "\n• " + "\n• ".join(errs))
                 return
+            _perr = ref_panel.prompt_errors(vals.get("prompt_positive", ""))
+            if _perr:                                        # @Foto_N che non esiste: mai generare in silenzio
+                QMessageBox.warning(self, tr("vid.ref.group", "Riferimenti multipli"),
+                                    tr("mw.ref_invalid", "Riferimenti non validi:") + "\n• " + "\n• ".join(_perr))
+                return
             vals["references"] = refs
-            _missing = [r["token"] for r in refs if r["token"] not in vals.get("prompt_positive", "")]
-            if _missing:                                     # il modello associa file↔testo SOLO via token
+            _unc = ref_panel.uncited(vals.get("prompt_positive", ""))
+            if _unc:                                         # passati comunque al modello, ma lo si dice
                 self._log(tr("mw.ref_untokened",
                              "[Riferimenti] {toks} non compaiono nel prompt: il modello potrebbe ignorarli.")
-                          .format(toks=", ".join(_missing)))
+                          .format(toks=", ".join(_unc)))
+            # i token @Foto_N (e i vecchi <Picture N>) diventano la sintassi del modello (<Picture k>, Image k…)
+            vals["prompt_positive"] = ref_panel.translate(vals.get("prompt_positive", ""))
             self._log(tr("mw.ref_log", "[Riferimenti] {n} file di riferimento.").format(n=len(refs)))
 
         # ── VIDEO LUNGHI: auto-extend oltre la soglia ──
@@ -3065,6 +3072,16 @@ class MainWindow(QMainWindow):
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
+        if cfg.get("arch") == "qwen_image21":                 # riferimenti nominati: @Foto_N inesistente = errore
+            _gr = self.frame1_tab.gen_refs
+            _perr = _gr.prompt_errors(cfg.get("prompt_raw") or "")
+            if _perr:
+                QMessageBox.warning(self, tr("f1.gen.refs.group", "Immagini di riferimento"), "\n".join(_perr))
+                return
+            _unc = _gr.uncited(cfg.get("prompt_raw") or "")
+            if _unc and cfg.get("ref_images"):                # passate comunque, come fa il modello ufficiale
+                self._log(tr("f1.gen.refs.uncited", "[Riferimenti] {toks} non sono citati nel prompt: vengono "
+                             "comunque passati al modello.").format(toks=", ".join(_unc)))
         # Krea 2 è uno SNAPSHOT diffusers (nessun file-modello): usa krea2_variant, non un checkpoint → salta il
         # controllo "modello obbligatorio" (il worker risolve turbo/raw dal catalogo).
         if cfg.get("arch") not in ("krea2", "qwen_image21") and (not cfg["model"] or cfg["model"].startswith("(")):

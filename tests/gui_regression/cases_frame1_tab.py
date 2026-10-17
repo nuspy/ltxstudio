@@ -53,26 +53,15 @@ _DIFFUSION, _CHECKPOINTS, _UPSCALE = _load_inventory()
 
 def _gen_models_for_arch(arch_lbl: str):
     """Replica il filtro di Frame1Tab._reload_gen (con NSFW=ON, precisione=Tutte) per enumerare
-    a import-time i modelli concreti che il dropdown «Genera immagine» esporrà per l'architettura."""
-    _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
-    out: list[str] = []
+    a import-time i modelli concreti che il dropdown «Genera immagine» esporrà per l'architettura.
+    Il filtro è per ARCHITETTURA DAL FILE (core/arch_filter: header, poi cartella, poi nome), non più per parole
+    nel nome: Klein, Fill, Kontext e Redux restano fuori dai t2i FLUX (vivono nei pannelli di modifica)."""
+    from core import arch_filter as af
+    out: list[str] = [m for m in _DIFFUSION if af.is_t2i_for_arch(arch_lbl, m)]
     if arch_lbl == "FLUX":
-        for m in _DIFFUSION:
-            ml = m.lower()
-            if "fill" in ml or "kontext" in ml or "redux" in ml:    # adapter/edit: non sono modelli t2i base
-                continue
-            if any(k in ml for k in kws):
-                out.append(m)
         for c in _CHECKPOINTS:
-            cl = c.lower()
-            if "kontext" in cl or "redux" in cl or _is_flux2(c):    # come _reload_gen (frame1_tab:380)
-                continue
-            if any(k in cl for k in kws) and c not in out:
+            if af.is_t2i_for_arch("FLUX", c) and af.family(c) != "flux2" and c not in out:
                 out.append(c)
-    else:
-        for m in _DIFFUSION:
-            if any(k in m.lower() for k in kws):
-                out.append(m)
     return out
 
 

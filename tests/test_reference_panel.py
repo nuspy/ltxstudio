@@ -30,8 +30,9 @@ def test_token_per_tipo(qtbot):
         assert p.add_path(f), f"{f} rifiutato"
     toks = [r["token"] for r in p.get_references()]
     assert toks == ["<Picture 1>", "<Picture 2>", "<Video 1>", "<Audio 1>"], toks
-    # rimuovendo la prima immagine la numerazione si compatta (i token restano coerenti col prompt)
+    # rimuovendo la prima immagine i NOMI non cambiano (Foto_2 resta Foto_2); il token del modello è posizionale
     p._remove_row(p._rows[0])
+    assert [r["name"] for r in p.get_references()] == ["Foto_2", "Video_1", "Audio_1"]
     assert [r["token"] for r in p.get_references()] == ["<Picture 1>", "<Video 1>", "<Audio 1>"]
 
 
@@ -71,7 +72,7 @@ def test_insert_token_signal(qtbot):
     p.add_path("a.png")
     with qtbot.waitSignal(p.insert_token, timeout=1000) as blocker:
         p._rows[0].ins_btn.click()
-    assert blocker.args == ["<Picture 1>"]
+    assert blocker.args == ["@Foto_1"]
 
 
 def test_token_finisce_nel_prompt_del_tab(qtbot):
@@ -92,9 +93,10 @@ def test_token_finisce_nel_prompt_del_tab(qtbot):
     t.reference_panel.enable.setChecked(True)
     assert t.reference_panel.add_path("gorilla.png")
     t.reference_panel._rows[0].ins_btn.click()
-    # con LTX la convenzione è «Image 1» (la chiede la scheda della LoRA MSR); i token angolari
-    # `<Picture 1>` sono di MiniMax H3
-    assert "Image 1" in t.prompt.toPlainText(), t.prompt.toPlainText()
+    # nel prompt si inserisce SEMPRE @Foto_N (unica convenzione); la sintassi del modello (con LTX «Image 1», con
+    # H3 `<Picture 1>`) si applica alla generazione con translate()
+    assert "@Foto_1" in t.prompt.toPlainText(), t.prompt.toPlainText()
+    assert t.reference_panel.translate(t.prompt.toPlainText()).endswith("Image 1 ") or         "Image 1" in t.reference_panel.translate(t.prompt.toPlainText())
 
 
 @pytest.mark.parametrize("arch,expect_images", [("minimax_h3", 9), ("ltx", 4)])
@@ -105,3 +107,60 @@ def test_video_tab_applica_i_limiti(qtbot, arch, expect_images):
     caps = dict(video_caps(arch)); caps["multiref"] = True     # forza il ramo LTX+MSR per 'ltx'
     t._apply_reference_limits(arch, caps)
     assert t.reference_panel._lim["image"] == expect_images
+
+
+def test_nomi_stabili_e_primo_libero(qtbot):
+    p = ReferencePanel(checkable=False); qtbot.addWidget(p)
+    p.set_limits(images=10, videos=0, audios=0, total=10)
+    for f in ("a.png", "b.png", "c.png"):
+        assert p.add_path(f)
+    assert [r["name"] for r in p.get_references()] == ["Foto_1", "Foto_2", "Foto_3"]
+    p._remove_row(p._rows[1])                                   # via Foto_2: Foto_3 NON diventa Foto_2
+    assert [r["name"] for r in p.get_references()] == ["Foto_1", "Foto_3"]
+    assert p.add_path("d.png")                                  # la nuova prende il primo libero: Foto_2
+    assert [r["name"] for r in p.get_references()] == ["Foto_1", "Foto_2", "Foto_3"]
+    assert p.get_references()[1]["path"] == "d.png"
+
+
+def test_traduzione_ordine_e_token_inesistente(qtbot):
+    p = ReferencePanel(checkable=False); qtbot.addWidget(p)
+    p.set_token_style("qwen21")
+    p.set_limits(images=10, videos=0, audios=0, total=10)
+    for f in ("a.png", "b.png", "c.png"):
+        p.add_path(f)
+    p._remove_row(p._rows[1])                                   # restano Foto_1, Foto_3
+    assert p.translate("la tartaruga in @Foto_1 mangia la lattuga in @Foto_3") ==         "la tartaruga in image 1 mangia la lattuga in image 2"
+    assert p.prompt_errors("@Foto_1 e @Foto_3") == []
+    errs = p.prompt_errors("@Foto_2 non c'è più")
+    assert errs and "@Foto_2" in errs[0]
+    assert p.uncited("solo @Foto_1") == ["@Foto_3"]             # caricata ma non citata: passata comunque
+
+
+def test_stato_salvato_ripristina_nomi(qtbot, tmp_path):
+    from PIL import Image
+    files = []
+    for i in range(3):
+        f = tmp_path / f"i{i}.png"; Image.new("RGB", (8, 8)).save(f); files.append(str(f))
+    p = ReferencePanel(checkable=False); qtbot.addWidget(p)
+    p.set_limits(images=10, videos=0, audios=0, total=10)
+    for f in files:
+        p.add_path(f)
+    p._remove_row(p._rows[0])                                   # restano Foto_2, Foto_3
+    st = p.gui_get_state()
+    q = ReferencePanel(checkable=False); qtbot.addWidget(q)
+    q.set_limits(images=10, videos=0, audios=0, total=10)
+    q.gui_set_state(st)
+    assert [r["name"] for r in q.get_references()] == ["Foto_2", "Foto_3"]
+
+
+def test_drop_di_file(qtbot, tmp_path):
+    from PySide6.QtCore import QMimeData, QPoint, QUrl, Qt
+    from PySide6.QtGui import QDropEvent
+    from PIL import Image
+    f = tmp_path / "x.png"; Image.new("RGB", (8, 8)).save(f)
+    p = ReferencePanel(checkable=False); qtbot.addWidget(p)
+    p.set_limits(images=10, videos=0, audios=0, total=10)
+    md = QMimeData(); md.setUrls([QUrl.fromLocalFile(str(f)), QUrl.fromLocalFile(str(tmp_path / "x.txt"))])
+    ev = QDropEvent(QPoint(5, 5), Qt.CopyAction, md, Qt.LeftButton, Qt.NoModifier)
+    p.dropEvent(ev)
+    assert [r["name"] for r in p.get_references()] == ["Foto_1"], "il file non-immagine va ignorato"

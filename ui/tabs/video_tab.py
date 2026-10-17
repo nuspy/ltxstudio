@@ -412,6 +412,11 @@ class VideoTab(QWidget):
         self.reference_panel.enable.toggled.connect(self._sync_h3_refs)
         self._sync_h3_refs()
         ref_l.addWidget(self.reference_panel)
+        # @Foto_N nel prompt: completamento digitando «@» + token evidenziati (unica convenzione dell'app)
+        from ui.widgets import ref_prompt
+        self._prompt_refs = ref_prompt.install(
+            self.prompt, lambda: self.reference_panel.names() if self.reference_panel.enable.isChecked() else set())
+        self.reference_panel.changed.connect(self._prompt_refs.highlighter.rehighlight)
         root.addWidget(ref_box)
 
         # --- Restauro volti automatico (post-generazione, opzionale) ---
@@ -997,8 +1002,26 @@ class VideoTab(QWidget):
         ])
 
     def _refilter_models(self):
-        """Ripopola il dropdown modello PER L'ARCHITETTURA scelta. Lo chiamano anche l'inventario asincrono,
-        il filtro NSFW e la precisione: prima rimetteva sempre i checkpoint LTX, anche con LingBot/Krea/H3."""
+        """Ripopola il menu modello PER L'ARCHITETTURA scelta. Se l'architettura è CAMBIATA e il modello concreto
+        scelto prima appartiene a un'altra, il combo mostra «scegli un modello» (ui/model_menu): mai il primo
+        modello della nuova architettura scelto al posto dell'utente."""
+        from ui import model_menu as _mm
+        arch = self._arch() if hasattr(self, "video_arch") else "ltx"
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
+        arch_changed = getattr(self, "_menu_arch", arch) != arch
+        self._menu_arch = arch
+        self._refilter_models_body()
+        if arch_changed and prev not in (None, _mm.PLACEHOLDER, "auto"):
+            self.model.blockSignals(True)
+            try:
+                self._finish_model_menu(prev, None)
+            finally:
+                self.model.blockSignals(False)
+            self._on_model_changed()
+
+    def _refilter_models_body(self):
+        """Corpo del ripopolamento (vedi `_refilter_models`). Lo chiamano anche l'inventario asincrono, il filtro
+        NSFW e la precisione: prima rimetteva sempre i checkpoint LTX, anche con LingBot/Krea/H3."""
         arch = self._arch() if hasattr(self, "video_arch") else "ltx"
         if arch == "lingbot":
             return self._refilter_lingbot_models()
@@ -1053,7 +1076,7 @@ class VideoTab(QWidget):
             return sorted(lst, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
         diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)])
         checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
-        ggufs = fav_first([m for m in self._gguf_models if "ltx" in m.lower()])
+        ggufs = fav_first([m for m in self._gguf_models if self._is_ltx_video_model(m)])
 
         # Nessuna whitelist di compatibilità: TUTTI i modelli LTX video sono esposti.
         if diffusion:
@@ -1166,18 +1189,11 @@ class VideoTab(QWidget):
         return best_i
 
     def _is_ltx_video_model(self, name: str) -> bool:
-        low = (name or "").lower()
-        if "text_projection" in low or "lora" in low:
-            return False
-        from core.ltx_release import OTHER_ARCH_MARKERS
-        if any(x in low for x in OTHER_ARCH_MARKERS):           # DiT MiniMax H3 «10Eros-Max»: non è LTX
-            return False
-        if (self._mcat.arch_of(name).upper() == "LTX") or "ltx" in low or "eros" in low:
-            return True
-        # FASE D weights-unification: il DETECTOR header è l'oracolo vero — un checkpoint LTX
-        # RINOMINATO (niente "ltx" nel nome, assente dal catalogo esterno) prima SPARIVA dal
-        # dropdown pur essendo riconosciuto da model_detect. Additivo: mai toglie, solo aggiunge.
-        return self._detected_family(name) in ("ltxv", "ltx")
+        """Transformer LTX per il menu «LTX»: lo decide l'HEADER/la cartella (core/arch_filter); il catalogo esterno e
+        il nome solo se il file non si riconosce. Prima il catalogo vinceva sempre: un Qwen21 etichettato «LTX» e il
+        file ausiliario `_ltx23_aux_components` finivano nel menu video."""
+        from core import arch_filter
+        return arch_filter.is_ltx_transformer(name, self._mcat.arch_of(name))
 
     @staticmethod
     def _detected_family(name: str) -> str:
