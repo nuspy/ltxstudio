@@ -193,7 +193,9 @@ NEW = [
     N("ltx-iclora-motion-track", "ControlNet", "IC-LoRA Motion-Track ref0.5", category="video",
       arch="ltx23", repo="Lightricks/LTX-2.3-22b-IC-LoRA-Motion-Track-Control",
       filename="ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
-      type="LoRA", family="LTX-2", gb=0.33),
+      type="LoRA", family="LTX-2", gb=0.33,
+      used_by=["cap.video_camera_ic"],   # PROVVISORIO: la motion-track non e' ancora sotto nessuna capability in matrice
+      note="Motion-track (tab Modifica Video AI, API /video/ic_lora kind=motion_track): tracce disegnate -> video di controllo; immagine di partenza = frame 0, forza 1.0. Col dev si aggiunge la distilled-LoRA 0.5"),
     # oumoumad/*: repo PUBBLICI, file byte-identici ai locali (1 308 756 416 B, verificato via HF 14/10/2026)
     N("ltx-iclora-outpaint", "Video", "IC-LoRA Outpaint (oumoumad)", category="video", arch="ltx23",
       repo="oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint",

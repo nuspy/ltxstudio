@@ -3754,9 +3754,9 @@ class MainWindow(QMainWindow):
         img = self.frame1_tab.image_path or ""
         if img and os.path.isfile(img):
             t.set_track_image(img)
-            self._log("[Movimento da tracce] immagine di partenza dal canvas: disegna le tracce e genera.")
+            self._log(tr("vedit.mt.handoff_ok", "[Movimento da tracce] immagine di partenza dal canvas: disegna le tracce e genera."))
         else:
-            self._log("[Movimento da tracce] nessuna immagine nel canvas del Frame 1: scegli un'immagine di partenza.")
+            self._log(tr("vedit.mt.handoff_none", "[Movimento da tracce] nessuna immagine nel canvas del Frame 1: scegli un'immagine di partenza."))
 
     def _open_v2v_from_vedit(self, mode: str, video: str, audio: str):
         """Dal «Doppiaggio da testo» di Modifica Video AI a Talk (video + audio) o Canta (foto + canzone) del pannello

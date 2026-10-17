@@ -35,7 +35,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx-iclora-depth": (["iclora_control"], []),
     "ltx-iclora-pose": (["iclora_control"], []),
     "ltx-iclora-union": (["iclora_control"], []),
-    "ltx-iclora-motion-track": (["iclora_control"], []),
+    "ltx-iclora-motion-track": (["iclora_control"], ["ltx23-distilled-lora-384|ltx23-distilled-fp8"]),   # dev + distilled-LoRA, oppure distilled
     "ltx-iclora-detailer": (["iclora_edit"], []),
     "ltx-iclora-outpaint": (["iclora_edit"], []),
     "ltx-iclora-refocus": (["iclora_edit"], []),
