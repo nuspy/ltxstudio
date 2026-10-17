@@ -583,6 +583,17 @@ def case_ui_footer_and_renames(w, spy):
     assert f._int_pulid_group.isEnabled(), "int PuLID disabilitato col motore Kontext"
 
 
+def _fake_flux2_encoder():
+    """Il motore FLUX.2 di Integra/Colore elenca ora SOLO Klein (header: il Dev non ha pipeline edit; prima il primo
+    modello della lista era un FLUX.1 «PornFlux_20» classificato FLUX.2 per il nome, e il caso passava per quello).
+    Un Klein 9B vuole l'encoder Qwen3-8B, non installato in ogni ambiente: il test verifica l'ISTRUZIONE, non i download,
+    quindi l'encoder si finge risolto. Ritorna la funzione per il ripristino."""
+    from core import flux2_encoder as fe
+    saved = fe.resolve_encoder
+    fe.resolve_encoder = lambda model_name, text_encoders, default=None: ("qwen_3_8b.safetensors", None)
+    return saved
+
+
 def case_integrate_flux2(w, spy):
     """Integra con motore FLUX.2 (ramo ComfyUI): richiede un modello FLUX.2 selezionato → richiesta inviata."""
     _force_native_up()
@@ -596,7 +607,12 @@ def case_integrate_flux2(w, spy):
         return                                   # nessun modello FLUX.2 installato
     f.integrate_model.setCurrentIndex(0)
     f.integrate_prompt.setPlainText("integrate")
-    w.generate_integrate()
+    from core import flux2_encoder as _fe
+    _saved = _fake_flux2_encoder()
+    try:
+        w.generate_integrate()
+    finally:
+        _fe.resolve_encoder = _saved
     assert spy.calls, "integrate FLUX.2: nessuna richiesta inviata (modello selezionato ma niente submit)"
 
 
@@ -677,7 +693,12 @@ def case_recolor_flux2(w, spy):
     f.color_engine.setCurrentIndex(1)            # FLUX.2
     f.color_target.setText("#00aa55")
     f.color_subject.setText("the shirt")
-    w.generate_recolor()
+    from core import flux2_encoder as _fe
+    _saved = _fake_flux2_encoder()
+    try:
+        w.generate_recolor()
+    finally:
+        _fe.resolve_encoder = _saved
     assert spy.calls, "recolor FLUX.2: nessuna richiesta inviata"
 
 
