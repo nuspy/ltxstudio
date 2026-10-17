@@ -3772,6 +3772,7 @@ class MainWindow(QMainWindow):
         loro codice restano intatti: qui si impostano solo i loro controlli esistenti."""
         panel = self.video_tab.v2v_panel
         self.tabs.setCurrentWidget(self.video_tab)
+        self.video_tab.show_edit_tab()                       # Talk/Canta vivono nel sotto-tab «Modifica» del tab Video
         name = Path(audio).name if audio else ""
         if mode == "sing":
             panel.rb_sing.setChecked(True)

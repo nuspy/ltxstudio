@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox, QComboBox,
     QHBoxLayout, QLabel, QGroupBox, QSlider, QCheckBox, QPushButton,
-    QPlainTextEdit, QToolButton, QInputDialog, QMessageBox, QScrollArea, QLineEdit,
+    QPlainTextEdit, QToolButton, QInputDialog, QMessageBox, QScrollArea, QLineEdit, QTabWidget,
 )
 
 from ui.tabs.advanced_tab import SamplerSeedGroup
@@ -247,19 +247,24 @@ class VideoTab(QWidget):
         # Default 0.50 ("soft reference" come il workflow di riferimento): valori alti (0.8+) ancorano
         # troppo al fotogramma → movimento rigido/innaturale; 0.45-0.6 lasciano al modello libertà di
         # movimento mantenendo l'identità. Alza verso 0.8 solo se vuoi aderenza stretta all'immagine.
+        # Queste righe (immagine iniziale / I2V / PuLID) stanno nel gruppo «Immagine iniziale», nel sotto-tab «Genera»:
+        # sono ingressi della GENERAZIONE, non della modifica. Il resto del gruppo «Video» (architettura, modello,
+        # risoluzione, VRAM…) è condiviso e sta SOPRA la barra dei sotto-tab.
+        i2v_box = QGroupBox(tr("vid.i2v.group", "Immagine iniziale (I2V)")); i2f = QFormLayout(i2v_box)
+        self._i2v_box = i2v_box
         isr = QHBoxLayout()
         self.img_strength = QSlider(Qt.Horizontal); self.img_strength.setRange(0, 100); self.img_strength.setValue(50)
         self.img_strength_lbl = QLabel("0.50")
         self.img_strength.valueChanged.connect(lambda v: self.img_strength_lbl.setText(f"{v/100:.2f}"))
         self.img_strength.setToolTip(tr("vid.img_strength.tt"))
         isr.addWidget(self.img_strength, 1); isr.addWidget(self.img_strength_lbl)
-        form.addRow(tr("vid.img_strength_lbl"), self._wrap(isr))
+        i2f.addRow(tr("vid.img_strength_lbl"), self._wrap(isr))
         # Metodo di condizionamento immagine→video (solo quando si parte da un'immagine)
         self.i2v_method = QComboBox()
         self.i2v_method.addItem(tr("vid.i2v_method.addguide"), "addguide")
         self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
         self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
-        form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
+        i2f.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
         # One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → poi l'i2v lo anima.
         # PuLID è FLUX-only, il video è LTX: keyframe→i2v è il modo corretto per l'identità sul video.
         # CHECKBOX di attivazione (richiesta utente): PuLID è OPT-IN esplicito; da spento i campi/bottone sono
@@ -268,7 +273,7 @@ class VideoTab(QWidget):
         self.pulid_kf_enable.setToolTip(tr("vid.pulid_kf.enable.tt",
             "Se attivo: genera il primo frame con l'identità del volto (PuLID-FLUX) → i2v. Se spento: i2v normale, "
             "nessun volto imposto."))
-        form.addRow("", self.pulid_kf_enable)
+        i2f.addRow("", self.pulid_kf_enable)
         prow = QHBoxLayout()
         self.pulid_kf_face = QLineEdit(); self.pulid_kf_face.setPlaceholderText(
             tr("vid.pulid_kf.ph", "foto volto (una o più, separate) → primo frame con l'identità"))
@@ -286,7 +291,7 @@ class VideoTab(QWidget):
         for _w in (self.pulid_kf_face, self.pulid_kf_browse, self.pulid_kf_gen):
             _w.setEnabled(False)                             # default: PuLID spento
         prow.addWidget(self.pulid_kf_face, 1); prow.addWidget(self.pulid_kf_browse); prow.addWidget(self.pulid_kf_gen)
-        form.addRow(tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"), self._wrap(prow))
+        i2f.addRow(tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"), self._wrap(prow))
         # Selettore MOTORE video: ltx2_infer (default, tutte le feature) vs comfy-native (VRAM dinamica,
         # no-OOM, ma solo t2v/i2v semplici). Persistito in user_prefs; il routing è in _generate_video_native.
         self.video_engine_sel = QComboBox()
@@ -384,13 +389,32 @@ class VideoTab(QWidget):
         form.addRow(note)
         root.addWidget(vbox)
 
+        # --- Sotto-tab «Genera» | «Modifica» ---
+        # SOPRA la barra (condiviso): prompt, preset, gruppo «Video» (architettura/checkpoint/risoluzione/VRAM), opzioni
+        # dell'architettura, Sampler/Seed e LoRA. «Genera»: immagine iniziale, storyboard, riferimenti, post-processo.
+        # «Modifica»: V2V (Normale / Talk / Canta / Ascolta / ReTake). Stessi widget di prima, stessa cfg emessa.
+        self.mode_tabs = QTabWidget()
+        _gen_w = QWidget(); gen_l = QVBoxLayout(_gen_w); gen_l.setContentsMargins(0, 6, 0, 0)
+        _edit_w = QWidget(); edit_l = QVBoxLayout(_edit_w); edit_l.setContentsMargins(0, 6, 0, 0)
+        gen_l.addWidget(self._i2v_box)
+        self.mode_tabs.addTab(_gen_w, tr("vid.tab.generate", "Genera"))
+        self.mode_tabs.addTab(_edit_w, tr("vid.tab.edit", "Modifica"))
+        self.mode_tabs.tabBar().setToolTip(tr("vid.tab.tt", "Genera: crea un video nuovo. Modifica: Talk, Canta, "
+                                              "Ascolta, ReTake e V2V su un video o una foto."))
+
         # --- V2V: editing video (Normal / Talk / ReTake) ---
         from ui.widgets.v2v_panel import V2VPanel
         v2v_box = QGroupBox(tr("vid.v2v.group"))
         v2v_l = QVBoxLayout(v2v_box)
         self.v2v_panel = V2VPanel(nsfw_getter=lambda: self.nsfw.currentText() == "NSFW")
         v2v_l.addWidget(self.v2v_panel)
-        root.addWidget(v2v_box)
+        edit_l.addWidget(v2v_box)
+        edit_l.addStretch(1)
+        # Tab e modalità V2V si tengono d'accordo: in «Genera» si genera (modalità Normale); scegliere Talk/Canta/…
+        # porta in «Modifica»; tornare in «Genera» rimette Normale. Così ciò che vedi è ciò che parte.
+        self._mode_sync = False
+        self.mode_tabs.currentChanged.connect(self._on_mode_tab)
+        self.v2v_panel._mode_group.buttonToggled.connect(self._on_panel_mode)
 
         # --- Storyboard multi-scena (immagini-keyframe a tempo → video senza montaggio) ---
         from ui.widgets.storyboard_panel import StoryboardPanel
@@ -398,7 +422,7 @@ class VideoTab(QWidget):
         sb_l = QVBoxLayout(sb_box)
         self.storyboard_panel = StoryboardPanel()
         sb_l.addWidget(self.storyboard_panel)
-        root.addWidget(sb_box)
+        gen_l.addWidget(sb_box)
 
         # --- Riferimenti multipli (identità/stile/movimento/voce, SENZA posizione temporale) ---
         # Complementare allo storyboard: lì le immagini sono keyframe a un istante, qui sono
@@ -417,7 +441,7 @@ class VideoTab(QWidget):
         self._prompt_refs = ref_prompt.install(
             self.prompt, lambda: self.reference_panel.names() if self.reference_panel.enable.isChecked() else set())
         self.reference_panel.changed.connect(self._prompt_refs.highlighter.rehighlight)
-        root.addWidget(ref_box)
+        gen_l.addWidget(ref_box)
 
         # --- Restauro volti automatico (post-generazione, opzionale) ---
         frbox = QGroupBox(tr("vid.face.group")); frf = QFormLayout(frbox)
@@ -474,7 +498,8 @@ class VideoTab(QWidget):
         def _toggle_rife(on):
             self.rife_factor.setEnabled(on)
         self.rife_auto.toggled.connect(_toggle_rife); _toggle_rife(False)
-        root.addWidget(frbox)
+        gen_l.addWidget(frbox)
+        gen_l.addStretch(1)
 
         # --- Sampler / Seed (spostati da Avanzate) ---
         self.sampler_seed = SamplerSeedGroup()
@@ -484,7 +509,8 @@ class VideoTab(QWidget):
         lbox = QGroupBox(tr("vid.lora.group")); ll = QVBoxLayout(lbox)
         self.lora = LoraTab(allow_nsfw_getter=lambda: self.nsfw.currentText() == "NSFW", embedded=True)
         ll.addWidget(self.lora)
-        root.addWidget(lbox, 1)
+        root.addWidget(lbox)
+        root.addWidget(self.mode_tabs, 1)
 
         self._refilter_models()
         self._on_preset(self.res_preset.currentText())
@@ -492,6 +518,34 @@ class VideoTab(QWidget):
 
     def _wrap(self, layout):
         w = QWidget(); w.setLayout(layout); return w
+
+    # ── sotto-tab Genera | Modifica ──────────────────────────────────────────────
+    def show_edit_tab(self) -> None:
+        """Porta in primo piano «Modifica» (usato anche dal rimando di «Modifica Video AI»)."""
+        self.mode_tabs.setCurrentIndex(1)
+
+    def is_edit_tab(self) -> bool:
+        return self.mode_tabs.currentIndex() == 1
+
+    def _on_mode_tab(self, idx: int) -> None:
+        if self._mode_sync:
+            return
+        if idx == 0 and self.v2v_panel.current_mode() != "normal":
+            self._mode_sync = True
+            try:
+                self.v2v_panel.rb_normal.setChecked(True)          # in «Genera» si genera: modalità Normale
+            finally:
+                self._mode_sync = False
+
+    def _on_panel_mode(self, _btn=None, checked: bool = True) -> None:
+        if self._mode_sync or not checked:
+            return
+        if self.v2v_panel.current_mode() != "normal" and self.mode_tabs.currentIndex() == 0:
+            self._mode_sync = True
+            try:
+                self.mode_tabs.setCurrentIndex(1)                  # una modalità di modifica vive in «Modifica»
+            finally:
+                self._mode_sync = False
 
     def _on_nsfw(self, *_):
         self._refilter_models()      # riselezione istantanea modelli utilizzabili
