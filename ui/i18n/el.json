@@ -3234,7 +3234,7 @@
   "feat.cap.video_restyle": "Στυλ βίντεο με εικόνα (ReStyle)",
   "feat.cap.video_camera_ic": "Κάμερα από αναφορά (Cameraman)",
   "feat.cap.video_lipdub": "Lip dub / μεταγλώττιση (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 bit + EXR",
+  "feat.cap.video_hdr_ic": "HDR10, 10 bit + EXR",
   "vedit.out.narrow_bar": "η νέα λωρίδα είναι πολύ στενή (< 15% του καμβά): το μοντέλο ίσως δεν τη γεμίσει. Χρησιμοποιήστε μεγαλύτερα περιθώρια.",
   "vedit.ckpt.dlora_missing": "⚠ dev: χρειάζεται το distilled LoRA ({f}) και δεν υπάρχει στον δίσκο. Κατέβασέ το από την καρτέλα «Βάρη μοντέλων» (χωρίς αυτόματη λήψη): χωρίς αυτό το βίντεο βγαίνει «αποϋλοποιημένο».",
   "vedit.ckpt.auto2": "ℹ αυτόματο: ο worker θα χρησιμοποιήσει το προεπιλεγμένο checkpoint (dev) και με το dev θα προστεθεί το επίσημο distilled LoRA. Το checkpoint μένει αυτό που επιλέχθηκε.",

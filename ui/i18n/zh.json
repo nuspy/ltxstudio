@@ -3234,7 +3234,7 @@
   "feat.cap.video_restyle": "以图像设定视频风格（ReStyle）",
   "feat.cap.video_camera_ic": "参考镜头运动（Cameraman）",
   "feat.cap.video_lipdub": "口型配音 / 重新配音（LipDub）",
-  "feat.cap.video_hdr_ic": "HDR 16 位 + EXR",
+  "feat.cap.video_hdr_ic": "HDR10, 10 位 + EXR",
   "vedit.out.narrow_bar": "新增的边条太窄（小于画布的 15%）：模型可能无法填充。请使用更宽的边距。",
   "vedit.ckpt.dlora_missing": "⚠ dev：需要 distilled LoRA（{f}），但磁盘上没有。请在「模型权重」标签页下载（不会自动下载）：没有它，视频会变得「非物质化」。",
   "vedit.ckpt.auto2": "ℹ 自动：worker 将使用默认检查点（dev），并为 dev 添加官方 distilled LoRA。检查点仍是所选的那个。",

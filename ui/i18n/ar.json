@@ -3234,7 +3234,7 @@
   "feat.cap.video_restyle": "نمط الفيديو بصورة (ReStyle)",
   "feat.cap.video_camera_ic": "الكاميرا من مرجع (Cameraman)",
   "feat.cap.video_lipdub": "دبلجة الشفاه / إعادة الدبلجة (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 بت + EXR",
+  "feat.cap.video_hdr_ic": "HDR10, 10 بت + EXR",
   "vedit.out.narrow_bar": "الشريط الجديد ضيق جدًا (أقل من 15% من اللوحة): قد لا يملأه النموذج. استخدم هوامش أوسع.",
   "vedit.ckpt.dlora_missing": "⚠ dev: مطلوب distilled LoRA ‏({f}) وهو غير موجود على القرص. نزّله من تبويب «أوزان النماذج» (بدون تنزيل تلقائي): بدونه يخرج الفيديو «متلاشيًا».",
   "vedit.ckpt.auto2": "ℹ تلقائي: سيستخدم الـ worker نقطة التحقق الافتراضية (dev) ومع dev ستُضاف distilled LoRA الرسمية. تبقى نقطة التحقق هي المختارة.",

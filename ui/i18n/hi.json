@@ -3234,7 +3234,7 @@
   "feat.cap.video_restyle": "छवि से वीडियो शैली (ReStyle)",
   "feat.cap.video_camera_ic": "संदर्भ से कैमरा (Cameraman)",
   "feat.cap.video_lipdub": "लिप डब / री-डबिंग (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 बिट + EXR",
+  "feat.cap.video_hdr_ic": "HDR10, 10 बिट + EXR",
   "vedit.out.narrow_bar": "नई पट्टी बहुत संकरी है (कैनवास के 15% से कम): मॉडल इसे नहीं भर सकता। चौड़े मार्जिन चुनें।",
   "vedit.ckpt.dlora_missing": "⚠ dev: distilled LoRA ({f}) ज़रूरी है और डिस्क पर नहीं है। इसे «मॉडल वेट्स» टैब से डाउनलोड करें (कोई ऑटोमैटिक डाउनलोड नहीं): इसके बिना वीडियो «विलुप्त-सा» निकलता है।",
   "vedit.ckpt.auto2": "ℹ ऑटोमैटिक: worker डिफ़ॉल्ट चेकपॉइंट (dev) इस्तेमाल करेगा और dev के साथ आधिकारिक distilled LoRA जोड़ा जाएगा। चेकपॉइंट वही रहेगा जो चुना गया है।",

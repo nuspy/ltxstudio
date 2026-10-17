@@ -3275,7 +3275,7 @@
   "feat.cap.video_restyle": "Stile video con immagine (ReStyle)",
   "feat.cap.video_camera_ic": "Camera da riferimento (Cameraman)",
   "feat.cap.video_lipdub": "Lip dub / ri-doppiaggio (LipDub)",
-  "feat.cap.video_hdr_ic": "HDR 16 bit + EXR",
+  "feat.cap.video_hdr_ic": "HDR10, 10 bit + EXR",
   "vedit.out.narrow_bar": "barra nuova troppo stretta (< 15% del canvas): il modello potrebbe non riempirla. Usa margini più larghi.",
   "vedit.ckpt.dlora_missing": "⚠ dev: serve la LoRA distilled ({f}) e non è su disco. Scaricala dal tab «Pesi modelli» (nessun download automatico): senza, il video esce «dematerializzato».",
   "vedit.ckpt.auto2": "ℹ automatico: il worker userà il checkpoint di default (dev) e col dev verrà aggiunta la LoRA distilled ufficiale. Il checkpoint resta quello scelto.",
