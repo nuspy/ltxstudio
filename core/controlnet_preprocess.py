@@ -39,9 +39,10 @@ def canny(image_path: str, out_path: str, low: int = 100, high: int = 200) -> st
     return out_path
 
 
-def depth(image_path: str, out_path: str) -> str:
+def depth(image_path: str, out_path: str, device: int = -1) -> str:
     """Depth map via DepthAnything-V2 (transformers pipeline). Richiede i pesi in DEPTH_DIR.
-    Scaffold: da validare su GPU dopo il download dei pesi."""
+    `device=-1` = CPU: il processo GUI non apre MAI un contesto CUDA (regola app-no-cuda-context); un worker
+    può passare device=0. Pesi: cartella HF; l'originale .pth si converte con core.depth_anything_convert."""
     import numpy as np
     import cv2
     from transformers import pipeline as hf_pipeline
@@ -49,11 +50,11 @@ def depth(image_path: str, out_path: str) -> str:
     if not os.path.isdir(DEPTH_DIR):
         raise RuntimeError(f"DepthAnything-V2 assente in {DEPTH_DIR}: scaricalo dal tab "
                            "«Pesi modelli» (voce depth-anything-v2, ~1.3GB).")
-    pipe = hf_pipeline(task="depth-estimation", model=DEPTH_DIR)
+    pipe = hf_pipeline(task="depth-estimation", model=DEPTH_DIR, device=device)
     from PIL import Image
     res = pipe(Image.open(image_path).convert("RGB"))
     d = np.asarray(res["depth"], dtype="float32")
-    d = (d - d.min()) / (d.ptp() + 1e-6) * 255.0
+    d = (d - d.min()) / (float(np.ptp(d)) + 1e-6) * 255.0   # np.ptp: ndarray.ptp non esiste in NumPy 2
     rgb = cv2.cvtColor(d.astype("uint8"), cv2.COLOR_GRAY2BGR)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     cv2.imwrite(out_path, rgb)
