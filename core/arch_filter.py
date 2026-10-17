@@ -165,7 +165,7 @@ def is_t2i_for_arch(arch_label: str, rel: str) -> bool:
     if c["family"] not in ARCH_FAMILIES.get(arch_label, set()):
         return False
     if arch_label == "FLUX":                     # i non-generativi vivono nei pannelli di modifica
-        if c["role"] in ("inpaint", "adapter") or c["variant"] in ("fill", "kontext", "redux", "klein"):
+        if c["role"] in ("inpaint", "adapter", "controlnet", "control_lora") or c["variant"] in ("fill", "kontext", "redux", "klein"):
             return False
         if _flags(rel):
             return False

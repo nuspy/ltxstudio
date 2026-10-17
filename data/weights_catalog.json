@@ -7323,6 +7323,309 @@
         "te",
         "uncensored"
       ]
+    },
+    {
+      "id": "flux-cn-union-pro2",
+      "module": "Immagini",
+      "label": "FLUX.1 ControlNet Union Pro 2.0 (Shakker, canny/depth/pose/gray, 4.3GB)",
+      "kind": "file",
+      "type": "ControlNet",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 4.28,
+      "scan_names": [
+        "shakker_union_pro_v2.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0",
+      "url": "https://huggingface.co/Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0",
+      "filename": "shakker_union_pro_v2.safetensors",
+      "remote_filename": "diffusion_pytorch_model.safetensors",
+      "note": "6 blocchi doppi, senza mode embedding; ControlNet unico per canny, soft edge, depth, pose, gray. Licenza FLUX.1 [dev] non commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_controlnet"
+      ],
+      "use": [
+        "controlnet_image"
+      ],
+      "deps": [
+        "flux-vae-ae",
+        "t5xxl-fp16|t5xxl-enconly-fp8"
+      ]
+    },
+    {
+      "id": "flux-cn-inpaint-alimama",
+      "module": "Immagini",
+      "label": "FLUX.1 ControlNet Inpainting Beta (AlimamaCreative, 4.3GB)",
+      "kind": "file",
+      "type": "ControlNet",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 4.28,
+      "scan_names": [
+        "alimama_flux_inpainting.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Beta",
+      "url": "https://huggingface.co/alimama-creative/FLUX.1-dev-Controlnet-Inpainting-Beta",
+      "filename": "alimama_flux_inpainting.safetensors",
+      "remote_filename": "diffusion_pytorch_model.safetensors",
+      "note": "inpainting su FLUX.1 dev normale (68 canali: latenti dell'immagine mascherata + maschera). Licenza FLUX.1 [dev] non commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_cn_inpaint"
+      ],
+      "use": [
+        "controlnet_image"
+      ],
+      "deps": [
+        "flux-vae-ae",
+        "t5xxl-fp16|t5xxl-enconly-fp8"
+      ]
+    },
+    {
+      "id": "zimage-cn-union21",
+      "module": "Immagini",
+      "label": "Z-Image Turbo ControlNet Union 2.1 8 step (alibaba-pai, 6.7GB)",
+      "kind": "file",
+      "type": "ControlNet",
+      "family": "Z-Image",
+      "gated": false,
+      "approx_gb": 6.71,
+      "scan_names": [
+        "Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "repo_id": "alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1",
+      "url": "https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1",
+      "filename": "Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors",
+      "remote_filename": "Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors",
+      "note": "canny/depth/pose/HED/gray con Z-Image Turbo (8 passi, guidance 0). Licenza Apache-2.0",
+      "used_by": [
+        "cap.image_controlnet"
+      ],
+      "use": [
+        "controlnet_image"
+      ]
+    },
+    {
+      "id": "flux-redux",
+      "module": "Immagini",
+      "label": "FLUX.1 Redux dev (variazioni da immagine, 0.13GB)",
+      "kind": "file",
+      "type": "Checkpoints",
+      "family": "Flux",
+      "gated": true,
+      "approx_gb": 0.129,
+      "scan_names": [
+        "FLUX_DEV_Redux.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "black-forest-labs/FLUX.1-Redux-dev",
+      "url": "https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev",
+      "filename": "FLUX_DEV_Redux.safetensors",
+      "remote_filename": "flux1-redux-dev.safetensors",
+      "deps": [
+        "siglip-so400m-384"
+      ],
+      "note": "proiettore SigLIP→token di FLUX: l'immagine di riferimento guida stile e contenuto. Licenza FLUX.1 [dev] non commerciale: i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_redux"
+      ],
+      "use": [
+        "image_adapter"
+      ]
+    },
+    {
+      "id": "siglip-so400m-384",
+      "module": "Immagini",
+      "label": "SigLIP so400m-patch14-384 (encoder visivo di Redux, 3.5GB)",
+      "kind": "file",
+      "type": "VisionEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 3.51,
+      "scan_names": [
+        "siglip-so400m"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "google/siglip-so400m-patch14-384",
+      "url": "https://huggingface.co/google/siglip-so400m-patch14-384",
+      "filename": "model.safetensors",
+      "remote_filename": "model.safetensors",
+      "note": "file completo (testo+visione): a Redux serve solo la torre visiva (caricata da sola). Apache-2.0",
+      "used_by": [
+        "cap.image_redux"
+      ],
+      "use": [
+        "image_adapter"
+      ]
+    },
+    {
+      "id": "openpose-body",
+      "module": "ControlNet",
+      "label": "OpenPose corpo (CMU, preprocessore di posa, 0.21GB)",
+      "kind": "file",
+      "type": "ControlNet",
+      "family": "Openpose",
+      "gated": false,
+      "approx_gb": 0.209,
+      "scan_names": [
+        "body_pose_model.pth"
+      ],
+      "category": "aux",
+      "arch": "openpose",
+      "repo_id": "lllyasviel/Annotators",
+      "url": "https://huggingface.co/lllyasviel/Annotators",
+      "filename": "body_pose_model.pth",
+      "remote_filename": "body_pose_model.pth",
+      "note": "mappa di posa (scheletro a 18 punti) per i ControlNet",
+      "used_by": [
+        "cap.image_controlnet"
+      ],
+      "use": [
+        "depth_ctrl",
+        "controlnet_image"
+      ]
+    },
+    {
+      "id": "mq2-local-lora",
+      "module": "Immagini",
+      "label": "MagicQuill V2 · modifica locale (LoRA di controllo FLUX.1 Kontext, 0.3GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MagicQuill",
+      "gated": false,
+      "approx_gb": 0.299,
+      "scan_names": [
+        "local_lora.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "LiuZichen/MagicQuillV2-models",
+      "url": "https://huggingface.co/LiuZichen/MagicQuillV2-models",
+      "filename": "local_lora.safetensors",
+      "remote_filename": "v2_ckpt/local_lora.safetensors",
+      "note": "area disegnata + prompt (Kontext + condizione «local»). Licenza CC BY-NC-SA 4.0 (non commerciale): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_magicquill"
+      ],
+      "use": [
+        "lora_style",
+        "control_lora"
+      ]
+    },
+    {
+      "id": "mq2-removal-lora",
+      "module": "Immagini",
+      "label": "MagicQuill V2 · rimozione oggetto (LoRA di controllo FLUX.1 Kontext, 0.3GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MagicQuill",
+      "gated": false,
+      "approx_gb": 0.299,
+      "scan_names": [
+        "removal_lora.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "LiuZichen/MagicQuillV2-models",
+      "url": "https://huggingface.co/LiuZichen/MagicQuillV2-models",
+      "filename": "removal_lora.safetensors",
+      "remote_filename": "v2_ckpt/removal_lora.safetensors",
+      "note": "toglie l'oggetto mascherato riempiendo lo sfondo. Licenza CC BY-NC-SA 4.0 (non commerciale): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_magicquill"
+      ],
+      "use": [
+        "lora_style",
+        "control_lora"
+      ]
+    },
+    {
+      "id": "mq2-edge-lora",
+      "module": "Immagini",
+      "label": "MagicQuill V2 · bordi guidati (LoRA di controllo FLUX.1 Kontext, 0.3GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MagicQuill",
+      "gated": false,
+      "approx_gb": 0.299,
+      "scan_names": [
+        "edge_lora.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "LiuZichen/MagicQuillV2-models",
+      "url": "https://huggingface.co/LiuZichen/MagicQuillV2-models",
+      "filename": "edge_lora.safetensors",
+      "remote_filename": "v2_ckpt/edge_lora.safetensors",
+      "note": "segue i contorni (originali + tratti aggiunti/rimossi). Licenza CC BY-NC-SA 4.0 (non commerciale): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_magicquill"
+      ],
+      "use": [
+        "lora_style",
+        "control_lora"
+      ]
+    },
+    {
+      "id": "mq2-color-lora",
+      "module": "Immagini",
+      "label": "MagicQuill V2 · colore guidato (LoRA di controllo FLUX.1 Kontext, 0.3GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MagicQuill",
+      "gated": false,
+      "approx_gb": 0.299,
+      "scan_names": [
+        "color_lora.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "LiuZichen/MagicQuillV2-models",
+      "url": "https://huggingface.co/LiuZichen/MagicQuillV2-models",
+      "filename": "color_lora.safetensors",
+      "remote_filename": "v2_ckpt/color_lora.safetensors",
+      "note": "ricolora seguendo blocchi di colore. Licenza CC BY-NC-SA 4.0 (non commerciale): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_magicquill"
+      ],
+      "use": [
+        "lora_style",
+        "control_lora"
+      ]
+    },
+    {
+      "id": "mq2-puzzle-lora",
+      "module": "Immagini",
+      "label": "MagicQuill V2 · integrazione (foreground) (LoRA di controllo FLUX.1 Kontext, 0.3GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MagicQuill",
+      "gated": false,
+      "approx_gb": 0.345,
+      "scan_names": [
+        "puzzle_lora.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "repo_id": "LiuZichen/MagicQuillV2-models",
+      "url": "https://huggingface.co/LiuZichen/MagicQuillV2-models",
+      "filename": "puzzle_lora.safetensors",
+      "remote_filename": "v2_ckpt/puzzle_lora.safetensors",
+      "note": "fonde un oggetto incollato nella scena (LoRA PEFT normale). Licenza CC BY-NC-SA 4.0 (non commerciale): i pesi li scarica l'utente",
+      "used_by": [
+        "cap.image_magicquill"
+      ],
+      "use": [
+        "lora_style",
+        "control_lora"
+      ]
     }
   ],
   "schema": 2,

@@ -86,7 +86,7 @@ def audit(on_progress=None) -> dict:
         _is_shard = bool(_re.match(r"(?i)(model|diffusion_pytorch_model)-\d+-of-\d+", m["name"]))
         _is_helper = "enhancer" in m["name"].lower()      # LLM di supporto (es. ernie prompt-enhancer)
         _pipeline_ok = (info["venv"] == "inference_server" and not _is_shard and not _is_helper
-                        and not _is_aux(m["path"]) and str(det.get("role") or "") != "adapter")
+                        and not _is_aux(m["path"]) and str(det.get("role") or "") not in ("adapter", "controlnet", "control_lora"))
         if mb <= 0 or (src != "measured" and not e.get("skipped_commit")):
             if not m["is_gguf"]:
                 info["venv"] = "inference_server" if _pipeline_ok else "ltx2"
