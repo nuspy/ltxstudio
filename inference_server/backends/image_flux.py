@@ -992,17 +992,57 @@ def _arch_of(params: dict) -> str:
 _SIBLING_ARCHS = ("flux", "kontext", "inpaint")          # arch FLUX.1 che condividono gli stessi componenti
 
 
-def _sibling_pipe(mm, model_raw: str, arch: str):
-    """Se in cache c'è una pipeline SORELLA (stesso file modello, arch diverso della famiglia FLUX.1,
-    shell condivisa) → ritornala: la nuova pipeline si costruisce con from_pipe (ZERO load da disco)."""
-    if mm is None:
+def _resolve_model_path(model_path: str) -> str:
+    """Risolve il path RELATIVO dalla GUI (es. "Flux\\FLUX_Krea_Dev.safetensors") nel file assoluto sotto
+    diffusion_models / Checkpoints. Tollera spazi↔underscore. Estratto da _load: lo STESSO risultato serve a
+    _load e al calcolo dell'identità dei pesi in run() (pre-evict), così «crea» e «modifica» — che la GUI
+    chiama una col path relativo e l'altra con quello assoluto — risolvono allo stesso file."""
+    if Path(model_path).is_file():
+        return model_path
+    dm = Path(ERNIE_TRANSFORMER).parent.parent              # ...\Models\diffusion_models
+    # cerca in diffusion_models E in Checkpoints (i checkpoint completi stanno lì, es. flux1-schnell-fp8)
+    bases = [dm, dm.parent / "Checkpoints", dm.parent / "checkpoints", dm.parent]
+    _name = Path(model_path).name
+    cands = []
+    for b in bases:
+        cands += [b / model_path, (b / model_path).with_name(_name.replace(" ", "_")),
+                  b / _name, b / "Flux" / _name]
+    for cand in cands:
+        if cand.is_file():
+            return str(cand)
+    return model_path
+
+
+def _weights_ident(arch: str, resolved_path: str, klein_te: str = "") -> tuple:
+    """IDENTITÀ DEI PESI di una pipeline: (famiglia, file risolto, encoder Klein). Due pipeline con la stessa
+    identità condividono transformer/VAE/encoder → la seconda si costruisce dalla prima (zero load) e NON si
+    sfratta la prima. Famiglie: core.model_identity (flux/kontext/inpaint = "flux1", Klein = "flux2k")."""
+    from core.model_identity import arch_family
+    return (arch_family(arch), os.path.normcase(os.path.abspath(str(resolved_path))), str(klein_te or ""))
+
+
+def _sibling_pipe(mm, ident: tuple):
+    """Se in cache c'è una pipeline SORELLA FLUX.1 (stessa identità dei pesi, shell condivisa) → ritornala:
+    la nuova pipeline si costruisce con from_pipe (ZERO load da disco). Il confronto è per IDENTITÀ (file
+    risolto), non per la stringa grezza della GUI: path relativo e assoluto dello stesso file combaciano."""
+    if mm is None or not ident:
         return None
-    for a in _SIBLING_ARCHS:
-        if a == arch:
-            continue
-        e = mm._cache.get(f"{a}:{model_raw}")
-        if e is not None and getattr(e.obj, "_ls_shared", False):
+    for e in list(mm._cache.values()):
+        if getattr(e.obj, "_ls_shared", False) and getattr(e.obj, "_ls_ident", None) == ident:
             return e.obj
+    return None
+
+
+def _flux2_sibling_pipe(mm, ident: tuple):
+    """Sorella FLUX.2 Klein (flux2_kontext ↔ flux2_inpaint, stesso file e stesso encoder) col placement
+    blockswap: i moduli sono GIÀ piazzati (pesi su CPU, layer-swap) e si condividono così come sono."""
+    if mm is None or not ident:
+        return None
+    for e in list(mm._cache.values()):
+        o = e.obj
+        if (getattr(o, "_ls_ident", None) == ident and getattr(o, "_ls_no_rebind", False)
+                and getattr(o, "_ls_place_mode", "") == "blockswap"):
+            return o
     return None
 
 
@@ -1042,19 +1082,8 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     # Risolvi il path RELATIVO (es. "Flux\\FLUX_Krea_Dev.safetensors" dall'inventario filesystem) →
     # assoluto sotto diffusion_models. Senza, Path.is_file() è False e si cade in from_pretrained che
     # interpreta il nome come repo_id HF ("Repo id must use alphanumeric..."). Tollera spazi↔underscore.
-    if not Path(model_path).is_file():
-        dm = Path(ERNIE_TRANSFORMER).parent.parent              # ...\Models\diffusion_models
-        # cerca in diffusion_models E in Checkpoints (i checkpoint completi stanno lì, es. flux1-schnell-fp8)
-        bases = [dm, dm.parent / "Checkpoints", dm.parent / "checkpoints", dm.parent]
-        _name = Path(model_path).name
-        cands = []
-        for b in bases:
-            cands += [b / model_path, (b / model_path).with_name(_name.replace(" ", "_")),
-                      b / _name, b / "Flux" / _name]
-        for cand in cands:
-            if cand.is_file():
-                model_path = str(cand)
-                break
+    model_path = _resolve_model_path(model_path)
+    _ident_path = model_path                            # file risolto PRIMA di dequant/normalize: base dell'identità
     # SEMPRE tracciato: quale stringa è arrivata dalla GUI e a quale file è stata risolta. Senza questa riga
     # un modello non risolto scivolava muto nel ramo HF (nessun log fino al crash) e non c'era modo di sapere
     # CHI l'avesse mandato.
@@ -1079,6 +1108,23 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             _new = {"flux": "flux2", "inpaint": "flux2_inpaint", "kontext": "flux2_kontext"}.get(arch, "flux2")
             print(f"[flux] arch '{arch}' richiesto ma il checkpoint è FLUX.2 (128 canali) → uso '{_new}'.")
             arch = _new
+
+    # FLUX.2 DEV non ha pipeline inpaint/edit: Flux2KleinInpaintPipeline/Flux2KleinPipeline vogliono un Klein
+    # (distillato, SENZA guidance_in, norme `.weight`, encoder Qwen3). Il Dev ha `guidance_in`, norme `.scale`
+    # e txt_in 15360 (Mistral): `klein_config_from_header` moriva con un KeyError
+    # 'double_blocks.0.img_attn.norm.query_norm.weight' (visto il 16/10 01:22 con flux2-dev-nvfp4-mixed) che
+    # non dice cosa fare. Errore chiaro PRIMA di toccare i pesi.
+    if arch in ("flux2_inpaint", "flux2_kontext") and Path(model_path).is_file()             and model_path.lower().endswith(".safetensors"):
+        try:
+            from core.model_detect import read_header
+            _hk = read_header(model_path)[0]
+            _is_dev = any("guidance_in" in _k for _k in _hk)
+        except Exception:                                   # noqa: BLE001 — header illeggibile: decide il loader
+            _is_dev = False
+        if _is_dev:
+            raise RuntimeError(
+                f"«{Path(model_path).name}» è FLUX.2 Dev: non ha una pipeline di inpaint/edit. "
+                f"Per inpaint/edit con FLUX.2 serve una variante Klein (es. miraclein_flux2klein_nsfw_v2).")
 
     # FLUX.1 (flux/kontext/inpaint) in formato BFL/SwarmUI col prefisso model.diffusion_model. →
     # normalizza (strip prefisso, cache) altrimenti from_single_file fallisce. flux2/Klein gestiscono da sé.
@@ -1107,8 +1153,9 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     # RIUSO SORELLA (from_pipe): stesso FILE modello già caricato con un altro arch FLUX.1 (es. t2i→kontext)
     # → costruisci la nuova pipeline dagli STESSI componenti (zero load da disco, ~1s). Solo 64ch: il Fill
     # (384ch) ha un transformer incompatibile e non arriva mai qui con lo stesso file.
+    _ident = _weights_ident(arch, _ident_path, klein_te)   # arch DOPO il guard-famiglia: è la pipeline vera
     if (arch in _SIBLING_ARCHS and is_file and _flux_in_channels(model_path) == 64):
-        _src = _sibling_pipe(mm, _model_raw, arch)
+        _src = _sibling_pipe(mm, _ident)
         if _src is not None:
             try:
                 from inference_server.component_store import STORE as _ST
@@ -1122,6 +1169,7 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
                 for _ck in pipe._ls_component_keys:
                     _ST.retain(_ck)                       # la nuova shell referenzia gli stessi componenti
                 pipe._ls_shared = True
+                pipe._ls_ident = _ident
                 pipe._ls_est_mb = getattr(_src, "_ls_est_mb", VRAM_MB.get(arch, 24000))
                 pipe._ls_weights_mb = getattr(_src, "_ls_weights_mb", pipe._ls_est_mb)
                 pipe._ls_working_mb = getattr(_src, "_ls_working_mb", 0)   # stessi componenti → stesso footprint
@@ -1130,6 +1178,32 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
                 return pipe, 50
             except Exception as _e:                       # noqa: BLE001 — fallback: load normale
                 print(f"[flux] from_pipe fallito ({_e}) → load completo", flush=True)
+    if (arch in ("flux2_kontext", "flux2_inpaint") and is_file
+            and os.environ.get("NATIVE_FLUX2_SIBLING", "1") != "0"):
+        # KLEIN edit↔inpaint↔colora sullo STESSO file: stesso transformer + stesso encoder Qwen3 (ident uguale) →
+        # la nuova pipeline usa i MODULI della sorella (già in blockswap), cambia solo la classe diffusers.
+        # Prima ogni cambio di compito ricaricava ~20-30GB da SSD (transformer fp8 + Qwen3). NATIVE_FLUX2_SIBLING=0 per
+        # tornare al load completo. Qualunque anomalia → ripiega sul load normale (stesso schema del from_pipe FLUX.1).
+        _fs = _flux2_sibling_pipe(mm, _ident)
+        if _fs is not None:
+            try:
+                pipe = Pipe(transformer=_fs.transformer, vae=_fs.vae, text_encoder=_fs.text_encoder,
+                            tokenizer=_fs.tokenizer, scheduler=_fs.scheduler)
+                _dev = torch.device("cuda")
+                try:                                         # come _place_flux2_blockswap: device di esecuzione = cuda
+                    pipe.__class__._execution_device = property(lambda self: _dev)
+                except Exception:                            # noqa: BLE001
+                    pass
+                pipe._ls_no_rebind = True
+                pipe._ls_place_mode = "blockswap"
+                pipe._ls_ident = _ident
+                for _a in ("_ls_weights_mb", "_ls_working_mb", "_ls_est_mb"):
+                    if hasattr(_fs, _a):
+                        setattr(pipe, _a, getattr(_fs, _a))
+                print(f"[flux2] sorella Klein: riuso i moduli già residenti per '{arch}' (zero load)", flush=True)
+                return pipe, VRAM_MB.get(arch, 24000)
+            except Exception as _e:                          # noqa: BLE001 — fallback: load normale
+                print(f"[flux2] riuso sorella Klein fallito ({_e}) → load completo", flush=True)
     if arch == "ernie":
         pipe = _assemble_ernie()                            # assemblaggio locale (shim transformers <5)
     elif arch.startswith("flux2") and is_file:
@@ -1316,6 +1390,7 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     print(f"[image] {arch}: {where} (est {est_mb}MB, file {int(sz_mb)}MB), attention={attn}, fbcache={fb}, compile={comp}", flush=True)
     # Le shell condivise pesano ~50MB proprie (tokenizer/scheduler): i GB veri sono nel ComponentStore
     # (contati lì, una volta sola per componente). Le monolitiche mantengono la stima piena.
+    pipe._ls_ident = _ident                                  # identità dei pesi: pre-evict e sorelle (task 12)
     return pipe, (50 if getattr(pipe, "_ls_shared", False) else VRAM_MB.get(arch, 16000))
 
 
@@ -1554,7 +1629,11 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if not params.get("model"):
         print(f"[image] modello non specificato → default {os.path.basename(model)}", flush=True)
     # encoder Klein alternativo: solo per FLUX.2 (gli altri arch lo ignorano, la chiave resta quella di sempre)
-    key = register(mm, model, arch, str(params.get("klein_te") or "") if arch.startswith("flux2") else "")
+    _kte = str(params.get("klein_te") or "") if arch.startswith("flux2") else ""
+    key = register(mm, model, arch, _kte)
+    # IDENTITÀ DEI PESI richiesta (famiglia, file risolto, encoder): le pipeline già in cache con la STESSA identità
+    # (crea→modifica sullo stesso file) NON vanno sfrattate: condividono i pesi e la nuova si costruisce da loro.
+    _req_ident = _weights_ident(arch, _resolve_model_path(str(model)), _kte)
     _step(f"register modello ({os.path.basename(str(model))})")
     preview_bus.set_message("Caricamento modello…")         # fase visibile nella finestra di anteprima
     # CAMBIO MODELLO — sfratta il PRECEDENTE *prima* di caricare il nuovo. Col caricamento in-RAM (no-mmap
@@ -1566,7 +1645,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if os.environ.get("NATIVE_AUTOEVICT", "1") == "1" and key not in mm._cache:
         try:
             from inference_server.component_store import STORE
-            if mm.evict_others(key):                        # key non in cache → scarica TUTTE le shell vecchie
+            if mm.evict_others(key, keep_ident=_req_ident):  # key non in cache → scarica le shell di ALTRI pesi
                 _tot = torch.cuda.mem_get_info()[1] if torch.cuda.is_available() else 0
                 STORE.evict_unused(_tot)                     # libera i transformer orfani (buffer no-mmap incluso)
                 mm.flush()
@@ -1624,8 +1703,12 @@ def run(params: dict, mm, output_dir: str) -> dict:
             from inference_server.component_store import STORE
             _free_mb = (torch.cuda.mem_get_info()[0] // 2**20) if torch.cuda.is_available() else 0
             _need_mb = _measure_pipe_mb(pipe) + int(getattr(pipe, "_ls_working_mb", 0) or 3200)
+            # i componenti GIÀ su GPU (T5/VAE/transformer condivisi, stessi usati dalla nuova pipe) non vanno
+            # richiesti di nuovo: è lo stesso conto di _ensure_placement (resident_of). Senza, un modello già
+            # residente "non entrava" e faceva sfrattare gli altri per nulla.
+            _need_mb = max(0, _need_mb - int(STORE.resident_of(getattr(pipe, "_ls_component_keys", ()) or ())))
             if _free_mb < _need_mb:                          # serve spazio → sfratta (size-aware, solo il deficit)
-                if mm.evict_others(key):
+                if mm.evict_others(key, keep_ident=_req_ident):
                     STORE.evict_unused(max(1, _need_mb - _free_mb))
                     mm.flush()
                 print(f"[image] auto-evict: serviva spazio (free {_free_mb} < need {_need_mb}MB) → sfrattati altri",

@@ -805,7 +805,18 @@ class _CpuParkRegistry(_DummyReg):
         budget = mem_budget.ram_cache_mb()
         while self._info and self._parked_mb() + mb > budget:  # LRU nel budget
             self._drop(min(self._info, key=lambda k: self._info[k]["used"]))
-        if not mem_budget.fits(mb, self._parked_mb()):
+        # 17/10: su WDDM la VRAM del worker e' addebitata al commit. Il parcheggio deve lasciare libero il commit
+        # che la generazione impegnera' ANCORA (picco VRAM − VRAM gia' allocata): senza, il load successivo
+        # (LoRA, stage 2) lo esauriva e il worker moriva con 0xC0000005 (dev + IC-LoRA). Se non ci sta, si
+        # rilasciano prima i parcheggi vecchi (LRU): il parcheggio e' solo una cache.
+        try:
+            _vram_now = torch.cuda.memory_reserved() / 2**20 if torch.cuda.is_available() else 0.0
+        except Exception:                               # noqa: BLE001
+            _vram_now = 0.0
+        _reserve = mem_budget.commit_reserve_mb(_vram_now)
+        while self._info and not mem_budget.fits(mb, self._parked_mb(), reserve_mb=_reserve):
+            self._drop(min(self._info, key=lambda k: self._info[k]["used"]))
+        if not mem_budget.fits(mb, self._parked_mb(), reserve_mb=_reserve):
             # QUALE dei tre vincoli ha detto no, e con che numeri. Il messaggio unico
             # «commit/RAM/budget insufficiente» era illeggibile: con la RAM al 29% sembrava un
             # errore del programma, mentre di norma è il BUDGET della cache (48 GB) ad essere
@@ -819,9 +830,9 @@ class _CpuParkRegistry(_DummyReg):
                 _perche.append(f"RAM: {_ram/1024:.1f}−{mb/1024:.1f} = "
                                f"{(_ram - mb)/1024:.1f}GB, sotto il minimo "
                                f"{mem_budget.ram_floor_mb()/1024:.0f}GB")
-            if _com - mb <= mem_budget.commit_floor_mb():
-                _perche.append(f"commit: {_com/1024:.1f}−{mb/1024:.1f} = "
-                               f"{(_com - mb)/1024:.1f}GB, sotto il minimo "
+            if _com - mb - _reserve <= mem_budget.commit_floor_mb():
+                _perche.append(f"commit: {_com/1024:.1f}−{mb/1024:.1f}−{_reserve/1024:.1f} (VRAM ancora da impegnare) = "
+                               f"{(_com - mb - _reserve)/1024:.1f}GB, sotto il minimo "
                                f"{mem_budget.commit_floor_mb()/1024:.0f}GB")
             if _res + mb > _bud:
                 _perche.append(f"budget cache pieno: {_res/1024:.1f}+{mb/1024:.1f} > "

@@ -51,10 +51,11 @@ class ModelKey:
 
     def base(self) -> str:
         """Chiave di RESIDENZA `arch:basename(model)` — stesso formato che i server riportano in
-        /system_stats (model_key). È su questa che si decide il riuso (il dtype non conta per l'identità)."""
-        import os
-        a, m, _ = self.norm()
-        return f"{a}:{os.path.basename(m) or '-'}"
+        /system_stats (model_key). È su questa che si decide il riuso (il dtype non conta per l'identità).
+        Task 12: la chiave dice quali PESI, non quale compito (flux/inpaint/kontext sullo stesso file = stessa
+        chiave) — definizione unica in core.model_identity, la stessa del server e del persistent_runner."""
+        from core.model_identity import residency_key
+        return residency_key(self.arch, self.model)
 
     def __str__(self) -> str:
         return self.base()

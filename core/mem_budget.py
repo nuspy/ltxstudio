@@ -11,6 +11,8 @@ Env (in ordine di precedenza, primo trovato vince):
   LS_RAM_FLOOR_MB   → NATIVE_RAM_FLOOR_MB                     → 16384  (RAM fisica da non intaccare)
   LS_COMMIT_FLOOR_MB→ NATIVE_COMMIT_FLOOR_MB → LTX_COMMIT_FLOOR_MB → 20480 (commit: il limite VERO
                       su Windows — sforarlo = access violation, vedi pagefile-commit-mmap-crash)
+  LS_PARK_VRAM_PEAK_MB → VRAM totale GPU via NVML (fallback 30720; picco di VRAM che il worker video porterà ANCORA sul commit: su Windows/WDDM la
+                      VRAM allocata è addebitata al commit, vedi `commit_reserve_mb`)
   LS_RAM_CACHE=0    → disabilita il parcheggio/cache RAM (legacy: LTX_RAM_PARK=0)
 """
 from __future__ import annotations
@@ -42,6 +44,30 @@ def ram_floor_mb() -> float:
 def commit_floor_mb() -> float:
     """Commit disponibile (RAM+pagefile, MB) da non intaccare MAI."""
     return _env_chain(20480.0, "LS_COMMIT_FLOOR_MB", "NATIVE_COMMIT_FLOOR_MB", "LTX_COMMIT_FLOOR_MB")
+
+
+def vram_peak_mb() -> float:
+    """Picco di VRAM (MB) che una generazione video puo' raggiungere — addebitato anche al commit su WDDM.
+    DINAMICO (regola «VRAM tarata per PC»): la VRAM totale della GPU letta via NVML/nvidia-smi
+    (core.gpu_mem, nessun contesto CUDA); 30720 solo se la lettura fallisce. Override: LS_PARK_VRAM_PEAK_MB."""
+    v = _env_chain(0.0, "LS_PARK_VRAM_PEAK_MB")
+    if v > 0:
+        return v
+    try:
+        from core import gpu_mem
+        t = float(gpu_mem.total_vram_mb())
+        if t > 0:
+            return t
+    except Exception:                                   # noqa: BLE001
+        pass
+    return 30720.0
+
+
+def commit_reserve_mb(vram_charged_mb: float = 0.0) -> float:
+    """Commit (MB) che il worker deve ancora impegnare quando la VRAM sale al picco: picco atteso meno
+    la VRAM già allocata dal processo (già dentro il commit libero). Il parcheggio RAM la deve lasciare
+    libera, altrimenti il load successivo (LoRA, stage 2) esaurisce il commit: 0xC0000005 (17/10)."""
+    return max(0.0, vram_peak_mb() - max(0.0, float(vram_charged_mb)))
 
 
 def emb_cache_mb() -> float:
@@ -83,9 +109,11 @@ def avail_commit_mb() -> float:
         return 1e9
 
 
-def fits(size_mb: float, resident_mb: float, *, require_psutil: bool = False) -> bool:
+def fits(size_mb: float, resident_mb: float, *, require_psutil: bool = False,
+         reserve_mb: float = 0.0) -> bool:
     """Il predicato UNICO "questi size_mb ci stanno in cache RAM?":
-    (RAM fisica − size > floor) AND (commit − size > commit_floor) AND (residente + size ≤ budget).
+    (RAM fisica − size > floor) AND (commit − size − reserve > commit_floor) AND (residente + size ≤ budget).
+    reserve_mb = commit che il chiamante impegnerà ancora dopo (es. VRAM del worker, vedi `commit_reserve_mb`).
     require_psutil=True → psutil assente = False (semantica storica di ComponentStore._ram_ok);
     False → psutil assente = vincolo RAM saltato (semantica storica di _trim/_CpuParkRegistry)."""
     if not enabled():
@@ -96,7 +124,7 @@ def fits(size_mb: float, resident_mb: float, *, require_psutil: bool = False) ->
         except Exception:                               # noqa: BLE001
             return False
     return ((avail_ram_mb() - size_mb > ram_floor_mb())
-            and (avail_commit_mb() - size_mb > commit_floor_mb())
+            and (avail_commit_mb() - size_mb - reserve_mb > commit_floor_mb())
             and (resident_mb + size_mb <= ram_cache_mb()))
 
 

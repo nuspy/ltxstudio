@@ -65,7 +65,8 @@ def _tee_log() -> None:
         pass
 
 
-_tee_log()
+if os.environ.get("LTX_SERVER_NO_TEE") != "1":          # i test unitari importano il modulo senza dirottare stdout
+    _tee_log()
 
 # il server LEGGE la preview dai file scritti dal processo figlio (get_preview usa questa env)
 os.environ["LTX2_SERVER_PREVIEW_DIR"] = _PREVIEW_DIR
@@ -107,12 +108,72 @@ def _tail(path: str, n: int = 2000) -> str:
 # commit-safe), FREE_DEMOTE parcheggia in RAM invece di distruggere, e i floor sono commit-aware.
 # Opt-out: NATIVE_PERSISTENT_CHILD=0 (torna al per-job isolato puro).
 _PERSIST = os.environ.get("NATIVE_PERSISTENT_CHILD", "1") != "0"
+_RESPAWN_ON_CHANGE = os.environ.get("NATIVE_CHILD_RESPAWN", "change") != "never"
 
 
 def _job_model_key(module: str, params: dict) -> str:
-    arch = str(params.get("arch", module) or module).lower()
-    model = str(params.get("model", "") or params.get("model_gguf", "") or "").lower()
-    return f"{arch}:{os.path.basename(model) or '-'}"
+    """Chiave di RESIDENZA del job: dice QUALI PESI servono, non quale compito li usa (task 12: crea→modifica
+    con lo stesso file = stessa chiave → il figlio NON viene ucciso). Definizione unica in core.model_identity,
+    condivisa con persistent_runner e gpu_registry. Rollback: NATIVE_RESIDENCY_BY_TASK=1."""
+    from core.model_identity import residency_key
+    arch = str(params.get("arch", module) or module)
+    return residency_key(arch, str(params.get("model", "") or params.get("model_gguf", "") or ""))
+
+
+# Moduli che TENGONO un modello generativo residente nel figlio persistente. Gli altri (segment SAM2,
+# upscale ESRGAN, video_*) sono AUSILIARI piccoli: prima passavano dal figlio persistente e, avendo una
+# chiave diversa, UCCIDEVANO il modello immagini (flusso inpaint = segment → FLUX ricaricato due volte).
+# Ora girano in un processo isolato (job_runner, già nel codice) e il figlio resta com'è; se manca VRAM
+# per l'ausiliario il figlio viene PARCHEGGIATO in RAM (demote), mai ucciso. Rollback: NATIVE_HELPERS_ISOLATED=0.
+_RESIDENT_MODULES = {"image"}
+_HELPERS_ISOLATED = os.environ.get("NATIVE_HELPERS_ISOLATED", "1") != "0"
+# VRAM libera MINIMA (MB) per far girare l'ausiliario accanto al modello residente: sotto → demote del figlio.
+# Misurata a ogni job (NVML), non fissa per scheda; per-modulo perché SAM2+DINO pesa più di ESRGAN.
+_HELPER_MIN_FREE_MB = {"segment": 6000, "upscale": 3000, "video_upscale": 6000, "video_face": 4000,
+                       "video_fps": 3000}
+
+
+def _helper_min_free_mb(module: str) -> int:
+    env = os.environ.get("NATIVE_HELPER_MIN_FREE_MB")
+    if env:
+        try:
+            return int(float(env))
+        except ValueError:
+            pass
+    return int(_HELPER_MIN_FREE_MB.get(module, 4000))
+
+
+def _use_persistent_child(module: str) -> bool:
+    """True se il job va al figlio persistente (modello residente); False → processo isolato per-job."""
+    if not (_PERSIST and _child is not None):
+        return False
+    return module in _RESIDENT_MODULES or not _HELPERS_ISOLATED
+
+
+def _prepare_helper_vram(module: str, free_mb: float | None = None) -> bool:
+    """Prima di un ausiliario isolato: se la VRAM libera non basta, PARCHEGGIA il modello residente (il
+    figlio resta vivo, i pesi vanno in RAM e rientrano da lì). Ritorna True se ha fatto demote."""
+    if _child is None or not _child._alive():
+        return False
+    if free_mb is None:
+        try:
+            from core.gpu_mem import free_vram_mb
+            free_mb = free_vram_mb()
+        except Exception:                                    # noqa: BLE001 — senza misura: non toccare nulla
+            return False
+    need = _helper_min_free_mb(module)
+    if free_mb >= need:
+        return False
+    ok = _child.free(demote=True)
+    print(f"[server] ausiliario '{module}': VRAM libera {int(free_mb)}MB < {need}MB → modello residente "
+          f"{'PARCHEGGIATO in RAM' if ok else 'non parcheggiabile (job in corso)'}", flush=True)
+    if ok:
+        try:
+            from core.gpu_mem import wait_free_vram_mb
+            wait_free_vram_mb(need, timeout_s=20, tag=f"helper-{module}")
+        except Exception:                                    # noqa: BLE001
+            pass
+    return bool(ok)
 
 
 class _PersistentChild:
@@ -200,8 +261,12 @@ class _PersistentChild:
     def run(self, module: str, params: dict, pf: str, rf: str, timeout: float = 1800) -> None:
         key = _job_model_key(module, params)
         with self._lock:
-            # cambio-modello (o figlio morto) → respawn pulito (evita il 2° load in-process)
-            if not self._alive() or (self.model_key not in ("-", key)):
+            # cambio di PESI (o figlio morto) → respawn pulito (evita il 2° load in-process). `key` è la chiave di
+            # residenza (famiglia:file): crea→modifica con lo STESSO file non cambia chiave → nessun respawn.
+            # NATIVE_CHILD_RESPAWN=never: nessun respawn al cambio (swap in-process, i parcheggi RAM restano
+            # utilizzabili) — da abilitare solo dopo il test dal vivo; default "change" = comportamento storico.
+            _changed = self.model_key not in ("-", key) and _RESPAWN_ON_CHANGE
+            if not self._alive() or _changed:
                 self._kill(); self._spawn()
             out = self._send(f"RUN {pf} {rf}", ("DONE", "ERR"), timeout)
             if out.startswith("DONE"):
@@ -275,7 +340,7 @@ def _worker():
             env.pop("LTX2_SERVER_PREVIEW_DIR", None)        # nel figlio preview_bus SCRIVE, non legge
             done_persistent = False
             proc = None
-            if _PERSIST and _child is not None:
+            if _use_persistent_child(job["module"]):
                 # FIGLIO PERSISTENTE: riusa il modello caldo tra i job (stesso modello). Il figlio ha un log
                 # PROPRIO (persistent_child.log). Fallback al per-job se non risponde/muore → nessuna regressione.
                 try:
@@ -285,6 +350,8 @@ def _worker():
                     with open(lf, "a", encoding="utf-8", errors="replace") as logf:
                         logf.write(f"\n[server] figlio persistente ko ({_pe}) → fallback per-job\n")
             if not done_persistent:
+                if _PERSIST and _child is not None and job["module"] not in _RESIDENT_MODULES:
+                    _prepare_helper_vram(job["module"])      # ausiliario isolato: se manca VRAM, demote del residente
                 with open(lf, "w", encoding="utf-8", errors="replace") as logf:
                     proc = subprocess.Popen(
                         [sys.executable, "-u", "-m", "inference_server.job_runner", pf, rf],

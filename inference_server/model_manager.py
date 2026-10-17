@@ -175,13 +175,17 @@ class ModelManager:
             self._cpu_cache.clear()
         return n
 
-    def evict_others(self, keep_key: str) -> int:
+    def evict_others(self, keep_key: str, keep_ident: tuple | None = None) -> int:
         """AUTO-EVICT al cambio modello: scarica TUTTE le shell tranne keep_key (non-sticky) → rilascia i loro
         componenti. Il transformer del modello PRECEDENTE diventa orfano (refcount 0) e verrà liberato/demotato
         dallo STORE (evict_unused); i componenti CONDIVISI usati da keep_key restano (refcount>0). Ritorna il
         numero di shell scaricate. Così cambiando modello la VRAM del precedente si libera SUBITO (non attende
-        la pressione di make_room). Disattivabile con NATIVE_AUTOEVICT=0."""
-        others = [k for k, e in self._cache.items() if k != keep_key and not e.sticky]
+        la pressione di make_room). Disattivabile con NATIVE_AUTOEVICT=0.
+        `keep_ident` (task 12): identità dei pesi (`pipe._ls_ident`) da NON sfrattare — le pipeline sorelle
+        (stesso file in crea/modifica) condividono i pesi con quella che sta per partire: scaricarle
+        costringerebbe a ricaricare ciò che si sta per riusare."""
+        others = [k for k, e in self._cache.items() if k != keep_key and not e.sticky
+                  and not (keep_ident is not None and getattr(e.obj, "_ls_ident", None) == keep_ident)]
         for k in others:
             self.unload(k, allow_cpu=False)             # la shell è leggera; l'orfano lo gestisce lo STORE
         if others:
