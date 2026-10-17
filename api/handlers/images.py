@@ -149,8 +149,27 @@ def _qwen21(p: dict, req: BaseModel | None = None) -> dict:
         p["guidance"] = 1.0 if meta.get("turbo") else float(meta.get("cfg", DEFAULT_GUIDANCE))
     if len(p.get("ref_images") or []) > MAX_REFS:
         raise HTTPException(422, f"al massimo {MAX_REFS} riferimenti")
+    _foto_tokens(p)
     p.pop("model", None)
     return p
+
+
+def _foto_tokens(p: dict) -> None:
+    """Riferimenti nominati come nella GUI: l'elemento k-esimo di `ref_images` è `@Foto_k`. Il prompt può citarlo con
+    `@Foto_N` (tradotto in «image N», la sintassi di Qwen-Image 2.1); un token che cita una foto inesistente è 422,
+    mai ignorato in silenzio. Le immagini passate ma non citate vanno comunque al modello. «image N» scritto a mano
+    resta valido."""
+    from core import image_refs as R
+    refs = [r for r in (p.get("ref_images") or []) if r]
+    prompt = p.get("prompt") or ""
+    order = {"image": list(range(1, len(refs) + 1))}
+    bad = R.unknown_tokens(prompt, {("image", n) for n in order["image"]})
+    if bad:
+        names = ", ".join(sorted({R.token_of(t.kind, t.n) for t in bad}))
+        raise HTTPException(422, f"il prompt cita {names}, ma ref_images ne contiene {len(refs)} "
+                                 f"(@Foto_1…@Foto_{len(refs)})" if refs else
+                                 f"il prompt cita {names} ma non ci sono immagini in ref_images")
+    p["prompt"] = R.translate(prompt, order, "qwen21")
 
 
 # ─────────────── registrazione ───────────────
