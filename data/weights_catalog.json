@@ -1362,6 +1362,13 @@
       "filename": "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
       "use": [
         "iclora_control"
+      ],
+      "used_by": [
+        "cap.video_motion_track"
+      ],
+      "note": "Motion-track (tab Modifica Video AI, API /video/ic_lora kind=motion_track): tracce disegnate -> video di controllo; immagine di partenza = frame 0, forza 1.0. Col dev si aggiunge la distilled-LoRA 0.5",
+      "deps": [
+        "ltx23-distilled-lora-384|ltx23-distilled-fp8"
       ]
     },
     {

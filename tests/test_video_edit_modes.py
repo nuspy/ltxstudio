@@ -31,7 +31,7 @@ def test_tab_modes_match_if_tab_not_yet_derived():
 
 def test_all_phase_1a_modes_present():
     for k in ("edit", "inpaint", "replace_char", "anime2real", "real2anime", "refocus", "uncompress",
-              "deinterlace", "motiondeblur", "detailer", "outpaint", "restyle", "cameraman", "lipdub", "hdr"):
+              "deinterlace", "motiondeblur", "detailer", "outpaint", "restyle", "cameraman", "lipdub", "hdr", "motion_track"):
         assert k in M.MODE_SPECS
 
 
@@ -93,7 +93,7 @@ def test_modes_for_family():
                                                              "motiondeblur", "detailer", "hdr"]
     assert [s.key for s in M.modes_for_family("outpaint")] == ["outpaint"]
     assert [s.key for s in M.modes_for_family("lipdub")] == ["lipdub", "lipdub_audio"]
-    assert [s.key for s in M.modes_for_family("camera")] == ["cameraman"]
+    assert [s.key for s in M.modes_for_family("camera")] == ["cameraman", "motion_track"]
     assert "lipdub" in M.families() and "hdr" in [s.key for f in M.families() for s in M.modes_for_family(f)]
 
 
@@ -160,3 +160,12 @@ def test_ic_kinds_list():
     assert "cameraman" in M.ICLORA_VIDEO_KINDS and "motion-track" in M.ICLORA_VIDEO_KINDS
     assert "lipdub" in M.ICLORA_VIDEO_KINDS and "hdr" in M.ICLORA_VIDEO_KINDS
     assert "canny" not in M.ICLORA_VIDEO_KINDS
+
+
+def test_motion_track_spec():
+    sp = M.get_spec("motion_track")
+    assert sp.kind == "motion-track" and sp.catalog_id == "ltx-iclora-motion-track"
+    assert sp.needs_source_image and sp.needs_tracks and not sp.needs_video and not sp.chunkable
+    assert sp.cap == "cap.video_motion_track" and sp.max_frames_per_segment == 257 and (sp.max_frames_per_segment - 1) % 8 == 0
+    assert M.spec_for_kind("motion-track").key == "motion_track"
+    assert M.segments_needed(1000, "motion_track") == 1      # non spezzabile: la GUI/API devono rifiutare
