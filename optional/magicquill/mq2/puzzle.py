@@ -1,6 +1,6 @@
 """LoRA 'puzzle' di MagicQuill V2 (modalità foreground = integrazione di un oggetto, senza immagine di controllo).
 
-Dal progetto MagicQuillV2 (CC BY-NC 4.0, (c) Zichen Liu et al.): vedi `inference_server/backends/mq2/__init__.py` per
+Dal progetto MagicQuillV2 (CC BY-NC 4.0, (c) Zichen Liu et al.): vedi `NOTICE.md` (cartella del componente) per
 attribuzione e avvertenza di licenza (NON commerciale). `edit.py` upstream la carica con un monkey-patch di
 `load_lora_weights` che converte il formato MISTO del file (2 stili di chiave) e aggiunge il prefisso `transformer.`.
 Qui la stessa conversione è fatta in memoria e la LoRA entra nel normale PEFT/diffusers (adapter 'mq_puzzle').

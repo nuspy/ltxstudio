@@ -1,7 +1,7 @@
 """Aggancio di MagicQuill V2 alla `FluxKontextPipeline` diffusers 0.38 già costruita da image_flux.
 
 Derivato da MagicQuillV2 `src/pipeline_flux_kontext_control.py` (CC BY-NC 4.0, (c) Zichen Liu et al.). Vedi
-`inference_server/backends/mq2/__init__.py` per attribuzione e avvertenza di licenza (NON commerciale).
+`NOTICE.md` (cartella del componente) per attribuzione e avvertenza di licenza (NON commerciale).
 
 Invece di copiare l'intera pipeline upstream (basata su un diffusers più vecchio) si usa la `__call__` STANDARD di
 FluxKontextPipeline e si sostituisce, per la durata del job, solo `prepare_latents`: restituisce i latenti Kontext

@@ -1,7 +1,7 @@
 """Blocchi FLUX con condizione di controllo MagicQuill V2, per il transformer diffusers 0.38 GIÀ caricato.
 
 Derivato da MagicQuillV2 `src/layers_cache.py` e `src/transformer_flux.py` (CC BY-NC 4.0, (c) Zichen Liu et al.; da
-EasyControl). Vedi `inference_server/backends/mq2/__init__.py` per attribuzione e avvertenza di licenza (NON
+EasyControl). Vedi `NOTICE.md` (cartella del componente) per attribuzione e avvertenza di licenza (NON
 commerciale). Riscritto (non copiato) per la struttura di diffusers 0.38: layout (B, S, H, D), `FluxAttention`, blocco
 singolo con txt separato, `FluxTransformer2DModel.forward` STANDARD (non sostituito).
 

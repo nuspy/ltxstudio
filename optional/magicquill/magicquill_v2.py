@@ -3,7 +3,7 @@
 LICENZA: il codice di riferimento MagicQuill V2 (https://github.com/zliucz/MagicQuillV2, (c) Zichen Liu et al.) è CC BY-NC 4.0 =
 USO NON COMMERCIALE (il README upstream porta anche un badge CC BY-SA 4.0; il catalogo pesi dice CC BY-NC-SA 4.0): questo
 modulo e i pesi `*_lora.safetensors` NON vanno distribuiti in un'edizione commerciale senza una decisione di licenza
-dell'utente. Dettagli e attribuzione: `inference_server/backends/mq2/__init__.py`.
+dell'utente. Dettagli e attribuzione: `NOTICE.md` (cartella del componente).
 
 Handler `image_mq` (job_runner / persistent_runner): `run(params, mm, output_dir)` -> {"status","output":[png]} | {"status":"error","error"}.
 Gira SOLO nel processo figlio del server (importa torch): mai dal GUI.

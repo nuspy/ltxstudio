@@ -3517,5 +3517,7 @@
   "feat.cap.image_magicquill": "MagicQuill V2（基于 FLUX.1 Kontext 的引导编辑）",
   "weights.license.ack.title": "非商业许可",
   "weights.license.ack.body": "这些权重的许可证不允许商业使用（{license}）。请仅供个人/非商业用途下载，并遵守作者的条款（署名与相同方式共享）。它们不属于安装程序：由你自行下载并自行负责。\n\n{names}\n\n你是否已阅读许可证并要下载？",
-  "weights.license.declined": "下载已取消：未确认许可证。"
+  "weights.license.declined": "下载已取消：未确认许可证。",
+  "mq.pack.title": "未安装 MagicQuill 组件",
+  "mq.pack.missing": "未安装 MagicQuill V2 组件。它包含非商业许可（CC BY-NC 4.0）的代码，不随应用提供：请在“模型权重”标签页下载（条目“mq2-code”），并同时下载 MagicQuill LoRA。"
 }

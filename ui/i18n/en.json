@@ -3589,5 +3589,7 @@
   "feat.cap.image_magicquill": "MagicQuill V2 (guided editing on FLUX.1 Kontext)",
   "weights.license.ack.title": "Non-commercial licence",
   "weights.license.ack.body": "These weights have a licence that does NOT allow commercial use ({license}). Download them only for your personal/non-commercial use, respecting the author's terms (attribution and share-alike). They are not part of the installer: you download them yourself, at your own responsibility.\n\n{names}\n\nHave you read the licence and do you want to download them?",
-  "weights.license.declined": "Download cancelled: licence not confirmed."
+  "weights.license.declined": "Download cancelled: licence not confirmed.",
+  "mq.pack.title": "MagicQuill component not installed",
+  "mq.pack.missing": "The MagicQuill V2 component is not installed. It contains code under a non-commercial licence (CC BY-NC 4.0) and is not included in the app: download it from the “Model weights” tab (entry “mq2-code”), together with the MagicQuill LoRAs."
 }

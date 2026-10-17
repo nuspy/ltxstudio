@@ -338,6 +338,9 @@ def register(app: FastAPI):
         from core import arch_filter as af
         if not af.is_kontext(req.model):
             raise HTTPException(422, f"MagicQuill richiede un checkpoint FLUX.1 Kontext: «{req.model}»")
+        from core import optional_components as oc
+        if not oc.magicquill_installed():                         # componente opzionale (licenza non commerciale)
+            raise HTTPException(409, oc.NOT_INSTALLED_MSG)
         _weights_409([f"mq2-{'puzzle' if req.mode == 'foreground' else req.mode}-lora"], "MagicQuill V2")
         p = req.model_dump(exclude_none=True)
         p.update({"_module": "image_mq", "arch": "kontext"})

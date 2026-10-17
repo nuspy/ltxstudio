@@ -132,3 +132,16 @@ def test_inpaint_with_controlnet_only_on_flux1_base(client):
     assert r.status_code == 200
     p = _run(client)
     assert "control_scale" not in p and "mode" not in p
+
+
+def test_magicquill_component_missing_is_409(client, monkeypatch):
+    """Codice MagicQuill (opzionale, licenza NC) non installato: 409 con messaggio chiaro, nessun job."""
+    monkeypatch.setenv("LTX_OPTIONAL_DISABLE", "magicquill")
+    k = os.path.join(M, "Flux", "FLUX_Kontext_Dev.safetensors")
+    if not os.path.isfile(k):
+        pytest.skip("FLUX Kontext assente")
+    g = _png(client.tmp, "g.png")
+    n0 = len(client.sent)
+    r = client.post("/image/magicquill", json={"mode": "local", "model": r"Flux\FLUX_Kontext_Dev.safetensors",
+                                               "image_path": g, "mask_path": g})
+    assert r.status_code == 409 and "non installato" in r.text and len(client.sent) == n0

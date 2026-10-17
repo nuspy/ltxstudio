@@ -143,19 +143,24 @@ def _pack_latents(x):
 
 
 def alimama_inputs(image, mask, width: int, height: int):
-    """(immagine di controllo PIL con l'area da rifare NERA, maschera impacchettata (1, seq, 4)): la convenzione di
-    AlimamaCreative (`prepare_image_with_mask`): maschera >0.5 = da rigenerare, resa nera nell'immagine; al ControlNet va
-    1 − maschera alla risoluzione dei latenti (H/8), poi impacchettata 2x2 (1 canale → 4)."""
+    """(immagine di controllo con l'area da rifare NERA, «maschera di conservazione» impacchettata (1, seq, 4)).
+
+    Scritta dalla CONVENZIONE, non da codice altrui (il repo GitHub AlimamaCreative non ha licenza di codice; i pesi sono
+    FLUX.1 [dev] non commerciale). La convenzione viene da due fatti verificabili: (1) la model card dice che il bianco della
+    maschera e' l'area da rigenerare; (2) `controlnet_x_embedder` del file ha 68 ingressi = 64 (latenti VAE dell'immagine
+    mascherata, impacchettati 2x2) + 4 (UN canale-maschera a risoluzione latente, impacchettato 2x2 = 4). Quindi: i pixel
+    da rifare diventano neri, e al ControlNet va, accanto ai latenti di quell'immagine, la maschera INVERTITA (1 = tieni)
+    ridotta alla griglia dei latenti (H/8 x W/8, vicino piu' prossimo) e impacchettata come i latenti."""
     import numpy as np
     import torch
+    import torch.nn.functional as TF
     from PIL import Image
     img = image.convert("RGB").resize((width, height), Image.LANCZOS)
-    m = mask.convert("L").resize((width, height), Image.NEAREST)
-    mb = np.asarray(m, dtype=np.uint8) > 127
-    arr = np.asarray(img).copy()
-    arr[mb] = 0
-    lat = m.resize((width // 8, height // 8), Image.NEAREST)
-    keep = 1.0 - (torch.from_numpy((np.asarray(lat, dtype=np.uint8) > 127).astype("float32"))[None, None])
+    hole = np.asarray(mask.convert("L").resize((width, height), Image.NEAREST)) > 127          # True = da rigenerare
+    arr = np.array(img)
+    arr[hole] = 0
+    hole_t = torch.from_numpy(hole.astype("float32"))[None, None]
+    keep = 1.0 - TF.interpolate(hole_t, size=(height // 8, width // 8), mode="nearest")
     return Image.fromarray(arr), _pack_latents(keep)
 
 

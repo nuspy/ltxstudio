@@ -3556,5 +3556,7 @@
   "feat.cap.image_magicquill": "MagicQuill V2 (modifica guidata su FLUX.1 Kontext)",
   "weights.license.ack.title": "Licenza non commerciale",
   "weights.license.ack.body": "Questi pesi hanno una licenza che NON consente l'uso commerciale ({license}). Si scaricano solo per tuo uso personale/non commerciale, rispettando le condizioni dell'autore (attribuzione e condivisione alle stesse condizioni). Non fanno parte dell'installer: li scarichi tu, sotto la tua responsabilità.\n\n{names}\n\nHai letto la licenza e vuoi scaricarli?",
-  "weights.license.declined": "Download annullato: licenza non confermata."
+  "weights.license.declined": "Download annullato: licenza non confermata.",
+  "mq.pack.title": "Componente MagicQuill non installato",
+  "mq.pack.missing": "Il componente MagicQuill V2 non è installato. Contiene codice con licenza non commerciale (CC BY-NC 4.0) e non è incluso nell'app: scaricalo dal tab «Pesi modelli» (voce «mq2-code»), insieme alle LoRA MagicQuill."
 }

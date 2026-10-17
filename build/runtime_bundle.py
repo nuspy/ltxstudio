@@ -20,6 +20,11 @@ from pathlib import Path
 RUNTIME_DIRS = ("workers", "scripts", "inference_server", "core", "assets")
 # file di dati di SOLA LETTURA spediti con l'app (lo stato utente — preferenze, cache, gui_state — si crea al volo)
 DATA_FILES = ("weights_catalog.json", "ca_bundle.pem", "precompiled_wheels.json")
+# Componenti con licenza NON commerciale (codice derivato di MagicQuill V2, CC BY-NC 4.0): NON entrano MAI in nessuna build o
+# installer, qualunque sia l'edizione (decisione 18/10/2026). Vivono in `optional/magicquill/` (repo, sviluppo) e li
+# installa l'utente (voce di catalogo `mq2-code`, con avviso di licenza). Glob relativi alla radice dell'app/dello stage.
+EXCLUDE_ALWAYS = ("optional", "scripts/package_magicquill_code.py", "inference_server/backends/magicquill_v2.py", "inference_server/backends/mq2",
+                  "**/magicquill_v2.py", "**/mq2")
 _IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo", "tests", "*.bak", "*.tmp*", "*.log",
                                  "edition.py")     # l'edizione bakeata è già compilata nell'exe
 
@@ -47,7 +52,7 @@ def stage(app_root: str | Path, dest: str | Path | None = None,
             shutil.copy2(app / "data" / f, data / f)
     pairs.append((data, "data"))
     removed = 0
-    for pat in exclude:
+    for pat in list(exclude) + list(EXCLUDE_ALWAYS):
         for f in out.glob(pat):
             if f.is_file():
                 f.unlink()
@@ -57,7 +62,16 @@ def stage(app_root: str | Path, dest: str | Path | None = None,
                 shutil.rmtree(f)
     if exclude:
         print(f"  [runtime] {removed} file di feature spente nell'edizione esclusi")
+    bad = forbidden_in(out)
+    if bad:                                          # rete di sicurezza: la build si ferma, non spedisce codice NC
+        raise RuntimeError(f"componenti con licenza non commerciale nello stage del runtime: {bad}")
     return pairs
+
+
+def forbidden_in(root: str | Path) -> list[str]:
+    """Percorsi (relativi a `root`) che le build non devono contenere (EXCLUDE_ALWAYS)."""
+    r = Path(root)
+    return sorted({str(p.relative_to(r)) for pat in EXCLUDE_ALWAYS for p in r.glob(pat)})
 
 
 # nucleo comune: lo usano tutte le edizioni (download/conversione dei pesi, server nativo, loader quantizzati)

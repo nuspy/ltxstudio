@@ -256,6 +256,35 @@ def case_mq_guards_and_visibility(w, spy):
 
 
 
+def case_mq_component_missing_warns_no_crash(w, spy):
+    """Componente MagicQuill (codice, licenza NC) non installato: avviso «non installato» + Apri tab Pesi, nessun job,
+    nessun crash; vale per le 4 modalita' e per l'integrazione (casella puzzle di Integra)."""
+    import os
+    from PySide6.QtWidgets import QMessageBox
+    _populate_inventory(w)
+    f = w.frame1_tab
+    m = _mq_ready(f)
+    if not m:
+        return
+    H.load_canvas_image(w)
+    _draw_center_mask(f.canvas)
+    seen = []
+    old_exec = QMessageBox.exec
+    QMessageBox.exec = lambda self, *a, **k: seen.append(self.text()) or 0
+    os.environ["LTX_OPTIONAL_DISABLE"] = "magicquill"
+    n0 = len(spy.calls)
+    try:
+        f.mq_mode.setCurrentIndex(f.mq_mode.findData("local"))
+        f.mq_prompt.setPlainText("x")
+        w.generate_magicquill()
+        w._start_native_mq_foreground({"image": "a.png", "mask": "b.png"}, m, "x", 20, 1, 2.5)
+    finally:
+        os.environ.pop("LTX_OPTIONAL_DISABLE", None)
+        QMessageBox.exec = old_exec
+    assert len(seen) == 2 and all("non \u00e8 installato" in t and "mq2-code" in t for t in seen), seen
+    assert len(spy.calls) == n0, "job partito senza il componente"
+
+
 CASES = [
     ("ctl_visibility_by_arch_and_family", "ControlNet/Redux solo con FLUX.1 e Z-Image (Redux solo FLUX.1); mai con FLUX.2, Krea 2, "
      "Qwen, Ernie.", case_ctl_visibility_by_arch_and_family),
@@ -271,6 +300,8 @@ CASES = [
      case_ctl_cn_inpaint_only_with_flux1_base),
     ("mq_modes_and_params", "MagicQuill: 4 modalita' con forza di default dell'autore (0.6/1.5/1.0), parametri e file verso image_mq.",
      case_mq_modes_and_params),
+    ("mq_component_missing", "Componente MagicQuill non installato: avviso + Apri tab Pesi, nessun job, nessun crash.",
+     case_mq_component_missing_warns_no_crash),
     ("mq_guards_and_visibility", "MagicQuill: menu solo Kontext FLUX.1, controlli per modalita', avvisi senza maschera e pesi mancanti.",
      case_mq_guards_and_visibility),
 ]
