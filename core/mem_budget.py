@@ -128,6 +128,26 @@ def fits(size_mb: float, resident_mb: float, *, require_psutil: bool = False,
             and (resident_mb + size_mb <= ram_cache_mb()))
 
 
+class LoadRefused(RuntimeError):
+    """Il caricamento previsto non ci sta nel commit: rifiutato PRIMA di iniziare (errore chiaro, nessun crash)."""
+
+
+def check_load(load_mb: float, what: str = "modello") -> None:
+    """GUARDIA di caricamento (task 12, incidente 17/10): se commit libero − carico previsto < pavimento di
+    commit → solleva `LoadRefused` invece di procedere (superare il commit su Windows = access violation / crash
+    di sistema, non un OOM pulito). `load_mb` = byte che il caricamento impegnerà ANCORA (0 se già residente).
+    Pavimento: `commit_floor_mb()` (env LS_COMMIT_FLOOR_MB…)."""
+    if load_mb <= 0:
+        return
+    avail = avail_commit_mb()
+    floor = commit_floor_mb()
+    if avail - float(load_mb) < floor:
+        raise LoadRefused(
+            f"Caricamento di {what} rifiutato: servono ~{load_mb / 1024:.1f} GB di memoria, il commit libero è "
+            f"{avail / 1024:.1f} GB e il pavimento di sicurezza {floor / 1024:.0f} GB. Chiudi altri programmi o "
+            f"scarica un modello dalla memoria («Libera VRAM») e riprova.")
+
+
 def pick_lru_victims(entries, need_mb: float) -> list:
     """Sceglie le vittime LRU per liberare `need_mb` dalla cache RAM.
     entries: iterable di (key, size_mb, last_used). Ritorna le key da sfrattare (più vecchie

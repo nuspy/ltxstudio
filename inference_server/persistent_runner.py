@@ -96,10 +96,12 @@ def main() -> int:
         _ipc.flush()
 
     print("[persistent_runner] pronto (ModelManager caldo)", file=sys.stderr, flush=True)
+    from inference_server.cuda_health import is_cuda_fatal
     for raw in sys.stdin:
         cmd = raw.strip()
         if not cmd:
             continue
+        rf_cur = None                                       # result.json del job in corso (per riportare l'errore)
         try:
             if cmd == "QUIT":
                 break
@@ -145,6 +147,7 @@ def main() -> int:
                 continue
             if cmd.startswith("RUN "):
                 _, pf, rf = cmd.split(" ", 2)
+                rf_cur = rf
                 with open(pf, encoding="utf-8") as f:
                     job = json.load(f)
                 module = job.get("module", "image")
@@ -165,8 +168,28 @@ def main() -> int:
         except Exception as e:                                # noqa: BLE001
             # errore NON nativo (gestito): riporta e continua. Un crash nativo invece uccide il processo
             # (il server lo rileva via EOF) — è la protezione voluta.
-            sys.stderr.write(f"[persistent_runner] errore: {e}\n{traceback.format_exc()[-1500:]}\n")
+            _tb = traceback.format_exc()[-1500:]
+            sys.stderr.write(f"[persistent_runner] errore: {e}\n{_tb}\n")
             sys.stderr.flush()
+            fatal = is_cuda_fatal(e)
+            if rf_cur:                                      # risultato d'errore leggibile (come job_runner), non «nessun risultato»
+                try:
+                    msg = f"{e}\n{_tb}"
+                    if fatal:
+                        msg = ("Errore CUDA nel processo immagini (" + str(e).splitlines()[0][:160] + "): il processo "
+                               "è stato riavviato per non lasciare la GPU in stato incoerente. Riprova.\n" + _tb)
+                    tmp = rf_cur + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as fh:
+                        json.dump({"status": "error", "error": msg}, fh)
+                    os.replace(tmp, rf_cur)
+                except Exception:                           # noqa: BLE001
+                    pass
+            if fatal:
+                # CONTESTO CUDA AVVELENATO (OOM, device-side assert…): ogni ripiego in-process lavorerebbe su uno stato
+                # inconsistente (incidente 17/10: ~90GB di memoria virtuale e crash di sistema). Il figlio si dichiara
+                # NON SANO ed esce; il server lo rigenera al job successivo.
+                emit("ERR cuda_fatal")
+                os._exit(86)
             emit("ERR eccezione (vedi log)")
     return 0
 
