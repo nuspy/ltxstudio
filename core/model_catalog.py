@@ -21,6 +21,8 @@ ARCH_DEFAULTS = {
     "Ernie":   {"sampler": "euler", "scheduler": "simple", "steps": 20, "cfg": 4.0, "clip_type": "flux2"},
     # Qwen-Image 2.1: campionato SENZA guidance (true_cfg 1.0), 40 passi (4/6 con le LoRA turbo)
     "Qwen-Image 2.1": {"sampler": "euler", "scheduler": "simple", "steps": 40, "cfg": 1.0, "clip_type": "qwen"},
+    # FLUX.3 Klein distillato (flow map): 16 passi, SENZA CFG né negative (core/flux3_spec); sampler/scheduler non usati
+    "FLUX.3 Klein": {"sampler": "euler", "scheduler": "flowmap", "steps": 16, "cfg": 1.0, "clip_type": "flux3"},
 }
 
 # Capability per ARCHITETTURA VIDEO — usata dalla GUI per abilitare/disabilitare i controlli quando
@@ -73,6 +75,11 @@ ARCH_IMAGE_CAPS = {
     # con la zona evidenziata sull'immagine (niente pipeline a maschera dedicata). Niente controlnet/PuLID.
     "qwen_image21": {"t2i": True, "inpaint": True, "kontext": True, "edit": True, "controlnet": False,
                      "pulid": False, "multiref": 10, "rgba": True},
+    # FLUX.3 Image Klein: t2i + editing per istruzione + multi-riferimento (≤10) + riquadri (layout e edit). NON ha un
+    # inpaint con maschera nativo: `inpaint` qui = modifica per istruzione + composito NOSTRO con maschera binarizzata
+    # (`inpaint_native: False`, dichiarato anche nel log del worker). Niente controlnet/PuLID/RGBA.
+    "flux3": {"t2i": True, "inpaint": True, "inpaint_native": False, "kontext": True, "edit": True,
+              "controlnet": False, "pulid": False, "multiref": 10, "boxes": True, "rgba": False},
 }
 
 
@@ -117,6 +124,7 @@ _RECOMMENDED: dict[str, dict] = {
     "krea2-raw": {"steps": 52, "cfg": 3.5, "note": "krea2 raw"},
     # Qwen-Image 2.1 (immagini): 40 passi senza guidance; LoRA turbo Viggle 4/6 passi
     "qwen-image-2.1": {"steps": 40, "cfg": 1.0, "note": "qwen-image 2.1 (true_cfg 1.0)"},
+    "flux3-klein": {"steps": 16, "cfg": 1.0, "note": "flux.3 klein distillato (flow map, senza CFG)"},
     "qwen_image_2.1": {"steps": 40, "cfg": 1.0, "note": "qwen-image 2.1 (true_cfg 1.0)"},
     # Krea Realtime (video): distillato ~4 step, autoregressivo
     "krea-realtime": {"steps": 4, "cfg": 1.0, "note": "krea realtime autoregressivo"},

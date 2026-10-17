@@ -146,6 +146,13 @@ MODEL_SYNTAX: dict[str, dict] = {
                   "riferimento ha latenti e id di posizione propri (nessuna etichetta nel template). «image N» e' la "
                   "citazione posizionale in linguaggio naturale; il massimo (4) e' una proposta prudente (VRAM), NON provato live",
     },
+    "flux3": {
+        "fmt": {"image": "the {ord} image"}, "max_images": 10, "verified": False,
+        "source": "docs diffusers (pipelines/flux3) e system prompt dell'upsampler FLUX.3 (task 13, 18/10): i riferimenti si "
+                  "citano per ORDINALE («the first image», «the second image»…) nell'ordine di invio; nel caption "
+                  "l'upsampler li chiama <ref_image_0>…; i riquadri di edit usano `ref_image_N` zero-based "
+                  "(core/flux3_caption.ref_name). NON provato dal vivo",
+    },
     "h3": {
         "fmt": {"image": "<Picture {n}>", "video": "<Video {n}>", "audio": "<Audio {n}>"}, "verified": True,
         "source": "core/h3_prompt.py (prompt strutturato MiniMax H3: <Picture N>/<Video N>/<Audio N>)",
@@ -156,6 +163,9 @@ MODEL_SYNTAX: dict[str, dict] = {
                   "umano veniva ignorato)",
     },
 }
+
+
+_ORD = ("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth")
 
 
 def translate(prompt: str, order: dict[str, list[int]], style: str) -> str:
@@ -173,7 +183,7 @@ def translate(prompt: str, order: dict[str, list[int]], style: str) -> str:
         if k is None or f is None:
             continue
         out.append(prompt[last:t.start])
-        out.append(f.format(n=k))
+        out.append(f.format(n=k, ord=_ORD[k - 1] if 1 <= k <= len(_ORD) else f"{k}th"))
         last = t.end
     out.append(prompt[last:])
     return "".join(out)

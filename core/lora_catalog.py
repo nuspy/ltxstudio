@@ -253,7 +253,7 @@ def _overrides() -> dict:
 # Pannelli le cui LoRA NON si fidano solo del dizionario (scanner esterno, spesso indietro sui file spostati):
 # arch → sottocartelle di <radice>\LoRA da scandire. Wan: «Wan21» = MultiTalk/Wan 2.1, «Wan22» = Wan 2.2
 # (le LoRA «Wan2_2-…» stanno in LoRA\Wan ma sono 2.2: le distingue il nome, vedi _wan_arch_of).
-_FOLDERS = {"FLUX": ("Flux",), "WAN21": ("Wan",), "WAN22": ("Wan", "Wan2.2")}
+_FOLDERS = {"FLUX": ("Flux",), "FLUX3": ("Flux3", "Flux"), "WAN21": ("Wan",), "WAN22": ("Wan", "Wan2.2")}
 _LORA_EXT = (".safetensors", ".pt", ".ckpt")
 _WAN22_NAME = re.compile(r"wan2[_.\-]?2|high[_-]?noise|low[_-]?noise", re.IGNORECASE)
 
@@ -265,6 +265,38 @@ def _wan_arch_of(path: str, filename: str) -> str:
     if f"{os.sep}wan2.2{os.sep}" in path.lower() or _WAN22_NAME.search(filename):
         return "Wan22"
     return "Wan21"
+
+
+_FLUX3_LORA_KEYS = re.compile(r"(^|\.)(content_)?mode_blocks\.(image|image_cond)\.\d+\.|(^|\.)txt_mode_blocks\.\d+\.")
+_LORA_FAMILY_CACHE: dict = {}
+
+
+def lora_family_from_keys(path: str) -> str:
+    """Famiglia di una LoRA dalle CHIAVI dell'header (mai dai metadati, REGOLA 14/10): «flux3» se ha i blocchi per
+    modalità di FLUX.3 Image Klein (nativo `content_mode_blocks`/`txt_mode_blocks` o diffusers `mode_blocks`), altrimenti
+    "" (non dice nulla: le altre famiglie le decidono dizionario/cartella). Cache per (path, mtime, size)."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return ""
+    sig = (path, st.st_mtime_ns, st.st_size)
+    if sig in _LORA_FAMILY_CACHE:
+        return _LORA_FAMILY_CACHE[sig]
+    fam = ""
+    try:
+        import struct
+        with open(path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            if 0 < n < 100_000_000:
+                keys = [k for k in json.loads(f.read(n)) if k != "__metadata__"]
+                if any(_FLUX3_LORA_KEYS.search(k) for k in keys):
+                    fam = "flux3"
+    except Exception:                                    # noqa: BLE001 — non è un safetensors leggibile
+        fam = ""
+    if len(_LORA_FAMILY_CACHE) > 4096:
+        _LORA_FAMILY_CACHE.clear()
+    _LORA_FAMILY_CACHE[sig] = fam
+    return fam
 
 
 def _is_adult(filename: str, *extra: Any) -> bool:
@@ -369,6 +401,11 @@ class LoraCatalog:
         out += _folder_loras(self.compatible_arch, seen, meta)
         out += _extra_loras(self.compatible_arch, seen)
         out = [e for e in out if not is_ic_lora_file(e.filename, e.path)]    # le IC-LoRA non sono LoRA normali
+        if self.compatible_arch.upper() in ("FLUX", "FLUX3"):
+            # FLUX.3 ≠ FLUX.1: una LoRA FLUX.3 (chiavi a blocchi per modalità) compare SOLO sotto «FLUX.3 Klein», mai fra
+            # le LoRA FLUX.1/2 anche se sta nella stessa cartella o il dizionario la chiama «FLUX»
+            want3 = self.compatible_arch.upper() == "FLUX3"
+            out = [e for e in out if (lora_family_from_keys(e.path) == "flux3") == want3]
         out.sort(key=lambda e: (e.preview_url is None, -e.downloads, e.name.lower()))
         self._entries = out
         self._mtime = self.path.stat().st_mtime

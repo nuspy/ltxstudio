@@ -7636,6 +7636,125 @@
       ],
       "license": "CC BY-NC-SA 4.0",
       "license_ack": "cc_by_nc_sa"
+    },
+    {
+      "id": "flux3-dit-fp8r",
+      "module": "Immagini",
+      "label": "FLUX.3 Image Klein DiT distillato fp8 per riga (6.3GB, RTX 40xx/50xx)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Flux3",
+      "gated": true,
+      "approx_gb": 6.27,
+      "scan_names": [
+        "flux3_klein_distilled_fp8r.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux3",
+      "repo_id": "black-forest-labs/flux-3-image-klein",
+      "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein",
+      "filename": "flux3_klein_distilled_fp8r.safetensors",
+      "remote_filename": "variants/fp8r/model.safetensors",
+      "sha256": "30054053f630725b488aead9a81b422793cee18027856a16bd17b902ad612018",
+      "note": "DiT 5,55B (flow map: 16 passi, senza CFG né negative), fp8 E4M3 con scala per riga (kernel fuso, serve cc ≥ 8.9). Crea, modifica per istruzione, multi-riferimento fino a 10, riquadri (layout/edit). Licenza FLUX Kommunity v1.0 (BFL): uso commerciale degli output solo se Qualifying User (ricavi annui sotto 5 milioni di dollari) con filtro/revisione dei contenuti e dichiarazione AI; i pesi li scarica l'utente dopo aver accettato la licenza su Hugging Face",
+      "used_by": [
+        "cap.image_flux3"
+      ],
+      "license": "FLUX Kommunity License v1.0",
+      "license_ack": "flux_kommunity",
+      "use": [
+        "ckpt_image",
+        "fp8",
+        "distilled"
+      ],
+      "deps": [
+        "flux3-te",
+        "flux2-vae",
+        "flux3-pup-sakura-q8"
+      ]
+    },
+    {
+      "id": "flux3-te",
+      "module": "Immagini",
+      "label": "FLUX.3 Klein text encoder Qwen3-VL-4B Instruct bf16 (8.9GB) + tokenizer",
+      "kind": "snapshot",
+      "type": "TextEncoders",
+      "family": "Flux3",
+      "gated": true,
+      "approx_gb": 8.88,
+      "scan_names": [],
+      "category": "image",
+      "arch": "flux3",
+      "repo_id": "black-forest-labs/flux-3-image-klein",
+      "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein",
+      "note": "8 strati (4,8,…,32) impilati → token a 20480 canali; Apache-2.0 (text_encoder/LICENSE). La licenza del DiT è quella FLUX Kommunity: Licenza FLUX Kommunity v1.0 (BFL): uso commerciale degli output solo se Qualifying User (ricavi annui sotto 5 milioni di dollari) con filtro/revisione dei contenuti e dichiarazione AI; i pesi li scarica l'utente dopo aver accettato la licenza su Hugging Face",
+      "allow_patterns": [
+        "text_encoder/*",
+        "LICENSE.md",
+        "NOTICE.md"
+      ],
+      "used_by": [
+        "cap.image_flux3"
+      ],
+      "license": "FLUX Kommunity License v1.0",
+      "license_ack": "flux_kommunity",
+      "use": [
+        "te"
+      ]
+    },
+    {
+      "id": "flux3-pup-configs",
+      "module": "Immagini",
+      "label": "FLUX.3 Klein upsampler: config + tokenizer + system prompt (json, ~20MB)",
+      "kind": "snapshot",
+      "type": "configs",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.02,
+      "scan_names": [],
+      "category": "image",
+      "arch": "flux3",
+      "repo_id": "black-forest-labs/flux-3-image-klein-pup",
+      "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein-pup",
+      "note": "solo json/chat template (NON i pesi dell'upsampler ufficiale): config Qwen3.5-9B, tokenizer e system_prompts.json (t2i, i2i, t2i_bbox, i2i_bbox). Apache-2.0",
+      "allow_patterns": [
+        "*.json",
+        "*.jinja",
+        "LICENSE*"
+      ],
+      "used_by": [
+        "cap.flux3_upsampler"
+      ]
+    },
+    {
+      "id": "flux3-pup-sakura-q8",
+      "module": "Immagini",
+      "label": "FLUX.3 Klein prompt upsampler abliterato Sakura Q8_0 (GGUF, 9.5GB)",
+      "kind": "file",
+      "type": "TextEncoders",
+      "family": "Flux3",
+      "gated": false,
+      "approx_gb": 9.53,
+      "scan_names": [
+        "Sakura-FLUX.3-Image-Klein-PromptUpsampler-Uncensored-Q8_0-8.87GiB.gguf"
+      ],
+      "category": "image",
+      "arch": "flux3",
+      "repo_id": "webmp3/Sakura-FLUX.3-Image-Klein-PromptUpsampler-Uncensored-GGUF",
+      "url": "https://huggingface.co/webmp3/Sakura-FLUX.3-Image-Klein-PromptUpsampler-Uncensored-GGUF",
+      "filename": "Sakura-FLUX.3-Image-Klein-PromptUpsampler-Uncensored-Q8_0-8.87GiB.gguf",
+      "remote_filename": "Sakura-FLUX.3-Image-Klein-PromptUpsampler-Uncensored-Q8_0-8.87GiB.gguf",
+      "sha256": "4fbde007612af89cae6be93a59b7a6ead980560504be29d7a0645fc36e704b41",
+      "deps": [
+        "flux3-pup-configs"
+      ],
+      "note": "Qwen3.5-9B (fine-tune BFL) con abliterazione di terzi (webmp3/Sakura, Apache-2.0, not-for-all-audiences): rifiuta meno dell'ufficiale. GGUF Q8_0 SOLO linguaggio (il proiettore visivo è un file a parte): letto da workers/flux3_gguf.py. DA CONFERMARE con l'utente (task 13, DECISIONE RICHIESTA).",
+      "used_by": [
+        "cap.flux3_upsampler"
+      ],
+      "use": [
+        "prompt_upsampler"
+      ]
     }
   ],
   "schema": 2,

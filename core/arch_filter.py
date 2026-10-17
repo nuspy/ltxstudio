@@ -22,7 +22,7 @@ _ROOT_SUBDIRS = ("diffusion_models", "Checkpoints", "checkpoints")
 
 # cartella (segmento esatto, minuscolo) → famiglia. Solo per ciò che l'header non dice.
 _FOLDER_FAMILY = {
-    "flux": "flux1", "z-image": "zimage", "zimage": "zimage", "ernie": "ernie",
+    "flux": "flux1", "flux3": "flux3", "z-image": "zimage", "zimage": "zimage", "ernie": "ernie",
     "krea2": "krea2", "qwen21": "qwen_image", "qwen": "qwen_image",
     "ltx": "ltxv", "ltxvideo": "ltxv", "ltx-2": "ltxv",
     "minimax": "minimax_h3", "minimax-h3": "minimax_h3",
@@ -31,6 +31,8 @@ _FOLDER_FAMILY = {
 
 # parole del nome → famiglia (ultima spiaggia)
 _NAME_FAMILY = (
+    # FLUX.3 Image Klein PRIMA di FLUX.2: il nome contiene «klein» come i FLUX.2 Klein, ma è un'altra architettura
+    (re.compile(r"flux_3(?!\d)|flux3|flux 3(?!\d)|flux\.3(?!\d)|flux-3(?!\d)"), "flux3"),
     (re.compile(r"flux_2(?!\d)|flux2|flux 2(?!\d)|flux\.2(?!\d)|klein"), "flux2"),
     (re.compile(r"flux|getphat|fuxcapacity"), "flux1"),
     (re.compile(r"z-image|z_image|zimage"), "zimage"),
@@ -156,7 +158,7 @@ def _flags(rel: str) -> set:
 
 
 # ── immagini ─────────────────────────────────────────────────────────────────────────────────────────────
-ARCH_FAMILIES = {"FLUX": {"flux1", "flux2"}, "Z-Image": {"zimage"}, "Ernie": {"ernie"}}
+ARCH_FAMILIES = {"FLUX": {"flux1", "flux2"}, "Z-Image": {"zimage"}, "Ernie": {"ernie"}, "FLUX.3 Klein": {"flux3"}}
 
 
 def is_t2i_for_arch(arch_label: str, rel: str) -> bool:
@@ -242,6 +244,7 @@ _TE_RULES = {
     "zimage": (("qwen34b",), ()),
     "ernie": (("ministral",), ()),
     "krea2": (("qwen3vl4b",), ()),
+    "flux3": (("qwen3vl4b",), ()),               # Qwen3-VL-4B Instruct (strati impilati a 20480 canali), cartella TextEncoders/Flux3
     "qwen_image": (("qwen3vl8b",), ("pei2i", "pet2i")),
 }
 _VAE_RULES = {                         # nomi base esatti (normalizzati)
@@ -250,13 +253,14 @@ _VAE_RULES = {                         # nomi base esatti (normalizzati)
     "flux2": {"flux2vaesafetensors"},
     "ernie": {"flux2vaesafetensors"},
     "krea2": set(),                    # Krea 2: VAE (Qwen-Image) dentro lo snapshot
+    "flux3": {"flux2vaesafetensors"},  # FLUX.3 = VAE di FLUX.2 (stesso sha256, verificato 18/10)
     "qwen_image": {"qwenimage21vaebf16safetensors"},
 }
 
 
 def image_arch_key(arch_label: str, model: str = "") -> str:
     """Chiave di famiglia per i componenti: FLUX → flux1/flux2 secondo il file scelto ('' se Auto/segnaposto)."""
-    base = {"Krea 2": "krea2", "Qwen-Image 2.1": "qwen_image", "Z-Image": "zimage", "Ernie": "ernie"}
+    base = {"Krea 2": "krea2", "FLUX.3 Klein": "flux3", "Qwen-Image 2.1": "qwen_image", "Z-Image": "zimage", "Ernie": "ernie"}
     if arch_label in base:
         return base[arch_label]
     if arch_label == "FLUX":

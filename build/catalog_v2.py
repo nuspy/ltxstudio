@@ -1052,6 +1052,10 @@ NEW += _local_oct14(N)
 from catalog_task9 import entries as _task9  # noqa: E402
 NEW += _task9(N)
 
+# task 13 (18/10/2026): FLUX.3 Image Klein (DiT fp8r, text encoder Qwen3-VL-4B, upsampler)
+from catalog_task13 import entries as _task13  # noqa: E402
+NEW += _task13(N)
+
 # url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {
     "gfpgan-13": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",
