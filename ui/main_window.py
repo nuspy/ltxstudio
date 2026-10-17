@@ -1719,6 +1719,36 @@ class MainWindow(QMainWindow):
                                 tr("mw.native_restart_failed_msg").format(timeout=timeout))
         return ok
 
+    def _ernie_pe_ok(self, cfg: dict) -> bool:
+        """«Migliora prompt» su ERNIE-Image usa il PE ufficiale (pe/model.safetensors, ~7.7 GB). Se manca: avviso con
+        «Apri tab Pesi modelli» / «Continua senza» / «Annulla»; NESSUN download da qui. True = si può procedere."""
+        try:
+            from core import model_paths as _mp
+            from inference_server.backends import ernie_pe
+            repo = str(_mp.p("ernie-image", r"E:\AI\Models\diffusers\Ernie\ERNIE-Image"))
+            if ernie_pe.available(repo):
+                return True
+        except Exception:                                    # noqa: BLE001 — il server verifica comunque
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle(tr("ernie.pe.missing.title", "Enhancer ERNIE mancante"))
+        box.setText(tr("ernie.pe.missing.body",
+                       "«Migliora prompt» su ERNIE-Image usa l'enhancer ufficiale (pe/model.safetensors, ~7.7 GB) e non "
+                       "è su disco. Non scarico nulla io: scaricalo dal tab «Pesi modelli» (voce «ernie-image-pe»); se hai "
+                       "già ernie-image-prompt-enhancer.safetensors, va spostato in {dir}.").format(dir=os.path.join(repo, "pe")))
+        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+        b_c = box.addButton(tr("ernie.pe.continue", "Continua senza migliorare"), QMessageBox.AcceptRole)
+        box.addButton(tr("common.cancel", "Annulla"), QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is b_w:
+            self.tabs.setCurrentWidget(self.weights_tab)
+            return False
+        if box.clickedButton() is b_c:
+            cfg["enhance"] = False
+            return True
+        return False
+
     def _ensure_flux2_encoder(self, unet: str | None) -> bool:
         """Pre-check FLUX.2: se il modello è FLUX.2 e il suo encoder testo manca, OFFRE di scaricarlo
         (Comfy-Org via huggingface_hub). Ritorna True se si può procedere (encoder presente o appena
@@ -3101,6 +3131,8 @@ class MainWindow(QMainWindow):
                 return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
+            return
+        if cfg.get("arch") == "ernie" and cfg.get("enhance") and not self._ernie_pe_ok(cfg):
             return
         v = self.video_tab.get_values()
         self._clamp_resolution(v)        # tetto risoluzione per edizione (es. demo 768px)

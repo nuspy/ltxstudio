@@ -3338,5 +3338,8 @@
   "vedit.hdr.hq": "उच्च गुणवत्ता (लगभग 2× धीमा)",
   "vedit.hdr.hq_tt": "दोगुने फ़्रेम बनाता है और हर दूसरा रखता है: समय-संबंधी आर्टिफ़ैक्ट कम, समय दोगुना।",
   "vedit.hdr.info_out": "प्लेयर SDR प्रीव्यू दिखाता है; असली HDR फ़ाइल (_HDR_PQ.mp4) और/या _EXR फ़ोल्डर उसी नाम से बगल में हैं।",
-  "vedit.hdr.info_src10": "स्रोत {p} है: HDR LoRA को 8-बिट Rec.709 SDR चाहिए; पहले से HDR (PQ/HLG) वीडियो इनपुट के रूप में न दें।"
+  "vedit.hdr.info_src10": "स्रोत {p} है: HDR LoRA को 8-बिट Rec.709 SDR चाहिए; पहले से HDR (PQ/HLG) वीडियो इनपुट के रूप में न दें।",
+  "ernie.pe.missing.title": "ERNIE enhancer नहीं मिला",
+  "ernie.pe.missing.body": "ERNIE-Image पर «प्रॉम्प्ट सुधारें» आधिकारिक enhancer (pe/model.safetensors, लगभग 7.7 GB) इस्तेमाल करता है और वह डिस्क पर नहीं है। मैं खुद कुछ डाउनलोड नहीं करता: इसे «मॉडल वेट» टैब से लें (प्रविष्टि «ernie-image-pe»); अगर ernie-image-prompt-enhancer.safetensors पहले से है तो उसे {dir} में ले जाएँ।",
+  "ernie.pe.continue": "बिना सुधार के जारी रखें"
 }

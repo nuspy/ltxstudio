@@ -83,6 +83,8 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "flux2-dev": (["ckpt_image", "big_quality"], []),
     "zimage-turbo": (["ckpt_image", "distilled"], []),
     "ernie-image": (["ckpt_image"], []),
+    "ernie-image-turbo": (["ckpt_image", "distilled"], ["ernie-image"]),
+    "ernie-image-pe": (["prompt_enhancer"], []),
     "krea2_turbo": (["ckpt_image", "distilled"], []),
     "flux1-schnell-fp8": (["ckpt_image", "distilled", "fp8"], []),
     "rife-flownet-v4": (["upscale_video"], []),

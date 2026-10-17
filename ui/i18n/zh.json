@@ -3338,5 +3338,8 @@
   "vedit.hdr.hq": "高质量（约慢 2 倍）",
   "vedit.hdr.hq_tt": "生成两倍帧数并每隔一帧保留一帧：时间伪影更少，耗时加倍。",
   "vedit.hdr.info_out": "播放器显示 SDR 预览；真正的 HDR 文件（_HDR_PQ.mp4）和/或 _EXR 文件夹以相同的名称放在旁边。",
-  "vedit.hdr.info_src10": "源是 {p}：HDR LoRA 需要 8 位 Rec.709 SDR；不能把已经是 HDR（PQ/HLG）的视频作为输入。"
+  "vedit.hdr.info_src10": "源是 {p}：HDR LoRA 需要 8 位 Rec.709 SDR；不能把已经是 HDR（PQ/HLG）的视频作为输入。",
+  "ernie.pe.missing.title": "缺少 ERNIE 增强器",
+  "ernie.pe.missing.body": "ERNIE-Image 的«改进提示词»使用官方增强器（pe/model.safetensors，约 7.7 GB），但磁盘上没有。我不会自行下载：请在«模型权重»标签页获取（条目«ernie-image-pe»）；如果你已有 ernie-image-prompt-enhancer.safetensors，请将其移动到 {dir}。",
+  "ernie.pe.continue": "不改进，继续"
 }

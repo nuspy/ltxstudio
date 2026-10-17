@@ -13,6 +13,7 @@ REFRESH_IDS = (
     "flux1-fuxcapacity", "flux1-getphat", "flux1-dev-nunchaku-fp4", "flux1-kontext-nunchaku-fp4",
     "flux2-dev-nvfp4", "ltx23-dev-gguf-q6k", "ltx23-dev-nvfp4", "ltx23-gguf-q4-distilled",
     "te-gemma3-lyrics", "te-flux1-clip-l-diffusers", "te-flux1-t5xxl-diffusers",
+    "ernie-image-turbo", "ernie-image-pe",
 )
 
 # voci ritirate da questo giro (sostituite da una versione migliore)
@@ -108,4 +109,20 @@ def entries(N):
           category="image", arch="flux1", kind="snapshot", type="diffusers", family="_te",
           tool_dest=r"E:\AI\Models\diffusers\_te\t5xxl", gb=9.12, no_remote=True,
           note="Letto da image_flux (TE_DIR). Doppione di TextEncoders/t5xxl_fp16: dedup SOLO con hardlink, mai cancellare."),
+
+        # ───────── ERNIE-Image: Turbo (single-file nativo) + prompt enhancer ufficiale ─────────
+        N("ernie-image-turbo", "Immagini", "ERNIE-Image Turbo (DMD, 8 passi, bf16 single-file, 15GB)",
+          category="image", arch="ernie", type="diffusion_models", family="Ernie",
+          filename="ernie-image-turbo.safetensors", gb=15.0, no_remote=True, deps=["ernie-image"],
+          scan=["ernie-image-turbo"],
+          note="Da ernie-image-turbo-BF16.gguf (core.gguf_to_safetensors, lossless; l'originale resta). Stesse chiavi e "
+               "config del base. 8 passi, guidance 1.0 (scheda Baidu). Fonte ufficiale Baidu/ERNIE-Image-Turbo: shard "
+               "diffusers da fondere in un file (non automatico)."),
+        N("ernie-image-pe", "Immagini", "ERNIE-Image prompt enhancer (Ministral-3 3B, bf16, 7.7GB)",
+          category="image", arch="ernie", repo="baidu/ERNIE-Image", remote="pe/model.safetensors",
+          filename="model.safetensors", tool_dest=r"E:\AI\Models\diffusers\Ernie\ERNIE-Image\pe", gb=7.7,
+          used_by=["cap.gen_images"], scan=["ernie-image-prompt-enhancer"],
+          note="Caricato SOLO con «Migliora prompt» su ERNIE-Image e scaricato subito dopo (inference_server/backends/"
+               "ernie_pe). Il file locale ernie-image-prompt-enhancer.safetensors (6.4GB, senza lm_head) va spostato in "
+               "pe/model.safetensors."),
     ]

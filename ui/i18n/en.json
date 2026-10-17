@@ -3412,5 +3412,8 @@
   "vedit.hdr.hq": "High quality (about 2x slower)",
   "vedit.hdr.hq_tt": "Generates twice the frames and keeps every other one: fewer temporal artifacts, double the time.",
   "vedit.hdr.info_out": "The player shows the SDR preview; the real HDR file (_HDR_PQ.mp4) and/or the _EXR folder are next to it, with the same name.",
-  "vedit.hdr.info_src10": "The source is {p}: the HDR LoRA expects 8-bit Rec.709 SDR; an already HDR video (PQ/HLG) must not be used as input."
+  "vedit.hdr.info_src10": "The source is {p}: the HDR LoRA expects 8-bit Rec.709 SDR; an already HDR video (PQ/HLG) must not be used as input.",
+  "ernie.pe.missing.title": "ERNIE enhancer missing",
+  "ernie.pe.missing.body": "«Improve prompt» on ERNIE-Image uses the official enhancer (pe/model.safetensors, ~7.7 GB) and it is not on disk. I download nothing myself: get it from the «Model weights» tab (entry «ernie-image-pe»); if you already have ernie-image-prompt-enhancer.safetensors, move it to {dir}.",
+  "ernie.pe.continue": "Continue without improving"
 }

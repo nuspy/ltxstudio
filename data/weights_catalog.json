@@ -7152,6 +7152,58 @@
         "te",
         "fp8"
       ]
+    },
+    {
+      "id": "ernie-image-turbo",
+      "module": "Immagini",
+      "label": "ERNIE-Image Turbo (DMD, 8 passi, bf16 single-file, 15GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Ernie",
+      "gated": false,
+      "approx_gb": 15.0,
+      "scan_names": [
+        "ernie-image-turbo"
+      ],
+      "category": "image",
+      "arch": "ernie",
+      "filename": "ernie-image-turbo.safetensors",
+      "deps": [
+        "ernie-image"
+      ],
+      "no_remote": true,
+      "note": "Da ernie-image-turbo-BF16.gguf (core.gguf_to_safetensors, lossless; l'originale resta). Stesse chiavi e config del base. 8 passi, guidance 1.0 (scheda Baidu). Fonte ufficiale Baidu/ERNIE-Image-Turbo: shard diffusers da fondere in un file (non automatico).",
+      "use": [
+        "ckpt_image",
+        "distilled"
+      ]
+    },
+    {
+      "id": "ernie-image-pe",
+      "module": "Immagini",
+      "label": "ERNIE-Image prompt enhancer (Ministral-3 3B, bf16, 7.7GB)",
+      "kind": "file",
+      "type": "misc",
+      "family": "",
+      "gated": false,
+      "approx_gb": 7.7,
+      "scan_names": [
+        "ernie-image-prompt-enhancer"
+      ],
+      "category": "image",
+      "arch": "ernie",
+      "repo_id": "baidu/ERNIE-Image",
+      "url": "https://huggingface.co/baidu/ERNIE-Image",
+      "filename": "model.safetensors",
+      "remote_filename": "pe/model.safetensors",
+      "tool_dest": "E:\\AI\\Models\\diffusers\\Ernie\\ERNIE-Image\\pe",
+      "note": "Caricato SOLO con «Migliora prompt» su ERNIE-Image e scaricato subito dopo (inference_server/backends/ernie_pe). Il file locale ernie-image-prompt-enhancer.safetensors (6.4GB, senza lm_head) va spostato in pe/model.safetensors.",
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "use": [
+        "prompt_enhancer"
+      ]
     }
   ],
   "schema": 2,
