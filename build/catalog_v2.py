@@ -196,6 +196,14 @@ NEW = [
       type="LoRA", family="LTX-2", gb=0.33,
       used_by=["cap.video_motion_track"],
       note="Motion-track (tab Modifica Video AI, API /video/ic_lora kind=motion_track): tracce disegnate -> video di controllo; immagine di partenza = frame 0, forza 1.0. Col dev si aggiunge la distilled-LoRA 0.5"),
+    # Inpaint video con FOTO di riferimento (task 8): LoRA r2v rank32. Fonte ignota (viene dal pacchetto «LTS Editor»,
+    # nessun repo verificato: ricerca HF 17/10/2026 senza risultati) -> no_remote, il file e' quello locale (327 287 384 B).
+    N("ltx23-inpaint-r2v", "Video", "LoRA Inpaint video con foto di riferimento (r2v, rank32)", category="video",
+      arch="ltx23", filename="ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors",
+      type="LoRA", family="LTX-2", gb=0.33, no_remote=True, used_by=["cap.video_inpaint_r2v"],
+      note="Modifica Video AI > Inpaint oggetto, casella «Inserisci un oggetto da una foto»: la foto va come "
+           "immagine di condizionamento (frame 0). Senza foto resta la LoRA t2v rank128. Nessun metadata nel file "
+           "(solo reference_downscale_factor=1). Col dev si aggiunge la distilled-LoRA"),
     # oumoumad/*: repo PUBBLICI, file byte-identici ai locali (1 308 756 416 B, verificato via HF 14/10/2026)
     N("ltx-iclora-outpaint", "Video", "IC-LoRA Outpaint (oumoumad)", category="video", arch="ltx23",
       repo="oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint",
@@ -943,6 +951,12 @@ NEW = [
       arch="flux1", repo="comfyanonymous/flux_text_encoders",
       remote="t5xxl_fp16.safetensors", filename="t5xxl_fp16.safetensors",
       type="TextEncoders", gb=9.2),
+    N("t5xxl-enconly-fp8", "TextEncoder", "T5-XXL fp8 e4m3 solo-encoder (FLUX.1, alternativa a t5xxl-fp16, 4.9GB)",
+      category="image", arch="flux1", repo="comfyanonymous/flux_text_encoders",
+      remote="t5xxl_fp8_e4m3fn.safetensors", filename="t5xxl_enconly.safetensors",
+      type="TextEncoders", gb=4.9, scan=["t5xxl_enconly", "t5xxl_fp8_e4m3fn"],
+      note="Letto da inference_server/backends/t5_single_file (pesi fp8 residenti, upcast per layer): usato solo se "
+           "manca la cartella HF _te/t5xxl con i pesi fp16. Stessi tensori di t5xxl_enconly (Civitai): 8/8 campioni da 1 MB identici."),
     N("long-clip-hi-dream", "TextEncoder", "Long-CLIP L (fonte remota ignota)",
       category="image", arch="flux1", filename="long_clip_l_hi_dream.safetensors",
       type="TextEncoders", gb=0.9, no_remote=True),
@@ -1059,7 +1073,7 @@ REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "l
            "ltx23-eros14", "ltx25-te-uncensored",
            # IC-LoRA Fase 1 (14/10): fonte corretta ai repo pubblici oumoumad + note Civitai
            "ltx-iclora-outpaint", "ltx-iclora-motiondeblur", "ltx-iclora-uncompress", "ltx-iclora-deinterlace",
-           "ltx-iclora-restyle", "ltx-iclora-cameraman") + _LOCAL_REFRESH
+           "ltx-iclora-restyle", "ltx-iclora-cameraman") + ("t5xxl-enconly",) + _LOCAL_REFRESH
 # chiavi della vecchia voce da NON ereditare quando la voce viene aggiornata (merged.update non le toglie)
 _STALE_ON_REFRESH = ("remote_filename", "no_remote", "note", "page")
 

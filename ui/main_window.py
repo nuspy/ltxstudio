@@ -308,31 +308,30 @@ class _VideoEditAIWorker(QThread):
             for _k in ("model", "gguf_transformer", "ltx_release"):   # checkpoint ESATTAMENTE come scelto nel tab Video
                 if cfg.get(_k):
                     params[_k] = cfg[_k]
-            if cfg["mode"] == "inpaint":                       # #59 parametri inpaint dalla GUI
-                params["control_strength"] = float(cfg.get("guide", 0.4))
-                params["cfg_scale"] = float(cfg.get("cfg_scale", 6.0))
-                params["mask_dilate"] = int(cfg.get("mask_dilate", 24))
-                params["mask_blur"] = float(cfg.get("mask_blur", 6.0))
-            if cfg["mode"] == "inpaint":                       # SAM2 track → latent-inpaint (vinpaint)
-                self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
+            if cfg["mode"] == "inpaint":                       # #59 inpaint: SAM2 track → latent-inpaint (vinpaint)
+                # Logica condivisa con la REST API (core/video_inpaint.py): LoRA t2v (a parole) o r2v (con foto di
+                # riferimento, scelta dell'utente), maschere SAM2, segmenti per i clip lunghi.
+                from core import video_inpaint as _vi
+                _miss = _vi.missing_weight(cfg)
+                if _miss:
+                    self.done.emit({"status": "error", "error": _miss}); return
+                params = _vi.inpaint_params(cfg, out)
+                if _vi.has_reference(cfg):
+                    # punto di aggancio @Foto_N (task 6): qui i riferimenti sono UNO (la foto del campo); quando il
+                    # meccanismo dei token sara' nel ramo, i nomi citati nel prompt vanno risolti prima di arrivare qui.
+                    _note = _vi.fit_reference(params, self.out_dir, stamp)
+                    if _note:
+                        self.progress.emit("[inpaint] " + _note)
+                    self.progress.emit(f"[inpaint] foto di riferimento → LoRA r2v ({_os.path.basename(cfg['ref_image'])})")
+                if params["num_frames"] > _vi.SEGMENT_FRAMES:
+                    self.progress.emit(f"[inpaint] clip lungo ({params['num_frames']} frame): "
+                                       f"{_vi.segments_info(params['num_frames'])} segmenti da {_vi.SEGMENT_FRAMES}")
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
-                seg = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
-                                    "inference_server", "backends", "video_segment.py")
-                # passa il dilate della GUI anche al TRACKING (le maschere del guide devono combaciare
-                # con quelle che il worker userà — prima il CLI girava con dilate=0 fisso)
-                r = _sp.run([self.INF_PY, "-u", seg, src, cfg["object"], gpath,
-                             str(int(cfg.get("mask_dilate", 24)))],
-                            capture_output=True, text=True, encoding="utf-8", errors="replace")
-                line = next((l for l in (r.stdout or "").splitlines() if l.startswith("GUIDE:")), "")
-                if not line:
-                    self.done.emit({"status": "error", "error": "tracking SAM2 fallito: " + (r.stderr or "")[-300:]}); return
-                # video_segment salva frames e masks accanto al video sorgente in <base>_track/
-                track_dir = _os.path.splitext(src)[0] + "_track"
-                params["original_frames_dir"] = _os.path.join(track_dir, "frames")
-                params["inpaint_masks_dir"] = _os.path.join(track_dir, "masks")
-                params["skip_stage_2"] = False
-                params["control_video"] = src                  # guide = video sorgente: senza, il worker degrada a ti2v (bug c6f8529, 14/10)
-                self.progress.emit("[edit] maschera tracciata → latent-inpaint")
+                try:
+                    _vi.attach_tracking(params, src, cfg["object"], gpath, int(cfg.get("mask_dilate", 24)),
+                                        log=self.progress.emit)
+                except RuntimeError as _e:
+                    self.done.emit({"status": "error", "error": str(_e)}); return
             elif cfg["mode"] == "replace_char":                # #102 Sostituisci personaggio (union-control-ref)
                 from core import controlnet_preprocess as _cp
                 # PREFLIGHT: il peso union-control-ref deve esistere (altrimenti il worker degrada IN SILENZIO
@@ -1742,6 +1741,36 @@ class MainWindow(QMainWindow):
                                 tr("mw.native_restart_failed_msg").format(timeout=timeout))
         return ok
 
+    def _ernie_pe_ok(self, cfg: dict) -> bool:
+        """«Migliora prompt» su ERNIE-Image usa il PE ufficiale (pe/model.safetensors, ~7.7 GB). Se manca: avviso con
+        «Apri tab Pesi modelli» / «Continua senza» / «Annulla»; NESSUN download da qui. True = si può procedere."""
+        try:
+            from core import model_paths as _mp
+            from inference_server.backends import ernie_pe
+            repo = str(_mp.p("ernie-image", r"E:\AI\Models\diffusers\Ernie\ERNIE-Image"))
+            if ernie_pe.available(repo):
+                return True
+        except Exception:                                    # noqa: BLE001 — il server verifica comunque
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle(tr("ernie.pe.missing.title", "Enhancer ERNIE mancante"))
+        box.setText(tr("ernie.pe.missing.body",
+                       "«Migliora prompt» su ERNIE-Image usa l'enhancer ufficiale (pe/model.safetensors, ~7.7 GB) e non "
+                       "è su disco. Non scarico nulla io: scaricalo dal tab «Pesi modelli» (voce «ernie-image-pe»); se hai "
+                       "già ernie-image-prompt-enhancer.safetensors, va spostato in {dir}.").format(dir=os.path.join(repo, "pe")))
+        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+        b_c = box.addButton(tr("ernie.pe.continue", "Continua senza migliorare"), QMessageBox.AcceptRole)
+        box.addButton(tr("common.cancel", "Annulla"), QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is b_w:
+            self.tabs.setCurrentWidget(self.weights_tab)
+            return False
+        if box.clickedButton() is b_c:
+            cfg["enhance"] = False
+            return True
+        return False
+
     def _ensure_flux2_encoder(self, unet: str | None) -> bool:
         """Pre-check FLUX.2: se il modello è FLUX.2 e il suo encoder testo manca, OFFRE di scaricarlo
         (Comfy-Org via huggingface_hub). Ritorna True se si può procedere (encoder presente o appena
@@ -3142,6 +3171,8 @@ class MainWindow(QMainWindow):
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
             return
+        if cfg.get("arch") == "ernie" and cfg.get("enhance") and not self._ernie_pe_ok(cfg):
+            return
         v = self.video_tab.get_values()
         self._clamp_resolution(v)        # tetto risoluzione per edizione (es. demo 768px)
         loras = [{"name": l["name"], "strength": l["strength"]} for l in cfg.get("loras", [])]
@@ -3760,6 +3791,8 @@ class MainWindow(QMainWindow):
         _spec = vem.MODE_SPECS.get(cfg.get("mode", ""))
         if _spec is not None and _spec.cap and not self._feature_gate(_spec.cap):
             return                                           # edizione senza la funzione: upsell mostrato dal gate
+        if cfg.get("mode") == "inpaint" and cfg.get("r2v") and not self._feature_gate("cap.video_inpaint_r2v"):
+            return                                           # inpaint con foto di riferimento (LoRA r2v): gate proprio
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
         _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64
