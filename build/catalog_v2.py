@@ -824,6 +824,26 @@ NEW = [
       filename="AfterMidnight_ref2va_h3_rank64_v1.2-native.safetensors", convert="mmh3_lora", type="LoRA",
       family="MiniMax-H3", gb=1.19, sens="adult", used_by=["cap.video_minimax_h3"],
       note="solo modalità Ref2VA; l'autore usa euler + scheduler beta"),
+    # H3 Video Upsampler (funzione = upscale video, arch = MiniMax H3): upscaler latente 3D (LBH-123-AI) + LoRA di guida
+    # h3upscale ×2 (sandpies). Header letti via HTTP range il 17/10/2026: upscaler 322 tensori F16 (345M parametri),
+    # LoRA 416 tensori BF16 rank 64 con reference_downscale_factor=2. La LoRA NON è una LoRA di stile: ha il suo posto
+    # nel tab Definizione video (use=upscale_video la esclude dal pannello LoRA del tab Video).
+    N("mmh3-latent-upscaler-v1", "Video", "H3 Video Upsampler: upscaler latente 3D ×1–4 (LBH-123-AI, fp16, 0.69GB)",
+      category="video", arch="minimax_h3", repo="LBH-123-AI/Minimax_h3_latent_Upscaler",
+      remote="minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors",
+      filename="minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors", type="latent_upscale_models", gb=0.69,
+      deps=["mmh3-lora-h3upscale-x2"], used_by=["cap.video_h3_upsampler"],
+      note="rete 3D (512 canali, 12+12 blocchi, 345M parametri) che ingrandisce il LATENTE H3 senza passare dai pixel; "
+           "Apache-2.0. Serve all'H3 Video Upsampler (Definizione video). Licenza dei pesi H3: territori esclusi "
+           "UE/UK/USA/Corea"),
+    N("mmh3-lora-h3upscale-x2", "Video", "H3 Video Upsampler: LoRA di guida h3upscale ×2 (sandpies, 0.62GB)",
+      category="video", arch="minimax_h3", repo="sandpies/ComfyUI-H3-Video-Upsampler",
+      remote="lora/h3upscale_v2_x2.safetensors", filename="h3upscale_v2_x2-native.safetensors",
+      convert="mmh3_lora_guide", type="LoRA", family="MiniMax-H3", gb=0.62,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_h3_upsampler"],
+      note="rank 64, 4000 passi, ai-toolkit su Alissonerdx/h3upscale-4k, base Ref2VA: il ri-disegno guarda il clip a metà "
+           "risoluzione (guida IC-LoRA a griglia 1/2) invece di inventare il dettaglio. Solo Ref2VA; si usa SOLO nel tab "
+           "Definizione video. Licenza H3 Community (no UE/UK/USA/Corea); leggi i termini del dataset prima dell'uso commerciale"),
     # Krea 2: LoRA ai-toolkit (diffusion_model.blocks… + txtfusion → text_fusion)
     # Krea 2 single-file community: convertito in nativo (nomi diffusers, Linear int8 ConvRot compressi) e montato
     # sul text encoder/VAE dello snapshot Turbo (workers/krea2_custom).
