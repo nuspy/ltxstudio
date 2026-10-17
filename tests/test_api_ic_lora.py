@@ -308,6 +308,7 @@ def test_motion_track_cfg_passthrough(image, no_run, monkeypatch):
     assert seen["fps"] == 24 and seen["image_strength"] == 1.0 and seen["seed"] == 9 and seen["prompt"] == "p"
     assert "width" not in seen and "height" not in seen, "senza valori espliciti: dall'aspetto dell'immagine"
     assert seen["model"].endswith("distilled-1.1_fp8.safetensors") and seen["keep_audio"] is False
+    assert seen["native_audio"] is True
     # valori espliciti passano invariati
     seen.clear()
     r = client.post("/video/ic_lora", json={"kind": "motion_track", "image_path": image, "tracks": _CTRL, "width": 768,

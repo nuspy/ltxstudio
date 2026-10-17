@@ -248,6 +248,12 @@ class VideoEditAITab(QWidget):
             "Quanto il primo fotogramma resta fedele all'immagine (1.0 = come nella ricetta ufficiale)."))
         self.mt_img_strength_lbl = QLabel(tr("vedit.cam.img_strength_lbl", "Forza immagine"))
         f.addRow(self.mt_img_strength_lbl, self.mt_img_strength)
+        self.mt_audio = QCheckBox(tr("vedit.mt.audio", "Genera anche l'audio (parlato/suoni dal prompt)"))
+        self.mt_audio.setChecked(True)
+        self.mt_audio.setToolTip(tr("vedit.mt.audio_tt",
+            "Come nel workflow ufficiale il modello genera l'audio insieme al video: voce e suoni vengono dal prompt. "
+            "Spegnilo se il prompt non parla (altrimenti l'audio puo' essere rumore)."))
+        f.addRow("", self.mt_audio)
         self.mt_seed = QSpinBox(); self.mt_seed.setRange(0, 2147483647); self.mt_seed.setValue(42)
         self.mt_seed_lbl = QLabel(tr("vedit.mt.seed_lbl", "Seme"))
         f.addRow(self.mt_seed_lbl, self.mt_seed)
@@ -946,7 +952,7 @@ class VideoEditAITab(QWidget):
         for w in (self.cam_img_strength, self.cam_seconds):
             self._show_row(w, is_cam)
         self._set_row_visible_for(self.mt_img, is_mt)
-        for w in (self.mt_editor, self.mt_info, self.mt_img_strength, self.mt_seed):
+        for w in (self.mt_editor, self.mt_info, self.mt_img_strength, self.mt_seed, self.mt_audio):
             self._show_row(w, is_mt)
         for w in (self.mt_w, self.mt_seconds):
             self._set_row_visible_for(w, is_mt)
@@ -1247,7 +1253,8 @@ class VideoEditAITab(QWidget):
             n, fps = self._mt_frames(), int(self.mt_fps.currentData() or mt.DEFAULT_FPS)
             cfg.update(video=img, track_image=img, tracks=self.mt_editor.tracks_json(n), tracks_size=[w, h],
                        width=w, height=h, fps=fps, num_frames=n, seed=int(self.mt_seed.value()),
-                       image_strength=float(self.mt_img_strength.value()), strength=1.0)
+                       image_strength=float(self.mt_img_strength.value()), strength=1.0,
+                       native_audio=bool(self.mt_audio.isChecked()))
         if sp.kind and sp.cap:                               # peso IC-LoRA assente: avviso + «Apri tab Pesi», nessun download
             miss = vic.missing_weight(sp)
             if miss:

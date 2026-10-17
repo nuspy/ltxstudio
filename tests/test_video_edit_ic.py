@@ -395,6 +395,10 @@ def test_motion_track_job_from_control_points(tmp_path):
     assert Image.open(p["image_path"]).size == (1024, 576)                     # frame 0 gia' alla risoluzione di lavoro
     assert ij.outputs(out)[0] == out and ij.outputs(out)[-1] == p["control_video"]
     assert ij.mux_audio_from == "" and ij.segments == 1
+    assert p["native_audio"] is True, "audio generato tenuto (come il workflow ufficiale): senza il flag il worker lo scarta"
+    ij2 = vic.build_job({"mode": "motion_track", "track_image": img, "tracks": _CTRL, "num_frames": 9, "native_audio": False},
+                        str(tmp_path), 6, str(tmp_path / "o2.mp4"))
+    assert ij2.params["native_audio"] is False
 
 
 def test_motion_track_coordinates_are_original_pixels_without_size(tmp_path):

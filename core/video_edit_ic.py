@@ -452,7 +452,8 @@ def _build_motion_track(cfg: dict, spec: vem.ModeSpec, out_dir: str, stamp: int,
     workflow ComfyUI) e/o `tracks_video_path` (video di controllo gia' pronto: ha la precedenza, niente rendering);
     `tracks_size` [w,h] spazio delle coordinate (altrimenti quello dichiarato nel JSON; se manca = pixel dell'immagine
     ORIGINALE, con lo stesso ritaglio «cover» dell'immagine di partenza); `tracks_format` auto|control|dense;
-    width/height (default dall'aspetto dell'immagine, lato corto 576), `num_frames` o `seconds` (default 121) e `fps` (24)."""
+    width/height (default dall'aspetto dell'immagine, lato corto 576), `num_frames` o `seconds` (default 121) e `fps` (24);
+    `native_audio` (default True): tiene l'audio generato insieme al video, come il workflow ufficiale."""
     from core import motion_tracks as mt
     from core import video_ic_prep as prep
     img = str(cfg.get("track_image") or cfg.get("image_path") or "")
@@ -527,13 +528,18 @@ def _build_motion_track(cfg: dict, spec: vem.ModeSpec, out_dir: str, stamp: int,
                "conditioning_attention": float(cfg.get("conditioning_attention", 1.0)),
                "fps": fps, "seed": int(cfg.get("seed", 42)), "output": output, "_strict_ic": True,
                "image_path": start, "ref_strength": float(cfg.get("image_strength", 1.0)),
-               "width": w, "height": h, "num_frames": n, "control_video": tracks_mp4}
+               "width": w, "height": h, "num_frames": n, "control_video": tracks_mp4,
+               # il workflow ufficiale salva l'audio generato insieme al video (voce/suoni dal prompt): il worker lo scarta
+               # per le IC-LoRA se manca il flag
+               "native_audio": bool(cfg.get("native_audio", True))}
     for k in ("model", "gguf_transformer", "ltx_release"):          # checkpoint come scelto, mai sostituito
         if cfg.get(k):
             p[k] = cfg[k]
     if not prompt:
         notes.append("nessun prompt: descrivi soggetto e scena, il movimento viene dalle tracce")
-    notes.append(f"{n} frame a {fps} fps = {n / fps:.1f} s; uscita con audio generato dal modello")
+    notes.append(f"{n} frame a {fps} fps = {n / fps:.1f} s; "
+                 + ("uscita con audio generato dal modello (parlato/suoni dal prompt)" if p["native_audio"]
+                    else "uscita senza audio"))
     return IcJob(params=p, spec=spec, work_dir=work, mux_audio_from="", source=img, notes=notes, segments=1,
                  extra_files=[tracks_mp4])
 

@@ -3458,5 +3458,7 @@
   "vedit.track.load_err": "Tracks not read: {e}",
   "vedit.track.save_err": "Tracks not saved: {e}",
   "vid.motion_tracks.btn": "Guide the motion with tracks…",
-  "vid.motion_tracks.tt": "Opens AI Video Edit in «Motion from tracks» mode with the starting image already set: you draw where subject and background move and the video follows the tracks."
+  "vid.motion_tracks.tt": "Opens AI Video Edit in «Motion from tracks» mode with the starting image already set: you draw where subject and background move and the video follows the tracks.",
+  "vedit.mt.audio": "Also generate the audio (speech/sounds from the prompt)",
+  "vedit.mt.audio_tt": "As in the official workflow the model generates the audio together with the video: voice and sounds come from the prompt. Turn it off if the prompt has no speech (otherwise the audio may be noise)."
 }

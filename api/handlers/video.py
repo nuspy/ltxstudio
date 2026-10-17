@@ -200,6 +200,8 @@ class IcLoraReq(BaseModel):
                                           "stesso disegno di LTXVDrawTracks)")
     num_frames: int | None = Field(None, description="motion_track: frame (8k+1; alternativa a `seconds`)")
     fps: int = Field(24, description="motion_track: fps (8-60, ufficiale 24)")
+    native_audio: bool = Field(True, description="motion_track: tiene l'audio generato insieme al video (voce/suoni dal "
+                               "prompt, come il workflow ufficiale); False = video muto")
     # checkpoint: ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)
     model: str | None = None
     ltx_release: str | None = None
@@ -450,7 +452,8 @@ def register(app: FastAPI):
             cfg.update(track_image=req.image_path, tracks=req.tracks, tracks_size=req.tracks_size,
                        tracks_format=req.tracks_format, tracks_video_path=req.tracks_video_path or "",
                        fps=req.fps, num_frames=req.num_frames, seconds=req.seconds or None,
-                       image_strength=(req.image_strength if "image_strength" in _given else 1.0), keep_audio=False)
+                       image_strength=(req.image_strength if "image_strength" in _given else 1.0), keep_audio=False,
+                       native_audio=req.native_audio)
         if model:
             cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
         if rel:

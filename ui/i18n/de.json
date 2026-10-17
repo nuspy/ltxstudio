@@ -3384,5 +3384,7 @@
   "vedit.track.load_err": "Spuren nicht gelesen: {e}",
   "vedit.track.save_err": "Spuren nicht gespeichert: {e}",
   "vid.motion_tracks.btn": "Bewegung mit Spuren steuern…",
-  "vid.motion_tracks.tt": "Öffnet «KI-Videobearbeitung» im Modus «Bewegung aus Spuren» mit bereits gesetztem Startbild: Du zeichnest, wohin sich Motiv und Hintergrund bewegen, und das Video folgt den Spuren."
+  "vid.motion_tracks.tt": "Öffnet «KI-Videobearbeitung» im Modus «Bewegung aus Spuren» mit bereits gesetztem Startbild: Du zeichnest, wohin sich Motiv und Hintergrund bewegen, und das Video folgt den Spuren.",
+  "vedit.mt.audio": "Ton mit erzeugen (Sprache/Geräusche aus dem Prompt)",
+  "vedit.mt.audio_tt": "Wie im offiziellen Workflow erzeugt das Modell den Ton zusammen mit dem Video: Stimme und Geräusche kommen aus dem Prompt. Ausschalten, wenn der Prompt nicht spricht (sonst kann der Ton Rauschen sein)."
 }

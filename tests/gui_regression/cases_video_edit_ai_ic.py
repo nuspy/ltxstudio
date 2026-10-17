@@ -1079,6 +1079,7 @@ def case_motion_cfg(w, spy):
     assert cfg["mode"] == "motion_track" and cfg["track_image"] == t.mt_img.text() == cfg["video"], cfg
     assert (cfg["width"], cfg["height"], cfg["fps"], cfg["num_frames"], cfg["seed"]) == (1024, 576, 24, 121, 1234), cfg
     assert cfg["strength"] == 1.0 and cfg["image_strength"] == 1.0 and cfg["tracks_size"] == [1024, 576]
+    assert cfg["native_audio"] is True and t.mt_audio.isChecked()
     assert cfg["model"] == _DIST["model"] and cfg["ckpt_state"] == "distilled" and "paper boat" in cfg["prompt"]
     d = json.loads(cfg["tracks"])
     assert len(d["points_store"]) == 2 and len(d["points_store"][0]) == 3 and d["points_store"][1] == [{"x": d["points_store"][1][0]["x"], "y": d["points_store"][1][0]["y"]}]
