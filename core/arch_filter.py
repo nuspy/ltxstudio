@@ -31,7 +31,7 @@ _FOLDER_FAMILY = {
 
 # parole del nome → famiglia (ultima spiaggia)
 _NAME_FAMILY = (
-    (re.compile(r"flux_2(?!\d)|flux2|flux 2(?!\d)|klein"), "flux2"),
+    (re.compile(r"flux_2(?!\d)|flux2|flux 2(?!\d)|flux\.2(?!\d)|klein"), "flux2"),
     (re.compile(r"flux|getphat|fuxcapacity"), "flux1"),
     (re.compile(r"z-image|z_image|zimage"), "zimage"),
     (re.compile(r"ernie"), "ernie"),
@@ -47,7 +47,7 @@ _NOT_T2I = re.compile(r"fill|kontext|redux|klein")
 
 def is_flux2_name(name: str) -> bool:
     """FLUX.2 dal solo nome, senza il falso positivo «PornFlux_20» (flux_2 seguito da una cifra)."""
-    return bool(re.search(r"flux_2(?!\d)|flux2|flux 2(?!\d)", (name or "").lower()))
+    return bool(re.search(r"flux_2(?!\d)|flux2|flux 2(?!\d)|flux\.2(?!\d)", (name or "").lower()))
 
 
 def is_flux2(name: str) -> bool:

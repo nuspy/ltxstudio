@@ -86,3 +86,16 @@ def test_default_del_proprio_modello_coincidono_col_backend():
         for name in ("model", "x-hyper-8", "turbo"):
             s, g, _h = _auto_settings(arch, name)
             assert af.inpaint_defaults(kind, name) == (s, g)
+
+
+def test_copia_cache_normalized_fuori_da_tutti_i_menu(tmp_path, monkeypatch):
+    """`X.safetensors.normalized.safetensors` e' la cache di image_flux, non un modello: l'inventario la nasconde."""
+    from core import offline_inventory as oi
+    monkeypatch.setattr(oi, "MODELS_ROOT", tmp_path)
+    d = tmp_path / "diffusion_models" / "Flux"
+    d.mkdir(parents=True)
+    (d / "fux.safetensors").write_bytes(b"x")
+    (d / "fux.safetensors.normalized.safetensors").write_bytes(b"x")
+    (d / "altro.safetensors").write_bytes(b"x")
+    assert [n.split(chr(92))[-1] for n in oi.list_models("diffusion_models")] == ["altro.safetensors", "fux.safetensors"]
+    assert oi.is_cache_copy("a.safetensors.normalized.safetensors") and not oi.is_cache_copy("a.safetensors")
