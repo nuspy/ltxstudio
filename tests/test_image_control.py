@@ -194,3 +194,98 @@ def test_redux_embeds_shapes():
     assert emb.shape == (1, 729 * 2, 4096)
     pe, pooled = IC.redux_prompt_embeds(None, emb, "", torch.device("cpu"))
     assert pe.shape == (1, 512 + 729 * 2, 4096) and pooled.shape == (1, 768) and float(pe[:, :512].abs().sum()) == 0
+
+
+# ── run() end-to-end con un ModelManager finto (nessun checkpoint, CPU) ─────────────────────────────────────
+class _FakeMM:
+    def __init__(self, pipe):
+        self.pipe, self._cache, self.applied = pipe, {}, []
+    def register(self, key, loader): self._cache.setdefault(key, None)
+    def ensure(self, key): return self.pipe
+    def evict_others(self, *a, **k): return False
+    def flush(self): pass
+    def apply_loras(self, pipe, loras): self.applied.append(loras)
+
+
+@pytest.fixture()
+def run_env(monkeypatch, tmp_path):
+    from inference_server.backends import image_flux as F
+    pipe = _tiny_flux_pipe()
+    pipe._ls_est_mb = 1234
+    mm = _FakeMM(pipe)
+    monkeypatch.setattr(F, "register", lambda mm_, model, arch, kte="": f"{arch}:{model}")
+    monkeypatch.setattr(F, "_resolve_model_path", lambda m: m)
+    monkeypatch.setattr(F, "_weights_ident", lambda *a, **k: ("x",))
+    seen = {}
+    monkeypatch.setattr(F, "_ensure_placement", lambda p, mm_=None, key=None: seen.setdefault("est", p._ls_est_mb) and "cpu")
+    monkeypatch.setattr(F, "_set_attention", lambda *a, **k: "sdpa")
+    monkeypatch.setattr(F, "_make_preview_cb", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("niente anteprima")))
+    monkeypatch.setattr(IC, "_attach_cn", lambda cn, where: None)
+    for name in ("CN_FLUX_UNION", "CN_FLUX_INPAINT", "CN_ZIMAGE", "REDUX_FILE", "SIGLIP_FILE"):
+        f_ = tmp_path / f"{name}.bin"; f_.write_bytes(b"x")
+        monkeypatch.setattr(IC, name, str(f_))                               # un file che esiste: _need passa
+    monkeypatch.setattr(IC, "load_flux_controlnet", lambda path, dtype=None: _tiny_cn(extra=4 if path == IC.CN_FLUX_INPAINT else 0))
+    # la CPU non ha l'encoder di testo: le pipeline derivate ricevono prompt_embeds dal wrapper di test
+    orig = IC.build_job
+
+    def bj(pipe_, params, cn=None, extra=None):
+        cpipe, kw, keep = orig(pipe_, params, cn, extra)
+        _embeds(kw)
+        return cpipe, kw, keep
+    monkeypatch.setattr(IC, "build_job", bj)
+    return pipe, mm, seen, tmp_path
+
+
+def test_run_flux_cn_flow_restores_state(run_env):
+    pipe, mm, seen, tmp = run_env
+    g = tmp / "g.png"
+    Image.effect_noise((96, 64), 60).convert("RGB").save(g)
+    res = IC.run({"mode": "flux_cn", "model": "m", "prompt": "p", "width": 64, "height": 64, "steps": 2, "seed": 3,
+                  "control_image": str(g), "control_preprocess": "canny", "gen_device": "cpu",
+                  "loras": [{"name": "x", "strength": 1.0}]}, mm, str(tmp / "o"))
+    assert res["status"] == "success" and os.path.isfile(res["output"][0]), res
+    assert seen["est"] == 1234 + IC._EXTRA_MB["flux_cn"], "il ControlNet va contato nel fabbisogno VRAM del placement"
+    assert pipe._ls_est_mb == 1234, "fabbisogno originale ripristinato dopo il placement"
+    assert mm.applied == [[{"name": "x", "strength": 1.0}]]
+
+
+def test_run_rejects_unknown_mode_and_missing_weights(run_env, monkeypatch):
+    pipe, mm, seen, tmp = run_env
+    assert IC.run({"mode": "boh"}, mm, str(tmp))["status"] == "error"
+    monkeypatch.setattr(IC, "CN_FLUX_UNION", str(tmp / "assente.safetensors"))
+    with pytest.raises(RuntimeError, match="Pesi modelli"):
+        IC.run({"mode": "flux_cn", "model": "m"}, mm, str(tmp))
+
+
+def test_run_alimama_flow_returns_original_size(run_env):
+    pipe, mm, seen, tmp = run_env
+    img = Image.effect_noise((80, 48), 80).convert("RGB"); img.save(tmp / "i.png")
+    mk = Image.new("L", (80, 48), 0); mk.paste(255, (20, 10, 60, 40)); mk.save(tmp / "m.png")
+    res = IC.run({"mode": "flux_cn_inpaint", "model": "m", "prompt": "p", "steps": 2, "seed": 4, "gen_device": "cpu",
+                  "image_path": str(tmp / "i.png"), "mask_path": str(tmp / "m.png")}, mm, str(tmp / "o"))
+    assert res["status"] == "success", res
+    assert Image.open(res["output"][0]).size == (80, 48)
+
+
+def test_run_redux_flow(run_env, monkeypatch):
+    pipe, mm, seen, tmp = run_env
+
+    class V(torch.nn.Module):
+        def __init__(self):
+            super().__init__(); self.p = torch.nn.Parameter(torch.zeros(1))
+        def forward(self, pixel_values):
+            class O: last_hidden_state = torch.randn(1, 4, 8)
+            return O
+
+    class E(torch.nn.Module):
+        def forward(self, h):
+            class O: image_embeds = torch.randn(1, 4, 32)           # token di stile alla larghezza del mini-transformer
+            return O
+    monkeypatch.setattr(IC, "load_siglip_vision", lambda *a, **k: V())
+    monkeypatch.setattr(IC, "load_redux_embedder", lambda *a, **k: E())
+    monkeypatch.setattr(IC, "redux_prompt_embeds",
+                        lambda pipe_, emb, prompt, dev: (torch.cat([torch.zeros(1, 6, 32), emb], 1), torch.zeros(1, 16)))
+    Image.effect_noise((64, 64), 60).convert("RGB").save(tmp / "r.png")
+    res = IC.run({"mode": "flux_redux", "model": "m", "prompt": "", "width": 64, "height": 64, "steps": 2, "seed": 5,
+                  "ref_images": [str(tmp / "r.png")], "gen_device": "cpu"}, mm, str(tmp / "o"))
+    assert res["status"] == "success", res

@@ -414,6 +414,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         except Exception as e:                               # noqa: BLE001
             _log(f"pre-evict saltato ({e})")
     pipe = mm.ensure(key)
+    pipe._ls_want_sticky = str(params.get("placement_mode", "")).lower() == "sticky"   # come image_flux: mai uno stato vecchio
     est0 = int(getattr(pipe, "_ls_est_mb", F.VRAM_MB.get(arch, 24000)))
     pipe._ls_est_mb = est0 + _EXTRA_MB[mode]                 # il ControlNet/SigLIP occupa VRAM accanto alla base
     try:
