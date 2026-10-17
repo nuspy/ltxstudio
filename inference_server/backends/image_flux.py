@@ -1831,7 +1831,9 @@ def run(params: dict, mm, output_dir: str) -> dict:
             # (ri)generare, NERO = pixel da mantenere. Inpaint: bianco = area disegnata. Outpaint: bianco =
             # estensione (bordo) da riempire, nero = foto (vedi mask_canvas._border_mask). NIENTE inversione:
             # invertirla faceva rigenerare la FOTO e lasciava NERA l'estensione (bug outpaint).
-            _mimg = Image.open(mk).convert("RGB")
+            # BINARIA: maschere con alpha < 255 (SAM = 0,6 × luminanza, pennellata singola 150/255) davano un edit
+            # «al 60%» — composite finale 60% generato + 40% originale = capo «fantasma» con TUTTI i motori (live 17/10).
+            _mimg = Image.open(mk).convert("L").point(lambda v: 255 if v > 127 else 0).convert("RGB")
             if _mimg.size != (_W, _H):                       # maschera allineata a width/height
                 _mimg = _mimg.resize((_W, _H), Image.NEAREST)
             kw["mask_image"] = _mimg
