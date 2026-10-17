@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "Джерело — {p}: HDR LoRA очікує 8-бітний SDR Rec.709; відео, що вже є HDR (PQ/HLG), подавати не можна.",
   "ernie.pe.missing.title": "Немає енхансера ERNIE",
   "ernie.pe.missing.body": "«Покращити промпт» в ERNIE-Image використовує офіційний енхансер (pe/model.safetensors, ~7,7 ГБ), якого немає на диску. Сам я нічого не завантажую: завантажте його на вкладці «Ваги моделей» (запис «ernie-image-pe»); якщо у вас уже є ernie-image-prompt-enhancer.safetensors, перемістіть його в {dir}.",
-  "ernie.pe.continue": "Продовжити без покращення"
+  "ernie.pe.continue": "Продовжити без покращення",
+  "pitch.mode": "Режим",
+  "pitch.mode.template": "За голосом-зразком (шаблон)",
+  "pitch.mode.score": "За MIDI-партитурою",
+  "pitch.mode.tt": "Шаблон: копіює інтонацію чистого голосу. MIDI-партитура: підлаштовує голос під ноти MIDI-файлу.",
+  "pitch.midi": "Партитура",
+  "pitch.midi.ph": "MIDI-партитура (.mid / .midi)",
+  "pitch.note.score": "Підлаштовує голос під ноти MIDI-партитури (голос має збігатися з партитурою за часом)."
 }

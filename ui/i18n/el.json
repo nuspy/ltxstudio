@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "Η πηγή είναι {p}: το HDR LoRA περιμένει SDR Rec.709 8 bit· βίντεο ήδη HDR (PQ/HLG) δεν πρέπει να δοθεί ως είσοδος.",
   "ernie.pe.missing.title": "Λείπει το enhancer του ERNIE",
   "ernie.pe.missing.body": "Το «Βελτίωση prompt» στο ERNIE-Image χρησιμοποιεί το επίσημο enhancer (pe/model.safetensors, ~7,7 GB) και δεν υπάρχει στον δίσκο. Δεν κατεβάζω τίποτα μόνος μου: κατέβασέ το από την καρτέλα «Βάρη μοντέλων» (εγγραφή «ernie-image-pe»)· αν έχεις ήδη το ernie-image-prompt-enhancer.safetensors, μετακίνησέ το στο {dir}.",
-  "ernie.pe.continue": "Συνέχεια χωρίς βελτίωση"
+  "ernie.pe.continue": "Συνέχεια χωρίς βελτίωση",
+  "pitch.mode": "Λειτουργία",
+  "pitch.mode.template": "Από φωνή-οδηγό (πρότυπο)",
+  "pitch.mode.score": "Από παρτιτούρα MIDI",
+  "pitch.mode.tt": "Πρότυπο: αντιγράφει τον τονισμό μιας σωστής φωνής. Παρτιτούρα MIDI: κουρδίζει τη φωνή στις νότες ενός αρχείου MIDI.",
+  "pitch.midi": "Παρτιτούρα",
+  "pitch.midi.ph": "παρτιτούρα MIDI (.mid / .midi)",
+  "pitch.note.score": "Κουρδίζει τη φωνή στις νότες μιας παρτιτούρας MIDI (η φωνή πρέπει να ακολουθεί την παρτιτούρα χρονικά)."
 }

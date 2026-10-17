@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "원본이 {p}입니다: HDR LoRA는 8비트 Rec.709 SDR을 기대하며, 이미 HDR(PQ/HLG)인 영상은 입력으로 쓰면 안 됩니다.",
   "ernie.pe.missing.title": "ERNIE 인핸서 없음",
   "ernie.pe.missing.body": "ERNIE-Image의 «프롬프트 개선»은 공식 인핸서(pe/model.safetensors, 약 7.7GB)를 사용하는데 디스크에 없습니다. 제가 직접 내려받지는 않습니다: «모델 가중치» 탭에서 받으세요(항목 «ernie-image-pe»). 이미 ernie-image-prompt-enhancer.safetensors가 있다면 {dir}로 옮기세요.",
-  "ernie.pe.continue": "개선 없이 계속"
+  "ernie.pe.continue": "개선 없이 계속",
+  "pitch.mode": "모드",
+  "pitch.mode.template": "가이드 보컬로 (템플릿)",
+  "pitch.mode.score": "MIDI 악보로",
+  "pitch.mode.tt": "템플릿: 음정이 맞는 목소리의 음정을 복사합니다. MIDI 악보: MIDI 파일의 음에 맞춰 목소리를 보정합니다.",
+  "pitch.midi": "악보",
+  "pitch.midi.ph": "MIDI 악보 (.mid / .midi)",
+  "pitch.note.score": "MIDI 악보의 음에 맞춰 목소리를 보정합니다 (목소리가 악보와 박자가 맞아야 합니다)."
 }

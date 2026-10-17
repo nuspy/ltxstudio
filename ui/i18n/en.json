@@ -3415,5 +3415,12 @@
   "vedit.hdr.info_src10": "The source is {p}: the HDR LoRA expects 8-bit Rec.709 SDR; an already HDR video (PQ/HLG) must not be used as input.",
   "ernie.pe.missing.title": "ERNIE enhancer missing",
   "ernie.pe.missing.body": "«Improve prompt» on ERNIE-Image uses the official enhancer (pe/model.safetensors, ~7.7 GB) and it is not on disk. I download nothing myself: get it from the «Model weights» tab (entry «ernie-image-pe»); if you already have ernie-image-prompt-enhancer.safetensors, move it to {dir}.",
-  "ernie.pe.continue": "Continue without improving"
+  "ernie.pe.continue": "Continue without improving",
+  "pitch.mode": "Mode",
+  "pitch.mode.template": "From guide voice (template)",
+  "pitch.mode.score": "From MIDI score",
+  "pitch.mode.tt": "Template: copies the pitch from an in-tune voice. MIDI score: tunes the voice to the notes of a MIDI file.",
+  "pitch.midi": "Score",
+  "pitch.midi.ph": "MIDI score (.mid / .midi)",
+  "pitch.note.score": "Tunes the voice to the notes of a MIDI score (the voice must follow the score in timing)."
 }

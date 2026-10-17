@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "A forrás {p}: a HDR LoRA 8 bites Rec.709 SDR-t vár; már HDR videót (PQ/HLG) nem szabad bemenetként megadni.",
   "ernie.pe.missing.title": "Hiányzik az ERNIE enhancer",
   "ernie.pe.missing.body": "Az ERNIE-Image «Prompt javítása» funkciója a hivatalos enhancert használja (pe/model.safetensors, ~7,7 GB), de az nincs a lemezen. Én nem töltök le semmit: szerezd be a «Modell súlyok» fülön («ernie-image-pe» tétel); ha már megvan az ernie-image-prompt-enhancer.safetensors, told át ide: {dir}.",
-  "ernie.pe.continue": "Folytatás javítás nélkül"
+  "ernie.pe.continue": "Folytatás javítás nélkül",
+  "pitch.mode": "Mód",
+  "pitch.mode.template": "Vezérhang alapján (sablon)",
+  "pitch.mode.score": "MIDI-kotta alapján",
+  "pitch.mode.tt": "Sablon: átveszi egy tiszta hang intonációját. MIDI-kotta: a hangot egy MIDI-fájl hangjaihoz igazítja.",
+  "pitch.midi": "Kotta",
+  "pitch.midi.ph": "MIDI-kotta (.mid / .midi)",
+  "pitch.note.score": "A hangot egy MIDI-kotta hangjaihoz igazítja (a hangnak időben követnie kell a kottát)."
 }

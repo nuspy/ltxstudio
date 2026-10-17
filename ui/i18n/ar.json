@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "المصدر {p}: تتوقع HDR LoRA فيديو SDR Rec.709 بعمق 8 بت؛ ولا يجوز إدخال فيديو HDR أصلًا (PQ/HLG).",
   "ernie.pe.missing.title": "مُحسِّن ERNIE غير موجود",
   "ernie.pe.missing.body": "«تحسين الموجّه» في ERNIE-Image يستخدم المُحسِّن الرسمي (pe/model.safetensors، حوالي 7.7 غيغابايت) وهو غير موجود على القرص. لا أنزّل شيئًا بنفسي: نزّله من تبويب «أوزان النماذج» (العنصر «ernie-image-pe»)؛ وإذا كان لديك ernie-image-prompt-enhancer.safetensors فانقله إلى {dir}.",
-  "ernie.pe.continue": "المتابعة دون تحسين"
+  "ernie.pe.continue": "المتابعة دون تحسين",
+  "pitch.mode": "الوضع",
+  "pitch.mode.template": "من صوت مرشد (قالب)",
+  "pitch.mode.score": "من نوتة MIDI",
+  "pitch.mode.tt": "القالب: ينسخ طبقة الصوت من صوت مضبوط. نوتة MIDI: يضبط الصوت على نغمات ملف MIDI.",
+  "pitch.midi": "النوتة",
+  "pitch.midi.ph": "نوتة MIDI (‎.mid / .midi)",
+  "pitch.note.score": "يضبط الصوت على نغمات نوتة MIDI (يجب أن يتبع الصوت النوتة زمنيًا)."
 }

@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "स्रोत {p} है: HDR LoRA को 8-बिट Rec.709 SDR चाहिए; पहले से HDR (PQ/HLG) वीडियो इनपुट के रूप में न दें।",
   "ernie.pe.missing.title": "ERNIE enhancer नहीं मिला",
   "ernie.pe.missing.body": "ERNIE-Image पर «प्रॉम्प्ट सुधारें» आधिकारिक enhancer (pe/model.safetensors, लगभग 7.7 GB) इस्तेमाल करता है और वह डिस्क पर नहीं है। मैं खुद कुछ डाउनलोड नहीं करता: इसे «मॉडल वेट» टैब से लें (प्रविष्टि «ernie-image-pe»); अगर ernie-image-prompt-enhancer.safetensors पहले से है तो उसे {dir} में ले जाएँ।",
-  "ernie.pe.continue": "बिना सुधार के जारी रखें"
+  "ernie.pe.continue": "बिना सुधार के जारी रखें",
+  "pitch.mode": "मोड",
+  "pitch.mode.template": "गाइड आवाज़ से (टेम्पलेट)",
+  "pitch.mode.score": "MIDI स्कोर से",
+  "pitch.mode.tt": "टेम्पलेट: सुर में आवाज़ से सुर की नकल करता है। MIDI स्कोर: आवाज़ को MIDI फ़ाइल के सुरों पर ट्यून करता है।",
+  "pitch.midi": "स्कोर",
+  "pitch.midi.ph": "MIDI स्कोर (.mid / .midi)",
+  "pitch.note.score": "आवाज़ को MIDI स्कोर के सुरों पर ट्यून करता है (आवाज़ को समय में स्कोर का पालन करना चाहिए)।"
 }

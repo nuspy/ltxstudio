@@ -3341,5 +3341,12 @@
   "vedit.hdr.info_src10": "Die Quelle ist {p}: die HDR-LoRA erwartet 8-Bit-SDR in Rec.709; ein bereits HDR-Video (PQ/HLG) darf nicht als Eingabe dienen.",
   "ernie.pe.missing.title": "ERNIE-Enhancer fehlt",
   "ernie.pe.missing.body": "«Prompt verbessern» bei ERNIE-Image nutzt den offiziellen Enhancer (pe/model.safetensors, ~7,7 GB), der nicht auf der Platte liegt. Ich lade selbst nichts herunter: hole ihn im Tab «Modellgewichte» (Eintrag «ernie-image-pe»); falls du ernie-image-prompt-enhancer.safetensors schon hast, verschiebe die Datei nach {dir}.",
-  "ernie.pe.continue": "Ohne Verbesserung fortfahren"
+  "ernie.pe.continue": "Ohne Verbesserung fortfahren",
+  "pitch.mode": "Modus",
+  "pitch.mode.template": "Nach Führungsstimme (Vorlage)",
+  "pitch.mode.score": "Nach MIDI-Partitur",
+  "pitch.mode.tt": "Vorlage: übernimmt die Tonhöhe einer sauberen Stimme. MIDI-Partitur: stimmt die Stimme auf die Noten einer MIDI-Datei.",
+  "pitch.midi": "Partitur",
+  "pitch.midi.ph": "MIDI-Partitur (.mid / .midi)",
+  "pitch.note.score": "Stimmt die Stimme auf die Noten einer MIDI-Partitur (die Stimme muss der Partitur zeitlich folgen)."
 }
