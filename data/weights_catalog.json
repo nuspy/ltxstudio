@@ -1372,6 +1372,33 @@
       ]
     },
     {
+      "id": "ltx23-inpaint-r2v",
+      "module": "Video",
+      "label": "LoRA Inpaint video con foto di riferimento (r2v, rank32)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.33,
+      "scan_names": [
+        "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors",
+      "no_remote": true,
+      "use": [
+        "iclora_edit"
+      ],
+      "used_by": [
+        "cap.video_inpaint_r2v"
+      ],
+      "note": "Modifica Video AI > Inpaint oggetto, casella «Inserisci un oggetto da una foto»: la foto va come immagine di condizionamento (frame 0). Senza foto resta la LoRA t2v rank128. Nessun metadata nel file (solo reference_downscale_factor=1). Col dev si aggiunge la distilled-LoRA",
+      "deps": [
+        "ltx23-distilled-lora-384|ltx23-distilled-fp8"
+      ]
+    },
+    {
       "id": "ltx-iclora-outpaint",
       "module": "Video",
       "label": "IC-LoRA Outpaint (oumoumad)",

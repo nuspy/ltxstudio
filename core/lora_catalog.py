@@ -193,7 +193,8 @@ _REGISTRY_FAMILIES = {"LTX": ("LTX", "LTX-2", "LTX-2.5")}
 # IC-LoRA (guidate da un video di controllo) e file ausiliari: NON sono LoRA «normali» da applicare a un t2v/i2v
 # (senza la guida producono rumore). Si usano dal tab «Modifica Video AI» / ControlNet, non dal pannello LoRA.
 # Restano visibili le LoRA camera-control / CameraControls (LoRA normali t2v/i2v).
-_IC_LORA_MARKERS = ("ic-lora", "iclora", "ic_lora", "scene-emb")
+# `inpaint_masked`: LoRA dell'inpaint video (t2v/r2v, task 8) guidate dal video+maschera SAM2 di «Modifica Video AI»
+_IC_LORA_MARKERS = ("ic-lora", "iclora", "ic_lora", "scene-emb", "inpaint_masked")
 
 
 def is_ic_lora_file(*names: str) -> bool:
