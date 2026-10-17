@@ -194,13 +194,16 @@ class IcJob:
     source: str = ""
     notes: list = field(default_factory=list)
     segments: int = 1
+    extra_files: list = field(default_factory=list)   # file accanto al risultato da mostrare (motion_track: video delle tracce)
 
     def outputs(self, result: str) -> list[str]:
-        """Risultato + file aggiuntivi del job (hdr: HEVC PQ e cartella EXR, letti dal sidecar scritto dal worker)."""
+        """Risultato + file aggiuntivi del job (hdr: HEVC PQ e cartella EXR, letti dal sidecar scritto dal worker;
+        motion_track: il video delle tracce di controllo)."""
+        extra = [f for f in self.extra_files if f and os.path.exists(f)]
         if self.spec.kind != "hdr":
-            return [result]
+            return [result, *extra]
         from core import hdr_export as _hx
-        return [result, *_hx.extra_outputs(str(self.params.get("output") or result))]
+        return [result, *_hx.extra_outputs(str(self.params.get("output") or result)), *extra]
 
 
 def _cap_even(w: int, h: int, cap: int) -> tuple[int, int, bool]:
@@ -239,6 +242,8 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
     rel = cfg.get("ltx_release")
     if rel and not _rel.ic_lora_supported(rel):
         raise IcJobError(f"Le IC-LoRA locali sono per LTX 2.3: il checkpoint scelto e' release {rel}.")
+    if spec.key == "motion_track":
+        return _build_motion_track(cfg, spec, out_dir, stamp, output, log)
     src = cfg.get("cam_ref") if spec.key == "cameraman" else cfg.get("video")
     if not src or not os.path.exists(src):
         raise IcJobError("video sorgente mancante" if spec.key != "cameraman"
@@ -437,6 +442,100 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
     p["control_video"] = guide
     return IcJob(params=p, spec=spec, work_dir=work, mux_audio_from=mux, layout=layout, gamma=gamma,
                  paste_original=paste, feather=feather, source=src, notes=notes, segments=nseg)
+
+
+def _build_motion_track(cfg: dict, spec: vem.ModeSpec, out_dir: str, stamp: int, output: str, log) -> IcJob:
+    """Motion-track (ricetta ufficiale Lightricks, vedi video_edit_modes): immagine di partenza (frame 0) + tracce disegnate ->
+    video di controllo (core/motion_tracks.py) -> IC-LoRA motion-track (forza 1.0) via ICLoraPipeline.
+
+    cfg: `track_image` (o `image_path`) immagine di partenza; `tracks` (JSON: punti di controllo dell'editor, tracce dense o
+    workflow ComfyUI) e/o `tracks_video_path` (video di controllo gia' pronto: ha la precedenza, niente rendering);
+    `tracks_size` [w,h] spazio delle coordinate (altrimenti quello dichiarato nel JSON; se manca = pixel dell'immagine
+    ORIGINALE, con lo stesso ritaglio «cover» dell'immagine di partenza); `tracks_format` auto|control|dense;
+    width/height (default dall'aspetto dell'immagine, lato corto 576), `num_frames` o `seconds` (default 121) e `fps` (24)."""
+    from core import motion_tracks as mt
+    from core import video_ic_prep as prep
+    img = str(cfg.get("track_image") or cfg.get("image_path") or "")
+    if not img or not os.path.exists(img):
+        raise IcJobError("immagine di partenza mancante (e' il frame 0 del video e lo sfondo delle tracce)")
+    tv = str(cfg.get("tracks_video_path") or "")
+    if tv and not os.path.exists(tv):
+        raise IcJobError(f"video delle tracce non trovato: {tv}")
+    raw_tracks = cfg.get("tracks")
+    if not tv and not raw_tracks:
+        raise IcJobError("tracce mancanti: disegna almeno una traccia (o fornisci un video delle tracce)")
+    try:
+        from PIL import Image
+        with Image.open(img) as im:
+            iw, ih = im.size
+    except Exception as e:                                          # noqa: BLE001
+        raise IcJobError(f"immagine di partenza illeggibile: {e}") from None
+    fps = int(round(float(cfg.get("fps") or mt.DEFAULT_FPS)))
+    if fps < 8 or fps > 60:
+        raise IcJobError(f"fps non valido: {fps}")
+    if cfg.get("num_frames"):
+        n = vem.snap_frames(int(cfg["num_frames"]))
+    else:
+        n = mt.frames_for_seconds(float(cfg.get("seconds") or (mt.DEFAULT_FRAMES / mt.DEFAULT_FPS)), fps)
+    if n > spec.max_frames_per_segment:
+        raise IcJobError(f"{n} frame oltre il tetto {spec.max_frames_per_segment} ({spec.max_frames_per_segment / fps:.1f} s a "
+                         f"{fps} fps) e le tracce non si possono spezzare in segmenti: accorcia il clip")
+    notes: list[str] = []
+    if cfg.get("width") and cfg.get("height"):
+        w0, h0 = int(cfg["width"]), int(cfg["height"])
+    else:
+        w0, h0 = mt.default_size(iw, ih, max_long=spec.max_long_edge)
+    w, h, _red = vem.clamp_resolution(w0, h0, spec)
+    if (w, h) != (w0, h0):
+        notes.append(f"risoluzione {w0}x{h0} portata a {w}x{h} (multipli di 64, tetto {spec.max_long_edge}px)")
+    work = os.path.join(out_dir, f"_vedit_{spec.key}_{stamp}")
+    os.makedirs(work, exist_ok=True)
+    from PIL import Image as _Im
+    start = os.path.join(work, "start.png")
+    _Im.fromarray(prep._load_image_cover(img, w, h)).save(start)     # cover + center-crop alla risoluzione di lavoro
+    tracks_mp4 = os.path.splitext(output)[0] + "_tracks.mp4"
+    if tv:
+        shutil.copyfile(tv, tracks_mp4)
+        notes.append("video delle tracce fornito: usato cosi' com'e' (la pipeline lo ridimensiona e ritaglia)")
+    else:
+        try:
+            inp = mt.parse_track_input(raw_tracks, n, str(cfg.get("tracks_format") or "auto"))
+        except (ValueError, TypeError) as e:
+            raise IcJobError(f"tracce non valide: {e}") from None
+        size = cfg.get("tracks_size")
+        if size and len(size) == 2:
+            inp.size = (int(size[0]), int(size[1]))
+        if inp.size is None:                                         # pixel dell'immagine originale -> spazio di lavoro (cover)
+            sc = max(w / float(iw), h / float(ih))
+            ox, oy = (iw * sc - w) / 2.0, (ih * sc - h) / 2.0
+            inp.tracks = [[{"x": p["x"] * sc - ox, "y": p["y"] * sc - oy} for p in t] for t in inp.tracks]
+            inp.size = (w, h)
+        dense = mt.dense_tracks(inp, n, w, h)
+        if not dense:
+            raise IcJobError("nessuna traccia utilizzabile")
+        out_of = sum(1 for t in dense for p in t if not (0 <= p["x"] < w and 0 <= p["y"] < h))
+        if out_of:
+            notes.append(f"{out_of} punti delle tracce cadono fuori dal quadro {w}x{h}")
+        log(f"[motion_track] {len(dense)} tracce, {n} frame, {w}x{h}: disegno il video di controllo")
+        try:
+            mt.write_video(dense, w, h, fps, tracks_mp4, num_frames=n)
+        except (RuntimeError, ValueError) as e:
+            raise IcJobError(str(e)) from None
+    prompt = (cfg.get("prompt") or "").strip()
+    p: dict = {"prompt": prompt, "negative": "worst quality, blurry", "control_type": spec.kind, "edit_lora": "",
+               "control_strength": float(cfg.get("strength", spec.default_strength)),
+               "conditioning_attention": float(cfg.get("conditioning_attention", 1.0)),
+               "fps": fps, "seed": int(cfg.get("seed", 42)), "output": output, "_strict_ic": True,
+               "image_path": start, "ref_strength": float(cfg.get("image_strength", 1.0)),
+               "width": w, "height": h, "num_frames": n, "control_video": tracks_mp4}
+    for k in ("model", "gguf_transformer", "ltx_release"):          # checkpoint come scelto, mai sostituito
+        if cfg.get(k):
+            p[k] = cfg[k]
+    if not prompt:
+        notes.append("nessun prompt: descrivi soggetto e scena, il movimento viene dalle tracce")
+    notes.append(f"{n} frame a {fps} fps = {n / fps:.1f} s; uscita con audio generato dal modello")
+    return IcJob(params=p, spec=spec, work_dir=work, mux_audio_from="", source=img, notes=notes, segments=1,
+                 extra_files=[tracks_mp4])
 
 
 def mux_audio(video: str, audio_src: str) -> str:
