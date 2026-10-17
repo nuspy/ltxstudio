@@ -4357,6 +4357,9 @@ class MainWindow(QMainWindow):
         # log componenti/settaggi EFFETTIVI (visibilità: cosa è stato auto-selezionato davvero)
         self._log(f"{mode} (backend NATIVO): modello={os.path.basename(model)} · pipeline={arch} · "
                   f"steps={steps} · guidance={guidance:.1f} · denoise={denoise:.2f} · seed={seed}")
+        if _f2 and int(steps) > 14 and mode == "inpaint":      # live 17/10: Klein a 21 passi = foto quasi invariata (MAD 4); a 12 = edit pieno
+            self._log(tr("mw.klein_steps_warn", "⚠ FLUX.2 Klein è distillato: con {n} passi l'edit si indebolisce fino a lasciare la foto quasi "
+                         "invariata (provato dal vivo: 12 passi = edit completo, 16 = parziale, 21 = invariato). Consigliati 12 passi.").format(n=int(steps)))
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,

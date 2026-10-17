@@ -3438,6 +3438,7 @@
   "pitch.midi": "Partition",
   "pitch.midi.ph": "partition MIDI (.mid / .midi)",
   "pitch.note.score": "Accorde la voix sur les notes d'une partition MIDI (la voix doit suivre la partition dans le temps).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein est distillé : avec {n} pas, l'édition s'affaiblit jusqu'à laisser la photo presque inchangée (testé en réel : 12 pas = édition complète, 16 = partielle, 21 = inchangée). 12 pas recommandés.",
   "ref.add.tt": "Choisissez un ou plusieurs fichiers (vous pouvez aussi les glisser ici).",
   "ref.from_canvas": "Depuis le canevas",
   "ref.from_canvas.tt": "Utilise comme référence l'image présente dans le canevas.",

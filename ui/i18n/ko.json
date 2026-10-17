@@ -3438,6 +3438,7 @@
   "pitch.midi": "악보",
   "pitch.midi.ph": "MIDI 악보 (.mid / .midi)",
   "pitch.note.score": "MIDI 악보의 음에 맞춰 목소리를 보정합니다 (목소리가 악보와 박자가 맞아야 합니다).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein은 증류 모델입니다. {n} 스텝에서는 편집이 약해져 사진이 거의 그대로 남습니다(실측: 12 스텝 = 완전 편집, 16 = 부분, 21 = 변화 없음). 12 스텝을 권장합니다.",
   "ref.add.tt": "파일을 하나 이상 선택하세요(여기로 끌어다 놓아도 됩니다).",
   "ref.from_canvas": "캔버스에서",
   "ref.from_canvas.tt": "캔버스에 있는 이미지를 참조로 사용합니다.",

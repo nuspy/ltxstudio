@@ -3438,6 +3438,7 @@
   "pitch.midi": "Partitura",
   "pitch.midi.ph": "partitura MIDI (.mid / .midi)",
   "pitch.note.score": "Afina a voz pelas notas de uma partitura MIDI (a voz tem de seguir a partitura no tempo).",
+  "mw.klein_steps_warn": "⚠ O FLUX.2 Klein é destilado: com {n} passos a edição enfraquece até deixar a foto quase inalterada (testado ao vivo: 12 passos = edição completa, 16 = parcial, 21 = inalterada). Recomendados 12 passos.",
   "ref.add.tt": "Escolha um ou mais arquivos (também pode arrastá-los para aqui).",
   "ref.from_canvas": "Do canvas",
   "ref.from_canvas.tt": "Usa como referência a imagem que está no canvas.",

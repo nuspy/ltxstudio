@@ -3477,6 +3477,7 @@
   "pitch.midi": "Spartito",
   "pitch.midi.ph": "spartito MIDI (.mid / .midi)",
   "pitch.note.score": "Intona la voce sulle note di uno spartito MIDI (la voce deve seguire lo spartito nei tempi).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein è distillato: con {n} passi l'edit si indebolisce fino a lasciare la foto quasi invariata (provato dal vivo: 12 passi = edit completo, 16 = parziale, 21 = invariato). Consigliati 12 passi.",
   "ref.add.tt": "Scegli uno o più file (puoi anche trascinarli qui).",
   "ref.from_canvas": "Dal canvas",
   "ref.from_canvas.tt": "Usa come riferimento l'immagine che hai nel canvas.",
