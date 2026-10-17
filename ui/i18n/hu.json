@@ -3423,5 +3423,9 @@
   "vedit.note_inpaint_r2v": "A fotóval (r2v LoRA) az új tárgy a fotóból származik; a promptban írd le a jelenetet és hogy mit csinál. A hosszú klipek szegmensekben készülnek, mindegyikben ugyanazzal a fotóval.",
   "vedit.err_no_ref_inpaint": "Inpaint fotóval: válaszd ki a beillesztendő tárgy fotóját (vagy kapcsold ki a jelölőnégyzetet).",
   "vedit.r2v.missing_body": "Hiányzik a referenciafotós inpaint súlya (r2v LoRA, kb. 0,33 GB). Én magam nem töltök le semmit: nyisd meg a «Modellsúlyok» fülön, vagy kapcsold ki a jelölőnégyzetet, hogy szavakkal inpaintelj.",
-  "feat.cap.video_inpaint_r2v": "Videó-inpaint referenciafotóval (r2v LoRA)"
+  "feat.cap.video_inpaint_r2v": "Videó-inpaint referenciafotóval (r2v LoRA)",
+  "vedit.inpaint.fullres": "Teljes felbontás (második fokozat)",
+  "vedit.inpaint.fullres.tt": "Bekapcsolva: a kimenet a videó felbontásában készül (a hosszabbik oldalon 1280 a felső határ), egy további finomítással (több idő és VRAM). Kikapcsolva: a kimenet fél felbontású.",
+  "vedit.inpaint.keepbg": "Eredeti háttér a maszkon kívül",
+  "vedit.inpaint.keepbg.tt": "Bekapcsolva: a maszkon (és a tágításon) kívül a videó az eredeti, teljes felbontásban, lágy széllel; csak az objektum területe változik. Kikapcsolva: a teljes képkocka generált."
 }

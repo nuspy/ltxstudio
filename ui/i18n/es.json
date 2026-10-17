@@ -3423,5 +3423,9 @@
   "vedit.note_inpaint_r2v": "Con la foto (LoRA r2v) el objeto nuevo se toma de la foto; en el prompt describe la escena y lo que hace. Los clips largos se generan por segmentos, con la misma foto en cada uno.",
   "vedit.err_no_ref_inpaint": "Inpaint con foto: elige la foto del objeto a insertar (o desactiva la casilla).",
   "vedit.r2v.missing_body": "Falta el peso del inpaint con foto de referencia (LoRA r2v, unos 0,33 GB). No descargo nada yo: ábrelo desde la pestaña «Pesos de modelos», o desactiva la casilla para usar el inpaint con palabras.",
-  "feat.cap.video_inpaint_r2v": "Inpaint de vídeo con foto de referencia (LoRA r2v)"
+  "feat.cap.video_inpaint_r2v": "Inpaint de vídeo con foto de referencia (LoRA r2v)",
+  "vedit.inpaint.fullres": "Resolución completa (segunda etapa)",
+  "vedit.inpaint.fullres.tt": "Activado: la salida tiene la resolución del vídeo (tope de 1280 en el lado largo), con un refinado extra (más tiempo y VRAM). Desactivado: la salida es a media resolución.",
+  "vedit.inpaint.keepbg": "Fondo original fuera de la máscara",
+  "vedit.inpaint.keepbg.tt": "Activado: fuera de la máscara (más la dilatación) el vídeo es tu original a resolución completa, con el borde difuminado; solo cambia el área del objeto. Desactivado: se genera todo el fotograma."
 }

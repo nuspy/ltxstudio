@@ -161,6 +161,21 @@ class VideoEditAITab(QWidget):
         self.inp_use_ref.toggled.connect(self._on_mode)
         f.addRow("", self.inp_use_ref)
 
+        # Inpaint: qualita' d'uscita (default ACCESI). Piena risoluzione = secondo stadio del pacchetto LTX (upsampler + raffinamento);
+        # sfondo originale = fuori dalla maschera il video e' il sorgente a piena risoluzione (bordo sfumato come la «Sfumatura maschera»).
+        self.inp_full_res = QCheckBox(tr("vedit.inpaint.fullres", "Piena risoluzione (secondo stadio)"))
+        self.inp_full_res.setChecked(True)
+        self.inp_full_res.setToolTip(tr("vedit.inpaint.fullres.tt",
+            "Acceso: l'uscita ha la risoluzione del video (tetto 1280 sul lato lungo), con un raffinamento in piu' (tempo e VRAM maggiori). "
+            "Spento: l'uscita e' a meta' risoluzione."))
+        f.addRow("", self.inp_full_res)
+        self.inp_keep_bg = QCheckBox(tr("vedit.inpaint.keepbg", "Sfondo originale fuori dalla maschera"))
+        self.inp_keep_bg.setChecked(True)
+        self.inp_keep_bg.setToolTip(tr("vedit.inpaint.keepbg.tt",
+            "Acceso: fuori dalla maschera (piu' la dilatazione) il video e' il tuo originale a piena risoluzione, con il bordo sfumato; "
+            "cambia solo l'area dell'oggetto. Spento: tutto il fotogramma e' generato."))
+        f.addRow("", self.inp_keep_bg)
+
         # Sostituisci personaggio / ReStyle / Inpaint r2v: immagine di riferimento, di stile o dell'oggetto.
         rrow = QHBoxLayout()
         self.ref_img = QLineEdit(); self.ref_img.setPlaceholderText(
@@ -976,6 +991,8 @@ class VideoEditAITab(QWidget):
         for w in (self.ref_strength, self.ref_strength_lbl):
             w.setEnabled(is_rc or inp_ref)
         self._show_row(self.inp_use_ref, is_inp)
+        self._show_row(self.inp_full_res, is_inp)
+        self._show_row(self.inp_keep_bg, is_inp)
         self.ref_row_lbl.setText(tr("vedit.style.image_lbl", "Immagine di stile") if is_restyle
                                  else tr("vedit.r2v.img_lbl", "Foto dell'oggetto da inserire") if inp_ref
                                  else tr("vedit.ref_lbl", "Immagine sostitutiva (personaggio)"))
@@ -1221,6 +1238,9 @@ class VideoEditAITab(QWidget):
                "enhance": self.vedit_enhance.isChecked(),
                "ref_image": self.ref_img.text().strip(),
                "ref_strength": float(self.ref_strength.value())}   # #102 forza identità del riferimento
+        if key == "inpaint":
+            cfg["full_res"] = self.inp_full_res.isChecked()
+            cfg["keep_background"] = self.inp_keep_bg.isChecked()
         if key == "inpaint":                                 # foto = scelta esplicita (casella r2v), non il solo campo
             if self.inp_use_ref.isChecked():
                 if not cfg["ref_image"] or not os.path.isfile(cfg["ref_image"]):

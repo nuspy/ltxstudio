@@ -21,12 +21,16 @@ class InpaintPipeline(ICLoraPipeline):
     @torch.inference_mode()
     def inpaint(self, *, prompt: str, seed: int, height: int, width: int, num_frames: int,
                 frame_rate: float, video_conditioning: list[tuple[str, float]],
-                attention_mask: torch.Tensor, images=None, negative_prompt: str = "worst quality, blurry",
+                attention_mask: torch.Tensor, images=None, stage2: bool = False,
+                negative_prompt: str = "worst quality, blurry",
                 cfg_scale: float = 4.0, num_steps: int = 30, stage_1_sigmas=None, **_ignore):
         """video_conditioning: [(video_originale, strength)]. attention_mask: (T,H,W) in [0,1], maschera
         OGGETTO (1=oggetto da sostituire); viene invertita internamente per la IC-LoRA.
         images: [ImageConditioningInput] opzionale = foto di riferimento dell'oggetto (LoRA inpaint r2v), condizionamento
-        di immagine come in ICLoraPipeline.__call__; None/vuoto = LoRA t2v (solo prompt)."""
+        di immagine come in ICLoraPipeline.__call__; None/vuoto = LoRA t2v (solo prompt).
+        stage2: True = secondo stadio come ICLoraPipeline.__call__ (upsampler spaziale x2 sul latente dello stage 1 + raffinamento
+        con le sigma distilled dello stage 2, senza guida IC): l'uscita e' a `width`x`height` pieni invece che a meta'. Lo stage 2 non
+        conosce la maschera: lo sfondo originale si rimette DOPO, in pixel (`composite_outside_mask` in ltx_inpaint_composite)."""
         from ltx_core.components.diffusion_steps import EulerCfgPpDiffusionStep
         from ltx_core.components.guiders import MultiModalGuider, MultiModalGuiderParams
         from ltx_core.components.noisers import GaussianNoiser
@@ -56,7 +60,7 @@ class InpaintPipeline(ICLoraPipeline):
 
         stage_1_conditionings = self.image_conditioner(_build)
         sig = stage_1_sigmas.to(dtype=torch.float32, device=self.device)
-        video_state, _ = self.stage_1(
+        video_state, audio_state = self.stage_1(
             denoiser=GuidedDenoiser(
                 v_context=video_context, a_context=audio_context,
                 video_guider=MultiModalGuider(params=MultiModalGuiderParams(cfg_scale=cfg_scale),
@@ -68,4 +72,23 @@ class InpaintPipeline(ICLoraPipeline):
             sigmas=sig, noiser=noiser, width=s1.width, height=s1.height, frames=num_frames, fps=frame_rate,
             video=ModalitySpec(context=video_context, conditionings=stage_1_conditionings),
             audio=ModalitySpec(context=audio_context))
+        if not stage2:
+            return self.video_decoder(video_state.latent, None, generator)
+
+        # Stage 2 (come ICLoraPipeline.__call__): upsample x2 del latente e raffinamento breve a risoluzione piena.
+        from ltx_pipelines.utils.constants import STAGE_2_DISTILLED_SIGMAS
+        from ltx_pipelines.utils.denoisers import SimpleDenoiser
+        from ltx_pipelines.utils.helpers import combined_image_conditionings
+        upscaled = self.upsampler(video_state.latent[:1])
+        s2_sig = STAGE_2_DISTILLED_SIGMAS.to(dtype=torch.float32, device=self.device)
+        s2_cond = self.image_conditioner(lambda enc: combined_image_conditionings(
+            images=list(images or []), height=height, width=width, video_encoder=enc,
+            dtype=self.dtype, device=self.device))
+        video_state, _ = self.stage_2(
+            denoiser=SimpleDenoiser(video_context, audio_context),
+            sigmas=s2_sig, noiser=noiser, width=width, height=height, frames=num_frames, fps=frame_rate,
+            video=ModalitySpec(context=video_context, conditionings=s2_cond,
+                               noise_scale=s2_sig[0].item(), initial_latent=upscaled),
+            audio=ModalitySpec(context=audio_context, noise_scale=s2_sig[0].item(),
+                               initial_latent=audio_state.latent))
         return self.video_decoder(video_state.latent, None, generator)
