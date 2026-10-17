@@ -11,8 +11,13 @@ Concetti
 - `ModeSpec.distilled`  "required" (la funzione non esiste senza checkpoint distilled) | "recommended"
                         (col dev la distilled-LoRA vale solo per lo stage 1: qualita' ridotta, vedi memoria
                         iclora-distilled-lora-mancante). La GUI avvisa/blocca, MAI cambia il modello da sola.
-- `phase` / `enabled`   le modalita' non ancora implementate (hdr 1c) esistono come spec ma
-                        `enabled=False`: non vanno mostrate come selezionabili.
+- `phase` / `enabled`   le modalita' non ancora implementate esistono come spec ma `enabled=False`:
+                        non vanno mostrate come selezionabili (oggi nessuna: hdr e' attiva dalla fase 1c).
+- `own_segments`        il worker spezza il clip da se' (hdr: l'uscita e' un tensore float lineare, non un mp4 da
+                        ricucire con `concat_segments`): niente `_run_chunked_ic`, il tetto `max_frames_per_segment`
+                        vale per segmento e la GUI non rifiuta i clip lunghi.
+- `native_res`          la pipeline allinea da sola a 64 (reflect-pad) e ritaglia: larghezza/altezza NON si arrotondano
+                        a 64 (aspetto e dimensioni del sorgente restano esatti, solo tetto sul lato lungo).
 
 TETTI (`max_long_edge`, `max_frames_per_segment`) — PRUDENTI, NON MISURATI dal vivo (DESIGN §7: i test live
 li fissano). Ipotesi di lavoro: GPU 32 GB, checkpoint distilled fp8 residente (~23 GB) + stage 2 a risoluzione
@@ -71,6 +76,8 @@ class ModeSpec:
     max_long_edge: int = 1280                 # tetto lato lungo (px); multiplo di 64
     max_frames_per_segment: int = 97          # 8n+1
     chunkable: bool = True                    # il video si puo' spezzare in segmenti (split+crossfade)
+    own_segments: bool = False                # il worker segmenta da solo (hdr), vedi docstring
+    native_res: bool = False                  # niente arrotondamento a 64: la pipeline allinea e ritaglia
     preprocess: str = PRE_NONE
     keep_audio: bool = True                   # rimettere l'audio originale dopo la generazione (_mux_audio_from)
     phase: str = "1a"                         # fase di implementazione: 1a | 1b | 1c | 1d
@@ -144,11 +151,17 @@ MODE_SPECS: dict[str, ModeSpec] = {s.key: s for s in (
        note_key="vedit.note_detailer", cap="cap.video_restore_iclora",
        experimental_key="vedit.note_detailer",                       # LoRA LTX-2 19B (rank 256) usata su 2.3
        **{**_RESTORE, "max_long_edge": 1024, "max_frames_per_segment": 73}),
+    # HDR (fase 1c): ricetta ufficiale Lightricks (ltx_pipelines.hdr_ic_lora.HDRICLoraPipeline + workflow ComfyUI
+    # LTX-2.3_ICLoRA_HDR_Distilled.json): video SDR Rec.709 -> HDR lineare float; NESSUN prompt (il testo e' il file
+    # scene-emb pre-calcolato, `catalog_id` ltx-iclora-hdr-scene-emb). Col dev: distilled-LoRA 0.5 come lipdub.
+    # Uscita: anteprima SDR tonemappata + HEVC 10 bit PQ/BT.2020 + (opz.) sequenza EXR (core/hdr_export.py).
+    # Tetti NON misurati (live in TESTS.md): 1280 px lato lungo, 97 frame per segmento (stage 2 a tile 2x2x2 e decode a
+    # tile: meno attivazioni del lipdub); clip piu' lunghi = segmenti con crossfade in luce lineare nel worker.
     _s(key="hdr", kind="hdr", catalog_id="ltx-iclora-hdr", i18n_key="vedit.mode.hdr",
        note_key="vedit.note_hdr", cap="cap.video_hdr_ic", family=FAMILY_REPAIR,
-       needs_prompt=NEEDS_NONE, distilled=DISTILLED_REQUIRED, max_long_edge=1024,
-       max_frames_per_segment=97, chunkable=False, keep_audio=True,
-       phase="1c", enabled=False, tags=("hdr_pipeline", "scene_emb")),
+       needs_prompt=NEEDS_NONE, distilled=DISTILLED_RECOMMENDED, max_long_edge=1280,
+       max_frames_per_segment=97, chunkable=False, own_segments=True, native_res=True, keep_audio=True,
+       phase="1c", enabled=True, tags=("hdr_pipeline", "scene_emb")),
     # ── famiglia Outpaint video ───────────────────────────────────────────────────────────────────
     _s(key="outpaint", family=FAMILY_OUTPAINT, i18n_key="vedit.mode.outpaint", kind="outpaint",
        catalog_id="ltx-iclora-outpaint", note_key="vedit.note_outpaint", cap="cap.video_outpaint",
@@ -265,7 +278,7 @@ def segments_needed(total_frames: int, spec: ModeSpec | str, overlap: int = DEFA
     """Quanti segmenti servono per `total_frames` con il tetto della modalita' (1 se entra in uno)."""
     sp = get_spec(spec) if isinstance(spec, str) else spec
     seg = sp.max_frames_per_segment
-    if total_frames <= seg or not sp.chunkable:
+    if total_frames <= seg or not (sp.chunkable or sp.own_segments):
         return 1
     step = max(1, seg - max(0, int(overlap)))
     return 1 + -(-(int(total_frames) - seg) // step)

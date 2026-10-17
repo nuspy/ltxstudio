@@ -927,6 +927,8 @@ _IC_FALLBACK = {
     "union": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
     "cameraman": "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors",
 }
+# scene-emb HDR (12,6 MB): embedding testo PRE-CALCOLATO che sostituisce Gemma nella pipeline HDR (nessun prompt)
+HDR_SCENE_EMB = _mpaths.p("ltx-iclora-hdr-scene-emb", os.path.join(_LORA2, "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors"))
 IC_LORA = {k: _mpaths.p(_IC_IDS[k], os.path.join(_LORA2, _IC_FALLBACK[k])) for k in _IC_IDS}
 IC_LORA = {k: v for k, v in IC_LORA.items() if os.path.exists(v)}   # solo quelle presenti su disco
 
@@ -1447,7 +1449,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         # in movimento (visto sia in modalità kernel che dequant; la dequant delle scale è corretta,
         # cos 0.9954). Coi checkpoint DEV la distilled-LoRA è obbligatoria → percorso fp8 pulito.
         # L'FP4 residente resta per i checkpoint DISTILLED-fp4 (nessuna fusione). Forza: LTX_FP4_MM=force.
-        _needs_fuse = bool(loras) or ptype in ("lipdub", "lipdub_audio") or ("distilled" not in os.path.basename(ckpt).lower()
+        _needs_fuse = bool(loras) or ptype in ("lipdub", "lipdub_audio", "hdr") or ("distilled" not in os.path.basename(ckpt).lower()
                                       and os.environ.get("LTX_NO_DLORA") != "1")
         # FP4 RESIDENTE ANCHE CON LE LoRA (scelta dell'utente, 27/08). La dequant a fp8 nasceva da
         # un degrado misurato il 23/07 («nubi di punti» sulle parti in movimento) che oggi NON si
@@ -1521,17 +1523,17 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # stage 1 (stage_2 nasce con loras=()) → col dev ricostruiamo lo stage 2 con la stessa LoRA
     # (vedi _dev_stage2_dlora). Il checkpoint resta quello scelto dall'utente.
     _dev_dlora = None
-    if ptype in ("iclora", "vinpaint", "lipdub", "lipdub_audio") and "distilled" not in os.path.basename(ckpt).lower():
+    if ptype in ("iclora", "vinpaint", "lipdub", "lipdub_audio", "hdr") and "distilled" not in os.path.basename(ckpt).lower():
         if os.environ.get("LTX_NO_DLORA") == "1":
             print("[dev] LTX_NO_DLORA=1 → distilled-LoRA NON applicata (diagnostica)", flush=True)
         elif os.path.exists(DISTILLED_LORA):
             # vinpaint: stage 1 con CFG/30 step, nessuno stage 2 → resta a strength 1.0 (storico).
-            _st = float(os.environ.get("LTX_DLORA_STRENGTH", "0.5" if ptype in ("iclora", "lipdub", "lipdub_audio") else "1.0"))
+            _st = float(os.environ.get("LTX_DLORA_STRENGTH", "0.5" if ptype in ("iclora", "lipdub", "lipdub_audio", "hdr") else "1.0"))
             _dev_dlora = LoraPathStrengthAndSDOps(DISTILLED_LORA, _st, LTXV_LORA_COMFY_RENAMING_MAP)
             loras = list(loras) + [_dev_dlora]
             print(f"[dev] {ptype}: checkpoint non-distilled → distilled-LoRA ufficiale "
                   f"({os.path.basename(DISTILLED_LORA)}, strength {_st}) su stage 1"
-                  f"{' e stage 2' if ptype in ('iclora', 'lipdub', 'lipdub_audio') else ''}", flush=True)
+                  f"{' e stage 2' if ptype in ('iclora', 'lipdub', 'lipdub_audio', 'hdr') else ''}", flush=True)
         else:
             print("[warn] checkpoint DEV su pipeline IC-LoRA senza distilled-LoRA su disco → "
                   "video 'dematerializzato'. Scarica ltx23-distilled-lora-384 o il checkpoint "
@@ -1562,6 +1564,18 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
                       gemma_root=GEMMA, ic_lora=_lip_ic, quantization=quant, offload_mode=offload)
         if _dev_dlora is not None:
             _dev_lipdub_dlora(pipe, _ckpt_pipe, _lip_ic, _dev_dlora, quant, offload)
+    elif ptype == "hdr":                                     # IC-LoRA HDR: pipeline DEDICATA, niente Gemma (scene-emb)
+        from ltx_pipelines.hdr_ic_lora import HDRICLoraPipeline
+        _hkw = dict(distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
+                    hdr_lora=IC_LORA["hdr"], text_embeddings_path=HDR_SCENE_EMB,
+                    quantization=quant, offload_mode=offload)
+        try:
+            pipe = HDRICLoraPipeline(registry=_PARK, **_hkw)
+        except TypeError:
+            pipe = HDRICLoraPipeline(**_hkw)
+        if _dev_dlora is not None:
+            _dev_hdr_dlora(pipe, _ckpt_pipe, LoraPathStrengthAndSDOps(IC_LORA["hdr"], 1.0, LTXV_LORA_COMFY_RENAMING_MAP),
+                           _dev_dlora, quant, offload)
     elif ptype == "retake":                                  # #24 ReTake: rigenera sezione [start,end] di un video
         from ltx_pipelines.retake import RetakePipeline
         pipe = _build(RetakePipeline,
@@ -1609,6 +1623,23 @@ def _dev_stage2_dlora(pipe, ckpt_path, dlora, quant, offload) -> None:
     except TypeError:
         pipe.stage_2 = DiffusionStage(ckpt_path, pipe.dtype, pipe.device, **kw)
     print("[dev] stage 2 ricostruito con la distilled-LoRA", flush=True)
+
+
+def _dev_hdr_dlora(pipe, ckpt_path, hdr_lora, dlora, quant, offload) -> None:
+    """HDRICLoraPipeline ha DUE stage (stage_1, stage_2) costruiti con loras=(hdr_lora,) e pensati per un checkpoint
+    DISTILLED. Col DEV li ricostruiamo con (hdr_lora 1.0, distilled-LoRA 0.5): e' il workflow ufficiale
+    (LTX-2.3_ICLoRA_HDR_Distilled.json: CheckpointLoaderSimple dev -> distilled-lora 0.5 -> HDR LoRA 1.0). Come nel
+    costruttore del pacchetto, con lo streaming dei pesi la quantizzazione e' disattivata. Il checkpoint resta quello
+    scelto dall'utente."""
+    from ltx_pipelines.utils.blocks import DiffusionStage
+    q = None if offload != OffloadMode.NONE else quant
+    kw = dict(loras=(hdr_lora, dlora), quantization=q, offload_mode=offload)
+    for _nm in ("stage_1", "stage_2"):
+        try:
+            setattr(pipe, _nm, DiffusionStage(ckpt_path, pipe.dtype, pipe.device, registry=_PARK, **kw))
+        except TypeError:
+            setattr(pipe, _nm, DiffusionStage(ckpt_path, pipe.dtype, pipe.device, **kw))
+    print("[dev] hdr: stage 1 e 2 ricostruiti con HDR LoRA + distilled-LoRA", flush=True)
 
 
 def _dev_lipdub_dlora(pipe, ckpt_path, ic_lora, dlora, quant, offload) -> None:
@@ -2264,7 +2295,10 @@ def run_generation(p: dict) -> str:
     def _r64(x):
         return max(64, int(round(float(x) / 64.0)) * 64)
     _ow, _oh = int(p.get("width", 768)), int(p.get("height", 512))
-    p["width"], p["height"] = _r64(_ow), _r64(_oh)
+    if p.get("native_res"):                                   # hdr: la pipeline allinea a 64 da sola (reflect-pad + crop)
+        p["width"], p["height"] = _ow // 2 * 2, _oh // 2 * 2
+    else:
+        p["width"], p["height"] = _r64(_ow), _r64(_oh)
     if (p["width"], p["height"]) != (_ow, _oh):
         print(f"[nativo] risoluzione {_ow}x{_oh} → {p['width']}x{p['height']} (multipli di 64 richiesti da LTX-2)", flush=True)
     # Video lungo → chunking in-process (memory-bounded, niente sborzo stage_2). Attiva con
@@ -2277,11 +2311,15 @@ def run_generation(p: dict) -> str:
         _sp = _vem.spec_for_kind(str(p.get("control_type", "")))
         if _sp is not None:
             _w2, _h2, _red = _vem.clamp_resolution(p["width"], p["height"], _sp)
+            if _sp.native_res:                                # tetto sul lato lungo senza arrotondare a 64 (core lo ha gia' fatto)
+                _w2, _h2 = p["width"], p["height"]
             if (_w2, _h2) != (p["width"], p["height"]):
                 print(f"[iclora] tetto {_sp.key}: {p['width']}x{p['height']} -> {_w2}x{_h2} "
                       f"(max lato lungo {_sp.max_long_edge})", flush=True)
                 p["width"], p["height"] = _w2, _h2
-            if _sp.chunkable and _ic_chunkable(p) and int(p.get("num_frames", 0)) > _sp.max_frames_per_segment:
+            if _sp.own_segments:
+                pass                                          # hdr: segmenta workers/ltx_hdr.py (tensore float, non mp4)
+            elif _sp.chunkable and _ic_chunkable(p) and int(p.get("num_frames", 0)) > _sp.max_frames_per_segment:
                 if not _chunk or _chunk > _sp.max_frames_per_segment:
                     _chunk = _sp.max_frames_per_segment
                     print(f"[iclora] tetto {_sp.key}: {p['num_frames']} frame > {_sp.max_frames_per_segment} "
@@ -2403,6 +2441,13 @@ def run_generation(p: dict) -> str:
                                                         LTXV_LORA_COMFY_RENAMING_MAP)]
         print(f"[msr] guida={os.path.basename(_msr_guide)} + LoRA "
               f"{os.path.basename(p['msr_lora'])} → pipeline iclora", flush=True)
+    elif _ic and os.path.exists(_ic) and p.get("control_type") == "hdr":
+        # HDRICLoraPipeline (ltx_pipelines.hdr_ic_lora): pipeline DEDICATA a due stage, testo = file scene-emb, uscita =
+        # float lineare [f,h,w,3] -> workers/ltx_hdr.py scrive anteprima SDR + HEVC PQ + EXR. La LoRA e' un parametro.
+        if not os.path.exists(HDR_SCENE_EMB):
+            raise SystemExit(f"[hdr] file scene-emb mancante: {HDR_SCENE_EMB}. Scaricalo dal tab «Pesi modelli» "
+                             "(id ltx-iclora-hdr-scene-emb, repo gated Lightricks/LTX-2.3-22b-IC-LoRA-HDR): nessun download automatico.")
+        ptype = "hdr"
     elif _ic and os.path.exists(_ic) and p.get("control_type") == "lipdub":
         # LipDubPipeline (JUST-DUB-IT): pipeline DEDICATA del pacchetto, la LoRA e' il suo parametro `ic_lora`
         # (strength 1.0 come nel workflow ufficiale), NON entra in `loras`.
@@ -2442,7 +2487,7 @@ def run_generation(p: dict) -> str:
     # M-park: la pipeline del job è ora NOTA → i pesi parcheggiati in RAM che questo job NON userà
     # vengono rimossi (regola di drop richiesta); quelli comuni (Gemma/VAE/upsampler/ckpt) restano.
     try:
-        _keep = [ckpt, GEMMA, UPSAMPLER, DISTILLED_LORA, *IC_LORA.values(),
+        _keep = [ckpt, GEMMA, UPSAMPLER, DISTILLED_LORA, HDR_SCENE_EMB, *IC_LORA.values(),
                  *[lo.path for lo in loras]]
         if _edit:
             _keep.append(_edit)
@@ -2572,6 +2617,14 @@ def run_generation(p: dict) -> str:
             print(f"[lipdub] SPERIMENTALE: audio utente fisso {os.path.basename(p['lipdub_audio'])} "
                   f"(riferimento audio: {_lip_kw['audio_reference']})", flush=True)
         video, audio, _nf_eff = _unpack_pipe(pipe(**_lip_kw))
+    elif ptype == "hdr":                                     # IC-LoRA HDR: SDR -> HDR (anteprima SDR + HEVC PQ + EXR)
+        try:
+            from workers import ltx_hdr as _HDR
+        except ModuleNotFoundError:
+            import ltx_hdr as _HDR                           # eseguito come script
+        _hdr_info = _HDR.run(pipe, p, _tc, log=lambda m: print(m, flush=True))
+        nf = int(_hdr_info["frames"])
+        video, audio, _nf_eff = None, None, None
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
@@ -2700,15 +2753,18 @@ def run_generation(p: dict) -> str:
                     "Frame NaN/inf dal denoise: pesi del modello corrotti o incompatibili "
                     "(es. GGUF con download incompleto). Verifica/riscarica il checkpoint selezionato.")
             yield _c
-    if torch.is_tensor(video):
-        video = next(_nan_guard([video]))
+    if ptype == "hdr":                                       # i file sono gia' scritti da ltx_hdr.run (streaming)
+        pass
     else:
-        video = _nan_guard(video)
-    # None (assente) = decide l'encoder dalla frequenza di uscita; 0 = nessun filtro, banda piena.
-    _lp = p.get("audio_lowpass")
-    encode_video(video=video, fps=fps, audio=audio, output_path=out,
-                 video_chunks_number=get_video_chunks_number(nf, _tc),
-                 audio_lowpass=None if _lp is None else int(_lp))
+        if torch.is_tensor(video):
+            video = next(_nan_guard([video]))
+        else:
+            video = _nan_guard(video)
+        # None (assente) = decide l'encoder dalla frequenza di uscita; 0 = nessun filtro, banda piena.
+        _lp = p.get("audio_lowpass")
+        encode_video(video=video, fps=fps, audio=audio, output_path=out,
+                     video_chunks_number=get_video_chunks_number(nf, _tc),
+                     audio_lowpass=None if _lp is None else int(_lp))
     # 'In ascolto (loop)': il render è il loop base (~8s, wrap seamless). Se l'utente ha chiesto una durata
     # maggiore, la otteniamo RIPETENDO il loop base (multipli interi → i bordi restano seamless, niente
     # crossfade/stacco). Fallback: se il ricalcolo/ripetizione fallisce, si consegna il loop base.

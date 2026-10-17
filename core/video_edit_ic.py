@@ -8,7 +8,8 @@ cfg (oltre alle chiavi storiche del tab): mode, video, prompt, strength, conditi
 res_mode (source|half|custom) + res_long, out_format (16:9|9:16|1:1|4:3|3:4|21:9|custom) + out_anchor +
 out_margins (sopra,destra,sotto,sinistra) + out_dark + out_paste + out_feather (px, default 24; 0 = taglio netto)
 + out_min_bar (0 = spento; barre minime in frazione del canvas, rimpicciolisce il sorgente), style_image, cam_ref/cam_img/cam_img_strength/
-cam_seconds/width/height (cameraman), model / gguf_transformer / ltx_release (checkpoint ESATTAMENTE come scelto
+cam_seconds/width/height (cameraman), hdr_format (pq|exr|both) + hdr_exposure_ev + hdr_exr_half + hdr_hq (hdr: uscita in
+core/hdr_export.py), model / gguf_transformer / ltx_release (checkpoint ESATTAMENTE come scelto
 dall'utente: mai sostituito qui).
 """
 from __future__ import annotations
@@ -86,15 +87,26 @@ def weight_path(spec: vem.ModeSpec) -> str:
     return str(_rel.get("2.3").ic_lora.get(spec.kind, ""))
 
 
+def hdr_scene_emb_path() -> str:
+    return _rel.hdr_scene_emb()
+
+
 def missing_weight(spec: vem.ModeSpec) -> str:
-    """Messaggio di errore se il peso della modalita' manca su disco, altrimenti ''."""
+    """Messaggio di errore se un peso della modalita' manca su disco, altrimenti ''. Per hdr serve ANCHE il file
+    scene-emb (embedding testo pre-calcolato al posto del prompt)."""
     if not spec.kind:
         return ""
+    msgs = []
     p = weight_path(spec)
-    if p and os.path.exists(p):
-        return ""
-    return (f"Peso «{spec.kind}» mancante: {p or '(non configurato)'}\n"
-            f"Scaricalo dal tab «Pesi modelli» (id catalogo {spec.catalog_id}).")
+    if not (p and os.path.exists(p)):
+        msgs.append(f"Peso «{spec.kind}» mancante: {p or '(non configurato)'}\n"
+                    f"Scaricalo dal tab «Pesi modelli» (id catalogo {spec.catalog_id}).")
+    if spec.kind == "hdr":
+        e = hdr_scene_emb_path()
+        if not os.path.exists(e):
+            msgs.append(f"File scene-emb HDR mancante: {e} (12,6 MB, repo gated Lightricks/LTX-2.3-22b-IC-LoRA-HDR)\n"
+                        "Scaricalo dal tab «Pesi modelli» (id catalogo ltx-iclora-hdr-scene-emb).")
+    return "\n".join(msgs)
 
 
 # ── lip dub (testo → nuova voce + labbra; ricetta ufficiale Lightricks, vedi video_edit_modes) ──────
@@ -182,6 +194,22 @@ class IcJob:
     source: str = ""
     notes: list = field(default_factory=list)
     segments: int = 1
+
+    def outputs(self, result: str) -> list[str]:
+        """Risultato + file aggiuntivi del job (hdr: HEVC PQ e cartella EXR, letti dal sidecar scritto dal worker)."""
+        if self.spec.kind != "hdr":
+            return [result]
+        from core import hdr_export as _hx
+        return [result, *_hx.extra_outputs(str(self.params.get("output") or result))]
+
+
+def _cap_even(w: int, h: int, cap: int) -> tuple[int, int, bool]:
+    """Riduce (mai ingrandisce) al tetto sul lato lungo mantenendo l'aspetto, dimensioni PARI (niente multipli di 64:
+    la pipeline HDR allinea da sola con reflect-pad e ritaglia). Ritorna (w, h, ridotto)."""
+    s = min(1.0, cap / float(max(w, h)))
+    w2 = max(2, int(round(w * s)) // 2 * 2)
+    h2 = max(2, int(round(h * s)) // 2 * 2)
+    return w2, h2, s < 1.0
 
 
 def _scale_to(w: int, h: int, mode: str, long_edge: int) -> tuple[int, int]:
@@ -306,7 +334,10 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
             w0, h0 = _scale_to(info.width, info.height, cfg.get("res_mode", "source"),
                                int(cfg.get("res_long", 0) or 0))
             mux = src if (spec.keep_audio and cfg.get("keep_audio", True) and info.has_audio) else ""
-        w, h, red = vem.clamp_resolution(w0, h0, spec)
+        if spec.native_res:
+            w, h, red = _cap_even(w0, h0, spec.max_long_edge)
+        else:
+            w, h, red = vem.clamp_resolution(w0, h0, spec)
         if red:
             notes.append(f"Sorgente {w0}x{h0} ridotto a {w}x{h} (tetto {spec.max_long_edge}px)")
         p["width"], p["height"] = w, h
@@ -355,13 +386,44 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
 
     p["num_frames"] = vem.snap_frames(n_total)
     nseg = vem.segments_needed(p["num_frames"], spec)
-    if p["num_frames"] > spec.max_frames_per_segment and not spec.chunkable:
+    if spec.native_res:
+        p["native_res"] = True
+    if spec.kind == "hdr":
+        # IC-LoRA HDR: opzioni di uscita (core/hdr_export.py). Il worker segmenta da solo (own_segments).
+        from core import hdr_export as _hx
+        fmt = str(cfg.get("hdr_format") or _hx.DEFAULT_FORMAT)
+        if fmt not in _hx.FORMATS:
+            raise IcJobError(f"formato HDR «{fmt}» sconosciuto (validi: {', '.join(_hx.FORMATS)})")
+        if fmt in ("pq", "both") and not _hx.ffmpeg_ok():
+            raise IcJobError("ffmpeg senza libx265: serve per il video HDR10 (HEVC 10 bit). Scegli «solo EXR» o "
+                             "installa un ffmpeg completo.")
+        p.update(hdr_format=fmt, hdr_exposure_ev=_hx.clamp_exposure(cfg.get("hdr_exposure_ev", _hx.DEFAULT_EXPOSURE_EV)),
+                 hdr_exr_half=bool(cfg.get("hdr_exr_half", True)), hdr_hq=bool(cfg.get("hdr_hq", False)),
+                 hdr_seg_frames=spec.max_frames_per_segment, hdr_overlap=vem.DEFAULT_OVERLAP,
+                 hdr_white_nits=float(cfg.get("hdr_white_nits", _hx.REF_WHITE_NITS)))
+        mux = ""                                                # l'audio lo rimette il worker (anteprima E HEVC)
+        if cfg.get("keep_audio", True) and info.has_audio:
+            p["hdr_audio_from"] = src
+        if cfg.get("hdr_hq"):
+            notes.append("alta qualita': il doppio dei frame interni, circa il doppio del tempo")
+        if fmt in ("exr", "both"):
+            notes.append(f"EXR: un file per frame ({p['num_frames']} frame, "
+                         f"{'half' if p['hdr_exr_half'] else 'float32'}): occupano molto disco")
+        if info.pix_fmt and ("10" in str(info.pix_fmt) or "12" in str(info.pix_fmt)):
+            notes.append(f"il sorgente e' a {info.pix_fmt}: la pipeline lo legge come SDR Rec.709 a 8 bit "
+                         "(la LoRA HDR e' addestrata su quello); un sorgente gia' HDR/PQ non va dato in ingresso")
+        notes.append("uscita: anteprima SDR tonemappata (player della GUI) + "
+                     + {"pq": "HEVC 10 bit PQ/BT.2020", "exr": "sequenza EXR lineare",
+                        "both": "HEVC 10 bit PQ/BT.2020 + sequenza EXR lineare"}[fmt])
+    if p["num_frames"] > spec.max_frames_per_segment and not (spec.chunkable or spec.own_segments):
         raise IcJobError(f"{p['num_frames']} frame oltre il tetto {spec.max_frames_per_segment} e la "
                          "modalita' non si puo' spezzare in segmenti: accorcia il clip")
-    if nseg > 1:
+    if nseg > 1 and not spec.own_segments:
         p["chunk_frames"] = spec.max_frames_per_segment
         p["overlap_frames"] = vem.DEFAULT_OVERLAP
         notes.append(f"{nseg} segmenti da {spec.max_frames_per_segment} frame")
+    elif nseg > 1:
+        notes.append(f"{nseg} segmenti da {spec.max_frames_per_segment} frame (crossfade in luce lineare)")
 
     if spec.preprocess == vem.PRE_RESTYLE_FRAME0:
         img = cfg.get("style_image") or cfg.get("ref_image")

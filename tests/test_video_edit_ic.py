@@ -137,7 +137,7 @@ def test_cameraman_job(tmp_path):
 
 def test_disabled_and_unknown_modes_rejected(tmp_path):
     src = _gen(tmp_path / "s.mp4", 17)
-    for m in ("hdr", "nope", "edit"):
+    for m in ("nope", "edit"):
         with pytest.raises(vic.IcJobError):
             vic.build_job({"mode": m, "video": src}, str(tmp_path), 1, str(tmp_path / "o.mp4"))
 

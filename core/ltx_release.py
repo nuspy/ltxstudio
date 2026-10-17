@@ -215,6 +215,12 @@ def is_distilled(path_or_name: str | None) -> bool:
     return "distilled" in os.path.basename(str(path_or_name).replace("\\", "/")).lower()
 
 
+def hdr_scene_emb() -> str:
+    """File scene-emb della IC-LoRA HDR (12,6 MB, embedding testo pre-calcolato che sostituisce Gemma: la pipeline HDR
+    non ha prompt). Stesso id di catalogo del worker (`ltx-iclora-hdr-scene-emb`), solo release 2.3."""
+    return str(_P("ltx-iclora-hdr-scene-emb", str(_LORA23 / "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors")))
+
+
 def ic_lora_supported(release: str | None) -> bool:
     """True se le IC-LoRA di editing/restauro locali si possono usare con la release: oggi solo la 2.3
     (tutti i pesi locali sono per 2.3; con la 2.5 l'unico adapter ufficiale e' il pixel-upscaler)."""

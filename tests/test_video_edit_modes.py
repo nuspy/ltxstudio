@@ -53,10 +53,20 @@ def test_ceilings_valid():
             assert s.min_long_edge <= s.max_long_edge
 
 
-def test_disabled_phases():
+def test_hdr_spec():
+    """hdr attivo dalla fase 1c: pipeline dedicata, nessun prompt, il worker segmenta da solo, niente arrotondamento a 64."""
     s = M.MODE_SPECS["hdr"]
-    assert (s.phase, s.enabled, s.distilled) == ("1c", False, M.DISTILLED_REQUIRED)
-    assert all(s.enabled for k, s in M.MODE_SPECS.items() if k != "hdr")
+    assert (s.phase, s.enabled, s.distilled, s.kind) == ("1c", True, M.DISTILLED_RECOMMENDED, "hdr")
+    assert (s.needs_prompt, s.cap, s.catalog_id) == (M.NEEDS_NONE, "cap.video_hdr_ic", "ltx-iclora-hdr")
+    assert s.own_segments and s.native_res and not s.chunkable and s.keep_audio
+    assert all(s.enabled for s in M.MODE_SPECS.values())
+
+
+def test_own_segments_counted_but_not_chunked_by_worker():
+    # hdr: i segmenti li conta la GUI (info), li esegue il worker da se' (own_segments); lipdub/inpaint restano a 1
+    assert M.segments_needed(97, "hdr") == 1
+    assert M.segments_needed(200, "hdr") == 3
+    assert M.segments_needed(1000, "lipdub") == 1
 
 
 def test_lipdub_spec():
@@ -80,12 +90,11 @@ def test_modes_for_family():
     assert [s.key for s in M.modes_for_family("edit")] == ["edit", "inpaint", "replace_char"]
     assert [s.key for s in M.modes_for_family("style")] == ["anime2real", "real2anime", "restyle"]
     assert [s.key for s in M.modes_for_family("repair")] == ["refocus", "uncompress", "deinterlace",
-                                                             "motiondeblur", "detailer"]
-    assert [s.key for s in M.modes_for_family("repair", include_disabled=True)][-1] == "hdr"
+                                                             "motiondeblur", "detailer", "hdr"]
     assert [s.key for s in M.modes_for_family("outpaint")] == ["outpaint"]
     assert [s.key for s in M.modes_for_family("lipdub")] == ["lipdub", "lipdub_audio"]
     assert [s.key for s in M.modes_for_family("camera")] == ["cameraman"]
-    assert "lipdub" in M.families() and "hdr" not in [s.key for f in M.families() for s in M.modes_for_family(f)]
+    assert "lipdub" in M.families() and "hdr" in [s.key for f in M.families() for s in M.modes_for_family(f)]
 
 
 def test_every_mode_in_exactly_one_family():
@@ -122,7 +131,7 @@ def test_spec_for_kind_and_get_spec():
     assert M.spec_for_kind("outpaint").key == "outpaint"
     assert M.spec_for_kind("union").key == "replace_char"
     assert M.spec_for_kind("lipdub").key == "lipdub"
-    assert M.spec_for_kind("hdr") is None               # disabilitata (fase 1c)
+    assert M.spec_for_kind("hdr").key == "hdr"
     assert M.spec_for_kind("nope") is None
     with pytest.raises(KeyError):
         M.get_spec("nope")
@@ -149,5 +158,5 @@ def test_snap_and_segments_needed():
 
 def test_ic_kinds_list():
     assert "cameraman" in M.ICLORA_VIDEO_KINDS and "motion-track" in M.ICLORA_VIDEO_KINDS
-    assert "lipdub" in M.ICLORA_VIDEO_KINDS and "hdr" not in M.ICLORA_VIDEO_KINDS
+    assert "lipdub" in M.ICLORA_VIDEO_KINDS and "hdr" in M.ICLORA_VIDEO_KINDS
     assert "canny" not in M.ICLORA_VIDEO_KINDS
