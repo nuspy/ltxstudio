@@ -1425,6 +1425,14 @@
       "filename": "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors",
       "use": [
         "iclora_edit"
+      ],
+      "used_by": [
+        "cap.video_hdr_ic"
+      ],
+      "note": "SDR -> HDR (HDRICLoraPipeline). Serve anche il file scene-emb (ltx-iclora-hdr-scene-emb) al posto del prompt; col dev si aggiunge la distilled-LoRA 0.5",
+      "deps": [
+        "ltx-iclora-hdr-scene-emb",
+        "ltx23-distilled-lora-384|ltx23-distilled-fp8"
       ]
     },
     {
@@ -7114,7 +7122,11 @@
       "filename": "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors",
       "use": [
         "iclora_edit"
-      ]
+      ],
+      "used_by": [
+        "cap.video_hdr_ic"
+      ],
+      "note": "Embedding testo pre-calcolato (video_context/audio_context) che la pipeline HDR usa al posto di Gemma: senza questo file la modalita' HDR non parte (nessun prompt)"
     }
   ],
   "schema": 2,

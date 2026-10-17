@@ -42,7 +42,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx-iclora-uncompress": (["iclora_edit"], []),
     "ltx-iclora-deinterlace": (["iclora_edit"], []),
     "ltx-iclora-motiondeblur": (["iclora_edit"], []),
-    "ltx-iclora-hdr": (["iclora_edit"], []),
+    "ltx-iclora-hdr": (["iclora_edit"], ["ltx-iclora-hdr-scene-emb", "ltx23-distilled-lora-384|ltx23-distilled-fp8"]),   # scene-emb al posto del prompt; dev + distilled-LoRA, oppure distilled
     "ltx-iclora-lipdub": (["iclora_edit"], ["ltx23-distilled-lora-384|ltx23-distilled-fp8"]),   # dev + distilled-LoRA, oppure distilled
     "ltx-iclora-restyle": (["iclora_edit"], []),
     "ltx-iclora-cameraman": (["iclora_edit"], []),

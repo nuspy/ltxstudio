@@ -203,7 +203,10 @@ NEW = [
       filename="ltx-2.3-22b-ic-lora-refocus.safetensors", type="LoRA", family="LTX-2", gb=1.3),
     N("ltx-iclora-hdr", "Video", "IC-LoRA HDR 0.9", category="video", arch="ltx23",
       repo="Lightricks/LTX-2.3-22b-IC-LoRA-HDR", gated=True,
-      filename="ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", type="LoRA", family="LTX-2", gb=0.33),
+      filename="ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", type="LoRA", family="LTX-2", gb=0.33,
+      used_by=["cap.video_hdr_ic"],
+      note="SDR -> HDR (HDRICLoraPipeline). Serve anche il file scene-emb (ltx-iclora-hdr-scene-emb) al posto del prompt; "
+           "col dev si aggiunge la distilled-LoRA 0.5"),
     N("ltx-iclora-lipdub", "Video", "IC-LoRA DubIt/LipDub 0.9", category="video", arch="ltx23",
       repo="Lightricks/LTX-2.3-22b-IC-LoRA-DubIt", gated=True,
       remote="ltx-2.3-22b-ic-lora-dubit-0.9.safetensors",
@@ -244,7 +247,10 @@ NEW = [
     # HDR: embedding testo pre-calcolato richiesto da HDRICLoraPipeline (fase 1c)
     N("ltx-iclora-hdr-scene-emb", "Video", "IC-LoRA HDR · scene embedding (12.6 MB)", category="video",
       arch="ltx23", repo="Lightricks/LTX-2.3-22b-IC-LoRA-HDR", gated=True,
-      filename="ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors", type="LoRA", family="LTX-2", gb=0.012),
+      filename="ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors", type="LoRA", family="LTX-2", gb=0.012,
+      used_by=["cap.video_hdr_ic"],
+      note="Embedding testo pre-calcolato (video_context/audio_context) che la pipeline HDR usa al posto di Gemma: "
+           "senza questo file la modalita' HDR non parte (nessun prompt)"),
     N("ltx23-transformer-only-fp8scaled", "Video",
       "LTX-2.3 distilled transformer-only fp8_scaled (comfy, fonte ignota)",
       category="video", arch="ltx23",

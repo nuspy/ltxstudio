@@ -96,27 +96,21 @@ def _make_new_mode_case(key: str):
 
 
 def case_families_and_modes(w, spy):
-    """Due livelli: famiglie (Lip dub presente dalla fase 1b, HDR assente), modalità per famiglia, da video_edit_modes."""
+    """Due livelli: famiglie (Lip dub dalla fase 1b, HDR in «Ripara video» dalla 1c), modalità per famiglia."""
     from core import video_edit_modes as vem
     t = _tab(w)
     fams = [t.family.itemData(i) for i in range(t.family.count())]
     assert fams == ["edit", "style", "repair", "outpaint", "lipdub", "camera"], fams
     expect = {"edit": ["edit", "inpaint", "replace_char"], "style": ["anime2real", "real2anime", "restyle"],
-              "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer"],
+              "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer", "hdr"],
               "outpaint": ["outpaint"], "lipdub": ["lipdub", "lipdub_audio"], "camera": ["cameraman"]}
     for fam, modes in expect.items():
         t.family.setCurrentIndex(t.family.findData(fam))
         got = [t.mode.itemData(i) for i in range(t.mode.count())]
         assert got == modes, f"{fam}: {got} != {modes}"
-    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub", "lipdub_audio"):
+    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub", "lipdub_audio", "hdr"):
         t.select_mode(k)                                 # da qualunque famiglia
         assert t.mode.currentData() == k and t.family.currentData() == vem.family_of(k)
-    for k in ("hdr",):                                   # fase 1c: non selezionabile
-        try:
-            t.select_mode(k)
-        except KeyError:
-            continue
-        raise AssertionError(f"{k} non deve essere selezionabile (enabled=False)")
     from ui.tabs.video_edit_ai_tab import MODES
     assert MODES == vem.legacy_modes()
 
@@ -858,8 +852,127 @@ def case_lipdub_translate_flow(w, spy):
     t2._translate_start(sync=True)                                      # senza video: blocco
 
 
+# ── HDR (fase 1c) ────────────────────────────────────────────────────────────────────────────────
+def _hdr_tab(w, frames: int = 50):
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    t.set_video(_lipdub_video("_vedit_hdr_a.mp4", audio=True, frames=frames))
+    _select_mode(w, "hdr")
+    t.prompt.setPlainText("")
+    return t
+
+
+def case_hdr_fields(w, spy):
+    """HDR: nessun prompt/enhance/forza/attenzione; campi propri (formato, esposizione, alta qualità, info); EXR half solo
+    se il formato include l'EXR; risoluzione e «mantieni audio» visibili; tornando a refocus tutto si ripristina."""
+    t = _hdr_tab(w)
+    assert t.family.currentData() == "repair" and t.note.text(), "nota della modalità"
+    for fld in (t.prompt, t.vedit_enhance, t.strength, t.attn, t.obj, t.lip_line):
+        assert fld.isHidden(), f"nascosto in hdr: {fld}"
+    for fld in (t.hdr_format, t.hdr_exposure, t.hdr_hq, t.hdr_info):
+        assert not fld.isHidden(), fld
+    assert not t.res_mode.parentWidget().isHidden() and not t.keep_audio.isHidden()
+    assert [t.hdr_format.itemData(i) for i in range(t.hdr_format.count())] == ["pq", "both", "exr"]
+    assert t.hdr_format.currentData() == "pq" and t.hdr_exr_half.isHidden(), "default HEVC PQ, EXR half nascosto"
+    t.hdr_format.setCurrentIndex(t.hdr_format.findData("both"))
+    assert not t.hdr_exr_half.isHidden()
+    assert "_HDR_PQ" in t.hdr_info.text() and "_EXR" in t.hdr_info.text(), t.hdr_info.text()
+    _select_mode(w, "refocus")
+    for fld in (t.hdr_format, t.hdr_exposure, t.hdr_exr_half, t.hdr_hq, t.hdr_info):
+        assert fld.isHidden(), fld
+    assert not t.prompt.isHidden() and not t.vedit_enhance.isHidden() and not t.strength.isHidden() and not t.attn.isHidden()
+    _select_mode(w, "hdr")
+    assert t.prompt.isHidden() and not t.hdr_format.isHidden()
+
+
+def case_hdr_cfg(w, spy):
+    """HDR col distilled: parte con prompt vuoto; la cfg porta formato/esposizione/EXR half/alta qualità, model come
+    scelto, audio mantenuto; i valori della GUI arrivano invariati."""
+    _ack_dev(False)
+    t = _hdr_tab(w)
+    _getter(w, _DIST)
+    t._go()
+    assert spy.calls, f"nessuna richiesta accodata (log: {t.log.toPlainText()[-300:]})"
+    cfg = _cfg_of(w)
+    assert cfg["mode"] == "hdr" and cfg["prompt"] == "" and (cfg.get("edit_lora") or "") == "", cfg
+    assert cfg["hdr_format"] == "pq" and cfg["hdr_exposure_ev"] == 0.0 and cfg["hdr_exr_half"] is True and cfg["hdr_hq"] is False
+    assert cfg["model"] == _DIST["model"] and cfg["ckpt_state"] == "distilled" and cfg["keep_audio"] is True
+    assert cfg["res_mode"] == "source"
+    t.hdr_format.setCurrentIndex(t.hdr_format.findData("both"))
+    t.hdr_exposure.setValue(1.5)
+    t.hdr_exr_half.setChecked(False)
+    t.hdr_hq.setChecked(True)
+    t.keep_audio.setChecked(False)
+    t._go()
+    cfg = _cfg_of(w)
+    assert (cfg["hdr_format"], cfg["hdr_exposure_ev"], cfg["hdr_exr_half"], cfg["hdr_hq"], cfg["keep_audio"]) == \
+           ("both", 1.5, False, True, False), cfg
+    t.keep_audio.setChecked(True)
+    t.hdr_hq.setChecked(False)
+    t.hdr_exposure.setValue(0.0)
+    t.hdr_exr_half.setChecked(True)
+    t.hdr_format.setCurrentIndex(t.hdr_format.findData("pq"))
+
+
+def case_hdr_dev_warns_but_runs(w, spy):
+    """HDR col dev: nessun blocco (distilled raccomandato, non richiesto): avviso con la distilled-LoRA 0.5 e parte;
+    il checkpoint resta quello scelto."""
+    _ack_dev(False)
+    t = _hdr_tab(w)
+    _getter(w, _DEV)
+    asked = []
+    t._ask_checkpoint = lambda sp, info, blocking=False: asked.append(sp.key) or "continue"
+    t._go()
+    assert asked == ["hdr"] and spy.calls, (asked, t.log.toPlainText()[-200:])
+    cfg = _cfg_of(w)
+    assert cfg["model"] == _DEV["model"] and cfg["ckpt_state"] == "dev"
+    del t._ask_checkpoint
+
+
+def case_hdr_weight_missing_dialog(w, spy):
+    """LoRA HDR o file scene-emb assenti: avviso con «Apri tab Pesi modelli» (segnale), nessun accodamento, nessun download."""
+    from core import video_edit_ic as vic
+    _ack_dev(True)
+    t = _hdr_tab(w)
+    _getter(w, _DIST)
+    orig = vic.missing_weight
+    vic.missing_weight = lambda spec: "File scene-emb HDR mancante: X:\\nope.safetensors"
+    try:
+        asked, opened = [], []
+        t.request_open_weights_tab.connect(lambda: opened.append(1))
+        t._ask_missing_weight = lambda sp, msg: asked.append((sp.key, msg)) or "weights"
+        before = len(spy.calls)
+        t._go()
+        assert [a[0] for a in asked] == ["hdr"] and "scene-emb" in asked[0][1] and opened == [1] and len(spy.calls) == before
+    finally:
+        vic.missing_weight = orig
+
+
+def case_hdr_gate(w, spy):
+    """cap.video_hdr_ic spenta: nessun accodamento (l'upsell lo mostra il gate)."""
+    _ack_dev(True)
+    t = _hdr_tab(w)
+    _getter(w, _DIST)
+    seen = []
+    w._feature_gate = lambda fid: (seen.append(fid) or False)
+    t._go()
+    assert seen == ["cap.video_hdr_ic"] and not spy.calls, (seen, len(spy.calls))
+
+
+def case_hdr_info_10bit_and_segments(w, spy):
+    """Riga info: avviso se il sorgente e' gia' a 10 bit (non va dato HDR in ingresso); info segmenti per clip lunghi."""
+    t = _hdr_tab(w, frames=200)
+    assert "⚠" not in t.hdr_info.text(), t.hdr_info.text()
+    assert "3" in t.seg_info.text(), f"200 frame con tetto 97 = 3 segmenti: {t.seg_info.text()!r}"
+    from types import SimpleNamespace
+    t._vinfo = SimpleNamespace(width=160, height=96, nb_frames=50, pix_fmt="yuv420p10le", has_audio=True, fps=25.0,
+                               duration=2.0)
+    t._refresh_hdr_info()
+    assert "⚠" in t.hdr_info.text() and "yuv420p10le" in t.hdr_info.text(), t.hdr_info.text()
+
+
 CASES = (
-    [("vedit_family_modes", "Due livelli famiglia/modalità: contenuti, select_mode, lipdub/hdr assenti.",
+    [("vedit_family_modes", "Due livelli famiglia/modalità: contenuti, select_mode (lipdub e hdr compresi).",
       case_families_and_modes),
      ("vedit_fields_per_mode", "Campi abilitati/visibili per modalità (restyle, restauro, outpaint, cameraman).",
       case_fields_per_mode),
@@ -915,7 +1028,18 @@ CASES = (
      ("vedit_lipdub_open_talk_sing", "Rimando a Talk/Canta: segnale e handler main_window (modalita', video, audio).",
       case_lipdub_open_talk_sing),
      ("vedit_lipdub_translate_flow", "Estrai e traduci (mock): riempie battuta, riuso testo, errori chiari, thread.",
-      case_lipdub_translate_flow)]
+      case_lipdub_translate_flow),
+     ("vedit_hdr_fields", "HDR: niente prompt/forza/attenzione, campi propri (formato, esposizione, hq), EXR half condizionato.",
+      case_hdr_fields),
+     ("vedit_hdr_cfg", "HDR: cfg con formato/esposizione/EXR half/alta qualità, prompt vuoto ok, model come scelto.",
+      case_hdr_cfg),
+     ("vedit_hdr_dev_warns_runs", "HDR col dev: avviso (distilled-LoRA 0.5) e parte, checkpoint invariato.",
+      case_hdr_dev_warns_but_runs),
+     ("vedit_hdr_weight_missing_dialog", "HDR: LoRA/scene-emb assenti → avviso + «Apri tab Pesi», nessun accodamento.",
+      case_hdr_weight_missing_dialog),
+     ("vedit_hdr_gate", "HDR: cap.video_hdr_ic spenta blocca l'accodamento.", case_hdr_gate),
+     ("vedit_hdr_info_10bit_segments", "HDR: avviso sorgente 10 bit e info segmenti per clip lunghi.",
+      case_hdr_info_10bit_and_segments)]
     + [(f"vedit_newmode_{k}", f"Modalità IC-LoRA {k}: cfg emessa (kind a registro, model come scelto, campi).",
         _make_new_mode_case(k)) for k in _NEW_MODES]
 )

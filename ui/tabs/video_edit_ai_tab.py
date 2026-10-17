@@ -8,7 +8,9 @@ UI a DUE livelli (famiglia → modalità), derivata da `core/video_edit_modes.py
 - **Camera / Movimento**: Cameraman (video di riferimento del movimento).
 - **Lip dub**: il video (con la sua voce) è il riferimento; una NUOVA battuta di testo genera voce e labbra nuove
   (ricetta ufficiale Lightricks JUST-DUB-IT). Non si fornisce un file audio esterno.
-(HDR: fase 1c, `enabled=False` nelle spec → non compare.)
+- **HDR** (in «Ripara video»): video SDR → HDR (IC-LoRA HDR, ricetta ufficiale Lightricks, nessun prompt). Uscita:
+  anteprima SDR tonemappata (quella che si apre nel player) + video HDR10 (HEVC 10 bit PQ/BT.2020) e/o sequenza EXR
+  lineare (core/hdr_export.py), a scelta; clip lunghi a segmenti nel worker.
 
 Il checkpoint è quello scelto nel tab Video: lo si MOSTRA in una riga di stato e, per le modalità che lo
 raccomandano/richiedono distilled, si avvisa/blocca. MAI scelto o cambiato al posto dell'utente.
@@ -46,6 +48,7 @@ _MODE_DEFAULT = {
     "motiondeblur": "Riduci il mosso (motion blur)", "detailer": "Aggiungi dettaglio (detailer)",
     "outpaint": "Outpaint video", "cameraman": "Cameraman (movimento di camera da riferimento)",
     "lipdub": "Doppiaggio da testo", "lipdub_audio": "Doppiaggio da audio (sperimentale)",
+    "hdr": "SDR → HDR",
 }
 _FAMILY_DEFAULT = {"edit": "Modifica", "style": "Stile", "repair": "Ripara video", "outpaint": "Outpaint video",
                    "lipdub": "Doppiaggio labiale", "camera": "Camera / Movimento"}
@@ -72,6 +75,10 @@ _NOTE_DEFAULT = {
                                "solo il video, con la LoRA del doppiaggio. Qualità non garantita; per canzoni e voci la via "
                                "collaudata è Talk/Canta del tab Video. L'audio comanda la durata: se è più corto il video "
                                "viene tagliato, se è più lungo l'audio viene tagliato.",
+    "vedit.note_hdr": "Converte un video SDR (Rec.709) in HDR (IC-LoRA HDR di Lightricks): nessun prompt, il testo è un file "
+                      "pre-calcolato. Nel player si apre un'anteprima SDR tonemappata; il file HDR vero (HEVC 10 bit PQ, "
+                      "BT.2020) e/o la sequenza EXR lineare stanno accanto, con lo stesso nome. Dai un sorgente SDR, non già "
+                      "HDR. Col checkpoint dev viene aggiunta la LoRA distilled ufficiale.",
     "vedit.note_cameraman": "Il movimento di camera viene copiato dal video di riferimento. Se il risultato "
                             "ricalca troppo il riferimento, abbassa la forza dell'immagine o cambia seme.",
 }
@@ -366,6 +373,35 @@ class VideoEditAITab(QWidget):
         f.addRow("", self.keep_audio)
         self.seg_info = QLabel(""); self.seg_info.setWordWrap(True)
         f.addRow("", self.seg_info)
+
+        # HDR (SDR → HDR): formato d'uscita, esposizione dell'anteprima SDR, EXR half, alta qualità
+        self.hdr_format = QComboBox()
+        for key, i18n, dflt in (("pq", "vedit.hdr.fmt_pq", "Video HDR10 (HEVC 10 bit, PQ)"),
+                                ("both", "vedit.hdr.fmt_both", "Video HDR10 + sequenza EXR"),
+                                ("exr", "vedit.hdr.fmt_exr", "Solo sequenza EXR (compositing)")):
+            self.hdr_format.addItem(tr(i18n, dflt), key)
+        self.hdr_format.setToolTip(tr("vedit.hdr.format_tt",
+            "Video HDR10: HEVC 10 bit, PQ, BT.2020 (TV/telefoni HDR, Resolve, YouTube). EXR: un file float lineare per "
+            "frame, per il compositing (DJV, Nuke, Blender): pesa molto. L'anteprima SDR c'è sempre."))
+        self.hdr_format.currentIndexChanged.connect(self._refresh_hdr_info)
+        self.hdr_format_lbl = QLabel(tr("vedit.hdr.format_lbl", "Formato HDR"))
+        f.addRow(self.hdr_format_lbl, self.hdr_format)
+        self.hdr_exposure = QDoubleSpinBox(); self.hdr_exposure.setRange(-6.0, 6.0); self.hdr_exposure.setSingleStep(0.5)
+        self.hdr_exposure.setDecimals(1); self.hdr_exposure.setSuffix(" EV"); self.hdr_exposure.setValue(0.0)
+        self.hdr_exposure.setToolTip(tr("vedit.hdr.exposure_tt",
+            "Esposizione dell'ANTEPRIMA SDR in stop (+1 = il doppio più chiaro). Non cambia il video HDR né gli EXR."))
+        self.hdr_exposure_lbl = QLabel(tr("vedit.hdr.exposure_lbl", "Esposizione anteprima SDR"))
+        f.addRow(self.hdr_exposure_lbl, self.hdr_exposure)
+        self.hdr_exr_half = QCheckBox(tr("vedit.hdr.exr_half", "EXR a 16 bit (half): metà dello spazio"))
+        self.hdr_exr_half.setChecked(True)
+        f.addRow("", self.hdr_exr_half)
+        self.hdr_hq = QCheckBox(tr("vedit.hdr.hq", "Alta qualità (circa 2× più lento)"))
+        self.hdr_hq.setToolTip(tr("vedit.hdr.hq_tt",
+            "Genera il doppio dei fotogrammi e tiene uno su due: meno artefatti temporali, tempo doppio."))
+        f.addRow("", self.hdr_hq)
+        self.hdr_info = QLabel(""); self.hdr_info.setWordWrap(True)
+        self.hdr_info_lbl = QLabel("")
+        f.addRow(self.hdr_info_lbl, self.hdr_info)
 
         # #59 parametri inpaint (regolabili): CFG (aderenza prompt), guide (ancoraggio all'originale),
         # dilatazione maschera (spazio al nuovo oggetto). Valori equilibrati di default.
@@ -729,6 +765,7 @@ class VideoEditAITab(QWidget):
         is_lipt = (key == "lipdub")                          # doppiaggio da TESTO (ricetta ufficiale)
         is_lipa = (key == "lipdub_audio")                    # doppiaggio da AUDIO (sperimentale)
         is_lip = is_lipt or is_lipa
+        is_hdr = (key == "hdr")                              # SDR → HDR: nessun prompt, forza/attenzione fisse
         is_repair = (sp.family == vem.FAMILY_REPAIR)
         is_ic_new = bool(sp.cap)                              # modalità IC-LoRA a registro (non storiche)
         # #102: il campo «oggetto» serve all'inpaint E a replace_char (= personaggio da sostituire, per la
@@ -775,8 +812,11 @@ class VideoEditAITab(QWidget):
         self.prompt.setPlaceholderText(
             tr("vedit.lipdub.prompt_ph", "avanzato (opzionale): prompt completo; se lo scrivi, scena/battuta/lingua "
                                          "sopra vengono ignorate") if is_lip else self._prompt_ph)
-        self._show_row(self.vedit_enhance, not is_lip)     # l'LLM potrebbe riscrivere la battuta tra virgolette
-        self._show_row(self.attn, is_ic_new and not is_lip)
+        self._show_row(self.prompt, sp.needs_prompt != vem.NEEDS_NONE)   # hdr: il testo e' il file scene-emb
+        self._show_row(self.vedit_enhance, not is_lip and not is_hdr)    # l'LLM potrebbe riscrivere la battuta
+        self._show_row(self.attn, is_ic_new and not is_lip and not is_hdr)
+        for w in (self.hdr_format, self.hdr_exposure, self.hdr_exr_half, self.hdr_hq, self.hdr_info):
+            self._show_row(w, is_hdr)
         self._set_row_visible_for(self.res_mode, is_repair or is_restyle or is_lip)
         self.res_long.setEnabled(self.res_mode.currentData() == "custom")
         self._show_row(self.keep_audio, is_ic_new and sp.keep_audio)
@@ -784,7 +824,7 @@ class VideoEditAITab(QWidget):
             self._show_row(w, key == "inpaint")
         for w in (self.dilate, self.blur):
             self._show_row(w, key in ("inpaint", "replace_char"))
-        self._show_row(self.strength, not is_cam and not is_lip)   # lip dub: forza riferimento 1.0 fissa (ufficiale)
+        self._show_row(self.strength, not is_cam and not is_lip and not is_hdr)   # lip dub/hdr: forza 1.0 fissa (ufficiale)
         self.strength.setEnabled(not is_restyle)          # ReStyle: forza 1.0 fissa (card)
         self.btn_pick.setEnabled(True)
         self.btn_pick.setText(tr("vedit.pick", "🎬 Scegli video…") if not is_cam
@@ -816,6 +856,7 @@ class VideoEditAITab(QWidget):
             self._on_outpaint_change()
         self._refresh_segments_info(sp)
         self._refresh_lipdub_info()
+        self._refresh_hdr_info()
         self.refresh_checkpoint_hint()
 
     def _set_ref_row_visible(self, vis: bool):
@@ -910,11 +951,30 @@ class VideoEditAITab(QWidget):
     def _refresh_segments_info(self, sp: vem.ModeSpec | None = None):
         sp = sp or self.current_spec()
         n = int(getattr(self._vinfo, "nb_frames", 0) or 0) if self._vinfo else 0
-        if not (sp.cap and sp.chunkable and n):
+        if not (sp.cap and (sp.chunkable or sp.own_segments) and n):
             self.seg_info.setText(""); return
         k = vem.segments_needed(vem.snap_frames(n), sp)
         self.seg_info.setText(tr("vedit.segments_info", "{n} segmenti da {f} frame").format(
             n=k, f=sp.max_frames_per_segment) if k > 1 else "")
+
+    def _refresh_hdr_info(self, *_):
+        """Riga informativa della modalità HDR: dove stanno i file d'uscita e avviso se il sorgente è già a 10 bit."""
+        if not self.mode.count():
+            return
+        is_hdr = (self.mode.currentData() == "hdr")
+        fmt = self.hdr_format.currentData()
+        self._show_row(self.hdr_exr_half, is_hdr and fmt in ("exr", "both"))
+        if not is_hdr:
+            self.hdr_info.setText(""); return
+        parts = [tr("vedit.hdr.info_out",
+                    "Il player mostra l'anteprima SDR; il file HDR vero (_HDR_PQ.mp4) e/o la cartella _EXR si trovano "
+                    "accanto, con lo stesso nome.")]
+        vi = self._vinfo
+        if vi is not None and any(t in str(getattr(vi, "pix_fmt", "")) for t in ("10le", "10be", "12le", "12be", "p010")):
+            parts.append("⚠ " + tr("vedit.hdr.info_src10",
+                "Il sorgente è a {p}: la LoRA HDR vuole un SDR Rec.709 a 8 bit; un video già HDR (PQ/HLG) non va dato "
+                "in ingresso.").format(p=vi.pix_fmt))
+        self.hdr_info.setText("  ".join(parts))
 
     # ── azione ───────────────────────────────────────────────────────────────────────────────
     def _block(self, key: str, default: str, **fmt):
@@ -982,6 +1042,9 @@ class VideoEditAITab(QWidget):
         if sp.cap:
             cfg["conditioning_attention"] = float(self.attn.value())
             cfg["keep_audio"] = bool(self.keep_audio.isChecked()) and sp.keep_audio
+        if key == "hdr":
+            cfg.update(hdr_format=self.hdr_format.currentData(), hdr_exposure_ev=float(self.hdr_exposure.value()),
+                       hdr_exr_half=self.hdr_exr_half.isChecked(), hdr_hq=self.hdr_hq.isChecked())
         if sp.family == vem.FAMILY_REPAIR or key == "restyle":
             cfg["res_mode"] = self.res_mode.currentData()
             cfg["res_long"] = int(self.res_long.value())

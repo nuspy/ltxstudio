@@ -392,7 +392,7 @@ class _VideoEditAIWorker(QThread):
                     out = _vic2.finalize(self._ic_job, out, log=lambda m: self.progress.emit(m))
                 except Exception as _e2:                       # noqa: BLE001
                     self.done.emit({"status": "error", "error": f"post-processo fallito: {_e2}"}); return
-                self.done.emit({"status": "success", "output": [out]})
+                self.done.emit({"status": "success", "output": self._ic_job.outputs(out)})
             elif _os.path.exists(out):
                 _mux = params.get("_mux_audio_from")           # #102 rimetti l'audio originale sul video rigenerato
                 if _mux and _os.path.exists(_mux):
@@ -3771,8 +3771,11 @@ class MainWindow(QMainWindow):
 
     def _on_video_edit_ai_done(self, res: dict):
         if res.get("status") == "success":
-            out = (res.get("output") or [""])[0]
+            outs = res.get("output") or [""]
+            out = outs[0]
             self.video_edit_ai_tab.log.appendPlainText(tr("vedit.done", "✅ Pronto: {o}").format(o=out))
+            for _x in outs[1:]:                              # hdr: HEVC PQ / cartella EXR accanto all'anteprima SDR
+                self.video_edit_ai_tab.log.appendPlainText(tr("vedit.done_extra", "   + {o}").format(o=_x))
             self._last_video_path = out
         else:
             self.video_edit_ai_tab.log.appendPlainText(tr("vedit.fail", "❌ Errore: {e}").format(e=res.get("error", "")[:300]))
