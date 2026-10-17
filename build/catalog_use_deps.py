@@ -73,10 +73,10 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx25-iclora-pixel-upscaler": (["iclora_edit", "upscaler_latent"], []),
     "ltx25-lora-multisubject": (["lora_style", "multisubject"], []),
     # ── immagini ──
-    "flux1-dev-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux1-fill-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux1-kontext-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux1-krea-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16"]),
+    "flux1-dev-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
+    "flux1-fill-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
+    "flux1-kontext-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
+    "flux1-krea-single": (["ckpt_image"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
     "flux1-dev": (["ckpt_image", "big_quality"], []),
     "flux1-fill": (["ckpt_image", "big_quality"], []),
     "flux1-kontext": (["ckpt_image", "big_quality"], []),
@@ -84,6 +84,9 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "flux2-dev": (["ckpt_image", "big_quality"], []),
     "zimage-turbo": (["ckpt_image", "distilled"], []),
     "ernie-image": (["ckpt_image"], []),
+    "ernie-image-turbo": (["ckpt_image", "distilled"], ["ernie-image"]),
+    "ernie-image-pe": (["prompt_enhancer"], []),
+    "gemma3-abliterated-lora": (["te", "uncensored"], ["ltx23-gemma-te"]),
     "krea2_turbo": (["ckpt_image", "distilled"], []),
     "flux1-schnell-fp8": (["ckpt_image", "distilled", "fp8"], []),
     "rife-flownet-v4": (["upscale_video"], []),
@@ -95,6 +98,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "flux2-klein-te-4b": (["te"], []),
     "flux2-klein-te-8b": (["te", "te_quant"], []),
     "t5xxl-fp16": (["te"], []),
+    "t5xxl-enconly-fp8": (["te", "fp8"], []),
     "long-clip-hi-dream": (["te"], []),
     "ernie-ministral": (["te"], []),
     "flux-vae-ae": (["vae"], []),
@@ -259,10 +263,10 @@ MAP.update({
     "zimage-biglove-zt1-fp8": (["ckpt_image", "fp8", "uncensored"], []),
     "zimage-turbo-bf16-single": (["ckpt_image", "distilled"], []),
     "zimage-turbo-nsfw-2602": (["ckpt_image", "distilled", "uncensored"], []),
-    "flux1-fuxcapacity-nsfw-fp8": (["ckpt_image", "fp8", "uncensored"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux1-getphat-v23-softcore-fp8": (["ckpt_image", "fp8", "uncensored"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux1-dev-nunchaku-fp4": (["ckpt_image", "nvfp4"], ["flux-vae-ae", "t5xxl-fp16"]),
-    "flux1-kontext-nunchaku-fp4": (["ckpt_image", "nvfp4"], ["flux-vae-ae", "t5xxl-fp16"]),
+    "flux1-fuxcapacity-nsfw-fp8": (["ckpt_image", "fp8", "uncensored"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
+    "flux1-getphat-v23-softcore-fp8": (["ckpt_image", "fp8", "uncensored"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
+    "flux1-dev-nunchaku-fp4": (["ckpt_image", "nvfp4"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
+    "flux1-kontext-nunchaku-fp4": (["ckpt_image", "nvfp4"], ["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"]),
     "flux2-dev-nvfp4": (["ckpt_image", "nvfp4"], ["flux2-vae", "mistral-te-fp8-single"]),
     "ltx23-dev-gguf-q6k": (["ckpt_video", "dev_quality", "gguf_small"],
                            ["ltx23-gemma-te", "ltx23-distilled-lora-384", "ltx23-spatial-upscaler"]),
@@ -310,6 +314,8 @@ def main() -> int:
             e.pop("use", None)
         # deps: unione con quelle già presenti (krea_rt→wan ecc. restano), mai auto-riferimenti
         merged = list(dict.fromkeys((e.get("deps") or []) + deps))
+        _alt = {m for d in merged if "|" in d for m in d.split("|")}      # dep semplice già coperta da un'alternativa a|b: via
+        merged = [d for d in merged if "|" in d or d not in _alt]
         if is_h3_dit(e):                              # TE singolo/vecchio gruppo -> gruppo completo di alternative
             merged = [d for d in merged if not d.startswith("mmh3-te-")]
             merged.insert(min(1, len(merged)), h3_te_group(e["id"]))
