@@ -30,10 +30,12 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
                                QVBoxLayout, QWidget)
 
 from core import video_dub_translate as vdt
+from core import motion_tracks as mt
 from core import video_edit_ic as vic
 from core import video_edit_modes as vem
 from core import video_ic_prep as prep_mod
 from ui.i18n_manager import tr
+from ui.widgets.track_editor import TrackEditor
 
 _LORA = "LTX-2/"
 # Le 5 modalità storiche derivano da core/video_edit_modes (fonte unica): stessi key/i18n/edit_lora di prima.
@@ -48,7 +50,7 @@ _MODE_DEFAULT = {
     "motiondeblur": "Riduci il mosso (motion blur)", "detailer": "Aggiungi dettaglio (detailer)",
     "outpaint": "Outpaint video", "cameraman": "Cameraman (movimento di camera da riferimento)",
     "lipdub": "Doppiaggio da testo", "lipdub_audio": "Doppiaggio da audio (sperimentale)",
-    "hdr": "SDR → HDR",
+    "hdr": "SDR → HDR", "motion_track": "Movimento da tracce (motion-track)",
 }
 _FAMILY_DEFAULT = {"edit": "Modifica", "style": "Stile", "repair": "Ripara video", "outpaint": "Outpaint video",
                    "lipdub": "Doppiaggio labiale", "camera": "Camera / Movimento"}
@@ -79,6 +81,10 @@ _NOTE_DEFAULT = {
                       "pre-calcolato. Nel player si apre un'anteprima SDR tonemappata; il file HDR vero (HEVC 10 bit PQ, "
                       "BT.2020) e/o la sequenza EXR lineare stanno accanto, con lo stesso nome. Dai un sorgente SDR, non già "
                       "HDR. Col checkpoint dev viene aggiunta la LoRA distilled ufficiale.",
+    "vedit.note_motion_track": "Disegna sull'immagine le tracce del movimento: ogni traccia è un soggetto (o un punto dello "
+                               "sfondo) e l'ORDINE dei punti è il tempo. L'immagine è il primo fotogramma; descrivi nel prompt chi è "
+                               "e cosa fa. Col checkpoint dev viene aggiunta la LoRA distilled ufficiale. Il video dura quanto scegli "
+                               "(24 fps ufficiali, 121 frame = 5 s); l'audio lo genera il modello.",
     "vedit.note_cameraman": "Il movimento di camera viene copiato dal video di riferimento. Se il risultato "
                             "ricalca troppo il riferimento, abbassa la forza dell'immagine o cambia seme.",
 }
@@ -118,6 +124,7 @@ class VideoEditAITab(QWidget):
         self._dub_thread = None
         self._dub_src_video = ""            # video da cui viene il «testo originale» mostrato (riuso STT)
         self._auto_prompt = ""              # ultimo testo di prompt precompilato dalla modalità
+        self._canvas_image_getter = None    # fn() -> path dell'immagine nel canvas del Frame 1 (main_window)
         v = QVBoxLayout(self)
         top = QHBoxLayout()
         self.btn_pick = QPushButton(tr("vedit.pick", "🎬 Scegli video…")); self.btn_pick.clicked.connect(self._pick)
@@ -195,6 +202,61 @@ class VideoEditAITab(QWidget):
         self.cam_seconds.setSpecialValueText(tr("vedit.cam.all", "tutto il riferimento"))
         self.cam_seconds_lbl = QLabel(tr("vedit.cam.dur_lbl", "Durata (s)"))
         f.addRow(self.cam_seconds_lbl, self.cam_seconds)
+
+        # Motion-track: immagine di partenza (frame 0 + sfondo dell'editor) + editor di tracce + dimensioni/durata/seme
+        mrow = QHBoxLayout()
+        self.mt_img = QLineEdit(); self.mt_img.setPlaceholderText(
+            tr("vedit.mt.img_ph", "immagine di partenza: è il primo fotogramma e lo sfondo su cui disegni le tracce"))
+        self.mt_img.editingFinished.connect(self._mt_image_changed)
+        self.mt_img_btn = QPushButton(tr("vedit.ref.browse", "Sfoglia…")); self.mt_img_btn.clicked.connect(self._pick_mt_img)
+        self.mt_img_canvas = QPushButton(tr("vedit.mt.from_canvas", "Dal canvas (Frame 1)"))
+        self.mt_img_canvas.clicked.connect(self._mt_from_canvas)
+        self.mt_img_frame = QPushButton(tr("vedit.mt.from_video", "Primo fotogramma del video"))
+        self.mt_img_frame.clicked.connect(self._mt_from_video)
+        for _w in (self.mt_img_btn, self.mt_img_canvas, self.mt_img_frame):
+            _w.setMinimumHeight(32)
+        mrow.addWidget(self.mt_img, 1); mrow.addWidget(self.mt_img_btn); mrow.addWidget(self.mt_img_canvas)
+        mrow.addWidget(self.mt_img_frame)
+        self.mt_img_lbl = QLabel(tr("vedit.mt.img_lbl", "Immagine di partenza"))
+        f.addRow(self.mt_img_lbl, self._wrap_ref(mrow))
+        self.mt_editor = TrackEditor()
+        self.mt_editor.canvas.setMinimumHeight(260)
+        self.mt_editor.changed.connect(self._mt_refresh_info)
+        self.mt_tracks_lbl = QLabel(tr("vedit.mt.tracks_lbl", "Tracce di movimento"))
+        f.addRow(self.mt_tracks_lbl, self.mt_editor)
+        self.mt_w = QSpinBox(); self.mt_w.setRange(256, 1280); self.mt_w.setSingleStep(64); self.mt_w.setValue(1024)
+        self.mt_h = QSpinBox(); self.mt_h.setRange(256, 1280); self.mt_h.setSingleStep(64); self.mt_h.setValue(576)
+        self.mt_w.valueChanged.connect(self._mt_size_changed); self.mt_h.valueChanged.connect(self._mt_size_changed)
+        msrow = QHBoxLayout(); msrow.addWidget(self.mt_w); msrow.addWidget(QLabel("×")); msrow.addWidget(self.mt_h)
+        self.mt_size_lbl = QLabel(tr("vedit.mt.size_lbl", "Larghezza × altezza"))
+        f.addRow(self.mt_size_lbl, self._wrap_ref(msrow))
+        self.mt_seconds = QDoubleSpinBox(); self.mt_seconds.setRange(0.5, 10.7); self.mt_seconds.setSingleStep(0.5)
+        self.mt_seconds.setDecimals(1); self.mt_seconds.setValue(5.0); self.mt_seconds.setSuffix(" s")
+        self.mt_fps = QComboBox()
+        for _fps in (24, 25, 30):
+            self.mt_fps.addItem(f"{_fps} fps", _fps)
+        self.mt_seconds.valueChanged.connect(self._mt_timing_changed); self.mt_fps.currentIndexChanged.connect(self._mt_timing_changed)
+        mdrow = QHBoxLayout(); mdrow.addWidget(self.mt_seconds); mdrow.addWidget(self.mt_fps)
+        self.mt_dur_lbl = QLabel(tr("vedit.mt.dur_lbl", "Durata e fps"))
+        f.addRow(self.mt_dur_lbl, self._wrap_ref(mdrow))
+        self.mt_info = QLabel(""); self.mt_info.setWordWrap(True)
+        self.mt_info_lbl = QLabel("")
+        f.addRow(self.mt_info_lbl, self.mt_info)
+        self.mt_img_strength = QDoubleSpinBox(); self.mt_img_strength.setRange(0.3, 1.0); self.mt_img_strength.setSingleStep(0.05)
+        self.mt_img_strength.setValue(1.0)
+        self.mt_img_strength.setToolTip(tr("vedit.mt.img_strength_tt",
+            "Quanto il primo fotogramma resta fedele all'immagine (1.0 = come nella ricetta ufficiale)."))
+        self.mt_img_strength_lbl = QLabel(tr("vedit.cam.img_strength_lbl", "Forza immagine"))
+        f.addRow(self.mt_img_strength_lbl, self.mt_img_strength)
+        self.mt_audio = QCheckBox(tr("vedit.mt.audio", "Genera anche l'audio (parlato/suoni dal prompt)"))
+        self.mt_audio.setChecked(True)
+        self.mt_audio.setToolTip(tr("vedit.mt.audio_tt",
+            "Come nel workflow ufficiale il modello genera l'audio insieme al video: voce e suoni vengono dal prompt. "
+            "Spegnilo se il prompt non parla (altrimenti l'audio puo' essere rumore)."))
+        f.addRow("", self.mt_audio)
+        self.mt_seed = QSpinBox(); self.mt_seed.setRange(0, 2147483647); self.mt_seed.setValue(42)
+        self.mt_seed_lbl = QLabel(tr("vedit.mt.seed_lbl", "Seme"))
+        f.addRow(self.mt_seed_lbl, self.mt_seed)
 
         # Doppiaggio (lipdub): scena (opz.) + battuta + lingua. Da testo: la battuta NUOVA genera voce+labbra
         # («<scena>, speaking in <Lingua> saying: "<battuta>"»); da audio (sperimentale): audio dell'utente fisso.
@@ -429,6 +491,7 @@ class VideoEditAITab(QWidget):
         self.btn_go = QPushButton(tr("vedit.go", "✨ Genera modifica")); self.btn_go.clicked.connect(self._go); theme.style_generate(self.btn_go)
         v.addWidget(self.btn_go)
         self.log = QPlainTextEdit(); self.log.setReadOnly(True); v.addWidget(self.log, 1)
+        self.mt_editor.message.connect(self.log.appendPlainText)
         self._on_family()
 
     # ── utilità ──────────────────────────────────────────────────────────────────────────────
@@ -487,6 +550,100 @@ class VideoEditAITab(QWidget):
                                            "Video (*.mp4 *.mov *.avi *.mkv *.webm)")
         if p:
             self.cam_ref.setText(p)
+
+    # ── motion-track: immagine, dimensioni, durata ─────────────────────────────────────────────
+    def set_canvas_image_getter(self, fn):
+        """`fn()` -> path dell'immagine nel canvas del Frame 1 o ''. Collegato da main_window."""
+        self._canvas_image_getter = fn
+
+    def _pick_mt_img(self):
+        p, _ = QFileDialog.getOpenFileName(self, tr("vedit.mt.img_lbl", "Immagine di partenza"), "",
+                                           "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
+        if p:
+            self.set_track_image(p)
+
+    def _mt_from_canvas(self):
+        p = ""
+        if self._canvas_image_getter is not None:
+            try:
+                p = self._canvas_image_getter() or ""
+            except Exception:                                # noqa: BLE001
+                p = ""
+        if p and os.path.isfile(p):
+            self.set_track_image(p)
+        else:
+            self._block("vedit.mt.no_canvas", "Nessuna immagine nel canvas del Frame 1: scegli un file.")
+
+    def _mt_from_video(self):
+        if not self._video or not os.path.isfile(self._video):
+            self._block("vedit.err_no_video", "Scegli prima un video."); return
+        import tempfile
+        out = os.path.join(tempfile.gettempdir(), "ltxstudio_motion", f"{Path(self._video).stem}_frame0.png")
+        try:
+            self.set_track_image(mt.extract_first_frame(self._video, out))
+        except Exception as e:                               # noqa: BLE001
+            self._block("vedit.mt.frame_err", "Primo fotogramma non estratto: {e}", e=e)
+
+    def set_track_image(self, path: str):
+        """Imposta l'immagine di partenza (sfondo dell'editor + frame 0), ricalcola le dimensioni dall'aspetto e riallinea
+        l'editor. API pubblica anche per il rimando dal tab Video."""
+        self.mt_img.setText(path or "")
+        self._mt_image_changed()
+
+    def _mt_image_changed(self, *_):
+        p = self.mt_img.text().strip()
+        if p and os.path.isfile(p):
+            try:
+                from PIL import Image
+                with Image.open(p) as im:
+                    iw, ih = im.size
+                w, h = mt.default_size(iw, ih, max_long=vem.get_spec("motion_track").max_long_edge)
+                for sb, v in ((self.mt_w, w), (self.mt_h, h)):
+                    sb.blockSignals(True); sb.setValue(v); sb.blockSignals(False)
+            except Exception:                                # noqa: BLE001
+                pass
+        self._mt_sync_editor()
+
+    def _mt_size_changed(self, *_):
+        self._mt_sync_editor()
+
+    def _mt_timing_changed(self, *_):
+        sp = vem.get_spec("motion_track")
+        fps = int(self.mt_fps.currentData() or mt.DEFAULT_FPS)
+        self.mt_seconds.blockSignals(True)
+        self.mt_seconds.setMaximum(round(sp.max_frames_per_segment / float(fps), 1) - 0.1)
+        self.mt_seconds.blockSignals(False)
+        self._mt_sync_editor()
+
+    def _mt_frames(self) -> int:
+        """Frame 8k+1 per durata e fps scelti, mai oltre il tetto della modalità."""
+        sp = vem.get_spec("motion_track")
+        fps = int(self.mt_fps.currentData() or mt.DEFAULT_FPS)
+        n = mt.frames_for_seconds(float(self.mt_seconds.value()), fps)
+        while n > sp.max_frames_per_segment:
+            n -= 8
+        return n
+
+    def _mt_sync_editor(self):
+        """Riallinea l'editor (sfondo + spazio di lavoro + frame/fps dell'anteprima) ai campi della modalità."""
+        if not hasattr(self, "mt_editor"):
+            return
+        w, h = int(self.mt_w.value()), int(self.mt_h.value())
+        img = self.mt_img.text().strip()
+        ok = self.mt_editor.set_reference(img if os.path.isfile(img) else "", w, h)
+        if img and not ok:
+            self._block("vedit.mt.img_unreadable", "Immagine di partenza illeggibile.")
+        self.mt_editor.set_frames(self._mt_frames(), int(self.mt_fps.currentData() or mt.DEFAULT_FPS))
+        self._mt_refresh_info()
+
+    def _mt_refresh_info(self, *_):
+        if not hasattr(self, "mt_info"):
+            return
+        n, fps = self._mt_frames(), int(self.mt_fps.currentData() or mt.DEFAULT_FPS)
+        parts = [tr("vedit.mt.info_frames", "{n} frame a {f} fps = {s} s").format(n=n, f=fps, s=f"{n / fps:.1f}")]
+        if self.mode.currentData() == "motion_track" and not self.mt_editor.has_tracks():
+            parts.append(tr("vedit.mt.info_notracks", "disegna almeno una traccia"))
+        self.mt_info.setText("  ·  ".join(parts))
 
     def _pick(self):
         p, _ = QFileDialog.getOpenFileName(self, tr("vedit.pick", "Scegli video"), "",
@@ -761,6 +918,7 @@ class VideoEditAITab(QWidget):
         is_rc = (key == "replace_char")
         is_restyle = (key == "restyle")
         is_cam = (key == "cameraman")
+        is_mt = (key == "motion_track")                     # movimento da tracce disegnate
         is_out = (key == "outpaint")
         is_lipt = (key == "lipdub")                          # doppiaggio da TESTO (ricetta ufficiale)
         is_lipa = (key == "lipdub_audio")                    # doppiaggio da AUDIO (sperimentale)
@@ -793,6 +951,11 @@ class VideoEditAITab(QWidget):
         self._set_row_visible_for(self.cam_w, is_cam)
         for w in (self.cam_img_strength, self.cam_seconds):
             self._show_row(w, is_cam)
+        self._set_row_visible_for(self.mt_img, is_mt)
+        for w in (self.mt_editor, self.mt_info, self.mt_img_strength, self.mt_seed, self.mt_audio):
+            self._show_row(w, is_mt)
+        for w in (self.mt_w, self.mt_seconds):
+            self._set_row_visible_for(w, is_mt)
         for w in (self.out_format, self.out_anchor, self.out_dark, self.out_paste, self.out_feather, self.out_minbar,
                   self.out_info, self.out_preview):
             self._show_row(w, is_out)
@@ -824,11 +987,14 @@ class VideoEditAITab(QWidget):
             self._show_row(w, key == "inpaint")
         for w in (self.dilate, self.blur):
             self._show_row(w, key in ("inpaint", "replace_char"))
-        self._show_row(self.strength, not is_cam and not is_lip and not is_hdr)   # lip dub/hdr: forza 1.0 fissa (ufficiale)
+        self._show_row(self.strength, not is_cam and not is_mt and not is_lip and not is_hdr)   # lip dub/hdr: forza 1.0 fissa (ufficiale)
         self.strength.setEnabled(not is_restyle)          # ReStyle: forza 1.0 fissa (card)
         self.btn_pick.setEnabled(True)
-        self.btn_pick.setText(tr("vedit.pick", "🎬 Scegli video…") if not is_cam
+        self.btn_pick.setText(tr("vedit.pick", "🎬 Scegli video…") if not (is_cam or is_mt)
                               else tr("vedit.pick_opt", "🎬 Scegli video (opzionale)…"))
+        self.mt_img_frame.setEnabled(bool(self._video))
+        if is_mt:
+            self._mt_timing_changed()
         # prompt precompilato (modalità di riparazione)
         cur = self.prompt.toPlainText().strip()
         if sp.default_prompt_key:
@@ -988,6 +1154,8 @@ class VideoEditAITab(QWidget):
         if is_cam:
             if not self.cam_ref.text().strip():
                 self._block("vedit.err_no_cam_ref", "Cameraman: scegli il video di riferimento del movimento."); return
+        elif key == "motion_track":
+            pass                                             # niente video: immagine + tracce (controlli sotto)
         elif not self._video:
             self._block("vedit.err_no_video", "Scegli prima un video."); return
         lora = next((l for k, _i, l in MODES if k == key), "")
@@ -1073,6 +1241,20 @@ class VideoEditAITab(QWidget):
             if max(w, h) < sp.min_long_edge or min(w, h) < 512:
                 self.log.appendPlainText(tr("vedit.cam.too_small",
                     "⚠ Risoluzione sotto 960×512: il riferimento viene seguito peggio."))
+        if key == "motion_track":
+            img = self.mt_img.text().strip()
+            if not img or not os.path.isfile(img):
+                self._block("vedit.err_no_track_image", "Motion-track: scegli l'immagine di partenza."); return
+            if not self.mt_editor.has_tracks():
+                self._block("vedit.err_no_tracks", "Motion-track: disegna almeno una traccia sull'immagine."); return
+            w, h = int(self.mt_w.value()), int(self.mt_h.value())
+            if (self.mt_editor.model.width, self.mt_editor.model.height) != (w, h):
+                self.mt_editor.set_reference(img, w, h)      # le tracce seguono la risoluzione scelta
+            n, fps = self._mt_frames(), int(self.mt_fps.currentData() or mt.DEFAULT_FPS)
+            cfg.update(video=img, track_image=img, tracks=self.mt_editor.tracks_json(n), tracks_size=[w, h],
+                       width=w, height=h, fps=fps, num_frames=n, seed=int(self.mt_seed.value()),
+                       image_strength=float(self.mt_img_strength.value()), strength=1.0,
+                       native_audio=bool(self.mt_audio.isChecked()))
         if sp.kind and sp.cap:                               # peso IC-LoRA assente: avviso + «Apri tab Pesi», nessun download
             miss = vic.missing_weight(sp)
             if miss:

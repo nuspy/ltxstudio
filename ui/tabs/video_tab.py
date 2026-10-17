@@ -55,6 +55,7 @@ def round32(v: int) -> int:
 
 class VideoTab(QWidget):
     request_pulid_keyframe = Signal(str, str)   # (foto|foto|…, prompt) → genera il primo frame col volto (PuLID)
+    request_motion_tracks = Signal()            # «Guida il movimento con tracce…» → Modifica Video AI, modalità motion-track
 
     def __init__(self):
         super().__init__()
@@ -265,6 +266,14 @@ class VideoTab(QWidget):
         self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
         self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
         i2f.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
+        # Rimando (non cambia il flusso del tab): l'immagine di partenza va a Modifica Video AI, modalità «movimento da tracce»
+        self.motion_tracks_btn = QPushButton(tr("vid.motion_tracks.btn", "Guida il movimento con tracce…"))
+        self.motion_tracks_btn.setToolTip(tr("vid.motion_tracks.tt",
+            "Apre Modifica Video AI nella modalità «Movimento da tracce» con l'immagine di partenza già impostata: disegni "
+            "dove si muovono soggetto e sfondo e il video segue le tracce."))
+        self.motion_tracks_btn.setMinimumHeight(32)
+        self.motion_tracks_btn.clicked.connect(lambda *_: self.request_motion_tracks.emit())
+        i2f.addRow("", self.motion_tracks_btn)
         # One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → poi l'i2v lo anima.
         # PuLID è FLUX-only, il video è LTX: keyframe→i2v è il modo corretto per l'identità sul video.
         # CHECKBOX di attivazione (richiesta utente): PuLID è OPT-IN esplicito; da spento i campi/bottone sono
