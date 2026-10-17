@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "Kép-ControlNet (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: képvariációk (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (vezetett szerkesztés FLUX.1 Kontexten)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (vezetett szerkesztés FLUX.1 Kontexten)",
+  "weights.license.ack.title": "Nem kereskedelmi licenc",
+  "weights.license.ack.body": "Ezeknek a súlyoknak a licence NEM engedi a kereskedelmi használatot ({license}). Csak személyes/nem kereskedelmi célra töltse le őket, a szerző feltételeit betartva (név feltüntetése és azonos feltételekkel terjesztés). Nem részei a telepítőnek: Ön tölti le őket, saját felelősségére.\n\n{names}\n\nElolvasta a licencet, és le szeretné tölteni?",
+  "weights.license.declined": "A letöltés megszakítva: a licenc nincs megerősítve."
 }

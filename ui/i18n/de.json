@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "Bild-ControlNet (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: Bildvariationen (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (geführte Bearbeitung mit FLUX.1 Kontext)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (geführte Bearbeitung mit FLUX.1 Kontext)",
+  "weights.license.ack.title": "Nichtkommerzielle Lizenz",
+  "weights.license.ack.body": "Diese Gewichte haben eine Lizenz, die die kommerzielle Nutzung NICHT erlaubt ({license}). Lade sie nur für den persönlichen/nichtkommerziellen Gebrauch herunter und beachte die Bedingungen des Autors (Namensnennung und Weitergabe unter gleichen Bedingungen). Sie sind nicht Teil des Installers: Du lädst sie selbst auf eigene Verantwortung herunter.\n\n{names}\n\nHast Du die Lizenz gelesen und möchtest sie herunterladen?",
+  "weights.license.declined": "Download abgebrochen: Lizenz nicht bestätigt."
 }

@@ -1217,6 +1217,10 @@ class Frame1Tab(QWidget):
         from PySide6.QtCore import QProcess
         from PySide6.QtWidgets import QProgressDialog
         ids_arg = ",".join([ids] if isinstance(ids, str) else list(ids))
+        from core import license_ack as _la
+        _acc = _la.confirm_gui(self, ids_arg.split(","))        # voci non commerciali: conferma di licenza
+        if _acc is None:
+            return
         script = str(Path(__file__).resolve().parents[2] / "scripts" / "download_weights.py")
         dlg = QProgressDialog(tr("f1.gen.dl.progress", "Scaricamento {m}…").format(m=ids_arg),
                               tr("common.cancel", "Annulla"), 0, 0, self)
@@ -1232,7 +1236,7 @@ class Frame1Tab(QWidget):
             self._reload_qwen21_edit_combos()
         proc.finished.connect(_fin)
         dlg.canceled.connect(proc.kill)
-        proc.start(sys.executable, ["-u", script, "--ids", ids_arg])
+        proc.start(sys.executable, ["-u", script, "--ids", ids_arg] + _la.args_for(_acc))
         dlg.show()
 
     def _gen_model_name(self) -> str:

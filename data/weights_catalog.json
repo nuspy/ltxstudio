@@ -7517,7 +7517,9 @@
       "use": [
         "lora_style",
         "control_lora"
-      ]
+      ],
+      "license": "CC BY-NC-SA 4.0",
+      "license_ack": "cc_by_nc_sa"
     },
     {
       "id": "mq2-removal-lora",
@@ -7544,7 +7546,9 @@
       "use": [
         "lora_style",
         "control_lora"
-      ]
+      ],
+      "license": "CC BY-NC-SA 4.0",
+      "license_ack": "cc_by_nc_sa"
     },
     {
       "id": "mq2-edge-lora",
@@ -7571,7 +7575,9 @@
       "use": [
         "lora_style",
         "control_lora"
-      ]
+      ],
+      "license": "CC BY-NC-SA 4.0",
+      "license_ack": "cc_by_nc_sa"
     },
     {
       "id": "mq2-color-lora",
@@ -7598,7 +7604,9 @@
       "use": [
         "lora_style",
         "control_lora"
-      ]
+      ],
+      "license": "CC BY-NC-SA 4.0",
+      "license_ack": "cc_by_nc_sa"
     },
     {
       "id": "mq2-puzzle-lora",
@@ -7625,7 +7633,9 @@
       "use": [
         "lora_style",
         "control_lora"
-      ]
+      ],
+      "license": "CC BY-NC-SA 4.0",
+      "license_ack": "cc_by_nc_sa"
     }
   ],
   "schema": 2,

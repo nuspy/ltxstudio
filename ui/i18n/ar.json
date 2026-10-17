@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "ControlNet للصور (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: تنويعات الصورة (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (تعديل موجّه على FLUX.1 Kontext)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (تعديل موجّه على FLUX.1 Kontext)",
+  "weights.license.ack.title": "ترخيص غير تجاري",
+  "weights.license.ack.body": "هذه الأوزان بترخيص لا يسمح بالاستخدام التجاري ({license}). نزّلها لاستخدامك الشخصي/غير التجاري فقط مع احترام شروط المؤلف (نسب العمل والمشاركة بالمثل). ليست جزءًا من المثبّت: تنزّلها بنفسك وعلى مسؤوليتك.\n\n{names}\n\nهل قرأت الترخيص وتريد تنزيلها؟",
+  "weights.license.declined": "أُلغي التنزيل: لم يتم تأكيد الترخيص."
 }

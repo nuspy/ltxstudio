@@ -347,6 +347,10 @@ class WeightsTab(QWidget):
         ids = [i for i, (cb, _e) in self._checks.items() if cb.isChecked()]
         if not ids:
             self.status.setText(tr("weights.none", "Nessun peso selezionato.")); return
+        from core import license_ack as _la
+        _acc = _la.confirm_gui(self, ids)                      # voci non commerciali (MagicQuill…): conferma di licenza
+        if _acc is None:
+            self.status.setText(tr("weights.license.declined", "Download annullato: licenza non confermata.")); return
         self._total = len(ids); self._done = 0
         self.bar.setRange(0, self._total); self.bar.setValue(0); self.logview.clear()
         script = str(Path(__file__).resolve().parents[2] / "scripts" / "download_weights.py")
@@ -365,7 +369,8 @@ class WeightsTab(QWidget):
         p.finished.connect(self._on_done)
         self._proc = p
         self.btn_dl.setEnabled(False); self.status.setText(tr("weights.downloading", "Scaricamento…"))
-        p.start(sys.executable, ["-u", script, "--ids", ",".join(ids), "--base-dir", self.base.text().strip()])
+        p.start(sys.executable, ["-u", script, "--ids", ",".join(ids), "--base-dir", self.base.text().strip()]
+                + _la.args_for(_acc))
 
     def _on_out(self, p: QProcess):
         for line in bytes(p.readAllStandardOutput()).decode("utf-8", "replace").splitlines():

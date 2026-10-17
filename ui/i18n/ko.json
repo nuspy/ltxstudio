@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "이미지 ControlNet (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: 이미지 변형 (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet 인페인팅 (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (FLUX.1 Kontext 기반 안내 편집)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (FLUX.1 Kontext 기반 안내 편집)",
+  "weights.license.ack.title": "비상업 라이선스",
+  "weights.license.ack.body": "이 가중치의 라이선스는 상업적 사용을 허용하지 않습니다({license}). 개인/비상업적 용도로만 내려받고 저작자의 조건(저작자 표시 및 동일 조건 공유)을 지키세요. 설치 프로그램에 포함되지 않으며, 직접 내려받는 것은 본인 책임입니다.\n\n{names}\n\n라이선스를 읽었고 내려받으시겠습니까?",
+  "weights.license.declined": "다운로드 취소: 라이선스가 확인되지 않았습니다."
 }

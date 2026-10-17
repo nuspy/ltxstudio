@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "इमेज ControlNet (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: छवि रूपांतर (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (FLUX.1 Kontext पर निर्देशित संपादन)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (FLUX.1 Kontext पर निर्देशित संपादन)",
+  "weights.license.ack.title": "गैर-व्यावसायिक लाइसेंस",
+  "weights.license.ack.body": "इन वज़न का लाइसेंस व्यावसायिक उपयोग की अनुमति नहीं देता ({license})। इन्हें केवल अपने व्यक्तिगत/गैर-व्यावसायिक उपयोग के लिए डाउनलोड करें और लेखक की शर्तों (श्रेय और समान शर्तों पर साझा) का पालन करें। ये इंस्टॉलर का हिस्सा नहीं हैं: आप इन्हें स्वयं, अपनी ज़िम्मेदारी पर डाउनलोड करते हैं।\n\n{names}\n\nक्या आपने लाइसेंस पढ़ लिया है और डाउनलोड करना चाहते हैं?",
+  "weights.license.declined": "डाउनलोड रद्द: लाइसेंस की पुष्टि नहीं हुई।"
 }

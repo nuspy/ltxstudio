@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "ControlNet для зображень (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: варіації зображення (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (керована правка на FLUX.1 Kontext)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (керована правка на FLUX.1 Kontext)",
+  "weights.license.ack.title": "Некомерційна ліцензія",
+  "weights.license.ack.body": "Ці ваги мають ліцензію, яка НЕ дозволяє комерційне використання ({license}). Завантажуйте їх лише для особистого/некомерційного використання, дотримуючись умов автора (зазначення авторства та поширення на тих самих умовах). Вони не входять до інсталятора: ви завантажуєте їх самі, на власну відповідальність.\n\n{names}\n\nВи прочитали ліцензію і хочете завантажити?",
+  "weights.license.declined": "Завантаження скасовано: ліцензію не підтверджено."
 }

@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "ControlNet לתמונות (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: וריאציות תמונה (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (עריכה מונחית על FLUX.1 Kontext)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (עריכה מונחית על FLUX.1 Kontext)",
+  "weights.license.ack.title": "רישיון לא מסחרי",
+  "weights.license.ack.body": "למשקלים אלה רישיון שאינו מתיר שימוש מסחרי ({license}). הורידו אותם רק לשימוש אישי/לא מסחרי, תוך כיבוד תנאי היוצר (ייחוס ושיתוף זהה). הם אינם חלק מהמתקין: אתם מורידים אותם בעצמכם ובאחריותכם.\n\n{names}\n\nקראתם את הרישיון ורוצים להוריד?",
+  "weights.license.declined": "ההורדה בוטלה: הרישיון לא אושר."
 }

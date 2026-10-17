@@ -3514,5 +3514,8 @@
   "feat.cap.image_controlnet": "ControlNet для изображений (FLUX.1, Z-Image)",
   "feat.cap.image_redux": "Redux: вариации изображения (FLUX.1)",
   "feat.cap.image_cn_inpaint": "ControlNet Inpainting (Alimama)",
-  "feat.cap.image_magicquill": "MagicQuill V2 (управляемая правка на FLUX.1 Kontext)"
+  "feat.cap.image_magicquill": "MagicQuill V2 (управляемая правка на FLUX.1 Kontext)",
+  "weights.license.ack.title": "Некоммерческая лицензия",
+  "weights.license.ack.body": "У этих весов лицензия, которая НЕ разрешает коммерческое использование ({license}). Скачивайте их только для личного/некоммерческого использования, соблюдая условия автора (указание авторства и распространение на тех же условиях). Они не входят в установщик: вы скачиваете их сами, на свою ответственность.\n\n{names}\n\nВы прочитали лицензию и хотите скачать?",
+  "weights.license.declined": "Загрузка отменена: лицензия не подтверждена."
 }

@@ -11,7 +11,7 @@ NC = "Licenza FLUX.1 [dev] non commerciale: i pesi li scarica l'utente"
 
 
 def entries(N):
-    return [
+    out = [
         N("flux-cn-union-pro2", "Immagini", "FLUX.1 ControlNet Union Pro 2.0 (Shakker, canny/depth/pose/gray, 4.3GB)",
           category="image", arch="flux1", repo="Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0",
           remote="diffusion_pytorch_model.safetensors", filename="shakker_union_pro_v2.safetensors",
@@ -54,6 +54,11 @@ def entries(N):
             ("color", "colore guidato", 0.299, "ricolora seguendo blocchi di colore."),
             ("puzzle", "integrazione (foreground)", 0.345, "fonde un oggetto incollato nella scena (LoRA PEFT normale)."))
     ]
+    for e in out:
+        if e["id"].startswith("mq2-"):                  # mai in silenzio: dialog con avviso di licenza + conferma (core/license_ack)
+            e["license"] = "CC BY-NC-SA 4.0"
+            e["license_ack"] = "cc_by_nc_sa"
+    return out
 
 
 # id → (tag d'uso, deps) per catalog_use_deps
