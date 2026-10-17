@@ -34,8 +34,9 @@ def test_invalid_kind_422(video):
     assert r.status_code == 422
     assert "refocus" in r.json()["detail"]["valid"]
     assert "lipdub" in r.json()["detail"]["valid"]
-    # canny/union non sono modalita' di questo endpoint; hdr e' una fase futura (disabilitata)
-    for k in ("canny", "union", "hdr", "motion-track"):
+    assert "hdr" in r.json()["detail"]["valid"]
+    # canny/union/motion-track non sono modalita' di questo endpoint
+    for k in ("canny", "union", "motion-track"):
         assert client.post("/video/ic_lora", json={"kind": k, "video_path": video}).status_code == 422, k
 
 
@@ -190,3 +191,51 @@ def test_lipdub_audio_api(video, no_run, monkeypatch, tmp_path):
     from api import gate
     monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_lipdub")
     assert client.post("/video/ic_lora", json={**base, "audio_path": str(aud)}).status_code == 403
+
+
+def test_hdr_validation_passthrough_and_outputs(video, no_run, monkeypatch, tmp_path):
+    base = {"kind": "hdr", "video_path": video, "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"}
+    r = client.post("/video/ic_lora", json={**base, "hdr_format": "dpx"})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "invalid_hdr_format" and "pq" in r.json()["detail"]["valid"]
+    r = client.post("/video/ic_lora", json={**base, "hdr_exposure_ev": 9})
+    assert r.status_code == 422                                   # fuori da -6..6
+    r = client.post("/video/ic_lora", json={**base, "hdr_format": "both", "hdr_exposure_ev": 1.5, "hdr_exr_half": False,
+                                            "hdr_hq": True})
+    assert r.status_code == 200 and r.json()["warnings"] == [], r.text
+    from api.handlers import video as h
+    from core import video_edit_ic as vic
+    seen = {}
+    prev = tmp_path / "o.mp4"
+    prev.write_bytes(b"x")
+    pq = tmp_path / "o_HDR_PQ.mp4"
+    pq.write_bytes(b"x")
+    exr = tmp_path / "o_EXR"
+    exr.mkdir()
+    spec = vic.vem.get_spec("hdr")
+
+    class _IJ:
+        params = {"output": str(prev)}
+
+        def outputs(self, result):
+            return [result, str(pq), str(exr)]
+
+    def fake_build(cfg, out_dir, stamp, output, log=None):
+        seen.update(cfg)
+        return _IJ()
+    monkeypatch.setattr(vic, "build_job", fake_build)
+    monkeypatch.setattr(h, "run_ltx2", lambda params, job: [str(prev)])
+    monkeypatch.setattr(vic, "finalize", lambda ij, out, log=None: out)
+    logs = []
+    outs = no_run["fn"](type("J", (), {"log": staticmethod(logs.append)})())
+    assert seen["mode"] == "hdr" and seen["hdr_format"] == "both" and seen["hdr_exposure_ev"] == 1.5
+    assert seen["hdr_exr_half"] is False and seen["hdr_hq"] is True
+    assert outs == [str(prev), str(pq)], "la cartella EXR non e' un file scaricabile: solo anteprima e HEVC"
+    assert any(str(exr) in m for m in logs)
+    assert spec.cap == "cap.video_hdr_ic" and spec.kind == "hdr"
+
+
+def test_hdr_gate_off_403(video, monkeypatch):
+    from api import gate
+    monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_hdr_ic")
+    r = client.post("/video/ic_lora", json={"kind": "hdr", "video_path": video})
+    assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_hdr_ic"

@@ -137,7 +137,7 @@ class IcLoraReq(BaseModel):
     """Modalita' IC-LoRA di «Modifica Video AI» (stessa logica della GUI: core/video_edit_ic.py)."""
     kind: str = Field(..., description="refocus | uncompress | deinterlace | motiondeblur | detailer | "
                                        "outpaint | restyle | cameraman | lipdub (Doppiaggio da testo) | "
-                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE)")
+                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE) | hdr (SDR -> HDR)")
     video_path: str = Field(..., description="video sorgente (cameraman: video di RIFERIMENTO del movimento)")
     prompt: str = ""
     strength: float = 1.0
@@ -171,6 +171,14 @@ class IcLoraReq(BaseModel):
     # lipdub_audio = «Doppiaggio da audio» SPERIMENTALE: l'audio dell'utente e' tenuto fisso nei latenti (l'audio comanda la durata)
     audio_path: str | None = Field(None, description="lipdub_audio: file audio da usare (canzone, voce, TTS)")
     audio_reference: str = Field("external", description="lipdub_audio: external (l'audio scelto fa da riferimento voce) | original (la voce del video)")
+    # hdr (SDR -> HDR, IC-LoRA HDR LTX-2.3): nessun prompt (il testo e' il file scene-emb). Uscita = anteprima SDR
+    # tonemappata (output[0]) + HEVC 10 bit PQ/BT.2020 e/o cartella EXR lineare (output[1:]), vedi core/hdr_export.py
+    hdr_format: str = Field("pq", description="hdr: pq (HEVC 10 bit PQ/BT.2020) | exr (sequenza EXR lineare) | both. "
+                            "I file scaricabili sono l'anteprima SDR e l'HEVC; la cartella EXR sta accanto all'anteprima "
+                            "(<anteprima senza .mp4>_EXR, un .exr per frame) e non e' un file scaricabile")
+    hdr_exposure_ev: float = Field(0.0, ge=-6.0, le=6.0, description="hdr: esposizione dell'anteprima SDR in stop (non tocca HDR/EXR)")
+    hdr_exr_half: bool = Field(True, description="hdr: EXR in float16 (False = float32, file doppi)")
+    hdr_hq: bool = Field(False, description="hdr: alta qualita' (2x frame interni, circa 2x tempo)")
     # cameraman
     image_path: str | None = None
     image_strength: float = 0.7
@@ -326,6 +334,10 @@ def register(app: FastAPI):
                                           "detail": "custom richiede 4 margini [sopra,destra,sotto,sinistra], almeno uno > 0"})
         if req.kind == "restyle" and not (req.style_image and os.path.exists(req.style_image)):
             raise HTTPException(422, {"error": "style_image_required"})
+        if req.kind == "hdr":
+            from core import hdr_export as _hx
+            if req.hdr_format not in _hx.FORMATS:
+                raise HTTPException(422, {"error": "invalid_hdr_format", "valid": list(_hx.FORMATS)})
         if not os.path.exists(req.video_path):
             raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
         warnings: list[str] = []
@@ -386,7 +398,9 @@ def register(app: FastAPI):
                "width": req.width, "height": req.height, "seed": req.seed,
                "lipdub_line": req.line, "lipdub_lang": req.language, "lipdub_scene": req.scene,
                "translate_to": req.translate_to, "source_text": req.source_text,
-               "lipdub_audio": req.audio_path or "", "lipdub_audio_ref": req.audio_reference}
+               "lipdub_audio": req.audio_path or "", "lipdub_audio_ref": req.audio_reference,
+               "hdr_format": req.hdr_format, "hdr_exposure_ev": req.hdr_exposure_ev,
+               "hdr_exr_half": req.hdr_exr_half, "hdr_hq": req.hdr_hq}
         if model:
             cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
         if rel:
@@ -403,7 +417,10 @@ def register(app: FastAPI):
                     raise RuntimeError(str(e)) from None
             ij = vic.build_job(cfg, os.path.dirname(output), int(_t.time()), output, log=lambda m: job.log(m))
             outs = run_ltx2(ij.params, job)
-            return [vic.finalize(ij, outs[0], log=lambda m: job.log(m))]
+            allo = ij.outputs(vic.finalize(ij, outs[0], log=lambda m: job.log(m)))
+            for d in (o for o in allo if os.path.isdir(o)):      # hdr: la cartella EXR non e' scaricabile come file
+                job.log(f"EXR: {d}")
+            return [o for o in allo if os.path.isfile(o)]
         r = _submit("video.ic_lora", fn)
         r["warnings"] = warnings
         return r
