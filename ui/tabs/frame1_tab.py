@@ -80,11 +80,9 @@ QWEN21_ASPECTS = ("1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16")
 
 
 def _is_flux2(name: str) -> bool:
-    """FLUX.2 (dev e Klein): lo dice l'HEADER del file (core/arch_filter); il nome solo se il file non si
-    riconosce. Prima «PornFlux_20» passava per FLUX.2 (sottostringa «flux_2») e un Klein senza «flux2» nel nome no."""
+    """FLUX.2 (dev e Klein): unica definizione in core/arch_filter (header del file; il nome solo se il file non si trova)."""
     from core import arch_filter as af
-    c = af.classify(name)
-    return c["family"] == "flux2" if c["source"] != "none" else af.is_flux2_name(name)
+    return af.is_flux2(name)
 
 
 def fill_lora_combo(combo: QComboBox, arch: str | None, allow_nsfw: bool = True):
@@ -1073,18 +1071,22 @@ class Frame1Tab(QWidget):
         allow = self._allow_nsfw()
         # rifinitura upscale → sempre FLUX.2
         from core import arch_filter as af
+        # Integra/Colore (flux2_kontext): solo Klein; rifinitura upscale: FLUX.2 caricabile (dev e Klein)
         flux2 = [m for m in self._models
                  if af.is_flux2_edit_pool(m) and (allow or not self._mcat.is_nsfw(m))]
+        refine2 = [m for m in self._models
+                   if af.is_flux2_refine_pool(m) and (allow or not self._mcat.is_nsfw(m))]
         from ui import model_menu as mm
         flux2_all = [m for m in self._models if af.is_flux2_edit_pool(m)]
+        refine2_all = [m for m in self._models if af.is_flux2_refine_pool(m)]
         refine_combo = getattr(self, "up_refine_model", None)
         if refine_combo is not None:
             cur = mm.current_key(refine_combo)
             refine_combo.clear()
-            refine_combo.addItems(flux2) if flux2 else refine_combo.addItem(tr("f1.flux2.none"))
-            if flux2:
+            refine_combo.addItems(refine2) if refine2 else refine_combo.addItem(tr("f1.flux2.none"))
+            if refine2:
                 self._color_name_combo(refine_combo)
-            mm.settle(refine_combo, cur, flux2_all)
+            mm.settle(refine_combo, cur, refine2_all)
         # integra: liste separate per engine
         ic = getattr(self, "integrate_model", None)
         if ic is not None:
@@ -1522,8 +1524,12 @@ class Frame1Tab(QWidget):
             self.inp_steps.setValue(TURBO_STEPS if meta.get("turbo") else int(meta.get("steps", DEFAULT_STEPS)))
             return
         # Tutte le voci dinamiche FLUX (checkpoint o UNET) usano lo stesso pool LoRA Flux.
+        kind = getattr(self, "_dynamic_kind", {}).get(label)
         if label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {}):
-            fill_lora_combo(self.inp_lora, "Flux", allow_nsfw=self._allow_nsfw())
+            fill_lora_combo(self.inp_lora, "Flux2" if kind == "klein" else "Flux", allow_nsfw=self._allow_nsfw())
+            if kind:                                   # passi del proprio modello (Fill 40, base 28, Klein 28, distillati 8)
+                from core import arch_filter as _af
+                self.inp_steps.setValue(_af.inpaint_defaults(kind, label)[0])
             return
         spec = INPAINT_MODELS.get(label, {})
         fill_lora_combo(self.inp_lora, spec.get("arch"), allow_nsfw=self._allow_nsfw())
@@ -1862,11 +1868,13 @@ class Frame1Tab(QWidget):
     #   per-variante). Restano fuori solo i Kontext (modello editing, non inpaint).
     def _refresh_inpaint_checkpoints(self, checkpoint_models: list[str]):
         # heuristic: identifica file FLUX/FLUX.2-compatibili dal nome (catalogo è opzionale)
+        # Il menu mostra SOLO ciò che il backend sa fare davvero (core/arch_filter.inpaint_kind, dall'HEADER):
+        # FLUX.1 Fill (384 canali) e FLUX.1 base (64) → FluxFillPipeline/FluxInpaintPipeline; Klein (128 canali, senza
+        # guidance_in) → Flux2KleinInpaintPipeline. Restano fuori FLUX.2 Dev (nessuna pipeline inpaint), Nunchaku, Krea 2,
+        # Kontext/Redux e i checkpoint completi (CheckpointLoader = ComfyUI, dismesso).
         from core import arch_filter as _af
-        is_flux_like = _af.is_inpaint_flux_like       # header FLUX.1/FLUX.2 (no Kontext/Redux): non più «krea» nel nome
-        ckpts = [c for c in checkpoint_models if is_flux_like(c)]
-        # in più: prendi anche i UNET Flux da diffusion_models (Fill, Dev, ecc.)
-        unets = [m for m in (self._models or []) if is_flux_like(m)]
+        ckpts = []
+        unets = [m for m in (self._models or []) if _af.inpaint_kind(m)]
         from ui import model_menu as mm
         prev_key = mm.current_key(self.inp_model)          # per il segnaposto se il file scelto e' sparito
         # rimuovi voci dinamiche precedenti
@@ -1897,12 +1905,14 @@ class Frame1Tab(QWidget):
             if idx >= 0:
                 self.inp_model.removeItem(idx)
         self._dynamic_unets.clear()
+        self._dynamic_kind = {}
         for u in sorted(unets):
             if u.lower() in hardcoded_unets:
                 continue
             base = _os.path.splitext(_os.path.basename(u))[0]
             label = f"{base}  · UNET Flux"
             self._dynamic_unets[label] = u
+            self._dynamic_kind[label] = _af.inpaint_kind(u)
             self.inp_model.insertItem(insert_at, label)
             insert_at += 1
         self.inp_model.blockSignals(True)
@@ -2026,6 +2036,11 @@ class Frame1Tab(QWidget):
             from core.qwen21_spec import DITS, DEFAULT_GUIDANCE
             meta = DITS.get(q21, {})
             self.inp_guidance.setValue(1.0 if meta.get("turbo") else float(meta.get("cfg", DEFAULT_GUIDANCE)))
+            return
+        dkind = getattr(self, "_dynamic_kind", {}).get((label or "").split("  ⛔")[0])
+        if dkind:                                   # voce dinamica: default del proprio modello, non «Fill = 30» per tutti
+            from core import arch_filter as _af
+            self.inp_guidance.setValue(_af.inpaint_defaults(dkind, label)[1])
             return
         if "hyper" in l or "hyp8" in l or "hyp-8" in l or "distill" in l or "turbo" in l:
             g = 2.5

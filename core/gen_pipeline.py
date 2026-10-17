@@ -32,9 +32,9 @@ HANDBUILT_ARCHS = ("flux", "flux2", "zimage", "ernie")
 
 
 def is_flux2(name: str) -> bool:
-    # «flux_2» seguito da una cifra NON è FLUX.2 («PornFlux_20» è FLUX.1): vedi core/arch_filter.is_flux2_name
-    from core.arch_filter import is_flux2_name
-    return is_flux2_name(name)
+    # unica definizione in core/arch_filter (header se il file c'è; «PornFlux_20» è FLUX.1, non FLUX.2)
+    from core.arch_filter import is_flux2 as _is_flux2
+    return _is_flux2(name)
 
 
 class GenPipeline:

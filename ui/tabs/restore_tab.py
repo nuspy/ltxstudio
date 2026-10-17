@@ -273,7 +273,8 @@ class RestoreTab(QWidget):
         from ui import model_menu as mm
         prev = mm.current_key(self.flux2_model)
         self.flux2_model.clear()
-        flux2 = [m for m in models if "flux2" in m.lower() or "flux_2" in m.lower() or "flux 2" in m.lower()]
+        from core.arch_filter import is_flux2 as _is_flux2
+        flux2 = [m for m in models if _is_flux2(m)]
         if not flux2:
             self.flux2_model.addItem(tr("res.color.no_model"))
         else:

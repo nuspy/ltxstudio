@@ -50,6 +50,14 @@ def is_flux2_name(name: str) -> bool:
     return bool(re.search(r"flux_2(?!\d)|flux2|flux 2(?!\d)", (name or "").lower()))
 
 
+def is_flux2(name: str) -> bool:
+    """UNICA definizione di «questo file è FLUX.2 (Dev o Klein)»: lo dice l'header se il file si trova su disco;
+    altrimenti (nome non risolvibile, es. grafo ComfyUI) il nome, senza il falso positivo «flux_2» in «Flux_20».
+    Sostituisce le copie sparse (gen_pipeline, inpaint_pipeline, frame1_tab, restore_tab, model_selection, img_router)."""
+    c = classify(name)
+    return c["family"] == "flux2" if c["source"] != "none" else is_flux2_name(name)
+
+
 def models_root() -> Path:
     from core import offline_inventory
     return Path(offline_inventory.MODELS_ROOT)
@@ -103,7 +111,7 @@ def classify(rel: str) -> dict:
     if key in _MEMO:
         return _MEMO[key]
     out = {"family": UNKNOWN, "variant": "", "role": "", "source": "none"}
-    if p:
+    if p and not ("svdq" in os.path.basename(p).lower() or "nunchaku" in p.lower()):
         try:
             from core import model_detect
             det = model_detect.get(p) or {}
@@ -113,6 +121,13 @@ def classify(rel: str) -> dict:
         if fam != UNKNOWN:
             out = {"family": fam, "variant": det.get("variant") or "", "role": det.get("role") or "",
                    "source": "header" if det.get("source") in ("metadata", "keys", "config") else "folder"}
+    if p and ("svdq" in os.path.basename(p).lower() or "nunchaku" in p.lower()):
+        # Nunchaku/SVDQuant (pesi quantizzati .qweight): l'header NON ha le chiavi FLUX standard, quindi il detector
+        # ripiega sulla cartella («Flux» → flux1) anche per un Klein. La famiglia la dice il nome; il formato è
+        # marcato `packed` perché nessuna pipeline FLUX di questo backend lo carica come transformer.
+        n = os.path.basename(p).lower()
+        out = {"family": "flux2" if (is_flux2_name(n) or "klein" in n or "flux.2" in n) else "flux1",
+               "variant": "klein" if "klein" in n else "", "role": "", "source": "name", "packed": "nunchaku"}
     if out["family"] == UNKNOWN:
         fam = _from_folder(rel)
         if fam != UNKNOWN:
@@ -169,21 +184,15 @@ def is_kontext(rel: str) -> bool:
 
 
 def is_flux2_edit_pool(rel: str) -> bool:
-    """Modelli per il motore «FLUX.2» di Integra/Colore/rifinitura: header FLUX.2 (dev e Klein), no Fill."""
-    return classify(rel)["family"] == "flux2" and "fill" not in _flags(rel)
+    """Modelli per il motore «FLUX.2» di Integra/Colore: arch `flux2_kontext` = Flux2KleinPipeline → SOLO Klein
+    (header FLUX.2 senza guidance_in; il Dev dà errore chiaro nel backend, Nunchaku non ha loader per Klein)."""
+    return inpaint_kind(rel) == "klein"
 
 
-def is_inpaint_flux_like(rel: str) -> bool:
-    """Voci dinamiche del menu Inpaint/Outpaint: FLUX.1/FLUX.2 che non siano Kontext né adattatori (Redux)."""
+def is_flux2_refine_pool(rel: str) -> bool:
+    """Rifinitura dell'upscale: FLUX.2 (dev e Klein) in formato caricabile (no Fill, no Nunchaku)."""
     c = classify(rel)
-    if c["family"] not in ("flux1", "flux2"):
-        return False
-    if c["role"] == "adapter" or c["variant"] in ("redux", "kontext"):
-        return False
-    low = os.path.basename((rel or "").replace("\\", "/")).lower()
-    if any(x in low for x in ("kontext", "redux", "text_encoders", "vae", "clip")):
-        return False
-    return True
+    return c["family"] == "flux2" and "fill" not in _flags(rel) and not c.get("packed")
 
 
 # ── video ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -260,3 +269,55 @@ def compatible_vae(arch_key: str, name: str) -> bool:
         return compatible_vae("flux1", name) or compatible_vae("flux2", name)
     base = _norm(os.path.basename((name or "").replace("\\", "/")))
     return base in _VAE_RULES.get(arch_key, set())
+
+
+# ── inpaint: cosa sa FARE davvero il backend per ogni file ───────────────────────────────────────────────
+# Dal codice (ui/main_window._start_native_inpaint + inference_server/backends/image_flux): arch «inpaint» =
+# FluxFillPipeline (Fill, 384 canali in ingresso) o FluxInpaintPipeline (FLUX.1 base, 64 canali); «flux2_inpaint» =
+# Flux2KleinInpaintPipeline (SOLO Klein: 128 canali e NESSUN guidance_in; FLUX.2 Dev ha guidance_in → nessuna pipeline
+# inpaint, KeyError reale il 16/10). I checkpoint (CheckpointLoaderSimple) restano su ComfyUI (dismesso); i pesi
+# Nunchaku/SVDQuant non hanno loader.
+def inpaint_kind(rel: str) -> str | None:
+    """'fill' | 'base' | 'klein' se il backend sa fare inpaint con questo file, altrimenti None. Dall'HEADER (canali in
+    ingresso, vector_in/guidance_in); per i GGUF (header non standard) solo se il nome dice «fill»."""
+    p = resolve(rel)
+    if not p:
+        return None
+    low = os.path.basename(p).lower()
+    if "svdq" in low or "nunchaku" in p.lower():
+        return None
+    if low.endswith(".gguf"):
+        return "fill" if "fill" in low else None
+    if "kontext" in low or "redux" in low:
+        return None                                  # stesse chiavi del dev: lo dice solo il nome
+    try:
+        from core import model_detect
+        tens, _meta = model_detect.read_header(p)
+    except Exception:                                # noqa: BLE001
+        return None
+    if not tens or any(k.endswith("qweight") for k in tens):
+        return None
+    shp = None
+    for k, v in tens.items():
+        if k.endswith("img_in.weight") or k.endswith("x_embedder.weight"):
+            shp = v.get("shape")
+            break
+    if not shp or len(shp) < 2 or not any("double_blocks" in k for k in tens):
+        return None
+    ch = int(shp[1])
+    has_vec = any("vector_in" in k for k in tens)
+    has_guid = any("guidance_in" in k for k in tens)
+    if has_vec:                                      # FLUX.1
+        return "fill" if ch == 384 else ("base" if ch == 64 else None)
+    if ch == 128 and not has_guid:                   # FLUX.2 senza guidance_in = Klein
+        return "klein"
+    return None
+
+
+def inpaint_defaults(kind: str, name: str = "") -> tuple[int, float]:
+    """(passi, guidance) del PROPRIO modello (stessi valori di image_flux._auto_settings, che la GUI può importare
+    senza torch): Fill dev 40/30, FLUX.1 base 28/3.5, Klein 28/4; distillati (hyper/turbo/schnell…) 8 passi, ≤3.5."""
+    from inference_server.backends.image_flux import _auto_settings
+    arch = {"fill": "inpaint", "base": "flux", "klein": "flux2_inpaint"}[kind]
+    steps, guid, _h = _auto_settings(arch, name)
+    return int(steps), float(guid)

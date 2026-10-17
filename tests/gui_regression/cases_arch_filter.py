@@ -40,6 +40,8 @@ FLUX2_DEV = {"double_blocks.0.img_attn.qkv.weight": (9216, 6144), "single_blocks
              "txt_in.weight": (6144, 15360)}
 FLUX2_KLEIN = {"double_blocks.0.img_attn.qkv.weight": (9216, 4096), "single_blocks.0.linear1.weight": (21504, 4096),
                "img_in.weight": (4096, 128)}
+FLUX1_FILL = dict(FLUX1, **{"img_in.weight": (3072, 384)})
+NUNCHAKU = {"single_transformer_blocks.0.norm.linear.qweight": (64, 64), "img_in.weight": (3072, 64)}
 OPAQUE = {"blocks.0.attn.wq.weight": (64, 64)}                 # convertito «-native»: l'header non dice nulla
 
 # nome relativo → (tensori, metadata)
@@ -49,6 +51,8 @@ DIFFUSION = {
     "Flux\\klein_senza_nome_flux.safetensors": (FLUX2_KLEIN, None),  # FLUX.2 Klein: header, non nome
     "Flux\\flux2_dev_named.safetensors": (FLUX2_DEV, None),
     "Flux\\Flux_Kontext_X.safetensors": (FLUX1, None),
+    "Flux\\FillX.safetensors": (FLUX1_FILL, None),                 # FLUX.1 Fill (384 canali)
+    "Flux\\nunchaku\\svdq-fp4_r32-flux.1-dev.safetensors": (NUNCHAKU, None),   # SVDQuant: nessun inpaint
     "Krea2\\KreaX_native.safetensors": (OPAQUE, None),
     "Qwen21\\NoctFake_native.safetensors": (OPAQUE, None),
     "miofavorito.safetensors": (OPAQUE, {"modelspec.architecture": "z-image"}),   # Z-Image dal solo header
@@ -118,7 +122,8 @@ def case_arch_gen_models_by_header(w, spy):
         f.img_nsfw.setCurrentText("SFW")
         f.gen_arch.setCurrentText("FLUX")
         got = _base(_texts(f.gen_model))
-        want = sorted(["flux1_dev_model.safetensors", "PornFlux_20_trap.safetensors", "flux2_dev_named.safetensors"])
+        want = sorted(["flux1_dev_model.safetensors", "PornFlux_20_trap.safetensors", "flux2_dev_named.safetensors",
+                       "svdq-fp4_r32-flux.1-dev.safetensors"])
         assert got == want, f"FLUX: {got} != {want}"
         f.gen_arch.setCurrentText("Z-Image")
         got = _base(_texts(f.gen_model))
@@ -143,11 +148,12 @@ def case_arch_edit_engines_by_header(w, spy):
         f.integrate_engine.setCurrentIndex(1)            # FLUX.2
         f._reload_flux_combos()
         got = _base(_texts(f.integrate_model, skip_auto=False))
-        want = sorted(["klein_senza_nome_flux.safetensors", "flux2_dev_named.safetensors"])
-        assert got == want, f"FLUX.2 (header, non nome): {got} != {want}"
+        want = ["klein_senza_nome_flux.safetensors"]
+        assert got == want, f"FLUX.2 (header, non nome; solo Klein: flux2_kontext non esiste per il Dev): {got} != {want}"
         assert "PornFlux_20_trap.safetensors" not in got, "un FLUX.1 con «Flux_20» nel nome non è FLUX.2"
         refine = _base(_texts(f.up_refine_model, skip_auto=False))
-        assert refine == want, f"rifinitura upscale (FLUX.2): {refine}"
+        assert refine == sorted(["klein_senza_nome_flux.safetensors", "flux2_dev_named.safetensors"]), \
+            f"rifinitura upscale (FLUX.2 caricabile): {refine}"
         from core.gen_pipeline import is_flux2
         assert not is_flux2("PornFlux_20_trap.safetensors") and is_flux2("FLUX_2_Dev.safetensors"), "is_flux2 del dispatch"
     finally:
@@ -155,16 +161,33 @@ def case_arch_edit_engines_by_header(w, spy):
 
 
 def case_arch_inpaint_dynamic_by_header(w, spy):
+    """Il menu Inpaint mostra solo ciò che il backend sa fare (header): Fill (384 canali), FLUX.1 base (64), Klein
+    (128 canali senza guidance_in). Fuori: FLUX.2 Dev, Nunchaku, Krea 2, Kontext, checkpoint (ComfyUI). Ogni voce
+    prende passi e guidance del PROPRIO modello (non quelli del modello scelto prima)."""
     fx = Fixture(w)
     try:
         f = w.frame1_tab
+        f._refresh_inpaint_checkpoints(["flux_aaa.safetensors", "Redux_X.safetensors"])   # checkpoint: mai in menu
         labels = [f.inp_model.itemText(i) for i in range(f.inp_model.count())]
         dyn = [l for l in labels if "UNET Flux" in l]
         joined = " | ".join(dyn)
-        assert "KreaX_native" not in joined, f"Krea 2 fra gli UNET Flux dell'Inpaint: {dyn}"
-        assert "Flux_Kontext_X" not in joined, f"Kontext fra gli UNET Flux dell'Inpaint: {dyn}"
-        for ok in ("flux1_dev_model", "PornFlux_20_trap", "flux2_dev_named", "klein_senza_nome_flux"):
-            assert ok in joined, f"{ok} (header FLUX) manca dall'Inpaint: {dyn}"
+        assert not [l for l in labels if "checkpoint Flux" in l], f"checkpoint (ComfyUI) nel menu Inpaint: {labels}"
+        for bad in ("KreaX_native", "Flux_Kontext_X", "flux2_dev_named", "svdq-fp4", "PornFlux_20_trap_NO"):
+            assert bad not in joined, f"{bad} non sa fare inpaint ma è nel menu: {dyn}"
+        for ok in ("flux1_dev_model", "PornFlux_20_trap", "klein_senza_nome_flux", "FillX"):
+            assert ok in joined, f"{ok} manca dall'Inpaint: {dyn}"
+        # default del proprio modello, scelti in sequenza (nessuna eredità dal precedente)
+        want = {"FillX  · UNET Flux": (40, 30.0), "flux1_dev_model  · UNET Flux": (28, 3.5),
+                "klein_senza_nome_flux  · UNET Flux": (28, 4.0), "PornFlux_20_trap  · UNET Flux": (28, 3.5)}
+        for lbl in ("FillX  · UNET Flux", "klein_senza_nome_flux  · UNET Flux", "flux1_dev_model  · UNET Flux",
+                    "FillX  · UNET Flux", "PornFlux_20_trap  · UNET Flux"):
+            i = f.inp_model.findText(lbl)
+            assert i >= 0, (lbl, labels)
+            f.inp_model.setCurrentIndex(i)
+            got = (f.inp_steps.value(), round(f.inp_guidance.value(), 2))
+            assert got == want[lbl], f"{lbl}: passi/guidance {got} != {want[lbl]}"
+        f.inp_model.setCurrentIndex(f.inp_model.findText("klein_senza_nome_flux  · UNET Flux"))
+        assert f.gen_lora_tab is not None and f._dynamic_kind["klein_senza_nome_flux  · UNET Flux"] == "klein"
     finally:
         fx.close()
 
@@ -253,6 +276,30 @@ def case_arch_video_ltx_menu_by_header(w, spy):
         fx.close()
 
 
+def case_arch_inpaint_unet_disappears_placeholder(w, spy):
+    """Voce dinamica dell'Inpaint scelta e poi sparita dall'inventario → segnaposto, nessuna richiesta al backend."""
+    from ui import model_menu as mm
+    from core import arch_filter as af
+    f = w.frame1_tab
+    saved = af.inpaint_kind
+    af.inpaint_kind = lambda rel: "base" if str(rel).startswith("flux_") else None
+    try:
+        f._models = ["flux_aaa.safetensors", "flux_bbb.safetensors"]
+        f._refresh_inpaint_checkpoints([])
+        j = f.inp_model.findText("flux_bbb  · UNET Flux")
+        assert j >= 0, [f.inp_model.itemText(i) for i in range(f.inp_model.count())]
+        f.inp_model.setCurrentIndex(j)
+        f._models = ["flux_aaa.safetensors"]
+        f._refresh_inpaint_checkpoints([])
+        assert mm.is_placeholder(f.inp_model) and f.inp_model.currentIndex() == 0, f.inp_model.currentText()
+        before = len(spy.calls)
+        w.generate_inpaint("inpaint")
+        assert len(spy.calls) == before, "Inpaint (inventario): con il segnaposto non deve partire nulla"
+    finally:
+        af.inpaint_kind = saved
+        f._models = []
+
+
 CASES = [
     ("arch_gen_models_by_header", "Genera immagine: FLUX/Z-Image/Ernie mostrano i file della propria famiglia (header), "
      "non quelli con una parola nel nome.", case_arch_gen_models_by_header),
@@ -266,4 +313,6 @@ CASES = [
      "generazione bloccata; Auto resta Auto.", case_arch_switch_never_picks_other_model),
     ("arch_video_ltx_menu_by_header", "Video: il menu LTX mostra solo transformer LTX (header), non Qwen21 "
      "etichettato LTX né i file _aux_; cambio arch → segnaposto.", case_arch_video_ltx_menu_by_header),
+    ("arch_inpaint_unet_disappears_placeholder", "Voce dinamica dell'Inpaint sparita dall'inventario: segnaposto e "
+     "nessuna richiesta.", case_arch_inpaint_unet_disappears_placeholder),
 ]
