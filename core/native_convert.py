@@ -266,6 +266,15 @@ def _mmh3_lora():
     return _renamer(rename, extra=extra)
 
 
+def _mmh3_lora_guide():
+    """LoRA H3 che porta nell'intestazione la geometria della guida (h3upscale: reference_downscale_factor,
+    minimax_h3_guide_*). Stessa conversione di _mmh3_lora; in più il metadata del sorgente SOPRAVVIVE: senza,
+    dopo la conversione (che cancella l'originale) la LoRA non si riconoscerebbe più come LoRA di guida."""
+    plan = _mmh3_lora()
+    plan.keep_meta = True
+    return plan
+
+
 def _krea2_dit():
     """Krea 2 single-file ComfyUI (es. Krea Noct V4 int8 ConvRot) → nomi Krea2Transformer2DModel; i Linear int8
     restano compressi (+ .convrot_group), `blocks.N.mod.lin` piatto → scale_shift_table [6, dim]."""
@@ -489,6 +498,7 @@ CONVERTERS = {
     "mmh3_te": _mmh3_te,              # MiniMax H3 TE Qwen3-VL-32B (nvfp4-AWQ / fp8) → Qwen3VLForConditionalGeneration
     "mmh3_vae": _mmh3_vae,            # MiniMax H3 VAE video fp16 → AutoencoderKLMiniMaxH3
     "mmh3_lora": _mmh3_lora,
+    "mmh3_lora_guide": _mmh3_lora_guide,   # LoRA H3 di GUIDA (h3upscale): come mmh3_lora ma conserva l'intestazione (fattore e geometria della guida)
     "mmh3_lora_fl": lambda: _mmh3_lora_released("fl2va"),    # LoRA H3 del modello completo → DiT pruned FL2VA
     "mmh3_lora_ref": lambda: _mmh3_lora_released("ref2va"),  # idem per il DiT pruned Ref2VA          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
     "krea2_dit": _krea2_dit,

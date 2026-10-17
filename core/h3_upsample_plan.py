@@ -29,8 +29,8 @@ MAX_GRID_SIDE = 9
 STEPS = 1
 SEED = 444
 VIDEO_SHIFT = 12.0            # shift sigma del video H3 (il «0,2» della ricetta è una frazione dello SCHEDULE, non del rumore)
-DENOISE_GUIDED = 0.1          # valore del nodo con la guida (video_upsampler.py: «the setting that held, by eye, guided»)
-DENOISE_RECIPE = 0.2          # valore della ricetta senza guida (tiled_upsampler.py)
+DENOISE_DEFAULT = 0.1         # default del nodo H3 Video Upsampler (video_upsampler.py: «the setting that held, by eye, guided»)
+DENOISE_RECIPE = 0.2          # valore della ricetta della catena (tiled_upsampler.py), solo come riferimento
 
 SPATIAL = 16                  # pixel per cella latente
 FRAME_PER_TOKEN = (1, 4, 4, 4, 4)
