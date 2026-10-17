@@ -3437,5 +3437,6 @@
   "pitch.mode.tt": "Sablon: átveszi egy tiszta hang intonációját. MIDI-kotta: a hangot egy MIDI-fájl hangjaihoz igazítja.",
   "pitch.midi": "Kotta",
   "pitch.midi.ph": "MIDI-kotta (.mid / .midi)",
-  "pitch.note.score": "A hangot egy MIDI-kotta hangjaihoz igazítja (a hangnak időben követnie kell a kottát)."
+  "pitch.note.score": "A hangot egy MIDI-kotta hangjaihoz igazítja (a hangnak időben követnie kell a kottát).",
+  "mw.klein_steps_warn": "⚠ A FLUX.2 Klein desztillált: {n} lépésnél a szerkesztés gyengül, a fotó szinte változatlan marad (élőben tesztelve: 12 lépés = teljes szerkesztés, 16 = részleges, 21 = változatlan). 12 lépés ajánlott."
 }

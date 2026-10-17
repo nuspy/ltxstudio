@@ -3437,5 +3437,6 @@
   "pitch.mode.tt": "Plantilla: copia la entonación de una voz afinada. Partitura MIDI: afina la voz a las notas de un archivo MIDI.",
   "pitch.midi": "Partitura",
   "pitch.midi.ph": "partitura MIDI (.mid / .midi)",
-  "pitch.note.score": "Afina la voz a las notas de una partitura MIDI (la voz debe seguir la partitura en el tiempo)."
+  "pitch.note.score": "Afina la voz a las notas de una partitura MIDI (la voz debe seguir la partitura en el tiempo).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein está destilado: con {n} pasos la edición se debilita hasta dejar la foto casi sin cambios (probado en vivo: 12 pasos = edición completa, 16 = parcial, 21 = sin cambios). Se recomiendan 12 pasos."
 }

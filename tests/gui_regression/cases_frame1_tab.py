@@ -909,6 +909,32 @@ def case_klein_te_uncensored(w, spy):
     assert "klein_te" not in _NativeImageWorker({"arch": "flux2_inpaint"}).params
 
 
+def case_klein_steps_warning(w, spy):
+    """Klein (distillato): oltre ~14 passi l'edit si indebolisce (live 17/10: 12 = pieno, 16 = parziale, 21 = invariato):
+    la GUI AVVISA nel log (senza cambiare i passi scelti dall'utente); a 12 passi nessun avviso."""
+    _force_native_up()
+    _populate_inventory(w)
+    f = w.frame1_tab
+    f.img_nsfw.setCurrentText("NSFW")
+    H.load_canvas_image(w)
+    i = next((k for k in range(f.inp_model.count()) if "miraclein" in f.inp_model.itemText(k).lower()), -1)
+    if i < 0:
+        return                                                    # Klein 9B non installato: niente da verificare
+    f.inp_model.setCurrentIndex(i)
+    f.inpaint_prompt.setPlainText("the woman is nude")
+    _draw_center_mask(f.canvas)
+    from ui.i18n_manager import tr
+    frag = tr("mw.klein_steps_warn", "⚠ FLUX.2 Klein").split("{n}")[0][:24]    # frammento localizzato fisso (lingua della GUI)
+    for steps, warn in ((21, True), (12, False)):
+        f.inp_steps.setValue(steps)
+        w.log.clear()
+        w.generate_inpaint("inpaint")
+        txt = w.log.toPlainText()
+        assert ((frag in txt) == warn), (steps, frag, txt[-300:])
+        if spy.calls:
+            assert spy.calls[-1]["params"].get("steps") == steps, "i passi scelti dall'utente non vanno cambiati"
+
+
 CASES = (
     _gen_model_cases()
     + [
@@ -1023,5 +1049,8 @@ CASES = (
         ("frame1_klein_te_uncensored",
          "Klein 9B: encoder uncensored scelto in Inpaint arriva come klein_te a ogni job Klein, non altrove.",
          case_klein_te_uncensored),
+        ("frame1_klein_steps_warning",
+         "Inpaint Klein: oltre ~14 passi la GUI avvisa nel log (edit debole), i passi dell'utente restano.",
+         case_klein_steps_warning),
     ]
 )

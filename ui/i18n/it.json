@@ -3476,5 +3476,6 @@
   "pitch.mode.tt": "Template: copia l'intonazione da una voce intonata. Spartito MIDI: intona la voce sulle note di un file MIDI.",
   "pitch.midi": "Spartito",
   "pitch.midi.ph": "spartito MIDI (.mid / .midi)",
-  "pitch.note.score": "Intona la voce sulle note di uno spartito MIDI (la voce deve seguire lo spartito nei tempi)."
+  "pitch.note.score": "Intona la voce sulle note di uno spartito MIDI (la voce deve seguire lo spartito nei tempi).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein è distillato: con {n} passi l'edit si indebolisce fino a lasciare la foto quasi invariata (provato dal vivo: 12 passi = edit completo, 16 = parziale, 21 = invariato). Consigliati 12 passi."
 }

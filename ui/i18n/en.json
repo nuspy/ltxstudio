@@ -3509,5 +3509,6 @@
   "pitch.mode.tt": "Template: copies the pitch from an in-tune voice. MIDI score: tunes the voice to the notes of a MIDI file.",
   "pitch.midi": "Score",
   "pitch.midi.ph": "MIDI score (.mid / .midi)",
-  "pitch.note.score": "Tunes the voice to the notes of a MIDI score (the voice must follow the score in timing)."
+  "pitch.note.score": "Tunes the voice to the notes of a MIDI score (the voice must follow the score in timing).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein is distilled: with {n} steps the edit weakens until the photo is left almost unchanged (tested live: 12 steps = full edit, 16 = partial, 21 = unchanged). 12 steps recommended."
 }

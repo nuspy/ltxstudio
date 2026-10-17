@@ -3437,5 +3437,6 @@
   "pitch.mode.tt": "模板：复制准确人声的音高。MIDI 乐谱：让人声贴合 MIDI 文件中的音符。",
   "pitch.midi": "乐谱",
   "pitch.midi.ph": "MIDI 乐谱（.mid / .midi）",
-  "pitch.note.score": "让人声贴合 MIDI 乐谱的音符（人声在时间上必须与乐谱对齐）。"
+  "pitch.note.score": "让人声贴合 MIDI 乐谱的音符（人声在时间上必须与乐谱对齐）。",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein 是蒸馏模型：使用 {n} 步时编辑效果会减弱，甚至几乎不改变照片（实测：12 步 = 完整编辑，16 步 = 部分，21 步 = 无变化）。建议使用 12 步。"
 }

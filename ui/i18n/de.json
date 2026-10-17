@@ -3437,5 +3437,6 @@
   "pitch.mode.tt": "Vorlage: übernimmt die Tonhöhe einer sauberen Stimme. MIDI-Partitur: stimmt die Stimme auf die Noten einer MIDI-Datei.",
   "pitch.midi": "Partitur",
   "pitch.midi.ph": "MIDI-Partitur (.mid / .midi)",
-  "pitch.note.score": "Stimmt die Stimme auf die Noten einer MIDI-Partitur (die Stimme muss der Partitur zeitlich folgen)."
+  "pitch.note.score": "Stimmt die Stimme auf die Noten einer MIDI-Partitur (die Stimme muss der Partitur zeitlich folgen).",
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein ist destilliert: Mit {n} Schritten schwächt sich die Bearbeitung ab, bis das Foto fast unverändert bleibt (live getestet: 12 Schritte = volle Bearbeitung, 16 = teilweise, 21 = unverändert). Empfohlen: 12 Schritte."
 }
