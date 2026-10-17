@@ -4,6 +4,12 @@ La LoRA (rank 64, chiavi `text_encoders.transformer.{model,vision_model}.…lora
 tocca 48 layer × 7 Linear + embed_tokens del ramo testo (337 pesi, tutti verificati contro gli header del Gemma
 `gemma-3-ltx`: 337/337 esistono, shape coerenti) e il vision tower, che QUI si ignora (l'encoder di LTX non lo usa).
 
+Natura della LoRA (misurata sui pesi, 17/10/2026): stile ABLITERAZIONE — delta non nullo SOLO su self_attn.o_proj e
+mlp.down_proj (43 layer su 48: i 5 restanti sono a zero), q/k/v/gate/up sono a zero; per ogni modulo il delta è quasi
+rank-1 (sv1 0,55 vs sv2 0,014). Senza alpha nel file la scala è 1 (convenzione ComfyUI): a scala 1 la componente della
+direzione principale in W scende da 0,93 a 0,37, quindi l'abliterazione è PARZIALE per costruzione (NON è l'estrazione
+del Gemma abliterato completo: W_abl − W_std non coincide con B·A). Costante sotto per cambiarla in una riga.
+
 Meccanismo: ltx-core sa già fondere LoRA nel builder dell'encoder (`builder.with_loras`, regola bf16); basta una
 mappa chiavi LoRA→modello. Si agganciano entrambi i builder del `PromptEncoder` (normale e streaming). L'embedding
 duplicato in `lm_head` (serve a generate()) riceve la stessa LoRA, come in Gemma (pesi legati).
@@ -16,6 +22,7 @@ from __future__ import annotations
 import os
 
 LORA_CATALOG_ID = "gemma3-abliterated-lora"
+LORA_STRENGTH = 1.0                                          # scala della fusione (nessun alpha nel file → 1)
 LORA_FILENAME = "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors"
 _SRC_PREFIX = "text_encoders.transformer.model."            # ramo testo (il vision_model NON passa il filtro)
 _DST_PREFIX = "model.model.language_model."                 # nomi del modello dopo GEMMA_LLM_KEY_OPS
@@ -54,7 +61,7 @@ def resolve_lora_path(lora_id: str, release: str) -> str:
     return path
 
 
-def attach(pipe, lora_path: str, strength: float = 1.0) -> int:
+def attach(pipe, lora_path: str, strength: float = LORA_STRENGTH) -> int:
     """Aggancia la LoRA ai builder dell'encoder di OGNI `PromptEncoder` della pipeline. Ritorna quanti ne ha toccati
     (0 = nessun PromptEncoder trovato: chi chiama deve trattarlo come errore, non come «forse standard»)."""
     from ltx_core.loader.primitives import LoraPathStrengthAndSDOps
