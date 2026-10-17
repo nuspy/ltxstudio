@@ -328,7 +328,8 @@ def build_job(pipe, params: dict, cn=None, extra: dict | None = None):
     # zimage_cn
     from diffusers import ZImageControlNetPipeline
     cpipe = _derive(pipe, ZImageControlNetPipeline, controlnet=cn)
-    kw = _common_kw(params, arch, W, H, (_ast, _agd))
+    # Z-Image Turbo + ControlNet Union 2.1 (esempio ufficiale diffusers): 9 passi (= 8 forward), guidance 0.0, scala 0.75
+    kw = _common_kw(params, arch, W, H, (9, 0.0))
     kw.update(control_image=ctl, controlnet_conditioning_scale=float(params.get("control_scale") or 0.75))
     if params.get("negative") and kw["guidance_scale"] > 0:
         kw["negative_prompt"] = params["negative"]
