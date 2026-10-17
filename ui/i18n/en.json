@@ -3412,5 +3412,18 @@
   "vedit.hdr.hq": "High quality (about 2x slower)",
   "vedit.hdr.hq_tt": "Generates twice the frames and keeps every other one: fewer temporal artifacts, double the time.",
   "vedit.hdr.info_out": "The player shows the SDR preview; the real HDR file (_HDR_PQ.mp4) and/or the _EXR folder are next to it, with the same name.",
-  "vedit.hdr.info_src10": "The source is {p}: the HDR LoRA expects 8-bit Rec.709 SDR; an already HDR video (PQ/HLG) must not be used as input."
+  "vedit.hdr.info_src10": "The source is {p}: the HDR LoRA expects 8-bit Rec.709 SDR; an already HDR video (PQ/HLG) must not be used as input.",
+  "ref.add.tt": "Choose one or more files (you can also drag them here).",
+  "ref.from_canvas": "From canvas",
+  "ref.from_canvas.tt": "Use the image in the canvas as a reference.",
+  "ref.hint2": "Each file gets a name (@Foto_1, @Foto_2…): cite it in the prompt by typing “@” (autocomplete) or with “↳ prompt”. Names do not change if you remove one. Files that are loaded but not cited are still passed to the model.",
+  "ref.err_unknown": "The prompt cites {tok}, but that reference does not exist.",
+  "f1.gen.refs.group": "Reference images",
+  "f1.gen.refs.no_canvas": "There is no image in the canvas to use.",
+  "f1.gen.refs.full": "Reference limit reached for this model.",
+  "f1.gen.refs.uncited": "[References] {toks} are not cited in the prompt: they are still passed to the model.",
+  "vid.i2v.group": "Starting image (I2V)",
+  "vid.tab.generate": "Generate",
+  "vid.tab.edit": "Edit",
+  "vid.tab.tt": "Generate: create a new video. Edit: Talk, Sing, Listen, ReTake and V2V on a video or a photo."
 }

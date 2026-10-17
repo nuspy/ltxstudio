@@ -3338,5 +3338,18 @@
   "vedit.hdr.hq": "고품질 (약 2배 느림)",
   "vedit.hdr.hq_tt": "프레임을 두 배로 생성하고 한 장씩 건너 남깁니다: 시간적 아티팩트는 줄고 시간은 두 배.",
   "vedit.hdr.info_out": "플레이어는 SDR 미리보기를 보여 주며, 실제 HDR 파일(_HDR_PQ.mp4)과/또는 _EXR 폴더는 같은 이름으로 옆에 있습니다.",
-  "vedit.hdr.info_src10": "원본이 {p}입니다: HDR LoRA는 8비트 Rec.709 SDR을 기대하며, 이미 HDR(PQ/HLG)인 영상은 입력으로 쓰면 안 됩니다."
+  "vedit.hdr.info_src10": "원본이 {p}입니다: HDR LoRA는 8비트 Rec.709 SDR을 기대하며, 이미 HDR(PQ/HLG)인 영상은 입력으로 쓰면 안 됩니다.",
+  "ref.add.tt": "파일을 하나 이상 선택하세요(여기로 끌어다 놓아도 됩니다).",
+  "ref.from_canvas": "캔버스에서",
+  "ref.from_canvas.tt": "캔버스에 있는 이미지를 참조로 사용합니다.",
+  "ref.hint2": "각 파일에는 이름(@Foto_1, @Foto_2…)이 붙습니다. 프롬프트에 «@»를 입력(자동 완성)하거나 «↳ 프롬프트»로 인용하세요. 하나를 제거해도 이름은 바뀌지 않습니다. 불러왔지만 인용하지 않은 파일도 모델에 전달됩니다.",
+  "ref.err_unknown": "프롬프트가 {tok}을(를) 인용했지만 그 참조는 없습니다.",
+  "f1.gen.refs.group": "참조 이미지",
+  "f1.gen.refs.no_canvas": "캔버스에 사용할 이미지가 없습니다.",
+  "f1.gen.refs.full": "이 모델의 참조 한도에 도달했습니다.",
+  "f1.gen.refs.uncited": "[참조] {toks}이(가) 프롬프트에 인용되지 않았습니다: 그래도 모델에 전달됩니다.",
+  "vid.i2v.group": "시작 이미지 (I2V)",
+  "vid.tab.generate": "생성",
+  "vid.tab.edit": "편집",
+  "vid.tab.tt": "생성: 새 영상을 만듭니다. 편집: 영상이나 사진에 Talk, 노래, 듣기, ReTake, V2V."
 }

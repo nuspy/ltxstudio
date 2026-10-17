@@ -3338,5 +3338,18 @@
   "vedit.hdr.hq": "Magas minőség (kb. 2× lassabb)",
   "vedit.hdr.hq_tt": "Kétszer annyi képkockát generál, és minden másodikat megtartja: kevesebb időbeli műtermék, dupla idő.",
   "vedit.hdr.info_out": "A lejátszó az SDR előnézetet mutatja; a valódi HDR fájl (_HDR_PQ.mp4) és/vagy az _EXR mappa mellette van, ugyanazzal a névvel.",
-  "vedit.hdr.info_src10": "A forrás {p}: a HDR LoRA 8 bites Rec.709 SDR-t vár; már HDR videót (PQ/HLG) nem szabad bemenetként megadni."
+  "vedit.hdr.info_src10": "A forrás {p}: a HDR LoRA 8 bites Rec.709 SDR-t vár; már HDR videót (PQ/HLG) nem szabad bemenetként megadni.",
+  "ref.add.tt": "Válassz egy vagy több fájlt (ide is húzhatod őket).",
+  "ref.from_canvas": "A vászonról",
+  "ref.from_canvas.tt": "A vásznon lévő képet használja referenciaként.",
+  "ref.hint2": "Minden fájl kap egy nevet (@Foto_1, @Foto_2…): a promptban a „@” beírásával (automatikus kiegészítés) vagy a „↳ prompt” gombbal hivatkozhatsz rá. A nevek nem változnak, ha egyet eltávolítasz. A betöltött, de nem hivatkozott fájlokat a modell mégis megkapja.",
+  "ref.err_unknown": "A prompt a(z) {tok} hivatkozásra utal, de ilyen referencia nincs.",
+  "f1.gen.refs.group": "Referenciaképek",
+  "f1.gen.refs.no_canvas": "A vásznon nincs használható kép.",
+  "f1.gen.refs.full": "Elérted ennek a modellnek a referencialimitjét.",
+  "f1.gen.refs.uncited": "[Referenciák] {toks} nincs megemlítve a promptban: a modell ettől még megkapja őket.",
+  "vid.i2v.group": "Kezdőkép (I2V)",
+  "vid.tab.generate": "Létrehozás",
+  "vid.tab.edit": "Szerkesztés",
+  "vid.tab.tt": "Létrehozás: új videó készítése. Szerkesztés: Talk, Éneklés, Hallgatás, ReTake és V2V videón vagy fotón."
 }

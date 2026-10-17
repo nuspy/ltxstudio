@@ -3338,5 +3338,18 @@
   "vedit.hdr.hq": "Hohe Qualität (ca. 2× langsamer)",
   "vedit.hdr.hq_tt": "Erzeugt doppelt so viele Frames und behält jeden zweiten: weniger zeitliche Artefakte, doppelte Zeit.",
   "vedit.hdr.info_out": "Der Player zeigt die SDR-Vorschau; die echte HDR-Datei (_HDR_PQ.mp4) und/oder der Ordner _EXR liegen daneben, mit gleichem Namen.",
-  "vedit.hdr.info_src10": "Die Quelle ist {p}: die HDR-LoRA erwartet 8-Bit-SDR in Rec.709; ein bereits HDR-Video (PQ/HLG) darf nicht als Eingabe dienen."
+  "vedit.hdr.info_src10": "Die Quelle ist {p}: die HDR-LoRA erwartet 8-Bit-SDR in Rec.709; ein bereits HDR-Video (PQ/HLG) darf nicht als Eingabe dienen.",
+  "ref.add.tt": "Wähle eine oder mehrere Dateien (du kannst sie auch hierher ziehen).",
+  "ref.from_canvas": "Aus der Leinwand",
+  "ref.from_canvas.tt": "Verwendet das Bild in der Leinwand als Referenz.",
+  "ref.hint2": "Jede Datei erhält einen Namen (@Foto_1, @Foto_2…): Zitiere sie im Prompt mit „@“ (Autovervollständigung) oder über „↳ Prompt“. Die Namen ändern sich nicht, wenn du eine Datei entfernst. Geladene, aber nicht zitierte Dateien werden trotzdem an das Modell übergeben.",
+  "ref.err_unknown": "Der Prompt zitiert {tok}, aber diese Referenz existiert nicht.",
+  "f1.gen.refs.group": "Referenzbilder",
+  "f1.gen.refs.no_canvas": "In der Leinwand ist kein Bild zum Verwenden vorhanden.",
+  "f1.gen.refs.full": "Referenzlimit für dieses Modell erreicht.",
+  "f1.gen.refs.uncited": "[Referenzen] {toks} werden im Prompt nicht zitiert: Sie werden trotzdem an das Modell übergeben.",
+  "vid.i2v.group": "Startbild (I2V)",
+  "vid.tab.generate": "Erzeugen",
+  "vid.tab.edit": "Bearbeiten",
+  "vid.tab.tt": "Erzeugen: erstellt ein neues Video. Bearbeiten: Talk, Singen, Zuhören, ReTake und V2V auf einem Video oder Foto."
 }

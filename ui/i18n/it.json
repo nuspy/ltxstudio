@@ -3379,5 +3379,18 @@
   "vedit.hdr.hq": "Alta qualità (circa 2× più lento)",
   "vedit.hdr.hq_tt": "Genera il doppio dei fotogrammi e ne tiene uno su due: meno artefatti temporali, tempo doppio.",
   "vedit.hdr.info_out": "Il player mostra l'anteprima SDR; il file HDR vero (_HDR_PQ.mp4) e/o la cartella _EXR si trovano accanto, con lo stesso nome.",
-  "vedit.hdr.info_src10": "Il sorgente è a {p}: la LoRA HDR vuole un SDR Rec.709 a 8 bit; un video già HDR (PQ/HLG) non va dato in ingresso."
+  "vedit.hdr.info_src10": "Il sorgente è a {p}: la LoRA HDR vuole un SDR Rec.709 a 8 bit; un video già HDR (PQ/HLG) non va dato in ingresso.",
+  "ref.add.tt": "Scegli uno o più file (puoi anche trascinarli qui).",
+  "ref.from_canvas": "Dal canvas",
+  "ref.from_canvas.tt": "Usa come riferimento l'immagine che hai nel canvas.",
+  "ref.hint2": "Ogni file riceve un nome (@Foto_1, @Foto_2…): citalo nel prompt scrivendo «@» (completamento automatico) o con «↳ prompt». I nomi non cambiano se ne togli uno. I file caricati ma non citati vengono comunque passati al modello.",
+  "ref.err_unknown": "Il prompt cita {tok}, ma quel riferimento non esiste.",
+  "f1.gen.refs.group": "Immagini di riferimento",
+  "f1.gen.refs.no_canvas": "Nel canvas non c'è nessuna immagine da usare.",
+  "f1.gen.refs.full": "Limite di riferimenti raggiunto per questo modello.",
+  "f1.gen.refs.uncited": "[Riferimenti] {toks} non sono citati nel prompt: vengono comunque passati al modello.",
+  "vid.i2v.group": "Immagine iniziale (I2V)",
+  "vid.tab.generate": "Genera",
+  "vid.tab.edit": "Modifica",
+  "vid.tab.tt": "Genera: crea un video nuovo. Modifica: Talk, Canta, Ascolta, ReTake e V2V su un video o una foto."
 }

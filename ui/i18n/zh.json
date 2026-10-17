@@ -3338,5 +3338,18 @@
   "vedit.hdr.hq": "高质量（约慢 2 倍）",
   "vedit.hdr.hq_tt": "生成两倍帧数并每隔一帧保留一帧：时间伪影更少，耗时加倍。",
   "vedit.hdr.info_out": "播放器显示 SDR 预览；真正的 HDR 文件（_HDR_PQ.mp4）和/或 _EXR 文件夹以相同的名称放在旁边。",
-  "vedit.hdr.info_src10": "源是 {p}：HDR LoRA 需要 8 位 Rec.709 SDR；不能把已经是 HDR（PQ/HLG）的视频作为输入。"
+  "vedit.hdr.info_src10": "源是 {p}：HDR LoRA 需要 8 位 Rec.709 SDR；不能把已经是 HDR（PQ/HLG）的视频作为输入。",
+  "ref.add.tt": "选择一个或多个文件(也可以拖到这里)。",
+  "ref.from_canvas": "来自画布",
+  "ref.from_canvas.tt": "把画布中的图像用作参考。",
+  "ref.hint2": "每个文件都会得到一个名称(@Foto_1、@Foto_2…):在提示词中输入“@”(自动补全)或点“↳ 提示词”来引用。删除其中一个时名称不会改变。已加载但未被引用的文件仍会传给模型。",
+  "ref.err_unknown": "提示词引用了 {tok},但该参考不存在。",
+  "f1.gen.refs.group": "参考图像",
+  "f1.gen.refs.no_canvas": "画布中没有可用的图像。",
+  "f1.gen.refs.full": "已达到该模型的参考数量上限。",
+  "f1.gen.refs.uncited": "[参考] {toks} 未在提示词中被引用:它们仍会传给模型。",
+  "vid.i2v.group": "起始图像 (I2V)",
+  "vid.tab.generate": "生成",
+  "vid.tab.edit": "编辑",
+  "vid.tab.tt": "生成:创建新视频。编辑:对视频或照片进行 Talk、唱歌、倾听、ReTake 和 V2V。"
 }
