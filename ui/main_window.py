@@ -2549,9 +2549,16 @@ class MainWindow(QMainWindow):
             #    Flux2KleinInpaintPipeline — #14/#78 completati). Solo i checkpoint restano su ComfyUI.
             if cfg.get("qwen21_dit"):                        # Qwen-Image 2.1: ritocco della sola area
                 # stessa scala «forza» dei FLUX (mantenimento → denoise); l'outpaint rigenera tutto il bordo
+                # Qwen: CFG VERA (true_cfg_scale) — 30 (default Fill) la brucia (chiazze verdi, 16/10 01:15). Stessa
+                # protezione che _start_native_inpaint applica a Klein/Hyper. Tetto = DECISIONE (qui 6.0, come Klein).
+                _qg = guidance_ui
+                if _qg is not None and float(_qg) > 6.0:
+                    self._log(f"[inpaint] Qwen-Image 2.1: guidance {float(_qg):.0f} clampata a 6.0 (CFG vera, "
+                              f"oltre brucia l'immagine)")
+                    _qg = 6.0
                 self._start_native_qwen21_edit(cfg["qwen21_dit"], ptxt, init_image=exp["image"], mask=exp["mask"],
                                                strength=denoise, negative=negative, seed=seed, steps=steps,
-                                               guidance=guidance_ui, loras=self._inp_loras(cfg),
+                                               guidance=_qg, loras=self._inp_loras(cfg),
                                                feather=cfg.get("feather", 0), mode=mode,
                                                enhance=cfg.get("enhance", False))
                 return
