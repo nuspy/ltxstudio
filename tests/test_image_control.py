@@ -170,8 +170,9 @@ def test_flux_alimama_cpu_round_trip(tmp_path):
     import numpy as np
     gi = Image.open(res["output"][0]).convert("RGB")
     got = np.asarray(gi).astype(int)
-    ref = np.asarray(img.resize(gi.size, Image.LANCZOS)).astype(int)      # il backend lavora a >=256 px
-    assert np.abs(got[:20, :20] - ref[:20, :20]).max() <= 2
+    assert gi.size == img.size                                              # torna alla misura della foto
+    ref = np.asarray(img).astype(int)
+    assert np.abs(got[:10, :10] - ref[:10, :10]).max() <= 2
 
 
 def test_redux_embeds_shapes():

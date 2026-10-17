@@ -140,6 +140,12 @@ MODEL_SYNTAX: dict[str, dict] = {
                   "nell'ordine dato; il template NON ha etichette «Picture N». «image N» è la citazione posizionale "
                   "in linguaggio naturale (non provata live)",
     },
+    "flux2_klein": {
+        "fmt": {"image": "image {n}"}, "max_images": 4, "verified": False,
+        "source": "inference_server/backends/image_flux.py + diffusers Flux2KleinPipeline: `image` e' una LISTA, ogni "
+                  "riferimento ha latenti e id di posizione propri (nessuna etichetta nel template). «image N» e' la "
+                  "citazione posizionale in linguaggio naturale; il massimo (4) e' una proposta prudente (VRAM), NON provato live",
+    },
     "h3": {
         "fmt": {"image": "<Picture {n}>", "video": "<Video {n}>", "audio": "<Audio {n}>"}, "verified": True,
         "source": "core/h3_prompt.py (prompt strutturato MiniMax H3: <Picture N>/<Video N>/<Audio N>)",

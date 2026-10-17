@@ -305,7 +305,7 @@ def build_job(pipe, params: dict, cn=None, extra: dict | None = None):
                   control_guidance_end=float(params.get("control_end", 1.0)))
         if float(params.get("true_cfg", 1.0)) > 1.0:
             kw.update(true_cfg_scale=float(params["true_cfg"]), negative_prompt=params.get("negative") or "")
-        keep_for = (img.resize((W, H), Image.LANCZOS), mk.resize((W, H), Image.NEAREST))
+        keep_for = (img, mk)                          # risoluzione ORIGINALE: il risultato torna alla misura della foto
         return cpipe, kw, keep_for
     W = int(params.get("width") or 1024)
     H = int(params.get("height") or 1024)

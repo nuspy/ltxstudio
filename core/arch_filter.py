@@ -174,6 +174,21 @@ def is_t2i_for_arch(arch_label: str, rel: str) -> bool:
     return True
 
 
+# Funzioni di «Genera immagine» che dipendono da architettura E modello (task 9): backend `image_control`.
+# controlnet → FLUX.1 (Union Pro 2.0) e Z-Image (Union 2.1); redux → solo FLUX.1. FLUX.2, Krea 2, Qwen-Image 2.1 (ha il
+# suo ControlNet) ed Ernie NON le mostrano. '' = funzione non disponibile per questa scelta.
+def image_function_backend(function: str, arch_label: str, model: str = "") -> str:
+    if function == "controlnet":
+        if arch_label == "Z-Image":
+            return "zimage_cn"
+        if arch_label == "FLUX" and not (model and classify(model)["family"] == "flux2"):
+            return "flux_cn"
+    elif function == "redux":
+        if arch_label == "FLUX" and not (model and classify(model)["family"] == "flux2"):
+            return "flux_redux"
+    return ""
+
+
 def is_flux_family(rel: str, family_name: str | None = None) -> bool:
     c = classify(rel)
     return c["family"] in ({family_name} if family_name else {"flux1", "flux2"})
