@@ -14,6 +14,10 @@ Contratto dei parametri:
     image_path      immagine base RGB (foreground: la composizione con l'oggetto già incollato)
     mask_path       bianco = area da modificare (local/removal/foreground; color_rgb: area da colorare).
                     foreground: se manca `prop_mask_path`, e' la maschera dell'OGGETTO incollato
+    prepared        (opz., foreground, default False) True = `image_path` e' GIA' l'immagine preparata come upstream
+                    (composito con l'oggetto + alone BIANCO nella zona di edit): usata cosi' com'e' per Kontext, senza
+                    aggiungere alone; `mask_path` = zona di edit e serve SOLO alla ricomposizione (grow 25 come
+                    final_mask upstream, se output_blend). `prop_mask_path` e `grow` sono ignorati.
     prop_mask_path  (opz., foreground) maschera dell'oggetto; allora `mask_path` = area aggiuntiva da riempire
     edge_path / erase_path (edge, opz.) tratti AGGIUNTI / bordi da TOGLIERE (bianco = tratto)
     edge_source     "canny" (default, nessun peso) | "hed" (richiede ControlNetHED.pth: altrimenti errore chiaro)
@@ -98,6 +102,10 @@ def prepare_inputs(params: dict):
         out["base_image"] = Image.fromarray(img)
         out["controls"].append({"mode": mode, "image": pp.black_masked(img, g), "gamma": _gamma(params, mode)})
         out["blend_mask"] = g
+    elif mode == "foreground" and params.get("prepared"):
+        m = _need_mask("mask_path", "zona di edit (solo ricomposizione)")
+        out["base_image"] = Image.fromarray(img)             # immagine preparata: nessun alone aggiunto
+        out["blend_mask"] = pp.grow_mask(m, 25)
     elif mode == "foreground":
         prop = _opt_mask("prop_mask_path")
         if prop is not None:

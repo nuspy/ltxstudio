@@ -229,3 +229,21 @@ def test_run_errori_non_sollevano(files):
     assert r["status"] == "error" and "non trovato" in r["error"] or "mode" in r["error"]
     r = mq.run(_p(files, mode="local"), None, str(files["_d"]))
     assert r["status"] == "error" and "model" in r["error"]
+
+
+def test_prepare_foreground_prepared(files):
+    # prepared=True: l'immagine arriva gia' con l'alone bianco e viene usata cosi' com'e'; la maschera serve solo al blend
+    a = np.asarray(Image.open(files["image_path"]).convert("RGB")).copy()
+    m = pp.load_mask(files["mask_path"])
+    a[m > 127] = 255
+    prep = os.path.join(os.path.dirname(files["image_path"]), "prepared.png")
+    Image.fromarray(a).save(prep)
+    j = mq.prepare_inputs(_p(files, mode="foreground", prepared=True, image_path=prep, grow=99))
+    assert j["controls"] == [] and j["puzzle_path"].endswith("puzzle_lora.safetensors")
+    assert np.array_equal(np.asarray(j["base_image"]), pp.load_rgb(prep, j["size"]))   # nessun alone aggiunto
+    assert np.array_equal(j["blend_mask"], pp.grow_mask(pp.load_mask(files["mask_path"], j["size"]), 25))
+    # senza prepared l'alone viene aggiunto da foreground_image (comportamento invariato)
+    j2 = mq.prepare_inputs(_p(files, mode="foreground", image_path=files["image_path"]))
+    assert not np.array_equal(np.asarray(j2["base_image"]), pp.load_rgb(files["image_path"], j2["size"]))
+    with pytest.raises(pp.MQError, match="mask_path"):
+        mq.prepare_inputs(_p(files, mode="foreground", prepared=True, mask_path=""))
