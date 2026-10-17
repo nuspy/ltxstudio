@@ -115,7 +115,7 @@ MODE_SPECS: dict[str, ModeSpec] = {s.key: s for s in (
     _s(key="inpaint", family=FAMILY_EDIT, i18n_key="vedit.mode.inpaint",
        edit_lora="LTX-2/ltx23_inpaint_masked_t2v_rank128_v1_10000steps.safetensors",
        note_key="vedit.note_inpaint", needs_prompt=NEEDS_REQUIRED, needs_object=True,
-       max_long_edge=1024, max_frames_per_segment=97, chunkable=False,   # maschere SAM2 per l'intero clip
+       max_long_edge=1024, max_frames_per_segment=97, chunkable=False,   # percorso strict IC; il tab usa il percorso legacy: segmenti in core/video_inpaint.py (task 8)
        tags=("sam2", "masks")),
     _s(key="replace_char", family=FAMILY_EDIT, i18n_key="vedit.mode.replace_char",
        kind="union", catalog_id="ltx-iclora-union",

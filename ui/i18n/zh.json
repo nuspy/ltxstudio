@@ -3415,5 +3415,13 @@
   "vid.present": "已有",
   "vid.missing": "待下载",
   "def.engine.h3up": "MiniMax H3 Video Upsampler",
-  "def.h3up.tiles.auto": "自动"
+  "def.h3up.tiles.auto": "自动",
+  "vedit.r2v.use": "用照片插入物体（r2v LoRA）",
+  "vedit.r2v.use.tt": "开启：选择要放入遮罩区域的物体或人物的照片，使用“r2v”LoRA（rank 32）。关闭：使用“t2v”LoRA（rank 128），新物体只在提示词中用文字描述。",
+  "vedit.r2v.img_lbl": "要插入的物体照片",
+  "vedit.r2v.img_ph": "要替换遮罩物体的物体或人物的照片",
+  "vedit.note_inpaint_r2v": "使用照片（r2v LoRA）时，新物体取自照片；在提示词中描述场景及其动作。长片段分段生成，每段使用同一张照片。",
+  "vedit.err_no_ref_inpaint": "照片修补：请选择要插入的物体照片（或关闭该选项）。",
+  "vedit.r2v.missing_body": "缺少参考照片修补的权重（r2v LoRA，约 0.33 GB）。我不会自行下载：请在“模型权重”标签页中打开，或关闭该选项以仅用文字修补。",
+  "feat.cap.video_inpaint_r2v": "带参考照片的视频修补（r2v LoRA）"
 }

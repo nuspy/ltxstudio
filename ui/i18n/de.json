@@ -3415,5 +3415,13 @@
   "vid.present": "vorhanden",
   "vid.missing": "herunterzuladen",
   "def.engine.h3up": "MiniMax H3 Video Upsampler",
-  "def.h3up.tiles.auto": "automatisch"
+  "def.h3up.tiles.auto": "automatisch",
+  "vedit.r2v.use": "Objekt aus einem Foto einsetzen (r2v-LoRA)",
+  "vedit.r2v.use.tt": "An: Wähle das FOTO des Objekts oder der Person, die in den maskierten Bereich eingesetzt werden soll; verwendet wird die „r2v“-LoRA (Rang 32). Aus: „t2v“-LoRA (Rang 128), das neue Objekt wird nur mit Worten im Prompt beschrieben.",
+  "vedit.r2v.img_lbl": "Foto des einzusetzenden Objekts",
+  "vedit.r2v.img_ph": "Foto des Objekts oder der Person, die anstelle des maskierten eingesetzt wird",
+  "vedit.note_inpaint_r2v": "Mit dem Foto (r2v-LoRA) wird das neue Objekt aus dem Foto übernommen; beschreibe im Prompt die Szene und was geschieht. Lange Clips werden in Segmenten erzeugt, mit demselben Foto in jedem.",
+  "vedit.err_no_ref_inpaint": "Inpaint mit Foto: Wähle das Foto des einzusetzenden Objekts (oder schalte das Kästchen aus).",
+  "vedit.r2v.missing_body": "Das Gewicht für Inpainting mit Referenzfoto (r2v-LoRA, etwa 0,33 GB) fehlt. Ich lade nichts selbst herunter: Öffne es im Tab „Modellgewichte“ oder schalte das Kästchen aus, um nur mit Worten zu inpainten.",
+  "feat.cap.video_inpaint_r2v": "Video-Inpaint mit Referenzfoto (r2v-LoRA)"
 }

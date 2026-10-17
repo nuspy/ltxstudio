@@ -21,10 +21,12 @@ class InpaintPipeline(ICLoraPipeline):
     @torch.inference_mode()
     def inpaint(self, *, prompt: str, seed: int, height: int, width: int, num_frames: int,
                 frame_rate: float, video_conditioning: list[tuple[str, float]],
-                attention_mask: torch.Tensor, negative_prompt: str = "worst quality, blurry",
+                attention_mask: torch.Tensor, images=None, negative_prompt: str = "worst quality, blurry",
                 cfg_scale: float = 4.0, num_steps: int = 30, stage_1_sigmas=None, **_ignore):
         """video_conditioning: [(video_originale, strength)]. attention_mask: (T,H,W) in [0,1], maschera
-        OGGETTO (1=oggetto da sostituire); viene invertita internamente per la IC-LoRA."""
+        OGGETTO (1=oggetto da sostituire); viene invertita internamente per la IC-LoRA.
+        images: [ImageConditioningInput] opzionale = foto di riferimento dell'oggetto (LoRA inpaint r2v), condizionamento
+        di immagine come in ICLoraPipeline.__call__; None/vuoto = LoRA t2v (solo prompt)."""
         from ltx_core.components.diffusion_steps import EulerCfgPpDiffusionStep
         from ltx_core.components.guiders import MultiModalGuider, MultiModalGuiderParams
         from ltx_core.components.noisers import GaussianNoiser
@@ -48,7 +50,7 @@ class InpaintPipeline(ICLoraPipeline):
         cam = (1.0 - m)[None, None]                                           # (1,1,F,h,w) = inpaint
 
         def _build(enc):
-            return self._create_conditionings(images=[], video_conditioning=video_conditioning,
+            return self._create_conditionings(images=list(images or []), video_conditioning=video_conditioning,
                                               height=s1.height, width=s1.width, video_encoder=enc,
                                               num_frames=num_frames, conditioning_attention_mask=cam)
 

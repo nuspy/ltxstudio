@@ -3415,5 +3415,13 @@
   "vid.present": "presente",
   "vid.missing": "por descargar",
   "def.engine.h3up": "MiniMax H3 Video Upsampler",
-  "def.h3up.tiles.auto": "automático"
+  "def.h3up.tiles.auto": "automático",
+  "vedit.r2v.use": "Insertar un objeto desde una foto (LoRA r2v)",
+  "vedit.r2v.use.tt": "Activado: elige la FOTO del objeto o de la persona que quieres poner en el área enmascarada y se usa la LoRA «r2v» (rango 32). Desactivado: LoRA «t2v» (rango 128), el objeto nuevo se describe solo con palabras en el prompt.",
+  "vedit.r2v.img_lbl": "Foto del objeto a insertar",
+  "vedit.r2v.img_ph": "foto del objeto o de la persona que sustituye al enmascarado",
+  "vedit.note_inpaint_r2v": "Con la foto (LoRA r2v) el objeto nuevo se toma de la foto; en el prompt describe la escena y lo que hace. Los clips largos se generan por segmentos, con la misma foto en cada uno.",
+  "vedit.err_no_ref_inpaint": "Inpaint con foto: elige la foto del objeto a insertar (o desactiva la casilla).",
+  "vedit.r2v.missing_body": "Falta el peso del inpaint con foto de referencia (LoRA r2v, unos 0,33 GB). No descargo nada yo: ábrelo desde la pestaña «Pesos de modelos», o desactiva la casilla para usar el inpaint con palabras.",
+  "feat.cap.video_inpaint_r2v": "Inpaint de vídeo con foto de referencia (LoRA r2v)"
 }
