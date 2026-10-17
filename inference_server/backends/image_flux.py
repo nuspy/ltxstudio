@@ -1027,7 +1027,7 @@ def _weights_ident(arch: str, resolved_path: str, klein_te: str = "") -> tuple:
 
 def _sibling_pipe(mm, ident: tuple):
     """Se in cache c'è una pipeline SORELLA FLUX.1 (stessa identità dei pesi, shell condivisa) → ritornala:
-    la nuova pipeline si costruisce con from_pipe (ZERO load da disco). Il confronto è per IDENTITÀ (file
+    la nuova pipeline si costruisce con gli STESSI moduli (ZERO load da disco). Il confronto è per IDENTITÀ (file
     risolto), non per la stringa grezza della GUI: path relativo e assoluto dello stesso file combaciano."""
     if mm is None or not ident:
         return None
@@ -1048,6 +1048,81 @@ def _flux2_sibling_pipe(mm, ident: tuple):
                 and getattr(o, "_ls_place_mode", "") == "blockswap"):
             return o
     return None
+
+
+def _destroy_same_ident(mm, ident: tuple) -> int:
+    """MAI DUE COPIE dello stesso peso (incidente 17/10/2026): se si sta per fare un load COMPLETO e in cache c'è
+    già una pipeline con la stessa identità (sorella non riusabile / riuso fallito / riuso disattivato), la si
+    SCARICA prima (destroy: shell + componenti, anche se referenziati) e solo dopo si carica. Ritorna quante
+    shell ha scaricato. Le variabili locali del chiamante che puntano alle vecchie pipeline vanno azzerate PRIMA."""
+    if mm is None or not ident:
+        return 0
+    from inference_server.component_store import STORE
+    hit = [k for k, e in list(mm._cache.items()) if getattr(e.obj, "_ls_ident", None) == ident]
+    parked = [k for k, e in list(getattr(mm, "_cpu_cache", {}).items()) if getattr(e.obj, "_ls_ident", None) == ident]
+    if not hit and not parked:
+        return 0
+    ckeys: list = []
+    for k in hit:
+        ckeys += list(getattr(mm._cache[k].obj, "_ls_component_keys", ()) or ())
+        mm.unload(k, allow_cpu=False)                        # distrugge: niente parcheggio RAM della vecchia copia
+    for k in parked:
+        e = mm._cpu_cache.pop(k, None)
+        if e is not None:
+            ckeys += list(getattr(e.obj, "_ls_component_keys", ()) or ())
+            try:
+                del e.obj
+            except Exception:                               # noqa: BLE001
+                pass
+    STORE.destroy(ckeys)
+    mm.flush(force=True)
+    print(f"[mem] load completo richiesto con residente della stessa identità → {len(hit) + len(parked)} pipeline "
+          f"SCARICATE (destroy) prima: mai due copie dello stesso peso", flush=True)
+    return len(hit) + len(parked)
+
+
+def _predicted_load_mb(model_path: str, arch: str) -> float:
+    """MB che il load di `model_path` impegnerà ANCORA sul commit: file (0 se il transformer è già nello store)
+    + componenti condivisi FLUX.1 non ancora nello store (stime prudenti)."""
+    try:
+        sz = os.path.getsize(model_path) / 2**20
+    except OSError:
+        return 0.0
+    try:
+        from inference_server.component_store import STORE
+        items = STORE._items
+        if arch in ("flux", "kontext", "inpaint"):
+            low = os.path.normpath(model_path).lower()
+            if any(k.startswith(f"flux_tr:{low}:") for k in items):
+                sz = 0.0
+            for ck, est in (("t5xxl", 9500.0), ("clip_l", 300.0), ("vae_flux", 200.0)):
+                if ck not in items:
+                    sz += est
+    except Exception:                                       # noqa: BLE001
+        pass
+    return sz
+
+
+def _guard_load(model_path: str, arch: str) -> None:
+    """Prima di OGNI assemblaggio/caricamento: commit libero − carico previsto < pavimento (core/mem_budget) →
+    errore chiaro (`LoadRefused`) invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
+    from core import mem_budget
+    mem_budget.check_load(_predicted_load_mb(model_path, arch), os.path.basename(str(model_path)))
+
+
+def _release_cuda_cache() -> None:
+    """Dopo OGNI generazione: restituisce al driver i blocchi che l'allocatore di torch tiene riservati ma non usa
+    (il transiente del VAE decode: 28,4GB reserved contro 24GB di pesi → 32,1/32,5GB «usati» e nessun margine per il
+    job successivo). I PESI restano residenti (sono tensori vivi): si libera solo la cache."""
+    try:
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+    except Exception:                                       # noqa: BLE001 — contesto avvelenato: il figlio uscirà da sé
+        pass
 
 
 def preload_shared_components() -> None:
@@ -1155,7 +1230,7 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             f"{diffusers.__version__}." + (f" Usa '{alt}' per questa funzione." if alt else
             " Aggiorna diffusers o scegli un'altra pipeline."))
     is_file = Path(model_path).is_file()
-    # RIUSO SORELLA (from_pipe): stesso FILE modello già caricato con un altro arch FLUX.1 (es. t2i→kontext)
+    # RIUSO SORELLA (stessi moduli): stesso FILE modello già caricato con un altro arch FLUX.1 (es. t2i→kontext)
     # → costruisci la nuova pipeline dagli STESSI componenti (zero load da disco, ~1s). Solo 64ch: il Fill
     # (384ch) ha un transformer incompatibile e non arriva mai qui con lo stesso file.
     _ident = _weights_ident(arch, _ident_path, klein_te)   # arch DOPO il guard-famiglia: è la pipeline vera
@@ -1165,11 +1240,18 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             try:
                 from inference_server.component_store import STORE as _ST
                 try:
-                    _src.remove_all_hooks()               # from_pipe NON gestisce gli hook → sanifica PRIMA
+                    _src.remove_all_hooks()               # niente hook di offload ereditati dalla sorella
                 except Exception:                         # noqa: BLE001
                     pass
                 _ST.bump_epoch()                          # stato toccato → tutte le pipe faranno rebind
-                pipe = Pipe.from_pipe(_src)
+                # NIENTE Pipe.from_pipe: in diffusers 0.38 ha `torch_dtype=torch.float32` di DEFAULT e fa
+                # `new_pipeline.to(dtype=float32)` su TUTTI i componenti — che sono gli STESSI oggetti della sorella:
+                # transformer fp8 e T5 venivano upcastati IN PLACE (est 27GB → 63GB, CUDA OOM, crash di sistema
+                # dal vivo il 17/10, pipeline_utils.py:122-123). Si costruisce con gli STESSI moduli, come fa
+                # _assemble_flux: nessuna allocazione su GPU, nessuna copia, nessun cambio di dtype.
+                pipe = Pipe(transformer=_src.transformer, vae=_src.vae, text_encoder=_src.text_encoder,
+                            tokenizer=_src.tokenizer, text_encoder_2=_src.text_encoder_2,
+                            tokenizer_2=_src.tokenizer_2, scheduler=_src.scheduler)
                 pipe._ls_component_keys = _src._ls_component_keys
                 for _ck in pipe._ls_component_keys:
                     _ST.retain(_ck)                       # la nuova shell referenzia gli stessi componenti
@@ -1178,17 +1260,21 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
                 pipe._ls_est_mb = getattr(_src, "_ls_est_mb", VRAM_MB.get(arch, 24000))
                 pipe._ls_weights_mb = getattr(_src, "_ls_weights_mb", pipe._ls_est_mb)
                 pipe._ls_working_mb = getattr(_src, "_ls_working_mb", 0)   # stessi componenti → stesso footprint
-                _set_attention(pipe, arch)
-                print(f"[flux] from_pipe: riuso componenti della sorella per '{arch}' (zero load)", flush=True)
+                # (_set_attention gira per-job in run(): qui nessuna chiamata CUDA durante la costruzione)
+                print(f"[flux] sorella: riuso gli STESSI moduli della pipeline residente per '{arch}' (zero load)",
+                      flush=True)
                 return pipe, 50
-            except Exception as _e:                       # noqa: BLE001 — fallback: load normale
-                print(f"[flux] from_pipe fallito ({_e}) → load completo", flush=True)
+            except Exception as _e:                       # noqa: BLE001 — fallback: scarica il residente, poi load
+                from inference_server.cuda_health import reraise_if_fatal
+                reraise_if_fatal(_e)                      # contesto CUDA avvelenato: il figlio esce, niente ripieghi
+                print(f"[flux] riuso della sorella fallito ({_e}) → scarico il residente, poi load completo", flush=True)
+                pipe = None
     if (arch in ("flux2_kontext", "flux2_inpaint") and is_file
             and os.environ.get("NATIVE_FLUX2_SIBLING", "1") != "0"):
         # KLEIN edit↔inpaint↔colora sullo STESSO file: stesso transformer + stesso encoder Qwen3 (ident uguale) →
         # la nuova pipeline usa i MODULI della sorella (già in blockswap), cambia solo la classe diffusers.
         # Prima ogni cambio di compito ricaricava ~20-30GB da SSD (transformer fp8 + Qwen3). NATIVE_FLUX2_SIBLING=0 per
-        # tornare al load completo. Qualunque anomalia → ripiega sul load normale (stesso schema del from_pipe FLUX.1).
+        # tornare al load completo. Qualunque anomalia → ripiega sul load normale (stesso schema della sorella FLUX.1).
         _fs = _flux2_sibling_pipe(mm, _ident)
         if _fs is not None:
             try:
@@ -1207,8 +1293,17 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
                         setattr(pipe, _a, getattr(_fs, _a))
                 print(f"[flux2] sorella Klein: riuso i moduli già residenti per '{arch}' (zero load)", flush=True)
                 return pipe, VRAM_MB.get(arch, 24000)
-            except Exception as _e:                          # noqa: BLE001 — fallback: load normale
-                print(f"[flux2] riuso sorella Klein fallito ({_e}) → load completo", flush=True)
+            except Exception as _e:                          # noqa: BLE001 — fallback: scarica il residente, poi load
+                from inference_server.cuda_health import reraise_if_fatal
+                reraise_if_fatal(_e)
+                print(f"[flux2] riuso sorella Klein fallito ({_e}) → scarico il residente, poi load completo", flush=True)
+                pipe = None
+        _fs = None                                           # nessun riferimento locale alla vecchia pipeline
+    # MAI DUE COPIE: se si arriva al load completo con un residente della stessa identità, lo si scarica PRIMA.
+    _src = None
+    _destroy_same_ident(mm, _ident)
+    if is_file:
+        _guard_load(model_path, arch)                        # commit libero − carico < pavimento → errore chiaro
     if arch == "ernie":
         pipe = _assemble_ernie(model_path if (is_file and str(model_path).lower().endswith(".safetensors")) else None)
         # assemblaggio locale (shim transformers <5); il PE (6.4GB) NON entra qui: ernie_pe lo carica solo su «Migliora prompt»
@@ -1621,6 +1716,15 @@ def _seam_tone_match(res_img, orig_img, mask_bool, feather: int, *, gain: bool =
 
 
 def run(params: dict, mm, output_dir: str) -> dict:
+    """Esegue il job. In ogni caso (successo, errore, eccezione) restituisce al driver la cache CUDA inutilizzata:
+    i pesi restano residenti, ma il job dopo non trova la VRAM «piena» di blocchi riservati e vuoti."""
+    try:
+        return _run_impl(params, mm, output_dir)
+    finally:
+        _release_cuda_cache()
+
+
+def _run_impl(params: dict, mm, output_dir: str) -> dict:
     import time as _time
     import torch
     from PIL import Image
@@ -1669,6 +1773,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 _gc.collect()                                # forza il rilascio dei buffer bytes del vecchio
             _step("pre-evict cambio-modello (scaricato il precedente)")
         except Exception as _e:                             # noqa: BLE001
+            from inference_server.cuda_health import reraise_if_fatal
+            reraise_if_fatal(_e)                            # CUDA avvelenato: mai proseguire in questo processo
             print(f"[image] pre-evict cambio modello saltato ({_e})", flush=True)
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
@@ -1733,6 +1839,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 print(f"[image] auto-evict SALTATO: c'è spazio (free {_free_mb} ≥ need {_need_mb}MB) → gli altri "
                       f"modelli RESTANO residenti", flush=True)
         except Exception as _e:                             # noqa: BLE001
+            from inference_server.cuda_health import reraise_if_fatal
+            reraise_if_fatal(_e)                            # era qui che il CUDA OOM veniva inghiottito (17/10)
             print(f"[image] auto-evict saltato ({_e})", flush=True)
     _step("auto-evict FATTO (sto per fare il placement in VRAM)")
     where = _ensure_placement(pipe, mm, key)                # placement per-JOB (gpu|offload con VRAM attuale)
