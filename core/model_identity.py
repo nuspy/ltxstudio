@@ -4,7 +4,7 @@ Problema (task 12, 17/10/2026): la chiave di residenza era `arch:basename(model)
 (flux = crea, inpaint = modifica con maschera, kontext = modifica per istruzione). Lo stesso file di pesi
 usato in crea e in modifica produceva due chiavi diverse → il server uccideva il figlio persistente (VRAM e
 RAM del parcheggio perse) e ricaricava tutto da SSD, anche se le due pipeline condividono transformer, VAE e
-text-encoder (ComponentStore, `from_pipe`).
+text-encoder (ComponentStore: la seconda pipeline si costruisce con gli stessi oggetti modulo).
 
 Regola: la chiave dice QUALI PESI sono residenti, non quale compito li sta usando.
 

@@ -90,7 +90,7 @@ class ComponentStore:
         return e.obj
 
     def retain(self, key: str) -> object:
-        """refcount++ su una entry ESISTENTE (per from_pipe: la nuova shell referenzia gli stessi moduli)."""
+        """refcount++ su una entry ESISTENTE (sorella: la nuova shell referenzia gli stessi moduli)."""
         e = self._items[key]
         e.refcount += 1
         e.last_used = _now()
@@ -244,6 +244,37 @@ class ComponentStore:
         if freed:
             self.bump_epoch()                            # i device sono cambiati → rebind delle pipe
         return freed
+
+    def destroy(self, keys) -> int:
+        """Distrugge i componenti `keys` ANCHE se referenziati (refcount ignorato) e libera la cache CUDA.
+        Serve a «scarica il residente PRIMA di ricaricare»: mai due copie dello stesso peso in RAM/VRAM
+        (incidente 17/10, task 12). Il chiamante deve aver già scaricato le shell che li referenziano."""
+        import gc
+        n = 0
+        for k in list(keys or ()):
+            e = self._items.pop(k, None)
+            if e is None:
+                continue
+            n += 1
+            try:
+                del e.obj
+            except Exception:                               # noqa: BLE001
+                pass
+            try:
+                from core import vram_ledger
+                vram_ledger.unregister(k)
+            except Exception:                               # noqa: BLE001
+                pass
+        if n:
+            gc.collect()
+            if torch is not None and torch.cuda.is_available():
+                try:
+                    torch.cuda.synchronize()
+                    torch.cuda.empty_cache()
+                except Exception:                           # noqa: BLE001
+                    pass
+            self.bump_epoch()
+        return n
 
     def demote_all(self) -> int:
         """FREE_DEMOTE (unified-model-manager): parcheggia in RAM TUTTI i componenti residenti in
