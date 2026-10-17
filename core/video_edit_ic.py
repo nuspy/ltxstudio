@@ -98,12 +98,21 @@ def missing_weight(spec: vem.ModeSpec) -> str:
 
 
 # ── lip dub (testo → nuova voce + labbra; ricetta ufficiale Lightricks, vedi video_edit_modes) ──────
-# Nome INGLESE della lingua (e' testo del prompt per il modello, non della GUI): chiave = codice breve.
-LIPDUB_LANGUAGES: tuple[tuple[str, str], ...] = (
-    ("", ""), ("it", "Italian"), ("en", "English"), ("es", "Spanish"), ("fr", "French"), ("de", "German"),
-    ("pt", "Portuguese"), ("ru", "Russian"), ("zh", "Chinese"), ("ja", "Japanese"), ("ko", "Korean"),
-    ("ar", "Arabic"), ("hi", "Hindi"), ("uk", "Ukrainian"), ("el", "Greek"), ("he", "Hebrew"), ("hu", "Hungarian"),
+# LINGUE PARLABILI. NON esiste un elenco ufficiale Lightricks delle lingue che LTX-2.3 sa parlare (verificato il
+# 17/10/2026: model card, paper LTX-2 «multilingual text encoder... performance varies across languages», paper
+# JUST-DUB-IT, workflow ufficiale). Qui sta l'insieme con almeno UNA prova, con la prova accanto: e' una PROPOSTA in
+# attesa di conferma dell'utente (DECISIONE RICHIESTA nel report). Per restringerlo basta togliere righe da questa tabella.
+#   card = model card HF Lightricks/LTX-2.3, tag `language:` (en de es fr ja ko zh it pt; il testo dice «Language(s): English»)
+#   eval = paper JUST-DUB-IT: valutazione «English-to-Foreign (covering Russian, Spanish, German, and French)»
+#   wf   = workflow ufficiale Lipdub: «Use the alphabet of the language ... Cyrillic for Russian or Chinese characters for Chinese»
+LIPDUB_SPOKEN_LANGS: tuple[tuple[str, str, str], ...] = (
+    ("en", "English", "card+eval"), ("es", "Spanish", "card+eval"), ("fr", "French", "card+eval"),
+    ("de", "German", "card+eval"), ("ru", "Russian", "eval+wf"), ("zh", "Chinese", "card+wf"),
+    ("it", "Italian", "card"), ("pt", "Portuguese", "card"), ("ja", "Japanese", "card"), ("ko", "Korean", "card"),
 )
+SPOKEN_CODES: tuple[str, ...] = tuple(c for c, _n, _e in LIPDUB_SPOKEN_LANGS)
+# voce vuota (= nessuna lingua nel prompt) + le lingue parlabili: il dropdown della GUI usa SOLO queste
+LIPDUB_LANGUAGES: tuple[tuple[str, str], ...] = (("", ""),) + tuple((c, n) for c, n, _e in LIPDUB_SPOKEN_LANGS)
 
 
 def lipdub_language_name(lang: str) -> str:
@@ -123,6 +132,15 @@ def compose_lipdub_prompt(line: str, language: str = "", scene: str = "") -> str
     head = scene if scene else "A person"
     where = " in " + lang if lang else ""
     return head + ", speaking" + where + ' saying: "' + line.replace('"', "'") + '"'
+
+
+def compose_lipdub_audio_prompt(line: str = "", language: str = "", scene: str = "") -> str:
+    """Prompt della variante da audio: battuta (trascrizione) opzionale; senza, solo la scena + «speaking»."""
+    full = compose_lipdub_prompt(line, language, scene)
+    if full:
+        return full
+    scene = (scene or "").strip().rstrip(",.")
+    return (scene if scene else "A person") + ", speaking"
 
 
 def estimate_speech_seconds(text: str) -> float:
@@ -199,6 +217,15 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
                          else "video di riferimento del movimento mancante")
     if spec.needs_audio_in_video and not prep.has_audio(src):
         raise IcJobError("il video non ha una traccia audio")
+    ext_audio = ""
+    if spec.needs_audio_file:
+        ext_audio = str(cfg.get("lipdub_audio") or "")
+        if not ext_audio or not os.path.exists(ext_audio):
+            raise IcJobError("audio mancante: scegli il file audio da usare (lipdub da audio)")
+        if not prep.has_audio(ext_audio):
+            raise IcJobError("il file scelto non contiene una traccia audio")
+        if cfg.get("lipdub_audio_ref") == "original" and not prep.has_audio(src):
+            raise IcJobError("riferimento voce «originale»: il video non ha una traccia audio")
     work = os.path.join(out_dir, f"_vedit_{spec.key}_{stamp}")
     os.makedirs(work, exist_ok=True)
     info = prep.probe(src, count_frames=True)
@@ -208,14 +235,14 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
         raise IcJobError(f"video troppo corto ({total} frame, minimo 9)")
     fps = int(round(info.fps or 25))
     prompt = (cfg.get("prompt") or "").strip()
-    if spec.key == "lipdub" and not prompt:                         # prompt libero vince; altrimenti si compone
-        prompt = compose_lipdub_prompt(cfg.get("lipdub_line", ""), cfg.get("lipdub_lang", ""),
-                                       cfg.get("lipdub_scene", ""))
+    if spec.kind == "lipdub" and not prompt:                        # prompt libero vince; altrimenti si compone
+        _compose = compose_lipdub_audio_prompt if spec.needs_audio_file else compose_lipdub_prompt
+        prompt = _compose(cfg.get("lipdub_line", ""), cfg.get("lipdub_lang", ""), cfg.get("lipdub_scene", ""))
     if spec.needs_prompt == vem.NEEDS_REQUIRED and not prompt:
-        raise IcJobError("battuta/prompt mancante" if spec.key == "lipdub" else "prompt mancante")
+        raise IcJobError("battuta/prompt mancante" if spec.kind == "lipdub" else "prompt mancante")
 
     # lipdub: forza del riferimento fissa (workflow ufficiale: 1.0), non regolabile
-    _strength = spec.default_strength if spec.key == "lipdub" else float(cfg.get("strength", spec.default_strength))
+    _strength = spec.default_strength if spec.kind == "lipdub" else float(cfg.get("strength", spec.default_strength))
     p: dict = {"prompt": prompt, "negative": "worst quality, blurry", "control_type": spec.kind,
                "edit_lora": "", "control_strength": float(_strength),
                "conditioning_attention": float(cfg.get("conditioning_attention", 1.0)),
@@ -286,7 +313,30 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
         if spec.min_long_edge and max(w, h) < spec.min_long_edge:
             notes.append(f"risoluzione {w}x{h} sotto il minimo consigliato ({spec.min_long_edge}px lato lungo)")
 
-    if spec.key == "lipdub":
+    if spec.needs_audio_file:
+        # Variante da audio (sperimentale): l'AUDIO comanda la durata. Piu' corto del video → il video e' tagliato alla
+        # sua durata; piu' lungo → l'audio e' tagliato alla durata del video. Il latente audio fisso deve avere
+        # esattamente la lunghezza del video, quindi l'audio e' preparato (wav stereo 48 kHz) a quella durata.
+        vsec = n_total / float(fps)
+        adur = prep.audio_duration(ext_audio)
+        target = vsec
+        if adur and adur + 0.3 < vsec:
+            target = adur
+            n_total = min(n_total, max(9, int(target * fps)))
+            notes.append(f"l'audio ({adur:.1f} s) e' piu' corto del video ({vsec:.1f} s): il video viene tagliato a "
+                         f"{n_total / fps:.1f} s (l'audio comanda la durata)")
+        elif adur and adur > vsec + 0.3:
+            notes.append(f"l'audio ({adur:.1f} s) e' piu' lungo del video ({vsec:.1f} s): verra' tagliato a "
+                         f"{vsec:.1f} s (il video non si allunga)")
+        n_total = vem.snap_frames(n_total)
+        if n_total < total:
+            guide = prep.cut_video(src, os.path.join(work, "guide_cut.mp4"), n_total)
+        wav = prep.prepare_audio(ext_audio, os.path.join(work, "ext_audio.wav"), n_total / float(fps))
+        p["lipdub_audio"] = wav
+        p["lipdub_audio_ref"] = "original" if cfg.get("lipdub_audio_ref") == "original" else "external"
+        notes.append("SPERIMENTALE: audio dell'utente tenuto fisso nei latenti, si rigenera solo il video; qualita' non "
+                     "garantita (per canzoni/voci collaudate usa Talk/Canta del tab Video)")
+    elif spec.kind == "lipdub":
         vsec = n_total / float(fps)
         if cfg.get("lipdub_line") and not (cfg.get("prompt") or "").strip():
             fit, est = lipdub_text_fit(cfg.get("lipdub_line", ""), vsec)

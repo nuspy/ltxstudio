@@ -154,12 +154,35 @@ def has_audio(path: str) -> bool:
 
 def audio_duration(path: str) -> float:
     """Durata (s) della prima traccia audio del file, 0.0 se assente o ignota."""
-    try:
-        r = _run([ffprobe_path(), "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration",
-                  "-of", "csv=p=0", str(path)], 120)
-        return float((r.stdout or "").strip().splitlines()[0])
-    except Exception:                                                # noqa: BLE001 — assente/N/A
-        return 0.0
+    for entry in ("stream=duration", "format=duration"):             # mp3/wav: la durata puo' stare solo nel container
+        try:
+            sel = ["-select_streams", "a:0"] if entry.startswith("stream") else []
+            r = _run([ffprobe_path(), "-v", "error", *sel, "-show_entries", entry, "-of", "csv=p=0", str(path)], 120)
+            v = float((r.stdout or "").strip().splitlines()[0])
+            if v > 0:
+                return v
+        except Exception:                                            # noqa: BLE001 — assente/N/A
+            continue
+    return 0.0
+
+
+def cut_video(src: str, dst: str, frames: int) -> str:
+    """Taglia `src` ai primi `frames` fotogrammi (audio incluso, tagliato alla stessa durata). Ritorna dst."""
+    info = probe(src)
+    fps = info.fps or 25.0
+    cmd = [ffmpeg_path(), "-v", "error", "-y", "-i", str(src), "-frames:v", str(int(frames)),
+           "-t", f"{frames / fps:.4f}", "-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p"]
+    cmd += ["-c:a", "aac"] if info.has_audio else ["-an"]
+    _run(cmd + [str(dst)], 1800)
+    return dst
+
+
+def prepare_audio(src: str, dst: str, seconds: float) -> str:
+    """Audio dell'utente → wav stereo 48 kHz di ESATTAMENTE `seconds` (tagliato se piu' lungo, silenzio in coda se
+    piu' corto di poco): e' la lunghezza che il latente audio fisso deve avere. Ritorna dst."""
+    _run([ffmpeg_path(), "-v", "error", "-y", "-i", str(src), "-vn", "-ac", "2", "-ar", "48000",
+          "-af", "apad", "-t", f"{seconds:.4f}", "-c:a", "pcm_s16le", str(dst)], 1800)
+    return dst
 
 
 def snap_frames(n: int) -> int:

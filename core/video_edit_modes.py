@@ -63,6 +63,7 @@ class ModeSpec:
     needs_ref_image: bool = False             # immagine di riferimento/stile obbligatoria
     needs_object: bool = False                # oggetto testuale (SAM2) obbligatorio
     needs_audio_in_video: bool = False        # il video DEVE avere una traccia audio
+    needs_audio_file: bool = False            # serve un file audio dell'utente (lipdub_audio)
     needs_video: bool = True                  # False: il video principale e' opzionale (cameraman)
     distilled: str = DISTILLED_RECOMMENDED
     default_strength: float = 1.0
@@ -163,6 +164,14 @@ MODE_SPECS: dict[str, ModeSpec] = {s.key: s for s in (
        needs_prompt=NEEDS_REQUIRED, needs_audio_in_video=True, distilled=DISTILLED_RECOMMENDED,
        max_long_edge=1024, max_frames_per_segment=249, chunkable=False, keep_audio=False,
        phase="1b", enabled=True, tags=("lipdub_pipeline",)),
+    # Variante SPERIMENTALE (non e' nella ricetta ufficiale): stessa pipeline/LoRA, ma l'audio dell'utente e' codificato
+    # nei latenti audio e TENUTO FISSO (frozen, come lo stage 2 ufficiale e come a2vid): si rigenera solo il video.
+    _s(key="lipdub_audio", family=FAMILY_LIPDUB, i18n_key="vedit.mode.lipdub_audio", kind="lipdub",
+       catalog_id="ltx-iclora-lipdub", note_key="vedit.note_lipdub_audio", cap="cap.video_lipdub",
+       needs_prompt=NEEDS_OPTIONAL, needs_audio_file=True, distilled=DISTILLED_RECOMMENDED,
+       max_long_edge=1024, max_frames_per_segment=249, chunkable=False, keep_audio=False,
+       phase="1b", enabled=True, experimental_key="vedit.note_lipdub_audio",
+       tags=("lipdub_pipeline", "audio_frozen")),
     # ── famiglia Camera / Movimento ───────────────────────────────────────────────────────────────
     _s(key="cameraman", family=FAMILY_CAMERA, i18n_key="vedit.mode.cameraman", kind="cameraman",
        catalog_id="ltx-iclora-cameraman", note_key="vedit.note_cameraman", cap="cap.video_camera_ic",

@@ -1447,7 +1447,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         # in movimento (visto sia in modalità kernel che dequant; la dequant delle scale è corretta,
         # cos 0.9954). Coi checkpoint DEV la distilled-LoRA è obbligatoria → percorso fp8 pulito.
         # L'FP4 residente resta per i checkpoint DISTILLED-fp4 (nessuna fusione). Forza: LTX_FP4_MM=force.
-        _needs_fuse = bool(loras) or ptype == "lipdub" or ("distilled" not in os.path.basename(ckpt).lower()
+        _needs_fuse = bool(loras) or ptype in ("lipdub", "lipdub_audio") or ("distilled" not in os.path.basename(ckpt).lower()
                                       and os.environ.get("LTX_NO_DLORA") != "1")
         # FP4 RESIDENTE ANCHE CON LE LoRA (scelta dell'utente, 27/08). La dequant a fp8 nasceva da
         # un degrado misurato il 23/07 («nubi di punti» sulle parti in movimento) che oggi NON si
@@ -1521,17 +1521,17 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # stage 1 (stage_2 nasce con loras=()) → col dev ricostruiamo lo stage 2 con la stessa LoRA
     # (vedi _dev_stage2_dlora). Il checkpoint resta quello scelto dall'utente.
     _dev_dlora = None
-    if ptype in ("iclora", "vinpaint", "lipdub") and "distilled" not in os.path.basename(ckpt).lower():
+    if ptype in ("iclora", "vinpaint", "lipdub", "lipdub_audio") and "distilled" not in os.path.basename(ckpt).lower():
         if os.environ.get("LTX_NO_DLORA") == "1":
             print("[dev] LTX_NO_DLORA=1 → distilled-LoRA NON applicata (diagnostica)", flush=True)
         elif os.path.exists(DISTILLED_LORA):
             # vinpaint: stage 1 con CFG/30 step, nessuno stage 2 → resta a strength 1.0 (storico).
-            _st = float(os.environ.get("LTX_DLORA_STRENGTH", "0.5" if ptype in ("iclora", "lipdub") else "1.0"))
+            _st = float(os.environ.get("LTX_DLORA_STRENGTH", "0.5" if ptype in ("iclora", "lipdub", "lipdub_audio") else "1.0"))
             _dev_dlora = LoraPathStrengthAndSDOps(DISTILLED_LORA, _st, LTXV_LORA_COMFY_RENAMING_MAP)
             loras = list(loras) + [_dev_dlora]
             print(f"[dev] {ptype}: checkpoint non-distilled → distilled-LoRA ufficiale "
                   f"({os.path.basename(DISTILLED_LORA)}, strength {_st}) su stage 1"
-                  f"{' e stage 2' if ptype in ('iclora', 'lipdub') else ''}", flush=True)
+                  f"{' e stage 2' if ptype in ('iclora', 'lipdub', 'lipdub_audio') else ''}", flush=True)
         else:
             print("[warn] checkpoint DEV su pipeline IC-LoRA senza distilled-LoRA su disco → "
                   "video 'dematerializzato'. Scarica ltx23-distilled-lora-384 o il checkpoint "
@@ -1548,10 +1548,16 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
         if _dev_dlora is not None:
             _dev_stage2_dlora(pipe, _ckpt_pipe, _dev_dlora, quant, offload)
-    elif ptype == "lipdub":                                  # JUST-DUB-IT: testo -> nuova voce + labbra (video+audio ref)
-        from ltx_pipelines.lipdub import LipDubPipeline
+    elif ptype in ("lipdub", "lipdub_audio"):               # JUST-DUB-IT: testo -> nuova voce + labbra (video+audio ref)
+        if ptype == "lipdub_audio":                          # SPERIMENTALE: audio utente congelato nei latenti
+            try:
+                from workers.ltx_lipdub_audio import LipDubAudioPipeline as _LipKlass
+            except ModuleNotFoundError:
+                from ltx_lipdub_audio import LipDubAudioPipeline as _LipKlass   # eseguito come script
+        else:
+            from ltx_pipelines.lipdub import LipDubPipeline as _LipKlass
         _lip_ic = LoraPathStrengthAndSDOps(IC_LORA["lipdub"], 1.0, LTXV_LORA_COMFY_RENAMING_MAP)
-        pipe = _build(LipDubPipeline,
+        pipe = _build(_LipKlass,
                       distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, ic_lora=_lip_ic, quantization=quant, offload_mode=offload)
         if _dev_dlora is not None:
@@ -2400,7 +2406,8 @@ def run_generation(p: dict) -> str:
     elif _ic and os.path.exists(_ic) and p.get("control_type") == "lipdub":
         # LipDubPipeline (JUST-DUB-IT): pipeline DEDICATA del pacchetto, la LoRA e' il suo parametro `ic_lora`
         # (strength 1.0 come nel workflow ufficiale), NON entra in `loras`.
-        ptype = "lipdub"
+        # variante SPERIMENTALE con audio dell'utente congelato nei latenti (workers/ltx_lipdub_audio.py)
+        ptype = "lipdub_audio" if p.get("lipdub_audio") else "lipdub"
     elif _ic and os.path.exists(_ic):
         ptype = "iclora"
         loras = list(loras) + [LoraPathStrengthAndSDOps(_ic, float(p.get("control_strength", 0.8)),
@@ -2544,7 +2551,7 @@ def run_generation(p: dict) -> str:
             regenerate_video=bool(p.get("regenerate_video", True)),
             regenerate_audio=bool(p.get("regenerate_audio", True)),
             tiling_config=_tc))
-    elif ptype == "lipdub":                                  # JUST-DUB-IT: il video (con audio) e' il riferimento
+    elif ptype in ("lipdub", "lipdub_audio"):               # JUST-DUB-IT: il video (con audio) e' il riferimento
         from ltx_pipelines.lipdub import _snap_frames_to_8k1
         from ltx_pipelines.utils.media_io import get_videostream_metadata
         cv = p["control_video"]
@@ -2555,12 +2562,16 @@ def run_generation(p: dict) -> str:
               f"{int(p.get('width', 0))}x{int(p.get('height', 0))} ref_strength={float(p.get('control_strength', 1.0))} "
               f"distilled={'distilled' in os.path.basename(ckpt).lower()}", flush=True)
         print(f"[lipdub] prompt: {p.get('prompt', '')}", flush=True)
-        video, audio, _nf_eff = _unpack_pipe(pipe(
-            prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
-            height=int(p.get("height", 512)), width=int(p.get("width", 768)),
-            images=[], reference_video_path=cv,
-            reference_strength=float(p.get("control_strength", 1.0)),
-            enhance_prompt=False, tiling_config=_tc))
+        _lip_kw = dict(prompt=p.get("prompt", ""), seed=int(p.get("seed", 42)),
+                       height=int(p.get("height", 512)), width=int(p.get("width", 768)),
+                       images=[], reference_video_path=cv,
+                       reference_strength=float(p.get("control_strength", 1.0)),
+                       enhance_prompt=False, tiling_config=_tc)
+        if ptype == "lipdub_audio":
+            _lip_kw.update(audio_path=p["lipdub_audio"], audio_reference=str(p.get("lipdub_audio_ref") or "external"))
+            print(f"[lipdub] SPERIMENTALE: audio utente fisso {os.path.basename(p['lipdub_audio'])} "
+                  f"(riferimento audio: {_lip_kw['audio_reference']})", flush=True)
+        video, audio, _nf_eff = _unpack_pipe(pipe(**_lip_kw))
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (video-guida canny/depth/pose)
         cv = p["control_video"]; cstr = float(p.get("control_strength", 0.8))
         print(f"[controlnet] IC-LoRA '{p.get('control_type')}' guida={cv} strength={cstr}", flush=True)
@@ -2674,7 +2685,7 @@ def run_generation(p: dict) -> str:
     # native_audio: l'utente CHIEDE l'audio nativo (parlato/suoni dal prompt, es. «says "hello world"»). LTX-2.3
     # genera audio+video insieme (ti2v con audio_guider) → tenerlo dà voce + lip-sync. Senza il flag si scarta
     # come prima (evita il rumore non-condizionato sui prompt non-parlato).
-    _audio_requested = (ptype in ("a2v", "lipdub")) or bool(p.get("audio_path")) or bool(p.get("native_audio"))
+    _audio_requested = (ptype in ("a2v", "lipdub", "lipdub_audio")) or bool(p.get("audio_path")) or bool(p.get("native_audio"))
     if not _audio_requested and audio is not None:
         print("[audio] nessun audio richiesto → scarto la traccia LTX-2 (rumore non condizionato)", flush=True)
         audio = None
@@ -2717,7 +2728,7 @@ def run_generation(p: dict) -> str:
         else:
             print(f"[listen] !! ripetizione loop fallita ({r.stderr[-200:] if r.stderr else '?'}) "
                   f"→ consegno il loop base {_base_s:.0f}s", flush=True)
-    if ptype == "lipdub" and os.path.exists(out) and not _has_audio_track(out):
+    if ptype in ("lipdub", "lipdub_audio") and os.path.exists(out) and not _has_audio_track(out):
         print("[lipdub] !! il file di uscita NON ha traccia audio: la nuova voce non e' stata salvata", flush=True)
     # RETE DI SICUREZZA: se l'audio era RICHIESTO (a2v: canto/lip-sync) ma il file è uscito muto — encoder
     # in fallback, mux fallito, traccia vuota — rimuxa dal file audio ORIGINALE, sulla stessa finestra usata

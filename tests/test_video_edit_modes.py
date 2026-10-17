@@ -67,6 +67,15 @@ def test_lipdub_spec():
     assert s.max_frames_per_segment == 249 and M.segments_needed(1000, "lipdub") == 1
 
 
+def test_lipdub_audio_spec():
+    """Variante sperimentale da audio: stessa LoRA/cap, serve un file audio (non l'audio nel video), prompt opzionale."""
+    a, t = M.MODE_SPECS["lipdub_audio"], M.MODE_SPECS["lipdub"]
+    assert (a.kind, a.catalog_id, a.cap, a.family) == (t.kind, t.catalog_id, t.cap, t.family)
+    assert a.needs_audio_file and not a.needs_audio_in_video and a.needs_prompt == M.NEEDS_OPTIONAL
+    assert a.experimental_key == "vedit.note_lipdub_audio" and not a.keep_audio and not a.chunkable
+    assert not t.needs_audio_file
+
+
 def test_modes_for_family():
     assert [s.key for s in M.modes_for_family("edit")] == ["edit", "inpaint", "replace_char"]
     assert [s.key for s in M.modes_for_family("style")] == ["anime2real", "real2anime", "restyle"]
@@ -74,7 +83,7 @@ def test_modes_for_family():
                                                              "motiondeblur", "detailer"]
     assert [s.key for s in M.modes_for_family("repair", include_disabled=True)][-1] == "hdr"
     assert [s.key for s in M.modes_for_family("outpaint")] == ["outpaint"]
-    assert [s.key for s in M.modes_for_family("lipdub")] == ["lipdub"]
+    assert [s.key for s in M.modes_for_family("lipdub")] == ["lipdub", "lipdub_audio"]
     assert [s.key for s in M.modes_for_family("camera")] == ["cameraman"]
     assert "lipdub" in M.families() and "hdr" not in [s.key for f in M.families() for s in M.modes_for_family(f)]
 
