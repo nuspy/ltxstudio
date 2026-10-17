@@ -564,7 +564,10 @@ def case_ic_lora_hidden_from_lora_panel(w, spy):
     cat = [e.filename for e in w.lora_tab.catalog.loras(allow_nsfw=True)]
     assert not [n for n in cat if is_ic_lora_file(n)], "nemmeno nel catalogo"
     for ic in ("ltx-2.3-22b-ic-lora-outpaint.safetensors", "LTX2.3-22B_IC-LoRA-Cameraman_v1_10500.safetensors",
-               "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors", "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors"):
+               "852654_LTX2.3-22B_ReStyle_IC-LoRA_8000_v0.1.safetensors", "ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors",
+               # task 8: le LoRA dell'inpaint video (a parole / con foto) sono di «Modifica Video AI», non del pannello LoRA
+               "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors",
+               "ltx23_inpaint_masked_t2v_rank128_v1_10000steps.safetensors"):
         assert is_ic_lora_file(ic), ic
     for ok in ("ltx-2-19b-lora-camera-control-dolly-left.safetensors", "LTX2.3_CameraControls.safetensors"):
         assert not is_ic_lora_file(ok), ok

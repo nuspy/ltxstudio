@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import uuid
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -117,6 +118,30 @@ class V2VEditReq(BaseModel):
     length_s: float = 5.0
     steps: int = 40
     seed: int = 42
+
+
+class InpaintReq(BaseModel):
+    """Inpaint VIDEO: SAM2 traccia `object` sul clip e ne rigenera l'area (stessa logica della GUI: core/video_inpaint.py).
+    Con `reference_image` si usa la LoRA r2v (il nuovo oggetto viene preso dalla foto), senza la LoRA t2v (a parole)."""
+    video_path: str
+    object: str = Field(..., description="oggetto da sostituire, a parole inglesi (es. «umbrella», «person») — SAM2/GroundingDINO")
+    prompt: str = Field(..., description="scena e cosa fa il nuovo contenuto. Se citi le foto con `@Foto_N` vale la convenzione del "
+                                         "tab Video (un solo riferimento qui: @Foto_1)")
+    reference_image: str | None = Field(None, description="foto dell'oggetto/persona da inserire nell'area mascherata: attiva la "
+                                        "LoRA r2v (rank32). Assente = LoRA t2v (rank128, solo prompt)")
+    reference_strength: float = Field(0.8, ge=0.1, le=1.0, description="forza dell'identita' della foto (solo con reference_image)")
+    cfg_scale: float = Field(6.0, ge=1.0, le=10.0)
+    guide: float = Field(0.4, ge=0.1, le=1.0, description="forza della guida (ancoraggio al video originale)")
+    mask_dilate: int = Field(24, ge=0, le=64)
+    mask_blur: float = Field(6.0, ge=0.0, le=30.0)
+    full_resolution: bool = Field(True, description="secondo stadio (upsampler + raffinamento): uscita a risoluzione piena del "
+                                  "sorgente (tetto 1280 sul lato lungo); False = meta' risoluzione come prima")
+    keep_background: bool = Field(True, description="fuori dalla maschera il video e' il SORGENTE originale a risoluzione piena "
+                                  "(bordo sfumato come `mask_blur`); False = tutto generato")
+    keep_audio: bool = Field(True, description="rimette l'audio originale sul risultato (l'inpaint non genera audio)")
+    seed: int = 42
+    model: str | None = Field(None, description="checkpoint ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)")
+    ltx_release: str | None = None
 
 
 class ControlNetReq(BaseModel):
@@ -326,6 +351,74 @@ def register(app: FastAPI):
              "seed": req.seed, "num_frames": max(9, int(req.length_s * req.fps) // 8 * 8 + 1),
              "output": out_path("video_v2v")}
         return _submit("video.v2v_edit", lambda job: run_ltx2(p, job))
+
+    @app.post("/video/inpaint", tags=["video"])
+    def video_inpaint(req: InpaintReq):
+        """Inpaint video con maschera SAM2. `reference_image` (opz.) = foto dell'oggetto da inserire (LoRA r2v).
+        Clip lunghi: segmenti di 97 frame con la stessa foto su ognuno. Risposta: job_id + `warnings`."""
+        from fastapi import HTTPException
+        from core import ltx_release as lrel
+        from core import video_edit_ic as vic
+        from core import video_inpaint as vi
+        gate.require("cap.video")
+        ref = (req.reference_image or "").strip()
+        if ref:
+            gate.require("cap.video_inpaint_r2v")
+            if not os.path.isfile(ref):
+                raise HTTPException(422, {"error": "reference_not_found", "path": ref})
+        if not os.path.exists(req.video_path):
+            raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
+        if not req.object.strip():
+            raise HTTPException(422, {"error": "object_required"})
+        if not req.prompt.strip():
+            raise HTTPException(422, {"error": "prompt_required"})
+        model = (req.model or "").strip()
+        rel = (req.ltx_release or (lrel.detect_release(model) if model else None) or "")
+        if rel and not lrel.ic_lora_supported(rel):
+            raise HTTPException(422, {"error": "release_unsupported", "release": rel,
+                                      "detail": "le LoRA dell'inpaint locali sono per LTX 2.3"})
+        cfg = {"prompt": req.prompt.strip(), "ref_image": ref, "ref_strength": req.reference_strength,
+               "cfg_scale": req.cfg_scale, "guide": req.guide, "mask_dilate": req.mask_dilate,
+               "mask_blur": req.mask_blur, "seed": req.seed, "video": req.video_path, "full_res": req.full_resolution,
+               "keep_background": req.keep_background, "keep_audio": req.keep_audio}
+        miss = vi.missing_weight(cfg)
+        if miss:
+            raise HTTPException(409, {"error": "weight_missing", "detail": miss})
+        if model:
+            cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
+        if rel:
+            cfg["ltx_release"] = rel
+        warnings: list[str] = []
+        if not lrel.is_distilled(model):
+            warnings.append("checkpoint non distilled" + ("" if model else " (default del worker: dev)")
+                            + ": verra' aggiunta la distilled-LoRA ufficiale (il checkpoint resta quello scelto)"
+                            if vic.distilled_lora_ok(rel or "2.3") else
+                            "checkpoint non distilled: la distilled-LoRA manca su disco, qualita' molto ridotta; "
+                            "scaricala dal tab Pesi modelli (id ltx23-distilled-lora-384)")
+
+        def fn(job):
+            from core import video_ic_prep as prep
+            info = prep.probe(req.video_path, count_frames=True)
+            if not info.width or not info.height:
+                raise RuntimeError(f"video illeggibile: {req.video_path}")
+            # come la GUI: l'inpaint PRESERVA risoluzione/durata/fps del SORGENTE (maschere e guida sono tracciate li')
+            cfg.update(width=_r64(info.width), height=_r64(info.height), fps=int(round(info.fps or 25)),
+                       num_frames=max(9, (int(info.nb_frames) // 8) * 8 + 1) if info.nb_frames else 25)
+            output = out_path("video_inpaint")
+            params = vi.inpaint_params(cfg, output)
+            if ref:
+                note = vi.fit_reference(params, os.path.dirname(output), uuid.uuid4().hex[:8])
+                if note:
+                    job.log("[inpaint] " + note)
+            gpath = out_path("_inpaint_guide")
+            vi.attach_tracking(params, req.video_path, req.object.strip(), gpath, req.mask_dilate, log=job.log)
+            outs = run_ltx2(params, job)
+            if params.get("_mux_audio_from") and outs:           # l'inpaint non genera audio: si rimette quello originale
+                outs = [vic.mux_audio(outs[0], params["_mux_audio_from"])] + list(outs[1:])
+            return outs
+        r = _submit("video.inpaint", fn)
+        r["warnings"] = warnings
+        return r
 
     @app.post("/video/controlnet", tags=["video"])
     def video_controlnet(req: ControlNetReq):

@@ -396,6 +396,7 @@ Modulo nativo: **`video_edit`** / LTX-2 con edit-LoRA. Tab **Modifica Video AI**
 - **Backend**: modalità `vinpaint` (richiede `inpaint_masks_dir` + `control_video` + `edit_lora` = `ltx23_inpaint_masked_t2v_rank128`).
 - **Parametri**: `video`, `object`, `prompt`, `cfg_scale` (5.0/6.0), `num_steps` (30), `control_strength` (0.5), `mask_dilate` (0–64, def 24), `mask_blur` (0).
 - **Output**: mp4. **Note**: bias contestuale LTX (es. auto→moto/cavallo a volte rifiutato).
+- **Con foto di riferimento (LoRA r2v)**: casella «Inserisci un oggetto da una foto» (scelta dell'utente): `edit_lora` = `ltx23_inpaint_masked_r2v_rank32`, foto → `image_path` (frame 0, forza `ref_strength`, adattata al quadro con bordi) → `pipe.inpaint(images=[...])`. Clip > 97 frame: segmenti da 97 con maschere e foto su ogni segmento (`core/video_inpaint.py`, condiviso con la REST `POST /video/inpaint`, `reference_image`). Gate `cap.video_inpaint_r2v`. Uscita a piena risoluzione (secondo stadio, tetto 1280), sfondo originale fuori dalla maschera (composizione in pixel, bordo sfumato) e audio originale rimesso: caselle del tab (default accese), API `full_resolution`/`keep_background`/`keep_audio`.
 
 ## 30. anime2real / real2anime
 - **Cosa fa**: conversione stile anime↔reale del video.

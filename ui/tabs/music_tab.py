@@ -1208,19 +1208,22 @@ class MusicTab(QWidget):
         self._start_job(job, "song", str(out))
 
     def _process_pitch(self):
-        """Correzione intonazione voce (DiffPitcher). Scaffold: da validare live."""
+        """Correzione intonazione voce (DiffPitcher): da voce-guida (template) o da spartito MIDI (score)."""
         if self._busy():
             return
         from core import diffpitcher_service as dp
         p = self.pitch_panel.get()
-        errs = dp.preflight(p["source"], p["pitch_ref"])
+        errs = dp.preflight(p["source"], p["pitch_ref"], p["mode"], p["midi"])
         if errs:
             QMessageBox.warning(self, tr("pitch.err", "Impossibile correggere"), "\n".join(errs)); return
         name = self.song_name.text().strip() or "vocal"
         out = dp.out_path(name)
         self._song_meta = {"label": "Intonazione", "source": Path(p["source"]).name,
-                           "pitch_ref": Path(p["pitch_ref"]).name, "steps": p["steps"], "shift_semi": p["shift_semi"]}
+                           "mode": p["mode"], "steps": p["steps"], "shift_semi": p["shift_semi"],
+                           **({"midi": Path(p["midi"]).name} if p["mode"] == "score"
+                              else {"pitch_ref": Path(p["pitch_ref"]).name})}
         job = dp.make_job(p["source"], p["pitch_ref"], name, steps=p["steps"], shift_semi=p["shift_semi"],
+                          mode=p["mode"], midi=p["midi"],
                           on_log=self._b.log.emit, on_progress=self._b.progress.emit, on_done=self._b.song_done.emit)
         self._start_job(job, "song", str(out))
 

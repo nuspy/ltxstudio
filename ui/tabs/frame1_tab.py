@@ -47,6 +47,7 @@ INPAINT_MODELS = {
         {"arch": "Flux2", "unet": "Flux\\miraclein_flux2klein_nsfw_v2_fp8.safetensors", "steps": 12},
     "Nessuno (solo LTX I2V)": {"arch": None, "unet": None, "steps": 0},
 }
+ERNIE_TURBO_STEPS, ERNIE_TURBO_CFG = 8, 1.0     # ERNIE-Image-Turbo (DMD): scheda ufficiale Baidu; una riga per cambiarli
 # generazione: arch -> (architettura catalogo LoRA, keyword per filtrare i modelli in diffusion_models)
 GEN_ARCH = {
     "FLUX": ("Flux", ("flux", "getphat", "fuxcapacity")),   # "krea" tolto: ora ambiguo con Krea 2
@@ -689,6 +690,8 @@ class Frame1Tab(QWidget):
         self.gen_arch.currentTextChanged.connect(self._on_qwen21_dit_changed)
         self.gen_model.currentIndexChanged.connect(self._on_krea2_model_changed)
         self.gen_arch.currentTextChanged.connect(self._on_krea2_model_changed)
+        self.gen_model.currentIndexChanged.connect(self._on_ernie_model_changed)
+        self.gen_arch.currentTextChanged.connect(self._on_ernie_model_changed)
         return box
 
     def _gen_refs_box(self) -> QGroupBox:
@@ -944,6 +947,20 @@ class Frame1Tab(QWidget):
         raw = str(self.gen_model.currentData() or "").endswith("raw")
         self.gen_steps.setValue(52 if raw else 8)
         self.gen_cfg.setValue(3.5 if raw else 0.0)
+
+    def _on_ernie_model_changed(self, *_):
+        """ERNIE-Image: il Turbo (DMD) vuole 8 passi a guidance 1.0 (scheda Baidu); il base resta ai default d'arch.
+        Solo un preset dei cursori (restano modificabili): il checkpoint lo sceglie sempre l'utente."""
+        if not hasattr(self, "gen_cfg") or self.gen_arch.currentText() != "Ernie":
+            return
+        name = f"{self.gen_model.currentText()} {self.gen_model.currentData() or ''}".lower()
+        if "turbo" in name:
+            self.gen_steps.setValue(ERNIE_TURBO_STEPS)
+            self.gen_cfg.setValue(ERNIE_TURBO_CFG)
+        else:
+            d = self._ARCH_DEFAULTS.get("Ernie") or {}
+            self.gen_steps.setValue(int(d.get("steps", 20)))
+            self.gen_cfg.setValue(float(d.get("cfg", 4.0)))
 
     def _krea2_dit(self):
         """Id del transformer single-file Krea 2 scelto (None = transformer dello snapshot Turbo/Raw)."""

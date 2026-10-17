@@ -510,7 +510,14 @@ def _patch_emb_cache():
                 pkg = _md.version("ltx-pipelines")
             except Exception:                            # noqa: BLE001
                 pkg = "?"
+            _lf = None
+            try:
+                from core import gemma_lora as _gl
+                _lf = _gl.key_fragment(te_b, _ec.file_fp)        # LoRA fusa sull'encoder: cambia gli embedding
+            except Exception:                            # noqa: BLE001
+                pass
             return {
+                **({"te_loras": _lf} if _lf else {}),            # presente SOLO con LoRA: le chiavi esistenti restano
                 "schema": _ec.SCHEMA,
                 "prompts": [str(p).strip() for p in prompts],   # il tokenizer fa già strip(): sicuro
                 "te": _ec.file_fp(te_p),
@@ -904,6 +911,7 @@ from core import model_paths as _mpaths                       # stdlib-only, sic
 CHECKPOINT = _mpaths.p("ltx23-dev-fp8", r"E:\AI\Models\diffusion_models\LTX\ltx-2.3-22b-dev-fp8.safetensors")
 UPSAMPLER = _mpaths.p("ltx23-spatial-upscaler", r"E:\AI\Models\latent_upscale_models\ltx-2.3-spatial-upscaler-x2-1.1.safetensors")
 GEMMA = _mpaths.p("ltx23-gemma-te", r"E:\AI\Models\TextEncoders\gemma-3-ltx")   # Gemma-3 12B Lightricks (formato ltx-core)
+GEMMA_LORA = ""        # LoRA «abliterata» fusa sul ramo testo del Gemma-3 (solo LTX 2.3); "" = encoder standard
 LORA_DIR = r"E:\AI\Models\LoRA"
 # LoRA di DISTILLAZIONE ufficiale (Lightricks/LTX-2.3, 7.6GB): OBBLIGATORIA per usare i checkpoint DEV
 # (non-distilled) con la pipeline two-stage — senza, il dev esce "dematerializzato" (nuvole di voxel).
@@ -1005,6 +1013,33 @@ def _apply_te_override(p: dict) -> None:
         raise RuntimeError(f"Text encoder «{tid}» non trovato su disco: scaricalo dal tab «Pesi modelli».")
     GEMMA = path
     print(f"[release] text encoder scelto: {os.path.basename(path)}", flush=True)
+
+
+def _apply_te_lora(p: dict) -> None:
+    """LoRA Gemma «abliterata» scelta dall'utente (`ltx_te_lora` = id di catalogo): fusa sul ramo testo dell'encoder
+    al caricamento (core/gemma_lora). Parametro assente/vuoto = encoder standard. Mai ripiego silenzioso: id
+    sconosciuto, release diversa dalla 2.3 o file assente → errore chiaro."""
+    global GEMMA_LORA
+    lid = str(p.get("ltx_te_lora") or "").strip()
+    if not lid:
+        GEMMA_LORA = ""
+        return
+    from core import gemma_lora as _gl
+    GEMMA_LORA = _gl.resolve_lora_path(lid, LTX_RELEASE)
+    print(f"[release] LoRA encoder Gemma (fusa sul ramo testo): {os.path.basename(GEMMA_LORA)}", flush=True)
+
+
+def _attach_gemma_lora(pipe, ptype: str) -> None:
+    """Aggancia la LoRA Gemma ai PromptEncoder della pipeline appena costruita (prima di metterla in cache)."""
+    from core import gemma_lora as _gl
+    n = _gl.attach(pipe, GEMMA_LORA)
+    if n == 0:
+        if ptype == "hdr":                                   # la pipeline HDR non usa Gemma (scene-emb): niente da fare
+            print("[release] LoRA encoder ignorata: la pipeline HDR non codifica prompt", flush=True)
+            return
+        raise RuntimeError("LoRA encoder Gemma richiesta, ma la pipeline non ha un PromptEncoder: non genero con "
+                           "l'encoder standard al suo posto.")
+    print(f"[release] LoRA encoder agganciata a {n} PromptEncoder", flush=True)
 
 
 def _unpack_pipe(res):
@@ -1429,7 +1464,7 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         print(f"[fp8] '{os.path.basename(ckpt)}' senza input_scale → fp8_cast (fold delle scale)", flush=True)
         qmode = "fp8_cast"
     lkey = tuple((lo.path, lo.strength) for lo in loras)
-    key = (ckpt, qmode, offload_str, lkey, stages, ptype, GEMMA)   # GEMMA: il TE può cambiare a parità di ckpt
+    key = (ckpt, qmode, offload_str, lkey, stages, ptype, GEMMA, GEMMA_LORA)   # TE e sua LoRA possono cambiare a parità di ckpt
     if key in _PIPE_CACHE:
         return _PIPE_CACHE[key]
     # M5-fix: fai spazio PRIMA di costruire (com'era, la vecchia pipe restava in cache DURANTE la
@@ -1554,6 +1589,10 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         pipe = _build(InpaintPipeline,
                       distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+        if _dev_dlora is not None and os.path.exists(DISTILLED_LORA):
+            # stage 2 (piena risoluzione): col dev la distilled-LoRA ufficiale a 0.5 come negli altri rami IC (stage 1 resta a 1.0)
+            _dev_stage2_dlora(pipe, _ckpt_pipe,
+                              LoraPathStrengthAndSDOps(DISTILLED_LORA, 0.5, LTXV_LORA_COMFY_RENAMING_MAP), quant, offload)
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (canny/depth/pose)
         from ltx_pipelines.ic_lora import ICLoraPipeline
         pipe = _build(ICLoraPipeline,
@@ -1619,6 +1658,8 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     # componenti condivisi (gemma/VAE tra pipeline diverse) richiede di iniettarli nei costruttori del package
     # esterno ltx_pipelines → va fatto con ispezione + test live (rimandato).
     # (lo sfratto LRU avviene PRIMA della build, vedi sopra — qui si registra e basta)
+    if GEMMA_LORA:
+        _attach_gemma_lora(pipe, ptype)
     _PIPE_CACHE[key] = pipe
     return pipe
 
@@ -1987,10 +2028,12 @@ def _run_chunked(p: dict, chunk: int) -> str:
 
 
 def _ic_chunkable(p: dict) -> bool:
-    """True se il job con control_video si puo' spezzare in segmenti del GUIDE: niente maschere per-frame
-    (inpaint/attention mask), niente ReTake, niente riferimenti MSR (stanno fuori dalla finestra del clip)."""
+    """True se il job con control_video si puo' spezzare in segmenti del GUIDE: niente attention mask per-frame
+    generiche, niente ReTake, niente riferimenti MSR (stanno fuori dalla finestra del clip).
+    Eccezione (task 8): l'inpaint VIDEO (`inpaint_masks_dir`) si spezza, perche' `_run_chunked_ic` taglia anche le
+    maschere negli stessi segmenti (`mask_offset`); la foto di riferimento r2v vale per ogni segmento."""
     return bool(p.get("control_video")) and not (
-        p.get("inpaint_masks_dir") or p.get("attention_mask_dir") or p.get("retake") or p.get("references"))
+        p.get("attention_mask_dir") or p.get("retake") or p.get("references"))
 
 
 def _run_chunked_ic(p: dict, chunk: int) -> str:
@@ -2011,6 +2054,12 @@ def _run_chunked_ic(p: dict, chunk: int) -> str:
     total = min(int(p["num_frames"]), int(info.nb_frames))
     if total < int(p["num_frames"]):
         print(f"[iclora] il guide ha {info.nb_frames} frame < num_frames {p['num_frames']}: uso {total}", flush=True)
+    if p.get("inpaint_masks_dir"):                           # inpaint video: una maschera per frame, stessa finestra del guide
+        import glob as _gl
+        _nm = len(_gl.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
+        if 0 < _nm < total:
+            print(f"[iclora] {_nm} maschere < {total} frame: uso {_nm}", flush=True)
+            total = _nm
     ov = max(0, int(p.get("overlap_frames", 0) or 0)) or prep.DEFAULT_OVERLAP
     segs = prep.plan_segments(total, chunk, ov)
     ovs = prep.overlaps_of(segs)
@@ -2043,8 +2092,10 @@ def _run_chunked_ic(p: dict, chunk: int) -> str:
         for k in ("chunk_frames", "overlap_frames", "ic_frame0_image"):
             cp.pop(k, None)
         cp.update(control_video=sub, num_frames=sg.count, output=outp)
-        if sg.index > 0:
-            cp.pop("image_path", None)
+        if p.get("inpaint_masks_dir"):
+            cp["mask_offset"] = int(sg.start)                # le maschere seguono il segmento (vedi ramo vinpaint)
+        if sg.index > 0 and not p.get("r2v_every_segment"):
+            cp.pop("image_path", None)                       # r2v: la foto e' l'identita' dell'oggetto, vale per ogni segmento
         print(f"[iclora] segmento {sg.index + 1}/{len(segs)}: frame {sg.start}-{sg.end - 1} ({sg.count}f)",
               flush=True)
         run_generation(cp)                                   # GenerationCancelled propaga; NIENTE retry silenzioso
@@ -2296,6 +2347,7 @@ def run_generation(p: dict) -> str:
     import time
     _apply_release(p.get("ltx_release"))                     # rilega i componenti alla release del job
     _apply_te_override(p)                                    # TE alternativo scelto (es. Gemma 4 uncensored)
+    _apply_te_lora(p)                                        # LoRA Gemma abliterata (2.3) sul ramo testo, se scelta
     _EMB_CTX["enabled"] = bool(p.get("emb_cache", True))     # preferenza dai params (vale anche col server)
     _install_step_progress()
     if p.get("t2a"):                                          # #29 text→audio (no video)
@@ -2571,16 +2623,32 @@ def run_generation(p: dict) -> str:
         import glob as _glob
         from workers.ltx_inpaint_cond import load_mask_tensor
         mks = sorted(_glob.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
+        mks = mks[int(p.get("mask_offset", 0) or 0):]        # segmento di un clip lungo: finestra di maschere del segmento
         nf = min(nf, len(mks))
         masks_t = load_mask_tensor(mks[:nf], int(p.get("height", 320)), int(p.get("width", 512)),
                                    dilate=int(p.get("mask_dilate", 24)), blur=float(p.get("mask_blur", 6.0)))
+        # r2v: foto di riferimento dell'oggetto da inserire = immagine di condizionamento (frame 0). Senza foto
+        # (LoRA t2v) `images` resta vuoto come prima. `r2v_mode`: oggi solo "frame0" (il file LoRA non documenta il formato).
+        _rf = int(p.get("r2v_frame", 0) or 0)                # 0 = sostituisce il latente del primo frame; >0 / -1 = keyframe aggiunto
+        _rf = (nf - 1) if _rf < 0 else min(_rf, nf - 1)
+        imgs = ([ImageConditioningInput(p["image_path"], _rf, float(p.get("ref_strength", 0.8)), 33)]
+                if p.get("image_path") else [])
+        if imgs:
+            print(f"[inpaint-r2v] riferimento={os.path.basename(p['image_path'])} frame {_rf} "
+                  f"forza={float(p.get('ref_strength', 0.8)):.2f} mode={p.get('r2v_mode', 'frame0')}", flush=True)
         video = pipe.inpaint(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 320)), width=int(p.get("width", 512)),
-            num_frames=nf, frame_rate=fps, attention_mask=masks_t,
+            num_frames=nf, frame_rate=fps, attention_mask=masks_t, images=imgs,
+            stage2=bool(p.get("inpaint_stage2", False)),
             video_conditioning=[(p["control_video"], float(p.get("control_strength", 0.5)))],
             cfg_scale=float(p.get("cfg_scale", 5.0)), num_steps=int(p.get("num_steps", 30)))
         audio = None
+        if p.get("inpaint_composite", False):                # fuori dalla maschera = sorgente ORIGINALE (pixel), bordo sfumato
+            from workers.ltx_inpaint_composite import composite_outside_mask
+            video = composite_outside_mask(video, p["control_video"], masks_t)
+            print("[inpaint] sfondo originale rimesso fuori dalla maschera (composizione in pixel)", flush=True)
+        print("[inpaint] stage2=%s composite=%s" % (bool(p.get("inpaint_stage2")), bool(p.get("inpaint_composite"))), flush=True)
     elif ptype == "a2v":                                     # AUDIO→VIDEO nativo: foto + canzone → canto
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
         video, audio, _nf_eff = _unpack_pipe(pipe(

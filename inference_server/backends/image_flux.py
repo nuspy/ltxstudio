@@ -739,8 +739,9 @@ def _assemble_flux(Pipe, transformer_path: str, arch: str = "flux"):
         te = STORE.acquire("clip_l", lambda: CLIPTextModel.from_pretrained(
             os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16)); got.append("clip_l")
         _step("CLIP-L acquisito")
-        te2 = STORE.acquire("t5xxl", lambda: T5EncoderModel.from_pretrained(
-            os.path.join(TE_DIR, "t5xxl"), torch_dtype=bf16)); got.append("t5xxl")
+        # T5: cartella HF fp16 (storico) se c'è; altrimenti single-file fp8 «t5xxl_enconly» / fp16 (t5_single_file)
+        from inference_server.backends import t5_single_file as _t5sf
+        te2 = STORE.acquire("t5xxl", lambda: _t5sf.make_loader(TE_DIR, bf16)()); got.append("t5xxl")
         _step("T5-XXL acquisito (9GB)")
     except Exception:
         for k in got:
@@ -925,7 +926,7 @@ def _assemble_flux2(Pipe, transformer_path: str, klein_te_dir: str | None = None
     return Pipe(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
 
 
-def _assemble_ernie():
+def _assemble_ernie(transformer_path: str | None = None):
     """Assembla ErnieImagePipeline (Baidu ERNIE-Image) da pesi LOCALI, con shim per transformers <5
     (il repo diffusers vuole transformers 5: TokenizersBackend / Ministral3 / model_type 'ministral3').
     transformer (single-file, chiavi 1:1) + text-encoder Mistral3 (single-file, remap model.→language_model.)
@@ -944,7 +945,8 @@ def _assemble_ernie():
         transformers.TokenizersBackend = PreTrainedTokenizerFast
     # transformer: config dal repo + pesi dal single-file (chiavi identiche, 409/409)
     tr = ErnieImageTransformer2DModel.from_config(json.load(open(os.path.join(ERNIE_REPO, "transformer", "config.json"))))
-    tr.load_state_dict(load_file(ERNIE_TRANSFORMER), assign=True)
+    # transformer scelto (ernie-image / ernie-image-turbo: stesse chiavi e config) o, senza scelta, il base
+    tr.load_state_dict(load_file(transformer_path or ERNIE_TRANSFORMER), assign=True)
     tr = tr.to(bf16)
     # text encoder Mistral3: 'ministral3' (sconosciuto a transformers 4) → 'ministral' + sliding_window=full
     tcfg = json.load(open(os.path.join(ERNIE_REPO, "text_encoder", "config.json")))
@@ -978,6 +980,8 @@ def _auto_settings(arch: str, model: str) -> tuple[int, float, bool]:
             "flux2_kontext": 4.0, "zimage": 3.5, "ernie": 4.5}.get(arch, 3.5)
     if hyper:
         steps, guid = 8, min(guid, 3.5)
+        if arch == "ernie":                              # ERNIE-Image-Turbo (DMD): 8 step, guidance 1.0 (scheda ufficiale)
+            guid = 1.0
     return steps, guid, hyper
 
 
@@ -1056,12 +1060,13 @@ def preload_shared_components() -> None:
     import torch
     from transformers import CLIPTextModel, T5EncoderModel
     from diffusers import AutoencoderKL
+    from inference_server.backends import t5_single_file as _t5sf   # T5: cartella fp16 o single-file fp8
     from inference_server.component_store import STORE
     bf16 = torch.bfloat16
     _vae_dt = torch.float32 if os.environ.get("NATIVE_VAE_FP32") == "1" else bf16
     loaders = {
         "clip_l": lambda: CLIPTextModel.from_pretrained(os.path.join(TE_DIR, "clip_l"), torch_dtype=bf16),
-        "t5xxl": lambda: T5EncoderModel.from_pretrained(os.path.join(TE_DIR, "t5xxl"), torch_dtype=bf16),
+        "t5xxl": lambda: _t5sf.make_loader(TE_DIR, bf16)(),
         "vae_flux": lambda: AutoencoderKL.from_single_file(
             AE_FLUX, config=os.path.join(TE_DIR, "flux_vae"), torch_dtype=_vae_dt),
     }
@@ -1205,7 +1210,8 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             except Exception as _e:                          # noqa: BLE001 — fallback: load normale
                 print(f"[flux2] riuso sorella Klein fallito ({_e}) → load completo", flush=True)
     if arch == "ernie":
-        pipe = _assemble_ernie()                            # assemblaggio locale (shim transformers <5)
+        pipe = _assemble_ernie(model_path if (is_file and str(model_path).lower().endswith(".safetensors")) else None)
+        # assemblaggio locale (shim transformers <5); il PE (6.4GB) NON entra qui: ernie_pe lo carica solo su «Migliora prompt»
     elif arch.startswith("flux2") and is_file:
         # FLUX.2: transformer locale + VAE locale + TE Mistral HF (assemblaggio, anche inpaint/kontext)
         pipe = _assemble_flux2(Pipe, model_path, _klein_te_dir(klein_te))
@@ -1625,6 +1631,16 @@ def run(params: dict, mm, output_dir: str) -> dict:
     _step_reset(params.get("_t_button"))                    # timeline ancorata al click "Genera" (wall-clock GUI)
     _step(f"run() START nel figlio (arch={_arch_of(params)}) — prima riga dopo spawn+import")
     arch = _arch_of(params)
+    if arch == "ernie" and params.get("enhance") and str(params.get("prompt") or "").strip():
+        # «Migliora prompt» su ERNIE-Image: PE ufficiale caricato SOLO ora e scaricato prima del DiT (ernie_pe)
+        from inference_server.backends import ernie_pe as _epe
+        if _epe.available(ERNIE_REPO):
+            preview_bus.set_message("Migliora prompt (ERNIE PE)…")
+            params = dict(params, prompt=_epe.enhance(str(params["prompt"]), int(params.get("width") or 1024),
+                                                      int(params.get("height") or 1024), ERNIE_REPO))
+        else:
+            print("[ernie-pe] «Migliora prompt» attivo ma mancano i pesi pe/model.safetensors: prompt non migliorato",
+                  flush=True)
     model = params.get("model") or _default_model(arch)   # fix KeyError 'model' (music-video/LoRA/API)
     if not params.get("model"):
         print(f"[image] modello non specificato → default {os.path.basename(model)}", flush=True)

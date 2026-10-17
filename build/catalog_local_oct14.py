@@ -13,6 +13,7 @@ REFRESH_IDS = (
     "flux1-fuxcapacity", "flux1-getphat", "flux1-dev-nunchaku-fp4", "flux1-kontext-nunchaku-fp4",
     "flux2-dev-nvfp4", "ltx23-dev-gguf-q6k", "ltx23-dev-nvfp4", "ltx23-gguf-q4-distilled",
     "te-gemma3-lyrics", "te-flux1-clip-l-diffusers", "te-flux1-t5xxl-diffusers",
+    "ernie-image-turbo", "ernie-image-pe", "gemma3-abliterated-lora",
 )
 
 # voci ritirate da questo giro (sostituite da una versione migliore)
@@ -45,24 +46,24 @@ def entries(N):
         N("flux1-fuxcapacity-nsfw-fp8", "Immagini", "fuxCapacity NSFW Porn Flux 2.0 (FLUX.1 dev, 18+, fp8, 11.08GB)",
           category="image", arch="flux1", type="diffusion_models", family="Flux",
           filename="fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors", gb=11.08, sens="adult", no_remote=True,
-          deps=["flux-vae-ae", "t5xxl-fp16"],
+          deps=["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"],
           scan=["fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors",
                 "fuxCapacityNSFWPornFlux_20_(SwarmUI).safetensors.normalized.safetensors"],
           note="Checkpoint FLUX.1 dev NSFW (import locale). Il .normalized accanto è la cache generata da image_flux."),
         N("flux1-getphat-v23-softcore-fp8", "Immagini", "getphat Flux Reality v23 Softcore (FLUX.1 dev, 18+, fp8, 11.08GB)",
           category="image", arch="flux1", type="diffusion_models", family="Flux",
           filename="getphat Flux Reality v23 Softcore FP8.safetensors", gb=11.08, sens="adult", no_remote=True,
-          deps=["flux-vae-ae", "t5xxl-fp16"],
+          deps=["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"],
           note="Checkpoint FLUX.1 dev NSFW fp8 (780 tensori F8_E4M3). Nome senza parole chiave: il flag 18+ viene da qui."),
         N("flux1-dev-nunchaku-fp4", "Immagini", "FLUX.1 dev nunchaku SVDQ fp4 r32 (Blackwell, 6.56GB)",
           category="image", arch="flux1", repo="nunchaku-ai/nunchaku-flux.1-dev",
           type="diffusion_models", family="Flux/nunchaku", filename="svdq-fp4_r32-flux.1-dev.safetensors", gb=6.56,
-          deps=["flux-vae-ae", "t5xxl-fp16"],
+          deps=["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"],
           note="Caricato dal motore nunchaku (image_flux._load_nunchaku_flux_tr): richiede la wheel nunchaku e una RTX 50xx."),
         N("flux1-kontext-nunchaku-fp4", "Immagini", "FLUX.1 Kontext dev nunchaku SVDQ fp4 r32 (Blackwell, 6.56GB)",
           category="image", arch="flux1", repo="nunchaku-ai/nunchaku-flux.1-kontext-dev",
           type="diffusion_models", family="Flux/nunchaku", filename="svdq-fp4_r32-flux.1-kontext-dev.safetensors", gb=6.56,
-          deps=["flux-vae-ae", "t5xxl-fp16"],
+          deps=["flux-vae-ae", "t5xxl-fp16|t5xxl-enconly-fp8"],
           note="Come flux1-dev-nunchaku-fp4, per l'editing Kontext."),
 
         # ───────── FLUX.2 dev: NVFP4 (versione migliore, sostituisce l'fp8 da 35 GB) ─────────
@@ -108,4 +109,28 @@ def entries(N):
           category="image", arch="flux1", kind="snapshot", type="diffusers", family="_te",
           tool_dest=r"E:\AI\Models\diffusers\_te\t5xxl", gb=9.12, no_remote=True,
           note="Letto da image_flux (TE_DIR). Doppione di TextEncoders/t5xxl_fp16: dedup SOLO con hardlink, mai cancellare."),
+
+        # ───────── ERNIE-Image: Turbo (single-file nativo) + prompt enhancer ufficiale ─────────
+        N("ernie-image-turbo", "Immagini", "ERNIE-Image Turbo (DMD, 8 passi, bf16 single-file, 15GB)",
+          category="image", arch="ernie", type="diffusion_models", family="Ernie",
+          filename="ernie-image-turbo.safetensors", gb=15.0, no_remote=True, deps=["ernie-image"],
+          scan=["ernie-image-turbo"],
+          note="Da ernie-image-turbo-BF16.gguf (core.gguf_to_safetensors, lossless; l'originale resta). Stesse chiavi e "
+               "config del base. 8 passi, guidance 1.0 (scheda Baidu). Fonte ufficiale Baidu/ERNIE-Image-Turbo: shard "
+               "diffusers da fondere in un file (non automatico)."),
+        N("ernie-image-pe", "Immagini", "ERNIE-Image prompt enhancer (Ministral-3 3B, bf16, 7.7GB)",
+          category="image", arch="ernie", repo="baidu/ERNIE-Image", remote="pe/model.safetensors",
+          filename="model.safetensors", tool_dest=r"E:\AI\Models\diffusers\Ernie\ERNIE-Image\pe", gb=7.7,
+          used_by=["cap.gen_images"], scan=["ernie-image-prompt-enhancer"],
+          note="Caricato SOLO con «Migliora prompt» su ERNIE-Image e scaricato subito dopo (inference_server/backends/"
+               "ernie_pe). Il file locale ernie-image-prompt-enhancer.safetensors (6.4GB, senza lm_head) va spostato in "
+               "pe/model.safetensors."),
+
+        # ───────── LTX-2.3: LoRA Gemma-3 «abliterata» fusa sul ramo testo dell'encoder ─────────
+        N("gemma3-abliterated-lora", "Video", "LoRA Gemma-3 abliterata (encoder LTX 2.3, rank 64, 0.59GB)",
+          category="video", arch="ltx23", type="TextEncoders", family="LTX",
+          filename="gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", gb=0.59, sens="adult",
+          no_remote=True, deps=["ltx23-gemma-te"], scan=["gemma-3-12b-it-abliterated_lora"],
+          note="Fusa sul ramo TESTO del Gemma-3 al caricamento (core/gemma_lora); solo LTX 2.3. Origine Civitai (nessuna "
+               "fonte remota verificata). NON nella cartella LoRA: lì il filtro la scambierebbe per una LoRA video."),
     ]
