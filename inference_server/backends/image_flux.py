@@ -1109,6 +1109,23 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             print(f"[flux] arch '{arch}' richiesto ma il checkpoint è FLUX.2 (128 canali) → uso '{_new}'.")
             arch = _new
 
+    # FLUX.2 DEV non ha pipeline inpaint/edit: Flux2KleinInpaintPipeline/Flux2KleinPipeline vogliono un Klein
+    # (distillato, SENZA guidance_in, norme `.weight`, encoder Qwen3). Il Dev ha `guidance_in`, norme `.scale`
+    # e txt_in 15360 (Mistral): `klein_config_from_header` moriva con un KeyError
+    # 'double_blocks.0.img_attn.norm.query_norm.weight' (visto il 16/10 01:22 con flux2-dev-nvfp4-mixed) che
+    # non dice cosa fare. Errore chiaro PRIMA di toccare i pesi.
+    if arch in ("flux2_inpaint", "flux2_kontext") and Path(model_path).is_file()             and model_path.lower().endswith(".safetensors"):
+        try:
+            from core.model_detect import read_header
+            _hk = read_header(model_path)[0]
+            _is_dev = any("guidance_in" in _k for _k in _hk)
+        except Exception:                                   # noqa: BLE001 — header illeggibile: decide il loader
+            _is_dev = False
+        if _is_dev:
+            raise RuntimeError(
+                f"«{Path(model_path).name}» è FLUX.2 Dev: non ha una pipeline di inpaint/edit. "
+                f"Per inpaint/edit con FLUX.2 serve una variante Klein (es. miraclein_flux2klein_nsfw_v2).")
+
     # FLUX.1 (flux/kontext/inpaint) in formato BFL/SwarmUI col prefisso model.diffusion_model. →
     # normalizza (strip prefisso, cache) altrimenti from_single_file fallisce. flux2/Klein gestiscono da sé.
     if arch in ("flux", "kontext", "inpaint") and Path(model_path).is_file():
