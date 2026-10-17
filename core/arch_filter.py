@@ -164,6 +164,8 @@ def is_t2i_for_arch(arch_label: str, rel: str) -> bool:
     c = classify(rel)
     if c["family"] not in ARCH_FAMILIES.get(arch_label, set()):
         return False
+    if c["role"] in ("controlnet", "control_lora"):   # adattatori di controllo: mai un modello di generazione
+        return False
     if arch_label == "FLUX":                     # i non-generativi vivono nei pannelli di modifica
         if c["role"] in ("inpaint", "adapter", "controlnet", "control_lora") or c["variant"] in ("fill", "kontext", "redux", "klein"):
             return False
