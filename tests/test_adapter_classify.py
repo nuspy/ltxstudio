@@ -47,3 +47,19 @@ def test_cache_version_invalidates_old_entries(tmp_path, monkeypatch):
     (tmp_path / "md.json").write_text(__import__("json").dumps({p: old}), "utf-8")
     assert md.get(p)["role"] == "controlnet"
     md._MEM.update({"cache": None, "mtime": None})
+
+
+def test_image_function_backend_matrix():
+    """ControlNet/Redux: solo FLUX.1 e Z-Image (Redux solo FLUX.1); mai FLUX.2, Krea 2, Qwen, Ernie."""
+    f = af.image_function_backend
+    assert f("controlnet", "Z-Image") == "zimage_cn" and f("redux", "Z-Image") == ""
+    assert f("controlnet", "FLUX") == "flux_cn" and f("redux", "FLUX") == "flux_redux"       # nessun modello: FLUX.1 di default
+    for arch in ("Krea 2", "Qwen-Image 2.1", "Ernie"):
+        assert f("controlnet", arch) == "" and f("redux", arch) == ""
+    assert f("boh", "FLUX") == ""
+    p = rf"{M}\Flux\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors"
+    if os.path.isfile(p):
+        assert f("controlnet", "FLUX", r"Flux\FLUX_2_Dev_FP8_Mixed_Scaled.safetensors") == ""
+    q = rf"{M}\Flux\FLUX_Dev.safetensors"
+    if os.path.isfile(q):
+        assert f("controlnet", "FLUX", r"Flux\FLUX_Dev.safetensors") == "flux_cn"
