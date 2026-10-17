@@ -312,6 +312,13 @@ class _FakeFluxPipe:
     def remove_all_hooks(self):
         pass
 
+    def unload_lora_weights(self):
+        pass
+
+    def __call__(self, **kw):
+        from PIL import Image
+        return types.SimpleNamespace(images=[Image.new("RGB", (64, 64))])
+
 
 def _patch_load_env(monkeypatch, image_flux, dm):
     import diffusers
@@ -430,3 +437,30 @@ def test_run_model_stays_resident_after_generation_and_siblings_survive(flux, mo
     r3 = image_flux.run({"arch": "flux", "model": str(b), "prompt": "z", "seed": 3, "steps": 2}, mm, out)
     assert r3["status"] == "success", r3
     assert k_crea not in mm._cache and f"flux:{b}" in mm._cache
+
+
+def test_run_and_real_load_create_then_inpaint_same_file_one_full_load(flux, monkeypatch, tmp_path):
+    """Integrazione: run() REALE + _load() REALE (solo il costruttore dei pesi è finto). «Crea» col path relativo,
+    «modifica» col path assoluto dello stesso file: 1 solo load completo, from_pipe per la seconda, entrambe
+    residenti; con un file DIVERSO il load è vero e la sorella di prima si sfratta."""
+    image_flux, dm = flux
+    from inference_server.model_manager import ModelManager
+    a = dm / "Flux" / "FLUX_Dev.safetensors"; _tiny_flux_file(a)
+    b = dm / "Flux" / "Krea.safetensors"; _tiny_flux_file(b)
+    loads = _patch_load_env(monkeypatch, image_flux, dm)
+    img, msk = _patch_run_env(monkeypatch, image_flux, tmp_path)
+    monkeypatch.setattr(image_flux, "_measure_pipe_mb", lambda p: 100)
+    _FakeFluxPipe.from_pipe_calls = 0
+    mm = ModelManager()
+    out = str(tmp_path / "out")
+    r1 = image_flux.run({"arch": "flux", "model": "Flux\FLUX_Dev.safetensors", "prompt": "x", "seed": 1,
+                         "steps": 2}, mm, out)
+    assert r1["status"] == "success", r1
+    r2 = image_flux.run({"arch": "inpaint", "model": str(a), "prompt": "y", "seed": 2, "steps": 2,
+                         "image_path": img, "mask_path": msk}, mm, out)
+    assert r2["status"] == "success", r2
+    assert len(loads) == 1 and _FakeFluxPipe.from_pipe_calls == 1                 # nessun nuovo load
+    assert len(mm._cache) == 2                                                     # crea e modifica entrambe residenti
+    r3 = image_flux.run({"arch": "flux", "model": str(b), "prompt": "z", "seed": 3, "steps": 2}, mm, out)
+    assert r3["status"] == "success", r3
+    assert len(loads) == 2 and len(mm._cache) == 1                                 # pesi diversi: load vero + sfratto
