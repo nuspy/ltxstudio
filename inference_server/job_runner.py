@@ -42,11 +42,13 @@ def main() -> int:
     _ti = _t.perf_counter()
     from inference_server.model_manager import ModelManager
     from inference_server.backends import image_flux, image_upscale, image_segment, video_postprocess
+    from inference_server.backends import magicquill_v2          # MagicQuill V2 su Kontext (task 9; CC BY-NC)
     from inference_server.backends import image_control
     print(f"[step-child] import torch/diffusers/backends = {_t.perf_counter()-_ti:.1f}s "
           f"(overhead figlio fresco per-job)", flush=True)
     handlers = {
         "image": image_flux.run,
+        "image_mq": magicquill_v2.run,
         "image_control": image_control.run,
         "upscale": image_upscale.run,
         "segment": image_segment.run,
