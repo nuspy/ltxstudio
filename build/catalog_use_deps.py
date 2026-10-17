@@ -43,7 +43,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx-iclora-deinterlace": (["iclora_edit"], []),
     "ltx-iclora-motiondeblur": (["iclora_edit"], []),
     "ltx-iclora-hdr": (["iclora_edit"], []),
-    "ltx-iclora-lipdub": (["iclora_edit"], []),
+    "ltx-iclora-lipdub": (["iclora_edit"], ["ltx23-distilled-lora-384|ltx23-distilled-fp8"]),   # dev + distilled-LoRA, oppure distilled
     "ltx-iclora-restyle": (["iclora_edit"], []),
     "ltx-iclora-cameraman": (["iclora_edit"], []),
     "ltx-iclora-cameraman-v2": (["iclora_edit"], []),

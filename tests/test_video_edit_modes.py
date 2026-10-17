@@ -54,10 +54,17 @@ def test_ceilings_valid():
 
 
 def test_disabled_phases():
-    for k, ph in (("lipdub", "1b"), ("hdr", "1c")):
-        s = M.MODE_SPECS[k]
-        assert (s.phase, s.enabled, s.distilled) == (ph, False, M.DISTILLED_REQUIRED)
-    assert all(s.enabled for k, s in M.MODE_SPECS.items() if k not in ("lipdub", "hdr"))
+    s = M.MODE_SPECS["hdr"]
+    assert (s.phase, s.enabled, s.distilled) == ("1c", False, M.DISTILLED_REQUIRED)
+    assert all(s.enabled for k, s in M.MODE_SPECS.items() if k != "hdr")
+
+
+def test_lipdub_spec():
+    """Lip dub (fase 1b): abilitato, non spezzabile, voce nuova (niente mux dell'audio originale), cap dedicata."""
+    s = M.MODE_SPECS["lipdub"]
+    assert (s.phase, s.enabled, s.kind, s.cap) == ("1b", True, "lipdub", "cap.video_lipdub")
+    assert s.needs_audio_in_video and not s.keep_audio and not s.chunkable and s.needs_prompt == M.NEEDS_REQUIRED
+    assert s.max_frames_per_segment == 249 and M.segments_needed(1000, "lipdub") == 1
 
 
 def test_modes_for_family():
@@ -67,9 +74,9 @@ def test_modes_for_family():
                                                              "motiondeblur", "detailer"]
     assert [s.key for s in M.modes_for_family("repair", include_disabled=True)][-1] == "hdr"
     assert [s.key for s in M.modes_for_family("outpaint")] == ["outpaint"]
-    assert M.modes_for_family("lipdub") == []
+    assert [s.key for s in M.modes_for_family("lipdub")] == ["lipdub"]
     assert [s.key for s in M.modes_for_family("camera")] == ["cameraman"]
-    assert "lipdub" not in M.families() and "lipdub" in M.families(include_empty=True)
+    assert "lipdub" in M.families() and "hdr" not in [s.key for f in M.families() for s in M.modes_for_family(f)]
 
 
 def test_every_mode_in_exactly_one_family():
@@ -105,7 +112,8 @@ def test_i18n_key_shapes():
 def test_spec_for_kind_and_get_spec():
     assert M.spec_for_kind("outpaint").key == "outpaint"
     assert M.spec_for_kind("union").key == "replace_char"
-    assert M.spec_for_kind("lipdub") is None            # disabilitata
+    assert M.spec_for_kind("lipdub").key == "lipdub"
+    assert M.spec_for_kind("hdr") is None               # disabilitata (fase 1c)
     assert M.spec_for_kind("nope") is None
     with pytest.raises(KeyError):
         M.get_spec("nope")
@@ -132,5 +140,5 @@ def test_snap_and_segments_needed():
 
 def test_ic_kinds_list():
     assert "cameraman" in M.ICLORA_VIDEO_KINDS and "motion-track" in M.ICLORA_VIDEO_KINDS
-    assert "lipdub" not in M.ICLORA_VIDEO_KINDS and "hdr" not in M.ICLORA_VIDEO_KINDS
+    assert "lipdub" in M.ICLORA_VIDEO_KINDS and "hdr" not in M.ICLORA_VIDEO_KINDS
     assert "canny" not in M.ICLORA_VIDEO_KINDS

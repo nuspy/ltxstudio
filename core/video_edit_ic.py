@@ -97,6 +97,59 @@ def missing_weight(spec: vem.ModeSpec) -> str:
             f"Scaricalo dal tab «Pesi modelli» (id catalogo {spec.catalog_id}).")
 
 
+# ── lip dub (testo → nuova voce + labbra; ricetta ufficiale Lightricks, vedi video_edit_modes) ──────
+# Nome INGLESE della lingua (e' testo del prompt per il modello, non della GUI): chiave = codice breve.
+LIPDUB_LANGUAGES: tuple[tuple[str, str], ...] = (
+    ("", ""), ("it", "Italian"), ("en", "English"), ("es", "Spanish"), ("fr", "French"), ("de", "German"),
+    ("pt", "Portuguese"), ("ru", "Russian"), ("zh", "Chinese"), ("ja", "Japanese"), ("ko", "Korean"),
+    ("ar", "Arabic"), ("hi", "Hindi"), ("uk", "Ukrainian"), ("el", "Greek"), ("he", "Hebrew"), ("hu", "Hungarian"),
+)
+
+
+def lipdub_language_name(lang: str) -> str:
+    """Nome inglese della lingua dal codice breve (it, es, ...); un nome libero passa invariato; '' = nessuna."""
+    lang = (lang or "").strip()
+    return dict(LIPDUB_LANGUAGES).get(lang.lower(), lang)
+
+
+def compose_lipdub_prompt(line: str, language: str = "", scene: str = "") -> str:
+    """Prompt nel formato dell'esempio ufficiale: `<scena>, speaking in <Lingua> saying: "<battuta>"`.
+    La battuta va nell'alfabeto della lingua parlata (il modello NON traduce). Senza scena: «A person»."""
+    line = " ".join((line or "").split())
+    if not line:
+        return ""
+    scene = (scene or "").strip().rstrip(",.")
+    lang = lipdub_language_name(language)
+    head = scene if scene else "A person"
+    where = " in " + lang if lang else ""
+    return head + ", speaking" + where + ' saying: "' + line.replace('"', "'") + '"'
+
+
+def estimate_speech_seconds(text: str) -> float:
+    """Stima GROSSOLANA (euristica, non misurata) della durata di una battuta parlata: ~2,5 parole/s per le
+    lingue alfabetiche, ~4,5 caratteri/s per cinese/giapponese/coreano. Serve solo ad avvisare."""
+    t = " ".join((text or "").split())
+    if not t:
+        return 0.0
+    cjk = sum(1 for c in t if "\u3040" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af")
+    if cjk >= 0.3 * len(t.replace(" ", "")):
+        return cjk / 4.5
+    return len(t.split()) / 2.5
+
+
+LIPDUB_TOO_SHORT, LIPDUB_TOO_LONG = 0.6, 1.25
+
+
+def lipdub_text_fit(line: str, video_seconds: float) -> tuple[str, float]:
+    """('ok'|'short'|'long'|'unknown', stima_s). Ufficiale: testo troppo lungo = parole saltate, troppo corto =
+    voce lenta e innaturale; l'uscita dura sempre quanto il video sorgente."""
+    est = estimate_speech_seconds(line)
+    if est <= 0 or video_seconds <= 0:
+        return "unknown", est
+    r = est / video_seconds
+    return ("short" if r < LIPDUB_TOO_SHORT else "long" if r > LIPDUB_TOO_LONG else "ok"), est
+
+
 # ── job ───────────────────────────────────────────────────────────────────────────────────────────
 @dataclass
 class IcJob:
@@ -155,11 +208,16 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
         raise IcJobError(f"video troppo corto ({total} frame, minimo 9)")
     fps = int(round(info.fps or 25))
     prompt = (cfg.get("prompt") or "").strip()
+    if spec.key == "lipdub" and not prompt:                         # prompt libero vince; altrimenti si compone
+        prompt = compose_lipdub_prompt(cfg.get("lipdub_line", ""), cfg.get("lipdub_lang", ""),
+                                       cfg.get("lipdub_scene", ""))
     if spec.needs_prompt == vem.NEEDS_REQUIRED and not prompt:
-        raise IcJobError("prompt mancante")
+        raise IcJobError("battuta/prompt mancante" if spec.key == "lipdub" else "prompt mancante")
 
+    # lipdub: forza del riferimento fissa (workflow ufficiale: 1.0), non regolabile
+    _strength = spec.default_strength if spec.key == "lipdub" else float(cfg.get("strength", spec.default_strength))
     p: dict = {"prompt": prompt, "negative": "worst quality, blurry", "control_type": spec.kind,
-               "edit_lora": "", "control_strength": float(cfg.get("strength", spec.default_strength)),
+               "edit_lora": "", "control_strength": float(_strength),
                "conditioning_attention": float(cfg.get("conditioning_attention", 1.0)),
                "fps": fps, "seed": int(cfg.get("seed", 42)), "output": output, "_strict_ic": True}
     for k in ("model", "gguf_transformer", "ltx_release"):          # checkpoint come scelto, mai sostituito
@@ -227,6 +285,23 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
         p["width"], p["height"] = w, h
         if spec.min_long_edge and max(w, h) < spec.min_long_edge:
             notes.append(f"risoluzione {w}x{h} sotto il minimo consigliato ({spec.min_long_edge}px lato lungo)")
+
+    if spec.key == "lipdub":
+        vsec = n_total / float(fps)
+        if cfg.get("lipdub_line") and not (cfg.get("prompt") or "").strip():
+            fit, est = lipdub_text_fit(cfg.get("lipdub_line", ""), vsec)
+            if fit == "long":
+                notes.append(f"battuta lunga (~{est:.1f} s di parlato per un video di {vsec:.1f} s): il modello "
+                             "potrebbe saltare delle parole; accorcia il testo")
+            elif fit == "short":
+                notes.append(f"battuta corta (~{est:.1f} s di parlato per un video di {vsec:.1f} s): la voce potrebbe "
+                             "risultare lenta e innaturale; allunga il testo")
+        adur = prep.audio_duration(src)
+        if adur and vsec - adur > 0.5:
+            notes.append(f"la traccia audio ({adur:.1f} s) e' piu' corta del video ({vsec:.1f} s): il riferimento "
+                         "della voce e' incompleto")
+        notes.append(f"la durata dell'uscita e' quella del video sorgente ({vsec:.1f} s); la voce e' generata dal "
+                     "modello (non si fornisce un audio esterno)")
 
     p["num_frames"] = vem.snap_frames(n_total)
     nseg = vem.segments_needed(p["num_frames"], spec)

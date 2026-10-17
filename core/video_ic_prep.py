@@ -152,6 +152,16 @@ def has_audio(path: str) -> bool:
     return bool((r.stdout or "").strip())
 
 
+def audio_duration(path: str) -> float:
+    """Durata (s) della prima traccia audio del file, 0.0 se assente o ignota."""
+    try:
+        r = _run([ffprobe_path(), "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration",
+                  "-of", "csv=p=0", str(path)], 120)
+        return float((r.stdout or "").strip().splitlines()[0])
+    except Exception:                                                # noqa: BLE001 — assente/N/A
+        return 0.0
+
+
 def snap_frames(n: int) -> int:
     """Il piu' grande 8k+1 <= n (min 9)."""
     n = int(n)

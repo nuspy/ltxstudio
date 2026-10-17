@@ -11,7 +11,7 @@ Concetti
 - `ModeSpec.distilled`  "required" (la funzione non esiste senza checkpoint distilled) | "recommended"
                         (col dev la distilled-LoRA vale solo per lo stage 1: qualita' ridotta, vedi memoria
                         iclora-distilled-lora-mancante). La GUI avvisa/blocca, MAI cambia il modello da sola.
-- `phase` / `enabled`   le modalita' non ancora implementate (lipdub 1b, hdr 1c) esistono come spec ma
+- `phase` / `enabled`   le modalita' non ancora implementate (hdr 1c) esistono come spec ma
                         `enabled=False`: non vanno mostrate come selezionabili.
 
 TETTI (`max_long_edge`, `max_frames_per_segment`) — PRUDENTI, NON MISURATI dal vivo (DESIGN §7: i test live
@@ -153,12 +153,16 @@ MODE_SPECS: dict[str, ModeSpec] = {s.key: s for s in (
        catalog_id="ltx-iclora-outpaint", note_key="vedit.note_outpaint", cap="cap.video_outpaint",
        needs_prompt=NEEDS_OPTIONAL, preprocess=PRE_OUTPAINT,
        max_long_edge=1280, max_frames_per_segment=97),               # tetto sul CANVAS finale
-    # ── famiglia Lip dub (fase 1b: non implementata) ──────────────────────────────────────────────
+    # ── famiglia Lip dub (fase 1b) ────────────────────────────────────────────────────────────────
+    # Ricetta ufficiale Lightricks (JUST-DUB-IT, ComfyUI-LTXVideo example_workflows/2.3/
+    # LTX-2.3_ICLoRA_Lipdub_Two_Stage_Distilled.json + ltx_pipelines.lipdub.LipDubPipeline): il video sorgente
+    # CON la sua traccia audio e' il riferimento video+audio; il NUOVO TESTO nel prompt genera nuova voce e nuove
+    # labbra (NON si fornisce un file audio esterno). Durata dell'uscita = durata del sorgente. Un solo parlante.
     _s(key="lipdub", family=FAMILY_LIPDUB, i18n_key="vedit.mode.lipdub", kind="lipdub",
        catalog_id="ltx-iclora-lipdub", note_key="vedit.note_lipdub", cap="cap.video_lipdub",
-       needs_prompt=NEEDS_REQUIRED, needs_audio_in_video=True, distilled=DISTILLED_REQUIRED,
+       needs_prompt=NEEDS_REQUIRED, needs_audio_in_video=True, distilled=DISTILLED_RECOMMENDED,
        max_long_edge=1024, max_frames_per_segment=249, chunkable=False, keep_audio=False,
-       phase="1b", enabled=False, tags=("lipdub_pipeline",)),
+       phase="1b", enabled=True, tags=("lipdub_pipeline",)),
     # ── famiglia Camera / Movimento ───────────────────────────────────────────────────────────────
     _s(key="cameraman", family=FAMILY_CAMERA, i18n_key="vedit.mode.cameraman", kind="cameraman",
        catalog_id="ltx-iclora-cameraman", note_key="vedit.note_cameraman", cap="cap.video_camera_ic",
@@ -191,15 +195,15 @@ def spec_for_kind(kind: str) -> ModeSpec | None:
 
 
 def modes_for_family(family: str, *, include_disabled: bool = False) -> list[ModeSpec]:
-    """Modalita' di una famiglia nell'ordine di definizione. Le spec `enabled=False` (lipdub/hdr finche'
-    non implementati) sono escluse salvo `include_disabled=True`."""
+    """Modalita' di una famiglia nell'ordine di definizione. Le spec `enabled=False` (hdr finche'
+    non implementato) sono escluse salvo `include_disabled=True`."""
     return [s for s in MODE_SPECS.values()
             if s.family == family and (include_disabled or s.enabled)]
 
 
 def families(*, include_empty: bool = False) -> list[str]:
     """Famiglie nell'ordine di FAMILIES; di default solo quelle con almeno una modalita' abilitata
-    (cosi' «Lip dub» non compare finche' la fase 1b non e' fatta)."""
+    (cosi' le famiglie non ancora implementate non compaiono)."""
     return [f for f in FAMILIES if include_empty or modes_for_family(f)]
 
 

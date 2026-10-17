@@ -6,7 +6,9 @@ UI a DUE livelli (famiglia → modalità), derivata da `core/video_edit_modes.py
 - **Ripara video**: refocus / uncompress / deinterlace / motion deblur / detailer (guida = video sorgente).
 - **Outpaint video**: estende il quadro (formato o margini) con IC-LoRA outpaint.
 - **Camera / Movimento**: Cameraman (video di riferimento del movimento).
-(Lip dub e HDR: fasi 1b/1c, `enabled=False` nelle spec → non compaiono.)
+- **Lip dub**: il video (con la sua voce) è il riferimento; una NUOVA battuta di testo genera voce e labbra nuove
+  (ricetta ufficiale Lightricks JUST-DUB-IT). Non si fornisce un file audio esterno.
+(HDR: fase 1c, `enabled=False` nelle spec → non compare.)
 
 Il checkpoint è quello scelto nel tab Video: lo si MOSTRA in una riga di stato e, per le modalità che lo
 raccomandano/richiedono distilled, si avvisa/blocca. MAI scelto o cambiato al posto dell'utente.
@@ -58,6 +60,11 @@ _NOTE_DEFAULT = {
                            "Descrivi la scena completa nel prompt. Oltre ~60% di area nuova il modello inventa molto.",
     "vedit.note_restyle": "Scegli un'immagine di stile e descrivi lo stile («Make it … style.»). "
                           "Funziona bene con stili semplici; texture complesse sono deboli (v0.1).",
+    "vedit.note_lipdub": "Doppiaggio labiale (JUST-DUB-IT, Lightricks): il video con la sua voce è il riferimento; scrivi la "
+                         "NUOVA battuta e il modello genera voce e labbra nuove, per la stessa durata del video. Un solo "
+                         "parlante; scrivi nell'alfabeto della lingua parlata (non traduce). Battuta di lunghezza simile "
+                         "all'originale: troppo lunga = parole saltate, troppo corta = voce lenta. Non si fornisce un file "
+                         "audio: per sincronizzare un audio già esistente usa «Talk» nel pannello V2V del tab Video.",
     "vedit.note_cameraman": "Il movimento di camera viene copiato dal video di riferimento. Se il risultato "
                             "ricalca troppo il riferimento, abbassa la forza dell'immagine o cambia seme.",
 }
@@ -155,6 +162,29 @@ class VideoEditAITab(QWidget):
         self.cam_seconds_lbl = QLabel(tr("vedit.cam.dur_lbl", "Durata (s)"))
         f.addRow(self.cam_seconds_lbl, self.cam_seconds)
 
+        # Lip dub: scena (opz.) + NUOVA battuta + lingua (opz.) → prompt «<scena>, speaking in <Lingua> saying: "<battuta>"»
+        self.lip_scene = QLineEdit()
+        self.lip_scene.setPlaceholderText(tr("vedit.lipdub.scene_ph",
+            "opzionale, in inglese: es. A woman in a red jacket, close-up in a kitchen"))
+        self.lip_scene_lbl = QLabel(tr("vedit.lipdub.scene_lbl", "Scena / chi parla (opz.)"))
+        f.addRow(self.lip_scene_lbl, self.lip_scene)
+        self.lip_line = QPlainTextEdit(); self.lip_line.setFixedHeight(70)
+        self.lip_line.setPlaceholderText(tr("vedit.lipdub.line_ph",
+            "la NUOVA battuta, nell'alfabeto della lingua parlata (il modello non traduce)"))
+        self.lip_line.textChanged.connect(self._refresh_lipdub_info)
+        self.lip_line_lbl = QLabel(tr("vedit.lipdub.line_lbl", "Nuova battuta (testo)"))
+        f.addRow(self.lip_line_lbl, self.lip_line)
+        self.lip_lang = QComboBox(); self.lip_lang.setEditable(True)
+        for code, name in vic.LIPDUB_LANGUAGES:
+            self.lip_lang.addItem(name if code else tr("vedit.lipdub.lang_none", "(non specificata)"), code)
+        self.lip_lang.setToolTip(tr("vedit.lipdub.lang_tt",
+            "Lingua parlata nella nuova battuta (nome inglese nel prompt). Puoi anche scriverne una a mano."))
+        self.lip_lang_lbl = QLabel(tr("vedit.lipdub.lang_lbl", "Lingua parlata (opz.)"))
+        f.addRow(self.lip_lang_lbl, self.lip_lang)
+        self.lip_info = QLabel(""); self.lip_info.setWordWrap(True)
+        self.lip_info_lbl = QLabel("")
+        f.addRow(self.lip_info_lbl, self.lip_info)
+
         # Outpaint: formato / margini / ancora / opzioni
         self.out_format = QComboBox()
         for key, i18n, dflt in (("16:9", "vedit.out.fmt.169", "16:9"), ("9:16", "vedit.out.fmt.916", "9:16"),
@@ -226,7 +256,8 @@ class VideoEditAITab(QWidget):
         f.addRow(self.out_preview_lbl, self.out_preview)
 
         self.prompt = QPlainTextEdit(); self.prompt.setFixedHeight(70)
-        self.prompt.setPlaceholderText(tr("vedit.prompt_ph", "cosa generare/cambiare (es. a blue motorcycle / snowy winter)"))
+        self._prompt_ph = tr("vedit.prompt_ph", "cosa generare/cambiare (es. a blue motorcycle / snowy winter)")
+        self.prompt.setPlaceholderText(self._prompt_ph)
         f.addRow(tr("vedit.prompt_lbl", "Prompt"), self.prompt)
         self.vedit_enhance = QCheckBox(tr("vedit.enhance", "✨ Arricchisci prompt (AI)"))
         self.vedit_enhance.setToolTip(tr("vedit.enhance.tt",
@@ -358,6 +389,39 @@ class VideoEditAITab(QWidget):
             self._probe_source()
             self._on_mode()
 
+    def _lipdub_line_text(self) -> str:
+        return self.lip_line.toPlainText().strip()
+
+    def _lipdub_lang_value(self) -> str:
+        """Codice breve se la voce scelta e' una di quelle in elenco, altrimenti il testo scritto a mano."""
+        txt = self.lip_lang.currentText().strip()
+        i = self.lip_lang.findText(txt)
+        return str(self.lip_lang.itemData(i) or "") if i >= 0 else txt
+
+    def _refresh_lipdub_info(self, *_):
+        """Riga informativa del lip dub: durata del video, stima del parlato della battuta, avvisi (mai blocchi)."""
+        if not hasattr(self, "lip_info"):
+            return
+        vi = self._vinfo
+        if self.mode.currentData() != "lipdub" or vi is None or not getattr(vi, "duration", 0):
+            self.lip_info.setText(""); return
+        parts = [tr("vedit.lipdub.info_dur", "Video: {v} s (la voce nuova dura quanto il video)").format(
+            v=f"{vi.duration:.1f}")]
+        if not vi.has_audio:
+            parts.append("⛔ " + tr("vedit.err_lipdub_no_audio",
+                "Lip dub: il video non ha una traccia audio (serve come riferimento della voce)."))
+        line = self._lipdub_line_text()
+        if line:
+            fit, est = vic.lipdub_text_fit(line, float(vi.duration))
+            parts.append(tr("vedit.lipdub.info_est", "battuta ≈ {e} s di parlato (stima)").format(e=f"{est:.1f}"))
+            if fit == "long":
+                parts.append("⚠ " + tr("vedit.lipdub.fit_long",
+                    "battuta lunga: il modello potrebbe saltare delle parole. Accorciala."))
+            elif fit == "short":
+                parts.append("⚠ " + tr("vedit.lipdub.fit_short",
+                    "battuta corta: la voce potrebbe risultare lenta e innaturale. Allungala."))
+        self.lip_info.setText("  ·  ".join(parts))
+
     def _probe_source(self):
         """ffprobe veloce del sorgente (dimensioni/fps/frame): serve ad anteprima outpaint e info segmenti."""
         self._vinfo = None
@@ -460,6 +524,21 @@ class VideoEditAITab(QWidget):
             return "weights"
         return "open" if clicked is b_open else "cancel"
 
+    def _ask_missing_weight(self, spec: vem.ModeSpec, msg: str) -> str:
+        """Peso IC-LoRA della modalità assente su disco: avviso con «Apri tab Pesi modelli» (nessun download
+        automatico). Ritorna 'weights' | 'cancel'. Sovrascrivibile nei test."""
+        self.log.appendPlainText("⚠ " + msg)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle(tr("vedit.weight.missing_title", "Peso mancante"))
+        box.setText(tr("vedit.weight.missing_body",
+                       "Manca il peso di questa modalità (IC-LoRA «{k}»). Non scarico nulla io: aprilo dal tab "
+                       "«Pesi modelli».").format(k=spec.kind) + "\n\n" + msg)
+        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+        box.addButton(tr("vedit.ckpt.btn_cancel", "Annulla"), QMessageBox.RejectRole)
+        box.exec()
+        return "weights" if box.clickedButton() is b_w else "cancel"
+
     # ── UI per modalità ──────────────────────────────────────────────────────────────────────
     def _on_mode(self, *_):
         if not self.mode.count():
@@ -470,6 +549,7 @@ class VideoEditAITab(QWidget):
         is_restyle = (key == "restyle")
         is_cam = (key == "cameraman")
         is_out = (key == "outpaint")
+        is_lip = (key == "lipdub")
         is_repair = (sp.family == vem.FAMILY_REPAIR)
         is_ic_new = bool(sp.cap)                              # modalità IC-LoRA a registro (non storiche)
         # #102: il campo «oggetto» serve all'inpaint E a replace_char (= personaggio da sostituire, per la
@@ -502,15 +582,21 @@ class VideoEditAITab(QWidget):
             self._show_row(w, is_out)
         self._set_row_visible_for(self.out_m["top"], is_out and self.out_format.currentData() == "custom")
         self.out_anchor.setEnabled(is_out and self.out_format.currentData() != "custom")
-        self._show_row(self.attn, is_ic_new)
-        self._set_row_visible_for(self.res_mode, is_repair or is_restyle)
+        for w in (self.lip_scene, self.lip_line, self.lip_lang, self.lip_info):
+            self._show_row(w, is_lip)
+        self.prompt.setPlaceholderText(
+            tr("vedit.lipdub.prompt_ph", "avanzato (opzionale): prompt completo; se lo scrivi, scena/battuta/lingua "
+                                         "sopra vengono ignorate") if is_lip else self._prompt_ph)
+        self._show_row(self.vedit_enhance, not is_lip)     # l'LLM potrebbe riscrivere la battuta tra virgolette
+        self._show_row(self.attn, is_ic_new and not is_lip)
+        self._set_row_visible_for(self.res_mode, is_repair or is_restyle or is_lip)
         self.res_long.setEnabled(self.res_mode.currentData() == "custom")
         self._show_row(self.keep_audio, is_ic_new and sp.keep_audio)
         for w in (self.cfg, self.guide):
             self._show_row(w, key == "inpaint")
         for w in (self.dilate, self.blur):
             self._show_row(w, key in ("inpaint", "replace_char"))
-        self._show_row(self.strength, not is_cam)
+        self._show_row(self.strength, not is_cam and not is_lip)   # lip dub: forza riferimento 1.0 fissa (ufficiale)
         self.strength.setEnabled(not is_restyle)          # ReStyle: forza 1.0 fissa (card)
         self.btn_pick.setEnabled(True)
         self.btn_pick.setText(tr("vedit.pick", "🎬 Scegli video…") if not is_cam
@@ -541,6 +627,7 @@ class VideoEditAITab(QWidget):
                 self._suggest_dark()
             self._on_outpaint_change()
         self._refresh_segments_info(sp)
+        self._refresh_lipdub_info()
         self.refresh_checkpoint_hint()
 
     def _set_ref_row_visible(self, vis: bool):
@@ -642,8 +729,9 @@ class VideoEditAITab(QWidget):
             n=k, f=sp.max_frames_per_segment) if k > 1 else "")
 
     # ── azione ───────────────────────────────────────────────────────────────────────────────
-    def _block(self, key: str, default: str):
-        self.log.appendPlainText(tr(key, default))
+    def _block(self, key: str, default: str, **fmt):
+        txt = tr(key, default)
+        self.log.appendPlainText(txt.format(**fmt) if fmt else txt)
 
     def _go(self):
         sp = self.current_spec()
@@ -676,9 +764,21 @@ class VideoEditAITab(QWidget):
             if not prompt:
                 self._block("vedit.err_no_style_text", "ReStyle: scrivi lo stile (es. «Disney 2D Animation») o un prompt."); return
             cfg["style_image"] = cfg["ref_image"]
-        if sp.needs_prompt == vem.NEEDS_REQUIRED and not cfg["prompt"] and key != "replace_char":
-            self._block("vedit.err_no_prompt", "Inserisci un prompt."); return
-        if not cfg["prompt"] and key not in ("replace_char",) and sp.needs_prompt == vem.NEEDS_REQUIRED:
+        if key == "lipdub":
+            if not cfg["prompt"] and not self._lipdub_line_text():
+                self._block("vedit.err_no_line", "Lip dub: scrivi la nuova battuta (o un prompt completo)."); return
+            vi = self._vinfo
+            if vi is not None and not vi.has_audio:
+                self._block("vedit.err_lipdub_no_audio",
+                            "Lip dub: il video non ha una traccia audio (serve come riferimento della voce)."); return
+            n = int(getattr(vi, "nb_frames", 0) or 0) if vi is not None else 0
+            if n and vem.snap_frames(n) > sp.max_frames_per_segment:
+                self._block("vedit.err_lipdub_too_long",
+                            "Lip dub: il video e' troppo lungo ({n} frame, massimo {m}): la modalita' non si spezza "
+                            "in segmenti. Accorcia il clip.", n=n, m=sp.max_frames_per_segment); return
+            cfg.update(lipdub_line=self._lipdub_line_text(), lipdub_lang=self._lipdub_lang_value(),
+                       lipdub_scene=self.lip_scene.text().strip(), enhance=False)
+        elif sp.needs_prompt == vem.NEEDS_REQUIRED and not cfg["prompt"] and key != "replace_char":
             self._block("vedit.err_no_prompt", "Inserisci un prompt."); return
         # campi delle nuove modalità IC
         if sp.cap:
@@ -712,6 +812,12 @@ class VideoEditAITab(QWidget):
             if max(w, h) < sp.min_long_edge or min(w, h) < 512:
                 self.log.appendPlainText(tr("vedit.cam.too_small",
                     "⚠ Risoluzione sotto 960×512: il riferimento viene seguito peggio."))
+        if sp.kind and sp.cap:                               # peso IC-LoRA assente: avviso + «Apri tab Pesi», nessun download
+            miss = vic.missing_weight(sp)
+            if miss:
+                if self._ask_missing_weight(sp, miss) == "weights":
+                    self.request_open_weights_tab.emit()
+                return
         # checkpoint: mostrato, avvisato, MAI cambiato
         info = self._checkpoint()
         st = info["state"]

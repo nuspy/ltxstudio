@@ -136,7 +136,7 @@ class ControlNetReq(BaseModel):
 class IcLoraReq(BaseModel):
     """Modalita' IC-LoRA di «Modifica Video AI» (stessa logica della GUI: core/video_edit_ic.py)."""
     kind: str = Field(..., description="refocus | uncompress | deinterlace | motiondeblur | detailer | "
-                                       "outpaint | restyle | cameraman")
+                                       "outpaint | restyle | cameraman | lipdub")
     video_path: str = Field(..., description="video sorgente (cameraman: video di RIFERIMENTO del movimento)")
     prompt: str = ""
     strength: float = 1.0
@@ -159,6 +159,11 @@ class IcLoraReq(BaseModel):
     min_bar: float = Field(0.0, ge=0.0, le=0.45, description="outpaint (opt-in, solo canvas non custom): se una barra "
                            "nuova e' piu' stretta, rimpicciolisce il video nel canvas finche' ogni barra e' >= questa "
                            "frazione (consigliato 0.15); 0 = spento")
+    # lipdub (JUST-DUB-IT): il video CON audio e' il riferimento; la NUOVA battuta (testo) genera voce e labbra nuove,
+    # per la stessa durata del video. NON si fornisce un file audio. `prompt` (se presente) vince su line/language/scene.
+    line: str = Field("", description="lipdub: la nuova battuta, nell'alfabeto della lingua parlata (il modello non traduce)")
+    language: str = Field("", description="lipdub: lingua parlata (it, en, es, fr, de, pt, ru, zh, ja, ko, ... o nome inglese)")
+    scene: str = Field("", description="lipdub: scena / chi parla, in inglese (opzionale)")
     # cameraman
     image_path: str | None = None
     image_strength: float = 0.7
@@ -292,7 +297,7 @@ def register(app: FastAPI):
 
     @app.post("/video/ic_lora", tags=["video"])
     def video_ic_lora(req: IcLoraReq):
-        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman.
+        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman, lipdub.
         Risposta: job_id + `warnings` (es. checkpoint non distilled: MAI sostituito)."""
         from fastapi import HTTPException
         from core import ltx_release as lrel
@@ -316,6 +321,14 @@ def register(app: FastAPI):
             raise HTTPException(422, {"error": "style_image_required"})
         if not os.path.exists(req.video_path):
             raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
+        if req.kind == "lipdub":
+            from core import video_ic_prep as _prep
+            if not (req.prompt.strip() or req.line.strip()):
+                raise HTTPException(422, {"error": "line_required",
+                                          "detail": "lipdub: indica `line` (la nuova battuta) o un `prompt` completo"})
+            if not _prep.has_audio(req.video_path):
+                raise HTTPException(422, {"error": "video_no_audio",
+                                          "detail": "lipdub: il video deve avere una traccia audio (riferimento della voce)"})
         warnings: list[str] = []
         model = (req.model or "").strip()
         rel = (req.ltx_release or (lrel.detect_release(model) if model else None) or "")
@@ -345,7 +358,8 @@ def register(app: FastAPI):
                "out_paste": req.paste_original, "out_feather": req.feather_px, "out_min_bar": req.min_bar,
                "cam_ref": req.video_path, "cam_img": req.image_path or "",
                "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
-               "width": req.width, "height": req.height, "seed": req.seed}
+               "width": req.width, "height": req.height, "seed": req.seed,
+               "lipdub_line": req.line, "lipdub_lang": req.language, "lipdub_scene": req.scene}
         if model:
             cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
         if rel:

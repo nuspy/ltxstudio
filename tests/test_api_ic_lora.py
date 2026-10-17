@@ -33,8 +33,9 @@ def test_invalid_kind_422(video):
     r = client.post("/video/ic_lora", json={"kind": "nope", "video_path": video})
     assert r.status_code == 422
     assert "refocus" in r.json()["detail"]["valid"]
-    # canny/union non sono modalita' di questo endpoint; lipdub/hdr sono fasi future (disabilitate)
-    for k in ("canny", "union", "lipdub", "hdr", "motion-track"):
+    assert "lipdub" in r.json()["detail"]["valid"]
+    # canny/union non sono modalita' di questo endpoint; hdr e' una fase futura (disabilitata)
+    for k in ("canny", "union", "hdr", "motion-track"):
         assert client.post("/video/ic_lora", json={"kind": k, "video_path": video}).status_code == 422, k
 
 
@@ -114,3 +115,35 @@ def test_outpaint_feather_and_min_bar_validation_and_passthrough(video, no_run, 
         no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
     assert seen["out_feather"] == 40 and seen["out_min_bar"] == 0.15
     assert seen["out_format"] == "4:3" and seen["out_anchor"] == "bottom" and seen["out_paste"] is True
+
+
+def test_lipdub_validation_and_passthrough(video, no_run, monkeypatch):
+    from core import video_ic_prep as prep
+    monkeypatch.setattr(prep, "has_audio", lambda p: False)
+    r = client.post("/video/ic_lora", json={"kind": "lipdub", "video_path": video, "line": "ciao"})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "video_no_audio"
+    monkeypatch.setattr(prep, "has_audio", lambda p: True)
+    r = client.post("/video/ic_lora", json={"kind": "lipdub", "video_path": video})
+    assert r.status_code == 422 and r.json()["detail"]["error"] == "line_required"
+    r = client.post("/video/ic_lora", json={"kind": "lipdub", "video_path": video, "line": "Hola amigos",
+                                            "language": "es", "scene": "a chef",
+                                            "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"})
+    assert r.status_code == 200 and r.json()["warnings"] == [], r.text
+    from core import video_edit_ic as vic
+    seen = {}
+
+    def fake_build(cfg, out_dir, stamp, output, log=None):
+        seen.update(cfg)
+        raise RuntimeError("stop")
+    monkeypatch.setattr(vic, "build_job", fake_build)
+    with pytest.raises(RuntimeError, match="stop"):
+        no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert seen["mode"] == "lipdub" and seen["lipdub_line"] == "Hola amigos" and seen["lipdub_lang"] == "es"
+    assert seen["lipdub_scene"] == "a chef"
+
+
+def test_lipdub_gate_off_403(video, monkeypatch):
+    from api import gate
+    monkeypatch.setattr(gate, "is_on", lambda fid: fid != "cap.video_lipdub")
+    r = client.post("/video/ic_lora", json={"kind": "lipdub", "video_path": video, "line": "x"})
+    assert r.status_code == 403 and r.json()["detail"]["capability"] == "cap.video_lipdub"

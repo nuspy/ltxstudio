@@ -137,7 +137,7 @@ def test_cameraman_job(tmp_path):
 
 def test_disabled_and_unknown_modes_rejected(tmp_path):
     src = _gen(tmp_path / "s.mp4", 17)
-    for m in ("lipdub", "hdr", "nope", "edit"):
+    for m in ("hdr", "nope", "edit"):
         with pytest.raises(vic.IcJobError):
             vic.build_job({"mode": m, "video": src}, str(tmp_path), 1, str(tmp_path / "o.mp4"))
 
@@ -157,3 +157,56 @@ def test_outpaint_feather_cfg_and_min_bar(tmp_path):
     e = vic.build_job({**base, "out_min_bar": 0.15}, str(tmp_path), 5, out)
     assert e.layout.scale < 1.0 and not e.layout.narrow_bar and e.layout.new_area > a.layout.new_area
     assert a.layout.narrow_bar and any("stretta" in n for n in a.notes)
+
+
+# ── lip dub (fase 1b) ────────────────────────────────────────────────────────────────────────────
+def test_compose_lipdub_prompt():
+    assert vic.compose_lipdub_prompt("Ciao a tutti!", "it", "a man in a kitchen") == \
+        'a man in a kitchen, speaking in Italian saying: "Ciao a tutti!"'
+    assert vic.compose_lipdub_prompt("Hola", "", "") == 'A person, speaking saying: "Hola"'
+    assert vic.compose_lipdub_prompt('say "x"  now', "Klingon", "") == \
+        "A person, speaking in Klingon saying: \"say 'x' now\""         # lingua libera passa; virgolette neutralizzate
+    assert vic.compose_lipdub_prompt("   ", "it", "x") == ""
+
+
+def test_lipdub_text_fit():
+    assert vic.lipdub_text_fit("", 5)[0] == "unknown" and vic.lipdub_text_fit("a b", 0)[0] == "unknown"
+    assert vic.lipdub_text_fit(" ".join(["parola"] * 12), 5)[0] == "ok"        # ~4.8 s su 5 s
+    assert vic.lipdub_text_fit("ciao", 5)[0] == "short"
+    assert vic.lipdub_text_fit(" ".join(["parola"] * 30), 5)[0] == "long"
+    assert vic.estimate_speech_seconds("你好，欢迎大家来到这里") > 1.5           # CJK: caratteri/s
+
+
+def test_lipdub_job(tmp_path):
+    src = _gen(tmp_path / "a.mp4", 49, audio=True)
+    out = str(tmp_path / "o.mp4")
+    ij = vic.build_job({"mode": "lipdub", "video": src, "lipdub_line": "Buongiorno a tutti, benvenuti nel mio canale.",
+                        "lipdub_lang": "it", "strength": 0.3, "keep_audio": True, "model": "E:/m/x-dev-fp8.safetensors"},
+                       str(tmp_path), 1, out)
+    p = ij.params
+    assert p["control_type"] == "lipdub" and p["control_video"] == src and p["_strict_ic"] is True
+    assert p["prompt"] == 'A person, speaking in Italian saying: "Buongiorno a tutti, benvenuti nel mio canale."'
+    assert p["control_strength"] == 1.0                      # forza fissa (ufficiale): la cfg non la cambia
+    assert ij.mux_audio_from == "" and p["model"] == "E:/m/x-dev-fp8.safetensors"   # voce NUOVA, checkpoint come scelto
+    assert p["num_frames"] == 49 and (p["width"], p["height"]) == (320, 192) and ij.segments == 1
+    assert any("durata dell'uscita" in n for n in ij.notes)
+    # prompt libero vince su battuta/lingua/scena
+    ij2 = vic.build_job({"mode": "lipdub", "video": src, "prompt": "custom", "lipdub_line": "ignorata"},
+                        str(tmp_path), 2, out)
+    assert ij2.params["prompt"] == "custom"
+    # battuta lunga per 2 s di video: avviso
+    ij3 = vic.build_job({"mode": "lipdub", "video": src, "lipdub_line": " ".join(["parola"] * 40)},
+                        str(tmp_path), 3, out)
+    assert any("battuta lunga" in n for n in ij3.notes)
+
+
+def test_lipdub_rejects(tmp_path):
+    mute = _gen(tmp_path / "m.mp4", 49)
+    with pytest.raises(vic.IcJobError, match="audio"):
+        vic.build_job({"mode": "lipdub", "video": mute, "lipdub_line": "x"}, str(tmp_path), 1, str(tmp_path / "o.mp4"))
+    src = _gen(tmp_path / "a.mp4", 49, audio=True)
+    with pytest.raises(vic.IcJobError, match="battuta"):
+        vic.build_job({"mode": "lipdub", "video": src}, str(tmp_path), 2, str(tmp_path / "o.mp4"))
+    longv = _gen(tmp_path / "l.mp4", 300, audio=True)                # 300 frame > 249: non si spezza
+    with pytest.raises(vic.IcJobError, match="tetto"):
+        vic.build_job({"mode": "lipdub", "video": longv, "lipdub_line": "x"}, str(tmp_path), 3, str(tmp_path / "o.mp4"))

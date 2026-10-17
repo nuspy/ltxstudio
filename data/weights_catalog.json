@@ -1447,6 +1447,13 @@
       "remote_filename": "ltx-2.3-22b-ic-lora-dubit-0.9.safetensors",
       "use": [
         "iclora_edit"
+      ],
+      "used_by": [
+        "cap.video_lipdub"
+      ],
+      "note": "Lip dub (JUST-DUB-IT): il testo genera voce+labbra nuove. Repo Lightricks LTX-2.3-22b-IC-LoRA-DubIt e -LipDub: stesso file (2 466 665 072 B, verificato su HF il 17/10/2026, coincide col locale). Serve distilled: col dev si aggiunge la distilled-LoRA 0.5",
+      "deps": [
+        "ltx23-distilled-lora-384|ltx23-distilled-fp8"
       ]
     },
     {

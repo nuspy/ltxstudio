@@ -207,7 +207,11 @@ NEW = [
     N("ltx-iclora-lipdub", "Video", "IC-LoRA DubIt/LipDub 0.9", category="video", arch="ltx23",
       repo="Lightricks/LTX-2.3-22b-IC-LoRA-DubIt", gated=True,
       remote="ltx-2.3-22b-ic-lora-dubit-0.9.safetensors",
-      filename="ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors", type="LoRA", family="LTX-2", gb=2.5),
+      filename="ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors", type="LoRA", family="LTX-2", gb=2.5,
+      used_by=["cap.video_lipdub"],
+      note="Lip dub (JUST-DUB-IT): il testo genera voce+labbra nuove. Repo Lightricks LTX-2.3-22b-IC-LoRA-DubIt e "
+           "-LipDub: stesso file (2 466 665 072 B, verificato su HF il 17/10/2026, coincide col locale). "
+           "Serve distilled: col dev si aggiunge la distilled-LoRA 0.5"),
     N("ltx-iclora-motiondeblur", "Video", "IC-LoRA Motion Deblur (oumoumad)", category="video", arch="ltx23",
       repo="oumoumad/LTX-2.3-22b-IC-LoRA-MotionDeblur",
       filename="ltx-2.3-22b-ic-lora-motiondeblur.safetensors", type="LoRA", family="LTX-2", gb=1.3),

@@ -96,22 +96,22 @@ def _make_new_mode_case(key: str):
 
 
 def case_families_and_modes(w, spy):
-    """Due livelli: famiglie (Lip dub assente: fase 1b), modalità per famiglia, derivate da video_edit_modes."""
+    """Due livelli: famiglie (Lip dub presente dalla fase 1b, HDR assente), modalità per famiglia, da video_edit_modes."""
     from core import video_edit_modes as vem
     t = _tab(w)
     fams = [t.family.itemData(i) for i in range(t.family.count())]
-    assert fams == ["edit", "style", "repair", "outpaint", "camera"], fams
+    assert fams == ["edit", "style", "repair", "outpaint", "lipdub", "camera"], fams
     expect = {"edit": ["edit", "inpaint", "replace_char"], "style": ["anime2real", "real2anime", "restyle"],
               "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer"],
-              "outpaint": ["outpaint"], "camera": ["cameraman"]}
+              "outpaint": ["outpaint"], "lipdub": ["lipdub"], "camera": ["cameraman"]}
     for fam, modes in expect.items():
         t.family.setCurrentIndex(t.family.findData(fam))
         got = [t.mode.itemData(i) for i in range(t.mode.count())]
         assert got == modes, f"{fam}: {got} != {modes}"
-    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char"):
+    for k in ("edit", "restyle", "detailer", "outpaint", "cameraman", "replace_char", "lipdub"):
         t.select_mode(k)                                 # da qualunque famiglia
         assert t.mode.currentData() == k and t.family.currentData() == vem.family_of(k)
-    for k in ("lipdub", "hdr"):                          # fasi 1b/1c: non selezionabili
+    for k in ("hdr",):                                   # fase 1c: non selezionabile
         try:
             t.select_mode(k)
         except KeyError:
@@ -543,6 +543,161 @@ def case_ic_lora_hidden_from_lora_panel(w, spy):
             assert ok in cat, f"{ok} (LoRA normale) deve restare visibile"
 
 
+# ── Lip dub (fase 1b) ────────────────────────────────────────────────────────────────────────────
+def _lipdub_video(name: str, audio: bool = True, frames: int = 50) -> str:
+    """Video REALE minuscolo (ffmpeg, CPU) con o senza traccia audio: il tab lo sonda con ffprobe."""
+    import subprocess
+    from core import video_ic_prep as prep
+    path = str(H.OUT_DIR / name)
+    cmd = [prep.ffmpeg_path(), "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=160x96:rate=25"]
+    if audio:
+        cmd += ["-f", "lavfi", "-i", "sine=frequency=330:sample_rate=16000", "-shortest"]
+    cmd += ["-frames:v", str(frames), "-c:v", "libx264", "-pix_fmt", "yuv420p"] + (["-c:a", "aac"] if audio else []) + [path]
+    subprocess.run(cmd, check=True, capture_output=True)
+    return path
+
+
+def _lipdub_tab(w, video: str):
+    t = _tab(w)
+    w.tabs.setCurrentWidget(t)
+    t.set_video(video)
+    _select_mode(w, "lipdub")
+    t.lip_line.setPlainText("")
+    t.lip_scene.setText("")
+    t.lip_lang.setCurrentIndex(0)
+    t.prompt.setPlainText("")
+    return t
+
+
+def case_lipdub_fields(w, spy):
+    """Lip dub: campi propri visibili (scena, battuta, lingua, info), strength/attenzione/mantieni audio/enhance nascosti,
+    risoluzione visibile; tornando a un'altra modalità tutto si ripristina."""
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    for fld in (t.lip_scene, t.lip_line, t.lip_lang, t.lip_info):
+        assert not fld.isHidden(), fld
+    for fld in (t.strength, t.attn, t.keep_audio, t.vedit_enhance, t.obj):
+        assert fld.isHidden(), f"nascosto in lipdub: {fld}"
+    assert not t.res_mode.parentWidget().isHidden()
+    assert t.family.currentData() == "lipdub" and t.note.text(), "nota della modalità"
+    ph_lip = t.prompt.placeholderText()
+    _select_mode(w, "refocus")
+    for fld in (t.lip_scene, t.lip_line, t.lip_lang, t.lip_info):
+        assert fld.isHidden(), fld
+    assert not t.strength.isHidden() and not t.vedit_enhance.isHidden() and not t.attn.isHidden()
+    assert t.prompt.placeholderText() != ph_lip, "il segnaposto del prompt torna quello normale"
+    codes = [t.lip_lang.itemData(i) for i in range(t.lip_lang.count())]
+    assert codes[0] == "" and {"it", "en", "es", "zh"} <= set(codes), codes
+
+
+def case_lipdub_cfg(w, spy):
+    """Lip dub con distilled: la cfg porta battuta/lingua/scena (il prompt si compone nel core), enhance spento,
+    nessun mantieni-audio, checkpoint inoltrato come scelto."""
+    _ack_dev(False)
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    _getter(w, _DIST)
+    t.lip_line.setPlainText("Buongiorno a tutti, benvenuti.")
+    t.lip_scene.setText("a chef in a kitchen")
+    t.lip_lang.setCurrentIndex(t.lip_lang.findData("it"))
+    t.vedit_enhance.setChecked(True)                      # anche se spuntato altrove: per lipdub resta spento
+    t._go()
+    assert spy.calls, f"nessuna richiesta accodata (log: {t.log.toPlainText()[-300:]})"
+    cfg = _cfg_of(w)
+    assert cfg["mode"] == "lipdub" and cfg["lipdub_line"] == "Buongiorno a tutti, benvenuti.", cfg
+    assert cfg["lipdub_lang"] == "it" and cfg["lipdub_scene"] == "a chef in a kitchen"
+    assert cfg["enhance"] is False and cfg["keep_audio"] is False
+    assert cfg["model"] == _DIST["model"] and cfg["ckpt_state"] == "distilled"
+    assert cfg["prompt"] == "" and (cfg.get("edit_lora") or "") == ""
+    # lingua scritta a mano: passa invariata
+    t.lip_lang.setEditText("Klingon")
+    t._go()
+    assert _cfg_of(w)["lipdub_lang"] == "Klingon"
+    # prompt libero: viene inoltrato e il core lo usera' al posto della composizione
+    t.prompt.setPlainText("custom full prompt")
+    t._go()
+    assert _cfg_of(w)["prompt"] == "custom full prompt"
+    t.vedit_enhance.setChecked(False)
+
+
+def case_lipdub_validation(w, spy):
+    """Blocchi: niente battuta, video senza audio, clip oltre il tetto; col dev avvisa ma non blocca."""
+    _ack_dev(False)
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    _getter(w, _DIST)
+    t._go()
+    assert not spy.calls and t.log.toPlainText().strip(), "senza battuta né prompt: blocco con messaggio"
+    t.log.clear()
+    mute = _lipdub_video("_vedit_lipdub_mute.mp4", audio=False)
+    t = _lipdub_tab(w, mute)
+    t.lip_line.setPlainText("ciao")
+    assert "⛔" in t.lip_info.text(), t.lip_info.text()
+    t._go()
+    assert not spy.calls, "video senza traccia audio: blocco"
+    t.log.clear()
+    longv = _lipdub_video("_vedit_lipdub_long.mp4", frames=300)
+    t = _lipdub_tab(w, longv)
+    t.lip_line.setPlainText("ciao")
+    t._go()
+    assert not spy.calls and "249" in t.log.toPlainText(), t.log.toPlainText()
+    # dev: avviso (dialog sovrascritto = «Procedi comunque»), non blocca
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    t.lip_line.setPlainText("ciao a tutti")
+    _getter(w, _DEV)
+    asked = []
+    t._ask_checkpoint = lambda sp, info, blocking=False: asked.append(sp.key) or "continue"
+    t._go()
+    assert asked == ["lipdub"] and len(spy.calls) == 1, (asked, len(spy.calls))
+    assert _cfg_of(w)["ckpt_state"] == "dev"
+
+
+def case_lipdub_info_fit(w, spy):
+    """Riga informativa: durata del video, stima del parlato, avviso se la battuta è lunga/corta (mai blocco)."""
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))        # 2 s
+    assert "2.0" in t.lip_info.text(), t.lip_info.text()
+    t.lip_line.setPlainText(" ".join(["parola"] * 5))               # ~2 s: ok
+    assert "⚠" not in t.lip_info.text() and "≈" in t.lip_info.text(), t.lip_info.text()
+    t.lip_line.setPlainText(" ".join(["parola"] * 30))              # ~12 s su 2 s
+    assert "⚠" in t.lip_info.text(), t.lip_info.text()
+    t.lip_line.setPlainText("ok")                                   # 0.4 s su 2 s
+    assert "⚠" in t.lip_info.text(), t.lip_info.text()
+    _select_mode(w, "refocus")
+    assert t.lip_info.text() == "", "fuori da lipdub la riga e' vuota"
+
+
+def case_lipdub_weight_missing_dialog(w, spy):
+    """LoRA lipdub assente: avviso con «Apri tab Pesi modelli» (segnale), nessun accodamento, nessun download."""
+    from core import video_edit_ic as vic
+    _ack_dev(True)
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    _getter(w, _DIST)
+    t.lip_line.setPlainText("ciao a tutti")
+    orig = vic.missing_weight
+    vic.missing_weight = lambda spec: "Peso «lipdub» mancante: X:\\nope.safetensors"
+    try:
+        asked, opened = [], []
+        t.request_open_weights_tab.connect(lambda: opened.append(1))
+        t._ask_missing_weight = lambda sp, msg: asked.append(sp.key) or "weights"
+        before = len(spy.calls)
+        t._go()
+        assert asked == ["lipdub"] and opened == [1] and len(spy.calls) == before
+        t._ask_missing_weight = lambda sp, msg: "cancel"
+        t._go()
+        assert opened == [1] and len(spy.calls) == before, "Annulla: nessun segnale e nessun accodamento"
+    finally:
+        vic.missing_weight = orig
+
+
+def case_lipdub_gate(w, spy):
+    """cap.video_lipdub spenta: nessun accodamento (l'upsell lo mostra il gate)."""
+    _ack_dev(True)
+    t = _lipdub_tab(w, _lipdub_video("_vedit_lipdub_a.mp4"))
+    _getter(w, _DIST)
+    t.lip_line.setPlainText("ciao a tutti")
+    seen = []
+    w._feature_gate = lambda fid: (seen.append(fid) or False)
+    t._go()
+    assert seen == ["cap.video_lipdub"] and not spy.calls, (seen, len(spy.calls))
+
+
 CASES = (
     [("vedit_family_modes", "Due livelli famiglia/modalità: contenuti, select_mode, lipdub/hdr assenti.",
       case_families_and_modes),
@@ -581,7 +736,18 @@ CASES = (
      ("vedit_legacy_modes_pass_model", "Le modalità storiche inoltrano il checkpoint scelto.",
       case_legacy_modes_pass_model),
      ("vedit_ic_lora_hidden_from_lora_panel", "IC-LoRA escluse dal pannello LoRA normale; camera-control visibili.",
-      case_ic_lora_hidden_from_lora_panel)]
+      case_ic_lora_hidden_from_lora_panel),
+     ("vedit_lipdub_fields", "Lip dub: campi propri visibili, strength/attenzione/audio/enhance nascosti, ripristino.",
+      case_lipdub_fields),
+     ("vedit_lipdub_cfg", "Lip dub: cfg con battuta/lingua/scena, enhance spento, model come scelto, prompt libero.",
+      case_lipdub_cfg),
+     ("vedit_lipdub_validation", "Lip dub: blocchi (no battuta, no audio, troppo lungo); col dev avvisa e parte.",
+      case_lipdub_validation),
+     ("vedit_lipdub_info_fit", "Lip dub: riga info durata/stima parlato, avvisi battuta lunga/corta.",
+      case_lipdub_info_fit),
+     ("vedit_lipdub_weight_missing_dialog", "Lip dub: LoRA assente → avviso + «Apri tab Pesi» (segnale), nessun accodamento.",
+      case_lipdub_weight_missing_dialog),
+     ("vedit_lipdub_gate", "Lip dub: cap.video_lipdub spenta blocca l'accodamento.", case_lipdub_gate)]
     + [(f"vedit_newmode_{k}", f"Modalità IC-LoRA {k}: cfg emessa (kind a registro, model come scelto, campi).",
         _make_new_mode_case(k)) for k in _NEW_MODES]
 )
