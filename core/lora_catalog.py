@@ -193,7 +193,8 @@ _REGISTRY_FAMILIES = {"LTX": ("LTX", "LTX-2", "LTX-2.5")}
 # IC-LoRA (guidate da un video di controllo) e file ausiliari: NON sono LoRA «normali» da applicare a un t2v/i2v
 # (senza la guida producono rumore). Si usano dal tab «Modifica Video AI» / ControlNet, non dal pannello LoRA.
 # Restano visibili le LoRA camera-control / CameraControls (LoRA normali t2v/i2v).
-_IC_LORA_MARKERS = ("ic-lora", "iclora", "ic_lora", "scene-emb")
+# `inpaint_masked`: LoRA dell'inpaint video (t2v/r2v, task 8) guidate dal video+maschera SAM2 di «Modifica Video AI»
+_IC_LORA_MARKERS = ("ic-lora", "iclora", "ic_lora", "scene-emb", "inpaint_masked")
 
 
 def is_ic_lora_file(*names: str) -> bool:
@@ -214,7 +215,9 @@ def _registry_loras(arch: str) -> list[LoraEntry]:
         for e in wc.load():
             if e.get("type") != "LoRA" or (e.get("family") or "").upper() not in fams:
                 continue
-            if "distill_lora" in (e.get("use") or []) or not wc.is_present(e, root):
+            # fuori dal pannello LoRA: distillazione («Velocità») e LoRA di FUNZIONE (upscale_video = guida h3upscale,
+            # che ha il suo posto nel tab Definizione video e non è una LoRA di stile per generare)
+            if {"distill_lora", "upscale_video"} & set(e.get("use") or []) or not wc.is_present(e, root):
                 continue
             path = str(Path(wc.dest_for(e, root)) / e["filename"])
             out.append(LoraEntry(sha256=e.get("sha256") or e["id"], filename=e["filename"], path=path,

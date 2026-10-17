@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import uuid
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -119,6 +120,30 @@ class V2VEditReq(BaseModel):
     seed: int = 42
 
 
+class InpaintReq(BaseModel):
+    """Inpaint VIDEO: SAM2 traccia `object` sul clip e ne rigenera l'area (stessa logica della GUI: core/video_inpaint.py).
+    Con `reference_image` si usa la LoRA r2v (il nuovo oggetto viene preso dalla foto), senza la LoRA t2v (a parole)."""
+    video_path: str
+    object: str = Field(..., description="oggetto da sostituire, a parole inglesi (es. «umbrella», «person») — SAM2/GroundingDINO")
+    prompt: str = Field(..., description="scena e cosa fa il nuovo contenuto. Se citi le foto con `@Foto_N` vale la convenzione del "
+                                         "tab Video (un solo riferimento qui: @Foto_1)")
+    reference_image: str | None = Field(None, description="foto dell'oggetto/persona da inserire nell'area mascherata: attiva la "
+                                        "LoRA r2v (rank32). Assente = LoRA t2v (rank128, solo prompt)")
+    reference_strength: float = Field(0.8, ge=0.1, le=1.0, description="forza dell'identita' della foto (solo con reference_image)")
+    cfg_scale: float = Field(6.0, ge=1.0, le=10.0)
+    guide: float = Field(0.4, ge=0.1, le=1.0, description="forza della guida (ancoraggio al video originale)")
+    mask_dilate: int = Field(24, ge=0, le=64)
+    mask_blur: float = Field(6.0, ge=0.0, le=30.0)
+    full_resolution: bool = Field(True, description="secondo stadio (upsampler + raffinamento): uscita a risoluzione piena del "
+                                  "sorgente (tetto 1280 sul lato lungo); False = meta' risoluzione come prima")
+    keep_background: bool = Field(True, description="fuori dalla maschera il video e' il SORGENTE originale a risoluzione piena "
+                                  "(bordo sfumato come `mask_blur`); False = tutto generato")
+    keep_audio: bool = Field(True, description="rimette l'audio originale sul risultato (l'inpaint non genera audio)")
+    seed: int = 42
+    model: str | None = Field(None, description="checkpoint ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)")
+    ltx_release: str | None = None
+
+
 class ControlNetReq(BaseModel):
     prompt: str
     control_video: str
@@ -137,8 +162,10 @@ class IcLoraReq(BaseModel):
     """Modalita' IC-LoRA di «Modifica Video AI» (stessa logica della GUI: core/video_edit_ic.py)."""
     kind: str = Field(..., description="refocus | uncompress | deinterlace | motiondeblur | detailer | "
                                        "outpaint | restyle | cameraman | lipdub (Doppiaggio da testo) | "
-                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE) | hdr (SDR -> HDR)")
-    video_path: str = Field(..., description="video sorgente (cameraman: video di RIFERIMENTO del movimento)")
+                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE) | hdr (SDR -> HDR) | "
+                                       "motion_track (movimento da tracce disegnate)")
+    video_path: str = Field("", description="video sorgente (cameraman: video di RIFERIMENTO del movimento; "
+                                            "motion_track: non serve)")
     prompt: str = ""
     strength: float = 1.0
     attention: float = Field(1.0, ge=0.1, le=1.0, description="attenzione della guida")
@@ -160,6 +187,10 @@ class IcLoraReq(BaseModel):
     min_bar: float = Field(0.0, ge=0.0, le=0.45, description="outpaint (opt-in, solo canvas non custom): se una barra "
                            "nuova e' piu' stretta, rimpicciolisce il video nel canvas finche' ogni barra e' >= questa "
                            "frazione (consigliato 0.15); 0 = spento")
+    fill_coverage: bool = Field(True, description="outpaint «garantisci riempimento» (default SI): se le barre nuove sono "
+                                "simmetriche sullo stesso asse (due barre opposte) e l'area nuova e' < 60%, il video "
+                                "originale viene rimpicciolito (cornice su 4 lati) perche' il modello altrimenti le "
+                                "lascia nere; false = layout letterale (originale piu' grande, barre forse non riempite)")
     # lipdub = «Doppiaggio da testo» (JUST-DUB-IT): il video CON audio e' il riferimento; la NUOVA battuta (testo) genera
     # voce e labbra nuove, per la stessa durata del video. `prompt` (se presente) vince su line/language/scene.
     line: str = Field("", description="lipdub: la nuova battuta, nell'alfabeto della lingua parlata (il modello non traduce)")
@@ -179,12 +210,27 @@ class IcLoraReq(BaseModel):
     hdr_exposure_ev: float = Field(0.0, ge=-6.0, le=6.0, description="hdr: esposizione dell'anteprima SDR in stop (non tocca HDR/EXR)")
     hdr_exr_half: bool = Field(True, description="hdr: EXR in float16 (False = float32, file doppi)")
     hdr_hq: bool = Field(False, description="hdr: alta qualita' (2x frame interni, circa 2x tempo)")
-    # cameraman
-    image_path: str | None = None
-    image_strength: float = 0.7
-    width: int = 960
+    # cameraman (image_path/image_strength/width/height/seconds valgono anche per motion_track, con default propri)
+    image_path: str | None = Field(None, description="cameraman: immagine iniziale (opz.) · motion_track: immagine di partenza "
+                                   "= frame 0 (OBBLIGATORIA)")
+    image_strength: float = Field(0.7, description="forza dell'immagine (motion_track, se omessa: 1.0)")
+    width: int = Field(960, description="motion_track: se omessa si ricava dall'aspetto dell'immagine (lato corto 576)")
     height: int = 576
-    seconds: float = 0.0
+    seconds: float = Field(0.0, description="cameraman: durata · motion_track: durata (default 121 frame = 5 s a 24 fps; "
+                           "tetto 257 frame, ~10,7 s a 24 fps)")
+    # motion_track (IC-LoRA motion-track LTX-2.3): le tracce sono punti sull'immagine; l'ordine dei punti e' il TEMPO
+    tracks: str | list | dict | None = Field(None, description="motion_track: tracce. JSON/oggetto: punti di controllo "
+        "[[{x,y},...],...] (uno o piu' punti per traccia; 1 punto = ferma), oppure {points_store, coordinates, size}, oppure "
+        "tracce dense (un punto per frame) oppure il workflow ComfyUI Lightricks con LTXVSparseTrackEditor. Coordinate: "
+        "`size` del JSON o `tracks_size`; se mancano = pixel dell'immagine ORIGINALE")
+    tracks_size: list[int] | None = Field(None, description="motion_track: [larghezza, altezza] dello spazio delle coordinate")
+    tracks_format: str = Field("auto", description="motion_track: auto | control (punti di controllo) | dense (un punto per frame)")
+    tracks_video_path: str | None = Field(None, description="motion_track: video di controllo gia' pronto (alternativa a `tracks`; "
+                                          "stesso disegno di LTXVDrawTracks)")
+    num_frames: int | None = Field(None, description="motion_track: frame (8k+1; alternativa a `seconds`)")
+    fps: int = Field(24, description="motion_track: fps (8-60, ufficiale 24)")
+    native_audio: bool = Field(True, description="motion_track: tiene l'audio generato insieme al video (voce/suoni dal "
+                               "prompt, come il workflow ufficiale); False = video muto")
     # checkpoint: ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)
     model: str | None = None
     ltx_release: str | None = None
@@ -207,12 +253,20 @@ class LipsyncReq(BaseModel):
 
 class EnhanceReq(BaseModel):
     video_path: str
-    engine: str = Field("seedvr2", description="seedvr2 | flashvsr")
+    engine: str = Field("seedvr2", description="seedvr2 | flashvsr | h3_upsampler (MiniMax H3, nativo)")
     seedvr2_model: str = "seedvr2_ema_3b_fp8_e4m3fn.safetensors"
     resolution: int = 1080
     batch_size: int = 5
     block_swap: int = 0
     scale: float = 2.0
+    # solo engine=h3_upsampler: il checkpoint H3 Ref2VA lo sceglie il chiamante (nessun ripiego automatico)
+    h3_profile: str | None = Field(None, description="nvfp4 | int4 | int8 | fp8 (obbligatorio per h3_upsampler)")
+    h3_te: str | None = Field(None, description="mmh3-te-nvfp4 | mmh3-te-fp8 | mmh3-te-int8 (vuoto = quello del profilo)")
+    megapixels: float = Field(2.0, description="uscita come area, rapporto invariato (1 MP = 1024x1024)")
+    denoise: float = Field(0.1, description="forza del ri-disegno, 0 = solo upscaler latente")
+    guide: bool = Field(True, description="guida con la LoRA h3upscale x2")
+    lora_strength: float = 1.0
+    tile_tokens: int = Field(0, description="budget di token per forward di tile; 0 = automatico dalla VRAM libera (tetto 70000)")
 
 
 class RifeReq(BaseModel):
@@ -298,6 +352,74 @@ def register(app: FastAPI):
              "output": out_path("video_v2v")}
         return _submit("video.v2v_edit", lambda job: run_ltx2(p, job))
 
+    @app.post("/video/inpaint", tags=["video"])
+    def video_inpaint(req: InpaintReq):
+        """Inpaint video con maschera SAM2. `reference_image` (opz.) = foto dell'oggetto da inserire (LoRA r2v).
+        Clip lunghi: segmenti di 97 frame con la stessa foto su ognuno. Risposta: job_id + `warnings`."""
+        from fastapi import HTTPException
+        from core import ltx_release as lrel
+        from core import video_edit_ic as vic
+        from core import video_inpaint as vi
+        gate.require("cap.video")
+        ref = (req.reference_image or "").strip()
+        if ref:
+            gate.require("cap.video_inpaint_r2v")
+            if not os.path.isfile(ref):
+                raise HTTPException(422, {"error": "reference_not_found", "path": ref})
+        if not os.path.exists(req.video_path):
+            raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
+        if not req.object.strip():
+            raise HTTPException(422, {"error": "object_required"})
+        if not req.prompt.strip():
+            raise HTTPException(422, {"error": "prompt_required"})
+        model = (req.model or "").strip()
+        rel = (req.ltx_release or (lrel.detect_release(model) if model else None) or "")
+        if rel and not lrel.ic_lora_supported(rel):
+            raise HTTPException(422, {"error": "release_unsupported", "release": rel,
+                                      "detail": "le LoRA dell'inpaint locali sono per LTX 2.3"})
+        cfg = {"prompt": req.prompt.strip(), "ref_image": ref, "ref_strength": req.reference_strength,
+               "cfg_scale": req.cfg_scale, "guide": req.guide, "mask_dilate": req.mask_dilate,
+               "mask_blur": req.mask_blur, "seed": req.seed, "video": req.video_path, "full_res": req.full_resolution,
+               "keep_background": req.keep_background, "keep_audio": req.keep_audio}
+        miss = vi.missing_weight(cfg)
+        if miss:
+            raise HTTPException(409, {"error": "weight_missing", "detail": miss})
+        if model:
+            cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
+        if rel:
+            cfg["ltx_release"] = rel
+        warnings: list[str] = []
+        if not lrel.is_distilled(model):
+            warnings.append("checkpoint non distilled" + ("" if model else " (default del worker: dev)")
+                            + ": verra' aggiunta la distilled-LoRA ufficiale (il checkpoint resta quello scelto)"
+                            if vic.distilled_lora_ok(rel or "2.3") else
+                            "checkpoint non distilled: la distilled-LoRA manca su disco, qualita' molto ridotta; "
+                            "scaricala dal tab Pesi modelli (id ltx23-distilled-lora-384)")
+
+        def fn(job):
+            from core import video_ic_prep as prep
+            info = prep.probe(req.video_path, count_frames=True)
+            if not info.width or not info.height:
+                raise RuntimeError(f"video illeggibile: {req.video_path}")
+            # come la GUI: l'inpaint PRESERVA risoluzione/durata/fps del SORGENTE (maschere e guida sono tracciate li')
+            cfg.update(width=_r64(info.width), height=_r64(info.height), fps=int(round(info.fps or 25)),
+                       num_frames=max(9, (int(info.nb_frames) // 8) * 8 + 1) if info.nb_frames else 25)
+            output = out_path("video_inpaint")
+            params = vi.inpaint_params(cfg, output)
+            if ref:
+                note = vi.fit_reference(params, os.path.dirname(output), uuid.uuid4().hex[:8])
+                if note:
+                    job.log("[inpaint] " + note)
+            gpath = out_path("_inpaint_guide")
+            vi.attach_tracking(params, req.video_path, req.object.strip(), gpath, req.mask_dilate, log=job.log)
+            outs = run_ltx2(params, job)
+            if params.get("_mux_audio_from") and outs:           # l'inpaint non genera audio: si rimette quello originale
+                outs = [vic.mux_audio(outs[0], params["_mux_audio_from"])] + list(outs[1:])
+            return outs
+        r = _submit("video.inpaint", fn)
+        r["warnings"] = warnings
+        return r
+
     @app.post("/video/controlnet", tags=["video"])
     def video_controlnet(req: ControlNetReq):
         gate.require("cap.controlnet")
@@ -312,7 +434,8 @@ def register(app: FastAPI):
 
     @app.post("/video/ic_lora", tags=["video"])
     def video_ic_lora(req: IcLoraReq):
-        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman, lipdub.
+        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman, lipdub, hdr,
+        motion_track (immagine + tracce -> video; output = video + video delle tracce di controllo).
         Risposta: job_id + `warnings` (es. checkpoint non distilled: MAI sostituito)."""
         from fastapi import HTTPException
         from core import ltx_release as lrel
@@ -338,7 +461,32 @@ def register(app: FastAPI):
             from core import hdr_export as _hx
             if req.hdr_format not in _hx.FORMATS:
                 raise HTTPException(422, {"error": "invalid_hdr_format", "valid": list(_hx.FORMATS)})
-        if not os.path.exists(req.video_path):
+        if req.kind == "motion_track":
+            from core import motion_tracks as _mt
+            if not (req.image_path and os.path.exists(req.image_path)):
+                raise HTTPException(422, {"error": "image_required", "path": req.image_path,
+                                          "detail": "motion_track: image_path = immagine di partenza (frame 0)"})
+            if req.tracks_format not in ("auto", "control", "dense"):
+                raise HTTPException(422, {"error": "invalid_tracks_format", "valid": ["auto", "control", "dense"]})
+            if req.tracks_video_path:
+                if not os.path.exists(req.tracks_video_path):
+                    raise HTTPException(422, {"error": "tracks_video_not_found", "path": req.tracks_video_path})
+            elif req.tracks in (None, "", [], {}):
+                raise HTTPException(422, {"error": "tracks_required",
+                                          "detail": "motion_track: indica `tracks` (JSON) o `tracks_video_path`"})
+            else:
+                try:
+                    _mt.parse_track_input(req.tracks, req.num_frames, req.tracks_format)
+                except (ValueError, TypeError, KeyError) as e:
+                    raise HTTPException(422, {"error": "invalid_tracks", "detail": str(e)})
+            if not 8 <= req.fps <= 60:
+                raise HTTPException(422, {"error": "invalid_fps", "detail": "fps tra 8 e 60"})
+            _n = (vem.snap_frames(req.num_frames) if req.num_frames
+                  else _mt.frames_for_seconds(req.seconds or (_mt.DEFAULT_FRAMES / _mt.DEFAULT_FPS), req.fps))
+            if _n > spec.max_frames_per_segment:
+                raise HTTPException(422, {"error": "too_long", "frames": _n, "max_frames": spec.max_frames_per_segment,
+                                          "detail": "le tracce non si possono spezzare in segmenti: accorcia il clip"})
+        elif not os.path.exists(req.video_path):
             raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
         warnings: list[str] = []
         if req.kind in ("lipdub", "lipdub_audio"):
@@ -393,6 +541,7 @@ def register(app: FastAPI):
                "out_format": req.canvas, "out_anchor": req.anchor,
                "out_margins": tuple(req.margins or (0, 0, 0, 0)), "out_dark": req.dark_source,
                "out_paste": req.paste_original, "out_feather": req.feather_px, "out_min_bar": req.min_bar,
+               "out_fill": req.fill_coverage,
                "cam_ref": req.video_path, "cam_img": req.image_path or "",
                "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
                "width": req.width, "height": req.height, "seed": req.seed,
@@ -401,6 +550,16 @@ def register(app: FastAPI):
                "lipdub_audio": req.audio_path or "", "lipdub_audio_ref": req.audio_reference,
                "hdr_format": req.hdr_format, "hdr_exposure_ev": req.hdr_exposure_ev,
                "hdr_exr_half": req.hdr_exr_half, "hdr_hq": req.hdr_hq}
+        if req.kind == "motion_track":
+            _given = req.model_fields_set
+            for _k in ("width", "height"):                       # senza valori espliciti: dall'aspetto dell'immagine
+                if _k not in _given:
+                    cfg.pop(_k, None)
+            cfg.update(track_image=req.image_path, tracks=req.tracks, tracks_size=req.tracks_size,
+                       tracks_format=req.tracks_format, tracks_video_path=req.tracks_video_path or "",
+                       fps=req.fps, num_frames=req.num_frames, seconds=req.seconds or None,
+                       image_strength=(req.image_strength if "image_strength" in _given else 1.0), keep_audio=False,
+                       native_audio=req.native_audio)
         if model:
             cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
         if rel:
@@ -451,9 +610,17 @@ def register(app: FastAPI):
     @app.post("/video/enhance", tags=["video"])
     def video_enhance(req: EnhanceReq):
         gate.require("cap.restore")
+        if req.engine == "h3_upsampler":
+            gate.require("cap.video_h3_upsampler")
         def fn(job):
             out = out_path(f"{req.engine}")
-            if req.engine == "flashvsr":
+            if req.engine == "h3_upsampler":
+                from core import h3_upsample_service as hs
+                hs.upscale_video(req.video_path, out, h3_profile=req.h3_profile or "", h3_te=req.h3_te or "",
+                                 megapixels=req.megapixels, denoise=req.denoise, guide=req.guide,
+                                 lora_strength=req.lora_strength, tile_tokens=req.tile_tokens,
+                                 on_log=lambda l: job.log(l))
+            elif req.engine == "flashvsr":
                 from core import flashvsr_service as fv
                 _errs = fv.preflight()                        # una sola chiamata (era invocata 2×)
                 if _errs:

@@ -238,6 +238,25 @@ class _FlashVSRWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _H3UpsampleWorker(QThread):
+    """H3 Video Upsampler (MiniMax H3 nativo, venv diffusers_next): upscaler latente + ri-disegno a tile. Log + path."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, src: str, out: str, params: dict):
+        super().__init__()
+        self.src, self.out, self.params = src, out, dict(params)
+
+    def run(self):
+        from core import h3_upsample_service as hs
+        try:
+            cfg = {k: v for k, v in self.params.items() if k not in ("video", "output")}
+            hs.upscale_video(self.src, self.out, on_log=lambda l: self.progress.emit(l), **cfg)
+            self.done.emit({"status": "success", "output": [self.out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class _VideoEditAIWorker(QThread):
     """#24/#59/#60 editing video AI: (inpaint) SAM2 track→guide magenta nel venv inference_server, poi
     LTX-2 edit_lora nel venv ltx2; (edit/style) direttamente LTX-2 col video sorgente come guide."""
@@ -289,31 +308,30 @@ class _VideoEditAIWorker(QThread):
             for _k in ("model", "gguf_transformer", "ltx_release"):   # checkpoint ESATTAMENTE come scelto nel tab Video
                 if cfg.get(_k):
                     params[_k] = cfg[_k]
-            if cfg["mode"] == "inpaint":                       # #59 parametri inpaint dalla GUI
-                params["control_strength"] = float(cfg.get("guide", 0.4))
-                params["cfg_scale"] = float(cfg.get("cfg_scale", 6.0))
-                params["mask_dilate"] = int(cfg.get("mask_dilate", 24))
-                params["mask_blur"] = float(cfg.get("mask_blur", 6.0))
-            if cfg["mode"] == "inpaint":                       # SAM2 track → latent-inpaint (vinpaint)
-                self.progress.emit("[edit] SAM2: traccio l'oggetto sul clip…")
+            if cfg["mode"] == "inpaint":                       # #59 inpaint: SAM2 track → latent-inpaint (vinpaint)
+                # Logica condivisa con la REST API (core/video_inpaint.py): LoRA t2v (a parole) o r2v (con foto di
+                # riferimento, scelta dell'utente), maschere SAM2, segmenti per i clip lunghi.
+                from core import video_inpaint as _vi
+                _miss = _vi.missing_weight(cfg)
+                if _miss:
+                    self.done.emit({"status": "error", "error": _miss}); return
+                params = _vi.inpaint_params(cfg, out)
+                if _vi.has_reference(cfg):
+                    # punto di aggancio @Foto_N (task 6): qui i riferimenti sono UNO (la foto del campo); quando il
+                    # meccanismo dei token sara' nel ramo, i nomi citati nel prompt vanno risolti prima di arrivare qui.
+                    _note = _vi.fit_reference(params, self.out_dir, stamp)
+                    if _note:
+                        self.progress.emit("[inpaint] " + _note)
+                    self.progress.emit(f"[inpaint] foto di riferimento → LoRA r2v ({_os.path.basename(cfg['ref_image'])})")
+                if params["num_frames"] > _vi.SEGMENT_FRAMES:
+                    self.progress.emit(f"[inpaint] clip lungo ({params['num_frames']} frame): "
+                                       f"{_vi.segments_info(params['num_frames'])} segmenti da {_vi.SEGMENT_FRAMES}")
                 gpath = _os.path.join(self.out_dir, f"_guide_{base}_{stamp}.mp4")
-                seg = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)),
-                                    "inference_server", "backends", "video_segment.py")
-                # passa il dilate della GUI anche al TRACKING (le maschere del guide devono combaciare
-                # con quelle che il worker userà — prima il CLI girava con dilate=0 fisso)
-                r = _sp.run([self.INF_PY, "-u", seg, src, cfg["object"], gpath,
-                             str(int(cfg.get("mask_dilate", 24)))],
-                            capture_output=True, text=True, encoding="utf-8", errors="replace")
-                line = next((l for l in (r.stdout or "").splitlines() if l.startswith("GUIDE:")), "")
-                if not line:
-                    self.done.emit({"status": "error", "error": "tracking SAM2 fallito: " + (r.stderr or "")[-300:]}); return
-                # video_segment salva frames e masks accanto al video sorgente in <base>_track/
-                track_dir = _os.path.splitext(src)[0] + "_track"
-                params["original_frames_dir"] = _os.path.join(track_dir, "frames")
-                params["inpaint_masks_dir"] = _os.path.join(track_dir, "masks")
-                params["skip_stage_2"] = False
-                params["control_video"] = src                  # guide = video sorgente: senza, il worker degrada a ti2v (bug c6f8529, 14/10)
-                self.progress.emit("[edit] maschera tracciata → latent-inpaint")
+                try:
+                    _vi.attach_tracking(params, src, cfg["object"], gpath, int(cfg.get("mask_dilate", 24)),
+                                        log=self.progress.emit)
+                except RuntimeError as _e:
+                    self.done.emit({"status": "error", "error": str(_e)}); return
             elif cfg["mode"] == "replace_char":                # #102 Sostituisci personaggio (union-control-ref)
                 from core import controlnet_preprocess as _cp
                 # PREFLIGHT: il peso union-control-ref deve esistere (altrimenti il worker degrada IN SILENZIO
@@ -1058,9 +1076,13 @@ class MainWindow(QMainWindow):
         self.video_tab.model.currentIndexChanged.connect(self.video_edit_ai_tab.refresh_checkpoint_hint)
         self.video_edit_ai_tab.request_open_video_tab.connect(lambda: self.tabs.setCurrentWidget(self.video_tab))
         self.video_edit_ai_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
+        self.video_def_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
         # Doppiaggio da testo: «ho un mio audio» → Talk/Canta del tab Video (esistenti, non toccate); «ultimo audio»
         self.video_edit_ai_tab.request_open_v2v.connect(self._open_v2v_from_vedit)
         self.video_edit_ai_tab.set_last_audio_getter(lambda: self.avatar_tab._last_audio())
+        # Movimento da tracce: immagine dal canvas del Frame 1, e rimando dal tab Video («Guida il movimento con tracce…»)
+        self.video_edit_ai_tab.set_canvas_image_getter(lambda: (self.frame1_tab.image_path or ""))
+        self.video_tab.request_motion_tracks.connect(self._open_motion_tracks_from_video)
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
@@ -3752,6 +3774,8 @@ class MainWindow(QMainWindow):
         _spec = vem.MODE_SPECS.get(cfg.get("mode", ""))
         if _spec is not None and _spec.cap and not self._feature_gate(_spec.cap):
             return                                           # edizione senza la funzione: upsell mostrato dal gate
+        if cfg.get("mode") == "inpaint" and cfg.get("r2v") and not self._feature_gate("cap.video_inpaint_r2v"):
+            return                                           # inpaint con foto di riferimento (LoRA r2v): gate proprio
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
         _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64
@@ -3780,6 +3804,19 @@ class MainWindow(QMainWindow):
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
                       self._on_video_edit_ai_done, on_progress=self.video_edit_ai_tab.log.appendPlainText)
+
+    def _open_motion_tracks_from_video(self):
+        """Dal tab Video a Modifica Video AI nella modalita' «Movimento da tracce», con l'immagine di partenza del tab Video
+        (quella del canvas Frame 1) gia' impostata. Il tab Video non viene toccato."""
+        t = self.video_edit_ai_tab
+        self.tabs.setCurrentWidget(t)
+        t.select_mode("motion_track")
+        img = self.frame1_tab.image_path or ""
+        if img and os.path.isfile(img):
+            t.set_track_image(img)
+            self._log(tr("vedit.mt.handoff_ok", "[Movimento da tracce] immagine di partenza dal canvas: disegna le tracce e genera."))
+        else:
+            self._log(tr("vedit.mt.handoff_none", "[Movimento da tracce] nessuna immagine nel canvas del Frame 1: scegli un'immagine di partenza."))
 
     def _open_v2v_from_vedit(self, mode: str, video: str, audio: str):
         """Dal «Doppiaggio da testo» di Modifica Video AI a Talk (video + audio) o Canta (foto + canzone) del pannello
@@ -3861,6 +3898,22 @@ class MainWindow(QMainWindow):
             self._log(f"[nativo] FlashVSR super-risoluzione (x{_fvs:g}) su {Path(src).name}…")
             self._fv_worker = _FlashVSRWorker(src, out, target_scale=_fvs)
             self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
+                          self._on_multitalk_done, on_progress=self._log)
+            return
+        if engine == "h3_upsampler":                     # MiniMax H3 Video Upsampler nativo (upscaler latente + tile guidati)
+            if not self._feature_gate("cap.video_h3_upsampler"):
+                return
+            from core import h3_upsample_service as hs
+            p = dict(cfg.get("h3up") or {})
+            p["video"] = src
+            errs = hs.preflight(p)                       # valori, venv, pesi (nessun download)
+            if errs:
+                QMessageBox.warning(self, "H3 Video Upsampler", "\n".join(errs)); return
+            out = str(OUTPUT_DIR / f"h3up_{Path(src).stem}.mp4")
+            self._log(f"[nativo] H3 Video Upsampler ({p.get('megapixels')} MP, denoise {p.get('denoise')}, "
+                      f"{'guidato' if p.get('guide') else 'senza guida'}) su {Path(src).name}…")
+            self._h3up_worker = _H3UpsampleWorker(src, out, p)
+            self._enqueue(tr("queue.job.h3up", "Super-risoluzione (H3 Video Upsampler)"), self._h3up_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
         # esrgan: upscale per-frame nativo (spandrel). CHIAVI CORRETTE: il backend video_postprocess.run()

@@ -35,7 +35,8 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx-iclora-depth": (["iclora_control"], []),
     "ltx-iclora-pose": (["iclora_control"], []),
     "ltx-iclora-union": (["iclora_control"], []),
-    "ltx-iclora-motion-track": (["iclora_control"], []),
+    "ltx-iclora-motion-track": (["iclora_control"], ["ltx23-distilled-lora-384|ltx23-distilled-fp8"]),   # dev + distilled-LoRA, oppure distilled
+    "ltx23-inpaint-r2v": (["iclora_edit"], ["ltx23-distilled-lora-384|ltx23-distilled-fp8"]),   # dev + distilled-LoRA, oppure distilled
     "ltx-iclora-detailer": (["iclora_edit"], []),
     "ltx-iclora-outpaint": (["iclora_edit"], []),
     "ltx-iclora-refocus": (["iclora_edit"], []),
@@ -252,6 +253,8 @@ MAP.update({
     "mmh3-ref2va-int4": (["ckpt_video", "av_joint", "ref_omni"], []),
     "krea2-sickrealism-v2": (["ckpt_image", "distilled", "fp8", "uncensored"], []),
     "mmh3-lightvae-dec": (["vae"], []), "mmh3-lightvae-enc": (["vae"], []),
+    "mmh3-latent-upscaler-v1": (["upscale_video"], ["mmh3-lora-h3upscale-x2"]),
+    "mmh3-lora-h3upscale-x2": (["upscale_video"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
     "klein9b-te-uncensored": (["te", "uncensored"], []),
     "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m": (["distill_lora"], []),
 })

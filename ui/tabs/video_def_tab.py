@@ -3,6 +3,8 @@
 Carica in automatico l'ultimo video generato; permette di sceglierne un altro. Motori:
 SeedVR2 (consigliato, AI video), ESRGAN per-fotogramma (veloce), FlashVSR (se installato).
 Opzione RIFE per aumentare gli FPS. Vedi core/video_enhance_pipeline.py.
+Quarto motore: H3 Video Upsampler (MiniMax H3, nativo): upscaler latente + ri-disegno a tile guidato dalla LoRA
+h3upscale, vedi core/h3_upsample_service.py.
 """
 from __future__ import annotations
 
@@ -19,13 +21,14 @@ from core.video_enhance_pipeline import SEEDVR2_MODELS
 from core import face_restore_pipeline as facerestore
 from ui.i18n_manager import tr
 
-_ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr"}
+_ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr", 3: "h3_upsampler"}
 
 
 class VideoDefTab(QWidget):
     request_enhance = Signal()
     request_face_restore = Signal()
     request_exr = Signal()
+    request_open_weights_tab = Signal()     # «Apri tab Pesi modelli» (pesi dell'H3 Upsampler mancanti)
 
     def __init__(self):
         super().__init__()
@@ -46,7 +49,11 @@ class VideoDefTab(QWidget):
         # motore + parametri
         box = QGroupBox(tr("def.restore.group")); f = QFormLayout(box)
         self.engine = QComboBox()
-        self.engine.addItems([tr("def.engine.seedvr2"), tr("def.engine.esrgan"), tr("def.engine.flashvsr")])
+        self.engine.addItems([tr("def.engine.seedvr2"), tr("def.engine.esrgan"), tr("def.engine.flashvsr"),
+                              tr("def.engine.h3up", "MiniMax H3 Video Upsampler")])
+        self.engine.setItemData(3, tr("def.engine.h3up.tt",
+            "Ingrandisce il video con MiniMax H3: upscaler latente + un ri-disegno a tile guidato dalla LoRA h3upscale "
+            "(il clip a metà risoluzione fa da guida). Serve il modello H3 Ref2VA."), Qt.ToolTipRole)
         self.engine.currentIndexChanged.connect(self._on_engine)
         self.engine.setToolTip(tr("def.engine.tt", "Motore di super-risoluzione: SeedVR2 (AI video), ESRGAN (veloce per frame), FlashVSR."))
         f.addRow(tr("def.engine_lbl"), self.engine)
@@ -77,6 +84,7 @@ class VideoDefTab(QWidget):
         self.scale.setToolTip(tr("def.scale.tt", "Fattore di scala ESRGAN: 2× raddoppia, 4× quadruplica la risoluzione."))
         f.addRow(tr("def.scale_lbl"), self.scale)
         root.addWidget(box)
+        self._build_h3up_box(root)
 
         # RIFE / FPS
         rbox = QGroupBox(tr("def.rife.group")); rf = QFormLayout(rbox)
@@ -157,6 +165,155 @@ class VideoDefTab(QWidget):
         self._on_engine()
         self._refresh_facerestore_status()
 
+    # ---- H3 Video Upsampler ----
+    def _build_h3up_box(self, root):
+        """Opzioni SOLO del motore H3 Video Upsampler (progressive disclosure: visibile solo con quel motore)."""
+        from core import h3_upsample_plan as P
+        from core import h3_upsample_spec as U
+        self.h3up_box = QGroupBox(tr("def.h3up.group", "Opzioni H3 Video Upsampler"))
+        f = QFormLayout(self.h3up_box)
+        self.h3up_model = QComboBox()
+        self.h3up_model.setToolTip(tr("def.h3up.model.tt",
+            "Checkpoint H3 Ref2VA che ri-disegna il video (la LoRA di guida è addestrata su questo). Quelli non "
+            "scaricati hanno ⬇: scaricali dal tab «Pesi modelli»."))
+        f.addRow(tr("def.h3up.model_lbl", "Modello H3 (Ref2VA)"), self.h3up_model)
+        self.h3up_te = QComboBox()
+        for tid, key, label in (("mmh3-te-nvfp4", "nvfp4", "Qwen3-VL-32B nvfp4-AWQ (15,7 GB, consigliato)"),
+                                ("mmh3-te-fp8", "fp8", "Qwen3-VL-32B fp8 (26,5 GB, RTX 40xx)"),
+                                ("mmh3-te-int8", "int8", "Qwen3-VL-32B int8-ConvRot (27 GB, qualità)")):
+            self.h3up_te.addItem(tr(f"vid.h3.te.{key}", label), tid)
+        self.h3up_te.setToolTip(tr("def.h3up.te.tt",
+            "Legge la didascalia della LoRA una volta sola: l'embedding resta in cache e dalla volta dopo il text "
+            "encoder non si carica."))
+        f.addRow(tr("def.h3up.te_lbl", "Text encoder"), self.h3up_te)
+        self.h3up_mp = QDoubleSpinBox()
+        self.h3up_mp.setRange(*U.MP_RANGE)
+        self.h3up_mp.setDecimals(2)
+        self.h3up_mp.setSingleStep(0.05)
+        self.h3up_mp.setValue(P.MEGAPIXELS)
+        self.h3up_mp.setSuffix(" MP")
+        self.h3up_mp.setToolTip(tr("def.h3up.mp.tt",
+            "Dimensione in uscita come area, rapporto ESATTO della sorgente (1 MP = 1024×1024): se i lati non sono "
+            "multipli di 32 si aggiunge un bordo che a fine lavoro viene ritagliato, mai stirato. Più grande della "
+            "sorgente: questa funzione ingrandisce soltanto."))
+        f.addRow(tr("def.h3up.mp_lbl", "Megapixel in uscita"), self.h3up_mp)
+        self.h3up_guide = QCheckBox(tr("def.h3up.guide.check", "Guida con la LoRA h3upscale (consigliata)"))
+        self.h3up_guide.setChecked(True)
+        self.h3up_guide.setToolTip(tr("def.h3up.guide.tt",
+            "Il ri-disegno guarda il clip a metà risoluzione e ne restaura il dettaglio invece di inventarlo. "
+            "Senza, il ri-disegno parte solo dal latente ingrandito."))
+        f.addRow(self.h3up_guide)
+        self.h3up_denoise = QDoubleSpinBox()
+        self.h3up_denoise.setRange(*U.DENOISE_RANGE)
+        self.h3up_denoise.setDecimals(3)
+        self.h3up_denoise.setSingleStep(0.005)
+        self.h3up_denoise.setValue(P.DENOISE_DEFAULT)
+        self.h3up_denoise.setToolTip(tr("def.h3up.denoise.tt",
+            "Quanto lavora l'unico passo di ri-disegno. 0,1 è il valore del nodo originale (guidato); 0 = solo "
+            "ingrandimento, senza caricare né il text encoder né il modello H3."))
+        f.addRow(tr("def.h3up.denoise_lbl", "Forza del ri-disegno"), self.h3up_denoise)
+        self.h3up_lora = QDoubleSpinBox()
+        self.h3up_lora.setRange(-4.0, 4.0)
+        self.h3up_lora.setSingleStep(0.05)
+        self.h3up_lora.setValue(1.0)
+        f.addRow(tr("def.h3up.lora_lbl", "Forza LoRA"), self.h3up_lora)
+        self.h3up_tiles = QSpinBox()
+        self.h3up_tiles.setRange(0, U.TILE_TOKENS_RANGE[1])      # 0 = automatico
+        self.h3up_tiles.setSpecialValueText(tr("def.h3up.tiles.auto", "automatico"))
+        self.h3up_tiles.setSingleStep(1024)
+        self.h3up_tiles.setValue(0)
+        self.h3up_tiles.setToolTip(tr("def.h3up.tiles.tt",
+            "Sequenza massima di una forward. Automatico = calcolata dalla VRAM libera dopo aver caricato il modello "
+            "(tetto 70.000, il valore della ricetta). Più basso = tile più piccoli e più numerosi: meno VRAM, più "
+            "lento, stessa fusione senza cuciture."))
+        f.addRow(tr("def.h3up.tiles_lbl", "Budget dei tile (token)"), self.h3up_tiles)
+        note = QLabel(tr("def.h3up.note",
+            "Upscaler latente + un ri-disegno a tile con MiniMax H3, nativo. Per i video lunghi lavora a segmenti con "
+            "dissolvenza nello spazio latente e tile fusi senza cuciture. La colonna sonora resta quella originale. "
+            "Licenza MiniMax H3 Community: territori esclusi UE, Regno Unito, USA, Corea del Sud."))
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#888;")
+        f.addRow(note)
+        root.addWidget(self.h3up_box)
+        self._refilter_h3up_models()
+
+    def _refilter_h3up_models(self):
+        """Dropdown modello = profili H3 Ref2VA (scelta dell'utente; i non scaricati hanno ⬇ e il download è nel tab
+        Pesi modelli). Nessun profilo scelto al posto suo: l'ordine è quello fisso del menu."""
+        from PySide6.QtGui import QColor
+        from core import h3_upsample_spec as U
+        from core import weights_catalog as wc
+        from core import weights_tooltips as wt
+        labels = {"nvfp4": tr("vid.h3.prof.nvfp4", "nvfp4 · 12,5 GB (RTX 50xx)"),
+                  "fp8": tr("vid.h3.prof.fp8", "fp8 · 21 GB (RTX 40xx)"),
+                  "int8": tr("vid.h3.prof.int8", "int8-ConvRot · 21 GB (tutte le GPU)"),
+                  "int4": tr("vid.h3.prof.int4", "int4 W4A8 · 12 GB (tutte le GPU)")}
+        entries = {e["id"]: e for e in wc.load()}
+        prev = self.h3up_model.currentData()
+        self.h3up_model.blockSignals(True)
+        self.h3up_model.clear()
+        for prof in U.PROFILES:
+            e = entries.get(U.dit_id(prof))
+            if not e or not wc.menu_allowed(e):
+                continue
+            try:
+                present = wc.is_present(e)
+            except Exception:                                   # noqa: BLE001
+                present = False
+            self.h3up_model.addItem(("" if present else "⬇ ") + "MiniMax H3 Ref2VA " + labels[prof], prof)
+            i = self.h3up_model.count() - 1
+            self.h3up_model.setItemData(i, wt.tooltip_for(e) + "\n" + (tr("vid.present", "presente") if present
+                                                                       else tr("vid.missing", "da scaricare")),
+                                        Qt.ToolTipRole)
+            if not present:
+                self.h3up_model.setItemData(i, QColor("#e8b339"), Qt.ForegroundRole)
+        j = self.h3up_model.findData(prev) if prev else -1
+        if j >= 0:
+            self.h3up_model.setCurrentIndex(j)
+        self.h3up_model.blockSignals(False)
+
+    def h3up_params(self) -> dict:
+        """Params del motore H3 Upsampler (core.h3_upsample_spec.build_params) dai controlli del tab."""
+        from core import h3_upsample_spec as U
+        return U.build_params({
+            "video": self._video, "h3_profile": self.h3up_model.currentData() or "",
+            "h3_te": self.h3up_te.currentData() or "", "megapixels": self.h3up_mp.value(),
+            "denoise": self.h3up_denoise.value(), "guide": self.h3up_guide.isChecked(),
+            "lora_strength": self.h3up_lora.value(), "tile_tokens": self.h3up_tiles.value()})
+
+    def _ask_missing_h3up(self, text: str) -> str:
+        """Pesi dell'H3 Upsampler assenti: avviso con «Apri tab Pesi modelli» (nessun download automatico).
+        Ritorna 'weights' | 'cancel'. Sovrascrivibile nei test."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle(tr("def.h3up.missing.title", "Pesi mancanti"))
+        box.setText(tr("def.h3up.missing.msg",
+                       "Per l'H3 Video Upsampler mancano questi pesi: {ids}\n\nNon scarico nulla io: scaricali dal "
+                       "tab «Pesi modelli».").format(ids=text))
+        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+        box.addButton(tr("vedit.ckpt.btn_cancel", "Annulla"), QMessageBox.RejectRole)
+        box.exec()
+        return "weights" if box.clickedButton() is b_w else "cancel"
+
+    def _preflight_h3up(self) -> bool:
+        """True se si può lanciare; altrimenti avvisa (valori errati) o propone il tab Pesi (pesi assenti)."""
+        from core import h3_upsample_spec as U
+        p = self.h3up_params()
+        errs = U.validate(p)
+        if errs:
+            QMessageBox.warning(self, tr("def.h3up.group", "Opzioni H3 Video Upsampler"), "\n".join(errs))
+            return False
+        try:
+            miss = U.missing_weights(p)
+        except Exception as e:                                   # noqa: BLE001
+            QMessageBox.warning(self, tr("def.h3up.group", "Opzioni H3 Video Upsampler"), str(e))
+            return False
+        if miss:
+            if self._ask_missing_h3up(U.missing_text(miss)) == "weights":
+                self.request_open_weights_tab.emit()
+            return False
+        return True
+
     # ---- API ----
     def set_video(self, path: str):
         self._video = path
@@ -190,6 +347,7 @@ class VideoDefTab(QWidget):
             "rife_multiplier": self.rife_mult.currentIndex() + 2,
             "rife_ckpt": self.rife_ckpt.currentText(),
             "chain_face": self.chain_face.isChecked(),
+            "h3up": self.h3up_params() if _ENGINE_KEY[self.engine.currentIndex()] == "h3_upsampler" else None,
         }
 
     def _wrap(self, layout):
@@ -223,6 +381,10 @@ class VideoDefTab(QWidget):
         (prima: SeedVR2 'exit N' muto / FlashVSR errore a valle)."""
         _ids = {"seedvr2": ["seedvr2-3b-fp8", "seedvr2-vae"], "flashvsr": ["flashvsr-v11"]}
         key = _ENGINE_KEY.get(self.engine.currentIndex(), "")
+        if key == "h3_upsampler":                      # pesi: avviso + «Apri tab Pesi modelli», nessun download
+            if self._preflight_h3up():
+                self.request_enhance.emit()
+            return
         ids = _ids.get(key)
         if ids:
             try:
@@ -256,7 +418,8 @@ class VideoDefTab(QWidget):
     # ---- interno ----
     def _on_engine(self, *_):
         key = _ENGINE_KEY[self.engine.currentIndex()]
-        sv = key == "seedvr2"; es = key == "esrgan"; fv = key == "flashvsr"
+        sv = key == "seedvr2"; es = key == "esrgan"; fv = key == "flashvsr"; h3 = key == "h3_upsampler"
+        self.h3up_box.setVisible(h3)
         self.seedvr2_model.setEnabled(sv); self.blocks.setEnabled(sv); self.batch.setEnabled(sv)
         self.resolution.setEnabled(sv); self.overlap.setEnabled(sv)
         self.esrgan_model.setEnabled(es)

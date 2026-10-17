@@ -1362,6 +1362,40 @@
       "filename": "ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
       "use": [
         "iclora_control"
+      ],
+      "used_by": [
+        "cap.video_motion_track"
+      ],
+      "note": "Motion-track (tab Modifica Video AI, API /video/ic_lora kind=motion_track): tracce disegnate -> video di controllo; immagine di partenza = frame 0, forza 1.0. Col dev si aggiunge la distilled-LoRA 0.5",
+      "deps": [
+        "ltx23-distilled-lora-384|ltx23-distilled-fp8"
+      ]
+    },
+    {
+      "id": "ltx23-inpaint-r2v",
+      "module": "Video",
+      "label": "LoRA Inpaint video con foto di riferimento (r2v, rank32)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "LTX-2",
+      "gated": false,
+      "approx_gb": 0.33,
+      "scan_names": [
+        "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors"
+      ],
+      "category": "video",
+      "arch": "ltx23",
+      "filename": "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors",
+      "no_remote": true,
+      "use": [
+        "iclora_edit"
+      ],
+      "used_by": [
+        "cap.video_inpaint_r2v"
+      ],
+      "note": "Modifica Video AI > Inpaint oggetto, casella «Inserisci un oggetto da una foto»: la foto va come immagine di condizionamento (frame 0). Senza foto resta la LoRA t2v rank128. Nessun metadata nel file (solo reference_downscale_factor=1). Col dev si aggiunge la distilled-LoRA",
+      "deps": [
+        "ltx23-distilled-lora-384|ltx23-distilled-fp8"
       ]
     },
     {
@@ -7127,6 +7161,65 @@
         "cap.video_hdr_ic"
       ],
       "note": "Embedding testo pre-calcolato (video_context/audio_context) che la pipeline HDR usa al posto di Gemma: senza questo file la modalita' HDR non parte (nessun prompt)"
+    },
+    {
+      "id": "mmh3-latent-upscaler-v1",
+      "module": "Video",
+      "label": "H3 Video Upsampler: upscaler latente 3D ×1–4 (LBH-123-AI, fp16, 0.69GB)",
+      "kind": "file",
+      "type": "latent_upscale_models",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.69,
+      "scan_names": [
+        "minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "LBH-123-AI/Minimax_h3_latent_Upscaler",
+      "url": "https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler",
+      "filename": "minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors",
+      "remote_filename": "minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors",
+      "deps": [
+        "mmh3-lora-h3upscale-x2"
+      ],
+      "note": "rete 3D (512 canali, 12+12 blocchi, 345M parametri) che ingrandisce il LATENTE H3 senza passare dai pixel; Apache-2.0. Serve all'H3 Video Upsampler (Definizione video). Licenza dei pesi H3: territori esclusi UE/UK/USA/Corea",
+      "used_by": [
+        "cap.video_h3_upsampler"
+      ],
+      "use": [
+        "upscale_video"
+      ]
+    },
+    {
+      "id": "mmh3-lora-h3upscale-x2",
+      "module": "Video",
+      "label": "H3 Video Upsampler: LoRA di guida h3upscale ×2 (sandpies, 0.62GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.62,
+      "scan_names": [
+        "h3upscale_v2_x2-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "sandpies/ComfyUI-H3-Video-Upsampler",
+      "url": "https://huggingface.co/sandpies/ComfyUI-H3-Video-Upsampler",
+      "filename": "h3upscale_v2_x2-native.safetensors",
+      "remote_filename": "lora/h3upscale_v2_x2.safetensors",
+      "deps": [
+        "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"
+      ],
+      "note": "rank 64, 4000 passi, ai-toolkit su Alissonerdx/h3upscale-4k, base Ref2VA: il ri-disegno guarda il clip a metà risoluzione (guida IC-LoRA a griglia 1/2) invece di inventare il dettaglio. Solo Ref2VA; si usa SOLO nel tab Definizione video. Licenza H3 Community (no UE/UK/USA/Corea); leggi i termini del dataset prima dell'uso commerciale",
+      "used_by": [
+        "cap.video_h3_upsampler"
+      ],
+      "convert": "mmh3_lora_guide",
+      "use": [
+        "upscale_video"
+      ]
     },
     {
       "id": "t5xxl-enconly-fp8",

@@ -341,3 +341,21 @@ def test_concat_rejects_size_mismatch_and_bad_overlaps(tmp_path):
         P.concat_segments([a, b], str(tmp_path / "o.mp4"), [0])
     with pytest.raises(ValueError):
         P.concat_segments([a, a], str(tmp_path / "o.mp4"), [1, 2])
+
+
+def test_fill_area_shrinks_only_symmetric_bars():
+    """fill_area (17/10, live): barre opposte con area nuova < 60% -> sorgente rimpicciolito al centro; una barra sola no."""
+    for asp, w, h in (("21:9", 704, 384), ("4:3", 704, 384), ("1:1", 704, 384)):
+        off = P.compute_outpaint_layout(w, h, aspect=asp)
+        on = P.compute_outpaint_layout(w, h, aspect=asp, fill_area=P.FILL_AREA)
+        assert off.scale == 1.0 and off.new_area < P.FILL_AREA
+        assert on.scale < 1.0 and abs(on.new_area - P.FILL_AREA) < 0.02
+        assert (on.canvas_w, on.canvas_h) == (off.canvas_w, off.canvas_h)                 # stesso canvas
+        assert abs((on.x + on.src_w / 2) - (off.x + off.src_w / 2)) <= 2 and abs((on.y + on.src_h / 2) - (off.y + off.src_h / 2)) <= 2
+        assert on.x >= 0 and on.y >= 0 and on.x + on.src_w <= on.canvas_w and on.y + on.src_h <= on.canvas_h
+    one = P.compute_outpaint_layout(704, 384, aspect="4:3", anchor="bottom", fill_area=P.FILL_AREA)
+    assert one == P.compute_outpaint_layout(704, 384, aspect="4:3", anchor="bottom")       # barra singola: invariato
+    big = P.compute_outpaint_layout(704, 384, aspect="9:16", fill_area=P.FILL_AREA)
+    assert big == P.compute_outpaint_layout(704, 384, aspect="9:16")                       # area gia' >= 60%: invariato
+    m = P.compute_outpaint_layout(704, 384, margins=(160, 0, 160, 0), fill_area=P.FILL_AREA)
+    assert m.scale < 1.0 and abs(m.new_area - P.FILL_AREA) < 0.02                          # vale anche con i margini

@@ -145,7 +145,7 @@ def test_disabled_and_unknown_modes_rejected(tmp_path):
 def test_outpaint_feather_cfg_and_min_bar(tmp_path):
     src = _gen(tmp_path / "v.mp4", 17, size="640x384")
     out = str(tmp_path / "o.mp4")
-    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False}
+    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False, "out_fill": False}
     a = vic.build_job({**base, "out_feather": 40}, str(tmp_path), 1, out)
     assert a.feather == 40 and a.layout.scale == 1.0
     b = vic.build_job({**base, "out_feather": 0}, str(tmp_path), 2, out)
@@ -157,6 +157,23 @@ def test_outpaint_feather_cfg_and_min_bar(tmp_path):
     e = vic.build_job({**base, "out_min_bar": 0.15}, str(tmp_path), 5, out)
     assert e.layout.scale < 1.0 and not e.layout.narrow_bar and e.layout.new_area > a.layout.new_area
     assert a.layout.narrow_bar and any("stretta" in n for n in a.notes)
+
+
+def test_outpaint_fill_default_on_shrinks_symmetric_bars(tmp_path):
+    """«Garantisci riempimento» (17/10): ATTIVO di default; due barre simmetriche -> sorgente rimpicciolito, area nuova >= 60%."""
+    src = _gen(tmp_path / "v.mp4", 17, size="640x384")
+    out = str(tmp_path / "o.mp4")
+    base = {"mode": "outpaint", "video": src, "out_format": "4:3", "keep_audio": False}
+    on = vic.build_job(base, str(tmp_path), 1, out)                                   # default: attivo
+    off = vic.build_job({**base, "out_fill": False}, str(tmp_path), 2, out)
+    assert off.layout.scale == 1.0 and off.layout.new_area < 0.45
+    assert on.layout.scale < 1.0 and on.layout.new_area >= P.FILL_AREA - 0.01
+    assert any("garantisci riempimento" in n for n in on.notes) and not any("stretta" in n for n in on.notes)
+    one = vic.build_job({**base, "out_anchor": "bottom"}, str(tmp_path), 3, out)       # UNA barra: nessun rimpicciolimento
+    assert one.layout.scale == 1.0
+    cust = vic.build_job({"mode": "outpaint", "video": src, "out_format": "custom", "out_margins": (160, 0, 160, 0),
+                          "keep_audio": False}, str(tmp_path), 4, out)                 # margini simmetrici: vale anche per custom
+    assert cust.layout.scale < 1.0 and cust.layout.new_area >= P.FILL_AREA - 0.01
 
 
 # ── lip dub (fase 1b) ────────────────────────────────────────────────────────────────────────────
@@ -364,3 +381,79 @@ def test_run_and_fill_cfg(monkeypatch, tmp_path):
     assert vdt.fill_cfg(cfg)["text"] == "Hello everyone" and cfg["lipdub_line"] == "Hello everyone" and cfg["lipdub_lang"] == "en"
     cfg2 = {"video": src, "translate_to": "en", "lipdub_line": "gia' scritta"}
     assert vdt.fill_cfg(cfg2) == {} and cfg2["lipdub_line"] == "gia' scritta"          # battuta presente: niente traduzione
+
+
+# ── motion_track: immagine + tracce -> video di controllo + params per ICLoraPipeline ───────────────
+def _img(path, size=(640, 360)):
+    from PIL import Image
+    Image.new("RGB", size, (90, 120, 160)).save(path)
+    return str(path)
+
+
+_CTRL = [[{"x": 100, "y": 100}, {"x": 300, "y": 180}, {"x": 520, "y": 120}], [{"x": 320, "y": 300}]]
+
+
+def test_motion_track_job_from_control_points(tmp_path):
+    import json
+    img = _img(tmp_path / "start.png")
+    out = str(tmp_path / "o.mp4")
+    ij = vic.build_job({"mode": "motion_track", "track_image": img, "tracks": json.dumps(_CTRL), "prompt": "a hero runs",
+                        "seconds": 5, "fps": 24, "seed": 7, "model": r"E:\m\ltx-2.3-22b-distilled-1.1.safetensors"},
+                       str(tmp_path), 5, out)
+    p = ij.params
+    assert p["control_type"] == "motion-track" and p["_strict_ic"] is True and p["edit_lora"] == ""
+    assert p["num_frames"] == 121 and p["fps"] == 24 and (p["width"], p["height"]) == (1024, 576)
+    assert p["control_strength"] == 1.0 and p["ref_strength"] == 1.0 and p["seed"] == 7
+    assert p["model"].endswith("distilled-1.1.safetensors")                    # checkpoint come scelto
+    assert os.path.exists(p["control_video"]) and p["control_video"].endswith("_tracks.mp4")
+    info = P.probe(p["control_video"], count_frames=True)
+    assert (info.width, info.height, info.nb_frames) == (1024, 576, 121)
+    from PIL import Image
+    assert Image.open(p["image_path"]).size == (1024, 576)                     # frame 0 gia' alla risoluzione di lavoro
+    assert ij.outputs(out)[0] == out and ij.outputs(out)[-1] == p["control_video"]
+    assert ij.mux_audio_from == "" and ij.segments == 1
+    assert p["native_audio"] is True, "audio generato tenuto (come il workflow ufficiale): senza il flag il worker lo scarta"
+    ij2 = vic.build_job({"mode": "motion_track", "track_image": img, "tracks": _CTRL, "num_frames": 9, "native_audio": False},
+                        str(tmp_path), 6, str(tmp_path / "o2.mp4"))
+    assert ij2.params["native_audio"] is False
+
+
+def test_motion_track_coordinates_are_original_pixels_without_size(tmp_path):
+    """Senza `size` le coordinate sono pixel dell'immagine ORIGINALE (640x360 -> 1024x576: fattore 1.6)."""
+    import numpy as np
+    img = _img(tmp_path / "s.png")
+    one = [[{"x": 320, "y": 180}]]                                             # centro dell'immagine
+    ij = vic.build_job({"mode": "motion_track", "track_image": img, "tracks": one, "num_frames": 9, "fps": 24},
+                       str(tmp_path), 1, str(tmp_path / "o.mp4"))
+    fr = list(P._read_frames(ij.params["control_video"], 1024, 576))[0]
+    ys, xs = np.nonzero(fr.sum(-1) > 150)
+    assert abs(xs.mean() - 512) < 3 and abs(ys.mean() - 288) < 3
+    # con `size` dichiarata nello spazio di lavoro nessuna trasformazione
+    ij2 = vic.build_job({"mode": "motion_track", "track_image": img,
+                         "tracks": {"points_store": [[{"x": 100, "y": 100}]], "size": [1024, 576]},
+                         "num_frames": 9}, str(tmp_path), 2, str(tmp_path / "o2.mp4"))
+    fr2 = list(P._read_frames(ij2.params["control_video"], 1024, 576))[0]
+    ys, xs = np.nonzero(fr2.sum(-1) > 150)
+    assert abs(xs.mean() - 100) < 3 and abs(ys.mean() - 100) < 3
+
+
+def test_motion_track_ready_made_video_and_rejects(tmp_path):
+    img = _img(tmp_path / "s.png")
+    tv = _gen(tmp_path / "t.mp4", 25)
+    ij = vic.build_job({"mode": "motion_track", "track_image": img, "tracks_video_path": tv, "num_frames": 25},
+                       str(tmp_path), 3, str(tmp_path / "o.mp4"))
+    assert os.path.exists(ij.params["control_video"]) and ij.params["num_frames"] == 25
+    with pytest.raises(vic.IcJobError, match="immagine"):
+        vic.build_job({"mode": "motion_track", "tracks": _CTRL}, str(tmp_path), 4, str(tmp_path / "o.mp4"))
+    with pytest.raises(vic.IcJobError, match="tracce mancanti"):
+        vic.build_job({"mode": "motion_track", "track_image": img}, str(tmp_path), 5, str(tmp_path / "o.mp4"))
+    with pytest.raises(vic.IcJobError, match="tetto"):
+        vic.build_job({"mode": "motion_track", "track_image": img, "tracks": _CTRL, "num_frames": 300},
+                      str(tmp_path), 6, str(tmp_path / "o.mp4"))
+    with pytest.raises(vic.IcJobError, match="non valide"):
+        vic.build_job({"mode": "motion_track", "track_image": img, "tracks": "[]"}, str(tmp_path), 7,
+                      str(tmp_path / "o.mp4"))
+    # 10 s a 24 fps = 241 frame: dentro il tetto (257)
+    ij = vic.build_job({"mode": "motion_track", "track_image": img, "tracks": _CTRL, "seconds": 10, "fps": 24,
+                        "width": 512, "height": 320}, str(tmp_path), 8, str(tmp_path / "o3.mp4"))
+    assert ij.params["num_frames"] == 241

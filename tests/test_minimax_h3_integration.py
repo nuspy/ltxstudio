@@ -38,7 +38,10 @@ def test_catalogo_h3_completo_e_nativo():
     for e in ids.values():
         assert wc.downloadable(e), f"{e['id']} non scaricabile"
         # il predittore Veda ha una sua capability (attenzione sparsa opzionale), non quella base di H3
-        want = ["cap.video_h3_veda"] if e["id"] == "mmh3-veda-r2va" else ["cap.video_minimax_h3"]
+        # idem l'H3 Video Upsampler (upscaler latente + LoRA di guida): funzione propria, cap propria
+        want = (["cap.video_h3_veda"] if e["id"] == "mmh3-veda-r2va"
+                else ["cap.video_h3_upsampler"] if e["id"] in ("mmh3-latent-upscaler-v1", "mmh3-lora-h3upscale-x2")
+                else ["cap.video_minimax_h3"])
         assert e.get("used_by") == want, f"{e['id']}: gating errato"
         assert "gguf" not in e["id"], "i GGUF H3 sono ritirati (nessun loader nativo)"
         if e.get("kind") == "file" and "Comfy" in (e.get("repo_id") or "") or e.get("convert"):

@@ -193,7 +193,17 @@ NEW = [
     N("ltx-iclora-motion-track", "ControlNet", "IC-LoRA Motion-Track ref0.5", category="video",
       arch="ltx23", repo="Lightricks/LTX-2.3-22b-IC-LoRA-Motion-Track-Control",
       filename="ltx-2.3-22b-ic-lora-motion-track-control-ref0.5.safetensors",
-      type="LoRA", family="LTX-2", gb=0.33),
+      type="LoRA", family="LTX-2", gb=0.33,
+      used_by=["cap.video_motion_track"],
+      note="Motion-track (tab Modifica Video AI, API /video/ic_lora kind=motion_track): tracce disegnate -> video di controllo; immagine di partenza = frame 0, forza 1.0. Col dev si aggiunge la distilled-LoRA 0.5"),
+    # Inpaint video con FOTO di riferimento (task 8): LoRA r2v rank32. Fonte ignota (viene dal pacchetto «LTS Editor»,
+    # nessun repo verificato: ricerca HF 17/10/2026 senza risultati) -> no_remote, il file e' quello locale (327 287 384 B).
+    N("ltx23-inpaint-r2v", "Video", "LoRA Inpaint video con foto di riferimento (r2v, rank32)", category="video",
+      arch="ltx23", filename="ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors",
+      type="LoRA", family="LTX-2", gb=0.33, no_remote=True, used_by=["cap.video_inpaint_r2v"],
+      note="Modifica Video AI > Inpaint oggetto, casella «Inserisci un oggetto da una foto»: la foto va come "
+           "immagine di condizionamento (frame 0). Senza foto resta la LoRA t2v rank128. Nessun metadata nel file "
+           "(solo reference_downscale_factor=1). Col dev si aggiunge la distilled-LoRA"),
     # oumoumad/*: repo PUBBLICI, file byte-identici ai locali (1 308 756 416 B, verificato via HF 14/10/2026)
     N("ltx-iclora-outpaint", "Video", "IC-LoRA Outpaint (oumoumad)", category="video", arch="ltx23",
       repo="oumoumad/LTX-2.3-22b-IC-LoRA-Outpaint",
@@ -822,6 +832,26 @@ NEW = [
       filename="AfterMidnight_ref2va_h3_rank64_v1.2-native.safetensors", convert="mmh3_lora", type="LoRA",
       family="MiniMax-H3", gb=1.19, sens="adult", used_by=["cap.video_minimax_h3"],
       note="solo modalità Ref2VA; l'autore usa euler + scheduler beta"),
+    # H3 Video Upsampler (funzione = upscale video, arch = MiniMax H3): upscaler latente 3D (LBH-123-AI) + LoRA di guida
+    # h3upscale ×2 (sandpies). Header letti via HTTP range il 17/10/2026: upscaler 322 tensori F16 (345M parametri),
+    # LoRA 416 tensori BF16 rank 64 con reference_downscale_factor=2. La LoRA NON è una LoRA di stile: ha il suo posto
+    # nel tab Definizione video (use=upscale_video la esclude dal pannello LoRA del tab Video).
+    N("mmh3-latent-upscaler-v1", "Video", "H3 Video Upsampler: upscaler latente 3D ×1–4 (LBH-123-AI, fp16, 0.69GB)",
+      category="video", arch="minimax_h3", repo="LBH-123-AI/Minimax_h3_latent_Upscaler",
+      remote="minimax_h3_latent_upscaler_3d_conv_v1/minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors",
+      filename="minimax_h3_latent_upscaler_3d_conv_v1_fp16.safetensors", type="latent_upscale_models", gb=0.69,
+      deps=["mmh3-lora-h3upscale-x2"], used_by=["cap.video_h3_upsampler"],
+      note="rete 3D (512 canali, 12+12 blocchi, 345M parametri) che ingrandisce il LATENTE H3 senza passare dai pixel; "
+           "Apache-2.0. Serve all'H3 Video Upsampler (Definizione video). Licenza dei pesi H3: territori esclusi "
+           "UE/UK/USA/Corea"),
+    N("mmh3-lora-h3upscale-x2", "Video", "H3 Video Upsampler: LoRA di guida h3upscale ×2 (sandpies, 0.62GB)",
+      category="video", arch="minimax_h3", repo="sandpies/ComfyUI-H3-Video-Upsampler",
+      remote="lora/h3upscale_v2_x2.safetensors", filename="h3upscale_v2_x2-native.safetensors",
+      convert="mmh3_lora_guide", type="LoRA", family="MiniMax-H3", gb=0.62,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_h3_upsampler"],
+      note="rank 64, 4000 passi, ai-toolkit su Alissonerdx/h3upscale-4k, base Ref2VA: il ri-disegno guarda il clip a metà "
+           "risoluzione (guida IC-LoRA a griglia 1/2) invece di inventare il dettaglio. Solo Ref2VA; si usa SOLO nel tab "
+           "Definizione video. Licenza H3 Community (no UE/UK/USA/Corea); leggi i termini del dataset prima dell'uso commerciale"),
     # Krea 2: LoRA ai-toolkit (diffusion_model.blocks… + txtfusion → text_fusion)
     # Krea 2 single-file community: convertito in nativo (nomi diffusers, Linear int8 ConvRot compressi) e montato
     # sul text encoder/VAE dello snapshot Turbo (workers/krea2_custom).

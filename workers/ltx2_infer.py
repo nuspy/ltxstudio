@@ -1589,6 +1589,10 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
         pipe = _build(InpaintPipeline,
                       distilled_checkpoint_path=_ckpt_pipe, spatial_upsampler_path=UPSAMPLER,
                       gemma_root=GEMMA, loras=loras, quantization=quant, offload_mode=offload)
+        if _dev_dlora is not None and os.path.exists(DISTILLED_LORA):
+            # stage 2 (piena risoluzione): col dev la distilled-LoRA ufficiale a 0.5 come negli altri rami IC (stage 1 resta a 1.0)
+            _dev_stage2_dlora(pipe, _ckpt_pipe,
+                              LoraPathStrengthAndSDOps(DISTILLED_LORA, 0.5, LTXV_LORA_COMFY_RENAMING_MAP), quant, offload)
     elif ptype == "iclora":                                  # #24 ControlNet IC-LoRA (canny/depth/pose)
         from ltx_pipelines.ic_lora import ICLoraPipeline
         pipe = _build(ICLoraPipeline,
@@ -2024,10 +2028,12 @@ def _run_chunked(p: dict, chunk: int) -> str:
 
 
 def _ic_chunkable(p: dict) -> bool:
-    """True se il job con control_video si puo' spezzare in segmenti del GUIDE: niente maschere per-frame
-    (inpaint/attention mask), niente ReTake, niente riferimenti MSR (stanno fuori dalla finestra del clip)."""
+    """True se il job con control_video si puo' spezzare in segmenti del GUIDE: niente attention mask per-frame
+    generiche, niente ReTake, niente riferimenti MSR (stanno fuori dalla finestra del clip).
+    Eccezione (task 8): l'inpaint VIDEO (`inpaint_masks_dir`) si spezza, perche' `_run_chunked_ic` taglia anche le
+    maschere negli stessi segmenti (`mask_offset`); la foto di riferimento r2v vale per ogni segmento."""
     return bool(p.get("control_video")) and not (
-        p.get("inpaint_masks_dir") or p.get("attention_mask_dir") or p.get("retake") or p.get("references"))
+        p.get("attention_mask_dir") or p.get("retake") or p.get("references"))
 
 
 def _run_chunked_ic(p: dict, chunk: int) -> str:
@@ -2048,6 +2054,12 @@ def _run_chunked_ic(p: dict, chunk: int) -> str:
     total = min(int(p["num_frames"]), int(info.nb_frames))
     if total < int(p["num_frames"]):
         print(f"[iclora] il guide ha {info.nb_frames} frame < num_frames {p['num_frames']}: uso {total}", flush=True)
+    if p.get("inpaint_masks_dir"):                           # inpaint video: una maschera per frame, stessa finestra del guide
+        import glob as _gl
+        _nm = len(_gl.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
+        if 0 < _nm < total:
+            print(f"[iclora] {_nm} maschere < {total} frame: uso {_nm}", flush=True)
+            total = _nm
     ov = max(0, int(p.get("overlap_frames", 0) or 0)) or prep.DEFAULT_OVERLAP
     segs = prep.plan_segments(total, chunk, ov)
     ovs = prep.overlaps_of(segs)
@@ -2080,8 +2092,10 @@ def _run_chunked_ic(p: dict, chunk: int) -> str:
         for k in ("chunk_frames", "overlap_frames", "ic_frame0_image"):
             cp.pop(k, None)
         cp.update(control_video=sub, num_frames=sg.count, output=outp)
-        if sg.index > 0:
-            cp.pop("image_path", None)
+        if p.get("inpaint_masks_dir"):
+            cp["mask_offset"] = int(sg.start)                # le maschere seguono il segmento (vedi ramo vinpaint)
+        if sg.index > 0 and not p.get("r2v_every_segment"):
+            cp.pop("image_path", None)                       # r2v: la foto e' l'identita' dell'oggetto, vale per ogni segmento
         print(f"[iclora] segmento {sg.index + 1}/{len(segs)}: frame {sg.start}-{sg.end - 1} ({sg.count}f)",
               flush=True)
         run_generation(cp)                                   # GenerationCancelled propaga; NIENTE retry silenzioso
@@ -2609,16 +2623,32 @@ def run_generation(p: dict) -> str:
         import glob as _glob
         from workers.ltx_inpaint_cond import load_mask_tensor
         mks = sorted(_glob.glob(os.path.join(p["inpaint_masks_dir"], "*.png")))
+        mks = mks[int(p.get("mask_offset", 0) or 0):]        # segmento di un clip lungo: finestra di maschere del segmento
         nf = min(nf, len(mks))
         masks_t = load_mask_tensor(mks[:nf], int(p.get("height", 320)), int(p.get("width", 512)),
                                    dilate=int(p.get("mask_dilate", 24)), blur=float(p.get("mask_blur", 6.0)))
+        # r2v: foto di riferimento dell'oggetto da inserire = immagine di condizionamento (frame 0). Senza foto
+        # (LoRA t2v) `images` resta vuoto come prima. `r2v_mode`: oggi solo "frame0" (il file LoRA non documenta il formato).
+        _rf = int(p.get("r2v_frame", 0) or 0)                # 0 = sostituisce il latente del primo frame; >0 / -1 = keyframe aggiunto
+        _rf = (nf - 1) if _rf < 0 else min(_rf, nf - 1)
+        imgs = ([ImageConditioningInput(p["image_path"], _rf, float(p.get("ref_strength", 0.8)), 33)]
+                if p.get("image_path") else [])
+        if imgs:
+            print(f"[inpaint-r2v] riferimento={os.path.basename(p['image_path'])} frame {_rf} "
+                  f"forza={float(p.get('ref_strength', 0.8)):.2f} mode={p.get('r2v_mode', 'frame0')}", flush=True)
         video = pipe.inpaint(
             prompt=p.get("prompt", ""), negative_prompt=p.get("negative", "worst quality, blurry"),
             seed=int(p.get("seed", 42)), height=int(p.get("height", 320)), width=int(p.get("width", 512)),
-            num_frames=nf, frame_rate=fps, attention_mask=masks_t,
+            num_frames=nf, frame_rate=fps, attention_mask=masks_t, images=imgs,
+            stage2=bool(p.get("inpaint_stage2", False)),
             video_conditioning=[(p["control_video"], float(p.get("control_strength", 0.5)))],
             cfg_scale=float(p.get("cfg_scale", 5.0)), num_steps=int(p.get("num_steps", 30)))
         audio = None
+        if p.get("inpaint_composite", False):                # fuori dalla maschera = sorgente ORIGINALE (pixel), bordo sfumato
+            from workers.ltx_inpaint_composite import composite_outside_mask
+            video = composite_outside_mask(video, p["control_video"], masks_t)
+            print("[inpaint] sfondo originale rimesso fuori dalla maschera (composizione in pixel)", flush=True)
+        print("[inpaint] stage2=%s composite=%s" % (bool(p.get("inpaint_stage2")), bool(p.get("inpaint_composite"))), flush=True)
     elif ptype == "a2v":                                     # AUDIO→VIDEO nativo: foto + canzone → canto
         imgs = [ImageConditioningInput(p["image_path"], 0, float(p.get("ref_strength", 1.0)), 33)] if p.get("image_path") else []
         video, audio, _nf_eff = _unpack_pipe(pipe(
