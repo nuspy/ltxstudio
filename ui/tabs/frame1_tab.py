@@ -1486,6 +1486,9 @@ class Frame1Tab(QWidget):
         return box
 
     def _on_color_engine_changed(self, idx: int):
+        if hasattr(self, "color_steps"):
+            self._swap_default_steps(self.color_steps, getattr(self, "_color_engine_klein", False), idx == 1)
+        self._color_engine_klein = (idx == 1)
         on = idx == QWEN21_ENGINE_IDX
         self.color_model.setVisible(on); self._color_model_lbl.setVisible(on)
         if on:
@@ -1601,8 +1604,24 @@ class Frame1Tab(QWidget):
         hint.setStyleSheet("color:#888;"); hint.setWordWrap(True); v.addWidget(hint)
         return box
 
+    @staticmethod
+    def _swap_default_steps(spin, old_engine_is_klein: bool, new_engine_is_klein: bool) -> None:
+        """Il DEFAULT dei passi segue il motore: FLUX.2 = Klein distillato → 12 (a 21 la foto resta invariata, live
+        17/10), gli altri 20. Un valore scelto a mano dall'utente (diverso dal default del motore che si lascia) non
+        si cambia mai."""
+        from core import arch_filter as af
+        if old_engine_is_klein == new_engine_is_klein:
+            return
+        old_def = af.KLEIN_STEPS if old_engine_is_klein else af.EDIT_STEPS_DEFAULT
+        new_def = af.KLEIN_STEPS if new_engine_is_klein else af.EDIT_STEPS_DEFAULT
+        if spin.value() == old_def:
+            spin.setValue(new_def)
+
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
+        if hasattr(self, "int_steps"):
+            self._swap_default_steps(self.int_steps, getattr(self, "_int_engine_klein", False), _idx == 1)
+        self._int_engine_klein = (_idx == 1)
         if _idx == QWEN21_ENGINE_IDX:
             engine_label = tr("f1.integrate.model.qwen21", "Modello (Qwen-Image 2.1)")
         elif _idx == 2:

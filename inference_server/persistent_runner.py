@@ -40,6 +40,19 @@ def _model_key(module: str, params: dict) -> str:
     return residency_key(arch, str(params.get("model", "") or params.get("model_gguf", "") or ""))
 
 
+def _run_handler(handler, params, mm, output_dir) -> dict:
+    """Esegue il job. Un errore GESTITO del handler (es. «FLUX.2 Dev non ha una pipeline di inpaint…») diventa il
+    risultato {"status": "error", "error": messaggio}: prima l'eccezione risaliva al ciclo principale, il file di
+    risultato non veniva scritto e la GUI mostrava solo «job terminato senza risultato… Log:» con la coda del log
+    tagliata (live 17/10, T0). I crash NATIVI uccidono comunque il processo (protezione voluta)."""
+    try:
+        return handler(params, mm, output_dir)
+    except Exception as e:                                    # noqa: BLE001
+        sys.stderr.write(f"[persistent_runner] errore del job: {e}\n{traceback.format_exc()[-1500:]}\n")
+        sys.stderr.flush()
+        return {"status": "error", "error": str(e)}
+
+
 def main() -> int:
     try:
         import faulthandler
@@ -141,7 +154,7 @@ def main() -> int:
                 if handler is None:
                     res = {"status": "error", "error": f"modulo non supportato: {module}"}
                 else:
-                    res = handler(params, mm, output_dir)
+                    res = _run_handler(handler, params, mm, output_dir)
                 tmp = rf + ".tmp"
                 with open(tmp, "w", encoding="utf-8") as f:
                     json.dump(res, f)

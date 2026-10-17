@@ -314,10 +314,18 @@ def inpaint_kind(rel: str) -> str | None:
     return None
 
 
+# FLUX.2 Klein e' DISTILLATO: provato dal vivo il 17/10 (inpaint, seed fisso) 12 passi = edit pieno, 16 = parziale,
+# 21 = foto invariata (core/arch_filter non cambia i passi scelti a mano dall'utente: e' solo il DEFAULT).
+KLEIN_STEPS = 12
+EDIT_STEPS_DEFAULT = 20                          # default degli spin passi di Integra/Colore con gli altri motori
+
+
 def inpaint_defaults(kind: str, name: str = "") -> tuple[int, float]:
     """(passi, guidance) del PROPRIO modello (stessi valori di image_flux._auto_settings, che la GUI può importare
     senza torch): Fill dev 40/30, FLUX.1 base 28/3.5, Klein 28/4; distillati (hyper/turbo/schnell…) 8 passi, ≤3.5."""
     from inference_server.backends.image_flux import _auto_settings
     arch = {"fill": "inpaint", "base": "flux", "klein": "flux2_inpaint"}[kind]
-    steps, guid, _h = _auto_settings(arch, name)
+    steps, guid, hyper = _auto_settings(arch, name)
+    if kind == "klein" and not hyper:
+        steps = KLEIN_STEPS                      # NON i 28 del backend: Klein e' distillato (vedi KLEIN_STEPS)
     return int(steps), float(guid)

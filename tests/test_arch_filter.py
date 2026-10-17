@@ -80,12 +80,13 @@ def test_nunchaku_klein_non_e_flux1(root):
 def test_default_del_proprio_modello_coincidono_col_backend():
     from inference_server.backends.image_flux import _auto_settings
     assert af.inpaint_defaults("fill", "FLUX_DEV_Fill") == (40, 30.0)
-    assert af.inpaint_defaults("klein", "k") == (28, 4.0)
+    assert af.inpaint_defaults("klein", "k") == (12, 4.0)          # distillato: 12 = edit pieno, 21 = invariato (live 17/10)
     assert af.inpaint_defaults("base", "x") == (28, 3.5)
     for kind, arch in (("fill", "inpaint"), ("base", "flux"), ("klein", "flux2_inpaint")):
         for name in ("model", "x-hyper-8", "turbo"):
-            s, g, _h = _auto_settings(arch, name)
-            assert af.inpaint_defaults(kind, name) == (s, g)
+            s, g, hyper = _auto_settings(arch, name)
+            want = (12 if (kind == "klein" and not hyper) else s, g)          # Klein: 12, non i 28 del backend
+            assert af.inpaint_defaults(kind, name) == want
 
 
 def test_copia_cache_normalized_fuori_da_tutti_i_menu(tmp_path, monkeypatch):
@@ -99,3 +100,15 @@ def test_copia_cache_normalized_fuori_da_tutti_i_menu(tmp_path, monkeypatch):
     (d / "altro.safetensors").write_bytes(b"x")
     assert [n.split(chr(92))[-1] for n in oi.list_models("diffusion_models")] == ["altro.safetensors", "fux.safetensors"]
     assert oi.is_cache_copy("a.safetensors.normalized.safetensors") and not oi.is_cache_copy("a.safetensors")
+
+
+def test_errore_del_job_arriva_alla_gui():
+    """Un errore gestito del handler (FLUX.2 Dev senza pipeline di inpaint) diventa il risultato del job, non un
+    «terminato senza risultato… Log:» con la coda del log tagliata (live 17/10, T0)."""
+    from inference_server import persistent_runner as pr
+
+    def boom(params, mm, out):
+        raise RuntimeError("«flux2-dev.safetensors» è FLUX.2 Dev: non ha una pipeline di inpaint/edit.")
+    res = pr._run_handler(boom, {}, None, ".")
+    assert res["status"] == "error" and "FLUX.2 Dev" in res["error"] and "pipeline di inpaint" in res["error"]
+    assert pr._run_handler(lambda p, m, o: {"status": "success", "output": ["a.png"]}, {}, None, ".")["output"] == ["a.png"]

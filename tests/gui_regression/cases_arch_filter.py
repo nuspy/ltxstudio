@@ -178,7 +178,7 @@ def case_arch_inpaint_dynamic_by_header(w, spy):
             assert ok in joined, f"{ok} manca dall'Inpaint: {dyn}"
         # default del proprio modello, scelti in sequenza (nessuna eredità dal precedente)
         want = {"FillX  · UNET Flux": (40, 30.0), "flux1_dev_model  · UNET Flux": (28, 3.5),
-                "klein_senza_nome_flux  · UNET Flux": (28, 4.0), "PornFlux_20_trap  · UNET Flux": (28, 3.5)}
+                "klein_senza_nome_flux  · UNET Flux": (12, 4.0), "PornFlux_20_trap  · UNET Flux": (28, 3.5)}
         for lbl in ("FillX  · UNET Flux", "klein_senza_nome_flux  · UNET Flux", "flux1_dev_model  · UNET Flux",
                     "FillX  · UNET Flux", "PornFlux_20_trap  · UNET Flux"):
             i = f.inp_model.findText(lbl)
@@ -300,6 +300,43 @@ def case_arch_inpaint_unet_disappears_placeholder(w, spy):
         f._models = []
 
 
+def case_arch_klein_default_steps(w, spy):
+    """Klein e' distillato: il DEFAULT dei passi e' 12 (21 = foto invariata, live 17/10) in Inpaint, Integra e Colore;
+    un valore scelto a mano dall'utente non viene toccato."""
+    f = w.frame1_tab
+    assert f.int_steps.value() == 20 and f.color_steps.value() == 20
+    f.integrate_engine.setCurrentIndex(1)                      # FLUX.2 (Klein)
+    assert f.int_steps.value() == 12, f.int_steps.value()
+    f.integrate_engine.setCurrentIndex(0)                      # Kontext: torna 20
+    assert f.int_steps.value() == 20
+    f.integrate_engine.setCurrentIndex(1)
+    f.int_steps.setValue(30)                                   # scelta dell'utente
+    f.integrate_engine.setCurrentIndex(0)
+    assert f.int_steps.value() == 30, "il valore scelto a mano non va cambiato"
+    f.color_engine.setCurrentIndex(1)
+    assert f.color_steps.value() == 12, f.color_steps.value()
+    f.color_steps.setValue(18)
+    f.color_engine.setCurrentIndex(0)
+    assert f.color_steps.value() == 18
+    # inpaint: voce Klein hardcoded = 12 passi
+    f.inp_model.setCurrentIndex(f.inp_model.findText("miraclein_flux2klein_nsfw_v2  (FLUX.2 Klein, edit)"))
+    assert f.inp_steps.value() == 12
+
+
+def case_arch_child_error_reaches_dialog(w, spy):
+    """L'errore chiaro del backend (FLUX.2 Dev non ha una pipeline di inpaint) arriva intero al messaggio della GUI."""
+    from PySide6.QtWidgets import QMessageBox
+    shown = []
+    old = QMessageBox.critical
+    QMessageBox.critical = staticmethod(lambda *a, **k: shown.append(a[2] if len(a) > 2 else "") or QMessageBox.Ok)
+    msg = "«flux2-dev-nvfp4-mixed.safetensors» è FLUX.2 Dev: non ha una pipeline di inpaint/edit. Serve una variante Klein."
+    try:
+        w._on_native_inpaint_done({"status": "error", "error": msg})
+    finally:
+        QMessageBox.critical = old
+    assert shown and "FLUX.2 Dev" in shown[0] and "Klein" in shown[0] and "Log:" not in shown[0], shown
+
+
 CASES = [
     ("arch_gen_models_by_header", "Genera immagine: FLUX/Z-Image/Ernie mostrano i file della propria famiglia (header), "
      "non quelli con una parola nel nome.", case_arch_gen_models_by_header),
@@ -315,4 +352,8 @@ CASES = [
      "etichettato LTX né i file _aux_; cambio arch → segnaposto.", case_arch_video_ltx_menu_by_header),
     ("arch_inpaint_unet_disappears_placeholder", "Voce dinamica dell'Inpaint sparita dall'inventario: segnaposto e "
      "nessuna richiesta.", case_arch_inpaint_unet_disappears_placeholder),
+    ("arch_klein_default_steps", "Klein: default 12 passi in Inpaint/Integra/Colore; il valore scelto a mano resta.",
+     case_arch_klein_default_steps),
+    ("arch_child_error_reaches_dialog", "L'errore chiaro del backend arriva intero al dialog della GUI.",
+     case_arch_child_error_reaches_dialog),
 ]
