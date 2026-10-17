@@ -193,8 +193,9 @@ class VideoDefTab(QWidget):
         self.h3up_mp.setValue(P.MEGAPIXELS)
         self.h3up_mp.setSuffix(" MP")
         self.h3up_mp.setToolTip(tr("def.h3up.mp.tt",
-            "Dimensione in uscita come area, rapporto invariato (1 MP = 1024×1024; con la guida i lati vanno a "
-            "multipli di 64). Più grande della sorgente: questa funzione ingrandisce soltanto."))
+            "Dimensione in uscita come area, rapporto ESATTO della sorgente (1 MP = 1024×1024): se i lati non sono "
+            "multipli di 32 si aggiunge un bordo che a fine lavoro viene ritagliato, mai stirato. Più grande della "
+            "sorgente: questa funzione ingrandisce soltanto."))
         f.addRow(tr("def.h3up.mp_lbl", "Megapixel in uscita"), self.h3up_mp)
         self.h3up_guide = QCheckBox(tr("def.h3up.guide.check", "Guida con la LoRA h3upscale (consigliata)"))
         self.h3up_guide.setChecked(True)
@@ -217,12 +218,14 @@ class VideoDefTab(QWidget):
         self.h3up_lora.setValue(1.0)
         f.addRow(tr("def.h3up.lora_lbl", "Forza LoRA"), self.h3up_lora)
         self.h3up_tiles = QSpinBox()
-        self.h3up_tiles.setRange(*U.TILE_TOKENS_RANGE)
+        self.h3up_tiles.setRange(0, U.TILE_TOKENS_RANGE[1])      # 0 = automatico
+        self.h3up_tiles.setSpecialValueText(tr("def.h3up.tiles.auto", "automatico"))
         self.h3up_tiles.setSingleStep(1024)
-        self.h3up_tiles.setValue(P.TOKEN_BUDGET)
+        self.h3up_tiles.setValue(0)
         self.h3up_tiles.setToolTip(tr("def.h3up.tiles.tt",
-            "Sequenza massima di una forward. Più basso = tile più piccoli e più numerosi: meno VRAM, più lento, "
-            "stessa fusione senza cuciture. 70.000 è il valore della ricetta."))
+            "Sequenza massima di una forward. Automatico = calcolata dalla VRAM libera dopo aver caricato il modello "
+            "(tetto 70.000, il valore della ricetta). Più basso = tile più piccoli e più numerosi: meno VRAM, più "
+            "lento, stessa fusione senza cuciture."))
         f.addRow(tr("def.h3up.tiles_lbl", "Budget dei tile (token)"), self.h3up_tiles)
         note = QLabel(tr("def.h3up.note",
             "Upscaler latente + un ri-disegno a tile con MiniMax H3, nativo. Per i video lunghi lavora a segmenti con "

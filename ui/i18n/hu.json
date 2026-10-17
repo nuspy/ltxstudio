@@ -3346,14 +3346,14 @@
   "def.h3up.te_lbl": "Szövegkódoló",
   "def.h3up.te.tt": "A LoRA leírását csak egyszer olvassa be: az embedding gyorsítótárban marad, így a következő futástól a szövegkódoló nem töltődik be.",
   "def.h3up.mp_lbl": "Kimeneti megapixel",
-  "def.h3up.mp.tt": "A kimeneti méret területként, az oldalarány megmarad (1 MP = 1024×1024; az útmutatóval az élek 64 többszöröseihez igazodnak). Nagyobbnak kell lennie a forrásnál: ez a funkció csak nagyít.",
+  "def.h3up.mp.tt": "Kimeneti méret területként, a forrás PONTOS oldalaránya (1 MP = 1024×1024): ha az oldalak nem a 32 többszörösei, szegélyt adunk hozzá, amelyet a végén levágunk, soha nem nyújtjuk. Nagyobbnak kell lennie a forrásnál: ez a funkció csak nagyít.",
   "def.h3up.guide.check": "Vezetés a h3upscale LoRA-val (ajánlott)",
   "def.h3up.guide.tt": "Az újrarajzolás a fél felbontású klipet nézi, és helyreállítja a részleteit ahelyett, hogy kitalálná őket. Vezetés nélkül csak a felnagyított látensből indul.",
   "def.h3up.denoise_lbl": "Újrarajzolás erőssége",
   "def.h3up.denoise.tt": "Mennyire dolgozik az egyetlen újrarajzoló lépés. A 0,1 az eredeti node értéke (vezetett); 0 = csak nagyítás, a szövegkódoló és a H3 modell betöltése nélkül.",
   "def.h3up.lora_lbl": "LoRA erőssége",
   "def.h3up.tiles_lbl": "Csempekeret (token)",
-  "def.h3up.tiles.tt": "Egy átfutás legnagyobb sorozathossza. Alacsonyabb = kisebb, több csempe: kevesebb VRAM, lassabb, ugyanaz a varratmentes összefésülés. A 70 000 a recept értéke.",
+  "def.h3up.tiles.tt": "Egy átfutás legnagyobb sorozathossza. Automatikus = a modell betöltése utáni szabad VRAM-ból számolva (plafon 70 000, a recept értéke). Alacsonyabb = kisebb, több csempe: kevesebb VRAM, lassabb, ugyanaz a varratmentes összefésülés.",
   "def.h3up.note": "Látens felskálázó + egy csempézett újrarajzolás a MiniMax H3-mal, natívan. A hosszú videókat szegmensenként dolgozza fel, a látens térben átúsztatva, a csempék varrat nélkül olvadnak össze. A hangsáv az eredeti marad. MiniMax H3 Community licenc: kizárt területek EU, Egyesült Királyság, USA, Dél-Korea.",
   "def.h3up.missing.title": "Hiányzó súlyok",
   "def.h3up.missing.msg": "A H3 Video Upsamplerhez hiányoznak ezek a súlyok: {ids}\n\nNem töltök le semmit magamtól: szerezd be őket a «Modellsúlyok» fülön.",
@@ -3361,5 +3361,6 @@
   "feat.cap.video_h3_upsampler": "H3 Video Upsampler (videó nagyítás MiniMax H3-mal)",
   "vid.present": "megvan",
   "vid.missing": "letöltendő",
-  "def.engine.h3up": "MiniMax H3 Video Upsampler"
+  "def.engine.h3up": "MiniMax H3 Video Upsampler",
+  "def.h3up.tiles.auto": "automatikus"
 }

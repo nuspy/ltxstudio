@@ -94,9 +94,10 @@ def _lora_meta(path: str) -> dict:
 
 # ── video in ingresso ─────────────────────────────────────────────────────────────────────────────────────────
 def read_video(path: str, canvas: tuple[int, int], tmp: Path):
-    """-> (memmap uint8 [N, ch, cw, 3] sulla tela di lavoro, fps, soundtrack (2, S) float32 a 32 kHz o None)."""
+    """-> (memmap uint8 [N, ch, cw, 3] sulla tela di lavoro, fps, soundtrack (2, S) float32 a 32 kHz o None).
+    La sorgente sta nell'angolo in alto a sinistra; il bordo a destra/in basso è ripetizione dell'ultimo pixel
+    (mai stiramento: il bordo si ritaglia all'uscita)."""
     import av
-    from PIL import Image
     cw, ch = canvas
     with av.open(path) as c:
         vs = c.streams.video[0]
@@ -111,10 +112,12 @@ def read_video(path: str, canvas: tuple[int, int], tmp: Path):
         for fr in c.decode(video=0):
             if i >= n:
                 break
-            if fr.width != cw or fr.height != ch:
-                mm[i] = np.asarray(fr.to_image().resize((cw, ch), Image.LANCZOS))
-            else:
-                mm[i] = fr.to_ndarray(format="rgb24")
+            a = fr.to_ndarray(format="rgb24")
+            if a.shape[1] > cw or a.shape[0] > ch:
+                raise RuntimeError(f"fotogramma {a.shape[1]}x{a.shape[0]} più grande della tela {cw}x{ch}")
+            if a.shape[1] != cw or a.shape[0] != ch:
+                a = np.pad(a, ((0, ch - a.shape[0]), (0, cw - a.shape[1]), (0, 0)), mode="edge")
+            mm[i] = a
             i += 1
     if i != n:
         raise RuntimeError(f"letti {i} fotogrammi su {n} dichiarati")
@@ -219,9 +222,11 @@ def prompt_embeds(W: dict, device):
 # ── uscita ─────────────────────────────────────────────────────────────────────────────────────────────────────
 class _Writer:
     def __init__(self, path: str, w: int, h: int, fps: float, n_total: int):
+        """w, h = misura FINALE (pari): i fotogrammi decodificati sono più grandi (tela) e si ritagliano in alto a sinistra."""
         import av
         from fractions import Fraction
         self.av = av
+        self.w, self.h = int(w), int(h)
         self.n_total, self.n = int(n_total), 0
         self.out = av.open(path, "w")
         self.st = self.out.add_stream("libx264", rate=Fraction(fps).limit_denominator(1001))
@@ -232,7 +237,7 @@ class _Writer:
         for a in frames:
             if self.n >= self.n_total:                               # il padding H3 oltre l'ultimo fotogramma vero
                 return
-            fr = self.av.VideoFrame.from_ndarray(np.ascontiguousarray(a), format="rgb24")
+            fr = self.av.VideoFrame.from_ndarray(np.ascontiguousarray(a[:self.h, :self.w]), format="rgb24")
             for pk in self.st.encode(fr):
                 self.out.mux(pk)
             self.n += 1
@@ -265,6 +270,11 @@ class Loaders:
     def upscaler(path):
         import h3_upsample_core as C
         return C.load_upscaler(path)
+
+    @staticmethod
+    def free_vram_gb():
+        from core import gpu_mem
+        return gpu_mem.free_vram_gb()
 
     @staticmethod
     def transformer(W, p):
@@ -300,7 +310,8 @@ def process(p: dict, W: dict, L, dev: str) -> str:
     src, out = p["video"], p["output"]
     mp_ = float(p.get("megapixels") or P.MEGAPIXELS)
     denoise = float(p.get("denoise") if p.get("denoise") is not None else P.DENOISE_DEFAULT)
-    budget = int(p.get("tile_tokens") or P.TOKEN_BUDGET)
+    budget_user = int(p.get("tile_tokens") or 0)            # 0 = automatico dalla VRAM libera (dopo il caricamento del DiT)
+    budget = budget_user or P.TOKEN_BUDGET
     guided = bool(W.get("guide_lora"))
     factor = 0
     if guided:
@@ -314,8 +325,8 @@ def process(p: dict, W: dict, L, dev: str) -> str:
     with av.open(src) as c:
         v0 = c.streams.video[0]
         sw, sh = v0.codec_context.width, v0.codec_context.height
-    cw, ch = P.grid_size(sw, sh)
-    w_px, h_px = P.target_size(cw, ch, mp_, align=32 * max(1, factor))
+    geo = P.plan_geometry(sw, sh, mp_, max(1, factor))
+    (cw, ch), (w_px, h_px), (ow_px, oh_px) = geo["canvas"], geo["out"], geo["crop"]
     if w_px < cw or h_px < ch:
         raise RuntimeError(f"{w_px}x{h_px} è più piccolo del video ({cw}x{ch}): questa funzione ingrandisce soltanto. "
                            "Alza i megapixel.")
@@ -329,10 +340,11 @@ def process(p: dict, W: dict, L, dev: str) -> str:
         tokens = 5 * ((length - 5) // 17) + 2
         plan = P.chunks(tokens)
         _log(f"{n} fotogrammi {sw}x{sh} @ {fps:g} fps → tela H3 {cw}x{ch}, {length} fotogrammi ({tokens} passi latenti) → "
-             f"uscita {w_px}x{h_px} ({w_px * h_px / 1048576:.2f} MP) · {len(plan)} segmenti · "
+             f"tela d'uscita {w_px}x{h_px} ({w_px * h_px / 1048576:.2f} MP) → file {ow_px}x{oh_px} (bordo {cw - sw}x{ch - sh} px tolto) · "
+             f"{len(plan)} segmenti · "
              + (f"guidato dalla LoRA (fattore {factor}), " if guided else "senza LoRA (nessuna guida), ")
              + (f"ri-disegno denoise {denoise:g} da sigma {sigma:.4f}" if sigma is not None else "SOLO ingrandimento (denoise 0)")
-             + f" · budget {budget} token · lettura {time.time() - t0:.0f}s")
+             + f" · budget {budget_user or 'auto'} token · lettura {time.time() - t0:.0f}s")
 
         # 1) didascalia (solo se c'è un ri-disegno)
         emb = tags = None
@@ -386,6 +398,12 @@ def process(p: dict, W: dict, L, dev: str) -> str:
             Wd = {k: v for k, v in W.items() if k not in ("turbo", "veda")}
             tr = L.transformer(Wd, pp)
             _log(f"transformer pronto in {time.time() - t0:.0f}s")
+            if not budget_user:                                  # regola «VRAM dinamica»: NVML dopo il caricamento
+                free = L.free_vram_gb()
+                budget = P.auto_token_budget(free)
+                _log(f"budget dei tile automatico: {budget} token (VRAM libera "
+                     + (f"{free:.1f} GB" if free is not None and free == free and free != float("inf") else "n.d.")
+                     + f"; tetto {P.TOKEN_BUDGET})")
             ta_total = int(audio.shape[-1])
             for i, ((k0, f0, k1, f1), cv) in enumerate(zip(plan, ups)):
                 a0, a1 = P.audio_span(f0, f1)
@@ -414,7 +432,7 @@ def process(p: dict, W: dict, L, dev: str) -> str:
         # 5) decodifica a pezzi → file
         t0 = time.time()
         vae = L.vae(W)
-        wr = _Writer(out, w_px, h_px, fps, n)
+        wr = _Writer(out, ow_px, oh_px, fps, n)
         C.decode_stream(vae, done_v, wr.write, pixel_mean=pm, pixel_std=ps, latents_mean=lm, latents_std=ls,
                         device=dev)
         wr.close()

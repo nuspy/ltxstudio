@@ -3346,14 +3346,14 @@
   "def.h3up.te_lbl": "Encodeur de texte",
   "def.h3up.te.tt": "Lit la légende de la LoRA une seule fois : l'embedding reste en cache et, dès l'exécution suivante, l'encodeur de texte n'est plus chargé.",
   "def.h3up.mp_lbl": "Mégapixels de sortie",
-  "def.h3up.mp.tt": "Taille de sortie en surface, rapport conservé (1 MP = 1024×1024 ; avec le guidage les côtés se calent sur des multiples de 64). Doit dépasser la source : cette fonction agrandit seulement.",
+  "def.h3up.mp.tt": "Taille de sortie en surface, rapport EXACT de la source (1 MP = 1024×1024) : si les côtés ne sont pas des multiples de 32, une bordure est ajoutée puis rognée à la fin, jamais étirée. Doit dépasser la source : cette fonction agrandit seulement.",
   "def.h3up.guide.check": "Guider avec la LoRA h3upscale (recommandé)",
   "def.h3up.guide.tt": "Le redessin regarde le clip en demi-résolution et en restaure le détail au lieu de l'inventer. Sans guidage, il part seulement du latent agrandi.",
   "def.h3up.denoise_lbl": "Force du redessin",
   "def.h3up.denoise.tt": "Intensité de l'unique passe de redessin. 0,1 est la valeur du nœud d'origine (guidé) ; 0 = agrandir seulement, sans charger l'encodeur de texte ni le modèle H3.",
   "def.h3up.lora_lbl": "Force de la LoRA",
   "def.h3up.tiles_lbl": "Budget des tuiles (tokens)",
-  "def.h3up.tiles.tt": "Séquence maximale d'une passe. Plus bas = tuiles plus petites et plus nombreuses : moins de VRAM, plus lent, même fusion sans couture. 70 000 est la valeur de la recette.",
+  "def.h3up.tiles.tt": "Séquence maximale d'une passe. Automatique = calculée d'après la VRAM libre une fois le modèle chargé (plafond 70 000, la valeur de la recette). Plus bas = tuiles plus petites et plus nombreuses : moins de VRAM, plus lent, même fusion sans couture.",
   "def.h3up.note": "Upscaler latent + un redessin par tuiles avec MiniMax H3, natif. Les vidéos longues sont traitées par segments fondus dans l'espace latent, les tuiles fusionnées sans couture. La bande-son reste l'originale. Licence MiniMax H3 Community : territoires exclus UE, Royaume-Uni, États-Unis, Corée du Sud.",
   "def.h3up.missing.title": "Poids manquants",
   "def.h3up.missing.msg": "Il manque ces poids pour H3 Video Upsampler : {ids}\n\nJe ne télécharge rien moi-même : récupérez-les dans l'onglet « Poids des modèles ».",
@@ -3361,5 +3361,6 @@
   "feat.cap.video_h3_upsampler": "H3 Video Upsampler (agrandissement vidéo avec MiniMax H3)",
   "vid.present": "présent",
   "vid.missing": "à télécharger",
-  "def.engine.h3up": "MiniMax H3 Video Upsampler"
+  "def.engine.h3up": "MiniMax H3 Video Upsampler",
+  "def.h3up.tiles.auto": "automatique"
 }

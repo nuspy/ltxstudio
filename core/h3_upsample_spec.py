@@ -18,7 +18,7 @@ GUIDE_LORA_ID = "mmh3-lora-h3upscale-x2" # sandpies/ComfyUI-H3-Video-Upsampler l
 
 PROFILES = ("nvfp4", "int4", "int8", "fp8")          # ordine di presentazione nel menu (non una scelta)
 MP_RANGE = (0.1, 16.0)
-TILE_TOKENS_RANGE = (8192, 1048576)
+TILE_TOKENS_RANGE = (8192, 1048576)      # 0 = automatico (dalla VRAM libera, tetto 70.000)
 DENOISE_RANGE = (0.0, 1.0)
 
 LICENSE_NOTE = ("Licenza MiniMax H3 Community: territori esclusi UE, Regno Unito, USA, Corea del Sud; gli output non "
@@ -49,7 +49,7 @@ def weight_ids(p: dict) -> dict:
 
 def build_params(cfg: dict) -> dict:
     """cfg della GUI/API → params del worker. Nessun default di comportamento nascosto: i valori mancanti prendono
-    quelli del nodo H3 Video Upsampler studiato (megapixel 2.0, denoise 0.1, forza LoRA 1.0, budget 70.000)."""
+    quelli del nodo H3 Video Upsampler studiato (megapixel 2.0, denoise 0.1, forza LoRA 1.0); budget dei tile automatico."""
     from core import h3_upsample_plan as P
     p = {
         "video": cfg.get("video") or "", "output": cfg.get("output") or "",
@@ -58,7 +58,7 @@ def build_params(cfg: dict) -> dict:
         "denoise": float(cfg["denoise"]) if cfg.get("denoise") is not None else P.DENOISE_DEFAULT,
         "guide": bool(cfg.get("guide", True)),
         "lora_strength": float(cfg.get("lora_strength") or 1.0),
-        "tile_tokens": int(cfg.get("tile_tokens") or P.TOKEN_BUDGET),
+        "tile_tokens": int(cfg.get("tile_tokens") or 0),          # 0 = automatico dalla VRAM libera (tetto 70.000)
     }
     if not p["h3_te"]:
         p.pop("h3_te")
@@ -81,8 +81,9 @@ def validate(p: dict) -> list[str]:
     if not lo <= float(p.get("denoise", -1)) <= hi:
         errs.append("denoise fuori intervallo (0–1).")
     lo, hi = TILE_TOKENS_RANGE
-    if not lo <= int(p.get("tile_tokens", 0)) <= hi:
-        errs.append(f"budget dei tile fuori intervallo ({lo}–{hi}).")
+    tt = int(p.get("tile_tokens", 0) or 0)
+    if tt != 0 and not lo <= tt <= hi:
+        errs.append(f"budget dei tile fuori intervallo (0 = automatico, {lo}–{hi}).")
     return errs
 
 

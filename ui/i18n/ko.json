@@ -3346,14 +3346,14 @@
   "def.h3up.te_lbl": "텍스트 인코더",
   "def.h3up.te.tt": "LoRA 캡션을 한 번만 읽습니다: 임베딩이 캐시에 남아 다음 실행부터는 텍스트 인코더를 불러오지 않습니다.",
   "def.h3up.mp_lbl": "출력 메가픽셀",
-  "def.h3up.mp.tt": "비율을 유지한 면적 기준 출력 크기(1 MP = 1024×1024, 가이드 사용 시 변이 64의 배수로 맞춰짐). 원본보다 커야 합니다: 이 기능은 확대만 합니다.",
+  "def.h3up.mp.tt": "원본의 정확한 비율을 유지한 면적 기준 출력 크기(1 MP = 1024×1024): 변이 32의 배수가 아니면 테두리를 더했다가 마지막에 잘라내며, 절대 늘리지 않습니다. 원본보다 커야 합니다: 이 기능은 확대만 합니다.",
   "def.h3up.guide.check": "h3upscale LoRA로 안내 (권장)",
   "def.h3up.guide.tt": "재그리기가 절반 해상도 클립을 보고 디테일을 지어내는 대신 복원합니다. 가이드가 없으면 확대된 잠재값에서만 시작합니다.",
   "def.h3up.denoise_lbl": "재그리기 강도",
   "def.h3up.denoise.tt": "단 한 번의 재그리기 단계가 얼마나 작동하는지. 0.1은 원본 노드의 값(가이드 사용)이며, 0 = 확대만(텍스트 인코더와 H3 모델을 불러오지 않음).",
   "def.h3up.lora_lbl": "LoRA 강도",
   "def.h3up.tiles_lbl": "타일 예산 (토큰)",
-  "def.h3up.tiles.tt": "한 번의 forward에서 가장 긴 시퀀스. 낮을수록 타일이 더 작고 많아집니다: VRAM 감소, 속도 저하, 이음매 없는 병합은 동일. 70,000은 레시피의 값입니다.",
+  "def.h3up.tiles.tt": "한 번의 forward에서 가장 긴 시퀀스. 자동 = 모델을 불러온 뒤 남은 VRAM으로 계산(상한 70,000, 레시피의 값). 낮을수록 타일이 더 작고 많아집니다: VRAM 감소, 속도 저하, 이음매 없는 병합은 동일.",
   "def.h3up.note": "MiniMax H3로 잠재 업스케일러 + 타일 단위 재그리기 1회를 네이티브로 수행합니다. 긴 영상은 잠재 공간에서 크로스페이드되는 세그먼트로 처리되고 타일은 이음매 없이 병합됩니다. 사운드트랙은 원본 그대로 유지됩니다. MiniMax H3 Community 라이선스: 제외 지역 EU, 영국, 미국, 대한민국.",
   "def.h3up.missing.title": "가중치 누락",
   "def.h3up.missing.msg": "H3 Video Upsampler에 다음 가중치가 없습니다: {ids}\n\n저는 아무것도 직접 내려받지 않습니다: «모델 가중치» 탭에서 받으세요.",
@@ -3361,5 +3361,6 @@
   "feat.cap.video_h3_upsampler": "H3 Video Upsampler (MiniMax H3 영상 확대)",
   "vid.present": "있음",
   "vid.missing": "다운로드 필요",
-  "def.engine.h3up": "MiniMax H3 Video Upsampler"
+  "def.engine.h3up": "MiniMax H3 Video Upsampler",
+  "def.h3up.tiles.auto": "자동"
 }

@@ -121,11 +121,12 @@ def tiny_dit():
         time_embed_dim=16, rope_freq_dim=2).eval().requires_grad_(False)
 
 
-def run_case(tmp: Path, *, guided: bool, denoise: float, audio: bool, n: int = N_FRAMES, tile_tokens: int = 20000):
+def run_case(tmp: Path, *, guided: bool, denoise: float, audio: bool, n: int = N_FRAMES, tile_tokens: int = 20000,
+             w: int = 256, h: int = 256, mp: float = 0.25, expect=(512, 512), free_gb: float = 12.0):
     import av
     from h3_upsample_diffusers_check import _tiny_vae
     src, out = str(tmp / "src.mp4"), str(tmp / "out.mp4")
-    make_video(src, n=n, audio=audio)
+    make_video(src, n=n, w=w, h=h, audio=audio)
     upf, lof = str(tmp / "up.safetensors"), str(tmp / "guide.safetensors")
     tiny_upscaler_file(upf)
     tiny_lora_file(lof)
@@ -147,12 +148,13 @@ def run_case(tmp: Path, *, guided: bool, denoise: float, audio: bool, n: int = N
         vae = staticmethod(lambda W: _tiny_vae())
         audio_vae = staticmethod(lambda W: TinyAudioVae())
         upscaler = staticmethod(lambda path: C.load_upscaler(path, torch.float32))
+        free_vram_gb = staticmethod(lambda: free_gb)
 
         @staticmethod
         def transformer(W, p):
             seen["lora_arg"] = p.get("loras")
             return tiny_dit()
-    p = {"video": src, "output": out, "megapixels": 0.25, "denoise": denoise, "tile_tokens": tile_tokens,
+    p = {"video": src, "output": out, "megapixels": mp, "denoise": denoise, "tile_tokens": tile_tokens,
          "lora_strength": 1.0, "workdir": str(tmp)}
     try:
         res = W_.process(p, W, L, "cpu")
@@ -163,7 +165,7 @@ def run_case(tmp: Path, *, guided: bool, denoise: float, audio: bool, n: int = N
         vs = c.streams.video[0]
         frames = [f.to_ndarray(format="rgb24") for f in c.decode(video=0)]
     assert len(frames) == n, (len(frames), n)
-    assert frames[0].shape == (512, 512, 3), frames[0].shape               # 0.25 MP, lati multipli di 64
+    assert frames[0].shape == (expect[1], expect[0], 3), frames[0].shape    # misura finale (ritagliata), pari
     arr = np.stack(frames[::17]).astype(np.float32)
     assert np.isfinite(arr).all() and arr.std() > 1.0, "video d'uscita piatto o non finito"
     return rec, seen
@@ -208,6 +210,19 @@ def check_rifiuta_di_rimpicciolire():
             assert "ingrandisce soltanto" in str(e), e
         else:
             raise AssertionError("doveva rifiutare megapixel più piccoli della sorgente")
+
+
+def check_sorgente_non_multipla_di_32_bordo_ritagliato_e_budget_auto():
+    """250x190 (non multipla di 32): bordo aggiunto, MAI stiramento, ritagliato all'uscita (rapporto esatto);
+    tile_tokens=0 → budget automatico dalla VRAM libera (qui finta: 12 GB)."""
+    g = P.plan_geometry(250, 190, 0.3, 2)
+    (cw, ch), (kw, kh) = g["canvas"], g["crop"]
+    assert (cw, ch) != (250, 190) and g["scale_mismatch"] < 0.003
+    with tempfile.TemporaryDirectory() as d:
+        rec, _ = run_case(Path(d), guided=True, denoise=0.1, audio=False, n=22, tile_tokens=0, w=250, h=190, mp=0.3,
+                          expect=(kw, kh), free_gb=12.0)
+    assert abs(kw / kh - 250 / 190) / (250 / 190) < 0.004, (kw, kh)
+    assert len(rec) == 1 and rec[0]["video"][3] * 16 == g["out"][1] and rec[0]["video"][4] * 16 == g["out"][0]
 
 
 def check_colonna_sonora_originale_non_toccata():

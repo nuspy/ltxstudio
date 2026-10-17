@@ -38,7 +38,7 @@ def test_nessuna_scelta_automatica_del_modello():
 def test_build_params_default_del_nodo_studiato():
     p = U.build_params({"video": "a.mp4", "h3_profile": "nvfp4"})
     assert p["megapixels"] == 2.0 and p["denoise"] == 0.1 and p["guide"] is True
-    assert p["lora_strength"] == 1.0 and p["tile_tokens"] == 70000
+    assert p["lora_strength"] == 1.0 and p["tile_tokens"] == 0          # 0 = automatico dalla VRAM
     p = U.build_params({"video": "a.mp4", "h3_profile": "nvfp4", "denoise": 0.0, "megapixels": 1.5})
     assert p["denoise"] == 0.0 and p["megapixels"] == 1.5          # 0 è un valore valido (solo ingrandimento)
 
@@ -46,7 +46,7 @@ def test_build_params_default_del_nodo_studiato():
 def test_validate_intervalli():
     ok = U.build_params({"video": "a.mp4", "h3_profile": "nvfp4"})
     assert U.validate(ok) == []
-    assert U.validate({**ok, "megapixels": 99}) and U.validate({**ok, "denoise": 1.5}) and U.validate({**ok, "tile_tokens": 10})
+    assert U.validate({**ok, "megapixels": 99}) and U.validate({**ok, "denoise": 1.5}) and U.validate({**ok, "tile_tokens": 10}) and not U.validate({**ok, "tile_tokens": 0})
     assert U.validate({**ok, "video": ""})
 
 
@@ -80,7 +80,7 @@ def test_api_enhance_request_accetta_il_motore():
     pytest.importorskip("fastapi")
     from api.handlers.video import EnhanceReq
     r = EnhanceReq(video_path="v.mp4", engine="h3_upsampler", h3_profile="int8")
-    assert r.megapixels == 2.0 and r.denoise == 0.1 and r.guide is True and r.tile_tokens == 70000
+    assert r.megapixels == 2.0 and r.denoise == 0.1 and r.guide is True and r.tile_tokens == 0
     assert r.engine == U.ENGINE
 
 

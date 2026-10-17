@@ -220,7 +220,7 @@ class EnhanceReq(BaseModel):
     denoise: float = Field(0.1, description="forza del ri-disegno, 0 = solo upscaler latente")
     guide: bool = Field(True, description="guida con la LoRA h3upscale x2")
     lora_strength: float = 1.0
-    tile_tokens: int = Field(70000, description="budget di token per forward di tile")
+    tile_tokens: int = Field(0, description="budget di token per forward di tile; 0 = automatico dalla VRAM libera (tetto 70000)")
 
 
 class RifeReq(BaseModel):

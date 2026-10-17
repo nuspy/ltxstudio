@@ -22,7 +22,12 @@ SIZE_ALIGN = 32               # i lati si agganciano a 32 px (a 32 × fattore co
 CHUNK_FRAMES = 102            # fotogrammi per segmento (multiplo di 17)
 CHUNK_OVERLAP = 17            # fotogrammi condivisi fra segmenti vicini
 ANCHOR_AUG = 0.999            # livello t a cui sono tenuti il perno del frame 0 e la guida (convenzione H3: 1 = pulito)
-TOKEN_BUDGET = 70000          # sequenza massima di una forward di tile
+TOKEN_BUDGET = 70000          # sequenza massima di una forward di tile (tetto e ripiego del budget automatico)
+TOKEN_MIN = 8192              # sotto questo il budget automatico non scende (il nodo originale: min 8192)
+# Budget automatico dalla VRAM libera (regola «VRAM dinamica»): ogni token di una forward del DiT H3 ne impegna ~BYTES_PER_TOKEN
+# (attivazioni di 50 blocchi, FFN swiglu e qkv; attenzione flash senza n²). STIMA da tarare sul «picco VRAM» dei test live.
+BYTES_PER_TOKEN = 160 * 1024
+VRAM_RESERVE_GB = 2.0         # margine per VAE/contesto/altri processi
 TILE_OVERLAP_PX = 128
 MIN_TILE_PX = 256
 MAX_GRID_SIDE = 9
@@ -103,6 +108,64 @@ def valid_length(n: int) -> int:
     """La lunghezza H3 più corta (17g + 5) che contiene n fotogrammi."""
     n = max(5, int(n))
     return 17 * math.ceil((n - 5) / 17) + 5
+
+
+def auto_token_budget(free_vram_gb: float | None) -> int:
+    """Budget di token per forward dalla VRAM LIBERA (letta con NVML DOPO aver caricato il DiT): tetto 70.000 (la ricetta),
+    pavimento 8.192; senza misura (None/inf) il valore della ricetta. Multiplo di 1024."""
+    if free_vram_gb is None or free_vram_gb != free_vram_gb or free_vram_gb == float("inf"):
+        return TOKEN_BUDGET
+    b = int(max(0.0, float(free_vram_gb) - VRAM_RESERVE_GB) * 2 ** 30 / BYTES_PER_TOKEN)
+    return max(TOKEN_MIN, min(TOKEN_BUDGET, b // 1024 * 1024))
+
+
+def pad_size(w: int, h: int, grid: int = GRID_PX) -> tuple[int, int]:
+    """Tela di lavoro: (w, h) PORTATI IN SU al multiplo di `grid` (si aggiunge bordo, non si stira né si taglia nulla: il
+    rapporto d'aspetto della sorgente resta esatto, il bordo si toglie all'uscita)."""
+    return (max(grid, -(-int(w) // grid) * grid), max(grid, -(-int(h) // grid) * grid))
+
+
+def plan_geometry(src_w: int, src_h: int, megapixels: float, factor: int = 1) -> dict:
+    """Tela di lavoro, tela d'uscita e ritaglio finale SENZA stirare la sorgente (regola «mai stirare»).
+
+    La sorgente sta nell'angolo in alto a sinistra di una tela a multipli di 32 (bordo aggiunto, mai tolto contenuto);
+    l'uscita è a multipli di 32·factor. Fra i bordi possibili (fino a +192 px) e le misure d'uscita vicine ai megapixel
+    voluti si sceglie quella in cui la scala di x e di y coincidono (il ritaglio finale non deforma) con meno bordo
+    e area più vicina. -> {canvas, out, crop, pad, scale_mismatch}"""
+    base = pad_size(src_w, src_h)
+    align = 32 * max(1, int(factor))
+    area = float(megapixels) * 1024.0 * 1024.0
+    best = None
+    for kw in range(0, 7):
+        for kh in range(0, 7):
+            cw, ch = base[0] + 32 * kw, base[1] + 32 * kh
+            sc = (area / (cw * ch)) ** 0.5
+            for ow in {max(align, int(sc * cw) // align * align), max(align, -(-int(sc * cw) // align) * align)}:
+                for oh in {max(align, int(sc * ch) // align * align), max(align, -(-int(sc * ch) // align) * align)}:
+                    if ow < cw or oh < ch:
+                        continue
+                    mism = abs((ow / cw) / (oh / ch) - 1.0)
+                    score = mism * 100.0 + abs(ow * oh - area) / area + (cw * ch / (base[0] * base[1]) - 1.0) * 2.0
+                    if best is None or score < best[0]:
+                        best = (score, (cw, ch), (ow, oh), mism)
+    if best is None:                                     # megapixel più piccoli della sorgente: lo dirà il chiamante
+        cw, ch = base
+        sc = (area / (cw * ch)) ** 0.5
+        return {"canvas": base, "out": (max(align, int(sc * cw) // align * align), max(align, int(sc * ch) // align * align)),
+                "crop": (src_w, src_h), "pad": (cw - src_w, ch - src_h), "scale_mismatch": 0.0}
+    _s, canvas, out, mism = best
+    return {"canvas": canvas, "out": out, "crop": crop_size(src_w, src_h, canvas, out),
+            "pad": (canvas[0] - src_w, canvas[1] - src_h), "scale_mismatch": mism}
+
+
+def crop_size(src_w: int, src_h: int, canvas: tuple[int, int], out_canvas: tuple[int, int]) -> tuple[int, int]:
+    """Parte dell'uscita che corrisponde alla sorgente vera: la sorgente occupa l'angolo in alto a sinistra della tela
+    (src_w × src_h su cw × ch); nell'uscita (ow × oh) è lo stesso rapporto, arrotondato a pari (yuv420)."""
+    cw, ch = canvas
+    ow, oh = out_canvas
+    w = max(2, int(round(src_w * ow / cw)) // 2 * 2)
+    h = max(2, int(round(src_h * oh / ch)) // 2 * 2)
+    return min(w, ow), min(h, oh)
 
 
 def grid_size(w: int, h: int, grid: int = GRID_PX) -> tuple[int, int]:
@@ -395,13 +458,14 @@ def join_chunk(done_v, done_a, v, a, k0: int, f0: int):
 # --- stima per il preflight e per i messaggi della GUI ----------------------------------------------------------
 def describe(src_w: int, src_h: int, n_frames: int, megapixels: float, factor: int = 2,
              budget: int = TOKEN_BUDGET) -> dict:
-    """Che cosa farà il lavoro, senza modelli: tela di lavoro, tela d'uscita, segmenti, tile del primo segmento."""
-    cw, ch = grid_size(src_w, src_h)
+    """Che cosa farà il lavoro, senza modelli: tela di lavoro, tela d'uscita, ritaglio, segmenti, tile del primo segmento."""
+    g = plan_geometry(src_w, src_h, megapixels, factor)
+    (cw, ch), (ow, oh) = g["canvas"], g["out"]
     length = valid_length(n_frames)
     tokens = 5 * ((length - 5) // 17) + 2
-    ow, oh = target_size(cw, ch, megapixels, align=32 * max(1, int(factor)))
     plan = chunks(tokens)
     k0, _f0, k1, _f1 = plan[0]
     tiles, grid = tile_grid(oh // SPATIAL, ow // SPATIAL, k1 - k0, factor, budget)
-    return {"canvas": (cw, ch), "out": (ow, oh), "frames_padded": length, "latent_steps": tokens,
-            "chunks": len(plan), "tiles_per_chunk": len(tiles), "grid": grid}
+    return {"canvas": (cw, ch), "out": (ow, oh), "crop": g["crop"], "pad": g["pad"], "scale_mismatch": g["scale_mismatch"],
+            "frames_padded": length, "latent_steps": tokens, "chunks": len(plan), "tiles_per_chunk": len(tiles),
+            "grid": grid}

@@ -85,7 +85,7 @@ curl -s -X POST http://127.0.0.1:8200/image/generate -H "Content-Type: applicati
 | `POST /video/v2v_edit` | `prompt*`, `control_video*`, `edit_lora*`, `control_strength=1.0`, `length_s=5` |
 | `POST /video/controlnet` | `prompt*`, `control_video*`, `control_type=canny` (canny/depth/pose), `control_strength=0.8`, `image_path?` |
 | `POST /video/lipsync` | `image_path*`, `audio_path*`, `prompt`, `audio_scale=3.0`, `separate_vocals=false`, `talk_region` (mouth/face), `talk_mask_offset=0` |
-| `POST /video/enhance` | `video_path*`, `engine=seedvr2` (seedvr2/flashvsr), `seedvr2_model`, `resolution=1080`, `batch_size=5`, `block_swap=0`, `scale=4.0` — `engine=h3_upsampler` (MiniMax H3, nativo; cap.video_h3_upsampler): `h3_profile*` (nvfp4/int4/int8/fp8, nessun ripiego), `h3_te`, `megapixels=2.0`, `denoise=0.1`, `guide=true`, `lora_strength=1.0`, `tile_tokens=70000`; pesi assenti → errore con id e GB, nessun download |
+| `POST /video/enhance` | `video_path*`, `engine=seedvr2` (seedvr2/flashvsr), `seedvr2_model`, `resolution=1080`, `batch_size=5`, `block_swap=0`, `scale=4.0` — `engine=h3_upsampler` (MiniMax H3, nativo; cap.video_h3_upsampler): `h3_profile*` (nvfp4/int4/int8/fp8, nessun ripiego), `h3_te`, `megapixels=2.0`, `denoise=0.1`, `guide=true`, `lora_strength=1.0`, `tile_tokens=0` (0 = automatico dalla VRAM libera, tetto 70000); pesi assenti → errore con id e GB, nessun download |
 | `POST /video/rife` | `video_path*`, `factor=2` |
 | `POST /video/faceswap` | `video_path*`, `source_face_path*` |
 

@@ -35,7 +35,7 @@ def test_sigma_di_partenza_della_ricetta():
 
 def test_valid_length_e_grid():
     assert [P.valid_length(n) for n in (1, 5, 6, 22, 23, 100, 107)] == [5, 5, 22, 22, 39, 107, 107]
-    assert P.grid_size(1280, 720) == (1280, 704) and P.grid_size(10, 10) == (32, 32)
+    assert P.pad_size(1280, 720) == (1280, 736) and P.grid_size(1280, 720) == (1280, 704) and P.grid_size(10, 10) == (32, 32)
 
 
 def test_target_size_mantiene_rapporto_e_griglia():
@@ -129,5 +129,28 @@ def test_intestazione_lora_di_guida():
 
 def test_describe():
     d = P.describe(1280, 720, 240, 2.0, factor=2)
-    assert d["canvas"] == (1280, 704) and d["out"][0] % 64 == 0 and d["out"][1] % 64 == 0
+    assert d["canvas"] == (1280, 768) and d["out"][0] % 64 == 0 and d["out"][1] % 64 == 0 and d["crop"] == (1920, 1080)
     assert d["frames_padded"] == 243 and d["latent_steps"] == 72 and d["chunks"] >= 3 and d["tiles_per_chunk"] >= 1
+
+
+@pytest.mark.parametrize("w,h", [(1280, 720), (960, 544), (250, 190), (1080, 1920), (1000, 1000), (854, 480), (640, 360),
+                                 (1921, 1081), (333, 777)])
+def test_geometria_senza_stirare(w, h):
+    """Regola «mai stirare»: bordo aggiunto (mai tolto contenuto), scala di x e y uguale, ritaglio finale dal rapporto esatto."""
+    for factor in (1, 2):
+        g = P.plan_geometry(w, h, 2.0, factor)
+        (cw, ch), (ow, oh), (kw, kh) = g["canvas"], g["out"], g["crop"]
+        assert cw >= w and ch >= h and cw % 32 == 0 and ch % 32 == 0
+        assert ow % (32 * factor) == 0 and oh % (32 * factor) == 0 and ow >= cw and oh >= ch
+        assert g["scale_mismatch"] < 0.003, g                      # stessa scala sui due assi: nessuna deformazione
+        assert kw % 2 == 0 and kh % 2 == 0 and kw <= ow and kh <= oh
+        assert abs(kw / kh - w / h) / (w / h) < 0.004, (kw, kh, w, h)       # rapporto ESATTO a meno dell'arrotondamento pari
+        assert cw - w <= 192 and ch - h <= 192                       # bordo contenuto
+
+
+def test_budget_automatico_dalla_vram():
+    assert P.auto_token_budget(None) == P.TOKEN_BUDGET == P.auto_token_budget(float("inf"))
+    assert P.auto_token_budget(64) == P.TOKEN_BUDGET                  # tetto
+    assert P.auto_token_budget(1) == P.TOKEN_MIN                      # pavimento
+    vals = [P.auto_token_budget(g) for g in (6, 8, 10, 12, 16, 20)]
+    assert vals == sorted(vals) and len(set(vals)) > 2 and all(v % 1024 == 0 or v == P.TOKEN_BUDGET for v in vals)

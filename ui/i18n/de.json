@@ -3346,14 +3346,14 @@
   "def.h3up.te_lbl": "Text-Encoder",
   "def.h3up.te.tt": "Liest die LoRA-Beschreibung nur einmal: das Embedding bleibt im Cache, ab dem nächsten Lauf wird der Text-Encoder nicht mehr geladen.",
   "def.h3up.mp_lbl": "Ausgabe in Megapixel",
-  "def.h3up.mp.tt": "Ausgabegröße als Fläche, Seitenverhältnis bleibt (1 MP = 1024×1024; mit der Führung rasten die Kanten auf Vielfache von 64 ein). Muss größer als die Quelle sein: diese Funktion vergrößert nur.",
+  "def.h3up.mp.tt": "Ausgabegröße als Fläche, EXAKTES Seitenverhältnis der Quelle (1 MP = 1024×1024): sind die Seiten keine Vielfachen von 32, wird ein Rand ergänzt und am Ende abgeschnitten, nie gestreckt. Muss größer als die Quelle sein: diese Funktion vergrößert nur.",
   "def.h3up.guide.check": "Mit der h3upscale-LoRA führen (empfohlen)",
   "def.h3up.guide.tt": "Die Neuzeichnung betrachtet den Clip in halber Auflösung und stellt dessen Details wieder her, statt sie zu erfinden. Ohne Führung startet sie nur vom vergrößerten Latent.",
   "def.h3up.denoise_lbl": "Stärke der Neuzeichnung",
   "def.h3up.denoise.tt": "Wie stark der einzelne Neuzeichnungsschritt arbeitet. 0,1 ist der Wert des Original-Nodes (geführt); 0 = nur vergrößern, ohne Text-Encoder oder H3-Modell zu laden.",
   "def.h3up.lora_lbl": "LoRA-Stärke",
   "def.h3up.tiles_lbl": "Kachel-Budget (Token)",
-  "def.h3up.tiles.tt": "Längste Sequenz eines Forward-Durchlaufs. Niedriger = kleinere, zahlreichere Kacheln: weniger VRAM, langsamer, gleiche nahtlose Verschmelzung. 70.000 ist der Wert des Rezepts.",
+  "def.h3up.tiles.tt": "Längste Sequenz eines Forward-Durchlaufs. Automatisch = aus dem freien VRAM nach dem Laden des Modells berechnet (Obergrenze 70.000, der Wert des Rezepts). Niedriger = kleinere, zahlreichere Kacheln: weniger VRAM, langsamer, gleiche nahtlose Verschmelzung.",
   "def.h3up.note": "Latent-Upscaler + eine gekachelte Neuzeichnung mit MiniMax H3, nativ. Lange Videos werden in Segmenten verarbeitet, die im Latent-Raum überblendet werden; die Kacheln verschmelzen ohne Nähte. Die Tonspur bleibt das Original. MiniMax-H3-Community-Lizenz: ausgeschlossene Gebiete EU, Vereinigtes Königreich, USA, Südkorea.",
   "def.h3up.missing.title": "Fehlende Gewichte",
   "def.h3up.missing.msg": "Für den H3 Video Upsampler fehlen diese Gewichte: {ids}\n\nIch lade nichts selbst herunter: hole sie im Tab «Modellgewichte».",
@@ -3361,5 +3361,6 @@
   "feat.cap.video_h3_upsampler": "H3 Video Upsampler (Video-Vergrößerung mit MiniMax H3)",
   "vid.present": "vorhanden",
   "vid.missing": "herunterzuladen",
-  "def.engine.h3up": "MiniMax H3 Video Upsampler"
+  "def.engine.h3up": "MiniMax H3 Video Upsampler",
+  "def.h3up.tiles.auto": "automatisch"
 }
