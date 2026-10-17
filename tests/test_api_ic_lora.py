@@ -115,7 +115,24 @@ def test_outpaint_feather_and_min_bar_validation_and_passthrough(video, no_run, 
     with pytest.raises(RuntimeError, match="stop"):
         no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
     assert seen["out_feather"] == 40 and seen["out_min_bar"] == 0.15
+    assert seen["out_fill"] is True                                      # «garantisci riempimento»: default SI (17/10)
     assert seen["out_format"] == "4:3" and seen["out_anchor"] == "bottom" and seen["out_paste"] is True
+
+
+def test_outpaint_fill_coverage_passthrough(video, no_run, monkeypatch):
+    from core import video_edit_ic as vic
+    seen = {}
+
+    def fake_build(cfg, out_dir, stamp, output, log=None):
+        seen.update(cfg)
+        raise RuntimeError("stop")
+    monkeypatch.setattr(vic, "build_job", fake_build)
+    r = client.post("/video/ic_lora", json={"kind": "outpaint", "video_path": video, "canvas": "1:1", "fill_coverage": False,
+                                            "model": "E:/m/ltx-2.3-22b-distilled-1.1_fp8.safetensors"})
+    assert r.status_code == 200, r.text
+    with pytest.raises(RuntimeError, match="stop"):
+        no_run["fn"](type("J", (), {"log": staticmethod(lambda m: None)})())
+    assert seen["out_fill"] is False
 
 
 def test_lipdub_validation_and_passthrough(video, no_run, monkeypatch):

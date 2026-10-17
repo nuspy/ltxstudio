@@ -238,6 +238,25 @@ class _FlashVSRWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _H3UpsampleWorker(QThread):
+    """H3 Video Upsampler (MiniMax H3 nativo, venv diffusers_next): upscaler latente + ri-disegno a tile. Log + path."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, src: str, out: str, params: dict):
+        super().__init__()
+        self.src, self.out, self.params = src, out, dict(params)
+
+    def run(self):
+        from core import h3_upsample_service as hs
+        try:
+            cfg = {k: v for k, v in self.params.items() if k not in ("video", "output")}
+            hs.upscale_video(self.src, self.out, on_log=lambda l: self.progress.emit(l), **cfg)
+            self.done.emit({"status": "success", "output": [self.out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class _VideoEditAIWorker(QThread):
     """#24/#59/#60 editing video AI: (inpaint) SAM2 track→guide magenta nel venv inference_server, poi
     LTX-2 edit_lora nel venv ltx2; (edit/style) direttamente LTX-2 col video sorgente come guide."""
@@ -1058,6 +1077,7 @@ class MainWindow(QMainWindow):
         self.video_tab.model.currentIndexChanged.connect(self.video_edit_ai_tab.refresh_checkpoint_hint)
         self.video_edit_ai_tab.request_open_video_tab.connect(lambda: self.tabs.setCurrentWidget(self.video_tab))
         self.video_edit_ai_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
+        self.video_def_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
         # Doppiaggio da testo: «ho un mio audio» → Talk/Canta del tab Video (esistenti, non toccate); «ultimo audio»
         self.video_edit_ai_tab.request_open_v2v.connect(self._open_v2v_from_vedit)
         self.video_edit_ai_tab.set_last_audio_getter(lambda: self.avatar_tab._last_audio())
@@ -3863,6 +3883,22 @@ class MainWindow(QMainWindow):
             self._log(f"[nativo] FlashVSR super-risoluzione (x{_fvs:g}) su {Path(src).name}…")
             self._fv_worker = _FlashVSRWorker(src, out, target_scale=_fvs)
             self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
+                          self._on_multitalk_done, on_progress=self._log)
+            return
+        if engine == "h3_upsampler":                     # MiniMax H3 Video Upsampler nativo (upscaler latente + tile guidati)
+            if not self._feature_gate("cap.video_h3_upsampler"):
+                return
+            from core import h3_upsample_service as hs
+            p = dict(cfg.get("h3up") or {})
+            p["video"] = src
+            errs = hs.preflight(p)                       # valori, venv, pesi (nessun download)
+            if errs:
+                QMessageBox.warning(self, "H3 Video Upsampler", "\n".join(errs)); return
+            out = str(OUTPUT_DIR / f"h3up_{Path(src).stem}.mp4")
+            self._log(f"[nativo] H3 Video Upsampler ({p.get('megapixels')} MP, denoise {p.get('denoise')}, "
+                      f"{'guidato' if p.get('guide') else 'senza guida'}) su {Path(src).name}…")
+            self._h3up_worker = _H3UpsampleWorker(src, out, p)
+            self._enqueue(tr("queue.job.h3up", "Super-risoluzione (H3 Video Upsampler)"), self._h3up_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
         # esrgan: upscale per-frame nativo (spandrel). CHIAVI CORRETTE: il backend video_postprocess.run()

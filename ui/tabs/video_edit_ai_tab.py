@@ -392,6 +392,17 @@ class VideoEditAITab(QWidget):
             "dell'originale e aumenta l'area da generare."))
         self.out_minbar.toggled.connect(self._on_outpaint_change)
         f.addRow("", self.out_minbar)
+        # «Garantisci riempimento» (live 17/10): due barre simmetriche sullo stesso asse sembrano un letterbox e il modello
+        # le lascia NERE (area nuova 33-45%); con l'area nuova >= 60% le riempie. ATTIVO di default, disattivabile.
+        self.out_fill = QCheckBox(tr("vedit.out.fill_lbl", "Garantisci riempimento (rimpicciolisce il video)"))
+        self.out_fill.setChecked(True)
+        self.out_fill.setToolTip(tr("vedit.out.fill.tt",
+            "Con due barre opposte (sopra+sotto o sinistra+destra) il modello le scambia per un letterbox e le lascia "
+            "nere. Con questa opzione, in quel caso, il video originale viene rimpicciolito al centro finché l'area "
+            "nuova è almeno il 60%: le barre vengono riempite, ma l'originale incollato risulta più piccolo (meno "
+            "risoluzione). Disattivala per tenere l'originale alla sua scala (le barre possono restare nere)."))
+        self.out_fill.toggled.connect(self._on_outpaint_change)
+        f.addRow("", self.out_fill)
         self.out_info = QLabel(""); self.out_info.setWordWrap(True)
         self.out_info_lbl = QLabel("")
         f.addRow(self.out_info_lbl, self.out_info)
@@ -956,7 +967,7 @@ class VideoEditAITab(QWidget):
             self._show_row(w, is_mt)
         for w in (self.mt_w, self.mt_seconds):
             self._set_row_visible_for(w, is_mt)
-        for w in (self.out_format, self.out_anchor, self.out_dark, self.out_paste, self.out_feather, self.out_minbar,
+        for w in (self.out_format, self.out_anchor, self.out_dark, self.out_paste, self.out_feather, self.out_minbar, self.out_fill,
                   self.out_info, self.out_preview):
             self._show_row(w, is_out)
         self._set_row_visible_for(self.out_m["top"], is_out and self.out_format.currentData() == "custom")
@@ -1062,6 +1073,8 @@ class VideoEditAITab(QWidget):
             kw["aspect"] = fmt
             if self.out_minbar.isChecked():
                 kw["min_bar"] = prep.MIN_BAR_FRACTION
+        if self.out_fill.isChecked():
+            kw["fill_area"] = prep.FILL_AREA
         try:
             return prep.compute_outpaint_layout(self._vinfo.width, self._vinfo.height, **kw)
         except ValueError:
@@ -1097,8 +1110,11 @@ class VideoEditAITab(QWidget):
             self.out_preview.setPixmap(pm); return
         warn = ("  ⚠ " + tr("vedit.out.too_big", "area nuova molto grande (> 60%): il modello inventerà molto.")) \
             if lay.too_much_new_area else ""
-        if lay.narrow_bar:
+        if lay.narrow_bar and not (self.out_fill.isChecked() and lay.scale < 0.999):
             warn += "  ⚠ " + self._narrow_bar_text()
+        if self.out_fill.isChecked() and lay.scale < 0.999 and not lay.clamped:
+            warn += "  ℹ " + tr("vedit.out.fill_scaled", "originale ridotto al {p}% per far riempire le barre").format(
+                p=int(round(lay.scale * 100)))
         self.out_info.setText(tr("vedit.out.canvas_info", "Canvas: {w}x{h} (area nuova {p}%)").format(
             w=lay.canvas_w, h=lay.canvas_h, p=int(round(lay.new_area * 100))) + self._adds_text(lay) + warn)
         # anteprima: canvas scalato nel box, sorgente grigio chiaro, area nuova nera tratteggiata
@@ -1221,7 +1237,7 @@ class VideoEditAITab(QWidget):
                        out_margins=(self.out_m["top"].value(), self.out_m["right"].value(),
                                     self.out_m["bottom"].value(), self.out_m["left"].value()),
                        out_dark=self.out_dark.isChecked(), out_paste=self.out_paste.isChecked(),
-                       out_feather=int(self.out_feather.value()),
+                       out_feather=int(self.out_feather.value()), out_fill=self.out_fill.isChecked(),
                        out_min_bar=(prep_mod.MIN_BAR_FRACTION if self.out_minbar.isChecked()
                                     and self.out_format.currentData() != "custom" else 0.0))
             if cfg["out_format"] == "custom" and not any(cfg["out_margins"]):

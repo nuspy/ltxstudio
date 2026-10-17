@@ -7,7 +7,7 @@ Modulo senza Qt e senza torch. Dato un `cfg` (stesse chiavi del segnale `request
 cfg (oltre alle chiavi storiche del tab): mode, video, prompt, strength, conditioning_attention, keep_audio,
 res_mode (source|half|custom) + res_long, out_format (16:9|9:16|1:1|4:3|3:4|21:9|custom) + out_anchor +
 out_margins (sopra,destra,sotto,sinistra) + out_dark + out_paste + out_feather (px, default 24; 0 = taglio netto)
-+ out_min_bar (0 = spento; barre minime in frazione del canvas, rimpicciolisce il sorgente), style_image, cam_ref/cam_img/cam_img_strength/
++ out_fill (default True: «garantisci riempimento», sorgente rimpicciolito se le barre sono simmetriche e l'area nuova < 60%), out_min_bar (0 = spento; barre minime in frazione del canvas, rimpicciolisce il sorgente), style_image, cam_ref/cam_img/cam_img_strength/
 cam_seconds/width/height (cameraman), hdr_format (pq|exr|both) + hdr_exposure_ev + hdr_exr_half + hdr_hq (hdr: uscita in
 core/hdr_export.py), model / gguf_transformer / ltx_release (checkpoint ESATTAMENTE come scelto
 dall'utente: mai sostituito qui).
@@ -302,15 +302,21 @@ def build_job(cfg: dict, out_dir: str, stamp: int, output: str, log=None) -> IcJ
             kw["margins"] = tuple(int(v) for v in cfg.get("out_margins", (0, 0, 0, 0)))
         else:
             kw["aspect"] = fmt
+        out_fill = bool(cfg.get("out_fill", True))                      # «garantisci riempimento»: default ATTIVO
+        if out_fill:
+            kw["fill_area"] = prep.FILL_AREA
         try:
             layout = prep.compute_outpaint_layout(info.width, info.height, **kw)
         except ValueError as e:
             raise IcJobError(str(e)) from None
         if layout.new_area <= 0.001:
             raise IcJobError("nessuna area nuova da generare: scegli un formato/margini diversi")
+        if out_fill and layout.scale < 0.999 and not layout.clamped:
+            notes.append(f"garantisci riempimento: video originale ridotto a scala {layout.scale:.2f} (area nuova {layout.new_area:.0%}) "
+                         "perche' due barre simmetriche non verrebbero riempite dal modello")
         if layout.too_much_new_area:
             notes.append(f"area nuova {layout.new_area:.0%} > {prep.MAX_NEW_AREA:.0%}: il modello inventera' molto")
-        if layout.narrow_bar:
+        if layout.narrow_bar and not (out_fill and layout.scale < 0.999):   # col riempimento garantito la barra stretta non conta
             notes.append(f"barra nuova stretta ({layout.narrow_bar_fraction:.0%} del canvas < {prep.MIN_BAR_FRACTION:.0%}): "
                          "il modello potrebbe NON riempirla; usa margini piu' larghi")
         if layout.clamped:

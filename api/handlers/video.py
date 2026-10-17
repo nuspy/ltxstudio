@@ -162,6 +162,10 @@ class IcLoraReq(BaseModel):
     min_bar: float = Field(0.0, ge=0.0, le=0.45, description="outpaint (opt-in, solo canvas non custom): se una barra "
                            "nuova e' piu' stretta, rimpicciolisce il video nel canvas finche' ogni barra e' >= questa "
                            "frazione (consigliato 0.15); 0 = spento")
+    fill_coverage: bool = Field(True, description="outpaint «garantisci riempimento» (default SI): se le barre nuove sono "
+                                "simmetriche sullo stesso asse (due barre opposte) e l'area nuova e' < 60%, il video "
+                                "originale viene rimpicciolito (cornice su 4 lati) perche' il modello altrimenti le "
+                                "lascia nere; false = layout letterale (originale piu' grande, barre forse non riempite)")
     # lipdub = «Doppiaggio da testo» (JUST-DUB-IT): il video CON audio e' il riferimento; la NUOVA battuta (testo) genera
     # voce e labbra nuove, per la stessa durata del video. `prompt` (se presente) vince su line/language/scene.
     line: str = Field("", description="lipdub: la nuova battuta, nell'alfabeto della lingua parlata (il modello non traduce)")
@@ -224,12 +228,20 @@ class LipsyncReq(BaseModel):
 
 class EnhanceReq(BaseModel):
     video_path: str
-    engine: str = Field("seedvr2", description="seedvr2 | flashvsr")
+    engine: str = Field("seedvr2", description="seedvr2 | flashvsr | h3_upsampler (MiniMax H3, nativo)")
     seedvr2_model: str = "seedvr2_ema_3b_fp8_e4m3fn.safetensors"
     resolution: int = 1080
     batch_size: int = 5
     block_swap: int = 0
     scale: float = 2.0
+    # solo engine=h3_upsampler: il checkpoint H3 Ref2VA lo sceglie il chiamante (nessun ripiego automatico)
+    h3_profile: str | None = Field(None, description="nvfp4 | int4 | int8 | fp8 (obbligatorio per h3_upsampler)")
+    h3_te: str | None = Field(None, description="mmh3-te-nvfp4 | mmh3-te-fp8 | mmh3-te-int8 (vuoto = quello del profilo)")
+    megapixels: float = Field(2.0, description="uscita come area, rapporto invariato (1 MP = 1024x1024)")
+    denoise: float = Field(0.1, description="forza del ri-disegno, 0 = solo upscaler latente")
+    guide: bool = Field(True, description="guida con la LoRA h3upscale x2")
+    lora_strength: float = 1.0
+    tile_tokens: int = Field(0, description="budget di token per forward di tile; 0 = automatico dalla VRAM libera (tetto 70000)")
 
 
 class RifeReq(BaseModel):
@@ -436,6 +448,7 @@ def register(app: FastAPI):
                "out_format": req.canvas, "out_anchor": req.anchor,
                "out_margins": tuple(req.margins or (0, 0, 0, 0)), "out_dark": req.dark_source,
                "out_paste": req.paste_original, "out_feather": req.feather_px, "out_min_bar": req.min_bar,
+               "out_fill": req.fill_coverage,
                "cam_ref": req.video_path, "cam_img": req.image_path or "",
                "cam_img_strength": req.image_strength, "cam_seconds": req.seconds,
                "width": req.width, "height": req.height, "seed": req.seed,
@@ -504,9 +517,17 @@ def register(app: FastAPI):
     @app.post("/video/enhance", tags=["video"])
     def video_enhance(req: EnhanceReq):
         gate.require("cap.restore")
+        if req.engine == "h3_upsampler":
+            gate.require("cap.video_h3_upsampler")
         def fn(job):
             out = out_path(f"{req.engine}")
-            if req.engine == "flashvsr":
+            if req.engine == "h3_upsampler":
+                from core import h3_upsample_service as hs
+                hs.upscale_video(req.video_path, out, h3_profile=req.h3_profile or "", h3_te=req.h3_te or "",
+                                 megapixels=req.megapixels, denoise=req.denoise, guide=req.guide,
+                                 lora_strength=req.lora_strength, tile_tokens=req.tile_tokens,
+                                 on_log=lambda l: job.log(l))
+            elif req.engine == "flashvsr":
                 from core import flashvsr_service as fv
                 _errs = fv.preflight()                        # una sola chiamata (era invocata 2×)
                 if _errs:
