@@ -32,9 +32,12 @@ import traceback
 
 def _model_key(module: str, params: dict) -> str:
     """Chiave del modello residente per il registro: arch/checkpoint. Job dello stesso modello riusano."""
-    arch = str(params.get("arch", module) or module).lower()
-    model = str(params.get("model", "") or params.get("model_gguf", "") or "").lower()
-    return f"{arch}:{os.path.basename(model) or '-'}"
+    # STESSA definizione del server (core.model_identity): la chiave dice quali PESI sono residenti, non il
+    # compito (crea/inpaint/kontext sullo stesso file = stessa chiave). Se le due divergessero, il registro
+    # GPU confronterebbe chiavi in formati diversi e non riconoscerebbe mai il riuso.
+    from core.model_identity import residency_key
+    arch = str(params.get("arch", module) or module)
+    return residency_key(arch, str(params.get("model", "") or params.get("model_gguf", "") or ""))
 
 
 def main() -> int:
@@ -69,9 +72,15 @@ def main() -> int:
     mm = ModelManager()                                     # PERSISTENTE: vive per tutti i job del figlio
     cur_key = "-"
 
+    # IPC sul stdout ORIGINALE; i print() dei backend ([step]/[mm]/[store]/[image]...) vanno su stderr =
+    # persistent_child.log. Prima finivano nella pipe, dove il server scarta ogni riga che non sia una risposta:
+    # in modalita' persistente NESSUNO di quei log era visibile (0 righe '[image]' nel log del figlio).
+    _ipc = sys.stdout
+    sys.stdout = sys.stderr
+
     def emit(line: str) -> None:
-        sys.stdout.write(line + "\n")
-        sys.stdout.flush()
+        _ipc.write(line + "\n")
+        _ipc.flush()
 
     print("[persistent_runner] pronto (ModelManager caldo)", file=sys.stderr, flush=True)
     for raw in sys.stdin:

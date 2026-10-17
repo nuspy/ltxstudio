@@ -137,8 +137,10 @@ class IcLoraReq(BaseModel):
     """Modalita' IC-LoRA di «Modifica Video AI» (stessa logica della GUI: core/video_edit_ic.py)."""
     kind: str = Field(..., description="refocus | uncompress | deinterlace | motiondeblur | detailer | "
                                        "outpaint | restyle | cameraman | lipdub (Doppiaggio da testo) | "
-                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE) | hdr (SDR -> HDR)")
-    video_path: str = Field(..., description="video sorgente (cameraman: video di RIFERIMENTO del movimento)")
+                                       "lipdub_audio (Doppiaggio da audio, SPERIMENTALE) | hdr (SDR -> HDR) | "
+                                       "motion_track (movimento da tracce disegnate)")
+    video_path: str = Field("", description="video sorgente (cameraman: video di RIFERIMENTO del movimento; "
+                                            "motion_track: non serve)")
     prompt: str = ""
     strength: float = 1.0
     attention: float = Field(1.0, ge=0.1, le=1.0, description="attenzione della guida")
@@ -179,12 +181,27 @@ class IcLoraReq(BaseModel):
     hdr_exposure_ev: float = Field(0.0, ge=-6.0, le=6.0, description="hdr: esposizione dell'anteprima SDR in stop (non tocca HDR/EXR)")
     hdr_exr_half: bool = Field(True, description="hdr: EXR in float16 (False = float32, file doppi)")
     hdr_hq: bool = Field(False, description="hdr: alta qualita' (2x frame interni, circa 2x tempo)")
-    # cameraman
-    image_path: str | None = None
-    image_strength: float = 0.7
-    width: int = 960
+    # cameraman (image_path/image_strength/width/height/seconds valgono anche per motion_track, con default propri)
+    image_path: str | None = Field(None, description="cameraman: immagine iniziale (opz.) · motion_track: immagine di partenza "
+                                   "= frame 0 (OBBLIGATORIA)")
+    image_strength: float = Field(0.7, description="forza dell'immagine (motion_track, se omessa: 1.0)")
+    width: int = Field(960, description="motion_track: se omessa si ricava dall'aspetto dell'immagine (lato corto 576)")
     height: int = 576
-    seconds: float = 0.0
+    seconds: float = Field(0.0, description="cameraman: durata · motion_track: durata (default 121 frame = 5 s a 24 fps; "
+                           "tetto 257 frame, ~10,7 s a 24 fps)")
+    # motion_track (IC-LoRA motion-track LTX-2.3): le tracce sono punti sull'immagine; l'ordine dei punti e' il TEMPO
+    tracks: str | list | dict | None = Field(None, description="motion_track: tracce. JSON/oggetto: punti di controllo "
+        "[[{x,y},...],...] (uno o piu' punti per traccia; 1 punto = ferma), oppure {points_store, coordinates, size}, oppure "
+        "tracce dense (un punto per frame) oppure il workflow ComfyUI Lightricks con LTXVSparseTrackEditor. Coordinate: "
+        "`size` del JSON o `tracks_size`; se mancano = pixel dell'immagine ORIGINALE")
+    tracks_size: list[int] | None = Field(None, description="motion_track: [larghezza, altezza] dello spazio delle coordinate")
+    tracks_format: str = Field("auto", description="motion_track: auto | control (punti di controllo) | dense (un punto per frame)")
+    tracks_video_path: str | None = Field(None, description="motion_track: video di controllo gia' pronto (alternativa a `tracks`; "
+                                          "stesso disegno di LTXVDrawTracks)")
+    num_frames: int | None = Field(None, description="motion_track: frame (8k+1; alternativa a `seconds`)")
+    fps: int = Field(24, description="motion_track: fps (8-60, ufficiale 24)")
+    native_audio: bool = Field(True, description="motion_track: tiene l'audio generato insieme al video (voce/suoni dal "
+                               "prompt, come il workflow ufficiale); False = video muto")
     # checkpoint: ESATTAMENTE come scelto (mai sostituito); vuoto = default del worker (dev)
     model: str | None = None
     ltx_release: str | None = None
@@ -320,7 +337,8 @@ def register(app: FastAPI):
 
     @app.post("/video/ic_lora", tags=["video"])
     def video_ic_lora(req: IcLoraReq):
-        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman, lipdub.
+        """Restauro (refocus/uncompress/deinterlace/motiondeblur/detailer), outpaint, restyle, cameraman, lipdub, hdr,
+        motion_track (immagine + tracce -> video; output = video + video delle tracce di controllo).
         Risposta: job_id + `warnings` (es. checkpoint non distilled: MAI sostituito)."""
         from fastapi import HTTPException
         from core import ltx_release as lrel
@@ -346,7 +364,32 @@ def register(app: FastAPI):
             from core import hdr_export as _hx
             if req.hdr_format not in _hx.FORMATS:
                 raise HTTPException(422, {"error": "invalid_hdr_format", "valid": list(_hx.FORMATS)})
-        if not os.path.exists(req.video_path):
+        if req.kind == "motion_track":
+            from core import motion_tracks as _mt
+            if not (req.image_path and os.path.exists(req.image_path)):
+                raise HTTPException(422, {"error": "image_required", "path": req.image_path,
+                                          "detail": "motion_track: image_path = immagine di partenza (frame 0)"})
+            if req.tracks_format not in ("auto", "control", "dense"):
+                raise HTTPException(422, {"error": "invalid_tracks_format", "valid": ["auto", "control", "dense"]})
+            if req.tracks_video_path:
+                if not os.path.exists(req.tracks_video_path):
+                    raise HTTPException(422, {"error": "tracks_video_not_found", "path": req.tracks_video_path})
+            elif req.tracks in (None, "", [], {}):
+                raise HTTPException(422, {"error": "tracks_required",
+                                          "detail": "motion_track: indica `tracks` (JSON) o `tracks_video_path`"})
+            else:
+                try:
+                    _mt.parse_track_input(req.tracks, req.num_frames, req.tracks_format)
+                except (ValueError, TypeError, KeyError) as e:
+                    raise HTTPException(422, {"error": "invalid_tracks", "detail": str(e)})
+            if not 8 <= req.fps <= 60:
+                raise HTTPException(422, {"error": "invalid_fps", "detail": "fps tra 8 e 60"})
+            _n = (vem.snap_frames(req.num_frames) if req.num_frames
+                  else _mt.frames_for_seconds(req.seconds or (_mt.DEFAULT_FRAMES / _mt.DEFAULT_FPS), req.fps))
+            if _n > spec.max_frames_per_segment:
+                raise HTTPException(422, {"error": "too_long", "frames": _n, "max_frames": spec.max_frames_per_segment,
+                                          "detail": "le tracce non si possono spezzare in segmenti: accorcia il clip"})
+        elif not os.path.exists(req.video_path):
             raise HTTPException(422, {"error": "video_not_found", "path": req.video_path})
         warnings: list[str] = []
         if req.kind in ("lipdub", "lipdub_audio"):
@@ -409,6 +452,16 @@ def register(app: FastAPI):
                "lipdub_audio": req.audio_path or "", "lipdub_audio_ref": req.audio_reference,
                "hdr_format": req.hdr_format, "hdr_exposure_ev": req.hdr_exposure_ev,
                "hdr_exr_half": req.hdr_exr_half, "hdr_hq": req.hdr_hq}
+        if req.kind == "motion_track":
+            _given = req.model_fields_set
+            for _k in ("width", "height"):                       # senza valori espliciti: dall'aspetto dell'immagine
+                if _k not in _given:
+                    cfg.pop(_k, None)
+            cfg.update(track_image=req.image_path, tracks=req.tracks, tracks_size=req.tracks_size,
+                       tracks_format=req.tracks_format, tracks_video_path=req.tracks_video_path or "",
+                       fps=req.fps, num_frames=req.num_frames, seconds=req.seconds or None,
+                       image_strength=(req.image_strength if "image_strength" in _given else 1.0), keep_audio=False,
+                       native_audio=req.native_audio)
         if model:
             cfg["gguf_transformer" if model.lower().endswith(".gguf") else "model"] = model
         if rel:
