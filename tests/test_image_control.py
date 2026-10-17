@@ -289,3 +289,31 @@ def test_run_redux_flow(run_env, monkeypatch):
     res = IC.run({"mode": "flux_redux", "model": "m", "prompt": "", "width": 64, "height": 64, "steps": 2, "seed": 5,
                   "ref_images": [str(tmp / "r.png")], "gen_device": "cpu"}, mm, str(tmp / "o"))
     assert res["status"] == "success", res
+
+
+def test_zimage_cn_cpu_round_trip(tmp_path):
+    """Z-Image ControlNet: pipeline derivata che condivide il transformer, mappa canny, 8 passi/guidance 0 di default."""
+    from diffusers import (AutoencoderKL, FlowMatchEulerDiscreteScheduler, ZImageControlNetModel, ZImagePipeline,
+                           ZImageTransformer2DModel)
+    torch.manual_seed(0)
+    tr = ZImageTransformer2DModel(all_patch_size=(2,), all_f_patch_size=(1,), in_channels=16, dim=64, n_layers=2,
+                                  n_refiner_layers=1, n_heads=4, n_kv_heads=4, cap_feat_dim=32, axes_dims=[8, 4, 4],
+                                  axes_lens=[64, 32, 32])
+    vae = AutoencoderKL(in_channels=3, out_channels=3, down_block_types=("DownEncoderBlock2D",) * 4,
+                        up_block_types=("UpDecoderBlock2D",) * 4, block_out_channels=(8, 8, 8, 8), layers_per_block=1,
+                        latent_channels=16, norm_num_groups=4, sample_size=64, shift_factor=0.1, scaling_factor=0.3)
+    pipe = ZImagePipeline(scheduler=FlowMatchEulerDiscreteScheduler(), vae=vae, text_encoder=None, tokenizer=None,
+                          transformer=tr)
+    cn = ZImageControlNetModel(control_layers_places=[0, 1], control_refiner_layers_places=[0], control_in_dim=33,
+                               add_control_noise_refiner="control_noise_refiner", dim=64, n_refiner_layers=1, n_heads=4,
+                               n_kv_heads=4)
+    g = tmp_path / "g.png"
+    Image.effect_noise((96, 64), 60).convert("RGB").save(g)
+    cpipe, kw, _ = IC.build_job(pipe, {"mode": "zimage_cn", "model": "m", "prompt": "p", "width": 64, "height": 64,
+                                       "seed": 1, "control_image": str(g), "control_preprocess": "canny",
+                                       "gen_device": "cpu"}, cn)
+    assert cpipe.transformer is tr and kw["controlnet_conditioning_scale"] == 0.75 and kw["guidance_scale"] == 0.0
+    kw.pop("prompt")
+    kw["prompt_embeds"] = [torch.randn(7, 32)]
+    kw["num_inference_steps"] = 2
+    assert cpipe(**kw).images[0].size == (64, 64)
