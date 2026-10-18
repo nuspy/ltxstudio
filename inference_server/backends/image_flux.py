@@ -2126,13 +2126,27 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             #  • INPAINT → anello SOTTILE (auto ~min_lato/128, 4–14 px): niente degradazione attorno all'edit.
             #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione + COLOR-MATCH al bordo.
             import numpy as _np
+            from core import tone_match as _tm                       # tono GLOBALE del generato ← zona-foto (task 14)
             _mk_bool = (_np.asarray(_m, dtype=_np.uint8) > 127)      # True = pixel da (ri)generare
             if params.get("outpaint"):
                 _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
                 # COLOR-MATCH al bordo (outpaint): l'estensione ha tono/luminosità un filo diversi dalla foto →
                 # linea di stacco. Riallinea al confine con falloff verso l'interno. Env NATIVE_OUTPAINT_COLORMATCH=0.
+                # TONO GLOBALE (task 14, «effetto cornice»): il modello rigenera anche la zona-foto → lo scarto di tono
+                # si stima sugli STESSI pixel (generato vs foto) e si toglie da TUTTO il generato; la correzione di
+                # confine resta come secondo stadio, solo se lo scarto dell'estensione è reale (core/tone_match.py).
+                # Env NATIVE_OUTPAINT_TONEMATCH=0 → comportamento di prima (solo correzione di confine a decadimento,
+                # e niente riempimento del punto sotto).
                 if os.environ.get("NATIVE_OUTPAINT_COLORMATCH", "1") == "1":
-                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
+                    if _tm.enabled():
+                        res_img = _tm.harmonize(res_img, _orig, _mk_bool, _feather, tau_mult=12.0, tag="tone-outpaint")
+                    else:
+                        res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
+                if _tm.enabled():
+                    # `_orig` è il frame del canvas: nell'estensione è il RIEMPIMENTO SCURO. La maschera sfumata vale < 1
+                    # vicino alla foto (≈0,84 al confine) e quel nero filtrava nel generato → banda scura attorno alla
+                    # foto. Nell'estensione si miscela il generato con se stesso (misurato: ΔE vicino al confine −1,0).
+                    _orig = Image.fromarray(_np.where(_mk_bool[:, :, None], _np.asarray(res_img), _np.asarray(_orig)))
                 _fo = int(round(_feather * 1.9))                         # dilata la regione generata prima di sfumare
                 _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))       # → la sfumatura NON tocca il bordo tela
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
@@ -2142,8 +2156,13 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
                 # contrasto un filo diversi dalla foto → LINEA di giunzione + "cambio di tono" visibili su aree
                 # ampie/lisce. Seam-localizzato (falloff dal bordo) per NON ridipingere un eventuale oggetto
                 # inserito lontano dal bordo. Env NATIVE_INPAINT_COLORMATCH=0 per disattivare.
+                # Task 14: stesso tono GLOBALE dell'outpaint (zona-foto = fuori maschera); NATIVE_OUTPAINT_TONEMATCH=0
+                # torna alla correzione di confine di prima.
                 if os.environ.get("NATIVE_INPAINT_COLORMATCH", "1") == "1":
-                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
+                    if _tm.enabled():
+                        res_img = _tm.harmonize(res_img, _orig, _mk_bool, _feather, tau_mult=6.0, clamp=32, tag="tone-inpaint")
+                    else:
+                        res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
                 _m = _m.filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
