@@ -119,7 +119,9 @@ def test_export_canvas_senza_contorno_guida(tmp_path):
 def test_worker_qwen_usa_il_prefill_in_outpaint():
     src = (Path(__file__).resolve().parents[1] / "workers" / "qwen_image21_infer.py").read_text(encoding="utf-8")
     assert 'p.get("outpaint")' in src and "outpaint_prefill.prefill_from_mask_path" in src
-    assert src.index("outpaint_prefill.prefill_from_mask_path") < src.index("_annotate(init_img, mask_path)")
+    assert "_outpaint_init(init_img, mask_path, p)" in src
+    assert src.index("_outpaint_init(init_img, mask_path, p)") < src.index("_annotate(init_img, mask_path)")
+    assert "outpaint_strength" not in src.split("def run(")[1], "Qwen: nessun cap di forza in outpaint"
 
 
 def test_outpaint_strength_costante_e_override(monkeypatch):
@@ -158,10 +160,9 @@ def test_worker_qwen_helper_outpaint(tmp_path, monkeypatch):
     assert w._outpaint_init(fr, "", {"outpaint": True}) is fr
     monkeypatch.setenv("NATIVE_OUTPAINT_PREFILL", "0")
     assert w._outpaint_init(fr, str(mp), {"outpaint": True}) is fr
-    assert w._outpaint_strength(1.0, {"outpaint": True}) == 1.0
     monkeypatch.delenv("NATIVE_OUTPAINT_PREFILL")
-    assert w._outpaint_strength(1.0, {"outpaint": True}) == pytest.approx(0.9)
-    assert w._outpaint_strength(1.0, {}) == 1.0                       # inpaint: forza invariata
+    # Qwen: la forza in outpaint NON si riduce (prova live: a 0,9 l'estensione restava il pre-riempimento sfocato)
+    assert not hasattr(w, "_outpaint_strength")
     assert w._outpaint_feather((992, 992), {"outpaint": True}) == 25
     assert w._outpaint_feather((992, 992), {}) == 7
     assert w._outpaint_feather((992, 992), {"outpaint": True, "feather": 9}) == 9
