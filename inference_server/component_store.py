@@ -161,6 +161,12 @@ class ComponentStore:
         (lo spazio è già pagato, la pipeline li riusa)."""
         return sum(e.size_mb for k in (keys or ()) if (e := self._items.get(k)) and e.device == device)
 
+    def all_resident(self, keys, device: str = "cuda") -> bool:
+        """True se TUTTI i componenti in `keys` esistono nello store e i loro pesi stanno già su `device`
+        (nessun byte da spostare: una pipeline sorella può usarli così come sono)."""
+        keys = tuple(keys or ())
+        return bool(keys) and all((e := self._items.get(k)) is not None and e.device == device for k in keys)
+
     def _ram_ok(self, size_mb: float) -> bool:
         """La CPU-cache può ospitare altri size_mb? Predicato UNIFICATO (commit 2): RAM fisica +
         COMMIT (il limite VERO su Windows — vedi pagefile-commit-mmap-crash) + budget, da

@@ -291,13 +291,46 @@ def _ensure_placement(pipe, mm=None, self_key: str | None = None) -> str:
                          keep={self_key} if self_key else set())
         except Exception:                                # noqa: BLE001
             pass
-    mode = _place_sticky(pipe) if _want_sticky else _place(pipe, est_missing)
+    mode = None
+    if not _want_sticky and getattr(pipe, "_ls_shared", False) and STORE.all_resident(keys):
+        mode = _place_resident(pipe)                     # sorella: pesi già su GPU → mai cambiare placement ai moduli condivisi
+    if mode is None:
+        mode = _place_sticky(pipe) if _want_sticky else _place(pipe, est_missing)
     for k in keys:
         # sticky: transformer+vae su cuda, T5/CLIP hooked (device 'misto') → non marcare i componenti 'cuda'
         STORE.note_device(k, "cuda" if mode == "gpu" else "cpu")
     pipe._ls_place_mode = mode
     pipe._ls_place_epoch = STORE.bump_epoch()            # invalida l'epoch delle ALTRE pipe → loro rebind
     return mode
+
+
+def _place_resident(pipe) -> str | None:
+    """Pipeline SORELLA i cui componenti (transformer/VAE/T5/CLIP condivisi) sono GIÀ tutti su GPU: i pesi sono pagati,
+    NON si piazza nulla e soprattutto NON si passa a offload — i moduli sono gli stessi della pipeline residente: spostarli
+    su CPU (visto dal vivo il 18/10: 28→1,7 GB di VRAM, RAM del figlio +17 GB, hook di offload sul transformer fp8
+    condiviso) rompe anche la pipeline di «crea». Serve solo la MEMORIA DI LAVORO (attivazioni + decode, `_ls_working_mb`):
+    se la VRAM libera non basta si restituisce al driver la cache inutilizzata e si ricontrolla; se ancora non basta →
+    errore CHIARO (mai un offload improvvisato sui moduli condivisi). Ritorna "gpu", oppure None solo con
+    NATIVE_ALLOW_OFFLOAD_SHARED=1 (si ricade nel _place storico, a proprio rischio)."""
+    import torch
+    working = float(getattr(pipe, "_ls_working_mb", 0) or 3200)
+    if not torch.cuda.is_available():
+        return "gpu"
+    free = torch.cuda.mem_get_info()[0] / 2**20
+    if free < working:
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        free = torch.cuda.mem_get_info()[0] / 2**20
+    print(f"[place] sorella con pesi GIÀ su GPU: placement invariato (gpu), serve solo la memoria di lavoro "
+          f"({working:.0f}MB, liberi {free:.0f}MB)", flush=True)
+    if free >= working:
+        return "gpu"
+    if os.environ.get("NATIVE_ALLOW_OFFLOAD_SHARED") == "1":
+        return None
+    raise RuntimeError(
+        f"VRAM libera insufficiente per questa operazione: servono ~{working / 1024:.1f} GB di memoria di lavoro e "
+        f"ne restano {free / 1024:.1f} GB (il modello è già in memoria e non viene spostato). Chiudi i programmi che "
+        f"usano la GPU o usa «Libera VRAM», poi riprova.")
 
 
 def _place_flux2_blockswap(pipe) -> str:
@@ -377,6 +410,32 @@ def _apply_fbcache(pipe) -> bool:
     except Exception as e:                              # noqa: BLE001
         print(f"[image] FBCache non applicato: {e}", flush=True)
         return False
+
+
+def _sync_fbcache(pipe, arch: str) -> None:
+    """First Block Cache COERENTE col job. Il transformer è CONDIVISO fra le pipeline FLUX.1 (crea/inpaint/kontext sullo
+    stesso file): i suoi hook di cache restano attaccati al modulo. Solo FluxPipeline (t2i) entra nel `cache_context` —
+    FluxInpaint/Fill/Kontext NO (diffusers 0.38) — quindi un job image-conditioned sul transformer di un «crea» con
+    cache attiva muore con «No context is set. Please set a context before retrieving the state.»
+    (hooks.py:44; visto dal vivo il 18/10: scambiato per un problema di offload). Prima il bug era nascosto
+    perché ogni cambio di compito ricaricava il transformer. Qui: image-conditioned → cache SPENTA; t2i con
+    NATIVE_FBCACHE=1 → ACCESA (a ogni job lo stato è quello giusto per il job)."""
+    tr = getattr(pipe, "transformer", None)
+    if tr is None or not hasattr(tr, "is_cache_enabled"):
+        return
+    want = os.environ.get("NATIVE_FBCACHE", "0") == "1" and not SPEC.get(arch, ("", False, False))[2]
+    try:
+        on = bool(tr.is_cache_enabled)
+        if on and not want:
+            tr.disable_cache()
+            print(f"[image] FBCache disattivata sul transformer condiviso per '{arch}' (la pipeline non entra nel "
+                  f"cache_context)", flush=True)
+        elif want and not on:
+            _apply_fbcache(pipe)
+    except Exception as _e:                                  # noqa: BLE001
+        from inference_server.cuda_health import reraise_if_fatal
+        reraise_if_fatal(_e)
+        print(f"[image] sync FBCache non riuscita ({_e})", flush=True)
 
 
 def _maybe_compile(pipe) -> bool:
@@ -1119,8 +1178,18 @@ def _release_cuda_cache() -> None:
         import torch
         gc.collect()
         if torch.cuda.is_available():
+            _before = _alloc = 0
+            try:
+                _before, _alloc = torch.cuda.memory_reserved() // 2**20, torch.cuda.memory_allocated() // 2**20
+            except Exception:                               # noqa: BLE001
+                pass
             torch.cuda.synchronize()
             torch.cuda.empty_cache()
+            try:
+                print(f"[mem] FINE JOB: cache CUDA restituita al driver (reserved {_before}MB → "
+                      f"{torch.cuda.memory_reserved() // 2**20}MB; pesi residenti alloc={_alloc}MB)", flush=True)
+            except Exception:                               # noqa: BLE001
+                pass
     except Exception:                                       # noqa: BLE001 — contesto avvelenato: il figlio uscirà da sé
         pass
 
@@ -1845,6 +1914,7 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
     _step("auto-evict FATTO (sto per fare il placement in VRAM)")
     where = _ensure_placement(pipe, mm, key)                # placement per-JOB (gpu|offload con VRAM attuale)
     _step(f"placement FATTO = {where}")
+    _sync_fbcache(pipe, arch)                               # per-job: stato della cache coerente col compito
     _set_attention(pipe, arch)                              # per-job: il transformer CONDIVISO può avere il
     print(f"[image] job {arch}: placement={where}", flush=True)  # processor dell'arch precedente (sage↔sdpa)
     mm.apply_loras(pipe, params.get("loras"))

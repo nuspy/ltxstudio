@@ -19,6 +19,7 @@ import io
 import json
 import os
 import sys
+import types
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ["LTX_SERVER_NO_TEE"] = "1"
@@ -383,3 +384,183 @@ def test_predicted_load_is_zero_when_everything_is_already_resident(flux):
     for k in (key, "t5xxl", "clip_l", "vae_flux"):
         cs.STORE._items[k] = cs._CEntry(obj=nn.Linear(1, 1), size_mb=1.0)
     assert image_flux._predicted_load_mb(str(f), "flux") == 0.0            # già residente: nessun carico previsto
+
+
+# ───────── L1 dal vivo (18/10): sorella con pesi già su GPU + «No context is set» (FBCache sul transformer condiviso) ─────────
+def _resident_store(keys, device="cuda"):
+    from inference_server import component_store as cs
+    for k in keys:
+        cs.STORE._items[k] = cs._CEntry(obj=nn.Linear(1, 1), size_mb=100.0, device=device)
+    return cs.STORE
+
+
+class _OffloadForbidden(_FakeFluxPipe):
+    def enable_model_cpu_offload(self, *a, **k):
+        raise AssertionError("offload sui moduli condivisi: vietato")
+
+    def enable_sequential_cpu_offload(self, *a, **k):
+        raise AssertionError("offload sui moduli condivisi: vietato")
+
+    def to(self, *a, **k):
+        raise AssertionError("nessuno spostamento di moduli già residenti")
+
+
+def _cuda_free(monkeypatch, free_mb):
+    """Finge una GPU con `free_mb` liberi (e conta empty_cache)."""
+    calls = {"empty": 0}
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda *a: (int(free_mb * 2**20), 32 * 1024 * 2**20))
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda *a: None)
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: calls.__setitem__("empty", calls["empty"] + 1))
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda *a: 0)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda *a: 0)
+    return calls
+
+
+def _shared_pipe(keys):
+    p = _OffloadForbidden()
+    p._ls_shared, p._ls_component_keys, p._ls_working_mb, p._ls_est_mb = True, keys, 3200, 27123
+    return p
+
+
+KEYS = ("tr", "vae_flux", "clip_l", "t5xxl")
+
+
+def test_sibling_with_resident_weights_stays_gpu_when_working_memory_fits(flux, monkeypatch):
+    """Il caso L1: pesi=0, working 3,2 GB, liberi 4,2 GB → 'gpu' (prima: need 4400 > 4213 → OFFLOAD, 28→1,7 GB di VRAM)."""
+    image_flux, dm = flux
+    st = _resident_store(KEYS)
+    _cuda_free(monkeypatch, 4213)
+    p = _shared_pipe(KEYS)
+    assert image_flux._ensure_placement(p, None, None) == "gpu"
+    assert p._ls_place_mode == "gpu" and all(st._items[k].device == "cuda" for k in KEYS)   # niente è stato spostato
+
+
+def test_sibling_with_resident_weights_never_offloads_clear_error_when_short(flux, monkeypatch):
+    image_flux, dm = flux
+    st = _resident_store(KEYS)
+    calls = _cuda_free(monkeypatch, 2000)                                 # meno della memoria di lavoro
+    p = _shared_pipe(KEYS)
+    with pytest.raises(RuntimeError, match="VRAM libera insufficiente") as ei:
+        image_flux._ensure_placement(p, None, None)
+    from inference_server.cuda_health import is_cuda_fatal
+    assert not is_cuda_fatal(ei.value)                                    # errore pulito, il figlio resta sano
+    assert calls["empty"] == 1                                            # prima ha restituito la cache al driver
+    assert all(st._items[k].device == "cuda" for k in KEYS)               # e i pesi sono ancora tutti su GPU
+
+
+def test_sibling_short_on_vram_old_path_only_with_explicit_override(flux, monkeypatch):
+    image_flux, dm = flux
+    _resident_store(KEYS)
+    _cuda_free(monkeypatch, 2000)
+    monkeypatch.setenv("NATIVE_ALLOW_OFFLOAD_SHARED", "1")
+    monkeypatch.setattr(image_flux, "_place", lambda pipe, mb, resident_mb=None: "offload")
+    assert image_flux._ensure_placement(_shared_pipe(KEYS), None, None) == "offload"   # solo a richiesta esplicita
+
+
+def test_not_fully_resident_pipeline_keeps_the_historical_placement(flux, monkeypatch):
+    image_flux, dm = flux
+    st = _resident_store(KEYS)
+    st._items["t5xxl"].device = "cpu"                                     # T5 parcheggiato in RAM: da riportare su
+    _cuda_free(monkeypatch, 30000)
+    seen = []
+    monkeypatch.setattr(image_flux, "_place", lambda pipe, mb, resident_mb=None: seen.append(mb) or "gpu")
+    assert image_flux._ensure_placement(_shared_pipe(KEYS), None, None) == "gpu" and seen
+
+
+class _CacheTr(nn.Linear):
+    """Transformer finto con l'API di cache di diffusers (CacheMixin): is_cache_enabled / enable_cache / disable_cache."""
+    def __init__(self):
+        super().__init__(2, 2)
+        self._cache_config = None
+
+    @property
+    def is_cache_enabled(self):
+        return self._cache_config is not None
+
+    def enable_cache(self, cfg):
+        self._cache_config = cfg
+
+    def disable_cache(self):
+        self._cache_config = None
+
+
+def test_sync_fbcache_matches_the_job(monkeypatch):
+    from inference_server.backends import image_flux
+    p = types.SimpleNamespace(transformer=_CacheTr())
+    monkeypatch.setenv("NATIVE_FBCACHE", "1")
+    enabled = []
+    monkeypatch.setattr(image_flux, "_apply_fbcache", lambda pipe: (enabled.append(1), pipe.transformer.enable_cache("x")))
+    image_flux._sync_fbcache(p, "flux")                                   # t2i con FBCache=1 → accesa
+    assert p.transformer.is_cache_enabled and enabled == [1]
+    for arch in ("inpaint", "kontext"):                                   # image-conditioned → SPENTA (non entrano nel cache_context)
+        p.transformer.enable_cache("x")
+        image_flux._sync_fbcache(p, arch)
+        assert not p.transformer.is_cache_enabled
+    monkeypatch.setenv("NATIVE_FBCACHE", "0")
+    p.transformer.enable_cache("x")
+    image_flux._sync_fbcache(p, "flux")                                   # FBCache spenta da env → spenta anche sul t2i
+    assert not p.transformer.is_cache_enabled
+
+
+def test_create_with_fbcache_then_inpaint_on_shared_transformer_no_context_error(flux, monkeypatch, tmp_path):
+    """RIPRODUCE «No context is set» (diffusers hooks.py:44): crea (FluxPipeline, FBCache accesa dal launcher) → inpaint
+    sullo STESSO transformer condiviso. La pipeline di inpaint NON entra nel cache_context → senza _sync_fbcache muore."""
+    image_flux, dm = flux
+    from inference_server.model_manager import ModelManager
+    from PIL import Image
+    a = dm / "Flux" / "FLUX_Dev.safetensors"
+    _tiny_flux_file(a)
+    img, msk = _patch_run_env(monkeypatch, image_flux, tmp_path)
+    monkeypatch.setenv("NATIVE_FBCACHE", "1")
+    shared_tr = _CacheTr()
+
+    class _T2I(_FakeFluxPipe):
+        def __call__(self, **kw):
+            assert self.transformer.is_cache_enabled                       # il t2i la usa
+            return types.SimpleNamespace(images=[Image.new("RGB", (64, 64))])
+
+    class _Inp(_FakeFluxPipe):
+        def __call__(self, **kw):
+            if self.transformer.is_cache_enabled:
+                raise ValueError("No context is set. Please set a context before retrieving the state.")
+            return types.SimpleNamespace(images=[Image.new("RGB", (64, 64))])
+
+    def fake_load(model_path, arch, mm=None, klein_te=""):
+        p = (_T2I if arch == "flux" else _Inp)(transformer=shared_tr)
+        p._ls_shared = False
+        p._ls_ident = image_flux._weights_ident(arch, image_flux._resolve_model_path(model_path))
+        return p, 12000
+    monkeypatch.setattr(image_flux, "_load", fake_load)
+    mm = ModelManager()
+    out = str(tmp_path / "out")
+    assert image_flux.run({"arch": "flux", "model": str(a), "prompt": "x", "seed": 1, "steps": 2}, mm, out)["status"] == "success"
+    assert shared_tr.is_cache_enabled                                       # lasciata accesa dal crea
+    r = image_flux.run({"arch": "inpaint", "model": str(a), "prompt": "y", "seed": 2, "steps": 2,
+                        "image_path": img, "mask_path": msk}, mm, out)
+    assert r["status"] == "success" and not shared_tr.is_cache_enabled      # spenta per l'inpaint
+    assert image_flux.run({"arch": "flux", "model": str(a), "prompt": "z", "seed": 3, "steps": 2}, mm, out)["status"] == "success"
+    assert shared_tr.is_cache_enabled                                       # e riaccesa al crea successivo
+
+
+def test_cache_release_happens_at_the_end_of_the_job_and_is_logged(flux, monkeypatch, tmp_path, capsys):
+    from PIL import Image
+    image_flux, mm, a, img, msk, loads = _fake_run_env(flux, monkeypatch, tmp_path)
+    events = []
+
+    def gen(self, **kw):
+        events.append("gen")
+        return types.SimpleNamespace(images=[Image.new("RGB", (64, 64))])
+    monkeypatch.setattr(_FakeFluxPipe, "__call__", gen)
+    real = image_flux._release_cuda_cache
+    monkeypatch.setattr(image_flux, "_release_cuda_cache", lambda: (events.append("release"), real()))
+    image_flux.run({"arch": "flux", "model": str(a), "prompt": "x", "seed": 1, "steps": 2}, mm, str(tmp_path / "out"))
+    assert events == ["gen", "release"]                                     # il rilascio è DOPO la generazione, a fine job
+    _cuda_free(monkeypatch, 5000)                                           # e lascia traccia nel log: reserved prima → dopo
+    reserved = iter([28388 * 2**20, 24400 * 2**20])
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda *a: next(reserved))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda *a: 23989 * 2**20)
+    capsys.readouterr()
+    real()
+    out = capsys.readouterr().out
+    assert "FINE JOB" in out and "28388MB" in out and "24400MB" in out
