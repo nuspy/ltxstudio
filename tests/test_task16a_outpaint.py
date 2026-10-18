@@ -120,3 +120,74 @@ def test_worker_qwen_usa_il_prefill_in_outpaint():
     src = (Path(__file__).resolve().parents[1] / "workers" / "qwen_image21_infer.py").read_text(encoding="utf-8")
     assert 'p.get("outpaint")' in src and "outpaint_prefill.prefill_from_mask_path" in src
     assert src.index("outpaint_prefill.prefill_from_mask_path") < src.index("_annotate(init_img, mask_path)")
+
+
+def test_outpaint_strength_costante_e_override(monkeypatch):
+    monkeypatch.delenv("NATIVE_OUTPAINT_STRENGTH", raising=False)
+    assert opf.outpaint_strength(1.0) == pytest.approx(0.9)
+    assert opf.outpaint_strength(None) == pytest.approx(0.9)
+    assert opf.outpaint_strength(0.6) == pytest.approx(0.6)          # mai alzata
+    monkeypatch.setenv("NATIVE_OUTPAINT_STRENGTH", "1.0")
+    assert opf.outpaint_strength(1.0) == pytest.approx(1.0)
+    monkeypatch.setenv("NATIVE_OUTPAINT_STRENGTH", "0.8")
+    assert opf.outpaint_strength(1.0) == pytest.approx(0.8)
+    monkeypatch.setenv("NATIVE_OUTPAINT_STRENGTH", "boh")
+    assert opf.outpaint_strength(1.0) == pytest.approx(0.9)
+
+
+def _worker():
+    import importlib, sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workers"))
+    return importlib.import_module("qwen_image21_infer")
+
+
+def test_worker_qwen_helper_outpaint(tmp_path, monkeypatch):
+    w = _worker()
+    ph = _photo(256, 256)
+    fr, m, _ = _frame(ph)
+    mp = tmp_path / "m.png"
+    Image.fromarray((m * 255).astype(np.uint8)).save(mp)
+    monkeypatch.delenv("NATIVE_OUTPAINT_PREFILL", raising=False)
+    monkeypatch.delenv("NATIVE_OUTPAINT_STRENGTH", raising=False)
+    # outpaint: il riferimento NON e' piu' il frame scuro
+    out = w._outpaint_init(fr, str(mp), {"outpaint": True, "seed": 5})
+    assert np.abs(np.asarray(out).astype(int)[m] - FILL).mean() > 40
+    assert (np.asarray(out)[~m] == np.asarray(fr)[~m]).all()
+    # inpaint / senza maschera / prefill spento: invariato
+    assert w._outpaint_init(fr, str(mp), {"outpaint": False}) is fr
+    assert w._outpaint_init(fr, "", {"outpaint": True}) is fr
+    monkeypatch.setenv("NATIVE_OUTPAINT_PREFILL", "0")
+    assert w._outpaint_init(fr, str(mp), {"outpaint": True}) is fr
+    assert w._outpaint_strength(1.0, {"outpaint": True}) == 1.0
+    monkeypatch.delenv("NATIVE_OUTPAINT_PREFILL")
+    assert w._outpaint_strength(1.0, {"outpaint": True}) == pytest.approx(0.9)
+    assert w._outpaint_strength(1.0, {}) == 1.0                       # inpaint: forza invariata
+    assert w._outpaint_feather((992, 992), {"outpaint": True}) == 25
+    assert w._outpaint_feather((992, 992), {}) == 7
+    assert w._outpaint_feather((992, 992), {"outpaint": True, "feather": 9}) == 9
+
+
+def test_worker_qwen_paste_back_outpaint_maschera_larga(tmp_path, monkeypatch):
+    """Outpaint: la maschera si dilata nella foto e si sfuma come nel percorso FLUX (prima: bordo netto a ~7 px)."""
+    monkeypatch.setenv("NATIVE_OUTPAINT_TONEMATCH", "0")             # isola la sfumatura della maschera
+    w = _worker()
+    ph = _photo(320, 320)
+    fr0, m, rect = _frame(ph)
+    fr = opf.prefill_extension(fr0, m, seed=1)                        # come nel worker: init = frame pre-riempito
+    mp = tmp_path / "m.png"
+    Image.fromarray((m * 255).astype(np.uint8)).save(mp)
+    a = np.asarray(fr).astype(int)
+    gen = Image.fromarray(np.clip(np.where(m[..., None], 200, a + 40), 0, 255).astype(np.uint8))   # zona-foto generata piu' chiara di 40
+    x0, y0, x1, y1 = rect
+    narrow = np.asarray(w._paste_back(gen, fr, str(mp), feather=7, outpaint=True, wide=False)).astype(int)
+    wide = np.asarray(w._paste_back(gen, fr, str(mp), feather=25, outpaint=True, wide=True)).astype(int)
+    row = y0 + 150
+    # stretta: la foto e' intatta a 20 px dal confine; larga: il generato entra nella foto per ~2 feather
+    assert np.abs(narrow[row, x0 + 30] - a[row, x0 + 30]).max() <= 2
+    assert np.abs(wide[row, x0 + 30] - a[row, x0 + 30]).max() >= 10
+    assert np.abs(wide[row, x0 + 160] - a[row, x0 + 160]).max() <= 2          # centro foto intatto
+    assert (wide[0, 0] == 200).all() and (narrow[0, 0] == 200).all()  # lontano dalla foto: tutto generato
+    # con prefill spento il percorso largo non scatta (comportamento di prima)
+    monkeypatch.setenv("NATIVE_OUTPAINT_PREFILL", "0")
+    assert not w._wide_outpaint({"outpaint": True})
+    assert w._outpaint_feather((992, 992), {"outpaint": True}) == 7
