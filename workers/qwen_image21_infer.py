@@ -275,6 +275,15 @@ def run(p: dict) -> str:
     init_img = Image.open(init_path) if init_path else None
     if mask_path and init_img is None:
         raise RuntimeError("Inpaint Qwen-Image 2.1: manca l'immagine da ritoccare")
+    if init_img is not None and mask_path and p.get("outpaint"):
+        # Task 16a: il frame del canvas ha l'estensione scura uniforme; qui diventa il riferimento 1 → il modello
+        # vede «una foto in una cornice nera» e la disegna (riga scura attorno all'originale). Si dà invece un
+        # riempimento plausibile (specchio sfocato + campo liscio + grana): i pixel della foto restano identici.
+        from core import outpaint_prefill
+        if outpaint_prefill.enabled():
+            init_img = outpaint_prefill.prefill_from_mask_path(init_img.convert("RGB"), mask_path,
+                                                               seed=int(p.get("seed") or 0))
+            _log("outpaint: estensione pre-riempita (specchio sfocato + campo liscio) invece del riempimento scuro")
     images = [Image.open(x) for x in refs]
     prompt = str(p.get("prompt") or "")
     if init_img is not None and mask_path:
