@@ -2015,6 +2015,17 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             if _mimg.size != (_W, _H):                       # maschera allineata a width/height
                 _mimg = _mimg.resize((_W, _H), Image.NEAREST)
             kw["mask_image"] = _mimg
+            # Task 16a — outpaint dei motori NON-Fill: il frame del canvas ha l'estensione scura uniforme. FluxFill la
+            # azzera da sé (non toccarlo), ma Klein la usa come riferimento + punto di partenza (vignetta scura) e il FLUX
+            # base la tiene come bordo. Si dà un riempimento plausibile (core/outpaint_prefill: specchio sfocato + campo
+            # liscio + grana); i pixel della foto restano identici e la maschera non cambia. NATIVE_OUTPAINT_PREFILL=0 = prima.
+            if params.get("outpaint") and type(pipe).__name__ in ("FluxInpaintPipeline", "Flux2KleinInpaintPipeline"):
+                from core import outpaint_prefill as _opf
+                if _opf.enabled():
+                    import numpy as _npf
+                    kw["image"] = _opf.prefill_extension(kw["image"], _npf.asarray(_mimg.convert("L")) > 127,
+                                                         seed=int(params.get("seed") or 0))
+                    print(f"[outpaint-prefill] {type(pipe).__name__}: estensione pre-riempita (specchio sfocato + campo liscio)", flush=True)
     else:
         kw["width"] = int(params.get("width", 1024))
         kw["height"] = int(params.get("height", 1024))
@@ -2039,6 +2050,12 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
     if type(pipe).__name__ == "FluxInpaintPipeline":
         kw["strength"] = float(params.get("denoise") or 0.9)
         kw["guidance_scale"] = min(float(kw.get("guidance_scale", 3.5)), 5.0)
+    # Task 16a — Klein outpaint: la GUI manda denoise=1.0 ma la pipeline Klein usa `strength` (default 0.8, non 1): la schedule
+    # partiva dal frame rumorato all'80% e il buio dell'estensione (bassa frequenza) sopravviveva. Qui denoise → strength.
+    if type(pipe).__name__ == "Flux2KleinInpaintPipeline" and params.get("outpaint"):
+        from core import outpaint_prefill as _opf2
+        if _opf2.enabled():
+            kw["strength"] = float(params.get("denoise") or 1.0)
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
