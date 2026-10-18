@@ -29,11 +29,27 @@ REACH_PCT = 0.40                    # a questa distanza (frazione del lato minor
 GRAIN_FACTOR = 0.6                  # grana = alta frequenza della foto × questo
 GRAIN_RANGE = (1.5, 8.0)            # livelli 0..255 (min, max) della deviazione standard della grana
 MIN_KNOWN_PX = 64                   # sotto questi pixel di foto non si riempie (nessun contenuto da continuare)
+OUTPAINT_STRENGTH = 0.9             # forza (denoise) in OUTPAINT per FLUX base e Qwen: a 1,0 la schedule parte da rumore puro e il
+                                    # pre-riempimento non arriva al modello (live 18/10: O2/O4 ancora «riquadro + altra immagine»).
+                                    # Override: env NATIVE_OUTPAINT_STRENGTH (0..1); solo outpaint, solo se il prefill è attivo.
 
 
 def enabled() -> bool:
     """`NATIVE_OUTPAINT_PREFILL=0` → interruttore di emergenza (il frame resta come esportato dal canvas)."""
     return os.environ.get("NATIVE_OUTPAINT_PREFILL", "1") != "0"
+
+
+def outpaint_strength(requested: float | None) -> float:
+    """Forza da usare in outpaint: min(richiesta, OUTPAINT_STRENGTH o env NATIVE_OUTPAINT_STRENGTH). `requested` None = 1,0."""
+    cap = OUTPAINT_STRENGTH
+    try:
+        env = os.environ.get("NATIVE_OUTPAINT_STRENGTH", "").strip()
+        if env:
+            cap = float(env)
+    except ValueError:
+        pass
+    cap = min(1.0, max(0.05, cap))
+    return min(1.0 if requested is None else float(requested), cap)
 
 
 def _resize(a: np.ndarray, w: int, h: int) -> np.ndarray:

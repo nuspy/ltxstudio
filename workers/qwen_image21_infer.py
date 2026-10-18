@@ -212,7 +212,50 @@ def _latent_mask(mask_path: str, lh: int, lw: int):
     return t.reshape(1, lh * lw, 1).to("cuda", torch.bfloat16)
 
 
-def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8, outpaint: bool = False):
+def _outpaint_init(init_img, mask_path: str, p: dict):
+    """Task 16a: in OUTPAINT il frame del canvas ha l'estensione scura uniforme; qui diventa il riferimento 1 → il modello
+    vede «una foto in una cornice nera» e la disegna. Si dà invece un riempimento plausibile (specchio sfocato + campo
+    liscio + grana); i pixel della foto restano identici. Fuori dall'outpaint (o con NATIVE_OUTPAINT_PREFILL=0) invariata."""
+    if init_img is None or not mask_path or not p.get("outpaint"):
+        return init_img
+    from core import outpaint_prefill
+    if not outpaint_prefill.enabled():
+        return init_img
+    out = outpaint_prefill.prefill_from_mask_path(init_img.convert("RGB"), mask_path, seed=int(p.get("seed") or 0))
+    _log("outpaint: estensione pre-riempita (specchio sfocato + campo liscio) invece del riempimento scuro")
+    return out
+
+
+def _wide_outpaint(p: dict) -> bool:
+    """Paste-back con maschera dilatata e sfumata larga: solo outpaint e solo con il prefill attivo (NATIVE_OUTPAINT_PREFILL=0
+    riporta alla sfumatura sottile di prima)."""
+    if not p.get("outpaint"):
+        return False
+    from core import outpaint_prefill
+    return outpaint_prefill.enabled()
+
+
+def _outpaint_feather(size, p: dict) -> int:
+    """Sfumatura del paste-back. Outpaint: AMPIA come il percorso FLUX (auto ~lato minore/40, 12-48 px): la maschera si
+    dilata nella foto e si sfuma (il bordo netto a 7 px era il «riquadro» visibile). Inpaint: sottile."""
+    explicit = int(p.get("feather") or 0)
+    if explicit:
+        return explicit
+    if _wide_outpaint(p):
+        return max(12, min(48, int(round(min(size) / 40))))
+    return max(4, min(size) // 128)
+
+
+def _outpaint_strength(strength: float, p: dict) -> float:
+    """Outpaint: forza ridotta (core.outpaint_prefill.OUTPAINT_STRENGTH, 0,9) così la schedule parte dal frame
+    pre-riempito rumorato e non da rumore puro. Solo outpaint e solo con il prefill attivo."""
+    if not p.get("outpaint"):
+        return strength
+    from core import outpaint_prefill
+    return outpaint_prefill.outpaint_strength(strength) if outpaint_prefill.enabled() else strength
+
+
+def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8, outpaint: bool = False, wide: bool = False):
     """Risultato alla risoluzione dell'ORIGINALE (il canvas lo rimette nel suo riquadro) e, fuori dalla
     maschera, l'originale al pixel (il giro nel VAE ammorbidisce i dettagli).
 
@@ -226,7 +269,12 @@ def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8, outpaint: b
     size = init_img.size
     m = Image.open(mask_path).convert("L").resize(size, Image.BILINEAR)
     gen_zone = np.asarray(m) > 127                          # True = rifatto dal modello (prima della sfumatura)
-    if feather:
+    if outpaint and wide and feather:
+        # come il percorso FLUX: la regione generata si dilata nella foto e si sfuma (il tono vicino al bordo e' gia'
+        # quello della foto) -> niente bordo netto a «riquadro». Fuori dalla foto la maschera resta 1.
+        fo = int(round(feather * 1.9))
+        m = m.filter(ImageFilter.MaxFilter(fo * 2 + 1)).filter(ImageFilter.GaussianBlur(fo))
+    elif feather:
         m = m.filter(ImageFilter.GaussianBlur(feather))
     gen = gen_img.resize(size, Image.LANCZOS)
     base = init_img.convert(gen.mode)
@@ -275,15 +323,7 @@ def run(p: dict) -> str:
     init_img = Image.open(init_path) if init_path else None
     if mask_path and init_img is None:
         raise RuntimeError("Inpaint Qwen-Image 2.1: manca l'immagine da ritoccare")
-    if init_img is not None and mask_path and p.get("outpaint"):
-        # Task 16a: il frame del canvas ha l'estensione scura uniforme; qui diventa il riferimento 1 → il modello
-        # vede «una foto in una cornice nera» e la disegna (riga scura attorno all'originale). Si dà invece un
-        # riempimento plausibile (specchio sfocato + campo liscio + grana): i pixel della foto restano identici.
-        from core import outpaint_prefill
-        if outpaint_prefill.enabled():
-            init_img = outpaint_prefill.prefill_from_mask_path(init_img.convert("RGB"), mask_path,
-                                                               seed=int(p.get("seed") or 0))
-            _log("outpaint: estensione pre-riempita (specchio sfocato + campo liscio) invece del riempimento scuro")
+    init_img = _outpaint_init(init_img, mask_path, p)
     images = [Image.open(x) for x in refs]
     prompt = str(p.get("prompt") or "")
     if init_img is not None and mask_path:
@@ -366,6 +406,7 @@ def run(p: dict) -> str:
     if init_img is not None:
         strength = float(p["strength"]) if p.get("strength") is not None else \
             (1.0 if mask_path else DEFAULT_STRENGTH)
+        strength = _outpaint_strength(strength, p) if mask_path else strength
         x0, (lh, lw) = _encode_init(pipe, init_img, kw["width"], kw["height"], gen)
         sig, s0 = _sigmas(pipe, steps, turbo_ckpt, x0.shape[1], strength)
         noise = torch.randn(x0.shape, generator=gen, device="cuda", dtype=x0.dtype)
@@ -393,8 +434,8 @@ def run(p: dict) -> str:
         img = img.convert("RGB")
     if init_img is not None and mask_path and p.get("paste_back", True):
         img = _paste_back(img, init_img, mask_path,          # sfumatura: 0 = auto, proporzionale alla foto
-                          feather=int(p.get("feather") or 0) or max(4, min(init_img.size) // 128),
-                          outpaint=bool(p.get("outpaint")))
+                          feather=_outpaint_feather(init_img.size, p),
+                          outpaint=bool(p.get("outpaint")), wide=_wide_outpaint(p))
     out = p.get("output") or str(REPO / "output" / f"qwen21_{int(time.time())}.png")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     img.save(out)
