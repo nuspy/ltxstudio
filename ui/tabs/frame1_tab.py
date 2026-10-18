@@ -790,22 +790,29 @@ class Frame1Tab(QWidget):
         self._f3_box.setVisible(on)
 
     def _on_flux3_changed(self, *_):
-        """FLUX.3 distillato: 16 passi (4–16), niente guidance né negative → quei campi si bloccano con la spiegazione."""
+        """FLUX.3 distillato: 16 passi (4–16), niente guidance né negative → quei campi si bloccano con la spiegazione. Uscendo
+        da FLUX.3 si sbloccano e si riapplica la logica dell'architettura scelta (es. Qwen Turbo)."""
         if not hasattr(self, "gen_cfg") or not hasattr(self, "gen_neg"):
             return
         from core import flux3_spec as S3
         on = self.gen_arch.currentText() == "FLUX.3 Klein"
+        locked = getattr(self, "_f3_locked", False)
         if on:
             self.gen_steps.setRange(S3.MIN_STEPS, S3.MAX_STEPS)
             self.gen_steps.setValue(S3.DEFAULT_STEPS)
-        else:
+            fixed = tr("f1.flux3.cfg_fixed", "FLUX.3 distillato campiona senza guidance (CFG) e senza prompt negativo.")
+            for w in (self.gen_cfg, self.gen_neg):
+                w.setEnabled(False)
+                w.setToolTip(fixed)
+            self._f3_locked = True
+        elif locked:
+            self._f3_locked = False
             self.gen_steps.setRange(1, 80)
-        fixed = tr("f1.flux3.cfg_fixed", "FLUX.3 distillato campiona senza guidance (CFG) e senza prompt negativo.")
-        for w, tip in ((self.gen_cfg, tr("f1.gen.cfg.tt", "Guidance (CFG): quanto l'immagine aderisce al prompt; valori troppo alti creano artefatti.")),
-                       (self.gen_neg, tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))):
-            if w is self.gen_cfg or self.gen_arch.currentText() != "Qwen-Image 2.1":
-                w.setEnabled(not on)
-                w.setToolTip(fixed if on else tip)
+            self.gen_cfg.setEnabled(True)
+            self.gen_cfg.setToolTip(tr("f1.gen.cfg.tt", "Guidance (CFG): quanto l'immagine aderisce al prompt; valori troppo alti creano artefatti."))
+            self.gen_neg.setEnabled(True)
+            self.gen_neg.setToolTip(tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))
+            self._on_qwen21_dit_changed()
 
     def _flux3_items(self):
         return [(cid, tr(k, fb)) for cid, k, fb in FLUX3_PROFILES]

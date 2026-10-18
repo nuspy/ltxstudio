@@ -15,8 +15,11 @@ from __future__ import annotations
 import gc
 import io
 import json
+import os
 import time
 from pathlib import Path
+
+DEV = os.environ.get("FLUX3_DEVICE", "cuda")        # solo i test su CPU (modello minuscolo) lo cambiano
 
 
 def _log(m: str) -> None:
@@ -68,9 +71,9 @@ def load(weights: str, cfg_dir: str, want_vision: bool = True):
         model = AutoModelForImageTextToText.from_config(cfg, dtype=torch.bfloat16)
     if str(weights).lower().endswith(".gguf"):
         import flux3_gguf
-        sd, vision = flux3_gguf.read_state(weights, "cuda"), False
+        sd, vision = flux3_gguf.read_state(weights, DEV), False
     else:
-        sd, vision = Q.read_safetensors(weights, "cuda"), True
+        sd, vision = Q.read_safetensors(weights, DEV), True
     if not vision:                                         # solo linguaggio: la torre visiva non c'è nel file
         model.model.visual = torch.nn.Identity()
     miss, unex = Q.load_into(model, sd)
@@ -78,10 +81,10 @@ def load(weights: str, cfg_dir: str, want_vision: bool = True):
     if miss or unex:
         raise RuntimeError(f"upsampler: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     del sd
-    model = model.to("cuda").eval()
+    model = model.to(DEV).eval()
     proc = AutoProcessor.from_pretrained(cfg_dir)
     prompts = json.loads((Path(cfg_dir) / "system_prompts.json").read_text("utf-8"))
-    _log(f"pronto in {time.time() - t0:.0f}s — VRAM {torch.cuda.memory_allocated() / 2**30:.1f} GB"
+    _log(f"pronto in {time.time() - t0:.0f}s — VRAM {(torch.cuda.memory_allocated() / 2**30) if DEV.startswith('cuda') else 0.0:.1f} GB"
          + ("" if vision else " (solo linguaggio: niente lettura dei riferimenti)"))
     model._flux3_vision = vision
     return model, proc, prompts
@@ -132,4 +135,5 @@ def run(weights: str, cfg_dir: str, prompt: str, images, rows) -> str:
     finally:
         del model, proc
         gc.collect()
-        torch.cuda.empty_cache()
+        if DEV.startswith("cuda"):
+            torch.cuda.empty_cache()

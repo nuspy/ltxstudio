@@ -168,6 +168,11 @@ MODEL_SYNTAX: dict[str, dict] = {
 _ORD = ("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth")
 
 
+def format_ref(fmt: str, k: int) -> str:
+    """Sintassi del modello per il k-esimo riferimento (1-based): `{n}` = numero, `{ord}` = ordinale inglese (FLUX.3)."""
+    return fmt.format(n=k, ord=_ORD[k - 1] if 1 <= k <= len(_ORD) else f"{k}th")
+
+
 def translate(prompt: str, order: dict[str, list[int]], style: str) -> str:
     """Sostituisce ogni token (`@Foto_N` o legacy) con la sintassi di `style` per l'immagine k-esima.
 
@@ -183,7 +188,7 @@ def translate(prompt: str, order: dict[str, list[int]], style: str) -> str:
         if k is None or f is None:
             continue
         out.append(prompt[last:t.start])
-        out.append(f.format(n=k, ord=_ORD[k - 1] if 1 <= k <= len(_ORD) else f"{k}th"))
+        out.append(format_ref(f, k))
         last = t.end
     out.append(prompt[last:])
     return "".join(out)
