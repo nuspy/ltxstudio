@@ -88,7 +88,7 @@ def validate(boxes, n_refs: int = 0) -> list[str]:
                 errs.append(f"riquadro {rid or i + 1}: riferimento di origine non valido (1–{n_refs})")
             if _box01(b.get("src_bbox")) is None:
                 errs.append(f"riquadro {rid or i + 1}: serve la zona di origine")
-            if mode in ("move", "anchor") and _box01(b.get("tgt_bbox")) is None:
+            if mode == "move" and _box01(b.get("tgt_bbox")) is None:      # ancora: la destinazione è l'origine stessa
                 errs.append(f"riquadro {rid or i + 1}: serve la zona di destinazione")
             if mode == "move" and _box01(b.get("src_bbox")) and b.get("src_bbox") == b.get("tgt_bbox"):
                 errs.append(f"riquadro {rid or i + 1}: «sposta» con origine = destinazione è «ancora»")

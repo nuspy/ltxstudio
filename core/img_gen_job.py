@@ -28,6 +28,9 @@ _ARCH_RUNNER = {
     "krea2_edit": (_LINGBOT_PY, str(REPO / "workers" / "krea2_infer.py")),
     # Qwen-Image 2.1: t2i + edit fino a 10 riferimenti + RGBA, nel venv condiviso con MiniMax H3 (diffusers main)
     "qwen_image21": (_DIFFUSERS_NEXT_PY, str(REPO / "workers" / "qwen_image21_infer.py")),
+    # FLUX.3 Image Klein (task 13): DiT NATIVO (workers/flux3_dit.py) → gira nello stesso venv condiviso, nessun diffusers
+    # più recente da installare (scripts/install_flux3_venv.py resta come venv di prova con diffusers ≥ 15/10).
+    "flux3": (_DIFFUSERS_NEXT_PY, str(REPO / "workers" / "flux3_infer.py")),
 }
 
 

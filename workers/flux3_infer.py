@@ -77,10 +77,18 @@ def resolve(p: dict, need_pup: bool) -> dict:
     return out
 
 
+def _vram(peak: bool = False) -> float:
+    """GB allocati (o picco) sul device del job; 0 su CPU (test) — mai un contesto CUDA creato per leggere un numero."""
+    if not DEV.startswith("cuda"):
+        return 0.0
+    import torch
+    return (torch.cuda.max_memory_allocated() if peak else torch.cuda.memory_allocated()) / 2 ** 30
+
+
 def _free() -> None:
     import torch
     gc.collect()
-    if torch.cuda.is_available():
+    if DEV.startswith("cuda") and torch.cuda.is_available():
         torch.cuda.empty_cache()
 
 
@@ -140,7 +148,7 @@ def load_text_encoder(te_dir: str):
     te = te.to(DEV).eval()
     proc = AutoProcessor.from_pretrained(te_dir)
     proc.tokenizer.padding_side = "right"
-    _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {torch.cuda.memory_allocated() / 2**30:.1f} GB")
+    _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram():.1f} GB")
     return te, proc
 
 
@@ -200,7 +208,7 @@ def vae_encode(vae, pil):
     """Immagine PIL (lati multipli di 16) → (token (h·w,128), ids (h·w,4)): media, patchify 2×2, BatchNorm del VAE."""
     import numpy as np
     import torch
-    x = torch.from_numpy(np.asarray(pil)).permute(2, 0, 1).float().div(127.5).sub(1.0).to(DEV)[None]
+    x = torch.from_numpy(np.array(pil)).permute(2, 0, 1).float().div(127.5).sub(1.0).to(DEV)[None]
     with torch.inference_mode():
         mean = vae.encode(x).latent_dist.mean                                         # (1, 32, H/8, W/8)
         hh, ww = mean.shape[2] // 2, mean.shape[3] // 2
@@ -236,13 +244,13 @@ def load_dit(path: str):
     model = D.load_state(model, state, DEV)
     import torch
     _log(f"DiT {'distillato (flow map)' if flow else 'Base (CFG)'}: {model._n_fp8} Linear fp8 · pronto in "
-         f"{time.time() - t0:.0f}s — VRAM {torch.cuda.memory_allocated() / 2**30:.1f} GB")
+         f"{time.time() - t0:.0f}s — VRAM {_vram():.1f} GB")
     return model
 
 
 # ── LoRA ─────────────────────────────────────────────────────────────────────────────────────────────────
 _DIFF_TO_NATIVE = (
-    ("mode_blocks.", "content_mode_blocks."), ("single_transformer_blocks.", "single_blocks."),
+    ("single_transformer_blocks.", "single_blocks."),
     (".attn.to_q", ".q_proj"), (".attn.to_k", ".k_proj"), (".attn.to_v", ".v_proj"), (".attn.to_out.0", ".attn_out"),
     (".ff.linear_in", ".mlp_in"), (".ff.linear_out", ".mlp_out"),
     ("x_embedders.", "emb_in."), ("context_embedder", "txt_in"),
@@ -251,6 +259,16 @@ _DIFF_TO_NATIVE = (
     ("target_timestep_embedder.linear_2", "ref_time_in.out_layer"), ("proj_out", "final_layer.image.linear"),
 )
 _LORA_PREFIXES = ("diffusion_model.", "base_model.model.transformer.", "base_model.model.", "transformer.")
+_MODE_BLOCKS = __import__("re").compile(r"(?<![A-Za-z_])mode_blocks\.")      # NON dentro «txt_mode_blocks» né «content_mode_blocks»
+
+
+def _native_name(name: str) -> str:
+    """Nome di modulo diffusers/SimpleTuner → nome nativo BFL (i nomi già nativi passano invariati)."""
+    name = _MODE_BLOCKS.sub("content_mode_blocks.", name)
+    for a, b in _DIFF_TO_NATIVE:
+        name = name.replace(a, b)
+    return name
+
 
 
 def lora_pairs(sd: dict) -> dict:
@@ -270,16 +288,13 @@ def lora_pairs(sd: dict) -> dict:
                 name, slot = k[:-len(tag_b)], "B"
             else:
                 continue
-            for a, b in _DIFF_TO_NATIVE:
-                name = name.replace(a, b)
+            name = _native_name(name)
             ent = out.setdefault(name, {})
             ent[slot] = v
             break
         else:
             if k.endswith(".alpha"):
-                name = k[:-len(".alpha")]
-                for a, b in _DIFF_TO_NATIVE:
-                    name = name.replace(a, b)
+                name = _native_name(k[:-len(".alpha")])
                 out.setdefault(name, {})["alpha"] = float(v)
     return {n: (e["A"], e["B"], e.get("alpha")) for n, e in out.items() if "A" in e and "B" in e}
 
@@ -480,7 +495,7 @@ def run(p: dict) -> str:
         tokens = D.denoise_flow_map(dit, packed, sched, on_step=tick)
     else:
         raise RuntimeError("FLUX.3 Base: il worker supporta oggi solo il distillato (il Base serve all'allenamento LoRA)")
-    peak = torch.cuda.max_memory_allocated() / 2 ** 30
+    peak = _vram(peak=True)
     _log(f"denoise {time.time() - t0:.0f}s — picco VRAM {peak:.1f} GB")
     del dit, packed
     _free()

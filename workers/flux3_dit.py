@@ -382,8 +382,7 @@ def denoise_flow_map(dit: DiT, packed: Packed, sched: Tensor, on_step=None) -> T
         t, dt = sched[i].item(), (sched[i + 1] - sched[i]).item()
         packed.timesteps["image"].fill_(t)
         target = sched[i + 1].reshape(1).to(packed.data["image"].device)
-        with torch.autocast(device_type=packed.data["image"].device.type, dtype=torch.bfloat16,
-                            enabled=packed.data["image"].is_cuda):
+        with torch.autocast(device_type=packed.data["image"].device.type, dtype=torch.bfloat16):
             v = dit(packed, timesteps_ref=target)
         packed.data["image"] = packed.data["image"] + dt * v
         if on_step:
@@ -397,8 +396,7 @@ def denoise_cfg(dit: DiT, packed: Packed, sched: Tensor, guidance: float, on_ste
     for i in range(len(sched) - 1):
         t, dt = sched[i].item(), (sched[i + 1] - sched[i]).item()
         packed.timesteps["image"].fill_(t)
-        with torch.autocast(device_type=packed.data["image"].device.type, dtype=torch.bfloat16,
-                            enabled=packed.data["image"].is_cuda):
+        with torch.autocast(device_type=packed.data["image"].device.type, dtype=torch.bfloat16):
             u, c = dit(packed).chunk(2)
         v = u + guidance * (c - u)
         x = packed.data["image"].chunk(2)[0] + dt * v
