@@ -337,6 +337,113 @@ def case_arch_child_error_reaches_dialog(w, spy):
     assert shown and "FLUX.2 Dev" in shown[0] and "Klein" in shown[0] and "Log:" not in shown[0], shown
 
 
+def case_arch_function_menus_overlap(w, spy):
+    """Un modello che sa fare PIU' funzioni compare in TUTTI i menu di quelle funzioni; uno che ne sa fare una sola solo
+    nel suo. FLUX.1 base: Crea + Inpaint. Qwen 2.1: Crea + Inpaint + Integra + Colore. Krea 2 Turbo/Raw: Crea + Integra
+    (motore Krea 2 Edit). Kontext: solo Integra. Klein e Fill: solo Modifica (backend: edit/inpaint richiedono una
+    foto). FLUX.2 Dev: solo Crea."""
+    fx = Fixture(w)
+    try:
+        f = w.frame1_tab
+        f.img_nsfw.setCurrentText("SFW")
+        f.gen_arch.setCurrentText("FLUX")
+        gen = " | ".join(_texts(f.gen_model))
+        inp = " | ".join(f.inp_model.itemText(i) for i in range(f.inp_model.count()))
+        f.integrate_engine.setCurrentIndex(0)
+        kontext = " | ".join(_texts(f.integrate_model, skip_auto=False))
+        f.integrate_engine.setCurrentIndex(1)
+        flux2 = " | ".join(_texts(f.integrate_model, skip_auto=False))
+        assert "flux1_dev_model" in gen and "flux1_dev_model" in inp, "FLUX.1 base deve stare in Crea E in Inpaint"
+        assert "Flux_Kontext_X" in kontext and "Flux_Kontext_X" not in gen and "Flux_Kontext_X" not in inp
+        assert "klein_senza_nome_flux" in flux2 and "klein_senza_nome_flux" in inp and "klein_senza_nome_flux" not in gen
+        assert "FillX" in inp and "FillX" not in gen, "Fill: solo Inpaint"
+        assert "flux2_dev_named" in gen and "flux2_dev_named" not in inp and "flux2_dev_named" not in flux2, \
+            "FLUX.2 Dev: solo Crea (nessuna pipeline di edit/inpaint)"
+        # Qwen-Image 2.1: Crea + Inpaint + Integra + Colore
+        f.gen_arch.setCurrentText("Qwen-Image 2.1")
+        qgen = {f.gen_model.itemData(i) for i in range(f.gen_model.count())} - {None}
+        f.integrate_engine.setCurrentIndex(3)
+        qint = {f.integrate_model.itemData(i) for i in range(f.integrate_model.count())} - {None}
+        f.color_engine.setCurrentIndex(3)
+        qcol = {f.color_model.itemData(i) for i in range(f.color_model.count())} - {None}
+        qinp = set(getattr(f, "_qwen21_inp", {}).values())
+        assert qgen and qgen == qint == qcol == qinp, f"Qwen non uguale nei menu: {qgen} {qint} {qcol} {qinp}"
+        # Krea 2: Turbo/Raw in Crea e nel motore Krea 2 Edit di Integra
+        f.gen_arch.setCurrentText("Krea 2")
+        kgen = {f.gen_model.itemData(i) for i in range(f.gen_model.count())}
+        f.integrate_engine.setCurrentIndex(2)
+        kint = {(f.integrate_model.itemData(i) or {}).get("krea2_variant") for i in range(f.integrate_model.count())}
+        assert {"krea2_turbo", "krea2_raw"} <= kgen and kint == {"turbo", "raw"}, (kgen, kint)
+    finally:
+        fx.close()
+
+
+def case_arch_inpaint_arch_selector(w, spy):
+    """Selettore «Architettura» nel tab Modifica (Inpaint): filtra il menu; la scelta che non appartiene alla nuova
+    architettura diventa «scegli un modello», mai un altro modello."""
+    from ui import model_menu as mm
+    fx = Fixture(w)
+    try:
+        f = w.frame1_tab
+        f.img_nsfw.setCurrentText("SFW")
+        view = f.inp_model.view()
+
+        def visible():
+            return [f.inp_model.itemText(i) for i in range(f.inp_model.count()) if not view.isRowHidden(i)]
+        f.inp_arch.setCurrentIndex(f.inp_arch.findData(""))
+        all_items = visible()
+        assert any("Qwen-Image 2.1" in t for t in all_items) and any("UNET Flux" in t for t in all_items)
+        f.inp_model.setCurrentIndex(f.inp_model.findText("flux1_dev_model  · UNET Flux"))
+        f.inp_arch.setCurrentIndex(f.inp_arch.findData("Qwen21"))
+        vis = visible()
+        assert any("Qwen-Image 2.1" in t for t in vis) and not any("UNET Flux" in t for t in vis), vis
+        assert mm.is_placeholder(f.inp_model), f"scelta FLUX.1 con filtro Qwen: {f.inp_model.currentText()!r}"
+        assert mm.blocked(w, f.inp_model)
+        f.inp_arch.setCurrentIndex(f.inp_arch.findData("Flux2"))
+        vis = visible()
+        assert any("klein_senza_nome_flux" in t for t in vis) and not any("flux1_dev_model" in t or "Qwen" in t for t in vis), vis
+        f.inp_arch.setCurrentIndex(f.inp_arch.findData("Flux"))
+        vis = visible()
+        assert any("flux1_dev_model" in t for t in vis) and not any("klein_senza" in t or "Qwen" in t for t in vis), vis
+        f.inp_arch.setCurrentIndex(f.inp_arch.findData(""))
+        assert len(visible()) >= len(all_items), "«Tutte le architetture» deve ripristinare il menu"
+    finally:
+        fx.close()
+
+
+def case_arch_adult_badge_menus(w, spy):
+    """Icona «vietato ai minori di 18» sui modelli NSFW dei menu Crea e Modifica: icona + tooltip testuale, il testo
+    della voce (nome file usato dai job) NON cambia; i modelli non 18+ non hanno icona."""
+    from PySide6.QtCore import Qt
+    fx = Fixture(w)
+    try:
+        _write_st(fx.root / "diffusion_models" / "Flux" / "xxx_nsfw_flux1.safetensors", FLUX1)
+        f = w.frame1_tab
+        f.set_model_inventory(list(fx.names) + ["Flux\\xxx_nsfw_flux1.safetensors"], [])
+        f.img_nsfw.setCurrentText("NSFW")
+        f.gen_arch.setCurrentText("FLUX")
+
+        def row(combo, needle):
+            i = next(i for i in range(combo.count()) if needle in combo.itemText(i))
+            return i, not combo.itemIcon(i).isNull(), str(combo.itemData(i, Qt.ToolTipRole) or "")
+        i, icon, tip = row(f.gen_model, "xxx_nsfw_flux1")
+        assert icon and "18" in tip, f"Crea: modello NSFW senza icona/tooltip: {icon} {tip!r}"
+        assert f.gen_model.itemText(i).endswith("xxx_nsfw_flux1.safetensors") and "🔞" not in f.gen_model.itemText(i), \
+            "il testo della voce (nome file) non deve cambiare"
+        assert not row(f.gen_model, "flux1_dev_model")[1], "modello non 18+ con icona"
+        i, icon, tip = row(f.inp_model, "xxx_nsfw_flux1")
+        assert icon and "18" in tip, f"Inpaint: modello NSFW senza icona/tooltip: {icon} {tip!r}"
+        assert not row(f.inp_model, "flux1_dev_model")[1]
+        f.gen_arch.setCurrentText("Qwen-Image 2.1")                 # voci di catalogo: sensitivity «adult»
+        adult_ids = [f.gen_model.itemData(i) for i in range(f.gen_model.count())
+                     if not f.gen_model.itemIcon(i).isNull()]
+        assert any(str(c).startswith("qwen21-uc") or "noctq" in str(c) for c in adult_ids), adult_ids
+        i = f.gen_model.findData("qwen21-dit-nvfp4")
+        assert i >= 0 and f.gen_model.itemIcon(i).isNull(), "Qwen base (non 18+) con icona"
+    finally:
+        fx.close()
+
+
 CASES = [
     ("arch_gen_models_by_header", "Genera immagine: FLUX/Z-Image/Ernie mostrano i file della propria famiglia (header), "
      "non quelli con una parola nel nome.", case_arch_gen_models_by_header),
@@ -356,4 +463,10 @@ CASES = [
      case_arch_klein_default_steps),
     ("arch_child_error_reaches_dialog", "L'errore chiaro del backend arriva intero al dialog della GUI.",
      case_arch_child_error_reaches_dialog),
+    ("arch_function_menus_overlap", "Un modello che fa piu' funzioni compare in tutti i loro menu (FLUX.1 base, Qwen, "
+     "Krea 2); Kontext/Klein/Fill solo Modifica; FLUX.2 Dev solo Crea.", case_arch_function_menus_overlap),
+    ("arch_inpaint_arch_selector", "Selettore Architettura in Modifica (Inpaint): filtra il menu, segnaposto se la scelta "
+     "non appartiene.", case_arch_inpaint_arch_selector),
+    ("arch_adult_badge_menus", "Icona 18+ (con tooltip) sui modelli NSFW di Crea e Modifica; testo invariato.",
+     case_arch_adult_badge_menus),
 ]

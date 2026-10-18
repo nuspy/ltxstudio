@@ -3451,5 +3451,9 @@
   "vid.i2v.group": "시작 이미지 (I2V)",
   "vid.tab.generate": "생성",
   "vid.tab.edit": "편집",
-  "vid.tab.tt": "생성: 새 영상을 만듭니다. 편집: 영상이나 사진에 Talk, 노래, 듣기, ReTake, V2V."
+  "vid.tab.tt": "생성: 새 영상을 만듭니다. 편집: 영상이나 사진에 Talk, 노래, 듣기, ReTake, V2V.",
+  "model.adult.tt": "성인 콘텐츠(18+, 미성년자 금지). NSFW 모드와 이를 허용하는 에디션에서만 표시됩니다.",
+  "f1.inpaint.arch_lbl": "아키텍처",
+  "f1.inpaint.arch.all": "모든 아키텍처",
+  "f1.inpaint.arch.tt": "선택한 아키텍처의 모델만 표시합니다. 이전에 고른 모델이 새 아키텍처에 속하지 않으면 메뉴가 «모델 선택»으로 돌아갑니다: 다른 모델이 대신 선택되지 않습니다."
 }

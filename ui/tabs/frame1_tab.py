@@ -468,6 +468,8 @@ class Frame1Tab(QWidget):
                 combo.setItemData(i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB", Qt.ToolTipRole)
         except Exception:                                    # noqa: BLE001
             pass
+        from ui.widgets import adult_badge
+        adult_badge.mark_combo(combo, self._mcat)             # 🔞 sui modelli 18+ (icona + tooltip testuale)
 
     def _color_curated_combo(self, combo, spec: dict, *, key: str = "unet"):
         """Colora le voci di un combo CURATO (label→dict) per fattibilità VRAM (verde/giallo/rosso),
@@ -555,6 +557,10 @@ class Frame1Tab(QWidget):
             self.gen_model.blockSignals(True); self.gen_model.clear()
             self.gen_model.addItem(tr("f1.gen.no_model"), None)
             self.gen_model.blockSignals(False)
+        from ui.widgets import adult_badge
+        adult_badge.mark_combo(
+            self.gen_model, self._mcat,
+            name_of=lambda i: "" if self.gen_model.itemData(i) in ("__auto__", None) else self.gen_model.itemText(i))
         self._update_gen_star()
         # Controlla se il golden template è disponibile per questa arch
         arch_key = {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(arch_lbl, "flux")
@@ -895,6 +901,8 @@ class Frame1Tab(QWidget):
             combo.setItemData(combo.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 combo.setItemData(combo.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        from ui.widgets import adult_badge
+        adult_badge.mark_combo(combo, adult_of=lambda i: (entries.get(combo.itemData(i)) or {}).get("sensitivity") == "adult")
         # scelta sparita (matrice / NSFW): segnaposto «scegli un modello», mai il primo elemento
         mm.settle(combo, prev, {c for c, _l in items})
         combo.blockSignals(False)
@@ -1245,6 +1253,17 @@ class Frame1Tab(QWidget):
             "Sfumatura del bordo tra area rigenerata e originale (px): Auto = proporzionale alla foto; "
             "valori alti = transizione più morbida ma anello di modifica più largo."))
         f.addRow(tr("f1.inpaint.feather_lbl", "Sfumatura bordo (px)"), self.inp_feather)
+        # Selettore ARCHITETTURA anche in Modifica (come in Crea): filtra il menu modello. Integra/Colore/Componi hanno già
+        # il loro «Motore» (Kontext/FLUX.2/Krea 2 Edit/Qwen), che fa da selettore di architettura.
+        self.inp_arch = QComboBox()
+        self.inp_arch.addItem(tr("f1.inpaint.arch.all", "Tutte le architetture"), "")
+        for _lbl, _key in (("FLUX.1", "Flux"), ("FLUX.2 (Klein)", "Flux2"), ("Qwen-Image 2.1", "Qwen21")):
+            self.inp_arch.addItem(_lbl, _key)
+        self.inp_arch.setToolTip(tr("f1.inpaint.arch.tt", "Mostra solo i modelli dell'architettura scelta. Se il "
+                                    "modello scelto prima non appartiene alla nuova architettura il menu torna su "
+                                    "«scegli un modello»: non ne viene scelto un altro al posto tuo."))
+        self.inp_arch.currentIndexChanged.connect(self._apply_inp_arch_filter)
+        f.addRow(tr("f1.inpaint.arch_lbl", "Architettura"), self.inp_arch)
         self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
         self.inp_model.setToolTip(tr("f1.inpaint.model.tt", "Modello usato per inpaint/outpaint (FLUX Fill o checkpoint compatibile)."))
         self._color_curated_combo(self.inp_model, INPAINT_MODELS, key="unet")   # colori VRAM (verde/giallo/rosso)
@@ -1956,6 +1975,8 @@ class Frame1Tab(QWidget):
             mm.settle(self.inp_model, prev_key)
         finally:
             self.inp_model.blockSignals(False)
+        self._mark_inp_adult()
+        self._apply_inp_arch_filter()
 
     def set_inpaint_availability(self, unet_names: list[str]):
         """Marca nel menu i modelli inpaint NON ancora presenti in ComfyUI (es. in download)."""
@@ -2029,8 +2050,67 @@ class Frame1Tab(QWidget):
         else:                                                 # voce spostata/sparita (matrice, SFW, download)
             mm.settle(self.inp_model, prev_key)                # sparita → segnaposto, mai il primo elemento
         self.inp_model.blockSignals(False)
+        self._mark_inp_adult()
+        self._apply_inp_arch_filter()
         if self.inp_model.currentText() != cur:
             self._reload_inpaint_loras()
+
+    def _inp_item_arch(self, i: int) -> str:
+        """Architettura di una voce del menu Inpaint: Qwen21 | Flux2 (Klein) | Flux (FLUX.1) | '' (nessuna: «Nessuno»)."""
+        label = self.inp_model.itemText(i).split("  ⛔")[0]
+        if label in getattr(self, "_qwen21_inp", {}):
+            return "Qwen21"
+        kind = getattr(self, "_dynamic_kind", {}).get(label)
+        if kind:
+            return "Flux2" if kind == "klein" else "Flux"
+        if label in self._dynamic_checkpoints:
+            return "Flux"
+        return (INPAINT_MODELS.get(label) or {}).get("arch") or ""
+
+    def _apply_inp_arch_filter(self, *_):
+        """Nasconde dal menu Inpaint le voci di altre architetture. Se la voce corrente sparisce dal menu compare il
+        segnaposto «scegli un modello» (ui/model_menu): mai un altro modello scelto al posto dell'utente."""
+        if not hasattr(self, "inp_arch") or not hasattr(self, "inp_model"):
+            return
+        from ui import model_menu as mm
+        want = self.inp_arch.currentData() or ""
+        view = self.inp_model.view()
+        for i in range(self.inp_model.count()):
+            d = self.inp_model.itemData(i)
+            ph = d == mm.PLACEHOLDER or (isinstance(d, dict) and d.get("placeholder"))
+            view.setRowHidden(i, bool(want) and not ph and self._inp_item_arch(i) != want)
+        cur = self.inp_model.currentIndex()
+        if cur >= 0 and view.isRowHidden(cur):
+            self.inp_model.blockSignals(True)
+            try:
+                self.inp_model.insertItem(0, mm.placeholder_text(), mm.PLACEHOLDER)
+                self.inp_model.setCurrentIndex(0)
+            finally:
+                self.inp_model.blockSignals(False)
+            self._reload_inpaint_loras()
+
+    def _mark_inp_adult(self) -> None:
+        """🔞 sulle voci 18+ del menu Inpaint/Outpaint: Qwen dal registro pesi (`sensitivity: adult`), le altre da
+        flag di catalogo/override utente, registro pesi e parole del nome del FILE (non del testo della voce)."""
+        if not hasattr(self, "inp_model"):
+            return
+        import os as _os
+        from core import weights_catalog as wc
+        from ui.widgets import adult_badge
+        try:
+            entries = {e["id"]: e for e in wc.load()}
+        except Exception:                                     # noqa: BLE001
+            entries = {}
+
+        def _adult(i: int):
+            label = self.inp_model.itemText(i).split("  ⛔")[0]
+            cid = getattr(self, "_qwen21_inp", {}).get(label)
+            if cid:
+                return (entries.get(cid) or {}).get("sensitivity") == "adult"
+            f = (getattr(self, "_dynamic_unets", {}).get(label)
+                 or (INPAINT_MODELS.get(label) or {}).get("unet") or "")
+            return adult_badge.is_adult_name(_os.path.basename(str(f)) or label, self._mcat) if f else None
+        adult_badge.mark_combo(self.inp_model, self._mcat, adult_of=_adult)
 
     def _sync_klein_te(self, *_):
         """Menu encoder Klein visibile solo con un FLUX.2 Klein 9B (encoder Qwen3-8B) e l'edizione 18+."""

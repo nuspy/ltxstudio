@@ -3451,5 +3451,9 @@
   "vid.i2v.group": "Imagem inicial (I2V)",
   "vid.tab.generate": "Gerar",
   "vid.tab.edit": "Editar",
-  "vid.tab.tt": "Gerar: cria um vídeo novo. Editar: Talk, Cantar, Ouvir, ReTake e V2V sobre um vídeo ou uma foto."
+  "vid.tab.tt": "Gerar: cria um vídeo novo. Editar: Talk, Cantar, Ouvir, ReTake e V2V sobre um vídeo ou uma foto.",
+  "model.adult.tt": "Conteúdo para adultos (18+, proibido para menores). Aparece só no modo NSFW e nas edições que o permitem.",
+  "f1.inpaint.arch_lbl": "Arquitetura",
+  "f1.inpaint.arch.all": "Todas as arquiteturas",
+  "f1.inpaint.arch.tt": "Mostra só os modelos da arquitetura escolhida. Se o modelo escolhido antes não pertence à nova arquitetura, o menu volta para «escolha um modelo»: nenhum outro modelo é escolhido no seu lugar."
 }

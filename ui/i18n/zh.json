@@ -3451,5 +3451,9 @@
   "vid.i2v.group": "起始图像 (I2V)",
   "vid.tab.generate": "生成",
   "vid.tab.edit": "编辑",
-  "vid.tab.tt": "生成:创建新视频。编辑:对视频或照片进行 Talk、唱歌、倾听、ReTake 和 V2V。"
+  "vid.tab.tt": "生成:创建新视频。编辑:对视频或照片进行 Talk、唱歌、倾听、ReTake 和 V2V。",
+  "model.adult.tt": "成人内容(18+,未成年人禁止)。仅在 NSFW 模式及允许该内容的版本中显示。",
+  "f1.inpaint.arch_lbl": "架构",
+  "f1.inpaint.arch.all": "所有架构",
+  "f1.inpaint.arch.tt": "只显示所选架构的模型。如果之前选的模型不属于新架构,菜单会回到“请选择模型”:不会替你选择其他模型。"
 }

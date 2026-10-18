@@ -1119,6 +1119,9 @@ class VideoTab(QWidget):
             _cfg = self._mcat.recommended_cfg(model)
             _note = self._mcat.recommended_note(model)
             _tip_parts = [model, tr("vid.model.tip_type").format(kind=kind)]
+            if is_nsfw:                                      # la 🔞 nel testo non e' l'unico segnale: anche il tooltip
+                from ui.widgets import adult_badge
+                _tip_parts.insert(0, adult_badge.adult_tooltip())
             if _steps is not None:
                 _tip_parts.append(tr("vid.model.tip_steps").format(steps=_steps))
             if _cfg is not None:

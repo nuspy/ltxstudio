@@ -3451,5 +3451,9 @@
   "vid.i2v.group": "Kezdőkép (I2V)",
   "vid.tab.generate": "Létrehozás",
   "vid.tab.edit": "Szerkesztés",
-  "vid.tab.tt": "Létrehozás: új videó készítése. Szerkesztés: Talk, Éneklés, Hallgatás, ReTake és V2V videón vagy fotón."
+  "vid.tab.tt": "Létrehozás: új videó készítése. Szerkesztés: Talk, Éneklés, Hallgatás, ReTake és V2V videón vagy fotón.",
+  "model.adult.tt": "Felnőtt tartalom (18+, kiskorúaknak tilos). Csak NSFW módban és az ezt engedélyező kiadásokban jelenik meg.",
+  "f1.inpaint.arch_lbl": "Architektúra",
+  "f1.inpaint.arch.all": "Minden architektúra",
+  "f1.inpaint.arch.tt": "Csak a kiválasztott architektúra modelljeit mutatja. Ha a korábban választott modell nem tartozik az új architektúrához, a menü visszaáll a „válassz modellt” értékre: helyetted nem választ másik modellt."
 }
