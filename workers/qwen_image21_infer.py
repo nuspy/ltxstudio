@@ -212,16 +212,31 @@ def _latent_mask(mask_path: str, lh: int, lw: int):
     return t.reshape(1, lh * lw, 1).to("cuda", torch.bfloat16)
 
 
-def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8):
+def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8, outpaint: bool = False):
     """Risultato alla risoluzione dell'ORIGINALE (il canvas lo rimette nel suo riquadro) e, fuori dalla
-    maschera, l'originale al pixel (il giro nel VAE ammorbidisce i dettagli)."""
+    maschera, l'originale al pixel (il giro nel VAE ammorbidisce i dettagli).
+
+    Task 14 («effetto cornice»): (1) lo scarto di tono del modello — su TUTTA la tela — si stima sulla zona-foto
+    e si toglie da tutto il generato (core/tone_match.py; NATIVE_OUTPAINT_TONEMATCH=0 lo spegne); (2) in OUTPAINT
+    l'«originale» nell'estensione è il riempimento scuro del canvas: dove la maschera sfumata è < 1 (vicino alla
+    foto) quel nero filtrava nel generato e disegnava una banda scura attorno alla foto → nell'estensione si
+    miscela il generato con se stesso."""
+    import numpy as np
     from PIL import Image, ImageFilter
     size = init_img.size
     m = Image.open(mask_path).convert("L").resize(size, Image.BILINEAR)
+    gen_zone = np.asarray(m) > 127                          # True = rifatto dal modello (prima della sfumatura)
     if feather:
         m = m.filter(ImageFilter.GaussianBlur(feather))
     gen = gen_img.resize(size, Image.LANCZOS)
-    return Image.composite(gen, init_img.convert(gen.mode), m)
+    base = init_img.convert(gen.mode)
+    if gen.mode == "RGB" and os.environ.get("NATIVE_OUTPAINT_TONEMATCH", "1") != "0":
+        from core import tone_match
+        gen = tone_match.harmonize(gen, init_img.convert("RGB"), gen_zone, int(feather) or 8,
+                                   tau_mult=12.0 if outpaint else 6.0, tag="tone-qwen21", log=_log)
+        if outpaint:
+            base = Image.fromarray(np.where(gen_zone[..., None], np.asarray(gen), np.asarray(base)))
+    return Image.composite(gen, base, m)
 
 
 def run(p: dict) -> str:
@@ -369,7 +384,8 @@ def run(p: dict) -> str:
         img = img.convert("RGB")
     if init_img is not None and mask_path and p.get("paste_back", True):
         img = _paste_back(img, init_img, mask_path,          # sfumatura: 0 = auto, proporzionale alla foto
-                          feather=int(p.get("feather") or 0) or max(4, min(init_img.size) // 128))
+                          feather=int(p.get("feather") or 0) or max(4, min(init_img.size) // 128),
+                          outpaint=bool(p.get("outpaint")))
     out = p.get("output") or str(REPO / "output" / f"qwen21_{int(time.time())}.png")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     img.save(out)

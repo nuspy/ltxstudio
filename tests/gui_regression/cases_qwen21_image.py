@@ -232,6 +232,27 @@ def case_qwen21_inpaint_mask(w, spy):
     assert w._inpaint_mode == "inpaint", "il risultato deve tornare nel suo riquadro (bbox)"
 
 
+def case_qwen21_outpaint_flag(w, spy):
+    """Outpaint con Qwen: al worker arriva `outpaint` (riempimento dell'estensione + tono globale, task 14);
+    l'inpaint NON lo porta."""
+    f = w.frame1_tab
+    H.load_canvas_image(w)
+    cv = f.canvas
+    cv.set_aspect(int(cv.aspect_w * 1.4) // 8 * 8, int(cv.aspect_h * 1.4) // 8 * 8)   # bordo da estendere
+    label = next((l for l, d in f._qwen21_inp.items() if d == "qwen21-dit-nvfp4"), None)
+    assert label, f"voce Qwen assente dal combo Inpaint: {list(f._qwen21_inp)}"
+    f.inp_model.setCurrentIndex(f.inp_model.findText(label))
+    f.outpaint_prompt.setPlainText("the same scene continues to the sides")
+    assert cv.has_outpaint_area(), "manca area da estendere"
+    p = _run(w, spy, lambda: w.generate_inpaint("outpaint"))
+    assert p["arch"] == "qwen_image21" and p.get("mask_path") and p.get("outpaint") is True, p
+    spy.calls.clear()
+    f.inpaint_prompt.setPlainText("a red vintage scooter")
+    _mask(cv)
+    q = _run(w, spy, lambda: w.generate_inpaint("inpaint"))
+    assert q["arch"] == "qwen_image21" and "outpaint" not in q, q
+
+
 CASES = [
     ("qwen21_panel_visibility", "Il pannello Qwen compare solo con quell'arch; in SFW 3 DiT base + 2 Turbo; 40/1.0.",
      case_qwen21_panel_visibility),
@@ -258,6 +279,8 @@ CASES = [
      case_qwen21_i2i_to_reference),
     ("qwen21_inpaint_mask", "Inpaint: voce Qwen nel combo modelli → foto + maschera + forza al worker.",
      case_qwen21_inpaint_mask),
+    ("qwen21_outpaint_flag", "Outpaint Qwen: il worker riceve `outpaint` (riempimento estensione + tono globale); "
+     "l'inpaint no.", case_qwen21_outpaint_flag),
 ]
 
 

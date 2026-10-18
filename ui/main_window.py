@@ -4490,6 +4490,8 @@ class MainWindow(QMainWindow):
         if mask:
             params["mask_path"] = mask
             params["feather"] = int(feather or 0)
+            if mode == "outpaint":
+                params["outpaint"] = True       # il worker: riempimento dell'estensione + tono globale (task 14)
         else:                                  # risultato alla risoluzione e al rapporto del canvas (mai stirato);
             v = self.video_tab.get_values()    # con la maschera vale il ritaglio del canvas, rimesso al pixel
             self._clamp_resolution(v)
