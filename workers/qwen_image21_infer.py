@@ -246,13 +246,11 @@ def _outpaint_feather(size, p: dict) -> int:
     return max(4, min(size) // 128)
 
 
-def _outpaint_strength(strength: float, p: dict) -> float:
-    """Outpaint: forza ridotta (core.outpaint_prefill.OUTPAINT_STRENGTH, 0,9) così la schedule parte dal frame
-    pre-riempito rumorato e non da rumore puro. Solo outpaint e solo con il prefill attivo."""
-    if not p.get("outpaint"):
-        return strength
-    from core import outpaint_prefill
-    return outpaint_prefill.outpaint_strength(strength) if outpaint_prefill.enabled() else strength
+# NB (task 16a, prova live 18/10): per Qwen la forza in OUTPAINT resta 1,0 (a differenza di FLUX base/Klein, cap 0,9).
+# Con forza < 1 i latenti partono da s0*rumore + (1-s0)*x0 con x0 = frame pre-riempito e la schedule salta i primi passi
+# (_sigmas): Qwen, a CFG 1, ridipinge pochissimo e l'estensione restava il pre-riempimento sfocato a macchie.
+# A 1,0 s0 = 1 → i latenti partono da RUMORE PIENO ovunque; fuori maschera li forza _keep_outside (originale rumorato),
+# dentro (l'estensione) decide il modello. Il pre-riempimento agisce quindi SOLO come riferimento 1 (annotato in rosso).
 
 
 def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8, outpaint: bool = False, wide: bool = False):
@@ -406,7 +404,6 @@ def run(p: dict) -> str:
     if init_img is not None:
         strength = float(p["strength"]) if p.get("strength") is not None else \
             (1.0 if mask_path else DEFAULT_STRENGTH)
-        strength = _outpaint_strength(strength, p) if mask_path else strength
         x0, (lh, lw) = _encode_init(pipe, init_img, kw["width"], kw["height"], gen)
         sig, s0 = _sigmas(pipe, steps, turbo_ckpt, x0.shape[1], strength)
         noise = torch.randn(x0.shape, generator=gen, device="cuda", dtype=x0.dtype)
