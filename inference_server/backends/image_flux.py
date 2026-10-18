@@ -2050,6 +2050,13 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
     if type(pipe).__name__ == "FluxInpaintPipeline":
         kw["strength"] = float(params.get("denoise") or 0.9)
         kw["guidance_scale"] = min(float(kw.get("guidance_scale", 3.5)), 5.0)
+        if params.get("outpaint"):
+            # Task 16a — a strength 1.0 la schedule parte da rumore puro: il pre-riempimento non arriva al modello e
+            # l'estensione e' un'altra scena (live 18/10, O2). In outpaint: min(denoise, 0.9) (env NATIVE_OUTPAINT_STRENGTH).
+            from core import outpaint_prefill as _opf3
+            if _opf3.enabled():
+                kw["strength"] = _opf3.outpaint_strength(kw["strength"])
+                print(f"[outpaint-prefill] FluxInpaintPipeline: strength outpaint {kw['strength']:.2f}", flush=True)
     # Task 16a — Klein outpaint: la GUI manda denoise=1.0 ma la pipeline Klein usa `strength` (default 0.8, non 1): la schedule
     # partiva dal frame rumorato all'80% e il buio dell'estensione (bassa frequenza) sopravviveva. Qui denoise → strength.
     if type(pipe).__name__ == "Flux2KleinInpaintPipeline" and params.get("outpaint"):
