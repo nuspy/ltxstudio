@@ -715,10 +715,18 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     # perdita accettata. Disattivabile con NATIVE_FLUX1_FP8=0 (fallback bf16 pieno, come prima).
     if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf:
         try:
+            # Task 16b (A/B, default INVARIATO): il skip di default di FluxTransformer2DModel e' SOLO ("pos_embed","norm"):
+            # x_embedder (anche i token della foto di riferimento di Kontext), context_embedder, time_text_embed
+            # (timestep+guidance embedder) e proj_out finiscono in fp8 e4m3 (errore relativo misurato 2.7-5%, guidance_in 4.7%),
+            # contrariamente a quanto diceva il vecchio commento. NATIVE_FLUX_FP8_KEEP_BF16=1 li tiene in bf16 (~50 MB in piu').
+            _skip = ("pos_embed", "norm", "x_embedder", "context_embedder", "time_text_embed", "proj_out") \
+                if os.environ.get("NATIVE_FLUX_FP8_KEEP_BF16") == "1" else None
             tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn,
-                                        compute_dtype=bf16)   # skip default: norm/embed restano bf16
+                                        compute_dtype=bf16, skip_modules_pattern=_skip)
             tr._ls_fp8_storage = True
             _src = "fp8-nativo" if _flux_fp8_e4m3(transformer_path) else "bf16→fp8"
+            if _skip is not None:
+                _src += " + embedder/proj_out bf16"
             print(f"[flux] transformer STORAGE fp8 (layerwise, {_src}): ~metà VRAM, niente offload", flush=True)
         except Exception as e:                           # noqa: BLE001
             print(f"[flux] layerwise fp8 non applicato ({e}) → bf16 (fallback)", flush=True)
@@ -2091,6 +2099,24 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             kw["callback_on_step_end_tensor_inputs"] = ["latents"]
         except Exception as _dde:                            # noqa: BLE001
             print(f"[diffdiff] disattivata ({_dde}) → inpaint normale", flush=True)
+    # Task 16b — interruttori DIAGNOSTICI (default spenti = comportamento invariato), per i test Kontext Q5-E2/E3:
+    # NATIVE_VAE_FP32=1 + Kontext: il VAE fp32 (wrapper di _assemble_flux) restituisce latenti della foto di riferimento in fp32;
+    # la pipeline li concatena a quelli bf16 e il transformer riceverebbe fp32 (mismatch col layerwise fp8) -> li riporta a bf16.
+    if os.environ.get("NATIVE_VAE_FP32") == "1" and hasattr(pipe, "_encode_vae_image") \
+            and not getattr(pipe, "_ls_enc_cast", False):
+        _enc0 = pipe._encode_vae_image
+        pipe._encode_vae_image = lambda *a, **k: _enc0(*a, **k).to(torch.bfloat16)
+        pipe._ls_enc_cast = True
+        print("[flux] VAE fp32: latenti di riferimento riportati a bf16 dopo l'encode", flush=True)
+    # NATIVE_T5_RELEASE_AFTER_ENCODE=1: T5/CLIP tornano in RAM subito dopo l'encode del prompt. Serve al transformer bf16 (22.9 GB)
+    # residente (STICKY): senza questo T5 resta in VRAM durante il denoise (nel Q5-C: alloc 31.9 GB -> spill nella shared-RAM, 128 s/step).
+    if os.environ.get("NATIVE_T5_RELEASE_AFTER_ENCODE") == "1":
+        for _tn in ("text_encoder", "text_encoder_2"):
+            _tm = getattr(pipe, _tn, None)
+            if _tm is not None and not getattr(_tm, "_ls_release_hook", False):
+                _tm.register_forward_hook(lambda m, i, o: (m.to("cpu"), torch.cuda.empty_cache(), None)[-1])
+                _tm._ls_release_hook = True
+        print("[flux] T5/CLIP: rilascio in RAM dopo l'encode (NATIVE_T5_RELEASE_AFTER_ENCODE=1)", flush=True)
     _step(f"GEN START pipe() — encode prompt+embedding → {kw.get('num_inference_steps','?')} step denoise → VAE decode")
     _vae = getattr(pipe, "vae", None)                       # cronometro del VAE decode (sotto-fase interna a pipe())
     _orig_dec = getattr(_vae, "decode", None)
