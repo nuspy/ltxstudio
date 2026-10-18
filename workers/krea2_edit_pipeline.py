@@ -17,11 +17,13 @@ del pack ComfyUI, senza ComfyUI:
 Riferimenti verbatim: `diffusers.pipelines.krea2.pipeline_krea2.Krea2Pipeline` (pack/position_ids/loop) e
 `diffusers.pipelines.qwenimage.pipeline_qwenimage_edit._get_qwen_prompt_embeds` (immagine→text-encoder).
 
-Nota: lo snapshot Krea 2 porta `tokenizer` ma NON un image-processor → il processor Qwen-VL viene costruito
-al volo; se non disponibile si degrada a encode text-only (il canale aspetto regge comunque l'edit).
+Nota: lo snapshot Krea 2 porta `tokenizer` ma NON un image-processor: il processor Qwen3-VL e' costruito
+localmente (config in `workers/qwen3vl_processor/`, niente rete); se manca l'edit si ferma con un errore
+(`KREA2_EDIT_ALLOW_TEXT_ONLY=1` ripristina il vecchio degrado a solo-testo, che produce una scena NUOVA).
 """
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import numpy as np
@@ -56,34 +58,35 @@ class Krea2EditPipeline(Krea2Pipeline):
 
     # ---------------------------------------------------------------- processor Qwen-VL (grounded)
     def _get_processor(self):
-        """Costruisce/carica un processor Qwen-VL per dare l'immagine al text-encoder. Ritorna None se
-        non disponibile (→ fallback text-only)."""
+        """Processor Qwen3-VL per dare l'immagine al text-encoder, costruito SENZA rete (il worker gira con
+        HF_HUB_OFFLINE=1): tokenizer dello snapshot + image/video processor dalle due config in
+        `workers/qwen3vl_processor/` (Qwen3-VL: patch 16, merge 2 - le stesse del text-encoder dello snapshot).
+        Prima del task 16b si tentava `AutoProcessor.from_pretrained('Qwen/Qwen3-VL-4B-Instruct')` dall'hub:
+        offline falliva e l'edit degradava IN SILENZIO a solo-testo (= scena nuova al posto della modifica).
+        Ritorna None solo se tutto fallisce; `grounded_text_hidden_states` allora solleva un errore chiaro."""
         if self._edit_processor_tried:
             return self._edit_processor
         self._edit_processor_tried = True
+        errs: list[str] = []
         try:
-            from transformers import AutoProcessor
-            # 1) prova a costruirlo dallo stesso repo del text-encoder (config baked se presente)
-            name = getattr(self.text_encoder.config, "_name_or_path", "") or ""
-            proc = None
-            for cand in (name, "Qwen/Qwen3-VL-4B-Instruct", "Qwen/Qwen2-VL-2B-Instruct"):
-                if not cand:
+            from transformers import AutoImageProcessor, AutoVideoProcessor, Qwen3VLProcessor
+            here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qwen3vl_processor")
+            for d in (os.environ.get("KREA2_PROCESSOR_DIR", ""), here):
+                if not d or not os.path.isfile(os.path.join(d, "preprocessor_config.json")):
                     continue
                 try:
-                    proc = AutoProcessor.from_pretrained(cand, trust_remote_code=True)
-                    break
-                except Exception:                                # noqa: BLE001
-                    continue
-            if proc is not None and self.tokenizer is not None:
-                # usa il tokenizer dello snapshot (allineato ai pesi) ma l'image-processor del processor
-                try:
-                    proc.tokenizer = self.tokenizer
-                except Exception:                                # noqa: BLE001
-                    pass
-            self._edit_processor = proc
-        except Exception:                                        # noqa: BLE001
-            self._edit_processor = None
-        return self._edit_processor
+                    self._edit_processor = Qwen3VLProcessor(
+                        image_processor=AutoImageProcessor.from_pretrained(d),
+                        video_processor=AutoVideoProcessor.from_pretrained(d), tokenizer=self.tokenizer)
+                    print(f"[krea2-edit] processor Qwen3-VL locale: {d}", flush=True)
+                    return self._edit_processor
+                except Exception as ex:                          # noqa: BLE001
+                    errs.append(f"{d}: {ex}")
+        except Exception as ex:                                  # noqa: BLE001
+            errs.append(str(ex))
+        self._edit_processor_error = "; ".join(errs) or "config del processor non trovate"
+        self._edit_processor = None
+        return None
 
     # ---------------------------------------------------------------- canale semantica (grounded encode)
     def grounded_text_hidden_states(
@@ -100,8 +103,15 @@ class Krea2EditPipeline(Krea2Pipeline):
         prompt = [prompt] if isinstance(prompt, str) else prompt
         proc = self._get_processor() if images else None
 
+        if images and proc is None:
+            # MAI degradare in silenzio a solo-testo: senza il canale immagine il modello inventa una scena nuova
+            # dal testo (visto nel test Q4 del 18/10: due donne in studio invece della foto modificata).
+            if os.environ.get("KREA2_EDIT_ALLOW_TEXT_ONLY") == "1":
+                print("[krea2-edit] ATTENZIONE: processor Qwen3-VL assente -> encode SOLO TESTO", flush=True)
+                return self.get_text_hidden_states(prompt, max_sequence_length, device)
+            raise RuntimeError("Krea 2 Edit: processor Qwen3-VL non disponibile ("
+                               + str(getattr(self, "_edit_processor_error", "?")) + ")")
         if proc is None:
-            # nessun canale immagine: usa la strada text-only nativa di Krea 2
             return self.get_text_hidden_states(prompt, max_sequence_length, device)
 
         # ridimensiona le immagini a lato lungo = grounding_px (area) come nel pack ComfyUI
@@ -122,6 +132,8 @@ class Krea2EditPipeline(Krea2Pipeline):
             attention_mask=model_inputs["attention_mask"],
             pixel_values=model_inputs.get("pixel_values"),
             image_grid_thw=model_inputs.get("image_grid_thw"),
+            # transformers >= 5: senza mm_token_type_ids il Qwen3-VL rifiuta l'input multimodale (mRoPE)
+            **({"mm_token_type_ids": model_inputs["mm_token_type_ids"]} if "mm_token_type_ids" in model_inputs else {}),
             output_hidden_states=True,
         )
         # Krea 2 impila PIÙ layer (num_text_layers) → mantieni la stessa forma del t2i
@@ -130,10 +142,20 @@ class Krea2EditPipeline(Krea2Pipeline):
         )
         attention_mask = model_inputs["attention_mask"].bool()
         # scarta il prefisso di sistema (i token immagine restano: sono parte del grounding)
-        drop = self.prompt_template_encode_start_idx
+        # Il prefisso da scartare e' quello del TEMPLATE USATO qui (_GROUND_SYS = 64 token), non i 34 del t2i
+        # (prompt_template_encode_start_idx): con 34 restavano 30 token di istruzione di sistema nel condizionamento.
+        drop = self._ground_drop()
         hidden_states = hidden_states[:, drop:]
         attention_mask = attention_mask[:, drop:]
         return hidden_states, attention_mask
+
+    def _ground_drop(self) -> int:
+        """Numero di token del prefisso di sistema del template grounded (misurato col tokenizer dello snapshot)."""
+        d = getattr(self, "_ground_drop_n", None)
+        if d is None:
+            d = len(self.tokenizer(_GROUND_SYS).input_ids)
+            self._ground_drop_n = d
+        return d
 
     @staticmethod
     def _resize_grounding(image, grounding_px: int):
