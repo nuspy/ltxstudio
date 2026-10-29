@@ -3557,5 +3557,15 @@
   "f3.box.ok": "{n} recuadros listos",
   "feat.cap.image_flux3": "FLUX.3 Image Klein (crear, editar por instrucción, hasta 10 referencias)",
   "feat.cap.flux3_boxes": "Recuadros FLUX.3 (diseño en Crear; nuevo/mover/anclar/quitar en Edición)",
-  "feat.cap.flux3_upsampler": "Upsampler de prompts FLUX.3 (Qwen3.5-9B, recomendado por BFL)"
+  "feat.cap.flux3_upsampler": "Upsampler de prompts FLUX.3 (Qwen3.5-9B, recomendado por BFL)",
+  "f1.flux3.te": "Codificador de texto",
+  "f1.flux3.te.auto": "Automático (Krea2 uncensored si está)",
+  "f1.flux3.te.krea2": "Krea2 uncensored fp8 (4,8 GB)",
+  "f1.flux3.te.official": "Oficial bf16 (8,9 GB)",
+  "f1.flux3.te.tt": "Codificador de texto (Qwen3-VL-4B): se prefiere el Krea2 uncensored fp8 que ya está en disco (4,8 GB); el oficial bf16 (8,9 GB) queda como alternativa. Cambian las palabras que el modelo «entiende»: compara con la misma semilla.",
+  "weights.license.ack.title.generic": "Licencia y avisos",
+  "weights.license.ack.q": "¿Lo has leído y quieres descargar?",
+  "weights.license.ack.body.nc": "Estos pesos tienen una licencia que NO permite el uso comercial ({license}). Se descargan solo para uso personal/no comercial, respetando las condiciones del autor. No forman parte del instalador: los descargas tú, bajo tu responsabilidad.",
+  "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs): el uso comercial de los resultados solo se permite si tus ingresos anuales brutos (con afiliadas) son inferiores a 5 millones de dólares, con filtro o revisión de contenidos y declaración de uso de IA; está prohibido usar modelo, derivados o resultados para entrenar otros modelos de imagen. Antes debes haber aceptado la licencia en Hugging Face con tu cuenta. Los pesos no están en el instalador: los descargas tú.",
+  "weights.license.ack.body.adult_content": "ATENCIÓN, solo para adultos (not-for-all-audiences): este modelo fue modificado por terceros para rechazar menos y puede producir textos para contenido explícito. Eres responsable de lo que generas y de las leyes que te afectan; están prohibidos los contenidos ilegales y las imágenes íntimas no consentidas."
 }

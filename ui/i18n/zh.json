@@ -3557,5 +3557,15 @@
   "f3.box.ok": "{n} 个区域框已就绪",
   "feat.cap.image_flux3": "FLUX.3 Image Klein（创建、指令式编辑、最多 10 张参考图）",
   "feat.cap.flux3_boxes": "FLUX.3 区域框（创建时布局；编辑时新增/移动/锚定/移除）",
-  "feat.cap.flux3_upsampler": "FLUX.3 提示词上采样器（Qwen3.5-9B，BFL 推荐）"
+  "feat.cap.flux3_upsampler": "FLUX.3 提示词上采样器（Qwen3.5-9B，BFL 推荐）",
+  "f1.flux3.te": "文本编码器",
+  "f1.flux3.te.auto": "自动（有则使用 Krea2 无审查版）",
+  "f1.flux3.te.krea2": "Krea2 无审查版 fp8（4.8GB）",
+  "f1.flux3.te.official": "官方 bf16（8.9GB）",
+  "f1.flux3.te.tt": "文本编码器（Qwen3-VL-4B）：优先使用磁盘上已有的 Krea2 无审查版 fp8（4.8GB）；官方 bf16（8.9GB）作为备选。它们会改变模型“理解”的词语：请用相同种子对比。",
+  "weights.license.ack.title.generic": "许可证与提示",
+  "weights.license.ack.q": "已阅读并要下载吗？",
+  "weights.license.ack.body.nc": "这些权重的许可证不允许商业使用（{license}）。仅限个人/非商业用途下载，并遵守作者条款。它们不属于安装程序：由你自行下载并自负责任。",
+  "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0（Black Forest Labs）：仅当你的年总收入（含关联公司）低于 500 万美元，并进行内容过滤或审核且声明使用 AI 时，才可将输出用于商业；禁止用模型、衍生品或输出训练其他图像模型。你必须先用自己的账号在 Hugging Face 上接受许可证。权重不在安装程序中：由你自行下载。",
+  "weights.license.ack.body.adult_content": "注意，仅限成人（not-for-all-audiences）：该模型由第三方修改以减少拒绝，可能为露骨内容生成文本。你需对自己生成的内容及适用法律负责；禁止非法内容和未经同意的私密图像。"
 }

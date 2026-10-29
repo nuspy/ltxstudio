@@ -3206,7 +3206,8 @@ class MainWindow(QMainWindow):
                                                control=bool(cfg.get("control_image"))):
                 return
         if cfg.get("arch") == "flux3" and not self._flux3_preflight(cfg.get("flux3_dit"), cfg.get("flux3_pup", True),
-                                                                     cfg.get("boxes"), len(cfg.get("ref_images") or [])):
+                                                                     cfg.get("boxes"), len(cfg.get("ref_images") or []),
+                                                                     cfg.get("flux3_te", "")):
             return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
@@ -3353,7 +3354,7 @@ class MainWindow(QMainWindow):
                   "krea2_te": cfg.get("krea2_te"),             # Krea 2: text encoder single-file (uncensored)
                   # Qwen-Image 2.1: DiT, turbo, encoder, RGBA, formato 2K, riferimenti (≤10), img2img
                   **{k: cfg[k] for k in ("qwen21_dit", "qwen21_turbo", "qwen21_te", "transparent",
-                                         "flux3_dit", "flux3_pup", "boxes",
+                                         "flux3_dit", "flux3_pup", "flux3_te", "boxes",
                                          "aspect_2k", "ref_images", "init_image", "strength",
                                          "qwen21_pe", "qwen21_pe_think", "control_image", "control_type",
                                          "control_scale", "control_preprocess") if k in cfg},
@@ -4670,14 +4671,21 @@ class MainWindow(QMainWindow):
                       self._on_native_inpaint_done)
 
     # ── FLUX.3 Image Klein (task 13): crea / modifica per istruzione / multi-riferimento / riquadri ───────────────
-    def _flux3_weight_ids(self, dit: str, pup: bool) -> list:
+    def _flux3_weight_ids(self, dit: str, pup: bool, te: str = "") -> list:
+        """Pesi che servono al job. Text encoder: la scelta (krea2|official) o, in automatico, il Krea2 uncensored se è su disco."""
         from core import flux3_spec as S3
-        ids = [dit or S3.DEFAULT_DIT, S3.TE, S3.VAE]
+        from core import model_paths as mp
+        from core import weights_catalog as wc
+        present = lambda i: bool(mp.entry(i)) and wc.is_present(mp.entry(i), str(mp.models_root()))
+        te_id = S3.te_id(te, present)
+        ids = [dit or S3.DEFAULT_DIT, te_id, S3.VAE]
+        if te_id != S3.TE:
+            ids.append(S3.TE_CONFIGS)               # tokenizer e config del TE a file singolo
         if pup:
             ids += [S3.PUP_DEFAULT, "flux3-pup-configs"]
         return ids
 
-    def _flux3_preflight(self, dit, pup, boxes, n_refs) -> bool:
+    def _flux3_preflight(self, dit, pup, boxes, n_refs, te="") -> bool:
         """Gate d'edizione, riquadri validi, pesi su disco (altrimenti avviso + «Apri tab Pesi», nessun download)."""
         if not self._feature_gate("cap.image_flux3"):
             return False
@@ -4691,7 +4699,7 @@ class MainWindow(QMainWindow):
             if errs:
                 QMessageBox.warning(self, tr("f1.flux3.boxes.btn", "Riquadri…"), "\n".join(errs))
                 return False
-        return self._missing_weights_notice(self._flux3_weight_ids(dit, pup), "FLUX.3 Klein")
+        return self._missing_weights_notice(self._flux3_weight_ids(dit, pup, te), "FLUX.3 Klein")
 
     def _start_native_flux3_edit(self, dit, prompt, *, refs=(), init_image="", mask="", boxes=None, pup=True, seed=None,
                                  steps=None, loras=None, feather=0, mode="flux3_edit", label=None):
@@ -4707,9 +4715,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
         from core import flux3_spec as S3
         dit = dit or S3.DEFAULT_DIT
-        if not self._flux3_preflight(dit, pup, boxes, len(refs) + (1 if init_image else 0)) or not self._ensure_native_ready():
+        te = self.frame1_tab.flux3_te_choice("f3e")
+        if not self._flux3_preflight(dit, pup, boxes, len(refs) + (1 if init_image else 0), te) or not self._ensure_native_ready():
             return
-        params = {"arch": "flux3", "flux3_dit": dit, "flux3_pup": bool(pup), "prompt": prompt or "",
+        params = {"arch": "flux3", "flux3_dit": dit, "flux3_pup": bool(pup), "flux3_te": te, "prompt": prompt or "",
                   "seed": seed if seed is not None else random.randint(0, 2**31),
                   "steps": int(steps or S3.DEFAULT_STEPS), "ref_images": refs[:S3.MAX_REFS], "loras": list(loras or []),
                   "boxes": list(boxes or [])}

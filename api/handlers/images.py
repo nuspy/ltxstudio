@@ -43,6 +43,7 @@ class Flux3Opts(BaseModel):
     """Campi propri di FLUX.3 Image Klein (ignorati dalle altre architetture)."""
     flux3_dit: str | None = Field(None, description="DiT di catalogo (default flux3-dit-fp8r)")
     flux3_pup: bool = Field(True, description="upsampler di prompt (BFL: raccomandato SEMPRE)")
+    flux3_te: str | None = Field(None, description="text encoder: '' (automatico: Krea2 uncensored se su disco, 18+) | krea2 | official")
     boxes: list[dict] | None = Field(None, description="riquadri, coordinate 0-1 [y_min,x_min,y_max,x_max]: layout "
         "{id,desc,bbox}; con riferimenti {id,desc,mode:new|move|anchor|remove,ref(1-based),src_bbox,tgt_bbox}")
 
@@ -242,6 +243,12 @@ def _flux3(p: dict, req: BaseModel | None = None) -> dict:
         raise HTTPException(422, f"flux3_dit sconosciuto: {p['flux3_dit']} ({', '.join(S3.DITS)})")
     if p.get("flux3_pup", True):
         gate.require("cap.flux3_upsampler")
+    if p.get("flux3_te") not in (None, *S3.TE_CHOICES):
+        raise HTTPException(422, f"flux3_te sconosciuto: {p['flux3_te']} ({' | '.join(repr(c) for c in S3.TE_CHOICES)})")
+    te_id = S3.te_id(p.get("flux3_te") or "", _present)
+    if te_id == S3.TE_KREA2:                                      # encoder uncensored: solo dove le voci 18+ sono ammesse
+        gate.require("cap.adult_mode")
+    p["flux3_te"] = p.get("flux3_te") or ""
     refs = [r for r in (p.get("ref_images") or []) if r]
     if len(refs) > S3.MAX_REFS:
         raise HTTPException(422, f"al massimo {S3.MAX_REFS} riferimenti")
@@ -260,13 +267,22 @@ def _flux3(p: dict, req: BaseModel | None = None) -> dict:
               "aspect_2k", "transparent", "control_image", "control_preprocess", "control_scale", "strength"):
         p.pop(k, None)
     _foto_tokens(p, "flux3")
-    _weights_409(_flux3_ids(p["flux3_dit"], p.get("flux3_pup", True)), "FLUX.3 Klein")
+    _weights_409(_flux3_ids(p["flux3_dit"], p.get("flux3_pup", True), p["flux3_te"]), "FLUX.3 Klein")
     return p
 
 
-def _flux3_ids(dit: str, pup: bool) -> list[str]:
+def _present(entry_id: str) -> bool:
+    from core import model_paths as mp
+    from core import weights_catalog as wc
+    e = mp.entry(entry_id)
+    return bool(e) and wc.is_present(e, str(mp.models_root()))
+
+
+def _flux3_ids(dit: str, pup: bool, te: str = "") -> list[str]:
     from core import flux3_spec as S3
-    return [dit, S3.TE, S3.VAE] + ([S3.PUP_DEFAULT, "flux3-pup-configs"] if pup else [])
+    te_id = S3.te_id(te, _present)
+    return ([dit, te_id, S3.VAE] + ([S3.TE_CONFIGS] if te_id != S3.TE else [])
+            + ([S3.PUP_DEFAULT, "flux3-pup-configs"] if pup else []))
 
 
 def _foto_tokens(p: dict, style: str = "qwen21") -> None:

@@ -361,12 +361,15 @@ def test_catalogo_flux3_voci_e_catena():
     assert dit["type"] == "diffusion_models" and dit["family"] == "Flux3" and dit["arch"] == "flux3"
     assert dit["sha256"].startswith("30054053") and dit["approx_gb"] == 6.27
     assert dit["license_ack"] == "flux_kommunity" and dit["gated"] is True
-    assert set(dit["deps"]) >= {"flux3-te", "flux2-vae", "flux3-pup-sakura-q8"}
+    # TE: alternativa a|b (scelta utente 29/10: Krea2 uncensored già su disco preferito, ufficiale come alternativa)
+    assert set(dit["deps"]) >= {"flux2-vae", "flux3-pup-sakura-q8", "flux3-te-configs", "krea2-te-uncensored|flux3-te"}
+    assert "flux3-te" not in dit["deps"]
     te = by["flux3-te"]
     assert te["kind"] == "snapshot" and te["license_ack"] == "flux_kommunity" and "text_encoder/*" in te["allow_patterns"]
     pup = by["flux3-pup-sakura-q8"]
     assert pup["filename"].endswith("Q8_0-8.87GiB.gguf") and pup["deps"] == ["flux3-pup-configs"]
-    assert pup["sha256"].startswith("4fbde007") and "license_ack" not in pup                # Apache-2.0: nessun avviso
+    assert pup["sha256"].startswith("4fbde007") and pup["license_ack"] == "adult_content"   # Apache-2.0 ma avviso «not-for-all-audiences»
+    assert "not-for-all-audiences" in pup["license"] and "UNICO upsampler" in pup["note"]
     cfg = by["flux3-pup-configs"]
     assert not any(p.endswith((".safetensors", ".gguf")) for p in cfg["allow_patterns"])    # NON i pesi dell'ufficiale
     for i in ("flux3-dit-fp8r", "flux3-te", "flux3-pup-sakura-q8", "flux3-pup-configs"):
@@ -381,5 +384,37 @@ def test_licenza_ack_richiesta_per_dit_e_te(monkeypatch):
     from core import license_ack as la
     from core import weights_catalog as wc
     monkeypatch.setattr(wc, "is_present", lambda e, base=None: False)
-    need = {e["id"] for e in la.needing_ack(["flux3-dit-fp8r"])}
-    assert {"flux3-dit-fp8r", "flux3-te"} <= need and "flux3-pup-sakura-q8" not in need
+    need = {e["id"]: e["license_ack"] for e in la.needing_ack(["flux3-dit-fp8r", "flux3-te", "flux3-pup-sakura-q8"])}
+    assert need["flux3-dit-fp8r"] == need["flux3-te"] == need["flux3-te-configs"] == "flux_kommunity"
+    assert need["flux3-pup-sakura-q8"] == "adult_content" and "flux3-pup-configs" not in need
+
+
+def test_deps_te_alternativa_krea2_preferito(monkeypatch):
+    """Dipendenza «krea2-te-uncensored|flux3-te»: con il Krea2 su disco vince lui; senza, l'ufficiale (da scaricare)."""
+    from core import weights_catalog as wc
+    by = {e["id"]: e for e in wc.load()}
+    alt = "krea2-te-uncensored|flux3-te"
+    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] == "krea2-te-uncensored")
+    assert wc.resolve_dep(alt, by) == "krea2-te-uncensored"
+    monkeypatch.setattr(wc, "is_present", lambda e, base=None: False)
+    assert wc.resolve_dep(alt, by) in ("krea2-te-uncensored", "flux3-te")     # nessuno presente: la prima consentita dall'edizione
+    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] == "flux3-te")
+    assert wc.resolve_dep(alt, by) == "flux3-te"
+
+
+def test_api_te_scelta_e_gate_adult(monkeypatch):
+    from api.handlers import images
+    seen = []
+    monkeypatch.setattr(images.gate, "require", lambda fid, *a, **k: seen.append(fid))
+    monkeypatch.setattr(images, "_weights_409", lambda ids, feature: seen.append(tuple(ids)))
+    monkeypatch.setattr(images, "_present", lambda i: i == S.TE_KREA2)
+    p = images._flux3({"prompt": "x", "arch": "flux3"})                                   # automatico + Krea2 su disco
+    assert p["flux3_te"] == "" and "cap.adult_mode" in seen                               # encoder uncensored: gate 18+
+    ids = [x for x in seen if isinstance(x, tuple)][-1]
+    assert S.TE_KREA2 in ids and S.TE_CONFIGS in ids and S.TE not in ids
+    seen.clear()
+    p = images._flux3({"prompt": "x", "arch": "flux3", "flux3_te": "official", "flux3_pup": False})
+    assert "cap.adult_mode" not in seen and S.TE in [x for x in seen if isinstance(x, tuple)][-1]
+    with pytest.raises(images.HTTPException) as e:
+        images._flux3({"prompt": "x", "arch": "flux3", "flux3_te": "boh"})
+    assert e.value.status_code == 422

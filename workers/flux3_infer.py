@@ -57,7 +57,11 @@ def resolve(p: dict, need_pup: bool) -> dict:
     dit_id = str(p.get("flux3_dit") or S.DEFAULT_DIT)
     if dit_id not in S.DITS:
         raise RuntimeError(f"DiT FLUX.3 sconosciuto: {dit_id} ({', '.join(S.DITS)})")
-    ids = {"dit": dit_id, "te": S.TE, "vae": S.VAE}
+    te_id = S.te_id(str(p.get("flux3_te") or ""),
+                    lambda i: bool(mp.entry(i)) and wc.is_present(mp.entry(i), str(mp.models_root())))
+    ids = {"dit": dit_id, "te": te_id, "te_cfg": S.TE_CONFIGS, "vae": S.VAE}
+    if te_id == S.TE:                      # il TE ufficiale è uno snapshot con config e tokenizer dentro
+        ids.pop("te_cfg")
     if need_pup:
         pup_id = str(p.get("flux3_pup_id") or S.PUP_DEFAULT)
         ids["pup"] = pup_id
@@ -72,8 +76,14 @@ def resolve(p: dict, need_pup: bool) -> dict:
     if missing:
         raise RuntimeError("Pesi FLUX.3 mancanti: " + ", ".join(missing) +
                            ". Scaricali dal tab «Pesi modelli» (FLUX.3 Klein, licenza FLUX Kommunity).")
-    te = Path(out["te"])
-    out["te_dir"] = str(te / "text_encoder") if (te / "text_encoder").is_dir() else str(te)
+    out["te_id"] = te_id
+    if te_id == S.TE:                      # snapshot ufficiale: shard + config + tokenizer nella stessa cartella
+        te = Path(out["te"])
+        out["te_src"] = out["te_cfg"] = str(te / "text_encoder") if (te / "text_encoder").is_dir() else str(te)
+    else:                                  # TE a file singolo: i json/tokenizer vengono dallo snapshot di configurazione
+        cfg = Path(out["te_cfg"])
+        out["te_src"] = out["te"]
+        out["te_cfg"] = str(cfg / "text_encoder") if (cfg / "text_encoder").is_dir() else str(cfg)
     return out
 
 
@@ -124,29 +134,58 @@ def prepare_multi_reference(image):
 
 
 # ── text encoder ─────────────────────────────────────────────────────────────────────────────────────────
-def load_text_encoder(te_dir: str):
+def remap_te_key(k: str):
+    """Nome HF di un tensore del text encoder, o None se non serve (torre visiva, lm_head). Il TE Krea2 «-native» ha i nomi
+    senza il prefisso `model.` (`language_model.layers…`): `model.language_model.layers…` come nel checkpoint ufficiale."""
+    if k == "lm_head.weight" or k.startswith(("model.visual.", "visual.")):
+        return None
+    if k.startswith("language_model."):
+        return "model." + k
+    return k
+
+
+def _header_keys(path: str) -> list:
+    import struct
+    with open(path, "rb") as f:
+        n = struct.unpack("<Q", f.read(8))[0]
+        return [k for k in json.loads(f.read(n)) if k != "__metadata__"]
+
+
+def build_te_model(te_src: str, cfg_dir: str):
+    """Qwen3-VL-4B solo-linguaggio sul device. `te_src` = cartella con gli shard bf16 ufficiali OPPURE un file singolo (Krea2
+    uncensored: fp8 per riga con `weight_scale`, nomi senza `model.`). Con fp8 i pesi restano fp8 in VRAM (4,8 GB) e ogni Linear
+    si dequantizza al volo (`_qlinear.RowFp8Linear`). Nessuna torre visiva, nessun lm_head."""
     import torch
     from accelerate import init_empty_weights
-    from transformers import AutoConfig, AutoProcessor, Qwen3VLForConditionalGeneration
+    from transformers import AutoConfig, Qwen3VLForConditionalGeneration
     import _qlinear as Q
-    t0 = time.time()
-    cfg = AutoConfig.from_pretrained(te_dir)
+    cfg = AutoConfig.from_pretrained(cfg_dir)
     with init_empty_weights():
         te = Qwen3VLForConditionalGeneration._from_config(cfg, dtype=torch.bfloat16)
-    sd = {}
-    for shard in sorted(Path(te_dir).glob("*.safetensors")):
-        sd.update(Q.read_safetensors(str(shard), DEV, skip=("lm_head.weight",)))
     te.lm_head = torch.nn.Identity()                  # servono solo gli stati nascosti
-    # la torre visiva non serve (il TE legge solo testo): si scarta per risparmiare 0,8 GB e il tempo di carico
-    sd = {k: v for k, v in sd.items() if not k.startswith("model.visual.")}
-    te.model.visual = torch.nn.Identity()
+    te.model.visual = torch.nn.Identity()             # il TE legge solo testo: -0,8 GB e tempo di carico
+    files = [te_src] if os.path.isfile(te_src) else sorted(str(x) for x in Path(te_src).glob("*.safetensors"))
+    sd = {}
+    for fpath in files:
+        skip = [k for k in _header_keys(fpath) if remap_te_key(k) is None]
+        part = Q.read_safetensors(fpath, DEV, skip=tuple(skip))
+        sd.update({remap_te_key(k): v for k, v in part.items()})
+    if os.path.isfile(te_src):
+        sd = Q.quantize_from_state_dict(te, sd)        # fp8 per riga → RowFp8Linear (sul meta-device)
     miss, unex = Q.load_into(te, sd)
     miss = [m for m in miss if not m.endswith("inv_freq")]
     if miss or unex:
         raise RuntimeError(f"text encoder: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     del sd
-    te = te.to(DEV).eval()
-    proc = AutoProcessor.from_pretrained(te_dir)
+    return te.to(DEV).eval()
+
+
+def load_text_encoder(te_src: str, cfg_dir: str | None = None):
+    from transformers import AutoProcessor
+    t0 = time.time()
+    cfg_dir = cfg_dir or te_src
+    te = build_te_model(te_src, cfg_dir)
+    proc = AutoProcessor.from_pretrained(cfg_dir)
     proc.tokenizer.padding_side = "right"
     _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram():.1f} GB")
     return te, proc
@@ -426,7 +465,7 @@ def run(p: dict) -> str:
     seed = int(seed)
 
     # 2) text encoder
-    te, proc = load_text_encoder(W["te_dir"])
+    te, proc = load_text_encoder(W["te_src"], W["te_cfg"])
     try:
         txt_tokens, txt_ids = encode_text(te, proc, caption)
     finally:

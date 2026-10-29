@@ -33,6 +33,12 @@ def entries(N):
           gb=8.88, allow=["text_encoder/*", "LICENSE.md", "NOTICE.md"], used_by=["cap.image_flux3"],
           note="8 strati (4,8,…,32) impilati → token a 20480 canali; Apache-2.0 (text_encoder/LICENSE). La licenza del DiT è "
                "quella FLUX Kommunity: " + LIC),
+        N("flux3-te-configs", "Immagini", "FLUX.3 Klein text encoder: config + tokenizer + chat template (json, ~12MB)",
+          category="image", arch="flux3", kind="snapshot", repo=REPO, gated=True, type="configs", gb=0.02,
+          allow=["text_encoder/*.json", "text_encoder/*.txt", "text_encoder/LICENSE", "LICENSE.md", "NOTICE.md"],
+          used_by=["cap.image_flux3"],
+          note="solo json/tokenizer del Qwen3-VL-4B-Instruct: servono sia col text encoder ufficiale sia col TE Krea2 (file singolo senza "
+               "tokenizer). Nessun peso. Repo gated: accetta la licenza FLUX Kommunity su Hugging Face"),
         N("flux3-pup-configs", "Immagini", "FLUX.3 Klein upsampler: config + tokenizer + system prompt (json, ~20MB)",
           category="image", arch="flux3", kind="snapshot", repo="black-forest-labs/flux-3-image-klein-pup", type="configs",
           gb=0.02, allow=["*.json", "*.jinja", "LICENSE*"], used_by=["cap.flux3_upsampler"],
@@ -42,21 +48,28 @@ def entries(N):
           category="image", arch="flux3", repo=PUP_REPO, remote=PUP_Q8, filename=PUP_Q8, type="TextEncoders",
           family="Flux3", gb=9.53, sha256="4fbde007612af89cae6be93a59b7a6ead980560504be29d7a0645fc36e704b41",
           deps=["flux3-pup-configs"], used_by=["cap.flux3_upsampler"],
-          note="Qwen3.5-9B (fine-tune BFL) con abliterazione di terzi (webmp3/Sakura, Apache-2.0, not-for-all-audiences): rifiuta "
+          note="Qwen3.5-9B (fine-tune BFL) con abliterazione di terzi (webmp3/Sakura, Apache-2.0, «not-for-all-audiences»): rifiuta "
                "meno dell'ufficiale. GGUF Q8_0 SOLO linguaggio (il proiettore visivo è un file a parte): letto da "
-               "workers/flux3_gguf.py. DA CONFERMARE con l'utente (task 13, DECISIONE RICHIESTA)."),
+               "workers/flux3_gguf.py. Scelto dall'utente il 29/10/2026 come UNICO upsampler per tutte le edizioni."),
     ]
     for e in out:
-        if e["id"] in ("flux3-dit-fp8r", "flux3-te"):    # mai in silenzio: dialog con la licenza + conferma (core/license_ack)
+        if e["id"] in ("flux3-dit-fp8r", "flux3-te", "flux3-te-configs"):   # mai in silenzio: dialog con la licenza + conferma
             e["license"] = "FLUX Kommunity License v1.0"
             e["license_ack"] = "flux_kommunity"
+        elif e["id"] == "flux3-pup-sakura-q8":           # Apache-2.0 ma modello senza filtri di rifiuto: avviso + conferma
+            e["license"] = "Apache-2.0 (not-for-all-audiences)"
+            e["license_ack"] = "adult_content"
     return out
 
 
 # id → (tag d'uso, deps) per catalog_use_deps. Catena: DiT → text encoder + VAE (flux2, già su disco) + upsampler.
 USE = {
-    "flux3-dit-fp8r": (["ckpt_image", "fp8", "distilled"], ["flux3-te", "flux2-vae", "flux3-pup-sakura-q8"]),
+    # TE: scelta dell'utente 29/10 — il Krea2 uncensored già su disco è PREFERITO se presente (alternativa a|b: la prima presente fra
+    # le voci consentite dall'edizione, altrimenti la prima consentita); l'ufficiale resta a catalogo come alternativa.
+    "flux3-dit-fp8r": (["ckpt_image", "fp8", "distilled"],
+                       ["flux3-te-configs", "krea2-te-uncensored|flux3-te", "flux2-vae", "flux3-pup-sakura-q8"]),
     "flux3-te": (["te"], []),
+    "flux3-te-configs": ([], []),
     "flux3-pup-configs": ([], []),
     "flux3-pup-sakura-q8": (["prompt_upsampler"], []),
 }

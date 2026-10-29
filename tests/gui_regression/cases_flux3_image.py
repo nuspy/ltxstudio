@@ -132,7 +132,11 @@ def case_flux3_missing_weights_warn_and_no_job(w, spy):
     finally:
         ew.missing = saved
     assert len(spy.calls) == n0, "job partito con i pesi mancanti"
-    assert {DIT, "flux3-te", "flux2-vae", "flux3-pup-sakura-q8", "flux3-pup-configs"} <= set(seen["ids"]), seen
+    ids = set(seen["ids"])
+    assert {DIT, "flux2-vae", "flux3-pup-sakura-q8", "flux3-pup-configs"} <= ids, seen
+    assert ("flux3-te" in ids) != ("krea2-te-uncensored" in ids), "serve UN solo text encoder (SFW: ufficiale)"
+    if "krea2-te-uncensored" in ids:
+        assert "flux3-te-configs" in ids, "il TE a file singolo vuole config e tokenizer dallo snapshot"
     f.f3_pup.setChecked(False)
     seen.clear()
     ew.missing = fake_missing
@@ -232,3 +236,35 @@ CASES = [
      case_flux3_edit_job_direct),
     ("flux3_boxes_dialog_context", "Pannello riquadri: layout senza riferimenti, edit con @Foto_N.", case_flux3_boxes_dialog_context),
 ]
+
+
+def case_flux3_text_encoder_choice(w, spy):
+    """TE: in SFW solo l'ufficiale; con le voci 18+ ammesse automatico/Krea2/ufficiale; la scelta arriva al job."""
+    f = w.frame1_tab
+    f.img_nsfw.setCurrentText("SFW")
+    f._fill_flux3_te()
+    assert _ids(f.f3_te) == ["official"] and f.flux3_te_choice("f3") == "official", _ids(f.f3_te)
+    if f.img_nsfw.findText("NSFW") >= 0:
+        f.img_nsfw.setCurrentText("NSFW")
+        if f._adult_ok():
+            assert _ids(f.f3_te) == ["", "krea2", "official"], _ids(f.f3_te)
+            f.f3_te.setCurrentIndex(0)                            # la scelta fatta in SFW (ufficiale) si mantiene: qui si riparte dall'automatico
+            assert f.flux3_te_choice("f3") == "" and "Krea2" in f.f3_te.itemText(0)
+            f.f3_te.setCurrentIndex(f.f3_te.findData("official"))
+            _arch(f, "FLUX.3 Klein")
+            f.img_nsfw.setCurrentText("NSFW")
+            f.gen_refs.clear()
+            f.gen_prompt.setPlainText("una cattedrale di ghiaccio")
+            p = _run(w, spy, w.generate_image)
+            assert p["flux3_te"] == "official", p
+            f.f3_te.setCurrentIndex(0)
+            p = _run(w, spy, w.generate_image)
+            assert p["flux3_te"] == "", p
+    f.img_nsfw.setCurrentText("SFW")
+    assert f.flux3_te_choice("f3e") == "official"
+    CASES_DONE.append(1)
+
+
+CASES_DONE: list = []
+CASES.append(("flux3_text_encoder_choice", "Text encoder FLUX.3: ufficiale in SFW; automatico/Krea2/ufficiale con voci 18+; la scelta arriva al job.",
+              case_flux3_text_encoder_choice))

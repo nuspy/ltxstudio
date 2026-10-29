@@ -30,7 +30,10 @@ VAE_CONFIG = {
 
 # ── voci di catalogo (build/catalog_task13.py) ───────────────────────────────────────────────────────────
 DIT_FP8R = "flux3-dit-fp8r"            # distillato, fp8 per riga (6,27 GB) — opzione A scelta dall'utente
-TE = "flux3-te"                        # Qwen3-VL-4B-Instruct bf16 (8,88 GB) + tokenizer
+TE = "flux3-te"                        # Qwen3-VL-4B-Instruct bf16 (8,88 GB) + tokenizer: l'UFFICIALE (alternativa)
+TE_KREA2 = "krea2-te-uncensored"       # Qwen3-VL-4B uncensored fp8 (4,85 GB) già su disco: PREFERITO se presente (utente 29/10)
+TE_CONFIGS = "flux3-te-configs"        # json + tokenizer + chat template del Qwen3-VL-4B (~12 MB): servono col TE a file singolo
+TE_CHOICES = ("", "krea2", "official")  # "" = automatico: Krea2 se presente, altrimenti l'ufficiale
 VAE = "flux2-vae"                      # già su disco, sha256 identico a quello di FLUX.3
 PUP_SAKURA_Q8 = "flux3-pup-sakura-q8"  # upsampler abliterato di terzi (GGUF Q8_0): in attesa della decisione
 PUP_DEFAULT = PUP_SAKURA_Q8
@@ -97,6 +100,16 @@ def clamp_size(width: int, height: int) -> tuple[int, int]:
     """Lati portati al multiplo di 16 nell'intervallo 64–4096 (stessa regola del codice ufficiale)."""
     f = lambda v: max(MIN_SIDE, min(MAX_SIDE, int(round(int(v) / GRID)) * GRID))
     return f(width), f(height)
+
+
+def te_id(choice: str = "", present=None) -> str:
+    """Voce di catalogo del text encoder. `choice`: "krea2" | "official" | "" (automatico: il Krea2 uncensored se è su disco —
+    scelta dell'utente del 29/10 —, altrimenti l'ufficiale). `present(id) -> bool` dice cosa c'è su disco."""
+    if choice == "official":
+        return TE
+    if choice == "krea2":
+        return TE_KREA2
+    return TE_KREA2 if (present is not None and present(TE_KREA2)) else TE
 
 
 def default_steps(dit_id: str = DEFAULT_DIT) -> int:

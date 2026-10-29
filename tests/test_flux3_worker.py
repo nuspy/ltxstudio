@@ -357,3 +357,109 @@ def test_gguf_rifiuta_architettura_e_tipi(tmp_path):
         G.read_state(str(tmp_path / "x.gguf"), "cpu")
     kv, tens, base = G.read_header(str(p))
     assert kv["general.architecture"] == "llama" and tens[0][0] == "token_embd.weight" and base % 32 == 0
+
+
+# ── text encoder: ufficiale (shard bf16) e Krea2 uncensored (file singolo fp8, nomi senza «model.») ──────────────────────
+def _te_hdr(name):
+    d = json.loads((DATA / name).read_text("utf-8"))
+    return d.get("tensors", d)
+
+
+def test_te_krea2_rimappatura_chiavi_su_header_veri():
+    """Tutti i 398 tensori del modello di linguaggio del TE Krea2 (header VERO) diventano chiavi e forme del TE ufficiale FLUX.3."""
+    krea, off = _te_hdr("krea2_te_header.json"), _te_hdr("flux3_te_header.json")
+    mapped = {W.remap_te_key(k): v for k, v in krea.items() if W.remap_te_key(k)}
+    mapped = {k: v for k, v in mapped.items() if not k.endswith(".weight_scale")}
+    ref = {k: v for k, v in off.items() if not k.startswith("model.visual.")}
+    assert set(mapped) == set(ref), (sorted(set(mapped) ^ set(ref))[:6])
+    assert all(mapped[k]["shape"] == ref[k]["shape"] for k in ref)
+    assert len(ref) == 398
+    assert W.remap_te_key("lm_head.weight") is None and W.remap_te_key("visual.blocks.0.attn.qkv.weight") is None
+    assert W.remap_te_key("model.visual.x") is None and W.remap_te_key("model.language_model.norm.weight") == "model.language_model.norm.weight"
+    assert sum(1 for v in krea.values() if v["dtype"] == "F8_E4M3") == 252                   # matrici fp8 con scala per riga
+
+
+def _tiny_te_cfg(tmp_path):
+    from transformers import AutoConfig
+    cfg = {"architectures": ["Qwen3VLForConditionalGeneration"], "model_type": "qwen3_vl", "image_token_id": 151655,
+           "video_token_id": 151656, "vision_start_token_id": 151652, "vision_end_token_id": 151653, "tie_word_embeddings": True,
+           "text_config": {"model_type": "qwen3_vl_text", "hidden_size": 64, "intermediate_size": 128, "num_attention_heads": 4,
+                           "num_key_value_heads": 2, "head_dim": 16, "num_hidden_layers": 3, "vocab_size": 300, "rms_norm_eps": 1e-6,
+                           "rope_theta": 5000000, "tie_word_embeddings": True, "max_position_embeddings": 4096,
+                           "rope_scaling": {"mrope_interleaved": True, "mrope_section": [2, 3, 3], "rope_type": "default"}},
+           "vision_config": {"model_type": "qwen3_vl", "depth": 1, "hidden_size": 16, "intermediate_size": 32, "num_heads": 2,
+                             "out_hidden_size": 64, "patch_size": 16, "spatial_merge_size": 2, "temporal_patch_size": 2,
+                             "num_position_embeddings": 16, "deepstack_visual_indexes": [0]}}
+    (tmp_path / "config.json").write_text(json.dumps(cfg))
+    return AutoConfig.from_pretrained(str(tmp_path))
+
+
+def test_te_caricamento_krea2_fp8_per_riga_vs_ufficiale_bf16(tmp_path):
+    """Stesso modello minuscolo: shard bf16 «ufficiale» e file singolo «Krea2» (fp8 per riga, nomi `language_model.`, con torre
+    visiva e scale): gli stati nascosti coincidono entro l'errore di fp8. Nessun modello vero in RAM."""
+    if D.FP8 is None:
+        pytest.skip("torch senza float8")
+    from safetensors.torch import save_file
+    from transformers import Qwen3VLForConditionalGeneration
+    cfg = _tiny_te_cfg(tmp_path)
+    torch.manual_seed(0)
+    ref = Qwen3VLForConditionalGeneration._from_config(cfg, dtype=torch.bfloat16)
+    sd = {k: v.detach().clone().contiguous() for k, v in ref.state_dict().items() if k != "lm_head.weight"}
+    off = tmp_path / "off"
+    off.mkdir()
+    (off / "config.json").write_text((tmp_path / "config.json").read_text())
+    save_file(sd, str(off / "model.safetensors"))
+    krea = {}
+    for k, v in sd.items():                                              # formato Krea2: fp8 per riga sui Linear del linguaggio
+        nk = k[len("model."):] if k.startswith("model.") else k
+        if k.startswith("model.language_model.layers") and k.endswith("_proj.weight"):
+            q, s = D.quantize_rows(v.float())
+            krea[nk] = q
+            krea[nk.replace(".weight", ".weight_scale")] = s.reshape(-1, 1).float()
+        else:
+            krea[nk] = v
+    single = tmp_path / "krea.safetensors"
+    save_file(krea, str(single))
+    a = W.build_te_model(str(off), str(tmp_path))
+    b = W.build_te_model(str(single), str(tmp_path))
+    from _qlinear import RowFp8Linear
+    assert sum(isinstance(m, RowFp8Linear) for m in b.modules()) == 3 * 7                  # q,k,v,o,gate,up,down × 3 strati
+    ids = torch.randint(0, 300, (1, 12))
+    pos = torch.arange(12)[None]
+    outs = []
+    for m in (a, b):
+        with torch.no_grad():
+            o = m(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos[None].expand(4, -1, -1),
+                  output_hidden_states=True, use_cache=False)
+        outs.append(torch.stack([o.hidden_states[i] for i in (1, 2, 3)]).float())
+    err = (outs[0] - outs[1]).abs().max() / outs[0].abs().max()
+    assert err < 0.2, float(err)                       # fp8 per riga su pesi casuali: scarto relativo contenuto, non identità
+    with torch.no_grad():
+        o = ref.eval()(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos[None].expand(4, -1, -1),
+                       output_hidden_states=True, use_cache=False)
+    refh = torch.stack([o.hidden_states[i] for i in (1, 2, 3)]).float()
+    assert (outs[0] - refh).abs().max() < 1e-2          # il caricamento «ufficiale» è esatto
+
+
+def test_te_scelta_krea2_preferito_se_presente():
+    assert S.te_id("", lambda i: i == S.TE_KREA2) == S.TE_KREA2                              # automatico: Krea2 se su disco
+    assert S.te_id("", lambda i: False) == S.TE and S.te_id("", None) == S.TE
+    assert S.te_id("official", lambda i: True) == S.TE and S.te_id("krea2", lambda i: False) == S.TE_KREA2
+    assert S.TE_CHOICES == ("", "krea2", "official")
+
+
+def test_resolve_te_krea2_usa_configs_dello_snapshot(monkeypatch):
+    from core import weights_catalog as wc
+    present = {S.DEFAULT_DIT, S.TE_KREA2, S.TE_CONFIGS, S.VAE}
+    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] in present)
+    out = W.resolve({"flux3_te": ""}, need_pup=False)
+    assert out["te_id"] == S.TE_KREA2 and out["te_src"].endswith("qwen3vl_4b_uncensored-fp8-native.safetensors")
+    assert "flux-3-image-klein" in out["te_cfg"].replace("\\", "/")
+    present.add(S.TE)
+    assert W.resolve({"flux3_te": "official"}, need_pup=False)["te_id"] == S.TE            # scelta esplicita vince
+    present.discard(S.TE_KREA2)
+    present.discard(S.TE_CONFIGS)
+    assert W.resolve({"flux3_te": ""}, need_pup=False)["te_id"] == S.TE                     # automatico senza Krea2: ufficiale
+    present.discard(S.TE)
+    with pytest.raises(RuntimeError, match=S.TE):
+        W.resolve({"flux3_te": ""}, need_pup=False)

@@ -742,6 +742,13 @@ class Frame1Tab(QWidget):
             "i tuoi. Costa qualche decina di secondi e ~19 GB di VRAM prima della generazione (poi si libera). Spegnilo "
             "solo se il tuo prompt è già completo."))
         parent_form.addRow(pup)
+        te = QComboBox()
+        te.setMinimumHeight(32)
+        te.setToolTip(tr("f1.flux3.te.tt",
+            "Text encoder (Qwen3-VL-4B): il Krea2 uncensored fp8 già su disco (4,8 GB) è quello preferito; l'ufficiale bf16 "
+            "(8,9 GB) resta come alternativa. Cambiano le parole che il modello «capisce»: confronta a parità di seed."))
+        parent_form.addRow(tr("f1.flux3.te", "Text encoder"), te)
+        setattr(self, f"{prefix}_te", te)
         row = QHBoxLayout()
         btn = QPushButton(tr("f1.flux3.boxes.btn", "Riquadri…"))
         btn.setMinimumHeight(44)
@@ -781,6 +788,8 @@ class Frame1Tab(QWidget):
         ff.addRow(lic)
         self._f3_box = box
         box.setVisible(False)
+        self._fill_flux3_te()
+        self.img_nsfw.currentTextChanged.connect(self._fill_flux3_te)
         self.gen_arch.currentTextChanged.connect(self._sync_flux3_box)
         self.gen_arch.currentTextChanged.connect(self._on_flux3_changed)
         return box
@@ -813,6 +822,32 @@ class Frame1Tab(QWidget):
             self.gen_neg.setEnabled(True)
             self.gen_neg.setToolTip(tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))
             self._on_qwen21_dit_changed()
+
+    def _fill_flux3_te(self, *_):
+        """Voci del text encoder: il Krea2 uncensored (18+) solo se le voci 18+ sono ammesse (come l'encoder «heretic» di Qwen);
+        altrimenti solo l'ufficiale. Mantiene la scelta se resta valida."""
+        adult = self._adult_ok()
+        items = ([("", tr("f1.flux3.te.auto", "Automatico (Krea2 uncensored se presente)")),
+                  ("krea2", tr("f1.flux3.te.krea2", "Krea2 uncensored fp8 (4,8 GB)"))] if adult else [])
+        items.append(("official", tr("f1.flux3.te.official", "Ufficiale bf16 (8,9 GB)")))
+        for name in ("f3_te", "f3e_te"):
+            combo = getattr(self, name, None)
+            if combo is None:
+                continue
+            cur = combo.currentData()
+            combo.blockSignals(True)
+            combo.clear()
+            for data, label in items:
+                combo.addItem(label, data)
+            i = combo.findData(cur)
+            combo.setCurrentIndex(i if i >= 0 else 0)
+            combo.blockSignals(False)
+
+    def flux3_te_choice(self, prefix: str = "f3") -> str:
+        """""|krea2|official per il worker; senza voci 18+ ammesse è sempre l'ufficiale."""
+        combo = getattr(self, f"{prefix}_te", None)
+        d = combo.currentData() if combo is not None else ""
+        return str(d or "") if self._adult_ok() else "official"
 
     def _flux3_items(self):
         return [(cid, tr(k, fb)) for cid, k, fb in FLUX3_PROFILES]
@@ -856,14 +891,15 @@ class Frame1Tab(QWidget):
             return {}
         refs = [r["path"] for r in self.gen_refs.get_references() if r.get("kind") == "image"]
         return {"flux3_dit": str(self.gen_model.currentData() or "flux3-dit-fp8r"),
-                "flux3_pup": self.f3_pup.isChecked(), "boxes": list(self._f3_boxes),
+                "flux3_pup": self.f3_pup.isChecked(), "flux3_te": self.flux3_te_choice("f3"), "boxes": list(self._f3_boxes),
                 "ref_images": refs[:10]}
 
     def flux3_edit_params(self) -> dict:
         """Upsampler + riquadri per i pannelli di editing quando il motore è FLUX.3 (vuoto altrimenti)."""
         if not hasattr(self, "integrate_engine") or self.integrate_engine.currentIndex() != FLUX3_ENGINE_IDX:
             return {}
-        return {"flux3_pup": self.f3e_pup.isChecked(), "boxes": list(self._f3e_boxes)}
+        return {"flux3_pup": self.f3e_pup.isChecked(), "flux3_te": self.flux3_te_choice("f3e"),
+                "boxes": list(self._f3e_boxes)}
 
     def _gen_refs_box(self) -> QGroupBox:
         """«Immagini di riferimento» dentro «Crea immagini»: visibile SOLO con i modelli multi-riferimento (limite per

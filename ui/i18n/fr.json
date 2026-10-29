@@ -3557,5 +3557,15 @@
   "f3.box.ok": "{n} cadres prêts",
   "feat.cap.image_flux3": "FLUX.3 Image Klein (créer, éditer par instruction, jusqu'à 10 références)",
   "feat.cap.flux3_boxes": "Cadres FLUX.3 (mise en page en Créer ; nouveau/déplacer/ancrer/retirer en Édition)",
-  "feat.cap.flux3_upsampler": "Upsampler de prompts FLUX.3 (Qwen3.5-9B, recommandé par BFL)"
+  "feat.cap.flux3_upsampler": "Upsampler de prompts FLUX.3 (Qwen3.5-9B, recommandé par BFL)",
+  "f1.flux3.te": "Encodeur de texte",
+  "f1.flux3.te.auto": "Automatique (Krea2 uncensored s'il est présent)",
+  "f1.flux3.te.krea2": "Krea2 uncensored fp8 (4,8 Go)",
+  "f1.flux3.te.official": "Officiel bf16 (8,9 Go)",
+  "f1.flux3.te.tt": "Encodeur de texte (Qwen3-VL-4B) : le Krea2 uncensored fp8 déjà sur disque (4,8 Go) est préféré ; l'officiel bf16 (8,9 Go) reste une alternative. Ils changent les mots que le modèle «comprend» : compare à seed égal.",
+  "weights.license.ack.title.generic": "Licence et avertissements",
+  "weights.license.ack.q": "As-tu lu et veux-tu télécharger ?",
+  "weights.license.ack.body.nc": "Ces poids ont une licence qui N'autorise PAS l'usage commercial ({license}). Ils ne se téléchargent que pour un usage personnel/non commercial, en respectant les conditions de l'auteur. Ils ne font pas partie de l'installateur : tu les télécharges sous ta responsabilité.",
+  "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs) : l'usage commercial des sorties n'est permis que si tes revenus annuels bruts (avec affiliées) sont inférieurs à 5 millions de dollars, avec filtre ou revue des contenus et mention de l'IA ; il est interdit d'utiliser modèle, dérivés ou sorties pour entraîner d'autres modèles d'image. Tu dois d'abord avoir accepté la licence sur Hugging Face avec ton compte. Les poids ne sont pas dans l'installateur : tu les télécharges.",
+  "weights.license.ack.body.adult_content": "ATTENTION, réservé aux adultes (not-for-all-audiences) : ce modèle a été modifié par un tiers pour refuser moins et peut écrire des textes pour du contenu explicite. Tu es responsable de ce que tu génères et des lois qui te concernent ; les contenus illégaux et les images intimes non consenties sont interdits."
 }

@@ -7668,9 +7668,10 @@
         "distilled"
       ],
       "deps": [
-        "flux3-te",
         "flux2-vae",
-        "flux3-pup-sakura-q8"
+        "flux3-pup-sakura-q8",
+        "flux3-te-configs",
+        "krea2-te-uncensored|flux3-te"
       ]
     },
     {
@@ -7748,13 +7749,43 @@
       "deps": [
         "flux3-pup-configs"
       ],
-      "note": "Qwen3.5-9B (fine-tune BFL) con abliterazione di terzi (webmp3/Sakura, Apache-2.0, not-for-all-audiences): rifiuta meno dell'ufficiale. GGUF Q8_0 SOLO linguaggio (il proiettore visivo è un file a parte): letto da workers/flux3_gguf.py. DA CONFERMARE con l'utente (task 13, DECISIONE RICHIESTA).",
+      "note": "Qwen3.5-9B (fine-tune BFL) con abliterazione di terzi (webmp3/Sakura, Apache-2.0, «not-for-all-audiences»): rifiuta meno dell'ufficiale. GGUF Q8_0 SOLO linguaggio (il proiettore visivo è un file a parte): letto da workers/flux3_gguf.py. Scelto dall'utente il 29/10/2026 come UNICO upsampler per tutte le edizioni.",
       "used_by": [
         "cap.flux3_upsampler"
       ],
       "use": [
         "prompt_upsampler"
-      ]
+      ],
+      "license": "Apache-2.0 (not-for-all-audiences)",
+      "license_ack": "adult_content"
+    },
+    {
+      "id": "flux3-te-configs",
+      "module": "Immagini",
+      "label": "FLUX.3 Klein text encoder: config + tokenizer + chat template (json, ~12MB)",
+      "kind": "snapshot",
+      "type": "configs",
+      "family": "",
+      "gated": true,
+      "approx_gb": 0.02,
+      "scan_names": [],
+      "category": "image",
+      "arch": "flux3",
+      "repo_id": "black-forest-labs/flux-3-image-klein",
+      "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein",
+      "note": "solo json/tokenizer del Qwen3-VL-4B-Instruct: servono sia col text encoder ufficiale sia col TE Krea2 (file singolo senza tokenizer). Nessun peso. Repo gated: accetta la licenza FLUX Kommunity su Hugging Face",
+      "allow_patterns": [
+        "text_encoder/*.json",
+        "text_encoder/*.txt",
+        "text_encoder/LICENSE",
+        "LICENSE.md",
+        "NOTICE.md"
+      ],
+      "used_by": [
+        "cap.image_flux3"
+      ],
+      "license": "FLUX Kommunity License v1.0",
+      "license_ack": "flux_kommunity"
     }
   ],
   "schema": 2,

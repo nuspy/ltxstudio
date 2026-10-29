@@ -1,6 +1,7 @@
 """Parità del DiT nativo (workers/flux3_dit.py) con diffusers.Flux3Transformer2DModel — modello MINUSCOLO su CPU.
 
-Va eseguito nel venv con diffusers ≥ 15/10 (E:\AI\Tools\flux3_venv): stessi pesi casuali (chiavi native → conversione ufficiale
+Va eseguito in un venv con diffusers ≥ 15/10 (main, PR #15046: `pip install git+https://github.com/huggingface/diffusers` in un venv
+TEMPORANEO — il flux3_venv usato il 18/10 è stato eliminato, nessun venv dedicato serve al worker): stessi pesi casuali (chiavi native → conversione ufficiale
 di diffusers `convert_flux3_transformer_checkpoint_to_diffusers`), stessi ingressi, confronto delle uscite. Nessuna GPU.
 """
 import sys
