@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "מהירה מאוד (1 — האיטי ביותר)",
   "def.fvp_motion.tt": "מספר פריימי קלט לכל פריים לטנטי. 4 מתאים כמעט לכל סרטון; 2 או 1 שומרים טוב יותר על פרטים בתנועה מהירה, במחיר זמן רב יותר.",
   "mw.fvsrplus_install_hint": "התקן את הקוד באמצעות: python scripts/install_flashvsrplus.py והורד את המשקולות מלשונית «משקולות מודלים» (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "סופר-רזולוציה (FlashVSR+)"
+  "queue.job.fvsrplus": "סופר-רזולוציה (FlashVSR+)",
+  "v2v.lsengine_label": "מנוע סנכרון שפתיים:",
+  "v2v.lsengine.ltx": "LTX-2.3 (אודיו←וידאו, ברירת מחדל)",
+  "v2v.lsengine.multitalk": "MultiTalk (‏Wan 2.1, סנכרון שפתיים ייעודי)",
+  "v2v.lsengine.tt": "LTX-2.3 מייצר וידאו ואודיו יחד; MultiTalk מנפיש את התמונה על קטע שמע אמיתי באמצעות Wan 2.1 (סנכרון שפתיים ייעודי, תומך ב-LoRA של Wan). בחרו את מה שנוח לכם.",
+  "queue.job.lipsync_multitalk": "סנכרון שפתיים (MultiTalk)"
 }

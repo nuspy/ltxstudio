@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "极快（1 — 最慢）",
   "def.fvp_motion.tt": "每个潜在帧对应的输入帧数。4 适合几乎所有视频；2 或 1 能在快速运动中保留更多细节，但耗时更长。",
   "mw.fvsrplus_install_hint": "请运行 python scripts/install_flashvsrplus.py 安装代码，并在“模型权重”标签页下载权重（flashvsr-plus-turbo / flashvsr-plus-base）。",
-  "queue.job.fvsrplus": "超分辨率 (FlashVSR+)"
+  "queue.job.fvsrplus": "超分辨率 (FlashVSR+)",
+  "v2v.lsengine_label": "口型同步引擎：",
+  "v2v.lsengine.ltx": "LTX-2.3（音频→视频，默认）",
+  "v2v.lsengine.multitalk": "MultiTalk（Wan 2.1，专用口型同步）",
+  "v2v.lsengine.tt": "LTX-2.3 同时生成视频和音频；MultiTalk 用 Wan 2.1 让照片跟随真实音频开口说话（专用口型同步，支持 Wan LoRA）。选你喜欢的。",
+  "queue.job.lipsync_multitalk": "口型同步 (MultiTalk)"
 }

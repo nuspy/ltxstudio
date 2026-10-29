@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "Muito rápido (1 — o mais lento)",
   "def.fvp_motion.tt": "Quadros de entrada por quadro latente. 4 serve para quase todos os vídeos; 2 ou 1 conservam melhor os detalhes em movimentos rápidos, ao custo de mais tempo.",
   "mw.fvsrplus_install_hint": "Instale o código com: python scripts/install_flashvsrplus.py e baixe os pesos na aba «Pesos dos modelos» (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "Super-resolução (FlashVSR+)"
+  "queue.job.fvsrplus": "Super-resolução (FlashVSR+)",
+  "v2v.lsengine_label": "Motor de lip-sync:",
+  "v2v.lsengine.ltx": "LTX-2.3 (áudio→vídeo, padrão)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, lip-sync dedicado)",
+  "v2v.lsengine.tt": "O LTX-2.3 gera vídeo e áudio juntos; o MultiTalk anima a foto sobre um áudio real com o Wan 2.1 (lip-sync dedicado, suporta LoRAs Wan). Escolha o que preferir.",
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
 }

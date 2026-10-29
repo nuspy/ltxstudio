@@ -3490,5 +3490,10 @@
   "def.fvp_motion.vfast": "Molto veloce (1 — il più lento)",
   "def.fvp_motion.tt": "Frame di ingresso per fotogramma latente. 4 va bene per quasi tutti i video; 2 o 1 conservano meglio i dettagli nei movimenti rapidi, a costo di più tempo.",
   "mw.fvsrplus_install_hint": "Installa il codice con: python scripts/install_flashvsrplus.py e scarica i pesi dal tab «Pesi modelli» (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "Super-risoluzione (FlashVSR+)"
+  "queue.job.fvsrplus": "Super-risoluzione (FlashVSR+)",
+  "v2v.lsengine_label": "Motore lip-sync:",
+  "v2v.lsengine.ltx": "LTX-2.3 (audio→video, predefinito)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, lip-sync dedicato)",
+  "v2v.lsengine.tt": "LTX-2.3 genera video e audio insieme; MultiTalk anima la foto su un audio reale con Wan 2.1 (lip-sync dedicato, supporta le LoRA Wan). Scegli quello che preferisci.",
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
 }

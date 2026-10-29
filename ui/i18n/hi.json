@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "बहुत तेज़ (1 — सबसे धीमा)",
   "def.fvp_motion.tt": "प्रति लेटेंट फ़्रेम इनपुट फ़्रेम की संख्या। 4 लगभग हर वीडियो के लिए ठीक है; 2 या 1 तेज़ गति में बारीकियाँ बेहतर बचाते हैं, पर समय अधिक लगता है।",
   "mw.fvsrplus_install_hint": "कोड इंस्टॉल करें: python scripts/install_flashvsrplus.py और «मॉडल वेट» टैब से वेट डाउनलोड करें (flashvsr-plus-turbo / flashvsr-plus-base)।",
-  "queue.job.fvsrplus": "सुपर-रेज़ोल्यूशन (FlashVSR+)"
+  "queue.job.fvsrplus": "सुपर-रेज़ोल्यूशन (FlashVSR+)",
+  "v2v.lsengine_label": "लिप-सिंक इंजन:",
+  "v2v.lsengine.ltx": "LTX-2.3 (ऑडियो→वीडियो, डिफ़ॉल्ट)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, समर्पित लिप-सिंक)",
+  "v2v.lsengine.tt": "LTX-2.3 वीडियो और ऑडियो साथ में बनाता है; MultiTalk, Wan 2.1 से फ़ोटो को असली ऑडियो पर चलाता है (समर्पित लिप-सिंक, Wan LoRA समर्थित)। जो पसंद हो वही चुनें।",
+  "queue.job.lipsync_multitalk": "लिप-सिंक (MultiTalk)"
 }

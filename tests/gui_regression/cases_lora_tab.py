@@ -279,6 +279,7 @@ def case_wan_lora_in_talk_sing(w, spy):
     panel = w.video_tab.v2v_panel
     try:
         w.video_tab.nsfw.setCurrentText("NSFW")
+        panel.cmb_lsengine.setCurrentIndex(panel.cmb_lsengine.findData("multitalk"))   # le LoRA Wan valgono per MultiTalk
         for rb, mode in ((panel.rb_talk, "talk"), (panel.rb_sing, "sing")):
             rb.setChecked(True); panel._on_mode()
             assert not panel.sec_wanlora.isHidden(), f"sezione LoRA Wan nascosta in {mode}"
@@ -289,6 +290,7 @@ def case_wan_lora_in_talk_sing(w, spy):
         cfg = panel.get_v2v_config()
         assert [l["name"] for l in cfg["wan_loras"]] == [rows[name]["entry"].comfy_name], cfg.get("wan_loras")
     finally:
+        panel.cmb_lsengine.setCurrentIndex(panel.cmb_lsengine.findData("ltx"))
         panel.rb_normal.setChecked(True); panel._on_mode()
 
 

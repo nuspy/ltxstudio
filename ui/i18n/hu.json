@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "Nagyon gyors (1 — a leglassabb)",
   "def.fvp_motion.tt": "Bemeneti képkockák száma látens képkockánként. A 4 szinte minden videóhoz megfelel; a 2 vagy 1 gyors mozgásnál jobban megőrzi a részleteket, de több időbe telik.",
   "mw.fvsrplus_install_hint": "Telepítsd a kódot: python scripts/install_flashvsrplus.py, majd töltsd le a súlyokat a «Modellsúlyok» fülön (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "Szuperfelbontás (FlashVSR+)"
+  "queue.job.fvsrplus": "Szuperfelbontás (FlashVSR+)",
+  "v2v.lsengine_label": "Szájszinkron motor:",
+  "v2v.lsengine.ltx": "LTX-2.3 (hang→videó, alapértelmezett)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, dedikált szájszinkron)",
+  "v2v.lsengine.tt": "Az LTX-2.3 egyszerre állít elő videót és hangot; a MultiTalk a Wan 2.1-gyel mozgatja a fotót valódi hangsávra (dedikált szájszinkron, támogatja a Wan LoRA-kat). Válaszd azt, amelyiket jobban szereted.",
+  "queue.job.lipsync_multitalk": "Szájszinkron (MultiTalk)"
 }

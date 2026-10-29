@@ -88,6 +88,21 @@ class V2VPanel(QWidget):
         for rb in (self.rb_normal, self.rb_talk, self.rb_sing, self.rb_listen, self.rb_retake):
             rb.toggled.connect(self._on_mode)
 
+        # --- motore lip-sync (Talk/Canta): LTX-2.3 a2v (predefinito) oppure MultiTalk (Wan 2.1, nativo) ---
+        self._ls_wrap = QWidget()
+        lr = QHBoxLayout(self._ls_wrap); lr.setContentsMargins(0, 0, 0, 0)
+        lr.addWidget(QLabel(tr("v2v.lsengine_label", "Motore lip-sync:")))
+        self.cmb_lsengine = QComboBox()
+        self.cmb_lsengine.addItem(tr("v2v.lsengine.ltx", "LTX-2.3 (audio→video, predefinito)"), "ltx")
+        self.cmb_lsengine.addItem(tr("v2v.lsengine.multitalk", "MultiTalk (Wan 2.1, lip-sync dedicato)"), "multitalk")
+        self.cmb_lsengine.setToolTip(tr("v2v.lsengine.tt",
+            "LTX-2.3 genera video e audio insieme; MultiTalk anima la foto su un audio reale con Wan 2.1 "
+            "(lip-sync dedicato, supporta le LoRA Wan). Scegli quello che preferisci."))
+        self.cmb_lsengine.currentIndexChanged.connect(lambda *_: self._on_mode())
+        lr.addWidget(self.cmb_lsengine, 1)
+        self._ls_wrap.setVisible(False)
+        root.addWidget(self._ls_wrap)
+
         # --- sorgente video (condivisa Talk/ReTake) ---
         self._src_wrap = QWidget()
         sv = QVBoxLayout(self._src_wrap); sv.setContentsMargins(0, 0, 0, 0)
@@ -263,14 +278,20 @@ class V2VPanel(QWidget):
             return "retake"
         return "normal"
 
+    def lipsync_engine(self) -> str:
+        """'ltx' (a2v LTX-2.3, predefinito) | 'multitalk' (Wan 2.1 nativo)."""
+        return self.cmb_lsengine.currentData() or "ltx"
+
     def _on_mode(self):
         m = self.current_mode()
         self._src_wrap.setVisible(m in ("talk", "retake"))   # 'sing'/'listen' usano la foto del Frame 1, non un video
         self.sec_retake.setVisible(m == "retake")
         self.sec_talk.setVisible(m == "talk")
         self.sec_sing.setVisible(m == "sing")
-        self.sec_wanlora.setVisible(m in ("talk", "sing"))
-        if m in ("talk", "sing"):
+        self._ls_wrap.setVisible(m in ("talk", "sing"))
+        _mt = m in ("talk", "sing") and self.lipsync_engine() == "multitalk"
+        self.sec_wanlora.setVisible(_mt)                      # le LoRA Wan valgono solo per MultiTalk
+        if _mt:
             self._ensure_wan_lora()
         self.sec_listen.setVisible(m == "listen")
         if m == "retake":
@@ -419,6 +440,8 @@ class V2VPanel(QWidget):
         if m == "retake":
             cfg.update({"v2v_start": round(self.v2v_start(), 2), "v2v_end": round(self.v2v_end(), 2),
                         "v2v_regen_audio": self.rb_audio_regen.isChecked()})
+        if m in ("talk", "sing"):
+            cfg["lipsync_engine"] = self.lipsync_engine()
         if m == "talk":
             cfg["wan_loras"] = self._selected_wan_loras()
             cfg.update({"talk_region": self.cmb_region.currentData(),

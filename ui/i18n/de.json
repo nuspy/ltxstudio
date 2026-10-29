@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "Sehr schnell (1 — am langsamsten)",
   "def.fvp_motion.tt": "Eingangsbilder pro Latent-Frame. 4 passt für fast alle Videos; 2 oder 1 bewahren bei schnellen Bewegungen mehr Details, kosten aber mehr Zeit.",
   "mw.fvsrplus_install_hint": "Installiere den Code mit: python scripts/install_flashvsrplus.py und lade die Gewichte im Tab „Modellgewichte“ herunter (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "Superauflösung (FlashVSR+)"
+  "queue.job.fvsrplus": "Superauflösung (FlashVSR+)",
+  "v2v.lsengine_label": "Lip-Sync-Engine:",
+  "v2v.lsengine.ltx": "LTX-2.3 (Audio→Video, Standard)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, dediziertes Lip-Sync)",
+  "v2v.lsengine.tt": "LTX-2.3 erzeugt Video und Audio gemeinsam; MultiTalk animiert das Foto mit Wan 2.1 auf einer echten Audiospur (dediziertes Lip-Sync, unterstützt Wan-LoRAs). Wähle, was dir besser gefällt.",
+  "queue.job.lipsync_multitalk": "Lip-Sync (MultiTalk)"
 }

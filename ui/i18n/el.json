@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "Πολύ γρήγορη (1 — το πιο αργό)",
   "def.fvp_motion.tt": "Καρέ εισόδου ανά λανθάνον καρέ. Το 4 ταιριάζει σχεδόν σε κάθε βίντεο· το 2 ή το 1 διατηρούν καλύτερα τις λεπτομέρειες στην γρήγορη κίνηση, με περισσότερο χρόνο.",
   "mw.fvsrplus_install_hint": "Εγκαταστήστε τον κώδικα με: python scripts/install_flashvsrplus.py και κατεβάστε τα βάρη από την καρτέλα «Βάρη μοντέλων» (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "Υπερ-ανάλυση (FlashVSR+)"
+  "queue.job.fvsrplus": "Υπερ-ανάλυση (FlashVSR+)",
+  "v2v.lsengine_label": "Μηχανή lip-sync:",
+  "v2v.lsengine.ltx": "LTX-2.3 (ήχος→βίντεο, προεπιλογή)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, αποκλειστικό lip-sync)",
+  "v2v.lsengine.tt": "Το LTX-2.3 παράγει μαζί βίντεο και ήχο· το MultiTalk κινεί τη φωτογραφία πάνω σε πραγματικό ήχο με το Wan 2.1 (αποκλειστικό lip-sync, υποστηρίζει LoRA του Wan). Επιλέξτε ό,τι προτιμάτε.",
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
 }

@@ -453,45 +453,25 @@ class _VideoEditAIWorker(QThread):
 
 
 class _NativeMultiTalkWorker(QThread):
-    """Lip-sync MultiTalk (Wan2.1) come subprocess nel venv ComfyUI legacy; riporta progress e path finale."""
+    """Lip-sync MultiTalk (Wan2.1 14B) NATIVO, senza ComfyUI: subprocess nel venv consolidato (core/multitalk_service,
+    motore workers/wan_mt). Riporta progress e path finale; stop() termina il processo."""
     done = Signal(dict)
     progress = Signal(str)
-
-    from core.comfy_legacy import venv_python as _cl_py
-    COMFY_PY = _cl_py() or r"E:\AI\Comfy_Nexus\ComfyUI\venv\Scripts\python.exe"
 
     def __init__(self, params: dict):
         super().__init__()
         self.params = params
+        self.proc = None
+
+    def stop(self):
+        _kill_proc_tree(getattr(self, "proc", None))
 
     def run(self):
-        import json as _json, os as _os, subprocess as _sp, tempfile as _tf
+        from core import multitalk_service as mts
         try:
-            worker = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "workers", "wan_multitalk.py")
-            # COORDINAMENTO (mancava): Wan2.1+MultiTalk è un load multi-GB — libera gli altri
-            # motori e aspetta il rilascio effettivo prima di partire.
-            try:
-                from core import mem_coordinator as _mc
-                _mc.free_and_wait("video", need_mb=18000)
-            except Exception:                               # noqa: BLE001
-                pass
-            jf = _tf.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
-            _json.dump(self.params, jf); jf.close()
-            proc = _sp.Popen([self.COMFY_PY, "-u", worker, jf.name],
-                             stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
-            self.proc = proc                                # #91: esposto per stop() alla chiusura
-            out_path = None
-            for line in proc.stdout:
-                line = line.rstrip()
-                if line.startswith("[") or line.startswith("OK:") or "Error" in line:
-                    self.progress.emit(line)
-                if line.startswith("OK:"):
-                    out_path = line[3:].strip()
-            proc.wait()
-            if out_path:
-                self.done.emit({"status": "success", "output": [out_path]})
-            else:
-                self.done.emit({"status": "error", "error": "MultiTalk: nessun output prodotto"})
+            out = mts.run_job(self.params, on_log=lambda l: self.progress.emit(l),
+                              on_proc=lambda p: setattr(self, "proc", p))
+            self.done.emit({"status": "success", "output": [out]})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
 
@@ -4063,6 +4043,8 @@ class MainWindow(QMainWindow):
         """Lip-sync/canto NATIVO via a2v LTX-2.3 (GGUF, zero ComfyUI). Sostituisce MultiTalk/Wan
         (era accoppiato al venv ComfyUI, rotto dal rename). Sorgente volto = foto Frame 1 o primo
         frame del video sorgente; audio reale (parlato/canzone). Chunking per i lunghi."""
+        if params.get("lipsync_engine") == "multitalk":          # scelta dell'utente: MultiTalk (Wan 2.1) nativo
+            return self._start_wan_multitalk(params)
         import subprocess as _sp, time as _t
         img = params.get("image_path")
         src = params.get("source_video")
@@ -4267,6 +4249,33 @@ class MainWindow(QMainWindow):
             self._log(f"[Talk] materializzazione audio fallita: {e}")
         return None
 
+    def _start_wan_multitalk(self, params: dict):
+        """Lip-sync MultiTalk NATIVO (Wan2.1 I2V 14B fp8 + adattatore audio): preflight con offerta di download dei pesi,
+        poi job in coda. Parametri dal pannello Talk/Canta; guidance LTX ignorata (con la distillazione lightx2v cfg=1)."""
+        from core import multitalk_service as mts
+        g = dict(params)
+        g["cfg"] = 1.0
+        g["seed"] = g.get("seed") if g.get("seed") is not None else random.randint(0, 2**31)
+        g.setdefault("output", str(OUTPUT_DIR / "multitalk.mp4"))
+        miss = mts.missing_weights()
+        if miss:
+            try:
+                from core import ensure_weights as ew
+                if ew.missing(mts.weight_ids()) and not ew.offer_download_gui(self, mts.weight_ids(), "MultiTalk"):
+                    return
+            except Exception:                           # noqa: BLE001 — il preflight sotto da' il messaggio
+                pass
+        errs = mts.preflight(g)
+        if errs:
+            QMessageBox.warning(self, "MultiTalk", "\n".join(errs))
+            return
+        nf = int(g.get("num_frames", 81) or 81)
+        self._log(f"[lip-sync MultiTalk] Wan2.1 14B nativo — {nf} frame ({nf / float(g.get('fps', 25) or 25):.1f}s) "
+                  f"{g.get('width')}x{g.get('height')}…")
+        self._mt_worker = _NativeMultiTalkWorker(g)
+        self._enqueue(tr("queue.job.lipsync_multitalk", "Lip-sync (MultiTalk)"), self._mt_worker, self._on_multitalk_done,
+                      on_progress=lambda s: self._log("[lip-sync] " + s))
+
     def _maybe_multitalk(self, vals: dict, v2v: dict, mode: str) -> bool:
         """Instrada Talk/Canta al motore MultiTalk nativo. Ritorna True se gestito (→ on_generate
         deve fermarsi). MultiTalk è audio-driven: serve un audio REALE (file/canzone)."""
@@ -4335,6 +4344,7 @@ class MainWindow(QMainWindow):
             "talk_mask_offset": int(v2v.get("talk_mask_offset", 0) or 0) if mode == "talk" else 0,
             "talk_reimagine": bool(v2v.get("talk_reimagine", False)) if mode == "talk" else False,
             "output": str(OUTPUT_DIR / f"multitalk_{mode}.mp4"),
+            "lipsync_engine": v2v.get("lipsync_engine", "ltx"),
             # LoRA Wan 2.1 scelte nella sezione «LoRA Wan» di Talk/Canta (si sommano alla distill lightx2v)
             "loras": list(v2v.get("wan_loras") or []),
         }

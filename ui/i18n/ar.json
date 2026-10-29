@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "سريعة جدًا (1 — الأبطأ)",
   "def.fvp_motion.tt": "عدد إطارات الإدخال لكل إطار كامن. القيمة 4 تناسب معظم الفيديوهات؛ و2 أو 1 تحافظ على تفاصيل أكثر في الحركة السريعة على حساب وقت أطول.",
   "mw.fvsrplus_install_hint": "ثبّت الشيفرة بالأمر: python scripts/install_flashvsrplus.py ونزّل الأوزان من تبويب «أوزان النماذج» (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "الدقة الفائقة (FlashVSR+)"
+  "queue.job.fvsrplus": "الدقة الفائقة (FlashVSR+)",
+  "v2v.lsengine_label": "محرّك مزامنة الشفاه:",
+  "v2v.lsengine.ltx": "LTX-2.3 (صوت→فيديو، الافتراضي)",
+  "v2v.lsengine.multitalk": "MultiTalk (‏Wan 2.1، مزامنة شفاه مخصّصة)",
+  "v2v.lsengine.tt": "يولّد LTX-2.3 الفيديو والصوت معًا؛ أما MultiTalk فيحرّك الصورة على صوت حقيقي باستخدام Wan 2.1 (مزامنة شفاه مخصّصة وتدعم LoRA الخاصة بـ Wan). اختر ما تفضّله.",
+  "queue.job.lipsync_multitalk": "مزامنة الشفاه (MultiTalk)"
 }

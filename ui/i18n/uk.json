@@ -3451,5 +3451,10 @@
   "def.fvp_motion.vfast": "Дуже швидкий (1 — найповільніше)",
   "def.fvp_motion.tt": "Вхідних кадрів на один латентний кадр. 4 підходить майже для всіх відео; 2 або 1 краще зберігають деталі при швидкому русі, але потребують більше часу.",
   "mw.fvsrplus_install_hint": "Встановіть код командою: python scripts/install_flashvsrplus.py і завантажте ваги на вкладці «Ваги моделей» (flashvsr-plus-turbo / flashvsr-plus-base).",
-  "queue.job.fvsrplus": "Надрозділення (FlashVSR+)"
+  "queue.job.fvsrplus": "Надрозділення (FlashVSR+)",
+  "v2v.lsengine_label": "Рушій lip-sync:",
+  "v2v.lsengine.ltx": "LTX-2.3 (аудіо→відео, за замовчуванням)",
+  "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, окремий lip-sync)",
+  "v2v.lsengine.tt": "LTX-2.3 генерує відео та звук разом; MultiTalk оживляє фото під реальну аудіодоріжку на Wan 2.1 (окремий lip-sync, підтримує LoRA для Wan). Оберіть те, що подобається.",
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
 }
