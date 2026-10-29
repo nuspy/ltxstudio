@@ -121,6 +121,11 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "seedvr2-3b-fp8": (["upscale_video"], []),
     "seedvr2-vae": (["upscale_video", "vae"], []),
     "flashvsr-v11": (["upscale_video"], []),
+    "flashvsr-plus-tc": (["upscale_video"], []),
+    "flashvsr-plus-turbo": (["upscale_video"], ["flashvsr-plus-turbo-lq", "flashvsr-plus-tc"]),
+    "flashvsr-plus-turbo-lq": (["upscale_video"], []),
+    "flashvsr-plus-base": (["upscale_video"], ["flashvsr-plus-base-lq", "flashvsr-plus-tc"]),
+    "flashvsr-plus-base-lq": (["upscale_video"], []),
     # ── aux ──
     "sam2-hiera-large": (["segment"], []),
     "grounding-dino-base": (["segment"], []),

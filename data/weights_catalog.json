@@ -7323,6 +7323,128 @@
         "te",
         "uncensored"
       ]
+    },
+    {
+      "id": "flashvsr-plus-tc",
+      "module": "Video",
+      "label": "FlashVSR+ TinyDecoder (comune a Turbo e Base)",
+      "kind": "file",
+      "type": "FlashVSR",
+      "family": "FlashVSR_plus",
+      "gated": false,
+      "approx_gb": 0.19,
+      "scan_names": [
+        "TCDecoder.ckpt"
+      ],
+      "category": "video",
+      "arch": "flashvsr_plus",
+      "repo_id": "ruchangyao/FlashVSR_plus",
+      "url": "https://huggingface.co/ruchangyao/FlashVSR_plus",
+      "filename": "TCDecoder.ckpt",
+      "sha256": "e224bdcf2f52745cbf4d393ff5374c2ba09e90285d5d19062d2bf63b915b6161",
+      "use": [
+        "upscale_video"
+      ]
+    },
+    {
+      "id": "flashvsr-plus-turbo",
+      "module": "Video",
+      "label": "FlashVSR+ Turbo (super-risoluzione video, veloce)",
+      "kind": "file",
+      "type": "FlashVSR",
+      "family": "FlashVSR_plus/turbo",
+      "gated": false,
+      "approx_gb": 5.68,
+      "scan_names": [
+        "dit.safetensors"
+      ],
+      "category": "video",
+      "arch": "flashvsr_plus",
+      "repo_id": "ruchangyao/FlashVSR_plus",
+      "url": "https://huggingface.co/ruchangyao/FlashVSR_plus",
+      "filename": "dit.safetensors",
+      "remote_filename": "turbo/dit.safetensors",
+      "sha256": "7862b92178176fa3aebc34c6c071daca6b56ab1dddb8e7ff9a01c47f5226ec8b",
+      "deps": [
+        "flashvsr-plus-turbo-lq",
+        "flashvsr-plus-tc"
+      ],
+      "use": [
+        "upscale_video"
+      ]
+    },
+    {
+      "id": "flashvsr-plus-turbo-lq",
+      "module": "Video",
+      "label": "FlashVSR+ Turbo: proiezione LQ",
+      "kind": "file",
+      "type": "FlashVSR",
+      "family": "FlashVSR_plus/turbo",
+      "gated": false,
+      "approx_gb": 1.15,
+      "scan_names": [
+        "lq_proj_in.safetensors"
+      ],
+      "category": "video",
+      "arch": "flashvsr_plus",
+      "repo_id": "ruchangyao/FlashVSR_plus",
+      "url": "https://huggingface.co/ruchangyao/FlashVSR_plus",
+      "filename": "lq_proj_in.safetensors",
+      "remote_filename": "turbo/lq_proj_in.safetensors",
+      "sha256": "e77b378ae12342eefbb58f924256f362a151b93ce73dd32808fcdaca9c051496",
+      "use": [
+        "upscale_video"
+      ]
+    },
+    {
+      "id": "flashvsr-plus-base",
+      "module": "Video",
+      "label": "FlashVSR+ Base (super-risoluzione video, qualita')",
+      "kind": "file",
+      "type": "FlashVSR",
+      "family": "FlashVSR_plus/base",
+      "gated": false,
+      "approx_gb": 5.68,
+      "scan_names": [
+        "dit.safetensors"
+      ],
+      "category": "video",
+      "arch": "flashvsr_plus",
+      "repo_id": "ruchangyao/FlashVSR_plus",
+      "url": "https://huggingface.co/ruchangyao/FlashVSR_plus",
+      "filename": "dit.safetensors",
+      "remote_filename": "base/dit.safetensors",
+      "sha256": "58d64c1f1b3a559bafb69bb014f3ab2745e800c89435afdc154966eb96bc7459",
+      "deps": [
+        "flashvsr-plus-base-lq",
+        "flashvsr-plus-tc"
+      ],
+      "use": [
+        "upscale_video"
+      ]
+    },
+    {
+      "id": "flashvsr-plus-base-lq",
+      "module": "Video",
+      "label": "FlashVSR+ Base: proiezione LQ",
+      "kind": "file",
+      "type": "FlashVSR",
+      "family": "FlashVSR_plus/base",
+      "gated": false,
+      "approx_gb": 1.15,
+      "scan_names": [
+        "lq_proj_in.safetensors"
+      ],
+      "category": "video",
+      "arch": "flashvsr_plus",
+      "repo_id": "ruchangyao/FlashVSR_plus",
+      "url": "https://huggingface.co/ruchangyao/FlashVSR_plus",
+      "filename": "lq_proj_in.safetensors",
+      "remote_filename": "base/lq_proj_in.safetensors",
+      "sha256": "a1fe997f19060171db8dd4d58c30debc78ddfcc357b63481798792a38a356d8d",
+      "use": [
+        "upscale_video"
+      ]
     }
   ],
   "schema": 2,

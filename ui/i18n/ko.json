@@ -3438,5 +3438,18 @@
   "pitch.midi": "악보",
   "pitch.midi.ph": "MIDI 악보 (.mid / .midi)",
   "pitch.note.score": "MIDI 악보의 음에 맞춰 목소리를 보정합니다 (목소리가 악보와 박자가 맞아야 합니다).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein은 증류 모델입니다. {n} 스텝에서는 편집이 약해져 사진이 거의 그대로 남습니다(실측: 12 스텝 = 완전 편집, 16 = 부분, 21 = 변화 없음). 12 스텝을 권장합니다."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein은 증류 모델입니다. {n} 스텝에서는 편집이 약해져 사진이 거의 그대로 남습니다(실측: 12 스텝 = 완전 편집, 16 = 부분, 21 = 변화 없음). 12 스텝을 권장합니다.",
+  "def.engine.fvsrplus": "FlashVSR+ (Turbo / Base)",
+  "def.engine.fvsrplus.tt": "FlashVSR+: 스트리밍 영상 초해상도(Wan2.1-1.3B, 단일 스텝), 최대 ×4, 하이브리드 어텐션 적용: FlashVSR v1.1보다 빠르고 메모리를 덜 사용합니다. Turbo = 빠름, Base = 품질. 작은 그래픽 카드에서도 동작합니다(메모리가 자동으로 조정됨).",
+  "def.fvp_mode_lbl": "FlashVSR+ 버전:",
+  "def.fvp_mode.turbo": "Turbo (빠름)",
+  "def.fvp_mode.base": "Base (품질)",
+  "def.fvp_mode.tt": "Turbo: 하이브리드 어텐션, 가장 빠름. Base: 전체 어텐션, 최고 품질.",
+  "def.fvp_motion_lbl": "움직임:",
+  "def.fvp_motion.normal": "보통 (4 — 권장)",
+  "def.fvp_motion.fast": "빠름 (2 — 더 느림)",
+  "def.fvp_motion.vfast": "매우 빠름 (1 — 가장 느림)",
+  "def.fvp_motion.tt": "잠재 프레임당 입력 프레임 수. 4는 거의 모든 영상에 적합하며, 2 또는 1은 빠른 움직임에서 디테일을 더 잘 보존하지만 시간이 더 걸립니다.",
+  "mw.fvsrplus_install_hint": "python scripts/install_flashvsrplus.py 로 코드를 설치하고 «모델 가중치» 탭에서 가중치를 받으세요 (flashvsr-plus-turbo / flashvsr-plus-base).",
+  "queue.job.fvsrplus": "초해상도 (FlashVSR+)"
 }

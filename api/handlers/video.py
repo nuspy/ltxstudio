@@ -253,12 +253,15 @@ class LipsyncReq(BaseModel):
 
 class EnhanceReq(BaseModel):
     video_path: str
-    engine: str = Field("seedvr2", description="seedvr2 | flashvsr | h3_upsampler (MiniMax H3, nativo)")
+    engine: str = Field("seedvr2", description="seedvr2 | flashvsr | flashvsr_plus | h3_upsampler (MiniMax H3, nativo)")
     seedvr2_model: str = "seedvr2_ema_3b_fp8_e4m3fn.safetensors"
     resolution: int = 1080
     batch_size: int = 5
     block_swap: int = 0
     scale: float = 2.0
+    # solo engine=flashvsr_plus: variante e compressione temporale (2 o 1 per i movimenti veloci)
+    fvp_mode: str = Field("turbo", description="turbo | base (solo engine=flashvsr_plus)")
+    fvp_temporal_compression: int = Field(4, description="4 | 2 | 1 (solo engine=flashvsr_plus)")
     # solo engine=h3_upsampler: il checkpoint H3 Ref2VA lo sceglie il chiamante (nessun ripiego automatico)
     h3_profile: str | None = Field(None, description="nvfp4 | int4 | int8 | fp8 (obbligatorio per h3_upsampler)")
     h3_te: str | None = Field(None, description="mmh3-te-nvfp4 | mmh3-te-fp8 | mmh3-te-int8 (vuoto = quello del profilo)")
@@ -620,6 +623,14 @@ def register(app: FastAPI):
                                  megapixels=req.megapixels, denoise=req.denoise, guide=req.guide,
                                  lora_strength=req.lora_strength, tile_tokens=req.tile_tokens,
                                  on_log=lambda l: job.log(l))
+            elif req.engine == "flashvsr_plus":
+                from core import flashvsrplus_service as fvp
+                _errs = fvp.preflight(req.fvp_mode)
+                if _errs:
+                    raise RuntimeError("; ".join(_errs))
+                fvp.upscale_video(req.video_path, out, mode=req.fvp_mode, scale=req.scale,
+                                  temporal_compression=req.fvp_temporal_compression,
+                                  on_log=lambda l: job.log(l))
             elif req.engine == "flashvsr":
                 from core import flashvsr_service as fv
                 _errs = fv.preflight()                        # una sola chiamata (era invocata 2×)

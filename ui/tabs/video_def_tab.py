@@ -21,7 +21,7 @@ from core.video_enhance_pipeline import SEEDVR2_MODELS
 from core import face_restore_pipeline as facerestore
 from ui.i18n_manager import tr
 
-_ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr", 3: "h3_upsampler"}
+_ENGINE_KEY = {0: "seedvr2", 1: "esrgan", 2: "flashvsr", 3: "h3_upsampler", 4: "flashvsr_plus"}
 
 
 class VideoDefTab(QWidget):
@@ -50,7 +50,12 @@ class VideoDefTab(QWidget):
         box = QGroupBox(tr("def.restore.group")); f = QFormLayout(box)
         self.engine = QComboBox()
         self.engine.addItems([tr("def.engine.seedvr2"), tr("def.engine.esrgan"), tr("def.engine.flashvsr"),
-                              tr("def.engine.h3up", "MiniMax H3 Video Upsampler")])
+                              tr("def.engine.h3up", "MiniMax H3 Video Upsampler"),
+                              tr("def.engine.fvsrplus", "FlashVSR+ (Turbo / Base)")])
+        self.engine.setItemData(4, tr("def.engine.fvsrplus.tt",
+            "FlashVSR+: super-risoluzione video in streaming (Wan2.1-1.3B, un solo passo), fino a ×4, "
+            "con attenzione ibrida: piu' veloce e con meno memoria di FlashVSR v1.1. Turbo = veloce, "
+            "Base = qualita'. Gira anche su schede piccole (la memoria si adatta da sola)."), Qt.ToolTipRole)
         self.engine.setItemData(3, tr("def.engine.h3up.tt",
             "Ingrandisce il video con MiniMax H3: upscaler latente + un ri-disegno a tile guidato dalla LoRA h3upscale "
             "(il clip a metà risoluzione fa da guida). Serve il modello H3 Ref2VA."), Qt.ToolTipRole)
@@ -83,6 +88,21 @@ class VideoDefTab(QWidget):
         self.scale = QDoubleSpinBox(); self.scale.setRange(1.0, 8.0); self.scale.setSingleStep(0.5); self.scale.setValue(2.0)
         self.scale.setToolTip(tr("def.scale.tt", "Fattore di scala ESRGAN: 2× raddoppia, 4× quadruplica la risoluzione."))
         f.addRow(tr("def.scale_lbl"), self.scale)
+        # FlashVSR+: variante (Turbo/Base) e compressione temporale (movimento)
+        self.fvp_mode = QComboBox()
+        self.fvp_mode.addItem(tr("def.fvp_mode.turbo", "Turbo (veloce)"), "turbo")
+        self.fvp_mode.addItem(tr("def.fvp_mode.base", "Base (qualità)"), "base")
+        self.fvp_mode.setToolTip(tr("def.fvp_mode.tt",
+            "Turbo: attenzione ibrida, il piu' veloce. Base: attenzione completa, qualita' massima."))
+        f.addRow(tr("def.fvp_mode_lbl", "Variante FlashVSR+:"), self.fvp_mode)
+        self.fvp_motion = QComboBox()
+        self.fvp_motion.addItem(tr("def.fvp_motion.normal", "Normale (4 — consigliato)"), 4)
+        self.fvp_motion.addItem(tr("def.fvp_motion.fast", "Veloce (2 — piu' lento)"), 2)
+        self.fvp_motion.addItem(tr("def.fvp_motion.vfast", "Molto veloce (1 — il piu' lento)"), 1)
+        self.fvp_motion.setToolTip(tr("def.fvp_motion.tt",
+            "Frame di ingresso per fotogramma latente. 4 va bene per quasi tutti i video; "
+            "2 o 1 conservano meglio i dettagli nei movimenti rapidi, a costo di piu' tempo."))
+        f.addRow(tr("def.fvp_motion_lbl", "Movimento:"), self.fvp_motion)
         root.addWidget(box)
         self._build_h3up_box(root)
 
@@ -348,6 +368,8 @@ class VideoDefTab(QWidget):
             "rife_ckpt": self.rife_ckpt.currentText(),
             "chain_face": self.chain_face.isChecked(),
             "h3up": self.h3up_params() if _ENGINE_KEY[self.engine.currentIndex()] == "h3_upsampler" else None,
+            "fvp": {"mode": self.fvp_mode.currentData() or "turbo",
+                    "temporal_compression": int(self.fvp_motion.currentData() or 4)},
         }
 
     def _wrap(self, layout):
@@ -386,6 +408,9 @@ class VideoDefTab(QWidget):
                 self.request_enhance.emit()
             return
         ids = _ids.get(key)
+        if key == "flashvsr_plus":                     # i pesi dipendono dalla variante scelta (Turbo / Base)
+            from core import flashvsrplus_service as _fvp
+            ids = _fvp.weight_ids(self.fvp_mode.currentData() or "turbo")
         if ids:
             try:
                 from core import ensure_weights as ew
@@ -419,11 +444,13 @@ class VideoDefTab(QWidget):
     def _on_engine(self, *_):
         key = _ENGINE_KEY[self.engine.currentIndex()]
         sv = key == "seedvr2"; es = key == "esrgan"; fv = key == "flashvsr"; h3 = key == "h3_upsampler"
+        fp = key == "flashvsr_plus"
         self.h3up_box.setVisible(h3)
         self.seedvr2_model.setEnabled(sv); self.blocks.setEnabled(sv); self.batch.setEnabled(sv)
         self.resolution.setEnabled(sv); self.overlap.setEnabled(sv)
         self.esrgan_model.setEnabled(es)
-        self.scale.setEnabled(es or fv)                      # FlashVSR: gira alla scala scelta (max ×4 nativo — #156)
+        self.fvp_mode.setEnabled(fp); self.fvp_motion.setEnabled(fp)
+        self.scale.setEnabled(es or fv or fp)                      # FlashVSR: gira alla scala scelta (max ×4 nativo — #156)
 
     def _pick(self):
         fn, _ = QFileDialog.getOpenFileName(self, tr("def.pick.dialog.title"), "", tr("def.pick.dialog.filter"))

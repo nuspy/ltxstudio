@@ -3438,5 +3438,18 @@
   "pitch.midi": "乐谱",
   "pitch.midi.ph": "MIDI 乐谱（.mid / .midi）",
   "pitch.note.score": "让人声贴合 MIDI 乐谱的音符（人声在时间上必须与乐谱对齐）。",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein 是蒸馏模型：使用 {n} 步时编辑效果会减弱，甚至几乎不改变照片（实测：12 步 = 完整编辑，16 步 = 部分，21 步 = 无变化）。建议使用 12 步。"
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein 是蒸馏模型：使用 {n} 步时编辑效果会减弱，甚至几乎不改变照片（实测：12 步 = 完整编辑，16 步 = 部分，21 步 = 无变化）。建议使用 12 步。",
+  "def.engine.fvsrplus": "FlashVSR+ (Turbo / Base)",
+  "def.engine.fvsrplus.tt": "FlashVSR+：流式视频超分辨率（Wan2.1-1.3B，单步），最高 ×4，采用混合注意力：比 FlashVSR v1.1 更快、更省显存。Turbo = 快速，Base = 画质。小显存显卡也能运行（显存会自动适配）。",
+  "def.fvp_mode_lbl": "FlashVSR+ 版本：",
+  "def.fvp_mode.turbo": "Turbo（快速）",
+  "def.fvp_mode.base": "Base（画质）",
+  "def.fvp_mode.tt": "Turbo：混合注意力，最快。Base：完整注意力，画质最佳。",
+  "def.fvp_motion_lbl": "运动：",
+  "def.fvp_motion.normal": "普通（4 — 推荐）",
+  "def.fvp_motion.fast": "快速（2 — 较慢）",
+  "def.fvp_motion.vfast": "极快（1 — 最慢）",
+  "def.fvp_motion.tt": "每个潜在帧对应的输入帧数。4 适合几乎所有视频；2 或 1 能在快速运动中保留更多细节，但耗时更长。",
+  "mw.fvsrplus_install_hint": "请运行 python scripts/install_flashvsrplus.py 安装代码，并在“模型权重”标签页下载权重（flashvsr-plus-turbo / flashvsr-plus-base）。",
+  "queue.job.fvsrplus": "超分辨率 (FlashVSR+)"
 }

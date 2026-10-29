@@ -3438,5 +3438,18 @@
   "pitch.midi": "स्कोर",
   "pitch.midi.ph": "MIDI स्कोर (.mid / .midi)",
   "pitch.note.score": "आवाज़ को MIDI स्कोर के सुरों पर ट्यून करता है (आवाज़ को समय में स्कोर का पालन करना चाहिए)।",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein डिस्टिल्ड मॉडल है: {n} स्टेप पर एडिट कमज़ोर हो जाता है और फ़ोटो लगभग वैसी ही रह जाती है (लाइव जाँच: 12 स्टेप = पूरा एडिट, 16 = आंशिक, 21 = कोई बदलाव नहीं)। 12 स्टेप अनुशंसित हैं।"
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein डिस्टिल्ड मॉडल है: {n} स्टेप पर एडिट कमज़ोर हो जाता है और फ़ोटो लगभग वैसी ही रह जाती है (लाइव जाँच: 12 स्टेप = पूरा एडिट, 16 = आंशिक, 21 = कोई बदलाव नहीं)। 12 स्टेप अनुशंसित हैं।",
+  "def.engine.fvsrplus": "FlashVSR+ (Turbo / Base)",
+  "def.engine.fvsrplus.tt": "FlashVSR+: स्ट्रीमिंग वीडियो सुपर-रेज़ोल्यूशन (Wan2.1-1.3B, एक ही चरण), ×4 तक, हाइब्रिड अटेंशन के साथ: FlashVSR v1.1 से तेज़ और कम मेमोरी में। Turbo = तेज़, Base = गुणवत्ता। छोटे कार्ड पर भी चलता है (मेमोरी अपने-आप ढल जाती है)।",
+  "def.fvp_mode_lbl": "FlashVSR+ संस्करण:",
+  "def.fvp_mode.turbo": "Turbo (तेज़)",
+  "def.fvp_mode.base": "Base (गुणवत्ता)",
+  "def.fvp_mode.tt": "Turbo: हाइब्रिड अटेंशन, सबसे तेज़। Base: पूर्ण अटेंशन, सर्वोत्तम गुणवत्ता।",
+  "def.fvp_motion_lbl": "गति:",
+  "def.fvp_motion.normal": "सामान्य (4 — अनुशंसित)",
+  "def.fvp_motion.fast": "तेज़ (2 — धीमा)",
+  "def.fvp_motion.vfast": "बहुत तेज़ (1 — सबसे धीमा)",
+  "def.fvp_motion.tt": "प्रति लेटेंट फ़्रेम इनपुट फ़्रेम की संख्या। 4 लगभग हर वीडियो के लिए ठीक है; 2 या 1 तेज़ गति में बारीकियाँ बेहतर बचाते हैं, पर समय अधिक लगता है।",
+  "mw.fvsrplus_install_hint": "कोड इंस्टॉल करें: python scripts/install_flashvsrplus.py और «मॉडल वेट» टैब से वेट डाउनलोड करें (flashvsr-plus-turbo / flashvsr-plus-base)।",
+  "queue.job.fvsrplus": "सुपर-रेज़ोल्यूशन (FlashVSR+)"
 }

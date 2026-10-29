@@ -3438,5 +3438,18 @@
   "pitch.midi": "Partitura",
   "pitch.midi.ph": "partitura MIDI (.mid / .midi)",
   "pitch.note.score": "Afina la voz a las notas de una partitura MIDI (la voz debe seguir la partitura en el tiempo).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein está destilado: con {n} pasos la edición se debilita hasta dejar la foto casi sin cambios (probado en vivo: 12 pasos = edición completa, 16 = parcial, 21 = sin cambios). Se recomiendan 12 pasos."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein está destilado: con {n} pasos la edición se debilita hasta dejar la foto casi sin cambios (probado en vivo: 12 pasos = edición completa, 16 = parcial, 21 = sin cambios). Se recomiendan 12 pasos.",
+  "def.engine.fvsrplus": "FlashVSR+ (Turbo / Base)",
+  "def.engine.fvsrplus.tt": "FlashVSR+: superresolución de vídeo en streaming (Wan2.1-1.3B, un solo paso), hasta ×4, con atención híbrida: más rápido y con menos memoria que FlashVSR v1.1. Turbo = rápido, Base = calidad. Funciona también en tarjetas pequeñas (la memoria se adapta sola).",
+  "def.fvp_mode_lbl": "Variante de FlashVSR+:",
+  "def.fvp_mode.turbo": "Turbo (rápido)",
+  "def.fvp_mode.base": "Base (calidad)",
+  "def.fvp_mode.tt": "Turbo: atención híbrida, la más rápida. Base: atención completa, máxima calidad.",
+  "def.fvp_motion_lbl": "Movimiento:",
+  "def.fvp_motion.normal": "Normal (4 — recomendado)",
+  "def.fvp_motion.fast": "Rápido (2 — más lento)",
+  "def.fvp_motion.vfast": "Muy rápido (1 — el más lento)",
+  "def.fvp_motion.tt": "Fotogramas de entrada por fotograma latente. 4 sirve para casi todos los vídeos; 2 o 1 conservan mejor los detalles en movimientos rápidos, a costa de más tiempo.",
+  "mw.fvsrplus_install_hint": "Instala el código con: python scripts/install_flashvsrplus.py y descarga los pesos desde la pestaña «Pesos de modelos» (flashvsr-plus-turbo / flashvsr-plus-base).",
+  "queue.job.fvsrplus": "Superresolución (FlashVSR+)"
 }

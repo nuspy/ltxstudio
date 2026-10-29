@@ -238,6 +238,28 @@ class _FlashVSRWorker(QThread):
             self.done.emit({"status": "error", "error": str(e)})
 
 
+class _FlashVSRPlusWorker(QThread):
+    """FlashVSR+ (Turbo/Base) super-risoluzione video fino a ×4 (pacchetto FlashVSR_Plus, SDPA, VRAM adattiva). Log + path."""
+    done = Signal(dict)
+    progress = Signal(str)
+
+    def __init__(self, src: str, out: str, target_scale: float = 2.0, mode: str = "turbo",
+                 temporal_compression: int = 4):
+        super().__init__()
+        self.src, self.out, self.target_scale = src, out, target_scale
+        self.mode, self.temporal_compression = mode, temporal_compression
+
+    def run(self):
+        from core import flashvsrplus_service as fvp
+        try:
+            fvp.upscale_video(self.src, self.out, target_scale=self.target_scale, mode=self.mode,
+                              temporal_compression=self.temporal_compression,
+                              on_log=lambda l: self.progress.emit(l))
+            self.done.emit({"status": "success", "output": [self.out]})
+        except Exception as e:                          # noqa: BLE001
+            self.done.emit({"status": "error", "error": str(e)})
+
+
 class _H3UpsampleWorker(QThread):
     """H3 Video Upsampler (MiniMax H3 nativo, venv diffusers_next): upscaler latente + ri-disegno a tile. Log + path."""
     done = Signal(dict)
@@ -3898,6 +3920,23 @@ class MainWindow(QMainWindow):
             self._log(f"[nativo] FlashVSR super-risoluzione (x{_fvs:g}) su {Path(src).name}…")
             self._fv_worker = _FlashVSRWorker(src, out, target_scale=_fvs)
             self._enqueue(tr("queue.job.flashvsr", "Super-risoluzione (FlashVSR)"), self._fv_worker,
+                          self._on_multitalk_done, on_progress=self._log)
+            return
+        if engine == "flashvsr_plus":                    # FlashVSR+ Turbo/Base (pacchetto nativo, SDPA)
+            from core import flashvsrplus_service as fvp
+            _fp = dict(cfg.get("fvp") or {})
+            _mode = _fp.get("mode", "turbo")
+            errs = fvp.preflight(_mode)
+            if errs:
+                QMessageBox.warning(self, "FlashVSR+", "\n".join(errs) +
+                    "\n\n" + tr("mw.fvsrplus_install_hint", "Installa il codice con: python scripts/install_flashvsrplus.py "
+                                  "e scarica i pesi dal tab «Pesi modelli» (flashvsr-plus-turbo / flashvsr-plus-base).")); return
+            out = str(OUTPUT_DIR / f"flashvsrplus_{_mode}_{Path(src).stem}.mp4")
+            _fvs = float(cfg.get("target_scale", 2.0) or 2.0)
+            _tc = int(_fp.get("temporal_compression", 4) or 4)
+            self._log(f"[nativo] FlashVSR+ {_mode} super-risoluzione (x{_fvs:g}, movimento {_tc}) su {Path(src).name}…")
+            self._fvp_worker = _FlashVSRPlusWorker(src, out, target_scale=_fvs, mode=_mode, temporal_compression=_tc)
+            self._enqueue(tr("queue.job.fvsrplus", "Super-risoluzione (FlashVSR+)"), self._fvp_worker,
                           self._on_multitalk_done, on_progress=self._log)
             return
         if engine == "h3_upsampler":                     # MiniMax H3 Video Upsampler nativo (upscaler latente + tile guidati)
