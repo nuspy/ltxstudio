@@ -212,16 +212,77 @@ def _latent_mask(mask_path: str, lh: int, lw: int):
     return t.reshape(1, lh * lw, 1).to("cuda", torch.bfloat16)
 
 
-def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8):
+def _outpaint_init(init_img, mask_path: str, p: dict):
+    """Task 16a: in OUTPAINT il frame del canvas ha l'estensione scura uniforme; qui diventa il riferimento 1 → il modello
+    vede «una foto in una cornice nera» e la disegna. Si dà invece un riempimento plausibile (specchio sfocato + campo
+    liscio + grana); i pixel della foto restano identici. Fuori dall'outpaint (o con NATIVE_OUTPAINT_PREFILL=0) invariata."""
+    if init_img is None or not mask_path or not p.get("outpaint"):
+        return init_img
+    from core import outpaint_prefill
+    if not outpaint_prefill.enabled():
+        return init_img
+    out = outpaint_prefill.prefill_from_mask_path(init_img.convert("RGB"), mask_path, seed=int(p.get("seed") or 0))
+    _log("outpaint: estensione pre-riempita (specchio sfocato + campo liscio) invece del riempimento scuro")
+    return out
+
+
+def _wide_outpaint(p: dict) -> bool:
+    """Paste-back con maschera dilatata e sfumata larga: solo outpaint e solo con il prefill attivo (NATIVE_OUTPAINT_PREFILL=0
+    riporta alla sfumatura sottile di prima)."""
+    if not p.get("outpaint"):
+        return False
+    from core import outpaint_prefill
+    return outpaint_prefill.enabled()
+
+
+def _outpaint_feather(size, p: dict) -> int:
+    """Sfumatura del paste-back. Outpaint: AMPIA come il percorso FLUX (auto ~lato minore/40, 12-48 px): la maschera si
+    dilata nella foto e si sfuma (il bordo netto a 7 px era il «riquadro» visibile). Inpaint: sottile."""
+    explicit = int(p.get("feather") or 0)
+    if explicit:
+        return explicit
+    if _wide_outpaint(p):
+        return max(12, min(48, int(round(min(size) / 40))))
+    return max(4, min(size) // 128)
+
+
+# NB (task 16a, prova live 18/10): per Qwen la forza in OUTPAINT resta 1,0 (a differenza di FLUX base/Klein, cap 0,9).
+# Con forza < 1 i latenti partono da s0*rumore + (1-s0)*x0 con x0 = frame pre-riempito e la schedule salta i primi passi
+# (_sigmas): Qwen, a CFG 1, ridipinge pochissimo e l'estensione restava il pre-riempimento sfocato a macchie.
+# A 1,0 s0 = 1 → i latenti partono da RUMORE PIENO ovunque; fuori maschera li forza _keep_outside (originale rumorato),
+# dentro (l'estensione) decide il modello. Il pre-riempimento agisce quindi SOLO come riferimento 1 (annotato in rosso).
+
+
+def _paste_back(gen_img, init_img, mask_path: str, feather: int = 8, outpaint: bool = False, wide: bool = False):
     """Risultato alla risoluzione dell'ORIGINALE (il canvas lo rimette nel suo riquadro) e, fuori dalla
-    maschera, l'originale al pixel (il giro nel VAE ammorbidisce i dettagli)."""
+    maschera, l'originale al pixel (il giro nel VAE ammorbidisce i dettagli).
+
+    Task 14 («effetto cornice»): (1) lo scarto di tono del modello — su TUTTA la tela — si stima sulla zona-foto
+    e si toglie da tutto il generato (core/tone_match.py; NATIVE_OUTPAINT_TONEMATCH=0 lo spegne); (2) in OUTPAINT
+    l'«originale» nell'estensione è il riempimento scuro del canvas: dove la maschera sfumata è < 1 (vicino alla
+    foto) quel nero filtrava nel generato e disegnava una banda scura attorno alla foto → nell'estensione si
+    miscela il generato con se stesso."""
+    import numpy as np
     from PIL import Image, ImageFilter
     size = init_img.size
     m = Image.open(mask_path).convert("L").resize(size, Image.BILINEAR)
-    if feather:
+    gen_zone = np.asarray(m) > 127                          # True = rifatto dal modello (prima della sfumatura)
+    if outpaint and wide and feather:
+        # come il percorso FLUX: la regione generata si dilata nella foto e si sfuma (il tono vicino al bordo e' gia'
+        # quello della foto) -> niente bordo netto a «riquadro». Fuori dalla foto la maschera resta 1.
+        fo = int(round(feather * 1.9))
+        m = m.filter(ImageFilter.MaxFilter(fo * 2 + 1)).filter(ImageFilter.GaussianBlur(fo))
+    elif feather:
         m = m.filter(ImageFilter.GaussianBlur(feather))
     gen = gen_img.resize(size, Image.LANCZOS)
-    return Image.composite(gen, init_img.convert(gen.mode), m)
+    base = init_img.convert(gen.mode)
+    if gen.mode == "RGB" and os.environ.get("NATIVE_OUTPAINT_TONEMATCH", "1") != "0":
+        from core import tone_match
+        gen = tone_match.harmonize(gen, init_img.convert("RGB"), gen_zone, int(feather) or 8,
+                                   tau_mult=12.0 if outpaint else 6.0, tag="tone-qwen21", log=_log)
+        if outpaint:
+            base = Image.fromarray(np.where(gen_zone[..., None], np.asarray(gen), np.asarray(base)))
+    return Image.composite(gen, base, m)
 
 
 def run(p: dict) -> str:
@@ -260,6 +321,7 @@ def run(p: dict) -> str:
     init_img = Image.open(init_path) if init_path else None
     if mask_path and init_img is None:
         raise RuntimeError("Inpaint Qwen-Image 2.1: manca l'immagine da ritoccare")
+    init_img = _outpaint_init(init_img, mask_path, p)
     images = [Image.open(x) for x in refs]
     prompt = str(p.get("prompt") or "")
     if init_img is not None and mask_path:
@@ -369,7 +431,8 @@ def run(p: dict) -> str:
         img = img.convert("RGB")
     if init_img is not None and mask_path and p.get("paste_back", True):
         img = _paste_back(img, init_img, mask_path,          # sfumatura: 0 = auto, proporzionale alla foto
-                          feather=int(p.get("feather") or 0) or max(4, min(init_img.size) // 128))
+                          feather=_outpaint_feather(init_img.size, p),
+                          outpaint=bool(p.get("outpaint")), wide=_wide_outpaint(p))
     out = p.get("output") or str(REPO / "output" / f"qwen21_{int(time.time())}.png")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     img.save(out)

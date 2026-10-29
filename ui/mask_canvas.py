@@ -1068,9 +1068,16 @@ class MaskCanvas(QWidget):
             hidden.append(self._brush_cursor)
         for it in hidden:
             it.setVisible(False)
-        self.scene.render(painter, target, source)
-        for it in hidden:
-            it.setVisible(True)
+        # Il contorno tratteggiato blu del frame (#46a, 4 px: mezzo dentro il frame) è solo una guida a video: nell'export
+        # restava come riga blu di 2 px sul bordo dell'immagine, e Klein/Qwen la leggevano come parte della scena (task 16a).
+        _frame_pen = self.frame_item.pen()
+        self.frame_item.setPen(QPen(Qt.NoPen))
+        try:
+            self.scene.render(painter, target, source)
+        finally:
+            self.frame_item.setPen(_frame_pen)
+            for it in hidden:
+                it.setVisible(True)
 
     def export(self, out_dir: Path) -> dict:
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)

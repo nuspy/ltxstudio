@@ -715,10 +715,18 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     # perdita accettata. Disattivabile con NATIVE_FLUX1_FP8=0 (fallback bf16 pieno, come prima).
     if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf:
         try:
+            # Task 16b (A/B, default INVARIATO): il skip di default di FluxTransformer2DModel e' SOLO ("pos_embed","norm"):
+            # x_embedder (anche i token della foto di riferimento di Kontext), context_embedder, time_text_embed
+            # (timestep+guidance embedder) e proj_out finiscono in fp8 e4m3 (errore relativo misurato 2.7-5%, guidance_in 4.7%),
+            # contrariamente a quanto diceva il vecchio commento. NATIVE_FLUX_FP8_KEEP_BF16=1 li tiene in bf16 (~50 MB in piu').
+            _skip = ("pos_embed", "norm", "x_embedder", "context_embedder", "time_text_embed", "proj_out") \
+                if os.environ.get("NATIVE_FLUX_FP8_KEEP_BF16") == "1" else None
             tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn,
-                                        compute_dtype=bf16)   # skip default: norm/embed restano bf16
+                                        compute_dtype=bf16, skip_modules_pattern=_skip)
             tr._ls_fp8_storage = True
             _src = "fp8-nativo" if _flux_fp8_e4m3(transformer_path) else "bf16→fp8"
+            if _skip is not None:
+                _src += " + embedder/proj_out bf16"
             print(f"[flux] transformer STORAGE fp8 (layerwise, {_src}): ~metà VRAM, niente offload", flush=True)
         except Exception as e:                           # noqa: BLE001
             print(f"[flux] layerwise fp8 non applicato ({e}) → bf16 (fallback)", flush=True)
@@ -2015,6 +2023,17 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             if _mimg.size != (_W, _H):                       # maschera allineata a width/height
                 _mimg = _mimg.resize((_W, _H), Image.NEAREST)
             kw["mask_image"] = _mimg
+            # Task 16a — outpaint dei motori NON-Fill: il frame del canvas ha l'estensione scura uniforme. FluxFill la
+            # azzera da sé (non toccarlo), ma Klein la usa come riferimento + punto di partenza (vignetta scura) e il FLUX
+            # base la tiene come bordo. Si dà un riempimento plausibile (core/outpaint_prefill: specchio sfocato + campo
+            # liscio + grana); i pixel della foto restano identici e la maschera non cambia. NATIVE_OUTPAINT_PREFILL=0 = prima.
+            if params.get("outpaint") and type(pipe).__name__ in ("FluxInpaintPipeline", "Flux2KleinInpaintPipeline"):
+                from core import outpaint_prefill as _opf
+                if _opf.enabled():
+                    import numpy as _npf
+                    kw["image"] = _opf.prefill_extension(kw["image"], _npf.asarray(_mimg.convert("L")) > 127,
+                                                         seed=int(params.get("seed") or 0))
+                    print(f"[outpaint-prefill] {type(pipe).__name__}: estensione pre-riempita (specchio sfocato + campo liscio)", flush=True)
     else:
         kw["width"] = int(params.get("width", 1024))
         kw["height"] = int(params.get("height", 1024))
@@ -2039,6 +2058,19 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
     if type(pipe).__name__ == "FluxInpaintPipeline":
         kw["strength"] = float(params.get("denoise") or 0.9)
         kw["guidance_scale"] = min(float(kw.get("guidance_scale", 3.5)), 5.0)
+        if params.get("outpaint"):
+            # Task 16a — a strength 1.0 la schedule parte da rumore puro: il pre-riempimento non arriva al modello e
+            # l'estensione e' un'altra scena (live 18/10, O2). In outpaint: min(denoise, 0.9) (env NATIVE_OUTPAINT_STRENGTH).
+            from core import outpaint_prefill as _opf3
+            if _opf3.enabled():
+                kw["strength"] = _opf3.outpaint_strength(kw["strength"])
+                print(f"[outpaint-prefill] FluxInpaintPipeline: strength outpaint {kw['strength']:.2f}", flush=True)
+    # Task 16a — Klein outpaint: la GUI manda denoise=1.0 ma la pipeline Klein usa `strength` (default 0.8, non 1): la schedule
+    # partiva dal frame rumorato all'80% e il buio dell'estensione (bassa frequenza) sopravviveva. Qui denoise → strength.
+    if type(pipe).__name__ == "Flux2KleinInpaintPipeline" and params.get("outpaint"):
+        from core import outpaint_prefill as _opf2
+        if _opf2.enabled():
+            kw["strength"] = float(params.get("denoise") or 1.0)
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
@@ -2067,6 +2099,24 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             kw["callback_on_step_end_tensor_inputs"] = ["latents"]
         except Exception as _dde:                            # noqa: BLE001
             print(f"[diffdiff] disattivata ({_dde}) → inpaint normale", flush=True)
+    # Task 16b — interruttori DIAGNOSTICI (default spenti = comportamento invariato), per i test Kontext Q5-E2/E3:
+    # NATIVE_VAE_FP32=1 + Kontext: il VAE fp32 (wrapper di _assemble_flux) restituisce latenti della foto di riferimento in fp32;
+    # la pipeline li concatena a quelli bf16 e il transformer riceverebbe fp32 (mismatch col layerwise fp8) -> li riporta a bf16.
+    if os.environ.get("NATIVE_VAE_FP32") == "1" and hasattr(pipe, "_encode_vae_image") \
+            and not getattr(pipe, "_ls_enc_cast", False):
+        _enc0 = pipe._encode_vae_image
+        pipe._encode_vae_image = lambda *a, **k: _enc0(*a, **k).to(torch.bfloat16)
+        pipe._ls_enc_cast = True
+        print("[flux] VAE fp32: latenti di riferimento riportati a bf16 dopo l'encode", flush=True)
+    # NATIVE_T5_RELEASE_AFTER_ENCODE=1: T5/CLIP tornano in RAM subito dopo l'encode del prompt. Serve al transformer bf16 (22.9 GB)
+    # residente (STICKY): senza questo T5 resta in VRAM durante il denoise (nel Q5-C: alloc 31.9 GB -> spill nella shared-RAM, 128 s/step).
+    if os.environ.get("NATIVE_T5_RELEASE_AFTER_ENCODE") == "1":
+        for _tn in ("text_encoder", "text_encoder_2"):
+            _tm = getattr(pipe, _tn, None)
+            if _tm is not None and not getattr(_tm, "_ls_release_hook", False):
+                _tm.register_forward_hook(lambda m, i, o: (m.to("cpu"), torch.cuda.empty_cache(), None)[-1])
+                _tm._ls_release_hook = True
+        print("[flux] T5/CLIP: rilascio in RAM dopo l'encode (NATIVE_T5_RELEASE_AFTER_ENCODE=1)", flush=True)
     _step(f"GEN START pipe() — encode prompt+embedding → {kw.get('num_inference_steps','?')} step denoise → VAE decode")
     _vae = getattr(pipe, "vae", None)                       # cronometro del VAE decode (sotto-fase interna a pipe())
     _orig_dec = getattr(_vae, "decode", None)
@@ -2126,13 +2176,27 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             #  • INPAINT → anello SOTTILE (auto ~min_lato/128, 4–14 px): niente degradazione attorno all'edit.
             #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione + COLOR-MATCH al bordo.
             import numpy as _np
+            from core import tone_match as _tm                       # tono GLOBALE del generato ← zona-foto (task 14)
             _mk_bool = (_np.asarray(_m, dtype=_np.uint8) > 127)      # True = pixel da (ri)generare
             if params.get("outpaint"):
                 _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
                 # COLOR-MATCH al bordo (outpaint): l'estensione ha tono/luminosità un filo diversi dalla foto →
                 # linea di stacco. Riallinea al confine con falloff verso l'interno. Env NATIVE_OUTPAINT_COLORMATCH=0.
+                # TONO GLOBALE (task 14, «effetto cornice»): il modello rigenera anche la zona-foto → lo scarto di tono
+                # si stima sugli STESSI pixel (generato vs foto) e si toglie da TUTTO il generato; la correzione di
+                # confine resta come secondo stadio, solo se lo scarto dell'estensione è reale (core/tone_match.py).
+                # Env NATIVE_OUTPAINT_TONEMATCH=0 → comportamento di prima (solo correzione di confine a decadimento,
+                # e niente riempimento del punto sotto).
                 if os.environ.get("NATIVE_OUTPAINT_COLORMATCH", "1") == "1":
-                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
+                    if _tm.enabled():
+                        res_img = _tm.harmonize(res_img, _orig, _mk_bool, _feather, tau_mult=12.0, tag="tone-outpaint")
+                    else:
+                        res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
+                if _tm.enabled():
+                    # `_orig` è il frame del canvas: nell'estensione è il RIEMPIMENTO SCURO. La maschera sfumata vale < 1
+                    # vicino alla foto (≈0,84 al confine) e quel nero filtrava nel generato → banda scura attorno alla
+                    # foto. Nell'estensione si miscela il generato con se stesso (misurato: ΔE vicino al confine −1,0).
+                    _orig = Image.fromarray(_np.where(_mk_bool[:, :, None], _np.asarray(res_img), _np.asarray(_orig)))
                 _fo = int(round(_feather * 1.9))                         # dilata la regione generata prima di sfumare
                 _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))       # → la sfumatura NON tocca il bordo tela
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
@@ -2142,8 +2206,13 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
                 # contrasto un filo diversi dalla foto → LINEA di giunzione + "cambio di tono" visibili su aree
                 # ampie/lisce. Seam-localizzato (falloff dal bordo) per NON ridipingere un eventuale oggetto
                 # inserito lontano dal bordo. Env NATIVE_INPAINT_COLORMATCH=0 per disattivare.
+                # Task 14: stesso tono GLOBALE dell'outpaint (zona-foto = fuori maschera); NATIVE_OUTPAINT_TONEMATCH=0
+                # torna alla correzione di confine di prima.
                 if os.environ.get("NATIVE_INPAINT_COLORMATCH", "1") == "1":
-                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
+                    if _tm.enabled():
+                        res_img = _tm.harmonize(res_img, _orig, _mk_bool, _feather, tau_mult=6.0, clamp=32, tag="tone-inpaint")
+                    else:
+                        res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
                 _m = _m.filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
