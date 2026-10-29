@@ -285,12 +285,16 @@ class FP8Linear(nn.Module):
         self.register_buffer("weight", torch.empty(out_features, in_features, dtype=FP8, device=device))
         self.register_buffer("weight_scale", torch.empty(out_features, dtype=torch.float32, device=device))
 
+    rowwise_ok = True          # `torch._scaled_mm` con scale per riga: torch 2.9 (cu130) NON lo supporta su Blackwell (visto il 29/10)
+
     def forward(self, x: Tensor) -> Tensor:
         leading = tuple(x.shape[:-1])
         rows = math.prod(leading)
-        flat = x.to(torch.bfloat16).reshape(rows, self.in_features)
         if rows == 0:
             return x.new_zeros(*leading, self.out_features, dtype=torch.bfloat16)
+        if not (FP8Linear.rowwise_ok and x.is_cuda):
+            return self._forward_dequant(x, leading)
+        flat = x.to(torch.bfloat16).reshape(rows, self.in_features)
         n, k, m = _ceil(self.out_features, _GEMM_ALIGN), _ceil(self.in_features, _GEMM_ALIGN), _ceil(rows, _ROW_ALIGN)
         weight, scale = self.weight, self.weight_scale
         if (n, k) != (self.out_features, self.in_features):
@@ -299,9 +303,22 @@ class FP8Linear(nn.Module):
         if (m, k) != (rows, self.in_features):
             flat = F.pad(flat, (0, k - self.in_features, 0, m - rows))
         q, qs = quantize_rows(flat.contiguous())
-        out = torch._scaled_mm(q, weight.T, qs[:, None].contiguous(), scale[None, :].contiguous(),
-                               out_dtype=torch.bfloat16, use_fast_accum=True)
+        try:
+            out = torch._scaled_mm(q, weight.T, qs[:, None].contiguous(), scale[None, :].contiguous(),
+                                   out_dtype=torch.bfloat16, use_fast_accum=True)
+        except RuntimeError as e:
+            if "owwise" not in str(e) and "not supported" not in str(e):
+                raise
+            FP8Linear.rowwise_ok = False                 # una volta sola: da qui in poi dequantizzazione al volo (log nel worker)
+            print("[flux3] _scaled_mm per riga non supportato da questo torch/GPU: fp8 dequantizzato layer per layer (bf16)", flush=True)
+            return self._forward_dequant(x, leading)
         return out[:rows, :self.out_features].reshape(*leading, self.out_features)
+
+    def _forward_dequant(self, x: Tensor, leading) -> Tensor:
+        """Ripiego senza kernel fp8: il peso del solo layer si dequantizza in bf16 (E4M3 × scala per riga, in fp32) e il prodotto è un
+        F.linear normale. L'attivazione NON si quantizza: leggermente più accurato del percorso fp8, più lento."""
+        w = (self.weight.float() * self.weight_scale[:, None]).to(torch.bfloat16)
+        return F.linear(x.to(torch.bfloat16), w).reshape(*leading, self.out_features)
 
 
 def swap_fp8_linears(module: nn.Module, keys) -> int:

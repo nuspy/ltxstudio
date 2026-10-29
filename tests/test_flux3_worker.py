@@ -463,3 +463,21 @@ def test_resolve_te_krea2_usa_configs_dello_snapshot(monkeypatch):
     present.discard(S.TE)
     with pytest.raises(RuntimeError, match=S.TE):
         W.resolve({"flux3_te": ""}, need_pup=False)
+
+
+def test_fp8_linear_ripiego_dequantizzato_senza_kernel():
+    """Senza `_scaled_mm` per riga (torch 2.9 su Blackwell, CPU) FP8Linear dequantizza il layer e usa F.linear: stesso risultato di un
+    Linear bf16 con il peso dequantizzato."""
+    if D.FP8 is None:
+        pytest.skip("torch senza float8")
+    torch.manual_seed(0)
+    w = torch.randn(48, 64) * 0.05
+    q, s = D.quantize_rows(w)
+    lin = D.FP8Linear(64, 48)
+    lin.weight, lin.weight_scale = q, s
+    x = torch.randn(2, 5, 64)
+    y = lin(x)
+    ref = torch.nn.functional.linear(x.to(torch.bfloat16), (q.float() * s[:, None]).to(torch.bfloat16))
+    assert y.shape == (2, 5, 48) and y.dtype == torch.bfloat16 and torch.equal(y, ref)
+    assert D.FP8Linear.rowwise_ok in (True, False)
+    assert lin(x.new_zeros(0, 64)).shape == (0, 48)
