@@ -247,6 +247,10 @@ class LoraTab(QWidget):
             lines.append(tr("lora.info.trigger") + ": " + ", ".join(e.triggers))
         else:
             lines.append(tr("lora.info.no_trigger"))
+        if getattr(e, "trigger_notes", None):          # didascalie di training: da consultare, mai inserite nel prompt
+            lines.append(tr("lora.info.trigger_notes") + ":
+  " + "
+  ".join(n[:200] for n in e.trigger_notes[:12]))
         if e.downloads:
             lines.append(tr("lora.info.downloads").format(n=e.downloads))
         if e.description:

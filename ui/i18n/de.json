@@ -3520,5 +3520,6 @@
   "weights.license.declined": "Download abgebrochen: Lizenz nicht bestätigt.",
   "mq.pack.title": "MagicQuill nicht verfügbar",
   "mq.pack.missing": "Die Funktion MagicQuill V2 ist in dieser Edition der App nicht enthalten (Komponente fehlt).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein ist destilliert: Mit {n} Schritten schwächt sich die Bearbeitung ab, bis das Foto fast unverändert bleibt (live getestet: 12 Schritte = volle Bearbeitung, 16 = teilweise, 21 = unverändert). Empfohlen: 12 Schritte."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein ist destilliert: Mit {n} Schritten schwächt sich die Bearbeitung ab, bis das Foto fast unverändert bleibt (live getestet: 12 Schritte = volle Bearbeitung, 16 = teilweise, 21 = unverändert). Empfohlen: 12 Schritte.",
+  "lora.info.trigger_notes": "Trainings-Beschreibungen (nur zur Ansicht, werden nie in den Prompt eingefügt)"
 }

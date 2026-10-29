@@ -3520,5 +3520,6 @@
   "weights.license.declined": "다운로드 취소: 라이선스가 확인되지 않았습니다.",
   "mq.pack.title": "MagicQuill 사용 불가",
   "mq.pack.missing": "이 에디션의 앱에는 MagicQuill V2 기능이 포함되어 있지 않습니다(구성 요소 없음).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein은 증류 모델입니다. {n} 스텝에서는 편집이 약해져 사진이 거의 그대로 남습니다(실측: 12 스텝 = 완전 편집, 16 = 부분, 21 = 변화 없음). 12 스텝을 권장합니다."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein은 증류 모델입니다. {n} 스텝에서는 편집이 약해져 사진이 거의 그대로 남습니다(실측: 12 스텝 = 완전 편집, 16 = 부분, 21 = 변화 없음). 12 스텝을 권장합니다.",
+  "lora.info.trigger_notes": "학습 캡션(참고용, 프롬프트에 자동 삽입되지 않음)"
 }

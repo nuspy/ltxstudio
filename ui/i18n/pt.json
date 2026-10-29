@@ -3520,5 +3520,6 @@
   "weights.license.declined": "Descarga cancelada: licença não confirmada.",
   "mq.pack.title": "MagicQuill indisponível",
   "mq.pack.missing": "A função MagicQuill V2 não está incluída nesta edição da aplicação (componente em falta).",
-  "mw.klein_steps_warn": "⚠ O FLUX.2 Klein é destilado: com {n} passos a edição enfraquece até deixar a foto quase inalterada (testado ao vivo: 12 passos = edição completa, 16 = parcial, 21 = inalterada). Recomendados 12 passos."
+  "mw.klein_steps_warn": "⚠ O FLUX.2 Klein é destilado: com {n} passos a edição enfraquece até deixar a foto quase inalterada (testado ao vivo: 12 passos = edição completa, 16 = parcial, 21 = inalterada). Recomendados 12 passos.",
+  "lora.info.trigger_notes": "Legendas de treino (apenas para consulta, nunca inseridas no prompt)"
 }

@@ -75,3 +75,45 @@ def test_adult_override_marks_nsfw():
             assert flux[n].nsfw, n
     sfw_visible = lc.LoraCatalog(compatible_arch="Flux").loras(allow_nsfw=False)
     assert all(not e.nsfw for e in sfw_visible)
+
+
+# ── task 17: trigger «solo token», sfw override, trigger del registro non nascosti dal dizionario ──────────────
+def test_split_triggers_captions_are_notes():
+    caps = ["almu"] + [f"woman sitting on the edge of a river with her feet touching the water {i}" for i in range(10)]
+    keep, notes = lc.split_triggers(caps)
+    assert keep == ["almu"] and len(notes) == 10
+    # lista di didascalie dove anche la prima è una frase: «olya. this photograph…» → il token prima del punto
+    keep, notes = lc.split_triggers(["olya. this photograph features a young woman standing against a plain wall"]
+                                    + ["a very long caption sentence that goes on and on %d" % i for i in range(9)])
+    assert keep == ["olya"] and len(notes) == 10
+    # trigger dichiarati (Civitai) brevi: restano tutti, fino a 4; una frase lunga singola resta il primo trigger
+    assert lc.split_triggers(["nipple lick", "nipple suck"]) == (["nipple lick", "nipple suck"], [])
+    long1 = "She moves up and down on top of him as his penis penetrates her asshole."
+    assert lc.split_triggers([long1, "He thrusts into her as his penis penetrates her asshole."]) == ([long1], [
+        "He thrusts into her as his penis penetrates her asshole."])
+
+
+def test_flux_caption_loras_have_only_the_token():
+    flux = _names("Flux")
+    for name, tok in (("almuflux.safetensors", "almu"), ("jpavfluxreality.safetensors", "jpav"),
+                      ("lmilflux.safetensors", "lmil"), ("riccflux.safetensors", "ricc")):
+        e = flux.get(name)
+        if e is None:
+            continue
+        assert e.triggers == [tok], (name, e.triggers)
+        assert len(e.trigger_notes) > 3                       # la didascalia resta consultabile
+
+
+def test_turbo_alpha_not_adult():
+    hit = [e for e in lc.LoraCatalog(compatible_arch="Flux").loras() if "Turbo-Alpha" in e.name]
+    if not hit:
+        pytest.skip("FLUX.1-Turbo-Alpha assente")
+    assert not hit[0].nsfw
+    assert hit[0] in lc.LoraCatalog(compatible_arch="Flux").loras(allow_nsfw=False)
+
+
+def test_registry_trigger_not_hidden_by_empty_dictionary_entry():
+    e = _names("LTX").get("head_swap_ltx25_v1_1_r64.safetensors")
+    if e is None:
+        pytest.skip("BFS LTX 2.5 head swap assente")
+    assert e.triggers and e.triggers[0].startswith("head_swap")

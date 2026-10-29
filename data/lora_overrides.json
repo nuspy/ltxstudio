@@ -1,5 +1,5 @@
 {
-  "_comment": "Correzioni al dizionario LoRA (E:\\AI\\dictionary, scanner esterno e talvolta in ritardo sui file spostati). adult = nomi file (minuscoli) 18+ da trattare NSFW anche se il dizionario dice SFW; arch = nome file -> arch del pannello (override del dizionario); extra = file fuori dalle cartelle LoRA che vanno mostrati come LoRA (paths = candidati relativi alla radice modelli, vale il primo esistente).",
+  "_comment": "Correzioni al dizionario LoRA (E:\\AI\\dictionary, scanner esterno e talvolta in ritardo sui file spostati). adult = nomi file (minuscoli) 18+ da trattare NSFW anche se il dizionario dice SFW; arch = nome file -> arch del pannello (override del dizionario); extra = file fuori dalle cartelle LoRA che vanno mostrati come LoRA (paths = candidati relativi alla radice modelli, vale il primo esistente). sfw = nomi file (minuscoli) da NON marcare 18+ anche se il dizionario dice nsfw (es. LoRA di velocità); triggers = nome file (minuscolo) -> trigger «solo token» al posto delle didascalie di training del dizionario (lista vuota = nessun trigger; le didascalie restano come note consultabili, mai inserite nel prompt).",
   "adult": [
     "deepthroat_epoch_80_(loras).safetensors",
     "fingering_i2v_e248_(loras).safetensors",
@@ -55,5 +55,78 @@
       "nsfw": true,
       "description": "LoRA LTX-2.x 18+ (rank 64, video+audio, header verificato 14/10)."
     }
-  ]
+  ],
+  "sfw": [
+    "flux.1-turbo-alpha.safetensors"
+  ],
+  "triggers": {
+    "almuflux.safetensors": [
+      "almu"
+    ],
+    "aphoflux.safetensors": [
+      "apho"
+    ],
+    "bllefluxreality softcore.safetensors": [
+      "blle"
+    ],
+    "dvelflux.safetensors": [
+      "dvel"
+    ],
+    "est3tic_lingerie_v1_flux-dev_(swarmui).safetensors": [
+      "est3tic_lingerie"
+    ],
+    "jpavfluxreality.safetensors": [
+      "jpav"
+    ],
+    "lmilflux.safetensors": [
+      "lmil"
+    ],
+    "mawiflux.safetensors": [
+      "mawi"
+    ],
+    "micro-thong-panties-v2.safetensors": [
+      "micro_thong"
+    ],
+    "mnraflux.safetensors": [
+      "mnra"
+    ],
+    "mohrflux.safetensors": [
+      "mohr"
+    ],
+    "moody-000019.safetensors": [
+      "moody"
+    ],
+    "riccflux.safetensors": [
+      "ricc"
+    ],
+    "sgmkfluxreality.safetensors": [
+      "sgmk"
+    ],
+    "yanjfluxreality hardcore.safetensors": [
+      "yanj"
+    ],
+    "yanjfluxreality softcore.safetensors": [
+      "yanj"
+    ],
+    "yschfluxreality softcore v11.safetensors": [
+      "ysch"
+    ],
+    "vmorflux.safetensors": [
+      "vmor"
+    ],
+    "underland-alice-000012.safetensors": [
+      "UnderlandAlice"
+    ],
+    "mysticxxx-v3.safetensors": [],
+    "pov_fist.safetensors": [
+      "POVF1ST"
+    ],
+    "steepslopetiddies_v1-2_rank16_bf16.safetensors": [
+      "SteepSlopeTiddies"
+    ],
+    "sexy_festival_goers.safetensors": [
+      "sxfestgoers"
+    ],
+    "blacked_flux_(swarmui).safetensors": []
+  }
 }

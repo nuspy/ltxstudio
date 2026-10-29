@@ -3559,5 +3559,6 @@
   "weights.license.declined": "Download annullato: licenza non confermata.",
   "mq.pack.title": "MagicQuill non disponibile",
   "mq.pack.missing": "La funzione MagicQuill V2 non è inclusa in questa edizione dell'app (componente assente).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein è distillato: con {n} passi l'edit si indebolisce fino a lasciare la foto quasi invariata (provato dal vivo: 12 passi = edit completo, 16 = parziale, 21 = invariato). Consigliati 12 passi."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein è distillato: con {n} passi l'edit si indebolisce fino a lasciare la foto quasi invariata (provato dal vivo: 12 passi = edit completo, 16 = parziale, 21 = invariato). Consigliati 12 passi.",
+  "lora.info.trigger_notes": "Esempi di training (solo da consultare, non inseriti nel prompt)"
 }
