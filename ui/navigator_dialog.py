@@ -247,6 +247,13 @@ class NavigatorDialog(QDialog):
         self.btn_play.clicked.connect(self._on_play)
         rv.addWidget(self.btn_play)
 
+        self.btn_export_clean = QPushButton(tr("nav.export_clean_btn", "Salva copia senza metadati\u2026"))
+        self.btn_export_clean.setToolTip(tr("nav.export_clean_tt",
+            "Salva una copia del file senza prompt, parametri e altri dati di generazione, da condividere."))
+        self.btn_export_clean.setEnabled(False)
+        self.btn_export_clean.clicked.connect(self._on_export_clean)
+        rv.addWidget(self.btn_export_clean)
+
         self.btn_delete = QPushButton(tr("nav.delete_file_btn"))
         self.btn_delete.setEnabled(False)
         self.btn_delete.setStyleSheet("color: #ff6b6b;")
@@ -310,6 +317,8 @@ class NavigatorDialog(QDialog):
         self._fill_meta(meta or {})
         self.btn_reuse.setEnabled(bool(meta))
         self.btn_play.setEnabled(True)
+        self.btn_export_clean.setEnabled(path.suffix.lower() in
+                                         (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".mkv", ".webm"))
         self.btn_delete.setEnabled(True)
 
     def _fill_preview(self, path: Path, meta: dict | None):
@@ -417,6 +426,25 @@ class NavigatorDialog(QDialog):
         else:
             subprocess.Popen(["xdg-open", str(path)])
 
+    def _on_export_clean(self):
+        """Task 21: copia del file SENZA metadati di generazione (prompt, modelli, parametri) da condividere."""
+        if not self._current_path:
+            return
+        from PySide6.QtWidgets import QFileDialog
+        from core import gen_metadata
+        src = self._current_path
+        title = tr("nav.export_clean_title", "Salva copia senza metadati")
+        default = str(src.with_name(src.stem + "_clean" + src.suffix))
+        dst, _ = QFileDialog.getSaveFileName(self, title, default, f"*{src.suffix}")
+        if not dst:
+            return
+        try:
+            gen_metadata.strip(src, dst)
+        except Exception as e:                                   # noqa: BLE001
+            QMessageBox.warning(self, title, str(e))
+            return
+        QMessageBox.information(self, title, tr("nav.export_clean_done", "Copia senza metadati salvata:") + "\n" + dst)
+
     def _on_delete(self):
         if not self._current_path:
             return
@@ -440,6 +468,7 @@ class NavigatorDialog(QDialog):
         self._current_meta = None
         self.btn_reuse.setEnabled(False)
         self.btn_play.setEnabled(False)
+        self.btn_export_clean.setEnabled(False)
         self.btn_delete.setEnabled(False)
         self.preview_lbl.setText(tr("nav.file_deleted"))
         self.prompt_text.clear()

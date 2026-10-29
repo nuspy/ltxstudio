@@ -3438,5 +3438,11 @@
   "pitch.midi": "Partition",
   "pitch.midi.ph": "partition MIDI (.mid / .midi)",
   "pitch.note.score": "Accorde la voix sur les notes d'une partition MIDI (la voix doit suivre la partition dans le temps).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein est distillé : avec {n} pas, l'édition s'affaiblit jusqu'à laisser la photo presque inchangée (testé en réel : 12 pas = édition complète, 16 = partielle, 21 = inchangée). 12 pas recommandés."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein est distillé : avec {n} pas, l'édition s'affaiblit jusqu'à laisser la photo presque inchangée (testé en réel : 12 pas = édition complète, 16 = partielle, 21 = inchangée). 12 pas recommandés.",
+  "settings.embed_meta": "Inclure les données de génération dans les fichiers (prompt, modèles, paramètres)",
+  "settings.embed_meta.tt": "Écrit dans chaque image et vidéo générée (PNG/JPEG/WebP/MP4) le prompt, le prompt négatif, le modèle, les LoRA, l'encodeur, le VAE, la graine, les étapes et les autres paramètres, au format lu par Civitai et d'autres programmes. ATTENTION : toute personne qui reçoit le fichier voit le prompt et les paramètres. Pour partager sans ces données, utilisez « Enregistrer une copie sans métadonnées » dans la Galerie. Aucun chemin de votre ordinateur n'y figure.",
+  "nav.export_clean_btn": "Enregistrer une copie sans métadonnées…",
+  "nav.export_clean_tt": "Enregistre une copie du fichier sans le prompt, les paramètres ni les autres données de génération, prête à partager.",
+  "nav.export_clean_title": "Enregistrer une copie sans métadonnées",
+  "nav.export_clean_done": "Copie sans métadonnées enregistrée :"
 }

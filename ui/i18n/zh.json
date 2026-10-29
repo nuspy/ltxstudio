@@ -3438,5 +3438,11 @@
   "pitch.midi": "乐谱",
   "pitch.midi.ph": "MIDI 乐谱（.mid / .midi）",
   "pitch.note.score": "让人声贴合 MIDI 乐谱的音符（人声在时间上必须与乐谱对齐）。",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein 是蒸馏模型：使用 {n} 步时编辑效果会减弱，甚至几乎不改变照片（实测：12 步 = 完整编辑，16 步 = 部分，21 步 = 无变化）。建议使用 12 步。"
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein 是蒸馏模型：使用 {n} 步时编辑效果会减弱，甚至几乎不改变照片（实测：12 步 = 完整编辑，16 步 = 部分，21 步 = 无变化）。建议使用 12 步。",
+  "settings.embed_meta": "在文件中包含生成数据（提示词、模型、参数）",
+  "settings.embed_meta.tt": "在每个生成的图像和视频（PNG/JPEG/WebP/MP4）内部写入提示词、负面提示词、模型、LoRA、编码器、VAE、种子、步数和其他参数，格式可被 Civitai 及其他程序读取。注意：收到文件的人可以看到提示词和参数。若要不带这些数据分享，请在图库中使用“保存不含元数据的副本”。其中绝不包含你电脑上的路径。",
+  "nav.export_clean_btn": "保存不含元数据的副本…",
+  "nav.export_clean_tt": "保存文件的副本，不含提示词、参数和其他生成数据，可直接分享。",
+  "nav.export_clean_title": "保存不含元数据的副本",
+  "nav.export_clean_done": "已保存不含元数据的副本："
 }

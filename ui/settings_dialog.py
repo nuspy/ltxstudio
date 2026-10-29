@@ -119,6 +119,16 @@ class SettingsDialog(QDialog):
             "Detector. Vuoto = firma valida senza testo. Limite di 5 caratteri per resistere a screenshot/"
             "compressione; per testo più lungo usare i metadati del file."))
         form.addRow(tr("settings.stego_text", "Testo firma (max 5)"), self.ed_stego_text)
+        # Task 21: dati di generazione (prompt, modelli, parametri) dentro i file immagine/video. Default ON.
+        self.cb_embed_meta = QCheckBox(tr("settings.embed_meta",
+            "Includi i dati di generazione nei file (prompt, modelli, parametri)"))
+        self.cb_embed_meta.setChecked(bool(user_prefs.get("embed_gen_metadata", True)))
+        self.cb_embed_meta.setToolTip(tr("settings.embed_meta.tt",
+            "Scrive dentro ogni immagine e video generato (PNG/JPEG/WebP/MP4) prompt, prompt negativo, modello, "
+            "LoRA, encoder, VAE, seed, passi e gli altri parametri, nel formato letto da Civitai e dagli altri "
+            "programmi. ATTENZIONE: chi riceve il file vede il prompt e i parametri. Per condividere senza dati "
+            "usa \u00abSalva copia senza metadati\u00bb nella Galleria. Non contiene mai percorsi del tuo computer."))
+        form.addRow(self.cb_embed_meta)
         return grp
 
     def _build_embcache_group(self) -> QGroupBox:
@@ -221,6 +231,8 @@ class SettingsDialog(QDialog):
             if hasattr(self, "cb_stego"):
                 user_prefs.set("stego_watermark", self.cb_stego.isChecked())
                 user_prefs.set("stego_text", self.ed_stego_text.text().strip())
+            if hasattr(self, "cb_embed_meta"):
+                user_prefs.set("embed_gen_metadata", self.cb_embed_meta.isChecked())
             if hasattr(self, "cb_embcache"):
                 user_prefs.set("emb_cache.enabled", self.cb_embcache.isChecked())
                 user_prefs.set("emb_cache.mb", int(self.sp_embcache.value()) * 1024)

@@ -3510,5 +3510,11 @@
   "pitch.midi": "Score",
   "pitch.midi.ph": "MIDI score (.mid / .midi)",
   "pitch.note.score": "Tunes the voice to the notes of a MIDI score (the voice must follow the score in timing).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein is distilled: with {n} steps the edit weakens until the photo is left almost unchanged (tested live: 12 steps = full edit, 16 = partial, 21 = unchanged). 12 steps recommended."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein is distilled: with {n} steps the edit weakens until the photo is left almost unchanged (tested live: 12 steps = full edit, 16 = partial, 21 = unchanged). 12 steps recommended.",
+  "settings.embed_meta": "Include generation data in files (prompt, models, parameters)",
+  "settings.embed_meta.tt": "Writes the prompt, negative prompt, model, LoRAs, encoder, VAE, seed, steps and other parameters inside every generated image and video (PNG/JPEG/WebP/MP4), in the format read by Civitai and other programs. WARNING: anyone who receives the file can see the prompt and parameters. To share without this data use \"Save copy without metadata\" in the Gallery. It never contains paths from your computer.",
+  "nav.export_clean_btn": "Save copy without metadata…",
+  "nav.export_clean_tt": "Saves a copy of the file without the prompt, parameters and other generation data, ready to share.",
+  "nav.export_clean_title": "Save copy without metadata",
+  "nav.export_clean_done": "Copy without metadata saved:"
 }

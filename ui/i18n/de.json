@@ -3438,5 +3438,11 @@
   "pitch.midi": "Partitur",
   "pitch.midi.ph": "MIDI-Partitur (.mid / .midi)",
   "pitch.note.score": "Stimmt die Stimme auf die Noten einer MIDI-Partitur (die Stimme muss der Partitur zeitlich folgen).",
-  "mw.klein_steps_warn": "⚠ FLUX.2 Klein ist destilliert: Mit {n} Schritten schwächt sich die Bearbeitung ab, bis das Foto fast unverändert bleibt (live getestet: 12 Schritte = volle Bearbeitung, 16 = teilweise, 21 = unverändert). Empfohlen: 12 Schritte."
+  "mw.klein_steps_warn": "⚠ FLUX.2 Klein ist destilliert: Mit {n} Schritten schwächt sich die Bearbeitung ab, bis das Foto fast unverändert bleibt (live getestet: 12 Schritte = volle Bearbeitung, 16 = teilweise, 21 = unverändert). Empfohlen: 12 Schritte.",
+  "settings.embed_meta": "Generierungsdaten in die Dateien einbetten (Prompt, Modelle, Parameter)",
+  "settings.embed_meta.tt": "Schreibt Prompt, Negativ-Prompt, Modell, LoRAs, Encoder, VAE, Seed, Schritte und weitere Parameter in jedes erzeugte Bild und Video (PNG/JPEG/WebP/MP4), im Format, das Civitai und andere Programme lesen. ACHTUNG: Wer die Datei erhält, sieht Prompt und Parameter. Zum Teilen ohne diese Daten nutze in der Galerie „Kopie ohne Metadaten speichern“. Pfade deines Computers sind nie enthalten.",
+  "nav.export_clean_btn": "Kopie ohne Metadaten speichern…",
+  "nav.export_clean_tt": "Speichert eine Kopie der Datei ohne Prompt, Parameter und andere Generierungsdaten, bereit zum Teilen.",
+  "nav.export_clean_title": "Kopie ohne Metadaten speichern",
+  "nav.export_clean_done": "Kopie ohne Metadaten gespeichert:"
 }

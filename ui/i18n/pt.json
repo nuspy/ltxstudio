@@ -3438,5 +3438,11 @@
   "pitch.midi": "Partitura",
   "pitch.midi.ph": "partitura MIDI (.mid / .midi)",
   "pitch.note.score": "Afina a voz pelas notas de uma partitura MIDI (a voz tem de seguir a partitura no tempo).",
-  "mw.klein_steps_warn": "⚠ O FLUX.2 Klein é destilado: com {n} passos a edição enfraquece até deixar a foto quase inalterada (testado ao vivo: 12 passos = edição completa, 16 = parcial, 21 = inalterada). Recomendados 12 passos."
+  "mw.klein_steps_warn": "⚠ O FLUX.2 Klein é destilado: com {n} passos a edição enfraquece até deixar a foto quase inalterada (testado ao vivo: 12 passos = edição completa, 16 = parcial, 21 = inalterada). Recomendados 12 passos.",
+  "settings.embed_meta": "Incluir os dados de geração nos arquivos (prompt, modelos, parâmetros)",
+  "settings.embed_meta.tt": "Grava dentro de cada imagem e vídeo gerado (PNG/JPEG/WebP/MP4) o prompt, o prompt negativo, o modelo, as LoRAs, o codificador, o VAE, a seed, os passos e os outros parâmetros, no formato lido pelo Civitai e outros programas. ATENÇÃO: quem receber o arquivo vê o prompt e os parâmetros. Para compartilhar sem esses dados, use «Salvar cópia sem metadados» na Galeria. Nunca contém caminhos do seu computador.",
+  "nav.export_clean_btn": "Salvar cópia sem metadados…",
+  "nav.export_clean_tt": "Salva uma cópia do arquivo sem o prompt, os parâmetros e outros dados de geração, pronta para compartilhar.",
+  "nav.export_clean_title": "Salvar cópia sem metadados",
+  "nav.export_clean_done": "Cópia sem metadados salva:"
 }

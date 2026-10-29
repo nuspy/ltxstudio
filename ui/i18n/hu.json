@@ -3438,5 +3438,11 @@
   "pitch.midi": "Kotta",
   "pitch.midi.ph": "MIDI-kotta (.mid / .midi)",
   "pitch.note.score": "A hangot egy MIDI-kotta hangjaihoz igazítja (a hangnak időben követnie kell a kottát).",
-  "mw.klein_steps_warn": "⚠ A FLUX.2 Klein desztillált: {n} lépésnél a szerkesztés gyengül, a fotó szinte változatlan marad (élőben tesztelve: 12 lépés = teljes szerkesztés, 16 = részleges, 21 = változatlan). 12 lépés ajánlott."
+  "mw.klein_steps_warn": "⚠ A FLUX.2 Klein desztillált: {n} lépésnél a szerkesztés gyengül, a fotó szinte változatlan marad (élőben tesztelve: 12 lépés = teljes szerkesztés, 16 = részleges, 21 = változatlan). 12 lépés ajánlott.",
+  "settings.embed_meta": "Generálási adatok beágyazása a fájlokba (prompt, modellek, paraméterek)",
+  "settings.embed_meta.tt": "Minden elkészült képbe és videóba (PNG/JPEG/WebP/MP4) beleírja a promptot, a negatív promptot, a modellt, a LoRA-kat, az enkódert, a VAE-t, a seedet, a lépéseket és a többi paramétert, a Civitai és más programok által olvasott formátumban. FIGYELEM: aki megkapja a fájlt, látja a promptot és a paramétereket. Adatok nélküli megosztáshoz használd a Galériában a „Másolat mentése metaadatok nélkül” funkciót. A számítógéped elérési útjait soha nem tartalmazza.",
+  "nav.export_clean_btn": "Másolat mentése metaadatok nélkül…",
+  "nav.export_clean_tt": "Elment egy másolatot a fájlról a prompt, a paraméterek és más generálási adatok nélkül, megosztásra készen.",
+  "nav.export_clean_title": "Másolat mentése metaadatok nélkül",
+  "nav.export_clean_done": "A metaadatok nélküli másolat elmentve:"
 }
