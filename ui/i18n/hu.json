@@ -3521,5 +3521,6 @@
   "mq.pack.title": "A MagicQuill nem érhető el",
   "mq.pack.missing": "A MagicQuill V2 funkció nem része az alkalmazás ezen kiadásának (hiányzó összetevő).",
   "mw.klein_steps_warn": "⚠ A FLUX.2 Klein desztillált: {n} lépésnél a szerkesztés gyengül, a fotó szinte változatlan marad (élőben tesztelve: 12 lépés = teljes szerkesztés, 16 = részleges, 21 = változatlan). 12 lépés ajánlott.",
-  "lora.info.trigger_notes": "Tanítási leírások (csak tájékoztatásul, a promptba soha nem kerülnek be)"
+  "lora.info.trigger_notes": "Tanítási leírások (csak tájékoztatásul, a promptba soha nem kerülnek be)",
+  "f1.gen.krea2.sickreal4": "Krea SickRealism v4 (18+, fp8, 8 lépés)"
 }

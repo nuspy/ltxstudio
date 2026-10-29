@@ -3521,5 +3521,6 @@
   "mq.pack.title": "MagicQuill 不可用",
   "mq.pack.missing": "此版本的应用不包含 MagicQuill V2 功能（缺少组件）。",
   "mw.klein_steps_warn": "⚠ FLUX.2 Klein 是蒸馏模型：使用 {n} 步时编辑效果会减弱，甚至几乎不改变照片（实测：12 步 = 完整编辑，16 步 = 部分，21 步 = 无变化）。建议使用 12 步。",
-  "lora.info.trigger_notes": "训练标注(仅供参考,不会自动插入提示词)"
+  "lora.info.trigger_notes": "训练标注(仅供参考,不会自动插入提示词)",
+  "f1.gen.krea2.sickreal4": "Krea SickRealism v4（18+，fp8，8 步）"
 }

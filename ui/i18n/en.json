@@ -3593,5 +3593,6 @@
   "mq.pack.title": "MagicQuill not available",
   "mq.pack.missing": "The MagicQuill V2 feature is not included in this edition of the app (component missing).",
   "mw.klein_steps_warn": "⚠ FLUX.2 Klein is distilled: with {n} steps the edit weakens until the photo is left almost unchanged (tested live: 12 steps = full edit, 16 = partial, 21 = unchanged). 12 steps recommended.",
-  "lora.info.trigger_notes": "Training captions (for reference only, never inserted into the prompt)"
+  "lora.info.trigger_notes": "Training captions (for reference only, never inserted into the prompt)",
+  "f1.gen.krea2.sickreal4": "Krea SickRealism v4 (18+, fp8, 8 steps)"
 }
