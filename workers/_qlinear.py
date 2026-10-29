@@ -16,6 +16,8 @@ qualità identica, niente quantizzazione delle attivazioni). Ogni layer accetta 
 """
 from __future__ import annotations
 
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -40,7 +42,9 @@ class _LoraMixin:
     def add_lokr(self, w1: torch.Tensor, w2: torch.Tensor, scale: float):
         self.loras.append(("lokr", w1, w2, float(scale)))
 
-    def _lora(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def _lora_dense(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Percorso denso (con autograd, o forme strane): y = y + s·B(A(x)) per intero, fuori posto."""
+        x = x.to(y.dtype)
         for lo in self.loras:
             if lo[0] == "lokr":
                 _, w1, w2, s = lo
@@ -49,6 +53,92 @@ class _LoraMixin:
                 a, b, s = lo
                 y = y + s * F.linear(F.linear(x, a.to(x.dtype)), b.to(x.dtype))
         return y
+
+    def _lora(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Somma le LoRA a `y` IN PLACE e a blocchi di token: niente copia intera di `x` (il cast al dtype di
+        calcolo è per blocco) né i 3-4 temporanei grandi quanto `y` della forma `y + s·B(A(x))`. Su sequenze
+        video lunghe (10 s ≈ 70k token × 21504 canali del qkv) quei temporanei erano 3-4 GB ciascuno e
+        mandavano in OOM H3 anche con 32 GB. Numericamente identico al percorso denso (stesse operazioni,
+        stesso ordine, solo su fette di token)."""
+        if not self.loras:
+            return y
+        if torch.is_grad_enabled() and (x.requires_grad or y.requires_grad):
+            return self._lora_dense(x, y)
+        if not y.is_contiguous():
+            y = y.contiguous()
+        x2 = x.reshape(-1, x.shape[-1])
+        y2 = y.view(-1, y.shape[-1])
+        add_lora_chunked(x2, y2, self.loras)
+        return y
+
+
+# ── LoRA a blocchi ──────────────────────────────────────────────────────────────────────────────
+LORA_CHUNK_MIN = 256                  # sotto questo numero di token non si divide più: OOM vero
+_CHUNK_CAP: dict = {}                 # device → tetto appreso dopo un OOM (token per blocco)
+
+
+def lora_chunk_tokens(rows: int, row_bytes: int, device) -> int:
+    """Token per blocco: il temporaneo di un blocco (cast di x + intermedio di rango + uscita + s·uscita)
+    resta sotto un budget proporzionale alla VRAM LIBERA di adesso (mai una soglia fissa sui GB della scheda):
+    1/8 del libero, tra 64 e 512 MB. Variabile QLINEAR_LORA_CHUNK = token per blocco (forzato, per i test)."""
+    forced = os.environ.get("QLINEAR_LORA_CHUNK")
+    if forced:
+        return max(1, min(rows, int(forced)))
+    dev = torch.device(device)
+    if dev.type != "cuda":
+        return min(rows, 32768)
+    try:
+        free = torch.cuda.mem_get_info(dev)[0]
+    except Exception:  # noqa: BLE001
+        free = 1 << 30
+    budget = max(64 << 20, min(512 << 20, free // 8))
+    n = max(LORA_CHUNK_MIN, budget // max(1, row_bytes))
+    cap = _CHUNK_CAP.get(str(dev))
+    if cap:
+        n = min(n, cap)
+    return min(rows, n)
+
+
+def _lora_term(xc: torch.Tensor, lo: tuple) -> torch.Tensor:
+    dt = xc.dtype
+    if lo[0] == "lokr":
+        _, w1, w2, s = lo
+        return s * lokr_apply(xc, w1.to(dt), w2.to(dt))
+    a, b, s = lo
+    return s * F.linear(F.linear(xc, a.to(dt)), b.to(dt))
+
+
+def add_lora_chunked(x2: torch.Tensor, y2: torch.Tensor, loras: list) -> None:
+    """y2 += Σ s·B(A(x2)) in place, a blocchi di righe. Se un blocco va in OOM (altri processi hanno preso VRAM
+    nel frattempo) lo dimezza e riprova a partire dalla LoRA non ancora applicata a quel blocco: il risultato
+    non cambia. A LORA_CHUNK_MIN righe senza spazio solleva l'OOM originale."""
+    rows = x2.shape[0]
+    if rows == 0:
+        return
+    mx = max((max(lo[1].shape) if lo[0] == "lokr" else max(lo[0].shape[0], lo[1].shape[0])) for lo in loras)
+    row_bytes = (x2.shape[1] + 2 * y2.shape[1] + mx) * y2.element_size()
+    ch = lora_chunk_tokens(rows, row_bytes, y2.device)
+
+    def run(i: int, j: int, k0: int) -> None:
+        for k in range(k0, len(loras)):
+            try:
+                xc = x2[i:j]
+                if xc.dtype != y2.dtype:
+                    xc = xc.to(y2.dtype)
+                y2[i:j].add_(_lora_term(xc, loras[k]))
+            except torch.OutOfMemoryError:
+                if j - i <= LORA_CHUNK_MIN:
+                    raise
+                if y2.is_cuda:
+                    torch.cuda.empty_cache()
+                    _CHUNK_CAP[str(y2.device)] = max(LORA_CHUNK_MIN, (j - i) // 2)
+                mid = (i + j) // 2
+                run(i, mid, k)
+                run(mid, j, k)
+                return
+
+    for i in range(0, rows, ch):
+        run(i, min(rows, i + ch), 0)
 
 
 class RowFp8Linear(nn.Module, _LoraMixin):
@@ -68,7 +158,7 @@ class RowFp8Linear(nn.Module, _LoraMixin):
         if self.scale is not None:
             w = w * self.scale.to(cd)
         y = F.linear(x.to(cd), w, self.bias.to(cd) if self.bias is not None else None)
-        return self._lora(x.to(cd), y).to(x.dtype)
+        return self._lora(x, y).to(x.dtype)
 
 
 class RowInt8Linear(nn.Module, _LoraMixin):
@@ -92,7 +182,7 @@ class RowInt8Linear(nn.Module, _LoraMixin):
             from core.native_convert import rotate
             xin = rotate(xin, self.convrot)
         y = F.linear(xin, w, self.bias.to(cd) if self.bias is not None else None)
-        return self._lora(x.to(cd), y).to(x.dtype)       # la LoRA legge l'ingresso NON ruotato
+        return self._lora(x, y).to(x.dtype)       # la LoRA legge l'ingresso NON ruotato (cast per blocco)
 
 
 class Nvfp4Linear(nn.Module, _LoraMixin):
