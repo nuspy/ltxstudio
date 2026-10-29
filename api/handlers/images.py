@@ -505,6 +505,7 @@ def register(app: FastAPI):
             raise HTTPException(422, "FLUX.3 Klein non ha outpaint: usa /image/edit con le immagini o /image/inpaint (composito)")
         if p["arch"] == "qwen_image21":                           # l'immagine arriva già allargata, maschera = bordo
             _qwen21_inpaint(p, req)
+            p["outpaint"] = True                                  # il worker lo usa per riempimento/tono (task 14)
         elif p.pop("controlnet_inpaint", False):
             p = _cn_inpaint(p, True)
         else:

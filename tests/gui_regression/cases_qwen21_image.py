@@ -232,7 +232,57 @@ def case_qwen21_inpaint_mask(w, spy):
     assert w._inpaint_mode == "inpaint", "il risultato deve tornare nel suo riquadro (bbox)"
 
 
+def case_qwen21_outpaint_flag(w, spy):
+    """Outpaint con Qwen: al worker arriva `outpaint` (riempimento dell'estensione + tono globale, task 14);
+    l'inpaint NON lo porta."""
+    f = w.frame1_tab
+    H.load_canvas_image(w)
+    cv = f.canvas
+    cv.set_aspect(int(cv.aspect_w * 1.4) // 8 * 8, int(cv.aspect_h * 1.4) // 8 * 8)   # bordo da estendere
+    label = next((l for l, d in f._qwen21_inp.items() if d == "qwen21-dit-nvfp4"), None)
+    assert label, f"voce Qwen assente dal combo Inpaint: {list(f._qwen21_inp)}"
+    f.inp_model.setCurrentIndex(f.inp_model.findText(label))
+    f.outpaint_prompt.setPlainText("the same scene continues to the sides")
+    assert cv.has_outpaint_area(), "manca area da estendere"
+    p = _run(w, spy, lambda: w.generate_inpaint("outpaint"))
+    assert p["arch"] == "qwen_image21" and p.get("mask_path") and p.get("outpaint") is True, p
+    spy.calls.clear()
+    f.inpaint_prompt.setPlainText("a red vintage scooter")
+    _mask(cv)
+    q = _run(w, spy, lambda: w.generate_inpaint("inpaint"))
+    assert q["arch"] == "qwen_image21" and "outpaint" not in q, q
+
+
+def case_qwen21_edit_nomask_canvas_aspect(w, spy):
+    """Edit per istruzione SENZA maschera (Qwen 2.1): la risoluzione d'uscita segue il canvas (che adotta la forma
+    della foto caricata), NON il tab Video rimasto al formato di prima (task 16b: 1024x1024 -> 704x1280)."""
+    f = w.frame1_tab
+    vt = w.video_tab
+    vt.res_preset.setCurrentText("Personalizzato"); vt.width.setValue(704); vt.height.setValue(1280)
+    src = str(H.OUT_DIR / "_gui_test_input_square.png")
+    H.make_test_image(src, 1024, 1024)
+    H.load_canvas_image(w, src)
+    cv = f.canvas
+    assert (cv.aspect_w, cv.aspect_h) == (1024, 1024), (cv.aspect_w, cv.aspect_h)
+    label = next((l for l, d in f._qwen21_inp.items() if d == "qwen21-dit-nvfp4"), None)
+    assert label, f"voce Qwen assente dal combo Inpaint: {list(f._qwen21_inp)}"
+    f.inp_model.setCurrentIndex(f.inp_model.findText(label))
+    f.inpaint_prompt.setPlainText("change the jacket into a red leather jacket")
+    p = _run(w, spy, lambda: w.generate_inpaint("inpaint"))
+    assert p["arch"] == "qwen_image21" and not p.get("mask_path"), p
+    assert (p["width"], p["height"]) == (1024, 1024), f"uscita {p['width']}x{p['height']} != canvas 1024x1024"
+    # canvas non quadrato: il rapporto segue il canvas
+    spy.calls.clear()
+    src2 = str(H.OUT_DIR / "_gui_test_input_wide.png")
+    H.make_test_image(src2, 1536, 864)
+    H.load_canvas_image(w, src2)
+    q = _run(w, spy, lambda: w.generate_inpaint("inpaint"))
+    assert abs(q["width"] / q["height"] - cv.aspect_w / cv.aspect_h) < 0.02, (q["width"], q["height"], cv.aspect_w, cv.aspect_h)
+
+
 CASES = [
+    ("qwen21_edit_nomask_canvas_aspect", "Edit Qwen senza maschera: uscita al rapporto del canvas, non del tab Video.",
+     case_qwen21_edit_nomask_canvas_aspect),
     ("qwen21_panel_visibility", "Il pannello Qwen compare solo con quell'arch; in SFW 3 DiT base + 2 Turbo; 40/1.0.",
      case_qwen21_panel_visibility),
     ("qwen21_adult_dits_only_nsfw", "I DiT 18+ (Uncensored, Noct-Q) compaiono solo in NSFW, anche in Integra; "
@@ -258,6 +308,8 @@ CASES = [
      case_qwen21_i2i_to_reference),
     ("qwen21_inpaint_mask", "Inpaint: voce Qwen nel combo modelli → foto + maschera + forza al worker.",
      case_qwen21_inpaint_mask),
+    ("qwen21_outpaint_flag", "Outpaint Qwen: il worker riceve `outpaint` (riempimento estensione + tono globale); "
+     "l'inpaint no.", case_qwen21_outpaint_flag),
 ]
 
 

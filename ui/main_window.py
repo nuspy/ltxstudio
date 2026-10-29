@@ -4508,6 +4508,9 @@ class MainWindow(QMainWindow):
         # log componenti/settaggi EFFETTIVI (visibilità: cosa è stato auto-selezionato davvero)
         self._log(f"{mode} (backend NATIVO): modello={os.path.basename(model)} · pipeline={arch} · "
                   f"steps={steps} · guidance={guidance:.1f} · denoise={denoise:.2f} · seed={seed}")
+        if _f2 and int(steps) > 14 and mode == "inpaint":      # live 17/10: Klein a 21 passi = foto quasi invariata (MAD 4); a 12 = edit pieno
+            self._log(tr("mw.klein_steps_warn", "⚠ FLUX.2 Klein è distillato: con {n} passi l'edit si indebolisce fino a lasciare la foto quasi "
+                         "invariata (provato dal vivo: 12 passi = edit completo, 16 = parziale, 21 = invariato). Consigliati 12 passi.").format(n=int(steps)))
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,
@@ -4613,6 +4616,22 @@ class MainWindow(QMainWindow):
     def _inp_loras(cfg: dict) -> list:
         return [{"name": cfg["lora"], "strength": 1.0}] if cfg.get("lora") else []
 
+    def _canvas_output_size(self) -> dict:
+        """Risoluzione d'uscita = quella del CANVAS visibile (task 16b). Caricando una foto in modalità «canvas» il
+        canvas adotta la forma della foto (set_aspect) SENZA aggiornare i valori del tab Video: usare quelli dava
+        1024×1024 → 704×1280 (formato cambiato, inquadratura tagliata). Se il canvas non è utilizzabile si ricade
+        sui valori del tab Video. Sempre col tetto di risoluzione dell'edizione."""
+        v = dict(self.video_tab.get_values())
+        try:
+            cv = self.frame1_tab.canvas
+            cw, ch = int(cv.aspect_w), int(cv.aspect_h)
+            if cw >= 64 and ch >= 64:
+                v["width"], v["height"] = cw, ch
+        except Exception:                                     # noqa: BLE001 — canvas assente: tab Video
+            pass
+        self._clamp_resolution(v)
+        return v
+
     def _start_native_qwen21_edit(self, dit, prompt, *, refs=(), init_image="", mask="", strength=None,
                                   negative="", seed=None, steps=None, guidance=None, loras=None, feather=0,
                                   mode="qwen21_edit", label=None, enhance=False, extra=None):
@@ -4656,9 +4675,10 @@ class MainWindow(QMainWindow):
         if mask:
             params["mask_path"] = mask
             params["feather"] = int(feather or 0)
+            if mode == "outpaint":
+                params["outpaint"] = True       # il worker: riempimento dell'estensione + tono globale (task 14)
         else:                                  # risultato alla risoluzione e al rapporto del canvas (mai stirato);
-            v = self.video_tab.get_values()    # con la maschera vale il ritaglio del canvas, rimesso al pixel
-            self._clamp_resolution(v)
+            v = self._canvas_output_size()     # con la maschera vale il ritaglio del canvas, rimesso al pixel
             params["width"], params["height"] = int(v["width"]), int(v["height"])
         if strength is not None:
             params["strength"] = float(strength)
