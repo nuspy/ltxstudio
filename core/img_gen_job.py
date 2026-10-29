@@ -201,9 +201,7 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
             pass
     try:                                                     # log del worker accanto all'immagine: tempi per fase, picco VRAM
         with open(out + ".log", "w", encoding="utf-8", errors="replace") as lf:
-            lf.write((r.stdout or "") + "
---- stderr ---
-" + (r.stderr or ""))
+            lf.write((r.stdout or "") + "\n--- stderr ---\n" + (r.stderr or ""))
     except OSError:
         pass
     if os.path.exists(out):

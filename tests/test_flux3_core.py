@@ -418,3 +418,19 @@ def test_api_te_scelta_e_gate_adult(monkeypatch):
     with pytest.raises(images.HTTPException) as e:
         images._flux3({"prompt": "x", "arch": "flux3", "flux3_te": "boh"})
     assert e.value.status_code == 422
+
+
+def test_dispatch_flux3_e_moduli_compilano():
+    """Il job FLUX.3 deve avere il worker dedicato (se img_gen_job non si importa, l'app cade sul server e gira un ALTRO modello:
+    successo il 29/10 con un errore di sintassi) e i moduli toccati devono compilare."""
+    import py_compile
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    for rel in ("core/img_gen_job.py", "core/license_ack.py", "core/flux3_spec.py", "core/flux3_caption.py", "workers/flux3_infer.py",
+                "workers/flux3_dit.py", "workers/flux3_pup.py", "workers/flux3_gguf.py", "api/handlers/images.py",
+                "ui/main_window.py", "ui/tabs/frame1_tab.py", "ui/widgets/flux3_boxes.py"):
+        py_compile.compile(str(root / rel), doraise=True)
+    from core import img_gen_job
+    assert img_gen_job.handles("flux3")
+    py, worker = img_gen_job._ARCH_RUNNER["flux3"]
+    assert worker.endswith("flux3_infer.py") and Path(worker).is_file()

@@ -25,7 +25,10 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from tests.app_env import harness as AH                       # noqa: E402
+import importlib.util                                         # noqa: E402
+_spec = importlib.util.spec_from_file_location("app_env_harness", ROOT / "tests" / "app_env" / "harness.py")
+AH = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(AH)                                  # harness «app completa» (tests/ non è un pacchetto)
 
 sys.stdout.reconfigure(line_buffering=True)
 MAIN_OUT = Path(r"E:\ai\ltxstudio\output")
