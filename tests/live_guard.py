@@ -34,7 +34,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # processi che il test può aver lanciato e che tengono memoria GPU/commit anche dopo la sua morte
 SERVER_PATTERN = (r"inference_server[\\/. ]|inference_server\.server|persistent_runner|job_runner|measure_worker|"
-                  r"workers[\\/.](ltx2_server|ltx2_infer|krea2_server|krea2_infer|krea_rt_server|qwen_image21_infer|"
+                  r"workers[\\/.](ltx2_server|ltx2_infer|krea2_server|krea2_infer|krea_rt_server|qwen_image21_infer|flux3_infer|"
                   r"wan_multitalk|minimax_h3_infer)")
 EXIT_BREACH = 99
 EXIT_NO_START = 98
