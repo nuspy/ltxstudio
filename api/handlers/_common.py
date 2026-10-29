@@ -175,6 +175,8 @@ def run_ltx2(params: dict, job=None, *, timeout: float = 7200) -> list[str]:
             _lg.close()
         proc.wait()
         if result and os.path.exists(result):
+            from core import gen_metadata                    # task 21: metadati di generazione nel video finale
+            gen_metadata.embed_result({"status": "success", "output": [result]}, params, label="Video")
             return [result]
         raise RuntimeError("LTX-2 nativo: nessun output prodotto")
     finally:

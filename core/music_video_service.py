@@ -329,7 +329,16 @@ def assemble_scenes(scenes: list[dict], song_path: str, out_path: str, *, fps: i
         raise
     except Exception:                                       # noqa: BLE001
         pass
+    _embed_final_metadata(out_path)                         # task 21: DOPO stego + watermark
     return out_path
+
+
+def _embed_final_metadata(path: str) -> None:
+    try:
+        from core import gen_metadata
+        gen_metadata.embed(path, {"label": "Videoclip", "output_kind": "mp4"}, force=False)
+    except Exception:                                       # noqa: BLE001
+        pass
 
 
 def whisper_available() -> bool:
@@ -515,5 +524,6 @@ def make_music_video(*, lyrics: str, song_path: str, image_path: str, out_path: 
         raise
     except Exception:                                       # noqa: BLE001
         pass
+    _embed_final_metadata(out_path)                         # task 21: DOPO stego + watermark
     log(f"Fatto: {out_path}")
     return out_path

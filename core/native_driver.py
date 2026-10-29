@@ -123,6 +123,20 @@ def history(prompt_id: str) -> dict:
 
 def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float = 1800,
                  retry_on_crash: bool = True, log=None) -> dict:
+    """Come `_run_and_wait`, poi (task 21) incorpora nel file FINALE i metadati di generazione: il motore ha
+    già scritto, firmato (stego) e marchiato (watermark) l'output, quindi questa è l'ultima scrittura."""
+    res = _run_and_wait(module, params, poll=poll, timeout=timeout, retry_on_crash=retry_on_crash, log=log)
+    if module != "segment":                                  # le maschere di segmentazione non sono generazioni
+        try:
+            from core import gen_metadata
+            gen_metadata.embed_result(res, params)
+        except Exception:                                    # noqa: BLE001
+            pass
+    return res
+
+
+def _run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float = 1800,
+                  retry_on_crash: bool = True, log=None) -> dict:
     """Submit + polling fino a success/error. Ritorna l'entry job (con 'output').
 
     Se il server MUORE a metà job (OOM, segfault), il job muore con lui: lo rialziamo e rilanciamo la
@@ -151,8 +165,8 @@ def run_and_wait(module: str, params: dict, *, poll: float = 1.0, timeout: float
             if _misses > 30:                             # ~30 polling falliti di fila = server davvero morto
                 if retry_on_crash and not is_up() and ensure_up(log=log):
                     _say(log, "[nativo] il server è morto durante il job → rilancio la generazione (1 volta)")
-                    return run_and_wait(module, params, poll=poll, timeout=timeout,
-                                        retry_on_crash=False, log=log)
+                    return _run_and_wait(module, params, poll=poll, timeout=timeout,
+                                         retry_on_crash=False, log=log)
                 return {"status": "error", "error": "server nativo non risponde al polling /history"}
             time.sleep(poll)
             continue
