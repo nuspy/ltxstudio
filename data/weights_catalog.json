@@ -6801,7 +6801,8 @@
         "ckpt_image",
         "fp8",
         "uncensored"
-      ]
+      ],
+      "page": "https://civitai.red/models/2196857?modelVersionId=2473592"
     },
     {
       "id": "zimage-turbo-bf16-single",
@@ -7087,7 +7088,8 @@
       "note": "Letto da image_flux (TE_DIR). Non cancellare.",
       "use": [
         "te"
-      ]
+      ],
+      "page": "https://huggingface.co/black-forest-labs/FLUX.1-dev/tree/main/text_encoder"
     },
     {
       "id": "te-flux1-t5xxl-diffusers",
@@ -7338,7 +7340,8 @@
       "use": [
         "te",
         "uncensored"
-      ]
+      ],
+      "page": "https://civitai.red/models/2780365?modelVersionId=3131293"
     },
     {
       "id": "flux-cn-union-pro2",
@@ -7691,6 +7694,7 @@
       "filename": "4x-AnimeSharp.safetensors",
       "no_remote": true,
       "note": "anime/illustrazioni; complementare a UltraSharp v2. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-AnimeSharp",
       "use": [
         "upscale_image"
       ]
@@ -7712,6 +7716,7 @@
       "filename": "4x_NMKD-Siax_200k.pth",
       "no_remote": true,
       "note": "generico, dettaglio naturale. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-NMKD-Siax-CX",
       "use": [
         "upscale_image"
       ]
@@ -7733,6 +7738,7 @@
       "filename": "4x_RealisticRescaler_100000_G.pth",
       "no_remote": true,
       "note": "foto realistiche. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-RealisticRescaler",
       "use": [
         "upscale_image"
       ]
@@ -7754,6 +7760,7 @@
       "filename": "4xFaceUpDAT.pth",
       "no_remote": true,
       "note": "specializzato sui volti (super-risoluzione, non restauro). File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-FaceUpDAT",
       "use": [
         "upscale_image"
       ]
@@ -7775,6 +7782,7 @@
       "filename": "4xNomos2_hq_dat2.pth",
       "no_remote": true,
       "note": "famiglia Nomos2, foto di qualità. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-Nomos2-hq-dat2",
       "use": [
         "upscale_image"
       ]
@@ -7796,6 +7804,7 @@
       "filename": "4xNomos2_hq_drct-l.safetensors",
       "no_remote": true,
       "note": "famiglia Nomos2, variante DRCT-L. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-Nomos2-hq-drct-l",
       "use": [
         "upscale_image"
       ]
@@ -7817,6 +7826,7 @@
       "filename": "4xNomos8kDAT.pth",
       "no_remote": true,
       "note": "dataset Nomos8k, architettura DAT (diverso da nomos8k-schat-l). File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-Nomos8kDAT",
       "use": [
         "upscale_image"
       ]
@@ -7838,6 +7848,7 @@
       "filename": "4xRealWebPhoto_v4_drct-l.pth",
       "no_remote": true,
       "note": "foto da web compresse. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://openmodeldb.info/models/4x-RealWebPhoto-v4-drct-l",
       "use": [
         "upscale_image"
       ]
@@ -7859,6 +7870,7 @@
       "filename": "HAT-L_SRx4_ImageNet-pretrain.safetensors",
       "no_remote": true,
       "note": "transformer HAT-L (ImageNet), architettura non ESRGAN. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://github.com/XPixelGroup/HAT",
       "use": [
         "upscale_image"
       ]
@@ -7880,6 +7892,7 @@
       "filename": "RealESRGAN_x2plus.pth",
       "no_remote": true,
       "note": "Real-ESRGAN 2x. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://github.com/xinntao/Real-ESRGAN",
       "use": [
         "upscale_image"
       ]
@@ -7901,8 +7914,1049 @@
       "filename": "RealESRGAN_x4plus.safetensors",
       "no_remote": true,
       "note": "Real-ESRGAN 4x (safetensors, preferibile al .pth gemello). File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "page": "https://github.com/xinntao/Real-ESRGAN",
       "use": [
         "upscale_image"
+      ]
+    },
+    {
+      "id": "lora-flux-almuflux",
+      "module": "Immagini",
+      "label": "almuFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "almuFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "almuFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "almu"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-aphoflux",
+      "module": "Immagini",
+      "label": "aphoFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "aphoFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "aphoFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "apho"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-bllefluxreality-softcore",
+      "module": "Immagini",
+      "label": "blleFLUXReality Softcore (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "blleFLUXReality Softcore.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "blleFLUXReality Softcore.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "blle"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-dvelflux",
+      "module": "Immagini",
+      "label": "dvelFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "dvelFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "dvelFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "dvel"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-est3tic-lingerie-v1-flux-dev-swarmui",
+      "module": "Immagini",
+      "label": "est3tic_lingerie_v1_FLUX-DEV_(SwarmUI) (FLUX.1, 0.04GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.04,
+      "scan_names": [
+        "est3tic_lingerie_v1_FLUX-DEV_(SwarmUI).safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "est3tic_lingerie_v1_FLUX-DEV_(SwarmUI).safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "est3tic_lingerie"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-hourglassv32-flux",
+      "module": "Immagini",
+      "label": "hourglassv32_FLUX (FLUX.1, 18+, 0.306GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.306,
+      "scan_names": [
+        "hourglassv32_FLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "hourglassv32_FLUX.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "navel",
+        "cleavage",
+        "panties",
+        "nipples"
+      ],
+      "page": "https://civitai.red/models/129130?modelVersionId=1668530",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-jpavfluxreality",
+      "module": "Immagini",
+      "label": "jpavFLUXReality (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "jpavFLUXReality.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "jpavFLUXReality.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "jpav"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-lmilflux",
+      "module": "Immagini",
+      "label": "lmilFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "lmilFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "lmilFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "lmil"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-mawiflux",
+      "module": "Immagini",
+      "label": "mawiFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "mawiFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "mawiFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "mawi"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-micro-thong-panties-v2",
+      "module": "Immagini",
+      "label": "micro-thong-panties-V2 (FLUX.1, 0.04GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.04,
+      "scan_names": [
+        "micro-thong-panties-V2.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "micro-thong-panties-V2.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "micro_thong"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-mnraflux",
+      "module": "Immagini",
+      "label": "mnraFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "mnraFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "mnraFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "mnra"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-mohrflux",
+      "module": "Immagini",
+      "label": "mohrFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "mohrFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "mohrFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "mohr"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-moody-000019",
+      "module": "Immagini",
+      "label": "Moody-000019 (FLUX.1, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "Moody-000019.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "Moody-000019.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "moody"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-mysticxxx-v3",
+      "module": "Immagini",
+      "label": "MysticXXX-V3 (FLUX.1, 18+, 0.156GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.156,
+      "scan_names": [
+        "MysticXXX-V3.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "MysticXXX-V3.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-oiledskin-fluxdev-swarmui",
+      "module": "Immagini",
+      "label": "OiledSkin_FluxDev_(SwarmUI) (FLUX.1, 18+, 0.344GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.344,
+      "scan_names": [
+        "OiledSkin_FluxDev_(SwarmUI).safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "OiledSkin_FluxDev_(SwarmUI).safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "OiledSkin"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-pov-fist",
+      "module": "Immagini",
+      "label": "PoV_Fist (FLUX.1, 18+, 0.306GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.306,
+      "scan_names": [
+        "PoV_Fist.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "PoV_Fist.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "POVF1ST"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-realunderboob-fl",
+      "module": "Immagini",
+      "label": "RealUnderboob_FL (FLUX.1, 18+, 0.172GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.172,
+      "scan_names": [
+        "RealUnderboob_FL.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "RealUnderboob_FL.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "RealUnderboob"
+      ],
+      "page": "https://civitai.red/models/1466115?modelVersionId=1658153",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-riccflux",
+      "module": "Immagini",
+      "label": "riccFLUX (FLUX.1, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "riccFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "riccFLUX.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "ricc"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-flux-sexy-festival-goers",
+      "module": "Immagini",
+      "label": "Sexy_Festival_Goers (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "Sexy_Festival_Goers.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "Sexy_Festival_Goers.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "sxfestgoers"
+      ],
+      "page": "https://civitai.red/models/1474673?modelVersionId=1668026",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-sgmkfluxreality",
+      "module": "Immagini",
+      "label": "sgmkFLUXReality (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "sgmkFLUXReality.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "sgmkFLUXReality.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "sgmk"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-steepslopetiddies-v1-2-rank16-bf16",
+      "module": "Immagini",
+      "label": "SteepSlopeTiddies_v1-2_rank16_bf16 (FLUX.1, 18+, 0.067GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.067,
+      "scan_names": [
+        "SteepSlopeTiddies_v1-2_rank16_bf16.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "SteepSlopeTiddies_v1-2_rank16_bf16.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "SteepSlopeTiddies"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-tan-lines-01",
+      "module": "Immagini",
+      "label": "tan-lines-01 (FLUX.1, 18+, 0.538GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.538,
+      "scan_names": [
+        "tan-lines-01.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "tan-lines-01.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "tan lines on skin"
+      ],
+      "page": "https://civitai.red/models/1517501?modelVersionId=1716933",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-underland-alice-000012",
+      "module": "Immagini",
+      "label": "underland-alice-000012 (FLUX.1, 18+, 0.04GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.04,
+      "scan_names": [
+        "underland-alice-000012.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "underland-alice-000012.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "UnderlandAlice"
+      ],
+      "page": "https://civitai.red/models/1498122?modelVersionId=1694726",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-vmorflux",
+      "module": "Immagini",
+      "label": "vmorFLUX (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "vmorFLUX.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "vmorFLUX.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "vmor"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-yanjfluxreality-hardcore",
+      "module": "Immagini",
+      "label": "yanjFLUXReality Hardcore (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "yanjFLUXReality Hardcore.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "yanjFLUXReality Hardcore.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "yanj"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-yanjfluxreality-softcore",
+      "module": "Immagini",
+      "label": "yanjFLUXReality Softcore (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "yanjFLUXReality Softcore.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "yanjFLUXReality Softcore.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "yanj"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-flux-yschfluxreality-softcore-v11",
+      "module": "Immagini",
+      "label": "yschFLUXReality Softcore v11 (FLUX.1, 18+, 0.613GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Flux",
+      "gated": false,
+      "approx_gb": 0.613,
+      "scan_names": [
+        "yschFLUXReality Softcore v11.safetensors"
+      ],
+      "category": "image",
+      "arch": "flux1",
+      "filename": "yschFLUXReality Softcore v11.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA FLUX; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "ysch"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-deepthroat-epoch-80-loras",
+      "module": "Video",
+      "label": "deepthroat_epoch_80_(LoRAs) (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "deepthroat_epoch_80_(LoRAs).safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "deepthroat_epoch_80_(LoRAs).safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "blowjob",
+        "deepthroat"
+      ],
+      "page": "https://civitai.red/models/1340403?modelVersionId=1513684",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-fingering-i2v-e248-loras",
+      "module": "Video",
+      "label": "fingering_i2v_e248_(LoRAs) (Wan 2.1, 18+, 0.359GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.359,
+      "scan_names": [
+        "fingering_i2v_e248_(LoRAs).safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "fingering_i2v_e248_(LoRAs).safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "She inserts two fingers into her pussy. She masturbates by sliding her fingers in and out of her pussy."
+      ],
+      "page": "https://civitai.red/models/1444759?modelVersionId=1694292",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-grinding-pussyjob-e130-loras",
+      "module": "Video",
+      "label": "grinding_pussyjob_e130_(LoRAs) (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "grinding_pussyjob_e130_(LoRAs).safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "grinding_pussyjob_e130_(LoRAs).safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "page": "https://civitai.red/models/1476907?modelVersionId=1681144",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-t2v-pov-bj-14b-loras",
+      "module": "Video",
+      "label": "T2V-POV_BJ-14B_(LoRAs) (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "T2V-POV_BJ-14B_(LoRAs).safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "T2V-POV_BJ-14B_(LoRAs).safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-detailz-wan",
+      "module": "Video",
+      "label": "detailz-wan (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "detailz-wan.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "detailz-wan.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "detailz"
+      ],
+      "page": "https://civitai.red/models/1385506?modelVersionId=1565668",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-masturbation-cumshot-wani2v480p-v1",
+      "module": "Video",
+      "label": "masturbation_cumshot_wanI2V480p_v1 (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "masturbation_cumshot_wanI2V480p_v1.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "masturbation_cumshot_wanI2V480p_v1.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "page": "https://civitai.red/models/1368557?modelVersionId=1546156",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-nipplesuckwan-e40",
+      "module": "Video",
+      "label": "nippleSuckWan_e40 (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "nippleSuckWan_e40.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "nippleSuckWan_e40.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "nipple lick",
+        "nipple licking",
+        "nipple suck",
+        "nipple sucking"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-phantom-wan-14b-fusionx-lora",
+      "module": "Video",
+      "label": "Phantom_Wan_14B_FusionX_LoRA (Wan 2.1, 0.317GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.317,
+      "scan_names": [
+        "Phantom_Wan_14B_FusionX_LoRA.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "Phantom_Wan_14B_FusionX_LoRA.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "page": "https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX",
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "lora-wan-wan-facefuck-epoch110-fast-speed-full-insertion-",
+      "module": "Video",
+      "label": "WAN-facefuck-epoch110 fast speed full insertion man has sex with womans mouth (Wan 2.1, 18+, 0.359GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.359,
+      "scan_names": [
+        "WAN-facefuck-epoch110 fast speed full insertion man has sex with womans mouth.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "WAN-facefuck-epoch110 fast speed full insertion man has sex with womans mouth.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "facefuck fast speed full insertion",
+        "man has sex with womans mouth"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-wan-nsfw-e14-fixed",
+      "module": "Video",
+      "label": "wan-nsfw-e14-fixed (Wan 2.1, 18+, 0.614GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.614,
+      "scan_names": [
+        "wan-nsfw-e14-fixed.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "wan-nsfw-e14-fixed.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "nsfwsks"
+      ],
+      "page": "https://civitai.red/models/1307155?modelVersionId=1475095",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-wan-t2v-i2v-anal-combined-e50",
+      "module": "Video",
+      "label": "wan-t2v-i2v-anal-combined-e50 (Wan 2.1, 18+, 0.307GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.307,
+      "scan_names": [
+        "wan-t2v-i2v-anal-combined-e50.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "wan-t2v-i2v-anal-combined-e50.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "triggers": [
+        "She moves up and down on top of him as his penis penetrates her asshole."
+      ],
+      "page": "https://civitai.red/models/1426284?modelVersionId=1612131",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-wan-cumshot-i2v",
+      "module": "Video",
+      "label": "wan_cumshot_i2v (Wan 2.1, 18+, 0.359GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.359,
+      "scan_names": [
+        "wan_cumshot_i2v.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "wan_cumshot_i2v.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-wan-dr34mj0b",
+      "module": "Video",
+      "label": "WAN_dr34mj0b (Wan 2.1, 18+, 0.18GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.18,
+      "scan_names": [
+        "WAN_dr34mj0b.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "WAN_dr34mj0b.safetensors",
+      "sensitivity": "adult",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "triggers": [
+        "bl0wj0b",
+        "d0ub13_bj"
+      ],
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "lora-wan-fusionx-facenaturalizer",
+      "module": "Video",
+      "label": "FusionX_FaceNaturalizer (Wan 2.1, 0.614GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.614,
+      "scan_names": [
+        "FusionX_FaceNaturalizer.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "filename": "FusionX_FaceNaturalizer.safetensors",
+      "no_remote": true,
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
+      "page": "https://civitai.red/models/1755105?modelVersionId=1986305",
+      "use": [
+        "lora_style"
       ]
     },
     {
@@ -7922,6 +8976,7 @@
       "filename": "Diff-Pitcher_world_fixed_40.safetensors",
       "no_remote": true,
       "note": "Modo template e spartito (scripts/diffpitcher_run.py). Import locale.",
+      "page": "https://github.com/haidog-yaqub/DiffPitcher",
       "use": [
         "music"
       ]
@@ -7943,6 +8998,7 @@
       "filename": "Diff-Pitcher_bigvgan_24khz_100band.safetensors",
       "no_remote": true,
       "note": "Vocoder del runner DiffPitcher. Import locale.",
+      "page": "https://github.com/haidog-yaqub/DiffPitcher",
       "use": [
         "music"
       ]
@@ -7964,6 +9020,7 @@
       "filename": "Diff-Pitcher_transformer_pitch_360.safetensors",
       "no_remote": true,
       "note": "Serve solo al modo «Da spartito MIDI» (config Pitchformer.yaml accanto). Import locale.",
+      "page": "https://github.com/haidog-yaqub/DiffPitcher",
       "use": [
         "music"
       ]
@@ -7985,6 +9042,7 @@
       "filename": "config.json",
       "no_remote": true,
       "note": "Accanto: Pitchformer.yaml (modo spartito). Import locale.",
+      "page": "https://github.com/haidog-yaqub/DiffPitcher",
       "use": [
         "music"
       ]
@@ -8009,6 +9067,7 @@
       "used_by": [
         "cap.gen_images"
       ],
+      "page": "https://huggingface.co/conradlocke/krea2-identity-edit",
       "use": [
         "lora_style"
       ]
@@ -8033,6 +9092,7 @@
       "used_by": [
         "cap.gen_images"
       ],
+      "page": "https://huggingface.co/nunchaku-ai/nunchaku-z-image-turbo",
       "use": [
         "ckpt_image",
         "nvfp4"

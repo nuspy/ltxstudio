@@ -7,6 +7,8 @@
 Trigger e sha256 letti dall'API Civitai il 29/10/2026.
 """
 
+import os
+
 C = "https://civitai.com/api/download/models/"
 P = "https://civitai.red/models/"
 
@@ -29,33 +31,93 @@ UPSCALERS = (
 )
 
 
+DP_PAGE = "https://github.com/haidog-yaqub/DiffPitcher"
+UPSCALER_PAGES = {'upscale-4x-animesharp': 'https://openmodeldb.info/models/4x-AnimeSharp', 'upscale-4x-nmkd-siax': 'https://openmodeldb.info/models/4x-NMKD-Siax-CX', 'upscale-4x-realisticrescaler': 'https://openmodeldb.info/models/4x-RealisticRescaler', 'upscale-4x-faceupdat': 'https://openmodeldb.info/models/4x-FaceUpDAT', 'upscale-4x-nomos2-dat2': 'https://openmodeldb.info/models/4x-Nomos2-hq-dat2', 'upscale-4x-nomos2-drct-l': 'https://openmodeldb.info/models/4x-Nomos2-hq-drct-l', 'upscale-4x-nomos8k-dat': 'https://openmodeldb.info/models/4x-Nomos8kDAT', 'upscale-4x-realwebphoto-drct-l': 'https://openmodeldb.info/models/4x-RealWebPhoto-v4-drct-l', 'upscale-hat-l-srx4': 'https://github.com/XPixelGroup/HAT', 'upscale-realesrgan-x2plus': 'https://github.com/xinntao/Real-ESRGAN', 'upscale-realesrgan-x4plus-st': 'https://github.com/xinntao/Real-ESRGAN'}
+
+
+# (id, file, arch, GB, 18+, trigger, pagina) — LoRA §3 di PULIZIA_MODELLI gia' su disco; generato da orch/task17_audit/c5_gen_loras.py
+LOCAL_LORAS = (
+    ('lora-flux-almuflux', 'almuFLUX.safetensors', 'flux1', 0.613, False, ['almu'], ''),
+    ('lora-flux-aphoflux', 'aphoFLUX.safetensors', 'flux1', 0.613, False, ['apho'], ''),
+    ('lora-flux-bllefluxreality-softcore', 'blleFLUXReality Softcore.safetensors', 'flux1', 0.613, True, ['blle'], ''),
+    ('lora-flux-dvelflux', 'dvelFLUX.safetensors', 'flux1', 0.613, False, ['dvel'], ''),
+    ('lora-flux-est3tic-lingerie-v1-flux-dev-swarmui', 'est3tic_lingerie_v1_FLUX-DEV_(SwarmUI).safetensors', 'flux1', 0.04, False, ['est3tic_lingerie'], ''),
+    ('lora-flux-hourglassv32-flux', 'hourglassv32_FLUX.safetensors', 'flux1', 0.306, True, ['navel', 'cleavage', 'panties', 'nipples'], 'https://civitai.red/models/129130?modelVersionId=1668530'),
+    ('lora-flux-jpavfluxreality', 'jpavFLUXReality.safetensors', 'flux1', 0.613, False, ['jpav'], ''),
+    ('lora-flux-lmilflux', 'lmilFLUX.safetensors', 'flux1', 0.613, False, ['lmil'], ''),
+    ('lora-flux-mawiflux', 'mawiFLUX.safetensors', 'flux1', 0.613, False, ['mawi'], ''),
+    ('lora-flux-micro-thong-panties-v2', 'micro-thong-panties-V2.safetensors', 'flux1', 0.04, False, ['micro_thong'], ''),
+    ('lora-flux-mnraflux', 'mnraFLUX.safetensors', 'flux1', 0.613, False, ['mnra'], ''),
+    ('lora-flux-mohrflux', 'mohrFLUX.safetensors', 'flux1', 0.613, False, ['mohr'], ''),
+    ('lora-flux-moody-000019', 'Moody-000019.safetensors', 'flux1', 0.307, False, ['moody'], ''),
+    ('lora-flux-mysticxxx-v3', 'MysticXXX-V3.safetensors', 'flux1', 0.156, True, [], ''),
+    ('lora-flux-oiledskin-fluxdev-swarmui', 'OiledSkin_FluxDev_(SwarmUI).safetensors', 'flux1', 0.344, True, ['OiledSkin'], ''),
+    ('lora-flux-pov-fist', 'PoV_Fist.safetensors', 'flux1', 0.306, True, ['POVF1ST'], ''),
+    ('lora-flux-realunderboob-fl', 'RealUnderboob_FL.safetensors', 'flux1', 0.172, True, ['RealUnderboob'], 'https://civitai.red/models/1466115?modelVersionId=1658153'),
+    ('lora-flux-riccflux', 'riccFLUX.safetensors', 'flux1', 0.613, False, ['ricc'], ''),
+    ('lora-flux-sexy-festival-goers', 'Sexy_Festival_Goers.safetensors', 'flux1', 0.613, True, ['sxfestgoers'], 'https://civitai.red/models/1474673?modelVersionId=1668026'),
+    ('lora-flux-sgmkfluxreality', 'sgmkFLUXReality.safetensors', 'flux1', 0.613, True, ['sgmk'], ''),
+    ('lora-flux-steepslopetiddies-v1-2-rank16-bf16', 'SteepSlopeTiddies_v1-2_rank16_bf16.safetensors', 'flux1', 0.067, True, ['SteepSlopeTiddies'], ''),
+    ('lora-flux-tan-lines-01', 'tan-lines-01.safetensors', 'flux1', 0.538, True, ['tan lines on skin'], 'https://civitai.red/models/1517501?modelVersionId=1716933'),
+    ('lora-flux-underland-alice-000012', 'underland-alice-000012.safetensors', 'flux1', 0.04, True, ['UnderlandAlice'], 'https://civitai.red/models/1498122?modelVersionId=1694726'),
+    ('lora-flux-vmorflux', 'vmorFLUX.safetensors', 'flux1', 0.613, True, ['vmor'], ''),
+    ('lora-flux-yanjfluxreality-hardcore', 'yanjFLUXReality Hardcore.safetensors', 'flux1', 0.613, True, ['yanj'], ''),
+    ('lora-flux-yanjfluxreality-softcore', 'yanjFLUXReality Softcore.safetensors', 'flux1', 0.613, True, ['yanj'], ''),
+    ('lora-flux-yschfluxreality-softcore-v11', 'yschFLUXReality Softcore v11.safetensors', 'flux1', 0.613, True, ['ysch'], ''),
+    ('lora-wan-deepthroat-epoch-80-loras', 'deepthroat_epoch_80_(LoRAs).safetensors', 'wan21', 0.307, True, ['blowjob', 'deepthroat'], 'https://civitai.red/models/1340403?modelVersionId=1513684'),
+    ('lora-wan-fingering-i2v-e248-loras', 'fingering_i2v_e248_(LoRAs).safetensors', 'wan21', 0.359, True, ['She inserts two fingers into her pussy. She masturbates by sliding her fingers in and out of her pussy.'], 'https://civitai.red/models/1444759?modelVersionId=1694292'),
+    ('lora-wan-grinding-pussyjob-e130-loras', 'grinding_pussyjob_e130_(LoRAs).safetensors', 'wan21', 0.307, True, [], 'https://civitai.red/models/1476907?modelVersionId=1681144'),
+    ('lora-wan-t2v-pov-bj-14b-loras', 'T2V-POV_BJ-14B_(LoRAs).safetensors', 'wan21', 0.307, True, [], ''),
+    ('lora-wan-detailz-wan', 'detailz-wan.safetensors', 'wan21', 0.307, True, ['detailz'], 'https://civitai.red/models/1385506?modelVersionId=1565668'),
+    ('lora-wan-masturbation-cumshot-wani2v480p-v1', 'masturbation_cumshot_wanI2V480p_v1.safetensors', 'wan21', 0.307, True, [], 'https://civitai.red/models/1368557?modelVersionId=1546156'),
+    ('lora-wan-nipplesuckwan-e40', 'nippleSuckWan_e40.safetensors', 'wan21', 0.307, True, ['nipple lick', 'nipple licking', 'nipple suck', 'nipple sucking'], ''),
+    ('lora-wan-phantom-wan-14b-fusionx-lora', 'Phantom_Wan_14B_FusionX_LoRA.safetensors', 'wan21', 0.317, False, [], 'https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX'),
+    ('lora-wan-wan-facefuck-epoch110-fast-speed-full-insertion-', 'WAN-facefuck-epoch110 fast speed full insertion man has sex with womans mouth.safetensors', 'wan21', 0.359, True, ['facefuck fast speed full insertion', 'man has sex with womans mouth'], ''),
+    ('lora-wan-wan-nsfw-e14-fixed', 'wan-nsfw-e14-fixed.safetensors', 'wan21', 0.614, True, ['nsfwsks'], 'https://civitai.red/models/1307155?modelVersionId=1475095'),
+    ('lora-wan-wan-t2v-i2v-anal-combined-e50', 'wan-t2v-i2v-anal-combined-e50.safetensors', 'wan21', 0.307, True, ['She moves up and down on top of him as his penis penetrates her asshole.'], 'https://civitai.red/models/1426284?modelVersionId=1612131'),
+    ('lora-wan-wan-cumshot-i2v', 'wan_cumshot_i2v.safetensors', 'wan21', 0.359, True, [], ''),
+    ('lora-wan-wan-dr34mj0b', 'WAN_dr34mj0b.safetensors', 'wan21', 0.18, True, ['bl0wj0b', 'd0ub13_bj'], ''),
+    ('lora-wan-fusionx-facenaturalizer', 'FusionX_FaceNaturalizer.safetensors', 'wan21', 0.614, False, [], 'https://civitai.red/models/1755105?modelVersionId=1986305'),
+)
+
+
 def entries(N):
     out = []
     for i, fn, arch, gb, note in UPSCALERS:
         out.append(N(i, "Upscale", f"{fn.rsplit('.', 1)[0]} ({arch}, {gb}GB)", category="aux", arch="esrgan",
-                     filename=fn, type="Upscale", gb=gb, no_remote=True,
+                     filename=fn, type="Upscale", gb=gb, no_remote=True, page=UPSCALER_PAGES.get(i),
                      note=f"{note}. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel."))
+
+    for i, fn, arch, gb, adult, trig, page in LOCAL_LORAS:
+        folder = "Flux" if arch == "flux1" else "Wan"
+        out.append(N(i, "Immagini" if arch == "flux1" else "Video", f"{os.path.splitext(fn)[0]} ({'FLUX.1' if arch == 'flux1' else 'Wan 2.1'}{', 18+' if adult else ''}, {gb}GB)",
+                     category="image" if arch == "flux1" else "video", arch=arch, filename=fn, type="LoRA", family=folder,
+                     gb=gb, no_remote=True, sens="adult" if adult else None, triggers=trig or None, page=page or None,
+                     note="LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA " + ("FLUX" if arch == "flux1" else "Wan 2.1")
+                          + "; architettura dalle chiavi dell'header. " + ("Pagina verificata (stesso nome file/dimensione)." if page else
+                          "Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).")))
 
     out += [
         # ───────── DiffPitcher (correzione intonazione, tab Musica): pesi in E:\AI\Models\DiffPitcher ─────────
         N("diffpitcher-world", "Musica (ACE-Step)", "DiffPitcher · WORLD fixed 40 (correzione intonazione, 0.47GB)",
           category="music", arch="diffpitcher", filename="Diff-Pitcher_world_fixed_40.safetensors", type="DiffPitcher",
-          gb=0.468, no_remote=True, note="Modo template e spartito (scripts/diffpitcher_run.py). Import locale."),
+          gb=0.468, no_remote=True, page=DP_PAGE, note="Modo template e spartito (scripts/diffpitcher_run.py). Import locale."),
         N("diffpitcher-bigvgan", "Musica (ACE-Step)", "DiffPitcher · BigVGAN 24kHz 100 band (vocoder, 0.45GB)",
           category="music", arch="diffpitcher", filename="Diff-Pitcher_bigvgan_24khz_100band.safetensors", type="DiffPitcher",
-          gb=0.45, no_remote=True, note="Vocoder del runner DiffPitcher. Import locale."),
+          gb=0.45, no_remote=True, page=DP_PAGE, note="Vocoder del runner DiffPitcher. Import locale."),
         N("diffpitcher-pitchformer", "Musica (ACE-Step)", "DiffPitcher · PitchFormer (modo spartito MIDI, 0.10GB)",
           category="music", arch="diffpitcher", filename="Diff-Pitcher_transformer_pitch_360.safetensors", type="DiffPitcher",
-          gb=0.102, no_remote=True,
+          gb=0.102, no_remote=True, page=DP_PAGE,
           note="Serve solo al modo «Da spartito MIDI» (config Pitchformer.yaml accanto). Import locale."),
         N("diffpitcher-config", "Musica (ACE-Step)", "DiffPitcher · config.json + Pitchformer.yaml (configurazione)",
-          category="music", arch="diffpitcher", filename="config.json", type="DiffPitcher", gb=0.001, no_remote=True,
+          category="music", arch="diffpitcher", filename="config.json", type="DiffPitcher", gb=0.001, no_remote=True, page=DP_PAGE,
           scan=["config.json"], note="Accanto: Pitchformer.yaml (modo spartito). Import locale."),
 
         # ───────── LoRA identità di Krea 2 Edit: applicata IN AUTOMATICO (workers/krea2_infer._find_identity_lora) ─────────
         N("krea2-identity-edit-lora", "Immagini", "Krea 2 Edit · LoRA identità v1.2 (automatica, 1.83GB)",
           category="image", arch="krea2", filename="krea2_identity_edit_v1_2.safetensors", type="LoRA", family="",
           gb=1.83, no_remote=True, used_by=["cap.gen_images"],
+          page="https://huggingface.co/conradlocke/krea2-identity-edit",
           note="Applicata da sola a peso 1.0 in ogni editing Krea 2 per conservare l'identità del soggetto "
                "(glob krea2_identity_edit*.safetensors sotto LoRA). Sta alla radice di LoRA e NON compare nel pannello LoRA."),
 
@@ -63,6 +125,7 @@ def entries(N):
         N("zimage-turbo-nunchaku-fp4", "Immagini", "Z-Image Turbo nunchaku SVDQ fp4 r128 (4.2GB, BUG NOTO wheel stabile)",
           category="image", arch="zimage", type="diffusion_models", family="Z-Image/nunchaku",
           filename="svdq-fp4_r128-z-image-turbo.safetensors", gb=4.2, no_remote=True, used_by=["cap.gen_images"],
+          page="https://huggingface.co/nunchaku-ai/nunchaku-z-image-turbo",
           note="Motore nativo in image_flux (NunchakuZImageTransformer2DModel) ma su wheel nunchaku STABILE per Windows "
                "fallisce (assert rotary_emb, docs/FUTURE_CHECKS.md #3, docs/MODEL_REVIEW_2026-07.md): da ricontrollare "
                "con la wheel nightly. Non proposto al download; dà errore chiaro se scelto."),
@@ -129,6 +192,7 @@ def entries(N):
 
 
 USE = {i: (["upscale_image"], []) for i, *_ in UPSCALERS}
+USE.update({r[0]: (["lora_style", "uncensored"] if r[4] else ["lora_style"], []) for r in LOCAL_LORAS})
 USE.update({
     "diffpitcher-world": (["music"], []),
     "diffpitcher-bigvgan": (["music"], []),
