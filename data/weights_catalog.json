@@ -2391,7 +2391,10 @@
       "used_by": [
         "cap.video"
       ],
-      "note": "il nodo kijai DownloadAndLoadWav2VecModel scarica nella sua dir (<comfy>/models/wav2vec2) al primo uso; MultiTalk oggi dormiente (albero ComfyUI dismesso) — voce di pre-download per quando torna attivo"
+      "note": "il nodo kijai DownloadAndLoadWav2VecModel scarica nella sua dir (<comfy>/models/wav2vec2) al primo uso; MultiTalk oggi dormiente (albero ComfyUI dismesso) — voce di pre-download per quando torna attivo",
+      "use": [
+        "audio_enc"
+      ]
     },
     {
       "id": "f5-tts",
@@ -7444,6 +7447,108 @@
       "sha256": "a1fe997f19060171db8dd4d58c30debc78ddfcc357b63481798792a38a356d8d",
       "use": [
         "upscale_video"
+      ]
+    },
+    {
+      "id": "wan21-i2v-14b-480p-fp8",
+      "module": "Video",
+      "label": "MultiTalk lip-sync: Wan2.1 I2V 14B 480P fp8 (Kijai, 17 GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Wan2.1",
+      "gated": false,
+      "approx_gb": 16.99,
+      "scan_names": [
+        "Wan2_1-I2V-14B-480P_fp8_e4m3fn.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "repo_id": "Kijai/WanVideo_comfy",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy",
+      "filename": "Wan2_1-I2V-14B-480P_fp8_e4m3fn.safetensors",
+      "sha256": "996dbad030df09b0b3c8e764f0fb5a81b98b220ab89524d6a9369e9ed882791f",
+      "deps": [
+        "wan21-multitalk-14b-fp8",
+        "wan-clip-vision-h",
+        "lightx2v-i2v-480p-rank64",
+        "wan21_13b_original",
+        "wav2vec2-multitalk"
+      ],
+      "used_by": [
+        "cap.video"
+      ],
+      "use": [
+        "ckpt_video",
+        "fp8"
+      ]
+    },
+    {
+      "id": "wan21-multitalk-14b-fp8",
+      "module": "Video",
+      "label": "MultiTalk: adattatore audio per Wan2.1 14B (fp8, 2,7 GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Wan2.1",
+      "gated": false,
+      "approx_gb": 2.71,
+      "scan_names": [
+        "WanVideo_2_1_Multitalk_14B_fp8_e4m3fn",
+        "WanVideo_2_1_Multitalk_14B_fp32"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "repo_id": "Kijai/WanVideo_comfy",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy",
+      "filename": "WanVideo_2_1_Multitalk_14B_fp8_e4m3fn.safetensors",
+      "sha256": "8620f05821c7ad28ef4d92349ef1e294c0f562b60a6f94840fceaa4de68b2834",
+      "use": [
+        "ckpt_video",
+        "fp8"
+      ]
+    },
+    {
+      "id": "lightx2v-i2v-480p-rank64",
+      "module": "Video",
+      "label": "lightx2v distillazione step+cfg per Wan2.1 I2V 480P (rank 64, LoRA)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Wan",
+      "gated": false,
+      "approx_gb": 0.74,
+      "scan_names": [
+        "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "repo_id": "Kijai/WanVideo_comfy",
+      "url": "https://huggingface.co/Kijai/WanVideo_comfy",
+      "filename": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "remote_filename": "Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "sha256": "85c4a61c30e0497aa44b91d93a893b624708461a56fe5485183b28fa07e2dfb3",
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "wan-clip-vision-h",
+      "module": "Video",
+      "label": "CLIP vision H (encoder immagine di Wan2.1 I2V)",
+      "kind": "file",
+      "type": "VisionEncoders",
+      "family": "",
+      "gated": false,
+      "approx_gb": 1.26,
+      "scan_names": [
+        "clip_vision_h.safetensors"
+      ],
+      "category": "video",
+      "arch": "wan21",
+      "repo_id": "Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged",
+      "filename": "clip_vision_h.safetensors",
+      "remote_filename": "split_files/clip_vision/clip_vision_h.safetensors",
+      "use": [
+        "ckpt_video"
       ]
     }
   ],

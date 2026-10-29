@@ -1,0 +1,10 @@
+Codice di terze parti vendorizzato in questa cartella (tutto Apache License 2.0; testo in LICENSE-APACHE-2.0.txt):
+  - t5.py, vae.py, tokenizers.py: Alibaba Wan Team — Wan2.1 (https://github.com/Wan-Video/Wan2.1), nella copia del
+    repo MeiGen-AI/MultiTalk (https://github.com/MeiGen-AI/MultiTalk). Modifiche nostre: tolta la dipendenza da
+    optimum-quanto, T5EncoderModel riscritto (streaming a blocchi), autocast/torch.load aggiornati.
+  - fm_solvers.py (FlowDPMSolverMultistepScheduler): Alibaba Wan Team, nella copia di kijai/ComfyUI-WanVideoWrapper
+    (https://github.com/kijai/ComfyUI-WanVideoWrapper, Apache-2.0).
+  - wav2vec2_config.json: configurazione di TencentGameMate/chinese-wav2vec2-base (copia di kijai/WanVideoWrapper).
+  - model.py: riscrittura compatta (solo I2V + MultiTalk a un parlante) derivata da wan/modules/multitalk_model.py di
+    MeiGen-AI/MultiTalk e dalla logica di campionamento di wan/multitalk.py; pesi compatibili (chiavi originali Wan).
+Nessuna dipendenza da ComfyUI a runtime.
