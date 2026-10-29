@@ -291,13 +291,46 @@ def _ensure_placement(pipe, mm=None, self_key: str | None = None) -> str:
                          keep={self_key} if self_key else set())
         except Exception:                                # noqa: BLE001
             pass
-    mode = _place_sticky(pipe) if _want_sticky else _place(pipe, est_missing)
+    mode = None
+    if not _want_sticky and getattr(pipe, "_ls_shared", False) and STORE.all_resident(keys):
+        mode = _place_resident(pipe)                     # sorella: pesi già su GPU → mai cambiare placement ai moduli condivisi
+    if mode is None:
+        mode = _place_sticky(pipe) if _want_sticky else _place(pipe, est_missing)
     for k in keys:
         # sticky: transformer+vae su cuda, T5/CLIP hooked (device 'misto') → non marcare i componenti 'cuda'
         STORE.note_device(k, "cuda" if mode == "gpu" else "cpu")
     pipe._ls_place_mode = mode
     pipe._ls_place_epoch = STORE.bump_epoch()            # invalida l'epoch delle ALTRE pipe → loro rebind
     return mode
+
+
+def _place_resident(pipe) -> str | None:
+    """Pipeline SORELLA i cui componenti (transformer/VAE/T5/CLIP condivisi) sono GIÀ tutti su GPU: i pesi sono pagati,
+    NON si piazza nulla e soprattutto NON si passa a offload — i moduli sono gli stessi della pipeline residente: spostarli
+    su CPU (visto dal vivo il 18/10: 28→1,7 GB di VRAM, RAM del figlio +17 GB, hook di offload sul transformer fp8
+    condiviso) rompe anche la pipeline di «crea». Serve solo la MEMORIA DI LAVORO (attivazioni + decode, `_ls_working_mb`):
+    se la VRAM libera non basta si restituisce al driver la cache inutilizzata e si ricontrolla; se ancora non basta →
+    errore CHIARO (mai un offload improvvisato sui moduli condivisi). Ritorna "gpu", oppure None solo con
+    NATIVE_ALLOW_OFFLOAD_SHARED=1 (si ricade nel _place storico, a proprio rischio)."""
+    import torch
+    working = float(getattr(pipe, "_ls_working_mb", 0) or 3200)
+    if not torch.cuda.is_available():
+        return "gpu"
+    free = torch.cuda.mem_get_info()[0] / 2**20
+    if free < working:
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        free = torch.cuda.mem_get_info()[0] / 2**20
+    print(f"[place] sorella con pesi GIÀ su GPU: placement invariato (gpu), serve solo la memoria di lavoro "
+          f"({working:.0f}MB, liberi {free:.0f}MB)", flush=True)
+    if free >= working:
+        return "gpu"
+    if os.environ.get("NATIVE_ALLOW_OFFLOAD_SHARED") == "1":
+        return None
+    raise RuntimeError(
+        f"VRAM libera insufficiente per questa operazione: servono ~{working / 1024:.1f} GB di memoria di lavoro e "
+        f"ne restano {free / 1024:.1f} GB (il modello è già in memoria e non viene spostato). Chiudi i programmi che "
+        f"usano la GPU o usa «Libera VRAM», poi riprova.")
 
 
 def _place_flux2_blockswap(pipe) -> str:
@@ -377,6 +410,32 @@ def _apply_fbcache(pipe) -> bool:
     except Exception as e:                              # noqa: BLE001
         print(f"[image] FBCache non applicato: {e}", flush=True)
         return False
+
+
+def _sync_fbcache(pipe, arch: str) -> None:
+    """First Block Cache COERENTE col job. Il transformer è CONDIVISO fra le pipeline FLUX.1 (crea/inpaint/kontext sullo
+    stesso file): i suoi hook di cache restano attaccati al modulo. Solo FluxPipeline (t2i) entra nel `cache_context` —
+    FluxInpaint/Fill/Kontext NO (diffusers 0.38) — quindi un job image-conditioned sul transformer di un «crea» con
+    cache attiva muore con «No context is set. Please set a context before retrieving the state.»
+    (hooks.py:44; visto dal vivo il 18/10: scambiato per un problema di offload). Prima il bug era nascosto
+    perché ogni cambio di compito ricaricava il transformer. Qui: image-conditioned → cache SPENTA; t2i con
+    NATIVE_FBCACHE=1 → ACCESA (a ogni job lo stato è quello giusto per il job)."""
+    tr = getattr(pipe, "transformer", None)
+    if tr is None or not hasattr(tr, "is_cache_enabled"):
+        return
+    want = os.environ.get("NATIVE_FBCACHE", "0") == "1" and not SPEC.get(arch, ("", False, False))[2]
+    try:
+        on = bool(tr.is_cache_enabled)
+        if on and not want:
+            tr.disable_cache()
+            print(f"[image] FBCache disattivata sul transformer condiviso per '{arch}' (la pipeline non entra nel "
+                  f"cache_context)", flush=True)
+        elif want and not on:
+            _apply_fbcache(pipe)
+    except Exception as _e:                                  # noqa: BLE001
+        from inference_server.cuda_health import reraise_if_fatal
+        reraise_if_fatal(_e)
+        print(f"[image] sync FBCache non riuscita ({_e})", flush=True)
 
 
 def _maybe_compile(pipe) -> bool:
@@ -656,10 +715,18 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     # perdita accettata. Disattivabile con NATIVE_FLUX1_FP8=0 (fallback bf16 pieno, come prima).
     if os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf:
         try:
+            # Task 16b (A/B, default INVARIATO): il skip di default di FluxTransformer2DModel e' SOLO ("pos_embed","norm"):
+            # x_embedder (anche i token della foto di riferimento di Kontext), context_embedder, time_text_embed
+            # (timestep+guidance embedder) e proj_out finiscono in fp8 e4m3 (errore relativo misurato 2.7-5%, guidance_in 4.7%),
+            # contrariamente a quanto diceva il vecchio commento. NATIVE_FLUX_FP8_KEEP_BF16=1 li tiene in bf16 (~50 MB in piu').
+            _skip = ("pos_embed", "norm", "x_embedder", "context_embedder", "time_text_embed", "proj_out") \
+                if os.environ.get("NATIVE_FLUX_FP8_KEEP_BF16") == "1" else None
             tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn,
-                                        compute_dtype=bf16)   # skip default: norm/embed restano bf16
+                                        compute_dtype=bf16, skip_modules_pattern=_skip)
             tr._ls_fp8_storage = True
             _src = "fp8-nativo" if _flux_fp8_e4m3(transformer_path) else "bf16→fp8"
+            if _skip is not None:
+                _src += " + embedder/proj_out bf16"
             print(f"[flux] transformer STORAGE fp8 (layerwise, {_src}): ~metà VRAM, niente offload", flush=True)
         except Exception as e:                           # noqa: BLE001
             print(f"[flux] layerwise fp8 non applicato ({e}) → bf16 (fallback)", flush=True)
@@ -1027,7 +1094,7 @@ def _weights_ident(arch: str, resolved_path: str, klein_te: str = "") -> tuple:
 
 def _sibling_pipe(mm, ident: tuple):
     """Se in cache c'è una pipeline SORELLA FLUX.1 (stessa identità dei pesi, shell condivisa) → ritornala:
-    la nuova pipeline si costruisce con from_pipe (ZERO load da disco). Il confronto è per IDENTITÀ (file
+    la nuova pipeline si costruisce con gli STESSI moduli (ZERO load da disco). Il confronto è per IDENTITÀ (file
     risolto), non per la stringa grezza della GUI: path relativo e assoluto dello stesso file combaciano."""
     if mm is None or not ident:
         return None
@@ -1048,6 +1115,91 @@ def _flux2_sibling_pipe(mm, ident: tuple):
                 and getattr(o, "_ls_place_mode", "") == "blockswap"):
             return o
     return None
+
+
+def _destroy_same_ident(mm, ident: tuple) -> int:
+    """MAI DUE COPIE dello stesso peso (incidente 17/10/2026): se si sta per fare un load COMPLETO e in cache c'è
+    già una pipeline con la stessa identità (sorella non riusabile / riuso fallito / riuso disattivato), la si
+    SCARICA prima (destroy: shell + componenti, anche se referenziati) e solo dopo si carica. Ritorna quante
+    shell ha scaricato. Le variabili locali del chiamante che puntano alle vecchie pipeline vanno azzerate PRIMA."""
+    if mm is None or not ident:
+        return 0
+    from inference_server.component_store import STORE
+    hit = [k for k, e in list(mm._cache.items()) if getattr(e.obj, "_ls_ident", None) == ident]
+    parked = [k for k, e in list(getattr(mm, "_cpu_cache", {}).items()) if getattr(e.obj, "_ls_ident", None) == ident]
+    if not hit and not parked:
+        return 0
+    ckeys: list = []
+    for k in hit:
+        ckeys += list(getattr(mm._cache[k].obj, "_ls_component_keys", ()) or ())
+        mm.unload(k, allow_cpu=False)                        # distrugge: niente parcheggio RAM della vecchia copia
+    for k in parked:
+        e = mm._cpu_cache.pop(k, None)
+        if e is not None:
+            ckeys += list(getattr(e.obj, "_ls_component_keys", ()) or ())
+            try:
+                del e.obj
+            except Exception:                               # noqa: BLE001
+                pass
+    STORE.destroy(ckeys)
+    mm.flush(force=True)
+    print(f"[mem] load completo richiesto con residente della stessa identità → {len(hit) + len(parked)} pipeline "
+          f"SCARICATE (destroy) prima: mai due copie dello stesso peso", flush=True)
+    return len(hit) + len(parked)
+
+
+def _predicted_load_mb(model_path: str, arch: str) -> float:
+    """MB che il load di `model_path` impegnerà ANCORA sul commit: file (0 se il transformer è già nello store)
+    + componenti condivisi FLUX.1 non ancora nello store (stime prudenti)."""
+    try:
+        sz = os.path.getsize(model_path) / 2**20
+    except OSError:
+        return 0.0
+    try:
+        from inference_server.component_store import STORE
+        items = STORE._items
+        if arch in ("flux", "kontext", "inpaint"):
+            low = os.path.normpath(model_path).lower()
+            if any(k.startswith(f"flux_tr:{low}:") for k in items):
+                sz = 0.0
+            for ck, est in (("t5xxl", 9500.0), ("clip_l", 300.0), ("vae_flux", 200.0)):
+                if ck not in items:
+                    sz += est
+    except Exception:                                       # noqa: BLE001
+        pass
+    return sz
+
+
+def _guard_load(model_path: str, arch: str) -> None:
+    """Prima di OGNI assemblaggio/caricamento: commit libero − carico previsto < pavimento (core/mem_budget) →
+    errore chiaro (`LoadRefused`) invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
+    from core import mem_budget
+    mem_budget.check_load(_predicted_load_mb(model_path, arch), os.path.basename(str(model_path)))
+
+
+def _release_cuda_cache() -> None:
+    """Dopo OGNI generazione: restituisce al driver i blocchi che l'allocatore di torch tiene riservati ma non usa
+    (il transiente del VAE decode: 28,4GB reserved contro 24GB di pesi → 32,1/32,5GB «usati» e nessun margine per il
+    job successivo). I PESI restano residenti (sono tensori vivi): si libera solo la cache."""
+    try:
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            _before = _alloc = 0
+            try:
+                _before, _alloc = torch.cuda.memory_reserved() // 2**20, torch.cuda.memory_allocated() // 2**20
+            except Exception:                               # noqa: BLE001
+                pass
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+            try:
+                print(f"[mem] FINE JOB: cache CUDA restituita al driver (reserved {_before}MB → "
+                      f"{torch.cuda.memory_reserved() // 2**20}MB; pesi residenti alloc={_alloc}MB)", flush=True)
+            except Exception:                               # noqa: BLE001
+                pass
+    except Exception:                                       # noqa: BLE001 — contesto avvelenato: il figlio uscirà da sé
+        pass
 
 
 def preload_shared_components() -> None:
@@ -1155,7 +1307,7 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             f"{diffusers.__version__}." + (f" Usa '{alt}' per questa funzione." if alt else
             " Aggiorna diffusers o scegli un'altra pipeline."))
     is_file = Path(model_path).is_file()
-    # RIUSO SORELLA (from_pipe): stesso FILE modello già caricato con un altro arch FLUX.1 (es. t2i→kontext)
+    # RIUSO SORELLA (stessi moduli): stesso FILE modello già caricato con un altro arch FLUX.1 (es. t2i→kontext)
     # → costruisci la nuova pipeline dagli STESSI componenti (zero load da disco, ~1s). Solo 64ch: il Fill
     # (384ch) ha un transformer incompatibile e non arriva mai qui con lo stesso file.
     _ident = _weights_ident(arch, _ident_path, klein_te)   # arch DOPO il guard-famiglia: è la pipeline vera
@@ -1165,11 +1317,18 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
             try:
                 from inference_server.component_store import STORE as _ST
                 try:
-                    _src.remove_all_hooks()               # from_pipe NON gestisce gli hook → sanifica PRIMA
+                    _src.remove_all_hooks()               # niente hook di offload ereditati dalla sorella
                 except Exception:                         # noqa: BLE001
                     pass
                 _ST.bump_epoch()                          # stato toccato → tutte le pipe faranno rebind
-                pipe = Pipe.from_pipe(_src)
+                # NIENTE Pipe.from_pipe: in diffusers 0.38 ha `torch_dtype=torch.float32` di DEFAULT e fa
+                # `new_pipeline.to(dtype=float32)` su TUTTI i componenti — che sono gli STESSI oggetti della sorella:
+                # transformer fp8 e T5 venivano upcastati IN PLACE (est 27GB → 63GB, CUDA OOM, crash di sistema
+                # dal vivo il 17/10, pipeline_utils.py:122-123). Si costruisce con gli STESSI moduli, come fa
+                # _assemble_flux: nessuna allocazione su GPU, nessuna copia, nessun cambio di dtype.
+                pipe = Pipe(transformer=_src.transformer, vae=_src.vae, text_encoder=_src.text_encoder,
+                            tokenizer=_src.tokenizer, text_encoder_2=_src.text_encoder_2,
+                            tokenizer_2=_src.tokenizer_2, scheduler=_src.scheduler)
                 pipe._ls_component_keys = _src._ls_component_keys
                 for _ck in pipe._ls_component_keys:
                     _ST.retain(_ck)                       # la nuova shell referenzia gli stessi componenti
@@ -1178,17 +1337,21 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
                 pipe._ls_est_mb = getattr(_src, "_ls_est_mb", VRAM_MB.get(arch, 24000))
                 pipe._ls_weights_mb = getattr(_src, "_ls_weights_mb", pipe._ls_est_mb)
                 pipe._ls_working_mb = getattr(_src, "_ls_working_mb", 0)   # stessi componenti → stesso footprint
-                _set_attention(pipe, arch)
-                print(f"[flux] from_pipe: riuso componenti della sorella per '{arch}' (zero load)", flush=True)
+                # (_set_attention gira per-job in run(): qui nessuna chiamata CUDA durante la costruzione)
+                print(f"[flux] sorella: riuso gli STESSI moduli della pipeline residente per '{arch}' (zero load)",
+                      flush=True)
                 return pipe, 50
-            except Exception as _e:                       # noqa: BLE001 — fallback: load normale
-                print(f"[flux] from_pipe fallito ({_e}) → load completo", flush=True)
+            except Exception as _e:                       # noqa: BLE001 — fallback: scarica il residente, poi load
+                from inference_server.cuda_health import reraise_if_fatal
+                reraise_if_fatal(_e)                      # contesto CUDA avvelenato: il figlio esce, niente ripieghi
+                print(f"[flux] riuso della sorella fallito ({_e}) → scarico il residente, poi load completo", flush=True)
+                pipe = None
     if (arch in ("flux2_kontext", "flux2_inpaint") and is_file
             and os.environ.get("NATIVE_FLUX2_SIBLING", "1") != "0"):
         # KLEIN edit↔inpaint↔colora sullo STESSO file: stesso transformer + stesso encoder Qwen3 (ident uguale) →
         # la nuova pipeline usa i MODULI della sorella (già in blockswap), cambia solo la classe diffusers.
         # Prima ogni cambio di compito ricaricava ~20-30GB da SSD (transformer fp8 + Qwen3). NATIVE_FLUX2_SIBLING=0 per
-        # tornare al load completo. Qualunque anomalia → ripiega sul load normale (stesso schema del from_pipe FLUX.1).
+        # tornare al load completo. Qualunque anomalia → ripiega sul load normale (stesso schema della sorella FLUX.1).
         _fs = _flux2_sibling_pipe(mm, _ident)
         if _fs is not None:
             try:
@@ -1207,8 +1370,17 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
                         setattr(pipe, _a, getattr(_fs, _a))
                 print(f"[flux2] sorella Klein: riuso i moduli già residenti per '{arch}' (zero load)", flush=True)
                 return pipe, VRAM_MB.get(arch, 24000)
-            except Exception as _e:                          # noqa: BLE001 — fallback: load normale
-                print(f"[flux2] riuso sorella Klein fallito ({_e}) → load completo", flush=True)
+            except Exception as _e:                          # noqa: BLE001 — fallback: scarica il residente, poi load
+                from inference_server.cuda_health import reraise_if_fatal
+                reraise_if_fatal(_e)
+                print(f"[flux2] riuso sorella Klein fallito ({_e}) → scarico il residente, poi load completo", flush=True)
+                pipe = None
+        _fs = None                                           # nessun riferimento locale alla vecchia pipeline
+    # MAI DUE COPIE: se si arriva al load completo con un residente della stessa identità, lo si scarica PRIMA.
+    _src = None
+    _destroy_same_ident(mm, _ident)
+    if is_file:
+        _guard_load(model_path, arch)                        # commit libero − carico < pavimento → errore chiaro
     if arch == "ernie":
         pipe = _assemble_ernie(model_path if (is_file and str(model_path).lower().endswith(".safetensors")) else None)
         # assemblaggio locale (shim transformers <5); il PE (6.4GB) NON entra qui: ernie_pe lo carica solo su «Migliora prompt»
@@ -1621,6 +1793,15 @@ def _seam_tone_match(res_img, orig_img, mask_bool, feather: int, *, gain: bool =
 
 
 def run(params: dict, mm, output_dir: str) -> dict:
+    """Esegue il job. In ogni caso (successo, errore, eccezione) restituisce al driver la cache CUDA inutilizzata:
+    i pesi restano residenti, ma il job dopo non trova la VRAM «piena» di blocchi riservati e vuoti."""
+    try:
+        return _run_impl(params, mm, output_dir)
+    finally:
+        _release_cuda_cache()
+
+
+def _run_impl(params: dict, mm, output_dir: str) -> dict:
     import time as _time
     import torch
     from PIL import Image
@@ -1669,6 +1850,8 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 _gc.collect()                                # forza il rilascio dei buffer bytes del vecchio
             _step("pre-evict cambio-modello (scaricato il precedente)")
         except Exception as _e:                             # noqa: BLE001
+            from inference_server.cuda_health import reraise_if_fatal
+            reraise_if_fatal(_e)                            # CUDA avvelenato: mai proseguire in questo processo
             print(f"[image] pre-evict cambio modello saltato ({_e})", flush=True)
     # need_mb=None: lo sfratto pre-load distruggerebbe/demoterebbe anche i COMPONENTI che questa pipeline
     # sta per riusare (refcount ancora 0 prima dell'acquire). _load carica su CPU; lo spazio si libera in
@@ -1733,10 +1916,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 print(f"[image] auto-evict SALTATO: c'è spazio (free {_free_mb} ≥ need {_need_mb}MB) → gli altri "
                       f"modelli RESTANO residenti", flush=True)
         except Exception as _e:                             # noqa: BLE001
+            from inference_server.cuda_health import reraise_if_fatal
+            reraise_if_fatal(_e)                            # era qui che il CUDA OOM veniva inghiottito (17/10)
             print(f"[image] auto-evict saltato ({_e})", flush=True)
     _step("auto-evict FATTO (sto per fare il placement in VRAM)")
     where = _ensure_placement(pipe, mm, key)                # placement per-JOB (gpu|offload con VRAM attuale)
     _step(f"placement FATTO = {where}")
+    _sync_fbcache(pipe, arch)                               # per-job: stato della cache coerente col compito
     _set_attention(pipe, arch)                              # per-job: il transformer CONDIVISO può avere il
     print(f"[image] job {arch}: placement={where}", flush=True)  # processor dell'arch precedente (sage↔sdpa)
     mm.apply_loras(pipe, params.get("loras"))
@@ -1831,10 +2017,23 @@ def run(params: dict, mm, output_dir: str) -> dict:
             # (ri)generare, NERO = pixel da mantenere. Inpaint: bianco = area disegnata. Outpaint: bianco =
             # estensione (bordo) da riempire, nero = foto (vedi mask_canvas._border_mask). NIENTE inversione:
             # invertirla faceva rigenerare la FOTO e lasciava NERA l'estensione (bug outpaint).
-            _mimg = Image.open(mk).convert("RGB")
+            # BINARIA: maschere con alpha < 255 (SAM = 0,6 × luminanza, pennellata singola 150/255) davano un edit
+            # «al 60%» — composite finale 60% generato + 40% originale = capo «fantasma» con TUTTI i motori (live 17/10).
+            _mimg = Image.open(mk).convert("L").point(lambda v: 255 if v > 127 else 0).convert("RGB")
             if _mimg.size != (_W, _H):                       # maschera allineata a width/height
                 _mimg = _mimg.resize((_W, _H), Image.NEAREST)
             kw["mask_image"] = _mimg
+            # Task 16a — outpaint dei motori NON-Fill: il frame del canvas ha l'estensione scura uniforme. FluxFill la
+            # azzera da sé (non toccarlo), ma Klein la usa come riferimento + punto di partenza (vignetta scura) e il FLUX
+            # base la tiene come bordo. Si dà un riempimento plausibile (core/outpaint_prefill: specchio sfocato + campo
+            # liscio + grana); i pixel della foto restano identici e la maschera non cambia. NATIVE_OUTPAINT_PREFILL=0 = prima.
+            if params.get("outpaint") and type(pipe).__name__ in ("FluxInpaintPipeline", "Flux2KleinInpaintPipeline"):
+                from core import outpaint_prefill as _opf
+                if _opf.enabled():
+                    import numpy as _npf
+                    kw["image"] = _opf.prefill_extension(kw["image"], _npf.asarray(_mimg.convert("L")) > 127,
+                                                         seed=int(params.get("seed") or 0))
+                    print(f"[outpaint-prefill] {type(pipe).__name__}: estensione pre-riempita (specchio sfocato + campo liscio)", flush=True)
     else:
         kw["width"] = int(params.get("width", 1024))
         kw["height"] = int(params.get("height", 1024))
@@ -1859,6 +2058,19 @@ def run(params: dict, mm, output_dir: str) -> dict:
     if type(pipe).__name__ == "FluxInpaintPipeline":
         kw["strength"] = float(params.get("denoise") or 0.9)
         kw["guidance_scale"] = min(float(kw.get("guidance_scale", 3.5)), 5.0)
+        if params.get("outpaint"):
+            # Task 16a — a strength 1.0 la schedule parte da rumore puro: il pre-riempimento non arriva al modello e
+            # l'estensione e' un'altra scena (live 18/10, O2). In outpaint: min(denoise, 0.9) (env NATIVE_OUTPAINT_STRENGTH).
+            from core import outpaint_prefill as _opf3
+            if _opf3.enabled():
+                kw["strength"] = _opf3.outpaint_strength(kw["strength"])
+                print(f"[outpaint-prefill] FluxInpaintPipeline: strength outpaint {kw['strength']:.2f}", flush=True)
+    # Task 16a — Klein outpaint: la GUI manda denoise=1.0 ma la pipeline Klein usa `strength` (default 0.8, non 1): la schedule
+    # partiva dal frame rumorato all'80% e il buio dell'estensione (bassa frequenza) sopravviveva. Qui denoise → strength.
+    if type(pipe).__name__ == "Flux2KleinInpaintPipeline" and params.get("outpaint"):
+        from core import outpaint_prefill as _opf2
+        if _opf2.enabled():
+            kw["strength"] = float(params.get("denoise") or 1.0)
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
@@ -1887,6 +2099,24 @@ def run(params: dict, mm, output_dir: str) -> dict:
             kw["callback_on_step_end_tensor_inputs"] = ["latents"]
         except Exception as _dde:                            # noqa: BLE001
             print(f"[diffdiff] disattivata ({_dde}) → inpaint normale", flush=True)
+    # Task 16b — interruttori DIAGNOSTICI (default spenti = comportamento invariato), per i test Kontext Q5-E2/E3:
+    # NATIVE_VAE_FP32=1 + Kontext: il VAE fp32 (wrapper di _assemble_flux) restituisce latenti della foto di riferimento in fp32;
+    # la pipeline li concatena a quelli bf16 e il transformer riceverebbe fp32 (mismatch col layerwise fp8) -> li riporta a bf16.
+    if os.environ.get("NATIVE_VAE_FP32") == "1" and hasattr(pipe, "_encode_vae_image") \
+            and not getattr(pipe, "_ls_enc_cast", False):
+        _enc0 = pipe._encode_vae_image
+        pipe._encode_vae_image = lambda *a, **k: _enc0(*a, **k).to(torch.bfloat16)
+        pipe._ls_enc_cast = True
+        print("[flux] VAE fp32: latenti di riferimento riportati a bf16 dopo l'encode", flush=True)
+    # NATIVE_T5_RELEASE_AFTER_ENCODE=1: T5/CLIP tornano in RAM subito dopo l'encode del prompt. Serve al transformer bf16 (22.9 GB)
+    # residente (STICKY): senza questo T5 resta in VRAM durante il denoise (nel Q5-C: alloc 31.9 GB -> spill nella shared-RAM, 128 s/step).
+    if os.environ.get("NATIVE_T5_RELEASE_AFTER_ENCODE") == "1":
+        for _tn in ("text_encoder", "text_encoder_2"):
+            _tm = getattr(pipe, _tn, None)
+            if _tm is not None and not getattr(_tm, "_ls_release_hook", False):
+                _tm.register_forward_hook(lambda m, i, o: (m.to("cpu"), torch.cuda.empty_cache(), None)[-1])
+                _tm._ls_release_hook = True
+        print("[flux] T5/CLIP: rilascio in RAM dopo l'encode (NATIVE_T5_RELEASE_AFTER_ENCODE=1)", flush=True)
     _step(f"GEN START pipe() — encode prompt+embedding → {kw.get('num_inference_steps','?')} step denoise → VAE decode")
     _vae = getattr(pipe, "vae", None)                       # cronometro del VAE decode (sotto-fase interna a pipe())
     _orig_dec = getattr(_vae, "decode", None)
@@ -1946,13 +2176,27 @@ def run(params: dict, mm, output_dir: str) -> dict:
             #  • INPAINT → anello SOTTILE (auto ~min_lato/128, 4–14 px): niente degradazione attorno all'edit.
             #  • OUTPAINT → sfumatura AMPIA (auto ~min_lato/40, 12–48 px) + dilatazione + COLOR-MATCH al bordo.
             import numpy as _np
+            from core import tone_match as _tm                       # tono GLOBALE del generato ← zona-foto (task 14)
             _mk_bool = (_np.asarray(_m, dtype=_np.uint8) > 127)      # True = pixel da (ri)generare
             if params.get("outpaint"):
                 _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
                 # COLOR-MATCH al bordo (outpaint): l'estensione ha tono/luminosità un filo diversi dalla foto →
                 # linea di stacco. Riallinea al confine con falloff verso l'interno. Env NATIVE_OUTPAINT_COLORMATCH=0.
+                # TONO GLOBALE (task 14, «effetto cornice»): il modello rigenera anche la zona-foto → lo scarto di tono
+                # si stima sugli STESSI pixel (generato vs foto) e si toglie da TUTTO il generato; la correzione di
+                # confine resta come secondo stadio, solo se lo scarto dell'estensione è reale (core/tone_match.py).
+                # Env NATIVE_OUTPAINT_TONEMATCH=0 → comportamento di prima (solo correzione di confine a decadimento,
+                # e niente riempimento del punto sotto).
                 if os.environ.get("NATIVE_OUTPAINT_COLORMATCH", "1") == "1":
-                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
+                    if _tm.enabled():
+                        res_img = _tm.harmonize(res_img, _orig, _mk_bool, _feather, tau_mult=12.0, tag="tone-outpaint")
+                    else:
+                        res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=3.0, clamp=45)
+                if _tm.enabled():
+                    # `_orig` è il frame del canvas: nell'estensione è il RIEMPIMENTO SCURO. La maschera sfumata vale < 1
+                    # vicino alla foto (≈0,84 al confine) e quel nero filtrava nel generato → banda scura attorno alla
+                    # foto. Nell'estensione si miscela il generato con se stesso (misurato: ΔE vicino al confine −1,0).
+                    _orig = Image.fromarray(_np.where(_mk_bool[:, :, None], _np.asarray(res_img), _np.asarray(_orig)))
                 _fo = int(round(_feather * 1.9))                         # dilata la regione generata prima di sfumare
                 _m = _m.filter(ImageFilter.MaxFilter(_fo * 2 + 1))       # → la sfumatura NON tocca il bordo tela
                 _m = _m.filter(ImageFilter.GaussianBlur(_fo))
@@ -1962,8 +2206,13 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 # contrasto un filo diversi dalla foto → LINEA di giunzione + "cambio di tono" visibili su aree
                 # ampie/lisce. Seam-localizzato (falloff dal bordo) per NON ridipingere un eventuale oggetto
                 # inserito lontano dal bordo. Env NATIVE_INPAINT_COLORMATCH=0 per disattivare.
+                # Task 14: stesso tono GLOBALE dell'outpaint (zona-foto = fuori maschera); NATIVE_OUTPAINT_TONEMATCH=0
+                # torna alla correzione di confine di prima.
                 if os.environ.get("NATIVE_INPAINT_COLORMATCH", "1") == "1":
-                    res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
+                    if _tm.enabled():
+                        res_img = _tm.harmonize(res_img, _orig, _mk_bool, _feather, tau_mult=6.0, clamp=32, tag="tone-inpaint")
+                    else:
+                        res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
                 _m = _m.filter(ImageFilter.GaussianBlur(_feather))
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001

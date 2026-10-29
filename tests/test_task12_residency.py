@@ -30,6 +30,8 @@ OTHER = r"E:\AI\Models\diffusion_models\Flux\FLUX_Krea_Dev.safetensors"
 @pytest.fixture(autouse=True)
 def _no_cuda(monkeypatch):
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    from inference_server import component_store as cs
+    cs.STORE._items.clear()                              # lo store è globale: ogni test parte pulito
 
 
 # ───────────────────────────── 1. identità ─────────────────────────────
@@ -295,19 +297,41 @@ def _tiny_flux_file(path, in_ch=64):
     save_file({"x_embedder.weight": torch.zeros(4, in_ch)}, str(path))
 
 
-class _FakeFluxPipe:
-    """Finta pipeline diffusers: `from_pipe` costruisce dagli stessi componenti (zero load)."""
-    from_pipe_calls = 0
+class _Mod(nn.Linear):
+    """Modulo finto che NON tollera spostamenti/cambi di dtype: la sorella deve riusarlo così com'è."""
+    moved = 0
 
-    def __init__(self, transformer=None, **kw):
-        self.transformer = transformer if transformer is not None else nn.Linear(2, 2)
-        self.vae = None
+    def __init__(self):
+        super().__init__(2, 2)
+        self.to_calls = 0
+
+    def to(self, *a, **k):
+        self.to_calls += 1
+        _Mod.moved += 1
+        raise AssertionError("la sorella non deve spostare/convertire i moduli condivisi (.to)")
+
+
+class _FakeFluxPipe:
+    """Finta pipeline diffusers. `from_pipe` è VIETATO (in diffusers 0.38 fa .to(dtype=float32) sui componenti
+    condivisi: incidente 17/10); si costruisce con gli STESSI oggetti modulo, come fa _assemble_flux."""
+    from_pipe_calls = 0
+    ctor_calls = 0
+    fail_ctor = None                                     # eccezione da sollevare nel costruttore (test)
+
+    def __init__(self, transformer=None, vae=None, text_encoder=None, tokenizer=None, text_encoder_2=None,
+                 tokenizer_2=None, scheduler=None, **kw):
+        if _FakeFluxPipe.fail_ctor is not None:
+            raise _FakeFluxPipe.fail_ctor
+        _FakeFluxPipe.ctor_calls += 1
+        self.transformer = transformer if transformer is not None else _Mod()
+        self.vae, self.text_encoder, self.tokenizer = vae, text_encoder, tokenizer
+        self.text_encoder_2, self.tokenizer_2, self.scheduler = text_encoder_2, tokenizer_2, scheduler
         self._ls_component_keys = ()
 
     @classmethod
     def from_pipe(cls, src, **kw):
         _FakeFluxPipe.from_pipe_calls += 1
-        return cls(transformer=src.transformer)
+        raise AssertionError("from_pipe vietato: upcasta i componenti condivisi a float32 (OOM, 17/10)")
 
     def remove_all_hooks(self):
         pass
@@ -332,6 +356,8 @@ def _patch_load_env(monkeypatch, image_flux, dm):
         p._ls_component_keys = ("t_" + os.path.basename(path), "vae_flux")
         for k in p._ls_component_keys:
             cs.STORE.acquire(k, lambda: nn.Linear(2, 2))
+        p.vae = nn.Linear(1, 1); p.text_encoder = nn.Linear(1, 1); p.text_encoder_2 = nn.Linear(1, 1)
+        p.tokenizer = object(); p.tokenizer_2 = object(); p.scheduler = object()
         return p
 
     monkeypatch.setattr(image_flux, "_assemble_flux", _assemble)
@@ -352,6 +378,7 @@ def test_load_create_then_inpaint_same_file_zero_new_loads(flux, monkeypatch):
     _tiny_flux_file(f)
     loads = _patch_load_env(monkeypatch, image_flux, dm)
     _FakeFluxPipe.from_pipe_calls = 0
+    _FakeFluxPipe.ctor_calls = 0
     mm = ModelManager()
     k_crea = image_flux.register(mm, "Flux\\FLUX_Dev.safetensors", "flux")          # crea: path relativo
     k_edit = image_flux.register(mm, str(f), "inpaint")                              # modifica: path assoluto
@@ -360,7 +387,7 @@ def test_load_create_then_inpaint_same_file_zero_new_loads(flux, monkeypatch):
     assert loads == [("flux", "FLUX_Dev.safetensors")]                               # 1 solo load completo
     p2 = mm.ensure(k_edit)
     assert loads == [("flux", "FLUX_Dev.safetensors")]                               # ...ma NESSUN nuovo load
-    assert _FakeFluxPipe.from_pipe_calls == 1 and p2 is not p1
+    assert _FakeFluxPipe.from_pipe_calls == 0 and p2 is not p1
     assert p2._ls_ident == p1._ls_ident and p2.transformer is p1.transformer         # stessi pesi, stessa istanza
 
 
@@ -384,7 +411,11 @@ def _patch_run_env(monkeypatch, image_flux, tmp_path):
     monkeypatch.setattr(stego, "enabled", lambda: False)
     monkeypatch.setattr(wm, "apply_to_file", lambda p: p)
     _RealGen = torch.Generator
-    monkeypatch.setattr(torch, "Generator", lambda device="cpu": _RealGen("cpu"))
+
+    class _CpuGen:                                       # una CLASSE (non una lambda): `torch.Generator | None` deve restare valido
+        def __new__(cls, device="cpu"):
+            return _RealGen("cpu")
+    monkeypatch.setattr(torch, "Generator", _CpuGen)
     monkeypatch.setattr(image_flux, "_ensure_placement", lambda pipe, mm=None, k=None: "gpu")
     monkeypatch.setattr(image_flux, "_set_attention", lambda pipe, arch="": "sdpa")
     monkeypatch.setattr(image_flux, "_make_preview_cb", lambda *a, **k: (lambda *x, **y: {}))
@@ -441,7 +472,7 @@ def test_run_model_stays_resident_after_generation_and_siblings_survive(flux, mo
 
 def test_run_and_real_load_create_then_inpaint_same_file_one_full_load(flux, monkeypatch, tmp_path):
     """Integrazione: run() REALE + _load() REALE (solo il costruttore dei pesi è finto). «Crea» col path relativo,
-    «modifica» col path assoluto dello stesso file: 1 solo load completo, from_pipe per la seconda, entrambe
+    «modifica» col path assoluto dello stesso file: 1 solo load completo, moduli condivisi per la seconda, entrambe
     residenti; con un file DIVERSO il load è vero e la sorella di prima si sfratta."""
     image_flux, dm = flux
     from inference_server.model_manager import ModelManager
@@ -451,6 +482,7 @@ def test_run_and_real_load_create_then_inpaint_same_file_one_full_load(flux, mon
     img, msk = _patch_run_env(monkeypatch, image_flux, tmp_path)
     monkeypatch.setattr(image_flux, "_measure_pipe_mb", lambda p: 100)
     _FakeFluxPipe.from_pipe_calls = 0
+    _FakeFluxPipe.ctor_calls = 0
     mm = ModelManager()
     out = str(tmp_path / "out")
     r1 = image_flux.run({"arch": "flux", "model": "Flux\FLUX_Dev.safetensors", "prompt": "x", "seed": 1,
@@ -459,7 +491,7 @@ def test_run_and_real_load_create_then_inpaint_same_file_one_full_load(flux, mon
     r2 = image_flux.run({"arch": "inpaint", "model": str(a), "prompt": "y", "seed": 2, "steps": 2,
                          "image_path": img, "mask_path": msk}, mm, out)
     assert r2["status"] == "success", r2
-    assert len(loads) == 1 and _FakeFluxPipe.from_pipe_calls == 1                 # nessun nuovo load
+    assert len(loads) == 1 and _FakeFluxPipe.from_pipe_calls == 0                 # nessun nuovo load, niente from_pipe
     assert len(mm._cache) == 2                                                     # crea e modifica entrambe residenti
     r3 = image_flux.run({"arch": "flux", "model": str(b), "prompt": "z", "seed": 3, "steps": 2}, mm, out)
     assert r3["status"] == "success", r3

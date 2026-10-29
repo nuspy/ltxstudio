@@ -273,6 +273,11 @@ class _PersistentChild:
             out = self._send(f"RUN {pf} {rf}", ("DONE", "ERR"), timeout)
             if out.startswith("DONE"):
                 self.model_key = out[len("DONE "):].strip() or key
+            elif out.startswith("ERR cuda_fatal"):
+                # il figlio si è dichiarato NON SANO (contesto CUDA avvelenato) ed esce: via, e al prossimo job
+                # se ne spawna uno pulito. Il result.json con l'errore è già stato scritto dal figlio.
+                self._kill()
+                self.model_key = "-"
 
     def stats(self, timeout: float = 5) -> dict | None:
         # NON-BLOCCANTE: se un job è in corso (lock preso) ripiega sulla chiave cachata (niente race su stdin).
