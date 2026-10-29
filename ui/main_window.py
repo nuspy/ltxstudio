@@ -712,8 +712,12 @@ class _NativeLtx2Worker(QThread):
                         _causa = _s
                         break
                 _testa = f"⛔ {_causa}\n\n" if _causa else ""
+                # un OOM / VRAM insufficiente non è «nessun output»: il titolo dice la causa vera
+                _esito = "memoria GPU insufficiente" if (
+                    "VRAM" in _causa or "memoria GPU" in _causa or "out of memory" in _causa.lower()
+                ) else "nessun output"
                 self.done.emit({"status": "error",
-                                "error": f"LTX-2 nativo: nessun output{_rc}.\n{_testa}{_why}\n\n"
+                                "error": f"LTX-2 nativo: {_esito}{_rc}.\n{_testa}{_why}\n\n"
                                          f"Log completo: {OUTPUT_DIR}\\gui_last_worker.log"})
         except Exception as e:                          # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
