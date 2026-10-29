@@ -4385,7 +4385,7 @@
       "filename": "Minimax_H3_Unlocked_V2-native.safetensors",
       "remote_filename": "Minimax_H3_Unlocked_V2.safetensors",
       "sensitivity": "adult",
-      "note": "la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16",
+      "note": "la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16. Parole d'attivazione dalla pagina del modello (core; altre: perky nipples, areolas, exposed cleavage, bare buttocks, caressing bare breasts, disrobing...)",
       "used_by": [
         "cap.video_minimax_h3"
       ],
@@ -4393,6 +4393,13 @@
       "use": [
         "lora_style",
         "uncensored"
+      ],
+      "triggers": [
+        "nude",
+        "topless",
+        "bare breasts",
+        "naked",
+        "completely unclothed"
       ]
     },
     {
@@ -5899,6 +5906,9 @@
       "use": [
         "lora_style",
         "uncensored"
+      ],
+      "triggers": [
+        "rjvideo"
       ]
     },
     {
@@ -6181,6 +6191,9 @@
       "use": [
         "lora_style",
         "uncensored"
+      ],
+      "triggers": [
+        "ME$$Y"
       ]
     },
     {
@@ -6211,6 +6224,9 @@
       "use": [
         "lora_style",
         "uncensored"
+      ],
+      "triggers": [
+        "thr0at"
       ]
     },
     {
@@ -7636,6 +7652,550 @@
       ],
       "license": "CC BY-NC-SA 4.0",
       "license_ack": "cc_by_nc_sa"
+    },
+    {
+      "id": "upscale-2x-text2hd-realplksr",
+      "module": "Upscale",
+      "label": "2x_Text2HD_v.1-RealPLKSR (RealPLKSR 2x, 0.03GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.03,
+      "scan_names": [
+        "2x_Text2HD_v.1-RealPLKSR.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "2x_Text2HD_v.1-RealPLKSR.pth",
+      "no_remote": true,
+      "note": "2x leggero per testo/documenti. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-animesharp",
+      "module": "Upscale",
+      "label": "4x-AnimeSharp (ESRGAN 4x, 0.06GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.06,
+      "scan_names": [
+        "4x-AnimeSharp.safetensors"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4x-AnimeSharp.safetensors",
+      "no_remote": true,
+      "note": "anime/illustrazioni; complementare a UltraSharp v2. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-nmkd-siax",
+      "module": "Upscale",
+      "label": "4x_NMKD-Siax_200k (ESRGAN 4x, 0.06GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.06,
+      "scan_names": [
+        "4x_NMKD-Siax_200k.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4x_NMKD-Siax_200k.pth",
+      "no_remote": true,
+      "note": "generico, dettaglio naturale. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-realisticrescaler",
+      "module": "Upscale",
+      "label": "4x_RealisticRescaler_100000_G (ESRGAN 4x, 0.12GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.12,
+      "scan_names": [
+        "4x_RealisticRescaler_100000_G.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4x_RealisticRescaler_100000_G.pth",
+      "no_remote": true,
+      "note": "foto realistiche. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-faceupdat",
+      "module": "Upscale",
+      "label": "4xFaceUpDAT (DAT 4x, 0.14GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.14,
+      "scan_names": [
+        "4xFaceUpDAT.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4xFaceUpDAT.pth",
+      "no_remote": true,
+      "note": "specializzato sui volti (super-risoluzione, non restauro). File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-nomos2-dat2",
+      "module": "Upscale",
+      "label": "4xNomos2_hq_dat2 (DAT 4x, 0.13GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.13,
+      "scan_names": [
+        "4xNomos2_hq_dat2.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4xNomos2_hq_dat2.pth",
+      "no_remote": true,
+      "note": "famiglia Nomos2, foto di qualità. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-nomos2-drct-l",
+      "module": "Upscale",
+      "label": "4xNomos2_hq_drct-l (DRCT 4x, 0.23GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.23,
+      "scan_names": [
+        "4xNomos2_hq_drct-l.safetensors"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4xNomos2_hq_drct-l.safetensors",
+      "no_remote": true,
+      "note": "famiglia Nomos2, variante DRCT-L. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-nomos8k-dat",
+      "module": "Upscale",
+      "label": "4xNomos8kDAT (DAT 4x, 0.29GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.29,
+      "scan_names": [
+        "4xNomos8kDAT.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4xNomos8kDAT.pth",
+      "no_remote": true,
+      "note": "dataset Nomos8k, architettura DAT (diverso da nomos8k-schat-l). File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-4x-realwebphoto-drct-l",
+      "module": "Upscale",
+      "label": "4xRealWebPhoto_v4_drct-l (DRCT 4x, 0.23GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.23,
+      "scan_names": [
+        "4xRealWebPhoto_v4_drct-l.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "4xRealWebPhoto_v4_drct-l.pth",
+      "no_remote": true,
+      "note": "foto da web compresse. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-hat-l-srx4",
+      "module": "Upscale",
+      "label": "HAT-L_SRx4_ImageNet-pretrain (HAT 4x, 0.15GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.15,
+      "scan_names": [
+        "HAT-L_SRx4_ImageNet-pretrain.safetensors"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "HAT-L_SRx4_ImageNet-pretrain.safetensors",
+      "no_remote": true,
+      "note": "transformer HAT-L (ImageNet), architettura non ESRGAN. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-realesrgan-x2plus",
+      "module": "Upscale",
+      "label": "RealESRGAN_x2plus (ESRGAN 2x, 0.06GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.06,
+      "scan_names": [
+        "RealESRGAN_x2plus.pth"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "RealESRGAN_x2plus.pth",
+      "no_remote": true,
+      "note": "Real-ESRGAN 2x. File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "upscale-realesrgan-x4plus-st",
+      "module": "Upscale",
+      "label": "RealESRGAN_x4plus (ESRGAN 4x, 0.06GB)",
+      "kind": "file",
+      "type": "Upscale",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.06,
+      "scan_names": [
+        "RealESRGAN_x4plus.safetensors"
+      ],
+      "category": "aux",
+      "arch": "esrgan",
+      "filename": "RealESRGAN_x4plus.safetensors",
+      "no_remote": true,
+      "note": "Real-ESRGAN 4x (safetensors, preferibile al .pth gemello). File locale (import utente): la cartella Upscale è scandita per intero e caricata con spandrel.",
+      "use": [
+        "upscale_image"
+      ]
+    },
+    {
+      "id": "diffpitcher-world",
+      "module": "Musica (ACE-Step)",
+      "label": "DiffPitcher · WORLD fixed 40 (correzione intonazione, 0.47GB)",
+      "kind": "file",
+      "type": "DiffPitcher",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.468,
+      "scan_names": [
+        "Diff-Pitcher_world_fixed_40.safetensors"
+      ],
+      "category": "music",
+      "arch": "diffpitcher",
+      "filename": "Diff-Pitcher_world_fixed_40.safetensors",
+      "no_remote": true,
+      "note": "Modo template e spartito (scripts/diffpitcher_run.py). Import locale.",
+      "use": [
+        "music"
+      ]
+    },
+    {
+      "id": "diffpitcher-bigvgan",
+      "module": "Musica (ACE-Step)",
+      "label": "DiffPitcher · BigVGAN 24kHz 100 band (vocoder, 0.45GB)",
+      "kind": "file",
+      "type": "DiffPitcher",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.45,
+      "scan_names": [
+        "Diff-Pitcher_bigvgan_24khz_100band.safetensors"
+      ],
+      "category": "music",
+      "arch": "diffpitcher",
+      "filename": "Diff-Pitcher_bigvgan_24khz_100band.safetensors",
+      "no_remote": true,
+      "note": "Vocoder del runner DiffPitcher. Import locale.",
+      "use": [
+        "music"
+      ]
+    },
+    {
+      "id": "diffpitcher-pitchformer",
+      "module": "Musica (ACE-Step)",
+      "label": "DiffPitcher · PitchFormer (modo spartito MIDI, 0.10GB)",
+      "kind": "file",
+      "type": "DiffPitcher",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.102,
+      "scan_names": [
+        "Diff-Pitcher_transformer_pitch_360.safetensors"
+      ],
+      "category": "music",
+      "arch": "diffpitcher",
+      "filename": "Diff-Pitcher_transformer_pitch_360.safetensors",
+      "no_remote": true,
+      "note": "Serve solo al modo «Da spartito MIDI» (config Pitchformer.yaml accanto). Import locale.",
+      "use": [
+        "music"
+      ]
+    },
+    {
+      "id": "diffpitcher-config",
+      "module": "Musica (ACE-Step)",
+      "label": "DiffPitcher · config.json + Pitchformer.yaml (configurazione)",
+      "kind": "file",
+      "type": "DiffPitcher",
+      "family": "",
+      "gated": false,
+      "approx_gb": 0.001,
+      "scan_names": [
+        "config.json"
+      ],
+      "category": "music",
+      "arch": "diffpitcher",
+      "filename": "config.json",
+      "no_remote": true,
+      "note": "Accanto: Pitchformer.yaml (modo spartito). Import locale.",
+      "use": [
+        "music"
+      ]
+    },
+    {
+      "id": "krea2-identity-edit-lora",
+      "module": "Immagini",
+      "label": "Krea 2 Edit · LoRA identità v1.2 (automatica, 1.83GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "",
+      "gated": false,
+      "approx_gb": 1.83,
+      "scan_names": [
+        "krea2_identity_edit_v1_2.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "filename": "krea2_identity_edit_v1_2.safetensors",
+      "no_remote": true,
+      "note": "Applicata da sola a peso 1.0 in ogni editing Krea 2 per conservare l'identità del soggetto (glob krea2_identity_edit*.safetensors sotto LoRA). Sta alla radice di LoRA e NON compare nel pannello LoRA.",
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "use": [
+        "lora_style"
+      ]
+    },
+    {
+      "id": "zimage-turbo-nunchaku-fp4",
+      "module": "Immagini",
+      "label": "Z-Image Turbo nunchaku SVDQ fp4 r128 (4.2GB, BUG NOTO wheel stabile)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Z-Image/nunchaku",
+      "gated": false,
+      "approx_gb": 4.2,
+      "scan_names": [
+        "svdq-fp4_r128-z-image-turbo.safetensors"
+      ],
+      "category": "image",
+      "arch": "zimage",
+      "filename": "svdq-fp4_r128-z-image-turbo.safetensors",
+      "no_remote": true,
+      "note": "Motore nativo in image_flux (NunchakuZImageTransformer2DModel) ma su wheel nunchaku STABILE per Windows fallisce (assert rotary_emb, docs/FUTURE_CHECKS.md #3, docs/MODEL_REVIEW_2026-07.md): da ricontrollare con la wheel nightly. Non proposto al download; dà errore chiaro se scelto.",
+      "used_by": [
+        "cap.gen_images"
+      ],
+      "use": [
+        "ckpt_image",
+        "nvfp4"
+      ]
+    },
+    {
+      "id": "krea2-sickrealism-v4",
+      "module": "Immagini",
+      "label": "Krea2 SickRealism · v4.0 fp8 (18+, 12.84GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 12.84,
+      "scan_names": [
+        "krea2Sickrealism_v40_fp8-native.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3402173?fileId=3292944",
+      "filename": "krea2Sickrealism_v40_fp8-native.safetensors",
+      "remote_filename": "krea2Sickrealism_v40_3292944.safetensors",
+      "sha256": "2f02249be11dd93eef9f40b68f9665867bd73d22187e424581b5943b01255c52",
+      "deps": [
+        "krea2_turbo"
+      ],
+      "sensitivity": "adult",
+      "note": "Civitai 2970908 · Krea 2 · v4.0 (Public dal 25/10/2026; Early Access finito). Sostituisce la v2.0 (krea2-sickrealism-v2, che RESTA: la cancella solo l'utente). La v3.0 (17/10) non è installata.",
+      "page": "https://civitai.red/models/2970908?modelVersionId=3402173",
+      "convert": "krea2_dit",
+      "use": [
+        "ckpt_image",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-lora-unlocked-v21",
+      "module": "Video",
+      "label": "LoRA H3 NSFW Unlocked V2.1 (18+, 0.298GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.298,
+      "scan_names": [
+        "Minimax_H3_Unlocked_V2.1-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3413468?fileId=3305979",
+      "filename": "Minimax_H3_Unlocked_V2.1-native.safetensors",
+      "remote_filename": "Minimax_H3_Unlocked_V2.1.safetensors",
+      "sha256": "a5fcea727e52394427547dec8d1217e508298c58a79fdc95e647ccdd9ff86ac6",
+      "sensitivity": "adult",
+      "note": "Civitai 2925727 · MiniMax H3 · V2.1 (18/10/2026), sostituisce la V2 (mmh3-lora-unlocked-v2, che RESTA). Parole d'attivazione dalla pagina del modello: core (trigger sopra); tag anatomici: perky nipples, areolas, exposed cleavage, bare buttocks, toned abdomen, subtle skin sheen; movimento: caressing bare breasts, intimate kissing, slipping off robe, disrobing, breathless sigh, skin-on-skin contact, arching back. Peso 0.3-1.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "nude",
+        "topless",
+        "bare breasts",
+        "naked",
+        "completely unclothed"
+      ],
+      "page": "https://civitai.red/models/2925727?modelVersionId=3413468",
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "krea2-lora-civ-perky-breasts-v1-1",
+      "module": "Immagini",
+      "label": "PERKY BREASTS · v1.1 (18+, 0.235GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "Krea2",
+      "gated": false,
+      "approx_gb": 0.235,
+      "scan_names": [
+        "Perkybreasts55880_1000step.safetensors"
+      ],
+      "category": "image",
+      "arch": "krea2",
+      "url": "https://civitai.com/api/download/models/3418708?fileId=3312224",
+      "filename": "Perkybreasts55880_1000step.safetensors",
+      "sha256": "8fd77de7c89241840874043422cc72b2fc492768e524aede1bc306f747e9dbb6",
+      "sensitivity": "adult",
+      "note": "Civitai 2997219 · Krea 2 · v1.1 (20/10/2026): trigger DIVERSI dalla v1.0 (perkybreasts). La v1.0 RESTA.",
+      "triggers": [
+        "perky breasts",
+        "puffy nipples"
+      ],
+      "page": "https://civitai.red/models/2997219?modelVersionId=3418708",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-lora-civ-nsfw-posing-touching-round-breasts-h3-v1-5",
+      "module": "Video",
+      "label": "NSFW | Posing + Touching + Round Breasts | H3 LoRA · v1.5 (18+, 0.31GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.31,
+      "scan_names": [
+        "H3-nsfw-round-breasts-posing-V1.5-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3406313?fileId=3297736",
+      "filename": "H3-nsfw-round-breasts-posing-V1.5-native.safetensors",
+      "remote_filename": "H3-nsfw-round-breasts-posing-V1.5.safetensors",
+      "sha256": "1eb33417114cfbfb1c88e553c6cc015f3f444a6326a39b8855918f9f2db788f8",
+      "sensitivity": "adult",
+      "note": "Civitai 2985832 · MiniMax H3 · v1.5 (16/10/2026). Nessun token d'attivazione (l'autore: prompt naturale). La v1 (mmh3-lora-civ-nsfw-posing-touching-round-breasts-h3-lo) RESTA.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "page": "https://civitai.red/models/2985832?modelVersionId=3406313",
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-lora-civ-bfs-best-face-swap-h3-character-swap-v1-1",
+      "module": "Video",
+      "label": "BFS - Best Face Swap · H3 Character Swap v1.1 (18+, 0.081GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.081,
+      "scan_names": [
+        "minimax_h3_character_swap_v1.1_ref2va_fro-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3412620?fileId=3305013",
+      "filename": "minimax_h3_character_swap_v1.1_ref2va_fro-native.safetensors",
+      "remote_filename": "minimax_h3_character_swap_v1.1_ref2va_fro.safetensors",
+      "sha256": "ab21167bed71db99ac09527ad1f26f5f3517687ebf2e1f1bd5e91cc0bdf9b9c3",
+      "sensitivity": "adult",
+      "note": "Civitai 2027766 · MiniMax H3 · v1.1 (18/10/2026). La v1.0 (mmh3-lora-civ-bfs-best-face-swap-h3-character-swap-v1) RESTA.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "body_swap: subject_definitions: <Subject 1> is the {details} shown in <Picture 1>, whose identity, face, head, hair or fur, skin, body shape, proportions and clothing define the character in the target video. The guide video provides the scene and the performance: its background, environment, lighting, camera, framing, body pose, hand and arm movement, head rotation, gaze direction, lip movement and facial expression, frame by frame; only the main subject of the guide video is replaced: its face, hair, body and clothing become <Subject 1>.  summary: [video generation + reference] Replace the guide subject with <Subject 1>, keeping the scene, camera and the complete motion and performance of the guide video.  detailed_description: [Shot 1] <Subject 1> takes the exact place of the guide subject and moves with the same timing, body pose, gestures, head motion, gaze, speech and facial expressions, while keeping the complete identity from <Picture 1>: facial structure, hair or fur, skin, body shape and clothing stay stable in every frame. The background, lighting, colors and camera of the guide video are preserved. Prevent identity drift, clothing changes, texture crawling and flicker."
+      ],
+      "page": "https://civitai.red/models/2027766?modelVersionId=3412620",
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "uncensored"
+      ]
     }
   ],
   "schema": 2,

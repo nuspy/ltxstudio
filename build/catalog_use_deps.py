@@ -279,6 +279,8 @@ MAP.update({
 CIV_LORA = (["lora_style", "uncensored"], [])
 from catalog_task9 import USE as _TASK9_USE  # noqa: E402  (task 9: ControlNet, Redux, OpenPose, MagicQuill)
 MAP.update(_TASK9_USE)
+from catalog_task17 import USE as _TASK17_USE  # noqa: E402  (task 17: upscaler locali, DiffPitcher, versioni nuove)
+MAP.update(_TASK17_USE)
 
 
 # MiniMax H3: il TE non dipende dalla DiT. Il worker legge SOLO W["te"] (workers/minimax_h3_infer.py load_text_encoder)
