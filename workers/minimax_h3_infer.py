@@ -119,6 +119,24 @@ def load_text_encoder(W: dict):
     return te.to("cuda").eval()
 
 
+def lora_specs(W: dict, p: dict) -> list:
+    """[(percorso, forza)] delle LoRA da applicare al DiT: turbo + LoRA dell'utente (risolte e verificate)."""
+    loras = []
+    if W.get("turbo"):
+        loras.append((W["turbo"], 1.0))
+    for lo in p.get("loras") or []:
+        name = lo.get("path") or lo.get("name") or ""
+        if not name:
+            continue
+        # dalla GUI arriva il nome relativo alla cartella LoRA (LoraEntry.comfy_name): risolverlo, mai scartarlo
+        from core import model_paths as mp
+        path = name if os.path.isabs(name) else os.path.join(str(mp.models_root()), "LoRA", name)
+        if not os.path.isfile(path):
+            raise RuntimeError(f"LoRA non trovata su disco: {name}")
+        loras.append((path, float(lo.get("strength", 1.0))))
+    return loras
+
+
 def load_transformer(W: dict, mode: str, p: dict):
     import torch
     from accelerate import init_empty_weights
@@ -139,19 +157,7 @@ def load_transformer(W: dict, mode: str, p: dict):
     if miss or unex:
         raise RuntimeError(f"transformer: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     tr = tr.to("cuda").eval()
-    loras = []
-    if W.get("turbo"):
-        loras.append((W["turbo"], 1.0))
-    for lo in p.get("loras") or []:
-        name = lo.get("path") or lo.get("name") or ""
-        if not name:
-            continue
-        # dalla GUI arriva il nome relativo alla cartella LoRA (LoraEntry.comfy_name): risolverlo, mai scartarlo
-        from core import model_paths as mp
-        path = name if os.path.isabs(name) else os.path.join(str(mp.models_root()), "LoRA", name)
-        if not os.path.isfile(path):
-            raise RuntimeError(f"LoRA non trovata su disco: {name}")
-        loras.append((path, float(lo.get("strength", 1.0))))
+    loras = lora_specs(W, p)
     for path, s in loras:
         from core import native_convert as nc
         if not nc.is_native(path):
@@ -294,9 +300,76 @@ def _inputs_for(stage, kw: dict) -> dict:
     return {k: v for k, v in kw.items() if k in names}
 
 
+def _weights_gb(path: str) -> float:
+    try:
+        return os.path.getsize(path) / 2**30
+    except OSError:
+        return 0.0
+
+
+def _canvas_hw(kw: dict, canvas: tuple) -> tuple:
+    """(altezza, larghezza) che avrebbe la tela 544p con lo stesso rapporto della richiesta."""
+    from diffusers.modular_pipelines.minimax_h3.modular_pipeline import resolve_canvas_size
+    return resolve_canvas_size(int(kw["width"]), int(kw["height"]), 32, canvas[0], canvas[1])
+
+
+def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: int):
+    """Stima il picco di VRAM (pesi + LoRA + attivazioni per la lunghezza reale della sequenza) e confronta con la
+    VRAM libera di ADESSO. Se nemmeno con parte dei blocchi in RAM ci sta: RuntimeError con numeri e rimedi."""
+    from core import h3_vram_plan as HP
+    sub = "transformer_ref" if mode == "ref2va" else "transformer"
+    try:
+        dims = HP.dims_from_config(json.loads((Path(W["configs"]) / sub / "config.json").read_text("utf-8")))
+    except (OSError, ValueError):
+        dims = dict(HP.DEFAULT_DIMS)
+    h, w = int(kw["height"]), int(kw["width"])
+    keyframes = int(bool(p.get("image_path"))) + int(bool(p.get("last_image_path")))
+    refs = (HP.ref_rows_estimate(p.get("references"), int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE), h, w)
+            if mode == "ref2va" else 0)
+    tokens = HP.sequence_tokens(frames, h, w, keyframes=keyframes, ref_rows=refs)
+    w_gb = _weights_gb(W["dit"])
+    l_gb = sum(_weights_gb(path) for path, _ in lora_specs(W, p))
+    te_gb = _weights_gb(W["te"])
+    avail = free_gb - 0.4                          # lo stesso margine del tetto per-processo
+    if te_gb + 2.0 > avail:                        # fase 1: il text encoder è l'unico modello in VRAM
+        raise RuntimeError(f"VRAM insufficiente per il text encoder di MiniMax H3 ({os.path.basename(W['te'])}: "
+                           f"{te_gb:.1f} GB + 2 di lavoro, liberi {avail:.1f} GB). Scegli un text encoder più "
+                           f"leggero (nvfp4) o chiudi i programmi che usano la GPU.")
+    plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb)
+    modo = "tutto residente" if plan0["offload_gb"] <= 0 else f"blocchi in RAM: {plan0['offload_gb']:.1f} GB"
+    _log(f"piano VRAM: {tokens // 1000}k token · pesi {w_gb:.1f} + LoRA {l_gb:.1f} + attivazioni "
+         f"{plan0['act_gb']:.1f} + riserva = {plan0['need_gb']:.1f} GB · liberi {avail:.1f} GB → {modo}")
+    if not plan0["fits"]:
+        raise RuntimeError(HP.explain_failure(plan0, height=h, width=w, num_frames=frames, free_gb=avail, dims=dims,
+                                              extra_rows=refs, canvas_544=_canvas_hw(kw, S.CANVAS["544"])))
+    return dims, plan0
+
+
+def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
+    """DiT e LoRA sono in VRAM: rimisura la VRAM libera VERA e, se le attivazioni non ci stanno, tiene in RAM
+    gli ultimi blocchi quanto basta (workers/h3_offload). Se non basta nemmeno così: errore chiaro."""
+    import h3_offload as O
+    from core import h3_vram_plan as HP
+    free = O.free_gb_now() - 0.4
+    need = plan0["act_gb"] + HP.RESERVE_GB
+    if free >= need:
+        _log(f"VRAM dopo il caricamento: liberi {free:.1f} GB, servono ~{need:.1f} per le attivazioni: tutto residente")
+        return
+    blocks = getattr(tr, "transformer_blocks", [])
+    n = O.blocks_for_deficit(blocks, need - free)
+    done = O.enable_block_offload(blocks, n, "cuda", _log)
+    free2 = O.free_gb_now() - 0.4
+    if done == 0 or free2 < need:
+        pl = HP.plan(free2, plan0["tokens"], dims, weights_gb=plan0["weights_gb"], lora_gb=plan0["lora_gb"])
+        raise RuntimeError(HP.explain_failure(pl, height=int(kw["height"]), width=int(kw["width"]),
+                                              num_frames=frames, free_gb=free2, dims=dims))
+    _log(f"VRAM dopo l'offload: liberi {free2:.1f} GB (servono ~{need:.1f})")
+
+
 def run(p: dict) -> str:
     from core import resources
-    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 26),
+    # nessuna soglia fissa sui GB: la VRAM necessaria si calcola più sotto da pesi, LoRA, durata e tela
+    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 0),
                       what="MiniMax H3")
     resources.start_commit_guard(2.0, what="MiniMax H3")
     import torch
@@ -369,6 +442,9 @@ def run(p: dict) -> str:
          f"{' turbo' if turbo else ''} · shift video {vshift} · seme {seed}")
     _log("prompt:\n" + kw["prompt"])
 
+    # pianificazione VRAM PRIMA di caricare qualunque cosa: errore chiaro invece di un OOM a metà denoise
+    dims, plan0 = _preflight(W, p, mode, kw, free0, frames)
+
     # 1) text encoder
     t0 = time.time()
     te = load_text_encoder(W)
@@ -401,6 +477,7 @@ def run(p: dict) -> str:
     t0 = time.time()
     tr = load_transformer(W, mode, p)
     _log(f"transformer pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
+    _fit_after_load(tr, dims, plan0, kw, frames)
     tname = "transformer_ref" if mode == "ref2va" else "transformer"
     st = _stage(blocks, g_den, {tname: tr, "scheduler": MiniMaxH3Scheduler(shift=vshift),
                                 "audio_scheduler": MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)})
@@ -431,6 +508,15 @@ def run(p: dict) -> str:
     return out
 
 
+def friendly_error(e: BaseException) -> str:
+    """Un OOM di CUDA non deve arrivare alla GUI come «nessun output»: l'ultima riga dice cosa è successo e cosa fare."""
+    if type(e).__name__ == "OutOfMemoryError" or "out of memory" in str(e).lower():
+        return ("memoria GPU (VRAM) esaurita durante la generazione di MiniMax H3. Riduci la durata o scegli la tela "
+                "544p, usa meno LoRA o un profilo più leggero (int4), e chiudi i programmi che usano la GPU. "
+                f"Dettaglio: {str(e).splitlines()[0][:200]}")
+    return str(e)
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("uso: minimax_h3_infer.py params.json")
@@ -441,7 +527,7 @@ def main() -> int:
         return 0
     except Exception as e:                                           # noqa: BLE001
         traceback.print_exc()
-        print(f"ERRORE: {e}", flush=True)
+        print(f"ERRORE: {friendly_error(e)}", flush=True)
         return 1
 
 
