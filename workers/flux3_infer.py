@@ -265,7 +265,7 @@ def vae_decode(vae, tokens, ids):
         z = tokens.float().reshape(h, w, 128).permute(2, 0, 1)[None]
         z = z * torch.sqrt(vae.bn.running_var.view(1, -1, 1, 1) + vae.bn.eps) + vae.bn.running_mean.view(1, -1, 1, 1)
         z = z.reshape(1, 32, 2, 2, h, w).permute(0, 1, 4, 2, 5, 3).reshape(1, 32, 2 * h, 2 * w)
-        if max(h, w) * S.GRID > 2048:
+        if h * w * S.GRID * S.GRID > S.VAE_TILE_ABOVE_PIXELS:          # a 2048² la decodifica fp32 senza tile toccava ~32 GB (live 29/10)
             vae.enable_tiling()
         img = vae.decode(z).sample[0]
     arr = ((img.float().clamp(-1, 1) + 1) * 127.5).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
@@ -540,7 +540,9 @@ def run(p: dict) -> str:
     _free()
 
     # 5) decodifica
+    t1 = time.time()
     out_img = vae_decode(vae, tokens, latent_ids(h16, w16, DEV))
+    _log(f"decodifica VAE {time.time() - t1:.0f}s — picco VRAM {_vram(peak=True):.1f} GB")
     del vae
     _free()
     if crop is not None:

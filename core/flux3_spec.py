@@ -52,6 +52,7 @@ SEED_MAX = 2 ** 32 - 1
 GRID = 16                              # lato multiplo di 16 (VAE ×8 · patch 2×2)
 MIN_SIDE, MAX_SIDE = 64, 4096
 DEFAULT_SIDE = 1024
+VAE_TILE_ABOVE_PIXELS = 1536 * 1536            # oltre questa area il VAE decodifica a tile (tile 1024, sovrapposizione 25 %)
 MAX_REFS = 10
 FIRST_REF_MAX_PIXELS = 4 * 1024 * 1024         # primo riferimento (edit singolo), canvas compreso
 MULTI_REF_MAX_PIXELS = 1024 * 1024             # ogni riferimento di un edit multiplo
