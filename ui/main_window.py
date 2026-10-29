@@ -1029,6 +1029,8 @@ class MainWindow(QMainWindow):
         # rapporto del canvas per il pannello riquadri FLUX.3 (nessun torch.cuda: solo i valori del tab Video)
         self.frame1_tab.size_provider = lambda: (int(self.video_tab.get_values().get("width", 1024)),
                                                  int(self.video_tab.get_values().get("height", 1024)))
+        self.frame1_tab.gen_arch.currentTextChanged.connect(self._apply_flux3_size_cap)
+        self._apply_flux3_size_cap()
         _NativeImageWorker.klein_te_source = self.frame1_tab.klein_te_choice      # encoder Klein scelto in Inpaint
         self.video_tab.request_pulid_keyframe.connect(self._gen_pulid_keyframe_for_video)
         # I widget Prompt globale / Prompt negativo sono stati spostati nel tab Video.
@@ -4691,13 +4693,19 @@ class MainWindow(QMainWindow):
                       self._on_native_inpaint_done)
 
     # ── FLUX.3 Image Klein (task 13): crea / modifica per istruzione / multi-riferimento / riquadri ───────────────
+    def _apply_flux3_size_cap(self, *_):
+        """Larghezza/altezza del tab Video: tetto 4096 con l'arch FLUX.3 Klein (nativo fino a 4096, verificato dal vivo), 2048 per
+        tutti gli altri motori (invariati: uscendo da FLUX.3 un valore più grande si riporta al tetto)."""
+        from core import flux3_spec as S3
+        top = S3.MAX_SIDE if self.frame1_tab.gen_arch.currentText() == "FLUX.3 Klein" else 2048
+        for spin in (self.video_tab.width, self.video_tab.height):
+            if spin.maximum() != top:
+                spin.setMaximum(top)
+
     def _flux3_weight_ids(self, dit: str, pup: bool, te: str = "") -> list:
         """Pesi che servono al job. Text encoder: la scelta (krea2|official) o, in automatico, il Krea2 uncensored se è su disco."""
         from core import flux3_spec as S3
-        from core import model_paths as mp
-        from core import weights_catalog as wc
-        present = lambda i: bool(mp.entry(i)) and wc.is_present(mp.entry(i), str(mp.models_root()))
-        te_id = S3.te_id(te, present)
+        te_id = S3.te_id(te, S3.disk_present)           # «ufficiale» = flux3-te se c'è, altrimenti il TE dentro Krea 2 Turbo
         ids = [dit or S3.DEFAULT_DIT, te_id, S3.VAE]
         if te_id != S3.TE:
             ids.append(S3.TE_CONFIGS)               # tokenizer e config del TE a file singolo

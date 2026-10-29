@@ -57,8 +57,7 @@ def resolve(p: dict, need_pup: bool) -> dict:
     dit_id = str(p.get("flux3_dit") or S.DEFAULT_DIT)
     if dit_id not in S.DITS:
         raise RuntimeError(f"DiT FLUX.3 sconosciuto: {dit_id} ({', '.join(S.DITS)})")
-    te_id = S.te_id(str(p.get("flux3_te") or ""),
-                    lambda i: bool(mp.entry(i)) and wc.is_present(mp.entry(i), str(mp.models_root())))
+    te_id = S.te_id(str(p.get("flux3_te") or ""), S.disk_present)
     ids = {"dit": dit_id, "te": te_id, "te_cfg": S.TE_CONFIGS, "vae": S.VAE}
     if te_id == S.TE:                      # il TE ufficiale è uno snapshot con config e tokenizer dentro
         ids.pop("te_cfg")
@@ -82,7 +81,7 @@ def resolve(p: dict, need_pup: bool) -> dict:
         out["te_src"] = out["te_cfg"] = str(te / "text_encoder") if (te / "text_encoder").is_dir() else str(te)
     else:                                  # TE a file singolo: i json/tokenizer vengono dallo snapshot di configurazione
         cfg = Path(out["te_cfg"])
-        out["te_src"] = out["te"]
+        out["te_src"] = str(Path(out["te"]) / S.TE_KREA2_TURBO_FILE) if te_id == S.TE_KREA2_TURBO else out["te"]
         out["te_cfg"] = str(cfg / "text_encoder") if (cfg / "text_encoder").is_dir() else str(cfg)
     return out
 
@@ -165,13 +164,16 @@ def build_te_model(te_src: str, cfg_dir: str):
     te.lm_head = torch.nn.Identity()                  # servono solo gli stati nascosti
     te.model.visual = torch.nn.Identity()             # il TE legge solo testo: -0,8 GB e tempo di carico
     files = [te_src] if os.path.isfile(te_src) else sorted(str(x) for x in Path(te_src).glob("*.safetensors"))
+    quantized = False
     sd = {}
     for fpath in files:
-        skip = [k for k in _header_keys(fpath) if remap_te_key(k) is None]
+        keys = _header_keys(fpath)
+        quantized = quantized or any(k.endswith(("_weight_qdata", "_weight_scale", ".weight_scale", ".weight_s_rel")) for k in keys)
+        skip = [k for k in keys if remap_te_key(k) is None]
         part = Q.read_safetensors(fpath, DEV, skip=tuple(skip))
         sd.update({remap_te_key(k): v for k, v in part.items()})
-    if os.path.isfile(te_src):
-        sd = Q.quantize_from_state_dict(te, sd)        # fp8 per riga → RowFp8Linear (sul meta-device)
+    if quantized:                                      # fp8 per riga → RowFp8Linear (sul meta-device); un file bf16 (TE di Krea 2 Turbo) no
+        sd = Q.quantize_from_state_dict(te, sd)
     miss, unex = Q.load_into(te, sd)
     miss = [m for m in miss if not m.endswith("inv_freq")]
     if miss or unex:

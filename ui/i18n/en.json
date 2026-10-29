@@ -3633,7 +3633,7 @@
   "f1.flux3.te": "Text encoder",
   "f1.flux3.te.auto": "Automatic (uncensored Krea2 if present)",
   "f1.flux3.te.krea2": "Krea2 uncensored fp8 (4.8 GB)",
-  "f1.flux3.te.official": "Official bf16 (8.9 GB)",
+  "f1.flux3.te.official": "Official bf16 (8.9 GB; reused from Krea 2 if installed)",
   "f1.flux3.te.tt": "Text encoder (Qwen3-VL-4B): the uncensored Krea2 fp8 already on disk (4.8 GB) is the preferred one; the official bf16 (8.9 GB) stays as an alternative. They change which words the model «understands»: compare with the same seed.",
   "weights.license.ack.title.generic": "License and notices",
   "weights.license.ack.q": "Have you read it and want to download?",

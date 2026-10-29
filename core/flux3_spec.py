@@ -32,6 +32,8 @@ VAE_CONFIG = {
 DIT_FP8R = "flux3-dit-fp8r"            # distillato, fp8 per riga (6,27 GB) — opzione A scelta dall'utente
 TE = "flux3-te"                        # Qwen3-VL-4B-Instruct bf16 (8,88 GB) + tokenizer: l'UFFICIALE (alternativa)
 TE_KREA2 = "krea2-te-uncensored"       # Qwen3-VL-4B uncensored fp8 (4,85 GB) già su disco: PREFERITO se presente (utente 29/10)
+TE_KREA2_TURBO = "krea2_turbo"         # lo snapshot di Krea 2 Turbo contiene il TE UFFICIALE di FLUX.3 (identico, verificato 29/10): si riusa, niente download
+TE_KREA2_TURBO_FILE = "text_encoder/model.safetensors"   # Qwen3VLModel bf16 a file singolo (8,88 GB), nomi `language_model.…` senza `model.`
 TE_CONFIGS = "flux3-te-configs"        # json + tokenizer + chat template del Qwen3-VL-4B (~12 MB): servono col TE a file singolo
 TE_CHOICES = ("", "krea2", "official")  # "" = automatico: Krea2 se presente, altrimenti l'ufficiale
 VAE = "flux2-vae"                      # già su disco, sha256 identico a quello di FLUX.3
@@ -103,14 +105,31 @@ def clamp_size(width: int, height: int) -> tuple[int, int]:
     return f(width), f(height)
 
 
+def disk_present(entry_id: str) -> bool:
+    """Voce di catalogo presente su disco. Per lo snapshot di Krea 2 Turbo conta solo se contiene il file del text encoder."""
+    from pathlib import Path
+    from core import model_paths as mp
+    from core import weights_catalog as wc
+    e = mp.entry(entry_id)
+    if not e or not wc.is_present(e, str(mp.models_root())):
+        return False
+    if entry_id == TE_KREA2_TURBO:
+        return (Path(mp.p(entry_id, "")) / TE_KREA2_TURBO_FILE).is_file()
+    return True
+
+
 def te_id(choice: str = "", present=None) -> str:
-    """Voce di catalogo del text encoder. `choice`: "krea2" | "official" | "" (automatico: il Krea2 uncensored se è su disco —
-    scelta dell'utente del 29/10 —, altrimenti l'ufficiale). `present(id) -> bool` dice cosa c'è su disco."""
-    if choice == "official":
-        return TE
+    """Voce di catalogo del text encoder. `choice`: "krea2" (Krea2 uncensored fp8) | "official" | "" (automatico: il Krea2 uncensored
+    se è su disco — scelta dell'utente del 29/10 —, altrimenti l'ufficiale). L'«ufficiale» è lo snapshot `flux3-te` se c'è, altrimenti
+    il TE già dentro Krea 2 Turbo (identico: nessun download); se non c'è né l'uno né l'altro resta `flux3-te` (da scaricare).
+    `present(id) -> bool` dice cosa c'è su disco (`disk_present`)."""
     if choice == "krea2":
         return TE_KREA2
-    return TE_KREA2 if (present is not None and present(TE_KREA2)) else TE
+    if choice != "official" and present is not None and present(TE_KREA2):
+        return TE_KREA2
+    if present is not None and not present(TE) and present(TE_KREA2_TURBO):
+        return TE_KREA2_TURBO
+    return TE
 
 
 def default_steps(dit_id: str = DEFAULT_DIT) -> int:

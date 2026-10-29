@@ -829,7 +829,7 @@ class Frame1Tab(QWidget):
         adult = self._adult_ok()
         items = ([("", tr("f1.flux3.te.auto", "Automatico (Krea2 uncensored se presente)")),
                   ("krea2", tr("f1.flux3.te.krea2", "Krea2 uncensored fp8 (4,8 GB)"))] if adult else [])
-        items.append(("official", tr("f1.flux3.te.official", "Ufficiale bf16 (8,9 GB)")))
+        items.append(("official", tr("f1.flux3.te.official", "Ufficiale bf16 (8,9 GB; riusato da Krea 2 se installato)")))
         for name in ("f3_te", "f3e_te"):
             combo = getattr(self, name, None)
             if combo is None:

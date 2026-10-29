@@ -3561,7 +3561,7 @@
   "f1.flux3.te": "文本编码器",
   "f1.flux3.te.auto": "自动（有则使用 Krea2 无审查版）",
   "f1.flux3.te.krea2": "Krea2 无审查版 fp8（4.8GB）",
-  "f1.flux3.te.official": "官方 bf16（8.9GB）",
+  "f1.flux3.te.official": "官方 bf16（8.9GB；已安装 Krea 2 时直接复用）",
   "f1.flux3.te.tt": "文本编码器（Qwen3-VL-4B）：优先使用磁盘上已有的 Krea2 无审查版 fp8（4.8GB）；官方 bf16（8.9GB）作为备选。它们会改变模型“理解”的词语：请用相同种子对比。",
   "weights.license.ack.title.generic": "许可证与提示",
   "weights.license.ack.q": "已阅读并要下载吗？",

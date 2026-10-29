@@ -3561,7 +3561,7 @@
   "f1.flux3.te": "מקודד טקסט",
   "f1.flux3.te.auto": "אוטומטי (Krea2 ללא סינון אם קיים)",
   "f1.flux3.te.krea2": "Krea2 ללא סינון fp8 (4.8GB)",
-  "f1.flux3.te.official": "רשמי bf16 (8.9GB)",
+  "f1.flux3.te.official": "רשמי bf16 (8.9GB; נעשה בו שימוש חוזר מ-Krea 2 אם הוא מותקן)",
   "f1.flux3.te.tt": "מקודד טקסט (Qwen3-VL-4B): ה-Krea2 ללא סינון fp8 שכבר על הדיסק (4.8GB) מועדף; הרשמי bf16 (8.9GB) נשאר כחלופה. הם משנים אילו מילים המודל «מבין»: השווה עם אותו seed.",
   "weights.license.ack.title.generic": "רישיון והתראות",
   "weights.license.ack.q": "קראת ורוצה להוריד?",

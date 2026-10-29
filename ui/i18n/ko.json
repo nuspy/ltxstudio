@@ -3561,7 +3561,7 @@
   "f1.flux3.te": "텍스트 인코더",
   "f1.flux3.te.auto": "자동(있으면 Krea2 무검열)",
   "f1.flux3.te.krea2": "Krea2 무검열 fp8 (4.8GB)",
-  "f1.flux3.te.official": "공식 bf16 (8.9GB)",
+  "f1.flux3.te.official": "공식 bf16 (8.9GB, Krea 2가 설치되어 있으면 재사용)",
   "f1.flux3.te.tt": "텍스트 인코더(Qwen3-VL-4B): 이미 디스크에 있는 Krea2 무검열 fp8(4.8GB)을 우선 사용하며, 공식 bf16(8.9GB)은 대안입니다. 모델이 «이해하는» 단어가 달라지므로 같은 시드로 비교하세요.",
   "weights.license.ack.title.generic": "라이선스 및 안내",
   "weights.license.ack.q": "읽어보았고 다운로드하시겠습니까?",

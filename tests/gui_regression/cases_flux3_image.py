@@ -134,8 +134,10 @@ def case_flux3_missing_weights_warn_and_no_job(w, spy):
     assert len(spy.calls) == n0, "job partito con i pesi mancanti"
     ids = set(seen["ids"])
     assert {DIT, "flux2-vae", "flux3-pup-sakura-q8", "flux3-pup-configs"} <= ids, seen
-    assert ("flux3-te" in ids) != ("krea2-te-uncensored" in ids), "serve UN solo text encoder (SFW: ufficiale)"
-    if "krea2-te-uncensored" in ids:
+    tes = ids & {"flux3-te", "krea2_turbo", "krea2-te-uncensored"}      # ufficiale scaricato, ufficiale riusato da Krea 2 Turbo, uncensored
+    assert len(tes) == 1, f"serve UN solo text encoder: {tes}"
+    assert "krea2-te-uncensored" not in tes, "in SFW l'encoder è l'ufficiale"
+    if tes != {"flux3-te"}:
         assert "flux3-te-configs" in ids, "il TE a file singolo vuole config e tokenizer dallo snapshot"
     f.f3_pup.setChecked(False)
     seen.clear()
@@ -268,3 +270,25 @@ def case_flux3_text_encoder_choice(w, spy):
 CASES_DONE: list = []
 CASES.append(("flux3_text_encoder_choice", "Text encoder FLUX.3: ufficiale in SFW; automatico/Krea2/ufficiale con voci 18+; la scelta arriva al job.",
               case_flux3_text_encoder_choice))
+
+
+def case_flux3_size_cap_4096(w, spy):
+    """Larghezza/altezza: tetto 4096 con FLUX.3 Klein (nativo fino a 4K), 2048 per gli altri motori, che restano invariati."""
+    f, v = w.frame1_tab, w.video_tab
+    _arch(f, "FLUX.3 Klein")
+    assert v.width.maximum() == 4096 and v.height.maximum() == 4096
+    v.width.setValue(4096); v.height.setValue(3072)
+    assert (v.width.value(), v.height.value()) == (4096, 3072)
+    f.gen_refs.clear()
+    f.gen_prompt.setPlainText("una salina al tramonto con una piramide di vetro")
+    p = _run(w, spy, w.generate_image)
+    assert p["arch"] == "flux3" and p["width"] == 4096 and p["height"] == 3072, p
+    _arch(f, "FLUX")                                               # uscendo da FLUX.3 il tetto torna a 2048 e il valore si adegua
+    assert v.width.maximum() == 2048 and v.width.value() == 2048 and v.height.value() == 2048
+    _arch(f, "Qwen-Image 2.1")
+    assert v.width.maximum() == 2048 and v.height.maximum() == 2048
+    CASES_DONE.append(1)
+
+
+CASES.append(("flux3_size_cap_4096", "Spin larghezza/altezza: tetto 4096 solo con FLUX.3 Klein, 2048 per gli altri motori.",
+              case_flux3_size_cap_4096))

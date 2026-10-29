@@ -31,7 +31,7 @@ def entries(N):
         N("flux3-te", "Immagini", "FLUX.3 Klein text encoder Qwen3-VL-4B Instruct bf16 (8.9GB) + tokenizer",
           category="image", arch="flux3", kind="snapshot", repo=REPO, gated=True, type="TextEncoders", family="Flux3",
           gb=8.88, allow=["text_encoder/*", "LICENSE.md", "NOTICE.md"], used_by=["cap.image_flux3"],
-          note="8 strati (4,8,…,32) impilati → token a 20480 canali; Apache-2.0 (text_encoder/LICENSE). La licenza del DiT è "
+          note="8 strati (4,8,…,32) impilati → token a 20480 canali; IDENTICO al TE nello snapshot di Krea 2 Turbo (text_encoder/model.safetensors): se Krea 2 Turbo è già su disco NON serve scaricarlo (riusato a runtime); Apache-2.0 (text_encoder/LICENSE). La licenza del DiT è "
                "quella FLUX Kommunity: " + LIC),
         N("flux3-te-configs", "Immagini", "FLUX.3 Klein text encoder: config + tokenizer + chat template (json, ~12MB)",
           category="image", arch="flux3", kind="snapshot", repo=REPO, gated=True, type="configs", gb=0.02,
@@ -64,10 +64,11 @@ def entries(N):
 
 # id → (tag d'uso, deps) per catalog_use_deps. Catena: DiT → text encoder + VAE (flux2, già su disco) + upsampler.
 USE = {
-    # TE: scelta dell'utente 29/10 — il Krea2 uncensored già su disco è PREFERITO se presente (alternativa a|b: la prima presente fra
-    # le voci consentite dall'edizione, altrimenti la prima consentita); l'ufficiale resta a catalogo come alternativa.
+    # TE (utente/Opus 29/10): alternativa «flux3-te|krea2_turbo|krea2-te-uncensored» = la prima PRESENTE su disco, altrimenti la prima
+    # (flux3-te, 8,9 GB: mai uno snapshot Krea da 35 GB scaricato per un encoder). Il TE ufficiale è IDENTICO a quello dentro lo
+    # snapshot di Krea 2 Turbo (riusato a runtime, core/flux3_spec.te_id); il Krea2 uncensored resta il preferito se c'è.
     "flux3-dit-fp8r": (["ckpt_image", "fp8", "distilled"],
-                       ["flux3-te-configs", "krea2-te-uncensored|flux3-te", "flux2-vae", "flux3-pup-sakura-q8"]),
+                       ["flux3-te-configs", "flux3-te|krea2_turbo|krea2-te-uncensored", "flux2-vae", "flux3-pup-sakura-q8"]),
     "flux3-te": (["te"], []),
     "flux3-te-configs": ([], []),
     "flux3-pup-configs": ([], []),

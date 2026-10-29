@@ -361,8 +361,8 @@ def test_catalogo_flux3_voci_e_catena():
     assert dit["type"] == "diffusion_models" and dit["family"] == "Flux3" and dit["arch"] == "flux3"
     assert dit["sha256"].startswith("30054053") and dit["approx_gb"] == 6.27
     assert dit["license_ack"] == "flux_kommunity" and dit["gated"] is True
-    # TE: alternativa a|b (scelta utente 29/10: Krea2 uncensored già su disco preferito, ufficiale come alternativa)
-    assert set(dit["deps"]) >= {"flux2-vae", "flux3-pup-sakura-q8", "flux3-te-configs", "krea2-te-uncensored|flux3-te"}
+    # TE: alternativa a|b|c (29/10: ufficiale riusato da Krea 2 Turbo, scaricabile, o Krea2 uncensored già su disco)
+    assert set(dit["deps"]) >= {"flux2-vae", "flux3-pup-sakura-q8", "flux3-te-configs", "flux3-te|krea2_turbo|krea2-te-uncensored"}
     assert "flux3-te" not in dit["deps"]
     te = by["flux3-te"]
     assert te["kind"] == "snapshot" and te["license_ack"] == "flux_kommunity" and "text_encoder/*" in te["allow_patterns"]
@@ -389,17 +389,20 @@ def test_licenza_ack_richiesta_per_dit_e_te(monkeypatch):
     assert need["flux3-pup-sakura-q8"] == "adult_content" and "flux3-pup-configs" not in need
 
 
-def test_deps_te_alternativa_krea2_preferito(monkeypatch):
-    """Dipendenza «krea2-te-uncensored|flux3-te»: con il Krea2 su disco vince lui; senza, l'ufficiale (da scaricare)."""
+def test_deps_te_alternativa_ufficiale_krea_turbo_o_uncensored(monkeypatch):
+    """Dipendenza «flux3-te|krea2_turbo|krea2-te-uncensored»: la prima PRESENTE; senza nulla, flux3-te (8,9 GB) e MAI lo snapshot
+    Krea da 35 GB. Con Krea 2 Turbo su disco il TE ufficiale non si scarica."""
     from core import weights_catalog as wc
     by = {e["id"]: e for e in wc.load()}
-    alt = "krea2-te-uncensored|flux3-te"
-    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] == "krea2-te-uncensored")
-    assert wc.resolve_dep(alt, by) == "krea2-te-uncensored"
-    monkeypatch.setattr(wc, "is_present", lambda e, base=None: False)
-    assert wc.resolve_dep(alt, by) in ("krea2-te-uncensored", "flux3-te")     # nessuno presente: la prima consentita dall'edizione
-    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] == "flux3-te")
-    assert wc.resolve_dep(alt, by) == "flux3-te"
+    alt = next(d for d in by["flux3-dit-fp8r"]["deps"] if "|" in d)
+    assert alt == "flux3-te|krea2_turbo|krea2-te-uncensored"
+    for present, want in (({"krea2-te-uncensored"}, "krea2-te-uncensored"), ({"krea2_turbo"}, "krea2_turbo"),
+                          ({"flux3-te"}, "flux3-te"), (set(), "flux3-te")):
+        monkeypatch.setattr(wc, "is_present", lambda e, base=None, present=present: e["id"] in present)
+        assert wc.resolve_dep(alt, by) == want, (present, want)
+    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] in ("krea2_turbo", "flux3-dit-fp8r", "flux2-vae"))
+    missing = wc.missing_ids_with_deps(by["flux3-dit-fp8r"])
+    assert "flux3-te" not in missing and "krea2_turbo" not in missing, missing         # il TE arriva da Krea 2 Turbo: nessun download
 
 
 def test_api_te_scelta_e_gate_adult(monkeypatch):

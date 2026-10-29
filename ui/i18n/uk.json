@@ -3561,7 +3561,7 @@
   "f1.flux3.te": "Текстовий енкодер",
   "f1.flux3.te.auto": "Автоматично (Krea2 uncensored, якщо є)",
   "f1.flux3.te.krea2": "Krea2 uncensored fp8 (4,8 ГБ)",
-  "f1.flux3.te.official": "Офіційний bf16 (8,9 ГБ)",
+  "f1.flux3.te.official": "Офіційний bf16 (8,9 ГБ; береться з Krea 2, якщо встановлено)",
   "f1.flux3.te.tt": "Текстовий енкодер (Qwen3-VL-4B): перевага за Krea2 uncensored fp8, що вже є на диску (4,8 ГБ); офіційний bf16 (8,9 ГБ) лишається альтернативою. Вони змінюють, які слова «розуміє» модель: порівнюйте за однакового seed.",
   "weights.license.ack.title.generic": "Ліцензія та попередження",
   "weights.license.ack.q": "Ви прочитали й хочете завантажити?",

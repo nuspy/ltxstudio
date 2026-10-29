@@ -7671,7 +7671,7 @@
         "flux2-vae",
         "flux3-pup-sakura-q8",
         "flux3-te-configs",
-        "krea2-te-uncensored|flux3-te"
+        "flux3-te|krea2_turbo|krea2-te-uncensored"
       ]
     },
     {
@@ -7688,7 +7688,7 @@
       "arch": "flux3",
       "repo_id": "black-forest-labs/flux-3-image-klein",
       "url": "https://huggingface.co/black-forest-labs/flux-3-image-klein",
-      "note": "8 strati (4,8,…,32) impilati → token a 20480 canali; Apache-2.0 (text_encoder/LICENSE). La licenza del DiT è quella FLUX Kommunity: Licenza FLUX Kommunity v1.0 (BFL): uso commerciale degli output solo se Qualifying User (ricavi annui sotto 5 milioni di dollari) con filtro/revisione dei contenuti e dichiarazione AI; i pesi li scarica l'utente dopo aver accettato la licenza su Hugging Face",
+      "note": "8 strati (4,8,…,32) impilati → token a 20480 canali; IDENTICO al TE nello snapshot di Krea 2 Turbo (text_encoder/model.safetensors): se Krea 2 Turbo è già su disco NON serve scaricarlo (riusato a runtime); Apache-2.0 (text_encoder/LICENSE). La licenza del DiT è quella FLUX Kommunity: Licenza FLUX Kommunity v1.0 (BFL): uso commerciale degli output solo se Qualifying User (ricavi annui sotto 5 milioni di dollari) con filtro/revisione dei contenuti e dichiarazione AI; i pesi li scarica l'utente dopo aver accettato la licenza su Hugging Face",
       "allow_patterns": [
         "text_encoder/*",
         "LICENSE.md",

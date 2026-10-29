@@ -441,11 +441,62 @@ def test_te_caricamento_krea2_fp8_per_riga_vs_ufficiale_bf16(tmp_path):
     assert (outs[0] - refh).abs().max() < 1e-2          # il caricamento «ufficiale» è esatto
 
 
+def test_te_caricamento_file_singolo_bf16_stile_krea2_turbo(tmp_path):
+    """Il TE di Krea 2 Turbo: file singolo bf16 con nomi `language_model.…` (e `visual.…`), senza scale. Stessi stati nascosti
+    dello shard «ufficiale» (bit a bit: nessuna quantizzazione) e nessun Linear fp8."""
+    from safetensors.torch import save_file
+    from transformers import Qwen3VLForConditionalGeneration
+    cfg = _tiny_te_cfg(tmp_path)
+    torch.manual_seed(1)
+    ref = Qwen3VLForConditionalGeneration._from_config(cfg, dtype=torch.bfloat16)
+    sd = {k: v.detach().clone().contiguous() for k, v in ref.state_dict().items() if k != "lm_head.weight"}
+    off = tmp_path / "off"
+    off.mkdir()
+    (off / "config.json").write_text((tmp_path / "config.json").read_text())
+    save_file(sd, str(off / "model.safetensors"))
+    turbo = {(k[len("model."):] if k.startswith("model.") else k): v for k, v in sd.items()}
+    assert any(k.startswith("visual.") for k in turbo) and any(k.startswith("language_model.") for k in turbo)
+    single = tmp_path / "turbo.safetensors"
+    save_file(turbo, str(single))
+    a = W.build_te_model(str(off), str(tmp_path))
+    b = W.build_te_model(str(single), str(tmp_path))
+    from _qlinear import RowFp8Linear
+    assert not any(isinstance(m, RowFp8Linear) for m in b.modules())
+    ids = torch.randint(0, 300, (1, 12))
+    pos = torch.arange(12)[None]
+    outs = []
+    for m in (a, b):
+        with torch.no_grad():
+            o = m(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos[None].expand(4, -1, -1),
+                  output_hidden_states=True, use_cache=False)
+        outs.append(torch.stack([o.hidden_states[i] for i in (1, 2, 3)]).float())
+    assert torch.equal(outs[0], outs[1])
+
+
 def test_te_scelta_krea2_preferito_se_presente():
-    assert S.te_id("", lambda i: i == S.TE_KREA2) == S.TE_KREA2                              # automatico: Krea2 se su disco
+    T = S.TE_KREA2_TURBO
+    assert S.te_id("", lambda i: i == S.TE_KREA2) == S.TE_KREA2                              # automatico: Krea2 uncensored se su disco
     assert S.te_id("", lambda i: False) == S.TE and S.te_id("", None) == S.TE
     assert S.te_id("official", lambda i: True) == S.TE and S.te_id("krea2", lambda i: False) == S.TE_KREA2
     assert S.TE_CHOICES == ("", "krea2", "official")
+    # «ufficiale» riusato da Krea 2 Turbo: solo se flux3-te non c'è (nessun download in più)
+    assert S.te_id("official", lambda i: i == T) == T
+    assert S.te_id("", lambda i: i == T) == T                                                # automatico senza uncensored: l'ufficiale riusato
+    assert S.te_id("official", lambda i: i in (T, S.TE_KREA2)) == T                          # scelta esplicita ufficiale: mai l'uncensored
+    assert S.te_id("official", lambda i: i in (T, S.TE)) == S.TE                             # lo snapshot scaricato ha la precedenza
+    assert S.te_id("", lambda i: i in (T, S.TE_KREA2)) == S.TE_KREA2
+    assert S.te_id("official", lambda i: False) == S.TE                                      # niente di niente: da scaricare flux3-te
+
+
+def test_te_krea2_turbo_header_vero_uguale_all_ufficiale():
+    """Il TE nello snapshot di Krea 2 Turbo (header VERO, bf16 a file singolo) ha gli stessi tensori e forme dell'ufficiale FLUX.3
+    a meno del prefisso `model.`; la torre visiva e lm_head non servono."""
+    turbo, off = _te_hdr("krea2_turbo_te_header.json"), _te_hdr("flux3_te_header.json")
+    assert len(turbo) == 713 and {v["dtype"] for v in turbo.values()} == {"BF16"}
+    mapped = {W.remap_te_key(k): v for k, v in turbo.items() if W.remap_te_key(k)}
+    ref = {k: v for k, v in off.items() if not k.startswith("model.visual.")}
+    assert set(mapped) == set(ref) and len(ref) == 398, sorted(set(mapped) ^ set(ref))[:6]
+    assert all(mapped[k]["shape"] == ref[k]["shape"] and mapped[k]["dtype"] == ref[k]["dtype"] for k in ref)
 
 
 def test_resolve_te_krea2_usa_configs_dello_snapshot(monkeypatch):
@@ -463,6 +514,23 @@ def test_resolve_te_krea2_usa_configs_dello_snapshot(monkeypatch):
     present.discard(S.TE)
     with pytest.raises(RuntimeError, match=S.TE):
         W.resolve({"flux3_te": ""}, need_pup=False)
+
+
+def test_resolve_te_ufficiale_riusato_da_krea2_turbo(monkeypatch, tmp_path):
+    from core import model_paths as mp
+    from core import weights_catalog as wc
+    present = {S.DEFAULT_DIT, S.TE_CONFIGS, S.VAE, S.TE_KREA2_TURBO}
+    monkeypatch.setattr(wc, "is_present", lambda e, base=None: e["id"] in present)
+    snap = tmp_path / "Krea-2-Turbo"
+    monkeypatch.setattr(mp, "p", lambda i, sub="": str(snap) if i == S.TE_KREA2_TURBO else str(tmp_path / i))
+    with pytest.raises(RuntimeError, match=S.TE):                                     # snapshot senza il file del TE: non conta
+        W.resolve({"flux3_te": "official"}, need_pup=False)
+    (snap / "text_encoder").mkdir(parents=True)
+    (snap / "text_encoder" / "model.safetensors").write_bytes(b"x")
+    out = W.resolve({"flux3_te": "official"}, need_pup=False)
+    assert out["te_id"] == S.TE_KREA2_TURBO and out["te_src"].replace("\\", "/").endswith("Krea-2-Turbo/text_encoder/model.safetensors")
+    assert "flux3-te-configs" in out["te_cfg"].replace("\\", "/")                      # tokenizer/config dallo snapshot di configurazione
+    assert W.resolve({"flux3_te": ""}, need_pup=False)["te_id"] == S.TE_KREA2_TURBO     # automatico senza uncensored: lo stesso
 
 
 def test_fp8_linear_ripiego_dequantizzato_senza_kernel():

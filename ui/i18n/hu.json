@@ -3561,7 +3561,7 @@
   "f1.flux3.te": "Szövegenkóder",
   "f1.flux3.te.auto": "Automatikus (uncensored Krea2, ha van)",
   "f1.flux3.te.krea2": "Krea2 uncensored fp8 (4,8 GB)",
-  "f1.flux3.te.official": "Hivatalos bf16 (8,9 GB)",
+  "f1.flux3.te.official": "Hivatalos bf16 (8,9 GB; a Krea 2-ből újrahasznosítva, ha telepítve van)",
   "f1.flux3.te.tt": "Szövegenkóder (Qwen3-VL-4B): az már a lemezen lévő Krea2 uncensored fp8 (4,8 GB) az előnyben részesített; a hivatalos bf16 (8,9 GB) alternatíva marad. Változtatják, mely szavakat «érti» a modell: hasonlítsd össze azonos seeddel.",
   "weights.license.ack.title.generic": "Licenc és figyelmeztetések",
   "weights.license.ack.q": "Elolvastad, és le akarod tölteni?",

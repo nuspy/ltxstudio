@@ -272,10 +272,8 @@ def _flux3(p: dict, req: BaseModel | None = None) -> dict:
 
 
 def _present(entry_id: str) -> bool:
-    from core import model_paths as mp
-    from core import weights_catalog as wc
-    e = mp.entry(entry_id)
-    return bool(e) and wc.is_present(e, str(mp.models_root()))
+    from core import flux3_spec as S3
+    return S3.disk_present(entry_id)
 
 
 def _flux3_ids(dit: str, pup: bool, te: str = "") -> list[str]:
