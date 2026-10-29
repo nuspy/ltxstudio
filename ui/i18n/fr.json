@@ -3442,7 +3442,7 @@
   "ref.add.tt": "Choisissez un ou plusieurs fichiers (vous pouvez aussi les glisser ici).",
   "ref.from_canvas": "Depuis le canevas",
   "ref.from_canvas.tt": "Utilise comme référence l'image présente dans le canevas.",
-  "ref.hint2": "Chaque fichier reçoit un nom (@Foto_1, @Foto_2…) : citez-le dans le prompt en tapant « @ » (saisie automatique) ou avec « ↳ prompt ». Les noms ne changent pas si vous en retirez un. Les fichiers chargés mais non cités sont quand même transmis au modèle.",
+  "ref.hint2": "Chaque fichier reçoit un nom (@image_1, @image_2… ; @video_1 pour les vidéos, @audio_1 pour l'audio) : citez-le dans le prompt en tapant « @ » (la liste avec miniature et nom apparaît) ou avec « ↳ prompt ». Les noms ne changent pas si vous en retirez un. Les fichiers chargés mais non cités sont quand même transmis au modèle.",
   "ref.err_unknown": "Le prompt cite {tok}, mais cette référence n'existe pas.",
   "f1.gen.refs.group": "Images de référence",
   "f1.gen.refs.no_canvas": "Il n'y a aucune image dans le canevas à utiliser.",
@@ -3455,5 +3455,6 @@
   "model.adult.tt": "Contenu pour adultes (18+, interdit aux mineurs). Visible seulement en mode NSFW et dans les éditions qui l'autorisent.",
   "f1.inpaint.arch_lbl": "Architecture",
   "f1.inpaint.arch.all": "Toutes les architectures",
-  "f1.inpaint.arch.tt": "Affiche uniquement les modèles de l'architecture choisie. Si le modèle choisi avant n'appartient pas à la nouvelle architecture, le menu revient sur « choisir un modèle » : aucun autre modèle n'est choisi à votre place."
+  "f1.inpaint.arch.tt": "Affiche uniquement les modèles de l'architecture choisie. Si le modèle choisi avant n'appartient pas à la nouvelle architecture, le menu revient sur « choisir un modèle » : aucun autre modèle n'est choisi à votre place.",
+  "f1.kontext.guidance.tt": "Guidance de Kontext (par défaut 2.5, de 1.0 à 4.0) : à quel point l'édition suit le prompt. Des valeurs plus basses atténuent le contraste et la saturation excessifs ; des valeurs plus hautes suivent le prompt plus fermement."
 }

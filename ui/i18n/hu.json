@@ -3442,7 +3442,7 @@
   "ref.add.tt": "Válassz egy vagy több fájlt (ide is húzhatod őket).",
   "ref.from_canvas": "A vászonról",
   "ref.from_canvas.tt": "A vásznon lévő képet használja referenciaként.",
-  "ref.hint2": "Minden fájl kap egy nevet (@Foto_1, @Foto_2…): a promptban a „@” beírásával (automatikus kiegészítés) vagy a „↳ prompt” gombbal hivatkozhatsz rá. A nevek nem változnak, ha egyet eltávolítasz. A betöltött, de nem hivatkozott fájlokat a modell mégis megkapja.",
+  "ref.hint2": "Minden fájl kap egy nevet (@image_1, @image_2…; videóknál @video_1, hangnál @audio_1): a promptban a „@” beírásával (megjelenik a miniatűrös, neves lista) vagy a „↳ prompt” gombbal hivatkozhatsz rá. A nevek nem változnak, ha egyet eltávolítasz. A betöltött, de nem hivatkozott fájlokat a modell mégis megkapja.",
   "ref.err_unknown": "A prompt a(z) {tok} hivatkozásra utal, de ilyen referencia nincs.",
   "f1.gen.refs.group": "Referenciaképek",
   "f1.gen.refs.no_canvas": "A vásznon nincs használható kép.",
@@ -3455,5 +3455,6 @@
   "model.adult.tt": "Felnőtt tartalom (18+, kiskorúaknak tilos). Csak NSFW módban és az ezt engedélyező kiadásokban jelenik meg.",
   "f1.inpaint.arch_lbl": "Architektúra",
   "f1.inpaint.arch.all": "Minden architektúra",
-  "f1.inpaint.arch.tt": "Csak a kiválasztott architektúra modelljeit mutatja. Ha a korábban választott modell nem tartozik az új architektúrához, a menü visszaáll a „válassz modellt” értékre: helyetted nem választ másik modellt."
+  "f1.inpaint.arch.tt": "Csak a kiválasztott architektúra modelljeit mutatja. Ha a korábban választott modell nem tartozik az új architektúrához, a menü visszaáll a „válassz modellt” értékre: helyetted nem választ másik modellt.",
+  "f1.kontext.guidance.tt": "Kontext guidance (alapértelmezett 2.5, 1.0–4.0): mennyire követi a szerkesztés a promptot. Az alacsonyabb értékek csökkentik a túlzott kontrasztot és telítettséget; a magasabbak határozottabban követik a promptot."
 }

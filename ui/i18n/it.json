@@ -3481,7 +3481,7 @@
   "ref.add.tt": "Scegli uno o più file (puoi anche trascinarli qui).",
   "ref.from_canvas": "Dal canvas",
   "ref.from_canvas.tt": "Usa come riferimento l'immagine che hai nel canvas.",
-  "ref.hint2": "Ogni file riceve un nome (@Foto_1, @Foto_2…): citalo nel prompt scrivendo «@» (completamento automatico) o con «↳ prompt». I nomi non cambiano se ne togli uno. I file caricati ma non citati vengono comunque passati al modello.",
+  "ref.hint2": "Ogni file riceve un nome (@image_1, @image_2…; per i video @video_1, per gli audio @audio_1): citalo nel prompt scrivendo «@» (compare l'elenco con miniatura e nome) o con «↳ prompt». I nomi non cambiano se ne togli uno. I file caricati ma non citati vengono comunque passati al modello.",
   "ref.err_unknown": "Il prompt cita {tok}, ma quel riferimento non esiste.",
   "f1.gen.refs.group": "Immagini di riferimento",
   "f1.gen.refs.no_canvas": "Nel canvas non c'è nessuna immagine da usare.",
@@ -3494,5 +3494,6 @@
   "model.adult.tt": "Contenuto per adulti (18+, vietato ai minori). Compare solo in modalità NSFW e nelle edizioni che lo consentono.",
   "f1.inpaint.arch_lbl": "Architettura",
   "f1.inpaint.arch.all": "Tutte le architetture",
-  "f1.inpaint.arch.tt": "Mostra solo i modelli dell'architettura scelta. Se il modello scelto prima non appartiene alla nuova architettura il menu torna su «scegli un modello»: non ne viene scelto un altro al posto tuo."
+  "f1.inpaint.arch.tt": "Mostra solo i modelli dell'architettura scelta. Se il modello scelto prima non appartiene alla nuova architettura il menu torna su «scegli un modello»: non ne viene scelto un altro al posto tuo.",
+  "f1.kontext.guidance.tt": "Guidance di Kontext (default 2.5, da 1.0 a 4.0): quanto l'edit segue il prompt. Valori più bassi attenuano il contrasto e la saturazione eccessivi; valori più alti seguono il prompt con più decisione."
 }

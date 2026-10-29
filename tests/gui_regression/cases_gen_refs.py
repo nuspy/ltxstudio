@@ -1,5 +1,5 @@
 """Casi GUI (mock) di «Immagini di riferimento» in Crea immagini (task 6, 17/10): sezione solo coi modelli
-multi-riferimento, nomi @Foto_N stabili, completamento con «@», avviso su token inesistente, traduzione nella sintassi
+multi-riferimento, nomi @image_N stabili, completamento con «@», avviso su token inesistente, traduzione nella sintassi
 del modello con le immagini nell'ordine giusto, «dal canvas», stato salvato. Lo Spy intercetta _enqueue: niente GPU."""
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def case_genrefs_section_only_for_multiref_models(w, spy):
     f.gen_refs.clear()
     added = sum(f.gen_refs.add_path(_img(f"_gr_lim{i}.png")) for i in range(12))
     assert added == 10, f"limite Qwen = 10, aggiunti {added}"
-    assert _names(f)[0] == "Foto_1" and _names(f)[-1] == "Foto_10", _names(f)
+    assert _names(f)[0] == "image_1" and _names(f)[-1] == "image_10", _names(f)
     f.gen_refs.clear()
 
 
@@ -39,11 +39,11 @@ def case_genrefs_names_stable(w, spy):
     f.gen_refs.clear()
     for i in range(3):
         f.gen_refs.add_path(_img(f"_gr_n{i}.png"))
-    assert _names(f) == ["Foto_1", "Foto_2", "Foto_3"], _names(f)
-    f.gen_refs._remove_row(f.gen_refs._rows[1])                 # via Foto_2
-    assert _names(f) == ["Foto_1", "Foto_3"], f"rinumerazione: {_names(f)}"
+    assert _names(f) == ["image_1", "image_2", "image_3"], _names(f)
+    f.gen_refs._remove_row(f.gen_refs._rows[1])                 # via image_2
+    assert _names(f) == ["image_1", "image_3"], f"rinumerazione: {_names(f)}"
     f.gen_refs.add_path(_img("_gr_n9.png"))
-    assert _names(f) == ["Foto_1", "Foto_2", "Foto_3"], f"la nuova deve prendere il primo numero libero: {_names(f)}"
+    assert _names(f) == ["image_1", "image_2", "image_3"], f"la nuova deve prendere il primo numero libero: {_names(f)}"
     assert f.gen_refs.get_references()[1]["path"].endswith("_gr_n9.png")
     f.gen_refs.clear()
 
@@ -59,10 +59,11 @@ def case_genrefs_prompt_completion(w, spy):
     f.gen_prompt.setFocus()
     QTest.keyClicks(f.gen_prompt, "la tartaruga in @")
     h = f._gen_prompt_refs
-    assert h.model.stringList() == ["@Foto_1", "@Foto_2"], h.model.stringList()
+    assert h.tokens() == ["@image_1", "@image_2"], h.tokens()
+    assert not h.model.item(0).icon().isNull() and "_gr_c0.png" in h.model.item(0).text(), "miniatura e nome nell'elenco"
     assert h.completer.completionCount() == 2
-    h._insert("@Foto_1")
-    assert f.gen_prompt.toPlainText().endswith("@Foto_1 "), f.gen_prompt.toPlainText()
+    h._insert("@image_1")
+    assert f.gen_prompt.toPlainText().endswith("@image_1 "), f.gen_prompt.toPlainText()
     f.gen_refs.clear()
 
 
@@ -73,7 +74,7 @@ def case_genrefs_unknown_token_warns_before_generating(w, spy):
     f.gen_model.setCurrentIndex(f.gen_model.findData("qwen21-dit-nvfp4"))
     f.gen_refs.clear()
     f.gen_refs.add_path(_img("_gr_u0.png"))
-    f.gen_prompt.setPlainText("@Foto_1 abbraccia @Foto_7")
+    f.gen_prompt.setPlainText("@image_1 abbraccia @image_7")
     shown = []
     old = QMessageBox.warning
     QMessageBox.warning = staticmethod(lambda *a, **k: shown.append(a[2] if len(a) > 2 else "") or QMessageBox.Ok)
@@ -82,8 +83,8 @@ def case_genrefs_unknown_token_warns_before_generating(w, spy):
         w.generate_image()
     finally:
         QMessageBox.warning = old
-    assert shown and "@Foto_7" in str(shown[0]), f"nessun avviso sul token inesistente: {shown}"
-    assert len(spy.calls) == n0, f"generazione partita nonostante @Foto_7 inesistente: {spy.calls[n0:]}"
+    assert shown and "@image_7" in str(shown[0]), f"nessun avviso sul token inesistente: {shown}"
+    assert len(spy.calls) == n0, f"generazione partita nonostante @image_7 inesistente: {spy.calls[n0:]}"
     f.gen_refs.clear()
 
 
@@ -95,13 +96,13 @@ def case_genrefs_cfg_order_and_translation(w, spy):
     paths = [_img(f"_gr_o{i}.png") for i in range(3)]
     for p in paths:
         f.gen_refs.add_path(p)
-    f.gen_refs._remove_row(f.gen_refs._rows[1])                  # restano Foto_1 e Foto_3
-    f.gen_prompt.setPlainText("la tartaruga in @Foto_3 mangia la lattuga in @Foto_1")
+    f.gen_refs._remove_row(f.gen_refs._rows[1])                  # restano image_1 e image_3
+    f.gen_prompt.setPlainText("la tartaruga in @image_3 mangia la lattuga in @image_1")
     p = _run(w, spy, w.generate_image)
     assert [os.path.basename(x) for x in p["ref_images"]] == ["_gr_o0.png", "_gr_o2.png"], p["ref_images"]
     assert p["prompt"] == "la tartaruga in image 2 mangia la lattuga in image 1", p["prompt"]
     # una foto caricata ma NON citata viene passata comunque
-    f.gen_prompt.setPlainText("solo @Foto_1")
+    f.gen_prompt.setPlainText("solo @image_1")
     p = _run(w, spy, w.generate_image)
     assert len(p["ref_images"]) == 2 and p["prompt"] == "solo image 1", p
     f.gen_refs.clear()
@@ -116,24 +117,24 @@ def case_genrefs_from_canvas_and_state(w, spy):
     f.gen_refs.canvas_btn.click()
     assert [r["path"] for r in f.gen_refs.get_references()] == [path], f.gen_refs.get_references()
     f.gen_refs.add_path(_img("_gr_s1.png"))
-    f.gen_refs._remove_row(f.gen_refs._rows[0])                  # resta solo Foto_2
+    f.gen_refs._remove_row(f.gen_refs._rows[0])                  # resta solo image_2
     st = gui_state.collect(w)
     key = next((k for k in st if k.endswith("gen_refs")), None)
     assert key and st[key]["t"] == "custom", f"stato dei riferimenti non salvato da gui_state: {[k for k in st if 'ref' in k]}"
     f.gen_refs.clear()
     gui_state.restore(w, st)
-    assert _names(f) == ["Foto_2"], f"stato ripristinato: {_names(f)}"
+    assert _names(f) == ["image_2"], f"stato ripristinato: {_names(f)}"
     f.gen_refs.clear()
 
 
 CASES = [
     ("genrefs_section_only_for_multiref_models", "«Immagini di riferimento» visibile solo con Qwen-Image 2.1; massimo 10.",
      case_genrefs_section_only_for_multiref_models),
-    ("genrefs_names_stable", "Nomi @Foto_N assegnati al caricamento; togliere Foto_2 non rinumera; la nuova prende il "
+    ("genrefs_names_stable", "Nomi @image_N assegnati al caricamento; togliere image_2 non rinumera; la nuova prende il "
      "primo libero.", case_genrefs_names_stable),
     ("genrefs_prompt_completion", "Digitando «@» nel prompt compare l'elenco dei nomi e l'inserimento sostituisce.",
      case_genrefs_prompt_completion),
-    ("genrefs_unknown_token_warns", "Un @Foto_N inesistente nel prompt avvisa e NON genera.",
+    ("genrefs_unknown_token_warns", "Un @image_N inesistente nel prompt avvisa e NON genera.",
      case_genrefs_unknown_token_warns_before_generating),
     ("genrefs_cfg_order_and_translation", "Alla generazione: ref_images nell'ordine, token tradotti in «image N», "
      "foto non citata passata comunque.", case_genrefs_cfg_order_and_translation),

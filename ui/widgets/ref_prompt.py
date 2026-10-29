@@ -1,7 +1,7 @@
-"""Prompt con riferimenti nominati: completamento automatico digitando `@` + evidenziazione dei token `@Foto_N`.
+"""Prompt con riferimenti nominati: completamento automatico digitando `@` + evidenziazione dei token `@image_N`.
 
 `install(edit, names_getter)` collega a una `QPlainTextEdit`:
- - digitando `@` (e le lettere seguenti) compare l'elenco dei nomi esistenti (`@Foto_1`, `@Foto_2`…); Invio/Tab/click
+ - digitando `@` (e le lettere seguenti) compare l'elenco dei nomi esistenti (`@image_1`, `@image_2`…); Invio/Tab/click
    lo inserisce al posto di ciò che è stato digitato;
  - i token evidenziati: validi in azzurro, riferimenti INESISTENTI in rosso sottolineato (sono un errore da
    correggere prima di generare, non vanno ignorati in silenzio).
@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import QEvent, QObject, QStringListModel, Qt
-from PySide6.QtGui import QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextCursor
+from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtGui import QColor, QFont, QStandardItem, QStandardItemModel, QSyntaxHighlighter, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import QCompleter, QPlainTextEdit
 
 from core import image_refs as R
@@ -44,12 +44,14 @@ class RefHighlighter(QSyntaxHighlighter):
 class _Helper(QObject):
     """Completer legato alla casella: filtro sul tasto, popup con i nomi, sostituzione del `@…` digitato."""
 
-    def __init__(self, edit: QPlainTextEdit, names_getter):
+    def __init__(self, edit: QPlainTextEdit, names_getter, entries_getter=None):
         super().__init__(edit)
         self.edit = edit
         self.names = names_getter
-        self.model = QStringListModel(self)
+        self.entries = entries_getter                # opz.: [{kind, n, label, icon}] → miniatura e nome nell'elenco
+        self.model = QStandardItemModel(self)
         self.completer = QCompleter(self.model, edit)
+        self.completer.setCompletionRole(Qt.UserRole)    # si confronta e si inserisce il TOKEN, si MOSTRA «token — file»
         self.completer.setWidget(edit)
         self.completer.setCompletionMode(QCompleter.PopupCompletion)
         self.completer.setCaseSensitivity(Qt.CaseInsensitive)
@@ -64,8 +66,15 @@ class _Helper(QObject):
             return
         self._on_text()
 
+    def _entries(self) -> list[dict]:
+        if self.entries is not None:
+            ents = list(self.entries())
+        else:
+            ents = [{"kind": k, "n": n} for k, n in self.names()]
+        return sorted(ents, key=lambda e: (R.KINDS.index(e["kind"]), e["n"]))
+
     def tokens(self) -> list[str]:
-        return [R.token_of(k, n) for k, n in sorted(self.names(), key=lambda t: (R.KINDS.index(t[0]), t[1]))]
+        return [R.token_of(e["kind"], e["n"]) for e in self._entries()]
 
     def _prefix(self) -> str | None:
         cur = self.edit.textCursor()
@@ -75,11 +84,21 @@ class _Helper(QObject):
 
     def _on_text(self) -> None:
         pre = self._prefix()
-        toks = self.tokens()
-        if pre is None or not toks:
+        ents = self._entries()
+        if pre is None or not ents:
             self.completer.popup().hide()
             return
-        self.model.setStringList(toks)
+        self.model.clear()
+        for e in ents:
+            tok = R.token_of(e["kind"], e["n"])
+            label = e.get("label") or ""
+            it = QStandardItem(f"{tok}  —  {label}" if label else tok)
+            it.setData(tok, Qt.UserRole)
+            if e.get("icon") is not None:
+                it.setIcon(e["icon"])                       # miniatura (immagini)
+            if label:
+                it.setToolTip(label)
+            self.model.appendRow(it)
         self.completer.setCompletionPrefix(pre)
         if self.completer.completionCount() == 0:
             self.completer.popup().hide()
@@ -103,7 +122,7 @@ class _Helper(QObject):
             if ev.key() in (Qt.Key_Enter, Qt.Key_Return, Qt.Key_Tab, Qt.Key_Backtab):
                 idx = self.completer.popup().currentIndex()
                 if idx.isValid():
-                    self._insert(idx.data())
+                    self._insert(idx.data(Qt.UserRole))
                     self.completer.popup().hide()
                     return True
             if ev.key() == Qt.Key_Escape:
@@ -112,9 +131,10 @@ class _Helper(QObject):
         return False
 
 
-def install(edit: QPlainTextEdit, names_getter) -> _Helper:
-    """Attiva completamento + evidenziazione su `edit`. Ritorna l'helper (tenuto vivo come figlio della casella)."""
+def install(edit: QPlainTextEdit, names_getter, entries_getter=None) -> _Helper:
+    """Attiva completamento + evidenziazione su `edit`. `entries_getter()` → [{kind, n, label, icon}] per mostrare
+    miniatura e nome del file nell'elenco (senza, solo i token). Ritorna l'helper (figlio della casella)."""
     hl = RefHighlighter(edit.document(), names_getter)
-    helper = _Helper(edit, names_getter)
+    helper = _Helper(edit, names_getter, entries_getter)
     helper.highlighter = hl
     return helper

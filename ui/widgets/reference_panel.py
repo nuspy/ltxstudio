@@ -3,12 +3,12 @@
 I file sono RIFERIMENTI senza posizione temporale (identità, stile, movimento, voce), diversi dai keyframe dello
 storyboard (`ImageConditioningInput(path, frame_idx, strength)`).
 
-NOMI: ogni file riceve AL CARICAMENTO un nome stabile — `Foto_1`, `Foto_2`… (video `Video_N`, audio `Audio_N`) — e nel
-prompt si cita con `@Foto_1` (completamento digitando `@`, vedi `ui/widgets/ref_prompt.py`). Togliere Foto_2 non
+NOMI: ogni file riceve AL CARICAMENTO un nome stabile — `image_1`, `image_2`… (video `video_N`, audio `audio_N`) — e nel
+prompt si cita con `@image_1` (completamento digitando `@`, vedi `ui/widgets/ref_prompt.py`). Togliere image_2 non
 rinumera le altre; una nuova immagine prende il primo numero libero (`core/image_refs.NameRegistry`). Alla generazione
 `translate()` traduce i token nella sintassi del MODELLO scelto (`set_token_style`: qwen21 → «image 1», h3 →
 `<Picture 1>`, ltx → «Image 1»…) e `get_references()` elenca i file nell'ordine in cui vanno passati al worker.
-I prompt vecchi con `<Picture N>` si leggono e si traducono ancora; la GUI mostra e inserisce solo `@Foto_N`.
+I prompt vecchi con `<Picture N>` si leggono e si traducono ancora; la GUI mostra e inserisce solo `@image_N`.
 
 Limiti PER ARCHITETTURA (`set_limits`): MiniMax H3 = 9 immagini + 3 video + 3 audio, max 12 file, clip 2–15 s;
 LTX con la LoRA Multiple-Subject-Reference = 2–5 immagini; Qwen-Image 2.1 = 10 immagini.
@@ -18,7 +18,7 @@ API:
   validation_errors() -> list[str];  prompt_errors(prompt) -> list[str]   (token che citano riferimenti inesistenti)
   names() -> set[(kind,n)];  order() -> {kind: [n…]};  translate(prompt) -> str
   set_limits(images=…, videos=…, audios=…, total=…, min_items=…, clip_s=(min,max))
-  insert_token (Signal[str]) — il tab lo collega alla casella del prompt (emette `@Foto_N`)
+  insert_token (Signal[str]) — il tab lo collega alla casella del prompt (emette `@image_N`)
   request_canvas (Signal) — bottone «Dal canvas» (solo con `canvas_button=True`)
 
 Indipendente: importabile e istanziabile senza il resto dell'app.
@@ -74,7 +74,7 @@ def media_duration(path: str) -> float | None:
 
 
 class _RefRow(QWidget):
-    """Un riferimento: miniatura, nome `@Foto_N`, file, descrizione breve, «inserisci nel prompt», rimuovi."""
+    """Un riferimento: miniatura, nome `@image_N`, file, descrizione breve, «inserisci nel prompt», rimuovi."""
 
     def __init__(self, path: str, kind: str, n: int, on_remove, on_insert, parent=None):
         super().__init__(parent)
@@ -249,7 +249,7 @@ class ReferencePanel(QWidget):
     def set_token_style(self, style: str) -> None:
         """Sintassi con cui il MODELLO cita il riferimento k-esimo (`core/image_refs.MODEL_SYNTAX`): 'h3'
         (`<Picture 1>`), 'ltx' (`Image 1`), 'qwen21'/'krea2_edit' (`image 1`). I nomi mostrati nel prompt restano
-        `@Foto_N`: cambia solo la traduzione alla generazione."""
+        `@image_N`: cambia solo la traduzione alla generazione."""
         if style in R.MODEL_SYNTAX and style != self._token_style:
             self._token_style = style
             self._refresh()
@@ -275,7 +275,7 @@ class ReferencePanel(QWidget):
             self.add_path(f)
 
     def add_path(self, path: str, n: int | None = None) -> bool:
-        """Aggiunge un file se il tipo è ammesso e i limiti lo consentono. True se aggiunto. Il nome (`Foto_N`) si
+        """Aggiunge un file se il tipo è ammesso e i limiti lo consentono. True se aggiunto. Il nome (`image_N`) si
         assegna QUI, al caricamento: il primo numero libero (o `n`, se libero: ripristino dello stato salvato)."""
         kind = kind_of(path)
         if not kind or self._lim.get(kind, 0) <= 0:
@@ -322,7 +322,7 @@ class ReferencePanel(QWidget):
         self.add_btn.setEnabled(len(self._rows) < self._total)
         self.hint.setText(tr(
             "ref.hint2",
-            "Ogni file riceve un nome (@Foto_1, @Foto_2…): citalo nel prompt scrivendo «@» (completamento "
+            "Ogni file riceve un nome (@image_1, @image_2…): citalo nel prompt scrivendo «@» (completamento "
             "automatico) o con «↳ prompt». I nomi non cambiano se ne togli uno. I file caricati ma non citati "
             "vengono comunque passati al modello."))
         self.changed.emit()
@@ -376,8 +376,19 @@ class ReferencePanel(QWidget):
             out.setdefault(r.kind, []).append(r.n)
         return out
 
+    def completion_entries(self) -> list[dict]:
+        """Voci per l'elenco che compare digitando «@»: tipo, numero, nome del file e miniatura (immagini). Tutti i tipi
+        caricati nel pannello (immagini; nel tab Video anche video e audio)."""
+        from PySide6.QtGui import QIcon
+        out = []
+        for r in self._rows:
+            pm = r.thumb.pixmap() if r.kind == "image" else None
+            out.append({"kind": r.kind, "n": r.n, "label": Path(r.path).name,
+                        "icon": QIcon(pm) if (pm is not None and not pm.isNull()) else None})
+        return out
+
     def translate(self, prompt: str) -> str:
-        """Prompt con `@Foto_N` (e i vecchi `<Picture N>`) tradotti nella sintassi del modello scelto."""
+        """Prompt con `@image_N` (e i vecchi `<Picture N>`) tradotti nella sintassi del modello scelto."""
         return R.translate(prompt, self.order(), self._token_style)
 
     def prompt_errors(self, prompt: str) -> list[str]:

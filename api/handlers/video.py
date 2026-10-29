@@ -125,8 +125,8 @@ class InpaintReq(BaseModel):
     Con `reference_image` si usa la LoRA r2v (il nuovo oggetto viene preso dalla foto), senza la LoRA t2v (a parole)."""
     video_path: str
     object: str = Field(..., description="oggetto da sostituire, a parole inglesi (es. «umbrella», «person») — SAM2/GroundingDINO")
-    prompt: str = Field(..., description="scena e cosa fa il nuovo contenuto. Se citi le foto con `@Foto_N` vale la convenzione del "
-                                         "tab Video (un solo riferimento qui: @Foto_1)")
+    prompt: str = Field(..., description="scena e cosa fa il nuovo contenuto. Se citi le foto con `@image_N` vale la convenzione del "
+                                         "tab Video (un solo riferimento qui: @image_1)")
     reference_image: str | None = Field(None, description="foto dell'oggetto/persona da inserire nell'area mascherata: attiva la "
                                         "LoRA r2v (rank32). Assente = LoRA t2v (rank128, solo prompt)")
     reference_strength: float = Field(0.8, ge=0.1, le=1.0, description="forza dell'identita' della foto (solo con reference_image)")

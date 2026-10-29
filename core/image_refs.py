@@ -1,15 +1,15 @@
-"""Riferimenti nominati `@Foto_N` — UNICA convenzione dell'app per citare le immagini di riferimento nel prompt.
+"""Riferimenti nominati `@image_N` — UNICA convenzione dell'app per citare le immagini di riferimento nel prompt.
 
-L'utente carica le immagini; ognuna riceve AL CARICAMENTO un nome stabile (`Foto_1`, `Foto_2`, …) e nel prompt le cita
-con `@Foto_N` («la tartaruga in @Foto_1 mangia la lattuga in @Foto_2»). Alla generazione i token vengono tradotti nella
+L'utente carica le immagini; ognuna riceve AL CARICAMENTO un nome stabile (`image_1`, `image_2`, …) e nel prompt le cita
+con `@image_N` («la tartaruga in @image_1 mangia la lattuga in @image_2»). Alla generazione i token vengono tradotti nella
 sintassi del MODELLO scelto (tabella `MODEL_SYNTAX`) e le immagini passate nell'ordine giusto.
 
 Regole:
- - i nomi sono STABILI: togliere Foto_2 non rinumera le altre; una nuova immagine prende il primo numero libero;
- - il prefisso è una COSTANTE unica (`PREFIX`) ma il parser accetta un elenco di alias (`ALIASES`): tradurlo per lingua
-   è una modifica di poche righe (aggiungere gli alias; il prefisso mostrato resta quello di `PREFIX`/`display_prefix`);
+ - i nomi sono STABILI: togliere image_2 non rinumera le altre; una nuova immagine prende il primo numero libero;
+ - il prefisso (`image`/`video`/`audio`, minuscolo) è UNICO per tutte le lingue e NON si traduce (deciso il 29/10); il
+   parser accetta in più gli alias dei vecchi nomi (`@Foto_N`, `@Video_N`, `@Audio_N`), che la GUI non mostra più;
  - i prompt vecchi con `<Picture N>` / `<Video N>` / `<Audio N>` (tab Video) si leggono ancora e vengono tradotti
-   come gli `@Foto_N`; la GUI però mostra e inserisce solo `@Foto_N`;
+   come gli `@image_N`; la GUI però mostra e inserisce solo `@image_N`;
  - un token che cita un riferimento inesistente è un ERRORE da segnalare prima di generare, mai ignorato in silenzio.
 
 Modulo puro (nessun Qt): testabile con pytest.
@@ -20,8 +20,10 @@ import re
 from dataclasses import dataclass
 
 # nome per tipo di riferimento. `PREFIX` = ciò che l'utente vede e digita; `ALIASES` = ciò che il parser accetta.
-PREFIX = {"image": "Foto", "video": "Video", "audio": "Audio"}
-ALIASES = {"image": ["Foto"], "video": ["Video"], "audio": ["Audio"]}
+# Prefisso UNICO per tutte le lingue (deciso dall'utente il 29/10): minuscolo, non tradotto. Gli alias (case-insensitive)
+# sono i vecchi nomi: `@Foto_N`, `@Video_N`, `@Audio_N` si leggono e si traducono, ma la GUI mostra solo i nuovi.
+PREFIX = {"image": "image", "video": "video", "audio": "audio"}
+ALIASES = {"image": ["image", "Foto"], "video": ["video"], "audio": ["audio"]}
 KINDS = ("image", "video", "audio")
 
 
@@ -30,12 +32,12 @@ def display_prefix(kind: str = "image") -> str:
 
 
 def name_of(kind: str, n: int) -> str:
-    """Nome visibile: `Foto_3`."""
+    """Nome visibile: `image_3`."""
     return f"{PREFIX[kind]}_{n}"
 
 
 def token_of(kind: str, n: int) -> str:
-    """Token nel prompt: `@Foto_3`."""
+    """Token nel prompt: `@image_3`."""
     return "@" + name_of(kind, n)
 
 
@@ -76,7 +78,7 @@ class Token:
 
 
 def scan(prompt: str) -> list[Token]:
-    """Tutti i token (`@Foto_N`, e i legacy `<Picture N>`) nel prompt, in ordine di apparizione."""
+    """Tutti i token (`@image_N`, e i legacy `<Picture N>`) nel prompt, in ordine di apparizione."""
     out: list[Token] = []
     for m in _alias_regex().finditer(prompt or ""):
         kind = _kind_of_alias(m.group("alias"))
@@ -153,10 +155,10 @@ MODEL_SYNTAX: dict[str, dict] = {
 
 
 def translate(prompt: str, order: dict[str, list[int]], style: str) -> str:
-    """Sostituisce ogni token (`@Foto_N` o legacy) con la sintassi di `style` per l'immagine k-esima.
+    """Sostituisce ogni token (`@image_N` o legacy) con la sintassi di `style` per l'immagine k-esima.
 
     `order[kind]` = numeri dei riferimenti NELL'ORDINE in cui vengono passati al worker (es. {'image': [1, 3]}:
-    Foto_3 è la 2ª immagine → «image 2»). I token di riferimenti inesistenti restano com'erano (li intercetta
+    image_3 è la 2ª immagine → «image 2»). I token di riferimenti inesistenti restano com'erano (li intercetta
     `unknown_tokens` prima di generare)."""
     fmt = MODEL_SYNTAX[style]["fmt"]
     pos = {kind: {n: i + 1 for i, n in enumerate(ns)} for kind, ns in order.items()}

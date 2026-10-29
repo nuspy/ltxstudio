@@ -444,6 +444,37 @@ def case_arch_adult_badge_menus(w, spy):
         fx.close()
 
 
+def case_kontext_guidance_adjustable(w, spy):
+    """Kontext: guidance regolabile (default 2.5, range 1.0-4.0) in Integra e Colore, con tooltip; il valore arriva al
+    job del motore (params["guidance"]). Con gli altri motori Integra torna al range largo."""
+    from cases_qwen21_image import _run
+    f = w.frame1_tab
+    f.integrate_engine.setCurrentIndex(0)                         # Kontext (FLUX.1)
+    assert (f.int_guidance.minimum(), f.int_guidance.maximum(), f.int_guidance.value()) == (10, 40, 25), \
+        (f.int_guidance.minimum(), f.int_guidance.maximum(), f.int_guidance.value())
+    assert "2.5" in f.int_guidance.toolTip() and "contrast" in f.int_guidance.toolTip().lower() or \
+        "contrasto" in f.int_guidance.toolTip()
+    f.int_guidance.setValue(15)
+    assert abs(f.get_inpaint_config()["integrate_guidance"] - 1.5) < 1e-6
+    f.integrate_engine.setCurrentIndex(1)                         # FLUX.2: range largo di prima
+    assert (f.int_guidance.minimum(), f.int_guidance.maximum()) == (10, 100)
+    f.integrate_engine.setCurrentIndex(0)
+    # Colore con Kontext: spin visibile, default 2.5, range 1.0-4.0; altri motori: nascosto
+    f.color_engine.setCurrentIndex(0)
+    assert not f.color_guidance.isHidden() and abs(f.color_guidance.value() - 2.5) < 1e-6
+    assert (f.color_guidance.minimum(), f.color_guidance.maximum()) == (1.0, 4.0)
+    f.color_engine.setCurrentIndex(1)
+    assert f.color_guidance.isHidden()
+    f.color_engine.setCurrentIndex(0)
+    f.color_guidance.setValue(1.8)
+    assert abs(f.get_color_config()["guidance"] - 1.8) < 1e-6
+    # il valore arriva al job Kontext del cambio colore
+    H.load_canvas_image(w)
+    f.color_target.setText("#00aa55"); f.color_subject.setText("the shirt")
+    p = _run(w, spy, w.generate_recolor)
+    assert p.get("arch") == "kontext" and abs(float(p["guidance"]) - 1.8) < 1e-6, p
+
+
 CASES = [
     ("arch_gen_models_by_header", "Genera immagine: FLUX/Z-Image/Ernie mostrano i file della propria famiglia (header), "
      "non quelli con una parola nel nome.", case_arch_gen_models_by_header),
@@ -469,4 +500,6 @@ CASES = [
      "non appartiene.", case_arch_inpaint_arch_selector),
     ("arch_adult_badge_menus", "Icona 18+ (con tooltip) sui modelli NSFW di Crea e Modifica; testo invariato.",
      case_arch_adult_badge_menus),
+    ("arch_kontext_guidance_adjustable", "Kontext: guidance regolabile 1.0-4.0 (default 2.5) in Integra e Colore, arriva al job.",
+     case_kontext_guidance_adjustable),
 ]

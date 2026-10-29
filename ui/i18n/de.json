@@ -3442,7 +3442,7 @@
   "ref.add.tt": "Wähle eine oder mehrere Dateien (du kannst sie auch hierher ziehen).",
   "ref.from_canvas": "Aus der Leinwand",
   "ref.from_canvas.tt": "Verwendet das Bild in der Leinwand als Referenz.",
-  "ref.hint2": "Jede Datei erhält einen Namen (@Foto_1, @Foto_2…): Zitiere sie im Prompt mit „@“ (Autovervollständigung) oder über „↳ Prompt“. Die Namen ändern sich nicht, wenn du eine Datei entfernst. Geladene, aber nicht zitierte Dateien werden trotzdem an das Modell übergeben.",
+  "ref.hint2": "Jede Datei erhält einen Namen (@image_1, @image_2…; @video_1 für Videos, @audio_1 für Audio): Zitiere sie im Prompt mit „@“ (es erscheint die Liste mit Vorschaubild und Name) oder über „↳ Prompt“. Die Namen ändern sich nicht, wenn du eine Datei entfernst. Geladene, aber nicht zitierte Dateien werden trotzdem an das Modell übergeben.",
   "ref.err_unknown": "Der Prompt zitiert {tok}, aber diese Referenz existiert nicht.",
   "f1.gen.refs.group": "Referenzbilder",
   "f1.gen.refs.no_canvas": "In der Leinwand ist kein Bild zum Verwenden vorhanden.",
@@ -3455,5 +3455,6 @@
   "model.adult.tt": "Inhalt für Erwachsene (18+, nicht für Minderjährige). Nur im NSFW-Modus und in Editionen sichtbar, die das erlauben.",
   "f1.inpaint.arch_lbl": "Architektur",
   "f1.inpaint.arch.all": "Alle Architekturen",
-  "f1.inpaint.arch.tt": "Zeigt nur die Modelle der gewählten Architektur. Gehört das zuvor gewählte Modell nicht zur neuen Architektur, springt das Menü auf „Modell wählen“: Es wird kein anderes Modell an deiner Stelle gewählt."
+  "f1.inpaint.arch.tt": "Zeigt nur die Modelle der gewählten Architektur. Gehört das zuvor gewählte Modell nicht zur neuen Architektur, springt das Menü auf „Modell wählen“: Es wird kein anderes Modell an deiner Stelle gewählt.",
+  "f1.kontext.guidance.tt": "Kontext-Guidance (Standard 2.5, von 1.0 bis 4.0): wie genau die Bearbeitung dem Prompt folgt. Niedrigere Werte mildern übermäßigen Kontrast und übermäßige Sättigung; höhere Werte folgen dem Prompt entschiedener."
 }

@@ -76,6 +76,9 @@ QWEN21_PROFILES = (
 # (ref_images ≤10 → workers/qwen_image21_infer.py). Krea 2 Edit (≤2) passa dai pannelli di modifica; FLUX.2/Klein nativo
 # prende UNA sola immagine (inference_server/backends/image_flux.py: image_path).
 GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10)}
+# Guidance di FLUX.1 Kontext: regolabile (default 2.5). Valori piu' bassi attenuano contrasto/saturazione eccessivi.
+KONTEXT_GUIDANCE_DEFAULT = 2.5
+KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
 QWEN21_ENGINE_IDX = 3       # posizione di «Qwen-Image 2.1» nei combo motore di Integra/Componi/Colore
 QWEN21_ASPECTS = ("1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16")
 
@@ -332,7 +335,8 @@ class Frame1Tab(QWidget):
 
         from ui.widgets import ref_prompt
         self._gen_prompt_refs = ref_prompt.install(
-            self.gen_prompt, lambda: self.gen_refs.names() if self._gen_refs_box_w.isVisibleTo(self) else set())
+            self.gen_prompt, lambda: self.gen_refs.names() if self._gen_refs_box_w.isVisibleTo(self) else set(),
+            lambda: self.gen_refs.completion_entries() if self._gen_refs_box_w.isVisibleTo(self) else [])
         self.gen_refs.changed.connect(self._gen_prompt_refs.highlighter.rehighlight)
 
         def _open_prompt_builder(_self=self):
@@ -702,7 +706,7 @@ class Frame1Tab(QWidget):
 
     def _gen_refs_box(self) -> QGroupBox:
         """«Immagini di riferimento» dentro «Crea immagini»: visibile SOLO con i modelli multi-riferimento (limite per
-        modello). Ogni immagine riceve al caricamento il nome @Foto_N, da citare nel prompt (completamento con «@»);
+        modello). Ogni immagine riceve al caricamento il nome @image_N, da citare nel prompt (completamento con «@»);
         alla generazione i token sono tradotti nella sintassi del modello e le immagini passate in ordine."""
         from ui.widgets.reference_panel import ReferencePanel
         box = QGroupBox(tr("f1.gen.refs.group", "Immagini di riferimento"))
@@ -733,7 +737,7 @@ class Frame1Tab(QWidget):
             self.gen_refs.set_limits(images=mx, videos=0, audios=0, total=mx, min_items=1)
 
     def _gen_refs_from_canvas(self):
-        """«Dal canvas»: la foto che c'è nel canvas diventa il prossimo riferimento (@Foto_N)."""
+        """«Dal canvas»: la foto che c'è nel canvas diventa il prossimo riferimento (@image_N)."""
         path = self.image_path
         if not path:
             from PySide6.QtWidgets import QMessageBox
@@ -746,7 +750,7 @@ class Frame1Tab(QWidget):
                                     tr("f1.gen.refs.full", "Limite di riferimenti raggiunto per questo modello."))
 
     def gen_prompt_raw(self) -> str:
-        """Prompt come lo ha scritto l'utente (con i token @Foto_N), senza traduzione."""
+        """Prompt come lo ha scritto l'utente (con i token @image_N), senza traduzione."""
         return self.gen_prompt.toPlainText().strip() or self.prompt.toPlainText().strip()
 
     def _krea2_box(self) -> QGroupBox:
@@ -832,7 +836,7 @@ class Frame1Tab(QWidget):
                 "control_scale": self.q21_cn_scale.value() / 100.0}
 
     def _qwen21_i2i_to_reference(self):
-        """Immagine iniziale → riferimento @Foto_1 (in testa; gli altri prendono i numeri successivi: è l'UNICA azione che rinumera), img2img spento."""
+        """Immagine iniziale → riferimento @image_1 (in testa; gli altri prendono i numeri successivi: è l'UNICA azione che rinumera), img2img spento."""
         path = self.q21_i2i_photo["edit"].text().strip() or (self.image_path or "")
         if not path:
             return
@@ -1388,6 +1392,7 @@ class Frame1Tab(QWidget):
         self.int_guidance.setToolTip(tr("f1.integrate.guidance.tt"))
         grow.addWidget(self.int_guidance, 1); grow.addWidget(self.int_guidance_lbl)
         g.addRow(tr("f1.integrate.guidance_lbl"), self._wrapw(grow))
+        self._sync_int_guidance(self.integrate_engine.currentIndex())   # Kontext (motore 0) = range 1.0-4.0
         intseedrow = QHBoxLayout()
         self.int_seed = QSpinBox(); self.int_seed.setRange(0, 2_147_483_647); self.int_seed.setValue(0)
         self.int_seed.setToolTip(tr("f1.seed.tt", "Seme del generatore casuale: fissarlo rende la generazione riproducibile."))
@@ -1494,6 +1499,15 @@ class Frame1Tab(QWidget):
         self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
         self.color_steps.setToolTip(tr("f1.steps.tt", "Numero di passi di diffusione: più passi = più dettaglio e tempi più lunghi."))
         f.addRow(tr("f1.steps_lbl"), self.color_steps)
+        # Guidance di Kontext per il cambio colore (solo motore Kontext): default 2.5, range 1.0-4.0
+        self.color_guidance = QDoubleSpinBox()
+        self.color_guidance.setRange(*KONTEXT_GUIDANCE_RANGE); self.color_guidance.setSingleStep(0.1)
+        self.color_guidance.setDecimals(1); self.color_guidance.setValue(KONTEXT_GUIDANCE_DEFAULT)
+        self.color_guidance.setToolTip(tr("f1.kontext.guidance.tt",
+            "Guidance di Kontext (default 2.5, da 1.0 a 4.0): quanto l'edit segue il prompt. Valori piu' bassi "
+            "attenuano il contrasto e la saturazione eccessivi; piu' alti seguono il prompt con piu' decisione."))
+        self._color_guidance_lbl = QLabel(tr("f1.integrate.guidance_lbl"))
+        f.addRow(self._color_guidance_lbl, self.color_guidance)
         self.color_btn = QPushButton(tr("f1.color.btn"))
         self.color_btn.setToolTip(tr("f1.color.run.tt", "Applica il nuovo colore al soggetto indicato lasciando invariato il resto."))
         self.color_btn.clicked.connect(lambda: self.request_recolor.emit())
@@ -1505,6 +1519,8 @@ class Frame1Tab(QWidget):
         return box
 
     def _on_color_engine_changed(self, idx: int):
+        if hasattr(self, "color_guidance"):
+            self.color_guidance.setVisible(idx == 0); self._color_guidance_lbl.setVisible(idx == 0)
         if hasattr(self, "color_steps"):
             self._swap_default_steps(self.color_steps, getattr(self, "_color_engine_klein", False), idx == 1)
         self._color_engine_klein = (idx == 1)
@@ -1551,6 +1567,7 @@ class Frame1Tab(QWidget):
             "qwen21_dit": self.qwen21_edit_dit(self.color_model),
             "grounding": self.edit_grounding_px(),
             "steps": self.color_steps.value(),
+            "guidance": float(self.color_guidance.value()),      # solo Kontext (default 2.5)
         }
 
     def _reload_inpaint_loras(self, *_):
@@ -1636,8 +1653,23 @@ class Frame1Tab(QWidget):
         if spin.value() == old_def:
             spin.setValue(new_def)
 
+    def _sync_int_guidance(self, engine_idx: int) -> None:
+        """Guidance di Integra: con Kontext (FLUX.1) range 1.0-4.0 e tooltip che spiega l'effetto; con gli altri motori
+        il range largo di prima. Il valore scelto resta se rientra nel range (altrimenti QSlider lo porta al limite)."""
+        if engine_idx == 0:
+            lo, hi = KONTEXT_GUIDANCE_RANGE
+            self.int_guidance.setRange(int(lo * 10), int(hi * 10))
+            self.int_guidance.setToolTip(tr("f1.kontext.guidance.tt",
+                "Guidance di Kontext (default 2.5, da 1.0 a 4.0): quanto l'edit segue il prompt. Valori piu' bassi "
+                "attenuano il contrasto e la saturazione eccessivi; piu' alti seguono il prompt con piu' decisione."))
+        else:
+            self.int_guidance.setRange(10, 100)
+            self.int_guidance.setToolTip(tr("f1.integrate.guidance.tt"))
+
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
+        if hasattr(self, "int_guidance"):
+            self._sync_int_guidance(_idx)
         if hasattr(self, "int_steps"):
             self._swap_default_steps(self.int_steps, getattr(self, "_int_engine_klein", False), _idx == 1)
         self._int_engine_klein = (_idx == 1)
@@ -2322,7 +2354,7 @@ class Frame1Tab(QWidget):
         }
 
     def _gen_prompt_translated(self) -> str:
-        """Prompt per il backend: i token @Foto_N (e i vecchi <Picture N>) tradotti nella sintassi del modello, con le
+        """Prompt per il backend: i token @image_N (e i vecchi <Picture N>) tradotti nella sintassi del modello, con le
         immagini nell'ordine in cui vengono passate. Con architetture senza riferimenti il prompt resta com'è."""
         raw = self.gen_prompt_raw()
         if self.gen_arch.currentText() in GEN_REF_ARCHS and self.gen_refs.enable.isChecked():

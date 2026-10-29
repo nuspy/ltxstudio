@@ -445,10 +445,11 @@ class VideoTab(QWidget):
         self.reference_panel.enable.toggled.connect(self._sync_h3_refs)
         self._sync_h3_refs()
         ref_l.addWidget(self.reference_panel)
-        # @Foto_N nel prompt: completamento digitando «@» + token evidenziati (unica convenzione dell'app)
+        # @image_N nel prompt: completamento digitando «@» + token evidenziati (unica convenzione dell'app)
         from ui.widgets import ref_prompt
         self._prompt_refs = ref_prompt.install(
-            self.prompt, lambda: self.reference_panel.names() if self.reference_panel.enable.isChecked() else set())
+            self.prompt, lambda: self.reference_panel.names() if self.reference_panel.enable.isChecked() else set(),
+            lambda: self.reference_panel.completion_entries() if self.reference_panel.enable.isChecked() else [])
         self.reference_panel.changed.connect(self._prompt_refs.highlighter.rehighlight)
         gen_l.addWidget(ref_box)
 
