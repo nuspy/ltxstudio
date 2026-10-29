@@ -8772,13 +8772,14 @@
       "filename": "nippleSuckWan_e40.safetensors",
       "sensitivity": "adult",
       "no_remote": true,
-      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina non trovata: file importato, origine non verificabile (hash assente su Civitai).",
+      "note": "LoRA locale (PULIZIA_MODELLI §3, integrata task 17): pannello LoRA Wan 2.1; architettura dalle chiavi dell'header. Pagina verificata (stesso nome file/dimensione).",
       "triggers": [
         "nipple lick",
         "nipple licking",
         "nipple suck",
         "nipple sucking"
       ],
+      "page": "https://civitai.red/models/1483161?modelVersionId=1677668",
       "use": [
         "lora_style",
         "uncensored"

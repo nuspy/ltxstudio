@@ -70,7 +70,7 @@ LOCAL_LORAS = (
     ('lora-wan-t2v-pov-bj-14b-loras', 'T2V-POV_BJ-14B_(LoRAs).safetensors', 'wan21', 0.307, True, [], ''),
     ('lora-wan-detailz-wan', 'detailz-wan.safetensors', 'wan21', 0.307, True, ['detailz'], 'https://civitai.red/models/1385506?modelVersionId=1565668'),
     ('lora-wan-masturbation-cumshot-wani2v480p-v1', 'masturbation_cumshot_wanI2V480p_v1.safetensors', 'wan21', 0.307, True, [], 'https://civitai.red/models/1368557?modelVersionId=1546156'),
-    ('lora-wan-nipplesuckwan-e40', 'nippleSuckWan_e40.safetensors', 'wan21', 0.307, True, ['nipple lick', 'nipple licking', 'nipple suck', 'nipple sucking'], ''),
+    ('lora-wan-nipplesuckwan-e40', 'nippleSuckWan_e40.safetensors', 'wan21', 0.307, True, ['nipple lick', 'nipple licking', 'nipple suck', 'nipple sucking'], 'https://civitai.red/models/1483161?modelVersionId=1677668'),
     ('lora-wan-phantom-wan-14b-fusionx-lora', 'Phantom_Wan_14B_FusionX_LoRA.safetensors', 'wan21', 0.317, False, [], 'https://huggingface.co/vrgamedevgirl84/Wan14BT2VFusioniX'),
     ('lora-wan-wan-facefuck-epoch110-fast-speed-full-insertion-', 'WAN-facefuck-epoch110 fast speed full insertion man has sex with womans mouth.safetensors', 'wan21', 0.359, True, ['facefuck fast speed full insertion', 'man has sex with womans mouth'], ''),
     ('lora-wan-wan-nsfw-e14-fixed', 'wan-nsfw-e14-fixed.safetensors', 'wan21', 0.614, True, ['nsfwsks'], 'https://civitai.red/models/1307155?modelVersionId=1475095'),
