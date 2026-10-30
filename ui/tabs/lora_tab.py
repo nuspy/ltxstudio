@@ -50,6 +50,7 @@ class LoraTab(QWidget):
         self._rows: dict[str, dict] = {}      # name -> {item, cb, sp, entry}
         # name -> (checked, strength, entry) — sopravvive ai cicli di filtro
         self._persistent_selection: dict[str, tuple[bool, float, "LoraEntry | None"]] = {}
+        self._sel_by_arch: dict[str, dict] = {}   # selezioni delle altre arch (inattive finché non si torna a quell'arch)
         # LoRA da ri-selezionare al prossimo refresh (restore da gui_state/preset, per comfy_name):
         # serve perché l'inventario LoRA si popola in modo asincrono (come i modelli).
         self._restore_pending: dict[str, float] | None = None
@@ -58,8 +59,21 @@ class LoraTab(QWidget):
         self.refresh()
 
     def set_arch(self, new_arch: str):
-        """Cambia l'architettura del catalogo LoRA e ricarica la lista."""
-        self._arch_label = new_arch or "LTX"
+        """Cambia l'architettura del catalogo LoRA e ricarica la lista.
+
+        La selezione è PER ARCHITETTURA (punti 3/9 dell'utente, 30/10): le LoRA spuntate con un'arch restano
+        memorizzate ma NON sono né visibili né attive quando si usa un'altra arch (prima restavano in
+        `selected_loras()` e finivano nel job dell'altra arch con un errore incomprensibile). Tornando
+        all'arch di prima la selezione ricompare."""
+        new_label = new_arch or "LTX"
+        if new_label != self._arch_label:
+            for name, r in self._rows.items():                      # stato vivo dell'arch che si lascia
+                self._persistent_selection[name] = (r["cb"].isChecked(), r["sp"].value(), r["entry"])
+            self._sel_by_arch[self._arch_label] = dict(self._persistent_selection)
+            self._persistent_selection = dict(self._sel_by_arch.get(new_label, {}))
+            self._rows.clear()
+            self.list.clear()
+        self._arch_label = new_label
         self.catalog = LoraCatalog(compatible_arch=new_arch) if new_arch else LoraCatalog()
         self.refresh()
 
