@@ -1054,9 +1054,10 @@ def _auto_settings(arch: str, model: str) -> tuple[int, float, bool]:
 
 def _arch_of(params: dict) -> str:
     a = (params.get("task") or params.get("arch") or "flux").lower()
-    if a == "flux" and any(t in str(params.get("model", "")).lower()
-                           for t in ("flux2", "flux_2", "flux 2", "flux.2")):
-        return "flux2"                                   # FLUX_2_Dev/FLUX.2 → loader flux2 (config+TE diversi)
+    if a == "flux" and params.get("model"):
+        from core import arch_filter                     # UNICA definizione (header se il file c'è; nome senza «Flux_20»)
+        if arch_filter.is_flux2(str(params.get("model"))):
+            return "flux2"                               # FLUX_2_Dev/FLUX.2 → loader flux2 (config+TE diversi)
     return a if a in SPEC else "flux"
 
 
