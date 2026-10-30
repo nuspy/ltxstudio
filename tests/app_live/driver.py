@@ -727,6 +727,8 @@ class Driver:
                 (f.inpaint_prompt if kind == "inpaint" else f.outpaint_prompt).setPlainText(case["prompt"])
                 f.inp_seed_rand.setChecked(False)
                 f.inp_seed.setValue(int(case.get("seed", 1)))
+                f.strength.setValue(int(round(float(case.get("fidelity", 0.0)) * 100)))   # «Fedeltà all'originale»
+                steps["fidelity"] = f.strength.value() / 100.0
                 if case.get("steps"):
                     f.inp_steps.setValue(int(case["steps"]))
                 if case.get("lora"):
@@ -762,6 +764,9 @@ class Driver:
                 mis.append(f"modello scelto {mname!r} assente dai parametri inviati al backend")
             if "seed" in case and p.get("seed") not in (None, int(case["seed"])):
                 mis.append(f"seed: impostato {case['seed']} ma il backend riceve {p.get('seed')}")
+            if kind == "inpaint" and "fidelity" in steps and p.get("denoise") is not None:      # punto 13: denoise = 1 − slider
+                if abs(float(p["denoise"]) - (1.0 - steps["fidelity"])) > 0.011:
+                    mis.append(f"fedeltà {steps['fidelity']:.2f}: il backend dovrebbe ricevere denoise {1 - steps['fidelity']:.2f}, riceve {p['denoise']}")
             if not (p.get("init_image") or p.get("image_path") or p.get("ref_images") or p.get("images")):
                 mis.append("nessuna immagine di partenza nei parametri del backend")
             if kind == "inpaint" and case.get("mask", True) and not (p.get("mask") or p.get("mask_path")) \
