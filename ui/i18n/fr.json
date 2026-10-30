@@ -3575,5 +3575,11 @@
   "weights.license.ack.q": "As-tu lu et veux-tu télécharger ?",
   "weights.license.ack.body.nc": "Ces poids ont une licence qui N'autorise PAS l'usage commercial ({license}). Ils ne se téléchargent que pour un usage personnel/non commercial, en respectant les conditions de l'auteur. Ils ne font pas partie de l'installateur : tu les télécharges sous ta responsabilité.",
   "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs) : l'usage commercial des sorties n'est permis que si tes revenus annuels bruts (avec affiliées) sont inférieurs à 5 millions de dollars, avec filtre ou revue des contenus et mention de l'IA ; il est interdit d'utiliser modèle, dérivés ou sorties pour entraîner d'autres modèles d'image. Tu dois d'abord avoir accepté la licence sur Hugging Face avec ton compte. Les poids ne sont pas dans l'installateur : tu les télécharges.",
-  "weights.license.ack.body.adult_content": "ATTENTION, réservé aux adultes (not-for-all-audiences) : ce modèle a été modifié par un tiers pour refuser moins et peut écrire des textes pour du contenu explicite. Tu es responsable de ce que tu génères et des lois qui te concernent ; les contenus illégaux et les images intimes non consenties sont interdits."
+  "weights.license.ack.body.adult_content": "ATTENTION, réservé aux adultes (not-for-all-audiences) : ce modèle a été modifié par un tiers pour refuser moins et peut écrire des textes pour du contenu explicite. Tu es responsable de ce que tu génères et des lois qui te concernent ; les contenus illégaux et les images intimes non consenties sont interdits.",
+  "settings.embed_meta": "Inclure les données de génération dans les fichiers (prompt, modèles, paramètres)",
+  "settings.embed_meta.tt": "Écrit dans chaque image et vidéo générée (PNG/JPEG/WebP/MP4) le prompt, le prompt négatif, le modèle, les LoRA, l'encodeur, le VAE, la graine, les étapes et les autres paramètres, au format lu par Civitai et d'autres programmes. ATTENTION : toute personne qui reçoit le fichier voit le prompt et les paramètres. Pour partager sans ces données, utilisez « Enregistrer une copie sans métadonnées » dans la Galerie. Aucun chemin de votre ordinateur n'y figure.",
+  "nav.export_clean_btn": "Enregistrer une copie sans métadonnées…",
+  "nav.export_clean_tt": "Enregistre une copie du fichier sans le prompt, les paramètres ni les autres données de génération, prête à partager.",
+  "nav.export_clean_title": "Enregistrer une copie sans métadonnées",
+  "nav.export_clean_done": "Copie sans métadonnées enregistrée :"
 }

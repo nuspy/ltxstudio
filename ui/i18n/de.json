@@ -3575,5 +3575,11 @@
   "weights.license.ack.q": "Hast du es gelesen und willst du herunterladen?",
   "weights.license.ack.body.nc": "Diese Gewichte haben eine Lizenz, die KEINE kommerzielle Nutzung erlaubt ({license}). Sie werden nur für den persönlichen/nicht kommerziellen Gebrauch geladen, unter Beachtung der Bedingungen des Autors. Sie gehören nicht zum Installer: du lädst sie auf eigene Verantwortung.",
   "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs): Kommerzielle Nutzung der Ausgaben nur, wenn dein jährlicher Bruttoumsatz (mit Affiliates) unter 5 Mio. Dollar liegt, mit Inhaltsfilter oder -prüfung und KI-Kennzeichnung; Modell, Derivate oder Ausgaben dürfen nicht zum Training anderer Bildmodelle dienen. Du musst die Lizenz vorher auf Hugging Face mit deinem Konto akzeptiert haben. Die Gewichte sind nicht im Installer: du lädst sie.",
-  "weights.license.ack.body.adult_content": "ACHTUNG, nur für Erwachsene (not-for-all-audiences): Dieses Modell wurde von Dritten verändert, damit es weniger ablehnt, und kann Texte für explizite Inhalte erzeugen. Du bist verantwortlich für das, was du erzeugst, und für die für dich geltenden Gesetze; illegale Inhalte und nicht einvernehmliche intime Bilder sind verboten."
+  "weights.license.ack.body.adult_content": "ACHTUNG, nur für Erwachsene (not-for-all-audiences): Dieses Modell wurde von Dritten verändert, damit es weniger ablehnt, und kann Texte für explizite Inhalte erzeugen. Du bist verantwortlich für das, was du erzeugst, und für die für dich geltenden Gesetze; illegale Inhalte und nicht einvernehmliche intime Bilder sind verboten.",
+  "settings.embed_meta": "Generierungsdaten in die Dateien einbetten (Prompt, Modelle, Parameter)",
+  "settings.embed_meta.tt": "Schreibt Prompt, Negativ-Prompt, Modell, LoRAs, Encoder, VAE, Seed, Schritte und weitere Parameter in jedes erzeugte Bild und Video (PNG/JPEG/WebP/MP4), im Format, das Civitai und andere Programme lesen. ACHTUNG: Wer die Datei erhält, sieht Prompt und Parameter. Zum Teilen ohne diese Daten nutze in der Galerie „Kopie ohne Metadaten speichern“. Pfade deines Computers sind nie enthalten.",
+  "nav.export_clean_btn": "Kopie ohne Metadaten speichern…",
+  "nav.export_clean_tt": "Speichert eine Kopie der Datei ohne Prompt, Parameter und andere Generierungsdaten, bereit zum Teilen.",
+  "nav.export_clean_title": "Kopie ohne Metadaten speichern",
+  "nav.export_clean_done": "Kopie ohne Metadaten gespeichert:"
 }

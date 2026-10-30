@@ -279,6 +279,18 @@ def _generate_comfy_native(params: dict, timeout: int) -> dict:
 
 
 def generate(params: dict, timeout: int = 3600) -> dict:
+    """Come `_generate_impl`, poi (task 21) scrive i metadati di generazione nel video FINALE (worker/server
+    hanno già fatto mux audio, firma invisibile e watermark: questa è l'ultima scrittura del file)."""
+    res = _generate_impl(params, timeout)
+    try:
+        from core import gen_metadata
+        gen_metadata.embed_result(res, params, label="Video")
+    except Exception:                                       # noqa: BLE001
+        pass
+    return res
+
+
+def _generate_impl(params: dict, timeout: int = 3600) -> dict:
     """Genera un video. params: prompt, image_path?(i2v), num_frames, fps, steps, guidance,
     seed, model, quant, offload, loras=[{name,strength}], output?. Ritorna {status, output:[mp4]}.
 

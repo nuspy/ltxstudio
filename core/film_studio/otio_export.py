@@ -21,11 +21,21 @@ def _watermark_master(path: str) -> str:
         pass
     try:
         from core import watermark
-        return watermark.apply_to_file(path)
+        path = watermark.apply_to_file(path)
     except RuntimeError:
         raise
     except Exception:                                       # noqa: BLE001
-        return path
+        pass
+    _embed_master_metadata(path)                            # task 21: per ULTIMI (stego/watermark riscrivono il file)
+    return path
+
+
+def _embed_master_metadata(path: str) -> None:
+    try:
+        from core import gen_metadata
+        gen_metadata.embed(path, {"label": "Film Studio (master)", "output_kind": "mp4"}, force=False)
+    except Exception:                                       # noqa: BLE001
+        pass
 
 
 def _aspect_filter(aspect: str) -> str:

@@ -3575,5 +3575,11 @@
   "weights.license.ack.q": "¿Lo has leído y quieres descargar?",
   "weights.license.ack.body.nc": "Estos pesos tienen una licencia que NO permite el uso comercial ({license}). Se descargan solo para uso personal/no comercial, respetando las condiciones del autor. No forman parte del instalador: los descargas tú, bajo tu responsabilidad.",
   "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs): el uso comercial de los resultados solo se permite si tus ingresos anuales brutos (con afiliadas) son inferiores a 5 millones de dólares, con filtro o revisión de contenidos y declaración de uso de IA; está prohibido usar modelo, derivados o resultados para entrenar otros modelos de imagen. Antes debes haber aceptado la licencia en Hugging Face con tu cuenta. Los pesos no están en el instalador: los descargas tú.",
-  "weights.license.ack.body.adult_content": "ATENCIÓN, solo para adultos (not-for-all-audiences): este modelo fue modificado por terceros para rechazar menos y puede producir textos para contenido explícito. Eres responsable de lo que generas y de las leyes que te afectan; están prohibidos los contenidos ilegales y las imágenes íntimas no consentidas."
+  "weights.license.ack.body.adult_content": "ATENCIÓN, solo para adultos (not-for-all-audiences): este modelo fue modificado por terceros para rechazar menos y puede producir textos para contenido explícito. Eres responsable de lo que generas y de las leyes que te afectan; están prohibidos los contenidos ilegales y las imágenes íntimas no consentidas.",
+  "settings.embed_meta": "Incluir los datos de generación en los archivos (prompt, modelos, parámetros)",
+  "settings.embed_meta.tt": "Escribe dentro de cada imagen y vídeo generado (PNG/JPEG/WebP/MP4) el prompt, el prompt negativo, el modelo, las LoRA, el codificador, el VAE, la semilla, los pasos y demás parámetros, en el formato que leen Civitai y otros programas. ATENCIÓN: quien reciba el archivo verá el prompt y los parámetros. Para compartir sin estos datos usa «Guardar copia sin metadatos» en la Galería. Nunca incluye rutas de tu equipo.",
+  "nav.export_clean_btn": "Guardar copia sin metadatos…",
+  "nav.export_clean_tt": "Guarda una copia del archivo sin el prompt, los parámetros ni otros datos de generación, lista para compartir.",
+  "nav.export_clean_title": "Guardar copia sin metadatos",
+  "nav.export_clean_done": "Copia sin metadatos guardada:"
 }

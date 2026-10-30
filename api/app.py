@@ -46,6 +46,10 @@ def _touch_activity():
 @app.middleware("http")
 async def _activity_mw(request: Request, call_next):
     _touch_activity()
+    # task 21: ?embed_metadata=false -> nessun dato di generazione dentro i file di questa richiesta
+    _em = (request.query_params.get("embed_metadata") or "").strip().lower()
+    from api.jobs import REQUEST_EMBED
+    REQUEST_EMBED.set(False if _em in ("0", "false", "no", "off") else (True if _em in ("1", "true", "yes", "on") else None))
     path = request.url.path
     _open = (path in ("/health", "/features", "/openapi.json")
              or path.startswith("/docs") or path.startswith("/redoc"))

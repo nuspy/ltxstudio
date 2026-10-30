@@ -12,9 +12,15 @@ import threading
 import queue
 import time
 import traceback
+import contextvars
 import uuid
 from dataclasses import dataclass, field
 from typing import Callable
+
+
+# Task 21: ?embed_metadata=false su una richiesta spegne i metadati di generazione nei file di QUEL job
+# (impostato dal middleware di api/app.py, letto da JobManager.submit nello stesso contesto della richiesta).
+REQUEST_EMBED: "contextvars.ContextVar[bool | None]" = contextvars.ContextVar("ltx_request_embed", default=None)
 
 
 @dataclass
@@ -29,6 +35,7 @@ class Job:
     error: str = ""
     warnings: list[str] = field(default_factory=list)  # avvisi non bloccanti (es. lingua testo ≠ lingua voce)
     info: dict = field(default_factory=dict)           # dettagli del risultato (es. lingue usate per speaker)
+    embed_metadata: bool | None = None                 # None = preferenza utente; False = per-richiesta "no metadati"
     created: float = field(default_factory=time.time)
     updated: float = field(default_factory=time.time)
 
@@ -55,7 +62,7 @@ class JobManager:
     def submit(self, kind: str, fn: "Callable[[Job], list[str]]", params: dict | None = None) -> str:
         jid = uuid.uuid4().hex
         with self._lock:
-            self._jobs[jid] = Job(id=jid, kind=kind, params=params or {})
+            self._jobs[jid] = Job(id=jid, kind=kind, params=params or {}, embed_metadata=REQUEST_EMBED.get())
             self._fns[jid] = fn
         self._q.put(jid)
         return jid
@@ -94,7 +101,12 @@ class JobManager:
                 pass
             job.touch(status="running", progress=0.01, message="avvio…")
             try:
-                outs = fn(job) or []
+                from core import gen_metadata
+                with gen_metadata.override(job.embed_metadata):
+                    gen_metadata.reset_last()
+                    outs = fn(job) or []
+                    # metadati di generazione nel file FINALE: dopo qualunque passo che riscriva il file
+                    gen_metadata.finalize_outputs([str(o) for o in outs if o], job.kind)
                 job.outputs = [str(o) for o in outs if o]
                 if job.outputs:
                     job.touch(status="success", progress=1.0, message="completato")

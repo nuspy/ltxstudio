@@ -3575,5 +3575,11 @@
   "weights.license.ack.q": "Leu e quer baixar?",
   "weights.license.ack.body.nc": "Estes pesos têm uma licença que NÃO permite uso comercial ({license}). São baixados apenas para uso pessoal/não comercial, respeitando as condições do autor. Não fazem parte do instalador: você os baixa por sua conta e risco.",
   "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs): o uso comercial dos resultados só é permitido se a sua receita anual bruta (com afiliadas) for inferior a 5 milhões de dólares, com filtro ou revisão de conteúdo e declaração de uso de IA; é proibido usar modelo, derivados ou resultados para treinar outros modelos de imagem. Antes você deve ter aceitado a licença no Hugging Face com a sua conta. Os pesos não estão no instalador: você os baixa.",
-  "weights.license.ack.body.adult_content": "ATENÇÃO, só para adultos (not-for-all-audiences): este modelo foi modificado por terceiros para recusar menos e pode produzir textos para conteúdo explícito. Você é responsável pelo que gera e pelas leis que lhe dizem respeito; conteúdo ilegal e imagens íntimas não consentidas são proibidos."
+  "weights.license.ack.body.adult_content": "ATENÇÃO, só para adultos (not-for-all-audiences): este modelo foi modificado por terceiros para recusar menos e pode produzir textos para conteúdo explícito. Você é responsável pelo que gera e pelas leis que lhe dizem respeito; conteúdo ilegal e imagens íntimas não consentidas são proibidos.",
+  "settings.embed_meta": "Incluir os dados de geração nos arquivos (prompt, modelos, parâmetros)",
+  "settings.embed_meta.tt": "Grava dentro de cada imagem e vídeo gerado (PNG/JPEG/WebP/MP4) o prompt, o prompt negativo, o modelo, as LoRAs, o codificador, o VAE, a seed, os passos e os outros parâmetros, no formato lido pelo Civitai e outros programas. ATENÇÃO: quem receber o arquivo vê o prompt e os parâmetros. Para compartilhar sem esses dados, use «Salvar cópia sem metadados» na Galeria. Nunca contém caminhos do seu computador.",
+  "nav.export_clean_btn": "Salvar cópia sem metadados…",
+  "nav.export_clean_tt": "Salva uma cópia do arquivo sem o prompt, os parâmetros e outros dados de geração, pronta para compartilhar.",
+  "nav.export_clean_title": "Salvar cópia sem metadados",
+  "nav.export_clean_done": "Cópia sem metadados salva:"
 }

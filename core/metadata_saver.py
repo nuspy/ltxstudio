@@ -45,6 +45,14 @@ class MetadataSaver:
             **meta,
         }
         sp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        # Task 21: i dati del sidecar anche DENTRO il file (PNG/JPEG/WebP/MP4…), qui = fine del salvataggio:
+        # il file è già nella sua forma finale (firma invisibile e watermark dei motori sono già stati applicati).
+        # force=False: se un funnel a monte (native_driver/run_clip/REST) li ha già scritti non si rifà il remux.
+        try:
+            from core import gen_metadata
+            gen_metadata.embed(output_path, payload, force=False)
+        except Exception:                                    # noqa: BLE001
+            pass
         return sp
 
     @staticmethod
@@ -56,6 +64,14 @@ class MetadataSaver:
                     return json.loads(sp.read_text(encoding="utf-8"))
                 except Exception:                            # noqa: BLE001
                     continue
+        # nessun sidecar (file copiato da altrove / sidecar perso): usa i dati incorporati nel file (task 21)
+        try:
+            from core import gen_metadata
+            emb = gen_metadata.read(output_path)
+            if emb and isinstance(emb.get(gen_metadata.KEY_JSON), dict):
+                return emb[gen_metadata.KEY_JSON]
+        except Exception:                                    # noqa: BLE001
+            pass
         return None
 
     # estensioni media mostrate in galleria (immagini, video, audio)

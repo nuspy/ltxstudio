@@ -3575,5 +3575,11 @@
   "weights.license.ack.q": "Elolvastad, és le akarod tölteni?",
   "weights.license.ack.body.nc": "Ezeknek a súlyoknak a licence NEM engedi a kereskedelmi használatot ({license}). Csak személyes/nem kereskedelmi célra tölthetők le, a szerző feltételeit betartva. Nem részei a telepítőnek: saját felelősségedre töltöd le.",
   "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs): a kimenetek kereskedelmi használata csak akkor engedélyezett, ha az éves bruttó bevételed (leányvállalatokkal) 5 millió dollár alatt van, tartalomszűréssel vagy ellenőrzéssel és MI-közléssel; tilos a modellt, származékait vagy kimeneteit más képmodellek tanítására használni. Előbb el kell fogadnod a licencet a Hugging Face-en a fiókoddal. A súlyok nincsenek a telepítőben: te töltöd le őket.",
-  "weights.license.ack.body.adult_content": "FIGYELEM, csak felnőtteknek (not-for-all-audiences): ezt a modellt harmadik fél módosította, hogy kevesebbet utasítson el, és explicit tartalomhoz is írhat szöveget. Te felelsz azért, amit generálsz, és a rád vonatkozó törvényekért; tilos a jogellenes tartalom és a beleegyezés nélküli intim kép."
+  "weights.license.ack.body.adult_content": "FIGYELEM, csak felnőtteknek (not-for-all-audiences): ezt a modellt harmadik fél módosította, hogy kevesebbet utasítson el, és explicit tartalomhoz is írhat szöveget. Te felelsz azért, amit generálsz, és a rád vonatkozó törvényekért; tilos a jogellenes tartalom és a beleegyezés nélküli intim kép.",
+  "settings.embed_meta": "Generálási adatok beágyazása a fájlokba (prompt, modellek, paraméterek)",
+  "settings.embed_meta.tt": "Minden elkészült képbe és videóba (PNG/JPEG/WebP/MP4) beleírja a promptot, a negatív promptot, a modellt, a LoRA-kat, az enkódert, a VAE-t, a seedet, a lépéseket és a többi paramétert, a Civitai és más programok által olvasott formátumban. FIGYELEM: aki megkapja a fájlt, látja a promptot és a paramétereket. Adatok nélküli megosztáshoz használd a Galériában a „Másolat mentése metaadatok nélkül” funkciót. A számítógéped elérési útjait soha nem tartalmazza.",
+  "nav.export_clean_btn": "Másolat mentése metaadatok nélkül…",
+  "nav.export_clean_tt": "Elment egy másolatot a fájlról a prompt, a paraméterek és más generálási adatok nélkül, megosztásra készen.",
+  "nav.export_clean_title": "Másolat mentése metaadatok nélkül",
+  "nav.export_clean_done": "A metaadatok nélküli másolat elmentve:"
 }

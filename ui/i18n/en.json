@@ -3647,5 +3647,11 @@
   "weights.license.ack.q": "Have you read it and want to download?",
   "weights.license.ack.body.nc": "These weights have a license that does NOT allow commercial use ({license}). They are downloaded for personal/non-commercial use only, respecting the author's terms. They are not part of the installer: you download them on your own responsibility.",
   "weights.license.ack.body.flux_kommunity": "FLUX Kommunity License v1.0 (Black Forest Labs): commercial use of outputs is allowed only if your annual gross revenue (with affiliates) is under 5 million dollars, with content filtering or review and AI disclosure; using the model, derivatives or outputs to train other image models is forbidden. You must first accept the license on Hugging Face with your account. The weights are not in the installer: you download them.",
-  "weights.license.ack.body.adult_content": "WARNING, adults only (not-for-all-audiences): this model was modified by a third party to refuse less and can write text for explicit content. You are responsible for what you generate and for the laws that apply to you; illegal content and non-consensual intimate images are forbidden."
+  "weights.license.ack.body.adult_content": "WARNING, adults only (not-for-all-audiences): this model was modified by a third party to refuse less and can write text for explicit content. You are responsible for what you generate and for the laws that apply to you; illegal content and non-consensual intimate images are forbidden.",
+  "settings.embed_meta": "Include generation data in files (prompt, models, parameters)",
+  "settings.embed_meta.tt": "Writes the prompt, negative prompt, model, LoRAs, encoder, VAE, seed, steps and other parameters inside every generated image and video (PNG/JPEG/WebP/MP4), in the format read by Civitai and other programs. WARNING: anyone who receives the file can see the prompt and parameters. To share without this data use \"Save copy without metadata\" in the Gallery. It never contains paths from your computer.",
+  "nav.export_clean_btn": "Save copy without metadata…",
+  "nav.export_clean_tt": "Saves a copy of the file without the prompt, parameters and other generation data, ready to share.",
+  "nav.export_clean_title": "Save copy without metadata",
+  "nav.export_clean_done": "Copy without metadata saved:"
 }

@@ -283,6 +283,11 @@ def run_clip(params: dict, *, free_vram: bool = True, timeout: int | None = None
     if not os.path.exists(out):
         tail = ((r.stdout or "")[-500:] + (r.stderr or "")[-500:]).strip()
         raise VideoJobError(f"clip non generata ({os.path.basename(out)}): {tail}")
+    try:                                                     # task 21: metadati nel file finale della clip
+        from core import gen_metadata
+        gen_metadata.embed_result({"status": "success", "output": [out]}, params, label="Video")
+    except Exception:                                        # noqa: BLE001
+        pass
     return out
 
 
