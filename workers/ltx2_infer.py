@@ -808,6 +808,13 @@ class _CpuParkRegistry(_DummyReg):
         if sid in self._sd:
             return state_dict
         mb = sum(v.nbytes for v in state_dict.sd.values()) / 2**20
+        from core import mem_budget as _mb0
+        if _mb0.skip_park_streaming_blocks(getattr(sd_ops, "name", ""), _STREAMING):
+            # offload a blocchi: questi pesi finiscono in buffer pinned e lo state dict viene scartato;
+            # parcheggiarlo = seconda copia in RAM (+17 GB sul transformer fp8). Vedi mem_budget.
+            print(f"[park] NON parcheggio {os.path.basename(str(paths[0]))} ({mb:.0f}MB): blocchi in "
+                  f"streaming, la copia pinned c'è già (LTX_PARK_BLOCKS=1 per forzare)", flush=True)
+            return state_dict
         from core import mem_budget                     # commit 2: budget/floor/predicato unificati
         budget = mem_budget.ram_cache_mb()
         while self._info and self._parked_mb() + mb > budget:  # LRU nel budget
@@ -903,6 +910,9 @@ class _CpuParkRegistry(_DummyReg):
 
 
 _PARK = _CpuParkRegistry()
+# True quando la pipeline in costruzione/uso fa offload a blocchi (pinned): il registry non parcheggia
+# la partizione dei blocchi (duplicherebbe i buffer pinned). Impostato da _get_pipe.
+_STREAMING = False
 
 # FASE G weights-unification: path DAL registro unico (fallback ai letterali storici) — il
 # catalogo è l'unica fonte di verità su DOVE vive un peso; i motori la interrogano per id.
@@ -1449,6 +1459,8 @@ def _get_pipe(ckpt: str, qmode: str, offload_str: str, loras: list, stages: str 
     Checkpoint SOLO-transformer (comfy fp8_scaled): pipeline costruita sulla TUPLA
     (bundle_default, file_scelto) — il loader fonde gli state-dict e l'ULTIMO path vince sulle
     chiavi comuni → transformer dal file dell'utente, VAE/vocoder/audio e config dal bundle."""
+    global _STREAMING
+    _STREAMING = str(offload_str or "") in ("cpu", "disk")   # anche sul cache-hit: i blocchi si costruiscono a run-time
     _ckpt_pipe: "str | tuple" = ckpt
     if _uses_aux_bundle(ckpt):
         print(f"[bundle] '{os.path.basename(ckpt)}' è un checkpoint PARZIALE → componenti aux dal "
@@ -2547,6 +2559,7 @@ def run_generation(p: dict) -> str:
               flush=True)
     else:
         _off = _auto_offload(p, ckpt)                        # GGUF→cpu sempre; fp8→none se c'entra tutto in GPU
+    p["_offload_used"] = _off                                # per run_generation_with_oom_retry (niente retry a vuoto)
     # M-park: la pipeline del job è ora NOTA → i pesi parcheggiati in RAM che questo job NON userà
     # vengono rimossi (regola di drop richiesta); quelli comuni (Gemma/VAE/upsampler/ckpt) restano.
     try:
@@ -2934,7 +2947,15 @@ def run_generation_with_oom_retry(p: dict) -> str:
     """run_generation + UNA ripetizione con offload=cpu in caso di CUDA OOM (gestione MEMORIA,
     mai del modello): i casi limite (es. dev-fp8 a 768×576) frammentano il build residente su
     Windows (niente expandable_segments) → invece di morire, si ripiega sul percorso streaming
-    (più lento ma stabile: device-fix + filtro comfy_quant nel builder, 22/07)."""
+    (più lento ma stabile: device-fix + filtro comfy_quant nel builder, 22/07).
+
+    Due regole (task 23, campagna 29/10 — LTX-2.5 GGUF Q8):
+    - il retry NON gira dentro l'`except`: finché l'eccezione è viva, il suo traceback tiene i frame di
+      run_generation (pipeline, transformer, latenti su GPU). Il secondo giro partiva con 32 GB già
+      allocati («post-load: 32.0GB») e moriva per OOM anche quando il percorso streaming sarebbe bastato;
+    - niente retry se il primo giro era GIÀ in offload=cpu (scelto da _auto_offload o forzato dal GGUF):
+      ripeterebbe lo stesso identico percorso, a vuoto."""
+    _oom_msg = None
     try:
         return run_generation(p)
     except GenerationCancelled:
@@ -2943,25 +2964,34 @@ def run_generation_with_oom_retry(p: dict) -> str:
         _msg = f"{type(e).__name__}: {e}"
         if "out of memory" not in _msg.lower():
             raise
-        if str(p.get("offload") or "") == "cpu":
+        if "cpu" in (str(p.get("offload") or ""), str(p.get("_offload_used") or "")):
+            if p.get("gguf_transformer"):
+                raise RuntimeError(
+                    f"{_msg[:200]} — il transformer GGUF «{os.path.basename(str(p['gguf_transformer']))}» "
+                    "resta residente in VRAM (non si streamma): con questa durata/risoluzione non entra. "
+                    "Riduci durata o risoluzione, oppure usa la variante fp8/INT8 dello stesso modello "
+                    "(si streamma dalla RAM).") from None
             raise                                            # era già streaming: niente da ritentare
-        print(f"[oom-retry] {_msg[:120]} → riprovo UNA volta con offload=cpu", flush=True)
-        try:
-            import gc
-            _PIPE_CACHE.clear()
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except Exception:                                    # noqa: BLE001
-            pass
-        p2 = dict(p)
-        p2["offload"] = "cpu"
-        # Il ripiego è lo STREAMING, e lo streaming non accetta il FP4: se il checkpoint è
-        # quantizzato va dequantizzato a fp8, altrimenti il retry muore con «Block streaming is
-        # not supported with this quantization policy» — cioè fallirebbe due volte per due motivi
-        # diversi. La dequant si paga QUI, dopo un errore vero, e mai preventivamente.
-        p2["_dequant_retry"] = True
-        return run_generation(p2)
+        _oom_msg = _msg
+    # FUORI dall'except: l'eccezione e il suo traceback (frame con la pipeline e i tensori su GPU) sono rilasciati
+    print(f"[oom-retry] {_oom_msg[:120]} → riprovo UNA volta con offload=cpu", flush=True)
+    try:
+        import gc
+        _PIPE_CACHE.clear()
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+    except Exception:                                        # noqa: BLE001
+        pass
+    p2 = dict(p)
+    p2["offload"] = "cpu"
+    # Il ripiego è lo STREAMING, e lo streaming non accetta il FP4: se il checkpoint è
+    # quantizzato va dequantizzato a fp8, altrimenti il retry muore con «Block streaming is
+    # not supported with this quantization policy» — cioè fallirebbe due volte per due motivi
+    # diversi. La dequant si paga QUI, dopo un errore vero, e mai preventivamente.
+    p2["_dequant_retry"] = True
+    return run_generation(p2)
 
 
 def main() -> None:
