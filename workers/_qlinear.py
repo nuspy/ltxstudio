@@ -99,6 +99,25 @@ def lora_chunk_tokens(rows: int, row_bytes: int, device) -> int:
     return min(rows, n)
 
 
+def ffn_chunk_tokens(rows: int, row_bytes: int, device) -> int:
+    """Token per blocco dell'MLP: i temporanei del blocco restano sotto 1/5 della VRAM libera, tra 256 MB e
+    1,5 GiB (come le LoRA, niente soglie fisse). QLINEAR_FFN_CHUNK = token per blocco (forzato, per i test).
+    Su CPU senza forzatura non si divide."""
+    forced = os.environ.get("QLINEAR_FFN_CHUNK")
+    if forced:
+        return max(1, min(rows, int(forced)))
+    dev = torch.device(device)
+    if dev.type != "cuda":
+        return rows
+    try:
+        free = torch.cuda.mem_get_info(dev)[0]
+    except Exception:  # noqa: BLE001
+        free = 2 << 30
+    budget = max(256 << 20, min(int(1.5 * 2**30), free // 5))
+    n = max(1024, budget // max(1, row_bytes))
+    return min(rows, n)
+
+
 def _lora_term(xc: torch.Tensor, lo: tuple) -> torch.Tensor:
     dt = xc.dtype
     if lo[0] == "lokr":
@@ -331,9 +350,30 @@ class FusedGateUpSwiGLU(nn.Module):
         super().__init__()
         self.gate_up, self.out = gate_up, out
 
-    def forward(self, x):
+    def _once(self, x):
         g, u = self.gate_up(x).chunk(2, dim=-1)
         return self.out(F.silu(g) * u)
+
+    def forward(self, x):
+        """gate_up -> silu*up -> out, a blocchi di token quando la sequenza e' lunga: gate_up da solo e'
+        N x 2f (4 GB a 72k token) e silu(g) / silu(g)*u altri 2 GB l'uno (OOM del 30/10 con H3 a 10 s).
+        Le righe sono indipendenti: il risultato non cambia."""
+        C = x.shape[-1]
+        rows = x.numel() // max(1, C)
+        if torch.is_grad_enabled() and x.requires_grad:
+            return self._once(x)
+        f = getattr(self.gate_up, "out_features", 0) // 2 or 4 * C
+        ch = ffn_chunk_tokens(rows, 4 * 4 * f, x.device)
+        if ch >= rows:
+            return self._once(x)
+        x2 = x.reshape(-1, C)
+        out = None
+        for i in range(0, rows, ch):
+            o = self._once(x2[i:i + ch])
+            if out is None:
+                out = torch.empty((rows,) + tuple(o.shape[1:]), dtype=o.dtype, device=o.device)
+            out[i:i + ch] = o
+        return out.reshape(*x.shape[:-1], out.shape[-1])
 
 
 def _fuse_gate_up(model: nn.Module, sd: dict) -> None:
