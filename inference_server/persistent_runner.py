@@ -75,9 +75,12 @@ def main() -> int:
     # torch + handlers importati QUI (nel figlio), MAI nel server HTTP.
     from inference_server.model_manager import ModelManager
     from inference_server.backends import image_flux, image_upscale, image_segment, video_postprocess
+    from core import optional_components as _oc                  # MagicQuill V2 = componente OPZIONALE (CC BY-NC, fuori dalle build)
+    image_mq_run = _oc.image_mq_handler()                        # se manca: risponde «non installato», mai un crash
+    from inference_server.backends import image_control
     from inference_server import component_store
     handlers = {
-        "image": image_flux.run, "upscale": image_upscale.run, "segment": image_segment.run,
+        "image": image_flux.run, "image_mq": image_mq_run, "image_control": image_control.run, "upscale": image_upscale.run, "segment": image_segment.run,
         "video_upscale": video_postprocess.run, "video_face": video_postprocess.run_face,
         "video_fps": video_postprocess.run_fps,
     }

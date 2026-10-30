@@ -112,7 +112,10 @@ animazioni** tramite la **REST API locale di LTX Studio** su `{base}` (Swagger `
 ## 3. Scelta dell'endpoint (intento → chiamata)
 - descrizione → immagine: `POST /image/generate` (`arch` flux/flux2/zimage/ernie, `model`)
 - modifica foto (istruzione): `POST /image/edit`; colore: `/image/recolor`; area precisa:
-  `/image/inpaint` (serve `mask_path`; creala con `/image/segment`); estendi bordi: `/image/outpaint`
+  `/image/inpaint` (serve `mask_path`; creala con `/image/segment`; `controlnet_inpaint` con un FLUX.1 base);
+  estendi bordi: `/image/outpaint`
+- composizione/posa/contorni di una foto guida → nuova immagine: `/image/controlnet` (FLUX.1 o Z-Image);
+  variazioni da una foto: `/image/redux`; modifica locale/rimozione/bordi/colore stile MagicQuill: `/image/magicquill`
 - upscale/restauro foto: `/image/upscale`; volto da foto su un'altra: `/image/faceswap`;
   identità del volto in generazione: `image/generate` con `pulid_face`
 - descrizione → video: `POST /video/generate` (t2v). foto → video: stesso con `image_path` (i2v).

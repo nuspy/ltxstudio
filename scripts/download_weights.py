@@ -42,6 +42,7 @@ def main() -> int:
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--base-dir", default=None, help="cartella base (override); i tool-dest la ignorano")
     ap.add_argument("--no-deps", action="store_true", help="NON espandere le dipendenze")
+    ap.add_argument("--accept-license", default="", help="id (virgola) o «all»: conferma di licenza per le voci con license_ack (MagicQuill…); senza, quelle voci NON si scaricano")
     args = ap.parse_args()
 
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
@@ -56,7 +57,13 @@ def main() -> int:
 
     token = dl.resolve_token()
     fail = 0
+    accepted = {a.strip() for a in args.accept_license.split(",") if a.strip()}
     for e in entries:
+        if e.get("license_ack") and "all" not in accepted and e["id"] not in accepted and not wc.is_present(e, args.base_dir):
+            log(f"[weights] ✗ {e['id']}: licenza {e.get('license', '?')} non confermata — il download parte solo dal dialog "
+                f"con avviso di licenza (o con --accept-license {e['id']}).")
+            fail += 1
+            continue
         if not wc.downloadable(e):
             log(f"[weights] ✗ {e['id']}: nessuna fonte remota (no_remote) — "
                 f"{e.get('note') or 'usa scan/link o import manuale.'}")

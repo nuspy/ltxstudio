@@ -313,13 +313,37 @@ def _from_config_file(path: str):
     return None
 
 
+def _from_adapter_keys(tensors: dict):
+    """Adattatori che NON sono modelli generativi (ControlNet, LoRA di controllo MagicQuill): il loro header somiglia
+    a quello del modello base (modelspec «Flux.1-dev/controlnet», cartella «Flux») e finiva fra i t2i. Si riconoscono
+    dalle chiavi: ruolo `controlnet` / `control_lora`, mai `t2i`."""
+    keys = tensors.keys() if tensors else ()
+    if not keys:
+        return None
+    ks = list(keys)
+    if any(k.startswith("controlnet_blocks.") for k in ks) and "controlnet_x_embedder.weight" in tensors:
+        shp = (tensors["controlnet_x_embedder.weight"] or {}).get("shape") or [0, 64]
+        return ("flux1", "controlnet_inpaint" if int(shp[1]) > 64 else "controlnet_union", "controlnet", "image")
+    if any(k.startswith("control_layers.") for k in ks) and any(k.startswith("control_all_x_embedder.") for k in ks):
+        return ("zimage", "controlnet", "controlnet", "image")
+    if any(".attn.processor.q_loras." in k for k in ks[:2000]):
+        return ("flux1", "control_lora", "control_lora", "image")
+    return None
+
+
+DET_VERSION = 2          # 2: ControlNet e LoRA di controllo riconosciuti dalle chiavi (ruolo controlnet/control_lora)
+
+
 def detect_one(path: str) -> dict:
     path = str(path)
     name = Path(path).name
     tensors, meta = read_header(path)
     arch_meta = (meta.get("modelspec.architecture") or meta.get("general.architecture") or "")
-    res = _from_arch_str(arch_meta)
-    source = "metadata"
+    res = _from_adapter_keys(tensors)
+    source = "keys"
+    if res is None:
+        res = _from_arch_str(arch_meta)
+        source = "metadata"
     if res is None:
         res = _from_keys(tensors, name)
         source = "keys"
@@ -464,11 +488,12 @@ def scan(roots=None, force: bool = False) -> list[dict]:
         except OSError:
             continue
         ent = cache.get(path)
-        if ent and ent.get("_sig") == sig and "family" in ent:
+        if ent and ent.get("_sig") == sig and "family" in ent and ent.get("_dv") == DET_VERSION:
             out.append(ent)
             continue
         det = detect_one(path)
         det["_sig"] = sig
+        det["_dv"] = DET_VERSION
         cache[path] = det
         out.append(det)
         changed = True
@@ -491,10 +516,11 @@ def get(path: str) -> dict:
     except OSError:
         return detect_one(path)
     ent = cache.get(path)
-    if ent and ent.get("_sig") == sig and "family" in ent:
+    if ent and ent.get("_sig") == sig and "family" in ent and ent.get("_dv") == DET_VERSION:
         return ent
     det = detect_one(path)
     det["_sig"] = sig
+    det["_dv"] = DET_VERSION
     cache[path] = det
     _save_cache(cache)
     return det

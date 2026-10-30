@@ -19,3 +19,4 @@ def test_esclude_file_e_cartelle(tmp_path):
     assert not (out / "workers" / "veda").exists()
     assert not (out / "workers" / "veda_h3.py").exists()
     assert (out / "workers" / "_qlinear.py").is_file() and (out / "core" / "x.py").is_file()
+

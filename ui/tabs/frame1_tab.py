@@ -75,7 +75,8 @@ QWEN21_PROFILES = (
 # core/image_refs.MODEL_SYNTAX, massimo). Verificato sul codice: solo Qwen-Image 2.1 le riceve da «Genera»
 # (ref_images ≤10 → workers/qwen_image21_infer.py). Krea 2 Edit (≤2) passa dai pannelli di modifica; FLUX.2/Klein nativo
 # prende UNA sola immagine (inference_server/backends/image_flux.py: image_path).
-GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10)}
+# Task 9: Krea 2 con riferimenti = Krea 2 Edit (in-context, ≤2 immagini, stesso DiT/TE single-file scelti per il t2i).
+GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10), "Krea 2": ("krea2_edit", 2)}
 # Guidance di FLUX.1 Kontext: regolabile (default 2.5). Valori piu' bassi attenuano contrasto/saturazione eccessivi.
 KONTEXT_GUIDANCE_DEFAULT = 2.5
 KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
@@ -117,6 +118,7 @@ class Frame1Tab(QWidget):
     request_restore_photo = Signal()    # restaura / colora foto (invia al tab Restauro)
     request_integrate = Signal()        # integra immagini (spostato qui dal canvas)
     request_compose = Signal()          # componi più foto (multi-reference / stitch)
+    request_magicquill = Signal()       # MagicQuill V2: modifica locale / rimozione / bordi / colore (Kontext)
 
     def __init__(self):
         super().__init__()
@@ -270,6 +272,8 @@ class Frame1Tab(QWidget):
         f.addRow(self._qwen21_box())
         f.addRow(self._krea2_box())
         f.addRow(self._gen_refs_box())
+        f.addRow(self._struct_box())                  # ControlNet FLUX.1 / Z-Image (task 9)
+        f.addRow(self._redux_box())                   # Redux: variazioni da un'immagine (FLUX.1)
         # LoRA multi-select (come nel tab Video)
         lora_group = QGroupBox(tr("f1.gen.lora.group"))
         lora_vl = QVBoxLayout(lora_group)
@@ -581,6 +585,28 @@ class Frame1Tab(QWidget):
         if hasattr(self, "gen_lora_tab"):
             self.gen_lora_tab.refresh()
 
+    def _inp_kind_now(self) -> str | None:
+        """'fill' | 'base' | 'klein' | None del modello scelto nel menu inpaint (dall'header del file)."""
+        label = self.inp_model.currentText().split("  ⛔")[0] if self.inp_model.count() else ""
+        if getattr(self, "_qwen21_inp", {}).get(label) or label in self._dynamic_checkpoints:
+            return None
+        unet = getattr(self, "_dynamic_unets", {}).get(label) or INPAINT_MODELS.get(label, {}).get("unet")
+        if not unet:
+            return None
+        from core import arch_filter as af
+        return af.inpaint_kind(unet)
+
+    def _sync_inp_cn(self, *_):
+        """ControlNet Inpainting (Alimama): visibile solo con un FLUX.1 base."""
+        if not hasattr(self, "inp_cn"):
+            return
+        ok = self._inp_kind_now() == "base"
+        self.inp_cn.setVisible(ok)
+        if not ok:
+            self.inp_cn.setChecked(False)
+        on = ok and self.inp_cn.isChecked()
+        self._inp_cn_scale_row.setVisible(on); self._inp_cn_scale_label.setVisible(on)
+
     def _inp_label(self) -> str:
         return self.inp_model.currentText().split("  ⛔")[0] if self.inp_model.count() else ""
 
@@ -748,6 +774,173 @@ class Frame1Tab(QWidget):
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(self, tr("f1.gen.refs.group", "Immagini di riferimento"),
                                     tr("f1.gen.refs.full", "Limite di riferimenti raggiunto per questo modello."))
+
+    # ---------- ControlNet FLUX.1 / Z-Image e Redux in «Crea immagini» (task 9) ----------
+    CN_KINDS = (("canny", "f1.gen.cn.canny", "Bordi (Canny)"),
+                ("depth", "f1.gen.cn.depth", "Profondità (DepthAnything, +1.3 GB)"),
+                ("pose", "f1.gen.cn.pose", "Posa umana (OpenPose)"),
+                ("gray", "f1.gen.cn.gray", "Luminosità (bianco e nero)"),
+                ("none", "f1.gen.cn.none", "Già una mappa (la uso così com'è)"))
+
+    def _image_function_mode(self, function: str) -> str:
+        """Quale backend serve alla funzione per l'architettura+modello scelti in «Genera» ('' = non disponibile qui).
+        Regola unica in core.arch_filter.image_function_backend: FLUX.2/Krea/Qwen/Ernie non la vedono."""
+        from core import arch_filter as af
+        return af.image_function_backend(function, self.gen_arch.currentText(), self._gen_model_name())
+
+    def _struct_box(self) -> QGroupBox:
+        """ControlNet di struttura per FLUX.1 (Union Pro 2.0) e Z-Image (Union 2.1): bordi, profondità, posa o luminosità
+        di una foto guida decidono la composizione; prompt e stile restano liberi."""
+        box = QGroupBox(tr("f1.gen.cn.group", "Controllo struttura (ControlNet)"))
+        box.setCheckable(True); box.setChecked(False)
+        box.setToolTip(tr("f1.gen.cn.tt",
+            "L'immagine segue bordi, profondità, posa o luminosità di una foto guida; prompt e stile decidono il "
+            "resto. FLUX.1 (Union Pro 2.0) e Z-Image (Union 2.1). Non si combina con Redux."))
+        f = QFormLayout(box)
+        self.cn_photo = self._photo_field(tr("f1.photo.ph", "(vuoto = la foto nel canvas)"))
+        f.addRow(tr("f1.gen.cn.photo", "Foto guida"), self.cn_photo["row"])
+        self.cn_kind = QComboBox()
+        for data, key, fb in self.CN_KINDS:
+            self.cn_kind.addItem(tr(key, fb), data)
+        self.cn_kind.setToolTip(tr("f1.gen.cn.kind.tt",
+            "Come estrarre la struttura dalla foto guida. «Già una mappa» usa l'immagine così com'è (scheletro, bordi "
+            "preparati altrove)."))
+        self.cn_kind.currentIndexChanged.connect(self._on_cn_kind)
+        f.addRow(tr("f1.gen.cn.kind", "Guida da"), self.cn_kind)
+        srow = QHBoxLayout()
+        self.cn_scale = QSlider(Qt.Horizontal); self.cn_scale.setRange(10, 120); self.cn_scale.setValue(70)
+        self._cn_scale_lbl = QLabel("0.70")
+        self.cn_scale.valueChanged.connect(lambda v: self._cn_scale_lbl.setText(f"{v / 100:.2f}"))
+        self.cn_scale.setToolTip(tr("f1.gen.cn.scale.tt",
+            "Quanto rispettare la struttura. Valori consigliati dagli autori: canny 0.7, profondità 0.8, posa 0.9."))
+        srow.addWidget(self.cn_scale, 1); srow.addWidget(self._cn_scale_lbl)
+        f.addRow(tr("f1.gen.cn.scale", "Forza"), self._wrapw(srow))
+        erow = QHBoxLayout()
+        self.cn_end = QSlider(Qt.Horizontal); self.cn_end.setRange(20, 100); self.cn_end.setValue(80)
+        self._cn_end_lbl = QLabel("0.80")
+        self.cn_end.valueChanged.connect(lambda v: self._cn_end_lbl.setText(f"{v / 100:.2f}"))
+        self.cn_end.setToolTip(tr("f1.gen.cn.end.tt",
+            "Fino a che punto della generazione il controllo agisce (1.0 = fino alla fine): più basso lascia più "
+            "libertà ai dettagli."))
+        erow.addWidget(self.cn_end, 1); erow.addWidget(self._cn_end_lbl)
+        self._cn_end_row = self._wrapw(erow)
+        self._cn_end_label = QLabel(tr("f1.gen.cn.end", "Controllo fino a"))
+        f.addRow(self._cn_end_label, self._cn_end_row)
+        self.cn_preview_btn = QPushButton(tr("f1.gen.cn.preview", "Anteprima della guida"))
+        self.cn_preview_btn.setToolTip(tr("f1.gen.cn.preview.tt",
+            "Mostra la mappa (bordi/profondità/posa) che il modello riceverà, senza generare."))
+        self.cn_preview_btn.clicked.connect(self._cn_preview)
+        f.addRow(self.cn_preview_btn)
+        self.cn_box = box
+        box.setVisible(False)
+        box.toggled.connect(lambda on: on and hasattr(self, "redux_box") and self.redux_box.setChecked(False))
+        for sig in (self.gen_arch.currentTextChanged, self.gen_model.currentIndexChanged):
+            sig.connect(self._sync_cn_boxes)
+        return box
+
+    def _redux_box(self) -> QGroupBox:
+        """Redux (FLUX.1): variazioni di un'immagine di riferimento (stile e contenuto), il prompt è facoltativo."""
+        box = QGroupBox(tr("f1.gen.redux.group", "Variazione da immagine (Redux)"))
+        box.setCheckable(True); box.setChecked(False)
+        box.setToolTip(tr("f1.gen.redux.tt",
+            "FLUX.1 Redux: genera nuove immagini nello stile e con il contenuto di una foto di riferimento. Il prompt "
+            "è facoltativo e si aggiunge al riferimento. Non si combina con il ControlNet."))
+        f = QFormLayout(box)
+        self.redux_photo = self._photo_field(tr("f1.photo.ph", "(vuoto = la foto nel canvas)"))
+        f.addRow(tr("f1.gen.redux.photo", "Immagine di riferimento"), self.redux_photo["row"])
+        srow = QHBoxLayout()
+        self.redux_strength = QSlider(Qt.Horizontal); self.redux_strength.setRange(10, 150); self.redux_strength.setValue(100)
+        self._redux_strength_lbl = QLabel("1.00")
+        self.redux_strength.valueChanged.connect(lambda v: self._redux_strength_lbl.setText(f"{v / 100:.2f}"))
+        self.redux_strength.setToolTip(tr("f1.gen.redux.strength.tt",
+            "Peso dell'immagine di riferimento rispetto al prompt: 1.00 = standard, più basso lascia più spazio al testo."))
+        srow.addWidget(self.redux_strength, 1); srow.addWidget(self._redux_strength_lbl)
+        f.addRow(tr("f1.gen.redux.strength", "Peso del riferimento"), self._wrapw(srow))
+        self.redux_box = box
+        box.setVisible(False)
+        box.toggled.connect(lambda on: on and hasattr(self, "cn_box") and self.cn_box.setChecked(False))
+        return box
+
+    def _sync_cn_boxes(self, *_):
+        """Mostra ControlNet/Redux solo dove il backend li sa fare (architettura + modello scelti)."""
+        if not hasattr(self, "cn_box") or not hasattr(self, "redux_box"):
+            return
+        cn = self._image_function_mode("controlnet")
+        self.cn_box.setVisible(bool(cn))
+        if not cn:
+            self.cn_box.setChecked(False)
+        zi = cn == "zimage_cn"
+        self._cn_end_label.setVisible(not zi); self._cn_end_row.setVisible(not zi)    # Z-Image: nessun «fino a»
+        self._apply_cn_defaults()
+        rd = self._image_function_mode("redux")
+        self.redux_box.setVisible(bool(rd))
+        if not rd:
+            self.redux_box.setChecked(False)
+
+    def _on_cn_kind(self, *_):
+        self._apply_cn_defaults()
+
+    def _apply_cn_defaults(self):
+        """Forza/«fino a» consigliati dagli autori per il tipo di guida (model card Shakker per FLUX; 0.75 Z-Image)."""
+        if not hasattr(self, "cn_kind"):
+            return
+        if self._image_function_mode("controlnet") == "zimage_cn":
+            self.cn_scale.setValue(75)
+            return
+        from core.control_maps import FLUX_UNION_DEFAULTS
+        sc, ge = FLUX_UNION_DEFAULTS.get(self.cn_kind.currentData() or "canny", (0.7, 0.8))
+        self.cn_scale.setValue(int(round(sc * 100))); self.cn_end.setValue(int(round(ge * 100)))
+
+    def _cn_preview(self):
+        """Mappa di controllo (CPU, nessun contesto CUDA nel processo GUI) mostrata in una finestra."""
+        from PySide6.QtGui import QPixmap
+        from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
+        path = self.cn_photo["edit"].text().strip() or (self.image_path or "")
+        if not path:
+            QMessageBox.information(self, tr("f1.gen.cn.group", "Controllo struttura (ControlNet)"),
+                                    tr("f1.gen.cn.no_photo", "Scegli una foto guida o carica una foto nel canvas."))
+            return
+        try:
+            from PIL import Image
+            from core import control_maps as cm
+            with Image.open(path) as im:
+                w, h = im.size
+            s = min(1.0, 768 / max(w, h))
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            try:
+                m = cm.make_control_map(path, self.cn_kind.currentData() or "canny", max(64, int(w * s)),
+                                        max(64, int(h * s)), device=-1)
+            finally:
+                QApplication.restoreOverrideCursor()
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(suffix="_cnmap.png", delete=False); tmp.close()
+            m.save(tmp.name)
+            dlg = QDialog(self); dlg.setWindowTitle(tr("f1.gen.cn.preview", "Anteprima della guida"))
+            lay = QVBoxLayout(dlg); lbl = QLabel(); lbl.setPixmap(QPixmap(tmp.name)); lay.addWidget(lbl)
+            self._cn_preview_dlg = dlg
+            dlg.show()
+        except Exception as e:                                # noqa: BLE001
+            QMessageBox.warning(self, tr("f1.gen.cn.group", "Controllo struttura (ControlNet)"), str(e))
+
+    def image_control_config(self) -> dict:
+        """Parametri di ControlNet/Redux per «Genera» (vuoto se nessuno dei due è acceso e visibile). `ctl_mode` è la
+        modalità del backend image_control (flux_cn | zimage_cn | flux_redux)."""
+        if not hasattr(self, "cn_box"):
+            return {}
+        if not self.redux_box.isHidden() and self.redux_box.isChecked():
+            return {"ctl_mode": "flux_redux",
+                    "ref_images": [self.redux_photo["edit"].text().strip() or (self.image_path or "")],
+                    "redux_strength": self.redux_strength.value() / 100.0}
+        if not self.cn_box.isHidden() and self.cn_box.isChecked():
+            mode = self._image_function_mode("controlnet")
+            out = {"ctl_mode": mode,
+                   "control_image": self.cn_photo["edit"].text().strip() or (self.image_path or ""),
+                   "control_preprocess": self.cn_kind.currentData() or "canny",
+                   "control_scale": self.cn_scale.value() / 100.0}
+            if mode == "flux_cn":
+                out["control_end"] = self.cn_end.value() / 100.0
+            return out
+        return {}
 
     def gen_prompt_raw(self) -> str:
         """Prompt come lo ha scritto l'utente (con i token @image_N), senza traduzione."""
@@ -1036,6 +1229,10 @@ class Frame1Tab(QWidget):
         from PySide6.QtCore import QProcess
         from PySide6.QtWidgets import QProgressDialog
         ids_arg = ",".join([ids] if isinstance(ids, str) else list(ids))
+        from core import license_ack as _la
+        _acc = _la.confirm_gui(self, ids_arg.split(","))        # voci non commerciali: conferma di licenza
+        if _acc is None:
+            return
         script = str(Path(__file__).resolve().parents[2] / "scripts" / "download_weights.py")
         dlg = QProgressDialog(tr("f1.gen.dl.progress", "Scaricamento {m}…").format(m=ids_arg),
                               tr("common.cancel", "Annulla"), 0, 0, self)
@@ -1051,7 +1248,7 @@ class Frame1Tab(QWidget):
             self._reload_qwen21_edit_combos()
         proc.finished.connect(_fin)
         dlg.canceled.connect(proc.kill)
-        proc.start(sys.executable, ["-u", script, "--ids", ids_arg])
+        proc.start(sys.executable, ["-u", script, "--ids", ids_arg] + _la.args_for(_acc))
         dlg.show()
 
     def _gen_model_name(self) -> str:
@@ -1147,6 +1344,7 @@ class Frame1Tab(QWidget):
             if pool:
                 self._color_name_combo(ic)
             mm.settle(ic, cur, cand)
+        self._reload_mq_models()
         # puzzle_lora è una LoRA FLUX.1 → disabilita in modalità FLUX.2
         if hasattr(self, "integrate_puzzle") and hasattr(self, "integrate_engine"):
             is_flux2_mode = (self.integrate_engine.currentIndex() == 1)
@@ -1297,6 +1495,27 @@ class Frame1Tab(QWidget):
         f.addRow(self._klein_te_row, self.inp_klein_te)
         self.inp_klein_te.setVisible(False); self._klein_te_row.setVisible(False)   # _sync_klein_te decide
         self.inp_model.currentTextChanged.connect(self._sync_klein_te)
+        # ControlNet Inpainting (Alimama, task 9): ControlNet che legge immagine mascherata + maschera e guida un FLUX.1
+        # BASE (64 canali). Compare solo con un modello FLUX.1 base (non Fill, non Klein, non Qwen): core.arch_filter.inpaint_kind.
+        self.inp_cn = QCheckBox(tr("f1.inpaint.cn", "ControlNet Inpainting (Alimama)"))
+        self.inp_cn.setToolTip(tr("f1.inpaint.cn.tt",
+            "Usa il ControlNet di inpainting di AlimamaCreative sopra il modello FLUX.1 scelto (funziona con i FLUX.1 base, "
+            "non con Fill o Klein): segue meglio il prompt nell'area mascherata. Vale per inpaint e outpaint."))
+        f.addRow("", self.inp_cn)
+        cnrow = QHBoxLayout()
+        self.inp_cn_scale = QSlider(Qt.Horizontal); self.inp_cn_scale.setRange(60, 100); self.inp_cn_scale.setValue(90)
+        self._inp_cn_scale_lbl = QLabel("0.90")
+        self.inp_cn_scale.valueChanged.connect(lambda v: self._inp_cn_scale_lbl.setText(f"{v / 100:.2f}"))
+        self.inp_cn_scale.setToolTip(tr("f1.inpaint.cn.scale.tt",
+            "Forza del ControlNet: 0.6-1.0 (consigliato dall'autore); alta = segue di più la zona mascherata."))
+        cnrow.addWidget(self.inp_cn_scale, 1); cnrow.addWidget(self._inp_cn_scale_lbl)
+        self._inp_cn_scale_row = self._wrapw(cnrow)
+        self._inp_cn_scale_label = QLabel(tr("f1.inpaint.cn.scale", "Forza ControlNet"))
+        f.addRow(self._inp_cn_scale_label, self._inp_cn_scale_row)
+        self.inp_cn.toggled.connect(lambda on: (self._inp_cn_scale_row.setVisible(on), self._inp_cn_scale_label.setVisible(on)))
+        self.inp_model.currentTextChanged.connect(self._sync_inp_cn)
+        self.inp_model.currentIndexChanged.connect(self._sync_inp_cn)
+        self._sync_inp_cn()
         self.inp_lora = QComboBox()
         self.inp_lora.setToolTip(tr("f1.inpaint.lora.tt", "LoRA opzionale applicata durante inpaint/outpaint per stile o soggetto."))
         f.addRow(tr("f1.inpaint.lora_lbl"), self.inp_lora)
@@ -1414,6 +1633,12 @@ class Frame1Tab(QWidget):
         g.addRow(b_int)
         wv.addWidget(int_box)
 
+        # ============ SEZIONE 2b: MAGICQUILL V2 (Kontext + LoRA di controllo) ============
+        sep_mq = QFrame(); sep_mq.setFrameShape(QFrame.HLine); sep_mq.setFrameShadow(QFrame.Sunken)
+        sep_mq.setStyleSheet("color: #444; margin: 6px 0;")
+        wv.addWidget(sep_mq)
+        wv.addWidget(self._magicquill_box())
+
         # ============ SEZIONE 3: COMPONI PIÙ FOTO (senza incollare → niente occlusione) ============
         sep2 = QFrame(); sep2.setFrameShape(QFrame.HLine); sep2.setFrameShadow(QFrame.Sunken)
         sep2.setStyleSheet("color: #444; margin: 6px 0;")
@@ -1464,6 +1689,137 @@ class Frame1Tab(QWidget):
         self._compose_masks: dict[str, str] = {}
 
         return wrap
+
+    # ---------- MagicQuill V2 (task 9): 4 LoRA di controllo su FLUX.1 Kontext ----------
+    MQ_MODES = (("local", "f1.mq.mode.local", "Modifica locale (area + prompt)"),
+                ("removal", "f1.mq.mode.removal", "Rimuovi oggetto"),
+                ("edge", "f1.mq.mode.edge", "Bordi guidati"),
+                ("color", "f1.mq.mode.color", "Colore guidato"))
+    MQ_STRENGTH = {"local": 1.0, "removal": 1.0, "edge": 0.6, "color": 1.5}      # default dell'originale (app.py)
+
+    def _magicquill_box(self) -> QGroupBox:
+        """MagicQuill V2: la maschera/i tratti disegnati sul canvas guidano FLUX.1 Kontext tramite una LoRA di controllo
+        (locale, rimozione, bordi, colore). Il modello Kontext lo sceglie sempre l'utente."""
+        box = QGroupBox(tr("f1.mq.group", "MagicQuill V2 (FLUX.1 Kontext)"))
+        g = QFormLayout(box)
+        info = QLabel(tr("f1.mq.info",
+            "Disegna sul canvas con il pennello maschera: l'area (modifica locale, rimozione, colore) oppure i tratti "
+            "(bordi guidati). Funziona solo con FLUX.1 Kontext. Licenza non commerciale (CC BY-NC)."))
+        info.setWordWrap(True); info.setStyleSheet("color:#9bd; font-size:11px;")
+        g.addRow(info)
+        self.mq_mode = QComboBox()
+        for data, key, fb in self.MQ_MODES:
+            self.mq_mode.addItem(tr(key, fb), data)
+        self.mq_mode.setToolTip(tr("f1.mq.mode.tt",
+            "Locale: rifà l'area disegnata secondo il prompt. Rimuovi: toglie l'oggetto e ricostruisce lo sfondo. "
+            "Bordi: la foto segue i contorni originali più i tratti che disegni. Colore: ricolora l'area col colore scelto."))
+        self.mq_mode.currentIndexChanged.connect(self._on_mq_mode)
+        g.addRow(tr("f1.mq.mode", "Modalità"), self.mq_mode)
+        self.mq_model = QComboBox()
+        self.mq_model.setToolTip(tr("f1.mq.model.tt", "Checkpoint FLUX.1 Kontext su cui lavorano le LoRA MagicQuill."))
+        g.addRow(tr("f1.mq.model", "Modello (Kontext)"), self.mq_model)
+        self.mq_prompt = QPlainTextEdit(); self.mq_prompt.setMaximumHeight(36)
+        self.mq_prompt.setPlaceholderText(tr("f1.mq.prompt.ph", "Cosa deve diventare l'area / la foto (in inglese rende meglio)"))
+        self._mq_prompt_lbl = QLabel(tr("f1.mq.prompt", "Prompt"))
+        g.addRow(self._mq_prompt_lbl, self.mq_prompt)
+        srow = QHBoxLayout()
+        self.mq_strength = QDoubleSpinBox(); self.mq_strength.setRange(0.0, 5.0); self.mq_strength.setSingleStep(0.05)
+        self.mq_strength.setValue(1.0)
+        self.mq_strength.setToolTip(tr("f1.mq.strength.tt",
+            "Quanto la condizione (area, bordi, colore) pesa sulla generazione. Valori dell'autore: locale 1.0, bordi 0.6, colore 1.5."))
+        self._mq_strength_lbl = QLabel(tr("f1.mq.strength", "Forza della guida"))
+        g.addRow(self._mq_strength_lbl, self.mq_strength)
+        crow = QHBoxLayout()
+        self.mq_color = QLineEdit("#d4af37"); self.mq_color.setMaximumWidth(90)
+        self.mq_swatch = QLabel(); self.mq_swatch.setFixedSize(26, 26)
+        cbtn = QPushButton(tr("f1.color.pick.btn")); cbtn.clicked.connect(self._mq_pick_color)
+        self.mq_color.textChanged.connect(self._mq_update_swatch)
+        crow.addWidget(self.mq_color); crow.addWidget(self.mq_swatch); crow.addWidget(cbtn); crow.addStretch(1)
+        self._mq_color_row = self._wrapw(crow)
+        self._mq_color_lbl = QLabel(tr("f1.mq.color", "Colore dell'area"))
+        g.addRow(self._mq_color_lbl, self._mq_color_row)
+        self.mq_erase = QCheckBox(tr("f1.mq.erase", "I tratti RIMUOVONO bordi (invece di aggiungerli)"))
+        self.mq_erase.setToolTip(tr("f1.mq.erase.tt",
+            "Bordi guidati: di norma i tratti disegnati si AGGIUNGONO ai contorni della foto; con questa casella cancellano "
+            "i contorni che attraversano."))
+        g.addRow("", self.mq_erase)
+        self.mq_grow = QSpinBox(); self.mq_grow.setRange(0, 100); self.mq_grow.setValue(10)
+        self.mq_grow.setToolTip(tr("f1.mq.grow.tt", "Quanto allargare l'area disegnata (px): lascia margine alla ricostruzione."))
+        self._mq_grow_lbl = QLabel(tr("f1.mq.grow", "Margine area (px)"))
+        g.addRow(self._mq_grow_lbl, self.mq_grow)
+        self.mq_steps = QSpinBox(); self.mq_steps.setRange(1, 80); self.mq_steps.setValue(20)
+        g.addRow(tr("f1.steps_lbl"), self.mq_steps)
+        self.mq_cfg = QDoubleSpinBox(); self.mq_cfg.setRange(0.0, 20.0); self.mq_cfg.setSingleStep(0.1); self.mq_cfg.setValue(3.5)
+        self.mq_cfg.setToolTip(tr("f1.gen.cfg.tt", "Guidance (CFG): quanto l'immagine aderisce al prompt; valori troppo alti creano artefatti."))
+        g.addRow(tr("f1.cfg_lbl"), self.mq_cfg)
+        seedrow = QHBoxLayout()
+        self.mq_seed = QSpinBox(); self.mq_seed.setRange(0, 2_147_483_647); self.mq_seed.setEnabled(False)
+        self.mq_seed_rand = QCheckBox(tr("f1.seed_rand")); self.mq_seed_rand.setChecked(True)
+        self.mq_seed_rand.toggled.connect(lambda on: self.mq_seed.setEnabled(not on))
+        seedrow.addWidget(self.mq_seed, 1); seedrow.addWidget(self.mq_seed_rand)
+        g.addRow(tr("f1.seed_lbl"), self._wrapw(seedrow))
+        b = QPushButton(tr("f1.mq.btn", "Genera con MagicQuill"))
+        b.setObjectName("generate")
+        b.setToolTip(tr("f1.mq.btn.tt", "Applica la modalità scelta alla foto del canvas usando la maschera disegnata."))
+        b.clicked.connect(lambda: self.request_magicquill.emit())
+        g.addRow(b)
+        self._mq_box = box
+        self._mq_update_swatch()
+        self._on_mq_mode()
+        return box
+
+    def _mq_update_swatch(self, *_):
+        c = self.mq_color.text().strip()
+        ok = len(c) == 7 and c.startswith("#")
+        self.mq_swatch.setStyleSheet(f"background:{c if ok else '#000'}; border:1px solid #555; border-radius:5px;")
+
+    def _mq_pick_color(self):
+        from PySide6.QtWidgets import QColorDialog
+        c = QColorDialog.getColor()
+        if c.isValid():
+            self.mq_color.setText(c.name())
+
+    def _on_mq_mode(self, *_):
+        m = self.mq_mode.currentData() or "local"
+        self.mq_strength.setValue(self.MQ_STRENGTH.get(m, 1.0))
+        for w in (self._mq_prompt_lbl, self.mq_prompt):
+            w.setVisible(m != "removal")                 # la rimozione usa il prompt dell'originale («remove the instance»)
+        for w in (self._mq_color_lbl, self._mq_color_row):
+            w.setVisible(m == "color")
+        self.mq_erase.setVisible(m == "edge")
+        for w in (self._mq_grow_lbl, self.mq_grow):
+            w.setVisible(m in ("local", "removal"))
+
+    def _reload_mq_models(self):
+        """Modelli Kontext (FLUX.1) per MagicQuill: dall'header (core.arch_filter.is_kontext); 18+ solo in NSFW."""
+        if not hasattr(self, "mq_model"):
+            return
+        from core import arch_filter as af
+        from ui import model_menu as mm
+        allow = self._allow_nsfw()
+        cand = [m for m in (self._models or []) if af.is_kontext(m)]
+        pool = [m for m in cand if allow or not self._mcat.is_nsfw(m)]
+        cur = mm.current_key(self.mq_model)
+        self.mq_model.clear()
+        self.mq_model.addItems(pool) if pool else self.mq_model.addItem(tr("f1.kontext.none"))
+        if pool:
+            self._color_name_combo(self.mq_model)
+        mm.settle(self.mq_model, cur, cand)
+
+    def get_magicquill_config(self) -> dict:
+        import re
+        mode = self.mq_mode.currentData() or "local"
+        col = self.mq_color.text().strip()
+        rgb = [int(col[i:i + 2], 16) for i in (1, 3, 5)] if re.fullmatch(r"#[0-9a-fA-F]{6}", col) else [212, 175, 55]
+        model = self.mq_model.currentText() if self.mq_model.count() else ""
+        return {"mode": mode,
+                "model": "" if model.startswith("(") else model,
+                "prompt": self.mq_prompt.toPlainText().strip(),
+                "strength": float(self.mq_strength.value()),
+                "color_rgb": rgb, "erase": bool(self.mq_erase.isChecked()),
+                "grow": int(self.mq_grow.value()),
+                "steps": int(self.mq_steps.value()), "guidance": float(self.mq_cfg.value()),
+                "seed": None if self.mq_seed_rand.isChecked() else int(self.mq_seed.value())}
 
     # ---------- cambia colore (Kontext prompt-based, stile MagicQuill) ----------
     def _color_box(self) -> QGroupBox:
@@ -2265,6 +2621,8 @@ class Frame1Tab(QWidget):
             "seed": None if self.inp_seed_rand.isChecked() else self.inp_seed.value(),
             "lora": self.inp_lora.currentData(),
             "available": available,
+            "cn_inpaint": bool(hasattr(self, "inp_cn") and self.inp_cn.isChecked() and self._inp_kind_now() == "base"),
+            "cn_inpaint_scale": (self.inp_cn_scale.value() / 100.0 if hasattr(self, "inp_cn_scale") else 0.9),
             "enhance": self.edit_enhance.isChecked() if hasattr(self, "edit_enhance") else False,
         }
 
@@ -2337,6 +2695,8 @@ class Frame1Tab(QWidget):
             "krea2_dit": self._krea2_dit(),
             "krea2_te": self._krea2_te(),
             **self._qwen21_config(),
+            **self._krea2_refs_config(),
+            **self.image_control_config(),
             "loras": self.gen_lora_tab.selected_loras(),
             "steps": self.gen_steps.value(),
             "cfg": float(self.gen_cfg.value()) if hasattr(self, "gen_cfg") else None,
@@ -2360,6 +2720,13 @@ class Frame1Tab(QWidget):
         if self.gen_arch.currentText() in GEN_REF_ARCHS and self.gen_refs.enable.isChecked():
             return self.gen_refs.translate(raw)
         return raw
+
+    def _krea2_refs_config(self) -> dict:
+        """Krea 2 con riferimenti (@Foto_N, ≤2): il job diventa Krea 2 Edit. Senza riferimenti resta testo→immagine."""
+        if self.gen_arch.currentText() != "Krea 2":
+            return {}
+        refs = [r["path"] for r in self.gen_refs.get_references() if r.get("kind") == "image"]
+        return {"ref_images": refs[:2]} if refs else {}
 
     def _qwen21_config(self) -> dict:
         """Parametri propri di Qwen-Image 2.1 (vuoto con le altre architetture)."""

@@ -42,10 +42,15 @@ def main() -> int:
     _ti = _t.perf_counter()
     from inference_server.model_manager import ModelManager
     from inference_server.backends import image_flux, image_upscale, image_segment, video_postprocess
+    from core import optional_components as _oc                  # MagicQuill V2 = componente OPZIONALE (CC BY-NC, fuori dalle build)
+    image_mq_run = _oc.image_mq_handler()                        # se manca: risponde «non installato», mai un crash
+    from inference_server.backends import image_control
     print(f"[step-child] import torch/diffusers/backends = {_t.perf_counter()-_ti:.1f}s "
           f"(overhead figlio fresco per-job)", flush=True)
     handlers = {
         "image": image_flux.run,
+        "image_mq": image_mq_run,
+        "image_control": image_control.run,
         "upscale": image_upscale.run,
         "segment": image_segment.run,
         "video_upscale": video_postprocess.run,

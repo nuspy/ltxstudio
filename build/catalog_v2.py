@@ -1048,6 +1048,10 @@ NEW += _civitai_oct14(N)
 from catalog_local_oct14 import entries as _local_oct14, REFRESH_IDS as _LOCAL_REFRESH, REMOVED_IDS as _LOCAL_REMOVED  # noqa: E402
 NEW += _local_oct14(N)
 
+# task 9 (17/10/2026): ControlNet FLUX.1/Z-Image, Redux+SigLIP, OpenPose, LoRA MagicQuill V2
+from catalog_task9 import entries as _task9  # noqa: E402
+NEW += _task9(N)
+
 # url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {
     "gfpgan-13": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth",

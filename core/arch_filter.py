@@ -164,12 +164,29 @@ def is_t2i_for_arch(arch_label: str, rel: str) -> bool:
     c = classify(rel)
     if c["family"] not in ARCH_FAMILIES.get(arch_label, set()):
         return False
+    if c["role"] in ("controlnet", "control_lora"):   # adattatori di controllo: mai un modello di generazione
+        return False
     if arch_label == "FLUX":                     # i non-generativi vivono nei pannelli di modifica
-        if c["role"] in ("inpaint", "adapter") or c["variant"] in ("fill", "kontext", "redux", "klein"):
+        if c["role"] in ("inpaint", "adapter", "controlnet", "control_lora") or c["variant"] in ("fill", "kontext", "redux", "klein"):
             return False
         if _flags(rel):
             return False
     return True
+
+
+# Funzioni di «Genera immagine» che dipendono da architettura E modello (task 9): backend `image_control`.
+# controlnet → FLUX.1 (Union Pro 2.0) e Z-Image (Union 2.1); redux → solo FLUX.1. FLUX.2, Krea 2, Qwen-Image 2.1 (ha il
+# suo ControlNet) ed Ernie NON le mostrano. '' = funzione non disponibile per questa scelta.
+def image_function_backend(function: str, arch_label: str, model: str = "") -> str:
+    if function == "controlnet":
+        if arch_label == "Z-Image":
+            return "zimage_cn"
+        if arch_label == "FLUX" and not (model and classify(model)["family"] == "flux2"):
+            return "flux_cn"
+    elif function == "redux":
+        if arch_label == "FLUX" and not (model and classify(model)["family"] == "flux2"):
+            return "flux_redux"
+    return ""
 
 
 def is_flux_family(rel: str, family_name: str | None = None) -> bool:

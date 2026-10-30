@@ -886,6 +886,7 @@ class MainWindow(QMainWindow):
         # Bottone «Integra immagini» spostato dal canvas al tab Inpaint/Outpaint
         self.frame1_tab.request_integrate.connect(self.generate_integrate)
         self.frame1_tab.request_compose.connect(self.generate_compose)
+        self.frame1_tab.request_magicquill.connect(self.generate_magicquill)
         self.frame1_tab.request_generate.connect(self.generate_image)
         self.frame1_tab.request_upscale.connect(self.generate_upscale)
         self.frame1_tab.request_recolor.connect(self.generate_recolor)
@@ -2703,8 +2704,11 @@ class MainWindow(QMainWindow):
                                               cfg.get("integrate_variant", "turbo"), seed,
                                               label=tr("queue.job.krea2edit", "Krea 2 Edit"))
                 return
-            # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. FLUX.2 e puzzle_lora → ComfyUI.
+            # ── BACKEND NATIVO (Kontext FLUX.1): niente ComfyUI. «Integrazione MagicQuill» (puzzle_lora) = mode foreground.
             from core import backend
+            if backend.is_native("image") and engine == "kontext" and aux:
+                self._start_native_mq_foreground(exp, model, ptxt, steps, seed, guidance)
+                return
             if backend.is_native("image") and engine == "kontext" and not aux:
                 # PuLID DEDICATO all'Image to Image (container proprio nel pannello, separato da
                 # quello di «Genera immagine» che agisce solo sulla generazione).
@@ -2828,6 +2832,11 @@ class MainWindow(QMainWindow):
         if not self._ensure_flux2_encoder(model):
             return
         masks = cfg.get("masks") or {}
+        from core import backend as _bk
+        if engine == "flux2" and _bk.is_native("image"):      # FLUX.2 Klein: multi-riferimento VERO (task 9)
+            srcs = [self.kontext.prep_masked(f, masks[f], OUTPUT_DIR) if f in masks else f for f in imgs]
+            self._start_native_klein_multiref(srcs, cfg.get("prompt") or "", model)
+            return
         # ── BACKEND NATIVO (FLUX.1 Kontext): affianca le foto (pre-mascherate) in un unico
         #    riferimento (stitch lato Python) → Kontext nativo. Il multi-reference VERO (N latenti
         #    separati) richiede FLUX.2 → resta su ComfyUI (posticipato).
@@ -3132,7 +3141,7 @@ class MainWindow(QMainWindow):
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
-        if cfg.get("arch") == "qwen_image21":                 # riferimenti nominati: @image_N inesistente = errore
+        if cfg.get("arch") in ("qwen_image21", "krea2"):      # riferimenti nominati: @image_N inesistente = errore
             _gr = self.frame1_tab.gen_refs
             _perr = _gr.prompt_errors(cfg.get("prompt_raw") or "")
             if _perr:
@@ -3184,6 +3193,14 @@ class MainWindow(QMainWindow):
         seed = cfg.get("seed") if cfg.get("seed") is not None else random.randint(0, 2**31)
         # Negativo dalla sezione gen; fallback al prompt negativo globale del tab Video
         negative = cfg.get("negative") or self.frame1_tab.get_values().get("prompt_negative", "")
+        if cfg.get("arch") == "krea2" and cfg.get("ref_images"):   # Krea 2 con riferimenti = Krea 2 Edit (task 9)
+            self._start_native_krea2_edit(cfg["ref_images"], cfg["prompt"], negative, 768,
+                                          cfg.get("krea2_variant") or "turbo", seed,
+                                          label=tr("queue.job.krea2edit", "Krea 2 Edit"),
+                                          dit=cfg.get("krea2_dit"), te=cfg.get("krea2_te"))
+            return
+        if cfg.get("ctl_mode"):                               # ControlNet FLUX.1 / Z-Image o Redux (task 9)
+            self._start_native_control(cfg, v, loras, seed, negative); return
         # Backend astratto: se il modulo "image" è su "native", usa l'InferenceServer (no ComfyUI).
         from core import backend
         if backend.is_native("image"):
@@ -3323,6 +3340,103 @@ class MainWindow(QMainWindow):
         self._native_worker = _NativeImageWorker(params)
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.image", "Immagine"), self._native_worker, self._on_native_image_done)
+
+    # ── ControlNet FLUX.1 / Z-Image, Redux, ControlNet Inpainting (Alimama): backend image_control (task 9) ──────────
+    _CTL_CAPS = {"flux_cn": "cap.image_controlnet", "zimage_cn": "cap.image_controlnet",
+                 "flux_redux": "cap.image_redux", "flux_cn_inpaint": "cap.image_cn_inpaint"}
+    _CTL_LABELS = {"flux_cn": "ControlNet FLUX.1", "zimage_cn": "ControlNet Z-Image",
+                   "flux_redux": "Redux", "flux_cn_inpaint": "ControlNet Inpainting (Alimama)"}
+
+    def _missing_weights_notice(self, ids: list, feature: str) -> bool:
+        """True se i pesi ci sono tutti. Altrimenti avviso con nome e GB di ciò che manca e «Apri tab Pesi modelli»:
+        NESSUN download da qui (regola del task: l'utente scarica dal tab Pesi)."""
+        try:
+            from core import ensure_weights as ew
+            miss = ew.missing(list(ids))
+        except Exception:                                    # noqa: BLE001 — il backend verifica comunque
+            return True
+        if not miss:
+            return True
+        gb = round(sum(float(e.get("approx_gb", 0) or 0) for e in miss), 1)
+        names = "\n".join(f"• {e.get('label') or e['id']}  ({e['id']}, ~{e.get('approx_gb', '?')} GB)" for e in miss)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle(tr("ctl.missing.title", "Pesi mancanti"))
+        box.setText(tr("ctl.missing.body",
+                       "{feature} ha bisogno di pesi che non sono su disco (~{gb} GB in tutto):\n\n{names}\n\n"
+                       "Non scarico nulla io: scaricali dal tab «Pesi modelli».").format(feature=feature, gb=gb, names=names))
+        b_w = box.addButton(tr("vedit.ckpt.btn_open_weights_tab", "Apri tab Pesi modelli"), QMessageBox.ActionRole)
+        box.addButton(tr("common.cancel", "Annulla"), QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is b_w:
+            self.tabs.setCurrentWidget(self.weights_tab)
+        return False
+
+    def _control_weight_ids(self, mode: str, kind: str = "") -> list:
+        ids = {"flux_cn": ["flux-cn-union-pro2"], "flux_cn_inpaint": ["flux-cn-inpaint-alimama"],
+               "zimage_cn": ["zimage-cn-union21"], "flux_redux": ["flux-redux", "siglip-so400m-384"]}[mode]
+        if kind == "depth":
+            ids = ids + ["depth-anything-v2"]
+        elif kind == "pose":
+            ids = ids + ["openpose-body"]
+        return ids
+
+    def _run_control_job(self, params: dict, label: str, mode_log: str):
+        """Accoda un job `image_control` (stessa anteprima live e stesso risultato del resto della tab Immagini)."""
+        self._inpaint_mode = mode_log
+        self._native_worker = _NativeImageWorker(params, module="image_control")
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(label, self._native_worker, self._on_native_inpaint_done)
+
+    def _start_native_control(self, cfg, v, loras, seed, negative):
+        """«Genera» con ControlNet (FLUX.1 / Z-Image) o Redux. `cfg["ctl_mode"]` dice quale."""
+        mode = cfg["ctl_mode"]
+        if not self._feature_gate(self._CTL_CAPS[mode]):
+            return
+        label = self._CTL_LABELS[mode]
+        if mode == "flux_redux":
+            refs = [p for p in (cfg.get("ref_images") or []) if p and os.path.isfile(p)]
+            if not refs:
+                QMessageBox.warning(self, tr("mw.no_image_title"), tr("ctl.redux.no_image",
+                    "Redux: scegli l'immagine di riferimento o carica una foto nel canvas.")); return
+        else:
+            if not os.path.isfile(cfg.get("control_image") or ""):
+                QMessageBox.warning(self, tr("mw.no_image_title"), tr("ctl.no_guide",
+                    "ControlNet: carica una foto nel canvas o scegline una nel campo «Foto guida».")); return
+        if not self._missing_weights_notice(self._control_weight_ids(mode, cfg.get("control_preprocess", "")), label):
+            return
+        if not self._ensure_native_ready():
+            return
+        params = {"mode": mode, "arch": cfg["arch"], "model": cfg["model"], "prompt": cfg["prompt"],
+                  "negative": negative, "width": v["width"], "height": v["height"], "steps": cfg["steps"],
+                  "guidance": cfg["cfg"] if cfg.get("cfg") is not None else 3.5, "seed": seed, "loras": loras}
+        for k in ("control_image", "control_preprocess", "control_scale", "control_end", "ref_images", "redux_strength"):
+            if k in cfg:
+                params[k] = cfg[k]
+        if mode == "zimage_cn":
+            params["guidance"] = cfg["cfg"] if cfg.get("cfg") is not None else 0.0
+        self._log(f"{label} (NATIVO): modello={os.path.basename(str(cfg['model']))} · {v['width']}×{v['height']} · "
+                  f"passi={cfg['steps']} · forza={cfg.get('control_scale', cfg.get('redux_strength', '-'))} · seed={seed}")
+        self._run_control_job(params, tr("queue.job.image_control", "Immagine ({what})").format(what=label), "generazione immagine")
+
+    def _start_native_cn_inpaint(self, exp, unet, prompt, negative, steps, seed, mode, icfg):
+        """Inpaint/outpaint con ControlNet Inpainting (Alimama) su un FLUX.1 base: il ControlNet legge l'immagine
+        mascherata + la maschera e guida il modello base; fuori dalla maschera restano i pixel originali."""
+        if not self._feature_gate("cap.image_cn_inpaint"):
+            return
+        if not self._missing_weights_notice(self._control_weight_ids("flux_cn_inpaint"), self._CTL_LABELS["flux_cn_inpaint"]):
+            return
+        if not self._ensure_native_ready():
+            return
+        model = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
+        params = {"mode": "flux_cn_inpaint", "arch": "flux", "model": model, "prompt": prompt, "negative": negative,
+                  "image_path": exp["image"], "mask_path": exp["mask"], "steps": steps,
+                  "guidance": float(icfg.get("cn_inpaint_guidance", 3.5)), "seed": seed,
+                  "control_scale": float(icfg.get("cn_inpaint_scale", 0.9)),
+                  "feather": int(icfg.get("feather", 0)), "outpaint": mode == "outpaint"}
+        self._log(f"{mode} con ControlNet Inpainting (Alimama): modello={os.path.basename(model)} · passi={steps} · "
+                  f"forza={params['control_scale']:.2f} · seed={seed}")
+        self._run_control_job(params, tr("queue.job.inpaint", "Inpaint/Outpaint"), mode)
 
     def _on_native_image_done(self, res: dict):
         self._stop_native_preview()
@@ -4328,6 +4442,10 @@ class MainWindow(QMainWindow):
         import os
         from core import native_driver
         from core.inpaint_pipeline import InpaintPipeline
+        _icfg = self.frame1_tab.get_inpaint_config()
+        if _icfg.get("cn_inpaint"):                       # ControlNet Inpainting (Alimama) su FLUX.1 base (task 9)
+            self._start_native_cn_inpaint(exp, unet, prompt, negative, steps, seed, mode, _icfg)
+            return
         if not self._ensure_native_ready():   # caduto? lo riavvia da sé
             return
         model = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
@@ -4540,8 +4658,126 @@ class MainWindow(QMainWindow):
         self._enqueue(label or tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"), self._native_worker,
                       self._on_native_inpaint_done)
 
+    # ── MagicQuill V2 (task 9): backend image_mq (Kontext + LoRA di controllo) ─────────────────────────────────
+    _MQ_LABEL = "MagicQuill V2"
+
+    def _mq_model_path(self, model: str) -> str:
+        return model if os.path.isabs(model) else os.path.join(r"E:\AI\Models\diffusion_models", model)
+
+    def _magicquill_component_ok(self) -> bool:
+        """Se l'edizione non include il codice di MagicQuill V2 (file esclusi dalla build) → avviso chiaro, mai un crash."""
+        from core import optional_components as oc
+        if oc.magicquill_installed():
+            return True
+        QMessageBox.information(self, tr("mq.pack.title", "MagicQuill non disponibile"),
+                                tr("mq.pack.missing", oc.NOT_INSTALLED_MSG))
+        return False
+
+    def generate_magicquill(self):
+        """Modifica locale / rimozione / bordi guidati / colore guidato con le LoRA MagicQuill V2 su FLUX.1 Kontext."""
+        if not self._feature_gate("cap.image_magicquill"):
+            return
+        if not self._magicquill_component_ok():
+            return
+        ft = self.frame1_tab
+        if mm.blocked(self, ft.mq_model):
+            return
+        cfg = ft.get_magicquill_config()
+        mode = cfg["mode"]
+        if not cfg["model"]:
+            QMessageBox.warning(self, tr("mw.no_model_title"), tr("f1.mq.no_model",
+                "MagicQuill: scegli un checkpoint FLUX.1 Kontext nel menu del pannello.")); return
+        if not ft.image_path:
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
+        if self._inpaint_pid:
+            QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
+        if not ft.canvas.has_mask():
+            QMessageBox.information(self, tr("mw.no_mask_title"), tr("f1.mq.no_mask",
+                "Disegna prima sul canvas con il pennello maschera: l'area da modificare/rimuovere/colorare, "
+                "oppure i tratti dei bordi.")); return
+        if mode == "local" and not cfg["prompt"]:
+            QMessageBox.information(self, tr("mw.no_mask_title"), tr("f1.mq.no_prompt",
+                "Scrivi nel prompt cosa deve diventare l'area disegnata.")); return
+        if not self._missing_weights_notice([f"mq2-{mode}-lora"], f"{self._MQ_LABEL} ({mode})"):
+            return
+        if not self._ensure_native_ready():
+            return
+        try:
+            exp = ft.canvas.export_inpaint(OUTPUT_DIR, "inpaint")
+        except Exception as e:                                     # noqa: BLE001
+            QMessageBox.warning(self, tr("mw.error_title", "Errore"), str(e)); return
+        self._inpaint_bbox = exp.get("bbox")
+        self._inpaint_before = exp.get("image")
+        seed = cfg["seed"] if cfg["seed"] is not None else random.randint(0, 2**31)
+        params = {"arch": "kontext", "mode": mode, "model": self._mq_model_path(cfg["model"]),
+                  "image_path": exp["image"], "prompt": cfg["prompt"], "steps": cfg["steps"],
+                  "guidance": cfg["guidance"], "seed": seed}
+        if mode in ("local", "removal"):
+            params["mask_path"] = exp["mask"]
+            params["grow"] = cfg["grow"]
+            params["strength_local"] = cfg["strength"]
+        elif mode == "edge":
+            params["erase_path" if cfg["erase"] else "edge_path"] = exp["mask"]
+            params["strength_edge"] = cfg["strength"]
+        else:                                                       # color: l'area disegnata prende il colore scelto
+            params["mask_path"] = exp["mask"]
+            params["color_rgb"] = cfg["color_rgb"]
+            params["strength_color"] = cfg["strength"]
+        self._inpaint_mode = "magicquill"
+        self._log(f"{self._MQ_LABEL} ({mode}, NATIVO): modello={os.path.basename(cfg['model'])} · passi={cfg['steps']} · "
+                  f"guida={cfg['strength']:.2f} · seed={seed}")
+        self._native_worker = _NativeImageWorker(params, module="image_mq")
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.magicquill", "MagicQuill V2"), self._native_worker, self._on_native_inpaint_done)
+
+    def _start_native_mq_foreground(self, exp, model, prompt, steps, seed, guidance):
+        """«Integrazione MagicQuill» (casella puzzle_lora di Integra) = mode foreground: l'immagine di Integra è già
+        preparata (oggetto incollato + alone bianco), la maschera è la zona di edit."""
+        if not self._feature_gate("cap.image_magicquill"):
+            return
+        if not self._magicquill_component_ok():
+            return
+        if not self._missing_weights_notice(["mq2-puzzle-lora"], f"{self._MQ_LABEL} (integrazione)"):
+            return
+        if not self._ensure_native_ready():
+            return
+        from core.kontext_pipeline import KONTEXT_MODEL
+        mp = self._mq_model_path(model or KONTEXT_MODEL)
+        params = {"arch": "kontext", "mode": "foreground", "model": mp, "image_path": exp["image"],
+                  "mask_path": exp["mask"], "prepared": True, "prompt": prompt or
+                  "Fill in the white region naturally and adapt the foreground into the background.",
+                  "steps": steps, "guidance": guidance, "seed": seed}
+        self._inpaint_mode = "integrazione"
+        self._log(f"Integra {self._MQ_LABEL} (foreground, NATIVO): modello={os.path.basename(mp)} · passi={steps} · seed={seed}")
+        self._native_worker = _NativeImageWorker(params, module="image_mq")
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.integrate", "Image to Image (Kontext)"), self._native_worker, self._on_native_inpaint_done)
+
+    def _start_native_klein_multiref(self, imgs, prompt, model):
+        """Componi con FLUX.2 Klein: le N foto sono N riferimenti VERI (latenti separati con id di posizione propri,
+        in-context), non uno stitch. Misura = quella del canvas. Passi/guidance: i default del modello (image_flux)."""
+        from core import image_refs as R
+        if not self._feature_gate("cap.inpaint"):
+            return
+        if not self._ensure_native_ready():
+            return
+        mp = model if os.path.isabs(model) else os.path.join(r"E:\AI\Models\diffusion_models", model)
+        v = self.video_tab.get_values()
+        self._clamp_resolution(v)
+        refs = [p for p in imgs if p][:R.MODEL_SYNTAX["flux2_klein"]["max_images"]]
+        params = {"arch": "flux2_kontext", "model": mp, "prompt": prompt or "combine the reference images into one coherent scene",
+                  "image_path": refs[0], "ref_images": refs, "gen_from_refs": True,
+                  "width": int(v["width"]), "height": int(v["height"]), "seed": random.randint(0, 2**31)}
+        self._inpaint_mode = "composizione"
+        self._inpaint_bbox = None
+        self._inpaint_before = None
+        self._log(f"Componi FLUX.2 Klein (multi-riferimento, {len(refs)} foto, {params['width']}×{params['height']})…")
+        self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._enqueue(tr("queue.job.compose", "Componi (FLUX.2 Klein)"), self._native_worker, self._on_native_inpaint_done)
+
     def _start_native_krea2_edit(self, images, prompt, negative, grounding, variant, seed,
-                                 label="Krea 2 Edit"):
+                                 label="Krea 2 Edit", dit=None, te=None):
         """Krea 2 Edit — editing per istruzione (single/multi) NATIVO (Krea2EditPipeline, no ComfyUI).
         `images` = lista di path (1 = single: frame 1; 2 = multi: scena=1, soggetto=2)."""
         if not self._feature_gate("cap.krea2_edit"):   # feature d'edizione (plus+); DEV = permissivo
@@ -4565,6 +4801,10 @@ class MainWindow(QMainWindow):
             "guidance": 2.0 if is_raw else 0.0,
             "seed": seed,
         }
+        if dit:                                            # finetune single-file scelto in «Crea» (es. Noct V4)
+            params["krea2_dit"] = dit
+        if te:                                             # text encoder single-file (es. uncensored)
+            params["krea2_te"] = te
         if len(imgs) == 1:
             params["image_path"] = imgs[0]
         else:

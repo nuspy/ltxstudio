@@ -82,6 +82,10 @@ def offer_download_gui(parent, ids: list[str], feature: str = "") -> bool:
     if QMessageBox.question(parent, tr("weights.missing.title", "Pesi mancanti"), msg) \
             != QMessageBox.Yes:
         return False
+    from core import license_ack as _la
+    _acc = _la.confirm_gui(parent, dl_ids)                    # voci non commerciali: conferma di licenza
+    if _acc is None:
+        return False
     dlg = QProgressDialog(tr("weights.missing.downloading", "Download pesi in corso…"),
                           tr("common.cancel", "Annulla"), 0, 0, parent)
     dlg.setWindowTitle(tr("weights.missing.title", "Pesi mancanti"))
@@ -100,7 +104,7 @@ def offer_download_gui(parent, ids: list[str], feature: str = "") -> bool:
     proc.readyReadStandardOutput.connect(_mostra_progresso)
     dlg.canceled.connect(proc.kill)
     proc.start(sys.executable, ["-u", str(repo / "scripts" / "download_weights.py"),
-                                "--ids", ",".join(dl_ids)])
+                                "--ids", ",".join(dl_ids)] + _la.args_for(_acc))
     while proc.state() != QProcess.NotRunning:
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()

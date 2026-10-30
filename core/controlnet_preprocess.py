@@ -2,12 +2,12 @@
 
 Estrae la "guida" di controllo da un'immagine o dai frame di un video, per i ControlNet nativi del
 motore video LTX-2 (#24) e per le immagini. Canny è puro OpenCV (nessun peso, validabile a freddo);
-depth e pose richiedono modelli (DepthAnything / DWpose) → scaffold con import lazy, da validare su GPU.
+depth e pose richiedono modelli (DepthAnything / OpenPose body CMU) con import lazy.
 
 API:
   canny(image_path, out, low=100, high=200) -> str         # puro cv2
   depth(image_path, out) -> str                            # DepthAnything-V2 (transformers)
-  pose(image_path, out) -> str                             # DWpose/openpose (stub)
+  pose(image_path, out) -> str                             # OpenPose body nativo (core.openpose_body)
   preprocess(image_path, kind, out) -> str                 # dispatch per 'canny'|'depth'|'pose'
   preprocess_video(video_path, kind, out_video, fps=None) -> str  # frame-by-frame → video di controllo
 """
@@ -61,11 +61,20 @@ def depth(image_path: str, out_path: str, device: int = -1) -> str:
     return out_path
 
 
-def pose(image_path: str, out_path: str) -> str:
-    """Pose skeleton (DWpose/openpose). Stub: richiede i pesi in POSE_DIR + il preprocessor.
-    Da implementare/validare su GPU (fase successiva)."""
-    raise NotImplementedError(
-        "pose preprocessing non ancora implementato: scaricare DWpose in POSE_DIR e collegare il detector.")
+def pose(image_path: str, out_path: str, device: int = -1) -> str:
+    """Posa OpenPose CORPO (18 keypoint CMU, scheletro colorato su fondo nero) — nativa, senza controlnet_aux.
+    Pesi: body_pose_model.pth (core.openpose_body.WEIGHTS_PATH). `device=-1` = CPU: il processo GUI non apre MAI
+    un contesto CUDA (regola app-no-cuda-context); un worker puo' passare device=0. Nessuna persona -> immagine nera."""
+    import cv2
+    from core import openpose_body as ob
+    ob.check_weights()                                   # errore CHIARO (nome file + dimensione) se mancano i pesi
+    bgr = cv2.imread(image_path)
+    if bgr is None:
+        raise FileNotFoundError(image_path)
+    canvas, _res = ob.pose_image(bgr[:, :, ::-1], device="cpu" if device < 0 else f"cuda:{int(device)}")
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    cv2.imwrite(out_path, canvas[:, :, ::-1])            # canvas RGB -> cv2 BGR (stessa convenzione di depth())
+    return out_path
 
 
 def preprocess(image_path: str, kind: str, out_path: str, **kw) -> str:

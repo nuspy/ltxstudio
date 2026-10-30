@@ -1,11 +1,14 @@
 """Endpoint IMMAGINI — esecuzione NATIVA via InferenceServer (:8189), zero ComfyUI.
 
-generate (t2i) · edit/kontext · recolor · inpaint · outpaint · upscale/restauro · segment · faceswap · face-id (PuLID).
+generate (t2i) · edit/kontext · recolor · inpaint · outpaint · upscale/restauro · segment · faceswap · face-id (PuLID) ·
+controlnet (FLUX.1 / Z-Image) · redux · magicquill (task 9).
 Qwen-Image 2.1 (`arch: qwen_image21`, nessun file-modello: il DiT è una voce di catalogo `qwen21_dit`) vale per
 generate (anche img2img con `init_image`+`strength`), edit (≤10 riferimenti), recolor, inpaint e outpaint.
 Ogni POST crea un job async → GET /jobs/{id} per stato + link di download.
 """
 from __future__ import annotations
+
+import os
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -91,10 +94,67 @@ class InpaintReq(Qwen21Opts):
     guidance: float = 30.0
     seed: int = 0
     strength: float | None = Field(None, description="qwen_image21: denoise nell'area (default 1.0)")
+    controlnet_inpaint: bool = Field(False, description="FLUX.1 base: usa il ControlNet Inpainting (Alimama); arch resta 'inpaint'")
+    control_scale: float = Field(0.9, description="forza del ControlNet Inpainting (0.6-1.0)")
 
 
 class OutpaintReq(InpaintReq):
     pass
+
+
+class ControlNetReq(BaseModel):
+    """ControlNet di struttura: FLUX.1 (Union Pro 2.0) o Z-Image (Union 2.1). Il file guida è una foto (si estrae la mappa)
+    o già una mappa (`control_preprocess=none`)."""
+    prompt: str
+    model: str | None = Field(None, description="checkpoint FLUX.1 (arch=flux) o Z-Image (arch=zimage), come in /image/generate")
+    arch: str = Field("flux", description="flux | zimage")
+    control_image: str = Field(..., description="foto guida (o mappa già pronta con control_preprocess=none)")
+    control_preprocess: str = Field("canny", description="canny | depth | pose | gray | none")
+    control_scale: float | None = Field(None, description="forza; default dagli autori: canny 0.7, depth 0.8, pose 0.9, gray 0.9 (zimage 0.75)")
+    control_end: float | None = Field(None, description="FLUX: fino a che punto agisce il controllo (0.2-1.0; default 0.8, posa 0.65)")
+    negative: str | None = None
+    width: int = 1024
+    height: int = 1024
+    steps: int | None = Field(None, description="default del modello (FLUX 30, Z-Image Turbo 8)")
+    guidance: float | None = Field(None, description="default del modello (FLUX 3.5, Z-Image Turbo 0.0)")
+    seed: int = 0
+    loras: list | None = None
+
+
+class ReduxReq(BaseModel):
+    """Redux (FLUX.1): variazioni di una o più immagini di riferimento; il prompt è facoltativo."""
+    model: str
+    ref_images: list[str] = Field(..., min_length=1, description="immagini di riferimento (i token si concatenano)")
+    prompt: str = ""
+    redux_strength: float = 1.0
+    width: int = 1024
+    height: int = 1024
+    steps: int | None = None
+    guidance: float | None = None
+    seed: int = 0
+    loras: list | None = None
+
+
+class MagicQuillReq(BaseModel):
+    """MagicQuill V2 su FLUX.1 Kontext. Maschere: bianco = area (local/removal/color) o tratti (edge)."""
+    mode: str = Field(..., description="local | removal | edge | color | foreground")
+    model: str = Field(..., description="checkpoint FLUX.1 Kontext")
+    image_path: str
+    mask_path: str | None = None
+    edge_path: str | None = Field(None, description="edge: tratti da AGGIUNGERE")
+    erase_path: str | None = Field(None, description="edge: bordi da TOGLIERE")
+    color_path: str | None = Field(None, description="color: immagine con le zone ricolorate")
+    color_rgb: list[int] | None = Field(None, description="color: [r,g,b] applicato all'area mask_path")
+    prepared: bool = Field(False, description="foreground: image_path ha già l'oggetto e l'alone bianco (come fa la GUI)")
+    prompt: str = ""
+    steps: int = 20
+    guidance: float = 3.5
+    seed: int = 0
+    grow: int | None = None
+    strength_local: float | None = None
+    strength_edge: float | None = None
+    strength_color: float | None = None
+    fix_perspective: bool = False
 
 
 class UpscaleReq(BaseModel):
@@ -182,6 +242,26 @@ def _foto_tokens(p: dict) -> None:
     p["prompt"] = R.translate(prompt, order, "qwen21")
 
 
+def _weights_409(ids: list[str], feature: str) -> None:
+    """Pesi assenti → 409 con nome e GB (nessun download dall'API: li scarica l'utente dal tab Pesi)."""
+    from core import ensure_weights as ew
+    try:
+        ew.require(ids, feature)
+    except ew.WeightsMissingError as e:
+        raise HTTPException(409, str(e))
+
+
+def _flux1_or_422(model: str | None, what: str) -> str:
+    """Il modello deve esistere ed essere FLUX.1 (header, core.arch_filter): FLUX.2/Krea/Qwen non hanno questa funzione."""
+    if not model:
+        raise HTTPException(422, f"'model' obbligatorio per {what}")
+    from core import arch_filter as af
+    c = af.classify(model)
+    if c["source"] != "none" and c["family"] != "flux1":
+        raise HTTPException(422, f"{what} vale solo per FLUX.1: «{model}» è {c['family']}")
+    return model
+
+
 # ─────────────── registrazione ───────────────
 def register(app: FastAPI):
 
@@ -222,6 +302,61 @@ def register(app: FastAPI):
             _qwen21(p, req)
         return _submit("image.edit", lambda job: run_image(p))
 
+    @app.post("/image/controlnet", tags=["immagini"])
+    def image_controlnet(req: ControlNetReq):
+        """Generazione guidata dalla STRUTTURA di una foto (bordi/profondità/posa/luminosità): FLUX.1 o Z-Image."""
+        gate.require("cap.image_controlnet")
+        if req.arch not in ("flux", "zimage"):
+            raise HTTPException(422, "arch: flux | zimage (Qwen-Image 2.1 ha il suo ControlNet in /image/generate)")
+        from core.control_maps import KINDS
+        if req.control_preprocess not in KINDS:
+            raise HTTPException(422, f"control_preprocess: {', '.join(KINDS)}")
+        if not os.path.isfile(req.control_image):
+            raise HTTPException(422, f"control_image inesistente: {req.control_image}")
+        if req.arch == "flux":
+            _flux1_or_422(req.model, "il ControlNet FLUX.1")
+        elif not req.model:
+            raise HTTPException(422, "'model' obbligatorio con arch=zimage")
+        mode = "flux_cn" if req.arch == "flux" else "zimage_cn"
+        ids = ["flux-cn-union-pro2" if req.arch == "flux" else "zimage-cn-union21"]
+        ids += {"depth": ["depth-anything-v2"], "pose": ["openpose-body"]}.get(req.control_preprocess, [])
+        _weights_409(ids, "ControlNet")
+        p = req.model_dump(exclude_none=True)
+        p.update({"_module": "image_control", "mode": mode})
+        p["loras"] = parse_loras(p.get("loras"))
+        return _submit("image.controlnet", lambda job: run_image(p))
+
+    @app.post("/image/redux", tags=["immagini"])
+    def image_redux(req: ReduxReq):
+        """Variazioni da immagine (FLUX.1 Redux)."""
+        gate.require("cap.image_redux")
+        _flux1_or_422(req.model, "Redux")
+        missing = [x for x in req.ref_images if not os.path.isfile(x)]
+        if missing:
+            raise HTTPException(422, f"ref_images inesistenti: {missing}")
+        _weights_409(["flux-redux", "siglip-so400m-384"], "Redux")
+        p = req.model_dump(exclude_none=True)
+        p.update({"_module": "image_control", "mode": "flux_redux", "arch": "flux"})
+        p["loras"] = parse_loras(p.get("loras"))
+        return _submit("image.redux", lambda job: run_image(p))
+
+    @app.post("/image/magicquill", tags=["immagini"])
+    def image_magicquill(req: MagicQuillReq):
+        """MagicQuill V2 (FLUX.1 Kontext + LoRA di controllo): modifica locale, rimozione, bordi, colore, integrazione."""
+        gate.require("cap.image_magicquill")
+        if req.mode not in ("local", "removal", "edge", "color", "foreground"):
+            raise HTTPException(422, "mode: local | removal | edge | color | foreground")
+        from core import arch_filter as af
+        if not af.is_kontext(req.model):
+            raise HTTPException(422, f"MagicQuill richiede un checkpoint FLUX.1 Kontext: «{req.model}»")
+        from core import optional_components as oc
+        if not oc.magicquill_installed():                         # componente opzionale (licenza non commerciale)
+            raise HTTPException(409, oc.NOT_INSTALLED_MSG)
+        _weights_409([f"mq2-{'puzzle' if req.mode == 'foreground' else req.mode}-lora"], "MagicQuill V2")
+        p = req.model_dump(exclude_none=True)
+        p.update({"_module": "image_mq", "arch": "kontext"})
+        return _submit("image.magicquill", lambda job: run_image(p))
+
     @app.post("/image/recolor", tags=["immagini"])
     def image_recolor(req: RecolorReq):
         gate.require("cap.inpaint")
@@ -244,6 +379,23 @@ def register(app: FastAPI):
         p["init_image"] = p.pop("image_path")                     # foto da ritoccare + maschera (bianco = rifai)
         return _qwen21(p, req)
 
+    def _cn_inpaint(p: dict, outpaint: bool) -> dict:
+        """Inpaint/outpaint col ControlNet Inpainting (Alimama) su un FLUX.1 BASE (header: inpaint_kind == base)."""
+        gate.require("cap.image_cn_inpaint")
+        if p.get("arch") != "inpaint":
+            raise HTTPException(422, "controlnet_inpaint vale solo con arch=inpaint (FLUX.1 base)")
+        from core import arch_filter as af
+        if af.inpaint_kind(p.get("model") or "") != "base":
+            raise HTTPException(422, f"controlnet_inpaint richiede un FLUX.1 BASE (non Fill/Klein): «{p.get('model')}»")
+        _weights_409(["flux-cn-inpaint-alimama"], "ControlNet Inpainting (Alimama)")
+        q = {"_module": "image_control", "mode": "flux_cn_inpaint", "arch": "flux", "model": p["model"],
+             "prompt": p["prompt"], "image_path": p["image_path"], "mask_path": p["mask_path"],
+             "steps": p.get("steps", 28), "guidance": min(float(p.get("guidance", 3.5)), 6.0), "seed": p.get("seed", 0),
+             "control_scale": p.get("control_scale", 0.9), "outpaint": outpaint}
+        if p.get("negative"):
+            q["negative"] = p["negative"]
+        return q
+
     @app.post("/image/inpaint", tags=["immagini"])
     def image_inpaint(req: InpaintReq):
         gate.require("cap.inpaint")
@@ -251,6 +403,10 @@ def register(app: FastAPI):
         _need_model(p)
         if p["arch"] == "qwen_image21":
             _qwen21_inpaint(p, req)
+        elif p.pop("controlnet_inpaint", False):
+            p = _cn_inpaint(p, False)
+        else:
+            p.pop("control_scale", None)
         return _submit("image.inpaint", lambda job: run_image(p))
 
     @app.post("/image/outpaint", tags=["immagini"])
@@ -261,7 +417,10 @@ def register(app: FastAPI):
         if p["arch"] == "qwen_image21":                           # l'immagine arriva già allargata, maschera = bordo
             _qwen21_inpaint(p, req)
             p["outpaint"] = True                                  # il worker lo usa per riempimento/tono (task 14)
+        elif p.pop("controlnet_inpaint", False):
+            p = _cn_inpaint(p, True)
         else:
+            p.pop("control_scale", None)
             p["outpaint"] = True
         return _submit("image.outpaint", lambda job: run_image(p))
 

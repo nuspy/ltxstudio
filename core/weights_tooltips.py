@@ -53,6 +53,9 @@ USE_TAGS: dict[str, str] = {
     "multiref10": "Fino a 10 immagini di riferimento (persone, prodotti, stili) e trasparenza RGBA nativa.",
     "uncensored": "Senza censura (18+): nudo ed esplicito senza filtri; visibile solo in modalità NSFW.",
     "prompt_enhancer": "Arricchitore di prompt: un LLM riscrive la tua richiesta in un prompt dettagliato prima di generare.",
+    "controlnet_image": "ControlNet immagini: la struttura (bordi, profondità, posa) di una foto guida decide la composizione.",
+    "image_adapter": "Adattatore immagine (Redux): una foto di riferimento guida stile e contenuto della nuova immagine.",
+    "control_lora": "LoRA di controllo MagicQuill: modifica guidata da maschere, bordi e colori (usata solo da MagicQuill).",
     "veda_sparse": "Attenzione sparsa Veda: un piccolo predittore calcola solo i blocchi d'attenzione che contano — video H3 più veloce, stessi pesi.",
 }
 

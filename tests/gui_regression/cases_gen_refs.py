@@ -21,9 +21,14 @@ def _names(f):
 
 def case_genrefs_section_only_for_multiref_models(w, spy):
     f = w.frame1_tab
-    for lbl in ("FLUX", "Z-Image", "Ernie", "Krea 2"):
+    for lbl in ("FLUX", "Z-Image", "Ernie"):
         _arch(f, lbl)
         assert not f._gen_refs_box_w.isVisibleTo(f), f"sezione riferimenti visibile con {lbl} (non li accetta da «Genera»)"
+    _arch(f, "Krea 2")                                          # task 9: Krea 2 con riferimenti = Krea 2 Edit (≤2)
+    assert f._gen_refs_box_w.isVisibleTo(f), "sezione riferimenti nascosta con Krea 2 (Edit, max 2)"
+    f.gen_refs.clear()
+    assert sum(f.gen_refs.add_path(_img(f"_gr_k{i}.png")) for i in range(4)) == 2, "limite Krea 2 Edit = 2"
+    f.gen_refs.clear()
     _arch(f, "Qwen-Image 2.1")
     assert f._gen_refs_box_w.isVisibleTo(f), "sezione riferimenti nascosta con Qwen-Image 2.1"
     f.gen_refs.clear()
@@ -31,6 +36,35 @@ def case_genrefs_section_only_for_multiref_models(w, spy):
     assert added == 10, f"limite Qwen = 10, aggiunti {added}"
     assert _names(f)[0] == "image_1" and _names(f)[-1] == "image_10", _names(f)
     f.gen_refs.clear()
+
+
+def case_genrefs_krea2_edit_from_create(w, spy):
+    """Krea 2 + riferimenti → job Krea 2 Edit con le immagini nell'ordine, token tradotti, e il DiT/TE single-file
+    scelti in «Crea» (task 9: prima l'Edit arrivava solo dai pannelli di modifica e non li riceveva)."""
+    f = w.frame1_tab
+    f.img_nsfw.setCurrentText("NSFW")
+    f.gen_arch.setCurrentText("Krea 2")
+    i = f.gen_model.findData("krea2-noct-v4")
+    if i < 0:
+        return                                                  # edizione senza voci 18+
+    f.gen_model.setCurrentIndex(i)
+    f.gen_refs.clear()
+    a, b = _img("_gr_k0.png"), _img("_gr_k1.png")
+    f.gen_refs.add_path(a); f.gen_refs.add_path(b)
+    f.gen_prompt.setPlainText("@Foto_1 con il cappello di @Foto_2")
+    p = _run(w, spy, w.generate_image)
+    assert p["arch"] == "krea2_edit" and p["images"] == [a, b], p
+    assert p["prompt"] == "image 1 con il cappello di image 2", p["prompt"]
+    assert p["krea2_dit"] == "krea2-noct-v4", p
+    f.gen_refs.clear()
+    f.gen_refs.add_path(a)                                      # una sola foto → single
+    f.gen_prompt.setPlainText("@Foto_1 in smoking")
+    p = _run(w, spy, w.generate_image)
+    assert p["arch"] == "krea2_edit" and p.get("image_path") == a and "images" not in p, p
+    f.gen_refs.clear()
+    f.gen_prompt.setPlainText("un'aragosta in smoking")         # senza riferimenti resta testo→immagine
+    p = _run(w, spy, w.generate_image)
+    assert p["arch"] == "krea2", p
 
 
 def case_genrefs_names_stable(w, spy):
@@ -130,6 +164,8 @@ def case_genrefs_from_canvas_and_state(w, spy):
 CASES = [
     ("genrefs_section_only_for_multiref_models", "«Immagini di riferimento» visibile solo con Qwen-Image 2.1; massimo 10.",
      case_genrefs_section_only_for_multiref_models),
+    ("genrefs_krea2_edit_from_create", "Krea 2 + riferimenti → Krea 2 Edit (≤2) con DiT/TE single-file; senza → t2i.",
+     case_genrefs_krea2_edit_from_create),
     ("genrefs_names_stable", "Nomi @image_N assegnati al caricamento; togliere image_2 non rinumera; la nuova prende il "
      "primo libero.", case_genrefs_names_stable),
     ("genrefs_prompt_completion", "Digitando «@» nel prompt compare l'elenco dei nomi e l'inserimento sostituisce.",
