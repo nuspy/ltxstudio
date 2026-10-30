@@ -191,7 +191,6 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "ltx23-pinkcherry18": (["ckpt_video", "dev_quality", "uncensored"], []),
     "ltx25-te-uncensored": (["te", "uncensored"], []),
     "ltx25-uncensored-v11-int8": (["ckpt_video", "distilled", "int8_comfy", "uncensored"], []),
-    "ltx25-uncensored-v11-q8": (["ckpt_video", "distilled", "gguf_small", "uncensored"], []),
     "ltx25-stubelius-remix-v1": (["ckpt_video", "distilled", "int8_comfy", "uncensored"], []),
     "mmh3-dit-pinkcherry18": (["ckpt_video", "q_int8", "uncensored"], []),
     "mmh3-lora-hmcumshot-v2": (["lora_style", "uncensored"], []),

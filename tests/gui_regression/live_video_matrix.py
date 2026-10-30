@@ -40,11 +40,9 @@ M = {
     "eros14":        r"E:\AI\Models\diffusion_models\LTX\ltx10eros_v14_2989669.safetensors",   # Civitai: vs v1.5
     # LTX-2.5 int8 ConvRot (fold nativo in ltx-core), distill già fuso
     "stubelius":     r"E:\AI\Models\diffusion_models\LTX\ltx2.5-Stubelius_remix_v1_distilled_int8_convrot.safetensors",
-    # LTX-2.5 uncensored v1.1 GGUF Q8: config e connector dal «compagno» estratto dal GGUF (workers/gguf_native)
-    "unc25_q8":      r"E:\AI\Models\diffusion_models\LTX\ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf",
     "unc25_int8":    r"E:\AI\Models\diffusion_models\LTX\ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors",
 }
-NSFW_KEYS = ("eros", "eros14", "pinkcherry", "stubelius", "unc25_q8", "unc25_int8")
+NSFW_KEYS = ("eros", "eros14", "pinkcherry", "stubelius", "unc25_int8")
 PROMPTS = [  # creativi e vari (regola: mai gattini/cani)
     "un fabbro forgia una spada incandescente in una bottega medievale, scintille",
     "una ballerina di flamenco danza su un tetto all'alba, vestito rosso al vento",
@@ -358,7 +356,6 @@ CASES += [
     ("ltx_eros14_t2v",              1200, case_t2v("eros14")),         # 14/10: confronto con ltx_eros_t2v
     ("ltx25_stubelius_t2v",         1500, case_t2v("stubelius")),
     ("ltx25_stubelius_te_unc_t2v",  1500, case_t2v_te("stubelius", "ltx25-te-uncensored")),
-    ("ltx25_unc_q8_gguf_t2v",       1800, case_t2v("unc25_q8")),       # 14/10: esce RUMORE (non è un PASS)
     ("ltx25_unc_int8_t2v",          1500, case_t2v("unc25_int8")),
 ]
 # altre architetture

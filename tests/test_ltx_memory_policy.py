@@ -169,18 +169,18 @@ def _items(t):
     return [t.model.itemText(i) for i in range(t.model.count())]
 
 
-def test_menu_fallback_nsfw_ha_le_tre_voci(tab):
+def test_menu_fallback_nsfw_ha_le_voci(tab):
     tab.nsfw.setCurrentText("NSFW")
     tab._inventory_ready = False
     tab._diffusion_models, tab._checkpoint_models, tab._gguf_models = [], [], []
     tab._refilter_models()
     testo = " | ".join(_items(tab))
-    for atteso in ("10EROS v1.4", "10EROS v1.5", "INT8", "GGUF Q8"):
+    for atteso in ("10EROS v1.4", "10EROS v1.5", "INT8"):
         assert atteso in testo, atteso
     tab.nsfw.setCurrentText("SFW")
     tab._refilter_models()
     testo = " | ".join(_items(tab))
-    for vietato in ("10EROS", "INT8", "Q8"):
+    for vietato in ("10EROS", "INT8"):
         assert vietato not in testo, f"{vietato} visibile in SFW"
 
 
@@ -188,10 +188,10 @@ def test_menu_nasconde_file_di_servizio(tab):
     tab.nsfw.setCurrentText("NSFW")
     inv = [r"LTX\_ltx23_aux_components.safetensors", r"LTX\ltx10eros_v14_2989669.safetensors",
            r"LTX\ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors"]
-    tab.set_model_inventory(inv, [], [r"LTX\ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf"])
+    tab.set_model_inventory(inv, [], [r"LTXltro-modello-Q6_K.gguf"])
     testo = " | ".join(_items(tab))
     assert "_ltx23_aux_components" not in testo
-    assert "ltx10eros_v14" in testo and "int8-native" in testo and "Q8_0.gguf" in testo
+    assert "ltx10eros_v14" in testo and "int8-native" in testo and "Q6_K.gguf" in testo
 
 
 # ── 4. classificazione per chiavi + niente doppioni GGUF ─────────────────────────────────────────────────
