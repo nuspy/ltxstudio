@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 from ui.i18n_manager import tr, i18n, LANGUAGES, LANG_FLAGS
 from ui.job_queue import GenerationQueue, JobQueuePanel
 from ui import model_menu as mm
-from ui.tabs.frame1_tab import QWEN21_ENGINE_IDX
+from ui.tabs.frame1_tab import QWEN21_ENGINE_IDX, FLUX3_ENGINE_IDX
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core.comfy_driver import ComfyDriver           # noqa: E402
@@ -1026,6 +1026,11 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.video_tab = VideoTab()
         self.frame1_tab = Frame1Tab()
+        # rapporto del canvas per il pannello riquadri FLUX.3 (nessun torch.cuda: solo i valori del tab Video)
+        self.frame1_tab.size_provider = lambda: (int(self.video_tab.get_values().get("width", 1024)),
+                                                 int(self.video_tab.get_values().get("height", 1024)))
+        self.frame1_tab.gen_arch.currentTextChanged.connect(self._apply_flux3_size_cap)
+        self._apply_flux3_size_cap()
         _NativeImageWorker.klein_te_source = self.frame1_tab.klein_te_choice      # encoder Klein scelto in Inpaint
         self.video_tab.request_pulid_keyframe.connect(self._gen_pulid_keyframe_for_video)
         # I widget Prompt globale / Prompt negativo sono stati spostati nel tab Video.
@@ -2580,6 +2585,11 @@ class MainWindow(QMainWindow):
                     self._start_native_qwen21_edit(q21, ptxt, refs=[exp["image"]], negative=negative, seed=seed,
                                                    loras=self._inp_loras(cfg), enhance=cfg.get("enhance", False))
                     return
+                if cfg.get("integrate_engine") == "flux3":        # motore FLUX.3 Klein selezionato in Integra
+                    self._start_native_flux3_edit(cfg.get("integrate_flux3_dit"), ptxt, refs=[exp["image"]], seed=seed,
+                                                  boxes=cfg.get("boxes"), pup=cfg.get("flux3_pup", True),
+                                                  mode="integrazione")
+                    return
                 if cfg.get("integrate_engine") == "krea2":        # motore Krea 2 Edit selezionato in Integra
                     self._start_native_krea2_edit([exp["image"]], ptxt, negative,
                                                   cfg.get("grounding", 768),
@@ -2697,6 +2707,13 @@ class MainWindow(QMainWindow):
                     refs=[] if exp.get("mask") else [exp["image"]], negative=negative, seed=seed,
                     mode="integrazione", label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"),
                     enhance=bool(cfg.get("enhance") and ptxt.strip()))
+                return
+            if engine == "flux3":                             # FLUX.3: modifica per istruzione del composito (+ riquadri)
+                self._start_native_flux3_edit(
+                    cfg.get("integrate_flux3_dit"), ptxt or self._QWEN21_INTEGRATE_PROMPT,
+                    init_image=exp["image"] if exp.get("mask") else "", mask=exp.get("mask") or "",
+                    refs=[] if exp.get("mask") else [exp["image"]], seed=seed, boxes=cfg.get("boxes"),
+                    pup=cfg.get("flux3_pup", True), mode="integrazione")
                 return
             if engine == "krea2":                             # motore Krea 2 Edit → edit del composito (single)
                 self._start_native_krea2_edit([exp["image"]], ptxt, negative,
@@ -2819,6 +2836,11 @@ class MainWindow(QMainWindow):
                                            label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"),
                                            enhance=self.frame1_tab.get_inpaint_config().get("enhance", False))
             return
+        if engine == "flux3":                             # FLUX.3: fino a 10 riferimenti VERI («the first image»…)
+            self._inpaint_before = None
+            self._start_native_flux3_edit(cfg.get("flux3_dit"), cfg.get("prompt") or "", refs=imgs,
+                                          boxes=None, pup=cfg.get("flux3_pup", True), mode="composizione")
+            return
         if engine == "krea2":                             # Krea 2 Edit → multi-reference VERO (scena+soggetto,
             # 2 latenti separati ai frame RoPE 1/2 — non lo stitch di FLUX.1). Il modello ne gestisce max 2.
             self._start_native_krea2_edit(imgs[:2], cfg.get("prompt", ""), "",
@@ -2896,7 +2918,7 @@ class MainWindow(QMainWindow):
         if self._inpaint_pid:
             QMessageBox.information(self, tr("mw.wait_title"), tr("mw.gen_in_progress_msg")); return
         _ft = self.frame1_tab
-        if mm.blocked(self, _ft.color_model if _ft.color_engine.currentIndex() == QWEN21_ENGINE_IDX
+        if mm.blocked(self, _ft.color_model if _ft.color_engine.currentIndex() in (QWEN21_ENGINE_IDX, FLUX3_ENGINE_IDX)
                       else _ft.integrate_model):
             return
         cc = self.frame1_tab.get_color_config()
@@ -2912,6 +2934,14 @@ class MainWindow(QMainWindow):
                 f"material, lighting and shadows; change only the color.",
                 refs=[self.frame1_tab.image_path], mode="cambio colore",
                 label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"))
+            return
+        if engine == "flux3":                             # FLUX.3 → recolor per istruzione
+            what = (cc.get("subject") or "").strip() or "the main subject"
+            self._inpaint_before = self.frame1_tab.image_path
+            self._start_native_flux3_edit(
+                cc.get("flux3_dit"), f"Recolor {what} in the first image to {cc['target']}. Keep the original texture, "
+                f"material, lighting and shadows; change only the color.",
+                refs=[self.frame1_tab.image_path], pup=False, mode="cambio colore")
             return
         if engine == "krea2":                             # Krea 2 Edit → recolor per istruzione (single)
             what = (cc.get("subject") or "").strip() or "the main subject"
@@ -3141,7 +3171,7 @@ class MainWindow(QMainWindow):
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
-        if cfg.get("arch") in ("qwen_image21", "krea2"):      # riferimenti nominati: @image_N inesistente = errore
+        if cfg.get("arch") in ("qwen_image21", "krea2", "flux3"):      # riferimenti nominati: @image_N inesistente = errore
             _gr = self.frame1_tab.gen_refs
             _perr = _gr.prompt_errors(cfg.get("prompt_raw") or "")
             if _perr:
@@ -3153,7 +3183,7 @@ class MainWindow(QMainWindow):
                              "comunque passati al modello.").format(toks=", ".join(_unc)))
         # Krea 2 è uno SNAPSHOT diffusers (nessun file-modello): usa krea2_variant, non un checkpoint → salta il
         # controllo "modello obbligatorio" (il worker risolve turbo/raw dal catalogo).
-        if cfg.get("arch") not in ("krea2", "qwen_image21") and (not cfg["model"] or cfg["model"].startswith("(")):
+        if cfg.get("arch") not in ("krea2", "qwen_image21", "flux3") and (not cfg["model"] or cfg["model"].startswith("(")):
             QMessageBox.warning(self, tr("mw.no_model_title"), tr("mw.no_model_arch_msg").format(arch=cfg['arch'])); return
         if cfg.get("arch") == "qwen_image21":                 # DiT = voce di catalogo (+ deps)
             if not self._feature_gate("cap.image_qwen21"):
@@ -3178,6 +3208,10 @@ class MainWindow(QMainWindow):
                                                cfg.get("qwen21_turbo"), pe=cfg.get("qwen21_pe", ""),
                                                control=bool(cfg.get("control_image"))):
                 return
+        if cfg.get("arch") == "flux3" and not self._flux3_preflight(cfg.get("flux3_dit"), cfg.get("flux3_pup", True),
+                                                                     cfg.get("boxes"), len(cfg.get("ref_images") or []),
+                                                                     cfg.get("flux3_te", "")):
+            return
         # FLUX.2: se manca l'encoder del modello, offri di scaricarlo prima di costruire.
         if cfg.get("arch") == "flux" and not self._ensure_flux2_encoder(cfg["model"]):
             return
@@ -3323,6 +3357,7 @@ class MainWindow(QMainWindow):
                   "krea2_te": cfg.get("krea2_te"),             # Krea 2: text encoder single-file (uncensored)
                   # Qwen-Image 2.1: DiT, turbo, encoder, RGBA, formato 2K, riferimenti (≤10), img2img
                   **{k: cfg[k] for k in ("qwen21_dit", "qwen21_turbo", "qwen21_te", "transparent",
+                                         "flux3_dit", "flux3_pup", "flux3_te", "boxes",
                                          "aspect_2k", "ref_images", "init_image", "strength",
                                          "qwen21_pe", "qwen21_pe_think", "control_image", "control_type",
                                          "control_scale", "control_preprocess") if k in cfg},
@@ -4656,6 +4691,81 @@ class MainWindow(QMainWindow):
         self._log(f"Qwen-Image 2.1 Edit ({dit}, {mode}, {len(refs)} rif., "
                   f"{'maschera' if mask else 'senza maschera'}, {params['steps']} passi) inviato…")
         self._enqueue(label or tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"), self._native_worker,
+                      self._on_native_inpaint_done)
+
+    # ── FLUX.3 Image Klein (task 13): crea / modifica per istruzione / multi-riferimento / riquadri ───────────────
+    def _apply_flux3_size_cap(self, *_):
+        """Larghezza/altezza del tab Video: tetto 4096 con l'arch FLUX.3 Klein (nativo fino a 4096, verificato dal vivo), 2048 per
+        tutti gli altri motori (invariati: uscendo da FLUX.3 un valore più grande si riporta al tetto)."""
+        from core import flux3_spec as S3
+        top = S3.MAX_SIDE if self.frame1_tab.gen_arch.currentText() == "FLUX.3 Klein" else 2048
+        for spin in (self.video_tab.width, self.video_tab.height):
+            if spin.maximum() != top:
+                spin.setMaximum(top)
+
+    def _flux3_weight_ids(self, dit: str, pup: bool, te: str = "") -> list:
+        """Pesi che servono al job. Text encoder: la scelta (krea2|official) o, in automatico, il Krea2 uncensored se è su disco."""
+        from core import flux3_spec as S3
+        te_id = S3.te_id(te, S3.disk_present)           # «ufficiale» = flux3-te se c'è, altrimenti il TE dentro Krea 2 Turbo
+        ids = [dit or S3.DEFAULT_DIT, te_id, S3.VAE]
+        if te_id != S3.TE:
+            ids.append(S3.TE_CONFIGS)               # tokenizer e config del TE a file singolo
+        if pup:
+            ids += [S3.PUP_DEFAULT, "flux3-pup-configs"]
+        return ids
+
+    def _flux3_preflight(self, dit, pup, boxes, n_refs, te="") -> bool:
+        """Gate d'edizione, riquadri validi, pesi su disco (altrimenti avviso + «Apri tab Pesi», nessun download)."""
+        if not self._feature_gate("cap.image_flux3"):
+            return False
+        if boxes and not self._feature_gate("cap.flux3_boxes"):
+            return False
+        if pup and not self._feature_gate("cap.flux3_upsampler"):
+            return False
+        if boxes:
+            from core import flux3_caption as C3
+            errs = C3.validate(boxes, n_refs)
+            if errs:
+                QMessageBox.warning(self, tr("f1.flux3.boxes.btn", "Riquadri…"), "\n".join(errs))
+                return False
+        return self._missing_weights_notice(self._flux3_weight_ids(dit, pup, te), "FLUX.3 Klein")
+
+    def _start_native_flux3_edit(self, dit, prompt, *, refs=(), init_image="", mask="", boxes=None, pup=True, seed=None,
+                                 steps=None, loras=None, feather=0, mode="flux3_edit", label=None):
+        """FLUX.3 Klein nei pannelli di editing (Integra, Componi, Colore). Con `refs` è modifica per istruzione (≤10
+        immagini, «the first image»… nel prompt); con `init_image`+`mask` è una modifica per istruzione sulla foto e
+        il risultato si ricompone con la maschera binarizzata (FLUX.3 NON ha un inpaint nativo)."""
+        if not (prompt or "").strip() and not boxes:
+            QMessageBox.information(self, tr("mw.no_mask_title", "Serve un'istruzione"),
+                                    tr("mw.qwen21_no_prompt", "Scrivi COSA modificare nell'istruzione."))
+            return
+        refs = [r for r in (refs or []) if r]
+        if not refs and not init_image:
+            QMessageBox.warning(self, tr("mw.no_image_title"), tr("mw.load_photo_canvas_msg")); return
+        from core import flux3_spec as S3
+        dit = dit or S3.DEFAULT_DIT
+        te = self.frame1_tab.flux3_te_choice("f3e")
+        if not self._flux3_preflight(dit, pup, boxes, len(refs) + (1 if init_image else 0), te) or not self._ensure_native_ready():
+            return
+        params = {"arch": "flux3", "flux3_dit": dit, "flux3_pup": bool(pup), "flux3_te": te, "prompt": prompt or "",
+                  "seed": seed if seed is not None else random.randint(0, 2**31),
+                  "steps": int(steps or S3.DEFAULT_STEPS), "ref_images": refs[:S3.MAX_REFS], "loras": list(loras or []),
+                  "boxes": list(boxes or [])}
+        if init_image:
+            params["init_image"] = init_image
+        if mask:
+            params["mask_path"] = mask
+            params["feather"] = int(feather or 0)
+        else:                                  # risultato alla risoluzione e al rapporto del canvas (mai stirato)
+            v = self.video_tab.get_values()
+            self._clamp_resolution(v)
+            params["width"], params["height"] = int(v["width"]), int(v["height"])
+        self._inpaint_mode = mode
+        self._native_worker = _NativeImageWorker(params)
+        self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+        self._log(f"FLUX.3 Klein Edit ({mode}, {len(refs)} rif., {len(boxes or [])} riquadri, "
+                  f"{'maschera (composito nostro)' if mask else 'senza maschera'}, {params['steps']} passi) inviato…")
+        self._enqueue(label or tr("queue.job.flux3edit", "FLUX.3 Klein Edit"), self._native_worker,
                       self._on_native_inpaint_done)
 
     # ── MagicQuill V2 (task 9): backend image_mq (Kontext + LoRA di controllo) ─────────────────────────────────

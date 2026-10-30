@@ -120,6 +120,9 @@ def _from_arch_str(a: str):
     s = (a or "").strip().lower().replace(" ", "-")
     if not s or s == "-":
         return None
+    # FLUX.3 (Image Klein, 15/10/2026): prima di FLUX.2 e FLUX.1
+    if "flux.3" in s or "flux-3" in s or "flux3" in s:
+        return ("flux3", "distilled" if "klein" in s and "base" not in s else "base", "t2i", "image")
     # FLUX.2
     if "flux.2" in s or "flux-2" in s or "flux2" in s:
         return ("flux2", "dev", "t2i", "image")
@@ -190,6 +193,13 @@ def _from_keys(tensors: dict, name: str):
         role = "i2v" if ("i2v" in nl or "image" in nl) else ("s2v" if "s2v" in nl else "t2v")
         return (v, role, role, "video")
 
+    # --- FLUX.3 Image Klein: blocchi PER MODALITÀ (content_mode_blocks.image|image_cond + txt_mode_blocks) + single_blocks
+    # condivisi, hidden 3072, token testo a 20480 canali (8 strati del Qwen3-VL-4B impilati). Il distillato (flow map) ha
+    # `ref_time_in` (checkpoint.py ufficiale: FLOW_MAP_KEY), il Base no. Formato nativo BFL e formato diffusers (`mode_blocks`).
+    if (_has(keys, "content_mode_blocks.") or _has(keys, "mode_blocks.image")) and _has(keys, "txt_mode_blocks.")             and _has(keys, "single_blocks.", "single_transformer_blocks."):
+        flow = _has(keys, "ref_time_in.in_layer", "target_timestep_embedder")
+        return ("flux3", "distilled" if flow else "base", "t2i", "image")
+
     # --- FLUX family: double_blocks + single_blocks ---
     if _has(keys, "double_blocks") and _has(keys, "single_blocks"):
         # redux = solo proiettore (poche chiavi)
@@ -241,6 +251,7 @@ _FOLDER_FAMILY = {
     "ltx": ("ltxv", "base", "video", "video"), "ltx-2": ("ltxv", "base", "video", "video"),
     "wan2.1": ("wan21", "t2v", "t2v", "video"), "wan2.2": ("wan22", "t2v", "t2v", "video"),
     "wan": ("wan21", "t2v", "t2v", "video"), "hunyuanvideo": ("hunyuan_video", "base", "video", "video"),
+    "flux3": ("flux3", "distilled", "t2i", "image"),     # prima di «flux»: il fallback sul nome scorre in ordine
     "dreamo": ("dreamo", "base", "edit", "image"), "flux": ("flux1", "dev", "t2i", "image"),
     "sd": ("sd15", "base", "t2i", "image"), "supir": ("sdxl", "base", "t2i", "image"),
 }
@@ -299,7 +310,7 @@ def _from_config_file(path: str):
         return None
     # firme per famiglia (sottostringhe in _class_name/architectures/model_type)
     sig = [
-        ("flux2", ["flux2", "flux.2"]), ("flux1", ["flux"]),
+        ("flux3", ["flux3", "flux.3"]), ("flux2", ["flux2", "flux.2"]), ("flux1", ["flux"]),
         ("ltxv", ["ltx"]), ("wan22", ["wan2.2", "wan22"]), ("wan21", ["wan"]),
         ("hunyuan_video", ["hunyuanvideo", "hunyuan_video"]), ("qwen_image", ["qwenimage", "qwen_image"]),
         ("hidream", ["hidream"]), ("sd3", ["sd3", "stablediffusion3"]),
@@ -331,7 +342,7 @@ def _from_adapter_keys(tensors: dict):
     return None
 
 
-DET_VERSION = 2          # 2: ControlNet e LoRA di controllo riconosciuti dalle chiavi (ruolo controlnet/control_lora)
+DET_VERSION = 3          # 2: ControlNet e LoRA di controllo dalle chiavi (ruolo controlnet/control_lora) · 3: FLUX.3 Klein (famiglia flux3)
 
 
 def detect_one(path: str) -> dict:
@@ -383,6 +394,8 @@ def compatible_components(det: dict) -> dict:
         if "klein" in var:
             return {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["qwen3_8b", "qwen3_4b"]}
         return {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["mistral_3_small_flux2"]}
+    if fam == "flux3":      # VAE di FLUX.2 (stesso sha256); TE Qwen3-VL-4B Instruct dentro lo snapshot (non un file singolo)
+        return {"vae": "Flux/flux2-vae.safetensors", "text_encoders": ["builtin (Qwen3-VL-4B, TextEncoders/Flux3)"]}
     M = {
         "flux1":  {"vae": "Flux/ae.safetensors", "text_encoders": ["clip_l", "t5xxl"]},
         "zimage": {"vae": "Flux/ae.safetensors", "text_encoders": ["qwen3_4b"]},

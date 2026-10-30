@@ -4,6 +4,9 @@ generate (t2i) · edit/kontext · recolor · inpaint · outpaint · upscale/rest
 controlnet (FLUX.1 / Z-Image) · redux · magicquill (task 9).
 Qwen-Image 2.1 (`arch: qwen_image21`, nessun file-modello: il DiT è una voce di catalogo `qwen21_dit`) vale per
 generate (anche img2img con `init_image`+`strength`), edit (≤10 riferimenti), recolor, inpaint e outpaint.
+FLUX.3 Image Klein (`arch: flux3`, oppure `model: "flux3"`; nessun file-modello, DiT di catalogo `flux3_dit`): generate (t2i, layout
+con `boxes`), edit (≤10 riferimenti `ref_images`/`images`, riquadri di edit) e inpaint (modifica per istruzione + composito NOSTRO con
+la maschera binarizzata: FLUX.3 non ha un inpaint nativo). Pesi mancanti → 409 (nome e GB), nessun download.
 Ogni POST crea un job async → GET /jobs/{id} per stato + link di download.
 """
 from __future__ import annotations
@@ -36,11 +39,20 @@ class Qwen21Opts(BaseModel):
     qwen21_pe_think: bool = Field(False, description="arricchitore in modalità approfondita (~3 min invece di ~40 s)")
 
 
-class GenerateReq(Qwen21Opts):
+class Flux3Opts(BaseModel):
+    """Campi propri di FLUX.3 Image Klein (ignorati dalle altre architetture)."""
+    flux3_dit: str | None = Field(None, description="DiT di catalogo (default flux3-dit-fp8r)")
+    flux3_pup: bool = Field(True, description="upsampler di prompt (BFL: raccomandato SEMPRE)")
+    flux3_te: str | None = Field(None, description="text encoder: '' (automatico: Krea2 uncensored se su disco, 18+) | krea2 | official")
+    boxes: list[dict] | None = Field(None, description="riquadri, coordinate 0-1 [y_min,x_min,y_max,x_max]: layout "
+        "{id,desc,bbox}; con riferimenti {id,desc,mode:new|move|anchor|remove,ref(1-based),src_bbox,tgt_bbox}")
+
+
+class GenerateReq(Flux3Opts, Qwen21Opts):
     prompt: str
     model: str | None = Field(None, description="nome file modello (es. flux1-dev.safetensors); "
                                                 "non serve con qwen_image21")
-    arch: str = Field("flux", description="flux | flux2 | zimage | ernie | qwen_image21")
+    arch: str = Field("flux", description="flux | flux2 | zimage | ernie | qwen_image21 | flux3")
     init_image: str | None = Field(None, description="img2img (qwen_image21): foto di partenza")
     control_image: str | None = Field(None, description="ControlNet (qwen_image21): foto guida della struttura")
     control_preprocess: str | None = Field(None, description="canny | lineart | depth | gray | none")
@@ -57,12 +69,12 @@ class GenerateReq(Qwen21Opts):
     pulid_strength: float = 0.8
 
 
-class EditReq(Qwen21Opts):
+class EditReq(Flux3Opts, Qwen21Opts):
     prompt: str
     image_path: str | None = None                              # single (o usa `images`)
     images: list[str] | None = None                            # multi (krea2_edit max 2, qwen_image21 max 10)
     model: str | None = None                                   # non richiesto per krea2_edit/qwen_image21
-    arch: str = Field("kontext", description="kontext | flux2_kontext | krea2_edit | qwen_image21")
+    arch: str = Field("kontext", description="kontext | flux2_kontext | krea2_edit | qwen_image21 | flux3")
     negative: str | None = None
     steps: int = 20
     guidance: float = 2.5
@@ -83,12 +95,12 @@ class RecolorReq(Qwen21Opts):
     seed: int = 0
 
 
-class InpaintReq(Qwen21Opts):
+class InpaintReq(Flux3Opts, Qwen21Opts):
     prompt: str
     image_path: str
     mask_path: str
     model: str | None = None                                   # non serve con qwen_image21
-    arch: str = Field("inpaint", description="inpaint | flux2_inpaint | qwen_image21")
+    arch: str = Field("inpaint", description="inpaint | flux2_inpaint | qwen_image21 | flux3 (composito nostro)")
     negative: str | None = None
     steps: int = 20
     guidance: float = 30.0
@@ -187,7 +199,7 @@ def _kontext_guidance(p: dict) -> None:
 
 
 def _need_model(p: dict) -> None:
-    if p.get("arch") != "qwen_image21" and not p.get("model"):
+    if p.get("arch") not in ("qwen_image21", "flux3") and not p.get("model"):
         raise HTTPException(422, f"'model' obbligatorio con arch={p.get('arch')}")
 
 
@@ -224,7 +236,64 @@ def _qwen21(p: dict, req: BaseModel | None = None) -> dict:
     return p
 
 
-def _foto_tokens(p: dict) -> None:
+def _flux3_arch(p: dict) -> None:
+    """`model: "flux3"` vale come `arch: "flux3"` (nessun file-modello: lo risolve il catalogo)."""
+    if str(p.get("model") or "").lower() == "flux3":
+        p["arch"] = "flux3"
+
+
+def _flux3(p: dict, req: BaseModel | None = None) -> dict:
+    """Valida e completa un job FLUX.3 Klein: gate d'edizione, riquadri (formato di core.flux3_caption), ≤10 riferimenti,
+    token @Foto_N → «the first image»…, pesi su disco (409 altrimenti). Distillato: niente guidance né negative."""
+    from core import flux3_caption as C3
+    from core import flux3_spec as S3
+    gate.require("cap.image_flux3")
+    p.setdefault("flux3_dit", S3.DEFAULT_DIT)
+    if p["flux3_dit"] not in S3.DITS:
+        raise HTTPException(422, f"flux3_dit sconosciuto: {p['flux3_dit']} ({', '.join(S3.DITS)})")
+    if p.get("flux3_pup", True):
+        gate.require("cap.flux3_upsampler")
+    if p.get("flux3_te") not in (None, *S3.TE_CHOICES):
+        raise HTTPException(422, f"flux3_te sconosciuto: {p['flux3_te']} ({' | '.join(repr(c) for c in S3.TE_CHOICES)})")
+    te_id = S3.te_id(p.get("flux3_te") or "", _present)
+    if te_id == S3.TE_KREA2:                                      # encoder uncensored: solo dove le voci 18+ sono ammesse
+        gate.require("cap.adult_mode")
+    p["flux3_te"] = p.get("flux3_te") or ""
+    refs = [r for r in (p.get("ref_images") or []) if r]
+    if len(refs) > S3.MAX_REFS:
+        raise HTTPException(422, f"al massimo {S3.MAX_REFS} riferimenti")
+    n_refs = len(refs) + (1 if p.get("init_image") else 0)
+    if p.get("boxes"):
+        gate.require("cap.flux3_boxes")
+        errs = C3.validate(p["boxes"], n_refs)
+        if errs:
+            raise HTTPException(422, "riquadri non validi: " + "; ".join(errs))
+    if req is not None:
+        f = type(req).model_fields.get("steps")
+        if f is not None and p.get("steps") == f.default:
+            p.pop("steps", None)                                  # il default dell'endpoint è pensato per FLUX.1
+    p["steps"] = max(S3.MIN_STEPS, min(S3.MAX_STEPS, int(p.get("steps") or S3.DEFAULT_STEPS)))
+    for k in ("guidance", "negative", "model", "qwen21_dit", "qwen21_te", "qwen21_turbo", "qwen21_pe", "qwen21_pe_think",
+              "aspect_2k", "transparent", "control_image", "control_preprocess", "control_scale", "strength"):
+        p.pop(k, None)
+    _foto_tokens(p, "flux3")
+    _weights_409(_flux3_ids(p["flux3_dit"], p.get("flux3_pup", True), p["flux3_te"]), "FLUX.3 Klein")
+    return p
+
+
+def _present(entry_id: str) -> bool:
+    from core import flux3_spec as S3
+    return S3.disk_present(entry_id)
+
+
+def _flux3_ids(dit: str, pup: bool, te: str = "") -> list[str]:
+    from core import flux3_spec as S3
+    te_id = S3.te_id(te, _present)
+    return ([dit, te_id, S3.VAE] + ([S3.TE_CONFIGS] if te_id != S3.TE else [])
+            + ([S3.PUP_DEFAULT, "flux3-pup-configs"] if pup else []))
+
+
+def _foto_tokens(p: dict, style: str = "qwen21") -> None:
     """Riferimenti nominati come nella GUI: l'elemento k-esimo di `ref_images` è `@image_k`. Il prompt può citarlo con
     `@image_N` (tradotto in «image N», la sintassi di Qwen-Image 2.1); un token che cita una foto inesistente è 422,
     mai ignorato in silenzio. Le immagini passate ma non citate vanno comunque al modello. «image N» scritto a mano
@@ -239,7 +308,7 @@ def _foto_tokens(p: dict) -> None:
         raise HTTPException(422, f"il prompt cita {names}, ma ref_images ne contiene {len(refs)} "
                                  f"(@image_1…@image_{len(refs)})" if refs else
                                  f"il prompt cita {names} ma non ci sono immagini in ref_images")
-    p["prompt"] = R.translate(prompt, order, "qwen21")
+    p["prompt"] = R.translate(prompt, order, style)
 
 
 def _weights_409(ids: list[str], feature: str) -> None:
@@ -277,12 +346,26 @@ def register(app: FastAPI):
                          for d, m in DITS.items() if adult or not m.get("adult")],
                 "aspects_2k": {k: list(v) for k, v in ASPECTS_2K.items()}}
 
+    @app.get("/image/flux3/options", tags=["immagini"])
+    def image_flux3_options():
+        """FLUX.3 Image Klein: DiT disponibili e se i pesi sono su disco (DiT, text encoder, VAE, upsampler); limiti."""
+        from core import ensure_weights as ew
+        from core import flux3_spec as S3
+        return {"dits": [{"id": d, "steps": m["steps"], "installed": not ew.missing(_flux3_ids(d, False))}
+                         for d, m in S3.DITS.items()],
+                "upsampler": {"id": S3.PUP_DEFAULT, "installed": not ew.missing([S3.PUP_DEFAULT, "flux3-pup-configs"])},
+                "max_refs": S3.MAX_REFS, "side": [S3.MIN_SIDE, S3.MAX_SIDE], "box_modes": list(S3.BOX_MODES),
+                "inpaint_native": False}
+
     @app.post("/image/generate", tags=["immagini"])
     def image_generate(req: GenerateReq):
         gate.require("cap.gen_images")                         # rispetta l'edizione come la GUI (403 se off)
         p = req.model_dump(exclude_none=True)
+        _flux3_arch(p)
         _need_model(p)
-        if p["arch"] == "qwen_image21":
+        if p["arch"] == "flux3":
+            _flux3(p, req)
+        elif p["arch"] == "qwen_image21":
             _qwen21(p, req)
         p["loras"] = parse_loras(p.get("loras"))
         return _submit("image.generate", lambda job: run_image(p))
@@ -292,7 +375,16 @@ def register(app: FastAPI):
         gate.require("cap.krea2_edit" if req.arch == "krea2_edit" else "cap.gen_images")
         p = req.model_dump(exclude_none=True)
         _kontext_guidance(p)
-        if p["arch"] == "qwen_image21":                           # immagini → riferimenti «image N»
+        _flux3_arch(p)
+        if p["arch"] == "flux3":                                  # immagini → riferimenti «the first image»…
+            refs = ([p.pop("image_path")] if p.get("image_path") else []) + list(p.pop("images", None) or [])
+            p["ref_images"] = refs + list(p.get("ref_images") or [])
+            if not p["ref_images"]:
+                raise HTTPException(422, "serve almeno un'immagine (image_path, images o ref_images)")
+            for k in ("grounding_px", "krea2_variant", "max_side"):
+                p.pop(k, None)
+            _flux3(p, req)
+        elif p["arch"] == "qwen_image21":                         # immagini → riferimenti «image N»
             refs = ([p.pop("image_path")] if p.get("image_path") else []) + list(p.pop("images", None) or [])
             p["ref_images"] = refs + list(p.get("ref_images") or [])
             if not p["ref_images"]:
@@ -400,8 +492,12 @@ def register(app: FastAPI):
     def image_inpaint(req: InpaintReq):
         gate.require("cap.inpaint")
         p = req.model_dump(exclude_none=True)
+        _flux3_arch(p)
         _need_model(p)
-        if p["arch"] == "qwen_image21":
+        if p["arch"] == "flux3":
+            p["init_image"] = p.pop("image_path")                 # modifica per istruzione + composito con maschera binarizzata
+            _flux3(p, req)
+        elif p["arch"] == "qwen_image21":
             _qwen21_inpaint(p, req)
         elif p.pop("controlnet_inpaint", False):
             p = _cn_inpaint(p, False)
@@ -413,7 +509,10 @@ def register(app: FastAPI):
     def image_outpaint(req: OutpaintReq):
         gate.require("cap.inpaint")
         p = req.model_dump(exclude_none=True)
+        _flux3_arch(p)
         _need_model(p)
+        if p["arch"] == "flux3":
+            raise HTTPException(422, "FLUX.3 Klein non ha outpaint: usa /image/edit con le immagini o /image/inpaint (composito)")
         if p["arch"] == "qwen_image21":                           # l'immagine arriva già allargata, maschera = bordo
             _qwen21_inpaint(p, req)
             p["outpaint"] = True                                  # il worker lo usa per riempimento/tono (task 14)

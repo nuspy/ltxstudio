@@ -1057,6 +1057,9 @@ NEW += _task9(N)
 # task 17 (29/10/2026): upscaler locali, DiffPitcher, LoRA identità Krea, nunchaku Z-Image + versioni Civitai nuove
 from catalog_task17 import entries as _task17  # noqa: E402
 NEW += _task17(N)
+# task 13 (18/10/2026): FLUX.3 Image Klein (DiT fp8r, text encoder Qwen3-VL-4B, upsampler)
+from catalog_task13 import entries as _task13  # noqa: E402
+NEW += _task13(N)
 
 # url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {
@@ -1079,7 +1082,7 @@ DEFAULT_CAT_BY_MODULE = {
 
 
 # Famiglie in cui NEW è la fonte autorevole anche per le voci già nel json (campi di NEW vincono).
-REFRESH = ("mmh3-", "qwen21-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "ltx23-lora-civ", "ltx25-lora-civ",
+REFRESH = ("mmh3-", "qwen21-", "flux3-", "lcav", "krea2-lora-civ", "krea2-sickrealism", "ltx23-lora-civ", "ltx25-lora-civ",
            "ltx23-eros14", "ltx25-te-uncensored",
            # IC-LoRA Fase 1 (14/10): fonte corretta ai repo pubblici oumoumad + note Civitai
            "ltx-iclora-outpaint", "ltx-iclora-motiondeblur", "ltx-iclora-uncompress", "ltx-iclora-deinterlace",

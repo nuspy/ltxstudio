@@ -22,6 +22,7 @@ KNOWN_CAPS = [
     "cap.video_lipdub", "cap.video_hdr_ic", "cap.video_motion_track", "cap.video_h3_upsampler",
     "cap.video_inpaint_r2v",
     "cap.image_controlnet", "cap.image_redux", "cap.image_cn_inpaint", "cap.image_magicquill",
+    "cap.image_flux3", "cap.flux3_boxes", "cap.flux3_upsampler",
 ]
 
 

@@ -281,6 +281,8 @@ from catalog_task9 import USE as _TASK9_USE  # noqa: E402  (task 9: ControlNet, 
 MAP.update(_TASK9_USE)
 from catalog_task17 import USE as _TASK17_USE  # noqa: E402  (task 17: upscaler locali, DiffPitcher, versioni nuove)
 MAP.update(_TASK17_USE)
+from catalog_task13 import USE as _TASK13_USE  # noqa: E402  (task 13: FLUX.3 Image Klein)
+MAP.update(_TASK13_USE)
 
 
 # MiniMax H3: il TE non dipende dalla DiT. Il worker legge SOLO W["te"] (workers/minimax_h3_infer.py load_text_encoder)

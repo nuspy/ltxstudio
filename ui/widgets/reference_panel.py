@@ -315,7 +315,7 @@ class ReferencePanel(QWidget):
         fmt = R.MODEL_SYNTAX.get(self._token_style, R.MODEL_SYNTAX["h3"])["fmt"]
         for r in self._rows:
             seq[r.kind] += 1
-            r.set_token(fmt.get(r.kind, "{n}").format(n=seq[r.kind]))
+            r.set_token(R.format_ref(fmt.get(r.kind, "{n}"), seq[r.kind]))
         bits = [f"{seq[k]}/{self._lim[k]} {tr('vid.ref.kind.' + k, k)}"
                 for k in ("image", "video", "audio") if self._lim[k] > 0]
         self.count_lbl.setText(" · ".join(bits) + f"  ({len(self._rows)}/{self._total})")

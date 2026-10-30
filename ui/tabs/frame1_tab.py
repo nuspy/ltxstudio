@@ -53,6 +53,7 @@ GEN_ARCH = {
     "FLUX": ("Flux", ("flux", "getphat", "fuxcapacity")),   # "krea" tolto: ora ambiguo con Krea 2
     "Krea 2": ("Krea2", ("krea-2", "krea2")),               # arch immagine alternativa (Turbo/Raw)
     "Qwen-Image 2.1": ("Qwen21", ("qwen-image-2.1", "qwen_image_2.1", "qwen21")),   # ≤10 riferimenti + RGBA
+    "FLUX.3 Klein": ("Flux3", ("flux3", "flux-3")),         # crea + edit + ≤10 riferimenti + riquadri (task 13)
     "Z-Image": ("Z-Image", ("z-image", "z_image", "zimage")),
     "Ernie": ("Ernie", ("ernie",)),
 }
@@ -76,11 +77,16 @@ QWEN21_PROFILES = (
 # (ref_images ≤10 → workers/qwen_image21_infer.py). Krea 2 Edit (≤2) passa dai pannelli di modifica; FLUX.2/Klein nativo
 # prende UNA sola immagine (inference_server/backends/image_flux.py: image_path).
 # Task 9: Krea 2 con riferimenti = Krea 2 Edit (in-context, ≤2 immagini, stesso DiT/TE single-file scelti per il t2i).
-GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10), "Krea 2": ("krea2_edit", 2)}
+GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10), "Krea 2": ("krea2_edit", 2), "FLUX.3 Klein": ("flux3", 10)}
 # Guidance di FLUX.1 Kontext: regolabile (default 2.5). Valori piu' bassi attenuano contrasto/saturazione eccessivi.
 KONTEXT_GUIDANCE_DEFAULT = 2.5
 KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
 QWEN21_ENGINE_IDX = 3       # posizione di «Qwen-Image 2.1» nei combo motore di Integra/Componi/Colore
+FLUX3_ENGINE_IDX = 4        # posizione di «FLUX.3 Klein» nei combo motore (task 13)
+# FLUX.3 Image Klein: DiT di catalogo (core/flux3_spec.DITS). Oggi uno solo (opzione A: distillato fp8 per riga).
+FLUX3_PROFILES = (
+    ("flux3-dit-fp8r", "f1.gen.flux3.fp8r", "FLUX.3 Klein distillato fp8 (RTX 40xx/50xx, 6.3GB + encoder)"),
+)
 QWEN21_ASPECTS = ("1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16")
 
 
@@ -270,6 +276,7 @@ class Frame1Tab(QWidget):
         self.gen_vae.setToolTip(tr("f1.gen.vae.tt", "VAE che decodifica il latente in immagine; 'auto' usa quello del modello."))
         f.addRow(tr("f1.gen.vae_lbl"), self.gen_vae)
         f.addRow(self._qwen21_box())
+        f.addRow(self._flux3_box())
         f.addRow(self._krea2_box())
         f.addRow(self._gen_refs_box())
         f.addRow(self._struct_box())                  # ControlNet FLUX.1 / Z-Image (task 9)
@@ -448,7 +455,7 @@ class Frame1Tab(QWidget):
     def _sync_gen_lora_arch(self, arch_lbl: str):
         """Sincronizza l'architettura del LoraTab con quella selezionata per la generazione."""
         arch_map = {"FLUX": "Flux", "Z-Image": "Z-Image", "Ernie": "Ernie", "Qwen-Image 2.1": "Qwen21",
-                    "Krea 2": "Krea2"}            # = family del registro pesi (core/lora_catalog)
+                    "Krea 2": "Krea2", "FLUX.3 Klein": "Flux3"}            # = family del registro pesi (core/lora_catalog)
         arch = arch_map.get(arch_lbl, "Flux")
         self.gen_lora_tab.set_arch(arch)
 
@@ -519,9 +526,11 @@ class Frame1Tab(QWidget):
 
     def _reload_gen_body(self, *_):
         arch_lbl = self.gen_arch.currentText()
-        if arch_lbl in ("Krea 2", "Qwen-Image 2.1"):          # voci dal catalogo pesi (nessun file-modello)
+        if arch_lbl in ("Krea 2", "Qwen-Image 2.1", "FLUX.3 Klein"):   # voci dal catalogo pesi (nessun file-modello)
             if arch_lbl == "Krea 2":
                 self._reload_gen_krea2()
+            elif arch_lbl == "FLUX.3 Klein":
+                self._reload_gen_flux3()
             else:
                 self._reload_gen_qwen21()
             if hasattr(self, "gen_warn_lbl"):                 # niente golden template: worker dedicato
@@ -729,6 +738,178 @@ class Frame1Tab(QWidget):
         self.gen_model.currentIndexChanged.connect(self._on_ernie_model_changed)
         self.gen_arch.currentTextChanged.connect(self._on_ernie_model_changed)
         return box
+
+    # ---------- FLUX.3 Image Klein (task 13) ----------
+    def _make_flux3_controls(self, prefix: str, parent_form: QFormLayout):
+        """Controlli comuni a «Crea» (prefix f3) e a «Image to Image» (prefix f3e): casella upsampler + riquadri.
+        Crea gli attributi `<prefix>_pup`, `<prefix>_boxes_btn`, `<prefix>_boxes_lbl`, `<prefix>_boxes_clear`."""
+        pup = QCheckBox(tr("f1.flux3.pup", "Migliora il prompt (upsampler)"))
+        pup.setChecked(True)
+        pup.setMinimumHeight(32)
+        pup.setToolTip(tr("f1.flux3.pup.tt",
+            "Black Forest Labs raccomanda di usarlo SEMPRE: un modello di linguaggio trasforma la tua richiesta breve nel "
+            "testo completo (soggetto, luce, composizione, dettagli) che FLUX.3 si aspetta, e con i riquadri tiene fermi "
+            "i tuoi. Costa qualche decina di secondi e ~19 GB di VRAM prima della generazione (poi si libera). Spegnilo "
+            "solo se il tuo prompt è già completo."))
+        parent_form.addRow(pup)
+        te = QComboBox()
+        te.setMinimumHeight(32)
+        te.setToolTip(tr("f1.flux3.te.tt",
+            "Text encoder (Qwen3-VL-4B): il Krea2 uncensored fp8 già su disco (4,8 GB) è quello preferito; l'ufficiale bf16 "
+            "(8,9 GB) resta come alternativa. Cambiano le parole che il modello «capisce»: confronta a parità di seed."))
+        parent_form.addRow(tr("f1.flux3.te", "Text encoder"), te)
+        setattr(self, f"{prefix}_te", te)
+        row = QHBoxLayout()
+        btn = QPushButton(tr("f1.flux3.boxes.btn", "Riquadri…"))
+        btn.setMinimumHeight(44)
+        btn.setToolTip(tr("f1.flux3.boxes.tt",
+            "Disegna zone con nome e descrizione: in «Crea» fissano dove sta ogni elemento; con riferimenti dicono cosa "
+            "aggiungere, spostare, tenere fermo o togliere. Posizione e scala sono vincoli, non una maschera rigida."))
+        lbl = QLabel(tr("f1.flux3.boxes.none", "nessun riquadro"))
+        lbl.setStyleSheet("color:#aaa;")
+        clr = QPushButton("✕")
+        clr.setMinimumHeight(44); clr.setMinimumWidth(44)
+        clr.setToolTip(tr("f1.flux3.boxes.clear", "Togli tutti i riquadri"))
+        row.addWidget(btn); row.addWidget(lbl, 1); row.addWidget(clr)
+        parent_form.addRow(self._wrapw(row))
+        setattr(self, f"{prefix}_pup", pup)
+        setattr(self, f"{prefix}_boxes_btn", btn)
+        setattr(self, f"{prefix}_boxes_lbl", lbl)
+        setattr(self, f"{prefix}_boxes_clear", clr)
+        setattr(self, f"_{prefix}_boxes", [])
+        btn.clicked.connect(lambda *_: self.open_flux3_boxes(prefix))
+        clr.clicked.connect(lambda *_: self._set_flux3_boxes(prefix, []))
+
+    def _flux3_box(self) -> QGroupBox:
+        """Opzioni proprie di FLUX.3 Image Klein (visibili solo con quell'architettura)."""
+        box = QGroupBox(tr("f1.gen.flux3.group", "FLUX.3 Klein"))
+        ff = QFormLayout(box)
+        self._make_flux3_controls("f3", ff)
+        info = QLabel(tr("f1.flux3.info",
+            "Distillato: 16 passi, nessuna guidance né negative. Con immagini di riferimento («Immagini di riferimento», "
+            "fino a 10) diventa modifica per istruzione. L'inpaint con maschera non è nativo: negli altri pannelli "
+            "FLUX.3 modifica per istruzione e la maschera ricompone il risultato."))
+        info.setWordWrap(True); info.setStyleSheet("color:#888; font-size:11px;")
+        ff.addRow(info)
+        lic = QLabel(tr("f1.gen.flux3.license",
+            "Licenza FLUX Kommunity: uso commerciale degli output solo sotto 5 milioni di dollari di ricavi, con filtro o "
+            "revisione dei contenuti. I pesi li scarichi tu dal tab Pesi dopo aver accettato la licenza."))
+        lic.setWordWrap(True); lic.setStyleSheet("color:#e8b339; font-size:11px;")
+        ff.addRow(lic)
+        self._f3_box = box
+        box.setVisible(False)
+        self._fill_flux3_te()
+        self.img_nsfw.currentTextChanged.connect(self._fill_flux3_te)
+        self.gen_arch.currentTextChanged.connect(self._sync_flux3_box)
+        self.gen_arch.currentTextChanged.connect(self._on_flux3_changed)
+        return box
+
+    def _sync_flux3_box(self, *_):
+        on = self.gen_arch.currentText() == "FLUX.3 Klein"
+        self._f3_box.setVisible(on)
+
+    def _on_flux3_changed(self, *_):
+        """FLUX.3 distillato: 16 passi (4–16), niente guidance né negative → quei campi si bloccano con la spiegazione. Uscendo
+        da FLUX.3 si sbloccano e si riapplica la logica dell'architettura scelta (es. Qwen Turbo)."""
+        if not hasattr(self, "gen_cfg") or not hasattr(self, "gen_neg"):
+            return
+        from core import flux3_spec as S3
+        on = self.gen_arch.currentText() == "FLUX.3 Klein"
+        locked = getattr(self, "_f3_locked", False)
+        if on:
+            self.gen_steps.setRange(S3.MIN_STEPS, S3.MAX_STEPS)
+            self.gen_steps.setValue(S3.DEFAULT_STEPS)
+            fixed = tr("f1.flux3.cfg_fixed", "FLUX.3 distillato campiona senza guidance (CFG) e senza prompt negativo.")
+            for w in (self.gen_cfg, self.gen_neg):
+                w.setEnabled(False)
+                w.setToolTip(fixed)
+            self._f3_locked = True
+        elif locked:
+            self._f3_locked = False
+            self.gen_steps.setRange(1, 80)
+            self.gen_cfg.setEnabled(True)
+            self.gen_cfg.setToolTip(tr("f1.gen.cfg.tt", "Guidance (CFG): quanto l'immagine aderisce al prompt; valori troppo alti creano artefatti."))
+            self.gen_neg.setEnabled(True)
+            self.gen_neg.setToolTip(tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))
+            self._on_qwen21_dit_changed()
+
+    def _fill_flux3_te(self, *_):
+        """Voci del text encoder: il Krea2 uncensored (18+) solo se le voci 18+ sono ammesse (come l'encoder «heretic» di Qwen);
+        altrimenti solo l'ufficiale. Mantiene la scelta se resta valida."""
+        adult = self._adult_ok()
+        items = ([("", tr("f1.flux3.te.auto", "Automatico (Krea2 uncensored se presente)")),
+                  ("krea2", tr("f1.flux3.te.krea2", "Krea2 uncensored fp8 (4,8 GB)"))] if adult else [])
+        items.append(("official", tr("f1.flux3.te.official", "Ufficiale bf16 (8,9 GB; riusato da Krea 2 se installato)")))
+        for name in ("f3_te", "f3e_te"):
+            combo = getattr(self, name, None)
+            if combo is None:
+                continue
+            cur = combo.currentData()
+            combo.blockSignals(True)
+            combo.clear()
+            for data, label in items:
+                combo.addItem(label, data)
+            i = combo.findData(cur)
+            combo.setCurrentIndex(i if i >= 0 else 0)
+            combo.blockSignals(False)
+
+    def flux3_te_choice(self, prefix: str = "f3") -> str:
+        """""|krea2|official per il worker; senza voci 18+ ammesse è sempre l'ufficiale."""
+        combo = getattr(self, f"{prefix}_te", None)
+        d = combo.currentData() if combo is not None else ""
+        return str(d or "") if self._adult_ok() else "official"
+
+    def _flux3_items(self):
+        return [(cid, tr(k, fb)) for cid, k, fb in FLUX3_PROFILES]
+
+    def _reload_gen_flux3(self, *_):
+        self._reload_gen_catalog(self._flux3_items())
+
+    def _flux3_refs(self, prefix: str) -> list[tuple[str, str]]:
+        """Riferimenti [(nome, path)] nell'ordine di invio per il contesto del pannello riquadri."""
+        if prefix == "f3":
+            return [(r["name"], r["path"]) for r in self.gen_refs.get_references() if r.get("kind") == "image"][:10]
+        base = (self.int_photo["edit"].text().strip() if hasattr(self, "int_photo") else "") or (self.image_path or "")
+        return [("Foto_1", base)] if base else []
+
+    def _flux3_ratio(self) -> float:
+        prov = getattr(self, "size_provider", None)
+        try:
+            w, h = prov() if prov else (1024, 1024)
+            return max(0.1, min(10.0, float(w) / float(h)))
+        except Exception:                                      # noqa: BLE001
+            return 1.0
+
+    def open_flux3_boxes(self, prefix: str = "f3"):
+        """Apre il pannello riquadri nel contesto giusto (layout se non ci sono riferimenti, edit altrimenti)."""
+        from ui.widgets.flux3_boxes import Flux3BoxesDialog
+        dlg = Flux3BoxesDialog(self, self._flux3_refs(prefix), self._flux3_ratio(), getattr(self, f"_{prefix}_boxes", []))
+        self._f3_dlg = dlg                                     # riferimento per i test (dlg.exec() è bloccante)
+        if dlg.exec() == dlg.Accepted:
+            self._set_flux3_boxes(prefix, dlg.boxes())
+
+    def _set_flux3_boxes(self, prefix: str, boxes: list):
+        setattr(self, f"_{prefix}_boxes", [b for b in boxes if b])
+        n = len(getattr(self, f"_{prefix}_boxes"))
+        getattr(self, f"{prefix}_boxes_lbl").setText(
+            tr("f1.flux3.boxes.n", "{n} riquadri").format(n=n) if n else tr("f1.flux3.boxes.none", "nessun riquadro"))
+
+    def _flux3_config(self) -> dict:
+        """Parametri di «Crea» con FLUX.3 Klein (vuoto con le altre architetture). I riquadri senza riferimenti sono un
+        LAYOUT; con riferimenti (ordine @Foto_N) un EDIT."""
+        if self.gen_arch.currentText() != "FLUX.3 Klein":
+            return {}
+        refs = [r["path"] for r in self.gen_refs.get_references() if r.get("kind") == "image"]
+        return {"flux3_dit": str(self.gen_model.currentData() or "flux3-dit-fp8r"),
+                "flux3_pup": self.f3_pup.isChecked(), "flux3_te": self.flux3_te_choice("f3"), "boxes": list(self._f3_boxes),
+                "ref_images": refs[:10]}
+
+    def flux3_edit_params(self) -> dict:
+        """Upsampler + riquadri per i pannelli di editing quando il motore è FLUX.3 (vuoto altrimenti)."""
+        if not hasattr(self, "integrate_engine") or self.integrate_engine.currentIndex() != FLUX3_ENGINE_IDX:
+            return {}
+        return {"flux3_pup": self.f3e_pup.isChecked(), "flux3_te": self.flux3_te_choice("f3e"),
+                "boxes": list(self._f3e_boxes)}
 
     def _gen_refs_box(self) -> QGroupBox:
         """«Immagini di riferimento» dentro «Crea immagini»: visibile SOLO con i modelli multi-riferimento (limite per
@@ -1255,7 +1436,7 @@ class Frame1Tab(QWidget):
     def _gen_model_name(self) -> str:
         """Nome modello selezionato; risolve la voce '⚡ Auto' al miglior modello dell'arch corrente
         (stesso criterio del motore auto_select: preferiti + qualità di famiglia)."""
-        if self.gen_arch.currentText() in ("Krea 2", "Qwen-Image 2.1"):   # nessun file-modello: lo risolve il worker
+        if self.gen_arch.currentText() in ("Krea 2", "Qwen-Image 2.1", "FLUX.3 Klein"):   # nessun file-modello: lo risolve il worker
             return ""
         if not self.gen_model.count() or self.gen_model_is_placeholder():
             return ""
@@ -1322,6 +1503,11 @@ class Frame1Tab(QWidget):
                       if hasattr(self, "integrate_engine") else 0)
             if engine == QWEN21_ENGINE_IDX:        # Qwen-Image 2.1 → DiT dal catalogo (18+ solo in NSFW)
                 self._reload_gen_catalog(self._qwen21_items(), combo=ic)
+                if hasattr(self, "integrate_puzzle"):
+                    self.integrate_puzzle.setEnabled(False); self.integrate_puzzle.setChecked(False)
+                return
+            if engine == FLUX3_ENGINE_IDX:         # FLUX.3 Klein → DiT dal catalogo
+                self._reload_gen_catalog(self._flux3_items(), combo=ic)
                 if hasattr(self, "integrate_puzzle"):
                     self.integrate_puzzle.setEnabled(False); self.integrate_puzzle.setChecked(False)
                 return
@@ -1561,12 +1747,17 @@ class Frame1Tab(QWidget):
         self.integrate_engine = QComboBox()
         self.integrate_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2"),
                                         tr("f1.engine.krea2edit", "Krea 2 Edit"),
-                                        tr("f1.engine.qwen21", "Qwen-Image 2.1")])
+                                        tr("f1.engine.qwen21", "Qwen-Image 2.1"),
+                                        tr("f1.engine.flux3", "FLUX.3 Klein")])
         self.integrate_engine.setToolTip(tr("f1.integrate.engine.tt"))
         # Cambio engine → ripopola il combo modelli (Kontext FLUX.1 / FLUX.2 / Krea 2 Turbo-Raw) +
         # abilitazione del puzzle_lora (LoRA FLUX.1) + visibilità dello slider grounding (solo Krea 2 Edit).
         self.integrate_engine.currentIndexChanged.connect(self._on_integrate_engine_changed)
         g.addRow(tr("f1.integrate.engine_lbl"), self.integrate_engine)
+        self._f3e_widget = QWidget(); _f3l = QFormLayout(self._f3e_widget); _f3l.setContentsMargins(0, 0, 0, 0)
+        self._make_flux3_controls("f3e", _f3l)
+        g.addRow(self._f3e_widget)
+        self._f3e_widget.setVisible(False)
         # Slider GROUNDING (edit↔fedeltà identità) — solo per Krea 2 Edit. 512=edit forte … 1536=preserva
         # identità (def 768). Manopola caratteristica del port comfyui-krea2edit.
         grrow = QHBoxLayout()
@@ -1590,6 +1781,7 @@ class Frame1Tab(QWidget):
         self.integrate_model.activated.connect(                # Qwen: download-on-select del DiT scelto
             lambda *_: self.integrate_engine.currentIndex() == QWEN21_ENGINE_IDX
             and self._offer_catalog_download(self.integrate_model))
+        # (FLUX.3: nessun download-on-select — i pesi con licenza si scaricano SOLO dal tab «Pesi modelli»)
         # Label dinamica: aggiornata da _on_integrate_engine_changed.
         self._integrate_model_label = QLabel(tr("f1.model_lbl"))
         g.addRow(self._integrate_model_label, self.integrate_model)
@@ -1842,9 +2034,10 @@ class Frame1Tab(QWidget):
         self.color_engine = QComboBox()
         self.color_engine.addItems([tr("f1.engine.kontext"), tr("f1.engine.flux2"),
                                     tr("f1.engine.krea2edit", "Krea 2 Edit"),
-                                    tr("f1.engine.qwen21", "Qwen-Image 2.1")])
+                                    tr("f1.engine.qwen21", "Qwen-Image 2.1"),
+                                    tr("f1.engine.flux3", "FLUX.3 Klein")])
         self.color_engine.setToolTip(tr("f1.color.engine.tt",
-            "Motore per il cambio colore: Kontext (FLUX.1), FLUX.2, Krea 2 Edit o Qwen-Image 2.1."))
+            "Motore per il cambio colore: Kontext (FLUX.1), FLUX.2, Krea 2 Edit, Qwen-Image 2.1 o FLUX.3 Klein."))
         f.addRow(tr("f1.engine_lbl"), self.color_engine)
         # Modello Qwen-Image 2.1 (solo con quel motore): gli altri motori prendono il modello da Integra
         self.color_model = QComboBox()
@@ -1881,10 +2074,14 @@ class Frame1Tab(QWidget):
         if hasattr(self, "color_steps"):
             self._swap_default_steps(self.color_steps, getattr(self, "_color_engine_klein", False), idx == 1)
         self._color_engine_klein = (idx == 1)
-        on = idx == QWEN21_ENGINE_IDX
+        on = idx in (QWEN21_ENGINE_IDX, FLUX3_ENGINE_IDX)
         self.color_model.setVisible(on); self._color_model_lbl.setVisible(on)
         if on:
-            self._reload_gen_catalog(self._qwen21_items(), combo=self.color_model)
+            self._color_model_lbl.setText(tr("f1.integrate.model.flux3", "Modello (FLUX.3 Klein)")
+                                          if idx == FLUX3_ENGINE_IDX else
+                                          tr("f1.integrate.model.qwen21", "Modello (Qwen-Image 2.1)"))
+            self._reload_gen_catalog(self._flux3_items() if idx == FLUX3_ENGINE_IDX else self._qwen21_items(),
+                                     combo=self.color_model)
 
     def _wrapw(self, layout) -> QWidget:
         w = QWidget(); w.setLayout(layout); return w
@@ -1899,7 +2096,13 @@ class Frame1Tab(QWidget):
     @staticmethod
     def _engine_val(idx: int) -> str:
         """Indice combo motore → valore backend. 0=Kontext(FLUX.1), 1=FLUX.2, 2=Krea 2 Edit, 3=Qwen-Image 2.1."""
-        return {0: "kontext", 1: "flux2", 2: "krea2", QWEN21_ENGINE_IDX: "qwen_image21"}.get(int(idx), "kontext")
+        return {0: "kontext", 1: "flux2", 2: "krea2", QWEN21_ENGINE_IDX: "qwen_image21",
+                FLUX3_ENGINE_IDX: "flux3"}.get(int(idx), "kontext")
+
+    def flux3_edit_dit(self, combo=None) -> str:
+        """DiT FLUX.3 scelto in un combo dei pannelli di editing ('' se il motore non è FLUX.3)."""
+        d = (combo if combo is not None else self.integrate_model).currentData()
+        return d if isinstance(d, str) and d.startswith("flux3-") else ""
 
     def qwen21_edit_dit(self, combo=None) -> str:
         """DiT Qwen scelto in un combo dei pannelli di editing (default: quello di Integra/Componi)."""
@@ -1922,6 +2125,7 @@ class Frame1Tab(QWidget):
             "subject": self.color_subject.text().strip(),
             "engine": self._engine_val(self.color_engine.currentIndex()),
             "qwen21_dit": self.qwen21_edit_dit(self.color_model),
+            "flux3_dit": self.flux3_edit_dit(self.color_model),
             "grounding": self.edit_grounding_px(),
             "steps": self.color_steps.value(),
             "guidance": float(self.color_guidance.value()),      # solo Kontext (default 2.5)
@@ -2030,7 +2234,9 @@ class Frame1Tab(QWidget):
         if hasattr(self, "int_steps"):
             self._swap_default_steps(self.int_steps, getattr(self, "_int_engine_klein", False), _idx == 1)
         self._int_engine_klein = (_idx == 1)
-        if _idx == QWEN21_ENGINE_IDX:
+        if _idx == FLUX3_ENGINE_IDX:
+            engine_label = tr("f1.integrate.model.flux3", "Modello (FLUX.3 Klein)")
+        elif _idx == QWEN21_ENGINE_IDX:
             engine_label = tr("f1.integrate.model.qwen21", "Modello (Qwen-Image 2.1)")
         elif _idx == 2:
             engine_label = tr("f1.integrate.model.krea2", "Modello (Krea 2)")
@@ -2040,6 +2246,8 @@ class Frame1Tab(QWidget):
             engine_label = tr("f1.integrate.model.kontext")
         if hasattr(self, "_integrate_model_label"):
             self._integrate_model_label.setText(engine_label)
+        if hasattr(self, "_f3e_widget"):                       # upsampler + riquadri: solo col motore FLUX.3
+            self._f3e_widget.setVisible(_idx == FLUX3_ENGINE_IDX)
         # slider grounding visibile SOLO per Krea 2 Edit
         if hasattr(self, "_edit_grounding_row"):
             self._edit_grounding_row.setVisible(_idx == 2)
@@ -2405,8 +2613,8 @@ class Frame1Tab(QWidget):
     def _reload_qwen21_edit_combos(self, *_):
         """Voci Qwen-Image 2.1 nei pannelli di editing: combo modello del Cambia colore e voci del combo
         Inpaint/Outpaint (prima di «Nessuno»). Rifiltrate al cambio SFW/NSFW e dopo un download."""
-        if hasattr(self, "color_model") and self.color_engine.currentIndex() == QWEN21_ENGINE_IDX:
-            self._reload_gen_catalog(self._qwen21_items(), combo=self.color_model)
+        if hasattr(self, "color_model") and self.color_engine.currentIndex() in (QWEN21_ENGINE_IDX, FLUX3_ENGINE_IDX):
+            self._on_color_engine_changed(self.color_engine.currentIndex())
         if not hasattr(self, "inp_model"):
             return
         from core import weights_catalog as wc
@@ -2587,6 +2795,8 @@ class Frame1Tab(QWidget):
             "integrate_engine": self._engine_val(self.integrate_engine.currentIndex()),
             "integrate_variant": self._integrate_krea2_variant(),   # turbo/raw quando engine=krea2
             "integrate_qwen21_dit": self.qwen21_edit_dit(),         # DiT quando engine=qwen_image21
+            "integrate_flux3_dit": self.flux3_edit_dit(),           # DiT quando engine=flux3
+            **self.flux3_edit_params(),                             # upsampler + riquadri (solo con engine=flux3)
             "grounding": self.edit_grounding_px(),
             "integrate_puzzle_lora": ("MagicQuill\\puzzle_lora.safetensors"
                                       if self.integrate_puzzle.isChecked() else None),
@@ -2662,6 +2872,8 @@ class Frame1Tab(QWidget):
             "engine": self._engine_val(self.integrate_engine.currentIndex()),
             "variant": self._integrate_krea2_variant(),            # turbo/raw quando engine=krea2
             "qwen21_dit": self.qwen21_edit_dit(),                  # DiT quando engine=qwen_image21
+            "flux3_dit": self.flux3_edit_dit(),                    # DiT quando engine=flux3
+            **self.flux3_edit_params(),
             "grounding": self.edit_grounding_px(),
             "model": (self.integrate_model.currentText() if self.integrate_model.count() else "") or None,
         }
@@ -2687,7 +2899,7 @@ class Frame1Tab(QWidget):
             "pulid_start_step": (self.gen_pulid_start.value() if hasattr(self, "gen_pulid_start") else 0),
             "pulid_true_cfg": (self.gen_pulid_truecfg.value() if hasattr(self, "gen_pulid_truecfg") else 1.0),
             "arch": {"FLUX": "flux", "Krea 2": "krea2", "Z-Image": "zimage", "Ernie": "ernie",
-                     "Qwen-Image 2.1": "qwen_image21"}.get(self.gen_arch.currentText(), "flux"),
+                     "Qwen-Image 2.1": "qwen_image21", "FLUX.3 Klein": "flux3"}.get(self.gen_arch.currentText(), "flux"),
             "model": self._gen_model_name(),
             # Krea 2: variante (turbo/raw) dalla voce selezionata nel dropdown → il worker risolve lo snapshot
             "krea2_variant": ("raw" if str(self.gen_model.currentData() or "").endswith("raw") else "turbo")
@@ -2696,6 +2908,7 @@ class Frame1Tab(QWidget):
             "krea2_dit": self._krea2_dit(),
             "krea2_te": self._krea2_te(),
             **self._qwen21_config(),
+            **self._flux3_config(),
             **self._krea2_refs_config(),
             **self.image_control_config(),
             "loras": self.gen_lora_tab.selected_loras(),

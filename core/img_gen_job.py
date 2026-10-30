@@ -28,6 +28,9 @@ _ARCH_RUNNER = {
     "krea2_edit": (_LINGBOT_PY, str(REPO / "workers" / "krea2_infer.py")),
     # Qwen-Image 2.1: t2i + edit fino a 10 riferimenti + RGBA, nel venv condiviso con MiniMax H3 (diffusers main)
     "qwen_image21": (_DIFFUSERS_NEXT_PY, str(REPO / "workers" / "qwen_image21_infer.py")),
+    # FLUX.3 Image Klein (task 13): DiT NATIVO (workers/flux3_dit.py) → gira nello stesso venv condiviso, nessun diffusers
+    # più recente da installare (provato anche in un venv con diffusers ≥ 15/10 poi eliminato: nessun venv dedicato).
+    "flux3": (_DIFFUSERS_NEXT_PY, str(REPO / "workers" / "flux3_infer.py")),
 }
 
 
@@ -196,6 +199,11 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
             os.remove(jf)
         except OSError:
             pass
+    try:                                                     # log del worker accanto all'immagine: tempi per fase, picco VRAM
+        with open(out + ".log", "w", encoding="utf-8", errors="replace") as lf:
+            lf.write((r.stdout or "") + "\n--- stderr ---\n" + (r.stderr or ""))
+    except OSError:
+        pass
     if os.path.exists(out):
         return {"status": "success", "output": [out]}
     tail = ((r.stdout or "")[-800:] + (r.stderr or "")[-800:]).strip()
