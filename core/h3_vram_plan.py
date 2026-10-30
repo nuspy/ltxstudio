@@ -8,11 +8,22 @@ attivazioni crescono linearmente con i token. A 1376×736 e 10 s sono ~72k token
 LoRA sommavano 3-4 temporanei grandi quanto il qkv. Qui la stima è per token e il confronto è con la VRAM
 LIBERA di adesso: nessuna soglia fissa sui GB della scheda (regola «VRAM dinamica»).
 
-Modello di costo (bf16, elementi per token). Col blocco a token-chunk (workers/h3_chunk.py, default) restano in
-memoria solo il flusso residuo (nuovo + quello del chiamante, caso peggiore fp32), Q/K/V pieni e l'uscita
-dell'attenzione: 4·h + 5·i; il resto è a blocchi ed è un'attività fissa (FIXED_ACT_GB). Senza chunk
-(H3_BLOCK_CHUNK=0) vale il modello a fasi del blocco originale (attenzione 2·h + 8·i, MLP 3·h + 4·f) × 1,7.
-Calibrazione e margine: vedi i commenti sulle costanti (prova dal vivo del 30/10: OOM nell'MLP, 28,47 GiB).
+Modello di costo = INVENTARIO di cio' che e' vivo in VRAM nel punto peggiore (attenzione di un blocco, ramo a
+blocchi di workers/h3_chunk.py), contato dal codice di diffusers (byte per token, N = lunghezza sequenza):
+  · video_embeds in forward(): proj_in e' fp32 e la variabile resta viva per tutto il giro dei blocchi   4·h
+  · flusso residuo in ingresso al blocco (tenuto dal chiamante), caso peggiore fp32                        4·h
+  · nuovo flusso residuo (buffer di uscita del blocco), caso peggiore fp32                                 4·h
+  · Q, K, V pieni (bf16, inner = teste × dim_head)                                                         6·i
+  · uscita dell'attenzione: a blocchi di query -> un blocco (compreso in FIXED_ACT_GB), non N
+  · rotary cos/sin fp32 (N × 96), position_ids, indici: trascurabili (~0,1 GB)
+  = 12·h + 6·i byte per token (107 KB a h=5376, i=7168 -> ~7,6 GiB a 72k token).
+Fisso (FIXED_ACT_GB): un blocco di temporanei (<= 1,5 GiB) + lavoro del kernel di attenzione (0,3) + una voce
+NON ATTRIBUIBILE dal codice (UNATTRIBUTED_GB): alla prova dal vivo di 8437349e, al primo flash_attn
+c'erano 26,72 GiB allocati, di cui 10,6 di pesi residenti e ~5,1 di inventario -> ~11 GiB che il codice letto
+non spiega (e 2,56 GiB di slack frammentato; PyTorch su Windows non ha expandable_segments). Quell'errore e'
+ora coperto a RUNTIME (margine verificato a ogni blocco, altri blocchi in RAM al volo) e il worker stampa
+`[mem]` per blocco e, all'OOM, i tensori vivi: al prossimo giro la voce si azzera o si spiega.
+Senza chunk (H3_BLOCK_CHUNK=0) vale il modello a fasi del blocco originale (attenzione 2·h + 8·i, MLP 3·h + 4·f) × 1,7.
 Con le LoRA sommate IN PLACE a blocchi (workers/_qlinear.py) non c'è più nessun temporaneo da sequenza intera.
 Se pesi + attivazioni non stanno nella VRAM libera, una parte dei blocchi del DiT resta in RAM e va in VRAM
 solo durante il proprio forward (workers/h3_offload.py): quanti dipende dal deficit misurato.
@@ -32,7 +43,8 @@ SAFETY = 1.15                  # frammentazione dell'allocatore, temporanei picc
 # non copre pesi + attivazioni + riserva, il worker tiene in RAM una parte dei blocchi (offload) invece di
 # fidarsi di «tutto residente». Il picco REALE misurato viene loggato a fine denoise per ricalibrare.
 UNCHUNKED_FACTOR = 1.7
-FIXED_ACT_GB = 4.5             # chunk di temporanei (<=1,5) + stato pipeline / tabelle / kernel non spiegati (3)
+UNATTRIBUTED_GB = 5.0          # vedi docstring: ~11 GiB osservati e non spiegati, meta' coperti qui, il resto a runtime
+FIXED_ACT_GB = 1.5 + 0.3 + UNATTRIBUTED_GB
 RESERVE_GB = 3.0               # contesto CUDA 1 + cache dell'allocatore + margine esplicito 2
 TEXT_TOKENS = 2048             # prompt strutturato + dialoghi (il TE ne produce di solito < 1500)
 AUDIO_LATENTS_PER_S = 40       # audio VAE di H3
@@ -92,13 +104,12 @@ def ref_rows_estimate(references: list | None, short_edge: int, height: int, wid
 
 def bytes_per_token(dims: dict, chunked: bool = True) -> float:
     """Byte per token del picco di attivazioni.
-    · chunked (workers/h3_chunk.py, default): restano flusso residuo (nuovo + quello del chiamante, nel caso
-      peggiore fp32 = 2 elementi bf16 ciascuno) e Q/K/V pieni + uscita dell'attenzione: 4·h + 5·i
-      (l'ultimo i e' il lavoro del kernel di attenzione); i temporanei per-token sono a blocchi (FIXED_ACT_GB).
+    · chunked (workers/h3_chunk.py, default): l'inventario del docstring del modulo, 12·h + 6·i byte;
+      i temporanei per-token sono a blocchi (FIXED_ACT_GB).
     · non chunked (H3_BLOCK_CHUNK=0): il modello a fasi del blocco originale, scalato di UNCHUNKED_FACTOR."""
     h, i, f = dims["hidden"], dims["inner"], dims["ffn"]
     if chunked:
-        return 2.0 * (4 * h + 5 * i) * SAFETY
+        return (12.0 * h + 6.0 * i) * SAFETY
     return 2.0 * max(2 * h + 8 * i, 3 * h + 4 * f) * SAFETY * UNCHUNKED_FACTOR
 
 

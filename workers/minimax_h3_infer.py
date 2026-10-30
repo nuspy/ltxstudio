@@ -23,6 +23,11 @@ import time
 import traceback
 from pathlib import Path
 
+# frammentazione: expandable_segments esiste solo su Linux (su Windows PyTorch lo ignora con un avviso: li' si
+# compensa con empty_cache + offload dinamico in workers/h3_chunk). Va impostato PRIMA di importare torch.
+if os.name != "nt":
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -360,19 +365,14 @@ def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
     free = O.free_gb_now() - 0.4
     # margine incluso in RESERVE_GB: se la VRAM libera non lo copre si tengono blocchi in RAM, non si spera
     need = plan0["act_gb"] + HP.RESERVE_GB
-    if free >= need:
-        _log(f"VRAM dopo il caricamento: liberi {free:.1f} GB, servono ~{need:.1f} per le attivazioni: tutto residente")
-        return
     blocks = getattr(tr, "transformer_blocks", [])
-    n = O.blocks_for_deficit(blocks, need - free)
-    done = O.enable_block_offload(blocks, n, "cuda", _log)
+    n = O.blocks_for_deficit(blocks, need - free) if free < need else 0
+    # l'offloader esiste SEMPRE (anche con n = 0): se a runtime la VRAM non basta, workers/h3_chunk libera altri
+    # blocchi al volo invece di andare in OOM (la prova del 30/10 aveva ~11 GB residenti non previsti)
+    O.enable_block_offload(blocks, n, "cuda", _log)
     free2 = O.free_gb_now() - 0.4
-    if done == 0 or free2 < need:
-        pl = HP.plan(free2, plan0["tokens"], dims, weights_gb=plan0["weights_gb"], lora_gb=plan0["lora_gb"],
-                     chunked=_chunked())
-        raise RuntimeError(HP.explain_failure(pl, height=int(kw["height"]), width=int(kw["width"]),
-                                              num_frames=frames, free_gb=free2, dims=dims))
-    _log(f"VRAM dopo l'offload: liberi {free2:.1f} GB (servono ~{need:.1f})")
+    _log(f"VRAM dopo il piano: liberi {free2:.1f} GB (servono ~{need:.1f}); "
+         f"{'tutto residente' if n == 0 else f'{n} blocchi in RAM'}; offload dinamico attivo")
 
 
 def run(p: dict) -> str:
@@ -401,7 +401,10 @@ def run(p: dict) -> str:
     _free_gpu_servers()
     free0, total = (x / 2**30 for x in torch.cuda.mem_get_info())
     # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema
-    torch.cuda.set_per_process_memory_fraction(max(0.2, min(1.0, (free0 - 0.4) / total)))
+    frac = max(0.2, min(1.0, (free0 - 0.4) / total))
+    torch.cuda.set_per_process_memory_fraction(frac)
+    import h3_chunk as _K
+    _K.CAP_BYTES = frac * total * 2**30                 # il tetto serve al controllo di margine per blocco
     _log(f"{mode} · {p.get('h3_dit') or 'profilo ' + str(p.get('h3_profile') or 'nvfp4')} · "
          f"VRAM libera {free0:.1f}/{total:.1f} GB")
 
@@ -531,6 +534,36 @@ def friendly_error(e: BaseException) -> str:
     return str(e)
 
 
+def dump_gpu_state(log=print, top: int = 10) -> None:
+    """Allo OOM: riepilogo dell'allocatore + i tensori CUDA vivi piu' grandi (per sapere cosa occupa la VRAM)."""
+    import gc
+    import torch
+    try:
+        log(torch.cuda.memory_summary(abbreviated=True))
+        storages = {}
+        for o in gc.get_objects():
+            try:
+                if torch.is_tensor(o) and o.is_cuda:
+                    st = o.untyped_storage()
+                    storages.setdefault(st.data_ptr(), (st.nbytes(), tuple(o.shape), str(o.dtype)))
+            except Exception:                                        # noqa: BLE001
+                continue
+        tot = sum(v[0] for v in storages.values())
+        log(f"[oom] tensori CUDA vivi: {len(storages)} storage, {tot / 2**30:.2f} GB")
+        for nb, shape, dt in sorted(storages.values(), key=lambda v: -v[0])[:top]:
+            log(f"[oom]   {nb / 2**30:6.2f} GB  {dt}  {list(shape)}")
+        groups = {}
+        for nb, shape, dt in storages.values():
+            g = groups.setdefault((shape, dt), [0, 0])
+            g[0] += 1
+            g[1] += nb
+        log(f"[oom] gruppi (forma, dtype) per byte totali:")
+        for (shape, dt), (n, nb) in sorted(groups.items(), key=lambda kv: -kv[1][1])[:top]:
+            log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt} {list(shape)}")
+    except Exception as e:                                           # noqa: BLE001
+        log(f"[oom] dump non riuscito: {e}")
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("uso: minimax_h3_infer.py params.json")
@@ -541,6 +574,8 @@ def main() -> int:
         return 0
     except Exception as e:                                           # noqa: BLE001
         traceback.print_exc()
+        if type(e).__name__ == "OutOfMemoryError" or "out of memory" in str(e).lower():
+            dump_gpu_state(lambda m: print(m, flush=True))            # prima dell'ERRORE: finale (ultima riga = causa)
         print(f"ERRORE: {friendly_error(e)}", flush=True)
         return 1
 

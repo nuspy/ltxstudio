@@ -153,7 +153,7 @@ def test_5090_regge_10s_a_768p_con_lora_con_poco_offload_e_544p_senza():
     blocco anche su 29 GB liberi; a 544p sta tutto residente."""
     t = HP.sequence_tokens(243, 736, 1376)
     p = HP.plan(29.4, t, weights_gb=13.7, lora_gb=0.5)
-    assert p["fits"] and 0 <= p["offload_gb"] < 3.0
+    assert p["fits"] and 0 <= p["offload_gb"] < 4.5
     t544 = HP.sequence_tokens(243, 544, 960)
     p2 = HP.plan(29.4, t544, weights_gb=13.7, lora_gb=0.5)
     assert p2["fits"] and p2["offload_gb"] == 0
@@ -335,7 +335,8 @@ def test_oom_diventa_un_messaggio_per_la_gui():
 
 
 def test_fit_after_load_attiva_chunk_e_offload_quando_il_margine_manca(monkeypatch):
-    """Flusso del worker dopo il caricamento (CPU, VRAM finta): 13,1 GB liberi non coprono ~16,6 -> blocchi in RAM."""
+    """Flusso del worker dopo il caricamento (CPU, VRAM finta): 13,1 GB liberi non coprono il fabbisogno -> blocchi
+    in RAM; l'offloader esiste comunque (offload dinamico a runtime)."""
     w = _worker()
     monkeypatch.setattr(O, "free_gb_now", lambda: 13.5)              # -0,4 di margine -> 13,1
     chiamate = []
@@ -344,13 +345,69 @@ def test_fit_after_load_attiva_chunk_e_offload_quando_il_margine_manca(monkeypat
     blocchi = [nn.Linear(2, 2) for _ in range(50)]
     tr = type("T", (), {"transformer_blocks": blocchi})()
     t = HP.sequence_tokens(243, 736, 1376)
-    plan0 = HP.plan(29.9, t, weights_gb=11.7, lora_gb=2.0)
-    with pytest.raises(RuntimeError):                                # free2 resta 13,5: la finta offload non libera nulla
-        w._fit_after_load(tr, HP.DEFAULT_DIMS, plan0, {"height": 736, "width": 1376}, 243)
-    assert chiamate[0][0] == "d" and chiamate[0][1] > 3.0 and chiamate[1] == 12
-    assert all(hasattr(b, "forward") for b in blocchi)
-    # con VRAM sufficiente: tutto residente, nessun offload
-    chiamate.clear()
-    monkeypatch.setattr(O, "free_gb_now", lambda: 30.0)
+    plan0 = HP.plan(29.9, t, weights_gb=11.7, lora_gb=2.5)
     w._fit_after_load(tr, HP.DEFAULT_DIMS, plan0, {"height": 736, "width": 1376}, 243)
-    assert chiamate == []
+    assert chiamate[0][0] == "d" and chiamate[0][1] > 3.0 and chiamate[1] == 12
+    assert all(hasattr(b, "_h3_idx") for b in blocchi), "il chunk va agganciato a ogni blocco"
+    # con VRAM sufficiente: nessun blocco in RAM, ma l'offloader c'e' (n = 0)
+    chiamate.clear()
+    monkeypatch.setattr(O, "free_gb_now", lambda: 40.0)
+    w._fit_after_load(tr, HP.DEFAULT_DIMS, plan0, {"height": 736, "width": 1376}, 243)
+    assert chiamate == [0]
+
+
+def test_inventario_del_piano_e_il_conto_del_codice():
+    """12·h + 6·i byte per token (video_embeds fp32 + flusso in/out fp32 + Q/K/V bf16), non un fattore."""
+    d = HP.DEFAULT_DIMS
+    assert abs(HP.bytes_per_token(d) - (12 * d["hidden"] + 6 * d["inner"]) * HP.SAFETY) < 1
+    t = HP.sequence_tokens(243, 736, 1376)
+    noto = t * HP.bytes_per_token(d) / 2**30
+    assert 7.5 < noto < 9.5
+    assert HP.FIXED_ACT_GB >= 1.8 + HP.UNATTRIBUTED_GB - 1e-9
+    # a 544p/10 s sta tutto residente su ~29 GB liberi, a 768p serve qualche blocco in RAM
+    assert HP.plan(29.5, HP.sequence_tokens(243, 544, 960), weights_gb=11.7, lora_gb=2.5)["offload_gb"] == 0
+    assert 0 < HP.plan(29.5, t, weights_gb=11.7, lora_gb=2.5)["offload_gb"] < 5
+
+
+def test_offload_dinamico_libera_altri_blocchi_e_protegge_quello_in_esecuzione():
+    blocchi = [_Blocco(s) for s in range(6)]
+    for b in blocchi:
+        b.lin = _layer(inf=40, outf=40, seed=1)
+    off = O.BlockOffloader(blocchi, "cpu")
+    per_blocco = O.block_bytes(blocchi[0])
+    liberato = off.offload_bytes(int(2.5 * per_blocco), protect=blocchi[5])
+    assert liberato >= 2.5 * per_blocco and 5 not in off.hosted and len(off.hosted) == 3
+    assert off.hosted == {4, 3, 2}                                   # dagli ultimi, saltando il protetto
+    off.offload_bytes(10**12, protect=blocchi[0])
+    assert len(off.hosted) == 4 and 0 not in off.hosted              # restano almeno 2 blocchi residenti
+
+
+def test_ensure_headroom_mette_in_ram_altri_blocchi_se_il_margine_manca(monkeypatch):
+    import h3_chunk as K
+    blocchi = [_Blocco(s) for s in range(5)]
+    for b in blocchi:
+        b.lin = _layer(inf=40, outf=40, seed=1)
+    per = O.block_bytes(blocchi[0])
+    stato = {"libero": 1 * per}
+    monkeypatch.setattr(K, "headroom_bytes", lambda dev: stato["libero"])
+    off = O.BlockOffloader(blocchi, "cpu")
+    monkeypatch.setattr(O, "CURRENT", off)
+    orig = off.offload_bytes
+
+    def conta(target, protect=None):
+        n = orig(target, protect)
+        stato["libero"] += n
+        return n
+
+    monkeypatch.setattr(off, "offload_bytes", conta)
+    assert K.ensure_headroom(int(2.5 * per), "cpu", protect=blocchi[0]) is True
+    assert len(off.hosted) == 2
+    assert K.ensure_headroom(int(50 * per), "cpu", protect=blocchi[0]) is False   # non basta nemmeno tutto: niente magie
+
+
+def test_dump_gpu_state_non_solleva_senza_cuda():
+    w = _worker()
+    righe = []
+    w.dump_gpu_state(righe.append)
+    assert righe, "deve scrivere qualcosa anche quando CUDA non c'e'"
+
