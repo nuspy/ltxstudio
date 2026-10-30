@@ -29,9 +29,15 @@ MODEL_FILES = {
     "STANDARD 1.1 (distilled fp8)": "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
     "BASE dev fp8 (qualità)":        "LTX\\ltx-2.3-22b-dev-fp8.safetensors",
     "10EROS v1.5 (NSFW)":             "LTX\\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
+    "10EROS v1.4 (NSFW)":             "LTX\\ltx10eros_v14_2989669.safetensors",
+    "LTX-2.5 uncensored v1.1 INT8 (NSFW)": "LTX\\ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors",
 }
-_MODEL_NSFW = {"10EROS v1.5 (NSFW)"}      # voci modello considerate NSFW (nascoste in SFW)
+_MODEL_NSFW = {"10EROS v1.5 (NSFW)", "10EROS v1.4 (NSFW)",
+               "LTX-2.5 uncensored v1.1 INT8 (NSFW)"}      # voci modello considerate NSFW (nascoste in SFW)
 GGUF_FALLBACK_FILE = "LTXVideo\\LTX-2\\unsloth\\distilled-1.1\\ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf"
+# GGUF NSFW mostrato nel fallback (inventario non ancora pronto): LTX-2.5 uncensored Q8 (22 GB, transformer
+# residente in VRAM: entra solo su clip brevi; per i clip lunghi c'è la variante INT8 che si streamma).
+GGUF_NSFW_FALLBACKS = {"LTX-2.5 uncensored v1.1 GGUF Q8 (NSFW)": "LTX\\ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf"}
 
 RES_PRESETS = {
     "Verticale 9:16 (704x1280)":          (704, 1280),
@@ -1077,6 +1083,8 @@ class VideoTab(QWidget):
                 add(f"{m}  · GGUF", "gguf", m, self._is_nsfw_model(m))
         else:
             add(tr("vid.model.gguf_fallback"), "gguf", GGUF_FALLBACK_FILE, False)
+            for _lbl, _gm in GGUF_NSFW_FALLBACKS.items():
+                add(_lbl, "gguf", _gm, True)
 
         for m in checkpoints:
             add(f"{m}  · checkpoint", "checkpoint", m, self._is_nsfw_model(m))
@@ -1178,6 +1186,8 @@ class VideoTab(QWidget):
         low = (name or "").lower()
         if "text_projection" in low or "lora" in low:
             return False
+        if low.replace("\\", "/").rsplit("/", 1)[-1].startswith("_"):
+            return False                                        # file di servizio (es. _ltx23_aux_components): non è un modello
         from core.ltx_release import OTHER_ARCH_MARKERS
         if any(x in low for x in OTHER_ARCH_MARKERS):           # DiT MiniMax H3 «10Eros-Max»: non è LTX
             return False
