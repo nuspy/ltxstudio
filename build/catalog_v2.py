@@ -800,7 +800,9 @@ NEW = [
       repo="lynaNSFW/minimaxH3_Collection", remote="Minimax_H3_Unlocked_V2.safetensors",
       filename="Minimax_H3_Unlocked_V2-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3",
       gb=0.3, sens="adult", used_by=["cap.video_minimax_h3"],
-      note="la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16"),
+      triggers=["nude", "topless", "bare breasts", "naked", "completely unclothed"],
+      note="la LoRA H3 più scaricata (Civitai 2925727), kohya rank 16. Parole d'attivazione dalla pagina del modello "
+           "(core; altre: perky nipples, areolas, exposed cleavage, bare buttocks, caressing bare breasts, disrobing...)"),
     # Turbo v4 8 passi di larryvrh (quella con cui è addestrato Veda): addestrata sul modello COMPLETO, la sua adaLN
     # si proietta sul DiT pruned con base/media del ramo (adaln_affine di multimodalart, tabelle verificate identiche)
     *[N(f"mmh3-adaln-affine-{k}", "Video", f"MiniMax H3 adaLN affine {lbl} (proiezione LoRA sul pruned, 0.1MB)",
@@ -1051,6 +1053,10 @@ NEW += _local_oct14(N)
 # task 9 (17/10/2026): ControlNet FLUX.1/Z-Image, Redux+SigLIP, OpenPose, LoRA MagicQuill V2
 from catalog_task9 import entries as _task9  # noqa: E402
 NEW += _task9(N)
+
+# task 17 (29/10/2026): upscaler locali, DiffPitcher, LoRA identità Krea, nunchaku Z-Image + versioni Civitai nuove
+from catalog_task17 import entries as _task17  # noqa: E402
+NEW += _task17(N)
 
 # url GitHub per voci file non-HF (il downloader FASE B le gestisce)
 GH_URLS = {

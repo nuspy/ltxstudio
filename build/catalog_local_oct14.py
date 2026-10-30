@@ -29,7 +29,7 @@ def entries(N):
         N("zimage-biglove-zt1-fp8", "Immagini", "Big Love Z · ZT1 (Z-Image Turbo, 18+, fp8, 5.73GB)",
           category="image", arch="zimage", type="diffusion_models", family="Z-Image",
           filename="bigLoveZ_zt1_pruned_fp8.safetensors", gb=5.73, sens="adult", no_remote=True,
-          note="Civitai Big Love Z ZT1, fp8 E4M3 (chiavi cap_embedder = Z-Image). Import locale: il formato fp8 è già "
+          page="https://civitai.red/models/2196857?modelVersionId=2473592", note="Civitai Big Love Z ZT1, fp8 E4M3 (chiavi cap_embedder = Z-Image). Import locale: il formato fp8 è già "
                "quello che _assemble_zimage carica. Diversa dalla Zora1 bf16 (zimage-biglove-zora1)."),
         N("zimage-turbo-bf16-single", "Immagini", "Z-Image Turbo bf16 (single-file, 11.46GB)",
           category="image", arch="zimage", repo="Comfy-Org/z_image_turbo",
@@ -104,7 +104,7 @@ def entries(N):
         N("te-flux1-clip-l-diffusers", "TextEncoder", "CLIP-L FLUX.1 (formato diffusers, cartella _te/clip_l, 0.23GB)",
           category="image", arch="flux1", kind="snapshot", type="diffusers", family="_te",
           tool_dest=r"E:\AI\Models\diffusers\_te\clip_l", gb=0.23, no_remote=True,
-          note="Letto da image_flux (TE_DIR). Non cancellare."),
+          page="https://huggingface.co/black-forest-labs/FLUX.1-dev/tree/main/text_encoder", note="Letto da image_flux (TE_DIR). Non cancellare."),
         N("te-flux1-t5xxl-diffusers", "TextEncoder", "T5-XXL FLUX.1 (formato diffusers, cartella _te/t5xxl, 9.1GB)",
           category="image", arch="flux1", kind="snapshot", type="diffusers", family="_te",
           tool_dest=r"E:\AI\Models\diffusers\_te\t5xxl", gb=9.12, no_remote=True,
@@ -131,6 +131,6 @@ def entries(N):
           category="video", arch="ltx23", type="TextEncoders", family="LTX",
           filename="gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", gb=0.59, sens="adult",
           no_remote=True, deps=["ltx23-gemma-te"], scan=["gemma-3-12b-it-abliterated_lora"],
-          note="Fusa sul ramo TESTO del Gemma-3 al caricamento (core/gemma_lora); solo LTX 2.3. Origine Civitai (nessuna "
+          page="https://civitai.red/models/2780365?modelVersionId=3131293", note="Fusa sul ramo TESTO del Gemma-3 al caricamento (core/gemma_lora); solo LTX 2.3. Origine Civitai (nessuna "
                "fonte remota verificata). NON nella cartella LoRA: lì il filtro la scambierebbe per una LoRA video."),
     ]

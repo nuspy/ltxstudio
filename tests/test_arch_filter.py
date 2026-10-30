@@ -42,6 +42,7 @@ def root(tmp_path, monkeypatch):
                                          "guidance_in.w": (4, 4), "img_in.weight": (6144, 128)})
     _st(d / "Flux" / "nunchaku" / "svdq-fp4_r32-FLUX.2-klein.safetensors",
         {"x.qweight": (4, 4), "img_in.weight": (4096, 128)})
+    _st(d / "Z-Image" / "nunchaku" / "svdq-fp4_r128-z-image-turbo.safetensors", {"x.qweight": (4, 4)})
     _st(d / "Krea2" / "k.safetensors", {"blocks.0.attn.wq.weight": (4, 4)})
     (d / "Flux" / "g.gguf").write_bytes(b"GGUF")
     (d / "Flux" / "fill-hyp.gguf").write_bytes(b"GGUF")
@@ -75,6 +76,12 @@ def test_is_flux2_unica_definizione(root):
 def test_nunchaku_klein_non_e_flux1(root):
     c = af.classify("Flux\\nunchaku\\svdq-fp4_r32-FLUX.2-klein.safetensors")
     assert c["family"] == "flux2" and c["packed"] == "nunchaku"
+
+
+def test_nunchaku_zimage_non_e_flux1(root):
+    """task 17: lo svdq di Z-Image finiva fra i FLUX.1 (ramo packed cadeva su flux1)."""
+    c = af.classify("Z-Image" + chr(92) + "nunchaku" + chr(92) + "svdq-fp4_r128-z-image-turbo.safetensors")
+    assert c["family"] == "zimage" and c["packed"] == "nunchaku"
 
 
 def test_default_del_proprio_modello_coincidono_col_backend():

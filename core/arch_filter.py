@@ -126,8 +126,10 @@ def classify(rel: str) -> dict:
         # ripiega sulla cartella («Flux» → flux1) anche per un Klein. La famiglia la dice il nome; il formato è
         # marcato `packed` perché nessuna pipeline FLUX di questo backend lo carica come transformer.
         n = os.path.basename(p).lower()
-        out = {"family": "flux2" if (is_flux2_name(n) or "klein" in n or "flux.2" in n) else "flux1",
-               "variant": "klein" if "klein" in n else "", "role": "", "source": "name", "packed": "nunchaku"}
+        fam = ("flux2" if (is_flux2_name(n) or "klein" in n or "flux.2" in n)
+               else "zimage" if re.search(r"z-image|z_image|zimage", n) else "flux1")      # svdq-…-z-image-turbo NON è FLUX.1
+        out = {"family": fam, "variant": "klein" if "klein" in n else "", "role": "", "source": "name",
+               "packed": "nunchaku"}
     if out["family"] == UNKNOWN:
         fam = _from_folder(rel)
         if fam != UNKNOWN:

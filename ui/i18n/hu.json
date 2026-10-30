@@ -3442,7 +3442,7 @@
   "ref.add.tt": "Válassz egy vagy több fájlt (ide is húzhatod őket).",
   "ref.from_canvas": "A vászonról",
   "ref.from_canvas.tt": "A vásznon lévő képet használja referenciaként.",
-  "ref.hint2": "Minden fájl kap egy nevet (@image_1, @image_2…; videóknál @video_1, hangnál @audio_1): a promptban a „@” beírásával (megjelenik a miniatűrös, neves lista) vagy a „↳ prompt” gombbal hivatkozhatsz rá. A nevek nem változnak, ha egyet eltávolítasz. A betöltött, de nem hivatkozott fájlokat a modell mégis megkapja.",
+  "ref.hint2": "Minden fájl kap egy nevet (@Foto_1, @Foto_2…): a promptban a „@” beírásával (automatikus kiegészítés) vagy a „↳ prompt” gombbal hivatkozhatsz rá. A nevek nem változnak, ha egyet eltávolítasz. A betöltött, de nem hivatkozott fájlokat a modell mégis megkapja.",
   "ref.err_unknown": "A prompt a(z) {tok} hivatkozásra utal, de ilyen referencia nincs.",
   "f1.gen.refs.group": "Referenciaképek",
   "f1.gen.refs.no_canvas": "A vásznon nincs használható kép.",
@@ -3525,5 +3525,7 @@
   "weights.license.ack.body": "Ezeknek a súlyoknak a licence NEM engedi a kereskedelmi használatot ({license}). Csak személyes/nem kereskedelmi célra töltse le őket, a szerző feltételeit betartva (név feltüntetése és azonos feltételekkel terjesztés). Nem részei a telepítőnek: Ön tölti le őket, saját felelősségére.\n\n{names}\n\nElolvasta a licencet, és le szeretné tölteni?",
   "weights.license.declined": "A letöltés megszakítva: a licenc nincs megerősítve.",
   "mq.pack.title": "A MagicQuill nem érhető el",
-  "mq.pack.missing": "A MagicQuill V2 funkció nem része az alkalmazás ezen kiadásának (hiányzó összetevő)."
+  "mq.pack.missing": "A MagicQuill V2 funkció nem része az alkalmazás ezen kiadásának (hiányzó összetevő).",
+  "lora.info.trigger_notes": "Tanítási leírások (csak tájékoztatásul, a promptba soha nem kerülnek be)",
+  "f1.gen.krea2.sickreal4": "Krea SickRealism v4 (18+, fp8, 8 lépés)"
 }

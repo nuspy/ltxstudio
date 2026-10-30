@@ -64,6 +64,35 @@ def _clean_triggers(raw: Any) -> list[str]:
     return uniq
 
 
+_TRIG_MAX_CHARS = 48        # un trigger «breve»: un token o una frase corta
+_TRIG_MAX_WORDS = 6
+_TRIG_MAX_KEEP = 4
+_TRIG_CAPTION_LIST = 8        # oltre questi elementi la lista è un set di didascalie, non trigger dichiarati
+
+
+def split_triggers(cleaned: list[str]) -> tuple[list[str], list[str]]:
+    """(trigger, note). I trigger del dizionario scanner sono spesso le DIDASCALIE del training (decine di frasi):
+    il primo elemento è il token vero (sempre tenuto); i successivi restano trigger finché sono brevi, al primo
+    elemento lungo (o oltre il quarto) il resto passa alle note — mostrate nel pannello ma mai inserite nel prompt."""
+    if not cleaned:
+        return [], []
+    first = cleaned[0]
+    if len(cleaned) > _TRIG_CAPTION_LIST and (len(first) > _TRIG_MAX_CHARS or len(first.split()) > _TRIG_MAX_WORDS):
+        # elenco di didascalie dove anche la prima è una frase: il token vero è al più la parola prima del punto
+        # («olya. this photograph…», «hbs. a woman…»); altrimenti nessun trigger
+        m = re.match(r"([\w-]{2,20})[.:,]\s", first)
+        return ([m.group(1)] if m else []), cleaned
+    keep = [first]
+    i = 1
+    while i < len(cleaned) and len(keep) < _TRIG_MAX_KEEP:
+        t = cleaned[i]
+        if len(t) > _TRIG_MAX_CHARS or len(t.split()) > _TRIG_MAX_WORDS:
+            break
+        keep.append(t)
+        i += 1
+    return keep, cleaned[i:]
+
+
 @dataclass
 class LoraEntry:
     sha256: str
@@ -80,6 +109,7 @@ class LoraEntry:
     downloads: int = 0
     civitai_url: str | None = None
     display_name: str = ""          # nome mostrato se il file ha un nome generico (es. diffusion_pytorch_model)
+    trigger_notes: list[str] = field(default_factory=list)   # didascalie/esempi di training: consultabili, MAI inseriti
 
     @property
     def name(self) -> str:
@@ -145,16 +175,24 @@ def _entry_from_raw(raw: dict) -> LoraEntry:
         int(raw.get("nsfw_level") or 0),
         plevel,
     )
+    fname = (raw.get("filename") or os.path.basename(raw.get("path", ""))).lower()
+    ovr_t = _overrides()["triggers"].get(fname)
+    if ovr_t is not None:                              # override «solo token»: le didascalie originali restano come note
+        triggers, notes = list(ovr_t), [t for t in triggers if t not in ovr_t]
+    else:
+        triggers, notes = split_triggers(triggers)
     return LoraEntry(
         sha256=raw.get("sha256") or raw.get("id") or "",
         filename=raw.get("filename") or os.path.basename(raw.get("path", "")),
         path=raw.get("path", ""),
         architecture=raw.get("architecture", ""),
         triggers=triggers,
+        trigger_notes=notes,
         description=_strip_html(civ.get("description") or raw.get("instructions") or ""),
-        nsfw=bool(raw.get("nsfw") or civ.get("nsfw") or nsfw_level >= 4
-                  or _looks_nsfw(raw.get("filename"), raw.get("path"), civ.get("tags"))
-                  or (raw.get("filename") or "").lower() in _overrides()["adult"]),
+        nsfw=(False if fname in _overrides()["sfw"] else
+              bool(raw.get("nsfw") or civ.get("nsfw") or nsfw_level >= 4
+                   or _looks_nsfw(raw.get("filename"), raw.get("path"), civ.get("tags"))
+                   or fname in _overrides()["adult"])),
         preview_url=purl,
         preview_is_video=pvid,
         preview_nsfw_level=plevel,
@@ -236,18 +274,22 @@ _OVR_CACHE: tuple[float, dict] = (-1.0, {})
 
 
 def _overrides() -> dict:
-    """adult (nomi file 18+), arch (nome file → arch pannello), extra (file fuori cartella LoRA). Cache per mtime."""
+    """adult (nomi file 18+), sfw (nomi file da NON marcare 18+ anche se il dizionario dice nsfw), triggers (nome file →
+    trigger «solo token», al posto delle didascalie del dizionario), arch (nome file → arch pannello),
+    extra (file fuori cartella LoRA). Cache per mtime."""
     global _OVR_CACHE
     try:
         mt = _OVR_PATH.stat().st_mtime
         if mt != _OVR_CACHE[0]:
             d = json.loads(_OVR_PATH.read_text(encoding="utf-8"))
             _OVR_CACHE = (mt, {"adult": {str(n).lower() for n in d.get("adult", [])},
+                               "sfw": {str(n).lower() for n in d.get("sfw", [])},
+                               "triggers": {str(k).lower(): list(v) for k, v in (d.get("triggers") or {}).items()},
                                "arch": {str(k).lower(): v for k, v in (d.get("arch") or {}).items()},
                                "extra": list(d.get("extra") or [])})
         return _OVR_CACHE[1]
     except (OSError, ValueError):
-        return {"adult": set(), "arch": {}, "extra": []}
+        return {"adult": set(), "sfw": set(), "triggers": {}, "arch": {}, "extra": []}
 
 
 # Pannelli le cui LoRA NON si fidano solo del dizionario (scanner esterno, spesso indietro sui file spostati):
@@ -364,7 +406,13 @@ class LoraCatalog:
                 continue
             out.append(_entry_from_raw(raw))
         seen = {os.path.normcase(e.path) for e in out}
-        out += [e for e in _registry_loras(self.compatible_arch) if os.path.normcase(e.path) not in seen]
+        reg = _registry_loras(self.compatible_arch)
+        by_path = {os.path.normcase(e.path): e for e in out}
+        for r in reg:                                   # il dizionario può avere la voce con trigger vuoti: vale il registro
+            d = by_path.get(os.path.normcase(r.path))
+            if d is not None and not d.triggers and r.triggers:
+                d.triggers = list(r.triggers)
+        out += [e for e in reg if os.path.normcase(e.path) not in seen]
         seen = {os.path.normcase(e.path) for e in out}
         out += _folder_loras(self.compatible_arch, seen, meta)
         out += _extra_loras(self.compatible_arch, seen)

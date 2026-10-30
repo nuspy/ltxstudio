@@ -1182,7 +1182,8 @@ class Frame1Tab(QWidget):
                                   # finetune single-file (18+: il filtro adult del catalogo lo nasconde in SFW)
                                   ("krea2-noct-v4", tr("f1.gen.krea2.noct", "Krea Noct V4 (18+, int8, 8 step)")),
                                   ("krea2-kroma-v031", tr("f1.gen.krea2.kroma", "Krea Kroma v0.3.1 Turbo (int8, 8 step)")),
-                                  ("krea2-sickrealism-v2", tr("f1.gen.krea2.sickreal", "Krea SickRealism v2 (18+, fp8, 8 step)"))])
+                                  ("krea2-sickrealism-v2", tr("f1.gen.krea2.sickreal", "Krea SickRealism v2 (18+, fp8, 8 step)")),
+                                  ("krea2-sickrealism-v4", tr("f1.gen.krea2.sickreal4", "Krea SickRealism v4 (18+, fp8, 8 step)"))])
 
     def _maybe_offer_gen_download(self, *_):
         """Solo su click utente: se l'arch immagine è a snapshot (Krea 2) e la variante scelta non è presente,

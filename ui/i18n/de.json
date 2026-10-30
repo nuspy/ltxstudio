@@ -3442,7 +3442,7 @@
   "ref.add.tt": "Wähle eine oder mehrere Dateien (du kannst sie auch hierher ziehen).",
   "ref.from_canvas": "Aus der Leinwand",
   "ref.from_canvas.tt": "Verwendet das Bild in der Leinwand als Referenz.",
-  "ref.hint2": "Jede Datei erhält einen Namen (@image_1, @image_2…; @video_1 für Videos, @audio_1 für Audio): Zitiere sie im Prompt mit „@“ (es erscheint die Liste mit Vorschaubild und Name) oder über „↳ Prompt“. Die Namen ändern sich nicht, wenn du eine Datei entfernst. Geladene, aber nicht zitierte Dateien werden trotzdem an das Modell übergeben.",
+  "ref.hint2": "Jede Datei erhält einen Namen (@Foto_1, @Foto_2…): Zitiere sie im Prompt mit „@“ (Autovervollständigung) oder über „↳ Prompt“. Die Namen ändern sich nicht, wenn du eine Datei entfernst. Geladene, aber nicht zitierte Dateien werden trotzdem an das Modell übergeben.",
   "ref.err_unknown": "Der Prompt zitiert {tok}, aber diese Referenz existiert nicht.",
   "f1.gen.refs.group": "Referenzbilder",
   "f1.gen.refs.no_canvas": "In der Leinwand ist kein Bild zum Verwenden vorhanden.",
@@ -3525,5 +3525,7 @@
   "weights.license.ack.body": "Diese Gewichte haben eine Lizenz, die die kommerzielle Nutzung NICHT erlaubt ({license}). Lade sie nur für den persönlichen/nichtkommerziellen Gebrauch herunter und beachte die Bedingungen des Autors (Namensnennung und Weitergabe unter gleichen Bedingungen). Sie sind nicht Teil des Installers: Du lädst sie selbst auf eigene Verantwortung herunter.\n\n{names}\n\nHast Du die Lizenz gelesen und möchtest sie herunterladen?",
   "weights.license.declined": "Download abgebrochen: Lizenz nicht bestätigt.",
   "mq.pack.title": "MagicQuill nicht verfügbar",
-  "mq.pack.missing": "Die Funktion MagicQuill V2 ist in dieser Edition der App nicht enthalten (Komponente fehlt)."
+  "mq.pack.missing": "Die Funktion MagicQuill V2 ist in dieser Edition der App nicht enthalten (Komponente fehlt).",
+  "lora.info.trigger_notes": "Trainings-Beschreibungen (nur zur Ansicht, werden nie in den Prompt eingefügt)",
+  "f1.gen.krea2.sickreal4": "Krea SickRealism v4 (18+, fp8, 8 Schritte)"
 }

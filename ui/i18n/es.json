@@ -3442,7 +3442,7 @@
   "ref.add.tt": "Elige uno o más archivos (también puedes arrastrarlos aquí).",
   "ref.from_canvas": "Desde el lienzo",
   "ref.from_canvas.tt": "Usa como referencia la imagen que hay en el lienzo.",
-  "ref.hint2": "Cada archivo recibe un nombre (@image_1, @image_2…; @video_1 para vídeos, @audio_1 para audio): cítalo en el prompt escribiendo «@» (aparece la lista con miniatura y nombre) o con «↳ prompt». Los nombres no cambian si quitas uno. Los archivos cargados pero no citados se pasan igualmente al modelo.",
+  "ref.hint2": "Cada archivo recibe un nombre (@Foto_1, @Foto_2…): cítalo en el prompt escribiendo «@» (autocompletado) o con «↳ prompt». Los nombres no cambian si quitas uno. Los archivos cargados pero no citados se pasan igualmente al modelo.",
   "ref.err_unknown": "El prompt cita {tok}, pero esa referencia no existe.",
   "f1.gen.refs.group": "Imágenes de referencia",
   "f1.gen.refs.no_canvas": "No hay ninguna imagen en el lienzo para usar.",
@@ -3525,5 +3525,7 @@
   "weights.license.ack.body": "Estos pesos tienen una licencia que NO permite el uso comercial ({license}). Descárgalos solo para tu uso personal/no comercial, respetando las condiciones del autor (atribución y compartir igual). No forman parte del instalador: los descargas tú, bajo tu responsabilidad.\n\n{names}\n\n¿Has leído la licencia y quieres descargarlos?",
   "weights.license.declined": "Descarga cancelada: licencia no confirmada.",
   "mq.pack.title": "MagicQuill no disponible",
-  "mq.pack.missing": "La función MagicQuill V2 no está incluida en esta edición de la app (componente ausente)."
+  "mq.pack.missing": "La función MagicQuill V2 no está incluida en esta edición de la app (componente ausente).",
+  "lora.info.trigger_notes": "Descripciones de entrenamiento (solo para consultar, nunca se insertan en el prompt)",
+  "f1.gen.krea2.sickreal4": "Krea SickRealism v4 (18+, fp8, 8 pasos)"
 }
