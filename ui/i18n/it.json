@@ -3641,5 +3641,7 @@
   "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)",
   "vid.size_eff": "Dimensioni effettive: {w}×{h} (i motori video vogliono multipli di 64).",
   "vid.size_eff.h3": "MiniMax H3: la risoluzione la decide la «Tela» (e la foto di partenza), non questi valori.",
-  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: risoluzione fissa 832×480 (limite del modello), non questi valori."
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: risoluzione fissa 832×480 (limite del modello), non questi valori.",
+  "f1.inpaint.fidelity_lbl": "Fedeltà all'originale",
+  "f1.inpaint.fidelity.tt": "0 = cambia tutto, 1 = immagine invariata. Al motore arriva denoise = 1 − valore."
 }

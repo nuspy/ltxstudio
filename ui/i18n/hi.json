@@ -3602,5 +3602,7 @@
   "queue.job.lipsync_multitalk": "लिप-सिंक (MultiTalk)",
   "vid.size_eff": "वास्तविक आकार: {w}×{h} (वीडियो इंजन को 64 के गुणज चाहिए)।",
   "vid.size_eff.h3": "MiniMax H3: रिज़ॉल्यूशन ‘कैनवास’ (और शुरुआती फ़ोटो) तय करता है, इन मानों से नहीं।",
-  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: रिज़ॉल्यूशन 832×480 पर तय है (मॉडल की सीमा), इन मानों पर नहीं।"
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: रिज़ॉल्यूशन 832×480 पर तय है (मॉडल की सीमा), इन मानों पर नहीं।",
+  "f1.inpaint.fidelity_lbl": "मूल के प्रति निष्ठा",
+  "f1.inpaint.fidelity.tt": "0 = सब कुछ बदलें, 1 = छवि अपरिवर्तित। इंजन को denoise = 1 − मान मिलता है।"
 }

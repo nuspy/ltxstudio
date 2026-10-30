@@ -201,12 +201,26 @@ def collect(win) -> dict:
     return state
 
 
+SCHEMA = 2
+
+
+def _migrate(d: dict) -> dict:
+    """Migrazioni UNA TANTUM dello stato salvato. Schema 2 (30/10/2026, punto 13): lo slider di Modifica «Forza» (denoise =
+    1 − 0,4·v) diventa «Fedeltà all'originale» (denoise = 1 − v): lo stesso risultato si ottiene con v' = 0,4·v."""
+    if int(d.get("_schema", 1) or 1) < 2:
+        k = "frame1_tab.strength"
+        if isinstance(d.get(k), (int, float)):
+            d[k] = int(round(float(d[k]) * 0.4))
+        d["_schema"] = 2
+    return d
+
+
 def load() -> dict:
     try:
         if STATE_PATH.exists():
             d = json.loads(STATE_PATH.read_text(encoding="utf-8"))
             if isinstance(d, dict):
-                return d
+                return _migrate(d)
     except Exception:
         pass
     return {}
@@ -216,6 +230,7 @@ def store(win) -> None:
     """Salva su disco lo stato corrente della GUI (atomico)."""
     try:
         state = collect(win)
+        state["_schema"] = SCHEMA
         STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp = STATE_PATH.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -3602,5 +3602,7 @@
   "queue.job.lipsync_multitalk": "Szájszinkron (MultiTalk)",
   "vid.size_eff": "Tényleges méret: {w}×{h} (a videómotorok 64 többszöröseit igénylik).",
   "vid.size_eff.h3": "MiniMax H3: a felbontást a «Vászon» (és a kiindulási fotó) adja, nem ezek az értékek.",
-  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: fix 832×480 felbontás (a modell korlátja), nem ezek az értékek."
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: fix 832×480 felbontás (a modell korlátja), nem ezek az értékek.",
+  "f1.inpaint.fidelity_lbl": "Hűség az eredetihez",
+  "f1.inpaint.fidelity.tt": "0 = minden változik, 1 = a kép változatlan. A motor denoise = 1 − érték értéket kap."
 }

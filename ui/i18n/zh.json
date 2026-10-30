@@ -3602,5 +3602,7 @@
   "queue.job.lipsync_multitalk": "口型同步 (MultiTalk)",
   "vid.size_eff": "实际尺寸：{w}×{h}（视频引擎要求为 64 的倍数）。",
   "vid.size_eff.h3": "MiniMax H3：分辨率由“画布”（以及起始照片）决定，而不是这些数值。",
-  "vid.size_eff.rt": "Krea Realtime / Self-Forcing：固定分辨率 832×480（模型限制），而不是这些数值。"
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing：固定分辨率 832×480（模型限制），而不是这些数值。",
+  "f1.inpaint.fidelity_lbl": "与原图的一致度",
+  "f1.inpaint.fidelity.tt": "0 = 全部改变，1 = 图像不变。引擎收到的 denoise = 1 − 数值。"
 }

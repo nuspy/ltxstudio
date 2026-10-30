@@ -3602,5 +3602,7 @@
   "queue.job.lipsync_multitalk": "مزامنة الشفاه (MultiTalk)",
   "vid.size_eff": "الحجم الفعلي: {w}×{h} (محركات الفيديو تتطلب مضاعفات 64).",
   "vid.size_eff.h3": "MiniMax H3: الدقة تحددها «اللوحة» (وصورة البداية) وليس هذه القيم.",
-  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: دقة ثابتة 832×480 (حد النموذج) وليس هذه القيم."
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: دقة ثابتة 832×480 (حد النموذج) وليس هذه القيم.",
+  "f1.inpaint.fidelity_lbl": "الالتزام بالأصل",
+  "f1.inpaint.fidelity.tt": "0 = تغيير كل شيء، 1 = الصورة دون تغيير. يتلقى المحرك denoise = 1 − القيمة."
 }

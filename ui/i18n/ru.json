@@ -3602,5 +3602,7 @@
   "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)",
   "vid.size_eff": "Фактический размер: {w}×{h} (видеомодели требуют кратности 64).",
   "vid.size_eff.h3": "MiniMax H3: разрешение задаётся «Холстом» (и исходным фото), а не этими значениями.",
-  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: фиксированное разрешение 832×480 (ограничение модели), а не эти значения."
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: фиксированное разрешение 832×480 (ограничение модели), а не эти значения.",
+  "f1.inpaint.fidelity_lbl": "Верность оригиналу",
+  "f1.inpaint.fidelity.tt": "0 = всё меняется, 1 = изображение без изменений. Движок получает denoise = 1 − значение."
 }

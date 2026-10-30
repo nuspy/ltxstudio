@@ -2564,7 +2564,7 @@ class MainWindow(QMainWindow):
                 pass
         retention = cfg.get("strength", 0.75)
         guidance_ui = cfg.get("guidance")                    # CFG esplicita dalla GUI (se impostata)
-        denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * retention))
+        denoise = 1.0 if mode == "outpaint" else self._denoise_from_fidelity(retention)
         # guard: serve un'area da rigenerare, altrimenti il modello non fa nulla
         if mode == "outpaint" and not self.frame1_tab.canvas.has_outpaint_area():
             QMessageBox.information(self, tr("mw.nothing_to_extend_title"),
@@ -2633,8 +2633,11 @@ class MainWindow(QMainWindow):
                 return
             from core import backend
             _unet = cfg.get("unet") or ""
-            if backend.is_native("image") and not cfg.get("checkpoint") and _unet:   # #95 I4: flux2 ora nativo
-                self._start_native_inpaint(exp, _unet, ptxt, negative, steps, seed, retention, mode,
+            # Anche i CHECKPOINT (Checkpoints\*.safetensors, es. flux1-schnell-fp8) vanno sul backend nativo: image_flux li
+            # risolve sotto Checkpoints. Prima restavano sul grafo ComfyUI → «urlopen error WinError 10061» (punto 15).
+            _ckpt = cfg.get("checkpoint") or ""
+            if backend.is_native("image") and (_unet or _ckpt):
+                self._start_native_inpaint(exp, _unet or _ckpt, ptxt, negative, steps, seed, retention, mode,
                                            guidance_override=guidance_ui)
                 return
             img_name = self._upload_local(exp["image"])
@@ -4523,6 +4526,12 @@ class MainWindow(QMainWindow):
         self._start_native_multitalk(params)
         return True
 
+    @staticmethod
+    def _denoise_from_fidelity(fidelity) -> float:
+        """Punto 13 dell'utente: lo slider è «Fedeltà all'originale» (0 = cambia tutto, 1 = immagine invariata);
+        denoise/strength = 1 − valore. L'outpaint resta a 1,0 (i limiti per motore stanno nel backend)."""
+        return max(0.0, min(1.0, 1.0 - float(fidelity)))
+
     def _start_native_inpaint(self, exp, unet, prompt, negative, steps, seed, retention, mode,
                               guidance_override=None):
         """Inpaint/outpaint via backend NATIVO (FluxFillPipeline) — niente ComfyUI.
@@ -4552,9 +4561,9 @@ class MainWindow(QMainWindow):
             if guidance != g:
                 self._log(f"[inpaint] modello distillato → guidance {g:.0f} clampata a {guidance:.1f} (evita macchie)")
         else:
-            guidance = InpaintPipeline.effective_guidance(unet, 30.0, retention, flux2=_f2)
+            guidance = InpaintPipeline.effective_guidance(unet, 30.0, None, flux2=_f2)   # guidance NON più legata allo slider (ora «Fedeltà»: default 0 la dimezzerebbe)
         # #95 I5: forza (strength) → denoise, non solo guidance (outpaint=1.0, inpaint scala con retention)
-        denoise = 1.0 if mode == "outpaint" else max(0.5, min(1.0, 1.0 - 0.4 * float(retention)))
+        denoise = 1.0 if mode == "outpaint" else self._denoise_from_fidelity(retention)
         params = {"model": model, "arch": arch, "prompt": prompt, "negative": negative,
                   "image_path": exp["image"], "mask_path": exp["mask"],
                   "steps": steps, "guidance": guidance, "seed": seed, "denoise": denoise,
