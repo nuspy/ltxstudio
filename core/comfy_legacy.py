@@ -1,8 +1,8 @@
 """Risoluzione del ComfyUI LEGACY locale (Comfy_Nexus*) — SOLO stdlib, importabile ovunque.
 
-NON è un backend di generazione (quello è nativo): serve ai 3 usi residui che riusano il
-venv/i nodi ComfyUI come LIBRERIA: rig SkinToken (core/rig_service.py), worker MultiTalk
-(WanVideoWrapper-as-library) e dequant dei checkpoint `.comfy_quant` (core/dequant_comfy.py).
+NON è un backend di generazione (quello è nativo): serve ai 2 usi residui che riusano il
+venv ComfyUI come LIBRERIA: rig SkinToken (core/rig_service.py) e dequant dei checkpoint `.comfy_quant`
+(core/dequant_comfy.py). MultiTalk NON lo usa piu' (task 20: motore nativo workers/wan_mt).
 La cartella è stata rinominata più volte (Comfy_Nexus → .bak → .bak.bau, 17/08) rompendo i
 path hardcoded: qui c'è UNA lista di candidati + override env, così un rinomino futuro si
 sistema in un punto solo. Un candidato è valido solo se ha il venv (python.exe).

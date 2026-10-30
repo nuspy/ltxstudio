@@ -383,6 +383,50 @@ def case_v2v_sing_multitalk(w, spy):
     assert p.get("audio_path") == song, f"audio canzone non trasmesso: {p.get('audio_path')}"
 
 
+def case_v2v_lipsync_engine_selector(w, spy):
+    """Selettore «Motore lip-sync» (Talk/Canta): visibile solo in quelle modalità, predefinito LTX, la scelta
+    arriva in get_v2v_config()['lipsync_engine'] e la sezione LoRA Wan compare solo con MultiTalk."""
+    panel = w.video_tab.v2v_panel
+    try:
+        panel.rb_normal.setChecked(True); panel._on_mode()
+        assert panel._ls_wrap.isHidden(), "selettore motore visibile fuori da Talk/Canta"
+        for rb in (panel.rb_talk, panel.rb_sing):
+            rb.setChecked(True); panel._on_mode()
+            assert not panel._ls_wrap.isHidden() and panel.lipsync_engine() == "ltx"
+            assert panel.sec_wanlora.isHidden(), "LoRA Wan visibili col motore LTX"
+            assert panel.get_v2v_config()["lipsync_engine"] == "ltx"
+            panel.cmb_lsengine.setCurrentIndex(panel.cmb_lsengine.findData("multitalk"))
+            assert not panel.sec_wanlora.isHidden() and panel.get_v2v_config()["lipsync_engine"] == "multitalk"
+            panel.cmb_lsengine.setCurrentIndex(panel.cmb_lsengine.findData("ltx"))
+    finally:
+        panel.rb_normal.setChecked(True); panel._on_mode()
+
+
+def case_v2v_sing_multitalk_wan_native(w, spy):
+    """Canta con motore MultiTalk (Wan 2.1 nativo): niente richiesta LTX; con preflight neutralizzato parte il worker
+    MultiTalk con foto, canzone, cfg=1 e il motore scelto; senza pesi mostra l'elenco e non parte."""
+    from core import multitalk_service as mts
+    H.load_canvas_image(w)
+    _set_prompt(w)
+    panel = w.video_tab.v2v_panel
+    panel.rb_sing.setChecked(True)
+    panel.cmb_lsengine.setCurrentIndex(panel.cmb_lsengine.findData("multitalk"))
+    panel._sing_audio_path = _dummy_file("_vid_sing_song2.wav", b"RIFF0000WAVEfmt ")
+    orig_pf, orig_miss = mts.preflight, mts.missing_weights
+    mts.preflight, mts.missing_weights = (lambda params=None: []), (lambda: [])
+    try:
+        w.on_generate()
+    finally:
+        mts.preflight, mts.missing_weights = orig_pf, orig_miss
+        panel.cmb_lsengine.setCurrentIndex(panel.cmb_lsengine.findData("ltx"))
+        panel.rb_normal.setChecked(True); panel._on_mode()
+    wk = getattr(w, "_mt_worker", None)
+    assert wk is not None and type(wk).__name__ == "_NativeMultiTalkWorker", "worker MultiTalk non creato"
+    assert wk.params.get("lipsync_engine") == "multitalk" and wk.params.get("cfg") == 1.0
+    assert wk.params.get("audio_path", "").endswith("_vid_sing_song2.wav"), wk.params.get("audio_path")
+    assert not any((c.get("module") or "").startswith("ltx") for c in spy.calls), "il motore LTX non doveva partire"
+
+
 # ─────────────────────────── preset video / preferiti ───────────────────────────
 def case_preset_apply_builtin(w, spy):
     """Applicare un preset video built-in deve aggiornare le impostazioni (steps) e la generazione
@@ -555,6 +599,10 @@ CASES = [
      case_v2v_talk_no_audio_guard),
     ("video_v2v_sing_multitalk", "Canta: foto+canzone → a2v/lip-sync nativo con audio_path.",
      case_v2v_sing_multitalk),
+    ("video_v2v_lipsync_engine_selector", "Selettore motore lip-sync: visibilita', default LTX, LoRA Wan solo con MultiTalk.",
+     case_v2v_lipsync_engine_selector),
+    ("video_v2v_sing_multitalk_wan_native", "Canta con MultiTalk (Wan 2.1 nativo): parte il worker dedicato, non LTX.",
+     case_v2v_sing_multitalk_wan_native),
     ("video_preset_apply_builtin", "Preset video built-in: applica gli steps e li usa nella generazione.",
      case_preset_apply_builtin),
     ("video_preset_save_and_delete", "Preset personale: salva ed elimina senza crash (stato pulito).",

@@ -126,6 +126,42 @@ def case_enhance_engine_flashvsr(w, spy):
     assert spy.calls, "FlashVSR: nessun enqueue dopo preflight ok (engine non instradato)"
 
 
+def case_enhance_engine_flashvsrplus(w, spy):
+    """FlashVSR+ (Turbo/Base): neutralizzato il preflight, la GUI deve enqueuare il worker FlashVSR+ con la
+    variante e la compressione temporale scelte (get_config['fvp']) e il nome file con la variante."""
+    src = _make_test_video()
+    t = w.video_def_tab
+    t.set_video(src); _set_engine(t, 4)
+    t.fvp_mode.setCurrentIndex(t.fvp_mode.findData("base"))
+    t.fvp_motion.setCurrentIndex(t.fvp_motion.findData(2))
+    assert t.get_config()["fvp"] == {"mode": "base", "temporal_compression": 2}, t.get_config()["fvp"]
+    from core import flashvsrplus_service as fvp
+    seen = {}
+    orig = fvp.preflight
+    fvp.preflight = lambda mode="turbo": seen.setdefault("mode", mode) and []
+    try:
+        w.generate_video_enhance()
+    finally:
+        fvp.preflight = orig
+    assert seen.get("mode") == "base", f"preflight non ha ricevuto la variante scelta: {seen}"
+    assert spy.calls, "FlashVSR+: nessun enqueue dopo preflight ok (engine non instradato)"
+    wk = getattr(w, "_fvp_worker", None)
+    assert wk is not None and wk.mode == "base" and wk.temporal_compression == 2, "worker FlashVSR+ senza i parametri GUI"
+    assert "flashvsrplus_base_" in wk.out, f"nome file senza variante: {wk.out}"
+
+
+def case_enhance_flashvsrplus_controls(w, spy):
+    """_on_engine: i controlli FlashVSR+ (variante, movimento) sono attivi SOLO con quel motore; la scala vale."""
+    t = w.video_def_tab
+    _set_engine(t, 4)
+    assert t.fvp_mode.isEnabled() and t.fvp_motion.isEnabled() and t.scale.isEnabled()
+    assert not t.seedvr2_model.isEnabled() and not t.esrgan_model.isEnabled()
+    _set_engine(t, 0)
+    assert not t.fvp_mode.isEnabled() and not t.fvp_motion.isEnabled()
+    assert [t.fvp_mode.itemData(i) for i in range(t.fvp_mode.count())] == ["turbo", "base"]
+    assert [t.fvp_motion.itemData(i) for i in range(t.fvp_motion.count())] == [4, 2, 1]
+
+
 def case_enhance_no_video_guard(w, spy):
     """Senza video sorgente generate_video_enhance NON deve enqueuare nulla (solo warning)."""
     t = w.video_def_tab
@@ -169,7 +205,7 @@ def case_enhance_config_rife_toggle(w, spy):
 def case_enhance_config_engine_mapping(w, spy):
     """get_config deve mappare l'indice combo → chiave engine ('seedvr2'/'esrgan'/'flashvsr')."""
     t = w.video_def_tab
-    want = {0: "seedvr2", 1: "esrgan", 2: "flashvsr"}
+    want = {0: "seedvr2", 1: "esrgan", 2: "flashvsr", 3: "h3_upsampler", 4: "flashvsr_plus"}
     for idx, key in want.items():
         _set_engine(t, idx)
         assert t.get_config()["engine"] == key, f"engine idx {idx} → atteso {key}, got {t.get_config()['engine']}"
@@ -332,6 +368,12 @@ CASES = [
      "SeedVR2: con preflight ok la GUI enqueua il worker SeedVR2.", case_enhance_engine_seedvr2),
     ("videodef_enhance_engine_flashvsr",
      "FlashVSR: con preflight ok la GUI enqueua il worker FlashVSR.", case_enhance_engine_flashvsr),
+    ("videodef_enhance_engine_flashvsrplus",
+     "FlashVSR+: variante e movimento arrivano al worker, preflight con la variante scelta.",
+     case_enhance_engine_flashvsrplus),
+    ("videodef_enhance_flashvsrplus_controls",
+     "FlashVSR+: i controlli variante/movimento si attivano solo con quel motore.",
+     case_enhance_flashvsrplus_controls),
     ("videodef_enhance_no_video_guard",
      "Enhance senza video: nessuna richiesta inviata (solo warning, no-crash).", case_enhance_no_video_guard),
     ("videodef_enhance_engine_enable_toggle",
