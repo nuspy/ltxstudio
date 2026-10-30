@@ -3,6 +3,7 @@
 Esegui con il python del venv di ComfyUI:
   E:\\AI\\Comfy_Nexus\\ComfyUI\\venv\\Scripts\\python.exe E:\\AI\\ltxstudio\\app.py
 """
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,14 @@ def main():
     apply_theme(app)
     win = MainWindow()
     win.show()
+    if os.environ.get("LTX_TEST_DRIVER") == "1":              # solo per i test dal vivo (tests/app_live); mai nelle build
+        try:
+            import importlib.util
+            _sp = importlib.util.spec_from_file_location("ltx_test_driver", str(Path(__file__).resolve().parent / "tests" / "app_live" / "driver.py"))
+            _m = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(_m)
+            _m.attach(win)
+        except Exception as e:                              # noqa: BLE001
+            print(f"[test-driver] non attivato: {e}", flush=True)
     # Primo avvio: wizard «Setup modelli» (cartelle → collega i locali → scarica i mancanti dell'edizione).
     try:
         from ui.setup import first_run

@@ -1,0 +1,8 @@
+{"nome": "Prova del sistema (a secco)", "cases": [
+ {"id": "proof_krea2_lora", "fn": "create_image", "descr": "Krea 2 + una LoRA: cablaggio widget -> backend (nessun job)", "nsfw": true,
+  "arch": "Krea 2", "model": "turbo", "w": 960, "h": 1024, "seed": 11, "prompt": "a lighthouse keeper repairing a lamp during a storm, cinematic", "loras": [{"piece": "perky", "strength": 0.8}]},
+ {"id": "proof_flux_plain", "fn": "create_image", "descr": "FLUX senza LoRA", "nsfw": true,
+  "arch": "FLUX", "model": "krea", "w": 1024, "h": 768, "seed": 12, "prompt": "an abandoned greenhouse overgrown with giant ferns, soft morning light"},
+ {"id": "proof_ltx_video", "fn": "video", "descr": "Video LTX 4 s", "nsfw": true,
+  "arch": "ltx", "model": "distilled", "w": 768, "h": 512, "secs": 4, "seed": 13, "prompt": "a paper boat drifting down a rain-filled gutter, close-up, shallow depth of field"}
+]}
