@@ -192,3 +192,50 @@ def test_menu_nasconde_file_di_servizio(tab):
     testo = " | ".join(_items(tab))
     assert "_ltx23_aux_components" not in testo
     assert "ltx10eros_v14" in testo and "int8-native" in testo and "Q8_0.gguf" in testo
+
+
+# ── 4. classificazione per chiavi + niente doppioni GGUF ─────────────────────────────────────────────────
+def _write_st(path, keys):
+    import json
+    import struct
+    hdr = {k: {"dtype": "U8", "shape": [1], "data_offsets": [0, 1]} for k in keys}
+    raw = json.dumps(hdr).encode()
+    with open(path, "wb") as fh:
+        fh.write(struct.pack("<Q", len(raw)) + raw + b"\0")
+
+
+def test_header_says_not_ltx(tmp_path):
+    from core import ltx_release as R
+    qwen = tmp_path / "noct.safetensors"
+    _write_st(qwen, ["transformer_blocks.0.attn.to_q.weight", "transformer_blocks.0.img_mlp.out.weight",
+                     "img_in.weight"])
+    ltx = tmp_path / "ltx.safetensors"
+    _write_st(ltx, ["model.diffusion_model.transformer_blocks.0.attn1.to_q.weight",
+                    "model.diffusion_model.transformer_blocks.0.audio_attn1.to_q.weight"])
+    altro = tmp_path / "vae.safetensors"
+    _write_st(altro, ["decoder.conv_in.weight"])
+    assert R.header_says_not_ltx(str(qwen)) is True
+    assert R.header_says_not_ltx(str(ltx)) is False
+    assert R.header_says_not_ltx(str(altro)) is False            # senza transformer_blocks: nessuna esclusione
+    assert R.header_says_not_ltx(str(tmp_path / "manca.safetensors")) is False
+    assert R.header_says_not_ltx(str(tmp_path / "x.gguf")) is False
+
+
+def test_menu_esclude_qwen_e_non_duplica_gguf(tab, tmp_path, monkeypatch):
+    qwen = tmp_path / "NoctQ_V4_int8_convrot-native.safetensors"
+    _write_st(qwen, ["transformer_blocks.0.attn.to_q.weight", "transformer_blocks.0.img_mlp.out.weight"])
+    # il catalogo esterno lo dichiara «LTX»: la classificazione deve vincere dalle chiavi
+    monkeypatch.setattr(type(tab._mcat), "arch_of", lambda self, n: "LTX")
+    monkeypatch.setattr(tab, "_resolve_model_path",
+                        lambda n: str(qwen) if "NoctQ" in n else None)
+    tab.nsfw.setCurrentText("NSFW")
+    inv = [r"Qwen21\NoctQ_V4_int8_convrot-native.safetensors", "ltx-2-3-22b-dev-Q6_K.gguf",
+           r"LTX\ltx10eros_v14_2989669.safetensors"]
+    tab.set_model_inventory(inv, [], ["ltx-2-3-22b-dev-Q6_K.gguf"])
+    testo = _items(tab)
+    assert not any("NoctQ" in t for t in testo)
+    assert sum("Q6_K.gguf" in t for t in testo) == 1, testo
+    assert any("ltx10eros_v14" in t for t in testo)
+    # senza lista GGUF il .gguf resta come «diffusion» (unica via per sceglierlo)
+    tab.set_model_inventory(inv, [], [])
+    assert sum("Q6_K.gguf" in t for t in _items(tab)) == 1

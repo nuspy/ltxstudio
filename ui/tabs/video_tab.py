@@ -1066,9 +1066,13 @@ class VideoTab(QWidget):
         # fav-first: i preferiti compaiono in cima a ogni categoria
         def fav_first(lst):
             return sorted(lst, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
-        diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)])
-        checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
         ggufs = fav_first([m for m in self._gguf_models if "ltx" in m.lower()])
+        # i .gguf stanno nella cartella diffusion_models e quindi comparivano due volte (diffusion + GGUF):
+        # se sono già nella lista GGUF (kind esplicito, quello che il worker usa) si tolgono dalla prima.
+        _gg_norm = {g.lower().replace("/", "\\") for g in ggufs}
+        diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)
+                               and m.lower().replace("/", "\\") not in _gg_norm])
+        checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
 
         # Nessuna whitelist di compatibilità: TUTTI i modelli LTX video sono esposti.
         if diffusion:
@@ -1188,7 +1192,9 @@ class VideoTab(QWidget):
             return False
         if low.replace("\\", "/").rsplit("/", 1)[-1].startswith("_"):
             return False                                        # file di servizio (es. _ltx23_aux_components): non è un modello
-        from core.ltx_release import OTHER_ARCH_MARKERS
+        from core.ltx_release import OTHER_ARCH_MARKERS, header_says_not_ltx
+        if header_says_not_ltx(self._resolve_model_path(name) or ""):
+            return False                                        # arch dalle chiavi: es. Noct-Q (Qwen-Image) che il catalogo dava «LTX»
         if any(x in low for x in OTHER_ARCH_MARKERS):           # DiT MiniMax H3 «10Eros-Max»: non è LTX
             return False
         if (self._mcat.arch_of(name).upper() == "LTX") or "ltx" in low or "eros" in low:
