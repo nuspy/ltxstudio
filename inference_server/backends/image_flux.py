@@ -1021,7 +1021,11 @@ def _assemble_ernie(transformer_path: str | None = None):
     if not hasattr(transformers, "TokenizersBackend"):
         transformers.TokenizersBackend = PreTrainedTokenizerFast
     # transformer: config dal repo + pesi dal single-file (chiavi identiche, 409/409)
-    tr = ErnieImageTransformer2DModel.from_config(json.load(open(os.path.join(ERNIE_REPO, "transformer", "config.json"))))
+    # Costruzione su META (nessuna RAM, nessuna init casuale) + pesi del file con assign: prima from_config() allocava e
+    # inizializzava 8B parametri in fp32 (~32GB di RAM, 205 s di load, processo a 74GB: punto 11 dell'utente / giro 30/10).
+    from accelerate import init_empty_weights
+    with init_empty_weights():
+        tr = ErnieImageTransformer2DModel.from_config(json.load(open(os.path.join(ERNIE_REPO, "transformer", "config.json"))))
     # transformer scelto (ernie-image / ernie-image-turbo: stesse chiavi e config) o, senza scelta, il base
     tr.load_state_dict(load_file(transformer_path or ERNIE_TRANSFORMER), assign=True)
     tr = tr.to(bf16)
@@ -1032,11 +1036,16 @@ def _assemble_ernie(transformer_path: str | None = None):
         tc["model_type"] = "ministral"
     if tc.get("sliding_window") is None:
         tc["sliding_window"] = tc.get("max_position_embeddings", 262144)
-    te = Mistral3Model(Mistral3Config(**tcfg))
     raw = load_file(ERNIE_TE)
     rem = {("language_model." + k[6:]) if k.startswith("model.") else k: v
            for k, v in raw.items() if not k.startswith("tekken_model")}
-    te.load_state_dict(rem, strict=False)
+    with init_empty_weights():                         # idem: niente init casuale fp32 del text encoder
+        te = Mistral3Model(Mistral3Config(**tcfg))
+    te.load_state_dict(rem, strict=False, assign=True)
+    if any(p.is_meta for p in te.parameters()):        # pesi mancanti nel file: ripiego sul percorso classico (init + load)
+        print("[ernie] parametri TE assenti nel file → ripiego sul caricamento classico", flush=True)
+        te = Mistral3Model(Mistral3Config(**tcfg))
+        te.load_state_dict(rem, strict=False)
     te = te.to(bf16)
     vae = AutoencoderKLFlux2.from_pretrained(os.path.join(ERNIE_REPO, "vae"), torch_dtype=bf16)
     tok = PreTrainedTokenizerFast(tokenizer_file=os.path.join(ERNIE_REPO, "tokenizer", "tokenizer.json"))
