@@ -125,7 +125,7 @@ def main():
     if a.max_proc_gb:
         cmd += ["--max-proc-gb", str(a.max_proc_gb)]
     cmd += ["--", sys.executable, "-u", os.path.join(ROOT, "app.py")]
-    applog = open(os.path.join(out, "app_stdout.log"), "w", encoding="utf-8", errors="replace")
+    applog = open(os.path.join(out, "app_stdout.log"), "a", encoding="utf-8", errors="replace")
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=applog, stderr=subprocess.STDOUT)
     cl = Client()
     results, stop = [], False
@@ -187,6 +187,22 @@ def main():
     say(f"FINE: {ok}/{len(results)} ok; risultati in {res_path}")
     json.dump({"nome": spec.get("nome"), "modo": mode, "dry": a.dry, "risultati": len(results), "ok": ok},
               open(os.path.join(out, "sommario.json"), "w", encoding="utf-8"))
+    if mode == "sweep" and results and results[-1].get("esito") == "crash" and not a.inventory_out:
+        ids = [c["id"] for c in spec["cases"]]
+        last = results[-1]["id"]
+        nxt = ids[ids.index(last) + 1] if last in ids and ids.index(last) + 1 < len(ids) else None
+        if nxt:                                              # app morta (crash/guardiano): riavvio l'app e proseguo dal caso dopo
+            say(f"app terminata: riavvio e proseguo da {nxt}")
+            time.sleep(15)                                   # rilascio memoria/porte
+            argv = [sys.executable, os.path.abspath(__file__), a.cases, "--sweep", "--from", nxt, "--out", out,
+                    "--min-commit-gb", str(a.min_commit_gb), "--timeout", str(a.timeout)]
+            if a.dry:
+                argv.append("--dry")
+            if a.no_open:
+                argv.append("--no-open")
+            if a.max_proc_gb:
+                argv += ["--max-proc-gb", str(a.max_proc_gb)]
+            return subprocess.run(argv).returncode
     if not a.no_review and results and not a.inventory_out:
         import importlib.util
         _sp = importlib.util.spec_from_file_location("ltx_review", os.path.join(HERE, "review.py"))
