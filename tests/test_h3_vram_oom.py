@@ -148,10 +148,31 @@ def test_token_del_caso_della_campagna():
     assert HP.sequence_tokens(243, 544, 960) < t / 1.8      # la tela 544p ha meno della metà dei token
 
 
-def test_5090_regge_10s_a_768p_con_lora():
+def test_5090_regge_10s_a_768p_con_lora_con_poco_offload_e_544p_senza():
+    """Dopo la prova del 30/10 (attivazioni reali > stima) il piano e' prudente: a 768p/10 s tiene in RAM qualche
+    blocco anche su 29 GB liberi; a 544p sta tutto residente."""
     t = HP.sequence_tokens(243, 736, 1376)
-    p = HP.plan(29.4, t, weights_gb=13.6, lora_gb=0.6)
-    assert p["fits"] and p["offload_gb"] == 0
+    p = HP.plan(29.4, t, weights_gb=13.7, lora_gb=0.5)
+    assert p["fits"] and 0 <= p["offload_gb"] < 3.0
+    t544 = HP.sequence_tokens(243, 544, 960)
+    p2 = HP.plan(29.4, t544, weights_gb=13.7, lora_gb=0.5)
+    assert p2["fits"] and p2["offload_gb"] == 0
+
+
+def test_caso_vivo_30_10_non_e_piu_tutto_residente():
+    """Dopo il caricamento (DiT + 2 LoRA = 13,7 GB) restavano 13,5 GB liberi: il vecchio piano diceva «servono
+    ~12,7: tutto residente» e il denoise finiva in OOM. Ora il fabbisogno supera i liberi -> offload."""
+    t = HP.sequence_tokens(243, 736, 1376)
+    act = HP.activation_gb(t, HP.DEFAULT_DIMS)
+    assert act + HP.RESERVE_GB >= (11.7 + 1.0) + 3.0, "fabbisogno: almeno +3 GB sul vecchio piano (12,7 GB)"
+    assert act + HP.RESERVE_GB > 13.5 - 0.4, "con 13,1 GB liberi non si puo' dire tutto residente"
+    p = HP.plan(13.1, t, weights_gb=0.0, lora_gb=0.0)           # come _fit_after_load: pesi gia' in VRAM
+    assert p["offload_gb"] > 0
+
+
+def test_percorso_non_chunked_e_piu_pesante():
+    t = HP.sequence_tokens(243, 736, 1376)
+    assert HP.activation_gb(t, HP.DEFAULT_DIMS, chunked=False) > HP.activation_gb(t, HP.DEFAULT_DIMS)
 
 
 def test_scheda_da_24gb_usa_l_offload_e_da_12_gb_riceve_un_messaggio_chiaro():
@@ -159,18 +180,18 @@ def test_scheda_da_24gb_usa_l_offload_e_da_12_gb_riceve_un_messaggio_chiaro():
     p24 = HP.plan(22.5, t, weights_gb=13.6, lora_gb=0.6)
     assert p24["fits"] and 0 < p24["offload_gb"] < 0.85 * 14.2
     p12 = HP.plan(11.0, t, weights_gb=13.6, lora_gb=0.6)
-    assert not p12["fits"]                                   # nemmeno i pesi stanno: niente OOM a metà
+    assert not p12["fits"]                                   # nemmeno i pesi stanno: niente OOM a meta'
     msg = HP.explain_failure(p12, height=736, width=1376, num_frames=243, free_gb=11.0,
                              canvas_544=(544, 960))
     assert "VRAM insufficiente" in msg and "11.0" in msg and "Prova a" in msg
 
 
 def test_non_ci_sono_soglie_fisse_la_stima_scala_con_la_durata():
-    short = HP.plan(20, HP.sequence_tokens(101, 736, 1376), weights_gb=13.6, lora_gb=0.6)
-    long_ = HP.plan(20, HP.sequence_tokens(365, 736, 1376), weights_gb=13.6, lora_gb=0.6)
+    short = HP.plan(24, HP.sequence_tokens(101, 736, 1376), weights_gb=13.6, lora_gb=0.6)
+    long_ = HP.plan(24, HP.sequence_tokens(365, 736, 1376), weights_gb=13.6, lora_gb=0.6)
     assert short["need_gb"] < long_["need_gb"]
     assert short["offload_gb"] < long_["offload_gb"]
-    assert HP.max_frames_that_fit(20, 736, 1376, weights_gb=13.6, lora_gb=0.6) >= 101
+    assert HP.max_frames_that_fit(24, 736, 1376, weights_gb=13.6, lora_gb=0.6) >= 101
 
 
 def test_dims_dal_config():
@@ -213,6 +234,91 @@ def test_offload_stesso_risultato_e_pesi_di_nuovo_in_ram(monkeypatch):
     assert blocchi[3].lin.weight.device.type == "cpu" and len(blocchi[3].lin.loras) == 2
 
 
+# ── MLP e blocco a token-chunk ──────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_ffn_swiglu_a_blocchi_identico(monkeypatch, dtype):
+    torch.manual_seed(5)
+    gu = nn.Linear(24, 2 * 40, bias=False).to(dtype)
+    out = nn.Linear(40, 24, bias=False).to(dtype)
+    ff = Q.FusedGateUpSwiGLU(gu, out)
+    x = torch.randn(2, 61, 24, dtype=dtype)
+    with torch.no_grad():
+        monkeypatch.setenv("QLINEAR_FFN_CHUNK", "100000")
+        ref = ff(x)
+        for ch in ("1", "9", "60"):
+            monkeypatch.setenv("QLINEAR_FFN_CHUNK", ch)
+            got = ff(x)
+            assert got.shape == ref.shape and got.dtype == ref.dtype
+            assert torch.allclose(got.float(), ref.float(), atol=1e-2 if dtype == torch.bfloat16 else 1e-5)
+
+
+class _FakeAttn(nn.Module):
+    fused_projections = False
+
+    def __init__(self, c):
+        super().__init__()
+        self.lin = nn.Linear(c, c, bias=False)
+        self.processor = object()
+
+    def forward(self, nh, rope, mask):
+        return self.lin(nh.float().cumsum(1) / 10).to(nh.dtype)        # dipende dai token precedenti: sequenza intera
+
+
+class _FakeBlock(nn.Module):
+    def __init__(self, c=24):
+        super().__init__()
+        self.norm1, self.norm2 = nn.RMSNorm(c), nn.RMSNorm(c)
+        self.attn = _FakeAttn(c)
+        self.ff = Q.FusedGateUpSwiGLU(nn.Linear(c, 2 * 40, bias=False), nn.Linear(40, c, bias=False))
+        self.adaln_proj = lambda temb: temb.chunk(6, dim=-1)
+
+    def forward(self, hs, temb, idx, rope, mask=None):                  # riferimento: come diffusers
+        sm, cm, gm, sf, cf, gf = self.adaln_proj(temb)
+        a = self.attn(self.norm1(hs) * (1.0 + cm.index_select(0, idx)) + sm.index_select(0, idx), rope, mask)
+        hs = hs + gm.index_select(0, idx) * a
+        f = self.ff(self.norm2(hs) * (1.0 + cf.index_select(0, idx)) + sf.index_select(0, idx))
+        return hs + gf.index_select(0, idx) * f
+
+
+def test_blocco_a_token_chunk_ramo_processore_originale(monkeypatch):
+    """Anche con un processore non standard (Veda) o proiezioni non fuse il blocco resta identico."""
+    import functools
+    import h3_chunk as K
+    monkeypatch.setenv("H3_BLOCK_CHUNK", "8")
+    torch.manual_seed(2)
+    blk = _FakeBlock()
+    hs = torch.randn(1, 37, 24)
+    temb = torch.randn(6, 144)                                     # 6 righe di tabella: 2 istanti x 3 modalita'
+    idx = torch.randint(0, 6, (37,))
+    keep = hs.clone()
+    with torch.no_grad():
+        ref = blk(hs, temb, idx, None)
+        tr = type("T", (), {"transformer_blocks": [blk]})()
+        assert K.enable_chunked_blocks(tr) == 1
+        assert isinstance(blk.forward, functools.partial)
+        got = blk(hs, temb, idx, None)
+    assert torch.allclose(got, ref, atol=1e-5)
+    assert torch.equal(hs, keep), "l'ingresso del blocco non va modificato"
+
+
+def test_blocco_h3_chunk_disattivabile(monkeypatch):
+    import h3_chunk as K
+    monkeypatch.setenv("H3_BLOCK_CHUNK", "0")
+    assert K.enable_chunked_blocks(type("T", (), {"transformer_blocks": [_FakeBlock()]})()) == 0
+
+
+VENV_PY = r"E:\AI\Tools\diffusers_next_venv\Scripts\python.exe"
+
+
+@pytest.mark.skipif(not os.path.exists(VENV_PY), reason="venv di H3 (diffusers col modello MiniMax) assente")
+def test_blocco_a_token_chunk_contro_il_blocco_reale_di_diffusers():
+    import subprocess
+    env = dict(os.environ, CUDA_VISIBLE_DEVICES="")
+    r = subprocess.run([VENV_PY, "-I", os.path.join(ROOT, "tests", "h3_chunk_diffusers_check.py")],
+                       capture_output=True, text=True, timeout=300, env=env)
+    assert r.returncode == 0 and r.stdout.strip().endswith("OK"), r.stdout[-800:] + r.stderr[-800:]
+
+
 # ── errore chiaro verso la GUI ──────────────────────────────────────────────────────────────────
 def _worker():
     spec = importlib.util.spec_from_file_location("mmh3w22", os.path.join(ROOT, "workers", "minimax_h3_infer.py"))
@@ -226,3 +332,25 @@ def test_oom_diventa_un_messaggio_per_la_gui():
     msg = w.friendly_error(torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 2.89 GiB."))
     assert "memoria GPU" in msg and "VRAM" in msg and "2.89" in msg
     assert w.friendly_error(RuntimeError("altro")) == "altro"
+
+
+def test_fit_after_load_attiva_chunk_e_offload_quando_il_margine_manca(monkeypatch):
+    """Flusso del worker dopo il caricamento (CPU, VRAM finta): 13,1 GB liberi non coprono ~16,6 -> blocchi in RAM."""
+    w = _worker()
+    monkeypatch.setattr(O, "free_gb_now", lambda: 13.5)              # -0,4 di margine -> 13,1
+    chiamate = []
+    monkeypatch.setattr(O, "enable_block_offload", lambda blocks, n, dev, log=None: (chiamate.append(n), n)[1])
+    monkeypatch.setattr(O, "blocks_for_deficit", lambda blocks, d, max_frac=0.85: (chiamate.append(("d", round(d, 1))), 12)[1])
+    blocchi = [nn.Linear(2, 2) for _ in range(50)]
+    tr = type("T", (), {"transformer_blocks": blocchi})()
+    t = HP.sequence_tokens(243, 736, 1376)
+    plan0 = HP.plan(29.9, t, weights_gb=11.7, lora_gb=2.0)
+    with pytest.raises(RuntimeError):                                # free2 resta 13,5: la finta offload non libera nulla
+        w._fit_after_load(tr, HP.DEFAULT_DIMS, plan0, {"height": 736, "width": 1376}, 243)
+    assert chiamate[0][0] == "d" and chiamate[0][1] > 3.0 and chiamate[1] == 12
+    assert all(hasattr(b, "forward") for b in blocchi)
+    # con VRAM sufficiente: tutto residente, nessun offload
+    chiamate.clear()
+    monkeypatch.setattr(O, "free_gb_now", lambda: 30.0)
+    w._fit_after_load(tr, HP.DEFAULT_DIMS, plan0, {"height": 736, "width": 1376}, 243)
+    assert chiamate == []

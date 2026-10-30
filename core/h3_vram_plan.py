@@ -8,11 +8,11 @@ attivazioni crescono linearmente con i token. A 1376×736 e 10 s sono ~72k token
 LoRA sommavano 3-4 temporanei grandi quanto il qkv. Qui la stima è per token e il confronto è con la VRAM
 LIBERA di adesso: nessuna soglia fissa sui GB della scheda (regola «VRAM dinamica»).
 
-Modello di costo (bf16, elementi per token), fase peggiore del blocco:
-  · attenzione: residuo + normalizzato (2·h) + qkv (3·i) + q,k normalizzati (2·i) + temporanei rotary (2·i)
-    + uscita dell'attenzione (i)                                         = 2·h + 8·i
-  · MLP SwiGLU: residuo + normalizzato (2·h) + gate_up (2·f) + silu·up (2·f) + uscita (h)
-                                                                          = 3·h + 4·f
+Modello di costo (bf16, elementi per token). Col blocco a token-chunk (workers/h3_chunk.py, default) restano in
+memoria solo il flusso residuo (nuovo + quello del chiamante, caso peggiore fp32), Q/K/V pieni e l'uscita
+dell'attenzione: 4·h + 5·i; il resto è a blocchi ed è un'attività fissa (FIXED_ACT_GB). Senza chunk
+(H3_BLOCK_CHUNK=0) vale il modello a fasi del blocco originale (attenzione 2·h + 8·i, MLP 3·h + 4·f) × 1,7.
+Calibrazione e margine: vedi i commenti sulle costanti (prova dal vivo del 30/10: OOM nell'MLP, 28,47 GiB).
 Con le LoRA sommate IN PLACE a blocchi (workers/_qlinear.py) non c'è più nessun temporaneo da sequenza intera.
 Se pesi + attivazioni non stanno nella VRAM libera, una parte dei blocchi del DiT resta in RAM e va in VRAM
 solo durante il proprio forward (workers/h3_offload.py): quanti dipende dal deficit misurato.
@@ -24,7 +24,16 @@ import math
 # dimensioni del DiT pruned ufficiale (config.json di transformer/): usate se il config non è leggibile
 DEFAULT_DIMS = {"hidden": 5376, "inner": 56 * 128, "ffn": 14336}
 SAFETY = 1.15                  # frammentazione dell'allocatore, temporanei piccoli non contati
-RESERVE_GB = 1.0               # contesto CUDA, cache dell'allocatore, VAE di condizionamento
+# Calibrazione sulla prova dal vivo del 30/10 (int4 W4A8, 10 s, 1376x736, ~72k token, DiT+2 LoRA = 13,7 GB):
+# col blocco ORIGINALE le attivazioni vive all'OOM erano 14,8 GB + 1,93 della richiesta, cioe' ~19,5 GB di picco
+# contro gli 11,7 stimati (1,7x), con ~3-5 GB non spiegati dai soli tensori del blocco (stato della pipeline,
+# flusso residuo in fp32, tabelle rotary, kernel W4A8). Percio': fattore sul modello per-token nel percorso non
+# a blocchi, FIXED_ACT_GB di attivazioni fisse sempre, e un margine esplicito nella riserva. Se la VRAM libera
+# non copre pesi + attivazioni + riserva, il worker tiene in RAM una parte dei blocchi (offload) invece di
+# fidarsi di «tutto residente». Il picco REALE misurato viene loggato a fine denoise per ricalibrare.
+UNCHUNKED_FACTOR = 1.7
+FIXED_ACT_GB = 4.5             # chunk di temporanei (<=1,5) + stato pipeline / tabelle / kernel non spiegati (3)
+RESERVE_GB = 3.0               # contesto CUDA 1 + cache dell'allocatore + margine esplicito 2
 TEXT_TOKENS = 2048             # prompt strutturato + dialoghi (il TE ne produce di solito < 1500)
 AUDIO_LATENTS_PER_S = 40       # audio VAE di H3
 AUDIO_CHANNELS = 2             # righe audio = latenti × canali (stereo, impacchettate per canale)
@@ -81,14 +90,20 @@ def ref_rows_estimate(references: list | None, short_edge: int, height: int, wid
     return total
 
 
-def bytes_per_token(dims: dict) -> float:
-    """Byte per token del picco di attivazioni (la fase peggiore del blocco)."""
+def bytes_per_token(dims: dict, chunked: bool = True) -> float:
+    """Byte per token del picco di attivazioni.
+    · chunked (workers/h3_chunk.py, default): restano flusso residuo (nuovo + quello del chiamante, nel caso
+      peggiore fp32 = 2 elementi bf16 ciascuno) e Q/K/V pieni + uscita dell'attenzione: 4·h + 5·i
+      (l'ultimo i e' il lavoro del kernel di attenzione); i temporanei per-token sono a blocchi (FIXED_ACT_GB).
+    · non chunked (H3_BLOCK_CHUNK=0): il modello a fasi del blocco originale, scalato di UNCHUNKED_FACTOR."""
     h, i, f = dims["hidden"], dims["inner"], dims["ffn"]
-    return 2.0 * max(2 * h + 8 * i, 3 * h + 4 * f) * SAFETY
+    if chunked:
+        return 2.0 * (4 * h + 5 * i) * SAFETY
+    return 2.0 * max(2 * h + 8 * i, 3 * h + 4 * f) * SAFETY * UNCHUNKED_FACTOR
 
 
-def activation_gb(tokens: int, dims: dict) -> float:
-    return tokens * bytes_per_token(dims) / 2**30
+def activation_gb(tokens: int, dims: dict, chunked: bool = True) -> float:
+    return tokens * bytes_per_token(dims, chunked) / 2**30 + FIXED_ACT_GB
 
 
 class Plan(dict):
@@ -97,7 +112,7 @@ class Plan(dict):
 
 
 def plan(free_gb: float, tokens: int, dims: dict | None = None, *, weights_gb: float = 0.0,
-         lora_gb: float = 0.0, reserve_gb: float = RESERVE_GB) -> Plan:
+         lora_gb: float = 0.0, reserve_gb: float = RESERVE_GB, chunked: bool = True) -> Plan:
     """Decide come far stare il DiT in `free_gb` di VRAM libera (pesi ancora da caricare: `weights_gb`; già
     caricati: 0, e `free_gb` è quello rimasto).
       · deficit = pesi + LoRA + attivazioni + riserva − libera
@@ -106,7 +121,7 @@ def plan(free_gb: float, tokens: int, dims: dict | None = None, *, weights_gb: f
       · altrimenti                             → fits False
     Il confronto è sempre con la VRAM libera passata (misurata dal chiamante), mai con i GB della scheda."""
     dims = dims or DEFAULT_DIMS
-    act = activation_gb(tokens, dims)
+    act = activation_gb(tokens, dims, chunked)
     resident = weights_gb + lora_gb
     need = resident + reserve_gb + act
     deficit = need - free_gb
@@ -119,7 +134,7 @@ def plan(free_gb: float, tokens: int, dims: dict | None = None, *, weights_gb: f
 
 def max_frames_that_fit(free_gb: float, height: int, width: int, dims: dict | None = None, *,
                         weights_gb: float = 0.0, lora_gb: float = 0.0, extra_rows: int = 0,
-                        min_s: float = 5.0, max_s: float = 15.0) -> int:
+                        min_s: float = 5.0, max_s: float = 15.0, chunked: bool = True) -> int:
     """Il massimo numero di fotogrammi 17·n+5 (≥ min_s) che ci sta, 0 se nemmeno il minimo."""
     best = 0
     n = max(0, math.ceil((round(min_s * FPS) - 5) / FRAMES_PER_CHUNK))
@@ -128,7 +143,7 @@ def max_frames_that_fit(free_gb: float, height: int, width: int, dims: dict | No
         if frames / FPS > max_s + 1e-6:
             break
         t = sequence_tokens(frames, height, width, ref_rows=extra_rows)
-        if not plan(free_gb, t, dims, weights_gb=weights_gb, lora_gb=lora_gb)["fits"]:
+        if not plan(free_gb, t, dims, weights_gb=weights_gb, lora_gb=lora_gb, chunked=chunked)["fits"]:
             break
         best = frames
         n += 1

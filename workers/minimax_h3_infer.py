@@ -328,14 +328,15 @@ def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: in
             if mode == "ref2va" else 0)
     tokens = HP.sequence_tokens(frames, h, w, keyframes=keyframes, ref_rows=refs)
     w_gb = _weights_gb(W["dit"])
-    l_gb = sum(_weights_gb(path) for path, _ in lora_specs(W, p))
+    # TUTTE le LoRA (turbo + utente); +25 %: le LoRA «diff» tengono in VRAM anche una matrice identità per modulo
+    l_gb = 1.25 * sum(_weights_gb(path) for path, _ in lora_specs(W, p))
     te_gb = _weights_gb(W["te"])
     avail = free_gb - 0.4                          # lo stesso margine del tetto per-processo
     if te_gb + 2.0 > avail:                        # fase 1: il text encoder è l'unico modello in VRAM
         raise RuntimeError(f"VRAM insufficiente per il text encoder di MiniMax H3 ({os.path.basename(W['te'])}: "
                            f"{te_gb:.1f} GB + 2 di lavoro, liberi {avail:.1f} GB). Scegli un text encoder più "
                            f"leggero (nvfp4) o chiudi i programmi che usano la GPU.")
-    plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb)
+    plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb, chunked=_chunked())
     modo = "tutto residente" if plan0["offload_gb"] <= 0 else f"blocchi in RAM: {plan0['offload_gb']:.1f} GB"
     _log(f"piano VRAM: {tokens // 1000}k token · pesi {w_gb:.1f} + LoRA {l_gb:.1f} + attivazioni "
          f"{plan0['act_gb']:.1f} + riserva = {plan0['need_gb']:.1f} GB · liberi {avail:.1f} GB → {modo}")
@@ -345,12 +346,19 @@ def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: in
     return dims, plan0
 
 
+def _chunked() -> bool:
+    return os.environ.get("H3_BLOCK_CHUNK") != "0"
+
+
 def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
     """DiT e LoRA sono in VRAM: rimisura la VRAM libera VERA e, se le attivazioni non ci stanno, tiene in RAM
     gli ultimi blocchi quanto basta (workers/h3_offload). Se non basta nemmeno così: errore chiaro."""
     import h3_offload as O
+    import h3_chunk as K
     from core import h3_vram_plan as HP
+    K.enable_chunked_blocks(tr, _log)               # qkv / norme / MLP a blocchi di token (picco da blocco, non da sequenza)
     free = O.free_gb_now() - 0.4
+    # margine incluso in RESERVE_GB: se la VRAM libera non lo copre si tengono blocchi in RAM, non si spera
     need = plan0["act_gb"] + HP.RESERVE_GB
     if free >= need:
         _log(f"VRAM dopo il caricamento: liberi {free:.1f} GB, servono ~{need:.1f} per le attivazioni: tutto residente")
@@ -360,7 +368,8 @@ def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
     done = O.enable_block_offload(blocks, n, "cuda", _log)
     free2 = O.free_gb_now() - 0.4
     if done == 0 or free2 < need:
-        pl = HP.plan(free2, plan0["tokens"], dims, weights_gb=plan0["weights_gb"], lora_gb=plan0["lora_gb"])
+        pl = HP.plan(free2, plan0["tokens"], dims, weights_gb=plan0["weights_gb"], lora_gb=plan0["lora_gb"],
+                     chunked=_chunked())
         raise RuntimeError(HP.explain_failure(pl, height=int(kw["height"]), width=int(kw["width"]),
                                               num_frames=frames, free_gb=free2, dims=dims))
     _log(f"VRAM dopo l'offload: liberi {free2:.1f} GB (servono ~{need:.1f})")
@@ -482,10 +491,15 @@ def run(p: dict) -> str:
     st = _stage(blocks, g_den, {tname: tr, "scheduler": MiniMaxH3Scheduler(shift=vshift),
                                 "audio_scheduler": MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)})
     t1 = time.time()
+    torch.cuda.synchronize()
+    base_gb = torch.cuda.memory_allocated() / 2**30            # pesi + LoRA residenti prima del denoise
+    torch.cuda.reset_peak_memory_stats()
     state = st(state=state, **_inputs_for(st, kw), num_inference_steps=nfe + 1,
                generator=torch.Generator("cpu").manual_seed(seed))
     _log(f"denoise {nfe} passi in {time.time() - t1:.0f}s ({(time.time() - t1) / max(1, nfe):.1f}s/passo) — "
          f"VRAM {_vram()}")
+    _log(f"calibrazione: attivazioni misurate {torch.cuda.max_memory_allocated() / 2**30 - base_gb:.1f} GB "
+         f"(stimate {plan0['act_gb']:.1f}) su {plan0['tokens'] // 1000}k token")
     if getattr(tr, "_veda_state", None) is not None:
         _log(f"Veda: {tr._veda_state.summary()}")
     del st, tr
