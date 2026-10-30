@@ -23,6 +23,11 @@ import time
 import traceback
 from pathlib import Path
 
+# frammentazione: expandable_segments esiste solo su Linux (su Windows PyTorch lo ignora con un avviso: li' si
+# compensa con empty_cache + offload dinamico in workers/h3_chunk). Va impostato PRIMA di importare torch.
+if os.name != "nt":
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -119,6 +124,24 @@ def load_text_encoder(W: dict):
     return te.to("cuda").eval()
 
 
+def lora_specs(W: dict, p: dict) -> list:
+    """[(percorso, forza)] delle LoRA da applicare al DiT: turbo + LoRA dell'utente (risolte e verificate)."""
+    loras = []
+    if W.get("turbo"):
+        loras.append((W["turbo"], 1.0))
+    for lo in p.get("loras") or []:
+        name = lo.get("path") or lo.get("name") or ""
+        if not name:
+            continue
+        # dalla GUI arriva il nome relativo alla cartella LoRA (LoraEntry.comfy_name): risolverlo, mai scartarlo
+        from core import model_paths as mp
+        path = name if os.path.isabs(name) else os.path.join(str(mp.models_root()), "LoRA", name)
+        if not os.path.isfile(path):
+            raise RuntimeError(f"LoRA non trovata su disco: {name}")
+        loras.append((path, float(lo.get("strength", 1.0))))
+    return loras
+
+
 def load_transformer(W: dict, mode: str, p: dict):
     import torch
     from accelerate import init_empty_weights
@@ -139,19 +162,7 @@ def load_transformer(W: dict, mode: str, p: dict):
     if miss or unex:
         raise RuntimeError(f"transformer: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
     tr = tr.to("cuda").eval()
-    loras = []
-    if W.get("turbo"):
-        loras.append((W["turbo"], 1.0))
-    for lo in p.get("loras") or []:
-        name = lo.get("path") or lo.get("name") or ""
-        if not name:
-            continue
-        # dalla GUI arriva il nome relativo alla cartella LoRA (LoraEntry.comfy_name): risolverlo, mai scartarlo
-        from core import model_paths as mp
-        path = name if os.path.isabs(name) else os.path.join(str(mp.models_root()), "LoRA", name)
-        if not os.path.isfile(path):
-            raise RuntimeError(f"LoRA non trovata su disco: {name}")
-        loras.append((path, float(lo.get("strength", 1.0))))
+    loras = lora_specs(W, p)
     for path, s in loras:
         from core import native_convert as nc
         if not nc.is_native(path):
@@ -294,9 +305,80 @@ def _inputs_for(stage, kw: dict) -> dict:
     return {k: v for k, v in kw.items() if k in names}
 
 
+def _weights_gb(path: str) -> float:
+    try:
+        return os.path.getsize(path) / 2**30
+    except OSError:
+        return 0.0
+
+
+def _canvas_hw(kw: dict, canvas: tuple) -> tuple:
+    """(altezza, larghezza) che avrebbe la tela 544p con lo stesso rapporto della richiesta."""
+    from diffusers.modular_pipelines.minimax_h3.modular_pipeline import resolve_canvas_size
+    return resolve_canvas_size(int(kw["width"]), int(kw["height"]), 32, canvas[0], canvas[1])
+
+
+def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: int):
+    """Stima il picco di VRAM (pesi + LoRA + attivazioni per la lunghezza reale della sequenza) e confronta con la
+    VRAM libera di ADESSO. Se nemmeno con parte dei blocchi in RAM ci sta: RuntimeError con numeri e rimedi."""
+    from core import h3_vram_plan as HP
+    sub = "transformer_ref" if mode == "ref2va" else "transformer"
+    try:
+        dims = HP.dims_from_config(json.loads((Path(W["configs"]) / sub / "config.json").read_text("utf-8")))
+    except (OSError, ValueError):
+        dims = dict(HP.DEFAULT_DIMS)
+    h, w = int(kw["height"]), int(kw["width"])
+    keyframes = int(bool(p.get("image_path"))) + int(bool(p.get("last_image_path")))
+    refs = (HP.ref_rows_estimate(p.get("references"), int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE), h, w)
+            if mode == "ref2va" else 0)
+    tokens = HP.sequence_tokens(frames, h, w, keyframes=keyframes, ref_rows=refs)
+    w_gb = _weights_gb(W["dit"])
+    # TUTTE le LoRA (turbo + utente); +25 %: le LoRA «diff» tengono in VRAM anche una matrice identità per modulo
+    l_gb = 1.25 * sum(_weights_gb(path) for path, _ in lora_specs(W, p))
+    te_gb = _weights_gb(W["te"])
+    avail = free_gb - 0.4                          # lo stesso margine del tetto per-processo
+    if te_gb + 2.0 > avail:                        # fase 1: il text encoder è l'unico modello in VRAM
+        raise RuntimeError(f"VRAM insufficiente per il text encoder di MiniMax H3 ({os.path.basename(W['te'])}: "
+                           f"{te_gb:.1f} GB + 2 di lavoro, liberi {avail:.1f} GB). Scegli un text encoder più "
+                           f"leggero (nvfp4) o chiudi i programmi che usano la GPU.")
+    plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb, chunked=_chunked())
+    modo = "tutto residente" if plan0["offload_gb"] <= 0 else f"blocchi in RAM: {plan0['offload_gb']:.1f} GB"
+    _log(f"piano VRAM: {tokens // 1000}k token · pesi {w_gb:.1f} + LoRA {l_gb:.1f} + attivazioni "
+         f"{plan0['act_gb']:.1f} + riserva = {plan0['need_gb']:.1f} GB · liberi {avail:.1f} GB → {modo}")
+    if not plan0["fits"]:
+        raise RuntimeError(HP.explain_failure(plan0, height=h, width=w, num_frames=frames, free_gb=avail, dims=dims,
+                                              extra_rows=refs, canvas_544=_canvas_hw(kw, S.CANVAS["544"])))
+    return dims, plan0
+
+
+def _chunked() -> bool:
+    return os.environ.get("H3_BLOCK_CHUNK") != "0"
+
+
+def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
+    """DiT e LoRA sono in VRAM: rimisura la VRAM libera VERA e, se le attivazioni non ci stanno, tiene in RAM
+    gli ultimi blocchi quanto basta (workers/h3_offload). Se non basta nemmeno così: errore chiaro."""
+    import h3_offload as O
+    import h3_chunk as K
+    from core import h3_vram_plan as HP
+    K.enable_chunked_blocks(tr, _log)               # qkv / norme / MLP a blocchi di token (picco da blocco, non da sequenza)
+    free = O.free_gb_now() - 0.4
+    # margine incluso in RESERVE_GB: se la VRAM libera non lo copre si tengono blocchi in RAM, non si spera
+    need = plan0["act_gb"] + HP.RESERVE_GB
+    blocks = getattr(tr, "transformer_blocks", [])
+    n = O.blocks_for_deficit(blocks, need - free) if free < need else 0
+    # l'offloader esiste SEMPRE (anche con n = 0): se a runtime la VRAM non basta, workers/h3_chunk libera altri
+    # blocchi al volo invece di andare in OOM (la prova del 30/10 aveva ~11 GB residenti non previsti)
+    O.enable_block_offload(blocks, n, "cuda", _log)
+    free2 = O.free_gb_now() - 0.4
+    _log(f"VRAM dopo il piano: liberi {free2:.1f} GB (servono ~{need:.1f}); "
+         f"{'tutto residente' if n == 0 else f'{n} blocchi in RAM'}; offload dinamico attivo")
+
+
 def run(p: dict) -> str:
     from core import resources
-    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 26),
+    # nessuna soglia fissa sui GB: la VRAM necessaria si calcola più sotto da pesi, LoRA, durata e tela
+    resources.require(commit_gb=float(p.get("need_commit_gb") or 8), vram_gb=float(p.get("need_vram_gb") or 0),
                       what="MiniMax H3")
     resources.start_commit_guard(2.0, what="MiniMax H3")
     import torch
@@ -319,7 +401,10 @@ def run(p: dict) -> str:
     _free_gpu_servers()
     free0, total = (x / 2**30 for x in torch.cuda.mem_get_info())
     # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema
-    torch.cuda.set_per_process_memory_fraction(max(0.2, min(1.0, (free0 - 0.4) / total)))
+    frac = max(0.2, min(1.0, (free0 - 0.4) / total))
+    torch.cuda.set_per_process_memory_fraction(frac)
+    import h3_chunk as _K
+    _K.CAP_BYTES = frac * total * 2**30                 # il tetto serve al controllo di margine per blocco
     _log(f"{mode} · {p.get('h3_dit') or 'profilo ' + str(p.get('h3_profile') or 'nvfp4')} · "
          f"VRAM libera {free0:.1f}/{total:.1f} GB")
 
@@ -369,6 +454,9 @@ def run(p: dict) -> str:
          f"{' turbo' if turbo else ''} · shift video {vshift} · seme {seed}")
     _log("prompt:\n" + kw["prompt"])
 
+    # pianificazione VRAM PRIMA di caricare qualunque cosa: errore chiaro invece di un OOM a metà denoise
+    dims, plan0 = _preflight(W, p, mode, kw, free0, frames)
+
     # 1) text encoder
     t0 = time.time()
     te = load_text_encoder(W)
@@ -401,14 +489,20 @@ def run(p: dict) -> str:
     t0 = time.time()
     tr = load_transformer(W, mode, p)
     _log(f"transformer pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
+    _fit_after_load(tr, dims, plan0, kw, frames)
     tname = "transformer_ref" if mode == "ref2va" else "transformer"
     st = _stage(blocks, g_den, {tname: tr, "scheduler": MiniMaxH3Scheduler(shift=vshift),
                                 "audio_scheduler": MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)})
     t1 = time.time()
+    torch.cuda.synchronize()
+    base_gb = torch.cuda.memory_allocated() / 2**30            # pesi + LoRA residenti prima del denoise
+    torch.cuda.reset_peak_memory_stats()
     state = st(state=state, **_inputs_for(st, kw), num_inference_steps=nfe + 1,
                generator=torch.Generator("cpu").manual_seed(seed))
     _log(f"denoise {nfe} passi in {time.time() - t1:.0f}s ({(time.time() - t1) / max(1, nfe):.1f}s/passo) — "
          f"VRAM {_vram()}")
+    _log(f"calibrazione: attivazioni misurate {torch.cuda.max_memory_allocated() / 2**30 - base_gb:.1f} GB "
+         f"(stimate {plan0['act_gb']:.1f}) su {plan0['tokens'] // 1000}k token")
     if getattr(tr, "_veda_state", None) is not None:
         _log(f"Veda: {tr._veda_state.summary()}")
     del st, tr
@@ -431,6 +525,45 @@ def run(p: dict) -> str:
     return out
 
 
+def friendly_error(e: BaseException) -> str:
+    """Un OOM di CUDA non deve arrivare alla GUI come «nessun output»: l'ultima riga dice cosa è successo e cosa fare."""
+    if type(e).__name__ == "OutOfMemoryError" or "out of memory" in str(e).lower():
+        return ("memoria GPU (VRAM) esaurita durante la generazione di MiniMax H3. Riduci la durata o scegli la tela "
+                "544p, usa meno LoRA o un profilo più leggero (int4), e chiudi i programmi che usano la GPU. "
+                f"Dettaglio: {str(e).splitlines()[0][:200]}")
+    return str(e)
+
+
+def dump_gpu_state(log=print, top: int = 10) -> None:
+    """Allo OOM: riepilogo dell'allocatore + i tensori CUDA vivi piu' grandi (per sapere cosa occupa la VRAM)."""
+    import gc
+    import torch
+    try:
+        log(torch.cuda.memory_summary(abbreviated=True))
+        storages = {}
+        for o in gc.get_objects():
+            try:
+                if torch.is_tensor(o) and o.is_cuda:
+                    st = o.untyped_storage()
+                    storages.setdefault(st.data_ptr(), (st.nbytes(), tuple(o.shape), str(o.dtype)))
+            except Exception:                                        # noqa: BLE001
+                continue
+        tot = sum(v[0] for v in storages.values())
+        log(f"[oom] tensori CUDA vivi: {len(storages)} storage, {tot / 2**30:.2f} GB")
+        for nb, shape, dt in sorted(storages.values(), key=lambda v: -v[0])[:top]:
+            log(f"[oom]   {nb / 2**30:6.2f} GB  {dt}  {list(shape)}")
+        groups = {}
+        for nb, shape, dt in storages.values():
+            g = groups.setdefault((shape, dt), [0, 0])
+            g[0] += 1
+            g[1] += nb
+        log(f"[oom] gruppi (forma, dtype) per byte totali:")
+        for (shape, dt), (n, nb) in sorted(groups.items(), key=lambda kv: -kv[1][1])[:top]:
+            log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt} {list(shape)}")
+    except Exception as e:                                           # noqa: BLE001
+        log(f"[oom] dump non riuscito: {e}")
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("uso: minimax_h3_infer.py params.json")
@@ -441,7 +574,9 @@ def main() -> int:
         return 0
     except Exception as e:                                           # noqa: BLE001
         traceback.print_exc()
-        print(f"ERRORE: {e}", flush=True)
+        if type(e).__name__ == "OutOfMemoryError" or "out of memory" in str(e).lower():
+            dump_gpu_state(lambda m: print(m, flush=True))            # prima dell'ERRORE: finale (ultima riga = causa)
+        print(f"ERRORE: {friendly_error(e)}", flush=True)
         return 1
 
 
