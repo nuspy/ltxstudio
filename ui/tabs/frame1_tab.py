@@ -71,14 +71,22 @@ QWEN21_PROFILES = (
     ("qwen21-noctq-v4-int8", "f1.gen.qwen21.noctq", "🔞 Noct-Q V4 realismo (25 passi, CFG 3)"),
     ("qwen21-noctq-anime-int8", "f1.gen.qwen21.noctq_anime", "🔞 Noct-Q Anime V1 (25 passi, CFG 3)"),
 )
+# Architetture di «Crea immagini» che accettano PIÙ immagini di riferimento: etichetta → (sintassi del modello in
+# core/image_refs.MODEL_SYNTAX, massimo). Verificato sul codice: solo Qwen-Image 2.1 le riceve da «Genera»
+# (ref_images ≤10 → workers/qwen_image21_infer.py). Krea 2 Edit (≤2) passa dai pannelli di modifica; FLUX.2/Klein nativo
+# prende UNA sola immagine (inference_server/backends/image_flux.py: image_path).
+GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10)}
+# Guidance di FLUX.1 Kontext: regolabile (default 2.5). Valori piu' bassi attenuano contrasto/saturazione eccessivi.
+KONTEXT_GUIDANCE_DEFAULT = 2.5
+KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
 QWEN21_ENGINE_IDX = 3       # posizione di «Qwen-Image 2.1» nei combo motore di Integra/Componi/Colore
 QWEN21_ASPECTS = ("1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16")
 
 
 def _is_flux2(name: str) -> bool:
-    """FLUX.2 (es. FLUX_2_Dev): VAE/encoder diversi da FLUX.1 → non supportato dalle pipeline FLUX.1."""
-    n = (name or "").lower()
-    return "flux_2" in n or "flux2" in n or "flux 2" in n
+    """FLUX.2 (dev e Klein): unica definizione in core/arch_filter (header del file; il nome solo se il file non si trova)."""
+    from core import arch_filter as af
+    return af.is_flux2(name)
 
 
 def fill_lora_combo(combo: QComboBox, arch: str | None, allow_nsfw: bool = True):
@@ -232,6 +240,7 @@ class Frame1Tab(QWidget):
         self.gen_model.setToolTip(tr("f1.gen.model.tt", "Modello usato per generare l'immagine; i colori indicano la fattibilità con la VRAM disponibile."))
         self.gen_model.currentIndexChanged.connect(self._update_gen_star)
         self.gen_model.currentIndexChanged.connect(self._refilter_gen_encoder)
+        self.gen_model.currentIndexChanged.connect(self._refilter_gen_vae)
         self.gen_model.currentIndexChanged.connect(self._update_auto_components)
         self.gen_model.activated.connect(self._maybe_offer_gen_download)   # download-on-select (Krea 2)
         gmrow = QHBoxLayout(); gmrow.setContentsMargins(0, 0, 0, 0)
@@ -260,6 +269,7 @@ class Frame1Tab(QWidget):
         f.addRow(tr("f1.gen.vae_lbl"), self.gen_vae)
         f.addRow(self._qwen21_box())
         f.addRow(self._krea2_box())
+        f.addRow(self._gen_refs_box())
         # LoRA multi-select (come nel tab Video)
         lora_group = QGroupBox(tr("f1.gen.lora.group"))
         lora_vl = QVBoxLayout(lora_group)
@@ -322,6 +332,12 @@ class Frame1Tab(QWidget):
         self.gen_btn.setObjectName("generate")
         self.gen_btn.setToolTip(tr("f1.gen.btn.tt", "Genera l'immagine di partenza con i parametri impostati."))
         self.gen_btn.clicked.connect(lambda: self.request_generate.emit())
+
+        from ui.widgets import ref_prompt
+        self._gen_prompt_refs = ref_prompt.install(
+            self.gen_prompt, lambda: self.gen_refs.names() if self._gen_refs_box_w.isVisibleTo(self) else set(),
+            lambda: self.gen_refs.completion_entries() if self._gen_refs_box_w.isVisibleTo(self) else [])
+        self.gen_refs.changed.connect(self._gen_prompt_refs.highlighter.rehighlight)
 
         def _open_prompt_builder(_self=self):
             from ui.widgets.prompt_builder import PromptBuilderDialog
@@ -456,6 +472,8 @@ class Frame1Tab(QWidget):
                 combo.setItemData(i, f"{info['precision'].upper()} · ~{info['footprint_gb']}GB", Qt.ToolTipRole)
         except Exception:                                    # noqa: BLE001
             pass
+        from ui.widgets import adult_badge
+        adult_badge.mark_combo(combo, self._mcat)             # 🔞 sui modelli 18+ (icona + tooltip testuale)
 
     def _color_curated_combo(self, combo, spec: dict, *, key: str = "unet"):
         """Colora le voci di un combo CURATO (label→dict) per fattibilità VRAM (verde/giallo/rosso),
@@ -479,6 +497,23 @@ class Frame1Tab(QWidget):
             pass
 
     def _reload_gen(self, *_):
+        """Ripopola il menu modello dell'architettura scelta. Se il modello concreto scelto prima non c'è più nel
+        nuovo menu (cambio architettura, NSFW, file spariti) il combo mostra «scegli un modello»: mai un altro
+        modello al suo posto (ui/model_menu). «Auto» e il segnaposto già attivo restano come sono."""
+        from ui import model_menu as mm
+        prev = mm.current_key(self.gen_model)
+        self._reload_gen_body()
+        if prev not in (None, mm.PLACEHOLDER, "__auto__"):
+            self.gen_model.blockSignals(True)
+            try:
+                mm.settle(self.gen_model, prev)
+            finally:
+                self.gen_model.blockSignals(False)
+            self._update_gen_star()
+        self._refilter_gen_encoder()
+        self._refilter_gen_vae()
+
+    def _reload_gen_body(self, *_):
         arch_lbl = self.gen_arch.currentText()
         if arch_lbl in ("Krea 2", "Qwen-Image 2.1"):          # voci dal catalogo pesi (nessun file-modello)
             if arch_lbl == "Krea 2":
@@ -491,41 +526,26 @@ class Frame1Tab(QWidget):
             if hasattr(self, "gen_lora_tab"):                 # rifiltra le LoRA (SFW/NSFW) anche qui
                 self.gen_lora_tab.refresh()
             return
-        _lora_arch, kws = GEN_ARCH.get(arch_lbl, (None, ()))
         allow = self._allow_nsfw()
+        from core import arch_filter as af
         models = []
-        # FLUX: includi sia FLUX.1 che FLUX.2 da diffusion_models, escludendo solo
-        # Fill (inpaint) e Kontext (editing). Aggiungi anche i checkpoint Flux.
+        # L'architettura del file la dice l'HEADER (core/arch_filter), non il nome: ogni menu mostra solo i file
+        # della famiglia scelta. FLUX = FLUX.1 + FLUX.2 generativi (Fill/Kontext/Redux/Klein vivono nei pannelli di
+        # modifica: il loader t2i non ne mappa le chiavi). Checkpoint (CheckpointLoader): solo FLUX.1.
+        for m in (self._models or []):
+            if not af.is_t2i_for_arch(arch_lbl, m):
+                continue
+            if not allow and self._mcat.is_nsfw(m):
+                continue
+            models.append(m)
         if arch_lbl == "FLUX":
-            for m in (self._models or []):
-                ml = m.lower()
-                # Escludi i NON-generativi: Fill (inpaint), Kontext (editing), Redux (adattatore di
-                # image-variation) e Klein (FLUX.2 edit-instruct, role=edit nel detector: il loader
-                # t2i flux2 non mappa le sue chiavi → 'double_blocks.7.img_mlp.2'; vive nel ramo inpaint).
-                if "fill" in ml or "kontext" in ml or "redux" in ml or "klein" in ml:
-                    continue
-                if any(k in ml for k in kws):
-                    if not allow and self._mcat.is_nsfw(m):
-                        continue
-                    models.append(m)
-            # Checkpoint Flux (lista dinamica dall'inventario ComfyUI)
             for c in (getattr(self, "_gen_checkpoint_models", []) or []):
-                cl = c.lower()
-                if "kontext" in cl or "redux" in cl or _is_flux2(c):
+                if not af.is_t2i_for_arch("FLUX", c) or af.family(c) == "flux2":
                     continue
-                if any(k in cl for k in kws):
-                    if not allow and self._mcat.is_nsfw(c):
-                        continue
-                    if c not in models:
-                        models.append(c)
-        else:
-            for m in self._models:
-                ml = m.lower()
-                if not any(k in ml for k in kws):
+                if not allow and self._mcat.is_nsfw(c):
                     continue
-                if not allow and self._mcat.is_nsfw(m):
-                    continue
-                models.append(m)
+                if c not in models:
+                    models.append(c)
         # fav-first: i modelli preferiti in cima (i nomi restano i filename reali, nessun prefisso
         # nel testo → currentText() resta valido per get_gen_config)
         models = sorted(models, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
@@ -541,6 +561,10 @@ class Frame1Tab(QWidget):
             self.gen_model.blockSignals(True); self.gen_model.clear()
             self.gen_model.addItem(tr("f1.gen.no_model"), None)
             self.gen_model.blockSignals(False)
+        from ui.widgets import adult_badge
+        adult_badge.mark_combo(
+            self.gen_model, self._mcat,
+            name_of=lambda i: "" if self.gen_model.itemData(i) in ("__auto__", None) else self.gen_model.itemText(i))
         self._update_gen_star()
         # Controlla se il golden template è disponibile per questa arch
         arch_key = {"FLUX": "flux", "Z-Image": "zimage", "Ernie": "ernie"}.get(arch_lbl, "flux")
@@ -617,16 +641,6 @@ class Frame1Tab(QWidget):
             "richiesta (in qualunque lingua) in un prompt inglese dettagliato; in editing guardano anche le "
             "immagini. «Approfondito» ragiona prima di scrivere: più accurato, molto più lento."))
         ff.addRow(tr("f1.gen.qwen21.pe", "Arricchitore ✨"), self.q21_pe_mode)
-        from ui.widgets.reference_panel import ReferencePanel
-        self.q21_refs = ReferencePanel()
-        self.q21_refs.set_token_style("qwen21")
-        self.q21_refs.set_limits(images=10, videos=0, audios=0, total=10, min_items=1)
-        self.q21_refs.enable.setText(tr("f1.gen.qwen21.refs", "Riferimenti (fino a 10 immagini)"))
-        self.q21_refs.enable.setToolTip(tr("f1.gen.qwen21.refs.tt",
-            "Persone, prodotti o stili da mantenere: citali nel prompt come «image 1», «image 2»… "
-            "Con riferimenti la generazione diventa editing (es. «la persona di image 1 al mare»)."))
-        self.q21_refs.insert_token.connect(lambda tok: self.gen_prompt.insertPlainText(tok + " "))
-        ff.addRow(self.q21_refs)
         # img2img: parte da una foto rumorata invece che dal rumore puro (forza = quanto la si ridisegna).
         # Diverso dai riferimenti: qui composizione e colori dell'immagine restano, il prompt la reinterpreta.
         self.q21_i2i = QCheckBox(tr("f1.gen.qwen21.i2i", "Parti da un'immagine (img2img)"))
@@ -689,6 +703,55 @@ class Frame1Tab(QWidget):
         self.gen_model.currentIndexChanged.connect(self._on_ernie_model_changed)
         self.gen_arch.currentTextChanged.connect(self._on_ernie_model_changed)
         return box
+
+    def _gen_refs_box(self) -> QGroupBox:
+        """«Immagini di riferimento» dentro «Crea immagini»: visibile SOLO con i modelli multi-riferimento (limite per
+        modello). Ogni immagine riceve al caricamento il nome @image_N, da citare nel prompt (completamento con «@»);
+        alla generazione i token sono tradotti nella sintassi del modello e le immagini passate in ordine."""
+        from ui.widgets.reference_panel import ReferencePanel
+        box = QGroupBox(tr("f1.gen.refs.group", "Immagini di riferimento"))
+        v = QVBoxLayout(box)
+        self.gen_refs = ReferencePanel(checkable=False, canvas_button=True)
+        self.gen_refs.set_limits(images=10, videos=0, audios=0, total=10, min_items=1)
+        self.gen_refs.insert_token.connect(lambda tok: self.gen_prompt.insertPlainText(tok + " "))
+        self.gen_refs.request_canvas.connect(self._gen_refs_from_canvas)
+        v.addWidget(self.gen_refs)
+        self._gen_refs_box_w = box
+        box.setVisible(False)
+        self.gen_arch.currentTextChanged.connect(self._sync_gen_refs)
+        return box
+
+    @property
+    def q21_refs(self):
+        """Nome storico del pannello riferimenti (test, script live). Property e non attributo: così gui_state lo
+        salva una volta sola (come `gen_refs`)."""
+        return self.gen_refs
+
+    def _sync_gen_refs(self, *_):
+        """Mostra la sezione solo se l'architettura accetta più riferimenti; applica limite e sintassi del modello."""
+        spec = GEN_REF_ARCHS.get(self.gen_arch.currentText())
+        self._gen_refs_box_w.setVisible(bool(spec))
+        if spec:
+            style, mx = spec
+            self.gen_refs.set_token_style(style)
+            self.gen_refs.set_limits(images=mx, videos=0, audios=0, total=mx, min_items=1)
+
+    def _gen_refs_from_canvas(self):
+        """«Dal canvas»: la foto che c'è nel canvas diventa il prossimo riferimento (@image_N)."""
+        path = self.image_path
+        if not path:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, tr("f1.gen.refs.group", "Immagini di riferimento"),
+                                    tr("f1.gen.refs.no_canvas", "Nel canvas non c'è nessuna immagine da usare."))
+            return
+        if not self.gen_refs.add_path(path):
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, tr("f1.gen.refs.group", "Immagini di riferimento"),
+                                    tr("f1.gen.refs.full", "Limite di riferimenti raggiunto per questo modello."))
+
+    def gen_prompt_raw(self) -> str:
+        """Prompt come lo ha scritto l'utente (con i token @image_N), senza traduzione."""
+        return self.gen_prompt.toPlainText().strip() or self.prompt.toPlainText().strip()
 
     def _krea2_box(self) -> QGroupBox:
         """Opzioni proprie di Krea 2: oggi il text encoder. L'unica alternativa all'encoder dello snapshot è 18+
@@ -773,7 +836,7 @@ class Frame1Tab(QWidget):
                 "control_scale": self.q21_cn_scale.value() / 100.0}
 
     def _qwen21_i2i_to_reference(self):
-        """Immagine iniziale → riferimento «image 1» (in testa), img2img spento: è la via giusta per lo stile."""
+        """Immagine iniziale → riferimento @image_1 (in testa; gli altri prendono i numeri successivi: è l'UNICA azione che rinumera), img2img spento."""
         path = self.q21_i2i_photo["edit"].text().strip() or (self.image_path or "")
         if not path:
             return
@@ -842,6 +905,8 @@ class Frame1Tab(QWidget):
             combo.setItemData(combo.count() - 1, _wt.tooltip_for(e), Qt.ToolTipRole)
             if not present:
                 combo.setItemData(combo.count() - 1, QColor("#e8b339"), Qt.ForegroundRole)
+        from ui.widgets import adult_badge
+        adult_badge.mark_combo(combo, adult_of=lambda i: (entries.get(combo.itemData(i)) or {}).get("sensitivity") == "adult")
         # scelta sparita (matrice / NSFW): segnaposto «scegli un modello», mai il primo elemento
         mm.settle(combo, prev, {c for c, _l in items})
         combo.blockSignals(False)
@@ -994,7 +1059,7 @@ class Frame1Tab(QWidget):
         (stesso criterio del motore auto_select: preferiti + qualità di famiglia)."""
         if self.gen_arch.currentText() in ("Krea 2", "Qwen-Image 2.1"):   # nessun file-modello: lo risolve il worker
             return ""
-        if not self.gen_model.count():
+        if not self.gen_model.count() or self.gen_model_is_placeholder():
             return ""
         if self.gen_model.currentData() == "__auto__":
             cands = [self.gen_model.itemData(i) for i in range(self.gen_model.count())
@@ -1034,19 +1099,23 @@ class Frame1Tab(QWidget):
         """
         allow = self._allow_nsfw()
         # rifinitura upscale → sempre FLUX.2
+        from core import arch_filter as af
+        # Integra/Colore (flux2_kontext): solo Klein; rifinitura upscale: FLUX.2 caricabile (dev e Klein)
         flux2 = [m for m in self._models
-                 if _is_flux2(m) and "fill" not in m.lower()
-                 and (allow or not self._mcat.is_nsfw(m))]
+                 if af.is_flux2_edit_pool(m) and (allow or not self._mcat.is_nsfw(m))]
+        refine2 = [m for m in self._models
+                   if af.is_flux2_refine_pool(m) and (allow or not self._mcat.is_nsfw(m))]
         from ui import model_menu as mm
-        flux2_all = [m for m in self._models if _is_flux2(m) and "fill" not in m.lower()]
+        flux2_all = [m for m in self._models if af.is_flux2_edit_pool(m)]
+        refine2_all = [m for m in self._models if af.is_flux2_refine_pool(m)]
         refine_combo = getattr(self, "up_refine_model", None)
         if refine_combo is not None:
             cur = mm.current_key(refine_combo)
             refine_combo.clear()
-            refine_combo.addItems(flux2) if flux2 else refine_combo.addItem(tr("f1.flux2.none"))
-            if flux2:
+            refine_combo.addItems(refine2) if refine2 else refine_combo.addItem(tr("f1.flux2.none"))
+            if refine2:
                 self._color_name_combo(refine_combo)
-            mm.settle(refine_combo, cur, flux2_all)
+            mm.settle(refine_combo, cur, refine2_all)
         # integra: liste separate per engine
         ic = getattr(self, "integrate_model", None)
         if ic is not None:
@@ -1070,8 +1139,7 @@ class Frame1Tab(QWidget):
                 pool, cand = flux2, flux2_all
                 empty = tr("f1.flux2.none")
             else:                                  # Kontext (FLUX.1)
-                cand = [m for m in self._models
-                        if "kontext" in m.lower() and "fill" not in m.lower() and not _is_flux2(m)]
+                cand = [m for m in self._models if af.is_kontext(m)]
                 pool = [m for m in cand if allow or not self._mcat.is_nsfw(m)]
                 empty = tr("f1.kontext.none")
             ic.clear()
@@ -1189,6 +1257,17 @@ class Frame1Tab(QWidget):
             "Sfumatura del bordo tra area rigenerata e originale (px): Auto = proporzionale alla foto; "
             "valori alti = transizione più morbida ma anello di modifica più largo."))
         f.addRow(tr("f1.inpaint.feather_lbl", "Sfumatura bordo (px)"), self.inp_feather)
+        # Selettore ARCHITETTURA anche in Modifica (come in Crea): filtra il menu modello. Integra/Colore/Componi hanno già
+        # il loro «Motore» (Kontext/FLUX.2/Krea 2 Edit/Qwen), che fa da selettore di architettura.
+        self.inp_arch = QComboBox()
+        self.inp_arch.addItem(tr("f1.inpaint.arch.all", "Tutte le architetture"), "")
+        for _lbl, _key in (("FLUX.1", "Flux"), ("FLUX.2 (Klein)", "Flux2"), ("Qwen-Image 2.1", "Qwen21")):
+            self.inp_arch.addItem(_lbl, _key)
+        self.inp_arch.setToolTip(tr("f1.inpaint.arch.tt", "Mostra solo i modelli dell'architettura scelta. Se il "
+                                    "modello scelto prima non appartiene alla nuova architettura il menu torna su "
+                                    "«scegli un modello»: non ne viene scelto un altro al posto tuo."))
+        self.inp_arch.currentIndexChanged.connect(self._apply_inp_arch_filter)
+        f.addRow(tr("f1.inpaint.arch_lbl", "Architettura"), self.inp_arch)
         self.inp_model = QComboBox(); self.inp_model.addItems(list(INPAINT_MODELS.keys()))
         self.inp_model.setToolTip(tr("f1.inpaint.model.tt", "Modello usato per inpaint/outpaint (FLUX Fill o checkpoint compatibile)."))
         self._color_curated_combo(self.inp_model, INPAINT_MODELS, key="unet")   # colori VRAM (verde/giallo/rosso)
@@ -1313,6 +1392,7 @@ class Frame1Tab(QWidget):
         self.int_guidance.setToolTip(tr("f1.integrate.guidance.tt"))
         grow.addWidget(self.int_guidance, 1); grow.addWidget(self.int_guidance_lbl)
         g.addRow(tr("f1.integrate.guidance_lbl"), self._wrapw(grow))
+        self._sync_int_guidance(self.integrate_engine.currentIndex())   # Kontext (motore 0) = range 1.0-4.0
         intseedrow = QHBoxLayout()
         self.int_seed = QSpinBox(); self.int_seed.setRange(0, 2_147_483_647); self.int_seed.setValue(0)
         self.int_seed.setToolTip(tr("f1.seed.tt", "Seme del generatore casuale: fissarlo rende la generazione riproducibile."))
@@ -1419,6 +1499,15 @@ class Frame1Tab(QWidget):
         self.color_steps = QSpinBox(); self.color_steps.setRange(1, 80); self.color_steps.setValue(20)
         self.color_steps.setToolTip(tr("f1.steps.tt", "Numero di passi di diffusione: più passi = più dettaglio e tempi più lunghi."))
         f.addRow(tr("f1.steps_lbl"), self.color_steps)
+        # Guidance di Kontext per il cambio colore (solo motore Kontext): default 2.5, range 1.0-4.0
+        self.color_guidance = QDoubleSpinBox()
+        self.color_guidance.setRange(*KONTEXT_GUIDANCE_RANGE); self.color_guidance.setSingleStep(0.1)
+        self.color_guidance.setDecimals(1); self.color_guidance.setValue(KONTEXT_GUIDANCE_DEFAULT)
+        self.color_guidance.setToolTip(tr("f1.kontext.guidance.tt",
+            "Guidance di Kontext (default 2.5, da 1.0 a 4.0): quanto l'edit segue il prompt. Valori piu' bassi "
+            "attenuano il contrasto e la saturazione eccessivi; piu' alti seguono il prompt con piu' decisione."))
+        self._color_guidance_lbl = QLabel(tr("f1.integrate.guidance_lbl"))
+        f.addRow(self._color_guidance_lbl, self.color_guidance)
         self.color_btn = QPushButton(tr("f1.color.btn"))
         self.color_btn.setToolTip(tr("f1.color.run.tt", "Applica il nuovo colore al soggetto indicato lasciando invariato il resto."))
         self.color_btn.clicked.connect(lambda: self.request_recolor.emit())
@@ -1430,6 +1519,11 @@ class Frame1Tab(QWidget):
         return box
 
     def _on_color_engine_changed(self, idx: int):
+        if hasattr(self, "color_guidance"):
+            self.color_guidance.setVisible(idx == 0); self._color_guidance_lbl.setVisible(idx == 0)
+        if hasattr(self, "color_steps"):
+            self._swap_default_steps(self.color_steps, getattr(self, "_color_engine_klein", False), idx == 1)
+        self._color_engine_klein = (idx == 1)
         on = idx == QWEN21_ENGINE_IDX
         self.color_model.setVisible(on); self._color_model_lbl.setVisible(on)
         if on:
@@ -1473,6 +1567,7 @@ class Frame1Tab(QWidget):
             "qwen21_dit": self.qwen21_edit_dit(self.color_model),
             "grounding": self.edit_grounding_px(),
             "steps": self.color_steps.value(),
+            "guidance": float(self.color_guidance.value()),      # solo Kontext (default 2.5)
         }
 
     def _reload_inpaint_loras(self, *_):
@@ -1485,8 +1580,12 @@ class Frame1Tab(QWidget):
             self.inp_steps.setValue(TURBO_STEPS if meta.get("turbo") else int(meta.get("steps", DEFAULT_STEPS)))
             return
         # Tutte le voci dinamiche FLUX (checkpoint o UNET) usano lo stesso pool LoRA Flux.
+        kind = getattr(self, "_dynamic_kind", {}).get(label)
         if label in self._dynamic_checkpoints or label in getattr(self, "_dynamic_unets", {}):
-            fill_lora_combo(self.inp_lora, "Flux", allow_nsfw=self._allow_nsfw())
+            fill_lora_combo(self.inp_lora, "Flux2" if kind == "klein" else "Flux", allow_nsfw=self._allow_nsfw())
+            if kind:                                   # passi del proprio modello (Fill 40, base 28, Klein 28, distillati 8)
+                from core import arch_filter as _af
+                self.inp_steps.setValue(_af.inpaint_defaults(kind, label)[0])
             return
         spec = INPAINT_MODELS.get(label, {})
         fill_lora_combo(self.inp_lora, spec.get("arch"), allow_nsfw=self._allow_nsfw())
@@ -1541,8 +1640,39 @@ class Frame1Tab(QWidget):
         hint.setStyleSheet("color:#888;"); hint.setWordWrap(True); v.addWidget(hint)
         return box
 
+    @staticmethod
+    def _swap_default_steps(spin, old_engine_is_klein: bool, new_engine_is_klein: bool) -> None:
+        """Il DEFAULT dei passi segue il motore: FLUX.2 = Klein distillato → 12 (a 21 la foto resta invariata, live
+        17/10), gli altri 20. Un valore scelto a mano dall'utente (diverso dal default del motore che si lascia) non
+        si cambia mai."""
+        from core import arch_filter as af
+        if old_engine_is_klein == new_engine_is_klein:
+            return
+        old_def = af.KLEIN_STEPS if old_engine_is_klein else af.EDIT_STEPS_DEFAULT
+        new_def = af.KLEIN_STEPS if new_engine_is_klein else af.EDIT_STEPS_DEFAULT
+        if spin.value() == old_def:
+            spin.setValue(new_def)
+
+    def _sync_int_guidance(self, engine_idx: int) -> None:
+        """Guidance di Integra: con Kontext (FLUX.1) range 1.0-4.0 e tooltip che spiega l'effetto; con gli altri motori
+        il range largo di prima. Il valore scelto resta se rientra nel range (altrimenti QSlider lo porta al limite)."""
+        if engine_idx == 0:
+            lo, hi = KONTEXT_GUIDANCE_RANGE
+            self.int_guidance.setRange(int(lo * 10), int(hi * 10))
+            self.int_guidance.setToolTip(tr("f1.kontext.guidance.tt",
+                "Guidance di Kontext (default 2.5, da 1.0 a 4.0): quanto l'edit segue il prompt. Valori piu' bassi "
+                "attenuano il contrasto e la saturazione eccessivi; piu' alti seguono il prompt con piu' decisione."))
+        else:
+            self.int_guidance.setRange(10, 100)
+            self.int_guidance.setToolTip(tr("f1.integrate.guidance.tt"))
+
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
+        if hasattr(self, "int_guidance"):
+            self._sync_int_guidance(_idx)
+        if hasattr(self, "int_steps"):
+            self._swap_default_steps(self.int_steps, getattr(self, "_int_engine_klein", False), _idx == 1)
+        self._int_engine_klein = (_idx == 1)
         if _idx == QWEN21_ENGINE_IDX:
             engine_label = tr("f1.integrate.model.qwen21", "Modello (Qwen-Image 2.1)")
         elif _idx == 2:
@@ -1721,37 +1851,57 @@ class Frame1Tab(QWidget):
             # forza i default per arch (clip_type → auto)
             self._apply_arch_defaults(self.gen_arch.currentText())
         if vaes is not None and hasattr(self, "gen_vae"):
-            cur = self.gen_vae.currentText()
-            self.gen_vae.clear()
-            self.gen_vae.addItem(tr("f1.gen.auto_from_model"), None)
-            for v in vaes:
-                self.gen_vae.addItem(v, v)
-            if cur:
-                i = self.gen_vae.findText(cur)
-                if i >= 0: self.gen_vae.setCurrentIndex(i)
+            self._all_vaes = list(vaes)                      # inventario completo (per il refiltro per arch)
+            self._refilter_gen_vae()
+
+    def _gen_components_key(self) -> tuple[str, str]:
+        """(chiave famiglia, file modello) per filtrare encoder/VAE: l'architettura del selettore e, per FLUX,
+        la famiglia del file scelto (FLUX.1 o FLUX.2)."""
+        from core import arch_filter as af
+        model = ""
+        if self.gen_arch.currentText() == "FLUX" and not self.gen_model_is_placeholder():
+            t = self.gen_model.currentText()
+            model = t if af.resolve(t) else ""
+        return af.image_arch_key(self.gen_arch.currentText(), model), model
 
     def _refilter_gen_encoder(self, *_):
-        """Aggiorna il dropdown «Text encoder» in base al modello selezionato.
-
-        Per i modelli FLUX.2 mostra SOLO gli encoder compatibili (Mistral-3 / Qwen3):
-        gli altri (Gemma, T5, CLIP-L, …) caricati come `flux2` fanno crashare il sampler
-        con «Input img and txt tensors must have 3 dimensions». Per gli altri modelli
-        mostra l'intero inventario. Mantiene la selezione corrente se resta valida."""
+        """Dropdown «Text encoder»: SOLO gli encoder dell'architettura scelta (FLUX.1: T5/CLIP-L; FLUX.2: Mistral-3 o
+        Qwen3 secondo il file; Z-Image: Qwen3-4B; Ernie: Ministral; Krea 2: Qwen3-VL 4B; Qwen-Image 2.1: Qwen3-VL 8B),
+        non l'intero inventario. Caricato un encoder di un'altra famiglia il sampler crasha (es. «Input img and txt
+        tensors must have 3 dimensions»). Selezione corrente tenuta se resta valida, altrimenti la voce «auto»."""
         if not hasattr(self, "gen_encoder") or not getattr(self, "_all_text_encoders", None):
             return
-        model = self.gen_model.currentText()
-        flux2 = _is_flux2(model)
+        from core import arch_filter as af
+        key, model = self._gen_components_key()
         cur = self.gen_encoder.currentData()
         self.gen_encoder.blockSignals(True)
         self.gen_encoder.clear()
         self.gen_encoder.addItem(tr("f1.gen.auto_from_model"), None)
         for e in self._all_text_encoders:
-            if flux2 and not is_compatible_encoder(model, e):
-                continue                                  # encoder incompatibile → nascosto
+            if not af.compatible_text_encoder(key, e, model):
+                continue                                  # encoder di un'altra architettura → nascosto
             self.gen_encoder.addItem(e, e)
         idx = self.gen_encoder.findData(cur) if cur else 0
         self.gen_encoder.setCurrentIndex(idx if idx >= 0 else 0)  # se sparito → «auto»
         self.gen_encoder.blockSignals(False)
+
+    def _refilter_gen_vae(self, *_):
+        """Dropdown «VAE»: solo i VAE dell'architettura scelta (stessa regola degli encoder)."""
+        if not hasattr(self, "gen_vae") or getattr(self, "_all_vaes", None) is None:
+            return
+        from core import arch_filter as af
+        key, _model = self._gen_components_key()
+        cur = self.gen_vae.currentData()
+        self.gen_vae.blockSignals(True)
+        self.gen_vae.clear()
+        self.gen_vae.addItem(tr("f1.gen.auto_from_model"), None)
+        for v in self._all_vaes:
+            if af.compatible_vae(key, v):
+                self.gen_vae.addItem(v, v)
+        i = self.gen_vae.findData(cur) if cur else 0
+        self.gen_vae.setCurrentIndex(i if i >= 0 else 0)
+        self.gen_vae.blockSignals(False)
+        self._update_auto_components()                    # riannota l'etichetta «auto» (voce 0 ricreata)
 
     def _update_auto_components(self, *_):
         """Auto-resolve componenti: rilevata l'ARCHITETTURA del modello scelto (detector header), mostra
@@ -1805,21 +1955,13 @@ class Frame1Tab(QWidget):
     #   per-variante). Restano fuori solo i Kontext (modello editing, non inpaint).
     def _refresh_inpaint_checkpoints(self, checkpoint_models: list[str]):
         # heuristic: identifica file FLUX/FLUX.2-compatibili dal nome (catalogo è opzionale)
-        def is_flux_like(name: str) -> bool:
-            n = (name or "").lower()
-            if "kontext" in n:
-                return False
-            # esclusioni tecniche
-            if any(x in n for x in ("text_encoders", "vae", ".vae.", "clip")):
-                return False
-            # keyword positive (catalogo o derivate)
-            return any(k in n for k in (
-                "flux", "getphat", "fuxcapacity", "krea", "reality", "fluxunchained",
-                "sigma", "verus", "pixelwave",
-            ))
-        ckpts = [c for c in checkpoint_models if is_flux_like(c)]
-        # in più: prendi anche i UNET Flux da diffusion_models (Fill, Dev, ecc.)
-        unets = [m for m in (self._models or []) if is_flux_like(m)]
+        # Il menu mostra SOLO ciò che il backend sa fare davvero (core/arch_filter.inpaint_kind, dall'HEADER):
+        # FLUX.1 Fill (384 canali) e FLUX.1 base (64) → FluxFillPipeline/FluxInpaintPipeline; Klein (128 canali, senza
+        # guidance_in) → Flux2KleinInpaintPipeline. Restano fuori FLUX.2 Dev (nessuna pipeline inpaint), Nunchaku, Krea 2,
+        # Kontext/Redux e i checkpoint completi (CheckpointLoader = ComfyUI, dismesso).
+        from core import arch_filter as _af
+        ckpts = []
+        unets = [m for m in (self._models or []) if _af.inpaint_kind(m)]
         from ui import model_menu as mm
         prev_key = mm.current_key(self.inp_model)          # per il segnaposto se il file scelto e' sparito
         # rimuovi voci dinamiche precedenti
@@ -1850,12 +1992,14 @@ class Frame1Tab(QWidget):
             if idx >= 0:
                 self.inp_model.removeItem(idx)
         self._dynamic_unets.clear()
+        self._dynamic_kind = {}
         for u in sorted(unets):
             if u.lower() in hardcoded_unets:
                 continue
             base = _os.path.splitext(_os.path.basename(u))[0]
             label = f"{base}  · UNET Flux"
             self._dynamic_unets[label] = u
+            self._dynamic_kind[label] = _af.inpaint_kind(u)
             self.inp_model.insertItem(insert_at, label)
             insert_at += 1
         self.inp_model.blockSignals(True)
@@ -1863,6 +2007,8 @@ class Frame1Tab(QWidget):
             mm.settle(self.inp_model, prev_key)
         finally:
             self.inp_model.blockSignals(False)
+        self._mark_inp_adult()
+        self._apply_inp_arch_filter()
 
     def set_inpaint_availability(self, unet_names: list[str]):
         """Marca nel menu i modelli inpaint NON ancora presenti in ComfyUI (es. in download)."""
@@ -1936,8 +2082,67 @@ class Frame1Tab(QWidget):
         else:                                                 # voce spostata/sparita (matrice, SFW, download)
             mm.settle(self.inp_model, prev_key)                # sparita → segnaposto, mai il primo elemento
         self.inp_model.blockSignals(False)
+        self._mark_inp_adult()
+        self._apply_inp_arch_filter()
         if self.inp_model.currentText() != cur:
             self._reload_inpaint_loras()
+
+    def _inp_item_arch(self, i: int) -> str:
+        """Architettura di una voce del menu Inpaint: Qwen21 | Flux2 (Klein) | Flux (FLUX.1) | '' (nessuna: «Nessuno»)."""
+        label = self.inp_model.itemText(i).split("  ⛔")[0]
+        if label in getattr(self, "_qwen21_inp", {}):
+            return "Qwen21"
+        kind = getattr(self, "_dynamic_kind", {}).get(label)
+        if kind:
+            return "Flux2" if kind == "klein" else "Flux"
+        if label in self._dynamic_checkpoints:
+            return "Flux"
+        return (INPAINT_MODELS.get(label) or {}).get("arch") or ""
+
+    def _apply_inp_arch_filter(self, *_):
+        """Nasconde dal menu Inpaint le voci di altre architetture. Se la voce corrente sparisce dal menu compare il
+        segnaposto «scegli un modello» (ui/model_menu): mai un altro modello scelto al posto dell'utente."""
+        if not hasattr(self, "inp_arch") or not hasattr(self, "inp_model"):
+            return
+        from ui import model_menu as mm
+        want = self.inp_arch.currentData() or ""
+        view = self.inp_model.view()
+        for i in range(self.inp_model.count()):
+            d = self.inp_model.itemData(i)
+            ph = d == mm.PLACEHOLDER or (isinstance(d, dict) and d.get("placeholder"))
+            view.setRowHidden(i, bool(want) and not ph and self._inp_item_arch(i) != want)
+        cur = self.inp_model.currentIndex()
+        if cur >= 0 and view.isRowHidden(cur):
+            self.inp_model.blockSignals(True)
+            try:
+                self.inp_model.insertItem(0, mm.placeholder_text(), mm.PLACEHOLDER)
+                self.inp_model.setCurrentIndex(0)
+            finally:
+                self.inp_model.blockSignals(False)
+            self._reload_inpaint_loras()
+
+    def _mark_inp_adult(self) -> None:
+        """🔞 sulle voci 18+ del menu Inpaint/Outpaint: Qwen dal registro pesi (`sensitivity: adult`), le altre da
+        flag di catalogo/override utente, registro pesi e parole del nome del FILE (non del testo della voce)."""
+        if not hasattr(self, "inp_model"):
+            return
+        import os as _os
+        from core import weights_catalog as wc
+        from ui.widgets import adult_badge
+        try:
+            entries = {e["id"]: e for e in wc.load()}
+        except Exception:                                     # noqa: BLE001
+            entries = {}
+
+        def _adult(i: int):
+            label = self.inp_model.itemText(i).split("  ⛔")[0]
+            cid = getattr(self, "_qwen21_inp", {}).get(label)
+            if cid:
+                return (entries.get(cid) or {}).get("sensitivity") == "adult"
+            f = (getattr(self, "_dynamic_unets", {}).get(label)
+                 or (INPAINT_MODELS.get(label) or {}).get("unet") or "")
+            return adult_badge.is_adult_name(_os.path.basename(str(f)) or label, self._mcat) if f else None
+        adult_badge.mark_combo(self.inp_model, self._mcat, adult_of=_adult)
 
     def _sync_klein_te(self, *_):
         """Menu encoder Klein visibile solo con un FLUX.2 Klein 9B (encoder Qwen3-8B) e l'edizione 18+."""
@@ -1979,6 +2184,11 @@ class Frame1Tab(QWidget):
             from core.qwen21_spec import DITS, DEFAULT_GUIDANCE
             meta = DITS.get(q21, {})
             self.inp_guidance.setValue(1.0 if meta.get("turbo") else float(meta.get("cfg", DEFAULT_GUIDANCE)))
+            return
+        dkind = getattr(self, "_dynamic_kind", {}).get((label or "").split("  ⛔")[0])
+        if dkind:                                   # voce dinamica: default del proprio modello, non «Fill = 30» per tutti
+            from core import arch_filter as _af
+            self.inp_guidance.setValue(_af.inpaint_defaults(dkind, label)[1])
             return
         if "hyper" in l or "hyp8" in l or "hyp-8" in l or "distill" in l or "turbo" in l:
             g = 2.5
@@ -2136,11 +2346,20 @@ class Frame1Tab(QWidget):
             "clip_type": ctype,
             "vae": vae,
             "seed": self.gen_seed.value() if seed_fixed else None,
-            "prompt": self.gen_prompt.toPlainText().strip() or self.prompt.toPlainText().strip(),
+            "prompt": self._gen_prompt_translated(),
+            "prompt_raw": self.gen_prompt_raw(),
             "negative": self.gen_neg.toPlainText().strip() if hasattr(self, "gen_neg") else "",
             "enhance": self.gen_enhance.isChecked() if hasattr(self, "gen_enhance") else False,
             "nsfw": self._allow_nsfw(),
         }
+
+    def _gen_prompt_translated(self) -> str:
+        """Prompt per il backend: i token @image_N (e i vecchi <Picture N>) tradotti nella sintassi del modello, con le
+        immagini nell'ordine in cui vengono passate. Con architetture senza riferimenti il prompt resta com'è."""
+        raw = self.gen_prompt_raw()
+        if self.gen_arch.currentText() in GEN_REF_ARCHS and self.gen_refs.enable.isChecked():
+            return self.gen_refs.translate(raw)
+        return raw
 
     def _qwen21_config(self) -> dict:
         """Parametri propri di Qwen-Image 2.1 (vuoto con le altre architetture)."""

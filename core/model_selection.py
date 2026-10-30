@@ -16,7 +16,8 @@ def arch_of(name: str) -> str:
     nl = name.lower()
     if "krea-2" in nl or "krea2" in nl:
         return "krea2"
-    if "flux2" in nl or "klein" in nl:
+    from core.arch_filter import is_flux2_name
+    if is_flux2_name(nl) or "klein" in nl:
         return "flux2"
     if "z-image" in nl or "zimage" in nl or "z_image" in nl:
         return "zimage"

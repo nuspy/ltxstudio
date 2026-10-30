@@ -26,8 +26,8 @@ FLUX2_VAE = "Flux\\flux2-vae.safetensors"
 
 
 def is_flux2(name: str) -> bool:
-    n = (name or "").lower()
-    return "flux_2" in n or "flux2" in n or "flux 2" in n or "klein" in n
+    from core.arch_filter import is_flux2 as _is_flux2        # unica definizione (header, poi nome; «klein» incluso)
+    return _is_flux2(name)
 
 
 def _is_hyper(name: str) -> bool:

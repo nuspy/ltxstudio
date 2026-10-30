@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QSpinBox, QDoubleSpinBox, QComboBox,
     QHBoxLayout, QLabel, QGroupBox, QSlider, QCheckBox, QPushButton,
-    QPlainTextEdit, QToolButton, QInputDialog, QMessageBox, QScrollArea, QLineEdit,
+    QPlainTextEdit, QToolButton, QInputDialog, QMessageBox, QScrollArea, QLineEdit, QTabWidget,
 )
 
 from ui.tabs.advanced_tab import SamplerSeedGroup
@@ -248,19 +248,24 @@ class VideoTab(QWidget):
         # Default 0.50 ("soft reference" come il workflow di riferimento): valori alti (0.8+) ancorano
         # troppo al fotogramma → movimento rigido/innaturale; 0.45-0.6 lasciano al modello libertà di
         # movimento mantenendo l'identità. Alza verso 0.8 solo se vuoi aderenza stretta all'immagine.
+        # Queste righe (immagine iniziale / I2V / PuLID) stanno nel gruppo «Immagine iniziale», nel sotto-tab «Genera»:
+        # sono ingressi della GENERAZIONE, non della modifica. Il resto del gruppo «Video» (architettura, modello,
+        # risoluzione, VRAM…) è condiviso e sta SOPRA la barra dei sotto-tab.
+        i2v_box = QGroupBox(tr("vid.i2v.group", "Immagine iniziale (I2V)")); i2f = QFormLayout(i2v_box)
+        self._i2v_box = i2v_box
         isr = QHBoxLayout()
         self.img_strength = QSlider(Qt.Horizontal); self.img_strength.setRange(0, 100); self.img_strength.setValue(50)
         self.img_strength_lbl = QLabel("0.50")
         self.img_strength.valueChanged.connect(lambda v: self.img_strength_lbl.setText(f"{v/100:.2f}"))
         self.img_strength.setToolTip(tr("vid.img_strength.tt"))
         isr.addWidget(self.img_strength, 1); isr.addWidget(self.img_strength_lbl)
-        form.addRow(tr("vid.img_strength_lbl"), self._wrap(isr))
+        i2f.addRow(tr("vid.img_strength_lbl"), self._wrap(isr))
         # Metodo di condizionamento immagine→video (solo quando si parte da un'immagine)
         self.i2v_method = QComboBox()
         self.i2v_method.addItem(tr("vid.i2v_method.addguide"), "addguide")
         self.i2v_method.addItem(tr("vid.i2v_method.inplace"), "inplace")
         self.i2v_method.setToolTip(tr("vid.i2v_method.tt"))
-        form.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
+        i2f.addRow(tr("vid.i2v_method_lbl"), self.i2v_method)
         # Rimando (non cambia il flusso del tab): l'immagine di partenza va a Modifica Video AI, modalità «movimento da tracce»
         self.motion_tracks_btn = QPushButton(tr("vid.motion_tracks.btn", "Guida il movimento con tracce…"))
         self.motion_tracks_btn.setToolTip(tr("vid.motion_tracks.tt",
@@ -268,7 +273,7 @@ class VideoTab(QWidget):
             "dove si muovono soggetto e sfondo e il video segue le tracce."))
         self.motion_tracks_btn.setMinimumHeight(32)
         self.motion_tracks_btn.clicked.connect(lambda *_: self.request_motion_tracks.emit())
-        form.addRow("", self.motion_tracks_btn)
+        i2f.addRow("", self.motion_tracks_btn)
         # One-click: foto volto (PuLID) → genera il PRIMO FRAME con l'identità → poi l'i2v lo anima.
         # PuLID è FLUX-only, il video è LTX: keyframe→i2v è il modo corretto per l'identità sul video.
         # CHECKBOX di attivazione (richiesta utente): PuLID è OPT-IN esplicito; da spento i campi/bottone sono
@@ -277,7 +282,7 @@ class VideoTab(QWidget):
         self.pulid_kf_enable.setToolTip(tr("vid.pulid_kf.enable.tt",
             "Se attivo: genera il primo frame con l'identità del volto (PuLID-FLUX) → i2v. Se spento: i2v normale, "
             "nessun volto imposto."))
-        form.addRow("", self.pulid_kf_enable)
+        i2f.addRow("", self.pulid_kf_enable)
         prow = QHBoxLayout()
         self.pulid_kf_face = QLineEdit(); self.pulid_kf_face.setPlaceholderText(
             tr("vid.pulid_kf.ph", "foto volto (una o più, separate) → primo frame con l'identità"))
@@ -295,7 +300,7 @@ class VideoTab(QWidget):
         for _w in (self.pulid_kf_face, self.pulid_kf_browse, self.pulid_kf_gen):
             _w.setEnabled(False)                             # default: PuLID spento
         prow.addWidget(self.pulid_kf_face, 1); prow.addWidget(self.pulid_kf_browse); prow.addWidget(self.pulid_kf_gen)
-        form.addRow(tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"), self._wrap(prow))
+        i2f.addRow(tr("vid.pulid_kf_lbl", "Volto → primo frame (PuLID)"), self._wrap(prow))
         # Selettore MOTORE video: ltx2_infer (default, tutte le feature) vs comfy-native (VRAM dinamica,
         # no-OOM, ma solo t2v/i2v semplici). Persistito in user_prefs; il routing è in _generate_video_native.
         self.video_engine_sel = QComboBox()
@@ -393,13 +398,32 @@ class VideoTab(QWidget):
         form.addRow(note)
         root.addWidget(vbox)
 
+        # --- Sotto-tab «Genera» | «Modifica» ---
+        # SOPRA la barra (condiviso): prompt, preset, gruppo «Video» (architettura/checkpoint/risoluzione/VRAM), opzioni
+        # dell'architettura, Sampler/Seed e LoRA. «Genera»: immagine iniziale, storyboard, riferimenti, post-processo.
+        # «Modifica»: V2V (Normale / Talk / Canta / Ascolta / ReTake). Stessi widget di prima, stessa cfg emessa.
+        self.mode_tabs = QTabWidget()
+        _gen_w = QWidget(); gen_l = QVBoxLayout(_gen_w); gen_l.setContentsMargins(0, 6, 0, 0)
+        _edit_w = QWidget(); edit_l = QVBoxLayout(_edit_w); edit_l.setContentsMargins(0, 6, 0, 0)
+        gen_l.addWidget(self._i2v_box)
+        self.mode_tabs.addTab(_gen_w, tr("vid.tab.generate", "Genera"))
+        self.mode_tabs.addTab(_edit_w, tr("vid.tab.edit", "Modifica"))
+        self.mode_tabs.tabBar().setToolTip(tr("vid.tab.tt", "Genera: crea un video nuovo. Modifica: Talk, Canta, "
+                                              "Ascolta, ReTake e V2V su un video o una foto."))
+
         # --- V2V: editing video (Normal / Talk / ReTake) ---
         from ui.widgets.v2v_panel import V2VPanel
         v2v_box = QGroupBox(tr("vid.v2v.group"))
         v2v_l = QVBoxLayout(v2v_box)
         self.v2v_panel = V2VPanel(nsfw_getter=lambda: self.nsfw.currentText() == "NSFW")
         v2v_l.addWidget(self.v2v_panel)
-        root.addWidget(v2v_box)
+        edit_l.addWidget(v2v_box)
+        edit_l.addStretch(1)
+        # Tab e modalità V2V si tengono d'accordo: in «Genera» si genera (modalità Normale); scegliere Talk/Canta/…
+        # porta in «Modifica»; tornare in «Genera» rimette Normale. Così ciò che vedi è ciò che parte.
+        self._mode_sync = False
+        self.mode_tabs.currentChanged.connect(self._on_mode_tab)
+        self.v2v_panel._mode_group.buttonToggled.connect(self._on_panel_mode)
 
         # --- Storyboard multi-scena (immagini-keyframe a tempo → video senza montaggio) ---
         from ui.widgets.storyboard_panel import StoryboardPanel
@@ -407,7 +431,7 @@ class VideoTab(QWidget):
         sb_l = QVBoxLayout(sb_box)
         self.storyboard_panel = StoryboardPanel()
         sb_l.addWidget(self.storyboard_panel)
-        root.addWidget(sb_box)
+        gen_l.addWidget(sb_box)
 
         # --- Riferimenti multipli (identità/stile/movimento/voce, SENZA posizione temporale) ---
         # Complementare allo storyboard: lì le immagini sono keyframe a un istante, qui sono
@@ -421,7 +445,13 @@ class VideoTab(QWidget):
         self.reference_panel.enable.toggled.connect(self._sync_h3_refs)
         self._sync_h3_refs()
         ref_l.addWidget(self.reference_panel)
-        root.addWidget(ref_box)
+        # @image_N nel prompt: completamento digitando «@» + token evidenziati (unica convenzione dell'app)
+        from ui.widgets import ref_prompt
+        self._prompt_refs = ref_prompt.install(
+            self.prompt, lambda: self.reference_panel.names() if self.reference_panel.enable.isChecked() else set(),
+            lambda: self.reference_panel.completion_entries() if self.reference_panel.enable.isChecked() else [])
+        self.reference_panel.changed.connect(self._prompt_refs.highlighter.rehighlight)
+        gen_l.addWidget(ref_box)
 
         # --- Restauro volti automatico (post-generazione, opzionale) ---
         frbox = QGroupBox(tr("vid.face.group")); frf = QFormLayout(frbox)
@@ -478,7 +508,8 @@ class VideoTab(QWidget):
         def _toggle_rife(on):
             self.rife_factor.setEnabled(on)
         self.rife_auto.toggled.connect(_toggle_rife); _toggle_rife(False)
-        root.addWidget(frbox)
+        gen_l.addWidget(frbox)
+        gen_l.addStretch(1)
 
         # --- Sampler / Seed (spostati da Avanzate) ---
         self.sampler_seed = SamplerSeedGroup()
@@ -488,7 +519,8 @@ class VideoTab(QWidget):
         lbox = QGroupBox(tr("vid.lora.group")); ll = QVBoxLayout(lbox)
         self.lora = LoraTab(allow_nsfw_getter=lambda: self.nsfw.currentText() == "NSFW", embedded=True)
         ll.addWidget(self.lora)
-        root.addWidget(lbox, 1)
+        root.addWidget(lbox)
+        root.addWidget(self.mode_tabs, 1)
 
         self._refilter_models()
         self._on_preset(self.res_preset.currentText())
@@ -496,6 +528,34 @@ class VideoTab(QWidget):
 
     def _wrap(self, layout):
         w = QWidget(); w.setLayout(layout); return w
+
+    # ── sotto-tab Genera | Modifica ──────────────────────────────────────────────
+    def show_edit_tab(self) -> None:
+        """Porta in primo piano «Modifica» (usato anche dal rimando di «Modifica Video AI»)."""
+        self.mode_tabs.setCurrentIndex(1)
+
+    def is_edit_tab(self) -> bool:
+        return self.mode_tabs.currentIndex() == 1
+
+    def _on_mode_tab(self, idx: int) -> None:
+        if self._mode_sync:
+            return
+        if idx == 0 and self.v2v_panel.current_mode() != "normal":
+            self._mode_sync = True
+            try:
+                self.v2v_panel.rb_normal.setChecked(True)          # in «Genera» si genera: modalità Normale
+            finally:
+                self._mode_sync = False
+
+    def _on_panel_mode(self, _btn=None, checked: bool = True) -> None:
+        if self._mode_sync or not checked:
+            return
+        if self.v2v_panel.current_mode() != "normal" and self.mode_tabs.currentIndex() == 0:
+            self._mode_sync = True
+            try:
+                self.mode_tabs.setCurrentIndex(1)                  # una modalità di modifica vive in «Modifica»
+            finally:
+                self._mode_sync = False
 
     def _on_nsfw(self, *_):
         self._refilter_models()      # riselezione istantanea modelli utilizzabili
@@ -1006,8 +1066,26 @@ class VideoTab(QWidget):
         ])
 
     def _refilter_models(self):
-        """Ripopola il dropdown modello PER L'ARCHITETTURA scelta. Lo chiamano anche l'inventario asincrono,
-        il filtro NSFW e la precisione: prima rimetteva sempre i checkpoint LTX, anche con LingBot/Krea/H3."""
+        """Ripopola il menu modello PER L'ARCHITETTURA scelta. Se l'architettura è CAMBIATA e il modello concreto
+        scelto prima appartiene a un'altra, il combo mostra «scegli un modello» (ui/model_menu): mai il primo
+        modello della nuova architettura scelto al posto dell'utente."""
+        from ui import model_menu as _mm
+        arch = self._arch() if hasattr(self, "video_arch") else "ltx"
+        prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
+        arch_changed = getattr(self, "_menu_arch", arch) != arch
+        self._menu_arch = arch
+        self._refilter_models_body()
+        if arch_changed and prev not in (None, _mm.PLACEHOLDER, "auto"):
+            self.model.blockSignals(True)
+            try:
+                self._finish_model_menu(prev, None)
+            finally:
+                self.model.blockSignals(False)
+            self._on_model_changed()
+
+    def _refilter_models_body(self):
+        """Corpo del ripopolamento (vedi `_refilter_models`). Lo chiamano anche l'inventario asincrono, il filtro
+        NSFW e la precisione: prima rimetteva sempre i checkpoint LTX, anche con LingBot/Krea/H3."""
         arch = self._arch() if hasattr(self, "video_arch") else "ltx"
         if arch == "lingbot":
             return self._refilter_lingbot_models()
@@ -1042,6 +1120,9 @@ class VideoTab(QWidget):
             _cfg = self._mcat.recommended_cfg(model)
             _note = self._mcat.recommended_note(model)
             _tip_parts = [model, tr("vid.model.tip_type").format(kind=kind)]
+            if is_nsfw:                                      # la 🔞 nel testo non e' l'unico segnale: anche il tooltip
+                from ui.widgets import adult_badge
+                _tip_parts.insert(0, adult_badge.adult_tooltip())
             if _steps is not None:
                 _tip_parts.append(tr("vid.model.tip_steps").format(steps=_steps))
             if _cfg is not None:
@@ -1062,7 +1143,7 @@ class VideoTab(QWidget):
             return sorted(lst, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
         diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)])
         checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
-        ggufs = fav_first([m for m in self._gguf_models if "ltx" in m.lower()])
+        ggufs = fav_first([m for m in self._gguf_models if self._is_ltx_video_model(m)])
 
         # Nessuna whitelist di compatibilità: TUTTI i modelli LTX video sono esposti.
         if diffusion:
@@ -1175,18 +1256,11 @@ class VideoTab(QWidget):
         return best_i
 
     def _is_ltx_video_model(self, name: str) -> bool:
-        low = (name or "").lower()
-        if "text_projection" in low or "lora" in low:
-            return False
-        from core.ltx_release import OTHER_ARCH_MARKERS
-        if any(x in low for x in OTHER_ARCH_MARKERS):           # DiT MiniMax H3 «10Eros-Max»: non è LTX
-            return False
-        if (self._mcat.arch_of(name).upper() == "LTX") or "ltx" in low or "eros" in low:
-            return True
-        # FASE D weights-unification: il DETECTOR header è l'oracolo vero — un checkpoint LTX
-        # RINOMINATO (niente "ltx" nel nome, assente dal catalogo esterno) prima SPARIVA dal
-        # dropdown pur essendo riconosciuto da model_detect. Additivo: mai toglie, solo aggiunge.
-        return self._detected_family(name) in ("ltxv", "ltx")
+        """Transformer LTX per il menu «LTX»: lo decide l'HEADER/la cartella (core/arch_filter); il catalogo esterno e
+        il nome solo se il file non si riconosce. Prima il catalogo vinceva sempre: un Qwen21 etichettato «LTX» e il
+        file ausiliario `_ltx23_aux_components` finivano nel menu video."""
+        from core import arch_filter
+        return arch_filter.is_ltx_transformer(name, self._mcat.arch_of(name))
 
     @staticmethod
     def _detected_family(name: str) -> str:

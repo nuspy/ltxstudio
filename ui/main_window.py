@@ -317,7 +317,7 @@ class _VideoEditAIWorker(QThread):
                     self.done.emit({"status": "error", "error": _miss}); return
                 params = _vi.inpaint_params(cfg, out)
                 if _vi.has_reference(cfg):
-                    # punto di aggancio @Foto_N (task 6): qui i riferimenti sono UNO (la foto del campo); quando il
+                    # punto di aggancio @image_N (task 6): qui i riferimenti sono UNO (la foto del campo); quando il
                     # meccanismo dei token sara' nel ramo, i nomi citati nel prompt vanno risolti prima di arrivare qui.
                     _note = _vi.fit_reference(params, self.out_dir, stamp)
                     if _note:
@@ -2203,12 +2203,19 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, tr("vid.ref.group", "Riferimenti multipli"),
                                     tr("mw.ref_invalid", "Riferimenti non validi:") + "\n• " + "\n• ".join(errs))
                 return
+            _perr = ref_panel.prompt_errors(vals.get("prompt_positive", ""))
+            if _perr:                                        # @image_N che non esiste: mai generare in silenzio
+                QMessageBox.warning(self, tr("vid.ref.group", "Riferimenti multipli"),
+                                    tr("mw.ref_invalid", "Riferimenti non validi:") + "\n• " + "\n• ".join(_perr))
+                return
             vals["references"] = refs
-            _missing = [r["token"] for r in refs if r["token"] not in vals.get("prompt_positive", "")]
-            if _missing:                                     # il modello associa file↔testo SOLO via token
+            _unc = ref_panel.uncited(vals.get("prompt_positive", ""))
+            if _unc:                                         # passati comunque al modello, ma lo si dice
                 self._log(tr("mw.ref_untokened",
                              "[Riferimenti] {toks} non compaiono nel prompt: il modello potrebbe ignorarli.")
-                          .format(toks=", ".join(_missing)))
+                          .format(toks=", ".join(_unc)))
+            # i token @image_N (e i vecchi <Picture N>) diventano la sintassi del modello (<Picture k>, Image k…)
+            vals["prompt_positive"] = ref_panel.translate(vals.get("prompt_positive", ""))
             self._log(tr("mw.ref_log", "[Riferimenti] {n} file di riferimento.").format(n=len(refs)))
 
         # ── VIDEO LUNGHI: auto-extend oltre la soglia ──
@@ -2843,7 +2850,8 @@ class MainWindow(QMainWindow):
                 self._inpaint_before = None
                 self._start_native_kontext({"image": cpath}, model,
                     cfg.get("prompt") or "combine these reference images into one coherent scene",
-                    "", 20, random.randint(0, 2**31), 2.5)
+                    "", 20, random.randint(0, 2**31),
+                    self.frame1_tab.get_inpaint_config().get("integrate_guidance", 2.5))   # guidance di Integra (Kontext)
                 return
             except Exception as e:                       # noqa: BLE001
                 self._log(f"[compose nativo] fallback ComfyUI: {e}")
@@ -2924,7 +2932,7 @@ class MainWindow(QMainWindow):
                        f"lighting and shadows; change only the color.")
             self._inpaint_before = self.frame1_tab.image_path
             self._start_native_kontext({"image": self.frame1_tab.image_path}, None, rprompt, "",
-                                       cc["steps"], random.randint(0, 2**31), 2.5)
+                                       cc["steps"], random.randint(0, 2**31), cc.get("guidance", 2.5))
             return
         try:
             img_name = self._upload_local(self.frame1_tab.image_path)
@@ -3124,6 +3132,16 @@ class MainWindow(QMainWindow):
         cfg = self.frame1_tab.get_gen_config()
         if not cfg["prompt"]:
             QMessageBox.warning(self, tr("mw.empty_prompt_title"), tr("mw.empty_image_prompt_msg")); return
+        if cfg.get("arch") == "qwen_image21":                 # riferimenti nominati: @image_N inesistente = errore
+            _gr = self.frame1_tab.gen_refs
+            _perr = _gr.prompt_errors(cfg.get("prompt_raw") or "")
+            if _perr:
+                QMessageBox.warning(self, tr("f1.gen.refs.group", "Immagini di riferimento"), "\n".join(_perr))
+                return
+            _unc = _gr.uncited(cfg.get("prompt_raw") or "")
+            if _unc and cfg.get("ref_images"):                # passate comunque, come fa il modello ufficiale
+                self._log(tr("f1.gen.refs.uncited", "[Riferimenti] {toks} non sono citati nel prompt: vengono "
+                             "comunque passati al modello.").format(toks=", ".join(_unc)))
         # Krea 2 è uno SNAPSHOT diffusers (nessun file-modello): usa krea2_variant, non un checkpoint → salta il
         # controllo "modello obbligatorio" (il worker risolve turbo/raw dal catalogo).
         if cfg.get("arch") not in ("krea2", "qwen_image21") and (not cfg["model"] or cfg["model"].startswith("(")):
@@ -3824,6 +3842,7 @@ class MainWindow(QMainWindow):
         loro codice restano intatti: qui si impostano solo i loro controlli esistenti."""
         panel = self.video_tab.v2v_panel
         self.tabs.setCurrentWidget(self.video_tab)
+        self.video_tab.show_edit_tab()                       # Talk/Canta vivono nel sotto-tab «Modifica» del tab Video
         name = Path(audio).name if audio else ""
         if mode == "sing":
             panel.rb_sing.setChecked(True)

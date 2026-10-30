@@ -116,6 +116,16 @@ class FaceSwapReq(BaseModel):
     source_face_path: str = Field(..., description="foto del volto sorgente")
 
 
+def _kontext_guidance(p: dict) -> None:
+    """Guidance di FLUX.1 Kontext: default 2.5, ammessa 1.0-4.0 (valori bassi attenuano contrasto/saturazione eccessivi)."""
+    if p.get("arch") == "kontext":
+        g = p.get("guidance")
+        if g is None:
+            p["guidance"] = 2.5
+        elif not 1.0 <= float(g) <= 4.0:
+            raise HTTPException(422, f"guidance di Kontext fuori range: {g} (ammesso 1.0-4.0, default 2.5)")
+
+
 def _need_model(p: dict) -> None:
     if p.get("arch") != "qwen_image21" and not p.get("model"):
         raise HTTPException(422, f"'model' obbligatorio con arch={p.get('arch')}")
@@ -149,8 +159,27 @@ def _qwen21(p: dict, req: BaseModel | None = None) -> dict:
         p["guidance"] = 1.0 if meta.get("turbo") else float(meta.get("cfg", DEFAULT_GUIDANCE))
     if len(p.get("ref_images") or []) > MAX_REFS:
         raise HTTPException(422, f"al massimo {MAX_REFS} riferimenti")
+    _foto_tokens(p)
     p.pop("model", None)
     return p
+
+
+def _foto_tokens(p: dict) -> None:
+    """Riferimenti nominati come nella GUI: l'elemento k-esimo di `ref_images` è `@image_k`. Il prompt può citarlo con
+    `@image_N` (tradotto in «image N», la sintassi di Qwen-Image 2.1); un token che cita una foto inesistente è 422,
+    mai ignorato in silenzio. Le immagini passate ma non citate vanno comunque al modello. «image N» scritto a mano
+    resta valido."""
+    from core import image_refs as R
+    refs = [r for r in (p.get("ref_images") or []) if r]
+    prompt = p.get("prompt") or ""
+    order = {"image": list(range(1, len(refs) + 1))}
+    bad = R.unknown_tokens(prompt, {("image", n) for n in order["image"]})
+    if bad:
+        names = ", ".join(sorted({R.token_of(t.kind, t.n) for t in bad}))
+        raise HTTPException(422, f"il prompt cita {names}, ma ref_images ne contiene {len(refs)} "
+                                 f"(@image_1…@image_{len(refs)})" if refs else
+                                 f"il prompt cita {names} ma non ci sono immagini in ref_images")
+    p["prompt"] = R.translate(prompt, order, "qwen21")
 
 
 # ─────────────── registrazione ───────────────
@@ -182,6 +211,7 @@ def register(app: FastAPI):
     def image_edit(req: EditReq):
         gate.require("cap.krea2_edit" if req.arch == "krea2_edit" else "cap.gen_images")
         p = req.model_dump(exclude_none=True)
+        _kontext_guidance(p)
         if p["arch"] == "qwen_image21":                           # immagini → riferimenti «image N»
             refs = ([p.pop("image_path")] if p.get("image_path") else []) + list(p.pop("images", None) or [])
             p["ref_images"] = refs + list(p.get("ref_images") or [])
@@ -207,6 +237,7 @@ def register(app: FastAPI):
              "prompt": f"recolor {subj}to {req.target}, keep everything else identical",
              "steps": req.steps, "guidance": req.guidance, "seed": req.seed}
         _need_model(p)
+        _kontext_guidance(p)
         return _submit("image.recolor", lambda job: run_image(p))
 
     def _qwen21_inpaint(p: dict, req: BaseModel) -> dict:

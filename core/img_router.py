@@ -53,7 +53,8 @@ def _detect_arch(model_path: str) -> str:
         return "flux2" if fam == "flux2" else "flux"
     except Exception:                                          # noqa: BLE001
         m = (model_path or "").lower()
-        return "flux2" if any(t in m for t in ("flux2", "flux_2", "flux 2")) else "flux"
+        from core.arch_filter import is_flux2_name
+        return "flux2" if is_flux2_name(m) else "flux"
 
 
 class _ComfyChild:

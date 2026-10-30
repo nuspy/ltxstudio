@@ -32,6 +32,16 @@ _CLIP_TYPES = ["flux", "flux2", "ltxv", "sd3", "stable_diffusion", "sdxl", "qwen
 _SKIP_SUBDIRS = {"upscale_models": {"ltx"}}
 
 
+# Copie di CACHE generate dall'app accanto al modello originale: non sono modelli e non vanno in nessun menu.
+# `<file>.safetensors.normalized.safetensors` = FLUX.1 con prefisso/fp8-E5M2 riscritto da
+# inference_server/backends/image_flux.py::_normalize_flux_prefix (si rigenera da sola dall'originale).
+CACHE_SUFFIXES = (".safetensors.normalized.safetensors",)
+
+
+def is_cache_copy(name: str) -> bool:
+    return str(name).lower().endswith(CACHE_SUFFIXES)
+
+
 def list_models(category: str) -> list[str]:
     subs, exts = _CATS.get(category, ([], ()))
     skip = _SKIP_SUBDIRS.get(category, set())
@@ -41,7 +51,7 @@ def list_models(category: str) -> list[str]:
         if not base.exists():
             continue
         for f in base.rglob("*"):
-            if f.is_file() and f.suffix.lower() in exts:
+            if f.is_file() and f.suffix.lower() in exts and not is_cache_copy(f.name):
                 if skip and any(part.lower() in skip for part in f.relative_to(base).parts[:-1]):
                     continue
                 out.append(str(f.relative_to(base)).replace("/", "\\"))

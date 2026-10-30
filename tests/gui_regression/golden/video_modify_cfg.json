@@ -1,0 +1,72 @@
+{
+ "listen_cfg": {
+  "listen_motion": 0.55,
+  "listen_mouth_closed": true,
+  "listen_seconds": 8.0
+ },
+ "retake_cfg": {
+  "v2v_end": 0.0,
+  "v2v_mode": "retake",
+  "v2v_regen_audio": false,
+  "v2v_start": 0.0,
+  "v2v_video_path": null
+ },
+ "sing_cfg": {
+  "sing_audio_path": "<ROOT>\\output\\tests\\_vmod_song.wav",
+  "sing_audio_scale": 2.0,
+  "sing_separate_vocals": true,
+  "v2v_mode": "sing",
+  "wan_loras": []
+ },
+ "sing_job": {
+  "_sep_vocals": true,
+  "anchor_every": 0,
+  "audio_path": "<ROOT>\\output\\tests\\_vmod_song.wav",
+  "audio_scale": 2.0,
+  "fps": 24,
+  "guidance": 1.0,
+  "height": 1280,
+  "image_path": "<ROOT>\\output\\tests\\_gui_test_input.png",
+  "negative": "pc game, console game, video game, cartoon, childish, ugly, deformed, low quality, blurry, watermark, text",
+  "num_frames": 192,
+  "overlap_frames": 24,
+  "prompt": "una tartaruga cantante in smoking, cinematografico",
+  "ref_anchor_strength": 0.25,
+  "ref_strength": 1.0,
+  "resume": true,
+  "seed": 1234,
+  "steps": 32,
+  "width": 704
+ },
+ "talk_cfg": {
+  "talk_mask_offset": 0,
+  "talk_region": "mouth",
+  "talk_reimagine": false,
+  "v2v_mode": "talk",
+  "v2v_video_path": null,
+  "wan_loras": []
+ },
+ "talk_job": {
+  "_sep_vocals": false,
+  "_talk_offset": 0,
+  "_talk_region": "mouth",
+  "_talk_source": "<ROOT>\\output\\tests\\_gui_test_input.png",
+  "anchor_every": 0,
+  "audio_path": "<ROOT>\\output\\tests\\_vmod_voice.wav",
+  "audio_scale": 2.0,
+  "fps": 24,
+  "guidance": 1.0,
+  "height": 1280,
+  "image_path": "<ROOT>\\output\\tests\\_gui_test_input.png",
+  "negative": "pc game, console game, video game, cartoon, childish, ugly, deformed, low quality, blurry, watermark, text",
+  "num_frames": 192,
+  "overlap_frames": 24,
+  "prompt": "una tartaruga cantante in smoking, cinematografico",
+  "ref_anchor_strength": 0.25,
+  "ref_strength": 1.0,
+  "resume": true,
+  "seed": 1234,
+  "steps": 32,
+  "width": 704
+ }
+}
