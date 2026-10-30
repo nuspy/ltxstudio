@@ -29,7 +29,7 @@ def main():
     apply_theme(app)
     win = MainWindow()
     win.show()
-    if os.environ.get("LTX_TEST_DRIVER") == "1":              # solo per i test dal vivo (tests/app_live); mai nelle build
+    if os.environ.get("LTX_TEST_DRIVER") == "1" and not getattr(sys, "frozen", False) and "__compiled__" not in globals():              # solo per i test dal vivo (tests/app_live); MAI nelle build (frozen/Nuitka)
         try:
             import importlib.util
             _sp = importlib.util.spec_from_file_location("ltx_test_driver", str(Path(__file__).resolve().parent / "tests" / "app_live" / "driver.py"))
