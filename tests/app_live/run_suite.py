@@ -90,6 +90,7 @@ def main():
     ap.add_argument("--no-review", action="store_true")
     ap.add_argument("--allow-existing-app", action="store_true")
     ap.add_argument("--keep-app", action="store_true")
+    ap.add_argument("--no-open", action="store_true", help="non aprire la pagina di revisione nel browser a fine giro")
     ap.add_argument("--inventory-out", default="", help="salva l'inventario REALE dei menu dell'app in questo JSON e termina (nessun caso)")
     a = ap.parse_args()
     mode = "fix-loop" if a.fix_loop else "sweep"
@@ -192,6 +193,8 @@ def main():
         review = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(review)
         idx = review.build(out, spec.get("nome", "giro"))
         say(f"pagina di revisione: {idx}")
+        if not a.no_open:
+            say("aperta nel browser: " + review.open_in_browser(idx))
     return 0 if ok == len(results) else 1
 
 

@@ -158,6 +158,29 @@ def serve(rd: str, port: int = 8766):
     HTTPServer(("127.0.0.1", port), H).serve_forever()
 
 
+def open_in_browser(index_html: str, port: int = 8766) -> str:
+    """Apre la pagina di revisione nel browser, servita da `serve` (cosi «Pubblica» scrive il .md nella cartella).
+    Il server resta vivo in un processo staccato (si chiude con la finestra del terminale o dal task manager)."""
+    import socket
+    import webbrowser
+    rd = os.path.dirname(index_html)
+    for p in range(port, port + 20):                     # prima porta libera
+        s = socket.socket()
+        s.settimeout(0.5)
+        busy = s.connect_ex(("127.0.0.1", p)) == 0
+        s.close()
+        if not busy:
+            port = p
+            break
+    kw = {"creationflags": 0x00000008 | 0x00000200} if os.name == "nt" else {}      # DETACHED_PROCESS | NEW_PROCESS_GROUP
+    subprocess.Popen([sys.executable, os.path.abspath(__file__), "serve", rd, str(port)], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, **kw)
+    time.sleep(1.5)
+    url = f"http://127.0.0.1:{port}/"
+    webbrowser.open(url)
+    return url
+
+
 PAGE = r"""<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Revisione giro test</title>
 <style>
