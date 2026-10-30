@@ -171,8 +171,16 @@ def resolve(w, path: str):
     return obj
 
 
+def _hidden(cb, i) -> bool:
+    """Voce nascosta dal filtro (setRowHidden sulla view del combo): l'utente non puo sceglierla."""
+    try:
+        return bool(cb.view().isRowHidden(i))
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
 def combo_items(cb):
-    return [{"i": i, "text": cb.itemText(i), "data": _safe(cb.itemData(i))} for i in range(cb.count())]
+    return [{"i": i, "text": cb.itemText(i), "data": _safe(cb.itemData(i))} for i in range(cb.count()) if not _hidden(cb, i)]
 
 
 def select_combo(cb, want):
@@ -189,11 +197,15 @@ def select_combo(cb, want):
         w = str(want).lower()
         for i in range(cb.count()):
             d = cb.itemData(i)
+            if _hidden(cb, i):
+                continue
             if w == cb.itemText(i).lower():
                 cb.setCurrentIndex(i)
                 return cb.itemText(i)
         for i in range(cb.count()):
             d = cb.itemData(i)
+            if _hidden(cb, i):
+                continue
             if w in cb.itemText(i).lower() or (isinstance(d, str) and w in d.lower()) or \
                     (isinstance(d, dict) and w in json.dumps(d, default=str).lower()):
                 cb.setCurrentIndex(i)
@@ -659,6 +671,130 @@ class Driver:
         res["mismatch"] = mis
         return res
 
+    # ── Modifica (inpaint / outpaint / Integra = edit per istruzione) ──────────────────────────────────
+    def find_button(self, root, key: str):
+        """Bottone VERO per chiave i18n (es. f1.inpaint.btn): lo cerca nell'albero dei widget."""
+        from PySide6.QtWidgets import QPushButton
+        from ui.i18n_manager import tr
+        txt = tr(key)
+        for b in root.findChildren(QPushButton):
+            if b.text() == txt and b.isEnabled():
+                return b
+        raise LookupError(f"bottone '{key}' ({txt!r}) non trovato")
+
+    def case_edit(self, case):
+        """kind: inpaint | outpaint | integrate. Carica la foto nel canvas VERO, disegna la maschera (inpaint) o allarga
+        la tela (outpaint), sceglie arch/modello nei menu di Modifica e preme il bottone vero."""
+        w = self.w
+        steps = {}
+        kind = case["kind"]
+
+        def setup():
+            from PySide6.QtCore import QRectF, Qt
+            from PySide6.QtGui import QColor, QImage, QPainter
+            f = w.frame1_tab
+            f.sub.setCurrentIndex(1)                                  # sotto-tab Modifica
+            cv = f.canvas
+            cv.load_image(case["source"], "canvas")
+            if kind == "outpaint":                                    # tela piu larga della foto: bordi vuoti da estendere
+                cv.set_aspect(int(cv.aspect_w * float(case.get("grow", 1.4)) // 16 * 16), int(cv.aspect_h))
+            elif kind == "inpaint" and case.get("mask", True):
+                m = QImage(int(cv.aspect_w), int(cv.aspect_h), QImage.Format_ARGB32)
+                m.fill(0)
+                pt = QPainter(m)
+                pt.setRenderHint(QPainter.Antialiasing)
+                pt.setBrush(QColor(255, 0, 0, 255))
+                pt.setPen(Qt.NoPen)
+                cx, cy, r = cv.aspect_w * 0.5, cv.aspect_h * 0.5, min(cv.aspect_w, cv.aspect_h) * 0.18
+                pt.drawEllipse(QRectF(cx - r, cy - r, 2 * r, 2 * r))
+                pt.end()
+                cv.mask_image = m
+                cv._refresh_mask()
+            if kind in ("inpaint", "outpaint"):
+                if case.get("arch") is not None:
+                    steps["arch"] = select_combo(f.inp_arch, case["arch"])
+                steps["model"] = select_combo(f.inp_model, case["model"])
+                (f.inpaint_prompt if kind == "inpaint" else f.outpaint_prompt).setPlainText(case["prompt"])
+                f.inp_seed_rand.setChecked(False)
+                f.inp_seed.setValue(int(case.get("seed", 1)))
+                if case.get("steps"):
+                    f.inp_steps.setValue(int(case["steps"]))
+                if case.get("lora"):
+                    steps["lora"] = select_combo(f.inp_lora, case["lora"])
+            else:
+                if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
+                    steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
+                steps["engine"] = select_combo(f.integrate_engine, case["engine"])
+                if case.get("model"):
+                    steps["model"] = select_combo(f.integrate_model, case["model"])
+                f.integrate_prompt.setPlainText(case["prompt"])
+                f.int_seed_rand.setChecked(False)
+                f.int_seed.setValue(int(case.get("seed", 1)))
+            for k, v in (case.get("widgets") or {}).items():
+                set_widget(resolve(w, k), v)
+            cfg = f.get_inpaint_config()
+            steps["cfg_gui"] = main_params({k: cfg[k] for k in cfg if k not in ("prompt_raw",)})
+            steps["canvas"] = {"mask": bool(cv.has_mask()), "outpaint_area": bool(cv.has_outpaint_area()),
+                               "size": [int(cv.aspect_w), int(cv.aspect_h)]}
+            key = {"inpaint": "f1.inpaint.btn", "outpaint": "f1.outpaint.btn", "integrate": "f1.integrate.btn"}[kind]
+            return self.find_button(f, key)
+        btn = self.gui(setup, 90)
+        self.gui(lambda: btn.click(), 30)
+        self.wait_job(float(case.get("timeout", 900)))
+        res = {"widget_state": steps}
+        q = [c for c in self.rec.calls if c["via"] == "queue"]
+        mis = []
+        if q:
+            p = q[0]["params"]
+            res["handler"] = f"{q[0]['worker']}:{q[0].get('module')}"
+            mname = os.path.basename(str((steps.get("cfg_gui") or {}).get("unet") or "")).lower()
+            if kind != "integrate" and mname and mname not in json.dumps(p).lower():
+                mis.append(f"modello scelto {mname!r} assente dai parametri inviati al backend")
+            if "seed" in case and p.get("seed") not in (None, int(case["seed"])):
+                mis.append(f"seed: impostato {case['seed']} ma il backend riceve {p.get('seed')}")
+            if not (p.get("init_image") or p.get("image_path") or p.get("ref_images") or p.get("images")):
+                mis.append("nessuna immagine di partenza nei parametri del backend")
+            if kind == "inpaint" and case.get("mask", True) and not (p.get("mask") or p.get("mask_path")) \
+                    and "kontext" not in json.dumps(p).lower():
+                mis.append("inpaint con maschera ma nessuna maschera inviata")
+            for k, v in (case.get("expect_params") or {}).items():
+                if p.get(k) != v:
+                    mis.append(f"parametro atteso {k}={v!r}, inviato {p.get(k)!r}")
+        res["mismatch"] = mis
+        return res
+
+    def inventory(self) -> dict:
+        """Le voci REALI dei menu dell'app (arch x modelli x LoRA): i casi si generano dall'inventario, non da liste a mano."""
+        def lor(panel):
+            return [{"file": r["entry"].filename, "name": r["entry"].name,
+                     "triggers": list(getattr(r["entry"], "triggers", []) or [])} for r in panel._rows.values()]
+
+        def inv():
+            w = self.w
+            f, vt = w.frame1_tab, w.video_tab
+            out = {"create": {}, "video": {}, "edit": {}}
+            f.img_nsfw.setCurrentText("NSFW")
+            vt.nsfw.setCurrentText("NSFW")
+            for i in range(f.gen_arch.count()):
+                f.gen_arch.setCurrentIndex(i)
+                f.gen_lora_tab.refresh()
+                out["create"][f.gen_arch.itemText(i)] = {"models": combo_items(f.gen_model), "loras": lor(f.gen_lora_tab)}
+            for i in range(vt.video_arch.count()):
+                vt.video_arch.setCurrentIndex(i)
+                vt.lora.refresh()
+                out["video"][str(vt.video_arch.itemData(i))] = {"label": vt.video_arch.itemText(i),
+                                                                "models": combo_items(vt.model), "loras": lor(vt.lora)}
+            for i in range(f.inp_arch.count()):
+                f.inp_arch.setCurrentIndex(i)
+                out["edit"]["inpaint:" + str(f.inp_arch.itemData(i))] = {"label": f.inp_arch.itemText(i), "models": combo_items(f.inp_model)}
+            f.inp_arch.setCurrentIndex(0)
+            out["edit"]["integrate_engines"] = {}
+            for i in range(f.integrate_engine.count()):
+                f.integrate_engine.setCurrentIndex(i)
+                out["edit"]["integrate_engines"][f.integrate_engine.itemText(i)] = {"models": combo_items(f.integrate_model)}
+            return out
+        return self.gui(inv, 120)
+
     def case_state(self, case):
         """Lettura dei widget indicati (nessuna azione): serve a verificare cosa mostra la GUI."""
         def rd():
@@ -691,6 +827,8 @@ class Driver:
                     out = {"ok": True, "server_up": bool(native_driver.is_up()), "jobs_busy": bool(self.gui(lambda: self.w.jobs.is_busy(), 20))}
                 elif cmd == "run_case":
                     out = self.run_case(msg["case"])
+                elif cmd == "inventory":
+                    out = {"ok": True, "inventory": self.inventory()}
                 elif cmd == "state":
                     out = self.case_state({"paths": msg.get("paths", [])})
                 elif cmd == "shutdown":

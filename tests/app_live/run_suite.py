@@ -77,7 +77,7 @@ def port_busy(port):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cases")
+    ap.add_argument("cases", nargs="?", default="")
     ap.add_argument("--fix-loop", action="store_true")
     ap.add_argument("--sweep", action="store_true")
     ap.add_argument("--only", default="")
@@ -90,9 +90,10 @@ def main():
     ap.add_argument("--no-review", action="store_true")
     ap.add_argument("--allow-existing-app", action="store_true")
     ap.add_argument("--keep-app", action="store_true")
+    ap.add_argument("--inventory-out", default="", help="salva l'inventario REALE dei menu dell'app in questo JSON e termina (nessun caso)")
     a = ap.parse_args()
     mode = "fix-loop" if a.fix_loop else "sweep"
-    spec = json.load(open(a.cases, encoding="utf-8"))
+    spec = json.load(open(a.cases, encoding="utf-8")) if not a.inventory_out else {"cases": [], "nome": "inventario"}
     cases = spec["cases"]
     if a.only:
         ids = set(a.only.split(","))
@@ -137,6 +138,10 @@ def main():
                 break
             time.sleep(3)
         say(f"app pronta (server_up={r.get('server_up')}) in {time.time() - t0:.0f}s")
+        if a.inventory_out:
+            inv = cl.send({"cmd": "inventory"}, timeout=180)
+            json.dump(inv.get("inventory", inv), open(a.inventory_out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            say("inventario salvato in " + a.inventory_out)
         for k, c in enumerate(cases, 1):
             c = dict(c)
             if a.dry:
@@ -181,7 +186,7 @@ def main():
     say(f"FINE: {ok}/{len(results)} ok; risultati in {res_path}")
     json.dump({"nome": spec.get("nome"), "modo": mode, "dry": a.dry, "risultati": len(results), "ok": ok},
               open(os.path.join(out, "sommario.json"), "w", encoding="utf-8"))
-    if not a.no_review and results:
+    if not a.no_review and results and not a.inventory_out:
         import importlib.util
         _sp = importlib.util.spec_from_file_location("ltx_review", os.path.join(HERE, "review.py"))
         review = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(review)
