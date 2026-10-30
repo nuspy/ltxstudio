@@ -323,7 +323,7 @@ def test_runner_survives_ordinary_errors_and_reports_them(monkeypatch, tmp_path)
     def handler(params, mm, out):
         raise LoadRefused("Caricamento di x rifiutato: commit insufficiente")
     lines, code, rf = _run_runner(monkeypatch, tmp_path, handler, ["RUN {pf} {rf}", "QUIT"])
-    assert code is None and lines == ["ERR eccezione (vedi log)"]        # errore non CUDA: il figlio resta vivo
+    assert code is None and len(lines) == 1 and lines[0].startswith("DONE")   # errore non CUDA: il figlio resta vivo (task 9: _run_handler → risultato d'errore)
     assert "rifiutato" in json.loads(rf.read_text())["error"]            # risultato leggibile, non «nessun risultato»
 
 

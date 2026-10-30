@@ -19,7 +19,7 @@ _FF = shutil.which("ffmpeg")
 needs_ff = pytest.mark.skipif(not _FF, reason="ffmpeg non disponibile")
 
 PARAMS = {"prompt": "a glass pyramid on a salt flat", "negative": "blurry", "steps": 16, "guidance": 1.0, "seed": 7,
-          "width": 320, "height": 320, "arch": "flux3", "flux3_dit": "flux3-dit-fp8r",
+          "width": 320, "height": 320, "arch": "flux",
           "model": "E:\\AI\\Models\\diffusion_models\\Flux\\FLUX_Krea_Dev.safetensors",
           "loras": [{"name": "Krea2\\x.safetensors", "strength": 0.7}],
           "init_image": "C:\\Users\\atain\\Desktop\\in.png", "_t_button": 1.0}
@@ -65,7 +65,7 @@ def test_native_driver_funnel_after_stego_and_watermark(tmp_path, monkeypatch):
     monkeypatch.setattr(nd, "submit", fake_submit)
     monkeypatch.setattr(nd, "history", fake_history)
     res = nd.run_and_wait("image", dict(PARAMS), poll=0.01, timeout=10)
-    assert res["status"] == "success"
+    assert res["status"] == "success", res
     _assert_final(out)
     assert stego.detect_file(out)[0]                         # la firma è sopravvissuta (pixel intatti)
 
@@ -142,7 +142,7 @@ def test_ltx2_service_generate_embeds_final_video(tmp_path, monkeypatch):
         return {"status": "success", "output": [params["output"]]}
     monkeypatch.setattr(svc, "_generate_impl", fake_impl)
     res = svc.generate(dict(PARAMS, output=out, num_frames=24, fps=24))
-    assert res["status"] == "success"
+    assert res["status"] == "success", res
     _assert_final(out)
     r = subprocess.run([_FF, "-v", "error", "-i", out, "-map", "0:a:0", "-f", "null", "-"], capture_output=True)
     assert r.returncode == 0                                 # audio intatto

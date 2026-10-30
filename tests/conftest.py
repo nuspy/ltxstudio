@@ -5,4 +5,5 @@ import os
 import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")   # nessuna finestra reale, nessuna GPU
+os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")    # prima di qualunque import di cv2 (altrimenti i test EXR dipendono dall ordine)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

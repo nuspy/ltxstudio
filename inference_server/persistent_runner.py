@@ -48,6 +48,9 @@ def _run_handler(handler, params, mm, output_dir) -> dict:
     try:
         return handler(params, mm, output_dir)
     except Exception as e:                                    # noqa: BLE001
+        from inference_server.cuda_health import is_cuda_fatal
+        if is_cuda_fatal(e):                                  # contesto CUDA avvelenato (task 12): sale al ciclo principale,
+            raise                                             # che scrive il risultato e fa uscire il figlio (exit 86)
         sys.stderr.write(f"[persistent_runner] errore del job: {e}\n{traceback.format_exc()[-1500:]}\n")
         sys.stderr.flush()
         return {"status": "error", "error": str(e)}
