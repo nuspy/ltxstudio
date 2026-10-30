@@ -85,6 +85,22 @@ def disk_free_mb(path: str) -> float:
         return 1e9
 
 
+def skip_park_streaming_blocks(partition_name: str, streaming: bool) -> bool:
+    """True se la partizione `partition_name` (nome dello SDOps passato al registry) NON va parcheggiata.
+
+    Con l'offload a blocchi (streaming) il builder di ltx-core copia ogni blocco in buffer pinned e poi
+    scarta lo state dict letto da disco: parcheggiarlo in RAM lo terrebbe vivo, cioe' una SECONDA copia
+    dello stesso transformer (misurato 29/10 su LTX-2.3 fp8: ~17,7 GB pinned + ~17,7 GB parcheggiati,
+    processo a 64-72 GB). La partizione dei blocchi (`*__blocks`) quindi non si parcheggia; le partizioni
+    piccole (non-block, VAE, vocoder, connector) si'. Costo: il prossimo stadio/job rilegge i blocchi da
+    disco. LTX_PARK_BLOCKS=1 ripristina il comportamento precedente."""
+    if not streaming:
+        return False
+    if os.environ.get("LTX_PARK_BLOCKS", "").strip() == "1":
+        return False
+    return str(partition_name or "").endswith("__blocks")
+
+
 def enabled() -> bool:
     """Parcheggio/cache RAM abilitati? (LS_RAM_CACHE=0 o legacy LTX_RAM_PARK=0 → off)."""
     if os.environ.get("LS_RAM_CACHE", "").strip() == "0":

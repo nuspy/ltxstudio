@@ -29,8 +29,11 @@ MODEL_FILES = {
     "STANDARD 1.1 (distilled fp8)": "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
     "BASE dev fp8 (qualità)":        "LTX\\ltx-2.3-22b-dev-fp8.safetensors",
     "10EROS v1.5 (NSFW)":             "LTX\\10Eros_v1.5_fp8mixed_experimental_learned.safetensors",
+    "10EROS v1.4 (NSFW)":             "LTX\\ltx10eros_v14_2989669.safetensors",
+    "LTX-2.5 uncensored v1.1 INT8 (NSFW)": "LTX\\ltx2.5-uncensored-v1.1-distilled-int8-native.safetensors",
 }
-_MODEL_NSFW = {"10EROS v1.5 (NSFW)"}      # voci modello considerate NSFW (nascoste in SFW)
+_MODEL_NSFW = {"10EROS v1.5 (NSFW)", "10EROS v1.4 (NSFW)",
+               "LTX-2.5 uncensored v1.1 INT8 (NSFW)"}      # voci modello considerate NSFW (nascoste in SFW)
 GGUF_FALLBACK_FILE = "LTXVideo\\LTX-2\\unsloth\\distilled-1.1\\ltx-2.3-22b-distilled-1.1-UD-Q4_K_M.gguf"
 
 RES_PRESETS = {
@@ -1141,9 +1144,13 @@ class VideoTab(QWidget):
         # fav-first: i preferiti compaiono in cima a ogni categoria
         def fav_first(lst):
             return sorted(lst, key=lambda m: (not user_prefs.is_fav_model(m), m.lower()))
-        diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)])
-        checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
         ggufs = fav_first([m for m in self._gguf_models if self._is_ltx_video_model(m)])
+        # i .gguf stanno nella cartella diffusion_models e quindi comparivano due volte (diffusion + GGUF):
+        # se sono già nella lista GGUF (kind esplicito, quello che il worker usa) si tolgono dalla prima.
+        _gg_norm = {g.lower().replace("/", "\\") for g in ggufs}
+        diffusion = fav_first([m for m in self._diffusion_models if self._is_ltx_video_model(m)
+                               and m.lower().replace("/", "\\") not in _gg_norm])
+        checkpoints = fav_first([m for m in self._checkpoint_models if self._is_ltx_video_model(m)])
 
         # Nessuna whitelist di compatibilità: TUTTI i modelli LTX video sono esposti.
         if diffusion:

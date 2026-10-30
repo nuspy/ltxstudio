@@ -363,3 +363,35 @@ def summary(release: str | None) -> str:
         bits.append("durata auto")
     bits.append(f"min {rel.min_vram_gb:.0f} GB")
     return " · ".join(bits)
+
+
+# ── ARCH DALLE CHIAVI (regola «arch dalle chiavi dell'header, non dai metadati/catalogo») ─────────────────
+_NOT_LTX_CACHE: dict = {}
+
+
+def header_says_not_ltx(path: str) -> bool:
+    """True SOLO se l'header safetensors mostra con certezza che NON è un transformer LTX.
+    Un transformer LTX (2.0/2.3/2.5, qualsiasi quantizzazione) ha blocchi `transformer_blocks.N.attn1.*`
+    (self-attention video) e quelli audio `audio_attn1`; i DiT Qwen-Image/FLUX hanno `transformer_blocks.N.attn.*`
+    / `img_mlp` / `double_blocks`. Il catalogo esterno classificava per errore i Noct-Q (Qwen-Image 2.1) come
+    «LTX» e finivano nel menu Video. Prudente: file illeggibile, .gguf, o senza `transformer_blocks` → False
+    (nessuna esclusione: il chiamante usa le sue regole). Solo lettura dell'header (pochi KB), cache per path."""
+    key = os.path.normcase(str(path or ""))
+    if key in _NOT_LTX_CACHE:
+        return _NOT_LTX_CACHE[key]
+    out = False
+    try:
+        if key.endswith(".safetensors") and os.path.isfile(path):
+            import json
+            import struct
+            with open(path, "rb") as fh:
+                n = struct.unpack("<Q", fh.read(8))[0]
+                if 0 < n < 512 * 2**20:
+                    keys = [k for k in json.loads(fh.read(n)) if k != "__metadata__"]
+                    has_blocks = any("transformer_blocks." in k for k in keys)
+                    has_attn1 = any(".attn1." in k or ".audio_attn1." in k for k in keys)
+                    out = has_blocks and not has_attn1
+    except Exception:                                     # noqa: BLE001
+        out = False
+    _NOT_LTX_CACHE[key] = out
+    return out

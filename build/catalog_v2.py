@@ -758,14 +758,6 @@ NEW = [
            "caricamento (with_int8_fold); asset/gemma_config innestati dal TE ufficiale. Vale con ogni transformer 2.5"),
     # Stesso modello del GGUF Q8_0 del repo, ma in safetensors int8: passa dal fold nativo di ltx-core (fp8_cast) e
     # porta i connector degli embedding nello stesso file (il percorso GGUF 2.5 non li sa leggere).
-    # GGUF Q8_0 (scelta dell'utente): transformer dequantizzato al volo; config e connector degli embedding da un
-    # «compagno» safetensors generato una volta dal GGUF stesso (workers/gguf_native.gguf_companion)
-    N("ltx25-uncensored-v11-q8", "Video", "LTX-2.5 Uncensored Turbo v1.1 (18+, GGUF Q8_0, distilled, 22.3GB)",
-      category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
-      remote="split/diffusion_models/ltx25_uncensored_v1.1-Q8_0.gguf",
-      filename="ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf", type="diffusion_models", family="LTX", gb=22.33,
-      sens="adult", deps=["ltx25-te-uncensored|ltx25-te-bf16", "ltx25-video-vae-conv", "ltx25-audio-vae"],
-      note="10Eros (0.7) + DMD distill + IC-LoRA + detailer + img2vid fusi: 4-8 passi, CFG 1"),
     N("ltx25-uncensored-v11-int8", "Video", "LTX-2.5 Uncensored Turbo v1.1 (18+, INT8, distilled, 21.5GB)",
       category="video", arch="ltx25", repo="ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
       remote="split/diffusion_models/ltx25_uncensored_v1.1-int8.safetensors",
@@ -1140,6 +1132,9 @@ REMOVED = {
     "mmh3-fl2va-gguf-q4", "mmh3-fl2va-gguf-q3", "mmh3-ref2va-gguf-q4", "mmh3-te-gguf-q4",
     # 10Eros v1 (LTX-2.3) sostituito da 10Eros v1.5 (ltx23-eros15): il file vecchio va cancellato
     "ltx23-eros",
+    # GGUF Q8_0 di LTX-2.5 uncensored: ridondante con la variante INT8 (ltx25-uncensored-v11-int8, che si streamma);
+    # il GGUF resta residente in VRAM e non entra su 32 GB con clip da 10 s (task 23, decisione utente 30/10).
+    "ltx25-uncensored-v11-q8",
 } | set(_LOCAL_REMOVED)
 
 

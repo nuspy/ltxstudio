@@ -4960,38 +4960,6 @@
       ]
     },
     {
-      "id": "ltx25-uncensored-v11-q8",
-      "module": "Video",
-      "label": "LTX-2.5 Uncensored Turbo v1.1 (18+, GGUF Q8_0, distilled, 22.3GB)",
-      "kind": "file",
-      "type": "diffusion_models",
-      "family": "LTX",
-      "gated": false,
-      "approx_gb": 22.33,
-      "scan_names": [
-        "ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf"
-      ],
-      "category": "video",
-      "arch": "ltx25",
-      "repo_id": "ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
-      "url": "https://huggingface.co/ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8",
-      "filename": "ltx2.5-uncensored-v1.1-distilled-Q8_0.gguf",
-      "remote_filename": "split/diffusion_models/ltx25_uncensored_v1.1-Q8_0.gguf",
-      "deps": [
-        "ltx25-te-uncensored|ltx25-te-bf16",
-        "ltx25-video-vae-conv",
-        "ltx25-audio-vae"
-      ],
-      "sensitivity": "adult",
-      "note": "10Eros (0.7) + DMD distill + IC-LoRA + detailer + img2vid fusi: 4-8 passi, CFG 1",
-      "use": [
-        "ckpt_video",
-        "distilled",
-        "gguf_small",
-        "uncensored"
-      ]
-    },
-    {
       "id": "mmh3-adaln-affine-fl",
       "module": "Video",
       "label": "MiniMax H3 adaLN affine FL2VA (proiezione LoRA sul pruned, 0.1MB)",
