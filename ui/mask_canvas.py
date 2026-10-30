@@ -227,10 +227,18 @@ class MaskCanvas(QWidget):
         self._tf = None                # stato trasformazione attiva
 
         self.frame_item = QGraphicsRectItem(QRectF(0, 0, self.aspect_w, self.aspect_h))
-        self.frame_item.setPen(QPen(QColor("#46a"), 4, Qt.DashLine))
+        self.frame_item.setPen(QPen(Qt.NoPen))                 # sfondo del frame (sotto la foto)
         self.frame_item.setBrush(QBrush(QColor(20, 20, 28)))
         self.frame_item.setZValue(-100)
         self.scene.addItem(self.frame_item)
+        # Contorno tratteggiato blu: elemento SEPARATO disegnato SOPRA la foto (punto 12 dell'utente: prima stava
+        # nello stesso item dello sfondo e la foto lo copriva). Sotto la maschera (500) e sotto le maniglie (720).
+        self.frame_border = QGraphicsRectItem(QRectF(0, 0, self.aspect_w, self.aspect_h))
+        self.frame_border.setPen(QPen(QColor("#46a"), 4, Qt.DashLine))
+        self.frame_border.setBrush(QBrush(Qt.NoBrush))
+        self.frame_border.setZValue(450)
+        self.frame_border.setAcceptedMouseButtons(Qt.NoButton)
+        self.scene.addItem(self.frame_border)
 
         # immagine base + layer importati: OGNI immagine ha la PROPRIA maschera.
         self.img_item = QGraphicsPixmapItem()
@@ -620,6 +628,8 @@ class MaskCanvas(QWidget):
     def set_aspect(self, w: int, h: int):
         self.aspect_w, self.aspect_h = max(1, w), max(1, h)
         self.frame_item.setRect(QRectF(0, 0, self.aspect_w, self.aspect_h))
+        if hasattr(self, "frame_border"):
+            self.frame_border.setRect(QRectF(0, 0, self.aspect_w, self.aspect_h))
         for e in self._entries:        # ridimensiona la maschera di ogni immagine
             e["mask"] = e["mask"].scaled(self.aspect_w, self.aspect_h) if not e["mask"].isNull() else self._new_mask()
         self._refresh_mask(); self._fit()
@@ -1070,12 +1080,12 @@ class MaskCanvas(QWidget):
             it.setVisible(False)
         # Il contorno tratteggiato blu del frame (#46a, 4 px: mezzo dentro il frame) è solo una guida a video: nell'export
         # restava come riga blu di 2 px sul bordo dell'immagine, e Klein/Qwen la leggevano come parte della scena (task 16a).
-        _frame_pen = self.frame_item.pen()
-        self.frame_item.setPen(QPen(Qt.NoPen))
+        _border_vis = self.frame_border.isVisible()
+        self.frame_border.setVisible(False)                     # guida solo a video: mai nell'export
         try:
             self.scene.render(painter, target, source)
         finally:
-            self.frame_item.setPen(_frame_pen)
+            self.frame_border.setVisible(_border_vis)
             for it in hidden:
                 it.setVisible(True)
 
