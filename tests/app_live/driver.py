@@ -644,7 +644,7 @@ class Driver:
             vals = vt.get_values()
             steps["valori_gui"] = main_params(vals)
             if hasattr(vt, "effective_video_size"):                # la GUI dichiara l'arrotondamento a 64 (o H3: Tela): si confronta il valore EFFETTIVO
-                if case["arch"] == "minimax_h3":
+                if case["arch"] in ("minimax_h3", "krea_rt"):
                     steps["valori_gui"].pop("width", None); steps["valori_gui"].pop("height", None)
                     steps["size_note"] = vt.size_effective.text()
                 else:

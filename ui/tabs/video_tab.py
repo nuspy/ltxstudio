@@ -1624,6 +1624,10 @@ class VideoTab(QWidget):
             self.size_effective.setText(tr("vid.size_eff.h3", "MiniMax H3: la risoluzione la decide la «Tela» (e la foto di partenza), non questi valori."))
             self.size_effective.setVisible(True)
             return
+        if arch == "krea_rt":
+            self.size_effective.setText(tr("vid.size_eff.rt", "Krea Realtime / Self-Forcing: risoluzione fissa 832×480 (limite del modello), non questi valori."))
+            self.size_effective.setVisible(True)
+            return
         ew, eh = self.effective_video_size(self.width.value(), self.height.value())
         differs = (ew, eh) != (self.width.value(), self.height.value())
         self.size_effective.setText(tr("vid.size_eff", "Dimensioni effettive: {w}×{h} (i motori video vogliono multipli di 64).").format(w=ew, h=eh))

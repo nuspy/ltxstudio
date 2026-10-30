@@ -3601,5 +3601,6 @@
   "v2v.lsengine.tt": "LTX-2.3 genera vídeo y audio juntos; MultiTalk anima la foto sobre un audio real con Wan 2.1 (lip-sync dedicado, admite LoRA de Wan). Elige el que prefieras.",
   "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)",
   "vid.size_eff": "Tamaño efectivo: {w}×{h} (los motores de vídeo necesitan múltiplos de 64).",
-  "vid.size_eff.h3": "MiniMax H3: la resolución la decide «Lienzo» (y la foto inicial), no estos valores."
+  "vid.size_eff.h3": "MiniMax H3: la resolución la decide «Lienzo» (y la foto inicial), no estos valores.",
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: resolución fija 832×480 (límite del modelo), no estos valores."
 }

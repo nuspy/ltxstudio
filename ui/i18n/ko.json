@@ -3601,5 +3601,6 @@
   "v2v.lsengine.tt": "LTX-2.3은 영상과 오디오를 함께 생성하고, MultiTalk은 Wan 2.1로 사진을 실제 오디오에 맞춰 움직입니다(전용 립싱크, Wan LoRA 지원). 원하는 쪽을 고르세요.",
   "queue.job.lipsync_multitalk": "립싱크 (MultiTalk)",
   "vid.size_eff": "실제 크기: {w}×{h} (비디오 엔진은 64의 배수가 필요합니다).",
-  "vid.size_eff.h3": "MiniMax H3: 해상도는 이 값이 아니라 '캔버스'(와 시작 사진)가 결정합니다."
+  "vid.size_eff.h3": "MiniMax H3: 해상도는 이 값이 아니라 '캔버스'(와 시작 사진)가 결정합니다.",
+  "vid.size_eff.rt": "Krea Realtime / Self-Forcing: 해상도는 832×480으로 고정(모델 한계)이며 이 값이 아닙니다."
 }

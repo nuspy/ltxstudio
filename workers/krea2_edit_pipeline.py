@@ -286,6 +286,10 @@ class Krea2EditPipeline(Krea2Pipeline):
         pos_ids = [self.prepare_position_ids(text_seq, gh_t, gw_t, device)]  # text + target(frame0)
         pos_ids.extend(ref_ids_list)                                          # + ref(frame1..N)
         position_ids = torch.cat(pos_ids, dim=0)
+        neg_position_ids = None
+        if do_cfg:    # il prompt negativo ha UNA LUNGHEZZA DIVERSA dal positivo: position_ids propri (prima condivisi → rotary 7923 vs 7929 a Raw/CFG>1)
+            neg_position_ids = torch.cat([self.prepare_position_ids(negative_prompt_embeds.shape[1], gh_t, gw_t, device)]
+                                         + list(ref_ids_list), dim=0)
         target_seq = latents.shape[1]
 
         # 4) timesteps (schedule Krea 2)
@@ -319,7 +323,7 @@ class Krea2EditPipeline(Krea2Pipeline):
                 if do_cfg:
                     neg_pred = self.transformer(
                         hidden_states=hs, encoder_hidden_states=negative_prompt_embeds, timestep=timestep,
-                        position_ids=position_ids, encoder_attention_mask=negative_prompt_embeds_mask,
+                        position_ids=neg_position_ids, encoder_attention_mask=negative_prompt_embeds_mask,
                         attention_kwargs=self._attention_kwargs, return_dict=False,
                     )[0][:, :target_seq]
                     noise_pred = noise_pred + guidance_scale * (noise_pred - neg_pred)

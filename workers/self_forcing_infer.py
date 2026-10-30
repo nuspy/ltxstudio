@@ -229,6 +229,9 @@ def run_generation(p: dict) -> str:
     # noise autoregressivo: [1, num_output_frames(latenti), 16, H/8, W/8]. Default 21 latenti ≈ 81px @16fps ≈ 5s.
     # Estensione/long-video: aumentare num_output_frames (rolling KV-cache) → memory-bounded.
     W = int(p.get("width", 832)); H = int(p.get("height", 480))
+    if (W, H) != (832, 480):          # frame_seq_length = 1560 hardcoded nel checkpoint (52×30 token): altre risoluzioni → kv_cache 3120 vs 3696 (giro 30/10)
+        print("[self_forcing] risoluzione forzata a 832×480 (il modello hardcoda frame_seq_length=1560)", flush=True)
+        W, H = 832, 480
     lat_h, lat_w = _snap_lat(H), _snap_lat(W)
     n_out = int(p.get("num_output_frames") or 0)
     if n_out <= 0:                                                 # da durata pixel: ~4 px per latente

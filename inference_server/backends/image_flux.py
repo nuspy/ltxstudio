@@ -333,6 +333,16 @@ def _place_resident(pipe) -> str | None:
         f"usano la GPU o usa «Libera VRAM», poi riprova.")
 
 
+def _vram_total_mb_safe() -> float:
+    """VRAM totale (MB) senza contesto CUDA nel processo chiamante; 32000 se non misurabile."""
+    try:
+        from core import gpu_mem
+        t = float(gpu_mem.total_vram_mb())
+        return t if t > 0 else 32000.0
+    except Exception:                                       # noqa: BLE001
+        return 32000.0
+
+
 def _place_flux2_blockswap(pipe) -> str:
     """Placement memory-bounded per FLUX.2 (~32B): block-swap manuale (no accelerate, che segfaulta coi
     buffer float8). I Linear quantizzati (Fp8Linear/Nvfp4Linear) tengono i pesi su CPU e li spostano su
@@ -1551,7 +1561,14 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
         #  - 'offload'    : enable_model_cpu_offload (su Windows spilla in shared-RAM → praticamente bloccato).
         #  - 'sequential' : enable_sequential_cpu_offload (Segmentation fault coi buffer float8).
         # Override: NATIVE_FLUX2_PLACE=blockswap|offload|sequential.
-        mode = (os.environ.get("NATIVE_FLUX2_PLACE") or "blockswap").lower()
+        mode = (os.environ.get("NATIVE_FLUX2_PLACE") or "").lower()
+        if not mode:
+            # blockswap sposta SOLO i Linear quantizzati (Fp8Linear/Nvfp4Linear). Un Klein bf16 (es. realDream_klein9B:
+            # DiT 18GB + Qwen3-8B 16GB = 33GB, giro 30/10 → CUDA OOM in enable_blockswap) non ha Linear quantizzati e
+            # finirebbe TUTTO su GPU: lì si usa l'offload a livello di modello (TE e DiT entrano uno alla volta nei 32GB).
+            _tr = getattr(pipe, "transformer", None)
+            _quant = _tr is not None and any(type(m).__name__ in ("Fp8Linear", "Nvfp4Linear") for m in _tr.modules())
+            mode = "blockswap" if (_quant or _weights_mb < 0.8 * _vram_total_mb_safe()) else "offload"
         if mode == "blockswap":
             where = _place_flux2_blockswap(pipe)
         elif mode == "sequential":
