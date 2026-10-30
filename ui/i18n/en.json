@@ -3671,5 +3671,7 @@
   "v2v.lsengine.ltx": "LTX-2.3 (audio→video, default)",
   "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, dedicated lip-sync)",
   "v2v.lsengine.tt": "LTX-2.3 generates video and audio together; MultiTalk animates the photo on a real audio track with Wan 2.1 (dedicated lip-sync, supports Wan LoRAs). Pick the one you prefer.",
-  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)",
+  "vid.size_eff": "Effective size: {w}×{h} (video engines need multiples of 64).",
+  "vid.size_eff.h3": "MiniMax H3: resolution is set by “Canvas” (and the start photo), not by these values."
 }

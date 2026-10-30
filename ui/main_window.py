@@ -2732,14 +2732,14 @@ class MainWindow(QMainWindow):
             if backend.is_native("image") and engine == "kontext" and aux:
                 self._start_native_mq_foreground(exp, model, ptxt, steps, seed, guidance)
                 return
-            if backend.is_native("image") and engine == "kontext" and not aux:
+            if backend.is_native("image") and engine in ("kontext", "flux2") and not aux:
                 # PuLID DEDICATO all'Image to Image (container proprio nel pannello, separato da
                 # quello di «Genera immagine» che agisce solo sulla generazione).
                 _pl = ({"pulid_face": cfg.get("integrate_pulid_face"),
                         "pulid_strength": cfg.get("integrate_pulid_strength", 0.8),
                         "pulid_start_step": cfg.get("integrate_pulid_start_step", 0),
                         "pulid_true_cfg": cfg.get("integrate_pulid_true_cfg", 1.0)}
-                       if cfg.get("integrate_pulid_face") else None)
+                       if cfg.get("integrate_pulid_face") and engine == "kontext" else None)
                 self._start_native_kontext(exp, model, ptxt, negative, steps, seed, guidance, pulid=_pl)
                 return
             prompt = self.kontext.integrate(img_name, ptxt, engine=engine, model=model,
@@ -4611,9 +4611,10 @@ class MainWindow(QMainWindow):
             # paesaggio). Un FLUX normale entra in FluxInpaintPipeline, che ha `strength`: parte dai TUOI
             # pixel e li reinterpreta quanto basta — è il SetLatentNoiseMask della vecchia IntegratePipeline
             # (ComfyUI, 3/06), quella che davvero piegava il braccio e chiudeva le dita sull'oggetto.
+            from core import arch_filter as _af
             _m = model or r"Flux\FLUX_Dev.safetensors"
             mp = _m if os.path.isabs(_m) else os.path.join(r"E:\AI\Models\diffusion_models", _m)
-            params = {"model": mp, "arch": "inpaint", "prompt": prompt, "negative": negative,
+            params = {"model": mp, "arch": "flux2_inpaint" if _af.is_flux2(_m) else "inpaint", "prompt": prompt, "negative": negative,
                       "image_path": exp["image"], "mask_path": mask,
                       # guidance ≥3.5 (standard FLUX): col 2.5 ereditato dal tab (tarato per Kontext) il
                       # modello si allontana dal prompt e reinventa l'oggetto.
@@ -4631,7 +4632,9 @@ class MainWindow(QMainWindow):
         else:
             unet = model or KONTEXT_MODEL
             mp = unet if os.path.isabs(unet) else os.path.join(r"E:\AI\Models\diffusion_models", unet)
-            params = {"model": mp, "arch": "kontext", "prompt": prompt, "negative": negative,
+            from core import arch_filter as _af
+            # FLUX.2 (Klein) come motore di Integra: pipeline nativa Flux2KleinPipeline (edit per istruzione), mai il grafo ComfyUI
+            params = {"model": mp, "arch": "flux2_kontext" if _af.is_flux2(unet) else "kontext", "prompt": prompt, "negative": negative,
                       "image_path": exp["image"], "steps": steps, "guidance": guidance, "seed": seed}
             if pulid and pulid.get("pulid_face"):             # identità volto (PuLID) anche sull'integra kontext
                 params.update({k: pulid[k] for k in ("pulid_face", "pulid_strength",

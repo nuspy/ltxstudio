@@ -3599,5 +3599,7 @@
   "v2v.lsengine.ltx": "LTX-2.3（音频→视频，默认）",
   "v2v.lsengine.multitalk": "MultiTalk（Wan 2.1，专用口型同步）",
   "v2v.lsengine.tt": "LTX-2.3 同时生成视频和音频；MultiTalk 用 Wan 2.1 让照片跟随真实音频开口说话（专用口型同步，支持 Wan LoRA）。选你喜欢的。",
-  "queue.job.lipsync_multitalk": "口型同步 (MultiTalk)"
+  "queue.job.lipsync_multitalk": "口型同步 (MultiTalk)",
+  "vid.size_eff": "实际尺寸：{w}×{h}（视频引擎要求为 64 的倍数）。",
+  "vid.size_eff.h3": "MiniMax H3：分辨率由“画布”（以及起始照片）决定，而不是这些数值。"
 }

@@ -3599,5 +3599,7 @@
   "v2v.lsengine.ltx": "LTX-2.3 (ήχος→βίντεο, προεπιλογή)",
   "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, αποκλειστικό lip-sync)",
   "v2v.lsengine.tt": "Το LTX-2.3 παράγει μαζί βίντεο και ήχο· το MultiTalk κινεί τη φωτογραφία πάνω σε πραγματικό ήχο με το Wan 2.1 (αποκλειστικό lip-sync, υποστηρίζει LoRA του Wan). Επιλέξτε ό,τι προτιμάτε.",
-  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)",
+  "vid.size_eff": "Πραγματικό μέγεθος: {w}×{h} (οι μηχανές βίντεο απαιτούν πολλαπλάσια του 64).",
+  "vid.size_eff.h3": "MiniMax H3: η ανάλυση ορίζεται από τον «Καμβά» (και τη φωτογραφία εκκίνησης), όχι από αυτές τις τιμές."
 }

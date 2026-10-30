@@ -156,6 +156,7 @@ class VideoTab(QWidget):
         except Exception:                                       # noqa: BLE001
             pass
         self.video_arch.currentIndexChanged.connect(self._on_arch_changed)
+        self.video_arch.currentIndexChanged.connect(lambda *_: self._update_size_effective() if hasattr(self, 'size_effective') else None)
         form.addRow(tr("vid.arch_lbl", "Architettura"), self.video_arch)
 
         # VIDEO LUNGO: Continuo (Self-Forcing rolling, una sola ripresa senza tagli, durata illimitata a memoria
@@ -230,6 +231,15 @@ class VideoTab(QWidget):
         wh.addWidget(QLabel(tr("vid.w_lbl"))); wh.addWidget(self.width)
         wh.addWidget(QLabel(tr("vid.h_lbl"))); wh.addWidget(self.height)
         form.addRow("", self._wrap(wh))
+        # Dimensioni EFFETTIVE: i motori video LTX-2 vogliono multipli di 64 (ui/main_window `_r64`) e H3 decide da «Tela»:
+        # prima la GUI mostrava 544 e il job partiva a 512 senza dirlo (giro test 30/10). Ora lo si vede.
+        self.size_effective = QLabel("")
+        self.size_effective.setWordWrap(True)
+        self.size_effective.setStyleSheet("color:#c9a227;")
+        self.size_effective.setVisible(False)
+        form.addRow("", self.size_effective)
+        self.width.valueChanged.connect(self._update_size_effective)
+        self.height.valueChanged.connect(self._update_size_effective)
         # FPS e Durata sulla stessa riga (compattazione richiesta)
         self.fps = QSpinBox(); self.fps.setRange(1, 60); self.fps.setValue(24)
         self.fps.setToolTip(tr("vid.fps.tt", "Frame al secondo. 24 = cinematografico, 30 = TV, 60 = fluid."))
@@ -1601,6 +1611,23 @@ class VideoTab(QWidget):
 
     def get_sampler_values(self) -> dict:
         return self.sampler_seed.get_values()
+
+    @staticmethod
+    def effective_video_size(w: int, h: int) -> tuple[int, int]:
+        """Stesso arrotondamento di MainWindow (`_r64`): multipli di 64, minimo 64."""
+        r64 = lambda x: max(64, int(round(int(x) / 64.0)) * 64)
+        return r64(w), r64(h)
+
+    def _update_size_effective(self, *_):
+        arch = self.video_arch.currentData() if hasattr(self, "video_arch") else "ltx"
+        if arch == "minimax_h3":
+            self.size_effective.setText(tr("vid.size_eff.h3", "MiniMax H3: la risoluzione la decide la «Tela» (e la foto di partenza), non questi valori."))
+            self.size_effective.setVisible(True)
+            return
+        ew, eh = self.effective_video_size(self.width.value(), self.height.value())
+        differs = (ew, eh) != (self.width.value(), self.height.value())
+        self.size_effective.setText(tr("vid.size_eff", "Dimensioni effettive: {w}×{h} (i motori video vogliono multipli di 64).").format(w=ew, h=eh))
+        self.size_effective.setVisible(differs)
 
     def wants_fixed_seed(self) -> bool:
         return self.sampler_seed.wants_fixed_seed()

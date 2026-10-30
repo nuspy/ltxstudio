@@ -3599,5 +3599,7 @@
   "v2v.lsengine.ltx": "LTX-2.3 (אודיו←וידאו, ברירת מחדל)",
   "v2v.lsengine.multitalk": "MultiTalk (‏Wan 2.1, סנכרון שפתיים ייעודי)",
   "v2v.lsengine.tt": "LTX-2.3 מייצר וידאו ואודיו יחד; MultiTalk מנפיש את התמונה על קטע שמע אמיתי באמצעות Wan 2.1 (סנכרון שפתיים ייעודי, תומך ב-LoRA של Wan). בחרו את מה שנוח לכם.",
-  "queue.job.lipsync_multitalk": "סנכרון שפתיים (MultiTalk)"
+  "queue.job.lipsync_multitalk": "סנכרון שפתיים (MultiTalk)",
+  "vid.size_eff": "הגודל בפועל: {w}×{h} (מנועי הווידאו דורשים כפולות של 64).",
+  "vid.size_eff.h3": "MiniMax H3: הרזולוציה נקבעת לפי «בד» (ותמונת ההתחלה), לא לפי ערכים אלה."
 }

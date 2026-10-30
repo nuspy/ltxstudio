@@ -3599,5 +3599,7 @@
   "v2v.lsengine.ltx": "LTX-2.3 (audio→vidéo, par défaut)",
   "v2v.lsengine.multitalk": "MultiTalk (Wan 2.1, lip-sync dédié)",
   "v2v.lsengine.tt": "LTX-2.3 génère vidéo et audio ensemble ; MultiTalk anime la photo sur un audio réel avec Wan 2.1 (lip-sync dédié, prend en charge les LoRA Wan). Choisissez celui que vous préférez.",
-  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)"
+  "queue.job.lipsync_multitalk": "Lip-sync (MultiTalk)",
+  "vid.size_eff": "Taille effective : {w}×{h} (les moteurs vidéo exigent des multiples de 64).",
+  "vid.size_eff.h3": "MiniMax H3 : la résolution est fixée par « Toile » (et la photo de départ), pas par ces valeurs."
 }

@@ -3599,5 +3599,7 @@
   "v2v.lsengine.ltx": "LTX-2.3 (صوت→فيديو، الافتراضي)",
   "v2v.lsengine.multitalk": "MultiTalk (‏Wan 2.1، مزامنة شفاه مخصّصة)",
   "v2v.lsengine.tt": "يولّد LTX-2.3 الفيديو والصوت معًا؛ أما MultiTalk فيحرّك الصورة على صوت حقيقي باستخدام Wan 2.1 (مزامنة شفاه مخصّصة وتدعم LoRA الخاصة بـ Wan). اختر ما تفضّله.",
-  "queue.job.lipsync_multitalk": "مزامنة الشفاه (MultiTalk)"
+  "queue.job.lipsync_multitalk": "مزامنة الشفاه (MultiTalk)",
+  "vid.size_eff": "الحجم الفعلي: {w}×{h} (محركات الفيديو تتطلب مضاعفات 64).",
+  "vid.size_eff.h3": "MiniMax H3: الدقة تحددها «اللوحة» (وصورة البداية) وليس هذه القيم."
 }
