@@ -313,13 +313,14 @@ class ModelManager:
                 if os.path.exists(cand):
                     name = cand
             try:
-                pipe.load_lora_weights(name, adapter_name=adapter)
+                if os.path.isfile(name):
+                    # diffusers (modo offline, HF_HUB_OFFLINE=1) con un PERCORSO DI FILE senza weight_name dà
+                    # «When using the offline mode, you must specify a `weight_name`»: cartella + weight_name è sempre valido.
+                    pipe.load_lora_weights(os.path.dirname(name), weight_name=os.path.basename(name), adapter_name=adapter)
+                else:
+                    raise FileNotFoundError(f"LoRA non trovata: {name}")
             except Exception as _e:                     # noqa: BLE001
-                if getattr(getattr(pipe, "transformer", None), "_ls_fp8_storage", False):
-                    raise RuntimeError(
-                        "LoRA non caricabile sul base con storage fp8 (layerwise casting): riavvia il "
-                        f"server con NATIVE_FLUX1_FP8=0 per usare questa LoRA in bf16. ({_e})") from _e
-                raise
+                raise RuntimeError(f"LoRA «{os.path.basename(str(name))}» non caricabile su questo modello: {_e}") from _e
             names.append(adapter); weights.append(float(lo.get("strength", 1.0)))
         try:
             pipe.set_adapters(names, adapter_weights=weights)

@@ -191,6 +191,26 @@ class ComponentStore:
             except Exception:                           # noqa: BLE001
                 pass
 
+    def free_cpu_mb(self, target_mb: float) -> float:
+        """Libera ALMENO `target_mb` di commit distruggendo i componenti parcheggiati in RAM (refcount==0, device=cpu),
+        dal più vecchio. Ritorna i MB liberati. Serve prima di un caricamento grosso quando il commit è scarso."""
+        from core import mem_budget
+        victims = mem_budget.pick_lru_victims(
+            ((k, e.size_mb, e.last_used) for k, e in self._items.items() if e.refcount == 0 and e.device == "cpu"),
+            float(target_mb))
+        freed = 0.0
+        for k in victims:
+            e = self._items.pop(k)
+            freed += float(e.size_mb)
+            try:
+                del e.obj
+            except Exception:                           # noqa: BLE001
+                pass
+        if victims:
+            import gc
+            gc.collect()
+        return freed
+
     def evict_unused(self, need_mb: float) -> float:
         """ULTIMA risorsa di make_room: libera VRAM dai componenti orfani (refcount==0, device=cuda),
         LRU. Se il budget RAM lo consente → DEMOTE su CPU (restore veloce al prossimo acquire); se no →

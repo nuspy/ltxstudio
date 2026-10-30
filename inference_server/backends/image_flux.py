@@ -1168,14 +1168,27 @@ def _predicted_load_mb(model_path: str, arch: str) -> float:
                     sz += est
     except Exception:                                       # noqa: BLE001
         pass
+    if str(arch).startswith("flux2"):
+        sz += 13500.0       # FLUX.2: + text encoder Mistral nvfp4 (~12.5GB RAW) + VAE: prima non contati (giro 30/10: processo a 81GB)
     return sz
 
 
 def _guard_load(model_path: str, arch: str) -> None:
     """Prima di OGNI assemblaggio/caricamento: commit libero − carico previsto < pavimento (core/mem_budget) →
-    errore chiaro (`LoadRefused`) invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
+    prima si libera la cache CPU dei modelli PARCHEGGIATI (LRU), solo se non basta errore chiaro (`LoadRefused`)
+    invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
     from core import mem_budget
-    mem_budget.check_load(_predicted_load_mb(model_path, arch), os.path.basename(str(model_path)))
+    need = _predicted_load_mb(model_path, arch)
+    if need > 0:
+        deficit = need + mem_budget.commit_floor_mb() + 8192.0 - mem_budget.avail_commit_mb()   # 8GB di margine per i transitori
+        if deficit > 0:
+            try:
+                from inference_server.component_store import STORE
+                freed = STORE.free_cpu_mb(deficit)          # i parcheggiati si ricaricano dal disco: meglio di un crash
+                print(f"[mem] commit scarso: liberati {freed / 1024:.1f} GB di modelli parcheggiati in RAM (servivano {deficit / 1024:.1f} GB)", flush=True)
+            except Exception:                               # noqa: BLE001
+                pass
+    mem_budget.check_load(need, os.path.basename(str(model_path)))
 
 
 def _release_cuda_cache() -> None:
