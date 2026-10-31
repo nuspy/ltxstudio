@@ -315,12 +315,24 @@ class ModelManager:
             if not os.path.isfile(name):
                 raise FileNotFoundError(f"LoRA non trovata: {name}")
             st = float(lo.get("strength", 1.0))
-            try:                                         # chiavi NORMALIZZATE (kohya/BFL/ComfyUI → naming diffusers del transformer)
-                out = pipe.lora_state_dict(name)
-                sd = out[0] if isinstance(out, tuple) else out
-            except Exception:                            # noqa: BLE001
+            sd = None                                    # chiavi NORMALIZZATE (kohya/BFL/ComfyUI → naming diffusers del transformer)
+            for _call in (lambda: pipe.lora_state_dict(os.path.dirname(name), weight_name=os.path.basename(name)),
+                          lambda: pipe.lora_state_dict(name)):      # in modo offline un FILE senza weight_name fallisce: prima cartella+weight_name
+                try:
+                    out = _call()
+                    sd = out[0] if isinstance(out, tuple) else out
+                    break
+                except Exception:                        # noqa: BLE001
+                    continue
+            if sd is None:
                 from safetensors.torch import load_file
                 sd = load_file(name)
+                if any(k.startswith("lora_unet_") for k in sd):          # kohya/BFL (qkv fusi): stessa conversione di diffusers
+                    try:
+                        from diffusers.loaders.lora_conversion_utils import _convert_kohya_flux_lora_to_diffusers as _kc
+                        sd = _kc(dict(sd))
+                    except Exception:                    # noqa: BLE001
+                        pass
             groups: dict = {}
             for k, v in sd.items():
                 for tag, role in ((".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_A.default.weight", "A"),
