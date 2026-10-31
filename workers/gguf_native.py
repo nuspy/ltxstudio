@@ -292,7 +292,22 @@ def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
     )
     stage._transformer_builder = new_builder
     from ltx_pipelines.utils.types import OffloadMode
-    stage._offload_mode = OffloadMode.NONE
+    # Offload a blocchi anche per i GGUF GRANDI (decisione utente 31/10: «avviso + tentativo di offload»). Un Q6_K 22B (~19 GB) resta
+    # residente con NONE e a risoluzioni/durate normali sfora i 32 GB (giro 30-31/10: OOM). Auto: file >= 16 GiB → CPU (pesi in RAM,
+    # streaming layer-per-layer); LTX_GGUF_OFFLOAD=none|cpu forza. L'avviso va nel log (compare nella GUI). Mai cambio di checkpoint.
+    import os as _os
+    _mode = (_os.environ.get("LTX_GGUF_OFFLOAD") or "auto").lower()
+    try:
+        _gb = _os.path.getsize(gguf_path) / 2 ** 30
+    except OSError:
+        _gb = 0.0
+    if _mode == "cpu" or (_mode == "auto" and _gb >= 16.0):
+        stage._offload_mode = OffloadMode.CPU
+        print(f"[gguf] ⚠ GGUF grande ({_gb:.0f} GB): offload a blocchi su CPU attivo (piu lento, ma non occupa tutta la VRAM)", flush=True)
+    else:
+        stage._offload_mode = OffloadMode.NONE
+        if _gb >= 12.0:
+            print(f"[gguf] ⚠ GGUF da {_gb:.0f} GB residente in VRAM (nessun offload): a risoluzione/durata alte puo non entrare", flush=True)
     # niente torch.compile sul transformer GGUF: la compilation traccia con fake/meta tensor e il
     # GGMLTensor (dequant custom on-the-fly) non è tracciabile → "Tensor on device meta".
     if getattr(stage, "_compilation_config", None) is not None:
