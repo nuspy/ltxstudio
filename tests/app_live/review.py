@@ -94,6 +94,15 @@ def build(run_dir: str, nome: str = "giro") -> str:
             v = p.get(key)
             if isinstance(v, str) and os.path.isfile(v):
                 origs.append({"label": key, "path": v, "thumb": _thumb(v, rd, f"{safe}_{key}"), "big": _thumb(v, rd, f"{safe}_{key}", True)})
+        for k, rr in enumerate(p.get("references") or []):                  # riferimenti multipli video (+ sfondo): originali affiancati
+            v = rr.get("path") if isinstance(rr, dict) else rr
+            if isinstance(v, str) and os.path.isfile(v):
+                lab = "SFONDO" if isinstance(rr, dict) and rr.get("role") == "background" else f"riferimento {k + 1}"
+                origs.append({"label": lab, "path": v, "thumb": _thumb(v, rd, f"{safe}_vref{k}"), "big": _thumb(v, rd, f"{safe}_vref{k}", True)})
+        for key2 in ("video",):
+            v = p.get(key2)
+            if isinstance(v, str) and os.path.isfile(v):
+                origs.append({"label": "video originale", "path": v, "thumb": _thumb(v, rd, f"{safe}_srcvid"), "big": _thumb(v, rd, f"{safe}_srcvid", True)})
         for k, v in enumerate(p.get("ref_images") or []):
             if isinstance(v, str) and os.path.isfile(v):
                 origs.append({"label": f"riferimento {k + 1}", "path": v, "thumb": _thumb(v, rd, f"{safe}_ref{k}"), "big": _thumb(v, rd, f"{safe}_ref{k}", True)})

@@ -160,6 +160,27 @@ def main():
                           "secs": secs, "seed": 8000 + n, "timeout": 3600,
                           "prompt": "a slow aerial flight over a foggy pine forest at dawn, then over a lake with a small wooden boat, camera keeps gliding forward",
                           "descr": f"Punto 29: LTX-2.5 {secs} s a 704x448/24 fps (soglia singola passata 20 s; 30/40 s = blocchi)"})
+    fx = a.fixtures
+    ltx = inv["video"].get("ltx", {}).get("models", [])
+    m23 = next((m for m in ltx if "distilled-1.1" in m["text"] and "gguf" not in m["text"].lower()), None)
+    m25 = rel25
+    for rel, mm in (("23", m23), ("25", m25)):                           # punto 26: riferimenti multipli + SFONDO obbligatorio
+        if mm:
+            cases.append({"id": f"video_msr_sfondo_ltx{rel}", "fn": "video", "nsfw": True, "arch": "ltx", "model": mm["text"], "w": 704, "h": 960, "secs": 4,
+                          "seed": 8500 + int(rel), "timeout": 2400, "refs": [os.path.join(fx, "ritratto_960x1024.png"), os.path.join(fx, "astronauta.png")],
+                          "background": os.path.join(fx, "sfondo_mongolfiere.png"),
+                          "prompt": "@image_1 waves at the camera and @image_2 nods, both standing in the balloon festival shown as background, soft morning light",
+                          "descr": f"Punto 26: LTX-{rel[0]}.{rel[1]} con 2 riferimenti + SFONDO obbligatorio (guarda se lo sfondo e davvero usato come scena)",
+                          "verify": "Lo SFONDO (mongolfiere) compare come scena del video? I due soggetti (donna dai capelli rossi, astronauta) sono riconoscibili? Confronta con le immagini originali affiancate."})
+    if m23:                                                              # punto 28: edit di un file video dalla GUI, checkpoint 2.3 distilled (nessun avviso modale dev)
+        cases.append({"id": "vedit_file_ltx23_distilled", "fn": "ops", "wait_job": True, "timeout": 2400,
+                      "ops": [{"set": "video_tab.model", "value": m23["text"]},
+                              {"call": "video_edit_ai_tab.set_video", "args": [os.path.join(fx, "clip_mercato_3s.mp4")]},
+                              {"call": "video_edit_ai_tab.select_mode", "args": ["edit"]},
+                              {"set": "video_edit_ai_tab.prompt", "value": "make the neon lanterns glow green"},
+                              {"call": "video_edit_ai_tab._go", "args": []}],
+                      "descr": "Punto 28: edit di un FILE video (modalita Modifica) con il checkpoint 2.3 distilled; se fallisce, l'errore va in errori_<data>.md e nel log del worker",
+                      "verify": "Il video modificato mantiene durata e movimento dell'originale (affiancato) e le lanterne sono verdi?"})
     for cid, img, kind, pt, mn, rad in (("segmenta_clic_polpo", scena, "point", (0.62, 0.45), 4.0, 0), ("segmenta_clic_donna", ritratto, "point", (0.55, 0.62), 12.0, 0),
                                        ("segmenta_lazo_astronauta", scena, "lasso", (0.17, 0.33), 4.0, 0.22)):
         cases.append({"id": cid, "fn": "segment", "kind": kind, "image": img, "point": list(pt), "min_area_pct": mn, "radius": rad, "timeout": 300,

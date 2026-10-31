@@ -32,7 +32,7 @@ _KEEP = ("module", "arch", "task", "model", "model_gguf", "krea2_variant", "krea
          "ltx_release", "video_arch", "loras", "lora", "prompt", "negative", "seed", "steps", "guidance", "cfg",
          "width", "height", "length", "fps", "strength", "denoise", "init_image", "image_path", "mask", "mask_path",
          "ref_images", "control_image", "control_type", "outpaint", "output", "native_audio", "h3_dit", "h3_profile",
-         "engine", "mode", "scale", "images", "audio_path", "klein_te")
+         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release")
 
 
 def _safe(v, depth=0):
@@ -318,7 +318,7 @@ class Driver:
         orig_enqueue = GenerationQueue.enqueue
 
         def enqueue(q, label, worker, on_done=None, on_progress=None):
-            params = getattr(worker, "params", None)
+            params = getattr(worker, "params", None) or getattr(worker, "cfg", None)      # _VideoEditAIWorker tiene la config in .cfg
             rec.call("queue", label=str(label), worker=type(worker).__name__, module=getattr(worker, "module", None),
                      params=main_params(params) if isinstance(params, dict) else {})
             if drv.dry:
@@ -528,7 +528,7 @@ class Driver:
             outs += f.get("outputs") or []
         outs = [o for i, o in enumerate(outs) if o not in outs[:i] and os.path.isfile(str(o))]
         res["uscite"] = outs
-        if qcalls and not outs and not problems:
+        if qcalls and not outs and not problems and not self.dry:
             problems.append("job finito ma nessun file di uscita")
         errs = [d for d in self.rec.dialogs if d["kind"] in ("critical", "warning", "exec")]
         if errs and not case.get("expect_dialog"):
@@ -665,6 +665,15 @@ class Driver:
                 vt.sampler_seed.seed.setValue(int(case.get("seed", 1)))
             if "audio" in case:
                 vt.native_audio.setChecked(bool(case["audio"]))
+            if case.get("refs"):                                  # Riferimenti multipli (punto 26): soggetti + SFONDO obbligatorio su LTX
+                rp = vt.reference_panel
+                rp.enable.setChecked(True)
+                rp.clear()                                        # parto sempre dal pannello vuoto (i casi si susseguono sulla stessa istanza)
+                for pth in case["refs"]:
+                    rp.add_path(pth)
+                if case.get("background"):
+                    rp.set_background(case["background"])
+                steps["refs"] = {"n": len(rp.names()), "bg": getattr(rp, "bg_path", ""), "needs_bg": bool(getattr(rp, "_needs_background", False))}
             for k, v in (case.get("widgets") or {}).items():
                 set_widget(resolve(w, k), v)
             vals = vt.get_values()
@@ -699,6 +708,15 @@ class Driver:
                 if fn not in json.dumps(p.get("loras") or p.get("lora") or []).lower():
                     mis.append(f"LoRA {fn} attiva nel pannello ma assente dai parametri del backend")
             mis += self._extra_loras(steps, p)
+            if case.get("refs"):                                    # punto 26: i riferimenti e lo sfondo devono arrivare al backend
+                refs = p.get("references") or []
+                want = len(case["refs"]) + (1 if case.get("background") else 0)
+                if len(refs) != want:
+                    mis.append(f"riferimenti: impostati {want} (soggetti + sfondo) ma il backend ne riceve {len(refs)}")
+                if case.get("background") and not any(isinstance(r, dict) and r.get("role") == "background" for r in refs):
+                    mis.append("lo SFONDO e impostato nel pannello ma non arriva al backend (role=background assente)")
+                if "msr" not in str(p.get("msr_lora", "")).lower():
+                    mis.append("nessuna LoRA Multiple-Subject-Reference nei parametri")
             if "seed" in case and p.get("seed") != int(case["seed"]):
                 mis.append(f"seed: impostato {case['seed']} ma il backend riceve {p.get('seed')}")
             for k, v in (case.get("expect_params") or {}).items():
