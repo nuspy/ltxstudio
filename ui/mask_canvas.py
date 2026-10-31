@@ -507,6 +507,7 @@ class MaskCanvas(QWidget):
             self._lasso_fallback = list(self._lasso_pts)
             self._clear_seg_marker()
             self._seg_region = ("box", QRectF(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)))
+            self._seg_from_lasso = True
             self.status.setText(tr("canvas.status_lasso_ai", "Lazo: l'AI seleziona l'oggetto nell'area…"))
             self._lasso_reset()
             self.request_segment_region.emit()
@@ -594,6 +595,7 @@ class MaskCanvas(QWidget):
         self._seg_region = None
 
     def sam_point_at(self, sp: QPointF):
+        self._seg_from_lasso = False
         sp = self._clamp(sp)
         self._clear_seg_marker()
         self._seg_region = ("point", sp)
@@ -619,6 +621,8 @@ class MaskCanvas(QWidget):
         p.end()
         mpath = out_dir / "seg_region.png"; mask.save(str(mpath))
         out = {"image": image, "mask": str(mpath), "hint": "center-1", "kind": kind}
+        if kind == "box" and getattr(self, "_seg_from_lasso", False):
+            out["lasso"] = True                                # il lazo chiede «l'oggetto contenuto nell'area»: maschera piu grande che non invade lo sfondo
         if kind == "point":                                   # coordinate nello spazio del composito (= quello inviato a SAM)
             out["point"] = [float(self._seg_region[1].x()), float(self._seg_region[1].y())]
         return out

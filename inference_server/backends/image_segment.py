@@ -123,7 +123,18 @@ def run(params: dict, mm, output_dir: str) -> dict:
             with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=dev == "cuda"):
                 sout = smodel(**sin)
             masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
-            m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, "iou_scores") else None)
+            if params.get("region_pick") == "largest":
+                # LAZO (punto 22/H): l'oggetto CONTENUTO nell'area = la maschera piu grande che non invade lo sfondo (<= 60 % della foto),
+                # come per il clic; il punteggio IoU stimato da solo sceglieva a volte una sola parte (1,8 % della foto nel giro del 31/10).
+                arr = (masks > 0)
+                while arr.ndim > 3:
+                    arr = arr[0]
+                areas = [int(arr[i].sum()) for i in range(arr.shape[0])]
+                lim = 0.6 * arr.shape[-1] * arr.shape[-2]
+                cands = [i for i in range(arr.shape[0]) if 0 < areas[i] <= lim]
+                m_np = (arr[max(cands, key=lambda i: areas[i])].numpy().astype("uint8") * 255) if cands else                     _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, "iou_scores") else None)
+            else:
+                m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, "iou_scores") else None)
         else:
             m_np = np.zeros((img.height, img.width), dtype="uint8")
             x0, y0, x1, y1 = (int(v) for v in box)
