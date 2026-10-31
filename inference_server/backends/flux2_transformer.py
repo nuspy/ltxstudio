@@ -85,12 +85,37 @@ class Nvfp4Linear(nn.Module):
         return F.linear(x.to(torch.bfloat16), w, b).to(x.dtype)
 
 
+_SWAP_LINEAR_MIN_BYTES = 16 * 2**20      # sotto i 16 MB un Linear e' "leggero" e sta stabilmente su GPU
+
+
+def _swap_plain_linear(m, compute_device):
+    """Linear NON quantizzato ma grosso (checkpoint FLUX.2-dev «nvfp4-mixed»: solo gli MLP sono nvfp4, attention e
+    proiezioni sono bf16 = ~25 GB). Messi tutti su GPU come moduli «leggeri» riempivano i 32 GB (alloc 27 GB prima
+    ancora di iniziare) e Windows spillava il resto nella RAM condivisa: commit +27 GB, app chiusa dal guardiano
+    (giro 31/10, crea_flux_07). Qui peso su CPU e copiato su GPU solo per la durata del forward, come i Linear
+    quantizzati; il bias (piccolo) resta su GPU."""
+    import torch.nn.functional as F
+    if m.bias is not None:
+        m.bias.data = m.bias.data.to(compute_device)
+
+    def forward(x, _m=m, _dev=compute_device):
+        w = _m.weight.to(device=x.device, dtype=x.dtype, non_blocking=True)
+        b = _m.bias.to(device=x.device, dtype=x.dtype) if _m.bias is not None else None
+        return F.linear(x, w, b)
+    m.forward = forward
+    m._ls_swap_linear = True
+
+
 def enable_blockswap(model, compute_device):
     """Block-swap stile ComfyUI (no accelerate): i pesi quantizzati (grossi) restano su CPU e il loro
     forward li sposta su GPU 1 layer alla volta; i moduli leggeri (norm/embed/modulation/bias) vanno su
     GPU stabilmente. Picco VRAM = moduli leggeri + 1 layer pesante. RAM tiene i pesi fp8."""
     for m in model.modules():
         is_q = isinstance(m, (Fp8Linear, Nvfp4Linear))
+        if (not is_q and type(m) is nn.Linear and m.weight is not None and not m.weight.is_meta
+                and m.weight.numel() * m.weight.element_size() >= _SWAP_LINEAR_MIN_BYTES):
+            _swap_plain_linear(m, compute_device)           # checkpoint «mixed»: Linear bf16 grossi restano su CPU
+            continue
         if is_q:
             if getattr(m, "bias", None) is not None:        # bias piccolo → GPU; weight/packed restano CPU
                 m.bias.data = m.bias.data.to(compute_device)
