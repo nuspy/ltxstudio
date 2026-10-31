@@ -305,6 +305,15 @@ class Driver:
         QMessageBox.critical = mk("critical", QMessageBox.Ok)
         QMessageBox.question = mk("question", QMessageBox.Yes)
 
+        def _exec(box, *a, **k):          # QMessageBox personalizzati con exec() bloccherebbero il thread GUI: si registra il testo e si risponde «annulla»
+            try:
+                rec.dialog("exec", box.windowTitle(), box.text() + (chr(10) + box.informativeText() if box.informativeText() else ""))
+            except Exception:             # noqa: BLE001
+                pass
+            return QMessageBox.Cancel
+        QMessageBox.exec = _exec
+        QMessageBox.exec_ = _exec
+
         from ui.job_queue import GenerationQueue
         orig_enqueue = GenerationQueue.enqueue
 
@@ -504,7 +513,7 @@ class Driver:
         res["uscite"] = outs
         if qcalls and not outs and not problems:
             problems.append("job finito ma nessun file di uscita")
-        errs = [d for d in self.rec.dialogs if d["kind"] in ("critical", "warning")]
+        errs = [d for d in self.rec.dialogs if d["kind"] in ("critical", "warning", "exec")]
         if errs and not case.get("expect_dialog"):
             problems.append("errore mostrato in GUI: " + errs[0]["text"][:300])
         res["esito"] = "ok" if not problems else "fallito"
@@ -809,6 +818,95 @@ class Driver:
                 out["edit"]["integrate_engines"][f.integrate_engine.itemText(i)] = {"models": combo_items(f.integrate_model)}
             return out
         return self.gui(inv, 120)
+
+    def case_compose(self, case):
+        """Modifica -> Componi foto multiple: lista di foto, prompt con @image_N, motore/modello, seed/passi, bottone VERO."""
+        w = self.w
+        steps = {}
+
+        def setup():
+            f = w.frame1_tab
+            f.sub.setCurrentIndex(1)
+            cv = f.canvas
+            cv.load_image(case["canvas_image"], "canvas") if case.get("canvas_image") else None
+            if case.get("canvas_wh"):
+                cv.set_aspect(int(case["canvas_wh"][0]), int(case["canvas_wh"][1]))
+            f.compose_list.clear()
+            for pth in case["images"]:
+                f.compose_list.addItem(pth)
+            steps["engine"] = select_combo(f.integrate_engine, case["engine"])
+            if case.get("model"):
+                steps["model"] = select_combo(f.integrate_model, case["model"])
+            f.compose_prompt.setPlainText(case["prompt"])
+            f.compose_seed_rand.setChecked(False)
+            f.compose_seed.setValue(int(case.get("seed", 1)))
+            if case.get("steps"):
+                f.compose_steps.setValue(int(case["steps"]))
+            steps["canvas"] = [int(cv.aspect_w), int(cv.aspect_h)]
+            steps["cfg_gui"] = main_params({k: v for k, v in f.get_compose_config().items() if k != "images"})
+            return self.find_button(f, "f1.compose.btn")
+        btn = self.gui(setup, 90)
+        self.gui(lambda: btn.click(), 30)
+        self.wait_job(float(case.get("timeout", 900)))
+        res = {"widget_state": steps}
+        q = [c for c in self.rec.calls if c["via"] == "queue"]
+        mis = []
+        if q:
+            p = q[0]["params"]
+            res["handler"] = f"{q[0]['worker']}:{q[0].get('module')}"
+            cw, ch = steps["canvas"]
+            if p.get("width") and p.get("height") and (abs(int(p["width"]) - cw) > 16 or abs(int(p["height"]) - ch) > 16):
+                mis.append(f"misura: il canvas e {cw}x{ch} ma il backend riceve {p.get('width')}x{p.get('height')}")
+            if "seed" in case and p.get("seed") not in (None, int(case["seed"])):
+                mis.append(f"seed: impostato {case['seed']} ma il backend riceve {p.get('seed')}")
+            refs = p.get("ref_images") or p.get("images") or []
+            if len(refs) < min(2, len(case["images"])):
+                mis.append(f"riferimenti: attese {len(case['images'])} foto, il backend ne riceve {len(refs)}")
+            if "@image" in str(p.get("prompt", "")):
+                mis.append("il prompt inviato contiene ancora @image_N (non tradotto nella sintassi del motore)")
+            for k, v in (case.get("expect_params") or {}).items():
+                if p.get(k) != v:
+                    mis.append(f"parametro atteso {k}={v!r}, inviato {p.get(k)!r}")
+        res["mismatch"] = mis
+        return res
+
+    def case_segment(self, case):
+        """Selezione col clic (SAM2) o col lazo (l'AI seleziona l'oggetto contenuto): la maschera deve coprire l'oggetto INTERO."""
+        w = self.w
+        steps = {}
+
+        def setup():
+            from PySide6.QtCore import QPointF
+            f = w.frame1_tab
+            f.sub.setCurrentIndex(1)
+            cv = f.canvas
+            cv.load_image(case["image"], "canvas")
+            x, y = float(case["point"][0]) * cv.aspect_w, float(case["point"][1]) * cv.aspect_h      # coordinate relative 0..1
+            steps["canvas"] = [int(cv.aspect_w), int(cv.aspect_h)]
+            if case["kind"] == "point":
+                cv.sam_point_at(QPointF(x, y))
+            else:                                                     # lazo: poligono attorno al punto
+                r = float(case.get("radius", 0.2)) * min(cv.aspect_w, cv.aspect_h)
+                cv._lasso_pts = [QPointF(x - r, y - r), QPointF(x + r, y - r), QPointF(x + r, y + r), QPointF(x - r, y + r)]
+                cv.lasso_finish()
+        self.gui(setup, 60)
+        self.wait_job(float(case.get("timeout", 300)))
+        res = {"widget_state": steps}
+        mis = []
+        outs = [f for f in self.rec.finished if f.get("outputs")]
+        if self.dry:
+            res["mismatch"] = []
+            return res
+        if outs:
+            from PIL import Image
+            import numpy as np
+            m = np.asarray(Image.open(outs[-1]["outputs"][0]).convert("L")) > 127
+            pct = 100.0 * m.mean()
+            res["mask_area_pct"] = round(pct, 2)
+            if pct < float(case.get("min_area_pct", 3.0)):
+                mis.append(f"la maschera copre solo il {pct:.1f}% della foto: sembra una macchia, non l'oggetto intero")
+        res["mismatch"] = mis
+        return res
 
     def case_state(self, case):
         """Lettura dei widget indicati (nessuna azione): serve a verificare cosa mostra la GUI."""
