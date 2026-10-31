@@ -3623,5 +3623,7 @@
   "queue.delete": "Supprimer le résultat",
   "queue.delete.q": "Supprimer ces fichiers du disque ?\n{n}",
   "queue.restored": "[liste des tâches] paramètres rétablis depuis : {l}",
-  "queue.restore.unsupported": "Pour ce type de tâche, les paramètres ne peuvent être que consultés (bouton Sidecar)."
+  "queue.restore.unsupported": "Pour ce type de tâche, les paramètres ne peuvent être que consultés (bouton Sidecar).",
+  "progress.elapsed": "Écoulé {t}",
+  "progress.remaining": "restant ~{t}"
 }

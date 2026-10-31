@@ -87,6 +87,10 @@ class GenProgressDialog(QDialog):
         self.cur_bar = QProgressBar(); v.addWidget(self.cur_bar)
         v.addWidget(QLabel(tr("progress.total_progress")))
         self.tot_bar = QProgressBar(); self.tot_bar.setRange(0, 100); v.addWidget(self.tot_bar)
+        # Punto 21: quanto e fatto e quanto manca — tempo trascorso e stima del rimanente (da step/secondo reali).
+        self.time_lbl = QLabel("")
+        self.time_lbl.setStyleSheet("color:#9aa1b0;")
+        v.addWidget(self.time_lbl)
 
         self.preview = QLabel(tr("progress.preview_placeholder"))
         self.preview.setAlignment(Qt.AlignCenter)
@@ -114,6 +118,10 @@ class GenProgressDialog(QDialog):
         self._done_w = 0; self._counted = set(); self._cur = None
         self.cur_bar.setRange(0, 0)        # "busy" finché non arriva un progress
         self.tot_bar.setValue(0)
+        import time as _t
+        self._t_start = _t.time()          # per tempo trascorso / stima (punto 21)
+        self._t_first_step = None
+        self.time_lbl.setText("")
         self._preview_pix = None
         self.preview.setPixmap(QPixmap())
         self.preview.setText(tr("progress.preview_placeholder"))
@@ -151,6 +159,7 @@ class GenProgressDialog(QDialog):
         """Fase corrente del backend nativo (es. 'Caricamento componenti…', 'Generazione…')."""
         if msg:
             self.status_lbl.setText(msg)
+        self._update_time(None)
 
     def on_native_step(self, step: int, total: int):
         """Progresso per il backend NATIVO (immagini/video): step/total REALI del denoising → barra
@@ -160,10 +169,36 @@ class GenProgressDialog(QDialog):
             return
         step = max(0, min(int(step), int(total)))
         self.cur_bar.setRange(0, total); self.cur_bar.setValue(step)
-        pct = int(100 * step / total)
+        # Totale PESATO sulle fasi (punto 21): caricamento/encoding 0-10 %, sampling 10-92 %, decodifica/salvataggio 92-99 %
+        # (prima il totale era la sola percentuale di sampling: a step 1/8 gia il 12 % pur con il caricamento ancora da fare).
+        pct = 10 + int(82 * step / total)
         self.tot_bar.setValue(max(self.tot_bar.value(), min(99, pct)))
+        self._update_time((step, total))
         self.status_lbl.setText(tr("progress.step_sampling") +
                                 tr("progress.step_counter").format(value=step, maximum=total))
+
+    def _update_time(self, st):
+        """«Trascorso mm:ss · rimanente ~mm:ss»: il rimanente solo dopo almeno 2 step (velocita reale del sampling)."""
+        import time as _t
+        t0 = getattr(self, "_t_start", None)
+        if t0 is None:
+            return
+        el = _t.time() - t0
+        txt = tr("progress.elapsed", "Trascorso {t}").format(t=self._fmt(el))
+        if st:
+            step, total = st
+            if getattr(self, "_t_first_step", None) is None and step >= 1:
+                self._t_first_step = (_t.time(), step)
+            fs = getattr(self, "_t_first_step", None)
+            if fs and step - fs[1] >= 1:
+                rate = (_t.time() - fs[0]) / (step - fs[1])
+                txt += "  ·  " + tr("progress.remaining", "rimanente ~{t}").format(t=self._fmt(rate * (total - step) + 3))
+        self.time_lbl.setText(txt)
+
+    @staticmethod
+    def _fmt(sec: float) -> str:
+        sec = int(max(0, sec))
+        return f"{sec // 60}:{sec % 60:02d}"
 
     def resizeEvent(self, event):
         # Mantieni l'anteprima nitida quando l'utente ridimensiona il dialog.

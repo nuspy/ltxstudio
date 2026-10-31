@@ -3623,5 +3623,7 @@
   "queue.delete": "删除结果",
   "queue.delete.q": "从磁盘删除这些文件？\n{n}",
   "queue.restored": "[任务列表] 已从以下任务恢复参数：{l}",
-  "queue.restore.unsupported": "此类任务的参数只能查看（Sidecar 按钮）。"
+  "queue.restore.unsupported": "此类任务的参数只能查看（Sidecar 按钮）。",
+  "progress.elapsed": "已用时 {t}",
+  "progress.remaining": "剩余约 {t}"
 }

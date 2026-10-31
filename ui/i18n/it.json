@@ -3662,5 +3662,7 @@
   "queue.delete": "Cancella risultato",
   "queue.delete.q": "Cancellare dal disco questi file?\n{n}",
   "queue.restored": "[lista lavori] parametri reimpostati da: {l}",
-  "queue.restore.unsupported": "Per questo tipo di lavoro i parametri si possono solo consultare (pulsante Sidecar)."
+  "queue.restore.unsupported": "Per questo tipo di lavoro i parametri si possono solo consultare (pulsante Sidecar).",
+  "progress.elapsed": "Trascorso {t}",
+  "progress.remaining": "rimanente ~{t}"
 }

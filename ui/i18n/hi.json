@@ -3623,5 +3623,7 @@
   "queue.delete": "परिणाम हटाएँ",
   "queue.delete.q": "क्या ये फ़ाइलें डिस्क से हटानी हैं?\n{n}",
   "queue.restored": "[कार्य सूची] पैरामीटर बहाल किए गए: {l}",
-  "queue.restore.unsupported": "इस प्रकार के कार्य के पैरामीटर केवल देखे जा सकते हैं (Sidecar बटन)।"
+  "queue.restore.unsupported": "इस प्रकार के कार्य के पैरामीटर केवल देखे जा सकते हैं (Sidecar बटन)।",
+  "progress.elapsed": "बीता समय {t}",
+  "progress.remaining": "शेष ~{t}"
 }

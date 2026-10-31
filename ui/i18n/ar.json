@@ -3623,5 +3623,7 @@
   "queue.delete": "حذف النتيجة",
   "queue.delete.q": "هل تريد حذف هذه الملفات من القرص؟\n{n}",
   "queue.restored": "[قائمة المهام] تمت استعادة المعاملات من: {l}",
-  "queue.restore.unsupported": "في هذا النوع من المهام يمكن عرض المعاملات فقط (زر Sidecar)."
+  "queue.restore.unsupported": "في هذا النوع من المهام يمكن عرض المعاملات فقط (زر Sidecar).",
+  "progress.elapsed": "المنقضي {t}",
+  "progress.remaining": "المتبقي ~{t}"
 }

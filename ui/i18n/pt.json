@@ -3623,5 +3623,7 @@
   "queue.delete": "Apagar resultado",
   "queue.delete.q": "Apagar estes arquivos do disco?\n{n}",
   "queue.restored": "[lista de trabalhos] parâmetros restaurados de: {l}",
-  "queue.restore.unsupported": "Neste tipo de trabalho os parâmetros só podem ser consultados (botão Sidecar)."
+  "queue.restore.unsupported": "Neste tipo de trabalho os parâmetros só podem ser consultados (botão Sidecar).",
+  "progress.elapsed": "Decorrido {t}",
+  "progress.remaining": "restante ~{t}"
 }

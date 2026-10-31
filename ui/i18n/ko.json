@@ -3623,5 +3623,7 @@
   "queue.delete": "결과 삭제",
   "queue.delete.q": "디스크에서 이 파일들을 삭제할까요?\n{n}",
   "queue.restored": "[작업 목록] 다음에서 매개변수 복원: {l}",
-  "queue.restore.unsupported": "이 작업 유형은 매개변수를 보기만 할 수 있습니다(사이드카 버튼)."
+  "queue.restore.unsupported": "이 작업 유형은 매개변수를 보기만 할 수 있습니다(사이드카 버튼).",
+  "progress.elapsed": "경과 {t}",
+  "progress.remaining": "남은 시간 ~{t}"
 }

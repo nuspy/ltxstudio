@@ -3623,5 +3623,7 @@
   "queue.delete": "Eredmény törlése",
   "queue.delete.q": "Törli ezeket a fájlokat a lemezről?\n{n}",
   "queue.restored": "[feladatlista] paraméterek visszaállítva innen: {l}",
-  "queue.restore.unsupported": "Ennél a feladattípusnál a paraméterek csak megtekinthetők (Sidecar gomb)."
+  "queue.restore.unsupported": "Ennél a feladattípusnál a paraméterek csak megtekinthetők (Sidecar gomb).",
+  "progress.elapsed": "Eltelt {t}",
+  "progress.remaining": "hátra ~{t}"
 }

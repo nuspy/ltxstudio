@@ -3623,5 +3623,7 @@
   "queue.delete": "Ergebnis löschen",
   "queue.delete.q": "Diese Dateien von der Festplatte löschen?\n{n}",
   "queue.restored": "[Jobliste] Parameter wiederhergestellt aus: {l}",
-  "queue.restore.unsupported": "Bei dieser Art von Job können die Parameter nur angesehen werden (Schaltfläche Sidecar)."
+  "queue.restore.unsupported": "Bei dieser Art von Job können die Parameter nur angesehen werden (Schaltfläche Sidecar).",
+  "progress.elapsed": "Verstrichen {t}",
+  "progress.remaining": "verbleibend ~{t}"
 }

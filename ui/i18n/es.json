@@ -3623,5 +3623,7 @@
   "queue.delete": "Borrar resultado",
   "queue.delete.q": "¿Borrar estos archivos del disco?\n{n}",
   "queue.restored": "[lista de trabajos] parámetros restablecidos desde: {l}",
-  "queue.restore.unsupported": "En este tipo de trabajo los parámetros solo se pueden consultar (botón Sidecar)."
+  "queue.restore.unsupported": "En este tipo de trabajo los parámetros solo se pueden consultar (botón Sidecar).",
+  "progress.elapsed": "Transcurrido {t}",
+  "progress.remaining": "restante ~{t}"
 }

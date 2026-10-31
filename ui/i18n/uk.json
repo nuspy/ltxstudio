@@ -3623,5 +3623,7 @@
   "queue.delete": "Видалити результат",
   "queue.delete.q": "Видалити ці файли з диска?\n{n}",
   "queue.restored": "[список завдань] параметри відновлено з: {l}",
-  "queue.restore.unsupported": "Для цього типу завдання параметри можна лише переглянути (кнопка Sidecar)."
+  "queue.restore.unsupported": "Для цього типу завдання параметри можна лише переглянути (кнопка Sidecar).",
+  "progress.elapsed": "Минуло {t}",
+  "progress.remaining": "залишилось ~{t}"
 }
