@@ -2722,7 +2722,8 @@ class Frame1Tab(QWidget):
         if cur >= 0 and view.isRowHidden(cur):
             self.inp_model.blockSignals(True)
             try:
-                self.inp_model.insertItem(0, mm.placeholder_text(), mm.PLACEHOLDER)
+                if self.inp_model.count() == 0 or self.inp_model.itemData(0) != mm.PLACEHOLDER:   # un solo segnaposto (prima se ne accumulavano)
+                    self.inp_model.insertItem(0, mm.placeholder_text(), mm.PLACEHOLDER)
                 self.inp_model.setCurrentIndex(0)
             finally:
                 self.inp_model.blockSignals(False)
