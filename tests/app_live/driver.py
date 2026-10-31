@@ -803,6 +803,11 @@ class Driver:
             steps["widget"] = {"model": widget_value(vt.model), "arch": widget_value(vt.video_arch),
                                "prompt": widget_value(vt.prompt)}
         self.gui(setup, 90)
+        # il bottone «Genera» del tab video e disabilitato finche il job precedente (anche di un altro tab) non e davvero chiuso: un click su
+        # un bottone disabilitato non fa nulla (dry run del 31/10 22:16: video H3 dopo due immagini = «nessuna chiamata»). Si attende, come un utente.
+        _t0 = time.time()
+        while time.time() - _t0 < 90 and not self.gui(lambda: bool(w.gen_btn.isEnabled()), 10):
+            time.sleep(1.0)
         self.gui(lambda: w.gen_btn.click(), 30)
         self.wait_job(float(case.get("timeout", 1800)))
         res = {"widget_state": steps}
