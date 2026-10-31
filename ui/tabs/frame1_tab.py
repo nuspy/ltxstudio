@@ -337,6 +337,13 @@ class Frame1Tab(QWidget):
         self.gen_neg.setPlaceholderText(tr("f1.gen.neg.ph"))
         self.gen_neg.setToolTip(tr("f1.gen.neg.tt", "Prompt negativo: elementi da evitare nell'immagine generata."))
         f.addRow(tr("f1.neg_lbl"), self.gen_neg)
+        # Punto 5: prompt e negativo IN ALTO nel form (subito sotto il contenuto) e con piu righe visibili (4 / 3).
+        self.gen_prompt.setMinimumHeight(92); self.gen_prompt.setMaximumHeight(16777215)
+        self.gen_neg.setMinimumHeight(64); self.gen_neg.setMaximumHeight(16777215)
+        for _w in (_pw, self.gen_neg):
+            _row, _ = f.getWidgetPosition(_w)
+            _tk = f.takeRow(_row)
+            f.insertRow(1 if _w is _pw else 2, _tk.labelItem.widget() if _tk.labelItem else None, _tk.fieldItem.widget())
         # Bottone-azione: NON nel form — vive nel footer ANCORATO in fondo al sotto-tab (sempre
         # visibile anche scorrendo), con lo stile del bottone «Genera Video» (objectName generate).
         self.gen_btn = QPushButton(tr("f1.gen.btn"))
