@@ -947,6 +947,23 @@ def _patch_nunchaku_zimage_rope() -> None:
             return input_args, kw
         tz.NunchakuZImageRopeHook.__call__ = _call
         tz.NunchakuZImageRopeHook._ls_patched = True
+
+        # CAUSA di «argument of type 'int' is not iterable» (giro 31/10 22:22, dopo che l'assert del rotary era passato): nunchaku chiama
+        # super().forward(x, t, cap_feats, patch_size, f_patch_size, return_dict) in modo POSIZIONALE, ma il diffusers installato ha l'ordine
+        # (x, t, cap_feats, return_dict, controlnet_block_samples, siglip_feats, image_noise_mask, patch_size, f_patch_size): patch_size=2 finiva
+        # in return_dict e f_patch_size=1 in controlnet_block_samples (`layer_idx in 1`). Si richiama il forward di diffusers per NOME.
+        _Cls = tz.NunchakuZImageTransformer2DModel
+
+        def _forward(self, x, t, cap_feats, patch_size=2, f_patch_size=1, return_dict=True, **kw):
+            hook = tz.NunchakuZImageRopeHook()
+            self.register_rope_hook(hook)
+            try:
+                return super(_Cls, self).forward(x, t, cap_feats, return_dict=return_dict, patch_size=patch_size,
+                                                 f_patch_size=f_patch_size, **kw)
+            finally:
+                self.unregister_rope_hook()
+                del hook
+        _Cls.forward = _forward
     except Exception as e:                                   # noqa: BLE001
         print(f"[nunchaku-zimage] patch rotary non applicata: {e}", flush=True)
 
