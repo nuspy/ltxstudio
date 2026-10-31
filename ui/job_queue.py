@@ -36,8 +36,44 @@ _STATUS = {
 }
 
 
+_MEDIA = (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm", ".wav", ".mp3", ".glb", ".obj")
+
+
+def _snap(p) -> dict:
+    """Copia dei parametri del worker con soli valori JSON-safe (niente oggetti Qt/tensori)."""
+    if not isinstance(p, dict):
+        return {}
+
+    def ok(v, d=0):
+        if isinstance(v, (str, int, float, bool)) or v is None:
+            return True
+        if d < 3 and isinstance(v, (list, tuple)):
+            return all(ok(x, d + 1) for x in v)
+        if d < 3 and isinstance(v, dict):
+            return all(isinstance(k, str) and ok(x, d + 1) for k, x in v.items())
+        return False
+    return {k: (list(v) if isinstance(v, tuple) else v) for k, v in p.items() if ok(v)}
+
+
+def _media_paths(obj, out=None, depth=0) -> list:
+    import os
+    out = [] if out is None else out
+    if depth > 4:
+        return out
+    if isinstance(obj, str):
+        if obj.lower().endswith(_MEDIA) and os.path.isfile(obj) and obj not in out:
+            out.append(obj)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            _media_paths(v, out, depth + 1)
+    elif isinstance(obj, (list, tuple)):
+        for v in obj:
+            _media_paths(v, out, depth + 1)
+    return out
+
+
 class _Job:
-    __slots__ = ("id", "label", "worker", "on_done", "on_progress", "status", "result")
+    __slots__ = ("id", "label", "worker", "on_done", "on_progress", "status", "result", "params", "outputs")
 
     def __init__(self, jid: int, label: str, worker, on_done, on_progress):
         self.id = jid
@@ -47,6 +83,8 @@ class _Job:
         self.on_progress = on_progress
         self.status = "queued"
         self.result: dict = {}
+        self.params: dict = _snap(getattr(worker, "params", None))     # copia JSON-safe per «reimposta parametri»
+        self.outputs: list = []
 
 
 class GenerationQueue(QObject):
@@ -144,6 +182,12 @@ class GenerationQueue(QObject):
         if job.status != "cancelled":
             job.status = "error" if result.get("status") == "error" else "done"
             job.result = result
+            try:
+                job.outputs = _media_paths(result)
+                if not job.outputs and isinstance(job.params, dict) and job.params.get("output"):
+                    job.outputs = _media_paths(job.params["output"])
+            except Exception:                                # noqa: BLE001
+                job.outputs = []
         if self._running is job:
             self._running = None
             self._release_lock()
@@ -176,6 +220,8 @@ class GenerationQueue(QObject):
 class JobQueuePanel(QWidget):
     """Pannello visibile della coda: lista job con stato + annulla/pulisci."""
 
+    restore_requested = Signal(dict, str)           # (parametri del lavoro, etichetta): la finestra principale li rimette nella GUI
+
     def __init__(self, queue: GenerationQueue, parent=None):
         super().__init__(parent)
         self.q = queue
@@ -194,8 +240,106 @@ class JobQueuePanel(QWidget):
         row.addWidget(self.btn_cancel)
         row.addWidget(self.btn_clear)
         v.addLayout(row)
+        # Lista lavori precedenti (punto 5): visualizza risultato, sidecar, reimposta parametri, rimuovi dalla lista, cancella risultato.
+        row2 = QHBoxLayout()
+        self.btn_view = QPushButton(tr("queue.view", "Visualizza risultato"))
+        self.btn_sidecar = QPushButton(tr("queue.sidecar", "Sidecar"))
+        self.btn_restore = QPushButton(tr("queue.restore", "Reimposta parametri"))
+        self.btn_remove = QPushButton(tr("queue.remove", "Rimuovi dalla lista"))
+        self.btn_delete = QPushButton(tr("queue.delete", "Cancella risultato"))
+        for b, fn in ((self.btn_view, self._view), (self.btn_sidecar, self._sidecar), (self.btn_restore, self._restore),
+                      (self.btn_remove, self._remove), (self.btn_delete, self._delete_result)):
+            b.clicked.connect(fn)
+            row2.addWidget(b)
+        v.addLayout(row2)
         self.q.changed.connect(self.refresh)
         self.refresh()
+
+    # --- azioni sul lavoro selezionato ---
+    def _sel(self):
+        it = self.list.currentItem()
+        if it is None:
+            return None
+        jid = int(it.data(Qt.UserRole))
+        return next((j for j in self.q.jobs() if j.id == jid), None)
+
+    def _view(self) -> None:
+        j = self._sel()
+        if not j or not j.outputs:
+            return
+        import os
+        path = j.outputs[0]
+        if path.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            from PySide6.QtGui import QPixmap
+            from PySide6.QtWidgets import QDialog, QScrollArea
+            dlg = QDialog(self)
+            dlg.setWindowTitle(os.path.basename(path))
+            dlg.setModal(False)
+            lay = QVBoxLayout(dlg)
+            lab = QLabel()
+            pm = QPixmap(path)
+            lab.setPixmap(pm.scaled(960, 960, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            sc = QScrollArea()
+            sc.setWidget(lab)
+            lay.addWidget(sc)
+            dlg.resize(1000, 800)
+            self._dlg = dlg
+            dlg.show()
+        elif path.lower().endswith((".mp4", ".mov", ".webm")):
+            try:
+                from ui.video_player_dialog import VideoPlayerDialog
+                d = VideoPlayerDialog(self)
+                d.play_file(path)
+                d.setModal(False)
+                self._dlg = d
+                d.show()
+            except Exception:                                # noqa: BLE001
+                os.startfile(path)                           # noqa: S606 - ripiego: lettore di sistema
+        else:
+            os.startfile(path)                               # noqa: S606
+
+    def _sidecar(self) -> None:
+        j = self._sel()
+        if not j or not j.outputs:
+            return
+        import json
+        from core.metadata_saver import MetadataSaver
+        sp = MetadataSaver.sidecar_path(j.outputs[0])
+        try:
+            txt = sp.read_text(encoding="utf-8") if sp.exists() else json.dumps(j.params, ensure_ascii=False, indent=2)
+        except Exception as e:                               # noqa: BLE001
+            txt = str(e)
+        from ui.widgets.msg_dialog import show_message
+        show_message(self, tr("queue.sidecar", "Sidecar"), txt, "information")
+
+    def _restore(self) -> None:
+        j = self._sel()
+        if j and j.params:
+            self.restore_requested.emit(dict(j.params), j.label)
+
+    def _remove(self) -> None:
+        j = self._sel()
+        if j and j.status not in ("queued", "running"):
+            self.q._jobs = [x for x in self.q._jobs if x.id != j.id]
+            self.q.changed.emit()
+
+    def _delete_result(self) -> None:
+        j = self._sel()
+        if not j or not j.outputs:
+            return
+        import os
+        from PySide6.QtWidgets import QMessageBox
+        names = "\n".join(os.path.basename(p) for p in j.outputs)
+        if QMessageBox.question(self, tr("queue.delete", "Cancella risultato"),
+                                tr("queue.delete.q", "Cancellare dal disco questi file?\n{n}").format(n=names)) != QMessageBox.Yes:
+            return
+        for pth in j.outputs:
+            try:
+                os.remove(pth)
+            except OSError:
+                pass
+        j.outputs = []
+        self.q.changed.emit()
 
     def _cancel_selected(self) -> None:
         it = self.list.currentItem()

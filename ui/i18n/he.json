@@ -3615,5 +3615,13 @@
   "dl.done_title": "ההורדה הושלמה",
   "dl.done_msg": "המשקלים הורדו: {ids}.\nעכשיו אפשר לחזור על הפעולה.",
   "dl.failed_title": "ההורדה נכשלה",
-  "dl.unknown": "שגיאה לא ידועה"
+  "dl.unknown": "שגיאה לא ידועה",
+  "queue.view": "הצג תוצאה",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "שחזר פרמטרים",
+  "queue.remove": "הסר מהרשימה",
+  "queue.delete": "מחק תוצאה",
+  "queue.delete.q": "למחוק את הקבצים האלה מהדיסק?\n{n}",
+  "queue.restored": "[רשימת משימות] הפרמטרים שוחזרו מ: {l}",
+  "queue.restore.unsupported": "בסוג משימה זה אפשר רק לעיין בפרמטרים (כפתור Sidecar)."
 }

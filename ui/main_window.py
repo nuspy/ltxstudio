@@ -1240,6 +1240,7 @@ class MainWindow(QMainWindow):
         self.queue_dock = QDockWidget(tr("queue.title", "Coda generazioni"), self)
         self.queue_dock.setObjectName("queue_dock")
         self.queue_panel = JobQueuePanel(self.jobs, self.queue_dock)
+        self.queue_panel.restore_requested.connect(self._restore_job_params)
         self.queue_dock.setWidget(self.queue_panel)
         self.queue_dock.setFeatures(QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetMovable
                                     | QDockWidget.DockWidgetFloatable)   # #96.3: chiudibile → si NASCONDE (non elimina)
@@ -1376,6 +1377,99 @@ class MainWindow(QMainWindow):
             tr("lang.changed.title"),
             tr("lang.changed.msg"),
         )
+
+    def _restore_job_params(self, p: dict, label: str = "") -> None:
+        """Lista lavori (punto 5): rimette nella GUI i parametri di un lavoro gia eseguito (Crea immagine o Crea video).
+        Prima dell'esecuzione il lavoro non viene lanciato: l'utente controlla e preme Genera."""
+        from ui.widgets.msg_dialog import show_message
+        f, vt = self.frame1_tab, self.video_tab
+        try:
+            if "num_frames" in p and p.get("prompt") is not None:                       # --- video ---
+                self.tabs.setCurrentWidget(vt)
+                vt.prompt.setPlainText(str(p.get("prompt", "")))
+                vt.res_preset.setCurrentText("Personalizzato")
+                if p.get("width"):
+                    vt.width.setValue(int(p["width"]))
+                if p.get("height"):
+                    vt.height.setValue(int(p["height"]))
+                if p.get("fps"):
+                    vt.fps.setValue(int(p["fps"]))
+                if p.get("num_frames") and p.get("fps"):
+                    vt.length.setValue(round(int(p["num_frames"]) / float(p["fps"]), 1))
+                if hasattr(vt, "sampler_seed") and p.get("seed") is not None:
+                    vt.sampler_seed.fixed_seed.setChecked(True)
+                    vt.sampler_seed.seed.setValue(int(p["seed"]))
+                mdl = p.get("model") or p.get("gguf_transformer")
+                if mdl:
+                    base = os.path.basename(str(mdl)).lower()
+                    for i in range(vt.model.count()):
+                        if base and base in (vt.model.itemText(i) + str(vt.model.itemData(i))).lower():
+                            vt.model.setCurrentIndex(i)
+                            break
+                self._log(tr("queue.restored", "[lista lavori] parametri reimpostati da: {l}").format(l=label))
+                return
+            amap = {"flux": "FLUX", "krea2": "Krea 2", "qwen_image21": "Qwen-Image 2.1", "flux3": "FLUX.3 Klein",
+                    "zimage": "Z-Image", "ernie": "Ernie"}
+            if p.get("arch") in amap and p.get("prompt") is not None:                   # --- immagine (Crea) ---
+                self.tabs.setCurrentWidget(f)
+                f.sub.setCurrentIndex(0)
+                f.gen_arch.setCurrentText(amap[p["arch"]])
+                key = p.get("model") or p.get("krea2_variant") or p.get("qwen21_dit") or p.get("flux3_dit") or ""
+                for i in range(f.gen_model.count()):
+                    d = f.gen_model.itemData(i)
+                    if key and (str(key).lower() in (str(d) + f.gen_model.itemText(i)).lower()):
+                        f.gen_model.setCurrentIndex(i)
+                        break
+                f.gen_prompt.setPlainText(str(p.get("prompt", "")))
+                if p.get("negative") is not None:
+                    f.gen_neg.setPlainText(str(p["negative"]))
+                if p.get("seed") is not None:
+                    f.gen_seed_rand.setChecked(False)
+                    f.gen_seed.setValue(int(p["seed"]))
+                if p.get("steps"):
+                    f.gen_steps.setValue(int(p["steps"]))
+                g = p.get("guidance", p.get("cfg"))
+                if g is not None:
+                    f.gen_cfg.setValue(float(g))
+                if p.get("width"):
+                    vt.width.setValue(int(p["width"]))
+                if p.get("height"):
+                    vt.height.setValue(int(p["height"]))
+                f.gen_lora_tab.refresh()
+                want = {os.path.basename(str(x.get("name", ""))).lower(): float(x.get("strength", 1.0)) for x in (p.get("loras") or []) if isinstance(x, dict)}
+                for r in f.gen_lora_tab._rows.values():
+                    nm = os.path.basename(str(r["entry"].filename or "")).lower()
+                    r["cb"].setChecked(nm in want)
+                    if nm in want:
+                        r["sp"].setValue(want[nm])
+                self._log(tr("queue.restored", "[lista lavori] parametri reimpostati da: {l}").format(l=label))
+                return
+            show_message(self, tr("queue.restore", "Reimposta parametri"),
+                         tr("queue.restore.unsupported", "Per questo tipo di lavoro i parametri si possono solo consultare (pulsante Sidecar)."), "information")
+        except Exception as e:                              # noqa: BLE001
+            show_message(self, tr("queue.restore", "Reimposta parametri"), str(e), "critical")
+
+    def _on_downloads_changed(self):
+        from ui.download_manager import manager as _dlm
+        act = _dlm().active()
+        self._dl_btn.setVisible(bool(act))
+        if act:
+            tot, got = sum(j.total_mb() for j in act), sum(j.got_mb() for j in act)
+            self._dl_btn.setToolTip(tr("dl.tt", "Download in corso: {done}/{total} MB - clic per i dettagli o per annullare (cancel downloads)")
+                                    .format(done=f"{got:,.0f}", total=f"{tot:,.0f}"))
+
+    def _show_downloads(self):
+        from ui.download_manager import downloads_dialog
+        self._dl_dialog = downloads_dialog(self)
+
+    def _on_download_finished(self, info: dict):
+        from ui.widgets.msg_dialog import show_message
+        if info.get("state") == "done":
+            show_message(self, tr("dl.done_title", "Download completato"),
+                         tr("dl.done_msg", "Pesi scaricati: {ids}.\nOra puoi ripetere l'operazione.").format(ids=", ".join(info.get("ids", []))), "information")
+        elif info.get("state") == "failed":
+            why = "; ".join(f"{i}: {w}" for i, w in info.get("failed", [])) or tr("dl.unknown", "errore sconosciuto")
+            show_message(self, tr("dl.failed_title", "Download non riuscito"), why, "critical")
 
     def _toggle_mem_monitor(self):
         """Apri/chiudi la finestra non-modale del monitor memoria (RAM/VRAM/GPU)."""

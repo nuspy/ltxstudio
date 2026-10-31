@@ -3687,5 +3687,13 @@
   "dl.done_title": "Download complete",
   "dl.done_msg": "Weights downloaded: {ids}.\nYou can now repeat the operation.",
   "dl.failed_title": "Download failed",
-  "dl.unknown": "unknown error"
+  "dl.unknown": "unknown error",
+  "queue.view": "View result",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "Restore parameters",
+  "queue.remove": "Remove from list",
+  "queue.delete": "Delete result",
+  "queue.delete.q": "Delete these files from disk?\n{n}",
+  "queue.restored": "[job list] parameters restored from: {l}",
+  "queue.restore.unsupported": "For this kind of job the parameters can only be viewed (Sidecar button)."
 }

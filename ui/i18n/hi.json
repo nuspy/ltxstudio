@@ -3615,5 +3615,13 @@
   "dl.done_title": "डाउनलोड पूरा",
   "dl.done_msg": "वज़न डाउनलोड हो गए: {ids}।\nअब आप ऑपरेशन दोहरा सकते हैं।",
   "dl.failed_title": "डाउनलोड विफल",
-  "dl.unknown": "अज्ञात त्रुटि"
+  "dl.unknown": "अज्ञात त्रुटि",
+  "queue.view": "परिणाम देखें",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "पैरामीटर बहाल करें",
+  "queue.remove": "सूची से हटाएँ",
+  "queue.delete": "परिणाम हटाएँ",
+  "queue.delete.q": "क्या ये फ़ाइलें डिस्क से हटानी हैं?\n{n}",
+  "queue.restored": "[कार्य सूची] पैरामीटर बहाल किए गए: {l}",
+  "queue.restore.unsupported": "इस प्रकार के कार्य के पैरामीटर केवल देखे जा सकते हैं (Sidecar बटन)।"
 }

@@ -3615,5 +3615,13 @@
   "dl.done_title": "Téléchargement terminé",
   "dl.done_msg": "Poids téléchargés : {ids}.\nVous pouvez maintenant répéter l'opération.",
   "dl.failed_title": "Échec du téléchargement",
-  "dl.unknown": "erreur inconnue"
+  "dl.unknown": "erreur inconnue",
+  "queue.view": "Voir le résultat",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "Rétablir les paramètres",
+  "queue.remove": "Retirer de la liste",
+  "queue.delete": "Supprimer le résultat",
+  "queue.delete.q": "Supprimer ces fichiers du disque ?\n{n}",
+  "queue.restored": "[liste des tâches] paramètres rétablis depuis : {l}",
+  "queue.restore.unsupported": "Pour ce type de tâche, les paramètres ne peuvent être que consultés (bouton Sidecar)."
 }

@@ -3615,5 +3615,13 @@
   "dl.done_title": "다운로드 완료",
   "dl.done_msg": "가중치 다운로드 완료: {ids}.\n이제 작업을 다시 실행할 수 있습니다.",
   "dl.failed_title": "다운로드 실패",
-  "dl.unknown": "알 수 없는 오류"
+  "dl.unknown": "알 수 없는 오류",
+  "queue.view": "결과 보기",
+  "queue.sidecar": "사이드카",
+  "queue.restore": "매개변수 복원",
+  "queue.remove": "목록에서 제거",
+  "queue.delete": "결과 삭제",
+  "queue.delete.q": "디스크에서 이 파일들을 삭제할까요?\n{n}",
+  "queue.restored": "[작업 목록] 다음에서 매개변수 복원: {l}",
+  "queue.restore.unsupported": "이 작업 유형은 매개변수를 보기만 할 수 있습니다(사이드카 버튼)."
 }

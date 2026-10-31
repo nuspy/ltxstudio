@@ -3615,5 +3615,13 @@
   "dl.done_title": "Download concluído",
   "dl.done_msg": "Pesos baixados: {ids}.\nAgora você pode repetir a operação.",
   "dl.failed_title": "Falha no download",
-  "dl.unknown": "erro desconhecido"
+  "dl.unknown": "erro desconhecido",
+  "queue.view": "Ver resultado",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "Restaurar parâmetros",
+  "queue.remove": "Remover da lista",
+  "queue.delete": "Apagar resultado",
+  "queue.delete.q": "Apagar estes arquivos do disco?\n{n}",
+  "queue.restored": "[lista de trabalhos] parâmetros restaurados de: {l}",
+  "queue.restore.unsupported": "Neste tipo de trabalho os parâmetros só podem ser consultados (botão Sidecar)."
 }

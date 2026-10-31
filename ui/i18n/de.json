@@ -3615,5 +3615,13 @@
   "dl.done_title": "Download abgeschlossen",
   "dl.done_msg": "Gewichte heruntergeladen: {ids}.\nSie können den Vorgang jetzt wiederholen.",
   "dl.failed_title": "Download fehlgeschlagen",
-  "dl.unknown": "unbekannter Fehler"
+  "dl.unknown": "unbekannter Fehler",
+  "queue.view": "Ergebnis ansehen",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "Parameter wiederherstellen",
+  "queue.remove": "Aus der Liste entfernen",
+  "queue.delete": "Ergebnis löschen",
+  "queue.delete.q": "Diese Dateien von der Festplatte löschen?\n{n}",
+  "queue.restored": "[Jobliste] Parameter wiederhergestellt aus: {l}",
+  "queue.restore.unsupported": "Bei dieser Art von Job können die Parameter nur angesehen werden (Schaltfläche Sidecar)."
 }

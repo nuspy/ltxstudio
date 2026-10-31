@@ -3615,5 +3615,13 @@
   "dl.done_title": "下载完成",
   "dl.done_msg": "权重已下载：{ids}。\n现在可以重复该操作。",
   "dl.failed_title": "下载失败",
-  "dl.unknown": "未知错误"
+  "dl.unknown": "未知错误",
+  "queue.view": "查看结果",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "恢复参数",
+  "queue.remove": "从列表移除",
+  "queue.delete": "删除结果",
+  "queue.delete.q": "从磁盘删除这些文件？\n{n}",
+  "queue.restored": "[任务列表] 已从以下任务恢复参数：{l}",
+  "queue.restore.unsupported": "此类任务的参数只能查看（Sidecar 按钮）。"
 }

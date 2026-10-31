@@ -3615,5 +3615,13 @@
   "dl.done_title": "اكتمل التنزيل",
   "dl.done_msg": "تم تنزيل الأوزان: {ids}.\nيمكنك الآن تكرار العملية.",
   "dl.failed_title": "فشل التنزيل",
-  "dl.unknown": "خطأ غير معروف"
+  "dl.unknown": "خطأ غير معروف",
+  "queue.view": "عرض النتيجة",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "استعادة المعاملات",
+  "queue.remove": "إزالة من القائمة",
+  "queue.delete": "حذف النتيجة",
+  "queue.delete.q": "هل تريد حذف هذه الملفات من القرص؟\n{n}",
+  "queue.restored": "[قائمة المهام] تمت استعادة المعاملات من: {l}",
+  "queue.restore.unsupported": "في هذا النوع من المهام يمكن عرض المعاملات فقط (زر Sidecar)."
 }

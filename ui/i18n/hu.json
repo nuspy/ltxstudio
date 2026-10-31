@@ -3615,5 +3615,13 @@
   "dl.done_title": "A letöltés kész",
   "dl.done_msg": "Letöltött súlyok: {ids}.\nMost megismételheti a műveletet.",
   "dl.failed_title": "A letöltés sikertelen",
-  "dl.unknown": "ismeretlen hiba"
+  "dl.unknown": "ismeretlen hiba",
+  "queue.view": "Eredmény megtekintése",
+  "queue.sidecar": "Sidecar",
+  "queue.restore": "Paraméterek visszaállítása",
+  "queue.remove": "Eltávolítás a listából",
+  "queue.delete": "Eredmény törlése",
+  "queue.delete.q": "Törli ezeket a fájlokat a lemezről?\n{n}",
+  "queue.restored": "[feladatlista] paraméterek visszaállítva innen: {l}",
+  "queue.restore.unsupported": "Ennél a feladattípusnál a paraméterek csak megtekinthetők (Sidecar gomb)."
 }
