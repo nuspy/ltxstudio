@@ -3634,5 +3634,22 @@
   "mw.compose_bad_ref": "O prompt cita {t}, mas a lista tem {n} fotos.",
   "vid.gguf.warn": "⚠ {gb} GB residentes na VRAM: pode não caber em alta resolução/duração",
   "lora.info.page": "Página",
-  "lora.page.btn": "Abrir a página da LoRA"
+  "lora.page.btn": "Abrir a página da LoRA",
+  "imp2.page.btn": "Importar da página…",
+  "imp2.page.tt": "Você já baixou o arquivo: indique a página do modelo e o app reconstrói arquitetura, triggers, descrição e imagem.",
+  "imp2.page.title": "Importar da página",
+  "imp2.page.url_lbl": "Página do modelo",
+  "imp2.page.file_lbl": "Arquivo",
+  "imp2.page.file_pick": "Escolha o arquivo baixado…",
+  "imp2.page.working": "\n🔗 Reconstruindo os dados de {f} a partir da página…",
+  "imp2.page.ok": "✓ Dados reconstruídos a partir da página (triggers: {t}).",
+  "imp2.page.err": "[warn] Página não lida ({e}): a análise do arquivo permanece.",
+  "imp2.key.btn": "Chave de API do Civitai (guia)…",
+  "imp2.key.title": "Chave de API do Civitai",
+  "imp2.key.steps": "1) Entre no Civitai (assinatura ou permissões de conteúdo adulto você gerencia no site: o app não paga nada).\n2) Abra as configurações da conta → «API Keys» → «Add API key», dê um nome e copie.\n3) Cole abaixo: fica só no seu PC (preferências do app) e nunca vai para os logs.",
+  "imp2.key.open": "Abrir as configurações da conta",
+  "imp2.key.field": "Cole aqui a chave de API",
+  "imp2.key.save": "Verificar e salvar",
+  "imp2.key.bad": "Chave não aceita ({c}). Verifique se copiou por inteiro.",
+  "imp2.key.ok": "Chave verificada e salva."
 }

@@ -3634,5 +3634,22 @@
   "mw.compose_bad_ref": "프롬프트가 {t}을(를) 참조하지만 목록에는 사진이 {n}장입니다.",
   "vid.gguf.warn": "⚠ VRAM 상주 {gb} GB: 고해상도/긴 길이에서는 들어가지 않을 수 있음",
   "lora.info.page": "페이지",
-  "lora.page.btn": "LoRA 페이지 열기"
+  "lora.page.btn": "LoRA 페이지 열기",
+  "imp2.page.btn": "페이지에서 가져오기…",
+  "imp2.page.tt": "파일을 이미 받았다면 모델 페이지를 알려 주세요. 앱이 아키텍처, 트리거, 설명, 이미지를 복원합니다.",
+  "imp2.page.title": "페이지에서 가져오기",
+  "imp2.page.url_lbl": "모델 페이지",
+  "imp2.page.file_lbl": "파일",
+  "imp2.page.file_pick": "받은 파일 선택…",
+  "imp2.page.working": "\n🔗 페이지에서 {f}의 데이터를 복원하는 중…",
+  "imp2.page.ok": "✓ 페이지에서 데이터를 복원했습니다(트리거: {t}).",
+  "imp2.page.err": "[warn] 페이지를 읽지 못했습니다({e}): 파일 분석은 유지됩니다.",
+  "imp2.key.btn": "Civitai API 키(안내)…",
+  "imp2.key.title": "Civitai API 키",
+  "imp2.key.steps": "1) Civitai에 로그인하세요(구독이나 성인 콘텐츠 권한은 사이트에서 직접 관리하며 앱은 결제하지 않습니다).\n2) 계정 설정 → “API Keys” → “Add API key”에서 이름을 정하고 복사하세요.\n3) 아래에 붙여넣기: 키는 PC(앱 환경설정)에만 저장되며 로그에 남지 않습니다.",
+  "imp2.key.open": "계정 설정 열기",
+  "imp2.key.field": "여기에 API 키 붙여넣기",
+  "imp2.key.save": "확인 후 저장",
+  "imp2.key.bad": "키가 거부되었습니다({c}). 전체를 복사했는지 확인하세요.",
+  "imp2.key.ok": "키를 확인하고 저장했습니다."
 }

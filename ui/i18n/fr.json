@@ -3634,5 +3634,22 @@
   "mw.compose_bad_ref": "Le prompt cite {t}, mais la liste contient {n} photos.",
   "vid.gguf.warn": "⚠ {gb} Go résidents en VRAM : peut ne pas tenir en haute résolution/durée",
   "lora.info.page": "Page",
-  "lora.page.btn": "Ouvrir la page de la LoRA"
+  "lora.page.btn": "Ouvrir la page de la LoRA",
+  "imp2.page.btn": "Importer depuis la page…",
+  "imp2.page.tt": "Fichier déjà téléchargé : indiquez la page du modèle et l'app reconstitue architecture, triggers, description et image.",
+  "imp2.page.title": "Importer depuis la page",
+  "imp2.page.url_lbl": "Page du modèle",
+  "imp2.page.file_lbl": "Fichier",
+  "imp2.page.file_pick": "Choisir le fichier téléchargé…",
+  "imp2.page.working": "\n🔗 Reconstitution des données de {f} depuis la page…",
+  "imp2.page.ok": "✓ Données reconstituées depuis la page (triggers : {t}).",
+  "imp2.page.err": "[warn] Page non lue ({e}) : l'analyse du fichier reste valable.",
+  "imp2.key.btn": "Clé API Civitai (guide)…",
+  "imp2.key.title": "Clé API Civitai",
+  "imp2.key.steps": "1) Connectez-vous à Civitai (abonnement ou droits pour contenus matures : vous les gérez sur le site, l'app ne paie rien).\n2) Ouvrez les réglages du compte → « API Keys » → « Add API key », nommez-la et copiez-la.\n3) Collez-la ci-dessous : elle reste sur votre PC (préférences de l'app) et n'apparaît jamais dans les logs.",
+  "imp2.key.open": "Ouvrir les réglages du compte",
+  "imp2.key.field": "Collez ici la clé API",
+  "imp2.key.save": "Vérifier et enregistrer",
+  "imp2.key.bad": "Clé refusée ({c}). Vérifiez qu'elle est copiée en entier.",
+  "imp2.key.ok": "Clé vérifiée et enregistrée."
 }

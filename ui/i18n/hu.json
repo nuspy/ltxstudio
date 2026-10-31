@@ -3634,5 +3634,22 @@
   "mw.compose_bad_ref": "A prompt {t}-ra hivatkozik, de a listában {n} fotó van.",
   "vid.gguf.warn": "⚠ {gb} GB állandóan a VRAM-ban: nagy felbontásnál/hossznál nem biztos, hogy elfér",
   "lora.info.page": "Oldal",
-  "lora.page.btn": "A LoRA oldalának megnyitása"
+  "lora.page.btn": "A LoRA oldalának megnyitása",
+  "imp2.page.btn": "Importálás oldalról…",
+  "imp2.page.tt": "A fájlt már letöltötte: adja meg a modell oldalát, az alkalmazás rekonstruálja az architektúrát, a triggereket, a leírást és a képet.",
+  "imp2.page.title": "Importálás oldalról",
+  "imp2.page.url_lbl": "Modell oldala",
+  "imp2.page.file_lbl": "Fájl",
+  "imp2.page.file_pick": "Válassza ki a letöltött fájlt…",
+  "imp2.page.working": "\n🔗 {f} adatainak rekonstruálása az oldalról…",
+  "imp2.page.ok": "✓ Adatok rekonstruálva az oldalról (triggerek: {t}).",
+  "imp2.page.err": "[warn] Az oldal nem olvasható ({e}): a fájlelemzés megmarad.",
+  "imp2.key.btn": "Civitai API-kulcs (útmutató)…",
+  "imp2.key.title": "Civitai API-kulcs",
+  "imp2.key.steps": "1) Jelentkezzen be a Civitai-ra (az előfizetést és a felnőtt tartalom jogosultságát Ön kezeli az oldalon: az alkalmazás nem fizet semmit).\n2) Nyissa meg a fiókbeállításokat → «API Keys» → «Add API key», nevezze el és másolja ki.\n3) Illessze be alább: csak az Ön gépén marad (alkalmazás-beállítások), naplóba soha nem kerül.",
+  "imp2.key.open": "Fiókbeállítások megnyitása",
+  "imp2.key.field": "Illessze be ide az API-kulcsot",
+  "imp2.key.save": "Ellenőrzés és mentés",
+  "imp2.key.bad": "A kulcsot nem fogadta el ({c}). Ellenőrizze, hogy teljesen kimásolta-e.",
+  "imp2.key.ok": "A kulcs ellenőrizve és mentve."
 }

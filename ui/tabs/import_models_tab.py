@@ -11,6 +11,7 @@ base a ComfyUI ma lascerà la decisione all'utente.
 """
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 from threading import Thread
@@ -129,6 +130,43 @@ class _ResolveWorker(QThread):
             self.resolved.emit(model_importer.resolve_civitai(self._ref))
         except Exception as e:                               # noqa: BLE001
             self.failed.emit(str(e))
+
+
+class _PageImportWorker(QThread):
+    """File locale + pagina del modello (civitai.com/.red/.green): arch dall'header (regola: mai da metadata), trigger/anteprima/NSFW
+    dalla pagina. Se la pagina non risponde l'analisi del file resta valida."""
+    item_ready = Signal(object)
+    note = Signal(str)
+
+    def __init__(self, path: str, page: str):
+        super().__init__()
+        self._path, self._page = path, page
+
+    def run(self):
+        try:
+            item = model_importer.analyze(self._path, fetch_civitai=True)
+        except Exception as e:                               # noqa: BLE001
+            item = model_importer.ImportItem(path=self._path, note=f"errore analisi: {e}")
+        if self._page:
+            try:
+                info = model_importer.resolve_civitai(self._page)
+                item.triggers = item.triggers or list(info.get("triggers") or [])
+                item.preview_url = item.preview_url or info.get("preview_url")
+                if item.type in ("", "Unknown"):
+                    item.type = model_importer._CIVITAI_TYPE_MAP.get(info.get("type"), info.get("type") or "Unknown")
+                if item.family in ("", "Unknown"):
+                    item.family = model_importer._CIVITAI_BASEMODEL_MAP.get(info.get("base_model"), "Unknown")
+                if info.get("nsfw"):
+                    item.nsfw, item.nsfw_source = True, info.get("nsfw_source", "civitai")
+                item.civitai = {"page": self._page, "version": info.get("version")}
+                item.note = (item.note + " " if item.note else "") + f"pagina: {self._page}"
+                item.dest_subfolder = model_importer._dest_subfolder(item.type, item.family)
+                self.note.emit(tr("imp2.page.ok", "✓ Dati ricostruiti dalla pagina (trigger: {t}).").format(t=", ".join(item.triggers[:6]) or "—"))
+            except Exception as e:                           # noqa: BLE001
+                code = getattr(e, "code", None)
+                self.note.emit(tr("imp2.page.err", "[warn] Pagina non letta ({e}): resta l'analisi del file.").format(
+                    e=("HTTP %s — se serve, usa «Chiave API Civitai (guida)…»" % code) if code else e))
+        self.item_ready.emit(item)
 
 
 class _SearchWorker(QThread):
@@ -380,6 +418,18 @@ class ImportModelsTab(QWidget):
         urow.addWidget(self.url_edit, 1)
         urow.addWidget(b_url)
         v.addLayout(urow)
+        # Punto 10 (approvato dall'utente 31/10): A) «Importa da pagina»: il file lo scarichi tu, indichi la pagina (civitai.com/.red/.green)
+        # e l'app ricostruisce arch (dall'header), trigger, descrizione, immagine; B) procedura guidata per la chiave API (solo user_prefs).
+        prow = QHBoxLayout()
+        b_page = QPushButton(tr("imp2.page.btn", "Importa da pagina…"))
+        b_page.setToolTip(tr("imp2.page.tt", "Hai già scaricato il file: indica la pagina del modello e l'app ricostruisce architettura, trigger, descrizione e immagine."))
+        b_page.clicked.connect(self._import_from_page)
+        b_key = QPushButton(tr("imp2.key.btn", "Chiave API Civitai (guida)…"))
+        b_key.clicked.connect(self._key_wizard)
+        prow.addWidget(b_page)
+        prow.addWidget(b_key)
+        prow.addStretch(1)
+        v.addLayout(prow)
 
         self.imp_drop = _DropArea()
         self.imp_drop.files_dropped.connect(self._analyze_and_queue)

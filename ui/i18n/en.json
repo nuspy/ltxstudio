@@ -3706,5 +3706,22 @@
   "mw.compose_bad_ref": "The prompt cites {t}, but the list has {n} photos.",
   "vid.gguf.warn": "⚠ {gb} GB resident in VRAM: may not fit at high resolution/duration",
   "lora.info.page": "Page",
-  "lora.page.btn": "Open the LoRA page"
+  "lora.page.btn": "Open the LoRA page",
+  "imp2.page.btn": "Import from page…",
+  "imp2.page.tt": "You already downloaded the file: give the model page and the app rebuilds architecture, triggers, description and image.",
+  "imp2.page.title": "Import from page",
+  "imp2.page.url_lbl": "Model page",
+  "imp2.page.file_lbl": "File",
+  "imp2.page.file_pick": "Choose the downloaded file…",
+  "imp2.page.working": "\n🔗 Rebuilding the data of {f} from the page…",
+  "imp2.page.ok": "✓ Data rebuilt from the page (triggers: {t}).",
+  "imp2.page.err": "[warn] Page not read ({e}): the file analysis stays.",
+  "imp2.key.btn": "Civitai API key (guide)…",
+  "imp2.key.title": "Civitai API key",
+  "imp2.key.steps": "1) Sign in to Civitai (any subscription or mature-content permission is yours to manage on the site: the app pays nothing).\n2) Open your account settings → “API Keys” → “Add API key”, name it and copy it.\n3) Paste it below: it stays only on your PC (app preferences) and never reaches the logs.",
+  "imp2.key.open": "Open the account settings",
+  "imp2.key.field": "Paste the API key here",
+  "imp2.key.save": "Verify and save",
+  "imp2.key.bad": "Key not accepted ({c}). Check that you copied it completely.",
+  "imp2.key.ok": "Key verified and saved."
 }

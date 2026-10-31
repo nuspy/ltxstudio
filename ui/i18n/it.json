@@ -3673,5 +3673,22 @@
   "mw.compose_bad_ref": "Il prompt cita {t}, ma nella lista ci sono {n} foto.",
   "vid.gguf.warn": "⚠ {gb} GB residenti in VRAM: a risoluzione/durata alte può non entrare",
   "lora.info.page": "Pagina",
-  "lora.page.btn": "Apri la pagina della LoRA"
+  "lora.page.btn": "Apri la pagina della LoRA",
+  "imp2.page.btn": "Importa da pagina…",
+  "imp2.page.tt": "Hai già scaricato il file: indica la pagina del modello e l'app ricostruisce architettura, trigger, descrizione e immagine.",
+  "imp2.page.title": "Importa da pagina",
+  "imp2.page.url_lbl": "Pagina del modello",
+  "imp2.page.file_lbl": "File",
+  "imp2.page.file_pick": "Scegli il file scaricato…",
+  "imp2.page.working": "\n🔗 Ricostruisco i dati di {f} dalla pagina…",
+  "imp2.page.ok": "✓ Dati ricostruiti dalla pagina (trigger: {t}).",
+  "imp2.page.err": "[warn] Pagina non letta ({e}): resta l'analisi del file.",
+  "imp2.key.btn": "Chiave API Civitai (guida)…",
+  "imp2.key.title": "Chiave API Civitai",
+  "imp2.key.steps": "1) Accedi a Civitai (anche l'abbonamento o i permessi per i contenuti maturi li gestisci tu, sul sito: l'app non paga nulla).\n2) Apri le impostazioni dell'account → «API Keys» → «Add API key», dai un nome e copiala.\n3) Incollala qui sotto: resta solo sul tuo PC (preferenze dell'app), non finisce mai nei log.",
+  "imp2.key.open": "Apri le impostazioni dell'account",
+  "imp2.key.field": "Incolla qui la chiave API",
+  "imp2.key.save": "Verifica e salva",
+  "imp2.key.bad": "Chiave non accettata ({c}). Controlla di averla copiata per intero.",
+  "imp2.key.ok": "Chiave verificata e salvata."
 }

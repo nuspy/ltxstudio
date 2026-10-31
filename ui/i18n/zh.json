@@ -3634,5 +3634,22 @@
   "mw.compose_bad_ref": "提示词引用了 {t}，但列表中只有 {n} 张照片。",
   "vid.gguf.warn": "⚠ 常驻显存 {gb} GB：高分辨率/长时长下可能放不下",
   "lora.info.page": "页面",
-  "lora.page.btn": "打开 LoRA 页面"
+  "lora.page.btn": "打开 LoRA 页面",
+  "imp2.page.btn": "从页面导入…",
+  "imp2.page.tt": "您已下载文件：提供模型页面，应用会重建架构、触发词、描述和图片。",
+  "imp2.page.title": "从页面导入",
+  "imp2.page.url_lbl": "模型页面",
+  "imp2.page.file_lbl": "文件",
+  "imp2.page.file_pick": "选择已下载的文件…",
+  "imp2.page.working": "\n🔗 正在从页面重建 {f} 的数据…",
+  "imp2.page.ok": "✓ 已从页面重建数据（触发词：{t}）。",
+  "imp2.page.err": "[warn] 未能读取页面（{e}）：保留文件分析结果。",
+  "imp2.key.btn": "Civitai API 密钥（向导）…",
+  "imp2.key.title": "Civitai API 密钥",
+  "imp2.key.steps": "1) 登录 Civitai（订阅或成人内容权限请在网站上自行管理：应用不会支付任何费用）。\n2) 打开账户设置 → “API Keys” → “Add API key”，命名并复制。\n3) 粘贴到下方：仅保存在您的电脑（应用偏好设置）中，绝不会写入日志。",
+  "imp2.key.open": "打开账户设置",
+  "imp2.key.field": "在此粘贴 API 密钥",
+  "imp2.key.save": "验证并保存",
+  "imp2.key.bad": "密钥未被接受（{c}）。请确认已完整复制。",
+  "imp2.key.ok": "密钥已验证并保存。"
 }

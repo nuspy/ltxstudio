@@ -3634,5 +3634,22 @@
   "mw.compose_bad_ref": "Der Prompt nennt {t}, aber die Liste enthält {n} Fotos.",
   "vid.gguf.warn": "⚠ {gb} GB dauerhaft im VRAM: passt bei hoher Auflösung/Dauer evtl. nicht",
   "lora.info.page": "Seite",
-  "lora.page.btn": "LoRA-Seite öffnen"
+  "lora.page.btn": "LoRA-Seite öffnen",
+  "imp2.page.btn": "Von Seite importieren…",
+  "imp2.page.tt": "Datei schon heruntergeladen: Modellseite angeben, die App rekonstruiert Architektur, Trigger, Beschreibung und Bild.",
+  "imp2.page.title": "Von Seite importieren",
+  "imp2.page.url_lbl": "Modellseite",
+  "imp2.page.file_lbl": "Datei",
+  "imp2.page.file_pick": "Heruntergeladene Datei wählen…",
+  "imp2.page.working": "\n🔗 Rekonstruiere die Daten von {f} von der Seite…",
+  "imp2.page.ok": "✓ Daten von der Seite rekonstruiert (Trigger: {t}).",
+  "imp2.page.err": "[warn] Seite nicht gelesen ({e}): die Dateianalyse bleibt.",
+  "imp2.key.btn": "Civitai-API-Schlüssel (Anleitung)…",
+  "imp2.key.title": "Civitai-API-Schlüssel",
+  "imp2.key.steps": "1) Bei Civitai anmelden (Abo und Rechte für nicht jugendfreie Inhalte verwalten Sie selbst auf der Website: die App zahlt nichts).\n2) Kontoeinstellungen öffnen → „API Keys“ → „Add API key“, benennen und kopieren.\n3) Unten einfügen: bleibt nur auf Ihrem PC (App-Einstellungen), landet nie in Logs.",
+  "imp2.key.open": "Kontoeinstellungen öffnen",
+  "imp2.key.field": "API-Schlüssel hier einfügen",
+  "imp2.key.save": "Prüfen und speichern",
+  "imp2.key.bad": "Schlüssel nicht akzeptiert ({c}). Prüfen Sie, ob er vollständig kopiert wurde.",
+  "imp2.key.ok": "Schlüssel geprüft und gespeichert."
 }
