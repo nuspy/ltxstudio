@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "此类任务的参数只能查看（Sidecar 按钮）。",
   "progress.elapsed": "已用时 {t}",
   "progress.remaining": "剩余约 {t}",
-  "canvas.status_lasso_ai": "套索：AI 正在选择区域内的对象…"
+  "canvas.status_lasso_ai": "套索：AI 正在选择区域内的对象…",
+  "f1.compose.auto": "自动",
+  "f1.compose.steps.tt": "扩散步数。“自动”＝引擎推荐值（FLUX.2 Klein 蒸馏版 12，Kontext 28）。",
+  "f1.compose.guidance.tt": "对提示词的遵循度。“自动”＝引擎推荐值。",
+  "f1.compose.guidance_lbl": "引导强度",
+  "mw.compose_bad_ref": "提示词引用了 {t}，但列表中只有 {n} 张照片。"
 }

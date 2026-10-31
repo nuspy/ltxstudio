@@ -3698,5 +3698,10 @@
   "queue.restore.unsupported": "For this kind of job the parameters can only be viewed (Sidecar button).",
   "progress.elapsed": "Elapsed {t}",
   "progress.remaining": "remaining ~{t}",
-  "canvas.status_lasso_ai": "Lasso: the AI selects the object inside the area…"
+  "canvas.status_lasso_ai": "Lasso: the AI selects the object inside the area…",
+  "f1.compose.auto": "auto",
+  "f1.compose.steps.tt": "Diffusion steps. “auto” = the engine's recommended value (distilled FLUX.2 Klein 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Prompt adherence. “auto” = the engine's recommended value.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "The prompt cites {t}, but the list has {n} photos."
 }

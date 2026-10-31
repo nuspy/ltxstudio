@@ -1879,7 +1879,36 @@ class Frame1Tab(QWidget):
         self.compose_prompt = QPlainTextEdit(); self.compose_prompt.setMaximumHeight(48)
         self.compose_prompt.setPlaceholderText(tr("f1.compose.prompt.ph"))
         self.compose_prompt.setToolTip(tr("f1.compose.prompt.tt", "Descrivi la scena finale che combina i soggetti delle foto elencate."))
+        self.compose_prompt.setMinimumHeight(72); self.compose_prompt.setMaximumHeight(16777215)
         cg.addWidget(self.compose_prompt)
+        # Punto 23: «@» nel prompt di Componi = elenco con miniatura e nome (come in Crea): image_1.. = ordine della lista.
+        from ui.widgets import ref_prompt as _rp
+        self._compose_prompt_refs = _rp.install(
+            self.compose_prompt,
+            lambda: {("image", k + 1) for k in range(self.compose_list.count())},
+            lambda: self._compose_completion_entries())
+        self.compose_list.model().rowsInserted.connect(lambda *_: self._compose_prompt_refs.highlighter.rehighlight())
+        self.compose_list.model().rowsRemoved.connect(lambda *_: self._compose_prompt_refs.highlighter.rehighlight())
+        # Punto 24: parametri che DEFINISCONO il risultato e prima non erano in GUI (seed casuale a ogni giro, passi/guidance fissi).
+        _crow = QHBoxLayout()
+        self.compose_seed_rand = QCheckBox(tr("f1.seed_rand")); self.compose_seed_rand.setChecked(True)
+        self.compose_seed = QSpinBox(); self.compose_seed.setRange(0, 2_147_483_647); self.compose_seed.setValue(0)
+        self.compose_seed.setEnabled(False)
+        self.compose_seed_rand.toggled.connect(lambda on: self.compose_seed.setEnabled(not on))
+        self.compose_steps = QSpinBox(); self.compose_steps.setRange(0, 80); self.compose_steps.setValue(0)
+        self.compose_steps.setSpecialValueText(tr("f1.compose.auto", "auto"))
+        self.compose_steps.setToolTip(tr("f1.compose.steps.tt", "Passi di diffusione. «auto» = quelli consigliati dal motore (FLUX.2 Klein distillato 12, Kontext 28)."))
+        self.compose_guidance = QDoubleSpinBox(); self.compose_guidance.setRange(0.0, 10.0); self.compose_guidance.setSingleStep(0.5)
+        self.compose_guidance.setValue(0.0)
+        self.compose_guidance.setSpecialValueText(tr("f1.compose.auto", "auto"))
+        self.compose_guidance.setToolTip(tr("f1.compose.guidance.tt", "Aderenza al prompt. «auto» = valore consigliato dal motore."))
+        for _lbl, _w in ((tr("f1.seed_lbl"), self.compose_seed), ("", self.compose_seed_rand),
+                         (tr("f1.steps_lbl"), self.compose_steps), (tr("f1.compose.guidance_lbl", "Guidance"), self.compose_guidance)):
+            if _lbl:
+                _crow.addWidget(QLabel(_lbl))
+            _crow.addWidget(_w)
+        _cw = QWidget(); _cw.setLayout(_crow)
+        cg.addWidget(_cw)
         b_comp = QPushButton(tr("f1.compose.btn"))
         b_comp.setObjectName("generate")                      # stile bottone-azione (come Genera Video)
         b_comp.setToolTip(tr("f1.compose.run.tt", "Componi le foto elencate in un'unica immagine coerente."))
@@ -2869,9 +2898,22 @@ class Frame1Tab(QWidget):
             self._compose_masks[key] = f
             it.setText(key + "  🎭")
 
+    def _compose_completion_entries(self) -> list:
+        from PySide6.QtGui import QIcon, QPixmap
+        out = []
+        for i in range(self.compose_list.count()):
+            path = self.compose_list.item(i).text().split("  🎭")[0]
+            pm = QPixmap(path)
+            out.append({"kind": "image", "n": i + 1, "label": os.path.basename(path),
+                        "icon": QIcon(pm.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)) if not pm.isNull() else None})
+        return out
+
     def get_compose_config(self) -> dict:
         imgs = [self.compose_list.item(i).text().split("  🎭")[0] for i in range(self.compose_list.count())]
         return {
+            "seed": None if self.compose_seed_rand.isChecked() else int(self.compose_seed.value()),
+            "steps": int(self.compose_steps.value()) or None,
+            "guidance": float(self.compose_guidance.value()) or None,
             "images": imgs,
             "masks": dict(getattr(self, "_compose_masks", {})),
             "method": "stitch" if self.compose_method.currentIndex() == 1 else "multiref",

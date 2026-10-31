@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "Ennél a feladattípusnál a paraméterek csak megtekinthetők (Sidecar gomb).",
   "progress.elapsed": "Eltelt {t}",
   "progress.remaining": "hátra ~{t}",
-  "canvas.status_lasso_ai": "Lasszó: az MI kijelöli a területen belüli tárgyat…"
+  "canvas.status_lasso_ai": "Lasszó: az MI kijelöli a területen belüli tárgyat…",
+  "f1.compose.auto": "auto",
+  "f1.compose.steps.tt": "Diffúziós lépések. «auto» = a motor ajánlott értéke (FLUX.2 Klein desztillált 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Promptkövetés. «auto» = a motor ajánlott értéke.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "A prompt {t}-ra hivatkozik, de a listában {n} fotó van."
 }

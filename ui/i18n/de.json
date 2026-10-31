@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "Bei dieser Art von Job können die Parameter nur angesehen werden (Schaltfläche Sidecar).",
   "progress.elapsed": "Verstrichen {t}",
   "progress.remaining": "verbleibend ~{t}",
-  "canvas.status_lasso_ai": "Lasso: Die KI wählt das Objekt im Bereich aus…"
+  "canvas.status_lasso_ai": "Lasso: Die KI wählt das Objekt im Bereich aus…",
+  "f1.compose.auto": "auto",
+  "f1.compose.steps.tt": "Diffusionsschritte. „auto“ = vom Modell empfohlener Wert (FLUX.2 Klein destilliert 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Prompt-Treue. „auto“ = vom Modell empfohlener Wert.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "Der Prompt nennt {t}, aber die Liste enthält {n} Fotos."
 }

@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "Для цього типу завдання параметри можна лише переглянути (кнопка Sidecar).",
   "progress.elapsed": "Минуло {t}",
   "progress.remaining": "залишилось ~{t}",
-  "canvas.status_lasso_ai": "Ласо: ШІ виділяє об'єкт у межах області…"
+  "canvas.status_lasso_ai": "Ласо: ШІ виділяє об'єкт у межах області…",
+  "f1.compose.auto": "авто",
+  "f1.compose.steps.tt": "Кроки дифузії. «авто» = рекомендоване значення рушія (FLUX.2 Klein дистильований 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Відповідність промпту. «авто» = рекомендоване значення рушія.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "У промпті вказано {t}, але в списку {n} фото."
 }

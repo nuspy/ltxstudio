@@ -2945,23 +2945,37 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, tr("f1.compose.group"), tr("mw.compose_need_two_msg")); return
         engine = cfg.get("engine", "kontext")
         model = cfg.get("model")
+        # Punto 23: @image_N nel prompt = la N-esima foto della lista; token inesistente = errore; poi traduzione nella sintassi del motore.
+        from core import image_refs as _R
+        _raw = cfg.get("prompt") or ""
+        _bad = _R.unknown_tokens(_raw, {("image", k + 1) for k in range(len(imgs))})
+        if _bad:
+            QMessageBox.warning(self, tr("f1.compose.group"),
+                                tr("mw.compose_bad_ref", "Il prompt cita {t}, ma nella lista ci sono {n} foto.").format(
+                                    t=", ".join(sorted({_R.token_of(t.kind, t.n) for t in _bad})), n=len(imgs)))
+            return
+        _style = {"qwen_image21": "qwen21", "flux3": "flux3", "krea2": "krea2_edit", "flux2": "flux2_klein"}.get(engine)
+        _order = {"image": list(range(1, len(imgs) + 1))}
+        cfg["prompt"] = _R.translate(_raw, _order, _style) if _style else _raw
+        _seed = cfg.get("seed") if cfg.get("seed") is not None else random.randint(0, 2**31)
+        _steps, _guid = cfg.get("steps"), cfg.get("guidance")
         if engine == "qwen_image21":                      # Qwen: fino a 10 riferimenti VERI («image 1…10»)
             self._inpaint_before = None
             self._start_native_qwen21_edit(cfg.get("qwen21_dit"), cfg.get("prompt") or "",
-                                           refs=imgs, mode="composizione",
+                                           refs=imgs, mode="composizione", seed=_seed, steps=_steps, guidance=_guid,
                                            label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"),
                                            enhance=self.frame1_tab.get_inpaint_config().get("enhance", False))
             return
         if engine == "flux3":                             # FLUX.3: fino a 10 riferimenti VERI («the first image»…)
             self._inpaint_before = None
             self._start_native_flux3_edit(cfg.get("flux3_dit"), cfg.get("prompt") or "", refs=imgs,
-                                          boxes=None, pup=cfg.get("flux3_pup", True), mode="composizione")
+                                          boxes=None, pup=cfg.get("flux3_pup", True), mode="composizione", seed=_seed, steps=_steps)
             return
         if engine == "krea2":                             # Krea 2 Edit → multi-reference VERO (scena+soggetto,
             # 2 latenti separati ai frame RoPE 1/2 — non lo stitch di FLUX.1). Il modello ne gestisce max 2.
             self._start_native_krea2_edit(imgs[:2], cfg.get("prompt", ""), "",
                                           cfg.get("grounding", 768), cfg.get("variant", "turbo"),
-                                          random.randint(0, 2**31),
+                                          _seed,
                                           label=tr("queue.job.krea2edit", "Krea 2 Edit"))
             return
         if engine == "flux2" and not model:
@@ -2973,7 +2987,7 @@ class MainWindow(QMainWindow):
         from core import backend as _bk
         if engine == "flux2" and _bk.is_native("image"):      # FLUX.2 Klein: multi-riferimento VERO (task 9)
             srcs = [self.kontext.prep_masked(f, masks[f], OUTPUT_DIR) if f in masks else f for f in imgs]
-            self._start_native_klein_multiref(srcs, cfg.get("prompt") or "", model)
+            self._start_native_klein_multiref(srcs, cfg.get("prompt") or "", model, seed=_seed, steps=_steps, guidance=_guid)
             return
         # ── BACKEND NATIVO (FLUX.1 Kontext): affianca le foto (pre-mascherate) in un unico
         #    riferimento (stitch lato Python) → Kontext nativo. Il multi-reference VERO (N latenti
@@ -2997,8 +3011,9 @@ class MainWindow(QMainWindow):
                 self._inpaint_before = None
                 self._start_native_kontext({"image": cpath}, model,
                     cfg.get("prompt") or "combine these reference images into one coherent scene",
-                    "", 20, random.randint(0, 2**31),
-                    self.frame1_tab.get_inpaint_config().get("integrate_guidance", 2.5))   # guidance di Integra (Kontext)
+                    "", _steps or 28, _seed,
+                    _guid or self.frame1_tab.get_inpaint_config().get("integrate_guidance", 2.5),   # guidance di Integra (Kontext)
+                    target_wh=self._canvas_output_size())      # punto 25: misura del CANVAS
                 return
             except Exception as e:                       # noqa: BLE001
                 self._log(f"[compose nativo] fallback ComfyUI: {e}")
@@ -4697,7 +4712,7 @@ class MainWindow(QMainWindow):
         self._enqueue(tr("queue.job.inpaint", "Inpaint/Outpaint"), self._native_worker,
                       self._on_native_inpaint_done)
 
-    def _start_native_kontext(self, exp, model, prompt, negative, steps, seed, guidance, pulid=None):
+    def _start_native_kontext(self, exp, model, prompt, negative, steps, seed, guidance, pulid=None, target_wh=None):
         """Kontext/integra via backend NATIVO (FluxKontextPipeline) — niente ComfyUI.
         Il composito (scena+oggetto) è il riferimento; il modello rigenera/armonizza."""
         import os
@@ -4765,6 +4780,8 @@ class MainWindow(QMainWindow):
                 params.update({k: pulid[k] for k in ("pulid_face", "pulid_strength",
                                                       "pulid_start_step", "pulid_true_cfg") if k in pulid})
                 self._log("Integra Kontext + PuLID (identità volto) attivo")
+            if target_wh:                                     # Componi (punto 25): uscita alla misura del canvas, non a quella dello stitch
+                params["width"], params["height"] = int(target_wh["width"]), int(target_wh["height"])
             self._log(f"Integra Kontext (backend NATIVO) inviato (steps={steps}, seed={seed})…")
         self._inpaint_mode = "integrazione"
         self._native_worker = _NativeImageWorker(params)
@@ -5044,7 +5061,7 @@ class MainWindow(QMainWindow):
         self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
         self._enqueue(tr("queue.job.integrate", "Image to Image (Kontext)"), self._native_worker, self._on_native_inpaint_done)
 
-    def _start_native_klein_multiref(self, imgs, prompt, model):
+    def _start_native_klein_multiref(self, imgs, prompt, model, seed=None, steps=None, guidance=None):
         """Componi con FLUX.2 Klein: le N foto sono N riferimenti VERI (latenti separati con id di posizione propri,
         in-context), non uno stitch. Misura = quella del canvas. Passi/guidance: i default del modello (image_flux)."""
         from core import image_refs as R
@@ -5053,12 +5070,15 @@ class MainWindow(QMainWindow):
         if not self._ensure_native_ready():
             return
         mp = model if os.path.isabs(model) else os.path.join(r"E:\AI\Models\diffusion_models", model)
-        v = self.video_tab.get_values()
-        self._clamp_resolution(v)
+        v = self._canvas_output_size()                  # punto 25: la misura è quella del CANVAS (non del tab Video)
         refs = [p for p in imgs if p][:R.MODEL_SYNTAX["flux2_klein"]["max_images"]]
         params = {"arch": "flux2_kontext", "model": mp, "prompt": prompt or "combine the reference images into one coherent scene",
                   "image_path": refs[0], "ref_images": refs, "gen_from_refs": True,
-                  "width": int(v["width"]), "height": int(v["height"]), "seed": random.randint(0, 2**31)}
+                  "width": int(v["width"]), "height": int(v["height"]),
+                  "seed": seed if seed is not None else random.randint(0, 2**31),
+                  "steps": int(steps or 12)}           # Klein e distillato: 12 passi (con 28 la foto resta quasi invariata)
+        if guidance:
+            params["guidance"] = float(guidance)
         self._inpaint_mode = "composizione"
         self._inpaint_bbox = None
         self._inpaint_before = None

@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "בסוג משימה זה אפשר רק לעיין בפרמטרים (כפתור Sidecar).",
   "progress.elapsed": "חלף {t}",
   "progress.remaining": "נותר ~{t}",
-  "canvas.status_lasso_ai": "לאסו: ה-AI בוחר את האובייקט בתוך האזור…"
+  "canvas.status_lasso_ai": "לאסו: ה-AI בוחר את האובייקט בתוך האזור…",
+  "f1.compose.auto": "אוטומטי",
+  "f1.compose.steps.tt": "צעדי דיפוזיה. «אוטומטי» = הערך המומלץ של המנוע (FLUX.2 Klein מזוקק 12, Kontext 28).",
+  "f1.compose.guidance.tt": "היצמדות להנחיה. «אוטומטי» = הערך המומלץ של המנוע.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "ההנחיה מפנה אל {t}, אך ברשימה יש {n} תמונות."
 }

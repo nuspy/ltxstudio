@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "Για αυτό το είδος εργασίας οι παράμετροι μπορούν μόνο να προβληθούν (κουμπί Sidecar).",
   "progress.elapsed": "Πέρασαν {t}",
   "progress.remaining": "απομένουν ~{t}",
-  "canvas.status_lasso_ai": "Λάσο: η AI επιλέγει το αντικείμενο μέσα στην περιοχή…"
+  "canvas.status_lasso_ai": "Λάσο: η AI επιλέγει το αντικείμενο μέσα στην περιοχή…",
+  "f1.compose.auto": "αυτόματο",
+  "f1.compose.steps.tt": "Βήματα διάχυσης. «auto» = η προτεινόμενη τιμή της μηχανής (FLUX.2 Klein απόσταξης 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Τήρηση του prompt. «auto» = η προτεινόμενη τιμή της μηχανής.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "Το prompt αναφέρει {t}, αλλά η λίστα έχει {n} φωτογραφίες."
 }

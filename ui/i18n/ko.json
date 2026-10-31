@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "이 작업 유형은 매개변수를 보기만 할 수 있습니다(사이드카 버튼).",
   "progress.elapsed": "경과 {t}",
   "progress.remaining": "남은 시간 ~{t}",
-  "canvas.status_lasso_ai": "올가미: AI가 영역 안의 객체를 선택하는 중…"
+  "canvas.status_lasso_ai": "올가미: AI가 영역 안의 객체를 선택하는 중…",
+  "f1.compose.auto": "자동",
+  "f1.compose.steps.tt": "확산 단계 수. '자동' = 엔진 권장값(FLUX.2 Klein 증류 12, Kontext 28).",
+  "f1.compose.guidance.tt": "프롬프트 준수도. '자동' = 엔진 권장값.",
+  "f1.compose.guidance_lbl": "가이던스",
+  "mw.compose_bad_ref": "프롬프트가 {t}을(를) 참조하지만 목록에는 사진이 {n}장입니다."
 }

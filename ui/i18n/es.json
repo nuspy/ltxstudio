@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "En este tipo de trabajo los parámetros solo se pueden consultar (botón Sidecar).",
   "progress.elapsed": "Transcurrido {t}",
   "progress.remaining": "restante ~{t}",
-  "canvas.status_lasso_ai": "Lazo: la IA selecciona el objeto dentro del área…"
+  "canvas.status_lasso_ai": "Lazo: la IA selecciona el objeto dentro del área…",
+  "f1.compose.auto": "auto",
+  "f1.compose.steps.tt": "Pasos de difusión. «auto» = el valor recomendado por el motor (FLUX.2 Klein destilado 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Adherencia al prompt. «auto» = valor recomendado por el motor.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "El prompt cita {t}, pero la lista tiene {n} fotos."
 }

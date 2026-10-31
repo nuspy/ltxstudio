@@ -3626,5 +3626,10 @@
   "queue.restore.unsupported": "Pour ce type de tâche, les paramètres ne peuvent être que consultés (bouton Sidecar).",
   "progress.elapsed": "Écoulé {t}",
   "progress.remaining": "restant ~{t}",
-  "canvas.status_lasso_ai": "Lasso : l'IA sélectionne l'objet dans la zone…"
+  "canvas.status_lasso_ai": "Lasso : l'IA sélectionne l'objet dans la zone…",
+  "f1.compose.auto": "auto",
+  "f1.compose.steps.tt": "Pas de diffusion. « auto » = valeur recommandée par le moteur (FLUX.2 Klein distillé 12, Kontext 28).",
+  "f1.compose.guidance.tt": "Adhérence au prompt. « auto » = valeur recommandée par le moteur.",
+  "f1.compose.guidance_lbl": "Guidance",
+  "mw.compose_bad_ref": "Le prompt cite {t}, mais la liste contient {n} photos."
 }
