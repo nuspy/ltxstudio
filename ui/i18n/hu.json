@@ -3625,5 +3625,6 @@
   "queue.restored": "[feladatlista] paraméterek visszaállítva innen: {l}",
   "queue.restore.unsupported": "Ennél a feladattípusnál a paraméterek csak megtekinthetők (Sidecar gomb).",
   "progress.elapsed": "Eltelt {t}",
-  "progress.remaining": "hátra ~{t}"
+  "progress.remaining": "hátra ~{t}",
+  "canvas.status_lasso_ai": "Lasszó: az MI kijelöli a területen belüli tárgyat…"
 }

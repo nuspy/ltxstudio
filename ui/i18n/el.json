@@ -3625,5 +3625,6 @@
   "queue.restored": "[λίστα εργασιών] επαναφέρθηκαν παράμετροι από: {l}",
   "queue.restore.unsupported": "Για αυτό το είδος εργασίας οι παράμετροι μπορούν μόνο να προβληθούν (κουμπί Sidecar).",
   "progress.elapsed": "Πέρασαν {t}",
-  "progress.remaining": "απομένουν ~{t}"
+  "progress.remaining": "απομένουν ~{t}",
+  "canvas.status_lasso_ai": "Λάσο: η AI επιλέγει το αντικείμενο μέσα στην περιοχή…"
 }

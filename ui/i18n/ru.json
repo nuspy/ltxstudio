@@ -3625,5 +3625,6 @@
   "queue.restored": "[список задач] параметры восстановлены из: {l}",
   "queue.restore.unsupported": "Для этого типа задачи параметры можно только просмотреть (кнопка Sidecar).",
   "progress.elapsed": "Прошло {t}",
-  "progress.remaining": "осталось ~{t}"
+  "progress.remaining": "осталось ~{t}",
+  "canvas.status_lasso_ai": "Лассо: ИИ выделяет объект внутри области…"
 }

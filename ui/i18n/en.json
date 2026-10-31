@@ -3697,5 +3697,6 @@
   "queue.restored": "[job list] parameters restored from: {l}",
   "queue.restore.unsupported": "For this kind of job the parameters can only be viewed (Sidecar button).",
   "progress.elapsed": "Elapsed {t}",
-  "progress.remaining": "remaining ~{t}"
+  "progress.remaining": "remaining ~{t}",
+  "canvas.status_lasso_ai": "Lasso: the AI selects the object inside the area…"
 }

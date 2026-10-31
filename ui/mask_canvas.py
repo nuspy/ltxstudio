@@ -497,6 +497,18 @@ class MaskCanvas(QWidget):
 
     def lasso_finish(self):
         from PySide6.QtGui import QPolygonF
+        if len(self._lasso_pts) >= 3 and getattr(self, "lasso_ai", True):
+            # Punto 22: il LAZO non disegna piu il poligono grezzo: l'oggetto CONTENUTO nell'area lo seleziona l'AI
+            # (SAM2 con il riquadro del lazo come prompt). Senza SAM (errore) il lazo resta il poligono (ripiego sotto).
+            xs = [pt.x() for pt in self._lasso_pts]
+            ys = [pt.y() for pt in self._lasso_pts]
+            self._lasso_fallback = list(self._lasso_pts)
+            self._clear_seg_marker()
+            self._seg_region = ("box", QRectF(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)))
+            self.status.setText(tr("canvas.status_lasso_ai", "Lazo: l'AI seleziona l'oggetto nell'area…"))
+            self._lasso_reset()
+            self.request_segment_region.emit()
+            return
         if len(self._lasso_pts) >= 3:
             self.push_undo()
             p = QPainter(self.mask_image)
@@ -505,6 +517,18 @@ class MaskCanvas(QWidget):
             self._refresh_mask()
             self.status.setText(tr("canvas.status_lasso_applied"))
         self._lasso_reset()
+
+    def apply_lasso_fallback(self) -> None:
+        """Se la selezione AI del lazo non e riuscita: si applica il poligono disegnato (comportamento di prima)."""
+        pts = getattr(self, "_lasso_fallback", None)
+        if pts and len(pts) >= 3:
+            from PySide6.QtGui import QPolygonF
+            self.push_undo()
+            p = QPainter(self.mask_image)
+            p.setBrush(QColor(255, 40, 40, 150)); p.setPen(Qt.NoPen)
+            p.drawPolygon(QPolygonF(pts)); p.end()
+            self._refresh_mask()
+        self._lasso_fallback = None
 
     def _draw_lasso(self):
         from PySide6.QtGui import QPolygonF, QPainterPath
@@ -592,7 +616,10 @@ class MaskCanvas(QWidget):
             p.drawRect(self._seg_region[1])
         p.end()
         mpath = out_dir / "seg_region.png"; mask.save(str(mpath))
-        return {"image": image, "mask": str(mpath), "hint": "center-1"}
+        out = {"image": image, "mask": str(mpath), "hint": "center-1", "kind": kind}
+        if kind == "point":                                   # coordinate nello spazio del composito (= quello inviato a SAM)
+            out["point"] = [float(self._seg_region[1].x()), float(self._seg_region[1].y())]
+        return out
 
     def load_mask_result(self, path: str):
         """Carica una maschera (bianco=selezione) generata da SAM nel layer maschera, modificabile."""

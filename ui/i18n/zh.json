@@ -3625,5 +3625,6 @@
   "queue.restored": "[任务列表] 已从以下任务恢复参数：{l}",
   "queue.restore.unsupported": "此类任务的参数只能查看（Sidecar 按钮）。",
   "progress.elapsed": "已用时 {t}",
-  "progress.remaining": "剩余约 {t}"
+  "progress.remaining": "剩余约 {t}",
+  "canvas.status_lasso_ai": "套索：AI 正在选择区域内的对象…"
 }

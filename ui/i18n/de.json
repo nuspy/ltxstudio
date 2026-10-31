@@ -3625,5 +3625,6 @@
   "queue.restored": "[Jobliste] Parameter wiederhergestellt aus: {l}",
   "queue.restore.unsupported": "Bei dieser Art von Job können die Parameter nur angesehen werden (Schaltfläche Sidecar).",
   "progress.elapsed": "Verstrichen {t}",
-  "progress.remaining": "verbleibend ~{t}"
+  "progress.remaining": "verbleibend ~{t}",
+  "canvas.status_lasso_ai": "Lasso: Die KI wählt das Objekt im Bereich aus…"
 }

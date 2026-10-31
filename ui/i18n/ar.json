@@ -3625,5 +3625,6 @@
   "queue.restored": "[قائمة المهام] تمت استعادة المعاملات من: {l}",
   "queue.restore.unsupported": "في هذا النوع من المهام يمكن عرض المعاملات فقط (زر Sidecar).",
   "progress.elapsed": "المنقضي {t}",
-  "progress.remaining": "المتبقي ~{t}"
+  "progress.remaining": "المتبقي ~{t}",
+  "canvas.status_lasso_ai": "المخطاف: يحدد الذكاء الاصطناعي الكائن داخل المنطقة…"
 }

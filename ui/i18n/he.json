@@ -3625,5 +3625,6 @@
   "queue.restored": "[רשימת משימות] הפרמטרים שוחזרו מ: {l}",
   "queue.restore.unsupported": "בסוג משימה זה אפשר רק לעיין בפרמטרים (כפתור Sidecar).",
   "progress.elapsed": "חלף {t}",
-  "progress.remaining": "נותר ~{t}"
+  "progress.remaining": "נותר ~{t}",
+  "canvas.status_lasso_ai": "לאסו: ה-AI בוחר את האובייקט בתוך האזור…"
 }

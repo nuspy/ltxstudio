@@ -3625,5 +3625,6 @@
   "queue.restored": "[작업 목록] 다음에서 매개변수 복원: {l}",
   "queue.restore.unsupported": "이 작업 유형은 매개변수를 보기만 할 수 있습니다(사이드카 버튼).",
   "progress.elapsed": "경과 {t}",
-  "progress.remaining": "남은 시간 ~{t}"
+  "progress.remaining": "남은 시간 ~{t}",
+  "canvas.status_lasso_ai": "올가미: AI가 영역 안의 객체를 선택하는 중…"
 }

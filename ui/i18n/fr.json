@@ -3625,5 +3625,6 @@
   "queue.restored": "[liste des tâches] paramètres rétablis depuis : {l}",
   "queue.restore.unsupported": "Pour ce type de tâche, les paramètres ne peuvent être que consultés (bouton Sidecar).",
   "progress.elapsed": "Écoulé {t}",
-  "progress.remaining": "restant ~{t}"
+  "progress.remaining": "restant ~{t}",
+  "canvas.status_lasso_ai": "Lasso : l'IA sélectionne l'objet dans la zone…"
 }

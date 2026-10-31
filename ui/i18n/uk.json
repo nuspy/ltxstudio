@@ -3625,5 +3625,6 @@
   "queue.restored": "[список завдань] параметри відновлено з: {l}",
   "queue.restore.unsupported": "Для цього типу завдання параметри можна лише переглянути (кнопка Sidecar).",
   "progress.elapsed": "Минуло {t}",
-  "progress.remaining": "залишилось ~{t}"
+  "progress.remaining": "залишилось ~{t}",
+  "canvas.status_lasso_ai": "Ласо: ШІ виділяє об'єкт у межах області…"
 }

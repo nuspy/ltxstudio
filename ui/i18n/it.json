@@ -3664,5 +3664,6 @@
   "queue.restored": "[lista lavori] parametri reimpostati da: {l}",
   "queue.restore.unsupported": "Per questo tipo di lavoro i parametri si possono solo consultare (pulsante Sidecar).",
   "progress.elapsed": "Trascorso {t}",
-  "progress.remaining": "rimanente ~{t}"
+  "progress.remaining": "rimanente ~{t}",
+  "canvas.status_lasso_ai": "Lazo: l'AI seleziona l'oggetto nell'area…"
 }

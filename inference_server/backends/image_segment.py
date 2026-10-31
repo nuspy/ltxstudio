@@ -85,6 +85,33 @@ def run(params: dict, mm, output_dir: str) -> dict:
     img = Image.open(params["image_path"]).convert("RGB")
 
     # MODALITÀ REGIONE (selezione magnetica da box/click): bbox dalla region mask → SAM2, no GroundingDINO
+    if params.get("region_point") and sproc is not None and smodel is not None:
+        # CLIC = l'AI identifica e seleziona l'OGGETTO INTERO (punto 22): SAM2 con point prompt, multimask:
+        # fra le 3 maschere (parte / sotto-oggetto / oggetto) si prende la PIU GRANDE fra quelle con IoU stimato
+        # vicino al migliore (>= 0,8 x best), cosi non resta la «macchia» di colore sotto il clic.
+        px, py = (float(v) for v in params["region_point"][:2])
+        sin = sproc(images=img, input_points=[[[[px, py]]]], input_labels=[[[1]]], return_tensors="pt").to(dev)
+        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=dev == "cuda"):
+            sout = smodel(**sin, multimask_output=True)
+        masks = sproc.post_process_masks(sout.pred_masks.cpu(), sin["original_sizes"].cpu())[0]
+        arr = (masks > 0)
+        while arr.ndim > 3:                                   # (n_punti, n_mask, H, W) -> (n_mask, H, W)
+            arr = arr[0]
+        sc = sout.iou_scores.cpu().float().reshape(-1)[-arr.shape[0]:]
+        # Prova su CPU (31/10): per un clic sull'«occhio» di un oggetto SAM2 da [parte 0,985 | oggetto 0,06 | oggetto 0,07]: gli iou
+        # stimati non indicano l'oggetto intero. Regola: fra le maschere che non invadono lo sfondo (<= 60 % della foto) si prende la PIU GRANDE.
+        areas = [int(arr[i].sum()) for i in range(arr.shape[0])]
+        lim = 0.6 * arr.shape[-1] * arr.shape[-2]
+        cands = [i for i in range(arr.shape[0]) if 0 < areas[i] <= lim]
+        pick = max(cands, key=lambda i: areas[i]) if cands else int(sc.argmax())
+        m_np = arr[pick].numpy().astype("uint8") * 255
+        os.makedirs(output_dir, exist_ok=True)
+        path = str(Path(output_dir) / "native_segmask_point.png")
+        _mout = Image.fromarray(m_np)
+        if _mout.size != img.size:
+            _mout = _mout.resize(img.size, Image.NEAREST)
+        _mout.save(path)
+        return {"status": "success", "output": [path]}
     if params.get("region_mask"):
         rm = np.array(Image.open(params["region_mask"]).convert("L"))
         ys, xs = np.where(rm > 127)

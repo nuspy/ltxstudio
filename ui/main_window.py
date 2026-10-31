@@ -5463,7 +5463,7 @@ class MainWindow(QMainWindow):
         if backend.is_native("segment"):
             try:
                 exp = self.frame1_tab.canvas.export_region_mask(OUTPUT_DIR)
-                return self._segment_native(region_mask=exp["mask"], image_path=exp["image"])
+                return self._segment_native(region_mask=exp["mask"], image_path=exp["image"], region_point=exp.get("point"))
             except Exception as e:                          # noqa: BLE001
                 QMessageBox.critical(self, tr("mw.selection_error_title"), str(e)); return
         if not self._sam_models:
@@ -5509,7 +5509,7 @@ class MainWindow(QMainWindow):
                       self._on_multitalk_done)
 
     def _segment_native(self, *, text: str = "", threshold: float = 0.30,
-                        region_mask: str = "", image_path: str = "", use_sam: bool = True):
+                        region_mask: str = "", image_path: str = "", use_sam: bool = True, region_point=None):
         """Segmentazione NATIVA (GroundingDINO+SAM2 via inference_server, handler 'segment'). Zero ComfyUI.
         Per testo: usa il composite locale; per regione: usa image/region mask locali (no upload)."""
         # PROPORZIONI: per la selezione a TESTO usa la foto SORGENTE reale (alle sue dimensioni native),
@@ -5521,6 +5521,8 @@ class MainWindow(QMainWindow):
         params = {"image_path": img}
         if region_mask:
             params["region_mask"] = region_mask
+            if region_point:                                  # clic: SAM2 con point prompt = oggetto intero (punto 22)
+                params["region_point"] = [float(region_point[0]), float(region_point[1])]
             self._log(tr("mw.segment_native_region", "[nativo] selezione magnetica…"))
         else:
             params["text"] = text
@@ -5535,9 +5537,14 @@ class MainWindow(QMainWindow):
     def _on_segment_native_done(self, res: dict):
         if res.get("status") != "success":
             self._log(f"[nativo] segment errore: {str(res.get('error', ''))[:200]}")
+            try:
+                self.frame1_tab.canvas.apply_lasso_fallback()
+            except Exception:                                # noqa: BLE001
+                pass
             QMessageBox.critical(self, tr("mw.selection_error_title"), str(res.get("error", ""))[:600]); return
         mask = (res.get("output") or [None])[0]
         if mask and os.path.exists(mask):
+            self.frame1_tab.canvas._lasso_fallback = None
             self.frame1_tab.canvas.load_mask_result(mask)
             self._log(tr("mw.segment_native_applied", "Selezione applicata alla maschera (modificabile)."))
 
