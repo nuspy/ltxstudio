@@ -211,6 +211,20 @@ def load_vae(W: dict):
     return vae.to("cuda").eval()
 
 
+def _drop_module_weights(m) -> None:
+    """Libera DAVVERO i pesi di un modulo anche se qualche riferimento Python lo tiene ancora vivo: parametri e buffer diventano vuoti."""
+    import torch
+    freed = 0
+    for t in list(m.parameters(recurse=True)) + list(m.buffers(recurse=True)):
+        try:
+            if t.is_cuda:
+                freed += t.numel() * t.element_size()
+            t.data = torch.empty(0, dtype=t.dtype, device=t.device)
+        except Exception:                                            # noqa: BLE001
+            pass
+    _log(f"{type(m).__name__}: pesi liberati ({freed / 2**30:.2f} GB su GPU)")
+
+
 def load_audio_vae(W: dict):
     import torch
     from accelerate import init_empty_weights
@@ -481,7 +495,14 @@ def run(p: dict) -> str:
             comps["audio_vae"] = load_audio_vae(W)
         st = _stage(blocks, g_venc, comps)
         state = st(state=state, **_inputs_for(st, kw))
+        _enc_modules = list(comps.values())
         del st, comps
+        # Il VAE fp32 (9,7 GB) restava vivo in VRAM durante il denoise: lo teneva ancora qualcosa dentro `blocks`/`state` (il `del` non basta;
+        # per il TE funziona, per il VAE no). Giro 31/10 22:27, 10Eros int8: dump «per RADICE» = AutoencoderKLMiniMaxH3 9,70 GB fp32 -> OOM.
+        # Si svuotano i pesi sul posto: la VRAM torna libera comunque, e al decode il VAE viene ricaricato da load_vae.
+        for _m in _enc_modules:
+            _drop_module_weights(_m)
+        del _enc_modules
         _gc()
         _log(f"condizionamenti VAE in {time.time() - t0:.0f}s")
 
@@ -505,6 +526,10 @@ def run(p: dict) -> str:
          f"(stimate {plan0['act_gb']:.1f}) su {plan0['tokens'] // 1000}k token")
     if getattr(tr, "_veda_state", None) is not None:
         _log(f"Veda: {tr._veda_state.summary()}")
+    # Il DiT NON viene davvero liberato dal solo `del` (giro 31/10 22:27, 10Eros int8 al decode: 12,6 GB di int8 + 9 GB di fp32 dei blocchi ancora
+    # vivi in VRAM — i blocchi risultano radici orfane nel dump — piu il VAE fp32 da 9,7 GB caricato per il decode = OOM). Si svuotano i pesi
+    # sul posto prima di caricare il VAE: la VRAM torna libera anche se qualcosa (h3_chunk/offload/Veda) tiene ancora un riferimento.
+    _drop_module_weights(tr)
     del st, tr
     _gc()
 
