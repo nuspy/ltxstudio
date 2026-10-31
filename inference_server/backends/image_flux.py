@@ -2049,6 +2049,19 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
         kw["width"], kw["height"] = _W, _H
         if (_W, _H) != (_iw, _ih):                           # allinea l'immagine alla griglia /16 + cap
             kw["image"] = kw["image"].resize((_W, _H), Image.LANCZOS)
+        # FLUX.2 Klein MULTI-RIFERIMENTO (Componi): le N foto sono N riferimenti in-context (Flux2KleinPipeline accetta una
+        # LISTA di immagini: latenti separati con id di posizione propri), NON uno stitch. Misura = quella richiesta (canvas),
+        # non quella della prima foto. (Patch 01_image_flux_klein_multiref perduta: riscritta il 31/10.)
+        if arch == "flux2_kontext" and params.get("gen_from_refs"):
+            _rl = [r for r in (params.get("ref_images") or []) if r and Path(str(r)).exists()]
+            if _rl:
+                if params.get("width") and params.get("height"):
+                    _W = max(256, int(params["width"]) // 16 * 16)
+                    _H = max(256, int(params["height"]) // 16 * 16)
+                    kw["width"], kw["height"] = _W, _H
+                _imgs = [Image.open(str(r)).convert("RGB") for r in _rl]
+                kw["image"] = _imgs if len(_imgs) > 1 else _imgs[0]
+                print(f"[image] Klein multi-riferimento: {len(_imgs)} immagini → {_W}×{_H}", flush=True)
         if arch in _MASK_ARCHS:
             mk = params.get("mask_path")
             if not mk or not Path(mk).exists():
