@@ -183,6 +183,13 @@ def main():
         if proc.poll() is None and not a.keep_app:
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
         applog.close()
+    try:                                                     # l'app di test scrive le preferenze (es. video_arch) nel worktree: ripristino la copia pulita
+        shutil.copy2(os.path.join(MAIN_ROOT, "data", "user_prefs.json"), os.path.join(ROOT, "data", "user_prefs.json"))
+        gs = os.path.join(ROOT, "data", "gui_state.json")
+        if os.path.exists(gs):
+            os.remove(gs)
+    except Exception:                                        # noqa: BLE001
+        pass
     ok = sum(1 for r in results if r.get("esito") == "ok")
     say(f"FINE: {ok}/{len(results)} ok; risultati in {res_path}")
     json.dump({"nome": spec.get("nome"), "modo": mode, "dry": a.dry, "risultati": len(results), "ok": ok},
