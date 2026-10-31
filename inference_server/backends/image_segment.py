@@ -131,19 +131,46 @@ def run(params: dict, mm, output_dir: str) -> dict:
                 arr = (masks > 0)
                 while arr.ndim > 3:
                     arr = arr[0]
+                # 2ª fonte di candidati (giro 31/10 22:29: col solo BOX SAM2 dava tre maschere da 1,8/3,1/1,8 % — nessuna era l'astronauta cerchiato):
+                # punti positivi in una griglia DENTRO l'area del lazo, un oggetto per punto, 3 maschere ciascuno; il centro dell'area e sempre incluso.
+                try:
+                    ph, pw = rm.shape[:2]
+                    gy, gx = np.where(rm > 127)
+                    cx, cy = float(gx.mean()), float(gy.mean())
+                    pts = [(cx, cy)]
+                    for fy in (0.2, 0.4, 0.6, 0.8):
+                        for fx in (0.2, 0.4, 0.6, 0.8):
+                            x = box[0] + fx * (box[2] - box[0])
+                            y = box[1] + fy * (box[3] - box[1])
+                            if rm[min(ph - 1, int(y)), min(pw - 1, int(x))] > 127:
+                                pts.append((x, y))
+                    pin = sproc(images=img, input_points=[[[[float(x), float(y)]] for x, y in pts]],
+                                input_labels=[[[1] for _ in pts]], return_tensors="pt").to(dev)
+                    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=dev == "cuda"):
+                        pout = smodel(**pin, multimask_output=True)
+                    pm = sproc.post_process_masks(pout.pred_masks.cpu(), pin["original_sizes"].cpu())[0] > 0   # (n_punti, 3, H, W)
+                    pm = pm.reshape(-1, pm.shape[-2], pm.shape[-1])
+                    if pm.shape[-2:] == arr.shape[-2:]:
+                        arr = torch.cat([arr, pm], dim=0)
+                except Exception as _e:                              # noqa: BLE001
+                    print(f"[segment] lazo: punti nell'area non usati ({_e})", flush=True)
                 areas = [int(arr[i].sum()) for i in range(arr.shape[0])]
                 lim = 0.6 * arr.shape[-1] * arr.shape[-2]
                 cands = [i for i in range(arr.shape[0]) if 0 < areas[i] <= lim]
                 if cands:
                     lasso = torch.from_numpy(np.array(Image.fromarray(((rm > 127).astype("uint8")) * 255).resize(
                         (arr.shape[-1], arr.shape[-2]), Image.NEAREST)) > 127)
+                    ccx = min(arr.shape[-1] - 1, int(cx * arr.shape[-1] / rm.shape[1])) if "cx" in dir() else None
+                    ccy = min(arr.shape[-2] - 1, int(cy * arr.shape[-2] / rm.shape[0])) if "cy" in dir() else None
 
                     def _iou(i):
                         inter = int((arr[i] & lasso).sum())
                         return inter / max(1, areas[i] + int(lasso.sum()) - inter)
-                    best = max(cands, key=_iou)
-                    print(f"[segment] lazo: candidati " + ", ".join(f"#{i}={100 * areas[i] / (arr.shape[-1] * arr.shape[-2]):.1f}% iou={_iou(i):.2f}" for i in cands)
-                          + f" -> #{best}", flush=True)
+                    # chi cerchia un oggetto lo cerchia attorno: il CENTRO dell'area sta sull'oggetto -> la maschera deve contenerlo
+                    on_c = [i for i in cands if ccx is not None and bool(arr[i][ccy, ccx])]
+                    pool = on_c or cands
+                    best = max(pool, key=_iou)
+                    print(f"[segment] lazo: {len(cands)} candidati ({len(on_c)} col centro) -> #{best} {100 * areas[best] / (arr.shape[-1] * arr.shape[-2]):.1f}% iou={_iou(best):.2f}", flush=True)
                     m_np = arr[best].numpy().astype("uint8") * 255
                 else:
                     m_np = _mask_to_2d(masks, sout.iou_scores.cpu() if hasattr(sout, "iou_scores") else None)
