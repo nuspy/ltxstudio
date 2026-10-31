@@ -333,6 +333,7 @@ class ModelManager:
                         groups.setdefault(base, {})[role] = v
                         break
             n = 0
+            expected = sum(1 for g in groups.values() if "A" in g and "B" in g)      # coppie A/B presenti nel file
             for base, g in groups.items():
                 m = mods.get(base)
                 if m is None or "A" not in g or "B" not in g:
@@ -344,7 +345,11 @@ class ModelManager:
                 sc = st * ((float(g["alpha"]) / a.shape[0]) if "alpha" in g else 1.0)
                 handles.append(m.register_forward_hook(_hook(a, b, sc)))
                 n += 1
-            print(f"[lora-fp8] {os.path.basename(name)} @{st}: {n} moduli agganciati (bf16, pesi fp8 intatti)", flush=True)
+            print(f"[lora-fp8] {os.path.basename(name)} @{st}: agganciati {n}/{expected} moduli (bf16, pesi fp8 intatti)", flush=True)
+            if expected and 0 < n < 0.5 * expected:
+                # un aggancio PARZIALE darebbe una LoRA debole senza nessun errore: meglio fermarsi con un messaggio chiaro
+                raise RuntimeError(f"LoRA «{os.path.basename(name)}»: agganciati solo {n} moduli su {expected} ({100 * n // expected} %): "
+                                   f"formato o architettura non compatibili con questo modello, la LoRA risulterebbe debole o inutile.")
             if n == 0:
                 raise RuntimeError(f"LoRA «{os.path.basename(name)}» non corrisponde a questo modello (nessun modulo del transformer trovato): "
                                    f"architettura diversa o formato non riconosciuto.")
