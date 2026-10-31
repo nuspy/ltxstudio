@@ -3630,7 +3630,14 @@ class MainWindow(QMainWindow):
         # Chunking SOLO per video davvero lunghi: LTX-2.3 regge ~20s in singolo shot sui 32GB. Spezzare a 5s
         # era troppo conservativo (introduceva chunk-boundary che potevano fallire → durata dimezzata muta).
         # Ora: ≤20s = singolo shot (durata piena garantita); >20s = chunk da ~20s memory-bounded.
-        _single_max = int(20 * fps) // 8 * 8 + 1             # ~481 frame @24fps
+        # Punto 29: soglia PER RELEASE + risoluzione + fps (LTX-2.5: 20 s a ≤1080p/≤25 fps, 10 s a 48/50 fps o 1440p/4K; 2.3 invariata),
+        # con tetto = soglia scelta in Avanzate → Video lunghi (prima era fissa a 20 s e lo slider era inerte).
+        from core import ltx_long as _ll
+        try:
+            _thr_user = float(self.advanced_tab.long_video_config().get("threshold", 20.0) or 20.0)
+        except Exception:                                    # noqa: BLE001
+            _thr_user = None
+        _single_max = _ll.single_pass_max_frames(params.get("ltx_release"), params.get("width", 704), params.get("height", 1280), fps, _thr_user)
         if nf > _single_max:
             # LV1/LV3: anche il video NATIVO normale ora rispetta gli slider «Video lungo» (Avanzate):
             # durata-segmento, overlap crossfade, anti-drift (re-anchor) e resume — prima inerti in nativo.
@@ -3639,6 +3646,8 @@ class MainWindow(QMainWindow):
                 _seg = int(float(_lv.get("seg_seconds", 20) or 20) * fps)
                 _chunk = min(_seg, _single_max) if _seg >= 9 else _single_max
                 params["chunk_frames"] = max(9, _chunk // 8 * 8 + 1)
+                if str(params.get("ltx_release") or "").startswith("2.5") and params.get("prompts"):
+                    params["chunk_hard_cut"] = True          # 2.5 multi-inquadratura: ogni blocco è una NUOVA inquadratura, unione con stacco netto
                 params["overlap_frames"] = int(_lv.get("overlap", 0) or 0)
                 params["ref_anchor_strength"] = float(_lv.get("ref_anchor_strength", 0.0) or 0.0)
                 params["anchor_every"] = int(_lv.get("anchor_every", 0) or 0)

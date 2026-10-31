@@ -1931,12 +1931,15 @@ def _run_chunked(p: dict, chunk: int) -> str:
         cp.pop("chunk_frames", None)
         cp["num_frames"] = cf
         cp["image_path"] = prev_img
+        if i > 0 and p.get("chunk_hard_cut"):                  # punto 29, LTX-2.5 multi-inquadratura: nuova inquadratura = nessun frame-guida del blocco prima
+            cp["image_path"] = orig_img
+            print(f"[chunk] {i}: stacco netto (nuova inquadratura, nessun frame-guida dal blocco precedente)", flush=True)
         # Punto 27 (30/10): stesso seed + stesso prompt + stessa immagine-guida dello stesso tipo = ogni blocco rifaceva la STESSA
         # scena identica (oltre i 15-20 s si vedeva 4 volte lo stesso movimento). Il seed cambia a ogni blocco (resta riproducibile).
         if i > 0 and p.get("seed") is not None:
             cp["seed"] = (int(p.get("seed", 42)) + 7919 * i) % (2 ** 31)
         # #39 ANTI-DRIFT: frena il collasso autoregressivo re-ancorando alla foto originale.
-        if i > 0 and orig_img and os.path.exists(str(orig_img)):
+        if i > 0 and orig_img and os.path.exists(str(orig_img)) and not p.get("chunk_hard_cut"):
             if _anchor_every and (i % _anchor_every == 0):    # hard reset: riparte dalla foto (piccolo salto)
                 cp["image_path"] = orig_img
                 print(f"[chunk] {i}: re-anchor HARD alla foto originale", flush=True)
