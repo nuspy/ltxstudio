@@ -75,11 +75,21 @@ class Recorder:
         self.finished: list[dict] = []
         self.lock = threading.Lock()
         self.t0 = time.time()
+        self.jobs: set = set()                                   # id dei job accodati NEL caso corrente
+        self.late: list = []
+        self.seq = 0
 
     def reset(self):
         with self.lock:
             self.calls, self.dialogs, self.finished = [], [], []
+            self.jobs, self.late = set(), []
             self.t0 = time.time()
+
+    def new_job(self) -> int:
+        with self.lock:
+            self.seq += 1
+            self.jobs.add(self.seq)
+            return self.seq
 
     def call(self, via, **kw):
         with self.lock:
@@ -92,6 +102,10 @@ class Recorder:
 
     def fin(self, **kw):
         with self.lock:
+            jid = kw.get("job")
+            if jid is not None and jid not in self.jobs:        # job di un caso PRECEDENTE che finisce tardi: non appartiene a questo caso
+                self.late.append({"t": round(time.time() - self.t0, 2), **kw})
+                return
             self.finished.append({"t": round(time.time() - self.t0, 2), **kw})
 
 
@@ -319,13 +333,14 @@ class Driver:
 
         def enqueue(q, label, worker, on_done=None, on_progress=None):
             params = getattr(worker, "params", None) or getattr(worker, "cfg", None)      # _VideoEditAIWorker tiene la config in .cfg
-            rec.call("queue", label=str(label), worker=type(worker).__name__, module=getattr(worker, "module", None),
+            jid = rec.new_job()
+            rec.call("queue", job=jid, label=str(label), worker=type(worker).__name__, module=getattr(worker, "module", None),
                      params=main_params(params) if isinstance(params, dict) else {})
             if drv.dry:
                 fake = {"status": "success", "output": [drv._placeholder()], "dry": True}
 
                 def _fin():
-                    rec.fin(label=str(label), status="success", dry=True, outputs=fake["output"])
+                    rec.fin(job=jid, label=str(label), status="success", dry=True, outputs=fake["output"])
                     if on_done:
                         on_done(fake)
                 QTimer.singleShot(300, _fin)
@@ -334,7 +349,7 @@ class Driver:
             def _wrapped(res):
                 outs: list = []
                 _media_in(res, outs)
-                rec.fin(label=str(label), status=(res or {}).get("status"), error=str((res or {}).get("error", ""))[-1200:],
+                rec.fin(job=jid, label=str(label), status=(res or {}).get("status"), error=str((res or {}).get("error", ""))[-1200:],
                         outputs=outs)
                 if on_done:
                     on_done(res)
@@ -473,6 +488,7 @@ class Driver:
         self.sampler.begin()
         try:
             self._wait_inventory()
+            self._wait_idle()
             self.reset_state()                                   # stato NOTO: canvas vuoto, nessun layer/maschera/riferimento (bug del 31/10)
             fn = getattr(self, "case_" + str(case.get("fn", "ops")), None)
             if fn is None:
@@ -536,6 +552,17 @@ class Driver:
                 pr["references"] = [({**r, "path": cp(r.get("path"), "ref")} if isinstance(r, dict) else r) for r in pr["references"]]
             if isinstance(pr.get("keyframes"), list):
                 pr["keyframes"] = [({**k2, "path": cp(k2.get("path"), "kf")} if isinstance(k2, dict) else k2) for k2 in pr["keyframes"]]
+
+    def _wait_idle(self, timeout: float = 1800.0) -> None:
+        """La coda deve essere VUOTA prima di un nuovo caso: un job del caso precedente ancora in corso non va confuso con il nuovo."""
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            try:
+                if not self.gui(lambda: self.w.jobs.is_busy(), 20):
+                    return
+            except Exception:                                # noqa: BLE001
+                return
+            time.sleep(2.0)
 
     def reset_state(self) -> None:
         """Porta la GUI a uno stato noto con i comandi VERI: pulsante 🗑 del canvas (clear_image: foto di base, layer, maschere),
@@ -618,7 +645,7 @@ class Driver:
         out = []
         for o in case.get("ops", []):
             out.append(self.gui(lambda o=o: self.op(o), 60))
-        if case.get("wait_job", True) and any("click" in o for o in case.get("ops", [])):
+        if case.get("wait_job", any("click" in o for o in case.get("ops", []))):
             self.wait_job(float(case.get("timeout", 600)))
         return {"ops_eseguite": out}
 
@@ -846,6 +873,7 @@ class Driver:
             from PySide6.QtCore import QRectF, Qt
             from PySide6.QtGui import QColor, QImage, QPainter
             f = w.frame1_tab
+            f.img_nsfw.setCurrentText("NSFW")                         # selettore 18+ vero: senza, le voci 🔞 non sono nei menu
             f.sub.setCurrentIndex(1)                                  # sotto-tab Modifica
             cv = f.canvas
             cv.load_image(case["source"], "canvas")
@@ -960,6 +988,7 @@ class Driver:
 
         def setup():
             f = w.frame1_tab
+            f.img_nsfw.setCurrentText("NSFW")
             f.sub.setCurrentIndex(1)
             cv = f.canvas
             cv.load_image(case["canvas_image"], "canvas") if case.get("canvas_image") else None

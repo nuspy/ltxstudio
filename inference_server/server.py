@@ -89,6 +89,30 @@ class SubmitReq(BaseModel):
     params: dict
 
 
+def _crash_cause(path: str, n: int = 60000) -> str:
+    """CAUSA VERA di un figlio morto, dal suo log: asserzione C++ («Assertion failed … file …»), «Fatal Python error», stack dei thread
+    (le prime righe, senza la lista dei moduli di estensione che `faulthandler` stampa in coda: 200 nomi pandas/sklearn che nascondevano tutto,
+    giro 30-31/10). Le asserzioni scritte in UTF-16 arrivano con uno spazio fra le lettere («A s s e r t i o n»): si ricompongono."""
+    import re
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            txt = f.read()[-n:]
+    except Exception:                                       # noqa: BLE001
+        return ""
+    txt = txt.replace("\x00", "")
+    txt = re.sub(r"(?:(?<=\s)|^)((?:[^\s] ){6,}[^\s])(?=\s|$)", lambda m: m.group(1).replace(" ", ""), txt, flags=re.M)
+    cut = txt.rfind("Extension modules:")
+    head = txt[:cut] if cut > 0 else txt
+    lines = head.splitlines()
+    key = [i for i, l in enumerate(lines) if re.search(r"Assertion\s*failed|Fatal Python error|Windows fatal exception|CUDA error|out of memory|Segmentation|Traceback", l, re.I)]
+    if not key:
+        return "\n".join(lines[-25:])
+    i0 = key[0] if len(key) == 1 else key[-1] if "Traceback" not in lines[key[-1]] else key[0]
+    start = max(0, i0 - 4)
+    block = [l.strip() for l in lines[start:start + 40] if l.strip()]
+    return "\n".join(block)[:1800]
+
+
 def _tail(path: str, n: int = 2000) -> str:
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
@@ -373,7 +397,8 @@ def _worker():
                 # nel suo file, non in quello del job: leggere `proc.returncode` qui sollevava
                 # UnboundLocalError, che sostituiva l'errore VERO e faceva sparire il log utile.
                 _chi = "figlio persistente" if done_persistent else f"exit {proc.returncode}"
-                _log = _tail(_PersistentChild._LOG) if done_persistent else _tail(lf)
+                _log = (_crash_cause(_PersistentChild._LOG) if done_persistent else _crash_cause(lf)) or \
+                       (_tail(_PersistentChild._LOG) if done_persistent else _tail(lf))
                 res = {"status": "error",
                        "error": f"job '{job['module']}' terminato senza risultato ({_chi}). "
                                 f"Log:\n{_log}"}
