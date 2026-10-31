@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: inpaint és outpaint",
   "f1.inp.desc.base": "FLUX alap: inpaint, outpaint, tárgycsere",
   "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, utasításos szerkesztés, arc-/tárgycsere",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "Kezdőkép: nincs (text-to-video)",
+  "vid.start.img": "🖼 Kezdőkép (a vászonról): {f} — a vásznon a 🗑-vel eltávolítható (text-to-video)",
+  "canvas.clear_image.tt": "Vászon törlése: nincs kezdőkép (a videó text-to-video lesz)",
+  "canvas.status_cleared": "A vászon törölve: nincs kezdőkép."
 }

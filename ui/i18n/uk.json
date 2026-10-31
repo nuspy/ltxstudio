@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: inpaint та outpaint",
   "f1.inp.desc.base": "FLUX base: inpaint, outpaint, заміна об'єктів",
   "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, редагування за інструкцією, заміна обличчя/об'єктів",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "Початкове зображення: немає (text-to-video)",
+  "vid.start.img": "🖼 Початкове зображення (з полотна): {f} — кнопкою 🗑 на полотні його можна прибрати (text-to-video)",
+  "canvas.clear_image.tt": "Очистити полотно: без початкового зображення (відео стане text-to-video)",
+  "canvas.status_cleared": "Полотно очищено: початкового зображення немає."
 }

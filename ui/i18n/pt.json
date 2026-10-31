@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: inpaint e outpaint",
   "f1.inp.desc.base": "FLUX base: inpaint, outpaint, substituição de objetos",
   "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, edição por instrução, substituição de rosto/objetos",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "Imagem inicial: nenhuma (text-to-video)",
+  "vid.start.img": "🖼 Imagem inicial (da tela): {f} — com 🗑 na tela você a remove (text-to-video)",
+  "canvas.clear_image.tt": "Esvaziar a tela: sem imagem inicial (o vídeo vira text-to-video)",
+  "canvas.status_cleared": "Tela esvaziada: sem imagem inicial."
 }

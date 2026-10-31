@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: אינפיינט ואאוטפיינט",
   "f1.inp.desc.base": "FLUX בסיס: אינפיינט, אאוטפיינט, החלפת אובייקטים",
   "f1.inp.desc.klein": "FLUX.2 Klein: אינפיינט, עריכה לפי הוראה, החלפת פנים/אובייקטים",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "תמונת פתיחה: אין (טקסט-לווידאו)",
+  "vid.start.img": "🖼 תמונת פתיחה (מהבד): {f} — עם 🗑 בבד מסירים (טקסט-לווידאו)",
+  "canvas.clear_image.tt": "ריקון הבד: ללא תמונת פתיחה (הווידאו הופך לטקסט-לווידאו)",
+  "canvas.status_cleared": "הבד רוקן: אין תמונת פתיחה."
 }

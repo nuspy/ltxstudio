@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill：局部重绘与扩图",
   "f1.inp.desc.base": "FLUX 基础版：重绘、扩图、对象替换",
   "f1.inp.desc.klein": "FLUX.2 Klein：重绘、指令编辑、人脸/对象替换",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "起始图像：无（文生视频）",
+  "vid.start.img": "🖼 起始图像（来自画布）：{f} — 在画布中点 🗑 可移除（文生视频）",
+  "canvas.clear_image.tt": "清空画布：无起始图像（视频变为文生视频）",
+  "canvas.status_cleared": "画布已清空：无起始图像。"
 }

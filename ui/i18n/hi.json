@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: इनपेंट और आउटपेंट",
   "f1.inp.desc.base": "FLUX बेस: इनपेंट, आउटपेंट, वस्तु बदलना",
   "f1.inp.desc.klein": "FLUX.2 Klein: इनपेंट, निर्देश से संपादन, चेहरा/वस्तु बदलना",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "शुरुआती छवि: कोई नहीं (text-to-video)",
+  "vid.start.img": "🖼 शुरुआती छवि (कैनवास से): {f} — कैनवास में 🗑 से हटाएँ (text-to-video)",
+  "canvas.clear_image.tt": "कैनवास खाली करें: कोई शुरुआती छवि नहीं (वीडियो text-to-video बनेगा)",
+  "canvas.status_cleared": "कैनवास खाली: कोई शुरुआती छवि नहीं।"
 }

@@ -3727,5 +3727,9 @@
   "f1.inp.desc.fill": "FLUX Fill: inpaint and outpaint",
   "f1.inp.desc.base": "FLUX base: inpaint, outpaint, object replacement",
   "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, instruction edit, face/object replacement",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "Start image: none (text-to-video)",
+  "vid.start.img": "🖼 Start image (from the canvas): {f} — use 🗑 in the canvas to remove it (text-to-video)",
+  "canvas.clear_image.tt": "Clear the canvas: no start image (the video becomes text-to-video)",
+  "canvas.status_cleared": "Canvas cleared: no start image."
 }

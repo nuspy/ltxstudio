@@ -1099,6 +1099,8 @@ class MainWindow(QMainWindow):
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
         self.frame1_tab.canvas.image_changed.connect(self.avatar_tab.on_canvas_image_changed)
+        self.frame1_tab.canvas.image_changed.connect(self.video_tab.set_start_image)
+        self.video_tab.set_start_image(self.frame1_tab.image_path or "")
         self.avatar_tab.load_into_canvas.connect(
             lambda p: self.frame1_tab.canvas.load_image(p, fit_mode="canvas"))
         self.audio_tab.tts_generated.connect(self.avatar_tab.set_last_audio)

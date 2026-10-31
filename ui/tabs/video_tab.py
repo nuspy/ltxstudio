@@ -92,6 +92,11 @@ class VideoTab(QWidget):
         # --- Prompt (spostato qui dal tab Frame 1) ---
         prompt_group = QGroupBox(tr("vid.prompt.group"))
         prompt_vl = QVBoxLayout(prompt_group)
+        # Cosa arriva al modello come primo fotogramma: l'immagine del canvas (Frame 1), se c'e (bug 31/10: restava li senza che si vedesse).
+        self.start_image_lbl = QLabel("")
+        self.start_image_lbl.setWordWrap(True)
+        self.set_start_image("")
+        prompt_vl.addWidget(self.start_image_lbl)
         prompt_vl.addWidget(QLabel(tr("vid.prompt.lbl")))
         self.prompt = QPlainTextEdit()
         self.prompt.setPlaceholderText(tr("vid.prompt.ph"))
@@ -1646,6 +1651,16 @@ class VideoTab(QWidget):
         differs = (ew, eh) != (self.width.value(), self.height.value())
         self.size_effective.setText(tr("vid.size_eff", "Dimensioni effettive: {w}×{h} (i motori video vogliono multipli di 64).").format(w=ew, h=eh))
         self.size_effective.setVisible(differs)
+
+    def set_start_image(self, path: str) -> None:
+        """Etichetta «Immagine iniziale»: nome del file del canvas (image-to-video) o «nessuna» (text-to-video)."""
+        import os
+        if path:
+            self.start_image_lbl.setText(tr("vid.start.img", "🖼 Immagine iniziale (dal canvas): {f} — con 🗑 nel canvas la togli (text-to-video)").format(f=os.path.basename(path)))
+            self.start_image_lbl.setStyleSheet("color:#c9a227;")
+        else:
+            self.start_image_lbl.setText(tr("vid.start.none", "Immagine iniziale: nessuna (text-to-video)"))
+            self.start_image_lbl.setStyleSheet("color:#9aa1b0;")
 
     def wants_fixed_seed(self) -> bool:
         return self.sampler_seed.wants_fixed_seed()

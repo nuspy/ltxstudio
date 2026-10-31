@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: inpaint και outpaint",
   "f1.inp.desc.base": "FLUX βασικό: inpaint, outpaint, αντικατάσταση αντικειμένων",
   "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, επεξεργασία με οδηγία, αντικατάσταση προσώπου/αντικειμένων",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "Αρχική εικόνα: καμία (text-to-video)",
+  "vid.start.img": "🖼 Αρχική εικόνα (από τον καμβά): {f} — με το 🗑 στον καμβά την αφαιρείτε (text-to-video)",
+  "canvas.clear_image.tt": "Άδειασμα καμβά: χωρίς αρχική εικόνα (το βίντεο γίνεται text-to-video)",
+  "canvas.status_cleared": "Ο καμβάς άδειασε: καμία αρχική εικόνα."
 }

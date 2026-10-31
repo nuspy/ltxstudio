@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: 인페인트·아웃페인트",
   "f1.inp.desc.base": "FLUX 기본: 인페인트, 아웃페인트, 객체 교체",
   "f1.inp.desc.klein": "FLUX.2 Klein: 인페인트, 지시 편집, 얼굴/객체 교체",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "시작 이미지: 없음(text-to-video)",
+  "vid.start.img": "🖼 시작 이미지(캔버스): {f} — 캔버스의 🗑로 제거(text-to-video)",
+  "canvas.clear_image.tt": "캔버스 비우기: 시작 이미지 없음(비디오는 text-to-video)",
+  "canvas.status_cleared": "캔버스를 비웠습니다: 시작 이미지 없음."
 }

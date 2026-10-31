@@ -3655,5 +3655,9 @@
   "f1.inp.desc.fill": "FLUX Fill: Inpaint und Outpaint",
   "f1.inp.desc.base": "FLUX base: Inpaint, Outpaint, Objektersatz",
   "f1.inp.desc.klein": "FLUX.2 Klein: Inpaint, Anweisungs-Edit, Gesichts-/Objektersatz",
-  "f1.inp.desc.none": "UNET Flux"
+  "f1.inp.desc.none": "UNET Flux",
+  "vid.start.none": "Startbild: keines (Text-zu-Video)",
+  "vid.start.img": "🖼 Startbild (aus der Leinwand): {f} — mit 🗑 in der Leinwand entfernen (Text-zu-Video)",
+  "canvas.clear_image.tt": "Leinwand leeren: kein Startbild (das Video wird Text-zu-Video)",
+  "canvas.status_cleared": "Leinwand geleert: kein Startbild."
 }
