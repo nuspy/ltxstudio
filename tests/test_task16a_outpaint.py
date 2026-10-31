@@ -104,13 +104,15 @@ def test_export_canvas_senza_contorno_guida(tmp_path):
     pm = cv.img_item.pixmap()
     s = cv.img_item.scale()
     cv.img_item.setPos((nw - pm.width() * s) / 2, (nh - pm.height() * s) / 2)
-    pen_before = cv.frame_item.pen()
+    pen_before = cv.frame_border.pen()                               # il contorno guida e un item SEPARATO sopra la foto (punto 12)
+    vis_before = cv.frame_border.isVisible()
     res = cv.export_inpaint(tmp_path / "e", "outpaint")
     im = np.asarray(Image.open(res["image"]).convert("RGB")).astype(int)
     for edge in (im[0:4, :], im[-4:, :], im[:, 0:4], im[:, -4:]):       # bordi del frame: solo il riempimento, niente riga blu
         assert (edge == FILL).all()
-    assert cv.frame_item.pen() == pen_before, "il contorno guida a video va ripristinato dopo l'export"
-    assert cv.frame_item.pen().color().name() == "#4466aa"
+    assert cv.frame_border.isVisible() == vis_before, "il contorno guida a video va ripristinato dopo l'export"
+    assert cv.frame_border.pen() == pen_before and cv.frame_border.pen().color().name() == "#4466aa"
+    assert cv.frame_border.zValue() > cv.img_item.zValue(), "il contorno deve stare SOPRA la foto"
     # nessun contorno attorno alla foto: subito fuori dal riquadro c'e' solo il riempimento
     x0, y0 = int(round((nw - pm.width() * s) / 2)), int(round((nh - pm.height() * s) / 2))
     assert (im[y0 + 40, x0 - 3:x0] == FILL).all()
