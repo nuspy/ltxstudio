@@ -557,6 +557,29 @@ def dump_gpu_state(log=print, top: int = 10) -> None:
             g = groups.setdefault((shape, dt), [0, 0])
             g[0] += 1
             g[1] += nb
+        # PROPRIETARIO dei tensori (31/10): a quale modulo di primo livello appartengono (DiT, VAE, TE, …), cosi si vede CHI occupa i 24,7 GB
+        # (nel giro 30-31/10: 14 GB di int8 del DiT + 9 GB di fp32 con layer da 2048 canali che nessun piano contava).
+        try:
+            own = {}
+            for o in gc.get_objects():
+                if isinstance(o, torch.nn.Module):
+                    for nm, t in list(o.named_parameters(recurse=True)) + list(o.named_buffers(recurse=True)):
+                        if t.is_cuda:
+                            key = t.untyped_storage().data_ptr()
+                            prev = own.get(key)
+                            if prev is None or len(nm) < len(prev[1]):          # il nome piu corto = il modulo piu vicino alla radice
+                                own[key] = (type(o).__name__, nm)
+            by = {}
+            for ptr, (nb, shape, dt) in storages.items():
+                cls, nm = own.get(ptr, ("(senza modulo)", ""))
+                g = by.setdefault((cls, dt), [0, 0, nm])
+                g[0] += 1
+                g[1] += nb
+            log("[oom] per proprietario (classe del modulo, dtype):")
+            for (cls, dt), (n, nb, nm) in sorted(by.items(), key=lambda kv: -kv[1][1])[:8]:
+                log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt}  {cls}  es. {nm[:60]}")
+        except Exception as e2:                                      # noqa: BLE001
+            log(f"[oom] attribuzione non riuscita: {e2}")
         log(f"[oom] gruppi (forma, dtype) per byte totali:")
         for (shape, dt), (n, nb) in sorted(groups.items(), key=lambda kv: -kv[1][1])[:top]:
             log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt} {list(shape)}")
