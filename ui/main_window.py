@@ -2954,7 +2954,8 @@ class MainWindow(QMainWindow):
                                 tr("mw.compose_bad_ref", "Il prompt cita {t}, ma nella lista ci sono {n} foto.").format(
                                     t=", ".join(sorted({_R.token_of(t.kind, t.n) for t in _bad})), n=len(imgs)))
             return
-        _style = {"qwen_image21": "qwen21", "flux3": "flux3", "krea2": "krea2_edit", "flux2": "flux2_klein"}.get(engine)
+        # kontext = stitch (le foto affiancate in UNA striscia, da sinistra a destra): «image N» e la citazione posizionale
+        _style = {"qwen_image21": "qwen21", "flux3": "flux3", "krea2": "krea2_edit", "flux2": "flux2_klein", "kontext": "flux2_klein"}.get(engine)
         _order = {"image": list(range(1, len(imgs) + 1))}
         cfg["prompt"] = _R.translate(_raw, _order, _style) if _style else _raw
         _seed = cfg.get("seed") if cfg.get("seed") is not None else random.randint(0, 2**31)
@@ -4955,8 +4956,7 @@ class MainWindow(QMainWindow):
             params["mask_path"] = mask
             params["feather"] = int(feather or 0)
         else:                                  # risultato alla risoluzione e al rapporto del canvas (mai stirato)
-            v = self.video_tab.get_values()
-            self._clamp_resolution(v)
+            v = self._canvas_output_size()                     # punto 25: misura del CANVAS (non del tab Video)
             params["width"], params["height"] = int(v["width"]), int(v["height"])
         self._inpaint_mode = mode
         self._native_worker = _NativeImageWorker(params)

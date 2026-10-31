@@ -860,7 +860,8 @@ class Driver:
             if "seed" in case and p.get("seed") not in (None, int(case["seed"])):
                 mis.append(f"seed: impostato {case['seed']} ma il backend riceve {p.get('seed')}")
             refs = p.get("ref_images") or p.get("images") or []
-            if len(refs) < min(2, len(case["images"])):
+            stitch = (p.get("arch") == "kontext")                  # Kontext: le foto sono affiancate in UN'immagine (image_path)
+            if not stitch and len(refs) < min(2, len(case["images"])):
                 mis.append(f"riferimenti: attese {len(case['images'])} foto, il backend ne riceve {len(refs)}")
             if "@image" in str(p.get("prompt", "")):
                 mis.append("il prompt inviato contiene ancora @image_N (non tradotto nella sintassi del motore)")
