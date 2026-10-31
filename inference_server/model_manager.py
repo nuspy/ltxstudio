@@ -277,12 +277,92 @@ class ModelManager:
 
     # ── LoRA hot-swap (su un pipeline diffusers) ─────────────────────────────
     @staticmethod
+    def _weights_fp8(tr) -> bool:
+        """True se il transformer ha pesi fp8 (storage layerwise / checkpoint fp8) o Linear quantizzati custom (Fp8Linear/Nvfp4Linear)."""
+        import itertools
+        import torch
+        f8 = tuple(getattr(torch, n) for n in ("float8_e4m3fn", "float8_e5m2") if hasattr(torch, n))
+        if getattr(tr, "_ls_fp8_storage", False):
+            return True
+        if any(p.dtype in f8 for p in itertools.islice(tr.parameters(), 60)):
+            return True
+        return any(type(m).__name__ in ("Fp8Linear", "Nvfp4Linear") for m in itertools.islice(tr.modules(), 4000))
+
+    @staticmethod
+    def _apply_loras_hooks(pipe, loras: list) -> None:
+        import os
+        import torch
+        tr = pipe.transformer
+        mods = dict(tr.named_modules())
+        handles = []
+
+        def _hook(a, b, sc):
+            cache = {}
+
+            def f(mod, inp, out):
+                x = inp[0]
+                ab = cache.get(x.device)
+                if ab is None:
+                    ab = cache.setdefault(x.device, (a.to(x.device), b.to(x.device)))
+                return out + (((x.to(ab[0].dtype) @ ab[0].t()) @ ab[1].t()) * sc).to(out.dtype)
+            return f
+        for lo in loras:
+            name = lo["name"]
+            if name and not os.path.isabs(name) and not os.path.exists(name):
+                cand = os.path.join(r"E:\AI\Models\LoRA", name)
+                if os.path.exists(cand):
+                    name = cand
+            if not os.path.isfile(name):
+                raise FileNotFoundError(f"LoRA non trovata: {name}")
+            st = float(lo.get("strength", 1.0))
+            try:                                         # chiavi NORMALIZZATE (kohya/BFL/ComfyUI → naming diffusers del transformer)
+                out = pipe.lora_state_dict(name)
+                sd = out[0] if isinstance(out, tuple) else out
+            except Exception:                            # noqa: BLE001
+                from safetensors.torch import load_file
+                sd = load_file(name)
+            groups: dict = {}
+            for k, v in sd.items():
+                for tag, role in ((".lora_A.weight", "A"), (".lora_B.weight", "B"), (".lora_A.default.weight", "A"),
+                                  (".lora_B.default.weight", "B"), (".lora_down.weight", "A"), (".lora_up.weight", "B"), (".alpha", "alpha")):
+                    if k.endswith(tag):
+                        base = k[: -len(tag)]
+                        for pre in ("transformer.", "diffusion_model.", "model.diffusion_model.", "base_model.model."):
+                            if base.startswith(pre):
+                                base = base[len(pre):]
+                        groups.setdefault(base, {})[role] = v
+                        break
+            n = 0
+            for base, g in groups.items():
+                m = mods.get(base)
+                if m is None or "A" not in g or "B" not in g:
+                    continue
+                if not (isinstance(m, torch.nn.Linear) or type(m).__name__ in ("Fp8Linear", "Nvfp4Linear")):
+                    continue
+                a = g["A"].to(torch.bfloat16)
+                b = g["B"].to(torch.bfloat16)
+                sc = st * ((float(g["alpha"]) / a.shape[0]) if "alpha" in g else 1.0)
+                handles.append(m.register_forward_hook(_hook(a, b, sc)))
+                n += 1
+            print(f"[lora-fp8] {os.path.basename(name)} @{st}: {n} moduli agganciati (bf16, pesi fp8 intatti)", flush=True)
+            if n == 0:
+                raise RuntimeError(f"LoRA «{os.path.basename(name)}» non corrisponde a questo modello (nessun modulo del transformer trovato): "
+                                   f"architettura diversa o formato non riconosciuto.")
+        pipe._ls_lora_hooks = handles
+
+    @staticmethod
     def apply_loras(pipe, loras: list[dict] | None) -> None:
         """loras = [{'name': path, 'strength': w}]. Carica/azzera senza ricaricare la base."""
         try:
             pipe.unload_lora_weights()
         except Exception:                               # noqa: BLE001
             pass
+        for _h in getattr(pipe, "_ls_lora_hooks", []) or []:        # LoRA «a hook» della generazione precedente
+            try:
+                _h.remove()
+            except Exception:                           # noqa: BLE001
+                pass
+        pipe._ls_lora_hooks = []
         # Filtra le voci placeholder/vuote che la GUI può passare (nessuna LoRA realmente selezionata):
         # {'name': ''}, 'None', 'nessuna', ecc. Se non resta nulla → nessuna LoRA da applicare, esci.
         def _real(lo):
@@ -296,13 +376,13 @@ class ModelManager:
         # crashare, fallisci con un messaggio chiaro/azionabile SOLO se c'è davvero una LoRA da applicare.
         # Il supporto LoRA nativo su base fp8 (iniezione manuale nel forward dequant) è dedicato — #17/#78.
         tr = getattr(pipe, "transformer", None)
-        if tr is not None and any(type(m).__name__ in ("Fp8Linear", "Nvfp4Linear")
-                                  for m in tr.modules()):
-            raise RuntimeError(
-                "LoRA non supportata su base FLUX.2/Klein in fp8 (moduli quantizzati custom): "
-                "usa un modello base bf16 per applicare la LoRA, oppure fondi la LoRA nel checkpoint. "
-                "Il supporto LoRA nativo su fp8 è pianificato (task #17/#78).")
         import os
+        if tr is not None and ModelManager._weights_fp8(tr):
+            # PESI fp8 (storage layerwise o Linear quantizzati custom): PEFT castava gli adattatori a float8 («"addmm_cuda" not implemented
+            # for Float8_e4m3fn», giro 30-31/10) e fondere il delta nel peso fp8 lo arrotonda via. Qui la LoRA resta a parte in bf16:
+            # y = base(x) + s·B(A(x)), agganciata come forward-hook ai Linear del transformer (nessun cambio di dtype dei pesi).
+            ModelManager._apply_loras_hooks(pipe, loras)
+            return
         names, weights = [], []
         for i, lo in enumerate(loras):
             adapter = f"a{i}"
