@@ -3631,5 +3631,6 @@
   "f1.compose.steps.tt": "Passos de difusão. «auto» = valor recomendado pelo motor (FLUX.2 Klein destilado 12, Kontext 28).",
   "f1.compose.guidance.tt": "Aderência ao prompt. «auto» = valor recomendado pelo motor.",
   "f1.compose.guidance_lbl": "Guidance",
-  "mw.compose_bad_ref": "O prompt cita {t}, mas a lista tem {n} fotos."
+  "mw.compose_bad_ref": "O prompt cita {t}, mas a lista tem {n} fotos.",
+  "vid.gguf.warn": "⚠ {gb} GB residentes na VRAM: pode não caber em alta resolução/duração"
 }

@@ -3703,5 +3703,6 @@
   "f1.compose.steps.tt": "Diffusion steps. “auto” = the engine's recommended value (distilled FLUX.2 Klein 12, Kontext 28).",
   "f1.compose.guidance.tt": "Prompt adherence. “auto” = the engine's recommended value.",
   "f1.compose.guidance_lbl": "Guidance",
-  "mw.compose_bad_ref": "The prompt cites {t}, but the list has {n} photos."
+  "mw.compose_bad_ref": "The prompt cites {t}, but the list has {n} photos.",
+  "vid.gguf.warn": "⚠ {gb} GB resident in VRAM: may not fit at high resolution/duration"
 }

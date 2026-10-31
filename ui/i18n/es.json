@@ -3631,5 +3631,6 @@
   "f1.compose.steps.tt": "Pasos de difusión. «auto» = el valor recomendado por el motor (FLUX.2 Klein destilado 12, Kontext 28).",
   "f1.compose.guidance.tt": "Adherencia al prompt. «auto» = valor recomendado por el motor.",
   "f1.compose.guidance_lbl": "Guidance",
-  "mw.compose_bad_ref": "El prompt cita {t}, pero la lista tiene {n} fotos."
+  "mw.compose_bad_ref": "El prompt cita {t}, pero la lista tiene {n} fotos.",
+  "vid.gguf.warn": "⚠ {gb} GB residentes en VRAM: puede no caber a alta resolución/duración"
 }

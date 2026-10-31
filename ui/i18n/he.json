@@ -3631,5 +3631,6 @@
   "f1.compose.steps.tt": "צעדי דיפוזיה. «אוטומטי» = הערך המומלץ של המנוע (FLUX.2 Klein מזוקק 12, Kontext 28).",
   "f1.compose.guidance.tt": "היצמדות להנחיה. «אוטומטי» = הערך המומלץ של המנוע.",
   "f1.compose.guidance_lbl": "Guidance",
-  "mw.compose_bad_ref": "ההנחיה מפנה אל {t}, אך ברשימה יש {n} תמונות."
+  "mw.compose_bad_ref": "ההנחיה מפנה אל {t}, אך ברשימה יש {n} תמונות.",
+  "vid.gguf.warn": "⚠ {gb} GB תושבים ב-VRAM: ייתכן שלא ייכנס ברזולוציה/משך גבוהים"
 }

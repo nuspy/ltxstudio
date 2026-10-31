@@ -3631,5 +3631,6 @@
   "f1.compose.steps.tt": "Pas de diffusion. « auto » = valeur recommandée par le moteur (FLUX.2 Klein distillé 12, Kontext 28).",
   "f1.compose.guidance.tt": "Adhérence au prompt. « auto » = valeur recommandée par le moteur.",
   "f1.compose.guidance_lbl": "Guidance",
-  "mw.compose_bad_ref": "Le prompt cite {t}, mais la liste contient {n} photos."
+  "mw.compose_bad_ref": "Le prompt cite {t}, mais la liste contient {n} photos.",
+  "vid.gguf.warn": "⚠ {gb} Go résidents en VRAM : peut ne pas tenir en haute résolution/durée"
 }

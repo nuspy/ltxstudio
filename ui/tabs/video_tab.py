@@ -1057,6 +1057,19 @@ class VideoTab(QWidget):
         self._finish_model_menu(prev, {f"{arch}:{c}" for c, _v, _l in items})
         self.model.blockSignals(False)
 
+    def _gguf_memory_warning(self, name: str) -> str:
+        """Avviso di memoria nel menu (31/10): un GGUF resta RESIDENTE in VRAM (non si streamma). Sopra ~15 GB di file
+        con la 5090 (32 GB) non entra insieme ad attivazioni e codificatore a risoluzioni/durate alte (giro 30/10: Q6_K 22B OOM)."""
+        import os
+        pth = self._resolve_model_path(name)
+        try:
+            gb = os.path.getsize(pth) / 2 ** 30 if pth else 0.0
+        except OSError:
+            gb = 0.0
+        if gb >= 15.0:
+            return "  " + tr("vid.gguf.warn", "⚠ {gb} GB residenti in VRAM: a risoluzione/durata alte può non entrare").format(gb=f"{gb:.0f}")
+        return ""
+
     def _resolve_model_path(self, name: str) -> str | None:
         """Risolve il nome relativo del modello video al path assoluto (per la detection header)."""
         import os
@@ -1172,7 +1185,8 @@ class VideoTab(QWidget):
 
         if ggufs:
             for m in ggufs:
-                add(f"{m}  · GGUF", "gguf", m, self._is_nsfw_model(m))
+                _w = self._gguf_memory_warning(m)
+                add(f"{m}  · GGUF{_w}", "gguf", m, self._is_nsfw_model(m))
         else:
             add(tr("vid.model.gguf_fallback"), "gguf", GGUF_FALLBACK_FILE, False)
 
