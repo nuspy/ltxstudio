@@ -482,6 +482,10 @@ class Driver:
         except Exception as e:                               # noqa: BLE001
             res["motivo"] = f"{type(e).__name__}: {e}"[:1800]
             res["traceback"] = traceback.format_exc()[-1500:]
+        try:
+            self._snapshot(case, res)
+        except Exception as e:                               # noqa: BLE001
+            res["snapshot_errore"] = repr(e)[:300]
         res.update(self.sampler.end())
         res["tempo_s"] = round(time.time() - t0, 1)
         res["calls"] = self.rec.calls[:12]
@@ -492,6 +496,46 @@ class Driver:
         except Exception:                                    # noqa: BLE001
             pass
         return res
+
+    def _snapshot(self, case: dict, res: dict) -> None:
+        """Copia in <giro>/files/<id>/ le USCITE e gli INGRESSI (immagine, maschera, riferimenti...) del caso appena finito e riscrive i
+        percorsi nei risultati. Senza, la pagina di revisione (costruita a fine giro) mostrava il contenuto che quei nomi di file avevano
+        alla fine, cioe di un altro caso."""
+        import shutil
+        base = os.environ.get("LTX_TEST_SNAP_DIR")
+        if not base:
+            return
+        d = os.path.join(base, "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in str(case.get("id"))))
+        os.makedirs(d, exist_ok=True)
+        seen = {}
+
+        def cp(path, tag):
+            if not isinstance(path, str) or not os.path.isfile(path):
+                return path
+            if path in seen:
+                return seen[path]
+            dst = os.path.join(d, f"{tag}_{len(seen)}_{os.path.basename(path)}")
+            try:
+                shutil.copy2(path, dst)
+                seen[path] = dst
+                return dst
+            except OSError:
+                return path
+        res["uscite_originali"] = list(res.get("uscite") or [])
+        res["uscite"] = [cp(x, "out") for x in res.get("uscite") or []]
+        for c in self.rec.calls:
+            pr = c.get("params")
+            if not isinstance(pr, dict):
+                continue
+            for k in ("init_image", "image_path", "mask", "mask_path", "control_image", "video", "audio_path"):
+                if isinstance(pr.get(k), str):
+                    pr[k] = cp(pr[k], k)
+            if isinstance(pr.get("ref_images"), list):
+                pr["ref_images"] = [cp(x, "ref") for x in pr["ref_images"]]
+            if isinstance(pr.get("references"), list):
+                pr["references"] = [({**r, "path": cp(r.get("path"), "ref")} if isinstance(r, dict) else r) for r in pr["references"]]
+            if isinstance(pr.get("keyframes"), list):
+                pr["keyframes"] = [({**k2, "path": cp(k2.get("path"), "kf")} if isinstance(k2, dict) else k2) for k2 in pr["keyframes"]]
 
     def reset_state(self) -> None:
         """Porta la GUI a uno stato noto con i comandi VERI: pulsante 🗑 del canvas (clear_image: foto di base, layer, maschere),

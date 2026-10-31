@@ -119,7 +119,8 @@ def main():
         src, dst = os.path.join(MAIN_ROOT, "data", fn), os.path.join(ROOT, "data", fn)
         if os.path.exists(src) and fn == "user_prefs.json":
             shutil.copy2(src, dst)
-    env = dict(os.environ, LTX_TEST_DRIVER="1", LTX_TEST_DRIVER_PORT=str(PORT), PYTHONUNBUFFERED="1", PYTHONFAULTHANDLER="1")
+    env = dict(os.environ, LTX_TEST_DRIVER="1", LTX_TEST_DRIVER_PORT=str(PORT), PYTHONUNBUFFERED="1", PYTHONFAULTHANDLER="1",
+               LTX_TEST_SNAP_DIR=os.path.join(out, "files"))
     cmd = [sys.executable, os.path.join(ROOT, "tests", "live_guard.py"), "--min-commit-gb", str(a.min_commit_gb),
            "--kill-servers-on-exit", "--out-dir", out]
     if a.max_proc_gb:
