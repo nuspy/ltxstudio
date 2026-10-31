@@ -889,6 +889,7 @@ def _assemble_zimage(transformer_path: str):
         from nunchaku import NunchakuZImageTransformer2DModel
         print(f"[nunchaku] carico transformer Z-Image SVDQ-FP4: {os.path.basename(transformer_path)}",
               flush=True)
+        _patch_nunchaku_zimage_rope()
         tr = NunchakuZImageTransformer2DModel.from_pretrained(transformer_path, torch_dtype=bf16)
     else:
         tr = _from_single_file_robust(ZImageTransformer2DModel, transformer_path, dict(torch_dtype=bf16))
@@ -907,6 +908,41 @@ def _assemble_zimage(transformer_path: str):
     tok = AutoTokenizer.from_pretrained(os.path.join(TE_DIR, "qwen3_4b"))
     sched = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=3.0)
     return ZImagePipeline(transformer=tr, vae=vae, text_encoder=te, tokenizer=tok, scheduler=sched)
+
+
+def _patch_nunchaku_zimage_rope() -> None:
+    """Z-Image nunchaku svdq-fp4: il giro del 30/10 abortiva il figlio persistente con l'assert C++ «rotary_emb.shape[0]*
+    shape[1] == M». La cache del rotary di nunchaku e indicizzata SOLO da `freqs_cis.data_ptr()`: tensori diversi (immagine /
+    testo / unificato, lunghezze diverse) che riusano lo stesso indirizzo dopo una free restituiscono un rotary impacchettato di
+    lunghezza SBAGLIATA. Qui la chiave include forma e dtype (e si registrano le prime forme viste, per la diagnosi dal vivo)."""
+    try:
+        from nunchaku.models.transformers import transformer_zimage as tz
+        if getattr(tz.NunchakuZImageRopeHook, "_ls_patched", False):
+            return
+        import torch
+        seen = []
+
+        def _call(self, module, input_args, input_kwargs):
+            freqs_cis = input_kwargs.get("freqs_cis", None)
+            if freqs_cis is None:
+                return None
+            key = (freqs_cis.data_ptr(), tuple(freqs_cis.shape), str(freqs_cis.dtype))
+            packed = self.packed_cache.get(key)
+            if packed is None:
+                packed = torch.view_as_real(freqs_cis).unsqueeze(3)
+                packed = torch.flip(packed, dims=[-1])
+                packed = tz.pack_rotemb(tz.pad_tensor(packed, 256, 1))
+                self.packed_cache[key] = packed
+                if len(seen) < 4:
+                    seen.append(tuple(freqs_cis.shape))
+                    print(f"[nunchaku-zimage] rotary {tuple(freqs_cis.shape)} -> impacchettato {tuple(packed.shape)}", flush=True)
+            kw = input_kwargs.copy()
+            kw["freqs_cis"] = packed
+            return input_args, kw
+        tz.NunchakuZImageRopeHook.__call__ = _call
+        tz.NunchakuZImageRopeHook._ls_patched = True
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[nunchaku-zimage] patch rotary non applicata: {e}", flush=True)
 
 
 def _assemble_flux2_klein(Pipe, transformer_path: str, te_dir: str | None = None):
