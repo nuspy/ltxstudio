@@ -3604,5 +3604,6 @@
   "vid.size_eff.h3": "MiniMax H3: 해상도는 이 값이 아니라 '캔버스'(와 시작 사진)가 결정합니다.",
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: 해상도는 832×480으로 고정(모델 한계)이며 이 값이 아닙니다.",
   "f1.inpaint.fidelity_lbl": "원본 충실도",
-  "f1.inpaint.fidelity.tt": "0 = 모두 변경, 1 = 이미지 그대로. 엔진에는 denoise = 1 − 값이 전달됩니다."
+  "f1.inpaint.fidelity.tt": "0 = 모두 변경, 1 = 이미지 그대로. 엔진에는 denoise = 1 − 값이 전달됩니다.",
+  "msg.copy": "복사"
 }

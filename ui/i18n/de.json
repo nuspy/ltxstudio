@@ -3604,5 +3604,6 @@
   "vid.size_eff.h3": "MiniMax H3: Die Auflösung bestimmt die „Leinwand“ (und das Startfoto), nicht diese Werte.",
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: feste Auflösung 832×480 (Modellgrenze), nicht diese Werte.",
   "f1.inpaint.fidelity_lbl": "Treue zum Original",
-  "f1.inpaint.fidelity.tt": "0 = alles ändern, 1 = Bild unverändert. Die Engine erhält Denoise = 1 − Wert."
+  "f1.inpaint.fidelity.tt": "0 = alles ändern, 1 = Bild unverändert. Die Engine erhält Denoise = 1 − Wert.",
+  "msg.copy": "Kopieren"
 }

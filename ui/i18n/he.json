@@ -3604,5 +3604,6 @@
   "vid.size_eff.h3": "MiniMax H3: הרזולוציה נקבעת לפי «בד» (ותמונת ההתחלה), לא לפי ערכים אלה.",
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: רזולוציה קבועה 832×480 (מגבלת המודל), לא ערכים אלה.",
   "f1.inpaint.fidelity_lbl": "נאמנות למקור",
-  "f1.inpaint.fidelity.tt": "0 = משנה הכול, 1 = התמונה ללא שינוי. המנוע מקבל denoise = 1 − ערך."
+  "f1.inpaint.fidelity.tt": "0 = משנה הכול, 1 = התמונה ללא שינוי. המנוע מקבל denoise = 1 − ערך.",
+  "msg.copy": "העתק"
 }

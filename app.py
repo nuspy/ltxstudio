@@ -27,6 +27,11 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("LTX Studio")
     apply_theme(app)
+    try:                                                   # messaggi non modali, selezionabili, scorrevoli (punto 8)
+        from ui.widgets.msg_dialog import install as _install_msgs
+        _install_msgs()
+    except Exception:                                      # noqa: BLE001
+        pass
     win = MainWindow()
     win.show()
     if os.environ.get("LTX_TEST_DRIVER") == "1" and not getattr(sys, "frozen", False) and "__compiled__" not in globals():              # solo per i test dal vivo (tests/app_live); MAI nelle build (frozen/Nuitka)

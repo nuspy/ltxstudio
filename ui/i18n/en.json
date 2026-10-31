@@ -3676,5 +3676,6 @@
   "vid.size_eff.h3": "MiniMax H3: resolution is set by “Canvas” (and the start photo), not by these values.",
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: fixed resolution 832×480 (model limit), not these values.",
   "f1.inpaint.fidelity_lbl": "Fidelity to original",
-  "f1.inpaint.fidelity.tt": "0 = change everything, 1 = image unchanged. The engine receives denoise = 1 − value."
+  "f1.inpaint.fidelity.tt": "0 = change everything, 1 = image unchanged. The engine receives denoise = 1 − value.",
+  "msg.copy": "Copy"
 }
