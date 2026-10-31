@@ -92,6 +92,7 @@ def main():
             n += 1
             cases.append({"id": f"modifica_integra_{re.sub(r'[^a-z0-9]+', '-', eng.lower())}_{k:02d}", "fn": "edit", "kind": "integrate", "engine": eng, "model": m["text"],
                           "source": scena, "layer": os.path.join(a.fixtures, "ritratto_960x1024.png"), "seed": 5000 + n, "timeout": 900,
+                          **({"expect_params": {"arch": "flux2_inpaint"}} if "flux.2" in eng.lower() else {}),
                           "prompt": "blend the pasted woman into the diner as a customer sitting at the counter, matching the warm light",
                           "descr": f"Modifica · Integra (edit per istruzione) · {eng} · {m['text'][:55]}"})
 
