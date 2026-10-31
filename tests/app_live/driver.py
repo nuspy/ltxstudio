@@ -472,6 +472,7 @@ class Driver:
         res = {"id": case.get("id"), "fn": case.get("fn"), "dry": self.dry, "esito": "errore", "motivo": ""}
         self.sampler.begin()
         try:
+            self._wait_inventory()
             fn = getattr(self, "case_" + str(case.get("fn", "ops")), None)
             if fn is None:
                 raise ValueError(f"tipo di caso sconosciuto: {case.get('fn')}")
@@ -490,6 +491,22 @@ class Driver:
         except Exception:                                    # noqa: BLE001
             pass
         return res
+
+    def _wait_inventory(self, timeout: float = 90.0) -> None:
+        """L'inventario dei modelli si carica in modo asincrono dopo l'avvio: il primo caso non deve partire con i menu ancora vuoti
+        («(nessun modello trovato)»). Si attende che il menu FLUX e quello video abbiano voci vere."""
+        def ready():
+            f, vt = self.w.frame1_tab, self.w.video_tab
+            t0 = f.gen_model.itemText(0) if f.gen_model.count() else ""
+            return bool(f.gen_model.count()) and "nessun modello" not in t0.lower() and vt.model.count() > 1
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            try:
+                if self.gui(ready, 20):
+                    return
+            except Exception:                                # noqa: BLE001
+                pass
+            time.sleep(1.5)
 
     def _judge(self, case, res):
         """Esito finale: job riuscito + uscita presente + corrispondenza widget↔backend."""
