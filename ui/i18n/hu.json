@@ -3651,5 +3651,9 @@
   "imp2.key.field": "Illessze be ide az API-kulcsot",
   "imp2.key.save": "Ellenőrzés és mentés",
   "imp2.key.bad": "A kulcsot nem fogadta el ({c}). Ellenőrizze, hogy teljesen kimásolta-e.",
-  "imp2.key.ok": "A kulcs ellenőrizve és mentve."
+  "imp2.key.ok": "A kulcs ellenőrizve és mentve.",
+  "f1.inp.desc.fill": "FLUX Fill: inpaint és outpaint",
+  "f1.inp.desc.base": "FLUX alap: inpaint, outpaint, tárgycsere",
+  "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, utasításos szerkesztés, arc-/tárgycsere",
+  "f1.inp.desc.none": "UNET Flux"
 }

@@ -3651,5 +3651,9 @@
   "imp2.key.field": "API-Schlüssel hier einfügen",
   "imp2.key.save": "Prüfen und speichern",
   "imp2.key.bad": "Schlüssel nicht akzeptiert ({c}). Prüfen Sie, ob er vollständig kopiert wurde.",
-  "imp2.key.ok": "Schlüssel geprüft und gespeichert."
+  "imp2.key.ok": "Schlüssel geprüft und gespeichert.",
+  "f1.inp.desc.fill": "FLUX Fill: Inpaint und Outpaint",
+  "f1.inp.desc.base": "FLUX base: Inpaint, Outpaint, Objektersatz",
+  "f1.inp.desc.klein": "FLUX.2 Klein: Inpaint, Anweisungs-Edit, Gesichts-/Objektersatz",
+  "f1.inp.desc.none": "UNET Flux"
 }

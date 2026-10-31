@@ -3690,5 +3690,9 @@
   "imp2.key.field": "Incolla qui la chiave API",
   "imp2.key.save": "Verifica e salva",
   "imp2.key.bad": "Chiave non accettata ({c}). Controlla di averla copiata per intero.",
-  "imp2.key.ok": "Chiave verificata e salvata."
+  "imp2.key.ok": "Chiave verificata e salvata.",
+  "f1.inp.desc.fill": "FLUX Fill: inpaint e outpaint",
+  "f1.inp.desc.base": "FLUX base: inpaint, outpaint, sostituzione di oggetti",
+  "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, edit per istruzione, sostituzione di viso/oggetti",
+  "f1.inp.desc.none": "UNET Flux"
 }

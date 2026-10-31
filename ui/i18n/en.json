@@ -3723,5 +3723,9 @@
   "imp2.key.field": "Paste the API key here",
   "imp2.key.save": "Verify and save",
   "imp2.key.bad": "Key not accepted ({c}). Check that you copied it completely.",
-  "imp2.key.ok": "Key verified and saved."
+  "imp2.key.ok": "Key verified and saved.",
+  "f1.inp.desc.fill": "FLUX Fill: inpaint and outpaint",
+  "f1.inp.desc.base": "FLUX base: inpaint, outpaint, object replacement",
+  "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, instruction edit, face/object replacement",
+  "f1.inp.desc.none": "UNET Flux"
 }

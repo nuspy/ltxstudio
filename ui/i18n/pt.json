@@ -3651,5 +3651,9 @@
   "imp2.key.field": "Cole aqui a chave de API",
   "imp2.key.save": "Verificar e salvar",
   "imp2.key.bad": "Chave não aceita ({c}). Verifique se copiou por inteiro.",
-  "imp2.key.ok": "Chave verificada e salva."
+  "imp2.key.ok": "Chave verificada e salva.",
+  "f1.inp.desc.fill": "FLUX Fill: inpaint e outpaint",
+  "f1.inp.desc.base": "FLUX base: inpaint, outpaint, substituição de objetos",
+  "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, edição por instrução, substituição de rosto/objetos",
+  "f1.inp.desc.none": "UNET Flux"
 }

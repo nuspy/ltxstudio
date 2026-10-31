@@ -3651,5 +3651,9 @@
   "imp2.key.field": "여기에 API 키 붙여넣기",
   "imp2.key.save": "확인 후 저장",
   "imp2.key.bad": "키가 거부되었습니다({c}). 전체를 복사했는지 확인하세요.",
-  "imp2.key.ok": "키를 확인하고 저장했습니다."
+  "imp2.key.ok": "키를 확인하고 저장했습니다.",
+  "f1.inp.desc.fill": "FLUX Fill: 인페인트·아웃페인트",
+  "f1.inp.desc.base": "FLUX 기본: 인페인트, 아웃페인트, 객체 교체",
+  "f1.inp.desc.klein": "FLUX.2 Klein: 인페인트, 지시 편집, 얼굴/객체 교체",
+  "f1.inp.desc.none": "UNET Flux"
 }

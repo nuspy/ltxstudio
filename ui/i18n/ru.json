@@ -3651,5 +3651,9 @@
   "imp2.key.field": "Вставьте ключ API сюда",
   "imp2.key.save": "Проверить и сохранить",
   "imp2.key.bad": "Ключ не принят ({c}). Проверьте, что он скопирован целиком.",
-  "imp2.key.ok": "Ключ проверен и сохранён."
+  "imp2.key.ok": "Ключ проверен и сохранён.",
+  "f1.inp.desc.fill": "FLUX Fill: inpaint и outpaint",
+  "f1.inp.desc.base": "FLUX base: inpaint, outpaint, замена объектов",
+  "f1.inp.desc.klein": "FLUX.2 Klein: inpaint, правка по инструкции, замена лица/объектов",
+  "f1.inp.desc.none": "UNET Flux"
 }

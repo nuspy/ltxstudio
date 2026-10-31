@@ -2598,9 +2598,15 @@ class Frame1Tab(QWidget):
             if u.lower() in hardcoded_unets:
                 continue
             base = _os.path.splitext(_os.path.basename(u))[0]
-            label = f"{base}  · UNET Flux"
+            _k = _af.inpaint_kind(u)
+            # Punto 14: accanto al nome, a COSA serve il modello (dall'header: fill / base / klein), non il generico «UNET Flux».
+            _desc = {"fill": tr("f1.inp.desc.fill", "FLUX Fill: inpaint e outpaint"),
+                     "base": tr("f1.inp.desc.base", "FLUX base: inpaint, outpaint, sostituzione di oggetti"),
+                     "klein": tr("f1.inp.desc.klein", "FLUX.2 Klein: inpaint, edit per istruzione, sostituzione di viso/oggetti")}.get(
+                         _k, tr("f1.inp.desc.none", "UNET Flux"))
+            label = f"{base}  · {_desc}"
             self._dynamic_unets[label] = u
-            self._dynamic_kind[label] = _af.inpaint_kind(u)
+            self._dynamic_kind[label] = _k
             self.inp_model.insertItem(insert_at, label)
             insert_at += 1
         self.inp_model.blockSignals(True)
