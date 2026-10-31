@@ -931,6 +931,12 @@ def _patch_nunchaku_zimage_rope() -> None:
             if packed is None:
                 packed = torch.view_as_real(freqs_cis).unsqueeze(3)
                 packed = torch.flip(packed, dims=[-1])
+                if packed.shape[0] > 1:
+                    # CAUSA dell'assert «rotary_emb.shape[0]*shape[1] == M» (giro 31/10: rotary (2, 64, 64) → (2, 256, 128), ma le righe
+                    # del GEMM sono 2×64 = 128 → 256 dopo il padding): con batch > 1 (CFG: positivo+negativo) nunchaku imballava il
+                    # rotary PER ELEMENTO con padding a 256 ciascuno, mentre il kernel indicizza per riga piatta (batch×lunghezza).
+                    # Appiattisco (B, L) in (1, B·L) prima del padding: per L multiplo di 16 il layout coincide con quello vecchio.
+                    packed = packed.reshape(1, packed.shape[0] * packed.shape[1], *packed.shape[2:])
                 packed = tz.pack_rotemb(tz.pad_tensor(packed, 256, 1))
                 self.packed_cache[key] = packed
                 if len(seen) < 4:
