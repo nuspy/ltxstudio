@@ -147,9 +147,11 @@ def run(params: dict, *, timeout: int | None = 1800) -> dict:
     # shards'). Single-GPU: un modello pesante alla volta.
     try:
         import urllib.request
+        # mode=destroy: Krea 2 gira in un processo SEPARATO (venv lingbot, ~35 GB di RAM) e il figlio immagini «demote» teneva i modelli
+        # PARCHEGGIATI in RAM (47,5 GB): somma = commit sotto il pavimento (giro 31/10, modifica_integra_krea-2-edit_00). Qui la RAM va all'OS.
         urllib.request.urlopen(urllib.request.Request(
-            "http://127.0.0.1:8189/free", data=b"{}", headers={"Content-Type": "application/json"}),
-            timeout=20).read()
+            "http://127.0.0.1:8189/free", data=b'{"mode": "destroy"}', headers={"Content-Type": "application/json"}),
+            timeout=30).read()
     except Exception:                                        # noqa: BLE001
         pass
     try:

@@ -1234,6 +1234,17 @@ def _guard_load(model_path: str, arch: str) -> None:
     invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
     from core import mem_budget
     need = _predicted_load_mb(model_path, arch)
+    if need >= float(os.environ.get("NATIVE_PARK_FREE_BIG_LOAD_MB", "15000")):
+        # CARICO GROSSO (es. FLUX.2-dev 22,7 GB + encoder): i modelli PARCHEGGIATI in RAM dei job precedenti (fino a 48 GB di cache) si
+        # sommano al transitorio del load e il commit crolla sotto il pavimento (giro 31/10: processo a 85 GB, guardiano a 18,6 GB). Si
+        # liberano TUTTI prima: tornano dal disco al prossimo uso, meglio di una chiusura dell'app.
+        try:
+            from inference_server.component_store import STORE
+            freed = STORE.free_cpu_mb(1e9)
+            if freed > 0:
+                print(f"[mem] carico grosso (~{need / 1024:.0f} GB): liberati {freed / 1024:.1f} GB di modelli parcheggiati in RAM", flush=True)
+        except Exception:                                   # noqa: BLE001
+            pass
     if need > 0:
         deficit = need + mem_budget.commit_floor_mb() + 8192.0 - mem_budget.avail_commit_mb()   # 8GB di margine per i transitori
         if deficit > 0:
