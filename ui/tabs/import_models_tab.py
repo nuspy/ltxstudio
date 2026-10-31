@@ -740,6 +740,93 @@ class ImportModelsTab(QWidget):
         w.start()
         self.url_edit.clear()
 
+    # ---- A) Importa da pagina ----
+    def _import_from_page(self):
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFileDialog, QFormLayout
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("imp2.page.title", "Importa da pagina"))
+        dlg.setMinimumWidth(560)
+        f = QFormLayout(dlg)
+        url = QLineEdit()
+        url.setPlaceholderText("https://civitai.com/models/…  /  civitai.red  /  civitai.green")
+        f.addRow(tr("imp2.page.url_lbl", "Pagina del modello"), url)
+        row = QHBoxLayout()
+        fe = QLineEdit()
+        fe.setReadOnly(True)
+        bp = QPushButton(tr("imp2.page.file_pick", "Scegli il file scaricato…"))
+        bp.clicked.connect(lambda: fe.setText(QFileDialog.getOpenFileName(dlg, "", "", "Modelli (*.safetensors *.ckpt *.pt *.gguf)")[0] or fe.text()))
+        row.addWidget(fe, 1)
+        row.addWidget(bp)
+        w = QWidget()
+        w.setLayout(row)
+        f.addRow(tr("imp2.page.file_lbl", "File"), w)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(dlg.accept)
+        bb.rejected.connect(dlg.reject)
+        f.addRow(bb)
+        if not dlg.exec():
+            return
+        path, page = fe.text().strip(), url.text().strip()
+        if not path or not os.path.isfile(path):
+            return
+        self._log(tr("imp2.page.working", "\
+🔗 Ricostruisco i dati di {f} dalla pagina…").format(f=os.path.basename(path)))
+        wk = _PageImportWorker(path, page)
+        wk.item_ready.connect(self._add_item_to_queue)
+        wk.note.connect(self._log)
+        self._workers.append(wk)
+        wk.start()
+
+    # ---- B) procedura guidata della chiave API (salvata SOLO in user_prefs, mai nei log) ----
+    def _key_wizard(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout as _V
+        from core import user_prefs
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("imp2.key.title", "Chiave API Civitai"))
+        dlg.setMinimumWidth(560)
+        lay = _V(dlg)
+        steps = QLabel(tr("imp2.key.steps",
+                          "1) Accedi a Civitai (anche l'abbonamento o i permessi per i contenuti maturi li gestisci tu, sul sito: l'app non paga nulla).\
+"
+                          "2) Apri le impostazioni dell'account → «API Keys» → «Add API key», dai un nome e copiala.\
+"
+                          "3) Incollala qui sotto: resta solo sul tuo PC (preferenze dell'app), non finisce mai nei log."))
+        steps.setWordWrap(True)
+        lay.addWidget(steps)
+        b_open = QPushButton(tr("imp2.key.open", "Apri le impostazioni dell'account"))
+        b_open.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://civitai.com/user/account")))
+        lay.addWidget(b_open)
+        ke = QLineEdit()
+        ke.setEchoMode(QLineEdit.Password)
+        ke.setPlaceholderText(tr("imp2.key.field", "Incolla qui la chiave API"))
+        lay.addWidget(ke)
+        res = QLabel("")
+        res.setWordWrap(True)
+        lay.addWidget(res)
+        bb = QDialogButtonBox()
+        b_save = bb.addButton(tr("imp2.key.save", "Verifica e salva"), QDialogButtonBox.AcceptRole)
+        bb.addButton(QDialogButtonBox.Close).clicked.connect(dlg.close)
+        lay.addWidget(bb)
+
+        def _save():
+            k = ke.text().strip()
+            if not k:
+                return
+            try:
+                model_importer.civitai_client._get_json(f"{model_importer.civitai_client.API}/models?limit=1", k, 20.0)
+            except Exception as e:                           # noqa: BLE001
+                code = getattr(e, "code", "")
+                res.setText(tr("imp2.key.bad", "Chiave non accettata ({c}). Controlla di averla copiata per intero.").format(c=code or type(e).__name__))
+                return
+            user_prefs.set("civitai_api_key", k)
+            ke.clear()
+            res.setText(tr("imp2.key.ok", "Chiave verificata e salvata."))
+        b_save.clicked.disconnect() if False else None
+        b_save.clicked.connect(_save)
+        dlg.exec()
+
     def _on_url_resolved(self, info: dict):
         it = model_importer.ImportItem(
             path="", name=info.get("name", "civitai"),
