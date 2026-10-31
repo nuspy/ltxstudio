@@ -574,6 +574,12 @@ class Driver:
         def r():
             f, vt = self.w.frame1_tab, self.w.video_tab
             f.canvas.clear_image()
+            try:                                                   # architettura video nota (LTX): un caso H3 prima non deve lasciare il menu modelli di H3
+                i = vt.video_arch.findData("ltx")
+                if i >= 0 and vt.video_arch.currentIndex() != i:
+                    vt.video_arch.setCurrentIndex(i)
+            except Exception:                                     # noqa: BLE001
+                pass
             try:
                 f.compose_list.clear()
                 f._compose_masks.clear()
