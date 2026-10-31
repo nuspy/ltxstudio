@@ -107,6 +107,11 @@ class LoraTab(QWidget):
         rl.addWidget(self.preview)
         self.info = QPlainTextEdit(); self.info.setReadOnly(True); self.info.setMaximumHeight(160)
         rl.addWidget(self.info)
+        self.btn_page = QPushButton(tr("lora.page.btn", "Apri la pagina della LoRA"))
+        self.btn_page.setVisible(False)
+        self._page_url = ""
+        self.btn_page.clicked.connect(self._open_page)
+        rl.addWidget(self.btn_page)
         split.addWidget(right)
         split.setSizes([520, 320])
         root.addWidget(split, 1)
@@ -250,6 +255,12 @@ class LoraTab(QWidget):
         user_prefs.toggle_fav_lora(e.comfy_name, strength)
         self.refresh()
 
+    def _open_page(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        if self._page_url:
+            QDesktopServices.openUrl(QUrl(self._page_url))
+
     def _on_select(self, cur, prev):
         if cur:
             self._show_entry(cur.data(Qt.UserRole))
@@ -265,13 +276,28 @@ class LoraTab(QWidget):
             lines.append(tr("lora.info.trigger_notes") + ":" + "".join(chr(10) + "  " + n[:200] for n in e.trigger_notes[:12]))
         if e.downloads:
             lines.append(tr("lora.info.downloads").format(n=e.downloads))
-        if e.description:
-            lines.append("\n" + e.description[:600])
+        from core import lora_examples as _ex
+        ex = _ex.info_for(getattr(e, "sha256", ""))
+        desc = e.description or ex.get("description", "")
+        if desc:
+            lines.append("\n" + desc[:600])
+        page = e.civitai_url or ex.get("page") or ""
+        if page:                                         # punto 6: pagina di provenienza (se disponibile)
+            lines.append("\n" + tr("lora.info.page", "Pagina") + ": " + page)
+        self._page_url = page
+        self.btn_page.setVisible(bool(page))
         self.info.setPlainText("\n".join(lines))
         # preview
         self.preview.setText(tr("lora.preview.loading"))
         url = self.catalog.preview_url_for(e, allow_nsfw=self.allow_nsfw_getter())
         if not url:
+            local = _ex.best_image(getattr(e, "sha256", ""), self.allow_nsfw_getter())   # esempio CERCATO online e messo in cache
+            if local:
+                try:
+                    self._set_thumb(open(local, "rb").read())
+                    return
+                except OSError:
+                    pass
             self.preview.setText(tr("lora.preview.none"))
             return
         if e.preview_is_video:

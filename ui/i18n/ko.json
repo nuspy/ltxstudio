@@ -3632,5 +3632,7 @@
   "f1.compose.guidance.tt": "프롬프트 준수도. '자동' = 엔진 권장값.",
   "f1.compose.guidance_lbl": "가이던스",
   "mw.compose_bad_ref": "프롬프트가 {t}을(를) 참조하지만 목록에는 사진이 {n}장입니다.",
-  "vid.gguf.warn": "⚠ VRAM 상주 {gb} GB: 고해상도/긴 길이에서는 들어가지 않을 수 있음"
+  "vid.gguf.warn": "⚠ VRAM 상주 {gb} GB: 고해상도/긴 길이에서는 들어가지 않을 수 있음",
+  "lora.info.page": "페이지",
+  "lora.page.btn": "LoRA 페이지 열기"
 }

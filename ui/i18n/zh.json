@@ -3632,5 +3632,7 @@
   "f1.compose.guidance.tt": "对提示词的遵循度。“自动”＝引擎推荐值。",
   "f1.compose.guidance_lbl": "引导强度",
   "mw.compose_bad_ref": "提示词引用了 {t}，但列表中只有 {n} 张照片。",
-  "vid.gguf.warn": "⚠ 常驻显存 {gb} GB：高分辨率/长时长下可能放不下"
+  "vid.gguf.warn": "⚠ 常驻显存 {gb} GB：高分辨率/长时长下可能放不下",
+  "lora.info.page": "页面",
+  "lora.page.btn": "打开 LoRA 页面"
 }

@@ -3632,5 +3632,7 @@
   "f1.compose.guidance.tt": "Promptkövetés. «auto» = a motor ajánlott értéke.",
   "f1.compose.guidance_lbl": "Guidance",
   "mw.compose_bad_ref": "A prompt {t}-ra hivatkozik, de a listában {n} fotó van.",
-  "vid.gguf.warn": "⚠ {gb} GB állandóan a VRAM-ban: nagy felbontásnál/hossznál nem biztos, hogy elfér"
+  "vid.gguf.warn": "⚠ {gb} GB állandóan a VRAM-ban: nagy felbontásnál/hossznál nem biztos, hogy elfér",
+  "lora.info.page": "Oldal",
+  "lora.page.btn": "A LoRA oldalának megnyitása"
 }

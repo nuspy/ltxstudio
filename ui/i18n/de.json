@@ -3632,5 +3632,7 @@
   "f1.compose.guidance.tt": "Prompt-Treue. „auto“ = vom Modell empfohlener Wert.",
   "f1.compose.guidance_lbl": "Guidance",
   "mw.compose_bad_ref": "Der Prompt nennt {t}, aber die Liste enthält {n} Fotos.",
-  "vid.gguf.warn": "⚠ {gb} GB dauerhaft im VRAM: passt bei hoher Auflösung/Dauer evtl. nicht"
+  "vid.gguf.warn": "⚠ {gb} GB dauerhaft im VRAM: passt bei hoher Auflösung/Dauer evtl. nicht",
+  "lora.info.page": "Seite",
+  "lora.page.btn": "LoRA-Seite öffnen"
 }

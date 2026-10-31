@@ -3671,5 +3671,7 @@
   "f1.compose.guidance.tt": "Aderenza al prompt. «auto» = valore consigliato dal motore.",
   "f1.compose.guidance_lbl": "Guidance",
   "mw.compose_bad_ref": "Il prompt cita {t}, ma nella lista ci sono {n} foto.",
-  "vid.gguf.warn": "⚠ {gb} GB residenti in VRAM: a risoluzione/durata alte può non entrare"
+  "vid.gguf.warn": "⚠ {gb} GB residenti in VRAM: a risoluzione/durata alte può non entrare",
+  "lora.info.page": "Pagina",
+  "lora.page.btn": "Apri la pagina della LoRA"
 }
