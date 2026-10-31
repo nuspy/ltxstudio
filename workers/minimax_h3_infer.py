@@ -580,6 +580,32 @@ def dump_gpu_state(log=print, top: int = 10) -> None:
                 log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt}  {cls}  es. {nm[:60]}")
         except Exception as e2:                                      # noqa: BLE001
             log(f"[oom] attribuzione non riuscita: {e2}")
+        # 2ª attribuzione, per RADICE: la prima (sopra) si fermava alla classe del Linear foglia («Linear … weight») e non diceva di quale
+        # modello fossero i 9 GB fp32 con layer da 2048 canali. Qui si risale alle radici (moduli che nessun altro modulo contiene).
+        try:
+            mods = [o for o in gc.get_objects() if isinstance(o, torch.nn.Module)]
+            child = set()
+            for o in mods:
+                for c in o.children():
+                    child.add(id(c))
+            rows = []
+            for o in mods:
+                if id(o) in child:
+                    continue
+                by = {}
+                for t in list(o.parameters(recurse=True)) + list(o.buffers(recurse=True)):
+                    if t.is_cuda:
+                        by[str(t.dtype)] = by.get(str(t.dtype), 0) + t.untyped_storage().nbytes()
+                tot = sum(by.values())
+                if tot > 2**28:
+                    nl = sum(1 for m in o.modules() if m.__class__.__name__ == "Linear")
+                    rows.append((tot, type(o).__name__, by, nl))
+            log("[oom] per RADICE (modello intero che possiede i pesi su GPU):")
+            for tot, cls, by, nl in sorted(rows, key=lambda r: -r[0])[:8]:
+                det = ", ".join(f"{k.replace('torch.', '')} {v / 2**30:.2f}" for k, v in sorted(by.items(), key=lambda kv: -kv[1]))
+                log(f"[oom]   {tot / 2**30:6.2f} GB  {cls}  ({nl} Linear)  [{det}]")
+        except Exception as e3:                                      # noqa: BLE001
+            log(f"[oom] attribuzione per radice non riuscita: {e3}")
         log(f"[oom] gruppi (forma, dtype) per byte totali:")
         for (shape, dt), (n, nb) in sorted(groups.items(), key=lambda kv: -kv[1][1])[:top]:
             log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt} {list(shape)}")
