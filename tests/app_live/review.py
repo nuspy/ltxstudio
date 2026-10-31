@@ -90,7 +90,12 @@ def build(run_dir: str, nome: str = "giro") -> str:
             t, b = _thumb(o, rd, f"{safe}_out{k}"), _thumb(o, rd, f"{safe}_out{k}", True)
             media.append({"path": o, "thumb": t, "big": b, "video": o.lower().endswith(VID)})
         origs = []
-        for key in ("init_image", "image_path", "mask", "mask_path", "control_image"):
+        iniz = None
+        if c.get("fn") == "video":                                          # «Immagine iniziale: nessuna / miniatura» (bug 31/10)
+            sp_ = p.get("image_path") or next((k.get("path") for k in (p.get("keyframes") or []) if isinstance(k, dict) and k.get("path")), None)
+            iniz = {"path": sp_ or "", "thumb": _thumb(sp_, rd, f"{safe}_iniz") if sp_ and os.path.isfile(sp_) else None,
+                    "big": _thumb(sp_, rd, f"{safe}_iniz", True) if sp_ and os.path.isfile(sp_) else None}
+        for key in (("init_image", "mask", "mask_path", "control_image") if c.get("fn") == "video" else ("init_image", "image_path", "mask", "mask_path", "control_image")):
             v = p.get(key)
             if isinstance(v, str) and os.path.isfile(v):
                 origs.append({"label": key, "path": v, "thumb": _thumb(v, rd, f"{safe}_{key}"), "big": _thumb(v, rd, f"{safe}_{key}", True)})
@@ -115,7 +120,7 @@ def build(run_dir: str, nome: str = "giro") -> str:
             "prompt": c.get("prompt") or p.get("prompt"), "negativo": c.get("negative") or p.get("negative"),
             "params": {k: v for k, v in p.items() if k not in ("prompt", "negative", "loras")}, "loras": loras,
             "media": media, "orig": origs, "verifica": _what_to_check(c, r), "descr": c.get("descr") or "",
-            "dialoghi": [d.get("text", "")[:300] for d in (r.get("dialoghi") or [])],
+            "dialoghi": [d.get("text", "")[:300] for d in (r.get("dialoghi") or [])], "iniz": iniz,
         })
     data = {"nome": nome, "run": run_dir, "creato": time.strftime("%Y-%m-%d %H:%M"), "cards": cards}
     open(os.path.join(rd, "data.json"), "w", encoding="utf-8").write(json.dumps(data, ensure_ascii=False, default=str))

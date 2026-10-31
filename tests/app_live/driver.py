@@ -32,7 +32,7 @@ _KEEP = ("module", "arch", "task", "model", "model_gguf", "krea2_variant", "krea
          "ltx_release", "video_arch", "loras", "lora", "prompt", "negative", "seed", "steps", "guidance", "cfg",
          "width", "height", "length", "fps", "strength", "denoise", "init_image", "image_path", "mask", "mask_path",
          "ref_images", "control_image", "control_type", "outpaint", "output", "native_audio", "h3_dit", "h3_profile",
-         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release")
+         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes")
 
 
 def _safe(v, depth=0):
@@ -473,6 +473,7 @@ class Driver:
         self.sampler.begin()
         try:
             self._wait_inventory()
+            self.reset_state()                                   # stato NOTO: canvas vuoto, nessun layer/maschera/riferimento (bug del 31/10)
             fn = getattr(self, "case_" + str(case.get("fn", "ops")), None)
             if fn is None:
                 raise ValueError(f"tipo di caso sconosciuto: {case.get('fn')}")
@@ -491,6 +492,37 @@ class Driver:
         except Exception:                                    # noqa: BLE001
             pass
         return res
+
+    def reset_state(self) -> None:
+        """Porta la GUI a uno stato noto con i comandi VERI: pulsante 🗑 del canvas (clear_image: foto di base, layer, maschere),
+        lista di Componi vuota, pannello Riferimenti multipli vuoto e spento. Senza, un'immagine caricata da un caso restava
+        l'immagine INIZIALE di tutti i video successivi (use_image = bool(frame1_tab.image_path))."""
+        if os.environ.get("LTX_DRIVER_NO_RESET") == "1":          # SOLO controllo negativo del test: riproduce il bug per provare che la verifica lo vede
+            return
+
+        def r():
+            f, vt = self.w.frame1_tab, self.w.video_tab
+            f.canvas.clear_image()
+            try:
+                f.compose_list.clear()
+                f._compose_masks.clear()
+            except Exception:                                     # noqa: BLE001
+                pass
+            try:
+                vt.reference_panel.clear()
+                vt.reference_panel.enable.setChecked(False)
+            except Exception:                                     # noqa: BLE001
+                pass
+            try:
+                sp = vt.storyboard_panel
+                if hasattr(sp, "clear"):
+                    sp.clear()
+            except Exception:                                     # noqa: BLE001
+                pass
+            return f.image_path
+        left = self.gui(r, 60)
+        if left:
+            raise AssertionError(f"reset dello stato fallito: il canvas ha ancora {left}")
 
     def _wait_inventory(self, timeout: float = 90.0) -> None:
         """L'inventario dei modelli si carica in modo asincrono dopo l'avvio: il primo caso non deve partire con i menu ancora vuoti
@@ -657,6 +689,9 @@ class Driver:
                 for r in vt.lora._rows.values():
                     r["cb"].setChecked(False)
             steps["loras"] = [self.pick_lora(vt.lora, L) for L in case.get("loras", [])]
+            if case.get("start_image"):                           # i2v: l'immagine iniziale e quella del canvas (comando vero: load_image)
+                w.frame1_tab.canvas.load_image(case["start_image"], "canvas")
+                steps["start_image"] = w.frame1_tab.image_path
             vt.prompt.setPlainText(case["prompt"])
             vt.res_preset.setCurrentText("Personalizzato")
             vt.width.setValue(case["w"]); vt.height.setValue(case["h"]); vt.length.setValue(case["secs"])
@@ -708,6 +743,26 @@ class Driver:
                 if fn not in json.dumps(p.get("loras") or p.get("lora") or []).lower():
                     mis.append(f"LoRA {fn} attiva nel pannello ma assente dai parametri del backend")
             mis += self._extra_loras(steps, p)
+            # CORRISPONDENZA dell'IMMAGINE INIZIALE (bug 31/10): senza immagine nel caso il backend non ne deve ricevere nessuna;
+            # con immagine deve arrivare QUELLA del caso (confronto per hash del contenuto).
+            got = p.get("image_path") or next((k.get("path") for k in (p.get("keyframes") or []) if isinstance(k, dict) and k.get("path")), None)
+            want = case.get("start_image")
+            res["immagine_iniziale"] = {"attesa": want, "ricevuta": got}
+            if not want and got:
+                mis.append(f"IMMAGINE INIZIALE non prevista dal caso ma ricevuta dal backend: {got}")
+            elif want:
+                if not got:
+                    mis.append("il caso ha un'immagine iniziale ma il backend non ne riceve nessuna")
+                else:
+                    import hashlib
+
+                    def _h(x):
+                        try:
+                            return hashlib.sha256(open(x, "rb").read()).hexdigest()
+                        except OSError:
+                            return None
+                    if os.path.normcase(os.path.abspath(got)) != os.path.normcase(os.path.abspath(want)) and _h(got) != _h(want):
+                        mis.append(f"immagine iniziale SBAGLIATA: attesa {os.path.basename(want)}, ricevuta {os.path.basename(str(got))}")
             if case.get("refs"):                                    # punto 26: i riferimenti e lo sfondo devono arrivare al backend
                 refs = p.get("references") or []
                 want = len(case["refs"]) + (1 if case.get("background") else 0)

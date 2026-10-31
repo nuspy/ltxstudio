@@ -356,6 +356,8 @@ class MaskCanvas(QWidget):
                 x.setMaximumWidth(w)
             bar.addWidget(x); return x
         b("📁", self._load_dialog, 40); b("⤢", self._fit, 40)
+        _bx = b("🗑", self.clear_image, 40)
+        _bx.setToolTip(tr("canvas.clear_image.tt", "Svuota il canvas: nessuna immagine iniziale (il video diventa text-to-video)"))
         b("↶", self.undo, 40); b("↷", self.redo, 40)
         b(tr("canvas.clear_btn"), self.clear_mask); b(tr("canvas.save_btn"), self.save_mask); b(tr("canvas.reset_btn"), self.reset_saved)
         # ── Menu PROPORZIONI/dimensioni (spostato qui dal tab Video). Sottomenù per ratio + Personalizzato.
@@ -701,6 +703,29 @@ class MaskCanvas(QWidget):
         if cb.isChecked() and _up is not None:
             _up.set("canvas_fit_mode", mode)
         return mode
+
+    def clear_image(self) -> None:
+        """Svuota il canvas: nessuna foto di base, nessun layer, nessuna maschera. Comando VERO della GUI (pulsante 🗑):
+        senza di esso, una foto caricata una volta restava per sempre l'immagine iniziale di OGNI video (nel codice reale
+        `use_image = bool(frame1_tab.image_path)`), e non c'era modo di fare un text-to-video senza riavviare l'app."""
+        for e in list(self._entries)[1:]:                          # layer importati: via dalla scena
+            try:
+                self.scene.removeItem(e["item"])
+            except Exception:                                      # noqa: BLE001
+                pass
+        self._entries = self._entries[:1]
+        self._entries[0]["mask"] = self._new_mask()
+        self._active = 0
+        self.img_item.setPixmap(QPixmap())
+        self.img_item.setScale(1.0)
+        self.img_item.setPos(0, 0)
+        self._image_path = None
+        self._clear_seg_marker()
+        self._undo.clear(); self._redo.clear()
+        self._rebuild_layer_list()
+        self._refresh_mask()
+        self.status.setText(tr("canvas.status_cleared", "Canvas svuotato: nessuna immagine iniziale."))
+        self.image_changed.emit("")
 
     def load_image(self, path: str, fit_mode: str | None = None):
         pix = QPixmap(path)

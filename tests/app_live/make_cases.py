@@ -172,6 +172,12 @@ def main():
                           "prompt": "@image_1 waves at the camera and @image_2 nods, both standing in the balloon festival shown as background, soft morning light",
                           "descr": f"Punto 26: LTX-{rel[0]}.{rel[1]} con 2 riferimenti + SFONDO obbligatorio (guarda se lo sfondo e davvero usato come scena)",
                           "verify": "Lo SFONDO (mongolfiere) compare come scena del video? I due soggetti (donna dai capelli rossi, astronauta) sono riconoscibili? Confronta con le immagini originali affiancate."})
+    if m23:                                                              # immagine iniziale (i2v): il file del caso DEVE essere quello che arriva al modello
+        cases.append({"id": "video_i2v_ltx23", "fn": "video", "nsfw": True, "arch": "ltx", "model": m23["text"], "w": 704, "h": 960, "secs": 4, "seed": 8601,
+                      "timeout": 2400, "start_image": os.path.join(fx, "ritratto_960x1024.png"),
+                      "prompt": "the woman smiles and tilts her head toward the camera, leaves moving softly in the wind behind her",
+                      "descr": "Immagine iniziale (i2v) caricata nel canvas col comando vero: deve essere la prima inquadratura",
+                      "verify": "Il primo fotogramma e la donna dai capelli rossi dell'immagine iniziale mostrata sopra?"})
     if m23:                                                              # punto 28: edit di un file video dalla GUI, checkpoint 2.3 distilled (nessun avviso modale dev)
         cases.append({"id": "vedit_file_ltx23_distilled", "fn": "ops", "wait_job": True, "timeout": 2400,
                       "ops": [{"set": "video_tab.model", "value": m23["text"]},
