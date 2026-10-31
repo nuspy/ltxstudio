@@ -3605,5 +3605,15 @@
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: רזולוציה קבועה 832×480 (מגבלת המודל), לא ערכים אלה.",
   "f1.inpaint.fidelity_lbl": "נאמנות למקור",
   "f1.inpaint.fidelity.tt": "0 = משנה הכול, 1 = התמונה ללא שינוי. המנוע מקבל denoise = 1 − ערך.",
-  "msg.copy": "העתק"
+  "msg.copy": "העתק",
+  "dl.started": "ההורדה התחילה ברקע (~{gb} GB). אפשר להמשיך להשתמש באפליקציה: אודיע בסיום; ואז חזרו על הפעולה.",
+  "dl.tt": "מוריד: {done}/{total} MB — לחצו לפרטים או לביטול (cancel downloads)",
+  "dl.title": "הורדות בתהליך",
+  "dl.none": "אין הורדות בתהליך.",
+  "dl.row": "{label}: {done} / {total} MB - {speed} MB/s - נותרו ~{eta}",
+  "dl.cancel": "ביטול ההורדה",
+  "dl.done_title": "ההורדה הושלמה",
+  "dl.done_msg": "המשקלים הורדו: {ids}.\nעכשיו אפשר לחזור על הפעולה.",
+  "dl.failed_title": "ההורדה נכשלה",
+  "dl.unknown": "שגיאה לא ידועה"
 }

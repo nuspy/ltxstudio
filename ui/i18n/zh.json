@@ -3605,5 +3605,15 @@
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing：固定分辨率 832×480（模型限制），而不是这些数值。",
   "f1.inpaint.fidelity_lbl": "与原图的一致度",
   "f1.inpaint.fidelity.tt": "0 = 全部改变，1 = 图像不变。引擎收到的 denoise = 1 − 数值。",
-  "msg.copy": "复制"
+  "msg.copy": "复制",
+  "dl.started": "已在后台开始下载（约 {gb} GB）。您可以继续使用应用：下载完成后会通知您，然后请重复该操作。",
+  "dl.tt": "正在下载：{done}/{total} MB — 点击查看详情或取消 (cancel downloads)",
+  "dl.title": "正在下载",
+  "dl.none": "没有正在进行的下载。",
+  "dl.row": "{label}：{done} / {total} MB - {speed} MB/s - 剩余约 {eta}",
+  "dl.cancel": "取消下载",
+  "dl.done_title": "下载完成",
+  "dl.done_msg": "权重已下载：{ids}。\n现在可以重复该操作。",
+  "dl.failed_title": "下载失败",
+  "dl.unknown": "未知错误"
 }

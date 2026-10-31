@@ -86,6 +86,19 @@ def offer_download_gui(parent, ids: list[str], feature: str = "") -> bool:
     _acc = _la.confirm_gui(parent, dl_ids)                    # voci non commerciali: conferma di licenza
     if _acc is None:
         return False
+    import os as _os
+    if _os.environ.get("LTX_DOWNLOAD_BLOCKING") != "1":
+        # Punto 7: il download parte IN BACKGROUND (l'app resta libera, icona con avanzamento, avviso a fine download).
+        try:
+            from ui.download_manager import manager as _mgr
+            from ui.widgets.msg_dialog import show_message as _sm
+            _mgr().start(dl_ids, feature, _la.args_for(_acc))
+            _sm(parent, tr("weights.missing.title", "Pesi mancanti"),
+                tr("dl.started", "Download avviato in background (~{gb} GB). Puoi continuare a usare l'app: ti avviso quando finisce; "
+                   "poi ripeti l'operazione.").format(gb=gb), "information")
+            return False
+        except Exception:                                # noqa: BLE001 - se la GUI non c'e: percorso bloccante di prima
+            pass
     dlg = QProgressDialog(tr("weights.missing.downloading", "Download pesi in corso…"),
                           tr("common.cancel", "Annulla"), 0, 0, parent)
     dlg.setWindowTitle(tr("weights.missing.title", "Pesi mancanti"))

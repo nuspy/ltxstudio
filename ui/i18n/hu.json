@@ -3605,5 +3605,15 @@
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: fix 832×480 felbontás (a modell korlátja), nem ezek az értékek.",
   "f1.inpaint.fidelity_lbl": "Hűség az eredetihez",
   "f1.inpaint.fidelity.tt": "0 = minden változik, 1 = a kép változatlan. A motor denoise = 1 − érték értéket kap.",
-  "msg.copy": "Másolás"
+  "msg.copy": "Másolás",
+  "dl.started": "A letöltés a háttérben elindult (~{gb} GB). Az alkalmazást tovább használhatja: szólok, ha kész; utána ismételje meg a műveletet.",
+  "dl.tt": "Letöltés: {done}/{total} MB — kattintson a részletekhez vagy a megszakításhoz (cancel downloads)",
+  "dl.title": "Folyamatban lévő letöltések",
+  "dl.none": "Nincs folyamatban lévő letöltés.",
+  "dl.row": "{label}: {done} / {total} MB - {speed} MB/s - hátra ~{eta}",
+  "dl.cancel": "Letöltés megszakítása",
+  "dl.done_title": "A letöltés kész",
+  "dl.done_msg": "Letöltött súlyok: {ids}.\nMost megismételheti a műveletet.",
+  "dl.failed_title": "A letöltés sikertelen",
+  "dl.unknown": "ismeretlen hiba"
 }

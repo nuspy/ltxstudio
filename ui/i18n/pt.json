@@ -3605,5 +3605,15 @@
   "vid.size_eff.rt": "Krea Realtime / Self-Forcing: resolução fixa 832×480 (limite do modelo), não estes valores.",
   "f1.inpaint.fidelity_lbl": "Fidelidade ao original",
   "f1.inpaint.fidelity.tt": "0 = muda tudo, 1 = imagem inalterada. O motor recebe denoise = 1 − valor.",
-  "msg.copy": "Copiar"
+  "msg.copy": "Copiar",
+  "dl.started": "Download iniciado em segundo plano (~{gb} GB). Você pode continuar usando o app: aviso quando terminar; depois repita a operação.",
+  "dl.tt": "Baixando: {done}/{total} MB — clique para detalhes ou cancelar (cancel downloads)",
+  "dl.title": "Downloads em andamento",
+  "dl.none": "Nenhum download em andamento.",
+  "dl.row": "{label}: {done} / {total} MB - {speed} MB/s - ~{eta} restantes",
+  "dl.cancel": "Cancelar download",
+  "dl.done_title": "Download concluído",
+  "dl.done_msg": "Pesos baixados: {ids}.\nAgora você pode repetir a operação.",
+  "dl.failed_title": "Falha no download",
+  "dl.unknown": "erro desconhecido"
 }

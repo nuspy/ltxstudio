@@ -1260,6 +1260,19 @@ class MainWindow(QMainWindow):
         self._mem_btn.setStyleSheet("QToolButton{border:none;font-size:16px;padding:2px 6px;}")
         self._mem_btn.clicked.connect(self._toggle_mem_monitor)
         self._tab_nav_layout.addWidget(self._mem_btn)
+        # Icona download (punto 7): visibile solo con download in corso; clic = elenco con MB/totale, ETA, Annulla download.
+        self._dl_btn = QToolButton(self)
+        self._dl_btn.setText("⬇")
+        self._dl_btn.setStyleSheet("QToolButton{border:none;font-size:16px;padding:2px 6px;color:#4caf50;}")
+        self._dl_btn.setVisible(False)
+        self._dl_btn.clicked.connect(lambda: self._show_downloads())
+        self._tab_nav_layout.addWidget(self._dl_btn)
+        try:
+            from ui.download_manager import manager as _dlm
+            _dlm().changed.connect(self._on_downloads_changed)
+            _dlm().finished.connect(self._on_download_finished)
+        except Exception:                                   # noqa: BLE001
+            pass
         self.jobs.changed.connect(self._refresh_status)
 
         # La riga "ComfyUI: NATIVO @ http://… | Template: …" non compare più nella barra di stato:
