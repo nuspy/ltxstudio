@@ -166,10 +166,16 @@ def run(params: dict, mm, output_dir: str) -> dict:
                     def _iou(i):
                         inter = int((arr[i] & lasso).sum())
                         return inter / max(1, areas[i] + int(lasso.sum()) - inter)
-                    # chi cerchia un oggetto lo cerchia attorno: il CENTRO dell'area sta sull'oggetto -> la maschera deve contenerlo
+                    # il CENTRO dell'area e solo un piccolo bonus, NON un filtro: sul caso dal vivo (1/11) il centro cadeva in un «buco» della maschera
+                    # dell'astronauta (IoU 0,32, 15,7 %) che veniva scartata, e vinceva un pezzo di 1,8 % (IoU 0,13) che conteneva il centro.
                     on_c = [i for i in cands if ccx is not None and bool(arr[i][ccy, ccx])]
-                    pool = on_c or cands
-                    best = max(pool, key=_iou)
+
+                    def _score(i):
+                        return _iou(i) + (0.05 if i in on_c else 0.0)
+                    best = max(cands, key=_score)
+                    for _i in sorted(cands, key=_iou, reverse=True)[:6]:        # diagnosi: i migliori per IoU (col centro = c)
+                        print(f"[segment]   cand #{_i}: {100 * areas[_i] / (arr.shape[-1] * arr.shape[-2]):.1f}% iou={_iou(_i):.2f}"
+                              f"{' c' if _i in on_c else ''}", flush=True)
                     print(f"[segment] lazo: {len(cands)} candidati ({len(on_c)} col centro) -> #{best} {100 * areas[best] / (arr.shape[-1] * arr.shape[-2]):.1f}% iou={_iou(best):.2f}", flush=True)
                     m_np = arr[best].numpy().astype("uint8") * 255
                 else:
