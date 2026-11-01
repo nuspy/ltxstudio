@@ -75,6 +75,39 @@ def port_busy(port):
         s.close()
 
 
+LAST_EXIT = os.path.join(ORCH, "ultima_uscita_app.txt")
+
+
+def _wait_clean(min_gap_s=30.0, timeout=120.0):
+    """Prima di avviare l'app di test: la precedente deve essere davvero sparita (porta libera, nessun live_guard/app.py di QUESTO worktree) e
+    devono essere passati almeno `min_gap_s` dalla sua uscita. Giro 1/11 00:15: la prova a secco era finita alle 00:15:10 e il giro vero e partito
+    7 s dopo; l'app nuova non ha mai risposto (nessuna riga di log in 4 minuti) e il giro e morto per TimeoutError senza che nessuno se ne accorgesse."""
+    import psutil
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            gap = time.time() - float(open(LAST_EXIT).read().strip())
+        except Exception:                                    # noqa: BLE001
+            gap = 1e9
+        busy = port_busy(PORT)
+        left = []
+        for pr in psutil.process_iter(["pid", "cmdline"]):
+            cl_ = " ".join(pr.info.get("cmdline") or [])
+            if ROOT in cl_ and ("live_guard.py" in cl_ or cl_.rstrip().endswith("app.py")) and pr.pid != os.getpid():
+                left.append(pr.pid)
+        if gap >= min_gap_s and not busy and not left:
+            return
+        time.sleep(2)
+    say("ATTENZIONE: l'app precedente non risulta ancora sparita dopo %.0f s: procedo comunque" % timeout)
+
+
+def _mark_exit():
+    try:
+        open(LAST_EXIT, "w").write(str(time.time()))
+    except Exception:                                        # noqa: BLE001
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cases", nargs="?", default="")
@@ -114,6 +147,7 @@ def main():
     if not a.allow_existing_app and (port_busy(PORT) or native_driver.is_up()):
         say("ABORT: c'è già un'app/server vivo (porta 8765 o InferenceServer :8189). Chiudila, oppure --allow-existing-app.")
         return 3
+    _wait_clean()
     # dati di runtime NON versionati (chiavi incluse): copiati dal principale, mai committati
     for fn in ("user_prefs.json", "lora_overrides.json"):
         src, dst = os.path.join(MAIN_ROOT, "data", fn), os.path.join(ROOT, "data", fn)
@@ -131,7 +165,21 @@ def main():
     cl = Client()
     results, stop = [], False
     try:
-        cl.connect(proc=proc)
+        try:
+            cl.connect(timeout=150, proc=proc)
+        except TimeoutError:
+            # l'app non ha mai avviato il driver (giro 1/11 00:15): si butta giu l'albero, si aspetta che sia pulito e si riprova UNA volta.
+            # Lo stack dell'app bloccata e in app_stdout.log (faulthandler, vedi app.py).
+            say("il driver non risponde dopo 150 s: riavvio l'app e riprovo una volta (stack dell'app bloccata in app_stdout.log)")
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+            time.sleep(5)
+            _mark_exit()
+            _wait_clean()
+            applog.write("\n===== NUOVO TENTATIVO DI AVVIO =====\n")
+            applog.flush()
+            proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=applog, stderr=subprocess.STDOUT)
+            cl = Client()
+            cl.connect(timeout=240, proc=proc)
         say("driver collegato: " + json.dumps(cl.send({"cmd": "ping"})))
         t0 = time.time()
         while time.time() - t0 < 300:                        # InferenceServer pronto (autostart dell'app)
@@ -184,6 +232,7 @@ def main():
         if proc.poll() is None and not a.keep_app:
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
         applog.close()
+        _mark_exit()
     try:                                                     # l'app di test scrive le preferenze (es. video_arch) nel worktree: ripristino la copia pulita
         shutil.copy2(os.path.join(MAIN_ROOT, "data", "user_prefs.json"), os.path.join(ROOT, "data", "user_prefs.json"))
         gs = os.path.join(ROOT, "data", "gui_state.json")

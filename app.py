@@ -9,6 +9,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# Solo test dal vivo (LTX_TEST_DRIVER=1, mai nelle build): se l'avvio si pianta, dopo 100 s lo stack di TUTTI i thread finisce nel log
+# (altrimenti un'app bloccata prima di qualunque riga di log non lascia traccia: giro 1/11 00:15). Annullato appena il driver e attaccato.
+if os.environ.get("LTX_TEST_DRIVER") == "1" and not getattr(sys, "frozen", False) and "__compiled__" not in globals():
+    import faulthandler
+    faulthandler.dump_traceback_later(100, exit=False)
+
 # Verifica TLS contro lo store di certificati del sistema, non contro il bundle certifi: dietro un
 # antivirus/proxy che ispeziona HTTPS certifi non riconosce la CA e ogni connessione fallisce (nel
 # .exe compilato in modo sistematico). Prima di qualunque import che possa aprire connessioni.
@@ -40,6 +46,8 @@ def main():
             _sp = importlib.util.spec_from_file_location("ltx_test_driver", str(Path(__file__).resolve().parent / "tests" / "app_live" / "driver.py"))
             _m = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(_m)
             _m.attach(win)
+            import faulthandler
+            faulthandler.cancel_dump_traceback_later()
         except Exception as e:                              # noqa: BLE001
             print(f"[test-driver] non attivato: {e}", flush=True)
     # Primo avvio: wizard «Setup modelli» (cartelle → collega i locali → scarica i mancanti dell'edizione).
