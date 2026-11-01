@@ -23,6 +23,8 @@ __pycache__/
 # Stato runtime / preferenze locali
 data/gui_state.json
 data/lora_examples/
+data/edge_voices.json
+data/edge_voices.tmp
 data/ca_bundle.pem
 data/user_prefs.json
 data/age_ack.json

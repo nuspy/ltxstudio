@@ -463,29 +463,78 @@ def edge_available() -> bool:
     return _EDGE_AVAILABLE
 
 
+_EDGE_CACHE = Path(__file__).resolve().parent.parent / "data" / "edge_voices.json"
+_EDGE_REFRESH_S = 24 * 3600
+_edge_thread = None
+
+
+def _edge_fetch_raw() -> list:
+    """Elenco voci dal servizio online Microsoft, con tetto di 20 s, in un loop proprio (da chiamare in un thread)."""
+    import edge_tts
+
+    async def _go():
+        return await asyncio.wait_for(edge_tts.list_voices(), 20)
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_go())
+    finally:
+        loop.close()
+
+
+def _edge_refresh_worker() -> None:
+    import json
+    import os
+    try:
+        raw = _edge_fetch_raw()
+        _EDGE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _EDGE_CACHE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, _EDGE_CACHE)
+    except Exception as e:                                   # noqa: BLE001 — rete/TLS: mai bloccare nulla
+        print(f"[tts] voci Edge non raggiungibili ({type(e).__name__}: {e}) → solo voci locali / cache", flush=True)
+
+
+def _edge_raw_voices() -> list:
+    """Voci Edge dalla CACHE su disco (data/edge_voices.json): istantanee. L'aggiornamento dalla rete (servizio ONLINE) gira in un thread
+    separato e non blocca mai: giro 1/11 04:45 — l'app restava appesa all'avvio per sempre dentro asyncio.run(list_voices) (socketpair di
+    loopback senza risposta) chiamato dal costruttore del tab Audio sul thread della GUI. Senza cache (primo avvio) si attende al massimo 8 s."""
+    import json
+    import threading
+    import time
+    global _edge_thread
+    voices: list = []
+    age = None
+    try:
+        if _EDGE_CACHE.exists():
+            voices = json.loads(_EDGE_CACHE.read_text(encoding="utf-8"))
+            age = time.time() - _EDGE_CACHE.stat().st_mtime
+    except Exception:                                        # noqa: BLE001
+        voices, age = [], None
+    if (age is None or age > _EDGE_REFRESH_S) and not (_edge_thread is not None and _edge_thread.is_alive()):
+        _edge_thread = threading.Thread(target=_edge_refresh_worker, name="edge-voices", daemon=True)
+        _edge_thread.start()
+        if not voices:
+            _edge_thread.join(8)
+            try:
+                if _EDGE_CACHE.exists():
+                    voices = json.loads(_EDGE_CACHE.read_text(encoding="utf-8"))
+            except Exception:                                # noqa: BLE001
+                voices = []
+    return voices
+
+
 def edge_list_voices(language_prefix: str = "it") -> list[VoicePreset]:
     """Elenca le voci Edge TTS disponibili (preset Microsoft). Filtrate per lingua.
 
-    L'elenco arriva da un servizio ONLINE Microsoft: senza rete — o dietro un proxy TLS la cui CA
-    non è in certifi — la richiesta fallisce. NON deve essere fatale: questa funzione è chiamata
-    mentre si costruisce il tab Audio, quindi un'eccezione qui impedisce l'avvio dell'intera GUI.
-    Si ritorna una lista vuota e restano disponibili le voci locali."""
+    Non blocca mai: legge la cache su disco e aggiorna la rete in background (vedi _edge_raw_voices). Chiamata mentre si costruisce il tab
+    Audio, quindi un'attesa o un'eccezione qui impedirebbe l'avvio dell'intera GUI. Senza cache e senza rete: lista vuota (restano le
+    voci locali)."""
     if not edge_available():
         return []
-    import edge_tts
     try:
-        try:
-            voices = asyncio.run(edge_tts.list_voices())
-        except RuntimeError:
-            # event loop già attivo (es. dentro Qt) → run in thread
-            import threading
-            result: list = []
-            def _runner():
-                result.append(asyncio.new_event_loop().run_until_complete(edge_tts.list_voices()))
-            t = threading.Thread(target=_runner); t.start(); t.join()
-            voices = result[0]
-    except Exception as e:                                   # noqa: BLE001 — rete/TLS: mai bloccare l'avvio
-        print(f"[tts] voci Edge non raggiungibili ({type(e).__name__}: {e}) → solo voci locali")
+        voices = _edge_raw_voices()
+    except Exception as e:                                   # noqa: BLE001
+        print(f"[tts] voci Edge non disponibili ({type(e).__name__}: {e}) → solo voci locali", flush=True)
         return []
     out: list[VoicePreset] = []
     for v in voices:
