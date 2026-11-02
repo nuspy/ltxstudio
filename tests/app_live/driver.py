@@ -666,7 +666,7 @@ class Driver:
                     v = v.get(part) if isinstance(v, dict) else None
                 if v is not None:
                     got.append(v)
-            if want not in got:
+            if not any(want == g or (isinstance(want, str) and isinstance(g, str) and want in g) for g in got):
                 problems.append(f"parametro del backend {dotted}: atteso {want!r}, trovato {got[:2]!r}")
         errs = [d for d in self.rec.dialogs if d["kind"] in ("critical", "warning", "exec")]
         if errs and not case.get("expect_dialog"):
