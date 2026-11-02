@@ -1,0 +1,225 @@
+"""MiniMax H3 EDIT con maschera — matematica pura (torch, senza ComfyUI, senza GPU obbligatoria).
+
+Riscrittura NATIVA, studiata dai nodi MIT `MiniMaxH3FantasticVideoEditLatent` / `EditComposite`
+(github.com/Adudeguyman/ComfyUI-Fantastic-MiniMaxH3-PromptBuilder, MIT, (c) 2026 Adudeguyman) e dai nodi `H3PeopleMask`,
+`H3GreyMannequins`, `clip_plan` (github.com/D3voz/comfyui-h3-oneclick-swap, MIT, (c) 2026 D3voz). Licenze e ringraziamenti
+in NOTICE-openjutsu.md. NIENTE codice dal pacchetto GPL «Context Loop»: la catena di clip di questo modulo e' la pianificazione
+a (lunghezza, contesto) del nodo MIT D3voz, la maschera causale/sostegno delle righe e' derivata dal layout di diffusers.
+
+Convenzioni H3 (verificate sul modulo diffusers `minimax_h3`):
+- clip valido = 17*k + 5 frame a 24 fps -> 5*k + 2 frame di latente; i frame-pixel per frame di latente ciclano (1, 4, 4, 4, 4);
+- una «cella» del latente e' 16x16 px; la maschera (1 = rigenera, 0 = tieni la sorgente) sta sulla griglia th/16 x tw/16;
+- audio: il latente tenuto ha maschera 0, quello generato 1.
+"""
+from __future__ import annotations
+
+import math
+
+import torch
+import torch.nn.functional as F
+
+FPS = 24
+CELL = 16                                   # lato in pixel di una cella di latente
+FRAMES_PER_LATENT = (1, 4, 4, 4, 4)         # frame-pixel per frame di latente (ciclo di 5)
+CUT_SNAP = 4                                # un clip puo finire fino a 4 frame prima di un taglio netto
+CHUNK = 16                                  # frame per passata nei ridimensionamenti
+SHARP_BLUR, SOFT_BLUR = 1.0, 8.0            # sigma minima / massima del manichino grigio
+
+
+# ── griglia dei frame ───────────────────────────────────────────────────────────────────────────
+def grid_floor(frames: int) -> int:
+    """Il clip H3 (17k+5) piu lungo contenuto in `frames` frame."""
+    return (frames - 5) // 17 * 17 + 5
+
+
+def usable_frames(n: int) -> int:
+    if n < 5:
+        raise ValueError(f"Il clip sorgente ha {n} frame; H3 ne vuole almeno 5.")
+    return grid_floor(n)
+
+
+def latent_frame_counts(n_pixel_frames: int) -> list[int]:
+    """Frame-pixel coperti da ciascun frame di latente per un clip di `n_pixel_frames` (17k+5)."""
+    if n_pixel_frames != grid_floor(n_pixel_frames):
+        raise ValueError(f"{n_pixel_frames} frame non e' della forma 17k+5.")
+    t = (n_pixel_frames - 5) // 17 * 5 + 2
+    counts = [FRAMES_PER_LATENT[k % 5] for k in range(t)]
+    assert sum(counts) == n_pixel_frames
+    return counts
+
+
+def budget_size(w: int, h: int, width: int, height: int) -> tuple[int, int, float]:
+    """(tw, th, scala): forma del clip entro width x height pixel, mai ingrandita, multipli di 32."""
+    scale = min(1.0, math.sqrt(width * height / float(w * h))) if width and height else 1.0
+    return max(32, round(w * scale / 32) * 32), max(32, round(h * scale / 32) * 32), scale
+
+
+def short_edge_size(w: int, h: int, short_edge: int) -> tuple[int, int]:
+    """Tela con lato corto `short_edge` (multiplo di 32), stesso rapporto del sorgente."""
+    scale = short_edge / float(min(w, h))
+    return max(32, round(w * scale / 32) * 32), max(32, round(h * scale / 32) * 32)
+
+
+# ── maschere ─────────────────────────────────────────────────────────────────────────────────────
+def resize_mask(mask: torch.Tensor, tw: int, th: int) -> torch.Tensor:
+    """[N, h, w] -> [N, th, tw]: 1 dove un qualunque pixel sorgente era mascherato (un bordo sottile non sparisce)."""
+    if tuple(mask.shape[1:]) == (th, tw):
+        return (mask > 0.5).float()
+    out = torch.empty((mask.shape[0], th, tw), dtype=torch.float32)
+    for i in range(0, mask.shape[0], CHUNK):
+        m = (mask[i:i + CHUNK] > 0.5).float()[:, None]
+        m = F.interpolate(m, size=(th, tw), mode="area" if th * tw < m.shape[-2] * m.shape[-1] else "nearest")
+        out[i:i + CHUNK] = (m[:, 0] > 0).float()
+    return out
+
+
+def grow_mask(mask: torch.Tensor, px: int) -> torch.Tensor:
+    """Allarga [N, H, W] di `px` pixel (dilatazione quadrata, due passate 1-D)."""
+    if px <= 0:
+        return mask
+    k = 2 * px + 1
+    out = torch.empty_like(mask)
+    for i in range(0, mask.shape[0], CHUNK):
+        m = mask[i:i + CHUNK].float()[:, None]
+        m = F.max_pool2d(m, (1, k), stride=1, padding=(0, px))
+        out[i:i + CHUNK] = F.max_pool2d(m, (k, 1), stride=1, padding=(px, 0))[:, 0]
+    return out
+
+
+def latent_mask(mask: torch.Tensor, frame_counts: list[int], lat_h: int, lat_w: int) -> torch.Tensor:
+    """Maschera-pixel [F, H, W] -> [1, 1, T, lat_h, lat_w]: un frame/cella di latente e mascherato se lo e' un qualunque pixel che copre."""
+    cells = F.adaptive_max_pool2d(mask[:, None], (lat_h, lat_w))[:, 0]
+    rows, at = [], 0
+    for n in frame_counts:
+        rows.append(cells[at:at + n].amax(dim=0))
+        at += n
+    return torch.stack(rows)[None, None]
+
+
+def feather_latent(mask: torch.Tensor, cells: int) -> torch.Tensor:
+    """[1,1,T,h,w] -> stessa forma con una rampa larga `cells` fuori dalla maschera (1 - k/(cells+1)): il bordo si fonde invece di tagliare."""
+    if cells <= 0:
+        return mask
+    x = near = mask[0].movedim(0, 1)                            # [T, 1, h, w]
+    out = x
+    for k in range(1, cells + 1):
+        near = F.max_pool2d(near, 3, stride=1, padding=1)
+        out = torch.maximum(out, near * (1 - k / (cells + 1)))
+    return out.movedim(1, 0)[None]
+
+
+def cell_mask(obj: torch.Tensor, tw: int, th: int, invert: bool = False, feather_px: int = 0, width: int | None = None):
+    """Cio che l'edit rigenera, sulla griglia delle celle: `obj` [n, mh, mw] (maschera cresciuta, 1 = oggetto/persona) -> maschera di
+    latente [1,1,T,th/16,tw/16] (+ conteggi). Invertita DOPO il ridimensionamento (cambia-sfondo: si rigenera tutto tranne la persona)."""
+    n = obj.shape[0]
+    counts = latent_frame_counts(n)
+    rows = []
+    for i in range(0, n, CHUNK):
+        m = resize_mask(obj[i:i + CHUNK], tw, th)
+        rows.append(F.adaptive_max_pool2d((1.0 - m if invert else m)[:, None], (th // CELL, tw // CELL))[:, 0])
+    cells = latent_mask(torch.cat(rows), counts, th // CELL, tw // CELL)
+    feather_cells = math.ceil(feather_px * tw / float(width or tw) / CELL) if feather_px else 0
+    return feather_latent(cells, feather_cells), counts
+
+
+# ── tagli e catena di clip ───────────────────────────────────────────────────────────────────────
+def find_shots(images: torch.Tensor, cut_threshold: float = 40.0) -> list[tuple[int, int]]:
+    """(inizio, fine) dei piani fra un taglio netto e l'altro. `images` [N, h, w, 3] float 0..1 (basta una versione piccola)."""
+    grey = torch.cat([F.interpolate(images[i:i + 64, ..., :3].mean(-1, keepdim=True).movedim(-1, 1).float(), size=(90, 160), mode="area")[:, 0]
+                      for i in range(0, images.shape[0], 64)]) * 255
+    diffs = [0.0] + (grey[1:] - grey[:-1]).abs().mean(dim=(1, 2)).tolist()
+    starts = [0]
+    for i in range(1, len(diffs)):
+        around = sorted(diffs[max(1, i - 6):i] + diffs[i + 1:i + 7])
+        median = around[len(around) // 2] if around else 0.0
+        if diffs[i] > cut_threshold and diffs[i] > 2.5 * median and i - starts[-1] >= 6:
+            starts.append(i)
+    return list(zip(starts, starts[1:] + [images.shape[0]]))
+
+
+def clip_plan(total: int, clip_frames: int, overlap: int, cuts: list[int], fits=None) -> list[tuple[int, int]]:
+    """[(lunghezza, contesto)] per clip. Un clip che puo finire su un taglio netto ci finisce e il successivo parte senza sovrapposizione;
+    se finisce fino a CUT_SNAP frame prima, il successivo riparte dagli ultimi 5. `fits(start, length)` (opzionale) limita la lunghezza
+    ai frame che stanno in memoria. Il contesto di un clip = i primi frame GIA generati del precedente (tenuti come contenuto dato)."""
+    longest = grid_floor(clip_frames)
+    clips, end, context = [], 0, 0
+    while True:
+        start = end - context
+        length = grid_floor(min(longest, total - start))
+        if fits:
+            length = next((n for n in range(length, context + 16, -17) if fits(end, n - context)), length)
+        if clips and length - context < 17:
+            return clips
+        following = overlap
+        if total - start > longest:
+            near = [(n, c - start - n) for n in range(length, longest // 2, -17) for c in cuts
+                    if 0 <= c - start - n <= CUT_SNAP and n - context >= 17 and total - start - n >= 22]
+            if near:
+                length, off = max(near, key=lambda x: (x[0], -x[1]))
+                following = 5 if off else 0
+        clips.append((length, context))
+        end, context = start + length, min(following, grid_floor(length - context))
+
+
+# ── persona: maschera, manichino grigio, sfondo grigio sfocato ───────────────────────────────────
+def person_mask(m: torch.Tensor, headroom: float, hold_frames: int) -> tuple[torch.Tensor, torch.Tensor]:
+    """Maschera di UNA persona [frames, h, w] con posa tenuta (+/- hold_frames) e spazio sopra la testa (headroom, quota dell'altezza);
+    ritorna (persona, altezza per pixel come quota del frame)."""
+    n, mh = m.shape[:2]
+    m = m.float()
+    if hold_frames:
+        m = F.max_pool1d(m.flatten(1).T[None], 2 * hold_frames + 1, stride=1, padding=hold_frames)[0].T.reshape(m.shape)
+    inside = m > 0.5
+    rows = torch.arange(mh, device=m.device)
+    occupied = inside.any(2)
+    height = (torch.where(occupied, rows, -1).amax(1) - torch.where(occupied, rows, mh).amin(1) + 1).clamp(min=0)
+    top = torch.where(inside, rows.view(1, mh, 1), mh).amin(1, keepdim=True)
+    room = (height * headroom).round().view(n, 1, 1)
+    # lo spazio sta solo sopra le colonne piu alte della persona (testa, capelli, mani alzate), non sopra le braccia tese
+    near_top = (top < mh) & (top <= top.amin(2, keepdim=True) + room)
+    person = inside | (near_top & (rows.view(1, mh, 1) >= top - room) & (rows.view(1, mh, 1) < top))
+    return person, person * (height / mh).view(n, 1, 1)
+
+
+def gaussian_blur(x: torch.Tensor, sigma: float) -> torch.Tensor:
+    """[n, c, h, w] con gaussiana separabile esatta (bordi estesi, non scuriti)."""
+    r = max(1, math.ceil(3 * sigma))
+    k = torch.exp(-0.5 * (torch.arange(-r, r + 1, device=x.device, dtype=x.dtype) / sigma) ** 2)
+    k = (k / k.sum()).repeat(x.shape[1], 1, 1, 1)
+    x = F.conv2d(F.pad(x, (r, r, 0, 0), mode="replicate"), k.view(x.shape[1], 1, 1, -1), groups=x.shape[1])
+    return F.conv2d(F.pad(x, (0, 0, r, r), mode="replicate"), k.view(x.shape[1], 1, -1, 1), groups=x.shape[1])
+
+
+def grey_mannequins(images: torch.Tensor, mask: torch.Tensor, size: torch.Tensor, blur: float = 0.02,
+                    neutral_background: bool = False) -> torch.Tensor:
+    """Le persone mascherate diventano figure grigie e lisce che tengono posa e ombreggiatura ma non volto, capelli, vestiti: un video di
+    riferimento del movimento non puo riportare le persone originali nell'edit. images [n,h,w,3] float 0..1; mask/size [n,h,w]."""
+    n, h, w = images.shape[:3]
+    out = torch.empty_like(images, dtype=torch.float32)
+    for i in range(0, n, CHUNK):
+        f = images[i:i + CHUNK].float().movedim(-1, 1)
+        m = F.interpolate(mask[i:i + CHUNK, None].float(), size=(h, w), mode="bilinear")
+        height = F.interpolate(size[i:i + CHUNK, None].float(), size=(h, w), mode="nearest") * h
+        soft = ((height * blur - SHARP_BLUR) / (SOFT_BLUR - SHARP_BLUR)).clamp(0, 1)
+        luma0 = (f * torch.tensor([0.299, 0.587, 0.114]).view(1, 3, 1, 1)).sum(1, keepdim=True)
+        luma = torch.lerp(gaussian_blur(luma0, SHARP_BLUR), gaussian_blur(luma0, SOFT_BLUR), soft)
+        grey = (0.45 + 0.45 * luma).expand(-1, 3, -1, -1)
+        base = torch.full_like(f, 0.5) if neutral_background else f
+        out[i:i + CHUNK] = torch.lerp(base, grey, m).movedim(1, -1)
+    return out
+
+
+def blur_area(frames: torch.Tensor, area: torch.Tensor, radius: float, grey: float = 0.0) -> torch.Tensor:
+    """Nel video di riferimento l'AREA (maschera 1 = da nascondere, es. lo sfondo nel cambio-sfondo) diventa una sfocatura liscia che porta
+    SOLO il movimento di camera e la disposizione grossolana: niente dettagli da copiare. `grey` in [0,1] la sposta verso il grigio medio.
+    frames [n,h,w,3] float 0..1; area [n,h,w]."""
+    n, h, w = frames.shape[:3]
+    out = torch.empty_like(frames, dtype=torch.float32)
+    for i in range(0, n, CHUNK):
+        f = frames[i:i + CHUNK].float().movedim(-1, 1)
+        a = F.interpolate(area[i:i + CHUNK, None].float(), size=(h, w), mode="bilinear").clamp(0, 1)
+        hidden = gaussian_blur(f, max(1.0, radius))
+        if grey > 0:
+            hidden = torch.lerp(hidden, torch.full_like(hidden, 0.5), grey)
+        out[i:i + CHUNK] = torch.lerp(f, hidden, a).movedim(1, -1)
+    return out
