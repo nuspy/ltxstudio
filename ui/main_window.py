@@ -304,6 +304,45 @@ class _VideoEditAIWorker(QThread):
         except Exception:                                       # noqa: BLE001
             return 0, 0
 
+    def _run_h3(self, cfg: dict, base: str, stamp: int):
+        """Cambia sfondo / Sostituisci personaggio col motore H3: SAM2 traccia la persona (venv inference_server), poi il worker H3
+        (workers/minimax_h3_infer.py, ramo h3_edit) rigenera a clip da 6 s in catena. Params e controlli: core/video_edit_h3.py."""
+        import json as _j, os as _os, subprocess as _sp
+        from core import video_edit_h3 as _vh3, video_inpaint as _vi
+        from core.ltx_video_job import runner_for
+        from core.worker_errors import explain as _explain
+        out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_h3_{base}_{stamp}.mp4")
+        try:
+            params = _vh3.build_params(cfg, out)
+        except _vh3.H3EditError as e:
+            self.done.emit({"status": "error", "error": str(e)}); return
+        self.progress.emit("[edit] SAM2: traccio la persona sul clip…")
+        try:
+            _vi.attach_tracking({}, cfg["video"], cfg["object"], _os.path.join(self.out_dir, f"_h3guide_{stamp}.mp4"), 0,
+                                log=lambda m: self.progress.emit(m))
+        except RuntimeError as e:
+            self.done.emit({"status": "error", "error": str(e)}); return
+        if not _os.path.isdir(params["h3_edit"]["mask_dir"]):
+            self.done.emit({"status": "error", "error": f"il tracking SAM2 non ha prodotto le maschere in {params['h3_edit']['mask_dir']}"}); return
+        py, worker = runner_for({"arch": "minimax_h3"})
+        if not _os.path.isfile(py):
+            self.done.emit({"status": "error", "error": f"Manca l'ambiente Python di MiniMax H3: {py}"}); return
+        jf = _os.path.join(self.out_dir, f"_h3edit_{stamp}.json")
+        _j.dump(params, open(jf, "w", encoding="utf-8"), ensure_ascii=False)
+        self.progress.emit("[edit] genero il video (MiniMax H3, clip da 6 s in catena)…")
+        try:
+            from core.ltx_video_job import free_video_vram as _fvv
+            _fvv(arch="minimax_h3")
+        except Exception:                                       # noqa: BLE001
+            pass
+        r = _sp.run([py, "-u", worker, jf], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        line = next((ln for ln in reversed((r.stdout or "").splitlines()) if ln.startswith("OK:")), "")
+        res = line[3:].strip() if line else ""
+        if res and _os.path.exists(res):
+            self.done.emit({"status": "success", "output": [res]})
+        else:
+            self.done.emit({"status": "error", "error": _explain(r.stdout, r.stderr, return_code=r.returncode)})
+
     def run(self):
         import json as _j, os as _os, subprocess as _sp, time as _t
         try:
@@ -319,6 +358,8 @@ class _VideoEditAIWorker(QThread):
                 _mc.free_and_wait("video", need_mb=6000, wait_s=20)
             except Exception:                               # noqa: BLE001
                 pass
+            if cfg.get("engine") == "h3_edit":                  # motore MiniMax H3 (edit con maschera, clip in catena): percorso a parte
+                self._run_h3(cfg, base, stamp); return
             out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_{base}_{stamp}.mp4")
             params = {"prompt": cfg["prompt"], "negative": "worst quality, blurry",
                       "edit_lora": cfg["edit_lora"], "control_strength": float(cfg.get("strength", 1.0)),

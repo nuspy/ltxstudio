@@ -87,7 +87,7 @@ def test_lipdub_audio_spec():
 
 
 def test_modes_for_family():
-    assert [s.key for s in M.modes_for_family("edit")] == ["edit", "inpaint", "replace_char"]
+    assert [s.key for s in M.modes_for_family("edit")] == ["edit", "inpaint", "replace_char", "change_background"]
     assert [s.key for s in M.modes_for_family("style")] == ["anime2real", "real2anime", "restyle"]
     assert [s.key for s in M.modes_for_family("repair")] == ["refocus", "uncompress", "deinterlace",
                                                              "motiondeblur", "detailer", "hdr"]

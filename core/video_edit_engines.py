@@ -129,21 +129,22 @@ def _present(item: str) -> bool:
     return bool(e) and wc.is_present(e)
 
 
-def weight_status(engine_id: str, present=_present) -> list[tuple[tuple[str, ...], bool]]:
+def weight_status(engine_id: str, present=None) -> list[tuple[tuple[str, ...], bool]]:
     """[(gruppo, soddisfatto)] — `present` iniettabile nei test."""
+    present = present or _present
     e = ENGINES[engine_id]
     return [(g, any(present(i) for i in g)) for g in e.weights]
 
 
-def is_installed(engine_id: str, present=_present) -> bool:
+def is_installed(engine_id: str, present=None) -> bool:
     return all(ok for _g, ok in weight_status(engine_id, present))
 
 
-def missing_groups(engine_id: str, present=_present) -> list[tuple[str, ...]]:
+def missing_groups(engine_id: str, present=None) -> list[tuple[str, ...]]:
     return [g for g, ok in weight_status(engine_id, present) if not ok]
 
 
-def missing_message(engine_id: str, present=_present) -> str:
+def missing_message(engine_id: str, present=None) -> str:
     """Messaggio d'errore chiaro (mai download): cosa manca e dove prenderlo."""
     miss = missing_groups(engine_id, present)
     if not miss:
@@ -162,7 +163,7 @@ def engine_params(action: str, engine_id: str) -> dict:
     return {"engine": e.id, "engine_kind": e.kind, "engine_action": action, **{f"engine_{k}": v for k, v in e.params.items()}}
 
 
-def dropdown_items(action: str, present=_present) -> list[dict]:
+def dropdown_items(action: str, present=None) -> list[dict]:
     """Voci del dropdown «Motore»: [{id, label_key, label, installed, default}] — i motori NON installati restano visibili."""
     d = default_engine(action)
     return [{"id": e.id, "label_key": e.label_key, "label": e.label, "installed": is_installed(e.id, present),

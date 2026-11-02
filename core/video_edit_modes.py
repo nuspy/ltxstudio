@@ -123,6 +123,12 @@ MODE_SPECS: dict[str, ModeSpec] = {s.key: s for s in (
        note_key="vedit.note_replace_char", needs_prompt=NEEDS_REQUIRED, needs_ref_image=True,
        default_strength=0.6, max_long_edge=1280, max_frames_per_segment=97,
        tags=("canny", "ref_image")),
+    # Cambia sfondo (Openjutsu, 02/11): tieni la persona e il movimento di camera, rigenera lo sfondo. SOLO motore H3 (tabella
+    # core/video_edit_engines.py): niente LoRA locale, i segmenti li fa il worker H3 (clip da 6 s in catena).
+    _s(key="change_background", family=FAMILY_EDIT, i18n_key="vedit.mode.change_background",
+       note_key="vedit.note_change_background", needs_prompt=NEEDS_OPTIONAL, needs_object=True, needs_ref_image=False,
+       max_long_edge=1280, max_frames_per_segment=121, chunkable=False, own_segments=True, native_res=True,
+       phase="2-1", tags=("sam2", "h3")),
     # ── famiglia Stile ────────────────────────────────────────────────────────────────────────────
     _s(key="anime2real", family=FAMILY_STYLE, i18n_key="vedit.mode.anime2real",
        edit_lora="LTX-2/ltx23_anime2real_rank64_v1_4500.safetensors",

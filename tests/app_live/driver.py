@@ -407,7 +407,15 @@ class Driver:
                 try:
                     av = [str(x) for x in (args if isinstance(args, (list, tuple)) else [args])]
                     if any(x.endswith(".py") or x == "-m" for x in av):
-                        rec.call("subprocess", argv=[os.path.basename(av[0])] + [x[-90:] for x in av[1:6]])
+                        prm = None
+                        if av[-1].lower().endswith(".json") and os.path.isfile(av[-1]):       # params del worker: serve a verificare widget -> backend
+                            try:
+                                d = json.load(open(av[-1], encoding="utf-8"))
+                                prm = {k: d.get(k) for k in ("engine", "engine_action", "engine_kind", "h3_edit", "h3_profile", "ltx_release",
+                                                             "gguf_transformer", "model", "edit_lora", "arch") if k in d}
+                            except Exception:                # noqa: BLE001
+                                prm = None
+                        rec.call("subprocess", argv=[os.path.basename(av[0])] + [x[-90:] for x in av[1:6]], params=prm)
                 except Exception:                            # noqa: BLE001
                     pass
                 super().__init__(args, *a, **k)
@@ -639,6 +647,20 @@ class Driver:
         res["uscite"] = outs
         if qcalls and not outs and not problems and not self.dry:
             problems.append("job finito ma nessun file di uscita")
+        subs = [c for c in self.rec.calls if c["via"] == "subprocess"]            # corrispondenza widget -> backend (motore scelto compreso)
+        for want in case.get("expect_subprocess", []):
+            if not any(want.lower() in " ".join(c.get("argv", [])).lower() for c in subs):
+                problems.append(f"il backend atteso non e' stato lanciato: {want}")
+        for dotted, want in (case.get("expect_params") or {}).items():
+            got = []
+            for c in subs:
+                v = c.get("params")
+                for part in dotted.split("."):
+                    v = v.get(part) if isinstance(v, dict) else None
+                if v is not None:
+                    got.append(v)
+            if want not in got:
+                problems.append(f"parametro del backend {dotted}: atteso {want!r}, trovato {got[:2]!r}")
         errs = [d for d in self.rec.dialogs if d["kind"] in ("critical", "warning", "exec")]
         if errs and not case.get("expect_dialog"):
             problems.append("errore mostrato in GUI: " + errs[0]["text"][:300])

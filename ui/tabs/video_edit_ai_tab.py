@@ -20,6 +20,7 @@ Emette `request_edit` con la config; l'orchestrazione (tracking + worker) è in 
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Qt, Signal
@@ -31,6 +32,8 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
 
 from core import video_dub_translate as vdt
 from core import motion_tracks as mt
+from core import video_edit_engines as veng
+from core import video_edit_h3 as vh3
 from core import video_edit_ic as vic
 from core import video_edit_modes as vem
 from core import video_inpaint as vinp
@@ -45,6 +48,7 @@ MODES = vem.legacy_modes()
 # default italiani (i18n: chiavi vedit.*, 15 lingue)
 _MODE_DEFAULT = {
     "edit": "Modifica globale (edit-anything)", "inpaint": "Inpaint oggetto (sperimentale)",
+    "change_background": "Cambia sfondo (tieni la persona)",
     "anime2real": "Anime → reale", "real2anime": "Reale → anime", "replace_char": "Sostituisci personaggio",
     "restyle": "ReStyle con immagine di stile", "refocus": "Rimetti a fuoco (sfocatura da obiettivo)",
     "uncompress": "Togli artefatti di compressione", "deinterlace": "Deinterlaccia",
@@ -142,6 +146,25 @@ class VideoEditAITab(QWidget):
         self.mode = QComboBox()
         self.mode.currentIndexChanged.connect(self._on_mode)
         f.addRow(tr("vedit.mode_lbl", "Modalità"), self.mode)
+        # MOTORE (tabella unica core/video_edit_engines.py): SOLO i motori che fanno l'azione della modalita; sceglie l'utente.
+        self.engine = QComboBox()
+        self.engine.currentIndexChanged.connect(self._on_engine)
+        self.engine_lbl = QLabel(tr("vedit.engine_lbl", "Motore"))
+        f.addRow(self.engine_lbl, self.engine)
+        self.engine_info = QLabel(""); self.engine_info.setWordWrap(True)
+        self.engine_open_weights = QPushButton(tr("vedit.engine.open_weights", "Apri tab Pesi"))
+        self.engine_open_weights.clicked.connect(lambda: self.request_open_weights_tab.emit())
+        _er = QHBoxLayout(); _er.addWidget(self.engine_info, 1); _er.addWidget(self.engine_open_weights)
+        self.engine_info_row = QWidget(); self.engine_info_row.setLayout(_er)
+        f.addRow("", self.engine_info_row)
+        self.h3_profile = QComboBox()
+        self.h3_profile_lbl = QLabel(tr("vedit.h3_profile_lbl", "Profilo H3"))
+        f.addRow(self.h3_profile_lbl, self.h3_profile)
+        self.h3_edge = QComboBox()
+        for _e in (480, 576, 736):
+            self.h3_edge.addItem(f"{_e}p", _e)
+        self.h3_edge_lbl = QLabel(tr("vedit.h3_edge_lbl", "Risoluzione (lato corto)"))
+        f.addRow(self.h3_edge_lbl, self.h3_edge)
         v.addLayout(f)
 
         # riga di stato del checkpoint (icona + testo: il colore non è l'unico veicolo)
@@ -1087,6 +1110,88 @@ class VideoEditAITab(QWidget):
         self._refresh_lipdub_info()
         self._refresh_hdr_info()
         self.refresh_checkpoint_hint()
+        self._refresh_engine_row()
+
+    # ── motore per azione ───────────────────────────────────────────────────────────────────────
+    def current_action(self) -> str | None:
+        return veng.action_of_mode(self.current_spec().key) if self.mode.count() else None
+
+    def current_engine(self) -> str:
+        """Id del motore scelto nel dropdown ('' se la modalita non ha motori selezionabili)."""
+        return (self.engine.currentData() or "") if self.engine.isVisibleTo(self) or self.engine.count() else ""
+
+    def _refresh_engine_row(self):
+        act = self.current_action()
+        items = veng.dropdown_items(act) if act else []
+        # un menu con un solo motore resta visibile (si vede chi lavora), ma solo se c'e almeno un motore
+        self.engine.blockSignals(True)
+        self.engine.clear()
+        want = veng.remembered(act) if act else ""
+        for it in items:
+            lbl = tr(it["label_key"], it["label"]) + ("" if it["installed"] else "  — " + tr("vedit.engine.not_installed", "non installato"))
+            self.engine.addItem(lbl, it["id"])
+        i = self.engine.findData(want)
+        self.engine.setCurrentIndex(i if i >= 0 else 0)
+        self.engine.blockSignals(False)
+        self._show_row(self.engine, bool(items))
+        self._on_engine()
+
+    def _on_engine(self, *_):
+        eid = self.engine.currentData() or ""
+        act = self.current_action()
+        if act and eid:
+            veng.remember(act, eid)
+        e = veng.ENGINES.get(eid)
+        is_h3 = bool(e) and e.kind == veng.KIND_H3_EDIT
+        miss = veng.missing_message(eid) if e else ""
+        self.engine_info.setText(("⛔ " + miss) if miss else (tr(e.note_key, "") if e and e.note_key else ""))
+        self.engine_info_row.setVisible(bool(miss) or bool(e and e.note_key))
+        self.engine_open_weights.setVisible(bool(miss))
+        for w in (self.h3_profile, self.h3_profile_lbl, self.h3_edge, self.h3_edge_lbl):
+            w.setVisible(is_h3 and bool(self.mode.count()))
+        if is_h3:
+            cur = self.h3_profile.currentData()
+            self.h3_profile.blockSignals(True)
+            self.h3_profile.clear()
+            for p in vh3.installed_profiles():
+                self.h3_profile.addItem(vh3.H3_PROFILE_I18N[p], p)
+            j = self.h3_profile.findData(cur)
+            self.h3_profile.setCurrentIndex(j if j >= 0 else 0)
+            self.h3_profile.blockSignals(False)
+        self._sync_engine_fields()
+
+    def _sync_engine_fields(self):
+        """Campi che cambiano col motore scelto (oggi: l'oggetto/personaggio e la foto servono al motore H3 anche dove LTX non li vuole)."""
+        sp = self.current_spec() if self.mode.count() else None
+        if sp is None:
+            return
+        eid = self.engine.currentData() or ""
+        is_h3 = eid == "h3_edit"
+        key = sp.key
+        if key in ("replace_char", "change_background"):
+            self.obj.setEnabled(True)
+            self._show_row(self.obj, True)
+            self.obj.setPlaceholderText(
+                tr("vedit.obj_ph_cb", "chi tenere (es. person)") if key == "change_background"
+                else (tr("vedit.obj_ph_rc_h3", "personaggio da sostituire (es. person) — obbligatorio per H3") if is_h3
+                      else tr("vedit.obj_ph_rc", "personaggio da sostituire (es. person) — opz., limita al soggetto")))
+            self._set_ref_row_visible(True)
+            for w in (self.ref_img, self.ref_btn, self.ref_row_lbl):
+                w.setEnabled(True)
+            self.ref_row_lbl.setText(tr("vedit.cb.place_lbl", "Foto del luogo (opz.)") if key == "change_background"
+                                     else tr("vedit.ref_lbl", "Immagine sostitutiva (personaggio)"))
+            self.ref_img.setPlaceholderText(tr("vedit.cb.place_ph", "opzionale: foto del nuovo luogo; vuoto = descrivi il luogo nel prompt")
+                                            if key == "change_background" else
+                                            tr("vedit.ref.ph", "immagine sostitutiva: = primo frame del video ma con l'altro personaggio"))
+            self._show_row(self.ref_strength, key == "replace_char" and not is_h3)
+            for w in (self.cfg, self.guide):
+                self._show_row(w, False)
+            for w in (self.dilate, self.blur):
+                self._show_row(w, key == "replace_char" and not is_h3)
+        if key == "change_background":
+            self.note.setText(tr("vedit.note_change_background",
+                "Cambia sfondo: SAM2 traccia la persona, l'AI rigenera tutto il resto (luogo nuovo, descritto a parole o da una foto) tenendo "
+                "persona, gesti, movimento di camera e audio. Video lunghi a clip da 6 s in catena. Specchi e riflessi non funzionano."))
 
     def _set_ref_row_visible(self, vis: bool):
         self.ref_row_lbl.setVisible(vis)
@@ -1215,6 +1320,23 @@ class VideoEditAITab(QWidget):
         txt = tr(key, default)
         self.log.appendPlainText(txt.format(**fmt) if fmt else txt)
 
+    def _go_h3(self, sp, eng: str):
+        """Cambia sfondo / Sostituisci personaggio col motore H3: params e controlli in core/video_edit_h3.py, nessun checkpoint LTX."""
+        prof = self.h3_profile.currentData() or ""
+        cfg = {"video": self._video, "mode": sp.key, "engine": eng, "object": self.obj.text().strip(),
+               "prompt": self.prompt.toPlainText().strip(), "ref_image": self.ref_img.text().strip(), "h3_profile": prof,
+               "short_edge": int(self.h3_edge.currentData() or vh3.DEFAULT_SHORT_EDGE), "keep_audio": True}
+        try:
+            vh3.build_params(dict(cfg), os.path.join(tempfile.gettempdir(), "_h3edit_check.mp4"))      # SOLO i controlli: nessun lavoro
+        except vh3.H3EditError as e:
+            miss = veng.missing_message(eng)
+            if miss and self._ask_missing_weight(sp, miss) == "weights":
+                self.request_open_weights_tab.emit()
+                return
+            self._block("vedit.err_h3", "{m}", m=str(e)); return
+        self.log.appendPlainText(tr("vedit.queued", "In elaborazione: {m}…").format(m=sp.key + " · H3"))
+        self.request_edit.emit(cfg)
+
     def _go(self):
         sp = self.current_spec()
         key = sp.key
@@ -1227,6 +1349,9 @@ class VideoEditAITab(QWidget):
         elif not self._video:
             self._block("vedit.err_no_video", "Scegli prima un video."); return
         lora = next((l for k, _i, l in MODES if k == key), "")
+        eng = self.engine.currentData() or "" if self.engine.count() else ""
+        if eng == "h3_edit":
+            return self._go_h3(sp, eng)
         prompt = self.prompt.toPlainText().strip()
         if key == "restyle" and not prompt and self.style_text.text().strip():
             prompt = tr("vedit.style.tpl", "Make it {s} style.").format(s=self.style_text.text().strip())

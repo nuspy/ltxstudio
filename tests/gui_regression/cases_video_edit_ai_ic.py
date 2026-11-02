@@ -103,7 +103,7 @@ def case_families_and_modes(w, spy):
     t = _tab(w)
     fams = [t.family.itemData(i) for i in range(t.family.count())]
     assert fams == ["edit", "style", "repair", "outpaint", "lipdub", "camera"], fams
-    expect = {"edit": ["edit", "inpaint", "replace_char"], "style": ["anime2real", "real2anime", "restyle"],
+    expect = {"edit": ["edit", "inpaint", "replace_char", "change_background"], "style": ["anime2real", "real2anime", "restyle"],
               "repair": ["refocus", "uncompress", "deinterlace", "motiondeblur", "detailer", "hdr"],
               "outpaint": ["outpaint"], "lipdub": ["lipdub", "lipdub_audio"], "camera": ["cameraman", "motion_track"]}
     for fam, modes in expect.items():
