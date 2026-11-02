@@ -432,7 +432,8 @@ def run(p: dict) -> str:
     g_dec = [n for n in names if n.startswith("decode")]
 
     # ingressi della richiesta
-    frames = S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))
+    edit = p.get("_h3_edit")                                     # edit con maschera a clip (workers/h3_edit_run.py): lunghezza e tela le decide lui
+    frames = int(edit["frames"]) if edit else S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))
     kw = {"prompt": build_prompt(p, S.frames_seconds(frames)), "num_frames": frames}
     if p.get("image_path"):
         kw["image"] = Image.open(p["image_path"]).convert("RGB")
@@ -450,7 +451,7 @@ def run(p: dict) -> str:
         ratio = (int(p["width"]), int(p["height"]))
     else:
         ratio = (16, 9)
-    kw["height"], kw["width"] = resolve_canvas_size(ratio[0], ratio[1], 32, short, maxpx)
+    kw["height"], kw["width"] = tuple(edit["canvas"]) if edit else resolve_canvas_size(ratio[0], ratio[1], 32, short, maxpx)
     if mode == "ref2va":
         kw["references"] = build_references(p)
         if not kw["references"]:
@@ -512,13 +513,31 @@ def run(p: dict) -> str:
     _log(f"transformer pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
     _fit_after_load(tr, dims, plan0, kw, frames)
     tname = "transformer_ref" if mode == "ref2va" else "transformer"
-    st = _stage(blocks, g_den, {tname: tr, "scheduler": MiniMaxH3Scheduler(shift=vshift),
-                                "audio_scheduler": MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)})
+    if edit:                                                     # righe tenute legate alla sorgente
+        import h3_edit_hold as _EH
+        _Hold = _EH.make_hold_scheduler_class(MiniMaxH3Scheduler)
+        _vs, _as = _Hold(shift=vshift), _Hold(shift=S.AUDIO_SHIFT)
+        _ps = tuple(tr.config.patch_size)
+        _vs.set_hold(*edit["video_hold"](_ps))
+        if edit.get("audio_hold") is not None:
+            _as.set_hold(*edit["audio_hold"]())
+    else:
+        _vs, _as = MiniMaxH3Scheduler(shift=vshift), MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)
+    st = _stage(blocks, g_den, {tname: tr, "scheduler": _vs, "audio_scheduler": _as})
     t1 = time.time()
     torch.cuda.synchronize()
     base_gb = torch.cuda.memory_allocated() / 2**30            # pesi + LoRA residenti prima del denoise
     torch.cuda.reset_peak_memory_stats()
-    state = st(state=state, **_inputs_for(st, kw), num_inference_steps=nfe + 1,
+    _den_kw = _inputs_for(st, kw)
+    if edit:                                                     # il rumore iniziale lo scegliamo noi: lo stesso rumore serve a rumorizzare la sorgente
+        _names = {i.name for i in st.blocks.inputs if i.name}
+        for _k, _v in (("latents", edit["noise"]), ("audio_latents", edit.get("audio_noise"))):
+            if _v is None:
+                continue
+            if _k not in _names:
+                raise RuntimeError(f"edit: la fase di denoise non dichiara l'ingresso «{_k}» (diffusers cambiato?)")
+            _den_kw[_k] = _v
+    state = st(state=state, **_den_kw, num_inference_steps=nfe + 1,
                generator=torch.Generator("cpu").manual_seed(seed))
     _log(f"denoise {nfe} passi in {time.time() - t1:.0f}s ({(time.time() - t1) / max(1, nfe):.1f}s/passo) — "
          f"VRAM {_vram()}")
@@ -540,6 +559,8 @@ def run(p: dict) -> str:
     del st
     _gc()
     _log(f"decode in {time.time() - t0:.0f}s")
+    if edit:
+        return res
     out = p.get("output") or str(REPO / "output" / f"minimax_h3_{time.strftime('%Y%m%d_%H%M%S')}.mp4")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     with_audio = p.get("generate_audio", True) is not False
@@ -643,7 +664,12 @@ def main() -> int:
         print("uso: minimax_h3_infer.py params.json")
         return 2
     try:
-        out = run(json.loads(Path(sys.argv[1]).read_text("utf-8")))
+        _p = json.loads(Path(sys.argv[1]).read_text("utf-8"))
+        if _p.get("h3_edit"):                                    # cambia sfondo / sostituisci personaggio con maschera (clip in catena)
+            import h3_edit_run as _ER
+            out = _ER.run_edit(_p, sys.modules[__name__])
+        else:
+            out = run(_p)
         print(f"OK:{out}", flush=True)
         return 0
     except Exception as e:                                           # noqa: BLE001
