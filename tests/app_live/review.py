@@ -247,7 +247,7 @@ button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}button:focus-v
 .cap{font-size:.78rem;color:var(--mut)}.box{background:var(--bg);border-radius:8px;padding:8px;font-size:.88rem;overflow-wrap:anywhere;white-space:pre-wrap}
 .todo{border-left:4px solid var(--ac);padding:4px 10px;margin:8px 0}textarea{width:100%;min-height:76px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:inherit;padding:8px}
 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut)}
-.err{color:var(--ko)}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:8px}#lb.on{display:flex}#lb img,#lb video{max-width:100%;max-height:100%}
+.vb{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.vbtn{min-width:96px}.vbtn.okb.on{background:var(--ok);color:#fff;border-color:var(--ok)}.vbtn.kob.on{background:var(--ko);color:#fff;border-color:var(--ko)}.err{color:var(--ko)}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:8px}#lb.on{display:flex}#lb img,#lb video{max-width:100%;max-height:100%}
 .foot{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:6}
 </style></head><body>
 <h1 id="t"></h1><div class="sub" id="s"></div>
@@ -259,6 +259,10 @@ details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;c
 const D=/*DATA*/null;const KEY='rev:'+D.creato+':'+D.nome;
 const H=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let notes={};try{notes=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+let ver={};try{ver=JSON.parse(localStorage.getItem(KEY+':v')||'{}')}catch(e){}
+const isBad=c=>c.esito!=='ok';
+const OKRE=/^\s*(ok|va bene|superato|tutto ok)\W*$/i;
+const verdict=c=>ver[c.id]||(OKRE.test(notes[c.id]||'')?'ok':'');
 const fileUrl=p=>location.protocol==='file:'?('file:///'+p.replace(/\\/g,'/')):('/file?p='+encodeURIComponent(p));
 document.getElementById('t').textContent='Revisione: '+D.nome;
 document.getElementById('s').textContent=D.creato+' · '+D.cards.length+' casi · cartella '+D.run;
@@ -271,19 +275,20 @@ ${c.descr?`<div class="meta">${H(c.descr)}</div>`:''}${c.motivo?`<div class="err
 <div class="todo"><b>Da verificare:</b> ${H(c.verifica)}</div>
 <div class="meta">arch <b>${H(c.arch)}</b> · modello <b>${H(c.modello)}</b> · handler ${H(c.handler)}<br>LoRA: ${lo}</div>
 <details><summary>Prompt e parametri</summary><div class="box"><b>Prompt:</b> ${H(c.prompt)}\n<b>Negativo:</b> ${H(c.negativo)}\n<b>Parametri al backend:</b> ${H(JSON.stringify(c.params))}</div></details>
-<label class="cap" for="n${i}">Il tuo giudizio (vuoto = superato)</label><textarea id="n${i}" data-i="${i}" placeholder="Scrivi solo se c'è un problema…">${H(notes[c.id]||'')}</textarea></section>`}
+<div class="vb" role="group" aria-label="Giudizio su ${H(c.id)}"><button type="button" class="vbtn okb${verdict(c)==='ok'?' on':''}" data-v="ok" data-i="${i}" aria-pressed="${verdict(c)==='ok'}">✓ ok</button><button type="button" class="vbtn kob${verdict(c)==='ko'?' on':''}" data-v="ko" data-i="${i}" aria-pressed="${verdict(c)==='ko'}">✗ non ok</button>${isBad(c)?'<span class="err">il driver lo ha dato come NON riuscito: finisce comunque nel file pubblicato, con il suo errore</span>':''}</div><label class="cap" for="n${i}">Il tuo giudizio (facoltativo; un «ok» da solo = superato)</label><textarea id="n${i}" data-i="${i}" placeholder="Scrivi solo se c'è un problema…">${H(notes[c.id]||'')}</textarea></section>`}
 function render(){const f=document.getElementById('flt').value;const l=D.cards.map((c,i)=>({c,i})).filter(({c})=>f==='all'||(f==='bad'&&c.esito!=='ok')||(f==='note'&&(notes[c.id]||'').trim()));
 document.getElementById('list').innerHTML=l.map(({c,i})=>card(c,i)).join('');cnt()}
-function cnt(){const n=Object.values(notes).filter(v=>v.trim()).length;document.getElementById('fc').textContent=n+' con nota su '+D.cards.length;document.getElementById('cnt').textContent=D.cards.filter(c=>c.esito!=='ok').length+' non riusciti dal driver'}
+function cnt(){const n=Object.values(notes).filter(v=>v.trim()).length;const nk=D.cards.filter(c=>verdict(c)==='ko').length,nb=D.cards.filter(c=>isBad(c)).length;document.getElementById('fc').textContent=n+' con nota · '+nk+' non ok · '+nb+' falliti (inclusi di diritto) su '+D.cards.length;document.getElementById('cnt').textContent=D.cards.filter(c=>c.esito!=='ok').length+' non riusciti dal driver'}
 document.addEventListener('input',e=>{if(e.target.matches('textarea[data-i]')){notes[D.cards[e.target.dataset.i].id]=e.target.value;try{localStorage.setItem(KEY,JSON.stringify(notes))}catch(x){}cnt()}});
+document.addEventListener('click',e=>{const b=e.target.closest('button.vbtn');if(!b)return;const c=D.cards[b.dataset.i];ver[c.id]=(ver[c.id]===b.dataset.v)?'':b.dataset.v;try{localStorage.setItem(KEY+':v',JSON.stringify(ver))}catch(x){}b.closest('section').querySelectorAll('button.vbtn').forEach(x=>{const on=ver[c.id]===x.dataset.v;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on)});cnt()});
 document.getElementById('flt').onchange=render;
 document.addEventListener('click',e=>{const a=e.target.closest('a.thumb');if(!a)return;e.preventDefault();const lb=document.getElementById('lb');const u=a.dataset.big;if(!u)return;lb.innerHTML=a.dataset.video==='1'?`<video src="${u}" controls autoplay></video>`:`<img src="${u}" alt="">`;lb.classList.add('on')});
 document.getElementById('lb').onclick=()=>{const lb=document.getElementById('lb');lb.classList.remove('on');lb.innerHTML=''};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('lb').click()});
-document.getElementById('pub').onclick=async()=>{const sel=D.cards.filter(c=>(notes[c.id]||'').trim());const pm=document.getElementById('pm');
-if(!sel.length){pm.textContent='Nessuna nota: tutti i casi risultano superati.';return}
+document.getElementById('pub').onclick=async()=>{const sel=D.cards.filter(c=>isBad(c)||verdict(c)==='ko'||((notes[c.id]||'').trim()&&verdict(c)!=='ok'));const pm=document.getElementById('pm');
+if(!sel.length){pm.textContent='Nessun caso non ok e nessun fallito: tutti superati.';return}
 let md='# Casi non superati — '+D.nome+' ('+D.creato+')\n\nCartella del giro: '+D.run+'\n\n';
-sel.forEach(c=>{md+='## '+c.id+'\n- funzione: '+c.fn+'\n- arch: '+(c.arch||'')+'\n- modello: '+(c.modello||'')+'\n- LoRA: '+(c.loras.length?c.loras.map(l=>l.file+' @'+l.strength).join(', '):'nessuna')+'\n- file: '+(c.media.map(m=>m.path).join(', ')||'nessuno')+'\n- esito del driver: '+c.esito+(c.motivo?' ('+c.motivo+')':'')+'\n- **utente:** '+notes[c.id].trim().replace(/\n/g,'\n  ')+'\n\n'});
+sel.forEach(c=>{md+='## '+c.id+'\n- funzione: '+c.fn+'\n- arch: '+(c.arch||'')+'\n- modello: '+(c.modello||'')+'\n- LoRA: '+(c.loras.length?c.loras.map(l=>l.file+' @'+l.strength).join(', '):'nessuna')+'\n- file: '+(c.media.map(m=>m.path).join(', ')||'nessuno')+'\n- esito del driver: '+c.esito+(c.motivo?' ('+c.motivo+')':'')+(c.dialoghi.length?'\n- errore in GUI: '+c.dialoghi.join(' | '):'')+'\n- giudizio: '+(verdict(c)==='ko'?'NON OK':(isBad(c)?'FALLITO (driver)':'senza giudizio'))+'\n- **utente:** '+((notes[c.id]||'').trim().replace(/\n/g,'\n  ')||'(nessun commento)')+'\n\n'});
 try{const r=await fetch('/publish',{method:'POST',body:md});if(r.ok){const j=await r.json();pm.textContent='Salvato: '+j.path;return}}catch(x){}
 const b=new Blob([md],{type:'text/markdown'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='pubblicato_'+new Date().toISOString().replace(/[:.]/g,'-')+'.md';a.click();pm.textContent='File scaricato ('+sel.length+' casi)'};
 render();
