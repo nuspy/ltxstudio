@@ -97,3 +97,29 @@ def test_preflight_of_an_edit_clip_counts_reference_video_frames(monkeypatch):
     assert len(seen) == 2, "il piano di memoria (h3_vram_plan.plan) deve essere chiamato a ogni clip"
     assert seen[1] - seen[0] == HP.ref_rows_estimate(edit["references"], 1024, H, W) - HP.ref_rows_estimate(base["references"], 1024, H, W) > 0
     assert plan_new["tokens"] == seen[1] > plan_old["tokens"]
+
+
+# ── tetto per processo e un-processo-per-clip ──────────────────────────────────────────────────────────────────────────────────
+def test_cap_fraction_counts_memory_already_reserved_by_the_process():
+    """Giro 02/11 (clip 2): libera 21,7 GB con ~10 GB gia riservati da questo processo: il tetto vecchio (libera-0,4)/totale = 21,3 GiB
+    veniva superato dal solo TE (14,6) + il residuo; il nuovo conta la memoria gia riservata."""
+    old = max(0.2, min(1.0, (21.7 - 0.4) / 31.8))
+    new = REAL.cap_fraction(21.7, 31.8, reserved_gb=7.5)
+    assert abs(old * 31.8 - 21.3) < 0.05
+    assert abs(new * 31.8 - (21.7 + 7.5 - 0.4)) < 0.05 and new > old
+    assert REAL.cap_fraction(30.0, 31.8, 0.0) == max(0.2, min(1.0, 29.6 / 31.8))             # processo fresco: invariato
+    assert REAL.cap_fraction(40.0, 31.8, 5.0) == 1.0 and REAL.cap_fraction(0.1, 31.8, 0.0) == 0.2
+
+
+def test_subprocess_clip_runner_streams_log_and_reports_the_failure_tail(tmp_path):
+    import types as _t
+    import h3_edit_run as ER
+    ok = tmp_path / "ok_worker.py"
+    ok.write_text("import sys\nprint('[h3] figlio parte', sys.argv[1:], flush=True)\n", encoding="utf-8")
+    bad = tmp_path / "bad_worker.py"
+    bad.write_text("import sys\nprint('[h3] riga 1', flush=True)\nprint('torch.OutOfMemoryError: finto', flush=True)\nsys.exit(1)\n", encoding="utf-8")
+    ER._subprocess_clip_runner(_t.SimpleNamespace(__file__=str(ok)), str(tmp_path))            # nessuna eccezione
+    import pytest
+    with pytest.raises(RuntimeError) as ei:
+        ER._subprocess_clip_runner(_t.SimpleNamespace(__file__=str(bad)), str(tmp_path))
+    assert "OutOfMemoryError: finto" in str(ei.value) and "codice 1" in str(ei.value)

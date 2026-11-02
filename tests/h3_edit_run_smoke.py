@@ -104,7 +104,7 @@ for action in ("change_background", "replace_character"):
     calls.clear()
     out = ER.run_edit({"output": str(TMP / f"out_{action}.mp4"), "seed": 1,
                        "h3_edit": {"action": action, "video": str(src), "mask_dir": str(TMP / "masks"), "short_edge": 192,
-                                   "clip_s": 6.0, "overlap": 39, "keep_audio": True, "picture": r"C:/TEMP/claude/pic_smoke.png"}}, FakeW)
+                                   "clip_s": 6.0, "overlap": 39, "keep_audio": True, "picture": r"C:/TEMP/claude/pic_smoke.png"}}, FakeW, clip_runner=lambda W, jd: ER.generate_clip(jd, FakeW))
     assert os.path.isfile(out) and os.path.getsize(out) > 1000, out
     with av.open(out) as c:
         n_out = sum(1 for _ in c.decode(c.streams.video[0]))

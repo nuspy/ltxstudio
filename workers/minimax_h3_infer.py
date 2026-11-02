@@ -389,6 +389,11 @@ def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
          f"{'tutto residente' if n == 0 else f'{n} blocchi in RAM'}; offload dinamico attivo")
 
 
+def cap_fraction(free_gb: float, total_gb: float, reserved_gb: float = 0.0) -> float:
+    """Frazione di `torch.cuda.set_per_process_memory_fraction`: (VRAM libera + gia riservata dal processo - margine 0,4 GB) / totale, 0,2..1,0."""
+    return max(0.2, min(1.0, (free_gb + reserved_gb - 0.4) / total_gb))
+
+
 def _decode_and_free(blocks, g_dec, W, state, *, load_vae_fn=None, load_avae_fn=None, stage_fn=None):
     """Decodifica col VAE video (fp32, ~9,7 GB) e il VAE audio e LI SVUOTA SUBITO. Il `del st` da solo non li liberava (giro 02/11, edit a clip in
     catena: dopo il decode del clip 1 restavano ~10 GB di VAE in VRAM e il DiT del clip 2 moriva per OOM a 27,7 GB allocati). Con un solo clip il
@@ -430,8 +435,11 @@ def run(p: dict) -> str:
     mode = S.mode_for(p)
     _free_gpu_servers()
     free0, total = (x / 2**30 for x in torch.cuda.mem_get_info())
-    # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema
-    frac = max(0.2, min(1.0, (free0 - 0.4) / total))
+    # TETTO: meglio un OOM chiaro che il driver WDDM che riversa la VRAM nella RAM di sistema.
+    # Il tetto vale per il TOTALE riservato da questo processo, non per la VRAM libera: se il processo ha gia memoria riservata (clip precedente
+    # nello stesso processo) quella va SOMMATA alla libera, altrimenti si conta due volte (giro 02/11: «21,29 GiB allowed» con 6,8 GiB liberi).
+    reserved0 = torch.cuda.memory_reserved() / 2**30
+    frac = cap_fraction(free0, total, reserved0)
     torch.cuda.set_per_process_memory_fraction(frac)
     import h3_chunk as _K
     _K.CAP_BYTES = frac * total * 2**30                 # il tetto serve al controllo di margine per blocco
@@ -505,6 +513,9 @@ def run(p: dict) -> str:
         # OOM nel DiT; sequenza del TE ~9k token, OOM da 9 GB nell'attenzione).
         _th, _tw = edit["canvas"]
         st.update_components(canvas_short_edge=int(min(_th, _tw)), canvas_max_pixels=int(_th * _tw))
+        # Anche le FOTO di riferimento alla tela del bersaglio: nel workflow MIT di Openjutsu (simple.api.json, nodo MiniMaxH3ReferenceToVideo) l'input
+        # `ref_image_size` e «match». A 1024 di lato corto una foto vale ~1,7k token nel TE e nel DiT, alla tela 480 sono ~0,4k.
+        st.update_components(reference_image_short_edge=int(min(_th, _tw)))
     import h3_te_attn as _TA                   # attenzione del TE a blocchi di query (esatta): niente matrice L x L in un colpo solo
     with _TA.query_chunked_attention():
         state = st(**_inputs_for(st, kw))
@@ -686,6 +697,11 @@ def main() -> int:
         print("uso: minimax_h3_infer.py params.json")
         return 2
     try:
+        if sys.argv[1] == "--h3-edit-clip":                      # figlio dell'edit a clip: UN clip per processo (VRAM pulita)
+            import h3_edit_run as _ER
+            _ER.generate_clip(sys.argv[2], sys.modules[__name__])
+            print(f"OK:{sys.argv[2]}", flush=True)
+            return 0
         _p = json.loads(Path(sys.argv[1]).read_text("utf-8"))
         if _p.get("h3_edit"):                                    # cambia sfondo / sostituisci personaggio con maschera (clip in catena)
             import h3_edit_run as _ER

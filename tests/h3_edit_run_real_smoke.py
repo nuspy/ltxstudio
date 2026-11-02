@@ -115,7 +115,7 @@ class FakeW:
 ER.encode_source_latent = lambda vae, f, c: torch.randn(1, 24, 5 * ((f.shape[0] - 5) // 17) + 2, f.shape[1] // 16, f.shape[2] // 16)
 out = ER.run_edit({"output": str(TMP / "out.mp4"), "seed": 3,
                    "h3_edit": {"action": "change_background", "video": VIDEO, "mask_dir": str(md), "short_edge": 480, "keep_audio": True,
-                               "clip_s": 6.0, "overlap": 39, "prompt_text": "a rainy neon street"}}, FakeW)
+                               "clip_s": 6.0, "overlap": 39, "prompt_text": "a rainy neon street"}}, FakeW, clip_runner=lambda W, jd: ER.generate_clip(jd, FakeW))
 th, tw = calls[0][1], calls[0][2]
 print("clip:", calls, "tela", (tw, th))
 assert tw != th and abs(tw / th - SW / SH) < 0.08, "la tela deve seguire il rapporto del sorgente (non quadrata)"
@@ -139,3 +139,23 @@ for k, seq in enumerate(per_clip):
     assert ids == ["load:vae", "drop:Linear", "load:avae", "drop:FakeAVAE", "run"], (k, seq)
     assert seq.count("gc") >= 2, (k, seq)                         # gc dopo ogni caricamento e fra i clip
 print("SMOKE REALE OK:", n_out, "frame a 24 fps per", round(dur, 2), "s; clip", len(calls))
+
+
+# ── ripresa da checkpoint: stesso input = i clip gia generati NON si rifanno; un clip fallito si riprende dal punto giusto ──
+import shutil  # noqa: E402
+
+n_first = len(calls)
+runs = []
+def counting_runner(W, jd):
+    runs.append(os.path.basename(jd)); ER.generate_clip(jd, FakeW)
+params = {"output": str(TMP / "out2.mp4"), "seed": 3,
+          "h3_edit": {"action": "change_background", "video": VIDEO, "mask_dir": str(md), "short_edge": 480, "keep_audio": True,
+                      "clip_s": 6.0, "overlap": 39, "prompt_text": "a rainy neon street"}}
+ER.run_edit(params, FakeW, clip_runner=counting_runner)
+assert runs == [], f"ripresa: nessun clip andava rifatto, rigenerati {runs}"
+tmpdirs = list((TMP).glob("_h3edit_tmp/*/clip_02"))
+assert tmpdirs, "cartella dei clip non trovata"
+shutil.rmtree(tmpdirs[0])                                    # simulo un guasto sul clip 3: sparisce il suo risultato
+ER.run_edit(params, FakeW, clip_runner=counting_runner)
+assert runs == ["clip_02"], f"ripresa: doveva rifare SOLO il clip 3, rifatti {runs}"
+print("RIPRESA OK: clip rigenerati dopo il guasto:", runs)

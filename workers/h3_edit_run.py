@@ -145,17 +145,47 @@ def _write_ref_video(frames01: torch.Tensor, path: str, audio: torch.Tensor | No
 
 
 # ── orchestrazione ───────────────────────────────────────────────────────────────────────────────
-def run_edit(p: dict, W) -> str:
-    """`W` = il modulo minimax_h3_infer (helper di caricamento e `run`). Ritorna il percorso dell'mp4 finale."""
+# Un CLIP = un PROCESSO (giro 02/11): in-process, dopo il clip 1 restavano 4-8 GB di VRAM «orfani» (blocchi del DiT, LoRA, buffer di h3_chunk) e il
+# clip 2 moriva contro il tetto per processo (21,29 GiB «allowed» con 6,8 GiB liberi sulla scheda). Il genitore (questa funzione) fa solo CPU:
+# sorgente, maschere, riferimenti, piano, composizione, montaggio. Ogni clip lo genera un FIGLIO (`minimax_h3_infer.py --h3-edit-clip <cartella>`)
+# che parte con la VRAM pulita, e i clip finiti restano su disco: se uno fallisce, la volta dopo si riprende da li (stesso input = stessa chiave).
+def _sha(*parts) -> str:
+    import hashlib
+    h = hashlib.sha1()
+    for x in parts:
+        h.update(x if isinstance(x, (bytes, bytearray)) else str(x).encode("utf-8"))
+    return h.hexdigest()[:16]
+
+
+def _subprocess_clip_runner(W, job_dir: str) -> None:
+    """Lancia il figlio che genera UN clip; il suo log passa su stdout del genitore (finisce nel log completo del job)."""
+    import collections
+    import subprocess
+    import sys
+    worker = str(Path(W.__file__).resolve())
+    proc = subprocess.Popen([sys.executable, "-u", worker, "--h3-edit-clip", str(job_dir)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace")
+    tail = collections.deque(maxlen=80)
+    for ln in proc.stdout:
+        sys.stdout.write(ln)
+        sys.stdout.flush()
+        tail.append(ln)
+    rc = proc.wait()
+    if rc != 0:
+        raise RuntimeError(f"il clip non e stato generato (codice {rc}):\n" + "".join(tail))
+
+
+def run_edit(p: dict, W, clip_runner=None) -> str:
+    """`W` = il modulo minimax_h3_infer. `clip_runner(W, job_dir)` (iniettabile nei test) genera un clip; di default un sottoprocesso."""
     e = dict(p["h3_edit"])
     action = e.get("action") or "change_background"
     _ensure(action in ("change_background", "replace_character"), f"azione H3 edit sconosciuta: {action}")
     src = e["video"]
     _ensure(os.path.isfile(src), f"video sorgente non trovato: {src}")
+    clip_runner = clip_runner or _subprocess_clip_runner
     t_all = time.time()
     short = int(e.get("short_edge") or 480)
-    from core import minimax_h3_spec as S
-    from core import h3_edit_prompt as PR
+    from core import h3_edit_prompt as PR  # noqa: F401  (usato dal figlio; qui si verifica che l'import funzioni prima di spendere minuti)
 
     # 1) tela, sorgente e maschere
     with __import__("av").open(src) as c0:
@@ -187,81 +217,68 @@ def run_edit(p: dict, W) -> str:
     clips = M.clip_plan(N, clip_frames, int(e.get("overlap", 39)), cuts)
     W._log(f"piano: {len(clips)} clip (lunghezza, contesto) = {clips}")
 
-    # 4) componenti condivisi
-    Wd = W.resolve({**p, "references": [{"kind": "image"}]})          # solo per i percorsi di VAE/configurazioni (modo ref2va)
     wav = W._decode_audio_av(src) if e.get("keep_audio", True) else None
     if wav is not None:
         wav = to_stereo(wav)
     pic = e.get("picture") or ""
     base = dict(p)
     base.pop("h3_edit", None)
+    base.pop("output", None)
     base["h3_mode"] = "ref2va"
     out_frames = torch.zeros(N, th, tw, 3)
     done = 0
-    tmp = Path(p.get("output") or W.REPO / "output").with_suffix("") .parent / "_h3edit_tmp"
-    tmp.mkdir(parents=True, exist_ok=True)
     seed0 = int(p.get("seed") or 0)
+    st = os.stat(src)
+    runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
+                  pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
+                  e.get("overlap"), N)
+    tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
+    tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
+    import numpy as _np
     for ci, (length, ctx) in enumerate(clips):
         start = done - ctx
         sl = slice(start, start + length)
         clip_src = src_t[sl].clone()
         if ctx and prev_tail is not None:                              # contesto = frame GIA generati (non la sorgente): continuita fra clip
             clip_src[:ctx] = (prev_tail[-ctx:] * 255).round().to(torch.uint8)
-        clip_obj = regen_pix[sl]
-        cells, counts = M.cell_mask(clip_obj, tw, th, invert=invert, feather_px=int(e.get("feather_px", 2)), width=tw)
+        cells, counts = M.cell_mask(regen_pix[sl], tw, th, invert=invert, feather_px=int(e.get("feather_px", 2)), width=tw)
         if ctx:                                                        # i frame di contesto non si rigenerano
             cells = cells.clone()
             cells[:, :, :_latents_of_frames(counts, ctx)] = 0
-        # sorgente codificata + audio: dal VAE (caricati qui, liberati subito)
-        vae = W.load_vae(Wd)
-        lat = encode_source_latent(vae, clip_src, _Const)
-        W._drop_module_weights(vae); del vae; W._gc()
-        T, lh, lw = lat.shape[2], lat.shape[3], lat.shape[4]
-        _ensure(cells.shape[2:] == (T, lh, lw), f"maschera {tuple(cells.shape[2:])} e latente {(T, lh, lw)} non coincidono")
-        gen = torch.Generator("cpu").manual_seed(seed0 + 7919 * ci)
-        noise = torch.randn(lat.shape, generator=gen, dtype=torch.float32)
-
-        def video_hold(patch, _lat=lat, _noise=noise, _cells=cells):
-            from diffusers.modular_pipelines.minimax_h3.before_denoise import patchify_video_latents
-            keep = (1.0 - _cells).expand(1, _lat.shape[1], -1, -1, -1).contiguous()
-            return patchify_video_latents(_lat, patch), patchify_video_latents(_noise, patch), patchify_video_latents(keep, patch)
-
-        audio_hold, audio_noise = None, None
+        jd = tmp / f"clip_{ci:02d}"
+        jd.mkdir(exist_ok=True)
+        seg = None
         if wav is not None:
-            from diffusers.modular_pipelines.minimax_h3.modular_pipeline import audio_latent_num_frames
-            avae = W.load_audio_vae(Wd)
-            n_lat = audio_latent_num_frames(length)
             s0, s1 = int(start / FPS * _SRC_AUDIO_SR), int((start + length) / FPS * _SRC_AUDIO_SR)
             seg = wav[:, s0:s1]
             if seg.shape[1] < (s1 - s0):
                 seg = torch.cat([seg, torch.zeros(seg.shape[0], (s1 - s0) - seg.shape[1])], 1)
-            arows = encode_source_audio(avae, seg, n_lat)
-            W._drop_module_weights(avae); del avae; W._gc()
-            ngen = torch.Generator("cpu").manual_seed(seed0 + 104729 * ci)
-            anoise = torch.randn(arows.shape, generator=ngen, dtype=torch.float32)
-            audio_noise = anoise.T[None].contiguous()                  # (1, C, rows): come lo vuole PrepareLatents
-            audio_hold = (lambda _a=arows, _n=anoise: (_a, _n, torch.ones_like(_a)))
-        # riferimenti: foto (nuovo personaggio / luogo) + video con la zona nascosta
-        refs = []
-        if pic:
-            refs.append({"kind": "image", "path": pic, "role": "subject"})
-        refvid = _write_ref_video(ref_frames[sl], str(tmp / f"ref_{ci:02d}.mp4"), seg if wav is not None else None)
-        refs.append({"kind": "video", "path": refvid, "role": "motion", "frames": int(length)})     # `frames`: serve al piano di memoria (righe del riferimento)
-        if action == "change_background":
-            prompt = PR.background_prompt(e.get("prompt_text") or "", e.get("keep_text") or "the person", length, ctx, has_picture=bool(pic),
-                                          picture_desc=e.get("picture_desc") or "", shots=e.get("shots") or "", lip_sync=wav is not None)
+        refvid = _write_ref_video(ref_frames[sl], str(jd / "ref.mp4"), seg)
+        meta = {"ci": ci, "clips": len(clips), "length": int(length), "ctx": int(ctx), "start": int(start), "seed": seed0 + ci, "th": th, "tw": tw,
+                "picture": pic, "refvid": refvid, "action": action, "keep_text": e.get("keep_text") or "the person",
+                "prompt_text": e.get("prompt_text") or "", "picture_desc": e.get("picture_desc") or "", "shots": e.get("shots") or "",
+                "has_audio": seg is not None, "base": base, "audio_seed": seed0 + 104729 * ci, "noise_seed": seed0 + 7919 * ci}
+        _np.save(jd / "clip_src.npy", clip_src.numpy())
+        _np.save(jd / "cells.npy", cells.numpy())
+        if seg is not None:
+            _np.save(jd / "seg.npy", seg.numpy())
+        (jd / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        key = _sha(clip_src.numpy().tobytes(), cells.numpy().tobytes(), json.dumps(meta, sort_keys=True, default=str))
+        gen_p, key_p = jd / "gen.npy", jd / "key.txt"
+        if gen_p.exists() and key_p.exists() and key_p.read_text().strip() == key:
+            W._log(f"--- clip {ci + 1}/{len(clips)}: GIA GENERATO (ripresa da {gen_p}) ---")
         else:
-            prompt = PR.replace_prompt(e.get("keep_text") or "the person", length, ctx, picture_desc=e.get("picture_desc") or "",
-                                       shots=e.get("shots") or "", lip_sync=wav is not None)
-        pc = dict(base)
-        pc.update(prompt=prompt, references=refs, seed=seed0 + ci, num_frames=length, duration_s=length / FPS, width=tw, height=th,
-                  generate_audio=False, _h3_edit={"noise": noise, "audio_noise": audio_noise, "video_hold": video_hold, "audio_hold": audio_hold,
-                                                  "frames": length, "canvas": (th, tw)})
-        pc.pop("output", None)
-        W._log(f"--- clip {ci + 1}/{len(clips)}: {length} frame (contesto {ctx}) ---")
-        res = W.run(pc)
-        gen_f = _to_float_frames(res["videos"][0])
+            if key_p.exists():
+                key_p.unlink()
+            if gen_p.exists():
+                gen_p.unlink()
+            (jd / "want_key.txt").write_text(key)
+            W._log(f"--- clip {ci + 1}/{len(clips)}: {length} frame (contesto {ctx}) — processo dedicato ---")
+            clip_runner(W, str(jd))
+            _ensure(gen_p.exists(), f"il clip {ci + 1} non ha prodotto {gen_p}")
+            key_p.write_text(key)
+        gen_f = torch.from_numpy(_np.load(gen_p)).float() / 255.0
         _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")
         gen_f = gen_f[:length]
         if gen_f.shape[1:3] != (th, tw):
@@ -270,8 +287,8 @@ def run_edit(p: dict, W) -> str:
         out_frames[start + ctx:start + length] = comp[ctx:]
         prev_tail = comp
         done = start + length
-        del res, gen_f, comp, noise, lat, cells
-        free_between_clips(W)
+        del gen_f, comp, cells
+        gc.collect()
         _save_progress(tmp, ci, len(clips))
 
     # 5) file finale con l'audio originale
@@ -287,15 +304,59 @@ def run_edit(p: dict, W) -> str:
     return out
 
 
-def free_between_clips(W) -> None:
-    """Fra un clip e l'altro: python gc + cache CUDA restituita + riga di log con la VRAM. Il DiT/VAE/TE sono gia svuotati da `W.run` e dai
-    `_drop_module_weights` sopra: qui si controlla che non ne resti un secondo residente (se la VRAM resta alta lo si vede nel log)."""
-    gc.collect()
-    try:
-        W._gc()
-        W._log(f"fra i clip: VRAM {W._vram()}")
-    except Exception:                                        # noqa: BLE001
-        pass
+def generate_clip(job_dir: str, W) -> None:
+    """FIGLIO: genera UN clip (VAE sorgente -> latente + maschera + audio -> Ref2VA con hold -> frame). Processo fresco = VRAM pulita."""
+    import numpy as _np
+    from core import h3_edit_prompt as PR
+    jd = Path(job_dir)
+    m = json.loads((jd / "meta.json").read_text("utf-8"))
+    length, ctx, th, tw, ci = m["length"], m["ctx"], m["th"], m["tw"], m["ci"]
+    clip_src = torch.from_numpy(_np.load(jd / "clip_src.npy"))
+    cells = torch.from_numpy(_np.load(jd / "cells.npy"))
+    base = dict(m["base"])
+    Wd = W.resolve({**base, "references": [{"kind": "image"}]})        # solo per i percorsi di VAE/configurazioni (modo ref2va)
+    vae = W.load_vae(Wd)
+    lat = encode_source_latent(vae, clip_src, _Const)
+    W._drop_module_weights(vae); del vae; W._gc()
+    T, lh, lw = lat.shape[2], lat.shape[3], lat.shape[4]
+    _ensure(tuple(cells.shape[2:]) == (T, lh, lw), f"maschera {tuple(cells.shape[2:])} e latente {(T, lh, lw)} non coincidono")
+    noise = torch.randn(lat.shape, generator=torch.Generator("cpu").manual_seed(m["noise_seed"]), dtype=torch.float32)
+
+    def video_hold(patch, _lat=lat, _noise=noise, _cells=cells):
+        from diffusers.modular_pipelines.minimax_h3.before_denoise import patchify_video_latents
+        keep = (1.0 - _cells).expand(1, _lat.shape[1], -1, -1, -1).contiguous()
+        return patchify_video_latents(_lat, patch), patchify_video_latents(_noise, patch), patchify_video_latents(keep, patch)
+
+    audio_hold, audio_noise = None, None
+    if m["has_audio"]:
+        from diffusers.modular_pipelines.minimax_h3.modular_pipeline import audio_latent_num_frames
+        seg = torch.from_numpy(_np.load(jd / "seg.npy"))
+        avae = W.load_audio_vae(Wd)
+        arows = encode_source_audio(avae, seg, audio_latent_num_frames(length))
+        W._drop_module_weights(avae); del avae; W._gc()
+        anoise = torch.randn(arows.shape, generator=torch.Generator("cpu").manual_seed(m["audio_seed"]), dtype=torch.float32)
+        audio_noise = anoise.T[None].contiguous()                      # (1, C, rows): come lo vuole PrepareLatents
+        audio_hold = (lambda _a=arows, _n=anoise: (_a, _n, torch.ones_like(_a)))
+    refs = []
+    if m["picture"]:
+        refs.append({"kind": "image", "path": m["picture"], "role": "subject"})
+    refs.append({"kind": "video", "path": m["refvid"], "role": "motion", "frames": int(length)})   # `frames`: serve al piano di memoria
+    lip = bool(m["has_audio"])
+    if m["action"] == "change_background":
+        prompt = PR.background_prompt(m["prompt_text"], m["keep_text"], length, ctx, has_picture=bool(m["picture"]), picture_desc=m["picture_desc"],
+                                      shots=m["shots"], lip_sync=lip)
+    else:
+        prompt = PR.replace_prompt(m["keep_text"], length, ctx, picture_desc=m["picture_desc"], shots=m["shots"], lip_sync=lip)
+    pc = dict(base)
+    pc.update(prompt=prompt, references=refs, seed=m["seed"], num_frames=length, duration_s=length / FPS, width=tw, height=th,
+              generate_audio=False, _h3_edit={"noise": noise, "audio_noise": audio_noise, "video_hold": video_hold, "audio_hold": audio_hold,
+                                              "frames": length, "canvas": (th, tw)})
+    W._log(f"clip {ci + 1}/{m['clips']}: {length} frame, contesto {ctx}, tela {tw}x{th}")
+    res = W.run(pc)
+    gen_f = _to_float_frames(res["videos"][0])
+    _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")
+    out = (gen_f[:length].clamp(0, 1) * 255).round().to(torch.uint8).numpy()
+    _np.save(jd / "gen.npy", out)
 
 
 def _latents_of_frames(counts: list[int], frames: int) -> int:
