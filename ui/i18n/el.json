@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "Φωτογραφία του χώρου (προαιρ.)",
   "vedit.cb.place_ph": "προαιρετικό: φωτογραφία του νέου χώρου· κενό = περιγράψτε τον χώρο στο prompt",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "Λείπει το περιβάλλον Python της έκδοσης LTX {r}: {p}"
+  "vedit.venv_missing": "Λείπει το περιβάλλον Python της έκδοσης LTX {r}: {p}",
+  "feat.cap.video_h3_edit": "Επεξεργασία βίντεο με MiniMax H3 (με μάσκα, κλιπ σε αλυσίδα)",
+  "feat.cap.video_change_background": "Αλλαγή φόντου βίντεο (διατήρηση του ατόμου)",
+  "feat.cap.video_engine_choice": "Επιλογή μηχανής ανά ενέργεια (Επεξεργασία βίντεο AI)"
 }

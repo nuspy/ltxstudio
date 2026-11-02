@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "Foto do lugar (opc.)",
   "vedit.cb.place_ph": "opcional: foto do novo lugar; vazio = descreva o lugar no prompt",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "Falta o ambiente Python da versão LTX {r}: {p}"
+  "vedit.venv_missing": "Falta o ambiente Python da versão LTX {r}: {p}",
+  "feat.cap.video_h3_edit": "Edição de vídeo com MiniMax H3 (edição com máscara, clipes encadeados)",
+  "feat.cap.video_change_background": "Trocar o fundo do vídeo (manter a pessoa)",
+  "feat.cap.video_engine_choice": "Escolha do motor por ação (Edição de vídeo IA)"
 }

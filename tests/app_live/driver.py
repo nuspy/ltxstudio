@@ -197,6 +197,13 @@ def combo_items(cb):
     return [{"i": i, "text": cb.itemText(i), "data": _safe(cb.itemData(i))} for i in range(cb.count()) if not _hidden(cb, i)]
 
 
+def _keep_ends(text: str, head: int = 1500, tail: int = 4500) -> str:
+    """Errore del job per il verbale: la CAUSA sta in testa (explain) e la coda del traceback in fondo; si taglia solo il mezzo."""
+    if len(text) <= head + tail:
+        return text
+    return text[:head] + "\n[... tagliato nel verbale dal driver ...]\n" + text[-tail:]
+
+
 def select_combo(cb, want):
     """Seleziona per indice, per {"data": x}, o per sottostringa del testo / dei dati (senza maiuscole)."""
     if isinstance(want, int):
@@ -349,7 +356,7 @@ class Driver:
             def _wrapped(res):
                 outs: list = []
                 _media_in(res, outs)
-                rec.fin(job=jid, label=str(label), status=(res or {}).get("status"), error=str((res or {}).get("error", ""))[-1200:],
+                rec.fin(job=jid, label=str(label), status=(res or {}).get("status"), error=_keep_ends(str((res or {}).get("error", ""))),
                         outputs=outs)
                 if on_done:
                     on_done(res)
@@ -666,7 +673,7 @@ class Driver:
             problems.append("errore mostrato in GUI: " + errs[0]["text"][:300])
         res["esito"] = "ok" if not problems else "fallito"
         res["problemi"] = problems
-        res["motivo"] = "; ".join(problems)[:1800]
+        res["motivo"] = "; ".join(problems)[:7000]
 
     # i casi ----------------------------------------------------------------------------------------------
     def case_ops(self, case):

@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "Фото места (необяз.)",
   "vedit.cb.place_ph": "необязательно: фото нового места; пусто = опишите место в промпте",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "Отсутствует среда Python для релиза LTX {r}: {p}"
+  "vedit.venv_missing": "Отсутствует среда Python для релиза LTX {r}: {p}",
+  "feat.cap.video_h3_edit": "Редактирование видео с MiniMax H3 (правка по маске, цепочка клипов)",
+  "feat.cap.video_change_background": "Смена фона видео (человек остаётся)",
+  "feat.cap.video_engine_choice": "Выбор движка для каждого действия (ИИ-правка видео)"
 }

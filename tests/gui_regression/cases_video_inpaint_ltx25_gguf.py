@@ -100,10 +100,28 @@ def case_inpaint_worker_error_reaches_gui_whole(w, spy):
     assert "gemma4-12b-with-proj-ltx-2.5-bf16.safetensors" in shown and "tokenizer.model" in shown, shown[-400:]
 
 
+def case_inpaint_num_frames_never_exceed_source(w, spy):
+    """Il numero di frame dell'edit e il piu grande 8n+1 CONTENUTO nel sorgente: 72 frame (3 s a 24 fps) -> 65, mai 73 (giro 2/11: maschere da 72
+    frame e latente da 73 = AssertionError «Pixel frames (72) not compatible with latent frames (9)» di ltx-pipelines)."""
+    t, _ = _prep(w, use_ref=False)
+    real = w._probe_video_dims
+    try:
+        for n, want in ((72, 65), (73, 73), (97, 97), (96, 89), (100, 97), (9, 9), (5, 9)):
+            w._probe_video_dims = lambda path, _n=n: (640, 384, _n, 24)
+            t._go()
+            got = w._edit_ai_worker.cfg["num_frames"]
+            assert got == want, f"sorgente da {n} frame: num_frames={got}, atteso {want}"
+            assert got <= max(9, n), (n, got)
+    finally:
+        w._probe_video_dims = real
+
+
 CASES = [
     ("vinpaint_ltx25_gguf_release_venv", "inpaint × GGUF LTX 2.5: il worker parte dal venv della 2.5, release e GGUF nei params.",
      case_inpaint_ltx25_gguf_uses_release_venv),
     ("vinpaint_ltx23_keeps_ltx2_venv", "inpaint senza checkpoint 2.5: venv della 2.3 come sempre.", case_inpaint_ltx23_keeps_ltx2_venv),
     ("vinpaint_worker_error_whole", "inpaint: l'errore del worker arriva alla GUI intero (causa + traceback), non tagliato.",
      case_inpaint_worker_error_reaches_gui_whole),
+    ("vinpaint_frames_8n1_within_source", "inpaint/edit: frame = 8n+1 contenuto nel sorgente (72 -> 65, non 73).",
+     case_inpaint_num_frames_never_exceed_source),
 ]

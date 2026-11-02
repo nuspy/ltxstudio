@@ -4151,7 +4151,9 @@ class MainWindow(QMainWindow):
         if _sw and _sh:
             cfg.setdefault("width", _r64e(_sw)); cfg.setdefault("height", _r64e(_sh))
             cfg.setdefault("fps", int(_sfps or _fps))
-            cfg.setdefault("num_frames", max(9, (_snf // 8 * 8 + 1) if _snf else
+            # 8n+1 CONTENUTI nel sorgente: «n // 8 * 8 + 1» sbaglia di UNO quando n e multiplo di 8 (72 -> 73: maschere/guida da 72 frame e latente da 73:
+            # AssertionError «Pixel frames (72) not compatible with latent frames (9)» di ltx-pipelines, giro 2/11, inpaint su un clip da 3 s a 24 fps)
+            cfg.setdefault("num_frames", max(9, vem.snap_frames(_snf) if _snf else
                                              int(float(vv.get("length_s", 1) or 1) * _fps) // 8 * 8 + 1))
         else:                                                # probe fallito → fallback ai controlli del tab
             cfg.setdefault("width", _r64e(vv.get("width", 512) or 512))

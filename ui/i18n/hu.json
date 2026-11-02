@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "A hely fotója (opc.)",
   "vedit.cb.place_ph": "opcionális: az új hely fotója; üresen a helyet írd le a promptban",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "Hiányzik az LTX {r} kiadás Python-környezete: {p}"
+  "vedit.venv_missing": "Hiányzik az LTX {r} kiadás Python-környezete: {p}",
+  "feat.cap.video_h3_edit": "Videószerkesztés MiniMax H3-mal (maszkos szerkesztés, láncolt klipek)",
+  "feat.cap.video_change_background": "A videó hátterének cseréje (a személy marad)",
+  "feat.cap.video_engine_choice": "Motorválasztás műveletenként (MI videószerkesztés)"
 }

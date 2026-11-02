@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "תמונת המקום (אופציונלי)",
   "vedit.cb.place_ph": "אופציונלי: תמונת המקום החדש; ריק = תארו את המקום בפרומפט",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "סביבת הפייתון של גרסת LTX {r} חסרה: {p}"
+  "vedit.venv_missing": "סביבת הפייתון של גרסת LTX {r} חסרה: {p}",
+  "feat.cap.video_h3_edit": "עריכת וידאו עם MiniMax H3 (עריכה עם מסכה, קליפים בשרשרת)",
+  "feat.cap.video_change_background": "החלפת רקע הסרטון (השארת האדם)",
+  "feat.cap.video_engine_choice": "בחירת מנוע לכל פעולה (עריכת וידאו AI)"
 }

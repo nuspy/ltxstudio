@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "장소 사진(선택)",
   "vedit.cb.place_ph": "선택: 새 장소 사진; 비우면 프롬프트에 장소를 설명하세요",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "LTX {r} 릴리스의 Python 환경이 없습니다: {p}"
+  "vedit.venv_missing": "LTX {r} 릴리스의 Python 환경이 없습니다: {p}",
+  "feat.cap.video_h3_edit": "MiniMax H3로 영상 편집(마스크 편집, 클립 연결)",
+  "feat.cap.video_change_background": "영상 배경 바꾸기(사람 유지)",
+  "feat.cap.video_engine_choice": "작업별 엔진 선택(AI 영상 편집)"
 }

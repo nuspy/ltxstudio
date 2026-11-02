@@ -406,7 +406,7 @@ def register(app: FastAPI):
                 raise RuntimeError(f"video illeggibile: {req.video_path}")
             # come la GUI: l'inpaint PRESERVA risoluzione/durata/fps del SORGENTE (maschere e guida sono tracciate li')
             cfg.update(width=_r64(info.width), height=_r64(info.height), fps=int(round(info.fps or 25)),
-                       num_frames=max(9, (int(info.nb_frames) // 8) * 8 + 1) if info.nb_frames else 25)
+                       num_frames=max(9, ((int(info.nb_frames) - 1) // 8) * 8 + 1) if info.nb_frames else 25)
             output = out_path("video_inpaint")
             params = vi.inpaint_params(cfg, output)
             if ref:

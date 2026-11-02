@@ -101,6 +101,16 @@ def encode_source_audio(audio_vae, wav: torch.Tensor, n_latents: int) -> torch.T
     return lat[:, :n_latents].reshape(-1, lat.shape[2])
 
 
+def to_stereo(wav: torch.Tensor) -> torch.Tensor:
+    """[canali, campioni] -> [2, campioni]: l'audio VAE di H3 e diffusers (encode_video) vogliono STEREO. Un sorgente mono (es. un video parlato)
+    si duplica sui due canali — giro 2/11: «Expected samples with 2 channels; got shape [1, 188000]»; piu di 2 canali: i primi due."""
+    if wav.dim() == 1:
+        wav = wav[None]
+    if wav.shape[0] == 1:
+        return wav.repeat(2, 1)
+    return wav[:2]
+
+
 # ── composizione finale ──────────────────────────────────────────────────────────────────────────
 def composite(gen: torch.Tensor, orig: torch.Tensor, cells: torch.Tensor, counts: list[int], blend_px: int = 8) -> torch.Tensor:
     """gen/orig [n, h, w, 3] float 0..1; cells [1,1,T,h/16,w/16] (1 = rigenerato). Fuori dalla maschera = pixel ORIGINALI (nessun giro nel VAE)."""
@@ -180,6 +190,8 @@ def run_edit(p: dict, W) -> str:
     # 4) componenti condivisi
     Wd = W.resolve({**p, "references": [{"kind": "image"}]})          # solo per i percorsi di VAE/configurazioni (modo ref2va)
     wav = W._decode_audio_av(src) if e.get("keep_audio", True) else None
+    if wav is not None:
+        wav = to_stereo(wav)
     pic = e.get("picture") or ""
     base = dict(p)
     base.pop("h3_edit", None)

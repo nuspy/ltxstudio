@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "صورة المكان (اختياري)",
   "vedit.cb.place_ph": "اختياري: صورة المكان الجديد؛ فارغ = صِف المكان في الوصف",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "بيئة بايثون لإصدار LTX {r} مفقودة: {p}"
+  "vedit.venv_missing": "بيئة بايثون لإصدار LTX {r} مفقودة: {p}",
+  "feat.cap.video_h3_edit": "تحرير الفيديو بـ MiniMax H3 (تحرير بقناع، مقاطع متسلسلة)",
+  "feat.cap.video_change_background": "تغيير خلفية الفيديو (مع إبقاء الشخص)",
+  "feat.cap.video_engine_choice": "اختيار المحرك لكل إجراء (تحرير الفيديو بالذكاء الاصطناعي)"
 }

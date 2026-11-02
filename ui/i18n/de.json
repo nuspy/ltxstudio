@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "Foto des Ortes (opt.)",
   "vedit.cb.place_ph": "optional: Foto des neuen Ortes; leer = Ort im Prompt beschreiben",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "Die Python-Umgebung für LTX-Release {r} fehlt: {p}"
+  "vedit.venv_missing": "Die Python-Umgebung für LTX-Release {r} fehlt: {p}",
+  "feat.cap.video_h3_edit": "Videobearbeitung mit MiniMax H3 (maskierter Edit, verkettete Clips)",
+  "feat.cap.video_change_background": "Videohintergrund ändern (Person behalten)",
+  "feat.cap.video_engine_choice": "Engine-Wahl pro Aktion (KI-Videobearbeitung)"
 }

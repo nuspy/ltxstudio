@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "地点照片（可选）",
   "vedit.cb.place_ph": "可选：新地点的照片；留空 = 在提示词中描述地点",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "缺少 LTX {r} 版本的 Python 环境：{p}"
+  "vedit.venv_missing": "缺少 LTX {r} 版本的 Python 环境：{p}",
+  "feat.cap.video_h3_edit": "使用 MiniMax H3 编辑视频（蒙版编辑，片段串联）",
+  "feat.cap.video_change_background": "更换视频背景（保留人物）",
+  "feat.cap.video_engine_choice": "按操作选择引擎（AI 视频编辑）"
 }

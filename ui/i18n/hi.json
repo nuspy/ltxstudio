@@ -3677,5 +3677,8 @@
   "vedit.cb.place_lbl": "जगह की फ़ोटो (वैकल्पिक)",
   "vedit.cb.place_ph": "वैकल्पिक: नई जगह की फ़ोटो; खाली = प्रॉम्प्ट में जगह का वर्णन करें",
   "vedit.err_h3": "{m}",
-  "vedit.venv_missing": "LTX {r} रिलीज़ का Python वातावरण नहीं मिला: {p}"
+  "vedit.venv_missing": "LTX {r} रिलीज़ का Python वातावरण नहीं मिला: {p}",
+  "feat.cap.video_h3_edit": "MiniMax H3 से वीडियो एडिट (मास्क एडिट, जुड़े क्लिप)",
+  "feat.cap.video_change_background": "वीडियो का बैकग्राउंड बदलें (व्यक्ति को रखें)",
+  "feat.cap.video_engine_choice": "हर क्रिया के लिए इंजन चुनें (AI वीडियो एडिट)"
 }
