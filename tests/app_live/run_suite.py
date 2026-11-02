@@ -182,7 +182,7 @@ def main():
             cl.connect(timeout=240, proc=proc)
         say("driver collegato: " + json.dumps(cl.send({"cmd": "ping"})))
         t0 = time.time()
-        while time.time() - t0 < 300:                        # InferenceServer pronto (autostart dell'app)
+        while time.time() - t0 < 900:                        # InferenceServer pronto (autostart dell'app; il 02/11 ci ha messo 306 s)
             r = cl.send({"cmd": "ready"}, timeout=60)
             if r.get("server_up"):
                 break
