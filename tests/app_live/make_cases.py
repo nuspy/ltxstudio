@@ -29,7 +29,19 @@ PROMPTS = {
         "a lantern festival on a river at night, floating lights slowly drifting, camera gently rising",
         "a beekeeper walking through a field of tall sunflowers at golden hour, slow tracking shot",
     ],
+    # Modelli 🔞/uncensored/fine-tune per adulti: sono tarati su PERSONE, e con prompt di paesaggio o oggetti non corrispondono (commenti
+    # dell'utente 03/11: «modelli NSFW, non c'e matching con il prompt»). Prompt SFW con una persona vestita in primo piano.
+    "video_people": [
+        "a young woman in a linen summer dress walking along a sunlit seaside promenade, soft breeze in her hair, slow tracking shot",
+        "a woman reading a book on a balcony at sunset, she looks up and smiles, warm light, shallow depth of field",
+        "a man and a woman laughing while cooking together in a bright kitchen, handheld camera, natural light",
+    ],
 }
+NSFW_MARK = ("🔞", "uncensored", "nsfw", "stubelius", "pinkcherry", "pink cherry", "noct-q", "unchained", "veda")
+
+
+def is_adult_model(text: str) -> bool:
+    return any(x in (text or "").lower() for x in NSFW_MARK)
 SIZES = {"Krea 2": (960, 1024), "FLUX": (1024, 1024), "Qwen-Image 2.1": (1024, 1024), "FLUX.3 Klein": (1024, 1024),
          "Z-Image": (1024, 1024), "Ernie": (1024, 1024)}
 
@@ -114,7 +126,7 @@ def main():
             n += 1
             h3 = arch == "minimax_h3"
             base = {"fn": "video", "nsfw": True, "arch": arch, "model": m["text"], "w": 704 if not h3 else 544, "h": 448 if not h3 else 960,
-                    "secs": 4 if not h3 else 5, "seed": 6000 + n, "prompt": PROMPTS["video"][n % 3], "timeout": 1800 if not h3 else 2400}
+                    "secs": 4 if not h3 else 5, "seed": 6000 + n, "prompt": PROMPTS["video_people" if is_adult_model(m["text"] + " " + json.dumps(m["data"])) else "video"][n % 3], "timeout": 1800 if not h3 else 2400}
             if arch == "lingbot":                      # il rewriter di default (Qwen3.6-27B) porta il commit a ~3 GB: finding, nel giro e spento
                 base["widgets"] = {"video_tab.lingbot_rewriter": False}
             cases.append({**base, "id": f"video_{arch}_{k:02d}_liscio", "descr": f"Video · {v.get('label', arch)} · {m['text'][:60]}"})
@@ -187,7 +199,7 @@ def main():
                               {"call": "video_edit_ai_tab._go", "args": []}],
                       "descr": "Punto 28: edit di un FILE video (modalita Modifica) con il checkpoint 2.3 distilled; se fallisce, l'errore va in errori_<data>.md e nel log del worker",
                       "verify": "Il video modificato mantiene durata e movimento dell'originale (affiancato) e le lanterne sono verdi?"})
-    for cid, img, kind, pt, mn, rad in (("segmenta_clic_polpo", scena, "point", (0.62, 0.45), 4.0, 0), ("segmenta_clic_donna", ritratto, "point", (0.55, 0.62), 12.0, 0),
+    for cid, img, kind, pt, mn, rad in (("segmenta_clic_polpo", scena, "point", (0.82, 0.42), 4.0, 0), ("segmenta_clic_donna", ritratto, "point", (0.55, 0.62), 12.0, 0),
                                        ("segmenta_lazo_astronauta", scena, "lasso", (0.17, 0.33), 4.0, 0.22)):
         cases.append({"id": cid, "fn": "segment", "kind": kind, "image": img, "point": list(pt), "min_area_pct": mn, "radius": rad, "timeout": 300,
                       "descr": f"Punto 22: {'clic' if kind == 'point' else 'lazo'}, l'AI deve selezionare l'oggetto INTERO"})

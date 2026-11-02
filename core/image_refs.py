@@ -148,6 +148,11 @@ MODEL_SYNTAX: dict[str, dict] = {
                   "riferimento ha latenti e id di posizione propri (nessuna etichetta nel template). «image N» e' la "
                   "citazione posizionale in linguaggio naturale; il massimo (4) e' una proposta prudente (VRAM), NON provato live",
     },
+    "kontext_stitch": {
+        "fmt": {"image": "the {ord} picture from the left"}, "max_images": 4, "verified": False,
+        "source": "ui/main_window.generate_compose: FLUX.1 Kontext vede UNA immagine, le foto affiancate da sinistra a destra: «image 2» non "
+                  "significa nulla per lui, la posizione si. NON provato dal vivo (revisione 31/10: la donna non veniva portata nella scena)",
+    },
     "flux3": {
         "fmt": {"image": "the {ord} image"}, "max_images": 10, "verified": False,
         "source": "docs diffusers (pipelines/flux3) e system prompt dell'upsampler FLUX.3 (task 13, 18/10): i riferimenti si "

@@ -49,6 +49,20 @@ def _mask_to_2d(masks, scores=None):
     return arr.numpy().astype("uint8") * 255
 
 
+POINT_MAX_FRAC = 0.85          # una maschera piu grande dell'85 % della foto e lo sfondo/la scena intera, non l'oggetto cliccato
+
+
+def pick_point_mask(areas: list[int], scores: list[float], total: int) -> int:
+    """Quale delle maschere multimask di SAM2 e «l'oggetto intero» sotto il clic: la PIU GRANDE che non e la scena intera.
+    Il tetto era 60 %: una persona in primo piano (ritratto: 64 % della foto) veniva scartata e si sceglieva la sola pelle del viso (30 %)
+    (provato su CPU con SAM2 sul ritratto di prova il 03/11: aree 15,0 / 64,1 / 30,7 %). Fra le candidate non c'e un criterio migliore:
+    gli iou stimati da SAM2 non indicano l'oggetto intero (vedi sopra)."""
+    cands = [i for i, a in enumerate(areas) if 0 < a <= POINT_MAX_FRAC * total]
+    if cands:
+        return max(cands, key=lambda i: areas[i])
+    return max(range(len(scores)), key=lambda i: scores[i])
+
+
 def _load(_model: str = "", _arch: str = "segment"):
     import torch
     from transformers import AutoProcessor, GroundingDinoForObjectDetection
@@ -101,9 +115,7 @@ def run(params: dict, mm, output_dir: str) -> dict:
         # Prova su CPU (31/10): per un clic sull'«occhio» di un oggetto SAM2 da [parte 0,985 | oggetto 0,06 | oggetto 0,07]: gli iou
         # stimati non indicano l'oggetto intero. Regola: fra le maschere che non invadono lo sfondo (<= 60 % della foto) si prende la PIU GRANDE.
         areas = [int(arr[i].sum()) for i in range(arr.shape[0])]
-        lim = 0.6 * arr.shape[-1] * arr.shape[-2]
-        cands = [i for i in range(arr.shape[0]) if 0 < areas[i] <= lim]
-        pick = max(cands, key=lambda i: areas[i]) if cands else int(sc.argmax())
+        pick = pick_point_mask(areas, [float(x) for x in sc], arr.shape[-1] * arr.shape[-2])
         m_np = arr[pick].numpy().astype("uint8") * 255
         os.makedirs(output_dir, exist_ok=True)
         path = str(Path(output_dir) / "native_segmask_point.png")

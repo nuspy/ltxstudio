@@ -489,9 +489,10 @@ def case_integrate_guidance_seed(w, spy):
     if c["via"] == "enqueue":
         p = c["params"]
         assert p.get("seed") == 4242, f"seed integrate non propagato: {p.get('seed')}"
-        # guidance: ramo kontext usa lo slider (3.5); ramo mask-based (FLUX Fill) usa il regime Fill (~30).
+        # guidance: ramo kontext = slider (3.5); ramo mask-based = max(3.5, slider) (generate_integrate: il default e un FLUX normale in
+        # FluxInpaintPipeline, non il Fill; il regime ~30 del Fill non c'entra). Il vecchio controllo «>= 20» era di quando si pensava al Fill.
         g = float(p.get("guidance", 0))
-        ok = abs(g - 3.5) < 0.01 if p.get("arch") == "kontext" else g >= 20.0
+        ok = abs(g - 3.5) < 0.01 if p.get("arch") == "kontext" else abs(g - max(3.5, 3.5)) < 0.01
         assert ok, f"guidance integrate errata per arch={p.get('arch')}: {g}"
 
 

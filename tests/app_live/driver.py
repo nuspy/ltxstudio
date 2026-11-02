@@ -926,8 +926,13 @@ class Driver:
                 pt.setRenderHint(QPainter.Antialiasing)
                 pt.setBrush(QColor(255, 0, 0, 255))
                 pt.setPen(Qt.NoPen)
-                cx, cy, r = cv.aspect_w * 0.5, cv.aspect_h * 0.5, min(cv.aspect_w, cv.aspect_h) * 0.18
-                pt.drawEllipse(QRectF(cx - r, cy - r, 2 * r, 2 * r))
+                # MASCHERA SUL TAVOLO della foto di prova (scena_1152x832: tavolo in basso, libero fra la tazza a sinistra e la 2a a destra).
+                # Prima era un cerchio fisso al CENTRO della foto = in aria sopra il tavolo: «metti una bussola sul tavolo» non aveva senso e la
+                # bussola «volava» (commenti dell'utente, revisione 31/10). Frazioni (cx, cy, rx, ry) della tela; per un'altra foto: case["mask_ellipse"].
+                fx, fy, frx, fry = case.get("mask_ellipse") or (0.55, 0.90, 0.08, 0.055)
+                cx, cy = cv.aspect_w * fx, cv.aspect_h * fy
+                rx, ry = cv.aspect_w * frx, cv.aspect_h * fry
+                pt.drawEllipse(QRectF(cx - rx, cy - ry, 2 * rx, 2 * ry))
                 pt.end()
                 cv.mask_image = m
                 cv._refresh_mask()

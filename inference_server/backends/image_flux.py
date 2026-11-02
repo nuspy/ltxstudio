@@ -2127,6 +2127,8 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             _W = max(256, int(params["width"]) // 16 * 16)         # Componi con Kontext (stitch): misura del canvas
             _H = max(256, int(params["height"]) // 16 * 16)
             kw["width"], kw["height"] = _W, _H
+            _orig_wh = (_W, _H)           # l'uscita ha la misura del CANVAS: NON va riportata a quella dello stitch (2 foto affiancate = ~2,2:1,
+            #                               l'immagine usciva allungata e deformata: commento dell'utente su componi_kontext, revisione 31/10)
         if arch == "flux2_kontext" and params.get("gen_from_refs"):
             _rl = [r for r in (params.get("ref_images") or []) if r and Path(str(r)).exists()]
             if _rl:
@@ -2134,6 +2136,7 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
                     _W = max(256, int(params["width"]) // 16 * 16)
                     _H = max(256, int(params["height"]) // 16 * 16)
                     kw["width"], kw["height"] = _W, _H
+                    _orig_wh = (_W, _H)   # idem: l'uscita del multi-riferimento ha la misura richiesta, non quella della 1a foto
                 _imgs = [Image.open(str(r)).convert("RGB") for r in _rl]
                 kw["image"] = _imgs if len(_imgs) > 1 else _imgs[0]
                 print(f"[image] Klein multi-riferimento: {len(_imgs)} immagini → {_W}×{_H}", flush=True)

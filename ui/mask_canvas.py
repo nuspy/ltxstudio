@@ -1301,6 +1301,25 @@ class MaskCanvas(QWidget):
             return QRectF()
         return QRectF(x0, y0, x1 - x0 + step, y1 - y0 + step)
 
+    def _auto_cutout_opaque_layers(self) -> list[int]:
+        """Prima di Integra, ogni foto-layer OPACA e senza maschera disegnata viene scontornata (u2net, CPU), se il modello e gia sul disco.
+        Senza, la foto opaca e un rettangolo: finisce intero nel composito, il ripiego «alone bianco» le disegna attorno una cornice bianca e il
+        modello (a) la lascia li, incollata (aspetto da stitch) o (b) la ridisegna come cornice (commenti dell'utente sulle revisioni del 31/10 e
+        1/11, 12 casi modifica_integra_* e componi_*). Non scarica nulla (niente sorprese): senza il modello resta il ripiego di prima.
+        Ritorna gli indici scontornati."""
+        done: list[int] = []
+        if not (Path.home() / ".u2net" / "u2net.onnx").exists():
+            return done
+        for i, e in enumerate(self._entries):
+            if i == 0 or e.get("base") or e.get("cutout") or self._mask_filled(e["mask"]):
+                continue
+            pm = e["item"].pixmap()
+            if pm.isNull() or pm.hasAlphaChannel() and self._alpha_silhouette(e) is not None:
+                continue                                  # gia scontornata / PNG con trasparenza vera
+            if self.cutout_layer(i, ask=False):
+                done.append(i)
+        return done
+
     def export_integrate(self, out_dir: Path) -> dict:
         """Input stile MagicQuill `foreground_edit` — la ricetta che INTEGRA DAVVERO (validata il 3/06).
 
@@ -1322,6 +1341,7 @@ class MaskCanvas(QWidget):
         W, H = self.aspect_w, self.aspect_h
         frame = QRectF(0, 0, W, H)
         grow = max(24, int(0.05 * max(W, H)))
+        self._auto_cutout_opaque_layers()
         comp = QImage(self._composite(out_dir)).convertToFormat(QImage.Format_ARGB32)
         obj = QImage(W, H, QImage.Format_ARGB32); obj.fill(Qt.transparent)        # dove c'è l'oggetto
         region = QImage(W, H, QImage.Format_ARGB32); region.fill(Qt.transparent)  # zona di edit
