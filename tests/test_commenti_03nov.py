@@ -49,3 +49,13 @@ def test_integrate_export_has_no_white_frame_with_opaque_photo(tmp_path):
     assert white.mean() < 0.01, "cornice bianca attorno alla foto incollata"
     assert cv._entries[1].get("cutout") is True
     assert r["has_region"]
+
+
+def test_click_selection_keeps_a_person_that_fills_most_of_the_frame():
+    """Misure SAM2 su CPU (03/11): ritratto, clic sul busto: maschere 15,0 / 64,1 / 30,7 % -> la persona intera (64 %), non la sola pelle."""
+    from inference_server.backends.image_segment import pick_point_mask
+    T = 1000
+    assert pick_point_mask([150, 641, 307], [0.445, 0.688, 0.824], T) == 1
+    assert pick_point_mask([18, 152, 62], [0.17, 0.54, 0.62], T) == 1            # polpo cliccato sulla testa: polpo + giacca, non solo la testa
+    assert pick_point_mask([20, 990, 30], [0.2, 0.9, 0.5], T) == 2              # una maschera = scena intera (99 %) non e mai l'oggetto
+    assert pick_point_mask([950, 960, 990], [0.1, 0.9, 0.5], T) == 1            # tutte enormi: ripiego sul punteggio SAM
