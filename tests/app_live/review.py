@@ -50,6 +50,34 @@ def _thumb(src: str, dst_dir: str, name: str, big: bool = False):
         return None
 
 
+def _overlay(img_path: str, mask_path: str, dst_dir: str, name: str):
+    """Miniatura (piccola e grande) della foto con la MASCHERA sovrapposta in rosso (bianco/alpha della maschera = zona rigenerata)."""
+    try:
+        from PIL import Image
+        import numpy as np
+        im = Image.open(img_path).convert("RGB")
+        mk = Image.open(mask_path)
+        a = np.asarray(mk.convert("RGBA"))
+        m = (a[..., 3] > 127) & (a[..., :3].max(axis=2) > 127) if mk.mode in ("RGBA", "LA", "P") and a[..., 3].min() < 255 else (a[..., :3].max(axis=2) > 127)
+        m = np.asarray(Image.fromarray((m * 255).astype("uint8")).resize(im.size, Image.NEAREST)) > 127
+        arr = np.asarray(im).astype(np.float32)
+        arr[m] = 0.55 * arr[m] + 0.45 * np.array([255, 0, 0], dtype=np.float32)
+        edge = m ^ np.roll(m, 1, 0) | m ^ np.roll(m, 1, 1)
+        arr[edge] = (255, 255, 0)
+        out = Image.fromarray(arr.clip(0, 255).astype("uint8"))
+        res = {}
+        for big in (False, True):
+            o = out.copy()
+            o.thumbnail((1600, 1600) if big else (480, 480))
+            rel = f"img/{name}{'_big' if big else ''}.jpg"
+            os.makedirs(os.path.join(dst_dir, "img"), exist_ok=True)
+            o.save(os.path.join(dst_dir, rel), quality=88 if big else 80)
+            res["big" if big else "thumb"] = rel
+        return res
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
 def _what_to_check(c: dict, r: dict) -> str:
     if c.get("verify"):
         return c["verify"]
@@ -111,6 +139,12 @@ def build(run_dir: str, nome: str = "giro") -> str:
         for k, v in enumerate(p.get("ref_images") or []):
             if isinstance(v, str) and os.path.isfile(v):
                 origs.append({"label": f"riferimento {k + 1}", "path": v, "thumb": _thumb(v, rd, f"{safe}_ref{k}"), "big": _thumb(v, rd, f"{safe}_ref{k}", True)})
+        _im = next((p.get(k) for k in ("init_image", "image_path") if isinstance(p.get(k), str) and os.path.isfile(p.get(k))), None)
+        _mk = next((p.get(k) for k in ("mask", "mask_path") if isinstance(p.get(k), str) and os.path.isfile(p.get(k))), None)
+        if _im and _mk and c.get("fn") != "video":                           # inpaint / Integra: MASCHERA SOVRAPPOSTA alla foto (richiesta 03/11)
+            ov = _overlay(_im, _mk, rd, f"{safe}_overlay")
+            if ov:
+                origs.append({"label": "MASCHERA SOVRAPPOSTA (rosso = zona rigenerata)", "path": _mk, **ov})
         loras = [{"file": os.path.basename(str(L.get("file"))), "strength": L.get("strength"), "trigger": ", ".join(L.get("triggers") or [])}
                  for L in (ws.get("loras") or [])]
         cards.append({
