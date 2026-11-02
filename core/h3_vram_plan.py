@@ -98,7 +98,10 @@ def ref_rows_estimate(references: list | None, short_edge: int, height: int, wid
         if kind == "image":
             total += math.ceil(short_edge / step) * math.ceil(short_edge * 16 / 9 / step)
         elif kind == "video":
-            total += 8 * rows_per_latent_frame(height, width)
+            # un riferimento di MOVIMENTO e breve (8 frame di latente), ma nell'edit il video di riferimento e il clip INTERO: se la richiesta
+            # dice quanti frame ha (`frames`) si contano i suoi frame di latente veri (giro 02/11: stimati 8, erano 42 -> piano sbagliato, OOM)
+            n = int((r or {}).get("frames") or 0)
+            total += (latent_frames(n) if n >= 5 else 8) * rows_per_latent_frame(height, width)
     return total
 
 

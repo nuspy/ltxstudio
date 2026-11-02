@@ -235,6 +235,27 @@ def swap_and_assign_gguf(model: nn.Module, sd: dict, quantized_names: set) -> nn
 
 
 # ───────────────────────── integrazione ltx-core ─────────────────────────
+def gguf_offload_decision(stage, gb: float, env_mode: str = "auto") -> tuple[str, str]:
+    """('cpu'|'none', messaggio per il log) per un transformer GGUF di `gb` GiB.
+
+    ltx-pipelines >= 1.2 (venv della LTX 2.5): lo streaming a blocchi di `DiffusionStage` e deciso dal TIPO del builder
+    (`_is_streaming = isinstance(builder, StreamingModelBuilder)`, utils/blocks.py:486-488) e legge SOLO safetensors (ltx_core/block_streaming/
+    builder.py:56-64, source.py:16-41: pesi come buffer contigui con TensorLayout). Il patch del GGUF mette un SingleGPUModelBuilder, quindi
+    l'attributo `_offload_mode` che si imposta qui NON ha effetto: il transformer GGUF resta residente in VRAM. Prima (31/10) il log diceva
+    «offload a blocchi su CPU attivo»: falso su quella libreria (giro 02/11: inpaint GGUF Q8_0 -> OOM «resta residente»)."""
+    want_cpu = env_mode == "cpu" or (env_mode == "auto" and gb >= 16.0)
+    streams_by_builder_type = hasattr(type(stage), "_is_streaming")
+    if want_cpu and streams_by_builder_type:
+        return "none", (f"[gguf] ⚠ GGUF grande ({gb:.0f} GB): con questa libreria (ltx-pipelines >= 1.2, LTX 2.5) lo streaming a blocchi funziona SOLO "
+                        "con i safetensors, non con i GGUF: il transformer resta RESIDENTE in VRAM. Se a questa risoluzione/durata non entra, "
+                        "usa la variante INT8 o fp8 dello stesso modello (si streamma dalla RAM). Nessun cambio automatico.")
+    if want_cpu:
+        return "cpu", f"[gguf] ⚠ GGUF grande ({gb:.0f} GB): offload a blocchi su CPU attivo (piu lento, ma non occupa tutta la VRAM)"
+    if gb >= 12.0:
+        return "none", f"[gguf] ⚠ GGUF da {gb:.0f} GB residente in VRAM (nessun offload): a risoluzione/durata alte puo non entrare"
+    return "none", ""
+
+
 def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
     """Aggancia un DiffusionStage di ltx-core a caricare il transformer dal GGUF (quantizzato,
     dequant on-the-fly). `config_source` = un safetensors con la STESSA architettura (es. il dev-fp8)
@@ -301,13 +322,10 @@ def patch_stage_to_gguf(stage, gguf_path: str, config_source: str) -> None:
         _gb = _os.path.getsize(gguf_path) / 2 ** 30
     except OSError:
         _gb = 0.0
-    if _mode == "cpu" or (_mode == "auto" and _gb >= 16.0):
-        stage._offload_mode = OffloadMode.CPU
-        print(f"[gguf] ⚠ GGUF grande ({_gb:.0f} GB): offload a blocchi su CPU attivo (piu lento, ma non occupa tutta la VRAM)", flush=True)
-    else:
-        stage._offload_mode = OffloadMode.NONE
-        if _gb >= 12.0:
-            print(f"[gguf] ⚠ GGUF da {_gb:.0f} GB residente in VRAM (nessun offload): a risoluzione/durata alte puo non entrare", flush=True)
+    _om, _msg = gguf_offload_decision(stage, _gb, _mode)
+    stage._offload_mode = OffloadMode.CPU if _om == "cpu" else OffloadMode.NONE
+    if _msg:
+        print(_msg, flush=True)
     # niente torch.compile sul transformer GGUF: la compilation traccia con fake/meta tensor e il
     # GGMLTensor (dequant custom on-the-fly) non è tracciabile → "Tensor on device meta".
     if getattr(stage, "_compilation_config", None) is not None:

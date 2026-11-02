@@ -247,7 +247,7 @@ def run_edit(p: dict, W) -> str:
         if pic:
             refs.append({"kind": "image", "path": pic, "role": "subject"})
         refvid = _write_ref_video(ref_frames[sl], str(tmp / f"ref_{ci:02d}.mp4"), seg if wav is not None else None)
-        refs.append({"kind": "video", "path": refvid, "role": "motion"})
+        refs.append({"kind": "video", "path": refvid, "role": "motion", "frames": int(length)})     # `frames`: serve al piano di memoria (righe del riferimento)
         if action == "change_background":
             prompt = PR.background_prompt(e.get("prompt_text") or "", e.get("keep_text") or "the person", length, ctx, has_picture=bool(pic),
                                           picture_desc=e.get("picture_desc") or "", shots=e.get("shots") or "", lip_sync=wav is not None)
@@ -270,7 +270,8 @@ def run_edit(p: dict, W) -> str:
         out_frames[start + ctx:start + length] = comp[ctx:]
         prev_tail = comp
         done = start + length
-        gc.collect()
+        del res, gen_f, comp, noise, lat, cells
+        free_between_clips(W)
         _save_progress(tmp, ci, len(clips))
 
     # 5) file finale con l'audio originale
@@ -284,6 +285,17 @@ def run_edit(p: dict, W) -> str:
                  audio=audio, audio_sample_rate=_SRC_AUDIO_SR if audio is not None else None)
     W._log(f"edit finito in {time.time() - t_all:.0f}s -> {out}")
     return out
+
+
+def free_between_clips(W) -> None:
+    """Fra un clip e l'altro: python gc + cache CUDA restituita + riga di log con la VRAM. Il DiT/VAE/TE sono gia svuotati da `W.run` e dai
+    `_drop_module_weights` sopra: qui si controlla che non ne resti un secondo residente (se la VRAM resta alta lo si vede nel log)."""
+    gc.collect()
+    try:
+        W._gc()
+        W._log(f"fra i clip: VRAM {W._vram()}")
+    except Exception:                                        # noqa: BLE001
+        pass
 
 
 def _latents_of_frames(counts: list[int], frames: int) -> int:

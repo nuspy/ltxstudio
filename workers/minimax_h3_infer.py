@@ -389,6 +389,22 @@ def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
          f"{'tutto residente' if n == 0 else f'{n} blocchi in RAM'}; offload dinamico attivo")
 
 
+def _decode_and_free(blocks, g_dec, W, state, *, load_vae_fn=None, load_avae_fn=None, stage_fn=None):
+    """Decodifica col VAE video (fp32, ~9,7 GB) e il VAE audio e LI SVUOTA SUBITO. Il `del st` da solo non li liberava (giro 02/11, edit a clip in
+    catena: dopo il decode del clip 1 restavano ~10 GB di VAE in VRAM e il DiT del clip 2 moriva per OOM a 27,7 GB allocati). Con un solo clip il
+    problema non si vedeva perche il processo finiva."""
+    lv, la, sf = load_vae_fn or load_vae, load_avae_fn or load_audio_vae, stage_fn or _stage
+    v, a = lv(W), la(W)
+    st = sf(blocks, g_dec, {"vae": v, "audio_vae": a})
+    try:
+        return st(state=state, output=["videos", "audio", "sampling_rate"])
+    finally:
+        _drop_module_weights(v)
+        _drop_module_weights(a)
+        del st, v, a
+        _gc()
+
+
 def run(p: dict) -> str:
     from core import resources
     # nessuna soglia fissa sui GB: la VRAM necessaria si calcola più sotto da pesi, LoRA, durata e tela
@@ -483,7 +499,16 @@ def run(p: dict) -> str:
         # il pipeline porta ogni immagine di riferimento a 2048 px di lato corto (anche ingrandendola): con 32 GB
         # l'attenzione del Qwen3-VL su quei token va in OOM (visto 27/09). 1024 = 4× meno token, identità intatta.
         st.update_components(reference_image_short_edge=int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE))
-    state = st(**_inputs_for(st, kw))
+    if edit:
+        # I VIDEO di riferimento vengono portati sulla tela di `canvas_short_edge` (default del pacchetto 768, max 768x1344): il riferimento dell'edit
+        # va alla STESSA tela del bersaglio (480p), altrimenti ha 2,5x i token del previsto (giro 02/11: righe di riferimento 26k invece di 10k,
+        # OOM nel DiT; sequenza del TE ~9k token, OOM da 9 GB nell'attenzione).
+        _th, _tw = edit["canvas"]
+        st.update_components(canvas_short_edge=int(min(_th, _tw)), canvas_max_pixels=int(_th * _tw))
+    import h3_te_attn as _TA                   # attenzione del TE a blocchi di query (esatta): niente matrice L x L in un colpo solo
+    with _TA.query_chunked_attention():
+        state = st(**_inputs_for(st, kw))
+    _drop_module_weights(te)                   # il `del` da solo non basta (visto sul DiT e sul VAE): i pesi del TE escono dalla VRAM comunque
     del st, te, comps                          # comps teneva ancora il TE: senza, resta in VRAM
     _gc()
     _log(f"testo codificato in {time.time() - t0:.0f}s")
@@ -554,10 +579,7 @@ def run(p: dict) -> str:
 
     # 4) decode
     t0 = time.time()
-    st = _stage(blocks, g_dec, {"vae": load_vae(W), "audio_vae": load_audio_vae(W)})
-    res = st(state=state, output=["videos", "audio", "sampling_rate"])
-    del st
-    _gc()
+    res = _decode_and_free(blocks, g_dec, W, state)
     _log(f"decode in {time.time() - t0:.0f}s")
     if edit:
         return res

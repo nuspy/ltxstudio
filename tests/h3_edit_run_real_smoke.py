@@ -43,6 +43,7 @@ for i in range(NS):                                           # al posto di SAM2
     Image.fromarray(m).save(md / f"{i:05d}.png")
 
 calls = []
+events = []
 
 
 class FakeAVAE(torch.nn.Module):
@@ -70,16 +71,23 @@ class FakeW:
     def resolve(p): return {}
 
     @staticmethod
-    def _gc(): pass
+    def _gc(): events.append("gc")
 
     @staticmethod
-    def _drop_module_weights(m): pass
+    def _vram(): return "0 GB (finto)"
 
     @staticmethod
-    def load_vae(W): return torch.nn.Linear(1, 1)
+    def _drop_module_weights(m): events.append("drop:" + type(m).__name__)
 
     @staticmethod
-    def load_audio_vae(W): return FakeAVAE()
+    def load_vae(W):
+        events.append("load:vae")
+        return torch.nn.Linear(1, 1)
+
+    @staticmethod
+    def load_audio_vae(W):
+        events.append("load:avae")
+        return FakeAVAE()
 
     _decode_audio_av = staticmethod(REAL._decode_audio_av)          # decodifica VERA dell'audio del fixture
 
@@ -97,6 +105,9 @@ class FakeW:
             a, n, k = e["audio_hold"]()
             assert a.shape == n.shape == k.shape and a.shape[0] % 2 == 0
             assert e["audio_noise"].shape == (1, 32, a.shape[0])
+        vref = [r for r in pc["references"] if r["kind"] == "video"][0]
+        assert vref["frames"] == pc["num_frames"], "il riferimento video deve dire i suoi frame (piano di memoria)"
+        events.append("run")
         calls.append((pc["num_frames"], th, tw))
         return {"videos": [(torch.rand(pc["num_frames"], th, tw, 3) * 255).to(torch.uint8)], "audio": [None], "sampling_rate": 32000}
 
@@ -114,4 +125,17 @@ with av.open(out) as c:
     assert len(c.streams.audio) == 1, "l'uscita deve avere l'audio originale"
 dur = NS / SFPS
 assert abs(n_out - dur * 24) <= 22, (n_out, dur * 24)            # 25 -> 24 fps: la durata resta quella del sorgente (meno al piu' 22 frame di griglia)
+# sequenza carica -> usa -> libera, un giro per clip: VAE video e audio caricati, svuotati PRIMA del clip (W.run carica e libera il resto da se)
+per_clip = []
+cur = []
+for e in events:
+    cur.append(e)
+    if e == "run":
+        per_clip.append(cur)
+        cur = []
+assert len(per_clip) == len(calls) >= 3
+for k, seq in enumerate(per_clip):
+    ids = [x for x in seq if x != "gc"]
+    assert ids == ["load:vae", "drop:Linear", "load:avae", "drop:FakeAVAE", "run"], (k, seq)
+    assert seq.count("gc") >= 2, (k, seq)                         # gc dopo ogni caricamento e fra i clip
 print("SMOKE REALE OK:", n_out, "frame a 24 fps per", round(dur, 2), "s; clip", len(calls))
