@@ -126,21 +126,31 @@ def _run_h3_worker(w, spy, mode: str, *, with_photo: bool):
             if cmd and cmd[0].lower().endswith("python.exe") and any(c.endswith("video_segment.py") for c in cmd):   # SAM2
                 os.makedirs(os.path.join(os.path.splitext(path)[0] + "_track", "masks"), exist_ok=True)
                 return types.SimpleNamespace(stdout="GUIDE:g.mp4\n", stderr="", returncode=0)
-            if cmd and cmd[0].lower().endswith("python.exe") and any(c.endswith("minimax_h3_infer.py") for c in cmd):
+            return types.SimpleNamespace(stdout="", stderr="", returncode=1)
+
+        class FakePopen:                                         # il worker H3 ora gira con Popen (log completo su file + avanzamento nel tab)
+            def __init__(self, cmd, *a, **k):
+                cmd = [str(c) for c in cmd]
+                assert any(c.endswith("minimax_h3_infer.py") for c in cmd), cmd
                 seen["py"], seen["worker"] = cmd[0], cmd[-2]
                 seen["params"] = json.load(open(cmd[-1], encoding="utf-8"))
-                return types.SimpleNamespace(stdout="", stderr="", returncode=1)
-            return types.SimpleNamespace(stdout="", stderr="", returncode=1)
+                self.stdout = iter(["[h3] finto" + chr(10), "ERRORE: finto" + chr(10)])
+
+            def wait(self):
+                return 1
 
         from core import mem_coordinator as _mc
         _o_fw, _o_fv = _mc.free_and_wait, lvj.free_video_vram
         _mc.free_and_wait = lambda *a, **k: 0
         lvj.free_video_vram = lambda *a, **k: 0
+        real_popen = subprocess.Popen
         subprocess.run = fake_run
+        subprocess.Popen = FakePopen
         try:
             wk2.run()
         finally:
             subprocess.run = real_run
+            subprocess.Popen = real_popen
             _mc.free_and_wait, lvj.free_video_vram = _o_fw, _o_fv
         return cfg, seen, done
 

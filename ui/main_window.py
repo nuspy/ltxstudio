@@ -335,13 +335,26 @@ class _VideoEditAIWorker(QThread):
             _fvv(arch="minimax_h3")
         except Exception:                                       # noqa: BLE001
             pass
-        r = _sp.run([py, "-u", worker, jf], capture_output=True, text=True, encoding="utf-8", errors="replace")
-        line = next((ln for ln in reversed((r.stdout or "").splitlines()) if ln.startswith("OK:")), "")
+        # Il log COMPLETO del worker va su file (e le righe di avanzamento nel tab): prima si perdeva tutto tranne l'errore e non si poteva capire
+        # a che punto della catena fosse morto (giro 02/11).
+        logp = _os.path.join(self.out_dir, f"_h3edit_{stamp}.log")
+        lines: list[str] = []
+        with open(logp, "w", encoding="utf-8", errors="replace") as lf:
+            proc = _sp.Popen([py, "-u", worker, jf], stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True, encoding="utf-8", errors="replace")
+            for ln in proc.stdout:
+                lf.write(ln)
+                lf.flush()
+                lines.append(ln)
+                if ln.startswith(("[h3]", "[edit]", "---", "[mem]")) and "FutureWarning" not in ln:
+                    self.progress.emit(ln.rstrip()[:240])
+            rc = proc.wait()
+        text = "".join(lines)
+        line = next((ln for ln in reversed(text.splitlines()) if ln.startswith("OK:")), "")
         res = line[3:].strip() if line else ""
         if res and _os.path.exists(res):
             self.done.emit({"status": "success", "output": [res]})
         else:
-            self.done.emit({"status": "error", "error": _explain(r.stdout, r.stderr, return_code=r.returncode)})
+            self.done.emit({"status": "error", "error": _explain(text, "", return_code=rc) + f"\n\nLog completo: {logp}"})
 
     def run(self):
         import json as _j, os as _os, subprocess as _sp, time as _t
