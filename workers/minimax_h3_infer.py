@@ -700,7 +700,7 @@ def main() -> int:
         if sys.argv[1] == "--h3-edit-clip":                      # figlio dell'edit a clip: UN clip per processo (VRAM pulita)
             import h3_edit_run as _ER
             _ER.generate_clip(sys.argv[2], sys.modules[__name__])
-            print(f"OK:{sys.argv[2]}", flush=True)
+            print(f"CLIP_PRONTO:{sys.argv[2]}", flush=True)          # NON «OK:»: l'interfaccia prende l'ultima riga «OK:» come file finale del job
             return 0
         _p = json.loads(Path(sys.argv[1]).read_text("utf-8"))
         if _p.get("h3_edit"):                                    # cambia sfondo / sostituisci personaggio con maschera (clip in catena)

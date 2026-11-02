@@ -54,6 +54,16 @@ def chunk_tokens(rows: int, row_bytes: int, device) -> int:
     return min(rows, n)
 
 
+def alloc_qkv(qkv: list, B: int, N: int, q, k, v, dev) -> None:
+    """Buffer pieni di Q/K/V, allocati UNA volta e in modo ATOMICO. Prima era `qkv.extend(generatore)`: se l'OOM arrivava alla 2a/3a `torch.empty`
+    la lista restava con 1-2 elementi, il tentativo dopo il dimezzamento di `each_chunk` vedeva `qkv` non vuoto, saltava l'allocazione e moriva con
+    `IndexError: list index out of range` (`qkv[2][:, i:j] = v`), mascherando l'OOM vero (giro 02/11, edit H3 sfondo; vale anche per l'H3 normale).
+    Ora, se una delle tre fallisce, la lista resta vuota e il riprovo (dopo empty_cache e dimezzamento) rialloca tutto."""
+    if qkv:
+        return
+    qkv.extend([torch.empty((B, N) + t.shape[2:], dtype=t.dtype, device=dev) for t in (q, k, v)])
+
+
 def each_chunk(n: int, ch: int, fn, device=None) -> None:
     """fn(i, j) su [0, n) a blocchi di `ch`. Va in OOM -> dimezza quel blocco (fn deve essere idempotente: scrive
     solo in buffer indicizzati da [i, j)) e ricorda il tetto appreso. A MIN_CHUNK token senza spazio risolleva."""
@@ -164,8 +174,7 @@ def block_forward(blk, hidden_states, temb, adaln_indices, rotary_emb, attention
             if rotary_emb is not None:
                 q = _apply_rotary_emb(q, rotary_emb[0][i:j], rotary_emb[1][i:j])
                 k = _apply_rotary_emb(k, rotary_emb[0][i:j], rotary_emb[1][i:j])
-            if not qkv:
-                qkv.extend(torch.empty((B, N) + t.shape[2:], dtype=t.dtype, device=dev) for t in (q, k, v))
+            alloc_qkv(qkv, B, N, q, k, v, dev)
             qkv[0][:, i:j] = q
             qkv[1][:, i:j] = k
             qkv[2][:, i:j] = v

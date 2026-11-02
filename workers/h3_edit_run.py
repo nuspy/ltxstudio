@@ -214,7 +214,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # 3) piano dei clip
     clip_frames = int(float(e.get("clip_s", 6.0)) * FPS)
     cuts = [a for a, _b in M.find_shots(f01[:, ::4, ::4], 40.0)[1:]]
-    clips = M.clip_plan(N, clip_frames, int(e.get("overlap", 39)), cuts)
+    clips = M.enforce_min_length(M.clip_plan(N, clip_frames, int(e.get("overlap", 39)), cuts), N)   # nessun clip sotto i 5 s (minimo del pacchetto H3)
     W._log(f"piano: {len(clips)} clip (lunghezza, contesto) = {clips}")
 
     wav = W._decode_audio_av(src) if e.get("keep_audio", True) else None

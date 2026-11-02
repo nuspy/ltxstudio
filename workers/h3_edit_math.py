@@ -161,6 +161,30 @@ def clip_plan(total: int, clip_frames: int, overlap: int, cuts: list[int], fits=
         end, context = start + length, min(following, grid_floor(length - context))
 
 
+MIN_CLIP_FRAMES = 124               # il pacchetto H3 genera da 5,0 a 15,0 s: sotto i 120 frame rifiuta (17*7+5 = 124 e il primo valido)
+
+
+def enforce_min_length(clips: list[tuple[int, int]], total: int, min_len: int = MIN_CLIP_FRAMES) -> list[tuple[int, int]]:
+    """Ogni clip deve durare almeno `min_len` frame (H3 rifiuta i clip sotto i 5 s: giro 02/11, ultimo clip da 56 frame -> ValueError). Un clip
+    corto si ALLUNGA all'indietro: stessi frame NUOVI, piu contesto (frame gia generati, tenuti). La lunghezza resta 17k+5 e il contesto cambia di
+    un multiplo di 17, quindi cade ancora su un confine di frame di latente. Errore chiaro se non c'e abbastanza storia (video < 5,2 s o piano
+    dopo un taglio netto con un piano troppo corto)."""
+    out, done, prev_len = [], 0, 0
+    for length, ctx in clips:
+        new = length - ctx
+        if length < min_len:
+            L = grid_floor(min_len) if grid_floor(min_len) >= min_len else grid_floor(min_len) + 17
+            ctx2 = L - new
+            if not out or ctx2 > done or ctx2 > prev_len:
+                raise ValueError(f"H3 genera clip di almeno {min_len / FPS:.1f} s ({min_len} frame): qui servirebbero {ctx2} frame di contesto ma ne "
+                                 f"esistono {min(done, prev_len)}. Il video (o il suo piano dopo un taglio netto) e troppo corto: {total} frame.")
+            length, ctx = L, ctx2
+        out.append((length, ctx))
+        done += new
+        prev_len = length
+    return out
+
+
 # ── persona: maschera, manichino grigio, sfondo grigio sfocato ───────────────────────────────────
 def person_mask(m: torch.Tensor, headroom: float, hold_frames: int) -> tuple[torch.Tensor, torch.Tensor]:
     """Maschera di UNA persona [frames, h, w] con posa tenuta (+/- hold_frames) e spazio sopra la testa (headroom, quota dell'altezza);

@@ -351,7 +351,10 @@ class _VideoEditAIWorker(QThread):
         text = "".join(lines)
         line = next((ln for ln in reversed(text.splitlines()) if ln.startswith("OK:")), "")
         res = line[3:].strip() if line else ""
-        if res and _os.path.exists(res):
+        # SUCCESSO solo se il processo e uscito con codice 0 E l'uscita e un FILE: un job H3 non deve mai risultare «ok» senza il suo video.
+        # (Giro 02/11: il figlio di un clip stampava «OK:<cartella del clip>», la cartella esisteva e il job risultava riuscito mentre
+        # il genitore era morto per un clip fallito.)
+        if rc == 0 and res and _os.path.isfile(res):
             self.done.emit({"status": "success", "output": [res]})
         else:
             self.done.emit({"status": "error", "error": _explain(text, "", return_code=rc) + f"\n\nLog completo: {logp}"})

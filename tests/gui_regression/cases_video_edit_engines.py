@@ -96,7 +96,7 @@ def case_engine_choice_switches_fields_and_is_remembered(w, spy):
         t3.engine.setCurrentIndex(t3.engine.findData("ltx_union_canny"))   # ripristino il default per i test successivi
 
 
-def _run_h3_worker(w, spy, mode: str, *, with_photo: bool):
+def _run_h3_worker(w, spy, mode: str, *, with_photo: bool, lines=None, rc=1):
     from ui import main_window as mw
     with _Weights(True):
         t, path = _prep(w, mode)
@@ -134,10 +134,10 @@ def _run_h3_worker(w, spy, mode: str, *, with_photo: bool):
                 assert any(c.endswith("minimax_h3_infer.py") for c in cmd), cmd
                 seen["py"], seen["worker"] = cmd[0], cmd[-2]
                 seen["params"] = json.load(open(cmd[-1], encoding="utf-8"))
-                self.stdout = iter(["[h3] finto" + chr(10), "ERRORE: finto" + chr(10)])
+                self.stdout = iter(lines if lines is not None else ["[h3] finto" + chr(10), "ERRORE: finto" + chr(10)])
 
             def wait(self):
-                return 1
+                return rc
 
         from core import mem_coordinator as _mc
         _o_fw, _o_fv = _mc.free_and_wait, lvj.free_video_vram
@@ -177,6 +177,23 @@ def case_engine_h3_replace_character_reaches_h3_worker_with_photo(w, spy):
     assert e["action"] == "replace_character" and e["picture"].endswith("_vedit_eng_photo.png")
     assert seen["params"]["engine_action"] == "replace_character"
     veng.remember("replace_character", "ltx_union_canny")
+
+
+def case_h3_job_is_never_ok_without_its_video(w, spy):
+    """Giro 02/11: il figlio di un clip stampava «OK:<cartella>» e il job risultava riuscito senza video. Successo = codice 0 E file di uscita."""
+    import tempfile
+    d = tempfile.mkdtemp()                                           # una CARTELLA che esiste (come quella del clip)
+    cfg, seen, done = _run_h3_worker(w, spy, "change_background", with_photo=False, lines=["OK:" + d + chr(10)], rc=0)
+    assert done and done[0]["status"] == "error", done
+    cfg, seen, done = _run_h3_worker(w, spy, "change_background", with_photo=False,
+                                     lines=["CLIP_PRONTO:" + d + chr(10), "ERRORE: il clip non e stato generato" + chr(10)], rc=1)
+    assert done[0]["status"] == "error" and "il clip non e stato generato" in done[0]["error"] and "Log completo" in done[0]["error"], done
+    f = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    f.close()
+    cfg, seen, done = _run_h3_worker(w, spy, "change_background", with_photo=False, lines=["OK:" + f.name + chr(10)], rc=0)
+    assert done[0]["status"] == "success" and done[0]["output"] == [f.name], done                  # uscita vera + codice 0 = ok
+    rc1 = _run_h3_worker(w, spy, "change_background", with_photo=False, lines=["OK:" + f.name + chr(10)], rc=1)[2]
+    assert rc1[0]["status"] == "error", "OK con codice diverso da 0: errore"
 
 
 def case_engine_ltx_choice_keeps_todays_backend(w, spy):
@@ -239,4 +256,6 @@ CASES = [
     ("vengine_choice_gated", "motore: la scelta e una funzione dell'edizione; spenta = menu nascosto, default di oggi.",
      case_engine_choice_gated_by_edition),
     ("vengine_h3_gated", "H3 / Cambia sfondo: gate di edizione al lancio, nessun job senza la funzione.", case_h3_features_gated_at_launch),
+    ("vengine_h3_never_ok_without_file", "H3: job riuscito solo con codice 0 e file di uscita (mai la cartella di un clip).",
+     case_h3_job_is_never_ok_without_its_video),
 ]

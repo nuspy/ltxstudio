@@ -130,3 +130,27 @@ def test_blur_area_keeps_outside_and_removes_detail_inside():
     out = M.blur_area(img, area, radius=6.0, grey=0.5)
     assert torch.allclose(out[:, :, :20], img[:, :, :20])    # persona intatta
     assert out[:, 4:60, 40:60].std() < 0.05                  # sfondo: niente dettaglio da copiare
+
+
+def test_enforce_min_length_extends_short_last_clip_backwards_keeping_new_frames():
+    raw = M.clip_plan(260, 144, 39, [])                         # giro 02/11: [(141,0),(141,39),(56,39)] -> l'ultimo da 56 frame era rifiutato da H3
+    assert raw[-1][0] == 56
+    fixed = M.enforce_min_length(raw, 260)
+    assert fixed == [(141, 0), (141, 39), (124, 107)]
+    assert all(l >= M.MIN_CLIP_FRAMES and l == M.grid_floor(l) for l, _c in fixed)
+    new = lambda cl: sum(l - c for l, c in cl)                  # noqa: E731
+    assert new(fixed) == new(raw)                               # stessi frame NUOVI generati: cambia solo il contesto
+    assert fixed[-1][1] <= fixed[-2][0]                         # il contesto sta dentro il clip precedente (prev_tail)
+    assert (fixed[-1][1] - raw[-1][1]) % 17 == 0                # confine di frame di latente conservato
+    cum = [0]
+    for k in range(60):
+        cum.append(cum[-1] + M.FRAMES_PER_LATENT[k % 5])
+    assert fixed[-1][1] in cum                                  # il contesto finisce esattamente su un frame di latente
+
+
+def test_enforce_min_length_leaves_good_plans_alone_and_rejects_too_short_videos():
+    good = M.clip_plan(24 * 20, 144, 39, [])
+    assert [c for c in M.enforce_min_length(good, 480) if c[0] < 124] == []
+    import pytest
+    with pytest.raises(ValueError, match="troppo corto"):
+        M.enforce_min_length([(56, 0)], 56)                    # un video da 2,3 s non puo andare in H3 (minimo 5,2 s)
