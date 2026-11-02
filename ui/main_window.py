@@ -2957,7 +2957,7 @@ class MainWindow(QMainWindow):
                                     t=", ".join(sorted({_R.token_of(t.kind, t.n) for t in _bad})), n=len(imgs)))
             return
         # kontext = stitch (le foto affiancate in UNA striscia, da sinistra a destra): «image N» e la citazione posizionale
-        _style = {"qwen_image21": "qwen21", "flux3": "flux3", "krea2": "krea2_edit", "flux2": "flux2_klein", "kontext": "flux2_klein"}.get(engine)
+        _style = {"qwen_image21": "qwen21", "flux3": "flux3", "krea2": "krea2_edit", "flux2": "flux2_klein", "kontext": "kontext_stitch"}.get(engine)
         _order = {"image": list(range(1, len(imgs) + 1))}
         cfg["prompt"] = _R.translate(_raw, _order, _style) if _style else _raw
         _seed = cfg.get("seed") if cfg.get("seed") is not None else random.randint(0, 2**31)
@@ -3012,8 +3012,11 @@ class MainWindow(QMainWindow):
                     comp.paste(im, (x, 0)); x += im.width
                 cpath = os.path.join(OUTPUT_DIR, "compose_stitch.png"); comp.save(cpath)
                 self._inpaint_before = None
-                self._start_native_kontext({"image": cpath}, model,
-                    cfg.get("prompt") or "combine these reference images into one coherent scene",
+                # Kontext legge UNA immagine: spiegargli che sono N foto affiancate e che il risultato e UNA scena (la prima), non la striscia
+                _kp = cfg.get("prompt") or "combine these reference images into one coherent scene"
+                _kp = (f"The image is a strip of {len(prepped)} pictures side by side. Create ONE single new image, not a strip: "
+                       f"the scene of the first picture, edited as follows. {_kp}")
+                self._start_native_kontext({"image": cpath}, model, _kp,
                     "", _steps or 28, _seed,
                     _guid or self.frame1_tab.get_inpaint_config().get("integrate_guidance", 2.5),   # guidance di Integra (Kontext)
                     target_wh=self._canvas_output_size())      # punto 25: misura del CANVAS
