@@ -424,7 +424,16 @@ class _VideoEditAIWorker(QThread):
                 _fvv(arch="ltx")
             except Exception:                               # noqa: BLE001
                 pass
-            r2 = _sp.run([self.LTX2_PY, "-u", worker, jf], capture_output=True, text=True,
+            # VENV DELLA RELEASE (02/11): LTX 2.5 (Gemma 4, transformers>=5.8) gira in lingbot_venv, la 2.3 in ltx2_venv. Questo worker usava
+            # SEMPRE ltx2_venv: un inpaint con un checkpoint/GGUF 2.5 finiva nel pacchetto ltx 1.1.6, che non sa caricare un text encoder da
+            # file singolo e moriva con «No files matching pattern 'tokenizer.model' found under …gemma4….safetensors» (messaggio poi tagliato).
+            from core.ltx_video_job import runner_for as _runner_for
+            _py, worker = _runner_for({"arch": "ltx", "ltx_release": params.get("ltx_release") or cfg.get("ltx_release")})
+            if not _os.path.isfile(_py):
+                self.done.emit({"status": "error", "error": tr(
+                    "vedit.venv_missing", "Manca l'ambiente Python della release LTX {r}: {p}").format(
+                    r=params.get("ltx_release") or cfg.get("ltx_release") or "2.3", p=_py)}); return
+            r2 = _sp.run([_py, "-u", worker, jf], capture_output=True, text=True,
                          encoding="utf-8", errors="replace")
             if _os.path.exists(out) and getattr(self, "_ic_job", None) is not None:
                 try:                                           # post IC-LoRA: outpaint (gamma+originale) e audio originale
@@ -447,7 +456,8 @@ class _VideoEditAIWorker(QThread):
                         pass
                 self.done.emit({"status": "success", "output": [out]})
             else:
-                self.done.emit({"status": "error", "error": (r2.stdout or "")[-200:] + (r2.stderr or "")[-300:]})
+                from core.worker_errors import explain as _explain      # causa INTERA + coda del traceback (non 500 caratteri)
+                self.done.emit({"status": "error", "error": _explain(r2.stdout, r2.stderr, return_code=r2.returncode)})
         except Exception as e:                              # noqa: BLE001
             self.done.emit({"status": "error", "error": str(e)})
 
@@ -4165,7 +4175,7 @@ class MainWindow(QMainWindow):
                 self.video_edit_ai_tab.log.appendPlainText(tr("vedit.done_extra", "   + {o}").format(o=_x))
             self._last_video_path = out
         else:
-            self.video_edit_ai_tab.log.appendPlainText(tr("vedit.fail", "❌ Errore: {e}").format(e=res.get("error", "")[:300]))
+            self.video_edit_ai_tab.log.appendPlainText(tr("vedit.fail", "❌ Errore: {e}").format(e=res.get("error", "")))   # intero: la causa non va tagliata
 
     def _enhance_video_native(self):
         """Definizione video NATIVA: super-risoluzione per-frame (ESRGAN/spandrel via inference_server,
