@@ -648,10 +648,10 @@ class Driver:
         if qcalls and not outs and not problems and not self.dry:
             problems.append("job finito ma nessun file di uscita")
         subs = [c for c in self.rec.calls if c["via"] == "subprocess"]            # corrispondenza widget -> backend (motore scelto compreso)
-        for want in case.get("expect_subprocess", []):
+        for want in ([] if self.dry else case.get("expect_subprocess", [])):
             if not any(want.lower() in " ".join(c.get("argv", [])).lower() for c in subs):
                 problems.append(f"il backend atteso non e' stato lanciato: {want}")
-        for dotted, want in (case.get("expect_params") or {}).items():
+        for dotted, want in ({} if self.dry else (case.get("expect_params") or {})).items():
             got = []
             for c in subs:
                 v = c.get("params")
