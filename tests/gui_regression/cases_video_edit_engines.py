@@ -181,6 +181,41 @@ def case_engine_ltx_choice_keeps_todays_backend(w, spy):
         assert "h3_profile" not in cfg and cfg["mode"] == "edit" and cfg["edit_lora"]
 
 
+def case_engine_choice_gated_by_edition(w, spy):
+    """cap.video_engine_choice spenta: il menu Motore e nascosto e vale il motore di default dell'azione (anche se prima ne era stato scelto un altro)."""
+    from core import features
+    with _Weights(True):
+        t, _ = _prep(w, "replace_char")
+        t.engine.setCurrentIndex(t.engine.findData("h3_edit"))
+        assert veng.remembered("replace_character") == "h3_edit"
+        old = features.is_enabled
+        features.is_enabled = lambda fid: False if fid == "cap.video_engine_choice" else old(fid)
+        try:
+            t2, _ = _prep(w, "edit")
+            t3, _ = _prep(w, "replace_char")
+            assert t3.engine.isHidden(), "con la scelta spenta il menu non va mostrato"
+            assert t3.engine.currentData() == "ltx_union_canny", t3.engine.currentData()      # il default di oggi, non l'ultima scelta
+        finally:
+            features.is_enabled = old
+        veng.remember("replace_character", "ltx_union_canny")
+
+
+def case_h3_features_gated_at_launch(w, spy):
+    """cap.video_change_background / cap.video_h3_edit: edizione senza la funzione = upsell e nessun job accodato."""
+    from core import features
+    with _Weights(True):
+        asked = []
+        old_en, old_gate = features.is_enabled, w._feature_gate
+        w._feature_gate = lambda fid: (asked.append(fid) or False) if fid in ("cap.video_change_background", "cap.video_h3_edit") else True
+        try:
+            w._gen_video_edit_ai({"video": "x.mp4", "mode": "change_background", "engine": "h3_edit"})
+            w._gen_video_edit_ai({"video": "x.mp4", "mode": "replace_char", "engine": "h3_edit"})
+        finally:
+            w._feature_gate = old_gate
+        assert asked == ["cap.video_change_background", "cap.video_h3_edit"], asked
+        assert not spy.calls, "senza la funzione nessun job deve partire"
+
+
 CASES = [
     ("vengine_menu_filtered", "motore: il menu mostra SOLO i motori che fanno l'azione.", case_engine_menu_shows_only_engines_for_the_action),
     ("vengine_not_installed", "motore non installato: visibile, marcato, «Apri tab Pesi», non parte.",
@@ -191,4 +226,7 @@ CASES = [
     ("vengine_h3_replace_backend", "motore H3: Sostituisci personaggio arriva al worker H3 con la foto.",
      case_engine_h3_replace_character_reaches_h3_worker_with_photo),
     ("vengine_ltx_unchanged", "motore LTX (default): percorso di sempre, nessun parametro H3.", case_engine_ltx_choice_keeps_todays_backend),
+    ("vengine_choice_gated", "motore: la scelta e una funzione dell'edizione; spenta = menu nascosto, default di oggi.",
+     case_engine_choice_gated_by_edition),
+    ("vengine_h3_gated", "H3 / Cambia sfondo: gate di edizione al lancio, nessun job senza la funzione.", case_h3_features_gated_at_launch),
 ]

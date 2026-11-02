@@ -4137,6 +4137,10 @@ class MainWindow(QMainWindow):
             return                                           # edizione senza la funzione: upsell mostrato dal gate
         if cfg.get("mode") == "inpaint" and cfg.get("r2v") and not self._feature_gate("cap.video_inpaint_r2v"):
             return                                           # inpaint con foto di riferimento (LoRA r2v): gate proprio
+        if cfg.get("mode") == "change_background" and not self._feature_gate("cap.video_change_background"):
+            return                                           # «Cambia sfondo» (Openjutsu): gate proprio
+        if cfg.get("engine") == "h3_edit" and not self._feature_gate("cap.video_h3_edit"):
+            return                                           # motore MiniMax H3 per l'edit con maschera: gate proprio
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
         _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64

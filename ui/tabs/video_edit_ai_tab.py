@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
 
 from core import video_dub_translate as vdt
 from core import motion_tracks as mt
+from core import features
 from core import video_edit_engines as veng
 from core import video_edit_h3 as vh3
 from core import video_edit_ic as vic
@@ -1130,16 +1131,20 @@ class VideoEditAITab(QWidget):
         for it in items:
             lbl = tr(it["label_key"], it["label"]) + ("" if it["installed"] else "  — " + tr("vedit.engine.not_installed", "non installato"))
             self.engine.addItem(lbl, it["id"])
+        # la SCELTA del motore e una funzione dell'edizione (cap.video_engine_choice): spenta = si usa sempre il motore di default dell'azione
+        choice = features.is_enabled("cap.video_engine_choice")
+        if not choice and act:
+            want = veng.default_engine(act)
         i = self.engine.findData(want)
         self.engine.setCurrentIndex(i if i >= 0 else 0)
         self.engine.blockSignals(False)
-        self._show_row(self.engine, bool(items))
+        self._show_row(self.engine, bool(items) and choice)
         self._on_engine()
 
     def _on_engine(self, *_):
         eid = self.engine.currentData() or ""
         act = self.current_action()
-        if act and eid:
+        if act and eid and features.is_enabled("cap.video_engine_choice"):
             veng.remember(act, eid)
         e = veng.ENGINES.get(eid)
         is_h3 = bool(e) and e.kind == veng.KIND_H3_EDIT
