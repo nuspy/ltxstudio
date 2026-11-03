@@ -59,8 +59,12 @@ def _frames_of(video: str, out_dir: str, fps: int = 0) -> tuple[list[str], float
     return frames, real_fps
 
 
-def _gdino_box(frame0_png: str, text: str, device: str):
-    """GroundingDINO: testo → box [x0,y0,x1,y1] sul frame-0 (box col punteggio più alto)."""
+def _gdino_box(frame0_png: str, text: str, device: str, engine: str | None = None):
+    """GroundingDINO: testo → box [x0,y0,x1,y1] sul frame-0 (box col punteggio più alto). Con `engine`=SAM 3.1 il riquadro viene da SAM 3.1 (da testo)."""
+    if engine == "sam31":
+        from core import sam31_detect as _D
+        bx = _D.boxes(frame0_png, text.strip().rstrip("."), device, 0.5)
+        return bx[0][:4] if bx else None
     import torch
     from PIL import Image
     from transformers import AutoProcessor, GroundingDinoForObjectDetection
@@ -94,8 +98,6 @@ def track_object(video: str, *, point=None, box=None, text: str = "", dilate: in
     _eng, _err = _SE.resolve_for_job(engine)
     if _err:
         raise RuntimeError(_err)
-    if _eng == _SE.SAM31:
-        raise RuntimeError("SAM 3.1: il caricatore nativo non e collegato al tracking video.")
     import numpy as np
     import torch
     from PIL import Image
@@ -110,9 +112,9 @@ def track_object(video: str, *, point=None, box=None, text: str = "", dilate: in
         raise RuntimeError("Nessun frame estratto dal video.")
 
     if text and not (point or box):                        # selezione a parole sul frame-0
-        box = _gdino_box(frames[0], text, device)
+        box = _gdino_box(frames[0], text, device, _eng)
         if box is None:
-            raise RuntimeError(f"GroundingDINO non ha trovato '{text}' nel primo frame.")
+            raise RuntimeError(f"{'SAM 3.1' if _eng == _SE.SAM31 else 'GroundingDINO'} non ha trovato '{text}' nel primo frame.")
 
     proc = Sam2VideoProcessor.from_pretrained(SAM2_DIR)
     model = Sam2VideoModel.from_pretrained(SAM2_DIR).to(device).eval()
@@ -146,8 +148,12 @@ def track_object(video: str, *, point=None, box=None, text: str = "", dilate: in
     return {"frames": frames, "masks": out_masks, "fps": fps}
 
 
-def detect_boxes(frame_png: str, text: str, device: str, threshold: float = 0.35) -> list[list[float]]:
-    """GroundingDINO: testo -> TUTTI i riquadri [x0,y0,x1,y1,punteggio] sul frame (multi-box; `_gdino_box` ne da uno solo)."""
+def detect_boxes(frame_png: str, text: str, device: str, threshold: float = 0.35, engine: str | None = None) -> list[list[float]]:
+    """GroundingDINO: testo -> TUTTI i riquadri [x0,y0,x1,y1,punteggio] sul frame (multi-box; `_gdino_box` ne da uno solo).
+    Con `engine`=SAM 3.1 i riquadri vengono da SAM 3.1 (da testo, soglia 0,5)."""
+    if engine == "sam31":
+        from core import sam31_detect as _D
+        return _D.boxes(frame_png, text.strip().rstrip("."), device, 0.5)
     import torch
     from PIL import Image
     from transformers import AutoProcessor, GroundingDinoForObjectDetection
@@ -179,8 +185,6 @@ def find_people(video: str, work_dir: str, *, text: str = "person", max_people: 
     _eng, _err = _SE.resolve_for_job(engine)
     if _err:
         raise RuntimeError(_err)
-    if _eng == _SE.SAM31:
-        raise RuntimeError("SAM 3.1: il caricatore nativo non e collegato a «Trova persone».")
     import numpy as np
     import torch
     from PIL import Image
@@ -195,7 +199,7 @@ def find_people(video: str, work_dir: str, *, text: str = "person", max_people: 
     smodel = Sam2VideoModel.from_pretrained(SAM2_DIR).to(device).eval()
 
     def _detect(_v):
-        return detect_boxes(frames[0], text, device)
+        return detect_boxes(frames[0], text, device, engine=_eng)
 
     def _track(_v, box, mask_dir):
         os.makedirs(mask_dir, exist_ok=True)

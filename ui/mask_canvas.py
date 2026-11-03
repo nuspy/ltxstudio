@@ -41,6 +41,8 @@ CTX_RGB = (255, 204, 0)
 BANNER_POS_FG = "#ff6b6b"          # rosso leggibile su fondo scuro (contrasto > 4,5:1 su #14141c)
 BANNER_CTX_FG = "#ffd23f"          # giallo (contrasto > 10:1 su #14141c)
 BANNER_BG = "#14141c"
+OVL_TRANSP_GAP = 5                 # px fra i due cursori di trasparenza (richiesta utente 03/11)
+OVL_TRANSP_COL_W = 16              # larghezza di una colonna cursore (px): la sola maniglia, cosi i due cursori restano a OVL_TRANSP_GAP px
 # Contesto automatico: margine in PIXEL attorno alla sagoma vera (decisione dell'utente 03/11). 87 px = stessa area della zona di prima (riquadro + 5 % della
 # scena) sui casi di prova (scena 1152x832 + ritratto largo 389 px, scontornato: 87-88 px), cosi il comportamento predefinito resta vicino a quello di sempre.
 DEFAULT_CTX_PX = 87
@@ -241,6 +243,7 @@ class MaskCanvas(QWidget):
         self.integrate_ctx_mode = "auto"           # "auto" (dilatazione della sagoma, integrate_context_pct) | "manual" (pennello)
         self.integrate_draw_target = "position"    # in manuale: quale maschera si sta disegnando ("position" | "context")
         self.integrate_ctx_enabled = True          # False = il motore non usa la maschera di contesto (es. Krea 2 Edit)
+        self.integrate_mode_active = True          # False = non si e nella modalita Integra (pagina diversa da Modifica): decide frame1_tab
         self._ctx_manual = None                    # QImage ARGB (giallo) della zona di contesto disegnata a mano
         self._ctx_touched = False                  # il contesto manuale e gia stato precompilato/disegnato
         self._ctx_undo: list[QImage] = []
@@ -314,6 +317,9 @@ class MaskCanvas(QWidget):
             self.layer_list.addItem(QListWidgetItem(e["name"]))
         self.layer_list.setCurrentRow(self._active)
         self.layer_list.blockSignals(False)
+        self._refresh_cutout_buttons()
+        if hasattr(self, "ovl_legend"):
+            self._apply_masks_visibility()
 
     # ───────────────────────── Proporzioni / dimensioni ─────────────────────────
     def _build_aspect_menu(self) -> QMenu:
@@ -436,21 +442,41 @@ class MaskCanvas(QWidget):
         mid.addLayout(toolcol)
         mid.addWidget(self.view, 1)
         # DUE cursori VERTICALI di trasparenza, uno per sovrapposizione (posizione rossa / contesto gialla): solo visualizzazione,
-        # non cambiano le maschere inviate. Ognuno vale solo per la sua sovrapposizione.
+        # non cambiano le maschere inviate. Ognuno vale solo per la sua sovrapposizione. Stanno in UN contenitore: cursori quasi attaccati
+        # (OVL_TRANSP_GAP px) e margini a zero (richiesta utente 03/11); il contenitore si nasconde intero quando il motore non usa le maschere.
         self.ovl_transp_sl = {}
         self.ovl_transp_val = {}
+        self.ovl_transp_box = QWidget(); self.ovl_transp_box.setObjectName("ovl_transp_box")
+        _tb = QVBoxLayout(self.ovl_transp_box); _tb.setContentsMargins(0, 2, 0, 2); _tb.setSpacing(2)
+        _cap = QLabel(tr("canvas.ovl_transp_title", "Trasparenza")); _cap.setAlignment(Qt.AlignHCenter); _cap.setWordWrap(True)
+        _cap.setToolTip(tr("canvas.ovl_transp_tt", "Trasparenza di questa sovrapposizione: 0 = piena, 100 = invisibile. Solo visualizzazione, non cambia le maschere inviate."))
+        _cap.setStyleSheet("QLabel{color:#e8e8f0;font-size:10px;font-weight:bold;}")
+        _tb.addWidget(_cap)
+        _row = QHBoxLayout(); _row.setContentsMargins(0, 0, 0, 0); _row.setSpacing(OVL_TRANSP_GAP)
+        _row.addStretch(1)                                    # i due cursori restano al centro, attaccati fra loro
+        _vals = QVBoxLayout(); _vals.setContentsMargins(0, 0, 0, 0); _vals.setSpacing(0)     # i due valori in %, sotto i cursori
         for _key, _fg, _txt, _def in (("position", BANNER_POS_FG, tr("canvas.ovl_transp_pos", "Trasparenza posizione"), self._ovl_transp["position"]),
                                       ("context", BANNER_CTX_FG, tr("canvas.ovl_transp_ctx", "Trasparenza contesto"), self._ovl_transp["context"])):
-            tcol = QVBoxLayout(); tcol.setSpacing(2); tcol.setContentsMargins(0, 2, 0, 2)
-            _lab = QLabel(_txt); _lab.setAlignment(Qt.AlignHCenter); _lab.setWordWrap(True); _lab.setMaximumWidth(72)
-            _lab.setStyleSheet("QLabel{color:%s;background:%s;border-radius:4px;padding:1px 3px;font-size:10px;font-weight:bold;}" % (_fg, BANNER_BG))
-            sl = QSlider(Qt.Vertical); sl.setRange(0, 100); sl.setValue(int(_def)); sl.setMinimumHeight(110)
-            sl.setToolTip(tr("canvas.ovl_transp_tt", "Trasparenza di questa sovrapposizione: 0 = piena, 100 = invisibile. Solo visualizzazione, non cambia le maschere inviate."))
-            val = QLabel(f"{int(_def)}%"); val.setAlignment(Qt.AlignHCenter)
+            tcol = QVBoxLayout(); tcol.setSpacing(1); tcol.setContentsMargins(0, 0, 0, 0)
+            # l'iniziale (da "Posizione"/"Contesto", gia tradotti) affianca il colore: il colore non e l'unico veicolo d'informazione
+            _word = tr("canvas.draw_target_pos", "Posizione") if _key == "position" else tr("canvas.draw_target_ctx", "Contesto")
+            _lab = QLabel((_word[:1] or "?").upper()); _lab.setAlignment(Qt.AlignHCenter); _lab.setFixedWidth(OVL_TRANSP_COL_W)
+            _lab.setStyleSheet("QLabel{color:%s;background:%s;border-radius:4px;padding:0;font-size:11px;font-weight:bold;}" % (_fg, BANNER_BG))
+            _lab.setToolTip(_txt)
+            sl = QSlider(Qt.Vertical); sl.setRange(0, 100); sl.setValue(int(_def)); sl.setMinimumHeight(110); sl.setFixedWidth(OVL_TRANSP_COL_W)
+            sl.setToolTip(_txt + ": " + tr("canvas.ovl_transp_tt", "Trasparenza di questa sovrapposizione: 0 = piena, 100 = invisibile. Solo visualizzazione, non cambia le maschere inviate."))
+            val = QLabel(f"{_word[:1].upper() or '?'} {int(_def)}%"); val.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            val.setStyleSheet("QLabel{color:%s;font-size:10px;font-weight:bold;}" % _fg); val.setToolTip(_txt)
             sl.valueChanged.connect(lambda v, k=_key: self._on_ovl_transp(k, v))
-            tcol.addWidget(_lab); tcol.addWidget(sl, 1, Qt.AlignHCenter); tcol.addWidget(val)
-            mid.addLayout(tcol)
+            tcol.addWidget(_lab); tcol.addWidget(sl, 1, Qt.AlignHCenter)
+            _row.addLayout(tcol)
+            _vals.addWidget(val)
             self.ovl_transp_sl[_key] = sl; self.ovl_transp_val[_key] = val
+        _row.addStretch(1)
+        _tb.addLayout(_row, 1)
+        _tb.addLayout(_vals)
+        self.ovl_transp_box.setFixedWidth(64)
+        mid.addWidget(self.ovl_transp_box)
         self.ovl_transp_pos_sl = self.ovl_transp_sl["position"]; self.ovl_transp_ctx_sl = self.ovl_transp_sl["context"]   # attributi pubblici: gui_state li ricorda
         # ---- pannello layer (immagini importate) a destra ----
         side = QVBoxLayout()
@@ -473,6 +499,7 @@ class MaskCanvas(QWidget):
         b_rst.setToolTip(tr("canvas.cutout_undo.tt", "Rimette la foto originale, con il suo sfondo."))
         b_rst.clicked.connect(self._restore_selected)
         cut.addWidget(b_cut); cut.addWidget(b_rst)
+        self._cutout_btns = (b_cut, b_rst)
         side.addLayout(cut)
         mid.addLayout(side)
         lay.addLayout(mid, 1)
@@ -1494,6 +1521,7 @@ class MaskCanvas(QWidget):
         niente sovrapposizione gialla, selettore spento)."""
         if enabled is not None:
             self.integrate_ctx_enabled = bool(enabled)
+            self._apply_masks_visibility()
         if px is not None:
             self.integrate_context_px = max(0, int(px)); self.integrate_context_pct = None
         elif pct is not None:
@@ -1532,8 +1560,46 @@ class MaskCanvas(QWidget):
     def _on_ovl_transp(self, key: str, v: int) -> None:
         """Trasparenza di UNA sovrapposizione (solo visualizzazione: le maschere esportate non cambiano)."""
         self._ovl_transp[key] = max(0, min(100, int(v)))
-        self.ovl_transp_val[key].setText(f"{self._ovl_transp[key]}%")
+        _w = self.ovl_transp_val[key]; _w.setText(_w.text().split(" ")[0] + f" {self._ovl_transp[key]}%")
         self._apply_overlay_opacity()
+
+    def masks_visible(self) -> bool:
+        """Le due maschere e i loro controlli si vedono SOLO in modalita Integra (pagina Modifica del pannello), con un motore che le usa e con almeno un
+        layer importato da integrare. Altrimenti sono NASCOSTI (non disattivati)."""
+        return bool(self.integrate_ctx_enabled and self.integrate_mode_active and self.has_layers())
+
+    def set_integrate_mode_active(self, active: bool) -> None:
+        self.integrate_mode_active = bool(active)
+        self._apply_masks_visibility()
+        self.refresh_integrate_overlay(force=True)
+
+    def _apply_masks_visibility(self) -> None:
+        """Scritta «Stai disegnando», legenda «Mostra zone», cursori di trasparenza, selettore della maschera da disegnare e sovrapposizioni rossa/gialla:
+        visibili solo se `masks_visible()` (modalita Integra + motore che usa le maschere + layer presenti)."""
+        on = self.masks_visible()
+        for w in (getattr(self, "draw_banner", None), getattr(self, "ovl_legend", None), getattr(self, "ovl_transp_box", None)):
+            if w is not None:
+                w.setVisible(on)
+        if not on:
+            for w in (getattr(self, "draw_target_lbl", None), getattr(self, "_draw_target_cb", None)):
+                if w is not None:
+                    w.setVisible(False)
+            if self.integrate_draw_target != "position":
+                self.integrate_draw_target = "position"
+        else:
+            manual = self.integrate_ctx_mode == "manual"
+            self.draw_target_lbl.setVisible(manual); self._draw_target_cb.setVisible(manual)
+        self._position_overlay()
+
+    def set_layer_tools_allowed(self, allowed: bool) -> None:
+        """«✂ Scontorna» e «↺ Sfondo» servono solo dove i layer importati vengono composti sulla scena (decide frame1_tab): qui si nascondono, mai disattivano."""
+        self._cutout_allowed = bool(allowed)
+        self._refresh_cutout_buttons()
+
+    def _refresh_cutout_buttons(self) -> None:
+        on = getattr(self, "_cutout_allowed", True) and self.has_layers()
+        for b in getattr(self, "_cutout_btns", ()):
+            b.setVisible(bool(on))
 
     def _apply_overlay_opacity(self) -> None:
         self._ovl_pos.setOpacity(1.0 - self._ovl_transp["position"] / 100.0)
@@ -1581,6 +1647,7 @@ class MaskCanvas(QWidget):
             txt, col = tr("canvas.banner_auto", "Contesto automatico: {n} px").format(n=self._ctx_pct_label()), BANNER_CTX_FG
         else:
             txt, col = tr("canvas.banner_pos", "Stai disegnando: POSIZIONE"), BANNER_POS_FG
+        lab.setVisible(self.masks_visible())                   # fuori da Integra / motore senza maschere / niente layer: scritta nascosta
         self.draw_banner_color = col
         lab.setText(txt)
         lab.setStyleSheet("QLabel#draw_banner{color:%s;background:%s;font-size:15px;font-weight:bold;border-radius:6px;padding:3px 10px;}" % (col, BANNER_BG))
@@ -1680,9 +1747,9 @@ class MaskCanvas(QWidget):
         self.ctx_geometry_changed.emit()
         if not any_region or not show:
             self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
+        if not self.masks_visible():                          # fuori da Integra o motore senza maschere: nemmeno il rosso della posizione
+            self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
         self._ovl_pos.setPixmap(pos_pm)
-        if not self.integrate_ctx_enabled:
-            self._ovl_ctx.setPixmap(empty); return
         if self.integrate_ctx_mode == "manual" and self._ctx_manual is not None:
             ctx_show = self._ctx_manual                            # in manuale si vede il TRATTO (giallo) cosi come e disegnato
         else:

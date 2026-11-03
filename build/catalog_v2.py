@@ -1009,14 +1009,19 @@ NEW = [
     N("sam2-hiera-large", "Segmentazione", "SAM2 Hiera Large (tracking/maschere)",
       category="aux", arch="sam", kind="snapshot", repo="facebook/sam2-hiera-large",
       type="Segmentation", family="hf", gb=0.9, scan=["sam2-hiera-large"]),
-    # SAM 3.1 (Meta, Object Multiplex): repo con ACCESSO A RICHIESTA (account HF + licenza SAM di Meta del 19/11/2025, approvazione che puo richiedere
-    # giorni; 403 = richiesta in attesa). Alternativa a SAM2 per clic/lazo/tracking (menu «Segmentazione»); SAM2 + GroundingDINO restano il predefinito.
+    # SAM 3.1 (Meta, Object Multiplex): repo con ACCESSO A RICHIESTA (account HF + licenza SAM di Meta del 19/11/2025, approvazione di Meta di solito in alcune ore;
+    # 403 = richiesta in attesa). Alternativa a SAM2 per testo/tracking (menu «Segmentazione»); SAM2 + GroundingDINO restano il predefinito.
     # Licenza: uso commerciale consentito; vietati usi militari, nucleari, di spionaggio e reverse engineering. Checkpoint nativo .pt (weights_only).
     N("sam3.1-multiplex", "Segmentazione", "SAM 3.1 (Meta, multi-oggetto) — alternativa a SAM2",
       category="aux", arch="sam", kind="snapshot", repo="facebook/sam3.1", gated=True,
       type="Segmentation", family="", gb=3.5, scan=["sam3.1"],
-      note="Accesso a richiesta su Hugging Face (licenza SAM di Meta, approvazione anche dopo giorni). Uso commerciale consentito; vietati usi militari, "
+      note="Accesso a richiesta su Hugging Face (licenza SAM di Meta, approvazione di Meta: di solito alcune ore). Uso commerciale consentito; vietati usi militari, "
            "nucleari, di spionaggio e reverse engineering."),
+    N("sam31-comfy-multiplex", "Segmentazione", "SAM 3.1 tracker video multiplex (Comfy-Org, fp16)",
+      category="aux", arch="sam", kind="file", repo="Comfy-Org/sam3.1", filename="sam3.1_multiplex_fp16.safetensors",
+      remote="checkpoints/sam3.1_multiplex_fp16.safetensors", type="Segmentation", family="sam3.1_multiplex", gb=1.75, scan=["sam3.1_multiplex"],
+      note="Copia Comfy-Org (non gated) dello stesso modello SAM 3.1 in fp16, single-file. Alternativa a chi non ha l'approvazione di Meta: si usa SOLO se il confronto "
+           "tensore per tensore col checkpoint di Meta la dichiara equivalente. Licenza SAM di Meta."),
     N("grounding-dino-base", "Segmentazione", "GroundingDINO base (detect da testo)",
       category="aux", arch="dino", kind="snapshot", repo="IDEA-Research/grounding-dino-base",
       type="Segmentation", family="hf", gb=0.9, scan=["grounding-dino-base"]),

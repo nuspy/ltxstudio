@@ -1469,7 +1469,44 @@ class MainWindow(QMainWindow):
         seg.addSeparator()
         a_help = seg.addAction(tr("seg.help.menu", "Come ottenere SAM 3.1…"))
         a_help.triggered.connect(lambda *_: self._show_sam31_help())
+        # Dopo «Ho chiesto l'accesso» (guida) compare da solo «Controlla e scarica SAM 3.1» (voce di menu + bottone nell'angolo della barra dei menu);
+        # l'app controlla ogni 30 minuti e scarica in background appena Meta approva. Rimanda / Annulla nel menu e nella guida.
+        from ui.sam31_watch import Sam31Watcher
+        self._sam31_watch = Sam31Watcher(self)
+        self._a_sam31_check = seg.addAction(tr("sam31.btn_check_download", "Controlla e scarica SAM 3.1"))
+        self._a_sam31_check.triggered.connect(lambda *_: self._sam31_watch.check_now())
+        self._a_sam31_snooze = seg.addAction(tr("sam31.menu_snooze", "Rimanda il controllo di SAM 3.1 (2 ore)"))
+        self._a_sam31_snooze.triggered.connect(lambda *_: self._sam31_watch.snooze())
+        self._a_sam31_cancel = seg.addAction(tr("sam31.menu_cancel", "Annulla il controllo automatico di SAM 3.1"))
+        self._a_sam31_cancel.triggered.connect(lambda *_: self._sam31_watch.cancel())
+        self._sam31_btn = QPushButton(tr("sam31.btn_check_download", "Controlla e scarica SAM 3.1"))
+        self._sam31_btn.setToolTip(tr("sam31.tt_button", "Controlla ora se Meta ha approvato l'accesso a SAM 3.1 e, se si, lo scarica. Controllo automatico ogni 30 minuti."))
+        self._sam31_btn.setMinimumHeight(28)
+        self._sam31_btn.clicked.connect(lambda *_: self._sam31_watch.check_now())
+        self.menuBar().setCornerWidget(self._sam31_btn, Qt.TopRightCorner)
+        self._sam31_watch.changed.connect(self._refresh_segmentation_labels)
+        self._sam31_watch.message.connect(lambda m: self.statusBar().showMessage(m, 8000))
         self._seg_group.triggered.connect(self._on_segmentation_chosen)
+        self._refresh_segmentation_labels()
+        self._sam31_watch.start()
+        try:                                                    # a download finito la voce SAM 3.1 passa da «non installato» a utilizzabile
+            from ui.download_manager import manager as _dlm
+            _dlm().finished.connect(lambda *_: self._refresh_segmentation_labels())
+        except Exception:                                       # noqa: BLE001
+            pass
+
+    def _refresh_segmentation_labels(self):
+        from core import segmentation_engine as SE
+        for ent in SE.menu_entries():
+            a = self._seg_actions.get(ent["id"])
+            if a is not None:
+                a.setText(self._seg_label(ent))
+        cur = SE.current()
+        self._seg_actions.get(cur if SE.is_selectable(cur) else SE.SAM2).setChecked(True)
+        from core import sam31_access as AC
+        vis = AC.button_visible()
+        for w in (self._a_sam31_check, self._a_sam31_snooze, self._a_sam31_cancel, self._sam31_btn):
+            w.setVisible(vis)
 
     @staticmethod
     def _seg_label(ent: dict) -> str:
@@ -1481,7 +1518,7 @@ class MainWindow(QMainWindow):
         from core import segmentation_engine as SE
         eng = action.data()
         if not SE.is_selectable(eng):
-            # SAM 3.1 non utilizzabile: nessuna scelta (e nessun ripiego silenzioso): resta quella di prima e si apre l'aiuto non modale
+            # SAM 3.1 non utilizzabile: nessuna scelta (e nessun ripiego silenzioso): resta quella di prima e si apre la guida non modale
             self._seg_actions[SE.current() if SE.is_selectable(SE.current()) else SE.SAM2].setChecked(True)
             self._show_sam31_help()
             return
@@ -1490,7 +1527,7 @@ class MainWindow(QMainWindow):
 
     def _show_sam31_help(self):
         from ui.widgets import sam31_help
-        sam31_help.show(self, on_use_sam2=lambda: self._seg_actions['sam2'].setChecked(True))
+        sam31_help.show(self, on_use_sam2=lambda: self._seg_actions['sam2'].setChecked(True), watcher=getattr(self, "_sam31_watch", None))
 
     def _change_language(self, lang_code: str):
         """Cambia lingua, aggiorna il pulsante e avvisa di riavviare."""
@@ -5830,7 +5867,8 @@ class MainWindow(QMainWindow):
             src = getattr(self.frame1_tab.canvas, "_image_path", None)
             image_path = src if (src and os.path.exists(src)) else ""
         img = image_path or self.frame1_tab.canvas._composite(OUTPUT_DIR)
-        params = {"image_path": img}
+        from core import segmentation_engine as _SE
+        params = {"image_path": img, "seg_engine": _SE.current()}     # il server di inferenza e un processo vecchio: la scelta del menu va passata, non riletta dalle preferenze
         if region_mask:
             params["region_mask"] = region_mask
             if region_pick:

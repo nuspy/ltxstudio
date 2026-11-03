@@ -263,6 +263,13 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     hold_cover = float(os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0) or 0.0) if invert else 0.0
     if not 0.0 < hold_cover < 1.0:
         hold_cover = 0.0
+    # first_clip_two_pass (env H3_EDIT_FIRST_TWO_PASS: 1 = si, un numero = frame di contesto; default spento; frame = quelli di `first_two_pass_frames`, default 22,
+    # portati al confine di frame di latente piu vicino per difetto): solo cambia-sfondo.
+    _tp = str(os.environ.get("H3_EDIT_FIRST_TWO_PASS") or e.get("first_clip_two_pass") or "0").strip().lower()
+    two_n = 0
+    if invert and _tp not in ("0", "", "false", "no", "off"):
+        _n = int(e.get("first_two_pass_frames") or 22) if _tp in ("1", "true", "yes", "on") else int(float(_tp))
+        two_n = M.latent_boundary_floor(_n)
     pers, size = M.person_mask(obj, headroom, hold_frames)
     pers = pers.float()
     person_grow = max(0, int(round(float(e.get("person_grow_px", 40)) * scale)))
@@ -336,58 +343,79 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         if ctx:                                                        # i frame di contesto non si rigenerano
             cells = cells.clone()
             cells[:, :, :_latents_of_frames(counts, ctx)] = 0
-        jd = tmp / f"clip_{ci:02d}"
-        jd.mkdir(exist_ok=True)
-        seg = None
-        if wav is not None:
-            s0, s1 = int(start / FPS * _SRC_AUDIO_SR), int((start + length) / FPS * _SRC_AUDIO_SR)
-            seg = wav[:, s0:s1]
-            if seg.shape[1] < (s1 - s0):
-                seg = torch.cat([seg, torch.zeros(seg.shape[0], (s1 - s0) - seg.shape[1])], 1)
-        refvid = _write_ref_video(ref_frames[sl], str(jd / "ref.mp4"), seg)
-        meta = {"ci": ci, "clips": len(clips), "length": int(length), "ctx": int(ctx), "start": int(start), "seed": seed0 + ci, "th": th, "tw": tw,
-                "picture": pic, "refvid": refvid, "action": action, "keep_text": e.get("keep_text") or "the person",
-                "prompt_text": e.get("prompt_text") or "", "picture_desc": e.get("picture_desc") or "", "shots": e.get("shots") or "",
-                "has_audio": seg is not None, "base": base, "audio_seed": seed0 + 104729 * ci, "noise_seed": seed0 + 7919 * ci}
-        if e.get("guide"):                                             # solo se scelta: senza, meta (e quindi la chiave del clip) e quella di sempre
-            meta["guide"] = {"frame_idx": int(e.get("guide_frame_idx") or 0)}
-            if invert and e.get("guide_mode") == "person":
-                # guida = SOLO la persona (matte morbido) su grigio neutro: il modello copia il TEMPO e la posa della persona fotogramma per fotogramma senza avere
-                # sotto gli occhi lo sfondo vecchio da ricopiare. Per i frame di contesto vale la persona gia generata (clip_src).
-                meta["guide"]["mode"] = "person"
-                mm = M.gaussian_blur(M.grow_mask(pers[sl].float(), 6)[:, None], 2.0)[:, 0].clamp(0, 1)[..., None]
-                _np.save(jd / "guide_src.npy", ((clip_src.float() / 255.0 * mm + 0.5 * (1 - mm)) * 255).round().to(torch.uint8).numpy())
-        if e.get("ref_clock_align"):                                   # variante sperimentale: SOLO se scelta (altrimenti meta e chiave restano quelle di sempre)
-            meta["ref_clock_align"] = True
-        _np.save(jd / "clip_src.npy", clip_src.numpy())
-        _np.save(jd / "cells.npy", cells.numpy())
-        if seg is not None:
-            _np.save(jd / "seg.npy", seg.numpy())
-        (jd / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-        key = _sha(clip_src.numpy().tobytes(), cells.numpy().tobytes(), json.dumps(meta, sort_keys=True, default=str))
-        gen_p, key_p = jd / "gen.npy", jd / "key.txt"
-        if gen_p.exists() and key_p.exists() and key_p.read_text().strip() == key:
-            W._log(f"--- clip {ci + 1}/{len(clips)}: GIA GENERATO (ripresa da {gen_p}) ---")
-        else:
-            if key_p.exists():
-                key_p.unlink()
-            if gen_p.exists():
-                gen_p.unlink()
-            (jd / "want_key.txt").write_text(key)
-            W._log(f"--- clip {ci + 1}/{len(clips)}: {length} frame (contesto {ctx}) — processo dedicato ---")
-            run_clip_with_fallback(W, clip_runner, str(jd))
-            _ensure(gen_p.exists(), f"il clip {ci + 1} non ha prodotto {gen_p}")
-            key_p.write_text(key)
-        gen_f = torch.from_numpy(_np.load(gen_p)).float() / 255.0
-        _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")
-        gen_f = gen_f[:length]
-        if gen_f.shape[1:3] != (th, tw):
-            gen_f = F.interpolate(gen_f.movedim(-1, 1), size=(th, tw), mode="bilinear", align_corners=False).movedim(1, -1)
-        comp = composite(gen_f, clip_src.float() / 255.0, cells, counts)          # clip_src ha gia il contesto = frame del clip prima
-        if invert and bg_matte:                                                    # la persona e quella ORIGINALE a pixel (bordo morbido), non quella ridisegnata nelle celle di bordo
-            comp = M.person_matte(comp, clip_src.float() / 255.0, pers[sl])
-        out_frames[start + ctx:start + length] = comp[ctx:]
-        prev_tail = comp
+        # first_clip_two_pass (env H3_EDIT_FIRST_TWO_PASS, default spento): il clip 1 non ha contesto, quindi il modello si inventa il moto dal riferimento con un orologio suo
+        # (persona ridisegnata sfasata di ~10 frame, dente di sega); il clip 2 prosegue un moto GIA fissato dai 39 frame di contesto e non ha il difetto. Passata A = clip 1 come
+        # sempre; i suoi primi N frame (composti col matte: nuovo sfondo + persona vera) diventano il CONTESTO tenuto al 100 % della passata B, che rigenera il clip 1.
+        two_pass = bool(two_n) and ci == 0 and ctx == 0 and invert and length >= two_n + 17
+        ctx0, src0, cells0, comp_a = ctx, clip_src, cells, None
+        for pass_i in range(2 if two_pass else 1):
+            if pass_i == 1:
+                clip_src = src0.clone()
+                clip_src[:two_n] = (comp_a[:two_n] * 255).round().to(torch.uint8)
+                cells = cells0.clone()
+                cells[:, :, :_latents_of_frames(counts, two_n)] = 0
+                ctx = two_n
+                W._log(f"--- clip 1, passata B: i primi {two_n} frame della passata A come contesto tenuto ---")
+            jd = tmp / (f"clip_{ci:02d}" if pass_i == 0 else f"clip_{ci:02d}b")
+            jd.mkdir(exist_ok=True)
+            seg = None
+            if wav is not None:
+                s0, s1 = int(start / FPS * _SRC_AUDIO_SR), int((start + length) / FPS * _SRC_AUDIO_SR)
+                seg = wav[:, s0:s1]
+                if seg.shape[1] < (s1 - s0):
+                    seg = torch.cat([seg, torch.zeros(seg.shape[0], (s1 - s0) - seg.shape[1])], 1)
+            refvid = _write_ref_video(ref_frames[sl], str(jd / "ref.mp4"), seg)
+            meta = {"ci": ci, "clips": len(clips), "length": int(length), "ctx": int(ctx), "start": int(start), "seed": seed0 + ci, "th": th, "tw": tw,
+                    "picture": pic, "refvid": refvid, "action": action, "keep_text": e.get("keep_text") or "the person",
+                    "prompt_text": e.get("prompt_text") or "", "picture_desc": e.get("picture_desc") or "", "shots": e.get("shots") or "",
+                    "has_audio": seg is not None, "base": base, "audio_seed": seed0 + 104729 * ci, "noise_seed": seed0 + 7919 * ci}
+            if pass_i == 1:                                                # passata B: i primi N frame sono il contesto tenuto (pulito); entra nella chiave del clip
+                meta["two_pass"] = int(two_n)
+            if e.get("guide"):                                             # solo se scelta: senza, meta (e quindi la chiave del clip) e quella di sempre
+                meta["guide"] = {"frame_idx": int(e.get("guide_frame_idx") or 0)}
+                if invert and e.get("guide_mode") == "person":
+                    # guida = SOLO la persona (matte morbido) su grigio neutro: il modello copia il TEMPO e la posa della persona fotogramma per fotogramma senza avere
+                    # sotto gli occhi lo sfondo vecchio da ricopiare. Per i frame di contesto vale la persona gia generata (clip_src).
+                    meta["guide"]["mode"] = "person"
+                    mm = M.gaussian_blur(M.grow_mask(pers[sl].float(), 6)[:, None], 2.0)[:, 0].clamp(0, 1)[..., None]
+                    _np.save(jd / "guide_src.npy", ((clip_src.float() / 255.0 * mm + 0.5 * (1 - mm)) * 255).round().to(torch.uint8).numpy())
+            if e.get("ref_clock_align"):                                   # variante sperimentale: SOLO se scelta (altrimenti meta e chiave restano quelle di sempre)
+                meta["ref_clock_align"] = True
+            _np.save(jd / "clip_src.npy", clip_src.numpy())
+            _np.save(jd / "cells.npy", cells.numpy())
+            if seg is not None:
+                _np.save(jd / "seg.npy", seg.numpy())
+            (jd / "meta.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+            key = _sha(clip_src.numpy().tobytes(), cells.numpy().tobytes(), json.dumps(meta, sort_keys=True, default=str))
+            gen_p, key_p = jd / "gen.npy", jd / "key.txt"
+            if gen_p.exists() and key_p.exists() and key_p.read_text().strip() == key:
+                W._log(f"--- clip {ci + 1}/{len(clips)}: GIA GENERATO (ripresa da {gen_p}) ---")
+            else:
+                if key_p.exists():
+                    key_p.unlink()
+                if gen_p.exists():
+                    gen_p.unlink()
+                (jd / "want_key.txt").write_text(key)
+                W._log(f"--- clip {ci + 1}/{len(clips)}: {length} frame (contesto {ctx}) — processo dedicato ---")
+                run_clip_with_fallback(W, clip_runner, str(jd))
+                _ensure(gen_p.exists(), f"il clip {ci + 1} non ha prodotto {gen_p}")
+                key_p.write_text(key)
+            gen_f = torch.from_numpy(_np.load(gen_p)).float() / 255.0
+            _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")
+            gen_f = gen_f[:length]
+            if gen_f.shape[1:3] != (th, tw):
+                gen_f = F.interpolate(gen_f.movedim(-1, 1), size=(th, tw), mode="bilinear", align_corners=False).movedim(1, -1)
+            comp = composite(gen_f, clip_src.float() / 255.0, cells, counts)          # clip_src ha gia il contesto = frame del clip prima
+            if invert and bg_matte:                                                    # la persona e quella ORIGINALE a pixel (bordo morbido), non quella ridisegnata nelle celle di bordo
+                comp = M.person_matte(comp, clip_src.float() / 255.0, pers[sl])
+            if pass_i == 1:                                                # i primi N frame restano ESATTAMENTE quelli composti dalla passata A (niente doppia codifica VAE)
+                comp = comp.clone()
+                comp[:two_n] = comp_a[:two_n]
+                out_frames[start:start + length] = comp
+            else:
+                out_frames[start + ctx0:start + length] = comp[ctx0:]
+                comp_a = comp.clone() if two_pass else None
+            prev_tail = comp
         done = start + length
         del gen_f, comp, cells
         gc.collect()

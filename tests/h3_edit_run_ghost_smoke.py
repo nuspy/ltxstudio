@@ -102,7 +102,7 @@ def frames_of(path):
 
 
 def run(tag, env):
-    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER"):
+    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS"):
         os.environ.pop(k, None)
     os.environ.update(env)
     calls.clear(); refs.clear()
@@ -119,7 +119,19 @@ man, c2, r2 = run("mann", {"H3_EDIT_BG_PERSON_REF": "mannequin", "H3_EDIT_BG_MAT
 mat, c3, r3 = run("matte", {})                                                 # senza variabili: matte di DEFAULT
 cov, c4, r4 = run("cover", {"H3_EDIT_BG_HOLD_COVER": "0.5"})                    # celle tenute con persona >= 50 %: gira e produce lo stesso numero di frame
 assert cov.shape == base.shape and c4 == c0, (c4, c0)
-print("clip base", c0, "preroll", c1)
+two, c5, r5 = run("two", {"H3_EDIT_FIRST_TWO_PASS": "1"})                       # clip 1 in due passate: un clip in piu (la passata B), stesso numero di frame
+assert two.shape == base.shape and len(c5) == len(c0) + 1 and c5[:2] == [141, 141], (c5, c0)
+import json  # noqa: E402
+tdir = next((TMP / "two" / "_h3edit_tmp").iterdir())
+mb = json.loads((tdir / "clip_00b" / "meta.json").read_text("utf-8"))
+assert mb["two_pass"] == 22 and mb["ctx"] == 22 and mb["ci"] == 0, mb
+ca, cb = np.load(tdir / "clip_00" / "cells.npy"), np.load(tdir / "clip_00b" / "cells.npy")
+assert ca.shape == cb.shape and float(cb[:, :, :7].max()) == 0.0 and float(ca[:, :, :7].max()) > 0, (ca[:, :, :7].max(), cb[:, :, :7].max())   # 22 frame = 7 frame di latente tenuti
+assert np.array_equal(ca[:, :, 7:], cb[:, :, 7:])                                  # il resto della maschera e quello di sempre
+sa, sb = np.load(tdir / "clip_00" / "clip_src.npy"), np.load(tdir / "clip_00b" / "clip_src.npy")
+assert not np.array_equal(sa[:22], sb[:22]) and np.array_equal(sa[22:], sb[22:])   # solo i primi 22 sono i frame puliti della passata A
+assert not (tdir / "clip_01" / "meta.json").exists() or json.loads((tdir / "clip_01" / "meta.json").read_text("utf-8"))["ctx"] == 39
+print("clip base", c0, "preroll", c1, "two-pass", c5)
 
 # PREROLL: stesso numero di frame in uscita, ma si genera di piu (clip 1 piu lungo di 17 frame)
 assert pre.shape[0] == base.shape[0], (pre.shape, base.shape)

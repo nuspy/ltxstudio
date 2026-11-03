@@ -83,3 +83,11 @@ def test_hold_cover_option_is_wired_and_in_the_checkpoint_key_only_when_set():
     assert 'os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0)' in src
     assert "hold_cover=hold_cover or None" in src
     assert '"bgcover", hold_cover' in src and "if hold_cover else ()" in src
+
+
+def test_first_clip_two_pass_boundaries_and_wiring():
+    assert [M.latent_boundary_floor(n) for n in (0, 1, 2, 5, 21, 22, 23, 39, 40)] == [0, 1, 1, 5, 18, 22, 22, 39, 39]     # confini del latente: 22 e 39 lo sono
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("H3_EDIT_FIRST_TWO_PASS") or e.get("first_clip_two_pass")' in src
+    assert 'meta["two_pass"] = int(two_n)' in src and "comp[:two_n] = comp_a[:two_n]" in src
+    assert 'f"clip_{ci:02d}b"' in src                                                       # la passata B ha la sua cartella (la A resta riusabile)

@@ -13,6 +13,7 @@ Convenzioni H3 (verificate sul modulo diffusers `minimax_h3`):
 """
 from __future__ import annotations
 
+import itertools
 import math
 
 import torch
@@ -46,6 +47,17 @@ def latent_frame_counts(n_pixel_frames: int) -> list[int]:
     counts = [FRAMES_PER_LATENT[k % 5] for k in range(t)]
     assert sum(counts) == n_pixel_frames
     return counts
+
+
+def latent_boundary_floor(frames: int) -> int:
+    """Il piu grande confine di frame di latente (1, 5, 9, ..., 17, 18, 22, ... cumulati di 1,4,4,4,4) <= `frames`: un contesto che finisce su un confine
+    non lascia mezzo frame di latente fra tenuto e rigenerato. 0 se `frames` < 1."""
+    acc, best = 0, 0
+    for c in itertools.cycle(FRAMES_PER_LATENT):
+        acc += c
+        if acc > frames:
+            return best
+        best = acc
 
 
 def budget_size(w: int, h: int, width: int, height: int) -> tuple[int, int, float]:

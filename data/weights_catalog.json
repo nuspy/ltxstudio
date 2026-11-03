@@ -2150,7 +2150,30 @@
       "arch": "sam",
       "repo_id": "facebook/sam3.1",
       "url": "https://huggingface.co/facebook/sam3.1",
-      "note": "Accesso a richiesta su Hugging Face (licenza SAM di Meta, approvazione anche dopo giorni). Uso commerciale consentito; vietati usi militari, nucleari, di spionaggio e reverse engineering.",
+      "note": "Accesso a richiesta su Hugging Face (licenza SAM di Meta, approvazione di Meta: di solito alcune ore). Uso commerciale consentito; vietati usi militari, nucleari, di spionaggio e reverse engineering.",
+      "use": [
+        "segment"
+      ]
+    },
+    {
+      "id": "sam31-comfy-multiplex",
+      "module": "Segmentazione",
+      "label": "SAM 3.1 tracker video multiplex (Comfy-Org, fp16)",
+      "kind": "file",
+      "type": "Segmentation",
+      "family": "sam3.1_multiplex",
+      "gated": false,
+      "approx_gb": 1.75,
+      "scan_names": [
+        "sam3.1_multiplex"
+      ],
+      "category": "aux",
+      "arch": "sam",
+      "repo_id": "Comfy-Org/sam3.1",
+      "url": "https://huggingface.co/Comfy-Org/sam3.1",
+      "filename": "sam3.1_multiplex_fp16.safetensors",
+      "remote_filename": "checkpoints/sam3.1_multiplex_fp16.safetensors",
+      "note": "Copia Comfy-Org (non gated) dello stesso modello SAM 3.1 in fp16, single-file. Alternativa a chi non ha l'approvazione di Meta: si usa SOLO se il confronto tensore per tensore col checkpoint di Meta la dichiara equivalente. Licenza SAM di Meta.",
       "use": [
         "segment"
       ]

@@ -512,12 +512,13 @@ def _sent_mask_area(w, spy):
 
 def case_integrate_context_zone(w, spy):
     """Integra «Zona di contesto»: i widget (selettore, cursore/campo %, pennello contesto, trasparenza) cambiano DAVVERO la maschera inviata
-    al backend; la trasparenza no; con Krea 2 Edit (niente maschera) il selettore e spento con spiegazione; la scritta segue il selettore."""
+    al backend; la trasparenza no; con Krea 2 Edit (niente maschera) i controlli sono nascosti; la scritta segue il selettore."""
     _force_native_up()
     _populate_inventory(w)
     f = w.frame1_tab
     cv = f.canvas
     f.img_nsfw.setCurrentText("NSFW")
+    f.sub.setCurrentIndex(f._inpaint_tab_index)                    # modalita Integra: pagina Modifica
     H.load_canvas_image(w)
     _add_canvas_layer(w)
     f.integrate_engine.setCurrentIndex(0)
@@ -545,10 +546,12 @@ def case_integrate_context_zone(w, spy):
     cv.set_mode("brush"); cv.set_brush(80); cv.push_undo(); cv.paint_at(QPointF(cv.aspect_w * 0.9, cv.aspect_h * 0.9))
     amb, _ = _sent_mask_area(w, spy)
     assert amb > am, f"il tratto di contesto non e nella maschera inviata: {am} -> {amb}"
-    # Krea 2 Edit: niente maschera → selettore spento con tooltip
+    # Krea 2 Edit: niente maschera → selettore, scritta, legenda, cursori di trasparenza NASCOSTI (non disattivati) e nessuna maschera inviata
     f.integrate_engine.setCurrentIndex(2)
-    assert not f.integrate_ctx_mode.isEnabled() and f.integrate_ctx_mode.toolTip().strip(), "Krea: selettore contesto non disabilitato/spiegato"
+    assert f.integrate_ctx_mode.isHidden() and f._ctx_mode_lbl.isHidden(), "Krea: selettore contesto ancora visibile"
+    assert cv.draw_banner.isHidden() and cv.ovl_legend.isHidden() and cv.ovl_transp_box.isHidden(), "Krea: controlli del canvas ancora visibili"
     f.integrate_engine.setCurrentIndex(0)
+    assert not f.integrate_ctx_mode.isHidden() and not cv.ovl_transp_box.isHidden() and not cv.draw_banner.isHidden(), "Kontext: controlli non tornati"
 
 
 def case_integrate_pulid_separation(w, spy):
@@ -928,6 +931,30 @@ def case_segment_text_dino_sam(w, spy):
         assert p.get("text") == "face", f"testo segment non propagato: {p.get('text')}"
 
 
+def case_segment_text_follows_the_segmentation_menu(w, spy):
+    """Menu «Segmentazione» → richiesta di selezione da testo: il motore scelto (sam2 / sam31) arriva davvero ai parametri del backend (seg_engine)."""
+    from core import segmentation_engine as SE
+    _force_native_up()
+    _populate_inventory(w)
+    w.driver.is_up = lambda: True
+    f = w.frame1_tab
+    H.load_canvas_image(w)
+    f.seg_text.setText("person")
+    f.seg_threshold.setValue(0.50)
+    old = SE.current
+    try:
+        for eng in ("sam2", "sam31"):
+            SE.current = lambda e=eng: e
+            n = len(spy.calls)
+            w.segment_by_text()
+            assert len(spy.calls) > n, f"{eng}: nessuna richiesta inviata"
+            c = spy.calls[-1]
+            assert c["via"] == "enqueue" and c["params"].get("seg_engine") == eng, f"{eng}: il backend riceve seg_engine={c['params'].get('seg_engine')!r}"
+            assert c["params"].get("text") == "person" and c["params"].get("image_path")
+    finally:
+        SE.current = old
+
+
 def case_segment_text_dino_only(w, spy):
     """Selezione da testo con detector GroundingDINO-only + soglia alta: no-crash + richiesta inviata."""
     _force_native_up()
@@ -1056,7 +1083,7 @@ CASES = (
          "Integra: guidance e seed fisso propagati (ramo nativo Kontext).",
          case_integrate_guidance_seed),
         ("frame1_integrate_context_zone",
-         "Integra «Zona di contesto»: selettore/cursore/pennello cambiano la maschera inviata; trasparenza no; Krea 2 Edit disabilitato.",
+         "Integra «Zona di contesto»: selettore/cursore/pennello cambiano la maschera inviata; trasparenza no; Krea 2 Edit: controlli nascosti.",
          case_integrate_context_zone),
         ("frame1_integrate_pulid_separation",
          "PuLID separati: box di Genera solo su genera, box di Image to Image solo su integra.",
@@ -1115,6 +1142,9 @@ CASES = (
         ("frame1_segment_text_dino_only",
          "Selezione da testo GroundingDINO-only + soglia 0.70: richiesta inviata.",
          case_segment_text_dino_only),
+        ("frame1_segment_text_follows_menu",
+         "Selezione da testo: il motore del menu Segmentazione (sam2 / sam31) arriva al backend come seg_engine.",
+         case_segment_text_follows_the_segmentation_menu),
         ("frame1_segment_empty_text_guard",
          "Selezione da testo senza testo: nessuna richiesta (guardia).",
          case_segment_empty_text_guard),
