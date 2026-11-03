@@ -242,8 +242,10 @@ def _what_to_check(c: dict, r: dict) -> str:
     return " ".join(bits)
 
 
-def build(run_dir: str, nome: str = "giro", baseline_dirs: list | None = None) -> str:
+def build(run_dir: str, nome: str = "giro", baseline_dirs: list | None = None, only_ok: bool = False) -> str:
     rows = [json.loads(l) for l in open(os.path.join(run_dir, "results.jsonl"), encoding="utf-8") if l.strip()]
+    if only_ok:                                                   # giri sperimentali: ai giudizi dell'utente vanno solo i candidati che passano i controlli automatici
+        rows = [r for r in rows if r.get("esito") == "ok"]
     stamp = time.strftime("%Y%m%d_%H%M")
     rd = os.path.join(ORCH, f"review_{stamp}")
     os.makedirs(rd, exist_ok=True)

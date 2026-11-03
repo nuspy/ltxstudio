@@ -126,6 +126,10 @@ def main():
     ap.add_argument("--stop-file", default="", help="se questo file esiste PRIMA di un caso, il giro si ferma li (turno GPU finito): scrive rimasti.json e non lancia altro")
     ap.add_argument("--force-review", action="store_true", help="costruisce la pagina di revisione anche con casi non ok (default: solo se TUTTI i casi del giro sono ok)")
     ap.add_argument("--no-open", action="store_true", help="non aprire la pagina di revisione nel browser a fine giro")
+    ap.add_argument("--no-autocheck", action="store_true", help="salta i controlli automatici sui risultati (tests/app_live/autocheck.py)")
+    ap.add_argument("--review-ok", action="store_true",
+                    help="pagina di revisione con i SOLI casi ok (+ i `baseline`), anche se altri sono rossi: serve ai giri sperimentali, dove i candidati "
+                         "che falliscono i controlli automatici non vanno all'utente")
     ap.add_argument("--inventory-out", default="", help="salva l'inventario REALE dei menu dell'app in questo JSON e termina (nessun caso)")
     a = ap.parse_args()
     mode = "fix-loop" if a.fix_loop else "sweep"
@@ -166,6 +170,15 @@ def main():
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=applog, stderr=subprocess.STDOUT)
     cl = Client()
     results, stop, stopped = [], False, False
+    ac, ac_hist, ac_run = None, {}, os.path.basename(out)
+    if not a.no_autocheck and not a.dry and not a.inventory_out:
+        try:                                                 # controlli automatici (a) invariato (b) Integra (c) inpaint (d) video con riferimenti
+            sys.path.insert(0, HERE)
+            import autocheck as ac                           # noqa: E402
+            ac_hist = ac.load_history() or ac.seed_history()
+        except Exception as e:                               # noqa: BLE001
+            say(f"controlli automatici non disponibili: {e!r}")
+            ac = None
     try:
         try:
             cl.connect(timeout=150, proc=proc)
@@ -211,6 +224,13 @@ def main():
                 r = {"id": c["id"], "fn": c.get("fn"), "esito": "crash", "motivo": f"{type(e).__name__}: {e} (app terminata o guardiano commit)"}
                 stop = True
             r["case"] = c
+            if ac is not None:
+                try:
+                    ac.apply(c, r, ac_run, ac_hist)
+                    for x in r.get("autocheck") or []:
+                        say(f"    controllo {x['nome']}: {x['esito']} {json.dumps(x.get('misure'), ensure_ascii=False)}")
+                except Exception as e:                       # noqa: BLE001
+                    r["autocheck_errore"] = repr(e)[:300]
             results.append(r)
             with open(res_path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
@@ -240,6 +260,11 @@ def main():
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
         applog.close()
         _mark_exit()
+        if ac is not None:
+            try:
+                ac.save_history(ac_hist)
+            except Exception:                                # noqa: BLE001
+                pass
     try:                                                     # l'app di test scrive le preferenze (es. video_arch) nel worktree: ripristino la copia pulita
         shutil.copy2(os.path.join(MAIN_ROOT, "data", "user_prefs.json"), os.path.join(ROOT, "data", "user_prefs.json"))
         gs = os.path.join(ROOT, "data", "gui_state.json")
@@ -282,11 +307,11 @@ def main():
             except Exception:                                # noqa: BLE001
                 pass
     _green = bool(_all) and all(_all.values()) and not stopped
-    if not a.no_review and results and not a.inventory_out and (_green or a.force_review):   # la pagina all'utente solo con TUTTO verde (regola 03/11)
+    if not a.no_review and results and not a.inventory_out and (_green or a.force_review or (a.review_ok and ok)):   # la pagina all'utente solo con TUTTO verde (regola 03/11)
         import importlib.util
         _sp = importlib.util.spec_from_file_location("ltx_review", os.path.join(HERE, "review.py"))
         review = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(review)
-        idx = review.build(out, spec.get("nome", "giro"))
+        idx = review.build(out, spec.get("nome", "giro"), only_ok=bool(a.review_ok))
         say(f"pagina di revisione: {idx}")
         if not a.no_open:
             say("aperta nel browser: " + review.open_in_browser(idx))
