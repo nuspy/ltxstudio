@@ -664,6 +664,45 @@ def _flux_cfg_no_guidance(cfg_dir: str) -> str:
     return dst
 
 
+_FP8_BF16_PATTERNS = ("pos_embed", "patch_embed", "norm", "^proj_in$", "^proj_out$")      # = DEFAULT_SKIP_MODULES_PATTERN di diffusers layerwise casting
+
+
+def _load_flux_tr_fp8_direct(path: str, cfg_dir: str):
+    """FLUX.1 con checkpoint nativo F8_E4M3 (getphat...): carica i pesi in fp8 TENSORE PER TENSORE su un modello 'meta' (assign), SENZA la copia bf16
+    intera in RAM. Prima: from_single_file(torch_dtype=bf16) -> ~24 GB bf16 + 12 GB fp8 + file = picco di processo 58-64 GB (giro A del 03/11, il
+    guardiano commit uccideva l'app a 14-15 GB liberi). Ora: ~12 GB fp8 (+ i soli tensori qkv fusi mentre il convertitore consuma gli originali).
+    Pesi IDENTICI al vecchio percorso: E4M3 senza scala -> bf16 -> fp8 e' lossless; i moduli che il layerwise casting salta (norme, embedder,
+    proj_in/out: stessi pattern di diffusers) restano bf16 come oggi. Solleva se qualcosa non torna: il chiamante ripiega sul percorso di prima."""
+    import re
+    import torch
+    from accelerate import init_empty_weights
+    from diffusers import FluxTransformer2DModel
+    from diffusers.loaders.single_file_utils import convert_flux_transformer_checkpoint_to_diffusers
+    from safetensors import safe_open
+    cfg = FluxTransformer2DModel.load_config(cfg_dir)
+    with init_empty_weights():
+        model = FluxTransformer2DModel.from_config(cfg)
+    ck: dict = {}
+    with safe_open(path, framework="pt") as h:
+        for k in h.keys():
+            ck[k] = h.get_tensor(k)                                   # fp8 com'e': nessun upcast
+    sd = convert_flux_transformer_checkpoint_to_diffusers(ck, **{})   # consuma `ck` (pop) -> nomi diffusers, ancora fp8
+    del ck
+    skip = tuple(_FP8_BF16_PATTERNS) + tuple(getattr(FluxTransformer2DModel, "_skip_layerwise_casting_patterns", None) or ())
+    for k in list(sd):
+        prefix = k.rsplit(".", 1)[0]
+        if any(re.search(pat, prefix) for pat in skip) and sd[k].dtype != torch.bfloat16:
+            sd[k] = sd[k].to(torch.bfloat16)
+    res = model.load_state_dict(sd, strict=False, assign=True)
+    del sd
+    meta = [n for n, p in list(model.named_parameters()) + list(model.named_buffers()) if p.is_meta]
+    if meta or res.unexpected_keys:
+        raise RuntimeError(f"caricamento fp8 diretto incompleto: {len(meta)} tensori su meta (es. {meta[:2]}), {len(res.unexpected_keys)} chiavi extra "
+                           f"(es. {list(res.unexpected_keys)[:2]})")
+    model.eval()
+    return model
+
+
 def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
     Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dal ramo fp8.
@@ -715,7 +754,19 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
                       f"(libera {_free//2**20}MB ≥ ~{int(_bf16_need*1.1)//2**20}MB) → niente staging RAM", flush=True)
         except Exception as _de:                                                # noqa: BLE001
             print(f"[flux] stima direct-to-VRAM saltata ({_de}) → path CPU", flush=True)
-    tr = _from_single_file_robust(FluxTransformer2DModel, transformer_path, _sf_kw)
+    tr = None
+    if (os.environ.get("NATIVE_FLUX_FP8_DIRECT", "1") == "1" and os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf
+            and os.path.isdir(_tr_cfg) and _flux_fp8_e4m3(transformer_path)):
+        try:
+            tr = _load_flux_tr_fp8_direct(transformer_path, _tr_cfg)
+            print(f"[flux] {os.path.basename(transformer_path)}: caricato in fp8 DIRETTO (meta+assign, niente copia bf16 in RAM)", flush=True)
+        except Exception as _fe:                         # noqa: BLE001
+            print(f"[flux] fp8 diretto non riuscito ({type(_fe).__name__}: {str(_fe)[:200]}) -> percorso di prima (bf16 poi fp8)", flush=True)
+            tr = None
+            import gc as _gc
+            _gc.collect()
+    if tr is None:
+        tr = _from_single_file_robust(FluxTransformer2DModel, transformer_path, _sf_kw)
     if _is_gguf:
         tr._ls_is_gguf = True    # il GGUF NON tollera model_cpu_offload (pesi quantizzati→CPU = calcolo su CPU,
         #                          166s/step): _place lo terrà SEMPRE gpu-resident (vedi _place).
