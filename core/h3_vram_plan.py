@@ -46,6 +46,12 @@ UNCHUNKED_FACTOR = 1.7
 UNATTRIBUTED_GB = 5.0          # vedi docstring: ~11 GiB osservati e non spiegati, meta' coperti qui, il resto a runtime
 FIXED_ACT_GB = 1.5 + 0.3 + UNATTRIBUTED_GB
 RESERVE_GB = 3.0               # contesto CUDA 1 + cache dell'allocatore + margine esplicito 2
+# Giro 03/11 (fixture 12 s, edit con video di riferimento, 864x480, clip da 141 frame): piano 36k token, 26,6 GB previsti con 29,6 liberi ("tutto
+# residente"); misurato: picco allocato 25,3 GB (pesi 12,6 + ~12,7 di attivazioni) + 3-5 GB riservati-non-usati (frammentazione) -> OOM a 29,7 al passo 5/8.
+# Con i riferimenti VIDEO le attivazioni reali superano la stima (condizionamenti e tabelle per le righe di riferimento): fattore 1,55 sulle
+# attivazioni, cosi il piano prevede subito blocchi in RAM (offload preventivo) invece di scoprirlo in OOM. Calibrazione da rifare con il prossimo giro.
+VIDEO_REF_ACT_FACTOR = 1.55
+FRAG_GB = 5.1                  # riservato-non-usato osservato il 03/11 (con defrag a inizio blocco dovrebbe scendere)
 TEXT_TOKENS = 2048             # prompt strutturato + dialoghi (il TE ne produce di solito < 1500)
 AUDIO_LATENTS_PER_S = 40       # audio VAE di H3
 AUDIO_CHANNELS = 2             # righe audio = latenti × canali (stereo, impacchettate per canale)
@@ -116,8 +122,25 @@ def bytes_per_token(dims: dict, chunked: bool = True) -> float:
     return 2.0 * max(2 * h + 8 * i, 3 * h + 4 * f) * SAFETY * UNCHUNKED_FACTOR
 
 
-def activation_gb(tokens: int, dims: dict, chunked: bool = True) -> float:
-    return tokens * bytes_per_token(dims, chunked) / 2**30 + FIXED_ACT_GB
+def has_video_refs(references: list | None) -> bool:
+    """True se tra i riferimenti c'e un VIDEO (edit H3: il clip intero e il riferimento di movimento)."""
+    return any((r or {}).get("kind") == "video" for r in (references or []))
+
+
+def activation_gb(tokens: int, dims: dict, chunked: bool = True, act_factor: float = 1.0) -> float:
+    return (tokens * bytes_per_token(dims, chunked) / 2**30 + FIXED_ACT_GB) * act_factor
+
+
+def expected_peak_gb(p: "Plan", *, measured_act_gb: float | None = None, frag_gb: float = FRAG_GB, free_after_load_gb: float | None = None) -> float:
+    """Picco atteso di VRAM del processo = pesi residenti (dopo l'offload) + attivazioni + frammentazione. Con `free_after_load_gb` (VRAM libera DOPO il
+    caricamento di DiT e LoRA, come in workers/minimax_h3_infer._fit_after_load) l'offload e quello deciso dal worker: deficit = (attivazioni + riserva) - libera."""
+    resident = p["weights_gb"] + p["lora_gb"]
+    if free_after_load_gb is not None:
+        off = max(0.0, p["act_gb"] + RESERVE_GB - free_after_load_gb)
+    else:
+        off = p["offload_gb"]
+    act = measured_act_gb if measured_act_gb is not None else p["act_gb"]
+    return max(0.0, resident - min(off, OFFLOADABLE * resident)) + act + frag_gb
 
 
 class Plan(dict):
@@ -126,7 +149,7 @@ class Plan(dict):
 
 
 def plan(free_gb: float, tokens: int, dims: dict | None = None, *, weights_gb: float = 0.0,
-         lora_gb: float = 0.0, reserve_gb: float = RESERVE_GB, chunked: bool = True) -> Plan:
+         lora_gb: float = 0.0, reserve_gb: float = RESERVE_GB, chunked: bool = True, act_factor: float = 1.0) -> Plan:
     """Decide come far stare il DiT in `free_gb` di VRAM libera (pesi ancora da caricare: `weights_gb`; già
     caricati: 0, e `free_gb` è quello rimasto).
       · deficit = pesi + LoRA + attivazioni + riserva − libera
@@ -135,7 +158,7 @@ def plan(free_gb: float, tokens: int, dims: dict | None = None, *, weights_gb: f
       · altrimenti                             → fits False
     Il confronto è sempre con la VRAM libera passata (misurata dal chiamante), mai con i GB della scheda."""
     dims = dims or DEFAULT_DIMS
-    act = activation_gb(tokens, dims, chunked)
+    act = activation_gb(tokens, dims, chunked, act_factor)
     resident = weights_gb + lora_gb
     need = resident + reserve_gb + act
     deficit = need - free_gb

@@ -1,4 +1,5 @@
 """Piano di memoria dell'edit H3: i riferimenti VIDEO contano per i loro frame veri (giro 02/11: stimati 8 frame di latente, erano 42)."""
+import pytest
 from core import h3_vram_plan as HP
 
 H, W, FRAMES = 480, 512, 141
@@ -137,3 +138,41 @@ def test_purge_big_quantized_tensors_empties_survivors_even_if_something_still_r
     assert holder["w"].numel() == 0 and holder["f8"].numel() == 0
     assert holder["vae"].numel() == 1024 * 1024 and holder["small"].numel() == 8
     assert abs(freed - (2048 * 1024 + 1024 * 1024) / 2**30) < 1e-6
+
+
+def test_video_reference_plan_forecasts_offload_and_keeps_the_expected_peak_under_27_gb():
+    """Giro 03/11 (fixture 12 s, 864x480, clip da 141 frame, edit con video di riferimento): piano 36k token, 26,6 GB previsti con 29,6 liberi (tutto residente);
+    misurato: picco allocato 25,3 GB (pesi 12,6 + 12,7 di attivazioni) + 5,1 GB riservati-non-usati -> OOM a 29,7. Col fattore sulle attivazioni con
+    riferimenti video il piano prevede subito l'offload e il picco atteso (misurato) scende sotto ~27 GB."""
+    W, Hh, F = 864, 480, 141
+    refs = [{"kind": "image", "path": "p.png"}, {"kind": "video", "path": "v.mp4", "frames": F}]
+    assert HP.has_video_refs(refs) and not HP.has_video_refs([{"kind": "image"}]) and not HP.has_video_refs(None)
+    rows = HP.ref_rows_estimate(refs, 1024, Hh, W)
+    tokens = HP.sequence_tokens(F, Hh, W, ref_rows=rows)
+    old = HP.plan(29.6, tokens, weights_gb=11.7, lora_gb=0.9)
+    new = HP.plan(29.6, tokens, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
+    assert old["offload_gb"] <= 0 and new["offload_gb"] > 2.5                       # prima "tutto residente", ora offload preventivo
+    assert new["act_gb"] > old["act_gb"] * 1.3 and new["fits"]
+    # dopo il caricamento di DiT+LoRA restano 14,4 GB liberi (log): il worker toglie dalla VRAM il deficit (attivazioni + riserva - liberi)
+    peak_old = HP.expected_peak_gb(old, measured_act_gb=12.7, free_after_load_gb=14.4)
+    peak_new = HP.expected_peak_gb(new, measured_act_gb=12.7, free_after_load_gb=14.4)
+    assert peak_old > 29.7 - 3 and peak_old > 29.0                                  # com'era: 12,6 + 12,7 + 5,1 = 30,4 GB > 29,7 consentiti -> OOM
+    assert peak_new < 27.0, peak_new
+    assert HP.activation_gb(tokens, HP.DEFAULT_DIMS, act_factor=1.0) == old["act_gb"]
+    assert HP.activation_gb(tokens, HP.DEFAULT_DIMS, act_factor=1.55) == pytest.approx(1.55 * old["act_gb"])
+
+
+def test_chunk_size_is_a_power_of_two(monkeypatch):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workers"))
+    import h3_chunk as K
+    monkeypatch.delenv("H3_BLOCK_CHUNK", raising=False)
+    for rows, rb in ((200000, 107_000), (200000, 150_000), (50000, 80_000)):
+        n = K.chunk_tokens(rows, rb, "cpu") if False else None
+    import torch
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda d=None: (13_700_000_000, 31 * 2**30))
+    d = torch.device("cuda:0")
+    for rb in (107_000, 150_000, 233_333):
+        n = K.chunk_tokens(10**6, rb, d)
+        assert n & (n - 1) == 0 and n >= K.MIN_CHUNK * 4, (rb, n)

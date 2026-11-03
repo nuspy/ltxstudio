@@ -388,7 +388,8 @@ def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: in
         raise RuntimeError(f"VRAM insufficiente per il text encoder di MiniMax H3 ({os.path.basename(W['te'])}: "
                            f"{te_gb:.1f} GB + 2 di lavoro, liberi {avail:.1f} GB). Scegli un text encoder più "
                            f"leggero (nvfp4) o chiudi i programmi che usano la GPU.")
-    plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb, chunked=_chunked())
+    plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb, chunked=_chunked(),
+                    act_factor=HP.VIDEO_REF_ACT_FACTOR if (mode == "ref2va" and HP.has_video_refs(p.get("references"))) else 1.0)
     modo = "tutto residente" if plan0["offload_gb"] <= 0 else f"blocchi in RAM: {plan0['offload_gb']:.1f} GB"
     _log(f"piano VRAM: {tokens // 1000}k token · pesi {w_gb:.1f} + LoRA {l_gb:.1f} + attivazioni "
          f"{plan0['act_gb']:.1f} + riserva = {plan0['need_gb']:.1f} GB · liberi {avail:.1f} GB → {modo}")

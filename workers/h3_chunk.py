@@ -48,6 +48,7 @@ def chunk_tokens(rows: int, row_bytes: int, device) -> int:
         free = 2 << 30
     budget = max(256 << 20, min(int(1.5 * 2**30), free // 5))
     n = max(MIN_CHUNK * 4, budget // max(1, row_bytes))
+    n = 1 << (int(n).bit_length() - 1)         # potenza di 2: blocchi di dimensione stabile -> l'allocatore riusa gli stessi segmenti (meno frammentazione)
     cap = _CAP.get(str(dev))
     if cap:
         n = min(n, cap)
