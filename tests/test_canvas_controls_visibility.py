@@ -26,6 +26,7 @@ def tab(qapp, tmp_path):
     t = Frame1Tab()
     t.canvas.set_aspect(800, 600)
     t.canvas.load_image(str(tmp_path / "scena.png"), "canvas")
+    t.sub.setCurrentIndex(t._inpaint_tab_index)                  # pagina Modifica = modalita Integra
     t._tmp = tmp_path
     return t
 
@@ -48,6 +49,7 @@ def test_engine_selector_in_the_gui_maps_to_the_caps_table(tab):
 
 
 def test_manual_mode_rows_hidden_with_krea_and_back_with_other_engines(tab):
+    assert tab.canvas.add_layer(str(tab._tmp / "soggetto.png"))
     tab.integrate_engine.setCurrentIndex(0)
     tab.integrate_ctx_mode.setCurrentIndex(tab.integrate_ctx_mode.findData("manual"))
     assert not tab._ctx_manual_row.isHidden() and tab._ctx_pct_row.isHidden()
@@ -61,6 +63,7 @@ def test_manual_mode_rows_hidden_with_krea_and_back_with_other_engines(tab):
 
 
 def test_transparency_sliders_are_five_pixels_apart_and_tight(qapp, tab):
+    assert tab.canvas.add_layer(str(tab._tmp / "soggetto.png"))
     from ui.mask_canvas import OVL_TRANSP_GAP
     assert OVL_TRANSP_GAP == 5
     cv = tab.canvas
@@ -117,6 +120,7 @@ def test_cutout_buttons_hidden_for_an_engine_that_does_not_compose_layers(tab, m
 
 
 def test_driver_visibility_helper_sees_hidden_rows_and_canvas_controls(tab):
+    assert tab.canvas.add_layer(str(tab._tmp / "soggetto.png"))
     """Lo stesso criterio che usano i casi dal vivo (tests/app_live/driver.widget_hidden): righe nascoste = widget nascosti anche se annidati."""
     import sys
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app_live"))
@@ -127,3 +131,25 @@ def test_driver_visibility_helper_sees_hidden_rows_and_canvas_controls(tab):
     for w in (tab.integrate_ctx_mode, tab.integrate_ctx_spin, tab.integrate_ctx_slider, tab.canvas.draw_banner, tab.canvas.ovl_legend,
               tab.canvas.ovl_transp_pos_sl, tab.canvas.ovl_transp_ctx_sl):
         assert widget_hidden(w), w
+
+
+def test_masks_are_visible_only_in_integrate_mode_with_a_supporting_engine_and_layers(tab):
+    """Richiesta utente 03/11 sera: le due maschere SOLO nella modalita Integra (pagina Modifica) con un motore che le usa; senza layer da integrare niente."""
+    cv = tab.canvas
+    shown = lambda: [not w.isHidden() for w in (cv.draw_banner, cv.ovl_legend, cv.ovl_transp_box)]
+    tab.integrate_engine.setCurrentIndex(0)
+    assert shown() == [False, False, False] and not cv.masks_visible()                 # pagina Modifica, motore ok, ma nessun layer
+    assert cv.add_layer(str(tab._tmp / "soggetto.png"))
+    assert shown() == [True, True, True] and cv.masks_visible()
+    for page in range(tab.sub.count()):                                                 # fuori dalla pagina Modifica: nascoste anche con layer e motore ok
+        tab.sub.setCurrentIndex(page)
+        assert cv.masks_visible() == (page == tab._inpaint_tab_index), page
+        assert shown() == [page == tab._inpaint_tab_index] * 3, page
+    tab.sub.setCurrentIndex(tab._inpaint_tab_index)
+    assert shown() == [True, True, True]
+    tab.integrate_engine.setCurrentIndex(2)                                             # Krea 2 Edit: nascoste anche in Integra con layer
+    assert shown() == [False, False, False] and cv._ovl_pos.pixmap().isNull() and cv._ovl_ctx.pixmap().isNull()
+    tab.integrate_engine.setCurrentIndex(3)
+    assert shown() == [True, True, True]
+    cv._drop_layers()                                                                   # tolti i layer: niente da integrare
+    assert shown() == [False, False, False]

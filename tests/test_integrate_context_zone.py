@@ -42,6 +42,7 @@ def tab(qapp, tmp_path):
     t.canvas.set_aspect(1024, 768)
     t.canvas.load_image(str(tmp_path / "scena.png"), "canvas")
     assert t.canvas.add_layer(str(tmp_path / "soggetto.png"))
+    t.sub.setCurrentIndex(t._inpaint_tab_index)                  # modalita Integra: pagina Modifica del pannello
     t.canvas.refresh_integrate_overlay(force=True)
     t._tmp = tmp_path
     return t

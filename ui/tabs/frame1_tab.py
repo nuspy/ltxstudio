@@ -2403,6 +2403,7 @@ class Frame1Tab(QWidget):
         engine = self._engine_val(self.integrate_engine.currentIndex())
         on_page = self.sub.currentIndex() == self._inpaint_tab_index
         cv.set_layer_tools_allowed(on_page and integrate_engine_composes_layers(engine))
+        cv.set_integrate_mode_active(on_page)                       # le due maschere: solo nella modalita Integra (pagina Modifica)
 
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""

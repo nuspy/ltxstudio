@@ -518,6 +518,7 @@ def case_integrate_context_zone(w, spy):
     f = w.frame1_tab
     cv = f.canvas
     f.img_nsfw.setCurrentText("NSFW")
+    f.sub.setCurrentIndex(f._inpaint_tab_index)                    # modalita Integra: pagina Modifica
     H.load_canvas_image(w)
     _add_canvas_layer(w)
     f.integrate_engine.setCurrentIndex(0)

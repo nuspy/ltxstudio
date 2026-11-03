@@ -243,6 +243,7 @@ class MaskCanvas(QWidget):
         self.integrate_ctx_mode = "auto"           # "auto" (dilatazione della sagoma, integrate_context_pct) | "manual" (pennello)
         self.integrate_draw_target = "position"    # in manuale: quale maschera si sta disegnando ("position" | "context")
         self.integrate_ctx_enabled = True          # False = il motore non usa la maschera di contesto (es. Krea 2 Edit)
+        self.integrate_mode_active = True          # False = non si e nella modalita Integra (pagina diversa da Modifica): decide frame1_tab
         self._ctx_manual = None                    # QImage ARGB (giallo) della zona di contesto disegnata a mano
         self._ctx_touched = False                  # il contesto manuale e gia stato precompilato/disegnato
         self._ctx_undo: list[QImage] = []
@@ -317,6 +318,8 @@ class MaskCanvas(QWidget):
         self.layer_list.setCurrentRow(self._active)
         self.layer_list.blockSignals(False)
         self._refresh_cutout_buttons()
+        if hasattr(self, "ovl_legend"):
+            self._apply_masks_visibility()
 
     # ───────────────────────── Proporzioni / dimensioni ─────────────────────────
     def _build_aspect_menu(self) -> QMenu:
@@ -1553,11 +1556,20 @@ class MaskCanvas(QWidget):
         _w = self.ovl_transp_val[key]; _w.setText(_w.text().split(" ")[0] + f" {self._ovl_transp[key]}%")
         self._apply_overlay_opacity()
 
+    def masks_visible(self) -> bool:
+        """Le due maschere e i loro controlli si vedono SOLO in modalita Integra (pagina Modifica del pannello), con un motore che le usa e con almeno un
+        layer importato da integrare. Altrimenti sono NASCOSTI (non disattivati)."""
+        return bool(self.integrate_ctx_enabled and self.integrate_mode_active and self.has_layers())
+
+    def set_integrate_mode_active(self, active: bool) -> None:
+        self.integrate_mode_active = bool(active)
+        self._apply_masks_visibility()
+        self.refresh_integrate_overlay(force=True)
+
     def _apply_masks_visibility(self) -> None:
-        """Le due maschere (posizione rossa / contesto gialla) e i loro controlli sul canvas compaiono SOLO se il motore di Integra le usa
-        (`integrate_ctx_enabled`, deciso da frame1_tab.INTEGRATE_ENGINE_CAPS). Con gli altri motori sono NASCOSTI (non disattivati):
-        scritta «Stai disegnando», legenda «Mostra zone», cursori di trasparenza, selettore della maschera da disegnare e sovrapposizioni."""
-        on = bool(self.integrate_ctx_enabled)
+        """Scritta «Stai disegnando», legenda «Mostra zone», cursori di trasparenza, selettore della maschera da disegnare e sovrapposizioni rossa/gialla:
+        visibili solo se `masks_visible()` (modalita Integra + motore che usa le maschere + layer presenti)."""
+        on = self.masks_visible()
         for w in (getattr(self, "draw_banner", None), getattr(self, "ovl_legend", None), getattr(self, "ovl_transp_box", None)):
             if w is not None:
                 w.setVisible(on)
@@ -1628,7 +1640,7 @@ class MaskCanvas(QWidget):
             txt, col = tr("canvas.banner_auto", "Contesto automatico: {n} px").format(n=self._ctx_pct_label()), BANNER_CTX_FG
         else:
             txt, col = tr("canvas.banner_pos", "Stai disegnando: POSIZIONE"), BANNER_POS_FG
-        lab.setVisible(bool(self.integrate_ctx_enabled))       # motore senza maschere: scritta nascosta
+        lab.setVisible(self.masks_visible())                   # fuori da Integra / motore senza maschere / niente layer: scritta nascosta
         self.draw_banner_color = col
         lab.setText(txt)
         lab.setStyleSheet("QLabel#draw_banner{color:%s;background:%s;font-size:15px;font-weight:bold;border-radius:6px;padding:3px 10px;}" % (col, BANNER_BG))
@@ -1728,7 +1740,7 @@ class MaskCanvas(QWidget):
         self.ctx_geometry_changed.emit()
         if not any_region or not show:
             self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
-        if not self.integrate_ctx_enabled:                    # il motore non usa le maschere: nemmeno il rosso della posizione
+        if not self.masks_visible():                          # fuori da Integra o motore senza maschere: nemmeno il rosso della posizione
             self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
         self._ovl_pos.setPixmap(pos_pm)
         if self.integrate_ctx_mode == "manual" and self._ctx_manual is not None:

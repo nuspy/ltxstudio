@@ -132,7 +132,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "flashvsr-plus-base-lq": (["upscale_video"], []),
     # ── aux ──
     "sam2-hiera-large": (["segment"], []),
-    "sam31-unsloth": (["segment"], []),
+    "sam3.1-multiplex": (["segment"], []),
     "sam31-comfy-multiplex": (["segment"], []),
     "grounding-dino-base": (["segment"], []),
     "depth-anything-v2": (["depth_ctrl"], []),

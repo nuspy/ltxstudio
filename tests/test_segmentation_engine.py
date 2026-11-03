@@ -64,13 +64,11 @@ def test_resolve_for_job_never_falls_back_silently(tmp_path, monkeypatch):
     assert S.resolve_for_job("sam31", d) == ("sam31", "")
 
 
-def test_no_more_gated_access_texts():
-    """03/11 sera: pesi non gated (unsloth/sam3.1): nessun testo su approvazioni di Meta, giorni o ore di attesa."""
-    for t in (S.describe_error("403 Client Error"), S.describe_error("401 Unauthorized"),
-              S.resolve_for_job("sam31", Path("Z:/non/esiste"))[1]):
-        assert "approvazion" not in t.lower().replace("approvazioni", "") and "giorni" not in t and "ore" not in t.split("ore")[0:0]
-    assert "senza account" in S.resolve_for_job("sam31", Path("Z:/non/esiste"))[1]
-    assert S.SAM31_REPO == "unsloth/sam3.1" and S.SAM31_CATALOG_ID == "sam31-unsloth"
+def test_access_texts_say_hours_not_days_and_point_to_the_alternatives():
+    err = S.resolve_for_job("sam31", Path("Z:/non/esiste"))[1]
+    assert "alcune ore" in err and "giorni" not in err and "Comfy-Org" in err and "SAM2" in err and "huggingface.co/facebook/sam3.1" in err
+    assert "alcune ore" in S.describe_error("403 Client Error") and "token" in S.describe_error("401 Unauthorized")
+    assert S.SAM31_REPO == "facebook/sam3.1" and S.SAM31_CATALOG_ID == "sam3.1-multiplex"
 
 
 @pytest.mark.skipif(not (Path(r"E:\AI\Models\Segmentation\sam3.1") / S.SAM31_CHECKPOINT).exists(), reason="SAM 3.1 non presente")
@@ -81,6 +79,7 @@ def test_real_folder_is_complete():
 def test_backends_refuse_unusable_sam31_without_falling_back(tmp_path, monkeypatch):
     """image_segment.run e video_segment.track_object: SAM 3.1 scelto ma non utilizzabile = errore chiaro (mai SAM2 di nascosto)."""
     monkeypatch.setattr(S, "models_dir", lambda: tmp_path / "vuoto")
+    monkeypatch.setattr(S, "comfy_dir", lambda: tmp_path / "vuoto_comfy")
     from inference_server.backends import image_segment, video_segment
     r = image_segment.run({"seg_engine": "sam31", "image_path": "x.png"}, None, str(tmp_path))
     assert r["status"] == "error" and "SAM 3.1" in r["error"] and "SAM2" in r["error"]
