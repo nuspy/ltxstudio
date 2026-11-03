@@ -35,7 +35,7 @@ CUSTOM_DITS = {
     "mmh3-dit-dasiwa-v4": {"label": "DaSiWa Hybrid v4 (int4)", "modes": ("fl2va", "ref2va")},
     # nvfp4 MISTA di rockerBOO (Ref2VA pruned: qkv int8-ConvRot, bordi e out_proj in BF16, resto nvfp4; layer config a parte): risposta al sospetto che i nostri nvfp4
     # (Abiray, stessa dimensione esatta di coolthor/wsjLL: tutti i 200 layer in nvfp4) siano fatti peggio. Serve per il confronto a parita di seme/prompt/encoder.
-    "mmh3-dit-rockerboo-nvfp4": {"label": "NVFP4 mista rockerBOO (bordi/out_proj BF16)", "modes": ("ref2va",)},
+    "mmh3-dit-rockerboo-nvfp4": {"label": "MiniMax-H3 Ref2VA nvfp4 + int8 ConvRot (rockerBOO, bordi BF16)", "modes": ("ref2va",), "official": True},   # quantizzazione del modello ufficiale, non un finetune
 }
 TE_IDS = ("mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8", "mmh3-te-heretic-nvfp4")
 TE_ADULT = "mmh3-te-heretic-nvfp4"

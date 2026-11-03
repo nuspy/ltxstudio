@@ -26,7 +26,7 @@ class H3EditError(RuntimeError):
 CUSTOM_MODELS: tuple[str, ...] = tuple(k for k, v in S.CUSTOM_DITS.items() if "ref2va" in v["modes"])
 CUSTOM_TE_PROFILE = "nvfp4"                   # i DiT personalizzati non hanno un profilo: l'encoder e quello del profilo nvfp4 (unico presente di default), dichiarato nel log
 H3_MODELS: tuple[str, ...] = H3_PROFILES + CUSTOM_MODELS
-H3_MODEL_LABELS = {**H3_PROFILE_I18N, **{k: f"{v['label']} (finetune, 18+ possibile)" for k, v in S.CUSTOM_DITS.items()}}
+H3_MODEL_LABELS = {**H3_PROFILE_I18N, **{k: (v["label"] if v.get("official") else f"{v['label']} (finetune, 18+ possibile)") for k, v in S.CUSTOM_DITS.items()}}
 
 
 def model_dit_id(model: str) -> str:
