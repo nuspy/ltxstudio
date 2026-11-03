@@ -967,7 +967,6 @@ class Driver:
                 if case.get("lora"):
                     steps["lora"] = select_combo(f.inp_lora, case["lora"])
             else:
-                cv.integrate_context_px = case.get("ctx_margin_px")
                 cv.integrate_regenerate = bool(case.get("regenera"))       # prova «rigenera» (scena senza foto + soggetto come riferimento)
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
                     steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
@@ -975,13 +974,19 @@ class Driver:
                 if case.get("model"):
                     steps["model"] = select_combo(f.integrate_model, case["model"])
                 # ── «Zona di contesto» dai widget VERI del pannello Integra (azzerati a ogni caso) ──────────────────────────────────────────
-                # `ctx_pct` (percento, anche > 100) o il vecchio `ctx_margin_pct` (frazione) → campo %; `ctx_mode: "manual"` → selettore «Manuale (pennello)»;
-                # `ctx_clear` → «Svuota»; `ctx_strokes` → tratti col pennello/gomma sulla maschera scelta dal selettore «Stai disegnando».
+                # `ctx_px` = margine in PIXEL attorno alla sagoma (campo px); `ctx_pct` (percento, anche > 100) e il vecchio `ctx_margin_pct` (frazione) restano come
+                # ALIAS per i casi vecchi e si convertono in px con la LARGHEZZA della sagoma (sagoma larga 200: 50 % = 100 px). Senza nessuno dei tre: il valore
+                # iniziale del pannello (87 px). `ctx_mode: "manual"` → selettore «Manuale (pennello)»; `ctx_clear` → «Svuota»; `ctx_strokes` → tratti col
+                # pennello/gomma sulla maschera scelta dal selettore «Stai disegnando».
                 f.integrate_ctx_mode.setCurrentIndex(f.integrate_ctx_mode.findData("auto"))
-                _pct = case.get("ctx_pct")
-                if _pct is None and case.get("ctx_margin_pct"):
-                    _pct = float(case["ctx_margin_pct"]) * 100.0
-                f.integrate_ctx_spin.setValue(int(round(float(_pct or 0))))
+                _px = case.get("ctx_px", case.get("ctx_margin_px"))
+                if _px is None and (case.get("ctx_pct") is not None or case.get("ctx_margin_pct") is not None):
+                    cv._auto_cutout_opaque_layers()                      # la larghezza e quella della sagoma VERA (foto scontornata)
+                    _frac = float(case["ctx_pct"]) / 100.0 if case.get("ctx_pct") is not None else float(case["ctx_margin_pct"])
+                    _px = int(round(_frac * cv.silhouette_width()))
+                from ui.mask_canvas import DEFAULT_CTX_PX
+                f.integrate_ctx_spin.setValue(int(DEFAULT_CTX_PX if _px is None else _px))
+                f._on_ctx_changed()                                      # il canvas riceve SEMPRE il valore del campo (anche se il campo era gia a quel valore)
                 if case.get("ctx_mode") == "manual":
                     f.integrate_ctx_mode.setCurrentIndex(f.integrate_ctx_mode.findData("manual"))
                     if case.get("ctx_clear"):
@@ -999,7 +1004,7 @@ class Driver:
                                 cv.paint_at(QPointF(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n))
                     cv.set_mode("move")
                     cv._draw_target_cb.setCurrentIndex(cv._draw_target_cb.findData("position"))
-                steps["ctx"] = {"mode": f.integrate_ctx_mode.currentData(), "pct": f.integrate_ctx_spin.value(), "banner": cv.draw_banner.text(),
+                steps["ctx"] = {"mode": f.integrate_ctx_mode.currentData(), "px": f.integrate_ctx_spin.value(), "pct_equiv": f.integrate_ctx_pct_lbl.text(), "banner": cv.draw_banner.text(),
                                 "banner_color": cv.draw_banner_color}
                 f.integrate_prompt.setPlainText(case["prompt"])
                 f.int_seed_rand.setChecked(False)
