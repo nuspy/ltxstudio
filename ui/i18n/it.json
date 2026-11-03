@@ -3886,5 +3886,8 @@
   "sam31.tt_button": "Controlla ora se Meta ha approvato l'accesso a SAM 3.1 e, se sì, lo scarica. Controllo automatico ogni 30 minuti.",
   "sam31.snoozed": "Controllo di SAM 3.1 rimandato di 2 ore.",
   "sam31.cancelled": "Controllo automatico di SAM 3.1 annullato.",
-  "sam31.btn_comfy": "Oppure scarica la copia Comfy-Org (non gated, 1,75 GB)"
+  "sam31.btn_comfy": "Oppure scarica la copia Comfy-Org (non gated, 1,75 GB)",
+  "vedit.h3.translate": "Traduci e arricchisci il testo in inglese",
+  "vedit.h3.translate.tt": "Il modello capisce l'inglese: luogo, descrizione della foto e soggetto scritti in un'altra lingua vengono tradotti (luogo e foto anche arricchiti di dettagli) con l'enhancer locale, una volta per lavoro e prima dei clip. Il soggetto e solo tradotto, mai arricchito (e l'etichetta per SAM). Testo gia inglese: nessuna elaborazione. Se l'enhancer non e disponibile parte il testo originale.",
+  "vedit.h3.text_result": "Testo inviato al modello: {t}"
 }

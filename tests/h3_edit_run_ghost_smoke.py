@@ -102,14 +102,14 @@ def frames_of(path):
         return np.stack([f.to_ndarray(format="rgb24") for f in c.decode(c.streams.video[0])])
 
 
-def run(tag, env):
+def run(tag, env, extra=None):
     for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES"):
         os.environ.pop(k, None)
     os.environ.update(env)
     calls.clear(); refs.clear(); prompts.clear()
     out = ER.run_edit({"output": str(TMP / tag / "out.mp4"), "seed": 1,
                        "h3_edit": {"action": "change_background", "video": str(src), "mask_dir": str(TMP / "masks"), "short_edge": 192,
-                                   "clip_s": 6.0, "overlap": 39, "keep_audio": True, "prompt_text": "x"}}, FakeW,
+                                   "clip_s": 6.0, "overlap": 39, "keep_audio": True, "prompt_text": "x", **(extra or {})}}, FakeW,
                       clip_runner=lambda W, jd: ER.generate_clip(jd, FakeW))
     return frames_of(out), list(calls), list(refs)
 
@@ -155,6 +155,9 @@ _, _c, _ = run("abl7", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "align
 assert "frame-accurate" in prompts[0] and "exact look" in prompts[0] and "Its first" not in prompts[0], prompts[0][:300]
 _, _c, _ = run("abl8", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "carryover_align"})
 assert "frame-accurate" in prompts[0] and "Its first 1.625 seconds" in prompts[0], prompts[0][:300]
+_, _c, _ = run("txt", {"H3_EDIT_MAX_FRAMES": "141"}, extra={"text_info": {"status": "ok", "seconds": 3.0, "original": {"prompt": "un rifugio"}, "sent": {"prompt": "A refuge."}}})
+_tj = json.loads((_k("txt") / "text_job.json").read_text("utf-8"))
+assert _tj["original"] == {"prompt": "un rifugio"} and _tj["sent"] == {"prompt": "A refuge."} and "text_info" not in json.loads((_k("txt") / "clip_00" / "meta.json").read_text("utf-8"))
 print("ABLAZIONE OK: kept cells base", int((c_base < 0.5).sum()), "like-replace", int((c_like < 0.5).sum()))
 print("clip base", c0, "preroll", c1, "two-pass", c5)
 

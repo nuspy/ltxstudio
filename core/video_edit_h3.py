@@ -311,6 +311,7 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
     if act == E.CHANGE_BACKGROUND and not pic and not str(cfg.get("prompt") or "").strip():
         raise H3EditError("Cambia sfondo: descrivi il nuovo luogo a parole o scegli la foto del luogo.")
     ep = E.ENGINES[eng].params
+    ti = cfg.get("h3_text_info")
     e = {"action": act, "video": video, "mask_dir": os.path.join(track_dir_of(video), "masks"),
          "short_edge": int(cfg.get("short_edge") or DEFAULT_SHORT_EDGE), "keep_text": keep_text,
          "prompt_text": str(cfg.get("prompt") or "").strip(), "picture": pic if pic and os.path.isfile(pic) else "",
@@ -318,6 +319,8 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
          "clip_s": float(ep["clip_s"]), "overlap": int(ep["overlap_frames"]), "grow_px": int(ep["grow_px"]),
          "feather_px": int(ep["feather_px"]), "headroom": float(ep["headroom"]), "hold_frames": int(ep["pose_hold_frames"]),
          "person_grow_px": int(ep["person_grow_px"]), "replace_expand": float(ep.get("replace_expand", 0.0))}
+    if ti and ti.get("status") not in (None, "off", "english"):  # cosa ha scritto l'utente e cosa e arrivato al modello (solo se il testo e stato elaborato: altrimenti i params restano quelli di sempre)
+        e["text_info"] = {"status": ti.get("status"), "seconds": ti.get("seconds"), "original": ti.get("original"), "sent": ti.get("sent")}
     out_p = {"arch": "minimax_h3", "h3_edit": e, "h3_profile": prof, "h3_turbo": turbo, "h3_video_shift": float(ep["video_shift"]),
              "seed": int(cfg.get("seed") or 42), "output": out, **E.engine_params(act, eng)}
     out_p.update(extra)                                          # opzioni di velocita / modello: presenti SOLO se scelte (default invariati)

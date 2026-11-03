@@ -167,3 +167,23 @@ def test_image_field_does_not_leak_between_actions(tab):
 def test_driver_reset_state_clears_the_edit_image_field():
     src = open(os.path.join(os.path.dirname(__file__), "app_live", "driver.py"), encoding="utf-8").read()
     assert "ve.ref_img.setText(" in src and "video_edit_ai_tab" in src.split("def reset_state")[1].split("def _wait_inventory")[0]
+
+
+def test_translate_checkbox_is_on_by_default_reaches_the_cfg_and_shows_the_sent_text(tab):
+    assert tab.h3_translate.isChecked() and tab.h3_translate.isVisibleTo(tab)
+    assert _go(tab)["h3_translate"] is True
+    tab.h3_translate.setChecked(False)
+    assert "h3_translate" not in _go(tab)                                      # spenta: il cfg e quello di sempre
+    assert not tab.h3_text_result.isVisibleTo(tab)
+    tab.set_h3_text_result("prompt: A snowy refuge at night")
+    assert tab.h3_text_result.isVisibleTo(tab) and "A snowy refuge" in tab.h3_text_result.text()
+
+
+def test_translate_strings_exist_in_all_15_languages():
+    import json
+    from pathlib import Path
+    for f in sorted((Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")):
+        d = json.loads(f.read_text("utf-8"))
+        for k in ("vedit.h3.translate", "vedit.h3.translate.tt", "vedit.h3.text_result"):
+            assert d.get(k), (f.name, k)
+        assert "{t}" in d["vedit.h3.text_result"]

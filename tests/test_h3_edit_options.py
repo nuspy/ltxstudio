@@ -216,3 +216,13 @@ def test_original_lora_with_a_native_twin_is_hidden_behind_the_native_one(tmp_pa
     _lora(tmp_path / "h3_character_swap_v1.5-native.safetensors", H3_KEYS)
     assert V.lora_edit_check(orig) == (False, "twin")
     assert V.lora_edit_check(str(tmp_path / "h3_character_swap_v1.5-native.safetensors")) == (True, "")
+
+
+def test_text_info_reaches_params_only_when_the_text_was_processed(clip):
+    base = V.build_params(_cfg(clip), "o.mp4", present=ALL)
+    assert "text_info" not in base["h3_edit"]                                                  # default: params di sempre
+    eng = V.build_params(_cfg(clip, h3_text_info={"status": "english", "original": {}, "sent": {}}), "o.mp4", present=ALL)
+    assert "text_info" not in eng["h3_edit"]                                                   # testo gia inglese: niente di nuovo
+    ti = {"status": "ok", "seconds": 4.2, "original": {"prompt": "un rifugio"}, "sent": {"prompt": "A refuge."}}
+    p = V.build_params(_cfg(clip, h3_text_info=ti), "o.mp4", present=ALL)
+    assert p["h3_edit"]["text_info"]["original"] == {"prompt": "un rifugio"} and p["h3_edit"]["text_info"]["sent"] == {"prompt": "A refuge."}

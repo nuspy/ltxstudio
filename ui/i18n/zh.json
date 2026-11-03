@@ -3847,5 +3847,8 @@
   "sam31.tt_button": "立即检查 Meta 是否已批准 SAM 3.1 的访问权限，如已批准则下载。每 30 分钟自动检查一次。",
   "sam31.snoozed": "SAM 3.1 检查已推迟 2 小时。",
   "sam31.cancelled": "SAM 3.1 自动检查已取消。",
-  "sam31.btn_comfy": "或下载 Comfy-Org 副本（无需审批，1.75 GB）"
+  "sam31.btn_comfy": "或下载 Comfy-Org 副本（无需审批，1.75 GB）",
+  "vedit.h3.translate": "将文本翻译成英文并丰富细节",
+  "vedit.h3.translate.tt": "模型理解英文：用其他语言写的地点、照片描述和主体会由本地增强器翻译（地点和照片还会补充细节），每个任务一次，在生成片段之前完成。主体只翻译，绝不补充（它是 SAM 的标签）。文本已是英文：不做处理。增强器不可用时发送原文。",
+  "vedit.h3.text_result": "发送给模型的文本：{t}"
 }

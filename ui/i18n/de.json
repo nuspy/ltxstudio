@@ -3847,5 +3847,8 @@
   "sam31.tt_button": "Prüft jetzt, ob Meta den Zugang zu SAM 3.1 freigegeben hat, und lädt es gegebenenfalls herunter. Automatische Prüfung alle 30 Minuten.",
   "sam31.snoozed": "SAM-3.1-Prüfung um 2 Stunden verschoben.",
   "sam31.cancelled": "Automatische SAM-3.1-Prüfung abgebrochen.",
-  "sam31.btn_comfy": "Oder die Comfy-Org-Kopie herunterladen (nicht gesperrt, 1,75 GB)"
+  "sam31.btn_comfy": "Oder die Comfy-Org-Kopie herunterladen (nicht gesperrt, 1,75 GB)",
+  "vedit.h3.translate": "Text ins Englische übersetzen und anreichern",
+  "vedit.h3.translate.tt": "Das Modell versteht Englisch: Ort, Fotobeschreibung und Motiv in einer anderen Sprache werden mit dem lokalen Enhancer übersetzt (Ort und Foto zusätzlich mit Details angereichert), einmal pro Auftrag und vor den Clips. Das Motiv wird nur übersetzt, nie angereichert (es ist das SAM-Label). Bereits englischer Text: nichts passiert. Ist der Enhancer nicht verfügbar, wird der Originaltext gesendet.",
+  "vedit.h3.text_result": "An das Modell gesendeter Text: {t}"
 }

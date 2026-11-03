@@ -349,6 +349,10 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
+    if e.get("text_info"):                                             # testo dell'utente tradotto/arricchito: l'originale e quello arrivato al modello restano nel log e in un file del job
+        W._log("testo: originale %s -> inviato al modello %s (%s, %s s)" % (json.dumps(e["text_info"].get("original"), ensure_ascii=False),
+               json.dumps(e["text_info"].get("sent"), ensure_ascii=False), e["text_info"].get("status"), e["text_info"].get("seconds")))
+        (tmp / "text_job.json").write_text(json.dumps(e["text_info"], ensure_ascii=False, indent=1), encoding="utf-8")
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
     import numpy as _np
     for ci, (length, ctx) in enumerate(clips):

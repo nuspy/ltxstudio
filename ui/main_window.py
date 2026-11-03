@@ -313,6 +313,14 @@ class _VideoEditAIWorker(QThread):
         from core.worker_errors import explain as _explain
         out = _os.path.join(self.out_dir, f"edit_{cfg['mode']}_h3_{base}_{stamp}.mp4")
         try:
+            from core import h3_edit_text as _h3t                # traduzione + arricchimento del testo (una chiamata, prima dei clip e prima di SAM)
+            cfg["h3_text_info"] = _h3t.apply_to_cfg(cfg, log=lambda m: self.progress.emit(m))
+            _sl = _h3t.summary_line(cfg["h3_text_info"])
+            if _sl:
+                self.progress.emit(_sl[:900])
+        except Exception as _ex:                                # noqa: BLE001 — il testo originale parte comunque
+            self.progress.emit(f"[h3text] AVVISO: {_ex}. Invio il testo originale.")
+        try:
             params = _vh3.build_params(cfg, out)
         except _vh3.H3EditError as e:
             self.done.emit({"status": "error", "error": str(e)}); return
@@ -4400,7 +4408,13 @@ class MainWindow(QMainWindow):
         self.video_edit_ai_tab.log.appendPlainText(tr("vedit.start", "[edit] avvio {m}…").format(m=cfg["mode"]))
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
-                      self._on_video_edit_ai_done, on_progress=self.video_edit_ai_tab.log.appendPlainText)
+                      self._on_video_edit_ai_done, on_progress=self._edit_ai_progress)
+
+    def _edit_ai_progress(self, line: str) -> None:
+        """Righe di avanzamento del job: nel log del tab; quella «[h3text] ...» (testo inviato al modello) anche nell'etichetta."""
+        self.video_edit_ai_tab.log.appendPlainText(line)
+        if line.startswith("[h3text] ") and ": " in line and " -> " not in line:
+            self.video_edit_ai_tab.set_h3_text_result(line[len("[h3text] "):])
 
     # ── tab «Scambia» ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     def _swap_find(self, req: dict):

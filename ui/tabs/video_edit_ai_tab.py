@@ -1244,6 +1244,20 @@ class VideoEditAITab(QWidget):
         g.addRow("", self.h3_lightvae)
         # Guida di latenti allineata (workers/h3_guide.py): il video sorgente entra anche come blocco di latenti sulla STESSA griglia del risultato. Serve alle LoRA
         # VFX Edit / Style Transfer / Head Swap / Motion Transfer / nitidezza (che la vogliono: con una scelta si attiva da sola); spuntata a mano e una PROVA.
+        # Testo in inglese: il prompt H3 e uno schema inglese. Di default il testo (luogo, descrizione della foto, soggetto) viene tradotto e arricchito con l'enhancer locale,
+        # UNA volta per job, prima dei clip; il soggetto (etichetta di SAM) solo tradotto, fedele. Testo gia inglese: nessuna chiamata.
+        self.h3_translate = QCheckBox(tr("vedit.h3.translate", "Traduci e arricchisci il testo in inglese"))
+        self.h3_translate.setChecked(True)
+        self.h3_translate.setMinimumHeight(32)
+        self.h3_translate.setToolTip(tr("vedit.h3.translate.tt", "Il modello capisce l'inglese: luogo, descrizione della foto e soggetto scritti in un'altra lingua vengono tradotti "
+                                        "(luogo e foto anche arricchiti di dettagli) con l'enhancer locale, una volta per lavoro e prima dei clip. Il soggetto e solo tradotto, "
+                                        "mai arricchito (e l'etichetta per SAM). Testo gia inglese: nessuna elaborazione. Se l'enhancer non e disponibile parte il testo originale."))
+        g.addRow("", self.h3_translate)
+        self.h3_text_result = QLabel("")
+        self.h3_text_result.setWordWrap(True)
+        self.h3_text_result.setStyleSheet("color:#74c0fc;")
+        self.h3_text_result.setVisible(False)
+        g.addRow("", self.h3_text_result)
         self.h3_guide = QCheckBox(tr("vedit.h3.guide", "Guida di latenti allineata (prova)"))
         self.h3_guide.setToolTip(tr("vedit.h3.guide.tt", "Il video sorgente entra anche come blocco di latenti puliti sulla stessa griglia (spazio e tempo) del risultato, "
                                     "oltre al riferimento <Video 1>. Le LoRA di guida (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidezza) la richiedono "
@@ -1385,10 +1399,17 @@ class VideoEditAITab(QWidget):
         if on and any(not veng._present(i) for i in ids) and not self._ensure_ids(ids):
             self.h3_lightvae.blockSignals(True); self.h3_lightvae.setChecked(False); self.h3_lightvae.blockSignals(False)
 
+    def set_h3_text_result(self, text: str) -> None:
+        """Etichetta col testo che e arrivato al modello dopo l'invio (tradotto/arricchito)."""
+        self.h3_text_result.setText(tr("vedit.h3.text_result", "Testo inviato al modello: {t}").format(t=text))
+        self.h3_text_result.setVisible(bool(text))
+
     def h3_option_cfg(self) -> dict:
         """Chiavi di velocita/modello da aggiungere al cfg dell'edit H3 (SOLO quelle scelte: default invariati)."""
         self._sync_h3_guide()                                      # la casella riflette le LoRA scelte ADESSO (anche se la spunta e arrivata da fuori)
         out = {"h3_turbo": self.h3_turbo.currentData() or vh3.DEFAULT_TURBO}
+        if self.h3_translate.isChecked():
+            out["h3_translate"] = True
         if self.h3_te.currentData():
             out["h3_te"] = self.h3_te.currentData()
         if self.h3_veda.isChecked():

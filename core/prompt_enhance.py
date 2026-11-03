@@ -21,11 +21,16 @@ _SYS_MUSIC = ("You expand music STYLE prompts. Rewrite the user's comma-separate
               "English style caption (~40 words) covering: genre/subgenre, main instruments, vocal character "
               "(or instrumental), mood, tempo feel, and production texture. It is a style description for a "
               "music generator, NOT lyrics. Output ONLY the caption, no preamble, no quotes.")
+_SYS_H3 = ("You receive ONE JSON object whose values are short texts written by a user in any language. Reply with ONE JSON object on a single line with EXACTLY the same keys "
+           "and nothing else (no markdown, no preamble). Per key: 'subject' is a segmentation label for a person: translate it FAITHFULLY into short English (1-6 words), "
+           "never add details or adjectives that are not there ('persona' -> 'person', 'la ragazza in rosso' -> 'the girl in red'). 'setting', 'picture_desc' and 'shots' "
+           "are descriptions: translate into English and enrich with concrete visual detail (30-50 words, one or two sentences: place, materials, lighting, atmosphere), "
+           "keeping every fact the user gave and inventing no people. Escape quotes so the JSON is valid.")
 _NSFW = " Explicit/NSFW content is allowed; do not refuse or sanitize."
 
 
 def _sys_for(kind: str) -> str:
-    return {"video": _SYS_VID, "music": _SYS_MUSIC}.get(kind, _SYS_IMG)
+    return {"video": _SYS_VID, "music": _SYS_MUSIC, "h3_fields": _SYS_H3}.get(kind, _SYS_IMG)
 
 
 def available() -> bool:
@@ -91,9 +96,14 @@ def _enhance_inproc(prompt: str, kind: str, nsfw: bool, max_new_tokens: int) -> 
                                           return_dict=True, return_tensors="pt").to(model.device)
         n_in = inputs["input_ids"].shape[1]
         with torch.inference_mode():
-            out = model.generate(**inputs, max_new_tokens=int(max_new_tokens),
-                                 do_sample=True, temperature=0.8, top_p=0.95)
+            if kind == "h3_fields":                         # traduzione fedele: deterministica (niente campionamento)
+                out = model.generate(**inputs, max_new_tokens=int(max_new_tokens), do_sample=False)
+            else:
+                out = model.generate(**inputs, max_new_tokens=int(max_new_tokens),
+                                     do_sample=True, temperature=0.8, top_p=0.95)
         txt = proc.decode(out[0][n_in:], skip_special_tokens=True).strip()
+        if kind == "h3_fields":
+            txt = " ".join(txt.split())                      # una sola riga: il genitore legge la riga ENHANCED:
         return txt or prompt
     except Exception:                                       # noqa: BLE001
         return prompt

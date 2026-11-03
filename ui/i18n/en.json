@@ -3919,5 +3919,8 @@
   "sam31.tt_button": "Check now whether Meta has approved access to SAM 3.1 and, if so, download it. Automatic check every 30 minutes.",
   "sam31.snoozed": "SAM 3.1 check postponed by 2 hours.",
   "sam31.cancelled": "Automatic SAM 3.1 check cancelled.",
-  "sam31.btn_comfy": "Or download the Comfy-Org copy (not gated, 1.75 GB)"
+  "sam31.btn_comfy": "Or download the Comfy-Org copy (not gated, 1.75 GB)",
+  "vedit.h3.translate": "Translate and enrich the text in English",
+  "vedit.h3.translate.tt": "The model understands English: place, photo description and subject written in another language are translated (place and photo also enriched with detail) with the local enhancer, once per job and before the clips. The subject is only translated, never enriched (it is the SAM label). Text already in English: nothing is done. If the enhancer is unavailable the original text is sent.",
+  "vedit.h3.text_result": "Text sent to the model: {t}"
 }
