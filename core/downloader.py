@@ -187,7 +187,7 @@ def download_entry(entry: dict, *, base_dir: str | None = None, token: str | Non
         verify_file(target, sha256=entry.get("sha256"))
         if entry.get("convert"):
             log(f"[native] conversione in formato nativo: {target.name}")
-            nc.convert(entry["convert"], target, out, log=log)
+            nc.convert(entry["convert"], target, out, delete_source=not entry.get("keep_source"), log=log)
             verify_file(out)
         return out
     # snapshot

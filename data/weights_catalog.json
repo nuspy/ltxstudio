@@ -4437,11 +4437,12 @@
         "mmh3-video-vae",
         "mmh3-audio-vae"
       ],
-      "note": "confronto nvfp4: qkv int8-ConvRot + bordi e out_proj BF16 (con minimax_h3_layer_config.json). Scaricato a mano dall'utente; conversione nativa da verificare al primo arrivo del file. Licenza H3 Community (no UE/UK/USA/Corea)",
+      "note": "confronto nvfp4: qkv int8-ConvRot + bordi e out_proj BF16 (con minimax_h3_layer_config.json). Scaricato a mano dall'utente; convertito in nativo il 03/11 (801 tensori, 45 s, picco RSS 1,06 GB, header verificato: qkv I8+convrot_group, mlp nvfp4 U8+F8, 100 chiavi adaln_proj); sorgente ComfyUI conservato (keep_source). Licenza H3 Community (no UE/UK/USA/Corea)",
       "used_by": [
         "cap.video_minimax_h3"
       ],
       "convert": "mmh3_dit",
+      "keep_source": true,
       "use": [
         "ckpt_video",
         "q_nvfp4"

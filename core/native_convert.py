@@ -739,7 +739,7 @@ def ensure_entry(entry: dict, dest_dir: Path, log=print) -> Path | None:
         if not is_complete(src):
             log(f"[native] {src.name} è incompleto (download interrotto): niente conversione")
             return dst if dst.exists() else None
-        return convert(conv, src, dst, log=log)
+        return convert(conv, src, dst, delete_source=not entry.get("keep_source"), log=log)   # keep_source: il sorgente lo cancella solo chi ne ha l'autorita
     return dst if dst.exists() else None
 
 
