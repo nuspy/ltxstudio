@@ -125,3 +125,26 @@ def test_integrate_context_mask_is_wider_than_position_mask_and_default_is_uncha
         assert pos.any() and r["context_px"] == (0 if pct is None else r["context_px"])
     assert areas["base"][1] == areas["p25"][1] == areas["p60"][1]                 # la posizione non cambia
     assert areas["base"][0] < areas["p25"][0] < areas["p60"][0]                  # il contesto cresce
+
+
+def test_integrate_export_provides_the_clean_scene_and_neutral_subject_refs(tmp_path):
+    """Integra «rigenera» (prova): export_integrate scrive la scena SENZA la foto incollata e il soggetto scontornato su grigio neutro come riferimento."""
+    import numpy as np
+    from PIL import Image
+    if not (FX / "scena_1152x832.png").exists() or not (Path.home() / ".u2net" / "u2net.onnx").exists():
+        pytest.skip("servono le foto di prova e u2net")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    from ui.mask_canvas import MaskCanvas
+    cv = MaskCanvas()
+    cv.load_image(str(FX / "scena_1152x832.png"), "canvas")
+    cv.add_layer(str(FX / "ritratto_960x1024.png"))
+    r = cv.export_integrate(tmp_path)
+    scene = np.asarray(Image.open(FX / "scena_1152x832.png").convert("RGB").resize((1152, 832))).astype(int)
+    base = np.asarray(Image.open(r["base"]).convert("RGB").resize((1152, 832))).astype(int)
+    assert np.abs(scene - base).mean() < 3.0, "la base deve essere la scena senza la foto incollata"
+    comp = np.asarray(Image.open(r["image"]).convert("RGB")).astype(int)
+    assert np.abs(comp - base).mean() > 5.0                                        # mentre il composito la contiene
+    ref = np.asarray(Image.open(r["layer_refs"][0]).convert("RGB"))
+    assert ref.shape[0] > 100 and (np.abs(ref.astype(int) - 128).sum(2) == 0).mean() > 0.1      # soggetto su grigio neutro 128
