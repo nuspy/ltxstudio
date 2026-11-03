@@ -853,6 +853,37 @@ NEW = [
       note="rank 64, 4000 passi, ai-toolkit su Alissonerdx/h3upscale-4k, base Ref2VA: il ri-disegno guarda il clip a metà "
            "risoluzione (guida IC-LoRA a griglia 1/2) invece di inventare il dettaglio. Solo Ref2VA; si usa SOLO nel tab "
            "Definizione video. Licenza H3 Community (no UE/UK/USA/Corea); leggi i termini del dataset prima dell'uso commerciale"),
+    # LoRA di GUIDA allineata (Alissonerdx/Minimax-H3-ComfyUI, 03/11): il video sorgente entra come latenti sulla stessa griglia del risultato
+    # (workers/h3_guide.py, core/h3_guide.py); il trigger entra da solo nel prompt. File grandi ma solo Ref2VA. Licenze per file (LICENSES.md del repo):
+    # Motion Transfer ha la sua (credito sopra 1 M$ di ricavi, niente API/SaaS ospitati); le altre sono "other/mixed" del repo.
+    N("mmh3-lora-vfx-edit-r128", "Video", "H3 VFX Edit r128 (guida allineata, 1.24GB)", category="video", arch="minimax_h3",
+      repo="Alissonerdx/Minimax-H3-ComfyUI", remote="loras/minimax_h3_vfx_edit_v1.0_r128.safetensors",
+      filename="minimax_h3_vfx_edit_v1.0_r128-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3", gb=1.24,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_minimax_h3"], triggers=["vfx_edit:"],
+      note="edit a parole di un video con la GUIDA allineata del sorgente (clip 73 fotogrammi a 384): prompt = una frase che inizia con «vfx_edit:». "
+           "Sperimentale: deriva d'identita, testi e loghi riscritti, clip lunghi peggiori"),
+    N("mmh3-lora-vfx-edit-r128-ffp", "Video", "H3 VFX Edit r128 FFP (guida allineata, 1.24GB)", category="video", arch="minimax_h3",
+      repo="Alissonerdx/Minimax-H3-ComfyUI", remote="loras/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors",
+      filename="minimax_h3_vfx_edit_v1.0_r128_ffp-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3", gb=1.24,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_minimax_h3"], triggers=["vfx_edit:"],
+      note="VFX Edit continuato a 512 e 124 fotogrammi, con propagazione del primo fotogramma modificato (foto nel canale nativo <Picture 1>); trigger «vfx_edit:»"),
+    N("mmh3-lora-style-transfer-r64", "Video", "H3 Style Transfer r64 (guida allineata, 0.62GB)", category="video", arch="minimax_h3",
+      repo="Alissonerdx/Minimax-H3-ComfyUI", remote="loras/minimax_h3_style_transfer_v1.0_r64.safetensors",
+      filename="minimax_h3_style_transfer_v1.0_r64-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3", gb=0.62,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_minimax_h3"], triggers=["style_transfer:"],
+      note="ri-disegna tutto il video in uno stile (foto di stile come <Picture 1> o solo testo) tenendo moto e tempi; forza 1.0, 0.7 se cambia troppo il movimento"),
+    N("mmh3-lora-motion-transfer", "Video", "H3 Motion Transfer (guide latents, adattatore V2 fuso, 0.18GB)", category="video", arch="minimax_h3",
+      repo="Alissonerdx/Minimax-H3-ComfyUI", remote="loras/minimax_h3_motion_transfer_v1.0_ref2va.safetensors",
+      filename="minimax_h3_motion_transfer_v1.0_ref2va-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3", gb=0.18,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_minimax_h3"], triggers=["motion_transfer:"],
+      note="il personaggio della foto di riferimento esegue il movimento del video guida; licenza Motion Transfer di Alissonerdx (credito sopra 1 M$ di ricavi, "
+           "niente API/SaaS ospitati)"),
+    N("mmh3-lora-lms-r64", "Video", "H3 LMS nitidezza r64 (guida allineata, 1.24GB)", category="video", arch="minimax_h3",
+      repo="Alissonerdx/Minimax-H3-ComfyUI", remote="loras/minimax_h3_lms_v1.0_r64.safetensors",
+      filename="minimax_h3_lms_v1.0_r64-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3", gb=1.24,
+      deps=["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"], used_by=["cap.video_minimax_h3"],
+      note="seconda passata di nitidezza su un clip esistente (guida allineata, stessa risoluzione e fotogrammi): didascalia FISSA «Enhance this video with sharp, "
+           "crisp details while preserving a natural photorealistic appearance.»"),
     # Krea 2: LoRA ai-toolkit (diffusion_model.blocks… + txtfusion → text_fusion)
     # Krea 2 single-file community: convertito in nativo (nomi diffusers, Linear int8 ConvRot compressi) e montato
     # sul text encoder/VAE dello snapshot Turbo (workers/krea2_custom).

@@ -175,7 +175,6 @@ class LoraTab(QWidget):
                 prev_strength = self._restore_pending[e.comfy_name]
             cb.setChecked(prev_checked)
             cb.clicked.connect(lambda _c, ent=e: self._show_entry(ent))
-            cb.clicked.connect(lambda *_: self.selection_changed.emit())
             h.addWidget(cb, 1)
             h.addWidget(QLabel(tr("lora.str_lbl")))
             sp = QDoubleSpinBox(); sp.setRange(0, 2); sp.setSingleStep(0.05); sp.setDecimals(2)
@@ -193,6 +192,7 @@ class LoraTab(QWidget):
                     cb.setChecked(False); cb.setEnabled(False); sp.setEnabled(False)
                     cb.setText(cb.text() + "  ⛔ " + _why)
                     w.setToolTip(_why); cb.setToolTip(_why)
+            cb.toggled.connect(lambda *_: self.selection_changed.emit())     # DOPO il filtro di riga (che puo spegnere la spunta): scatta per click e per setChecked
             it.setSizeHint(w.sizeHint())
             self.list.setItemWidget(it, w)
             self._rows[e.name] = {"item": it, "cb": cb, "sp": sp, "entry": e, "star": star}

@@ -1358,6 +1358,7 @@ class VideoEditAITab(QWidget):
 
     def h3_option_cfg(self) -> dict:
         """Chiavi di velocita/modello da aggiungere al cfg dell'edit H3 (SOLO quelle scelte: default invariati)."""
+        self._sync_h3_guide()                                      # la casella riflette le LoRA scelte ADESSO (anche se la spunta e arrivata da fuori)
         out = {"h3_turbo": self.h3_turbo.currentData() or vh3.DEFAULT_TURBO}
         if self.h3_te.currentData():
             out["h3_te"] = self.h3_te.currentData()

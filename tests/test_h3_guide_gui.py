@@ -109,3 +109,20 @@ def test_the_new_texts_exist_in_all_15_languages():
             assert d.get(k), (f.name, k)
         assert "{kind}" in d["vedit.h3.guide.lora_info"] and "{trigger}" in d["vedit.h3.guide.lora_info"] and "{kind}" in d["vedit.h3.guide.lora_info_caption"], f.name
         assert "vedit.h3.lora.why.guide" not in d
+
+
+def test_registry_lists_the_guide_loras_in_the_h3_panel_when_the_files_are_on_disk(tab):
+    """Le LoRA di guida sono nel registro pesi (build/catalog_v2.py): compaiono nel pannello LoRA H3 SOLO se il file e sul disco (l'LMS non scaricato resta fuori)."""
+    from core import model_paths as mp
+    from core import weights_catalog as wc
+    ids = ("mmh3-lora-vfx-edit-r128", "mmh3-lora-vfx-edit-r128-ffp", "mmh3-lora-style-transfer-r64", "mmh3-lora-motion-transfer", "mmh3-lora-lms-r64")
+    ents = {e["id"]: e for e in wc.load() if e["id"] in ids}
+    assert set(ents) == set(ids), "voci mancanti nel registro pesi"
+    for e in ents.values():
+        assert e["type"] == "LoRA" and e["family"] == "MiniMax-H3" and e["filename"].endswith("-native.safetensors") and e.get("repo_id") == "Alissonerdx/Minimax-H3-ComfyUI"
+        assert "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8" in (e.get("deps") or [])
+    tab.h3_lora.refresh()
+    shown = {r["entry"].filename for r in tab.h3_lora._rows.values()}
+    root = str(mp.models_root())
+    for e in ents.values():
+        assert (e["filename"] in shown) == bool(wc.is_present(e, root)), e["id"]

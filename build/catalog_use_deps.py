@@ -264,6 +264,11 @@ MAP.update({
     "mmh3-lightvae-dec": (["vae"], []), "mmh3-lightvae-enc": (["vae"], []),
     "mmh3-latent-upscaler-v1": (["upscale_video"], ["mmh3-lora-h3upscale-x2"]),
     "mmh3-lora-h3upscale-x2": (["upscale_video"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
+    "mmh3-lora-vfx-edit-r128": (["lora_style", "ref_omni"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
+    "mmh3-lora-vfx-edit-r128-ffp": (["lora_style", "ref_omni"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
+    "mmh3-lora-style-transfer-r64": (["lora_style", "ref_omni"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
+    "mmh3-lora-motion-transfer": (["lora_style", "ref_omni"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
+    "mmh3-lora-lms-r64": (["lora_style", "ref_omni"], ["mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"]),
     "klein9b-te-uncensored": (["te", "uncensored"], []),
     "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m": (["distill_lora"], []),
 })
