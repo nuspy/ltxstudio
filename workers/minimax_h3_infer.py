@@ -554,8 +554,35 @@ def run(p: dict) -> str:
         # `ref_image_size` e «match». A 1024 di lato corto una foto vale ~1,7k token nel TE e nel DiT, alla tela 480 sono ~0,4k.
         st.update_components(reference_image_short_edge=int(min(_th, _tw)))
     import h3_te_attn as _TA                   # attenzione del TE a blocchi di query (esatta): niente matrice L x L in un colpo solo
+    # Cronometro per parte (03/11: ~100 s per clip nell'Edit H3 senza sapere dove): visione vs linguaggio, chiamate e lunghezza della sequenza
+    _tt, _hooks = {}, []
+
+    def _timed(name, mod):
+        def pre(_m, args, kwargs):
+            torch.cuda.synchronize()
+            _tt.setdefault(name, [0.0, 0, 0])[2] = time.time()
+        def post(_m, args, kwargs, out):
+            torch.cuda.synchronize()
+            r = _tt[name]
+            r[0] += time.time() - r[2]
+            r[1] += 1
+            x = kwargs.get("inputs_embeds") if isinstance(kwargs, dict) else None
+            if x is not None:
+                _tt[name + "_len"] = int(x.shape[-2])
+        _hooks.append(mod.register_forward_pre_hook(pre, with_kwargs=True))
+        _hooks.append(mod.register_forward_hook(post, with_kwargs=True))
+    inner = getattr(te, "model", te)
+    for _n in ("visual", "language_model"):
+        if getattr(inner, _n, None) is not None:
+            _timed(_n, getattr(inner, _n))
+    t1 = time.time()
     with _TA.query_chunked_attention():
         state = st(**_inputs_for(st, kw))
+    for h in _hooks:
+        h.remove()
+    _log("codifica TE: " + f"totale {time.time() - t1:.0f}s · " + " · ".join(
+        f"{k} {v[0]:.0f}s in {v[1]} chiamate" for k, v in _tt.items() if isinstance(v, list))
+        + (f" · sequenza {_tt['language_model_len']} token" if "language_model_len" in _tt else ""))
     _drop_module_weights(te)                   # il `del` da solo non basta (visto sul DiT e sul VAE): i pesi del TE escono dalla VRAM comunque
     del st, te, comps                          # comps teneva ancora il TE: senza, resta in VRAM
     _gc()
