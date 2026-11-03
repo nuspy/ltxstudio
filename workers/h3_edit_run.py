@@ -237,7 +237,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
 
     # 2) video di riferimento (<Video 1>) — la zona rigenerata e nascosta: niente dettagli originali da copiare
     if invert:
-        ref_frames = M.blur_area(f01, 1.0 - pers, radius=max(6.0, 0.02 * th), grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))
+        ref_frames = M.blur_area(f01, 1.0 - pers, radius=max(6.0, 0.02 * th * float(os.environ.get("H3_EDIT_BG_BLUR") or e.get("bg_blur", 1.0))),
+                                grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)
     else:
         ref_frames = M.grey_mannequins(f01, pers, size, blur=0.02)
 
@@ -261,7 +262,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     st = os.stat(src)
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
-                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), e.get("bg_feather_px"))
+                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"))
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
