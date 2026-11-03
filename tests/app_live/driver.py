@@ -970,6 +970,7 @@ class Driver:
                 # margine di CONTESTO di Integra (parametro interno dei casi `_maschera_larga`): None = il tracciato di sempre; azzerato a ogni caso
                 cv.integrate_context_pct = case.get("ctx_margin_pct")
                 cv.integrate_context_px = case.get("ctx_margin_px")
+                cv.integrate_regenerate = bool(case.get("regenera"))       # prova «rigenera» (scena senza foto + soggetto come riferimento)
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
                     steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])
