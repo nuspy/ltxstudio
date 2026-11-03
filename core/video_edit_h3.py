@@ -67,6 +67,6 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
          "picture_desc": str(cfg.get("picture_desc") or ""), "keep_audio": bool(cfg.get("keep_audio", True)),
          "clip_s": float(ep["clip_s"]), "overlap": int(ep["overlap_frames"]), "grow_px": int(ep["grow_px"]),
          "feather_px": int(ep["feather_px"]), "headroom": float(ep["headroom"]), "hold_frames": int(ep["pose_hold_frames"]),
-         "person_grow_px": int(ep["person_grow_px"])}
+         "person_grow_px": int(ep["person_grow_px"]), "replace_expand": float(ep.get("replace_expand", 0.30))}
     return {"arch": "minimax_h3", "h3_edit": e, "h3_profile": prof, "h3_turbo": DEFAULT_TURBO, "h3_video_shift": float(ep["video_shift"]),
             "seed": int(cfg.get("seed") or 42), "output": out, **E.engine_params(act, eng)}

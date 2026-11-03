@@ -173,3 +173,22 @@ def test_change_background_does_not_keep_an_old_band_around_the_person():
             assert kept[8:21, 11:21].all()                                                              # il cuore della persona e tenuto
         else:
             assert box[0] < 160 and box[1] > 352 and box[2] < 120 and box[3] > 360, box                 # sostituisci: copre la persona CON i bordi
+
+
+def test_replace_region_expands_to_a_wider_box_but_background_change_is_untouched():
+    """Giudizio 03/11 (Scambia): le braccia del nuovo personaggio uscivano dalla zona rigenerata (era la sagoma del vecchio volto) e restava il video originale:
+    chiazze bianche ai bordi. Sostituisci allarga il riquadro del soggetto (stabile nel tempo); Cambia sfondo non cambia."""
+    n, h, w = 22, 480, 512
+    pers = torch.zeros(n, h, w)
+    pers[:, 100:300, 200:320] = 1.0                                   # il soggetto: 120 px di larghezza, 200 di altezza
+    plain = M.regen_region(pers, False, 8, 4, expand=0.0)
+    wide = M.regen_region(pers, False, 8, 4, expand=0.30)
+    assert wide.sum() > plain.sum() * 1.9
+    ys, xs = torch.where(wide[10] > 0.5)
+    assert xs.min() <= 200 - 30 and xs.max() >= 320 + 30 and ys.min() <= 100 - 50 and ys.max() >= 300 + 50     # +30 % per lato (36 px / 60 px) meno la crescita
+    assert torch.equal(M.regen_region(pers, True, 8, 4, expand=0.30), pers)                                      # cambia-sfondo: nessun allargamento
+    moving = torch.zeros(n, h, w)
+    for i in range(n):
+        moving[i, 100:300, 100 + 8 * i: 220 + 8 * i] = 1.0
+    box = M.expand_box_region(moving, 0.0, window=12)                 # unione dei riquadri vicini: stabile, contiene sempre il soggetto
+    assert (box >= moving).all()

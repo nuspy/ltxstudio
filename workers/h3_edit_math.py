@@ -86,7 +86,35 @@ def grow_mask(mask: torch.Tensor, px: int) -> torch.Tensor:
     return out
 
 
-def regen_region(pers: torch.Tensor, invert: bool, person_grow: int, grow: int) -> torch.Tensor:
+def expand_box_region(mask: torch.Tensor, frac: float, window: int = 12) -> torch.Tensor:
+    """Riquadro del soggetto allargato di `frac` per lato (della larghezza/altezza del riquadro), stabile nel tempo: il riquadro di ogni frame e l'UNIONE dei
+    riquadri dei frame vicini (+/- `window`). Serve a «Sostituisci personaggio»: il nuovo personaggio puo avere una sagoma piu larga dell'originale (braccia aperte
+    nel ritratto contro il primo piano di un volto) e fuori dalla zona rigenerata restava il video originale: chiazze bianche ai bordi (giudizio 03/11).
+    Ritorna [N,H,W] 0/1; vuoto per frame senza soggetto."""
+    n, h, w = mask.shape
+    m = mask > 0.5
+    ys = m.any(2)                                                    # [N, H]
+    xs = m.any(1)                                                    # [N, W]
+    out = torch.zeros(n, h, w)
+    boxes = []
+    for i in range(n):
+        if ys[i].any():
+            yy, xx = torch.where(ys[i])[0], torch.where(xs[i])[0]
+            boxes.append([int(xx.min()), int(yy.min()), int(xx.max()) + 1, int(yy.max()) + 1])
+        else:
+            boxes.append(None)
+    for i in range(n):
+        near = [b for b in boxes[max(0, i - window): i + window + 1] if b]
+        if not near:
+            continue
+        x0, y0 = min(b[0] for b in near), min(b[1] for b in near)
+        x1, y1 = max(b[2] for b in near), max(b[3] for b in near)
+        dx, dy = int(round((x1 - x0) * frac)), int(round((y1 - y0) * frac))
+        out[i, max(0, y0 - dy): min(h, y1 + dy), max(0, x0 - dx): min(w, x1 + dx)] = 1.0
+    return out
+
+
+def regen_region(pers: torch.Tensor, invert: bool, person_grow: int, grow: int, expand: float = 0.0) -> torch.Tensor:
     """Maschera-pixel [N,H,W] da dare a `cell_mask` (1 = «oggetto»; con invert=True si rigenera il complemento).
     - sostituisci personaggio (invert=False): si rigenera la persona CRESCIUTA di person_grow + grow px, cosi copre tutta la persona originale con i bordi.
     - cambia sfondo (invert=True): si rigenera tutto tranne la persona e la zona rigenerata deve ENTRARE un poco nel bordo della persona, mai lasciarle
@@ -95,7 +123,10 @@ def regen_region(pers: torch.Tensor, invert: bool, person_grow: int, grow: int) 
       Dentro il bordo ci entrano le celle di 16 px che toccano lo sfondo (adaptive_max_pool sul complemento)."""
     if invert:
         return pers.float()
-    return grow_mask(grow_mask(pers.float(), max(0, person_grow)), max(0, grow))
+    reg = grow_mask(grow_mask(pers.float(), max(0, person_grow)), max(0, grow))
+    if expand > 0:
+        reg = torch.maximum(reg, expand_box_region(reg, float(expand)))
+    return reg
 
 
 def latent_mask(mask: torch.Tensor, frame_counts: list[int], lat_h: int, lat_w: int) -> torch.Tensor:
