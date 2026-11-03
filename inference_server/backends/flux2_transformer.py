@@ -53,7 +53,12 @@ class Fp8Linear(nn.Module):
         import torch.nn.functional as F
         # cast-on-forward (block-swap stile ComfyUI): il peso fp8 vive su CPU, qui va su x.device 1 layer
         # alla volta (dequant→bf16), poi il temporaneo è liberato. Picco VRAM = 1 layer.
-        w = self.weight.to(device=x.device, dtype=x.dtype) * self.weight_scale.to(device=x.device, dtype=x.dtype)
+        if getattr(self, "exact_scale", False):
+            # scala VERA del file (fp8 «scalato» ComfyUI): (fp8 -> fp32) * scala -> bf16, uguale bit per bit alla cache dequantizzata (provato su 4 pesi del
+            # realDream: il prodotto tutto in bf16 differisce di ~1e-3)
+            w = (self.weight.to(device=x.device).float() * self.weight_scale.to(device=x.device)).to(x.dtype)
+        else:
+            w = self.weight.to(device=x.device, dtype=x.dtype) * self.weight_scale.to(device=x.device, dtype=x.dtype)
         b = self.bias.to(device=x.device, dtype=x.dtype) if self.bias is not None else None
         return F.linear(x, w, b)
 
@@ -293,6 +298,28 @@ def klein_config_from_header(ckpt_path: str) -> dict:
     }
 
 
+def is_scaled_fp8_klein(ckpt_path: str) -> bool:
+    """True per un Klein con pesi F8_E4M3 + `weight_scale` scalare (fp8 «scalato» ComfyUI, es. realDream_klein9B), che `load_flux2_klein_transformer`
+    carica DIRETTAMENTE (Fp8Linear, ~9 GB) senza passare dalla dequantizzazione in bf16 (18 GB: transformer 17,8 GB + encoder 15,3 GB = 33 GB misurati,
+    piano «offload» e processo a 60 GB: giro A3 del 03/11). Esclusi i Dev e i nvfp4 (pesi U8 / weight_scale_2)."""
+    import json
+    import struct
+    try:
+        with open(ckpt_path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            hdr = json.loads(f.read(n))
+        keys = [k for k in hdr if k != "__metadata__"]
+        w8 = sum(1 for k in keys if k.endswith(".weight") and hdr[k].get("dtype") == "F8_E4M3")
+        sc = sum(1 for k in keys if k.endswith(".weight_scale"))
+        nv = any(k.endswith(".weight_scale_2") for k in keys)
+        if not w8 or not sc or nv:
+            return False
+        cfg = klein_config_from_header(ckpt_path)
+        return cfg["joint_attention_dim"] in (7680, 12288)               # Qwen3-4B / Qwen3-8B: Klein; i Dev (Mistral, 15360) no
+    except Exception:                                                    # noqa: BLE001
+        return False
+
+
 def load_flux2_klein_transformer(ckpt_path: str, cfg: dict | None = None):
     """Carica il transformer Klein (fp8 puro) come Flux2Transformer2DModel con Fp8Linear (scale=1.0)
     per TUTTI i Linear fp8 → block-swap memory-bounded come per Dev. Config dedotta dai dim se non data."""
@@ -360,6 +387,8 @@ def load_flux2_klein_transformer(ckpt_path: str, cfg: dict | None = None):
                     set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())   # resta fp8
                     set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
                                                 value=torch.tensor(file_scales.get(b[:-len(".weight")], 1.0), dtype=torch.float32))
+                    if b[:-len(".weight")] in file_scales:
+                        modules[mod].exact_scale = True
                 else:
                     set_module_tensor_to_device(tr, nk, "cpu", value=t.to(torch.bfloat16),
                                                 dtype=torch.bfloat16)
