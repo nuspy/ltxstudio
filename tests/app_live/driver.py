@@ -32,7 +32,8 @@ _KEEP = ("module", "arch", "task", "model", "model_gguf", "krea2_variant", "krea
          "ltx_release", "video_arch", "loras", "lora", "prompt", "negative", "seed", "steps", "guidance", "cfg",
          "width", "height", "length", "fps", "strength", "denoise", "init_image", "image_path", "mask", "mask_path",
          "ref_images", "control_image", "control_type", "outpaint", "output", "native_audio", "h3_dit", "h3_profile",
-         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes")
+         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes",
+         "h3_turbo", "h3_te", "h3_veda", "h3_lightvae", "h3_guide", "h3_guide_lora")      # opzioni H3 della tab Modifica Video (velocita / modello / guida allineata)
 
 
 def _safe(v, depth=0):
@@ -419,7 +420,8 @@ class Driver:
                             try:
                                 d = json.load(open(av[-1], encoding="utf-8"))
                                 prm = {k: d.get(k) for k in ("engine", "engine_action", "engine_kind", "h3_edit", "h3_profile", "ltx_release",
-                                                             "gguf_transformer", "model", "edit_lora", "arch") if k in d}
+                                                             "gguf_transformer", "model", "edit_lora", "arch", "h3_turbo", "h3_te", "h3_dit", "h3_veda",
+                                                             "h3_lightvae", "h3_guide", "h3_guide_lora", "prompt", "loras") if k in d}
                             except Exception:                # noqa: BLE001
                                 prm = None
                         rec.call("subprocess", argv=[os.path.basename(av[0])] + [x[-90:] for x in av[1:6]], params=prm)
