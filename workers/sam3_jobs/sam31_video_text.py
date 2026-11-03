@@ -14,6 +14,9 @@ import os
 import sys
 import time
 
+if any(a == "cpu" for a in sys.argv[1:]) and "--device" in sys.argv:        # --device cpu: nessuna GPU, nemmeno un contesto CUDA
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 DEFAULT_CKPT = r"E:\AI\Models\Segmentation\sam3.1\sam3.1_multiplex.pt"
 
 
@@ -28,6 +31,66 @@ def patch_torch_load():
             return {k: (v.float() if v.is_floating_point() else v) for k, v in load_file(str(f)).items()}
         return orig(f, *args, **kw)
     torch.load = _load
+
+
+def patch_fp32_cpu():
+    """Su CPU il codice di Meta forza matmul bfloat16 (perflib.fused.addmm_act: kernel pensati per GPU, sotto autocast bf16) e con pesi float32 va in errore di dtype.
+    Qui si sostituisce SOLO quella funzione con la versione float32 equivalente (linear + attivazione): stessi numeri, niente bf16 lento sulla CPU."""
+    import sys
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    def addmm_act(activation, linear, mat1):
+        y = linear(mat1)
+        if isinstance(activation, type) and issubclass(activation, nn.Module):
+            return activation()(y)
+        if activation is F.relu:
+            return F.relu(y)
+        if activation is F.gelu:
+            return F.gelu(y)
+        raise ValueError(f"Unexpected activation {activation}")
+    n = 0
+    for name, mod in list(sys.modules.items()):
+        if name.startswith("sam3") and getattr(mod, "addmm_act", None) is not None:
+            mod.addmm_act = addmm_act
+            n += 1
+    # Il codice di Meta scrive device="cuda" fisso in molti punti (decoder, posizioni, ecc.): in modalita CPU ogni richiesta di device cuda diventa cpu.
+    def _cpu_kw(fn):
+        def w(*a, **k):
+            d = k.get("device")
+            if d is not None and str(d).startswith("cuda"):
+                k["device"] = "cpu"
+            if k.get("dtype") in (torch.bfloat16, torch.float16):          # CPU: tutto in float32 (il codice di Meta presume l'autocast bf16 della GPU)
+                k["dtype"] = torch.float32
+            return fn(*a, **k)
+        return w
+    for nm in ("arange", "zeros", "ones", "empty", "full", "tensor", "as_tensor", "linspace", "rand", "randn", "zeros_like", "ones_like", "eye", "randperm", "empty_like"):
+        if hasattr(torch, nm):
+            setattr(torch, nm, _cpu_kw(getattr(torch, nm)))
+    import types
+    torch.cuda.get_device_properties = lambda *a, **k: types.SimpleNamespace(major=0, minor=0, name="cpu", total_memory=0, multi_processor_count=1)   # lettura al momento dell'import
+    torch.Tensor.cuda = lambda self, *a, **k: self
+    torch.Tensor.pin_memory = lambda self, *a, **k: self
+    torch.Tensor.bfloat16 = lambda self, *a, **k: self.float()
+    torch.Tensor.half = lambda self, *a, **k: self.float()
+    nn.Module.cuda = lambda self, *a, **k: self
+    _to = torch.Tensor.to
+
+    def _tensor_to(self, *a, **k):
+        a = tuple("cpu" if isinstance(x, (str, torch.device)) and str(x).startswith("cuda") else (torch.float32 if isinstance(x, torch.dtype) and x in (torch.bfloat16, torch.float16) else x) for x in a)
+        if k.get("dtype") in (torch.bfloat16, torch.float16):
+            k["dtype"] = torch.float32
+        if str(k.get("device", "")).startswith("cuda"):
+            k["device"] = "cpu"
+        return _to(self, *a, **k)
+    torch.Tensor.to = _tensor_to
+    # La cache delle posizioni del builder viene precalcolata con device="cuda" scritto fisso (position_encoding.py:55): su CPU si rimanda al primo uso.
+    import sam3.model_builder as mb
+    from sam3.model.position_encoding import PositionEmbeddingSine
+    mb._create_position_encoding = lambda precompute_resolution=None: PositionEmbeddingSine(num_pos_feats=256, normalize=True, scale=None, temperature=10000,
+                                                                                            precompute_resolution=None)
+    return n
 
 
 def main():
@@ -45,6 +108,8 @@ def main():
     from sam3.model_builder import build_sam3_multiplex_video_predictor
     dev = a.device or ("cuda" if torch.cuda.is_available() else "cpu")
     patch_torch_load()
+    if dev == "cpu":
+        print(f"[sam31] CPU: addmm_act float32 in {patch_fp32_cpu()} moduli", file=sys.stderr, flush=True)
     t0 = time.time()
     # use_fa3=False: niente kernel FlashAttention 3 (Windows / CPU); use_rope_real=False: RoPE complessa, come nel checkpoint
     pred = build_sam3_multiplex_video_predictor(checkpoint_path=a.checkpoint, use_fa3=False, use_rope_real=False, compile=False, warm_up=False,
@@ -52,6 +117,15 @@ def main():
     if dev == "cpu":
         pred.model = pred.model.cpu()
     t_load = time.time() - t0
+    # Incongruenza del codice di Meta: Sam3BasePredictor.start_session passa offload_state_to_cpu / video_loader_type, ma init_state del tracker multiplex non li accetta.
+    _init = pred.model.init_state
+
+    def _init_state(**kw):
+        kw.pop("offload_state_to_cpu", None)
+        if kw.pop("video_loader_type", "cv2") == "cv2":
+            kw["use_cv2"] = True
+        return _init(**kw)
+    pred.model.init_state = _init_state
     sid = pred.start_session(a.video, offload_video_to_cpu=(dev == "cpu"), offload_state_to_cpu=(dev == "cpu"))["session_id"]
     r = pred.add_prompt(session_id=sid, frame_idx=0, text=a.text.strip().rstrip("."))
     os.makedirs(a.out_dir, exist_ok=True)

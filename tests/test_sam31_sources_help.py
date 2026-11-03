@@ -49,9 +49,10 @@ def test_comfy_copy_is_used_only_if_declared_equivalent(tmp_path, monkeypatch):
     assert not SE.comfy_usable()
 
 
-def test_loader_flags_are_off_until_the_meta_jobs_are_proven():
-    """Il codice di Meta si esegue solo col lanciatore autorizzato dall'utente: finche non c'e la prova, SAM 3.1 non e selezionabile."""
-    assert SE.LOADER_READY is False and SE.IMAGE_READY is False and SE.VIDEO_READY is False
+def test_flags_say_what_was_proven():
+    """Immagine provata con Meta e Comfy su un fotogramma vero (CPU); tracking multiplex nativo non ancora (su CPU la propagazione fallisce, serve la GPU)."""
+    assert SE.LOADER_READY is True and SE.IMAGE_READY is True and SE.VIDEO_READY is False
+    assert SE.COMFY_EQUIVALENT is True
 
 
 def test_help_text_has_warning_steps_and_when_to_choose():

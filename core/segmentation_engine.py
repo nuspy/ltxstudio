@@ -54,12 +54,18 @@ COMFY_DIRNAME = "sam3.1_multiplex"
 COMFY_CHECKPOINT = "sam3.1_multiplex_fp16.safetensors"
 COMFY_FILES = {COMFY_CHECKPOINT: 1_745_546_848}
 # None = confronto non ancora fatto; True/False = esito di scripts/sam31_compare_checkpoints.py. Solo True la rende usabile al posto del .pt di Meta.
-COMFY_EQUIVALENT: bool | None = None
+# Esito 03/11 (scripts/sam31_compare_checkpoints.py + job sam31_compare_ckpts_image.py): 1590 tensori in comune con le stesse forme, errore massimo 6,7e-3 e
+# medio 3,8e-6 (arrotondamento fp16, massimo relativo 4,8e-4), mancano solo i 32 freqs_cis (RoPE ricalcolata) e text_projection (non usata dal testo del modello);
+# stesso fotogramma e stesso testo: IoU delle maschere >= 0,9998 e punteggi entro 0,0008. Il tracker multiplex non e verificabile finche il video non gira.
+COMFY_EQUIVALENT: bool | None = True
 
 # I percorsi sono eseguiti dal codice di Meta in un processo figlio (core/sam31_detect.py): si accendono SOLO dopo la prova (permesso al lanciatore sam3_run.sh).
-LOADER_READY = False                   # cancello della scelta nel menu (immagine E video)
-IMAGE_READY = False                    # testo -> maschere su una foto
-VIDEO_READY = False                    # tracking multiplex da testo
+# Provato 03/11 su CPU con un fotogramma vero (job sam31_image_text.py via sam3_run.sh): testo -> riquadri/maschere con Meta e con la copia Comfy. Nei video SAM 3.1
+# trova l'oggetto da testo sul fotogramma 0 e SAM2 lo propaga (percorso provato). Il tracking multiplex nativo (sam31_video_text.py) trova gli oggetti sul fotogramma 0
+# ma su CPU la propagazione fallisce (tensori di batch 0 nel tracker, codice di Meta pensato per GPU): VIDEO_READY resta spento finche non gira (serve GPU).
+LOADER_READY = True                    # cancello della scelta nel menu
+IMAGE_READY = True                     # testo -> maschere su una foto
+VIDEO_READY = False                    # tracking multiplex nativo da testo
 
 LICENSE_SUMMARY_IT = (
     "Licenza SAM (Meta, 19/11/2025): uso commerciale consentito. Vietati gli usi militari, nucleari, di spionaggio e il reverse engineering. "

@@ -6,6 +6,12 @@ import pytest
 from core import segmentation_engine as S
 
 
+@pytest.fixture(autouse=True)
+def _no_real_comfy_copy(tmp_path, monkeypatch):
+    """Su questo PC la copia Comfy-Org c'e davvero: i test dei pesi di Meta non devono vederla."""
+    monkeypatch.setattr(S, "comfy_dir", lambda: tmp_path / "comfy_assente")
+
+
 def _make(tmp_path, complete=True):
     d = tmp_path / "sam3.1"
     d.mkdir()

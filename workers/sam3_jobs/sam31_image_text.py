@@ -12,6 +12,9 @@ import json
 import os
 import sys
 
+if any(a == "cpu" for a in sys.argv[1:]) and "--device" in sys.argv:        # --device cpu: nessuna GPU, nemmeno un contesto CUDA
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 DEFAULT_CKPT = r"E:\AI\Models\Segmentation\sam3.1\sam3.1_multiplex.pt"
 
 
@@ -24,6 +27,66 @@ def load_state(path):
         return {k: (v.float() if v.is_floating_point() else v) for k, v in sd.items()}
     ck = torch.load(path, map_location="cpu", weights_only=True)
     return ck["model"] if isinstance(ck.get("model"), dict) else ck
+
+
+def patch_fp32_cpu():
+    """Su CPU il codice di Meta forza matmul bfloat16 (perflib.fused.addmm_act: kernel pensati per GPU, sotto autocast bf16) e con pesi float32 va in errore di dtype.
+    Qui si sostituisce SOLO quella funzione con la versione float32 equivalente (linear + attivazione): stessi numeri, niente bf16 lento sulla CPU."""
+    import sys
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
+    def addmm_act(activation, linear, mat1):
+        y = linear(mat1)
+        if isinstance(activation, type) and issubclass(activation, nn.Module):
+            return activation()(y)
+        if activation is F.relu:
+            return F.relu(y)
+        if activation is F.gelu:
+            return F.gelu(y)
+        raise ValueError(f"Unexpected activation {activation}")
+    n = 0
+    for name, mod in list(sys.modules.items()):
+        if name.startswith("sam3") and getattr(mod, "addmm_act", None) is not None:
+            mod.addmm_act = addmm_act
+            n += 1
+    # Il codice di Meta scrive device="cuda" fisso in molti punti (decoder, posizioni, ecc.): in modalita CPU ogni richiesta di device cuda diventa cpu.
+    def _cpu_kw(fn):
+        def w(*a, **k):
+            d = k.get("device")
+            if d is not None and str(d).startswith("cuda"):
+                k["device"] = "cpu"
+            if k.get("dtype") in (torch.bfloat16, torch.float16):          # CPU: tutto in float32 (il codice di Meta presume l'autocast bf16 della GPU)
+                k["dtype"] = torch.float32
+            return fn(*a, **k)
+        return w
+    for nm in ("arange", "zeros", "ones", "empty", "full", "tensor", "as_tensor", "linspace", "rand", "randn", "zeros_like", "ones_like", "eye", "randperm", "empty_like"):
+        if hasattr(torch, nm):
+            setattr(torch, nm, _cpu_kw(getattr(torch, nm)))
+    import types
+    torch.cuda.get_device_properties = lambda *a, **k: types.SimpleNamespace(major=0, minor=0, name="cpu", total_memory=0, multi_processor_count=1)   # lettura al momento dell'import
+    torch.Tensor.cuda = lambda self, *a, **k: self
+    torch.Tensor.pin_memory = lambda self, *a, **k: self
+    torch.Tensor.bfloat16 = lambda self, *a, **k: self.float()
+    torch.Tensor.half = lambda self, *a, **k: self.float()
+    nn.Module.cuda = lambda self, *a, **k: self
+    _to = torch.Tensor.to
+
+    def _tensor_to(self, *a, **k):
+        a = tuple("cpu" if isinstance(x, (str, torch.device)) and str(x).startswith("cuda") else (torch.float32 if isinstance(x, torch.dtype) and x in (torch.bfloat16, torch.float16) else x) for x in a)
+        if k.get("dtype") in (torch.bfloat16, torch.float16):
+            k["dtype"] = torch.float32
+        if str(k.get("device", "")).startswith("cuda"):
+            k["device"] = "cpu"
+        return _to(self, *a, **k)
+    torch.Tensor.to = _tensor_to
+    # La cache delle posizioni del builder viene precalcolata con device="cuda" scritto fisso (position_encoding.py:55): su CPU si rimanda al primo uso.
+    import sam3.model_builder as mb
+    from sam3.model.position_encoding import PositionEmbeddingSine
+    mb._create_position_encoding = lambda precompute_resolution=None: PositionEmbeddingSine(num_pos_feats=256, normalize=True, scale=None, temperature=10000,
+                                                                                            precompute_resolution=None)
+    return n
 
 
 def main():
@@ -41,11 +104,13 @@ def main():
     from sam3.model.sam3_image_processor import Sam3Processor
     from sam3.model_builder import build_sam3_image_model
     dev = a.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    if dev == "cpu":
+        print(f"[sam31] CPU: addmm_act float32 in {patch_fp32_cpu()} moduli", file=sys.stderr, flush=True)
     model = build_sam3_image_model(device="cpu", eval_mode=True, checkpoint_path=None, load_from_HF=False)
     sd = load_state(a.checkpoint)
     det = {k[len("detector."):]: v for k, v in sd.items() if k.startswith("detector.")}
     missing, unexpected = model.load_state_dict(det, strict=False)
-    print(f"[sam31] checkpoint {os.path.basename(a.checkpoint)}: {len(det)} chiavi detector, mancanti {len(missing)}, in piu {len(unexpected)}", file=sys.stderr, flush=True)
+    print(f"[sam31] checkpoint {os.path.basename(a.checkpoint)}: {len(det)} chiavi detector, mancanti {len(missing)} {list(missing)[:6]}, in piu {len(unexpected)}", file=sys.stderr, flush=True)
     del sd, det
     if dev.startswith("cuda"):
         model = model.cuda()
