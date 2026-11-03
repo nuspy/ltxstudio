@@ -526,6 +526,8 @@ def run(p: dict) -> str:
     cfgdir = Path(W["configs"])
     wf = "ref2va" if mode == "ref2va" else ("fl2va" if (p.get("image_path") or p.get("last_image_path")) else "t2va")
     blocks = MiniMaxH3Blocks().get_workflow(wf)
+    edit = p.get("_h3_edit")                                     # edit con maschera a clip (workers/h3_edit_run.py): lunghezza e tela le decide lui
+    guide = _guide_setup(p, edit)                                # None senza guida: tutto quel che segue e come sempre
     guide_only = bool(guide) and not p.get("references")           # solo guida (LMS, VFX Edit, Style Transfer a parole): niente riferimenti nativi
     blocks_text = MiniMaxH3Blocks().get_workflow("t2va") if guide_only else blocks
     if guide or p.get("h3_ref_clock_align"):
@@ -540,9 +542,7 @@ def run(p: dict) -> str:
     g_den = [n for n in names if n.startswith("denoise")]
     g_dec = [n for n in names if n.startswith("decode")]
 
-    # ingressi della richiesta
-    edit = p.get("_h3_edit")                                     # edit con maschera a clip (workers/h3_edit_run.py): lunghezza e tela le decide lui
-    guide = _guide_setup(p, edit)                                # None senza guida: tutto quel che segue e come sempre
+    # ingressi della richiesta (edit e guida sono definiti piu sopra: servono gia alla scelta dei blocchi)
     frames = (int(edit["frames"]) if edit else
               (guide["frames"] if guide and guide["frames"] else S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))))
     kw = {"prompt": build_prompt(p, S.frames_seconds(frames)), "num_frames": frames}
