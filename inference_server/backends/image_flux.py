@@ -1450,9 +1450,21 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     print(f"[image] modello richiesto: '{_model_raw}' → '{model_path}' "
           f"(file={Path(model_path).is_file()}, arch={arch})", flush=True)
     # AUTO-DEQUANT: se è un checkpoint quantizzato ComfyUI (comfy_quant), convertilo in bf16 (cache).
+    # Un Klein fp8 SCALATO (realDream_klein9B) NON si dequantizza: il loader Klein lo carica diretto in Fp8Linear (~9 GB, blockswap) e il forward e uguale bit per
+    # bit alla cache bf16; la cache da 18 GB portava il pipeline a 33 GB, piano «offload» e 60 GB di processo (giro A3 del 03/11). NATIVE_KLEIN_SCALED_FP8=0 = come prima.
+    _skip_dq = False
+    try:
+        if os.environ.get("NATIVE_KLEIN_SCALED_FP8", "1") == "1" and str(arch).startswith("flux2"):
+            from inference_server.backends.flux2_transformer import is_scaled_fp8_klein
+            _skip_dq = is_scaled_fp8_klein(model_path)
+            if _skip_dq:
+                print("[flux2] Klein fp8 scalato: caricato DIRETTO (Fp8Linear + weight_scale), niente dequantizzazione in bf16", flush=True)
+    except Exception:                                       # noqa: BLE001
+        _skip_dq = False
     try:
         from core.dequant_comfy import ensure_dequantized
-        model_path = ensure_dequantized(model_path)
+        if not _skip_dq:
+            model_path = ensure_dequantized(model_path)
     except Exception:                                       # noqa: BLE001
         pass
     # GUARD FAMIGLIA: se l'arch (dal detector/GUI) contraddice i CANALI REALI del checkpoint, correggila —
