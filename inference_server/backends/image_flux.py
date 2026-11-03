@@ -355,7 +355,12 @@ def _place_flux2_blockswap(pipe) -> str:
     te = getattr(pipe, "text_encoder", None)
     if te is not None:
         try:
-            enable_blockswap(te, dev)
+            _on_gpu = next(te.parameters()).device.type == "cuda"        # encoder gia caricato su GPU (carico diretto): resta li, niente blockswap
+        except StopIteration:
+            _on_gpu = False
+        try:
+            if not _on_gpu:
+                enable_blockswap(te, dev)
         except Exception:                                   # noqa: BLE001
             te.to(dev)
     try:
@@ -1055,7 +1060,19 @@ def _assemble_flux2_klein(Pipe, transformer_path: str, te_dir: str | None = None
     vae = vae.to(bf16)
     # Qwen3 (Qwen3ForCausalLM): la pipeline Klein chiama text_encoder(..., output_hidden_states=True) e
     # concatena i layer [9,18,27]. Caricato in bf16 dai pesi locali (no repo runtime, no ComfyUI).
-    te = AutoModelForCausalLM.from_pretrained(qdir, torch_dtype=bf16)
+    # Encoder Qwen3 DIRETTO su GPU quando la VRAM libera basta (16,4 GB bf16 per l'8B + margine): senza, il processo teneva ~60 GB di commit (giro A2 del
+    # 03/11, Klein 9B realDream: 28 GB di pipeline su CPU + la memoria liberata ma ancora committata dopo lo spostamento + CUDA). Spento con
+    # NATIVE_KLEIN_TE_DIRECT=0; senza CUDA o con poca VRAM resta il percorso di prima (CPU + blockswap).
+    _te_kw = {}
+    try:
+        if os.environ.get("NATIVE_KLEIN_TE_DIRECT", "1") == "1" and torch.cuda.is_available():
+            _need = sum(os.path.getsize(os.path.join(qdir, f)) for f in os.listdir(qdir) if f.endswith(".safetensors"))
+            if torch.cuda.mem_get_info()[0] >= _need + 8 * 2**30:
+                _te_kw = {"device_map": "cuda"}
+                print(f"[flux2] encoder Qwen3 caricato DIRETTO su GPU ({_need / 2**30:.1f} GB, niente copia su CPU)", flush=True)
+    except Exception:                                   # noqa: BLE001
+        _te_kw = {}
+    te = AutoModelForCausalLM.from_pretrained(qdir, torch_dtype=bf16, **_te_kw)
     tok = AutoTokenizer.from_pretrained(qdir)
     try:
         sched = FlowMatchEulerDiscreteScheduler.from_pretrained(os.path.join(FLUX2_DIR, "scheduler"))
