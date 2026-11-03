@@ -32,7 +32,8 @@ _KEEP = ("module", "arch", "task", "model", "model_gguf", "krea2_variant", "krea
          "ltx_release", "video_arch", "loras", "lora", "prompt", "negative", "seed", "steps", "guidance", "cfg",
          "width", "height", "length", "fps", "strength", "denoise", "init_image", "image_path", "mask", "mask_path",
          "ref_images", "control_image", "control_type", "outpaint", "output", "native_audio", "h3_dit", "h3_profile",
-         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes")
+         "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes",
+         "mask_ref", "padding_mask_crop", "msr_strength", "msr_apply_lora", "msr_spacing", "control_strength", "msr_frames", "feather")
 
 
 def _safe(v, depth=0):
@@ -278,6 +279,7 @@ class Driver:
         self.rec = Recorder()
         self.sampler = Sampler()
         self.dry = False
+        self.inject = None
         self._dry_png = None
         drv = self
 
@@ -340,6 +342,13 @@ class Driver:
 
         def enqueue(q, label, worker, on_done=None, on_progress=None):
             params = getattr(worker, "params", None) or getattr(worker, "cfg", None)      # _VideoEditAIWorker tiene la config in .cfg
+            _inj = getattr(drv, "inject", None)
+            if _inj and isinstance(params, dict):
+                # PARAMETRI SPERIMENTALI del caso (`"inject"`): non hanno ancora un comando in GUI (per esempio padding_mask_crop dell'inpaint FLUX base,
+                # msr_strength / msr_apply_lora dei video MSR). Si aggiungono ai parametri GIA costruiti dalla GUI e si registrano; il resto del caso
+                # (modello, maschera, prompt, seed) resta quello dei widget veri e la verifica widget -> backend vale come sempre.
+                params.update(_inj)
+                rec.call("inject", params=_safe(_inj))
             jid = rec.new_job()
             rec.call("queue", job=jid, label=str(label), worker=type(worker).__name__, module=getattr(worker, "module", None),
                      params=main_params(params) if isinstance(params, dict) else {})
@@ -505,6 +514,7 @@ class Driver:
     def run_case(self, case: dict) -> dict:
         t0 = time.time()
         self.rec.reset()
+        self.inject = dict(case.get("inject") or {}) or None
         self.dry = bool(case.get("dry"))
         res = {"id": case.get("id"), "fn": case.get("fn"), "dry": self.dry, "esito": "errore", "motivo": ""}
         self.sampler.begin()
@@ -564,7 +574,7 @@ class Driver:
         _exp = getattr(self.w, "_last_integrate_export", None)                # Integra: maschera di POSIZIONE e di CONTESTO dello stesso caso
         if isinstance(_exp, dict) and case.get("kind") == "integrate" and _exp.get("position_mask"):
             res["maschere"] = {"posizione": cp(_exp["position_mask"], "posizione"), "contesto": cp(_exp.get("mask"), "contesto"),
-                               "context_px": _exp.get("context_px", 0)}
+                               "composito": cp(_exp.get("image"), "composito"), "context_px": _exp.get("context_px", 0)}
         for c in self.rec.calls:
             pr = c.get("params")
             if not isinstance(pr, dict):
@@ -968,6 +978,8 @@ class Driver:
                     steps["lora"] = select_combo(f.inp_lora, case["lora"])
             else:
                 cv.integrate_regenerate = bool(case.get("regenera"))       # prova «rigenera» (scena senza foto + soggetto come riferimento)
+                cv.integrate_approach = str(case.get("approach") or "")      # prove 03/11: armonizza / klein_ref_inpaint / klein_armonizza / kontext_stitch
+                cv.integrate_strength = float(case["approach_strength"]) if case.get("approach_strength") is not None else None
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
                     steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])

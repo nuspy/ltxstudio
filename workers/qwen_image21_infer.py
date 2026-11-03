@@ -324,11 +324,15 @@ def run(p: dict) -> str:
     init_img = _outpaint_init(init_img, mask_path, p)
     images = [Image.open(x) for x in refs]
     prompt = str(p.get("prompt") or "")
-    if init_img is not None and mask_path:
+    if init_img is not None and mask_path and p.get("mask_ref", True):
         # inpaint: l'originale annotato in rosso è il riferimento 1 (il modello capisce COSA cambiare)
         # e fuori dalla maschera i latenti restano quelli dell'originale (DOVE cambiare lo decide la maschera)
         images = [_annotate(init_img, mask_path)] + images
         prompt = f"{prompt} {MASK_HINT}"
+    # `mask_ref: false` (PROVA Integra 03/11, default = comportamento di sempre): niente originale annotato come riferimento. Con l'originale
+    # (il composito con la persona incollata) tra i riferimenti il modello di edit lo RICOPIA — dentro la maschera i latenti partono da rumore,
+    # ma il riferimento 1 mostra gia la persona: esce identica con le sole tonalita cambiate (correlazione dei dettagli fini 0.86-0.95).
+    # Senza riferimento la zona e generativa: `strength` < 1 la ridisegna partendo dai pixel dell'originale rumorati.
     images = images[:MAX_REFS]
     pe = pe_kind(p)
     if pe and prompt.strip():

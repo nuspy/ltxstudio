@@ -1454,6 +1454,13 @@ class MaskCanvas(QWidget):
     # export_integrate scrive anche la SCENA SENZA le foto (`base`) e i soggetti scontornati su fondo neutro (`layer_refs`): il modello li usa come
     # riferimenti e RIDISEGNA la persona nella zona della maschera. Parametro interno dei casi di prova (`_rigenera`), non ancora un comando in GUI.
     integrate_regenerate: bool = False
+    # PROVE Integra (03/11): approccio alternativo al «composito come riferimento» (che gli edit model ricopiano). "" = comportamento di sempre.
+    # qwen: "armonizza" (nessun riferimento, rielaborazione parziale del composito dentro la maschera) · flux2: "klein_ref_inpaint" (scena + soggetto
+    # come image_reference del Klein inpaint) / "klein_armonizza" (composito, strength esplicita) · kontext: "kontext_stitch" (scena | soggetto affiancati,
+    # edit per istruzione senza maschera). `integrate_strength` = forza/denoise dell'approccio (None = predefinito dell'approccio). Non sono ancora comandi
+    # in GUI: diventano comandi solo dopo l'ok dell'utente sulle misure (DECISIONE RICHIESTA).
+    integrate_approach: str = ""
+    integrate_strength: float | None = None
 
     @staticmethod
     def _dilate_alpha(img: QImage, px: int) -> QImage:

@@ -2945,6 +2945,9 @@ class MainWindow(QMainWindow):
             negative = cfg.get("integrate_negative") or ""
             aux = cfg.get("integrate_puzzle_lora") or None    # puzzle_lora opzionale (solo Kontext)
             guidance = cfg.get("integrate_guidance", 2.5)
+            _appr = getattr(self.frame1_tab.canvas, "integrate_approach", "") or ""
+            if _appr and self._start_integrate_approach(_appr, engine, exp, cfg, ptxt, model, negative, seed, steps, guidance):
+                return
             if engine == "qwen_image21" and getattr(self.frame1_tab.canvas, "integrate_regenerate", False) and exp.get("base") and exp.get("layer_refs"):
                 # RIGENERA (prova): scena senza foto + maschera + soggetto come riferimento: il modello ridisegna la persona nella zona, non la ricopia
                 _n = len(exp["layer_refs"])
@@ -3038,6 +3041,67 @@ class MainWindow(QMainWindow):
             self._log(f"Integrazione {engine}: inviata (steps={steps}, seed={seed}, puzzle_lora={'sì' if aux else 'no'}).")
         except Exception as e:
             QMessageBox.critical(self, tr("mw.integrate_error_title"), str(e)); self._log(f"[ERR] integrate: {e}")
+
+    def _start_integrate_approach(self, appr, engine, exp, cfg, ptxt, model, negative, seed, steps, guidance) -> bool:
+        """PROVE Integra (03/11): approcci alternativi al «composito come riferimento», che gli edit model ricopiano (la persona esce incollata, con
+        le sole tonalita cambiate; misurato: correlazione dei dettagli fini 0.86-0.95 per Qwen, 0.97 per Klein). Ritorna True se ha avviato il job.
+        Il valore di `canvas.integrate_approach` arriva dai casi di prova; il predefinito dell'app NON cambia finche l'utente non decide."""
+        import os
+        cv = self.frame1_tab.canvas
+        S = getattr(cv, "integrate_strength", None)
+        where = "in the middle"
+        try:
+            from PIL import Image as _PI
+            import numpy as _np
+            _pm = _np.asarray(_PI.open(exp["position_mask"]).convert("L")) > 127
+            _xs = _np.where(_pm.any(0))[0]
+            _cx = float(_xs.mean()) / _pm.shape[1] if len(_xs) else 0.5
+            where = "on the left side" if _cx < 0.4 else ("on the right side" if _cx > 0.6 else "in the middle")
+        except Exception:                                      # noqa: BLE001
+            pass
+        if engine == "qwen_image21" and appr == "armonizza" and exp.get("mask"):
+            # nessun riferimento (mask_ref=False): la zona (sagoma + contesto) e GENERATIVA, riparte dai pixel del composito rumorati al livello `strength`
+            self._start_native_qwen21_edit(
+                cfg.get("integrate_qwen21_dit"), ptxt or self._QWEN21_INTEGRATE_PROMPT, init_image=exp["image"], mask=exp["mask"],
+                strength=float(S if S is not None else 0.55), refs=[], negative=negative, seed=seed, mode="integrazione",
+                label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"), enhance=False, extra={"mask_ref": False})
+            return True
+        if engine == "flux2" and appr in ("klein_ref_inpaint", "klein_armonizza") and exp.get("mask") and model:
+            mp = model if os.path.isabs(model) else os.path.join(r"E:\AI\Models\diffusion_models", model)
+            ref_mode = bool(appr == "klein_ref_inpaint" and exp.get("base") and exp.get("layer_refs"))
+            prompt = ptxt or "blend the person into the scene"
+            if ref_mode:
+                prompt = (f"The person from the reference image, standing {where} of the scene, as a real part of it: match the perspective, scale, lighting "
+                          "and colour grading, add contact shadows, let the foreground objects overlap her where they should, keep her face, hair and clothes "
+                          "identical to the reference. " + prompt)
+            params = {"model": mp, "arch": "flux2_inpaint", "prompt": prompt, "negative": negative or "",
+                      "image_path": exp["base"] if ref_mode else exp["image"], "mask_path": exp["mask"],
+                      "steps": max(int(steps or 0), 12), "guidance": max(3.5, float(guidance or 0)), "seed": seed,
+                      "denoise": 1.0, "feather": 48, "strength": float(S if S is not None else (1.0 if ref_mode else 0.55))}
+            if ref_mode:
+                params["ref_images"] = list(exp["layer_refs"][:1])
+            self._log(f"Integra {appr} (Klein inpaint, strength={params['strength']:.2f}, rif.={len(params.get('ref_images') or [])}) inviato...")
+            self._inpaint_mode = "integrazione"
+            self._native_worker = _NativeImageWorker(params)
+            self._start_native_preview(tr("progress.preview_title", "Anteprima generazione"))
+            self._enqueue(tr("queue.job.integrate", "Image to Image (Kontext)"), self._native_worker, self._on_native_inpaint_done)
+            return True
+        if engine == "kontext" and appr == "kontext_stitch" and exp.get("base") and exp.get("layer_refs"):
+            # Kontext vede UNA immagine: scena | soggetto affiancati, edit per istruzione senza maschera (come «Componi» con Kontext, che l'utente ha promosso)
+            from PIL import Image as _PI
+            a, b = _PI.open(exp["base"]).convert("RGB"), _PI.open(exp["layer_refs"][0]).convert("RGB")
+            b = b.resize((max(1, int(b.width * a.height / b.height)), a.height))
+            strip = _PI.new("RGB", (a.width + b.width, a.height), (255, 255, 255))
+            strip.paste(a, (0, 0)); strip.paste(b, (a.width, 0))
+            cpath = os.path.join(OUTPUT_DIR, "integrate_stitch.png"); strip.save(cpath)
+            kp = ("The image is a strip of 2 pictures side by side. Create ONE single new image, not a strip: the scene of the first picture, with the person "
+                  f"shown in the second picture added {where} of it, as a real part of the scene: same face, hair and clothes as in the second picture, "
+                  "matching perspective, scale, lighting and colour grading, with contact shadows. Do not change anything else. " + (ptxt or ""))
+            self._inpaint_before = exp.get("base")
+            self._start_native_kontext({"image": cpath}, model, kp.strip(), "", steps or 28, seed, max(2.5, float(guidance or 0)),
+                                       target_wh={"width": a.width, "height": a.height})
+            return True
+        return False
 
     def _layers_from_compose_list(self) -> int:
         """Porta sul canvas le foto elencate nella lista laterale, con la loro maschera.

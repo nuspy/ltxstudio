@@ -2491,6 +2491,13 @@ def run_generation(p: dict) -> str:
                 width=_mw, height=_mh, frame_count=_mf, fps=int(p.get("fps", 24)))
             p["control_video"] = _msr_guide
             p.setdefault("control_strength", 1.0)            # la guida MSR va seguita, non suggerita
+        elif _msr_strategy == "slot_embedding" and p.get("msr_apply_lora", True):
+            # 2.5: la LoRA MSR porta 480 coppie lora_A/lora_B per il DiT (oltre ai 5 tensori degli slot): senza i suoi PESI applicati il modello non e
+            # addestrato a leggere i riferimenti a frame negativi e li ignora (03/11: video MSR 2.5 senza ragazza ne astronauta; `loras` era []).
+            # Il plugin ComfyUI-LTX2.5-MSR la carica come LoRA normale. I tensori `reference_slot_embedding.*` il caricatore li ignora (cerca solo
+            # lora_A/lora_B). `msr_apply_lora: false` = comportamento di prima (per il confronto).
+            loras = list(loras) + [LoraPathStrengthAndSDOps(p["msr_lora"], float(p.get("msr_strength", 1.0)), LTXV_LORA_COMFY_RENAMING_MAP)]
+            print(f"[msr] LoRA {os.path.basename(p['msr_lora'])} applicata al DiT (forza {float(p.get('msr_strength', 1.0)):.2f}) + slot embedding", flush=True)
     ckpt = _resolve_ckpt(p.get("model"))
     _bn = os.path.basename(ckpt).lower()
     if p.get("quant"):
