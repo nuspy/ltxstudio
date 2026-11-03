@@ -664,6 +664,45 @@ def _flux_cfg_no_guidance(cfg_dir: str) -> str:
     return dst
 
 
+_FP8_BF16_PATTERNS = ("pos_embed", "patch_embed", "norm", "^proj_in$", "^proj_out$")      # = DEFAULT_SKIP_MODULES_PATTERN di diffusers layerwise casting
+
+
+def _load_flux_tr_fp8_direct(path: str, cfg_dir: str):
+    """FLUX.1 con checkpoint nativo F8_E4M3 (getphat...): carica i pesi in fp8 TENSORE PER TENSORE su un modello 'meta' (assign), SENZA la copia bf16
+    intera in RAM. Prima: from_single_file(torch_dtype=bf16) -> ~24 GB bf16 + 12 GB fp8 + file = picco di processo 58-64 GB (giro A del 03/11, il
+    guardiano commit uccideva l'app a 14-15 GB liberi). Ora: ~12 GB fp8 (+ i soli tensori qkv fusi mentre il convertitore consuma gli originali).
+    Pesi IDENTICI al vecchio percorso: E4M3 senza scala -> bf16 -> fp8 e' lossless; i moduli che il layerwise casting salta (norme, embedder,
+    proj_in/out: stessi pattern di diffusers) restano bf16 come oggi. Solleva se qualcosa non torna: il chiamante ripiega sul percorso di prima."""
+    import re
+    import torch
+    from accelerate import init_empty_weights
+    from diffusers import FluxTransformer2DModel
+    from diffusers.loaders.single_file_utils import convert_flux_transformer_checkpoint_to_diffusers
+    from safetensors import safe_open
+    cfg = FluxTransformer2DModel.load_config(cfg_dir)
+    with init_empty_weights():
+        model = FluxTransformer2DModel.from_config(cfg)
+    ck: dict = {}
+    with safe_open(path, framework="pt") as h:
+        for k in h.keys():
+            ck[k] = h.get_tensor(k)                                   # fp8 com'e': nessun upcast
+    sd = convert_flux_transformer_checkpoint_to_diffusers(ck, **{})   # consuma `ck` (pop) -> nomi diffusers, ancora fp8
+    del ck
+    skip = tuple(_FP8_BF16_PATTERNS) + tuple(getattr(FluxTransformer2DModel, "_skip_layerwise_casting_patterns", None) or ())
+    for k in list(sd):
+        prefix = k.rsplit(".", 1)[0]
+        if any(re.search(pat, prefix) for pat in skip) and sd[k].dtype != torch.bfloat16:
+            sd[k] = sd[k].to(torch.bfloat16)
+    res = model.load_state_dict(sd, strict=False, assign=True)
+    del sd
+    meta = [n for n, p in list(model.named_parameters()) + list(model.named_buffers()) if p.is_meta]
+    if meta or res.unexpected_keys:
+        raise RuntimeError(f"caricamento fp8 diretto incompleto: {len(meta)} tensori su meta (es. {meta[:2]}), {len(res.unexpected_keys)} chiavi extra "
+                           f"(es. {list(res.unexpected_keys)[:2]})")
+    model.eval()
+    return model
+
+
 def _load_flux_tr(transformer_path: str, arch: str = "flux"):
     """Carica il SOLO transformer FLUX.1 da single file (config locale per canali reali, GGUF-aware).
     Estratto da _assemble_flux: riusato dal ComponentStore (chiave per-file) e dal ramo fp8.
@@ -715,7 +754,19 @@ def _load_flux_tr(transformer_path: str, arch: str = "flux"):
                       f"(libera {_free//2**20}MB ≥ ~{int(_bf16_need*1.1)//2**20}MB) → niente staging RAM", flush=True)
         except Exception as _de:                                                # noqa: BLE001
             print(f"[flux] stima direct-to-VRAM saltata ({_de}) → path CPU", flush=True)
-    tr = _from_single_file_robust(FluxTransformer2DModel, transformer_path, _sf_kw)
+    tr = None
+    if (os.environ.get("NATIVE_FLUX_FP8_DIRECT", "1") == "1" and os.environ.get("NATIVE_FLUX1_FP8", "1") == "1" and not _is_gguf
+            and os.path.isdir(_tr_cfg) and _flux_fp8_e4m3(transformer_path)):
+        try:
+            tr = _load_flux_tr_fp8_direct(transformer_path, _tr_cfg)
+            print(f"[flux] {os.path.basename(transformer_path)}: caricato in fp8 DIRETTO (meta+assign, niente copia bf16 in RAM)", flush=True)
+        except Exception as _fe:                         # noqa: BLE001
+            print(f"[flux] fp8 diretto non riuscito ({type(_fe).__name__}: {str(_fe)[:200]}) -> percorso di prima (bf16 poi fp8)", flush=True)
+            tr = None
+            import gc as _gc
+            _gc.collect()
+    if tr is None:
+        tr = _from_single_file_robust(FluxTransformer2DModel, transformer_path, _sf_kw)
     if _is_gguf:
         tr._ls_is_gguf = True    # il GGUF NON tollera model_cpu_offload (pesi quantizzati→CPU = calcolo su CPU,
         #                          166s/step): _place lo terrà SEMPRE gpu-resident (vedi _place).
@@ -1251,7 +1302,34 @@ def _predicted_load_mb(model_path: str, arch: str) -> float:
     return sz
 
 
-def _guard_load(model_path: str, arch: str) -> None:
+def _free_parked_pipelines(mm) -> float:
+    """Distrugge le pipeline MONOLITICHE parcheggiate in RAM da `mm` (`_cpu_cache`: Klein/Z-Image/Ernie... scaricate dalla VRAM con demote). Non sono nello
+    STORE, quindi `STORE.free_cpu_mb` non le vede: nel giro A del 03/11 una Klein 8B parcheggiata (~26 GB: transformer + Qwen3-8B) si sommava al load
+    della Klein 9B seguente (altri ~26 GB + transitorio) = 59 GB di processo e il guardiano a 18,6 GB di commit libero. Tornano dal disco al prossimo uso."""
+    cache = getattr(mm, "_cpu_cache", None)
+    if not cache:
+        return 0.0
+    freed = 0.0
+    for k in list(cache):
+        e = cache.pop(k, None)
+        if e is None:
+            continue
+        freed += float(getattr(e, "vram_mb", 0) or 0)
+        try:
+            del e.obj
+        except Exception:                                   # noqa: BLE001
+            pass
+        del e
+    import gc
+    gc.collect()
+    try:
+        mm.flush()
+    except Exception:                                       # noqa: BLE001
+        pass
+    return freed
+
+
+def _guard_load(model_path: str, arch: str, mm=None) -> None:
     """Prima di OGNI assemblaggio/caricamento: commit libero − carico previsto < pavimento (core/mem_budget) →
     prima si libera la cache CPU dei modelli PARCHEGGIATI (LRU), solo se non basta errore chiaro (`LoadRefused`)
     invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
@@ -1268,12 +1346,17 @@ def _guard_load(model_path: str, arch: str) -> None:
                 print(f"[mem] carico grosso (~{need / 1024:.0f} GB): liberati {freed / 1024:.1f} GB di modelli parcheggiati in RAM", flush=True)
         except Exception:                                   # noqa: BLE001
             pass
+        _pf = _free_parked_pipelines(mm)
+        if _pf > 0:
+            print(f"[mem] carico grosso (~{need / 1024:.0f} GB): liberate anche le pipeline monolitiche parcheggiate ({_pf / 1024:.1f} GB)", flush=True)
     if need > 0:
         deficit = need + mem_budget.commit_floor_mb() + 8192.0 - mem_budget.avail_commit_mb()   # 8GB di margine per i transitori
         if deficit > 0:
             try:
                 from inference_server.component_store import STORE
                 freed = STORE.free_cpu_mb(deficit)          # i parcheggiati si ricaricano dal disco: meglio di un crash
+                if freed < deficit:
+                    freed += _free_parked_pipelines(mm)
                 print(f"[mem] commit scarso: liberati {freed / 1024:.1f} GB di modelli parcheggiati in RAM (servivano {deficit / 1024:.1f} GB)", flush=True)
             except Exception:                               # noqa: BLE001
                 pass
@@ -1483,7 +1566,7 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     _src = None
     _destroy_same_ident(mm, _ident)
     if is_file:
-        _guard_load(model_path, arch)                        # commit libero − carico < pavimento → errore chiaro
+        _guard_load(model_path, arch, mm)                    # commit libero − carico < pavimento → errore chiaro
     if arch == "ernie":
         pipe = _assemble_ernie(model_path if (is_file and str(model_path).lower().endswith(".safetensors")) else None)
         # assemblaggio locale (shim transformers <5); il PE (6.4GB) NON entra qui: ernie_pe lo carica solo su «Migliora prompt»
