@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Vezetés: csak a személy semleges háttéren (háttércsere)",
+  "vedit.h3.guide_person.tt": "Háttércserénél a vezetés csak a személyt (lágy szél) viszi szürkén, a régi hátteret nem: a modell a személy IDŐZÍTÉSÉT másolja a háttér másolása nélkül. A vezetést is bekapcsolja. Kikapcsolva = vezetés a teljes klippel.",
+  "vedit.h3.ref_clock": "Igazított referenciaóra (kísérleti)",
+  "vedit.h3.ref_clock.tt": "A <Video 1> referenciavideó a helyén marad a sorozatban, de belső ideje megegyezik a generált videóéval: minden képkockájának az eredmény megfelelő képkockájának ideje van. LoRA nem kell. Kikapcsolva = a megszokott módon."
 }

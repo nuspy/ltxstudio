@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "الدليل: الشخص فقط على خلفية محايدة (تغيير الخلفية)",
+  "vedit.h3.guide_person.tt": "في تغيير الخلفية يحمل الدليل الشخص فقط (حافة ناعمة) على الرمادي لا الخلفية القديمة: ينسخ النموذج توقيت الشخص دون نسخ الخلفية. يفعّل الدليل أيضًا. إيقاف = دليل بالمقطع كاملًا.",
+  "vedit.h3.ref_clock": "ساعة المرجع المحاذية (تجريبي)",
+  "vedit.h3.ref_clock.tt": "يبقى فيديو المرجع <Video 1> في مكانه ضمن التسلسل لكن زمنه الداخلي هو زمن الفيديو المولَّد: لكل إطار منه زمن الإطار المقابل في النتيجة. لا حاجة إلى LoRA. إيقاف = كما كان دائمًا."
 }

@@ -201,7 +201,12 @@ def opts_key(p: dict) -> tuple:
 def guide_key(e: dict) -> tuple:
     """Parte della chiave dei checkpoint dovuta alla guida di latenti allineata (workers/h3_guide.py): VUOTA se l'edit non la usa, cosi i clip gia fatti restano validi."""
     from core import h3_guide as CG
-    return CG.spec_key({"frame_idx": int(e.get("guide_frame_idx") or 0)} if e.get("guide") else None)
+    out = CG.spec_key({"frame_idx": int(e.get("guide_frame_idx") or 0)} if e.get("guide") else None)
+    if e.get("guide") and e.get("guide_mode") == "person" and e.get("action", "change_background") == "change_background":
+        out += (("guide_person_v1",),)                                  # guida = solo la persona su grigio (cambia-sfondo): cambia i clip
+    if e.get("ref_clock_align"):
+        out += (("refclock_v1",),)                                      # orologio del riferimento video allineato a quello del bersaglio: cambia i clip
+    return out
 
 
 def _subprocess_clip_runner(W, job_dir: str, stream_all: bool = False) -> None:
@@ -346,6 +351,14 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 "has_audio": seg is not None, "base": base, "audio_seed": seed0 + 104729 * ci, "noise_seed": seed0 + 7919 * ci}
         if e.get("guide"):                                             # solo se scelta: senza, meta (e quindi la chiave del clip) e quella di sempre
             meta["guide"] = {"frame_idx": int(e.get("guide_frame_idx") or 0)}
+            if invert and e.get("guide_mode") == "person":
+                # guida = SOLO la persona (matte morbido) su grigio neutro: il modello copia il TEMPO e la posa della persona fotogramma per fotogramma senza avere
+                # sotto gli occhi lo sfondo vecchio da ricopiare. Per i frame di contesto vale la persona gia generata (clip_src).
+                meta["guide"]["mode"] = "person"
+                mm = M.gaussian_blur(M.grow_mask(pers[sl].float(), 6)[:, None], 2.0)[:, 0].clamp(0, 1)[..., None]
+                _np.save(jd / "guide_src.npy", ((clip_src.float() / 255.0 * mm + 0.5 * (1 - mm)) * 255).round().to(torch.uint8).numpy())
+        if e.get("ref_clock_align"):                                   # variante sperimentale: SOLO se scelta (altrimenti meta e chiave restano quelle di sempre)
+            meta["ref_clock_align"] = True
         _np.save(jd / "clip_src.npy", clip_src.numpy())
         _np.save(jd / "cells.npy", cells.numpy())
         if seg is not None:
@@ -406,6 +419,9 @@ def generate_clip(job_dir: str, W) -> None:
     Wd = W.resolve({**base, "references": [{"kind": "image"}]})        # solo per i percorsi di VAE/configurazioni (modo ref2va)
     vae = W.load_vae(Wd)
     lat = encode_source_latent(vae, clip_src, _Const)
+    guide_lat = lat
+    if (m.get("guide") or {}).get("mode") == "person":                 # guida = persona su grigio (guide_src.npy), non il clip intero
+        guide_lat = encode_source_latent(vae, torch.from_numpy(_np.load(jd / "guide_src.npy")), _Const)
     W._drop_module_weights(vae); del vae; W._gc()
     T, lh, lw = lat.shape[2], lat.shape[3], lat.shape[4]
     _ensure(tuple(cells.shape[2:]) == (T, lh, lw), f"maschera {tuple(cells.shape[2:])} e latente {(T, lh, lw)} non coincidono")
@@ -443,9 +459,12 @@ def generate_clip(job_dir: str, W) -> None:
     if m.get("guide"):
         # Guida allineata: il clip sorgente (i suoi latenti, GIA calcolati per le righe tenute) entra anche come blocco di condizione sulla griglia del
         # video generato (workers/h3_guide.py). Si aggiunge al riferimento nativo <Video 1>; le LoRA di guida (VFX Edit, Style Transfer...) la vogliono.
-        pc["_h3_guide_latents"] = lat
+        pc["_h3_guide_latents"] = guide_lat
         pc["h3_guide"] = {"frame_idx": int(m["guide"].get("frame_idx") or 0)}
-    W._log(f"clip {ci + 1}/{m['clips']}: {length} frame, contesto {ctx}, tela {tw}x{th}" + (" · guida allineata" if m.get("guide") else ""))
+    if m.get("ref_clock_align"):
+        pc["h3_ref_clock_align"] = True
+    W._log(f"clip {ci + 1}/{m['clips']}: {length} frame, contesto {ctx}, tela {tw}x{th}" + (" · guida allineata" + (" (solo persona)" if (m.get("guide") or {}).get("mode") == "person" else "") if m.get("guide") else "")
+           + (" · orologio del riferimento allineato" if m.get("ref_clock_align") else ""))
     res = W.run(pc)
     gen_f = _to_float_frames(res["videos"][0])
     _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")

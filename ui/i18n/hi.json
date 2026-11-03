@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "गाइड: केवल तटस्थ पृष्ठभूमि पर व्यक्ति (पृष्ठभूमि बदलना)",
+  "vedit.h3.guide_person.tt": "पृष्ठभूमि बदलने में गाइड पुरानी पृष्ठभूमि नहीं, केवल धूसर पर व्यक्ति (मुलायम किनारा) रखता है: मॉडल पृष्ठभूमि की नकल किए बिना व्यक्ति का टाइमिंग कॉपी करता है। गाइड भी चालू होता है। बंद = पूरे क्लिप का गाइड।",
+  "vedit.h3.ref_clock": "संरेखित संदर्भ घड़ी (परीक्षण)",
+  "vedit.h3.ref_clock.tt": "संदर्भ वीडियो <Video 1> अनुक्रम में अपनी जगह रहता है, पर उसका आंतरिक समय जनरेट किए गए वीडियो जैसा है: उसके हर फ़्रेम में परिणाम के संगत फ़्रेम का समय होता है। LoRA ज़रूरी नहीं। बंद = पहले जैसा।"
 }

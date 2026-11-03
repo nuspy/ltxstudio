@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Guía: solo la persona sobre fondo neutro (cambiar fondo)",
+  "vedit.h3.guide_person.tt": "En cambiar fondo la guía lleva solo a la persona (borde suave) sobre gris, no el fondo viejo: el modelo copia el TIEMPO de la persona sin copiar el fondo. También activa la guía. Desactivada = guía con el clip entero.",
+  "vedit.h3.ref_clock": "Reloj de la referencia alineado (prueba)",
+  "vedit.h3.ref_clock.tt": "El vídeo de referencia <Video 1> queda donde está en la secuencia, pero su tiempo interno es el del vídeo generado: cada fotograma suyo tiene el tiempo del fotograma correspondiente del resultado. No hace falta LoRA. Desactivado = como siempre."
 }

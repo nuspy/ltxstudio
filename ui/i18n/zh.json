@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "引导：仅中性背景上的人物（更换背景）",
+  "vedit.h3.guide_person.tt": "更换背景时，引导只包含灰色背景上的人物（柔和边缘），而不是旧背景：模型复制人物的时间节奏而不复制背景。同时开启引导。关闭 = 使用整段视频引导。",
+  "vedit.h3.ref_clock": "对齐参考时钟（试验）",
+  "vedit.h3.ref_clock.tt": "参考视频 <Video 1> 在序列中的位置不变，但其内部时间与生成视频相同：它的每一帧都带有结果中对应帧的时间。无需 LoRA。关闭 = 与以往相同。"
 }

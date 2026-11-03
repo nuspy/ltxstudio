@@ -328,6 +328,10 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
         out_p["h3_edit"]["guide"] = True
         if gi:
             out_p["h3_edit"]["guide_lora"] = gi["id"]
+        if cfg.get("h3_guide_mode") == "person" and act == E.CHANGE_BACKGROUND:      # solo cambia-sfondo: nel sostituisci la persona vecchia e proprio cio che si cambia
+            out_p["h3_edit"]["guide_mode"] = "person"
+    if cfg.get("h3_ref_clock_align"):                            # variante sperimentale: orologio rotary del riferimento video = quello del video generato
+        out_p["h3_edit"]["ref_clock_align"] = True
     return out_p
 
 

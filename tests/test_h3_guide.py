@@ -193,4 +193,29 @@ def test_guide_layout_and_denoise_on_the_real_diffusers_pipeline():
                        env=env, timeout=1200)
     out = (r.stdout or "") + (r.stderr or "")
     assert r.returncode == 0, out[-4000:]
-    assert "verifiche passate: 8" in out
+    assert "verifiche passate: 9" in out
+
+
+# ── varianti sperimentali del 03/11 sera: guida «solo persona» e orologio del riferimento allineato ───────────────────────────────
+def test_person_guide_and_ref_clock_flow_to_params_and_keys(clip):
+    p0 = V.build_params(_cfg(clip), "o.mp4", present=ALL)
+    assert "guide_mode" not in p0["h3_edit"] and "ref_clock_align" not in p0["h3_edit"]                 # default spenti
+    p = V.build_params(_cfg(clip, h3_guide=True, h3_guide_mode="person", h3_ref_clock_align=True), "o.mp4", present=ALL)
+    assert p["h3_edit"]["guide"] is True and p["h3_edit"]["guide_mode"] == "person" and p["h3_edit"]["ref_clock_align"] is True
+    # il sostituisci non usa la guida «solo persona» (la persona vecchia e proprio cio che si cambia)
+    pr = V.build_params(_cfg(clip, mode="replace_char", ref_image=clip, h3_guide=True, h3_guide_mode="person"), "o.mp4", present=ALL)
+    assert pr["h3_edit"]["guide"] is True and "guide_mode" not in pr["h3_edit"]
+    only_clock = V.build_params(_cfg(clip, h3_ref_clock_align=True), "o.mp4", present=ALL)
+    assert "guide" not in only_clock["h3_edit"] and only_clock["h3_edit"]["ref_clock_align"] is True      # l'orologio funziona senza guida
+    import h3_edit_run as ER
+    assert ER.guide_key(p0["h3_edit"]) == ()
+    assert ER.guide_key(only_clock["h3_edit"]) == (("refclock_v1",),)
+    assert ER.guide_key(p["h3_edit"]) == (("guide_v1", 0), ("guide_person_v1",), ("refclock_v1",))
+    assert ER.guide_key({**pr["h3_edit"], "guide_mode": "person"}) == (("guide_v1", 0),)                   # sostituisci: la modalita non conta
+
+
+def test_worker_ref_clock_needs_a_native_video_reference_flag_and_is_off_by_default():
+    src = (ROOT / "workers" / "minimax_h3_infer.py").read_text(encoding="utf-8")
+    assert 'p.get("h3_ref_clock_align")' in src and 'kw["ref_clock_align"] = True' in src
+    edit = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'if e.get("ref_clock_align"):' in edit and 'meta["ref_clock_align"] = True' in edit        # niente in meta senza l'opzione: chiave del clip di sempre

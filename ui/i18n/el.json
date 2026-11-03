@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Οδηγός: μόνο το άτομο σε ουδέτερο φόντο (αλλαγή φόντου)",
+  "vedit.h3.guide_person.tt": "Στην αλλαγή φόντου ο οδηγός φέρει μόνο το άτομο (απαλή άκρη) σε γκρι, όχι το παλιό φόντο: το μοντέλο αντιγράφει τον ΧΡΟΝΙΣΜΟ του ατόμου χωρίς να αντιγράφει το φόντο. Ενεργοποιεί και τον οδηγό. Απενεργοποιημένο = οδηγός με ολόκληρο το κλιπ.",
+  "vedit.h3.ref_clock": "Ευθυγραμμισμένο ρολόι αναφοράς (δοκιμή)",
+  "vedit.h3.ref_clock.tt": "Το βίντεο αναφοράς <Video 1> μένει στη θέση του στην ακολουθία, αλλά ο εσωτερικός του χρόνος είναι ίδιος με του παραγόμενου βίντεο: κάθε καρέ του έχει τον χρόνο του αντίστοιχου καρέ του αποτελέσματος. Δεν χρειάζεται LoRA. Απενεργοποιημένο = όπως πάντα."
 }

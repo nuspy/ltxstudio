@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "מדריך: רק האדם על רקע ניטרלי (החלפת רקע)",
+  "vedit.h3.guide_person.tt": "בהחלפת רקע המדריך נושא רק את האדם (קצה רך) על אפור, לא את הרקע הישן: המודל מעתיק את התזמון של האדם בלי להעתיק את הרקע. מפעיל גם את המדריך. כבוי = מדריך עם כל הקליפ.",
+  "vedit.h3.ref_clock": "שעון ההפניה מיושר (ניסיוני)",
+  "vedit.h3.ref_clock.tt": "סרטון ההפניה <Video 1> נשאר במקומו ברצף, אבל הזמן הפנימי שלו זהה לזה של הסרטון שנוצר: לכל פריים שלו יש הזמן של הפריים המתאים בתוצאה. לא נדרש LoRA. כבוי = כמו תמיד."
 }

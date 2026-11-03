@@ -528,8 +528,11 @@ def run(p: dict) -> str:
     blocks = MiniMaxH3Blocks().get_workflow(wf)
     guide_only = bool(guide) and not p.get("references")           # solo guida (LMS, VFX Edit, Style Transfer a parole): niente riferimenti nativi
     blocks_text = MiniMaxH3Blocks().get_workflow("t2va") if guide_only else blocks
-    if guide:
+    if guide or p.get("h3_ref_clock_align"):
         import h3_guide as HG
+        if p.get("h3_ref_clock_align"):
+            if not p.get("references"):
+                raise RuntimeError("h3_ref_clock_align: serve un riferimento VIDEO nativo (e quello che si allinea)")
         HG.install(blocks)                                         # layout + condizioni del denoise Ref2VA conoscono la guida; senza `guide_latents` restano quelli di diffusers
     names = list(blocks.sub_blocks.keys())
     g_text = [n for n in blocks_text.sub_blocks.keys() if n in ("before_encode", "text_encoder")]
@@ -543,6 +546,8 @@ def run(p: dict) -> str:
     frames = (int(edit["frames"]) if edit else
               (guide["frames"] if guide and guide["frames"] else S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))))
     kw = {"prompt": build_prompt(p, S.frames_seconds(frames)), "num_frames": frames}
+    if p.get("h3_ref_clock_align"):
+        kw["ref_clock_align"] = True                               # orologio rotary del riferimento video = quello del video generato (variante sperimentale)
     if p.get("image_path"):
         kw["image"] = Image.open(p["image_path"]).convert("RGB")
     if p.get("last_image_path"):

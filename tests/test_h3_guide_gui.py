@@ -100,7 +100,8 @@ def test_the_new_texts_exist_in_all_15_languages():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1] / "ui" / "i18n"
     keys = ("vedit.h3.guide", "vedit.h3.guide.tt", "vedit.h3.guide.lora_info", "vedit.h3.guide.lora_info_caption", "vedit.h3.lora.why.tara", "h3.guide.kind.lms",
-            "h3.guide.kind.vfx_edit", "h3.guide.kind.style_transfer", "h3.guide.kind.head_swap", "h3.guide.kind.motion_transfer", "h3.guide.kind.motion_transfer_ffp")
+            "h3.guide.kind.vfx_edit", "h3.guide.kind.style_transfer", "h3.guide.kind.head_swap", "h3.guide.kind.motion_transfer", "h3.guide.kind.motion_transfer_ffp",
+            "vedit.h3.guide_person", "vedit.h3.guide_person.tt", "vedit.h3.ref_clock", "vedit.h3.ref_clock.tt")
     files = sorted(root.glob("*.json"))
     assert len(files) == 15
     for f in files:
@@ -126,3 +127,19 @@ def test_registry_lists_the_guide_loras_in_the_h3_panel_when_the_files_are_on_di
     root = str(mp.models_root())
     for e in ents.values():
         assert (e["filename"] in shown) == bool(wc.is_present(e, root)), e["id"]
+
+
+def test_experimental_checkboxes_are_off_by_default_and_reach_the_cfg(tab):
+    assert not tab.h3_guide_person.isChecked() and not tab.h3_ref_clock.isChecked()
+    assert tab.h3_guide_person.minimumHeight() >= 32 and tab.h3_ref_clock.minimumHeight() >= 32
+    cfg = _go(tab)
+    assert "h3_guide" not in cfg and "h3_guide_mode" not in cfg and "h3_ref_clock_align" not in cfg
+    tab.h3_ref_clock.setChecked(True)
+    cfg = _go(tab)
+    assert cfg["h3_ref_clock_align"] is True and "h3_guide" not in cfg
+    tab.h3_guide_person.setChecked(True)
+    cfg = _go(tab)
+    assert cfg["h3_guide"] is True and cfg["h3_guide_mode"] == "person"
+    from core import video_edit_h3 as vh3
+    p = vh3.build_params(dict(cfg), "o.mp4", present=lambda i: True)
+    assert p["h3_edit"]["guide"] and p["h3_edit"]["guide_mode"] == "person" and p["h3_edit"]["ref_clock_align"]

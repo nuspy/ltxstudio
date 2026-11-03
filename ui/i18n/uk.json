@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Керування: лише людина на нейтральному фоні (зміна фону)",
+  "vedit.h3.guide_person.tt": "Під час зміни фону керування несе лише людину (м'який край) на сірому, а не старий фон: модель копіює ТЕМП людини, не копіюючи фон. Також вмикає керування. Вимкнено = керування цілим кліпом.",
+  "vedit.h3.ref_clock": "Вирівняний годинник референсу (тест)",
+  "vedit.h3.ref_clock.tt": "Референсне відео <Video 1> лишається на своєму місці в послідовності, але його внутрішній час збігається з часом згенерованого відео: кожен його кадр має час відповідного кадру результату. LoRA не потрібна. Вимкнено = як раніше."
 }

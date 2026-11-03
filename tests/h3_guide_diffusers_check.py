@@ -130,7 +130,7 @@ def _tiny_dit():
     return tr, calls
 
 
-def _run_denoise(install: bool, refs, guide=None, frame_idx=0, steps=4, seed=11):
+def _run_denoise(install: bool, refs, guide=None, frame_idx=0, steps=4, seed=11, align=False):
     """Esegue le fasi `denoise.*` del workflow ref2va di diffusers (come fa il worker) e ritorna (latenti, audio, chiamate al DiT)."""
     import minimax_h3_infer as W
     from diffusers import MiniMaxH3Scheduler
@@ -147,6 +147,8 @@ def _run_denoise(install: bool, refs, guide=None, frame_idx=0, steps=4, seed=11)
               condition_latents=[torch.randn(1, 24, *shape) for _, shape in refs], audio_condition_latents=[])
     if guide is not None:
         kw["guide_latents"], kw["guide_frame_idx"] = guide, frame_idx
+    if align:
+        kw["ref_clock_align"] = True
     state = st(**W._inputs_for(st, kw), num_inference_steps=steps + 1, generator=torch.Generator("cpu").manual_seed(seed))
     return state.values["latents"], state.values["audio_latents"], calls, kw
 
@@ -273,6 +275,58 @@ def check_encode_probe_and_audio_helpers():
     ok("ingresso: probe, lettura, codifica = encode_vae_condition di diffusers, audio sorgente rimontato")
 
 
+def check_ref_clock_align():
+    """Orologio del riferimento allineato: le righe del riferimento VIDEO nativo hanno il tempo del passo corrispondente del video generato (h, w del riferimento intatte),
+    immagine/bersaglio/indici invariati; spento = identico a diffusers; nel denoise reale il DiT riceve le nuove coordinate."""
+    B = HG._bd()
+    refs = [("image", (1, 4, 4)), ("video", (6, 4, 6))]
+    lay, T = _base_layout(refs)
+    shapes = [s_ for _, s_ in refs]
+    new = HG.align_ref_clock(lay, [(k, False) for k, _ in refs], shapes, [], T)
+    pos0, pos1 = lay["position_ids"], new["position_ids"]
+    vi = lay["video_indices"]
+    n_img, n_vid = (4 // 2) * (4 // 2), 6 * RPF
+    img, vid = vi[:n_img], vi[n_img:n_img + n_vid]
+    tgt = vi[int(lay["num_condition_video_rows"]):]
+    origin = float(pos0[tgt[0], 0])
+    tg = B._temporal_position_grid(T, origin)
+    assert torch.equal(pos1[vid, 0], tg[:6].repeat_interleave(RPF)), "tempo del riferimento video != tempo del bersaglio dello stesso passo"
+    assert torch.equal(pos1[vid, 0], pos1[tgt[:6 * RPF], 0]), "passo k del riferimento e passo k del bersaglio devono avere lo stesso tempo"
+    assert torch.equal(pos1[vid, 1:], pos0[vid, 1:]), "h e w del riferimento restano i suoi"
+    assert torch.equal(pos1[img], pos0[img]) and torch.equal(pos1[tgt], pos0[tgt])
+    assert float(pos0[vid, 0].min()) != float(pos1[vid, 0].min()), "senza allineamento il riferimento ha un orologio SUO"
+    for k in ("token_tags", "video_indices", "audio_indices", "text_indices"):
+        assert torch.equal(new[k], lay[k])
+    # audio del riferimento video: tempo = origine + indice (canale-maggiore)
+    cond = [torch.zeros(1, 24, *s_) for s_ in shapes]
+    from diffusers.modular_pipelines.minimax_h3.before_denoise import MiniMaxH3Ref2VAPrepareLayoutStep as R_
+    ra = [types.SimpleNamespace(kind="image", has_audio=False), types.SimpleNamespace(kind="video", has_audio=True)]
+    a_lat = [torch.zeros(2 * 20, 32)]
+    pos, tags, vi2, ai2, ti2, ncv, nca = R_.build_ref2va_packed_sequence(TAGS, ra, cond, a_lat, T, LH, LW, TA, (1, 2, 2), 2, 2, 0)
+    lay2 = {"position_ids": pos, "token_tags": tags, "video_indices": vi2, "audio_indices": ai2, "text_indices": ti2, "num_condition_video_rows": ncv, "num_condition_audio_rows": nca}
+    n2 = HG.align_ref_clock(lay2, [("image", False), ("video", True)], shapes, [40], T)
+    org2 = float(pos[vi2[ncv], 0])
+    assert torch.equal(n2["position_ids"][ai2[:nca], 0], org2 + torch.arange(20, dtype=torch.float64).repeat(2))
+    try:
+        HG.align_ref_clock(lay, [("image", False), ("video", False)], [(1, 4, 4), (T + 3, 4, 6)], [], T)
+    except Exception:                                                  # noqa: BLE001
+        pass
+    # --- denoise reale: spento = bit a bit diffusers; acceso = il DiT vede le coordinate allineate
+    base_lat, _, base_calls, _ = _run_denoise(True, refs, None)
+    plain_lat, _, _, _ = _run_denoise(False, refs, None)
+    assert torch.equal(base_lat, plain_lat)
+    al_lat, _, al_calls, _ = _run_denoise(True, refs, None, align=True)
+    c0 = al_calls[0]
+    p = c0["position_ids"]
+    v = c0["video_indices"]
+    ref_rows = v[n_img:n_img + n_vid]
+    tgt_rows = v[n_img + n_vid:]
+    assert torch.equal(p[ref_rows, 0], p[tgt_rows[:n_vid], 0]), "nel DiT il riferimento deve avere il tempo del bersaglio"
+    assert torch.equal(c0["token_tags"], base_calls[0]["token_tags"]) and c0["hidden_states"].shape == base_calls[0]["hidden_states"].shape
+    assert not torch.equal(al_lat, base_lat), "il riferimento allineato deve cambiare il risultato"
+    ok("orologio del riferimento allineato: tempo = bersaglio, h/w e indici intatti, audio del rif. video, spento = diffusers, DiT vede le coordinate")
+
+
 def main() -> int:
     print("verifica guida H3 (CPU, DiT minuscolo)", flush=True)
     check_coordinates_equal_target_grid()
@@ -283,6 +337,7 @@ def main() -> int:
     check_no_guide_is_bit_identical()
     check_clear_errors()
     check_encode_probe_and_audio_helpers()
+    check_ref_clock_align()
     print(f"verifiche passate: {len(PASS)}")
     return 0
 

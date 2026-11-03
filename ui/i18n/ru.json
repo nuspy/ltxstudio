@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Управление: только человек на нейтральном фоне (смена фона)",
+  "vedit.h3.guide_person.tt": "При смене фона управление несёт только человека (мягкий край) на сером, а не старый фон: модель копирует ТЕМП человека, не копируя фон. Также включает управление. Выключено = управление всем клипом.",
+  "vedit.h3.ref_clock": "Выровненные часы референса (тест)",
+  "vedit.h3.ref_clock.tt": "Референсное видео <Video 1> остаётся на своём месте в последовательности, но его внутреннее время совпадает со временем генерируемого видео: у каждого его кадра время соответствующего кадра результата. LoRA не нужна. Выключено = как раньше."
 }

@@ -3841,5 +3841,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Guida: solo la persona su fondo neutro (cambia-sfondo)",
+  "vedit.h3.guide_person.tt": "Nel cambia-sfondo la guida porta solo la persona (bordo morbido) su grigio, non lo sfondo vecchio: il modello copia il TEMPO della persona senza ricopiare lo sfondo. Accende anche la guida. Spenta = guida con il clip intero.",
+  "vedit.h3.ref_clock": "Orologio del riferimento allineato (prova)",
+  "vedit.h3.ref_clock.tt": "Il riferimento video <Video 1> resta dov'è nella sequenza, ma il suo tempo interno è lo stesso del video generato: ogni suo fotogramma ha il tempo del fotogramma corrispondente del risultato. Nessuna LoRA richiesta. Spento = come sempre."
 }

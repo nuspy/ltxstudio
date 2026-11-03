@@ -1240,6 +1240,17 @@ class VideoEditAITab(QWidget):
         self.h3_guide_info.setVisible(False)
         g.addRow("", self.h3_guide_info)
         self._h3_guide_manual = False
+        # Varianti sperimentali per il ritardo della persona ridisegnata (doppione sfasato di ~10 fotogrammi, 03/11): entrambe spente di default.
+        self.h3_guide_person = QCheckBox(tr("vedit.h3.guide_person", "Guida: solo la persona su fondo neutro (cambia-sfondo)"))
+        self.h3_guide_person.setToolTip(tr("vedit.h3.guide_person.tt", "Nel cambia-sfondo la guida porta solo la persona (bordo morbido) su grigio, non lo sfondo vecchio: "
+                                           "il modello copia il TEMPO della persona senza ricopiare lo sfondo. Accende anche la guida. Spenta = guida con il clip intero."))
+        self.h3_guide_person.setMinimumHeight(32)
+        g.addRow("", self.h3_guide_person)
+        self.h3_ref_clock = QCheckBox(tr("vedit.h3.ref_clock", "Orologio del riferimento allineato (prova)"))
+        self.h3_ref_clock.setToolTip(tr("vedit.h3.ref_clock.tt", "Il riferimento video <Video 1> resta dov'e nella sequenza, ma il suo tempo interno e lo stesso del video generato: "
+                                        "ogni suo fotogramma ha il tempo del fotogramma corrispondente del risultato. Nessuna LoRA richiesta. Spento = come sempre."))
+        self.h3_ref_clock.setMinimumHeight(32)
+        g.addRow("", self.h3_ref_clock)
         self.h3_lora_lbl = QLabel(tr("vedit.h3.lora_group", "LoRA di H3 (compatibili con Ref2VA)"))
         g.addRow(self.h3_lora_lbl)
         self.h3_lora = LoraTab(allow_nsfw_getter=lambda: bool(self._nsfw_getter()), embedded=True, arch="MiniMax-H3")
@@ -1371,8 +1382,12 @@ class VideoEditAITab(QWidget):
         sel = [{"name": l["name"], "strength": float(l["strength"])} for l in self.h3_lora.selected_loras()]
         if sel:
             out["loras"] = sel
-        if self.h3_guide.isChecked():                              # anche forzata da una LoRA di guida: build_params la riconosce dal nome, qui la prova a mano
+        if self.h3_guide.isChecked() or self.h3_guide_person.isChecked():     # anche forzata da una LoRA di guida: build_params la riconosce dal nome, qui la prova a mano
             out["h3_guide"] = True
+        if self.h3_guide_person.isChecked():
+            out["h3_guide_mode"] = "person"
+        if self.h3_ref_clock.isChecked():
+            out["h3_ref_clock_align"] = True
         return out
 
     def _sync_engine_fields(self):

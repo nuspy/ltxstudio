@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "가이드: 중립 배경 위의 인물만 (배경 변경)",
+  "vedit.h3.guide_person.tt": "배경 변경에서 가이드는 옛 배경이 아니라 회색 위의 인물(부드러운 가장자리)만 담습니다. 모델은 배경을 베끼지 않고 인물의 타이밍만 따라 합니다. 가이드도 함께 켭니다. 끔 = 클립 전체 가이드.",
+  "vedit.h3.ref_clock": "정렬된 참조 시계 (시험)",
+  "vedit.h3.ref_clock.tt": "참조 영상 <Video 1>은 시퀀스의 제자리에 있지만 내부 시간은 생성 영상과 같습니다. 각 프레임이 결과의 대응 프레임 시간을 가집니다. LoRA 불필요. 끔 = 기존과 동일."
 }

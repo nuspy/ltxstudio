@@ -73,6 +73,44 @@ def insert_guide_rows(layout: dict, steps: int, lat_h: int, lat_w: int, frame_id
             "num_condition_video_rows": ncv + g_rows, "num_condition_audio_rows": nca, "n_guide_rows": g_rows}
 
 
+def align_ref_clock(layout: dict, refs: list, cond_shapes: list, audio_rows: list, num_latent_frames: int, patch: tuple = PATCH) -> dict:
+    """«Orologio allineato» (idea TARA senza LoRA e senza penalita d'attenzione): le righe del riferimento VIDEO nativo restano al loro posto nella sequenza, ma il
+    loro tempo rotary non e piu quello del SUO orologio (che parte dopo testo e immagini e avanza) bensi quello del video generato: t_rif(passo k) = t_bersaglio(passo k).
+    h e w restano quelli del riferimento. Vale anche per la traccia audio di un riferimento video (tempo = quello dell'audio generato). Immagini e audio autonomi non si toccano.
+
+    refs: [(kind, has_audio)] nell'ordine dei riferimenti; cond_shapes: (T, h, w) di ogni riferimento immagine/video, nello stesso ordine; audio_rows: righe di ogni
+    riferimento con audio. Ritorna un NUOVO layout (stessi indici, cambia solo position_ids)."""
+    B = _bd()
+    _, ph, pw = patch
+    pos = layout["position_ids"].clone()
+    vi, ai = layout["video_indices"], layout["audio_indices"]
+    ncv, nca = int(layout["num_condition_video_rows"]), int(layout["num_condition_audio_rows"])
+    origin = float(pos[int(vi[ncv]), 0])
+    tgrid = B._temporal_position_grid(int(num_latent_frames), origin).to(pos.dtype)
+    v_cur = a_cur = c_i = a_i = 0
+    for kind, has_audio in refs:
+        if kind in ("image", "video"):
+            t_r, h_r, w_r = (int(x) for x in cond_shapes[c_i])
+            c_i += 1
+            rows = t_r * (h_r // ph) * (w_r // pw)
+            idx = vi[v_cur:v_cur + rows]
+            v_cur += rows
+            if kind == "video":
+                if t_r > int(num_latent_frames):
+                    raise ValueError(f"riferimento video di {t_r} passi di latente piu lungo del video generato ({num_latent_frames}): l'orologio non si puo allineare")
+                pos[idx, 0] = tgrid[:t_r].repeat_interleave(rows // t_r)
+        if kind == "audio" or (kind == "video" and has_audio):
+            n = int(audio_rows[a_i])
+            a_i += 1
+            idx = ai[a_cur:a_cur + n]
+            a_cur += n
+            if kind == "video":                                       # canale-maggiore: n/2 latenti per canale, tempo = origine + indice (come l'audio generato)
+                pos[idx, 0] = origin + torch.arange(n // 2, dtype=pos.dtype).repeat(2)
+    if v_cur != ncv or a_cur != nca:
+        raise RuntimeError(f"orologio allineato: righe riferimento {v_cur}/{ncv} video, {a_cur}/{nca} audio non tornano")
+    return {**layout, "position_ids": pos}
+
+
 # ── blocchi della pipeline (sostituiscono i due del denoise Ref2VA; senza guida si comportano come gli originali) ──────────────
 def _make_blocks():
     from diffusers.modular_pipelines.minimax_h3.before_denoise import (MiniMaxH3PrepareConditionLatentsStep,
@@ -83,7 +121,9 @@ def _make_blocks():
         return [InputParam(name="guide_latents", type_hint=torch.Tensor, default=None,
                            description="Latenti VAE normalizzati del video guida, (1, C, passi, h, w) alla tela del bersaglio; None = nessuna guida."),
                 InputParam(name="guide_frame_idx", type_hint=int, default=0,
-                           description="Fotogramma (pixel) del video generato da cui parte la guida; deve cadere all'inizio di un passo di latente.")]
+                           description="Fotogramma (pixel) del video generato da cui parte la guida; deve cadere all'inizio di un passo di latente."),
+                InputParam(name="ref_clock_align", type_hint=bool, default=False,
+                           description="Porta il tempo rotary del riferimento VIDEO nativo sull'orologio del video generato (variante sperimentale, default spenta).")]
 
     class GuidedRef2VAPrepareLayoutStep(MiniMaxH3Ref2VAPrepareLayoutStep):
         @property
@@ -97,10 +137,19 @@ def _make_blocks():
         @torch.no_grad()
         def __call__(self, components, state):
             components, state = super().__call__(components, state)
+            patch = tuple(components.patch_size)
+            if state.get("ref_clock_align"):
+                keys = ("position_ids", "token_tags", "video_indices", "audio_indices", "text_indices", "num_condition_video_rows", "num_condition_audio_rows")
+                lay = {k: state.get(k) for k in keys}
+                dev = lay["position_ids"].device
+                lay = {k: (v.cpu() if torch.is_tensor(v) else v) for k, v in lay.items()}
+                refs = [(r.kind, bool(getattr(r, "has_audio", False))) for r in state.get("normalized_references") or []]
+                new = align_ref_clock(lay, refs, [tuple(c.shape[2:5]) for c in state.get("condition_latents") or []],
+                                      [a.shape[0] for a in state.get("audio_condition_latents") or []], int(state.get("num_latent_frames")), patch)
+                state.set("position_ids", new["position_ids"].to(dev))
             g = state.get("guide_latents")
             if g is None:
                 return components, state
-            patch = tuple(components.patch_size)
             lay = {k: state.get(k) for k in ("position_ids", "token_tags", "video_indices", "audio_indices", "text_indices",
                                              "num_condition_video_rows", "num_condition_audio_rows")}
             dev = lay["position_ids"].device

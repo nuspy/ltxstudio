@@ -3874,5 +3874,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Guide: only the person on a neutral background (change background)",
+  "vedit.h3.guide_person.tt": "In change-background the guide carries only the person (soft edge) on grey, not the old background: the model copies the person's TIMING without copying the background. It also switches the guide on. Off = guide with the whole clip.",
+  "vedit.h3.ref_clock": "Aligned reference clock (experimental)",
+  "vedit.h3.ref_clock.tt": "The <Video 1> reference video stays where it is in the sequence, but its internal time is the same as the generated video's: each of its frames has the time of the matching frame of the result. No LoRA needed. Off = as always."
 }

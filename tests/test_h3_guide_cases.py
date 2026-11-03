@@ -32,16 +32,20 @@ def _dig(d, dotted):
 def test_case_file_shape():
     d = json.loads(CASES.read_text("utf-8"))
     ids = [c["id"] for c in d["cases"]]
-    assert ids == ["h3guida_01_rifugio_senza", "h3guida_02_rifugio_con_guida", "h3guida_03_rifugio_lora_vfx_edit", "h3guida_10_vfx_cappotto_rosso",
-                   "h3guida_11_style_transfer_art_deco"]
+    assert ids == ["h3guida_01_rifugio_senza", "h3guida_02_rifugio_con_guida", "h3guida_03_rifugio_lora_vfx_edit", "h3guida_04_rifugio_guida_matte",
+                   "h3guida_05_rifugio_guida_persona_matte", "h3guida_06_rifugio_orologio_matte", "h3guida_07_sostituisci_ritratto_pulito_guida",
+                   "h3guida_10_vfx_cappotto_rosso", "h3guida_11_style_transfer_art_deco"]
     assert set(d["skip"]) == {"h3guida_10_vfx_cappotto_rosso", "h3guida_11_style_transfer_art_deco"}
     for c in d["cases"]:
         assert c["fn"] == "ops" and c["expect_params"] and c["expect_subprocess"] == ["minimax_h3_infer.py"] and c["descr"] and c["verify"] and c["stima_min"], c["id"]
     # i turni non mescolano i casi in attesa di decisione con quelli eseguibili
-    assert all("h3guida_1" not in i for i in d["turni"]["A (subito, dalla tab di oggi)"])
+    assert all("h3guida_1" not in i for t, v in d["turni"].items() if not t.startswith("B") for i in v)
+    assert d["turni"]["TESTA TURNO 16 (~112 min, 4 casi)"] == ["h3guida_04_rifugio_guida_matte", "h3guida_06_rifugio_orologio_matte", "h3guida_05_rifugio_guida_persona_matte",
+                                                              "h3guida_07_sostituisci_ritratto_pulito_guida"]
 
 
-@pytest.mark.parametrize("cid", ["h3guida_01_rifugio_senza", "h3guida_02_rifugio_con_guida", "h3guida_03_rifugio_lora_vfx_edit"])
+@pytest.mark.parametrize("cid", ["h3guida_01_rifugio_senza", "h3guida_02_rifugio_con_guida", "h3guida_03_rifugio_lora_vfx_edit", "h3guida_04_rifugio_guida_matte",
+                                 "h3guida_05_rifugio_guida_persona_matte", "h3guida_06_rifugio_orologio_matte", "h3guida_07_sostituisci_ritratto_pulito_guida"])
 def test_runnable_cases_drive_the_real_widgets_and_the_expected_params_come_out(qapp, cid, monkeypatch, tmp_path):
     from core import video_edit_engines as veng
     from core import video_edit_h3 as vh3
@@ -83,10 +87,19 @@ def test_runnable_cases_drive_the_real_widgets_and_the_expected_params_come_out(
         assert got is not None and (got == want or (isinstance(want, str) and isinstance(got, str) and want in got)), (cid, dotted, want, got)
     if cid == "h3guida_01_rifugio_senza":                            # il riferimento NON ha guida: params di sempre
         assert "guide" not in p["h3_edit"] and "h3_guide" not in cfg
+    elif cid == "h3guida_06_rifugio_orologio_matte":                 # solo l'orologio: niente guida
+        assert "guide" not in p["h3_edit"] and p["h3_edit"]["ref_clock_align"] is True
     else:
         assert p["h3_edit"]["guide"] is True
+    if cid != "h3guida_05_rifugio_guida_persona_matte":
+        assert "guide_mode" not in p["h3_edit"]
+    # a fine caso le caselle sono rimesse a zero (la cfg era gia stata emessa): i casi dopo, anche di altri file, non le ereditano
+    tabw = w.video_edit_ai_tab
+    assert not tabw.h3_guide.isChecked() and not tabw.h3_guide_person.isChecked() and not tabw.h3_ref_clock.isChecked()
+    if cid == "h3guida_07_sostituisci_ritratto_pulito_guida":
+        assert p["h3_edit"]["action"] == "replace_character" and p["h3_edit"]["picture"].endswith("ritratto_sfondo_neutro_pulito.png")
     if cid == "h3guida_03_rifugio_lora_vfx_edit":
-        assert w.video_edit_ai_tab.h3_guide.isChecked() and not w.video_edit_ai_tab.h3_guide.isEnabled()      # accesa da sola e bloccata
+        # (la guida accesa e bloccata dalla LoRA si prova in test_h3_guide_gui; qui TRAIL ha gia rimesso tutto a zero)
         assert p["loras"][0]["strength"] == 1.0
 
 

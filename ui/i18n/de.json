@@ -3802,5 +3802,9 @@
   "h3.guide.kind.style_transfer": "Style Transfer",
   "h3.guide.kind.head_swap": "Head Swap",
   "h3.guide.kind.motion_transfer": "Motion Transfer",
-  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP",
+  "vedit.h3.guide_person": "Führung: nur die Person auf neutralem Hintergrund (Hintergrund wechseln)",
+  "vedit.h3.guide_person.tt": "Beim Hintergrundwechsel enthält die Führung nur die Person (weicher Rand) auf Grau, nicht den alten Hintergrund: Das Modell übernimmt das TIMING der Person, ohne den Hintergrund zu kopieren. Schaltet auch die Führung ein. Aus = Führung mit dem ganzen Clip.",
+  "vedit.h3.ref_clock": "Ausgerichtete Referenzuhr (Test)",
+  "vedit.h3.ref_clock.tt": "Das Referenzvideo <Video 1> bleibt an seiner Stelle in der Sequenz, aber seine interne Zeit ist die des erzeugten Videos: Jedes Bild hat die Zeit des passenden Bildes im Ergebnis. Keine LoRA nötig. Aus = wie bisher."
 }
