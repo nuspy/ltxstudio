@@ -457,6 +457,13 @@ class Driver:
             return {"op": f"menu {op['menu']}", "items": combo_items(resolve(w, op["menu"]))}
         if "lora" in op:                                     # {"lora": "frame1_tab.gen_lora_tab", "piece": "...", "strength": 0.8}
             return {"op": "lora", **self.pick_lora(resolve(w, op["lora"]), op)}
+        if "env" in op:                                      # variabili d'ambiente DELL'APP (ereditate dai worker lanciati dopo): valore vuoto = rimossa
+            for k, v in op["env"].items():
+                if v in ("", None):
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = str(v)
+            return {"op": "env " + ",".join(op["env"])}
         if "wait" in op:
             time.sleep(float(op["wait"]))
             return {"op": f"wait {op['wait']}"}
