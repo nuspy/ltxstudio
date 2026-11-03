@@ -43,15 +43,16 @@ SAFETY = 1.15                  # frammentazione dell'allocatore, temporanei picc
 # non copre pesi + attivazioni + riserva, il worker tiene in RAM una parte dei blocchi (offload) invece di
 # fidarsi di «tutto residente». Il picco REALE misurato viene loggato a fine denoise per ricalibrare.
 UNCHUNKED_FACTOR = 1.7
-UNATTRIBUTED_GB = 5.0          # vedi docstring: ~11 GiB osservati e non spiegati, meta' coperti qui, il resto a runtime
+UNATTRIBUTED_GB = 1.0          # era 5,0: gli ~11 GiB «non spiegati» del 30/10 erano la perdita di each_chunk (flusso residuo di ogni blocco tenuto vivo da un ciclo di
+                               # riferimenti fino al GC ciclico: 28-50 blocchi x 0,2-0,4 GB), trovata e corretta il 03/11; resta 1 GB di margine finche non c'e la misura
 FIXED_ACT_GB = 1.5 + 0.3 + UNATTRIBUTED_GB
 RESERVE_GB = 3.0               # contesto CUDA 1 + cache dell'allocatore + margine esplicito 2
 # Giro 03/11 (fixture 12 s, edit con video di riferimento, 864x480, clip da 141 frame): piano 36k token, 26,6 GB previsti con 29,6 liberi ("tutto
 # residente"); misurato: picco allocato 25,3 GB (pesi 12,6 + ~12,7 di attivazioni) + 3-5 GB riservati-non-usati (frammentazione) -> OOM a 29,7 al passo 5/8.
 # Con i riferimenti VIDEO le attivazioni reali superano la stima (condizionamenti e tabelle per le righe di riferimento): fattore 1,55 sulle
 # attivazioni, cosi il piano prevede subito blocchi in RAM (offload preventivo) invece di scoprirlo in OOM. Calibrazione da rifare con il prossimo giro.
-VIDEO_REF_ACT_FACTOR = 1.55
-FRAG_GB = 5.1                  # riservato-non-usato osservato il 03/11 (con defrag a inizio blocco dovrebbe scendere)
+VIDEO_REF_ACT_FACTOR = 1.3     # era 1,55 prima di trovare la perdita di each_chunk; col fix le attivazioni attese a 864x480/141 frame sono ~9 GB (da ricalibrare con [mem] di ogni passo)
+FRAG_GB = 2.5                  # riservato-non-usato osservato dopo il defrag a inizio blocco (03/11: 2,4 GB; prima del defrag 5,1)
 TEXT_TOKENS = 2048             # prompt strutturato + dialoghi (il TE ne produce di solito < 1500)
 AUDIO_LATENTS_PER_S = 40       # audio VAE di H3
 AUDIO_CHANNELS = 2             # righe audio = latenti × canali (stereo, impacchettate per canale)

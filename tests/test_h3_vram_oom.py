@@ -164,7 +164,7 @@ def test_caso_vivo_30_10_non_e_piu_tutto_residente():
     ~12,7: tutto residente» e il denoise finiva in OOM. Ora il fabbisogno supera i liberi -> offload."""
     t = HP.sequence_tokens(243, 736, 1376)
     act = HP.activation_gb(t, HP.DEFAULT_DIMS)
-    assert act + HP.RESERVE_GB >= (11.7 + 1.0) + 3.0, "fabbisogno: almeno +3 GB sul vecchio piano (12,7 GB)"
+    # (30/10: ~11 GB «non spiegati» erano la perdita di each_chunk, corretta il 03/11: la voce fissa e scesa da 5 a 1 GB, il fabbisogno resta sopra i liberi)
     assert act + HP.RESERVE_GB > 13.5 - 0.4, "con 13,1 GB liberi non si puo' dire tutto residente"
     p = HP.plan(13.1, t, weights_gb=0.0, lora_gb=0.0)           # come _fit_after_load: pesi gia' in VRAM
     assert p["offload_gb"] > 0
@@ -347,7 +347,7 @@ def test_fit_after_load_attiva_chunk_e_offload_quando_il_margine_manca(monkeypat
     t = HP.sequence_tokens(243, 736, 1376)
     plan0 = HP.plan(29.9, t, weights_gb=11.7, lora_gb=2.5)
     w._fit_after_load(tr, HP.DEFAULT_DIMS, plan0, {"height": 736, "width": 1376}, 243)
-    assert chiamate[0][0] == "d" and chiamate[0][1] > 3.0 and chiamate[1] == 12
+    assert chiamate[0][0] == "d" and chiamate[0][1] > 1.0 and chiamate[1] == 12
     assert all(hasattr(b, "_h3_idx") for b in blocchi), "il chunk va agganciato a ogni blocco"
     # con VRAM sufficiente: nessun blocco in RAM, ma l'offloader c'e' (n = 0)
     chiamate.clear()
@@ -366,7 +366,8 @@ def test_inventario_del_piano_e_il_conto_del_codice():
     assert HP.FIXED_ACT_GB >= 1.8 + HP.UNATTRIBUTED_GB - 1e-9
     # a 544p/10 s sta tutto residente su ~29 GB liberi, a 768p serve qualche blocco in RAM
     assert HP.plan(29.5, HP.sequence_tokens(243, 544, 960), weights_gb=11.7, lora_gb=2.5)["offload_gb"] == 0
-    assert 0 < HP.plan(29.5, t, weights_gb=11.7, lora_gb=2.5)["offload_gb"] < 5
+    assert HP.plan(29.5, t, weights_gb=11.7, lora_gb=2.5)["offload_gb"] == 0                # col fix della perdita di each_chunk (03/11) ci sta residente
+    assert 0 < HP.plan(22.0, t, weights_gb=11.7, lora_gb=2.5)["offload_gb"] < 9            # su una scheda da 24 GB serve qualche blocco in RAM
 
 
 def test_offload_dinamico_libera_altri_blocchi_e_protegge_quello_in_esecuzione():

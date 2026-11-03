@@ -140,26 +140,23 @@ def test_purge_big_quantized_tensors_empties_survivors_even_if_something_still_r
     assert abs(freed - (2048 * 1024 + 1024 * 1024) / 2**30) < 1e-6
 
 
-def test_video_reference_plan_forecasts_offload_and_keeps_the_expected_peak_under_27_gb():
-    """Giro 03/11 (fixture 12 s, 864x480, clip da 141 frame, edit con video di riferimento): piano 36k token, 26,6 GB previsti con 29,6 liberi (tutto residente);
-    misurato: picco allocato 25,3 GB (pesi 12,6 + 12,7 di attivazioni) + 5,1 GB riservati-non-usati -> OOM a 29,7. Col fattore sulle attivazioni con
-    riferimenti video il piano prevede subito l'offload e il picco atteso (misurato) scende sotto ~27 GB."""
+def test_video_reference_plan_fits_a_32gb_card_resident_and_a_16gb_card_with_streaming_and_peak_stays_under_27_gb():
+    """Giro 03/11 (fixture 12 s, 864x480, clip da 141 frame, edit con video di riferimento): piano 36k token, 26,6 GB previsti con 29,6 liberi; misurato 27,1 GB
+    allocati all'OOM, di cui ~19 erano la perdita di each_chunk (50 flussi residui [1, 37929, 5376] tenuti vivi da un ciclo di riferimenti), ora corretta.
+    Il piano senza la voce «non spiegata» da 5 GB e col fattore 1,3 sui riferimenti video: su 32 GB tutto residente con picco atteso < 27 GB; su 16 GB ci sta
+    con i blocchi del DiT in RAM (streaming), come richiesto per Openjutsu."""
     W, Hh, F = 864, 480, 141
     refs = [{"kind": "image", "path": "p.png"}, {"kind": "video", "path": "v.mp4", "frames": F}]
     assert HP.has_video_refs(refs) and not HP.has_video_refs([{"kind": "image"}]) and not HP.has_video_refs(None)
     rows = HP.ref_rows_estimate(refs, 1024, Hh, W)
     tokens = HP.sequence_tokens(F, Hh, W, ref_rows=rows)
-    old = HP.plan(29.6, tokens, weights_gb=11.7, lora_gb=0.9)
-    new = HP.plan(29.6, tokens, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
-    assert old["offload_gb"] <= 0 and new["offload_gb"] > 2.5                       # prima "tutto residente", ora offload preventivo
-    assert new["act_gb"] > old["act_gb"] * 1.3 and new["fits"]
-    # dopo il caricamento di DiT+LoRA restano 14,4 GB liberi (log): il worker toglie dalla VRAM il deficit (attivazioni + riserva - liberi)
-    peak_old = HP.expected_peak_gb(old, measured_act_gb=12.7, free_after_load_gb=14.4)
-    peak_new = HP.expected_peak_gb(new, measured_act_gb=12.7, free_after_load_gb=14.4)
-    assert peak_old > 29.7 - 3 and peak_old > 29.0                                  # com'era: 12,6 + 12,7 + 5,1 = 30,4 GB > 29,7 consentiti -> OOM
-    assert peak_new < 27.0, peak_new
-    assert HP.activation_gb(tokens, HP.DEFAULT_DIMS, act_factor=1.0) == old["act_gb"]
-    assert HP.activation_gb(tokens, HP.DEFAULT_DIMS, act_factor=1.55) == pytest.approx(1.55 * old["act_gb"])
+    big = HP.plan(29.6, tokens, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
+    assert big["fits"] and big["offload_gb"] <= 0 and big["act_gb"] < 11.0                     # 32 GB: tutto residente
+    assert HP.expected_peak_gb(big, free_after_load_gb=29.6 - 12.6) < 27.0, HP.expected_peak_gb(big, free_after_load_gb=29.6 - 12.6)
+    small = HP.plan(15.6, tokens, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
+    assert small["fits"] and small["offload_gb"] > 5.0                                            # 16 GB: ci sta con blocchi in RAM (streaming)
+    assert HP.expected_peak_gb(small, free_after_load_gb=15.6 - 12.6) < 15.6                     # il picco atteso sta dentro la scheda
+    assert HP.activation_gb(tokens, HP.DEFAULT_DIMS, act_factor=1.3) == pytest.approx(1.3 * HP.activation_gb(tokens, HP.DEFAULT_DIMS))
 
 
 def test_chunk_size_is_a_power_of_two(monkeypatch):
