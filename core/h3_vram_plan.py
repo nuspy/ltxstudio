@@ -51,7 +51,7 @@ RESERVE_GB = 3.0               # contesto CUDA 1 + cache dell'allocatore + margi
 # residente"); misurato: picco allocato 25,3 GB (pesi 12,6 + ~12,7 di attivazioni) + 3-5 GB riservati-non-usati (frammentazione) -> OOM a 29,7 al passo 5/8.
 # Con i riferimenti VIDEO le attivazioni reali superano la stima (condizionamenti e tabelle per le righe di riferimento): fattore 1,55 sulle
 # attivazioni, cosi il piano prevede subito blocchi in RAM (offload preventivo) invece di scoprirlo in OOM. Calibrazione da rifare con il prossimo giro.
-VIDEO_REF_ACT_FACTOR = 1.3     # era 1,55 prima di trovare la perdita di each_chunk; col fix le attivazioni attese a 864x480/141 frame sono ~9 GB (da ricalibrare con [mem] di ogni passo)
+VIDEO_REF_ACT_FACTOR = 1.6     # 03/11: picco misurato 24-26 GB a 864x480/141 frame con 12,6 GB di pesi = attivazioni ~12-13 GB contro i ~7 del modello base: 1,6 (era 1,55, poi 1,3 dopo il fix della perdita di each_chunk)
 FRAG_GB = 2.5                  # riservato-non-usato osservato dopo il defrag a inizio blocco (03/11: 2,4 GB; prima del defrag 5,1)
 TEXT_TOKENS = 2048             # prompt strutturato + dialoghi (il TE ne produce di solito < 1500)
 AUDIO_LATENTS_PER_S = 40       # audio VAE di H3

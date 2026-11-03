@@ -140,23 +140,29 @@ def test_purge_big_quantized_tensors_empties_survivors_even_if_something_still_r
     assert abs(freed - (2048 * 1024 + 1024 * 1024) / 2**30) < 1e-6
 
 
-def test_video_reference_plan_fits_a_32gb_card_resident_and_a_16gb_card_with_streaming_and_peak_stays_under_27_gb():
-    """Giro 03/11 (fixture 12 s, 864x480, clip da 141 frame, edit con video di riferimento): piano 36k token, 26,6 GB previsti con 29,6 liberi; misurato 27,1 GB
-    allocati all'OOM, di cui ~19 erano la perdita di each_chunk (50 flussi residui [1, 37929, 5376] tenuti vivi da un ciclo di riferimenti), ora corretta.
-    Il piano senza la voce «non spiegata» da 5 GB e col fattore 1,3 sui riferimenti video: su 32 GB tutto residente con picco atteso < 27 GB; su 16 GB ci sta
-    con i blocchi del DiT in RAM (streaming), come richiesto per Openjutsu."""
-    W, Hh, F = 864, 480, 141
-    refs = [{"kind": "image", "path": "p.png"}, {"kind": "video", "path": "v.mp4", "frames": F}]
-    assert HP.has_video_refs(refs) and not HP.has_video_refs([{"kind": "image"}]) and not HP.has_video_refs(None)
-    rows = HP.ref_rows_estimate(refs, 1024, Hh, W)
-    tokens = HP.sequence_tokens(F, Hh, W, ref_rows=rows)
-    big = HP.plan(29.6, tokens, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
-    assert big["fits"] and big["offload_gb"] <= 0 and big["act_gb"] < 11.0                     # 32 GB: tutto residente
-    assert HP.expected_peak_gb(big, free_after_load_gb=29.6 - 12.6) < 27.0, HP.expected_peak_gb(big, free_after_load_gb=29.6 - 12.6)
-    small = HP.plan(15.6, tokens, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
-    assert small["fits"] and small["offload_gb"] > 5.0                                            # 16 GB: ci sta con blocchi in RAM (streaming)
-    assert HP.expected_peak_gb(small, free_after_load_gb=15.6 - 12.6) < 15.6                     # il picco atteso sta dentro la scheda
-    assert HP.activation_gb(tokens, HP.DEFAULT_DIMS, act_factor=1.3) == pytest.approx(1.3 * HP.activation_gb(tokens, HP.DEFAULT_DIMS))
+def test_video_reference_plan_is_realistic_on_32_24_and_16_gb_cards():
+    """Giro 03/11 (fixture 12 s, 864x480, clip da 141 frame, edit con video di riferimento): la prova e riuscita con picco 24,1-26,0 GB e 12,6 GB di pesi, cioe
+    attivazioni ~12-13 GB (il modello base ne prevedeva ~7): fattore 1,6 sui riferimenti video. Su 32 GB tutto residente con picco atteso < 27 GB; su 24 GB ci sta
+    con blocchi del DiT in RAM; su 16 GB il clip da 141 frame NON ci sta (messaggio chiaro, niente OOM a meta) ma uno piu corto (105 frame) si."""
+    Hh, W = 480, 864
+
+    def mk(frames, free):
+        refs = [{"kind": "image", "path": "p.png"}, {"kind": "video", "path": "v.mp4", "frames": frames}]
+        t = HP.sequence_tokens(frames, Hh, W, ref_rows=HP.ref_rows_estimate(refs, 1024, Hh, W))
+        return HP.plan(free, t, weights_gb=11.7, lora_gb=0.9, act_factor=HP.VIDEO_REF_ACT_FACTOR)
+    assert HP.has_video_refs([{"kind": "image"}, {"kind": "video"}]) and not HP.has_video_refs([{"kind": "image"}]) and not HP.has_video_refs(None)
+    assert HP.VIDEO_REF_ACT_FACTOR == 1.6
+    big = mk(141, 29.6)
+    assert big["fits"] and big["offload_gb"] <= 0                                                   # 32 GB: tutto residente
+    peak = HP.expected_peak_gb(big, free_after_load_gb=29.6 - 12.6)
+    assert 24.0 < peak < 27.0, peak                                                                 # misurato 24,1-26,0
+    mid = mk(141, 22.0)
+    assert mid["fits"] and mid["offload_gb"] > 3.0                                                  # 24 GB: blocchi in RAM
+    small = mk(141, 15.6)
+    assert not small["fits"]                                                                        # 16 GB, 141 frame: non ci sta (e lo dice prima)
+    ok16 = mk(105, 15.6)
+    assert ok16["fits"] and ok16["offload_gb"] > 5.0 and HP.expected_peak_gb(ok16, free_after_load_gb=15.6 - 12.6) < 15.6
+    assert HP.activation_gb(big["tokens"], HP.DEFAULT_DIMS, act_factor=1.6) == pytest.approx(1.6 * HP.activation_gb(big["tokens"], HP.DEFAULT_DIMS))
 
 
 def test_chunk_size_is_a_power_of_two(monkeypatch):
