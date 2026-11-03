@@ -660,7 +660,7 @@ class Driver:
                 problems.append(f"il backend atteso non e' stato lanciato: {want}")
         for dotted, want in ({} if self.dry else (case.get("expect_params") or {})).items():
             got = []
-            for c in subs:
+            for c in [x for x in self.rec.calls if x["via"] in ("subprocess", "queue")]:      # sottoprocessi (video) E code di lavoro (immagini)
                 v = c.get("params")
                 for part in dotted.split("."):
                     v = v.get(part) if isinstance(v, dict) else None
