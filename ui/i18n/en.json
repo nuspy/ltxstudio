@@ -3861,5 +3861,14 @@
   "vedit.h3.te.profile": "The profile's own (default)",
   "vedit.h3.te.tt": "H3 text encoder. Default: the one of the chosen profile. Picking it by hand is for comparisons (same encoder for every model).",
   "vedit.h3.lora.why.convert": "not in native format: convert it from the «Weights» tab (the edit only uses native LoRAs)",
-  "vedit.h3.lora.why.guide": "needs the aligned latent guide (AddGuide, frame 0) which the LTX Studio H3 edit does not have yet"
+  "vedit.h3.lora.why.guide": "needs the aligned latent guide (AddGuide, frame 0) which the LTX Studio H3 edit does not have yet",
+  "canvas.ovl_transp_title": "Transparency",
+  "sam31.help.menu": "SAM 3.1: what it does and when to choose it…",
+  "sam31.help.title": "SAM 3.1: what it does and when to choose it",
+  "sam31.help.what": "SAM 3.1 (Meta) finds objects from a written description (\"person\", \"red car\") and draws their mask, even for several objects at once. In videos it finds the object on the first frame from text, in place of GroundingDINO, and SAM2 follows it over time.",
+  "sam31.help.choose_sam31": "Choose SAM 3.1 when you select by name: selection from text, \"Find people\", tracking an object described in words.",
+  "sam31.help.choose_sam2": "Choose SAM2 for clicks, lasso and boxes on the photo and when graphics memory is low: it is lighter and works everywhere.",
+  "sam31.help.not_installed": "SAM 3.1 is not installed: download it (about 1.8 GB, no account or approval needed) or use SAM2, which is already ready.",
+  "sam31.help.btn_download": "Download SAM 3.1 (about 1.8 GB)",
+  "dl.sam31_running": "The SAM 3.1 download is already running."
 }

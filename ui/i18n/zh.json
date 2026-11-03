@@ -3789,5 +3789,14 @@
   "vedit.h3.te.profile": "沿用所选配置（默认）",
   "vedit.h3.te.tt": "H3 文本编码器。默认：所选配置自带的那个。手动选择用于对比（所有模型使用同一编码器）。",
   "vedit.h3.lora.why.convert": "不是原生格式：请在“权重”标签页转换（编辑只使用原生 LoRA）",
-  "vedit.h3.lora.why.guide": "需要对齐的潜变量引导（AddGuide，第 0 帧），LTX Studio 的 H3 编辑尚未支持"
+  "vedit.h3.lora.why.guide": "需要对齐的潜变量引导（AddGuide，第 0 帧），LTX Studio 的 H3 编辑尚未支持",
+  "canvas.ovl_transp_title": "透明度",
+  "sam31.help.menu": "SAM 3.1：功能与选择时机…",
+  "sam31.help.title": "SAM 3.1：功能与选择时机",
+  "sam31.help.what": "SAM 3.1（Meta）可根据文字描述（“人”“红色汽车”）找到物体并绘制其蒙版，也可同时处理多个物体。在视频中，它在第一帧通过文字找到物体（取代 GroundingDINO），再由 SAM2 在时间上跟踪。",
+  "sam31.help.choose_sam31": "按名称选择时请选 SAM 3.1：文字选择、“查找人物”、跟踪用文字描述的物体。",
+  "sam31.help.choose_sam2": "点击、套索和框选照片，或显存不足时请选 SAM2：它更轻量，处处可用。",
+  "sam31.help.not_installed": "SAM 3.1 尚未安装：请下载（约 1.8 GB，无需账号或审批），或使用已就绪的 SAM2。",
+  "sam31.help.btn_download": "下载 SAM 3.1（约 1.8 GB）",
+  "dl.sam31_running": "SAM 3.1 已在下载中。"
 }

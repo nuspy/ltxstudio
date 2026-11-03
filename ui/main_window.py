@@ -1467,9 +1467,23 @@ class MainWindow(QMainWindow):
         # la voce spuntata e quella scelta se utilizzabile; altrimenti resta SAM2 (la scelta salvata non viene toccata)
         self._seg_actions.get(cur if SE.is_selectable(cur) else SE.SAM2).setChecked(True)
         seg.addSeparator()
-        a_help = seg.addAction(tr("seg.help.menu", "Come ottenere SAM 3.1…"))
+        a_help = seg.addAction(tr("sam31.help.menu", "SAM 3.1: cosa fa e quando sceglierlo…"))
         a_help.triggered.connect(lambda *_: self._show_sam31_help())
         self._seg_group.triggered.connect(self._on_segmentation_chosen)
+        try:                                                    # a download finito la voce SAM 3.1 passa da «non installato» a utilizzabile
+            from ui.download_manager import manager as _dlm
+            _dlm().finished.connect(lambda *_: self._refresh_segmentation_labels())
+        except Exception:                                       # noqa: BLE001
+            pass
+
+    def _refresh_segmentation_labels(self):
+        from core import segmentation_engine as SE
+        for ent in SE.menu_entries():
+            a = self._seg_actions.get(ent["id"])
+            if a is not None:
+                a.setText(self._seg_label(ent))
+        cur = SE.current()
+        self._seg_actions.get(cur if SE.is_selectable(cur) else SE.SAM2).setChecked(True)
 
     @staticmethod
     def _seg_label(ent: dict) -> str:
@@ -1481,16 +1495,33 @@ class MainWindow(QMainWindow):
         from core import segmentation_engine as SE
         eng = action.data()
         if not SE.is_selectable(eng):
-            # SAM 3.1 non utilizzabile: nessuna scelta (e nessun ripiego silenzioso): resta quella di prima e si apre l'aiuto non modale
+            # SAM 3.1 non utilizzabile: nessuna scelta (e nessun ripiego silenzioso): resta quella di prima; se mancano i pesi parte l'offerta di download
+            # del catalogo (dialog di consenso esistente, download in background), altrimenti si apre la finestra non modale
             self._seg_actions[SE.current() if SE.is_selectable(SE.current()) else SE.SAM2].setChecked(True)
-            self._show_sam31_help()
+            if SE.sam31_status()[0] in ("missing", "partial"):
+                self._download_sam31()
+            else:
+                self._show_sam31_help()
             return
         SE.set_current(eng)
         self.statusBar().showMessage(tr("seg.chosen", "Segmentazione: {n}").format(n=action.text()), 5000)
 
+    def _download_sam31(self):
+        """Normale download del catalogo pesi (unsloth/sam3.1, non gated): dialog di consenso, poi in background con progresso e Annulla."""
+        from core import ensure_weights as ew
+        from core import segmentation_engine as SE
+        from ui.download_manager import manager
+        if any(SE.SAM31_CATALOG_ID in j.ids for j in manager().active()):
+            self.statusBar().showMessage(tr("dl.sam31_running", "Il download di SAM 3.1 e gia in corso."), 6000)
+            return
+        if SE.sam31_status()[0] == "partial":                  # ripresa: is_present() vede la cartella e non offrirebbe nulla
+            manager().start([SE.SAM31_CATALOG_ID], "SAM 3.1")
+            return
+        ew.offer_download_gui(self, [SE.SAM31_CATALOG_ID], "SAM 3.1")
+
     def _show_sam31_help(self):
         from ui.widgets import sam31_help
-        sam31_help.show(self, on_use_sam2=lambda: self._seg_actions['sam2'].setChecked(True))
+        sam31_help.show(self, on_use_sam2=lambda: self._seg_actions['sam2'].setChecked(True), on_download=self._download_sam31)
 
     def _change_language(self, lang_code: str):
         """Cambia lingua, aggiorna il pulsante e avvisa di riavviare."""

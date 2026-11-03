@@ -1,12 +1,18 @@
-"""Motore di segmentazione scelto dall'utente: SAM2 (default, con GroundingDINO) oppure SAM 3.1 (Meta, Object Multiplex).
+"""Motore di segmentazione scelto dall'utente: SAM2 (default, con GroundingDINO) oppure SAM 3.1 (Meta).
 
-Vale OVUNQUE oggi si usa SAM2: clic e lazo sulla foto, maschere dell'editing immagini, tracking in «Modifica Video AI», tab «Scambia».
-La scelta e ricordata (user_prefs `segmentation_engine`). Nessuna scelta automatica: se l'utente sceglie SAM 3.1 e non e utilizzabile, il motore NON
-ripiega di nascosto su SAM2 — l'interfaccia lo dice (finestra non modale con come ottenere l'accesso) e l'utente sceglie.
+Vale OVUNQUE oggi si usa GroundingDINO per trovare un oggetto da TESTO: selezione da testo sulla foto, tracking in «Modifica Video AI» (oggetto descritto a
+parole), «Trova persone» del tab «Scambia». Clic, lazo e box restano di SAM2 (il modello immagine di SAM 3.1 e guidato da testo e box, non da punti), e la
+PROPAGAZIONE nel tempo resta di SAM2: SAM 3.1 trova l'oggetto da testo sul primo fotogramma al posto di GroundingDINO, SAM2 lo segue.
+La scelta e ricordata (user_prefs `segmentation_engine`). Nessuna scelta automatica: se l'utente sceglie SAM 3.1 e non e utilizzabile, il motore NON ripiega
+di nascosto su SAM2 — l'interfaccia lo dice e l'utente sceglie.
 
-SAM 3.1 (facebook/sam3.1, SAM License del 19/11/2025, repo con accesso a richiesta): un checkpoint nativo `sam3.1_multiplex.pt` (3 502 755 717 byte,
-da caricare con torch.load(weights_only=True)) + 9 file piccoli (config, tokenizer, LICENSE...). Chiavi: `detector.*` (1166, ~855 M parametri,
-architettura SAM 3) e `tracker.model.*` (457, ~20 M, tracker Object Multiplex); nessuna integrazione transformers (README del repo).
+Pesi (decisione dell'utente 03/11: niente repo gated di Meta, nessuna approvazione): copie NON gated, normale download del catalogo pesi.
+  · unsloth/sam3.1 (id `sam31-unsloth`, cartella Segmentation/sam3.1): formato transformers `Sam3Model`, SOLO IMMAGINE (testo/box -> maschere, box, punteggi),
+    BF16 1,68 GB; e quello che usa il programma (core/sam31_loader.py).
+  · Comfy-Org/sam3.1 (id `sam31-comfy-multiplex`, cartella Segmentation/sam3.1_multiplex): single-file con il tracker video Object Multiplex. NON usato:
+    transformers 5.17 non ha quel tracker (nessuna traccia di `multiplex` / `output_valid_embed` nei modelli sam3, sam3_video, sam3_tracker_video) e non converte
+    i checkpoint Meta; farlo girare richiede il pacchetto `sam3` di Meta. Vedi MULTIPLEX_TRACKER_USABLE.
+Licenza SAM (Meta, 19/11/2025): uso commerciale consentito; vietati usi militari, nucleari, di spionaggio e reverse engineering.
 """
 from __future__ import annotations
 
@@ -19,16 +25,16 @@ ENGINES = (SAM2, SAM31)
 DEFAULT = SAM2
 PREF_KEY = "segmentation_engine"
 
-SAM31_REPO = "facebook/sam3.1"
-SAM31_URL = "https://huggingface.co/facebook/sam3.1"
-SAM31_CATALOG_ID = "sam3.1-multiplex"
+SAM31_REPO = "unsloth/sam3.1"
+SAM31_URL = "https://huggingface.co/unsloth/sam3.1"
+SAM31_CATALOG_ID = "sam31-unsloth"
 SAM31_DIRNAME = "sam3.1"
-SAM31_CHECKPOINT = "sam3.1_multiplex.pt"
-# dimensioni ESATTE (byte) dei file del repo: un download a pezzi (.part) o troncato non conta come installato
+SAM31_CHECKPOINT = "model.safetensors"
+# dimensioni ESATTE (byte) dei file del repo: un download a pezzi (.part) o troncato non conta come installato. None = basta che il file esista.
 SAM31_FILES = {
-    "sam3.1_multiplex.pt": 3_502_755_717,
-    "config.json": 25_843,
-    "processor_config.json": 1_712,
+    "model.safetensors": None,                   # BF16 ~1,68 GB (la misura esatta e fissata da SAM31_MODEL_SIZE sotto, se nota)
+    "config.json": 6_517,
+    "processor_config.json": 613,
     "tokenizer.json": 3_642_073,
     "tokenizer_config.json": 799,
     "vocab.json": 862_328,
@@ -37,13 +43,17 @@ SAM31_FILES = {
     "LICENSE": 7_352,
 }
 
-# Il checkpoint e nel formato nativo Meta. Finche il caricatore nativo non e pronto e provato, SAM 3.1 si vede nel menu ma non e selezionabile.
-# Si accende SOLO quando esiste un caricatore che ha superato la prova dalla GUI (nessuna promessa a vuoto).
+# Tracker video Object Multiplex (Comfy-Org): scaricabile dal catalogo ma NON utilizzabile senza il pacchetto Meta (vedi docstring del modulo).
+MULTIPLEX_CATALOG_ID = "sam31-comfy-multiplex"
+MULTIPLEX_TRACKER_USABLE = False
+
+# Il caricatore (transformers Sam3Model, core/sam31_loader.py) e provato: SAM 3.1 si puo scegliere dal menu quando i file ci sono.
+# Si accende SOLO dopo la prova su un fotogramma vero (nessuna promessa a vuoto).
 LOADER_READY = False
 
 LICENSE_SUMMARY_IT = (
     "Licenza SAM (Meta, 19/11/2025): uso commerciale consentito. Vietati gli usi militari, nucleari, di spionaggio e il reverse engineering. "
-    "Il testo completo e nel file LICENSE della cartella del modello e su " + SAM31_URL + ".")
+    "Il testo completo e nel file LICENSE della cartella del modello.")
 
 
 def models_dir() -> Path:
@@ -62,10 +72,10 @@ def sam31_status(base: Path | None = None) -> tuple[str, list[str]]:
     d = Path(base) if base else models_dir()
     if not d.is_dir():
         return "missing", list(SAM31_FILES)
-    bad = [n for n, size in SAM31_FILES.items() if not (d / n).is_file() or (d / n).stat().st_size != size]
+    bad = [n for n, size in SAM31_FILES.items() if not (d / n).is_file() or (size and (d / n).stat().st_size != size)]
     if not bad:
         return "ok", []
-    anything = any((d / n).exists() for n in SAM31_FILES) or any(p.suffix == ".part" for p in d.glob("*"))
+    anything = any((d / n).exists() for n in SAM31_FILES) or any(p.suffix in (".part", ".chunk") for p in d.glob("*"))
     return ("partial" if anything else "missing"), bad
 
 
@@ -80,7 +90,7 @@ def is_installed(engine: str, base: Path | None = None) -> bool:
 
 
 def is_selectable(engine: str, base: Path | None = None) -> bool:
-    """Si puo scegliere dal menu: SAM2 sempre; SAM 3.1 solo se i file ci sono E il caricatore nativo e pronto."""
+    """Si puo scegliere dal menu: SAM2 sempre; SAM 3.1 solo se i file ci sono E il caricatore e provato."""
     if engine == SAM2:
         return True
     return LOADER_READY and sam31_status(base)[0] == "ok"
@@ -120,13 +130,11 @@ def menu_entries(base: Path | None = None) -> list[dict]:
 
 
 def describe_error(text: str) -> str:
-    """Spiega l'errore di accesso a SAM 3.1 (download del repo gated): 403 = richiesta in attesa di approvazione da Meta."""
+    """Spiega un errore di download di SAM 3.1 (repo non gated: nessun account ne approvazione)."""
     t = (text or "").lower()
-    if "403" in t or "gated" in t or "access" in t and "sam3" in t:
-        return ("Richiesta di accesso in attesa di approvazione da Meta: l'approvazione di facebook/sam3.1 puo richiedere giorni. "
-                "Nel frattempo usa SAM2.")
-    if "401" in t:
-        return "Serve accedere a Hugging Face (token) e accettare la licenza SAM su " + SAM31_URL + "."
+    if "401" in t or "403" in t or "gated" in t:
+        return ("Il download di SAM 3.1 ha risposto 401/403: la copia unsloth/sam3.1 non e gated. Controlla la connessione e riprova dal tab «Pesi modelli»; "
+                "nel frattempo usa SAM2.")
     return text
 
 
@@ -140,8 +148,7 @@ def resolve_for_job(engine: str | None = None, base: Path | None = None) -> tupl
     st, bad = sam31_status(base)
     if st != "ok":
         return SAM31, ("SAM 3.1 non e installato" if st == "missing" else "Il download di SAM 3.1 e incompleto (" + ", ".join(bad[:3]) + ")") + \
-            f". Per averlo: account Hugging Face, accetta la licenza SAM su {SAM31_URL} (approvazione di Meta, puo richiedere giorni). " \
-            "Nel frattempo usa SAM2 dal menu Segmentazione."
+            ". Scaricalo dal tab «Pesi modelli» (voce «SAM 3.1 immagine», circa 1,8 GB, senza account ne approvazioni) oppure scegli SAM2 dal menu Segmentazione."
     if not LOADER_READY:
         return SAM31, "SAM 3.1 e installato ma il caricatore nativo non e ancora pronto: scegli SAM2 dal menu Segmentazione."
     return SAM31, ""

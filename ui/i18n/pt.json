@@ -3789,5 +3789,14 @@
   "vedit.h3.te.profile": "O do perfil (padrão)",
   "vedit.h3.te.tt": "Text encoder do H3. Padrão: o do perfil escolhido. Escolher à mão serve para comparações (mesmo codificador para todos os modelos).",
   "vedit.h3.lora.why.convert": "não está em formato nativo: converta-a na aba «Pesos» (a edição só usa LoRAs nativas)",
-  "vedit.h3.lora.why.guide": "precisa do guia de latentes alinhado (AddGuide, quadro 0), que a edição H3 do LTX Studio ainda não tem"
+  "vedit.h3.lora.why.guide": "precisa do guia de latentes alinhado (AddGuide, quadro 0), que a edição H3 do LTX Studio ainda não tem",
+  "canvas.ovl_transp_title": "Transparência",
+  "sam31.help.menu": "SAM 3.1: o que faz e quando escolhê-lo…",
+  "sam31.help.title": "SAM 3.1: o que faz e quando escolhê-lo",
+  "sam31.help.what": "O SAM 3.1 (Meta) encontra objetos a partir de uma descrição escrita («pessoa», «carro vermelho») e desenha a máscara deles, até de vários objetos ao mesmo tempo. Nos vídeos, encontra o objeto no primeiro quadro a partir do texto, no lugar do GroundingDINO, e o SAM2 o acompanha no tempo.",
+  "sam31.help.choose_sam31": "Escolha o SAM 3.1 quando selecionar pelo nome: seleção por texto, «Encontrar pessoas», rastreamento de um objeto descrito em palavras.",
+  "sam31.help.choose_sam2": "Escolha o SAM2 para cliques, laço e caixas na foto e quando a memória da placa for pouca: é mais leve e funciona em todo lugar.",
+  "sam31.help.not_installed": "O SAM 3.1 não está instalado: baixe-o (cerca de 1,8 GB, sem conta nem aprovações) ou use o SAM2, que já está pronto.",
+  "sam31.help.btn_download": "Baixar o SAM 3.1 (cerca de 1,8 GB)",
+  "dl.sam31_running": "O download do SAM 3.1 já está em andamento."
 }

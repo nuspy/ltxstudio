@@ -1058,7 +1058,7 @@ CASES = (
          "Integra: guidance e seed fisso propagati (ramo nativo Kontext).",
          case_integrate_guidance_seed),
         ("frame1_integrate_context_zone",
-         "Integra «Zona di contesto»: selettore/cursore/pennello cambiano la maschera inviata; trasparenza no; Krea 2 Edit disabilitato.",
+         "Integra «Zona di contesto»: selettore/cursore/pennello cambiano la maschera inviata; trasparenza no; Krea 2 Edit: controlli nascosti.",
          case_integrate_context_zone),
         ("frame1_integrate_pulid_separation",
          "PuLID separati: box di Genera solo su genera, box di Image to Image solo su integra.",

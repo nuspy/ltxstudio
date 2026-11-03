@@ -87,14 +87,37 @@ def _load(_model: str = "", _arch: str = "segment"):
     return {"gproc": gproc, "gmodel": gmodel, "sproc": sproc, "smodel": smodel, "dev": dev}, VRAM_MB
 
 
+def _run_sam31_text(params: dict, output_dir: str) -> dict:
+    """Selezione da TESTO con SAM 3.1 (Sam3Model, via worker nel venv transformers 5.x): le maschere di tutti gli oggetti trovati, unite, al posto di
+    GroundingDINO + SAM2."""
+    import shutil
+    from PIL import Image
+    from core import sam31_detect as D
+    text = (params.get("text") or "object").strip().rstrip(".")
+    thr = float(params.get("threshold", 0.5))
+    os.makedirs(output_dir, exist_ok=True)
+    r = D.detect(params["image_path"], text, "", thr, out_dir=str(Path(output_dir) / "sam31"))
+    if not r["union"]:
+        return {"status": "error", "error": f"nessun oggetto '{text}' trovato (SAM 3.1, soglia {thr})"}
+    img = Image.open(params["image_path"])
+    path = str(Path(output_dir) / "native_segmask.png")
+    m = Image.open(r["union"])
+    if m.size != img.size:                                   # la maschera DEVE combaciare con la foto
+        m = m.resize(img.size, Image.NEAREST)
+    m.save(path)
+    shutil.rmtree(Path(output_dir) / "sam31", ignore_errors=True)
+    return {"status": "success", "output": [path]}
+
+
 def run(params: dict, mm, output_dir: str) -> dict:
     # Motore scelto dall'utente (menu «Segmentazione»): SAM 3.1 non utilizzabile -> errore CHIARO, mai ripiego silenzioso su SAM2.
     from core import segmentation_engine as _SE
     _eng, _err = _SE.resolve_for_job(params.get("seg_engine"))
     if _err:
         return {"status": "error", "error": _err}
-    if _eng == _SE.SAM31:
-        return {"status": "error", "error": "SAM 3.1: il caricatore nativo non e collegato a questo percorso."}
+    if _eng == _SE.SAM31 and not (params.get("region_point") or params.get("region_mask")):
+        return _run_sam31_text(params, output_dir)
+    # clic / lazo / box: SAM2 anche con SAM 3.1 scelto (il modello immagine di SAM 3.1 e guidato da testo e box, non da punti)
     import numpy as np
     import torch
     from PIL import Image

@@ -12,7 +12,7 @@ def _make(tmp_path, complete=True):
     for n, size in S.SAM31_FILES.items():
         p = d / n
         with open(p, "wb") as f:
-            f.truncate(size if (complete or n != S.SAM31_CHECKPOINT) else 1000)      # file sparsi: nessun I/O vero
+            f.truncate((size or 1_000_000) if (complete or n != S.SAM31_CHECKPOINT) else 1000)      # file sparsi: nessun I/O vero
     return d
 
 
@@ -32,13 +32,15 @@ def test_default_is_sam2_and_choice_is_remembered(monkeypatch):
 
 def test_missing_partial_complete_states(tmp_path):
     assert S.sam31_status(tmp_path / "non_esiste")[0] == "missing"
-    d = _make(tmp_path, complete=False)                                              # il .pt e di 1000 byte: download a pezzi
+    d = _make(tmp_path, complete=False)                                              # il modello e di 1000 byte: troncato
     st, bad = S.sam31_status(d)
-    assert st == "partial" and bad == [S.SAM31_CHECKPOINT]
-    (d / (S.SAM31_CHECKPOINT)).unlink()
-    (d / (S.SAM31_CHECKPOINT + ".part")).write_bytes(b"x")
+    if S.SAM31_FILES[S.SAM31_CHECKPOINT]:                                            # con la misura esatta un file troncato non conta come installato
+        assert st == "partial" and bad == [S.SAM31_CHECKPOINT]
+    (d / S.SAM31_CHECKPOINT).unlink()
+    (d / (S.SAM31_CHECKPOINT + ".part")).write_bytes(b"x")                           # download a pezzi
     assert S.sam31_status(d)[0] == "partial"
-    d2 = _make(tmp_path / "b" if (tmp_path / "b").mkdir() is None else tmp_path)
+    (tmp_path / "b").mkdir()
+    d2 = _make(tmp_path / "b")
     assert S.sam31_status(d2)[0] == "ok"
 
 
@@ -54,7 +56,7 @@ def test_menu_marks_not_installed_and_blocks_selection(tmp_path):
 def test_resolve_for_job_never_falls_back_silently(tmp_path, monkeypatch):
     assert S.resolve_for_job("sam2") == ("sam2", "")
     eng, err = S.resolve_for_job("sam31", tmp_path / "vuoto")
-    assert eng == "sam31" and "non e installato" in err and "huggingface.co/facebook/sam3.1" in err and "SAM2" in err
+    assert eng == "sam31" and "non e installato" in err and "Pesi modelli" in err and "SAM2" in err
     d = _make(tmp_path)
     monkeypatch.setattr(S, "LOADER_READY", False)
     assert "caricatore nativo" in S.resolve_for_job("sam31", d)[1]
@@ -62,9 +64,13 @@ def test_resolve_for_job_never_falls_back_silently(tmp_path, monkeypatch):
     assert S.resolve_for_job("sam31", d) == ("sam31", "")
 
 
-def test_403_means_pending_approval():
-    assert "attesa di approvazione da Meta" in S.describe_error("403 Client Error: Forbidden for url facebook/sam3.1")
-    assert "token" in S.describe_error("401 Unauthorized")
+def test_no_more_gated_access_texts():
+    """03/11 sera: pesi non gated (unsloth/sam3.1): nessun testo su approvazioni di Meta, giorni o ore di attesa."""
+    for t in (S.describe_error("403 Client Error"), S.describe_error("401 Unauthorized"),
+              S.resolve_for_job("sam31", Path("Z:/non/esiste"))[1]):
+        assert "approvazion" not in t.lower().replace("approvazioni", "") and "giorni" not in t and "ore" not in t.split("ore")[0:0]
+    assert "senza account" in S.resolve_for_job("sam31", Path("Z:/non/esiste"))[1]
+    assert S.SAM31_REPO == "unsloth/sam3.1" and S.SAM31_CATALOG_ID == "sam31-unsloth"
 
 
 @pytest.mark.skipif(not (Path(r"E:\AI\Models\Segmentation\sam3.1") / S.SAM31_CHECKPOINT).exists(), reason="SAM 3.1 non presente")

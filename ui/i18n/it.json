@@ -3828,5 +3828,14 @@
   "vedit.h3.te.profile": "Quello del profilo (predefinito)",
   "vedit.h3.te.tt": "Text encoder di H3. Predefinito: quello del profilo scelto. Sceglierlo a mano serve ai confronti (stesso encoder per tutti i modelli).",
   "vedit.h3.lora.why.convert": "non è in formato nativo: convertila dal tab «Pesi» (l'edit usa solo LoRA native)",
-  "vedit.h3.lora.why.guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora"
+  "vedit.h3.lora.why.guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora",
+  "canvas.ovl_transp_title": "Trasparenza",
+  "sam31.help.menu": "SAM 3.1: cosa fa e quando sceglierlo…",
+  "sam31.help.title": "SAM 3.1: cosa fa e quando sceglierlo",
+  "sam31.help.what": "SAM 3.1 (Meta) trova gli oggetti da una descrizione scritta («persona», «auto rossa») e ne disegna la maschera, anche per più oggetti insieme. Nei video trova l'oggetto sul primo fotogramma da testo, al posto di GroundingDINO, e SAM2 lo segue nel tempo.",
+  "sam31.help.choose_sam31": "Scegli SAM 3.1 quando selezioni per nome: selezione da testo, «Trova persone», tracking di un oggetto descritto a parole.",
+  "sam31.help.choose_sam2": "Scegli SAM2 per clic, lazo e box sulla foto e quando la memoria della scheda è poca: è più leggero e funziona ovunque.",
+  "sam31.help.not_installed": "SAM 3.1 non è installato: scaricalo (circa 1,8 GB, senza account né approvazioni) oppure usa SAM2, che è già pronto.",
+  "sam31.help.btn_download": "Scarica SAM 3.1 (circa 1,8 GB)",
+  "dl.sam31_running": "Il download di SAM 3.1 è già in corso."
 }
