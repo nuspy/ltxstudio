@@ -272,6 +272,27 @@ def esperimenti_msr() -> dict:
     return {"nome": "Esperimenti video MSR 03/11 (riferimenti, scenari nuovi)", "skip": [], "cases": cases}
 
 
+def esperimenti_krea2() -> dict:
+    """Krea 2 Edit (Integra): 3 job di indagine (cause ipotizzate dal codice, vedi report). Il motore non ha altri approcci: si cambiano solo
+    prompt, passi/guidance (la GUI forza 20/2.0 contro i 52/3.5 del menu «Raw (52 step)») e grounding. Gli scenari non sono quelli del turno 31 per Krea."""
+    M = "Krea 2 Raw (52 step, qualità)"
+    keep = ("Keep everything in the picture exactly as it is: the same people, objects and layout. Only adjust the lighting, colours and contact shadows "
+            "on the person who was pasted in, so that she looks naturally lit by this scene.")
+    spec = [
+        ("krea_conservativo_20_2", "galeone", dict(prompt=keep)),
+        ("krea_conservativo_52_35", "carnevale", dict(prompt=keep, inject={"steps": 52, "guidance": 3.5}, expect_params={"steps": 52, "guidance": 3.5})),
+        ("krea_multi_52_35_grounding1152", "battaglia", dict(regenera=True, inject={"steps": 52, "guidance": 3.5}, expect_params={"steps": 52, "guidance": 3.5},
+                                                              widgets={"frame1_tab.edit_grounding": 1152})),
+    ]
+    cases = []
+    for k, (cid, sc, kw) in enumerate(spec):
+        c = _base_integra(sc, 20 + k, engine="Krea 2 Edit", model=M, **kw)
+        c["id"] = cid
+        c["descr"] = f"Integra · Krea 2 Edit Raw · {cid} · scenario {sc}"
+        cases.append(c)
+    return {"nome": "Indagine Krea 2 Edit (Integra) 03/11", "skip": [], "cases": cases}
+
+
 def verifica_rotazione(spec: dict) -> list:
     """Rotazione: nello stesso sotto-gruppo (stesso motore) nessuno scenario si ripete, e due casi CONSECUTIVI non usano mai lo stesso scenario."""
     errori = []
@@ -334,7 +355,8 @@ def main():
     elif mode == "esperimenti":
         out = {os.path.join(ORCH, "casi_exp_integra_20261103.json"): esperimenti_integra(),
                os.path.join(ORCH, "casi_exp_inpaint_20261103.json"): esperimenti_inpaint(),
-               os.path.join(ORCH, "casi_exp_msr_20261103.json"): esperimenti_msr()}
+               os.path.join(ORCH, "casi_exp_msr_20261103.json"): esperimenti_msr(),
+               os.path.join(ORCH, "casi_exp_krea2_20261103.json"): esperimenti_krea2()}
     elif mode == "raccogli":
         return raccogli(sys.argv[2])
     else:

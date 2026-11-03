@@ -121,7 +121,7 @@ def test_casi_fixture_e_esperimenti():
     assert len(fx["cases"]) == 5 * len(ms.SCENARI)
     assert all(c["fn"] == "create_image" and c["fixture_dest"].startswith(ms.FIX) for c in fx["cases"])
     assert len({c["seed"] for c in fx["cases"]}) == len(fx["cases"])
-    for spec in (ms.esperimenti_integra(), ms.esperimenti_inpaint(), ms.esperimenti_msr()):
+    for spec in (ms.esperimenti_integra(), ms.esperimenti_inpaint(), ms.esperimenti_msr(), ms.esperimenti_krea2()):
         assert 1 <= len(spec["cases"]) <= 12                                                # al piu 12 job per turno
         assert ms.verifica_rotazione(spec) == [], spec["nome"]
         assert len({c["id"] for c in spec["cases"]}) == len(spec["cases"])
