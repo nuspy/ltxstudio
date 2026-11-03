@@ -100,7 +100,7 @@ def test_guard_load_frees_parked_monolithic_pipelines(monkeypatch):
 
 def test_integrate_context_mask_is_wider_than_position_mask_and_default_is_unchanged(tmp_path):
     """Integra: la maschera di POSIZIONE (sagoma) e il CONTESTO (zona rigenerabile) sono separate; il contesto si allarga dilatando la stessa forma;
-    senza parametro il tracciato e quello di sempre (nessun cambiamento per i casi esistenti)."""
+    senza parametro vale il 22 % della larghezza della sagoma (circa l'area di sempre)."""
     import numpy as np
     from PIL import Image
     fx = FX
@@ -122,7 +122,10 @@ def test_integrate_context_mask_is_wider_than_position_mask_and_default_is_uncha
         pos = np.asarray(Image.open(r["position_mask"]).convert("L")) > 127
         areas[name] = (int(ctx.sum()), int(pos.sum()))
         assert not (pos & ~ctx).any(), "la posizione deve stare dentro il contesto"
-        assert pos.any() and r["context_px"] == (0 if pct is None else r["context_px"])
+        assert pos.any()
+        ys, xs = np.nonzero(pos)
+        want = 87 if pct is None else pct * (xs.max() - xs.min() + 1)       # None = DEFAULT_CTX_PX; `integrate_context_pct` = alias (frazione della larghezza)
+        assert abs(r["context_px"] - want) <= 2
     assert areas["base"][1] == areas["p25"][1] == areas["p60"][1]                 # la posizione non cambia
     assert areas["base"][0] < areas["p25"][0] < areas["p60"][0]                  # il contesto cresce
 

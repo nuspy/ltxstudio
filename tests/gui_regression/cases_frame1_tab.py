@@ -528,7 +528,7 @@ def case_integrate_context_zone(w, spy):
     a0, _ = _sent_mask_area(w, spy)
     f.integrate_ctx_spin.setValue(80)
     a80, _ = _sent_mask_area(w, spy)
-    f.integrate_ctx_spin.setValue(250)                              # oltre il 60 % e oltre il massimo del cursore: nessun tetto
+    f.integrate_ctx_spin.setValue(900)                              # in PIXEL, oltre il massimo del cursore (meta del lato lungo): nessun tetto
     a250, _ = _sent_mask_area(w, spy)
     assert a0 < a80 <= a250, f"l'area della maschera inviata deve crescere col %: {a0} {a80} {a250}"
     # la trasparenza e SOLO visualizzazione: la maschera inviata non cambia
