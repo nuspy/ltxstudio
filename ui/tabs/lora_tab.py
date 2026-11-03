@@ -40,6 +40,8 @@ class _ThumbLoader(QThread):
 
 
 class LoraTab(QWidget):
+    selection_changed = Signal()               # l'utente (o gui_set_state) ha cambiato la spunta di una LoRA: serve a chi mostra effetti collegati alla scelta
+
     def __init__(self, allow_nsfw_getter=lambda: True, embedded: bool = False, arch: str | None = "LTX"):
         super().__init__()
         self.allow_nsfw_getter = allow_nsfw_getter
@@ -173,6 +175,7 @@ class LoraTab(QWidget):
                 prev_strength = self._restore_pending[e.comfy_name]
             cb.setChecked(prev_checked)
             cb.clicked.connect(lambda _c, ent=e: self._show_entry(ent))
+            cb.clicked.connect(lambda *_: self.selection_changed.emit())
             h.addWidget(cb, 1)
             h.addWidget(QLabel(tr("lora.str_lbl")))
             sp = QDoubleSpinBox(); sp.setRange(0, 2); sp.setSingleStep(0.05); sp.setDecimals(2)
@@ -385,6 +388,7 @@ class LoraTab(QWidget):
         # volute non ancora presenti → applicate quando l'inventario le carica
         self._restore_pending = want or None
         self.refresh()
+        self.selection_changed.emit()
 
     def auto_insert_triggers(self) -> bool:
         return self.auto_triggers.isChecked()

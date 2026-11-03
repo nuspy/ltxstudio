@@ -1224,14 +1224,59 @@ class VideoEditAITab(QWidget):
                                        "Spento = decoder originale."))
         self.h3_lightvae.toggled.connect(self._on_h3_lightvae_toggled)
         g.addRow("", self.h3_lightvae)
+        # Guida di latenti allineata (workers/h3_guide.py): il video sorgente entra anche come blocco di latenti sulla STESSA griglia del risultato. Serve alle LoRA
+        # VFX Edit / Style Transfer / Head Swap / Motion Transfer / nitidezza (che la vogliono: con una scelta si attiva da sola); spuntata a mano e una PROVA.
+        self.h3_guide = QCheckBox(tr("vedit.h3.guide", "Guida di latenti allineata (prova)"))
+        self.h3_guide.setToolTip(tr("vedit.h3.guide.tt", "Il video sorgente entra anche come blocco di latenti puliti sulla stessa griglia (spazio e tempo) del risultato, "
+                                    "oltre al riferimento <Video 1>. Le LoRA di guida (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidezza) la richiedono "
+                                    "e la attivano da sole. Spenta = come sempre."))
+        self.h3_guide.setMinimumHeight(32)
+        g.addRow("", self.h3_guide)
+        self.h3_guide_info = QLabel("")
+        self.h3_guide_info.setWordWrap(True)
+        self.h3_guide_info.setStyleSheet("color:#74c0fc;")
+        self.h3_guide_info.setVisible(False)
+        g.addRow("", self.h3_guide_info)
+        self._h3_guide_manual = False
         self.h3_lora_lbl = QLabel(tr("vedit.h3.lora_group", "LoRA di H3 (compatibili con Ref2VA)"))
         g.addRow(self.h3_lora_lbl)
         self.h3_lora = LoraTab(allow_nsfw_getter=lambda: bool(self._nsfw_getter()), embedded=True, arch="MiniMax-H3")
         self.h3_lora.setMinimumHeight(190)
         self.h3_lora.set_row_filter(self._h3_lora_row_filter)
+        self.h3_lora.selection_changed.connect(self._sync_h3_guide)
         g.addRow(self.h3_lora)
         self.h3_opts_box.setVisible(False)
         v.addWidget(self.h3_opts_box)
+
+    def _sync_h3_guide(self) -> None:
+        """Se tra le LoRA scelte c'e una LoRA di guida la guida si attiva da sola (casella bloccata) e si dice quale trigger entra nel prompt; senza, la casella
+        torna a quella scelta a mano."""
+        from core import h3_guide as CG
+        sel = [{"name": l["name"]} for l in self.h3_lora.selected_loras()]
+        err = ""
+        try:
+            gi = CG.guide_of_loras(sel)
+        except ValueError as ex:
+            gi, err = None, str(ex)
+        forced = gi is not None
+        was_forced = not self.h3_guide.isEnabled()
+        self.h3_guide.blockSignals(True)
+        if forced and not was_forced:
+            self._h3_guide_manual = self.h3_guide.isChecked()
+        if forced:
+            self.h3_guide.setChecked(True)
+        elif was_forced:
+            self.h3_guide.setChecked(self._h3_guide_manual)
+        self.h3_guide.setEnabled(not forced)
+        self.h3_guide.blockSignals(False)
+        if forced:
+            kind = tr(gi["label_key"], gi["kind"])
+            txt = (tr("vedit.h3.guide.lora_info_caption", "LoRA «{kind}»: guida attiva; il prompt diventa la didascalia fissa della LoRA.").format(kind=kind) if gi["caption"]
+                   else tr("vedit.h3.guide.lora_info", "LoRA «{kind}»: guida attiva; nel prompt entra da sola «{trigger}».").format(kind=kind, trigger=gi["trigger"]))
+        else:
+            txt = "⛔ " + err if err else ""
+        self.h3_guide_info.setText(txt)
+        self.h3_guide_info.setVisible(bool(txt))
 
     def _h3_lora_row_filter(self, entry):
         """Riga LoRA disattivata col motivo se non e una LoRA H3 (chiavi dell'header) o e solo FL2VA."""
@@ -1323,6 +1368,8 @@ class VideoEditAITab(QWidget):
         sel = [{"name": l["name"], "strength": float(l["strength"])} for l in self.h3_lora.selected_loras()]
         if sel:
             out["loras"] = sel
+        if self.h3_guide.isChecked():                              # anche forzata da una LoRA di guida: build_params la riconosce dal nome, qui la prova a mano
+            out["h3_guide"] = True
         return out
 
     def _sync_engine_fields(self):

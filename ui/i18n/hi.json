@@ -3789,5 +3789,15 @@
   "vedit.h3.te.profile": "प्रोफ़ाइल वाला (डिफ़ॉल्ट)",
   "vedit.h3.te.tt": "H3 का टेक्स्ट एनकोडर। डिफ़ॉल्ट: चुनी गई प्रोफ़ाइल वाला। हाथ से चुनना तुलना के लिए है (सभी मॉडलों के लिए एक ही एनकोडर)।",
   "vedit.h3.lora.why.convert": "नेटिव फ़ॉर्मैट में नहीं है: «वज़न» टैब से बदलें (संपादन केवल नेटिव LoRA इस्तेमाल करता है)",
-  "vedit.h3.lora.why.guide": "संरेखित लेटेंट गाइड (AddGuide, फ़्रेम 0) चाहिए, जो LTX Studio के H3 संपादन में अभी नहीं है"
+  "vedit.h3.guide": "संरेखित लेटेंट गाइड (परीक्षण)",
+  "vedit.h3.guide.tt": "स्रोत वीडियो <Video 1> संदर्भ के अलावा, परिणाम की ही ग्रिड (स्थान और समय) पर साफ़ लेटेंट के ब्लॉक के रूप में भी जाता है। गाइड LoRA (VFX Edit, Style Transfer, Head Swap, Motion Transfer, शार्पनेस) को यह चाहिए और वे इसे अपने आप चालू करती हैं। बंद = पहले जैसा।",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: गाइड चालू; प्रॉम्प्ट में «{trigger}» अपने आप जुड़ता है।",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: गाइड चालू; प्रॉम्प्ट LoRA का निश्चित कैप्शन बन जाता है।",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA मॉडल के अटेंशन पैच के साथ नेटिव वीडियो संदर्भ का उपयोग करता है, जो LTX Studio में नहीं है: «guide latents» संस्करण का उपयोग करें",
+  "h3.guide.kind.lms": "LMS (शार्पनेस)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

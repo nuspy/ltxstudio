@@ -3789,5 +3789,15 @@
   "vedit.h3.te.profile": "프로필 기본값",
   "vedit.h3.te.tt": "H3 텍스트 인코더. 기본값: 선택한 프로필의 것. 직접 고르는 것은 비교용입니다(모든 모델에 같은 인코더).",
   "vedit.h3.lora.why.convert": "네이티브 형식이 아닙니다: “가중치” 탭에서 변환하세요(편집은 네이티브 LoRA만 사용)",
-  "vedit.h3.lora.why.guide": "정렬된 잠재 가이드(AddGuide, 0번 프레임)가 필요하지만 LTX Studio의 H3 편집에는 아직 없습니다"
+  "vedit.h3.guide": "정렬된 잠재 가이드 (시험)",
+  "vedit.h3.guide.tt": "원본 영상이 <Video 1> 참조와 별도로, 결과와 같은 격자(공간과 시간)의 깨끗한 잠재 블록으로도 입력됩니다. 가이드 LoRA(VFX Edit, Style Transfer, Head Swap, Motion Transfer, 선명도)는 이것을 필요로 하며 스스로 켭니다. 끔 = 기존과 동일.",
+  "vedit.h3.guide.lora_info": "LoRA '{kind}': 가이드 켜짐, 프롬프트에 '{trigger}'가 자동으로 추가됩니다.",
+  "vedit.h3.guide.lora_info_caption": "LoRA '{kind}': 가이드 켜짐, 프롬프트가 LoRA의 고정 캡션으로 바뀝니다.",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA는 LTX Studio에 없는 모델 어텐션 패치가 있는 네이티브 비디오 참조를 사용합니다. 'guide latents' 버전을 사용하세요",
+  "h3.guide.kind.lms": "LMS (선명도)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

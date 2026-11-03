@@ -198,6 +198,12 @@ def opts_key(p: dict) -> tuple:
     return (("opts", p.get("h3_dit"), bool(p.get("h3_veda")), p.get("h3_lightvae"), json.dumps(p.get("loras") or [], sort_keys=True)) + ((p.get("h3_te"),) if p.get("h3_te") else ()),)
 
 
+def guide_key(e: dict) -> tuple:
+    """Parte della chiave dei checkpoint dovuta alla guida di latenti allineata (workers/h3_guide.py): VUOTA se l'edit non la usa, cosi i clip gia fatti restano validi."""
+    from core import h3_guide as CG
+    return CG.spec_key({"frame_idx": int(e.get("guide_frame_idx") or 0)} if e.get("guide") else None)
+
+
 def _subprocess_clip_runner(W, job_dir: str, stream_all: bool = False) -> None:
     """Lancia il figlio che genera UN clip; il suo log passa su stdout del genitore (finisce nel log completo del job)."""
     import collections
@@ -288,7 +294,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *opts_key(p))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
+                  *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
@@ -316,6 +322,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 "picture": pic, "refvid": refvid, "action": action, "keep_text": e.get("keep_text") or "the person",
                 "prompt_text": e.get("prompt_text") or "", "picture_desc": e.get("picture_desc") or "", "shots": e.get("shots") or "",
                 "has_audio": seg is not None, "base": base, "audio_seed": seed0 + 104729 * ci, "noise_seed": seed0 + 7919 * ci}
+        if e.get("guide"):                                             # solo se scelta: senza, meta (e quindi la chiave del clip) e quella di sempre
+            meta["guide"] = {"frame_idx": int(e.get("guide_frame_idx") or 0)}
         _np.save(jd / "clip_src.npy", clip_src.numpy())
         _np.save(jd / "cells.npy", cells.numpy())
         if seg is not None:
@@ -408,7 +416,12 @@ def generate_clip(job_dir: str, W) -> None:
     pc.update(prompt=prompt, references=refs, seed=m["seed"], num_frames=length, duration_s=length / FPS, width=tw, height=th,
               generate_audio=False, _h3_edit={"noise": noise, "audio_noise": audio_noise, "video_hold": video_hold, "audio_hold": audio_hold,
                                               "frames": length, "canvas": (th, tw)})
-    W._log(f"clip {ci + 1}/{m['clips']}: {length} frame, contesto {ctx}, tela {tw}x{th}")
+    if m.get("guide"):
+        # Guida allineata: il clip sorgente (i suoi latenti, GIA calcolati per le righe tenute) entra anche come blocco di condizione sulla griglia del
+        # video generato (workers/h3_guide.py). Si aggiunge al riferimento nativo <Video 1>; le LoRA di guida (VFX Edit, Style Transfer...) la vogliono.
+        pc["_h3_guide_latents"] = lat
+        pc["h3_guide"] = {"frame_idx": int(m["guide"].get("frame_idx") or 0)}
+    W._log(f"clip {ci + 1}/{m['clips']}: {length} frame, contesto {ctx}, tela {tw}x{th}" + (" · guida allineata" if m.get("guide") else ""))
     res = W.run(pc)
     gen_f = _to_float_frames(res["videos"][0])
     _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")

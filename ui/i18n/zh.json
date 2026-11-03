@@ -3789,5 +3789,15 @@
   "vedit.h3.te.profile": "沿用所选配置（默认）",
   "vedit.h3.te.tt": "H3 文本编码器。默认：所选配置自带的那个。手动选择用于对比（所有模型使用同一编码器）。",
   "vedit.h3.lora.why.convert": "不是原生格式：请在“权重”标签页转换（编辑只使用原生 LoRA）",
-  "vedit.h3.lora.why.guide": "需要对齐的潜变量引导（AddGuide，第 0 帧），LTX Studio 的 H3 编辑尚未支持"
+  "vedit.h3.guide": "对齐潜变量引导（试验）",
+  "vedit.h3.guide.tt": "除 <Video 1> 参考外，源视频还会作为一组干净的潜变量，按与结果相同的网格（空间和时间）输入。引导型 LoRA（VFX Edit、Style Transfer、Head Swap、Motion Transfer、锐化）需要它，并会自动开启。关闭 = 与以往相同。",
+  "vedit.h3.guide.lora_info": "LoRA「{kind}」：已启用引导；提示词中会自动加入「{trigger}」。",
+  "vedit.h3.guide.lora_info_caption": "LoRA「{kind}」：已启用引导；提示词将变为该 LoRA 的固定描述。",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA 使用带模型注意力补丁的原生视频参考，LTX Studio 不具备该补丁：请使用“guide latents”版本",
+  "h3.guide.kind.lms": "LMS（锐化）",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

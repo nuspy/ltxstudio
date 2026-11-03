@@ -3789,5 +3789,15 @@
   "vedit.h3.te.profile": "O do perfil (padrão)",
   "vedit.h3.te.tt": "Text encoder do H3. Padrão: o do perfil escolhido. Escolher à mão serve para comparações (mesmo codificador para todos os modelos).",
   "vedit.h3.lora.why.convert": "não está em formato nativo: converta-a na aba «Pesos» (a edição só usa LoRAs nativas)",
-  "vedit.h3.lora.why.guide": "precisa do guia de latentes alinhado (AddGuide, quadro 0), que a edição H3 do LTX Studio ainda não tem"
+  "vedit.h3.guide": "Guia de latentes alinhada (teste)",
+  "vedit.h3.guide.tt": "O vídeo de origem entra também como bloco de latentes limpos na mesma grade (espaço e tempo) do resultado, além da referência <Video 1>. As LoRA de guia (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidez) a exigem e a ativam sozinhas. Desligada = como sempre.",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: guia ativa; «{trigger}» é adicionado sozinho ao prompt.",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: guia ativa; o prompt passa a ser a legenda fixa da LoRA.",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA usa uma referência de vídeo nativa com um patch de atenção do modelo que o LTX Studio não tem: use a versão «guide latents»",
+  "h3.guide.kind.lms": "LMS (nitidez)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }
