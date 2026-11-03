@@ -273,7 +273,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
 
     # 2) video di riferimento (<Video 1>) — la zona rigenerata e nascosta: niente dettagli originali da copiare
     bg_person_ref = str(os.environ.get("H3_EDIT_BG_PERSON_REF") or e.get("bg_person_ref") or "sharp").lower()   # sharp (oggi) | mannequin
-    bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte") or "") not in ("", "0")                # matte a pixel della persona (solo composizione)
+    # matte a pixel della persona (solo composizione): DI DEFAULT nel cambia-sfondo (03/11: testa fedele 0.124 -> 0.007); si spegne con H3_EDIT_BG_MATTE=0 o bg_matte=0/false
+    bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")
     if invert:
         ref_frames = M.blur_area(f01, 1.0 - pers, radius=max(6.0, 0.02 * th * float(os.environ.get("H3_EDIT_BG_BLUR") or e.get("bg_blur", 1.0))),
                                 grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)

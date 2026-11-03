@@ -113,10 +113,10 @@ def run(tag, env):
     return frames_of(out), list(calls), list(refs)
 
 
-base, c0, r0 = run("base", {})
-pre, c1, r1 = run("preroll", {"H3_EDIT_PREROLL": "17"})
-man, c2, r2 = run("mann", {"H3_EDIT_BG_PERSON_REF": "mannequin"})
-mat, c3, r3 = run("matte", {"H3_EDIT_BG_MATTE": "1"})
+base, c0, r0 = run("base", {"H3_EDIT_BG_MATTE": "0"})                       # il matte e di default: qui spento per avere la base senza
+pre, c1, r1 = run("preroll", {"H3_EDIT_PREROLL": "17", "H3_EDIT_BG_MATTE": "0"})
+man, c2, r2 = run("mann", {"H3_EDIT_BG_PERSON_REF": "mannequin", "H3_EDIT_BG_MATTE": "0"})
+mat, c3, r3 = run("matte", {})                                                 # senza variabili: matte di DEFAULT
 print("clip base", c0, "preroll", c1)
 
 # PREROLL: stesso numero di frame in uscita, ma si genera di piu (clip 1 piu lungo di 17 frame)

@@ -42,11 +42,11 @@ def test_pixel_matte_keeps_original_inside_the_person_and_generated_outside():
     assert float(hard[0, 4, 10, 0]) == 0.0 and float(hard[0, 5, 10, 0]) == 1.0
 
 
-def test_options_are_off_by_default_and_not_in_the_checkpoint_key_unless_they_change_the_clips():
+def test_options_defaults_and_not_in_the_checkpoint_key_unless_they_change_the_clips():
     src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
     assert '"H3_EDIT_PREROLL") or e.get("preroll_frames") or 0' in src
     assert 'or e.get("bg_person_ref") or "sharp"' in src
-    assert 'str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte") or "") not in ("", "0")' in src
+    assert 'str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")' in src   # matte DI DEFAULT nel cambia-sfondo
     assert '"bgref", bg_person_ref' in src and '"preroll", preroll' in src                 # cambiano i clip: nella chiave
     key_line = [l for l in src.splitlines() if l.strip().startswith('"maskalign_v2"')][0] + src.split('"maskalign_v2"')[1].split("*opts_key(p))")[0]
     assert "bg_matte" not in key_line                                                         # il matte e solo composizione: i clip si riusano
