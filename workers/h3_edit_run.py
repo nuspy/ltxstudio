@@ -208,7 +208,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # DENTRO il bordo della persona; con 2 px (= 1 cella a 0,5) la rampa era larga ~15 px con la linea a 0,5 a ~20 px dentro la sagoma; con 0 e larga
     # ~9 px a ~10 px dentro (misurato sui frame del 03/11). Nel cambia-sfondo si usa 0 (parametro bg_feather_px), per sostituisci resta feather_px.
     feather_px = int(e.get("bg_feather_px", 0)) if invert else int(e.get("feather_px", 2))
-    regen_pix = M.regen_region(pers, invert, person_grow, grow, expand=0.0 if invert else float(e.get("replace_expand", 0.30)))   # cio che si rigenera (prima dell'inversione)
+    regen_pix = M.regen_region(pers, invert, person_grow, grow, expand=0.0 if invert else float(os.environ.get("H3_EDIT_REPLACE_EXPAND") or e.get("replace_expand", 0.0)))   # cio che si rigenera (prima dell'inversione)
     if not invert:
         pers = M.grow_mask(pers.float(), person_grow)                  # il manichino grigio del riferimento copre la persona cresciuta
 
@@ -238,7 +238,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     st = os.stat(src)
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
-                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_BG_GREY"), e.get("bg_feather_px"))
+                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), e.get("bg_feather_px"))
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
