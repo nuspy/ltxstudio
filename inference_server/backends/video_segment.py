@@ -16,7 +16,14 @@ API:
 from __future__ import annotations
 
 import os
+import sys as _sys
 from pathlib import Path
+
+# Lanciato come SCRIPT (`python video_segment.py ...`, tracking SAM2 di Modifica Video AI e «Trova persone») la radice del repo non e nel path: senza,
+# `from core import ...` moriva con ModuleNotFoundError e il tracking falliva (giro C del 03/11, bug introdotto dal blocco SAM 3.1).
+_ROOT = str(Path(__file__).resolve().parents[2])
+if _ROOT not in _sys.path:
+    _sys.path.insert(0, _ROOT)
 
 SEG_DIR = r"E:\AI\Models\Segmentation"
 # FASE F weights-unification: dir DAL registro unico, fallback ai letterali storici.

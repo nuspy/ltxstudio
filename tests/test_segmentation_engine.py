@@ -80,3 +80,15 @@ def test_backends_refuse_unusable_sam31_without_falling_back(tmp_path, monkeypat
     assert r["status"] == "error" and "SAM 3.1" in r["error"] and "SAM2" in r["error"]
     with pytest.raises(RuntimeError, match="SAM 3.1"):
         video_segment.track_object("v.mp4", point=(1, 1), engine="sam31")
+
+
+def test_video_segment_runs_as_a_script_without_the_repo_on_the_path(tmp_path):
+    """Giro C 03/11: `python video_segment.py ...` (CLI del tracking) non trovava `core`: ModuleNotFoundError. Il file deve aggiungere da se la radice del repo."""
+    import subprocess
+    import sys
+    seg = Path(__file__).resolve().parents[1] / "inference_server" / "backends" / "video_segment.py"
+    code = ("import sys, runpy; sys.path = [p for p in sys.path if 'ltxstudio' not in p.lower()];"
+            f"m = runpy.run_path(r'{seg}', run_name='x');"
+            "\ntry:\n    m['track_object']('v.mp4', point=(1, 1), engine='sam31')\nexcept RuntimeError as e:\n    print('OK:' + str(e)[:40])")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(tmp_path))
+    assert "OK:" in r.stdout, r.stdout + r.stderr[-400:]
