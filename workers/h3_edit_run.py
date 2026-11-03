@@ -200,10 +200,12 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     obj = read_masks(e["mask_dir"], N, tw, th)
     scale = tw / float(sw)
     pers, size = M.person_mask(obj, float(e.get("headroom", 0.10)), int(e.get("hold_frames", 2)))
-    pers = M.grow_mask(pers.float(), max(0, int(round(float(e.get("person_grow_px", 40)) * scale))))
     invert = action == "change_background"
+    person_grow = max(0, int(round(float(e.get("person_grow_px", 40)) * scale)))
     grow = max(0, int(round(float(e.get("grow_px", 16)) * scale)))
-    regen_pix = M.grow_mask(pers, grow)                                # cio che si rigenera (prima dell'eventuale inversione)
+    regen_pix = M.regen_region(pers, invert, person_grow, grow)        # cio che si rigenera (prima dell'eventuale inversione)
+    if not invert:
+        pers = M.grow_mask(pers.float(), person_grow)                  # il manichino grigio del riferimento copre la persona cresciuta
 
     # 2) video di riferimento (<Video 1>) — la zona rigenerata e nascosta: niente dettagli originali da copiare
     if invert:

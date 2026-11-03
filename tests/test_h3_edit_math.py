@@ -154,3 +154,22 @@ def test_enforce_min_length_leaves_good_plans_alone_and_rejects_too_short_videos
     import pytest
     with pytest.raises(ValueError, match="troppo corto"):
         M.enforce_min_length([(56, 0)], 56)                    # un video da 2,3 s non puo andare in H3 (minimo 5,2 s)
+
+
+def test_change_background_does_not_keep_an_old_band_around_the_person():
+    """03/11: «alone bianco molto spesso» attorno alla persona: la persona veniva CRESCIUTA di 40+16 px e quella fascia di sfondo vecchio restava
+    tenuta. Ora il cambia-sfondo non cresce la persona: le celle tenute stanno dentro la persona, la zona rigenerata entra nel suo bordo."""
+    n, h, w = 22, 480, 512                                                 # 17*1+5 frame
+    pers = torch.zeros(n, h, w)
+    pers[:, 120:360, 160:352] = 1.0                                        # persona: x 160..352, y 120..360 (multipli di 16)
+    for invert, expect_band in ((True, False), (False, True)):
+        reg = M.regen_region(pers, invert, 32, 13)
+        cells, _ = M.cell_mask(reg, w, h, invert=invert, feather_px=0)
+        kept = cells[0, 0, 0] < 0.5                                         # [h/16, w/16] celle TENUTE
+        ys, xs = torch.where(kept) if invert else torch.where(~kept)         # per sostituisci: celle rigenerate = persona cresciuta
+        box = (xs.min().item() * 16, (xs.max().item() + 1) * 16, ys.min().item() * 16, (ys.max().item() + 1) * 16)
+        if invert:
+            assert box[0] >= 160 and box[1] <= 352 and box[2] >= 120 and box[3] <= 360, box            # niente fascia fuori dalla persona
+            assert kept[8:21, 11:21].all()                                                              # il cuore della persona e tenuto
+        else:
+            assert box[0] < 160 and box[1] > 352 and box[2] < 120 and box[3] > 360, box                 # sostituisci: copre la persona CON i bordi

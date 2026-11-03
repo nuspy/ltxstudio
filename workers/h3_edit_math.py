@@ -86,6 +86,18 @@ def grow_mask(mask: torch.Tensor, px: int) -> torch.Tensor:
     return out
 
 
+def regen_region(pers: torch.Tensor, invert: bool, person_grow: int, grow: int) -> torch.Tensor:
+    """Maschera-pixel [N,H,W] da dare a `cell_mask` (1 = «oggetto»; con invert=True si rigenera il complemento).
+    - sostituisci personaggio (invert=False): si rigenera la persona CRESCIUTA di person_grow + grow px, cosi copre tutta la persona originale con i bordi.
+    - cambia sfondo (invert=True): si rigenera tutto tranne la persona e la zona rigenerata deve ENTRARE un poco nel bordo della persona, mai lasciarle
+      intorno una fascia di sfondo vecchio: niente crescita della persona (a 03/11 era 40+16 px a 640 e il bordo chiaro della parete originale restava
+      tutt'intorno: «alone bianco molto spesso»; misurato sui frame: 15-24 % di pixel bianchi, 50-86 % invariati nei 45 px fuori dalla sagoma).
+      Dentro il bordo ci entrano le celle di 16 px che toccano lo sfondo (adaptive_max_pool sul complemento)."""
+    if invert:
+        return pers.float()
+    return grow_mask(grow_mask(pers.float(), max(0, person_grow)), max(0, grow))
+
+
 def latent_mask(mask: torch.Tensor, frame_counts: list[int], lat_h: int, lat_w: int) -> torch.Tensor:
     """Maschera-pixel [F, H, W] -> [1, 1, T, lat_h, lat_w]: un frame/cella di latente e mascherato se lo e' un qualunque pixel che copre."""
     cells = F.adaptive_max_pool2d(mask[:, None], (lat_h, lat_w))[:, 0]
