@@ -302,13 +302,13 @@ def composite_inpaint(original: str, edited: str, masks: list[str], out_video: s
 if __name__ == "__main__":   # CLI: track oggetto + costruisci guide magenta. Stampa "GUIDE:<path>".
     import sys
     if len(sys.argv) >= 4 and sys.argv[1] == "--find-people":          # «Trova persone» (tab Scambia): --find-people <video> <work_dir> [testo]
-        find_people(sys.argv[2], sys.argv[3], text=(sys.argv[4] if len(sys.argv) > 4 else "person"), device="cuda")
+        find_people(sys.argv[2], sys.argv[3], text=(sys.argv[4] if len(sys.argv) > 4 else "person"), device=os.environ.get("LTX_SEG_DEVICE", "cuda"))
         print("TRACKS:" + os.path.join(sys.argv[3], "tracks.json"), flush=True)
         sys.exit(0)
     if len(sys.argv) < 4:
         print("uso: video_segment.py <video> <text> <out_guide.mp4> [dilate]"); sys.exit(2)
     video, text, out_guide = sys.argv[1], sys.argv[2], sys.argv[3]
     dil = int(sys.argv[4]) if len(sys.argv) > 4 else 0
-    r = track_object(video, text=text, dilate=dil, device="cuda")
+    r = track_object(video, text=text, dilate=dil, device=os.environ.get("LTX_SEG_DEVICE", "cuda"))
     g = build_masked_guide(r["frames"], r["masks"], out_guide, fps=r["fps"])
     print(f"GUIDE:{g}")
