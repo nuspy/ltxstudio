@@ -1320,6 +1320,35 @@ class MaskCanvas(QWidget):
                 done.append(i)
         return done
 
+    # ── due maschere di Integra: POSIZIONE (dove sta il soggetto) e CONTESTO (zona che il modello puo rigenerare) ─────────────────────────────────────
+    # Prima c'era un solo tracciato: la zona da rigenerare era il riquadro della foto incollata + il 5 % del lato lungo. Il giudizio dell'utente del 03/11
+    # (Kontext: «la maschera deve essere piu grande della posizione della ragazza, perche il modello tiene conto solo di cio che c'e sotto la maschera»)
+    # chiede di separarle. `integrate_context_pct` (frazione del lato lungo del riquadro del soggetto) o `integrate_context_px` allargano il CONTESTO,
+    # dilatandolo con la stessa forma; None = comportamento di sempre. Per ora e un parametro interno (casi di prova): diventa comando in GUI solo
+    # dopo l'ok dell'utente.
+    integrate_context_pct: float | None = None
+    integrate_context_px: int | None = None
+
+    @staticmethod
+    def _dilate_alpha(img: QImage, px: int) -> QImage:
+        """Dilatazione di `px` pixel di una maschera (alpha) con kernel ellittico: la zona si allarga attorno alla stessa forma."""
+        if px <= 0 or np is None:
+            return img
+        try:
+            import cv2 as _cv2
+        except Exception:                                    # noqa: BLE001
+            return img
+        a = img.convertToFormat(QImage.Format_Alpha8)
+        buf = np.frombuffer(a.constBits(), dtype=np.uint8, count=a.sizeInBytes())
+        arr = np.array(buf.reshape(a.height(), a.bytesPerLine())[:, :a.width()])
+        k = _cv2.getStructuringElement(_cv2.MORPH_ELLIPSE, (2 * px + 1, 2 * px + 1))
+        d = np.ascontiguousarray(_cv2.dilate((arr > 0).astype(np.uint8) * 255, k))
+        out = QImage(d.data, d.shape[1], d.shape[0], d.strides[0], QImage.Format_Alpha8).copy()
+        res = QImage(img.width(), img.height(), QImage.Format_ARGB32)
+        res.fill(QColor(255, 255, 255))
+        res.setAlphaChannel(out)
+        return res
+
     def export_integrate(self, out_dir: Path) -> dict:
         """Input stile MagicQuill `foreground_edit` — la ricetta che INTEGRA DAVVERO (validata il 3/06).
 
@@ -1385,6 +1414,16 @@ class MaskCanvas(QWidget):
                             QColor(255, 255, 255))
                 any_region = True
         po.end(); pr.end(); pv.end()
+        ctx_px = 0
+        if self.integrate_context_px is not None:
+            ctx_px = int(self.integrate_context_px)
+        elif self.integrate_context_pct is not None and any_region:
+            _b = self._mask_bounds(obj) if np is not None else QRectF()
+            if _b.isNull():
+                _b = self._mask_bounds(region)
+            ctx_px = int(round(float(self.integrate_context_pct) * max(_b.width(), _b.height())))
+        if ctx_px > 0 and any_region:
+            region = self._dilate_alpha(region, ctx_px)           # CONTESTO: stessa forma, allargata di ctx_px
         # alone bianco = zona da sbiancare (solo foto opache) MENO l'oggetto
         whiten = wreg.copy()
         pw = QPainter(whiten); pw.setCompositionMode(QPainter.CompositionMode_DestinationOut)
@@ -1395,9 +1434,14 @@ class MaskCanvas(QWidget):
         msk = QImage(W, H, QImage.Format_ARGB32); msk.fill(Qt.black)
         pm = QPainter(msk); pm.drawImage(0, 0, region); pm.end()
         mpath = out_dir / "integrate_mask.png"; msk.save(str(mpath))
+        # maschera di POSIZIONE (dove sta il soggetto: la sagoma) accanto a quella di CONTESTO (integrate_mask.png = quanto il modello puo rigenerare)
+        posm = QImage(W, H, QImage.Format_ARGB32); posm.fill(Qt.black)
+        ppm = QPainter(posm); ppm.drawImage(0, 0, obj); ppm.end()
+        pospath = out_dir / "integrate_position_mask.png"; posm.save(str(pospath))
         # has_region NON dipende da has_layers(): senza layer ma con una maschera sulla foto del canvas
         # c'è eccome qualcosa da integrare (era il blocco «aggiungi una o più immagini»).
-        return {"image": str(ipath), "mask": str(mpath), "has_region": bool(any_region)}
+        return {"image": str(ipath), "mask": str(mpath), "position_mask": str(pospath), "context_px": int(ctx_px),
+                "layers": [e.get("path") for e in self._entries[1:] if e.get("path")], "has_region": bool(any_region)}
 
     def _drop_layers(self):
         for e in self._entries[1:]:           # rimuove i layer importati (tiene la base)

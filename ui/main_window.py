@@ -2805,6 +2805,7 @@ class MainWindow(QMainWindow):
                 pass
         try:
             exp = self.frame1_tab.canvas.export_integrate(OUTPUT_DIR)
+            self._last_integrate_export = exp                   # i test dal vivo ne leggono le maschere (posizione / contesto) per la pagina di revisione
             if not exp.get("has_region"):
                 QMessageBox.information(self, tr("mw.nothing_to_integrate_title"),
                                         tr("mw.nothing_to_integrate_msg")); return
