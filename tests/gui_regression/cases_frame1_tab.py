@@ -496,6 +496,61 @@ def case_integrate_guidance_seed(w, spy):
         assert ok, f"guidance integrate errata per arch={p.get('arch')}: {g}"
 
 
+def _sent_mask_area(w, spy):
+    """Genera da Integra e ritorna l'AREA (pixel) della maschera di contesto che il backend riceve davvero (mask_path del job accodato)."""
+    import numpy as np
+    from PIL import Image
+    n = len(spy.calls)
+    w.generate_integrate()
+    assert len(spy.calls) > n, "integrate: nessuna richiesta inviata"
+    c = spy.calls[-1]
+    assert c["via"] == "enqueue", f"via inattesa: {c['via']}"
+    mp = c["params"].get("mask_path")
+    assert mp and os.path.exists(mp), f"nessuna maschera inviata: {c['params']}"
+    return int((np.asarray(Image.open(mp).convert("L")) > 127).sum()), mp
+
+
+def case_integrate_context_zone(w, spy):
+    """Integra «Zona di contesto»: i widget (selettore, cursore/campo %, pennello contesto, trasparenza) cambiano DAVVERO la maschera inviata
+    al backend; la trasparenza no; con Krea 2 Edit (niente maschera) il selettore e spento con spiegazione; la scritta segue il selettore."""
+    _force_native_up()
+    _populate_inventory(w)
+    f = w.frame1_tab
+    cv = f.canvas
+    f.img_nsfw.setCurrentText("NSFW")
+    H.load_canvas_image(w)
+    _add_canvas_layer(w)
+    f.integrate_engine.setCurrentIndex(0)
+    f.integrate_puzzle.setChecked(False)
+    f.integrate_prompt.setPlainText("blend")
+    f.integrate_ctx_mode.setCurrentIndex(f.integrate_ctx_mode.findData("auto"))
+    f.integrate_ctx_spin.setValue(0)
+    a0, _ = _sent_mask_area(w, spy)
+    f.integrate_ctx_spin.setValue(80)
+    a80, _ = _sent_mask_area(w, spy)
+    f.integrate_ctx_spin.setValue(250)                              # oltre il 60 % e oltre il massimo del cursore: nessun tetto
+    a250, _ = _sent_mask_area(w, spy)
+    assert a0 < a80 <= a250, f"l'area della maschera inviata deve crescere col %: {a0} {a80} {a250}"
+    # la trasparenza e SOLO visualizzazione: la maschera inviata non cambia
+    cv.ovl_transp_pos_sl.setValue(95); cv.ovl_transp_ctx_sl.setValue(5)
+    a250b, _ = _sent_mask_area(w, spy)
+    assert a250b == a250, "la trasparenza non deve cambiare la maschera inviata"
+    # manuale: precompilato con l'automatica; un tratto del pennello CONTESTO compare nella maschera inviata, la posizione resta
+    from PySide6.QtCore import QPointF
+    f.integrate_ctx_mode.setCurrentIndex(f.integrate_ctx_mode.findData("manual"))
+    f.integrate_ctx_clear_btn.click()
+    am, _ = _sent_mask_area(w, spy)
+    cv._draw_target_cb.setCurrentIndex(cv._draw_target_cb.findData("context"))
+    assert "CONTEST" in cv.draw_banner.text().upper() or "CONTEXT" in cv.draw_banner.text().upper()
+    cv.set_mode("brush"); cv.set_brush(80); cv.push_undo(); cv.paint_at(QPointF(cv.aspect_w * 0.9, cv.aspect_h * 0.9))
+    amb, _ = _sent_mask_area(w, spy)
+    assert amb > am, f"il tratto di contesto non e nella maschera inviata: {am} -> {amb}"
+    # Krea 2 Edit: niente maschera → selettore spento con tooltip
+    f.integrate_engine.setCurrentIndex(2)
+    assert not f.integrate_ctx_mode.isEnabled() and f.integrate_ctx_mode.toolTip().strip(), "Krea: selettore contesto non disabilitato/spiegato"
+    f.integrate_engine.setCurrentIndex(0)
+
+
 def case_integrate_pulid_separation(w, spy):
     """I due container PuLID sono SEPARATI: quello in «Genera immagine» agisce solo sulla
     generazione, quello in «Image to Image» solo sull'integra (richiesta utente 22/07)."""
@@ -1000,6 +1055,9 @@ CASES = (
         ("frame1_integrate_guidance_seed",
          "Integra: guidance e seed fisso propagati (ramo nativo Kontext).",
          case_integrate_guidance_seed),
+        ("frame1_integrate_context_zone",
+         "Integra «Zona di contesto»: selettore/cursore/pennello cambiano la maschera inviata; trasparenza no; Krea 2 Edit disabilitato.",
+         case_integrate_context_zone),
         ("frame1_integrate_pulid_separation",
          "PuLID separati: box di Genera solo su genera, box di Image to Image solo su integra.",
          case_integrate_pulid_separation),

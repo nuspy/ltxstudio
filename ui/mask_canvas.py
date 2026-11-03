@@ -18,7 +18,7 @@ except Exception:
 
 from PySide6.QtCore import (
     Qt, QRectF, QPointF, QPoint, Signal, QPropertyAnimation, QEasingCurve,
-    QParallelAnimationGroup,
+    QParallelAnimationGroup, QTimer,
 )
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QBrush, QWheelEvent, QMouseEvent
 from PySide6.QtWidgets import (
@@ -34,6 +34,13 @@ from core.mask_store import MaskStore
 from ui.i18n_manager import tr
 
 MAX_UNDO = 100
+
+# Integra, due maschere: POSIZIONE (dove sta il soggetto) in ROSSO, CONTESTO (zona che il modello puo rigenerare) in GIALLO.
+POS_RGB = (255, 40, 40)
+CTX_RGB = (255, 204, 0)
+BANNER_POS_FG = "#ff6b6b"          # rosso leggibile su fondo scuro (contrasto > 4,5:1 su #14141c)
+BANNER_CTX_FG = "#ffd23f"          # giallo (contrasto > 10:1 su #14141c)
+BANNER_BG = "#14141c"
 
 # strumenti: (modo, icona, chiave_titolo, chiave_descrizione)
 TOOLS = [
@@ -225,6 +232,18 @@ class MaskCanvas(QWidget):
         self._handles: list = []       # maniglie ridimensiona/ruota (in modalità Sposta)
         self._handle_rects: dict = {}  # role -> QRectF (hit test)
         self._tf = None                # stato trasformazione attiva
+        # ── Integra: due maschere (POSIZIONE rossa, CONTESTO gialla), sempre visibili ──
+        self.integrate_ctx_mode = "auto"           # "auto" (dilatazione della sagoma, integrate_context_pct) | "manual" (pennello)
+        self.integrate_draw_target = "position"    # in manuale: quale maschera si sta disegnando ("position" | "context")
+        self.integrate_ctx_enabled = True          # False = il motore non usa la maschera di contesto (es. Krea 2 Edit)
+        self._ctx_manual = None                    # QImage ARGB (giallo) della zona di contesto disegnata a mano
+        self._ctx_touched = False                  # il contesto manuale e gia stato precompilato/disegnato
+        self._ctx_undo: list[QImage] = []
+        self._ctx_redo: list[QImage] = []
+        self._ovl_sig = None
+        self._ovl_base = None
+        self._ovl_pos = None
+        self._ovl_ctx = None
 
         self.frame_item = QGraphicsRectItem(QRectF(0, 0, self.aspect_w, self.aspect_h))
         self.frame_item.setPen(QPen(Qt.NoPen))                 # sfondo del frame (sotto la foto)
@@ -252,8 +271,18 @@ class MaskCanvas(QWidget):
 
         self.mask_item = QGraphicsPixmapItem(); self.mask_item.setZValue(500)
         self.scene.addItem(self.mask_item)
+        # Sovrapposizioni di Integra: item SEPARATI (come il contorno blu del punto 12), mai nell'export (_render_scene li nasconde).
+        # Contesto (giallo) sotto, posizione (rosso) sopra; sotto il pennello (500) e le maniglie (720).
+        self._ovl_ctx = QGraphicsPixmapItem(); self._ovl_ctx.setZValue(460); self._ovl_ctx.setAcceptedMouseButtons(Qt.NoButton)
+        self._ovl_pos = QGraphicsPixmapItem(); self._ovl_pos.setZValue(470); self._ovl_pos.setAcceptedMouseButtons(Qt.NoButton)
+        self.scene.addItem(self._ovl_ctx); self.scene.addItem(self._ovl_pos)
+        self._ovl_transp = {"position": 50, "context": 50}      # trasparenza % di OGNI sovrapposizione (solo visualizzazione)
+        self._ovl_timer = QTimer(self); self._ovl_timer.setSingleShot(True); self._ovl_timer.setInterval(90)
+        self._ovl_timer.timeout.connect(self.refresh_integrate_overlay)
 
         self._build_ui(); self._refresh_mask(); self._rebuild_layer_list(); self._fit()
+        self.scene.changed.connect(self._ovl_schedule)   # sposta/ridimensiona/aggiungi layer: l'anteprima si aggiorna da sola
+        self._update_banner(); self.refresh_integrate_overlay()
 
     # ---------- modello "entries": ogni immagine ha la sua maschera ----------
     def _new_mask(self) -> QImage:
@@ -368,12 +397,26 @@ class MaskCanvas(QWidget):
         bar.addWidget(self.aspect_btn)
         # Bottone «Integra immagini» spostato nel tab «Inpaint / Outpaint», sezione Integra.
         bar.addStretch(1)
+        # «Stai disegnando»: in Integra manuale pennello e gomma agiscono SOLO sulla maschera scelta qui
+        self.draw_target_lbl = QLabel(tr("canvas.draw_target_lbl", "Stai disegnando:"))
+        self._draw_target_cb = QComboBox()
+        self._draw_target_cb.addItem(tr("canvas.draw_target_pos", "Posizione"), "position")
+        self._draw_target_cb.addItem(tr("canvas.draw_target_ctx", "Contesto"), "context")
+        self._draw_target_cb.setToolTip(tr("canvas.draw_target_tt", "Quale maschera di Integra disegnano pennello e gomma: Posizione (rosso) = dove sta il soggetto; Contesto (giallo) = quanto il modello puo ridisegnare attorno."))
+        self._draw_target_cb.currentIndexChanged.connect(self._on_draw_target_changed)
+        bar.addWidget(self.draw_target_lbl); bar.addWidget(self._draw_target_cb)
+        self.draw_target_lbl.setVisible(False); self._draw_target_cb.setVisible(False)    # solo con «Manuale (pennello)»
         bar.addWidget(QLabel(tr("canvas.brush_label")))
         self.brush_sl = QSlider(Qt.Horizontal); self.brush_sl.setRange(3, 200); self.brush_sl.setValue(self.brush_size)
         self.brush_sl.setMaximumWidth(140); self.brush_sl.valueChanged.connect(self.set_brush)
         bar.addWidget(self.brush_sl)
         self.brush_lbl = QLabel(f"{self.brush_size}px"); bar.addWidget(self.brush_lbl)
         lay.addLayout(bar)
+        # Scritta ben leggibile della maschera in disegno (colore della maschera, fondo scuro: contrasto > 4,5:1 anche su foto chiare)
+        self.draw_banner = QLabel(""); self.draw_banner.setObjectName("draw_banner")
+        self.draw_banner.setAlignment(Qt.AlignCenter)
+        self.draw_banner_color = BANNER_CTX_FG
+        lay.addWidget(self.draw_banner)
 
         mid = QHBoxLayout(); mid.setSpacing(6)
         # ---- colonna strumenti VERTICALE (solo icone) a sinistra ----
@@ -387,6 +430,23 @@ class MaskCanvas(QWidget):
         self._mode_btns["move"].setChecked(True)
         mid.addLayout(toolcol)
         mid.addWidget(self.view, 1)
+        # DUE cursori VERTICALI di trasparenza, uno per sovrapposizione (posizione rossa / contesto gialla): solo visualizzazione,
+        # non cambiano le maschere inviate. Ognuno vale solo per la sua sovrapposizione.
+        self.ovl_transp_sl = {}
+        self.ovl_transp_val = {}
+        for _key, _fg, _txt, _def in (("position", BANNER_POS_FG, tr("canvas.ovl_transp_pos", "Trasparenza posizione"), self._ovl_transp["position"]),
+                                      ("context", BANNER_CTX_FG, tr("canvas.ovl_transp_ctx", "Trasparenza contesto"), self._ovl_transp["context"])):
+            tcol = QVBoxLayout(); tcol.setSpacing(2); tcol.setContentsMargins(0, 2, 0, 2)
+            _lab = QLabel(_txt); _lab.setAlignment(Qt.AlignHCenter); _lab.setWordWrap(True); _lab.setMaximumWidth(72)
+            _lab.setStyleSheet("QLabel{color:%s;background:%s;border-radius:4px;padding:1px 3px;font-size:10px;font-weight:bold;}" % (_fg, BANNER_BG))
+            sl = QSlider(Qt.Vertical); sl.setRange(0, 100); sl.setValue(int(_def)); sl.setMinimumHeight(110)
+            sl.setToolTip(tr("canvas.ovl_transp_tt", "Trasparenza di questa sovrapposizione: 0 = piena, 100 = invisibile. Solo visualizzazione, non cambia le maschere inviate."))
+            val = QLabel(f"{int(_def)}%"); val.setAlignment(Qt.AlignHCenter)
+            sl.valueChanged.connect(lambda v, k=_key: self._on_ovl_transp(k, v))
+            tcol.addWidget(_lab); tcol.addWidget(sl, 1, Qt.AlignHCenter); tcol.addWidget(val)
+            mid.addLayout(tcol)
+            self.ovl_transp_sl[_key] = sl; self.ovl_transp_val[_key] = val
+        self.ovl_transp_pos_sl = self.ovl_transp_sl["position"]; self.ovl_transp_ctx_sl = self.ovl_transp_sl["context"]   # attributi pubblici: gui_state li ricorda
         # ---- pannello layer (immagini importate) a destra ----
         side = QVBoxLayout()
         side.addWidget(QLabel(tr("canvas.images_panel_label")))
@@ -425,6 +485,20 @@ class MaskCanvas(QWidget):
             "QPushButton:hover{background:rgba(46,86,140,230);color:#fff;border-color:#7fb0ff;}")
         self.upload_overlay.clicked.connect(self._load_dialog)
         self.upload_overlay.adjustSize()
+        # legenda piccola + interruttore mostra/nascondi delle due sovrapposizioni (widget sopra la vista: non e nella scena, non va nell'export)
+        self.ovl_legend = QWidget(self.view)
+        self.ovl_legend.setObjectName("ovl_legend")
+        self.ovl_legend.setStyleSheet("QWidget#ovl_legend{background:%s;border-radius:6px;} QLabel{background:transparent;}" % BANNER_BG)
+        _ll = QHBoxLayout(self.ovl_legend); _ll.setContentsMargins(6, 2, 6, 2); _ll.setSpacing(6)
+        self.ovl_show_cb = QCheckBox(tr("canvas.ovl_show", "Mostra zone"))
+        self.ovl_show_cb.setChecked(True)
+        self.ovl_show_cb.setStyleSheet("color:#e8e8f0;")
+        self.ovl_show_cb.setToolTip(tr("canvas.ovl_show_tt", "Mostra o nasconde le sovrapposizioni di posizione (rosso) e contesto (giallo)."))
+        self.ovl_show_cb.toggled.connect(lambda _v: self.refresh_integrate_overlay(force=True))
+        self.ovl_leg_pos = QLabel("<span style='color:%s'>&#9632;</span> <span style='color:#e8e8f0'>%s</span>" % (BANNER_POS_FG, tr("canvas.draw_target_pos", "Posizione")))
+        self.ovl_leg_ctx = QLabel("<span style='color:%s'>&#9632;</span> <span style='color:#e8e8f0'>%s</span>" % (BANNER_CTX_FG, tr("canvas.draw_target_ctx", "Contesto")))
+        _ll.addWidget(self.ovl_show_cb); _ll.addWidget(self.ovl_leg_pos); _ll.addWidget(self.ovl_leg_ctx)
+        self.ovl_legend.adjustSize()
         self._position_overlay()
 
     def _position_overlay(self):
@@ -434,6 +508,9 @@ class MaskCanvas(QWidget):
         vp = self.view.viewport()
         ov.move((vp.width() - ov.width()) // 2, (vp.height() - ov.height()) // 2)
         ov.setVisible(self._image_path is None)
+        lg = getattr(self, "ovl_legend", None)
+        if lg is not None:
+            lg.adjustSize(); lg.move(6, max(0, vp.height() - lg.height() - 6)); lg.raise_()
 
     # ---------- tooltip grafico degli strumenti ----------
     def _show_hint(self, btn: "_ToolButton"):
@@ -464,6 +541,7 @@ class MaskCanvas(QWidget):
         elif m == "lasso":
             self.status.setText(tr("canvas.status_lasso"))
         self._update_handles()      # maniglie visibili solo in modalità Sposta
+        self._update_banner()
 
     # ---------- cursore-cerchio del pennello (mostra il diametro reale) ----------
     def _ensure_brush_cursor(self):
@@ -479,6 +557,7 @@ class MaskCanvas(QWidget):
         if not inside:
             self._brush_cursor.setVisible(False); return
         r = self.brush_size / 2.0
+        self._brush_cursor.setPen(QPen(QColor(CTX_RGB[0], CTX_RGB[1], CTX_RGB[2]) if self._ctx_active() else QColor(POS_RGB[0], POS_RGB[1], POS_RGB[2]), 1.5))
         self._brush_cursor.setRect(QRectF(sp.x()-r, sp.y()-r, 2*r, 2*r))
         self._brush_cursor.setVisible(True)
 
@@ -665,6 +744,8 @@ class MaskCanvas(QWidget):
             self.frame_border.setRect(QRectF(0, 0, self.aspect_w, self.aspect_h))
         for e in self._entries:        # ridimensiona la maschera di ogni immagine
             e["mask"] = e["mask"].scaled(self.aspect_w, self.aspect_h) if not e["mask"].isNull() else self._new_mask()
+        if self._ctx_manual is not None:
+            self._ctx_manual = self._ctx_manual.scaled(self.aspect_w, self.aspect_h)
         self._refresh_mask(); self._fit()
         self.set_resolution_label(self.aspect_w, self.aspect_h)   # sincronizza etichetta menu Proporzioni
 
@@ -726,6 +807,7 @@ class MaskCanvas(QWidget):
         self._image_path = None
         self._clear_seg_marker()
         self._undo.clear(); self._redo.clear()
+        self._ctx_reset()
         self._rebuild_layer_list()
         self._refresh_mask()
         self.status.setText(tr("canvas.status_cleared", "Canvas svuotato: nessuna immagine iniziale."))
@@ -1026,40 +1108,67 @@ class MaskCanvas(QWidget):
         self._reindex_z(); self._rebuild_layer_list(); self._refresh_mask()
 
     # ---------- maschera: paint / fill / undo ----------
+    def _ctx_active(self) -> bool:
+        """True se pennello/gomma/annulla agiscono sulla maschera di CONTESTO (Integra manuale + selettore «Contesto»)."""
+        return (self.integrate_ctx_mode == "manual" and self.integrate_ctx_enabled
+                and self.integrate_draw_target == "context" and self._ctx_manual is not None)
+
     def push_undo(self):
+        if self._ctx_active():
+            self._ctx_undo.append(self._ctx_manual.copy())
+            if len(self._ctx_undo) > MAX_UNDO:
+                self._ctx_undo.pop(0)
+            self._ctx_redo.clear()
+            return
         self._undo.append(self.mask_image.copy())
         if len(self._undo) > MAX_UNDO:
             self._undo.pop(0)
         self._redo.clear()
 
     def undo(self):
+        if self._ctx_active():
+            if self._ctx_undo:
+                self._ctx_redo.append(self._ctx_manual.copy())
+                self._ctx_manual = self._ctx_undo.pop(); self.refresh_integrate_overlay(force=True)
+            return
         if self._undo:
             self._redo.append(self.mask_image.copy())
             self.mask_image = self._undo.pop(); self._refresh_mask()
 
     def redo(self):
+        if self._ctx_active():
+            if self._ctx_redo:
+                self._ctx_undo.append(self._ctx_manual.copy())
+                self._ctx_manual = self._ctx_redo.pop(); self.refresh_integrate_overlay(force=True)
+            return
         if self._redo:
             self._undo.append(self.mask_image.copy())
             self.mask_image = self._redo.pop(); self._refresh_mask()
 
     def paint_at(self, sp: QPointF):
-        p = QPainter(self.mask_image)
+        ctx = self._ctx_active()                      # Integra manuale, «Stai disegnando: Contesto» → pennello GIALLO sulla maschera di contesto
+        p = QPainter(self._ctx_manual if ctx else self.mask_image)
         if self.mode == "erase":
             p.setCompositionMode(QPainter.CompositionMode_Clear); p.setBrush(Qt.transparent)
         else:
-            p.setBrush(QColor(255, 40, 40, 150))
+            p.setBrush(QColor(CTX_RGB[0], CTX_RGB[1], CTX_RGB[2], 150) if ctx else QColor(255, 40, 40, 150))
         p.setPen(Qt.NoPen)
         p.drawEllipse(sp, self.brush_size/2, self.brush_size/2); p.end()
-        self._refresh_mask()
+        if ctx:
+            self._ctx_touched = True
+            self.refresh_integrate_overlay(force=True)
+        else:
+            self._refresh_mask()
 
     def fill_at(self, sp: QPointF):
         # flood fill semplice sull'alpha della maschera, partendo dal punto
         x, y = int(sp.x()), int(sp.y())
         if not (0 <= x < self.aspect_w and 0 <= y < self.aspect_h):
             return
-        img = self.mask_image
+        ctx = self._ctx_active()
+        img = self._ctx_manual if ctx else self.mask_image
         target_on = (img.pixel(x, y) >> 24) & 0xFF > 0
-        fillcol = QColor(255, 40, 40, 150).rgba()
+        fillcol = QColor(CTX_RGB[0], CTX_RGB[1], CTX_RGB[2], 150).rgba() if ctx else QColor(255, 40, 40, 150).rgba()
         clear = (self.mode == "erase")
         stack = [(x, y)]; seen = set()
         W, H = self.aspect_w, self.aspect_h
@@ -1074,12 +1183,19 @@ class MaskCanvas(QWidget):
                 continue
             img.setPixel(cx, cy, 0 if clear else fillcol)
             stack += [(cx+1, cy), (cx-1, cy), (cx, cy+1), (cx, cy-1)]
-        self._refresh_mask()
+        if ctx:
+            self._ctx_touched = True
+            self.refresh_integrate_overlay(force=True)
+        else:
+            self._refresh_mask()
 
     def _refresh_mask(self):
         self.mask_item.setPixmap(QPixmap.fromImage(self.mask_image))
 
     def clear_mask(self, silent: bool = False):
+        if not silent and self._ctx_active():
+            self.clear_context()                                   # «Pulisci» con «Stai disegnando: Contesto» svuota il contesto, non la posizione
+            return
         if not silent:
             self.push_undo()
         self.mask_image.fill(Qt.transparent); self._refresh_mask()
@@ -1125,7 +1241,7 @@ class MaskCanvas(QWidget):
 
     def _render_scene(self, painter, target: QRectF, source: QRectF):
         """Renderizza la scena nascondendo maschera/maniglie/marker (non devono finire nell'output)."""
-        hidden = [self.mask_item] + list(self._handles)
+        hidden = [self.mask_item] + list(self._handles) + [i for i in (self._ovl_pos, self._ovl_ctx) if i is not None]
         if self._seg_marker is not None:
             hidden.append(self._seg_marker)
         if self._lasso_item is not None:
@@ -1345,37 +1461,199 @@ class MaskCanvas(QWidget):
         a = img.convertToFormat(QImage.Format_Alpha8)
         buf = np.frombuffer(a.constBits(), dtype=np.uint8, count=a.sizeInBytes())
         arr = np.array(buf.reshape(a.height(), a.bytesPerLine())[:, :a.width()])
-        k = _cv2.getStructuringElement(_cv2.MORPH_ELLIPSE, (2 * px + 1, 2 * px + 1))
-        d = np.ascontiguousarray(_cv2.dilate((arr > 0).astype(np.uint8) * 255, k))
+        src = arr > 0
+        if not src.any():
+            return img
+        # Dilatazione = tutti i pixel entro `px` dalla forma (distanza euclidea esatta): equivale al kernel ellittico, ma costa come un
+        # solo passaggio anche per raggi enormi (oltre il 100 % del soggetto un kernel (2px+1)^2 sarebbe lentissimo). Il limite e il bordo.
+        dist = _cv2.distanceTransform((~src).astype(np.uint8), _cv2.DIST_L2, _cv2.DIST_MASK_PRECISE)
+        d = np.ascontiguousarray(((dist <= float(px)) | src).astype(np.uint8) * 255)
         out = QImage(d.data, d.shape[1], d.shape[0], d.strides[0], QImage.Format_Alpha8).copy()
         res = QImage(img.width(), img.height(), QImage.Format_ARGB32)
         res.fill(QColor(255, 255, 255))
         res.setAlphaChannel(out)
         return res
 
-    def export_integrate(self, out_dir: Path) -> dict:
-        """Input stile MagicQuill `foreground_edit` — la ricetta che INTEGRA DAVVERO (validata il 3/06).
+    # ── Integra: parametri dal pannello, sovrapposizioni, banner ─────────────────────────────────────────────────────────
+    def set_integrate_context(self, mode: str | None = None, pct: float | None = None, enabled: bool | None = None) -> None:
+        """Il pannello Integra comanda il canvas. `mode` = "auto" | "manual"; `pct` = frazione (0.25 = 25 % del lato lungo del soggetto; None/0 = come
+        prima); `enabled` = il motore usa la maschera di contesto (False per Krea 2 Edit: niente sovrapposizione gialla, selettore spento)."""
+        if enabled is not None:
+            self.integrate_ctx_enabled = bool(enabled)
+        if pct is not None:
+            self.integrate_context_pct = None if not pct else max(0.0, float(pct))
+        if mode in ("auto", "manual") and mode != self.integrate_ctx_mode:
+            self.integrate_ctx_mode = mode
+            if mode == "manual":
+                if self._ctx_manual is None or not self._ctx_touched:
+                    self.context_from_auto()                          # parte PRECOMPILATO con la zona automatica del momento
+            else:
+                self.integrate_draw_target = "position"
+                self._draw_target_cb.blockSignals(True); self._draw_target_cb.setCurrentIndex(0); self._draw_target_cb.blockSignals(False)
+        manual = self.integrate_ctx_mode == "manual" and self.integrate_ctx_enabled
+        self.draw_target_lbl.setVisible(manual); self._draw_target_cb.setVisible(manual)
+        if not manual and self.integrate_draw_target != "position":
+            self.integrate_draw_target = "position"
+            self._draw_target_cb.blockSignals(True); self._draw_target_cb.setCurrentIndex(0); self._draw_target_cb.blockSignals(False)
+        self._update_banner()
+        self.refresh_integrate_overlay(force=True)
 
-        L'OGGETTO (maschera disegnata del layer, o in fallback il suo bbox) resta come seme; la ZONA DI
-        EDIT attorno (bbox cresciuto) va a BIANCO; il resto = base. Il modello rigenera quella zona: ed è
-        LARGA di proposito, perché lì dentro ci finiscono anche mano e braccio — così può PIEGARE IL
-        BRACCIO e far CHIUDERE LE DITA attorno all'oggetto, invece di limitarsi a rifinirne i bordi.
+    def _ovl_schedule(self, *_a) -> None:
+        try:
+            self._ovl_timer.start()
+        except RuntimeError:                                     # canvas gia distrutto (chiusura): niente da aggiornare
+            pass
 
-        Due strade sbagliate già percorse (13/07, entrambe verificate a occhio sul risultato):
-          · ring-mask sottile attorno alla sagoma → non c'è spazio per la mano: l'oggetto resta appoggiato;
-          · sagoma protetta + niente alone → l'oggetto è intatto ma la scena non lo accoglie.
-        La cucitura del riquadro NON si cura restringendo la maschera: si cura sfumandola (feather ampio
-        passato al backend da generate_integrate).
+    def _on_draw_target_changed(self, _i: int) -> None:
+        self.integrate_draw_target = self._draw_target_cb.currentData() or "position"
+        self._update_banner()
+        if self.brush_cursor_visible():
+            self._hide_brush_cursor()
 
-        Se non c'è NESSUN layer ma hai mascherato un'area della foto del canvas, quella è la regione da
-        integrare: stessa logica, l'oggetto è ciò che hai mascherato.
-        """
-        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    def brush_cursor_visible(self) -> bool:
+        return getattr(self, "_brush_cursor", None) is not None and self._brush_cursor.isVisible()
+
+    def _on_ovl_transp(self, key: str, v: int) -> None:
+        """Trasparenza di UNA sovrapposizione (solo visualizzazione: le maschere esportate non cambiano)."""
+        self._ovl_transp[key] = max(0, min(100, int(v)))
+        self.ovl_transp_val[key].setText(f"{self._ovl_transp[key]}%")
+        self._apply_overlay_opacity()
+
+    def _apply_overlay_opacity(self) -> None:
+        self._ovl_pos.setOpacity(1.0 - self._ovl_transp["position"] / 100.0)
+        self._ovl_ctx.setOpacity(1.0 - self._ovl_transp["context"] / 100.0)
+
+    def _ctx_pct_label(self) -> int:
+        return int(round((self.integrate_context_pct or 0.0) * 100))
+
+    def _update_banner(self) -> None:
+        """Scritta sopra il canvas: quale maschera si sta disegnando, nel colore di quella maschera, su fondo scuro (leggibile anche su foto chiare)."""
+        lab = getattr(self, "draw_banner", None)
+        if lab is None:
+            return
+        if self.integrate_ctx_mode == "manual" and self.integrate_ctx_enabled:
+            if self.integrate_draw_target == "context":
+                txt, col = tr("canvas.banner_ctx", "Stai disegnando: CONTESTO"), BANNER_CTX_FG
+            else:
+                txt, col = tr("canvas.banner_pos", "Stai disegnando: POSIZIONE"), BANNER_POS_FG
+        elif self.integrate_ctx_enabled:
+            txt, col = tr("canvas.banner_auto", "Contesto automatico: {n} %").format(n=self._ctx_pct_label()), BANNER_CTX_FG
+        else:
+            txt, col = tr("canvas.banner_pos", "Stai disegnando: POSIZIONE"), BANNER_POS_FG
+        self.draw_banner_color = col
+        lab.setText(txt)
+        lab.setStyleSheet("QLabel#draw_banner{color:%s;background:%s;font-size:15px;font-weight:bold;border-radius:6px;padding:3px 10px;}" % (col, BANNER_BG))
+
+    def _ctx_reset(self) -> None:
+        self._ctx_manual = None; self._ctx_touched = False
+        self._ctx_undo.clear(); self._ctx_redo.clear()
+        if self.integrate_ctx_mode == "manual":
+            self.context_from_auto(); self._ctx_touched = False
+
+    def _new_ctx_image(self) -> QImage:
+        m = QImage(self.aspect_w, self.aspect_h, QImage.Format_ARGB32); m.fill(Qt.transparent)
+        return m
+
+    def auto_context_alpha(self):
+        """Zona di contesto AUTOMATICA al valore corrente (= quella che verrebbe esportata in modalita automatica), come QImage alpha."""
+        obj, region, _w, any_region = self._build_integrate_masks()
+        if not any_region:
+            return None
+        sav = self.integrate_ctx_mode
+        self.integrate_ctx_mode = "auto"
+        try:
+            out, _px = self._integrate_context(obj, region, any_region)
+        finally:
+            self.integrate_ctx_mode = sav
+        return out
+
+    def context_from_auto(self) -> None:
+        """Precompila (o ripristina) la maschera di contesto manuale con la zona automatica del momento."""
+        if self._ctx_manual is not None:
+            self._ctx_undo.append(self._ctx_manual.copy())
+        auto = self.auto_context_alpha()
+        img = self._new_ctx_image()
+        if auto is not None:
+            tint = QImage(self.aspect_w, self.aspect_h, QImage.Format_ARGB32); tint.fill(QColor(CTX_RGB[0], CTX_RGB[1], CTX_RGB[2], 150))
+            tint.setAlphaChannel(auto.convertToFormat(QImage.Format_Alpha8).convertToFormat(QImage.Format_Alpha8))
+            img = tint
+        self._ctx_manual = img; self._ctx_touched = True
+        self._ctx_redo.clear()
+        self.refresh_integrate_overlay(force=True)
+
+    def clear_context(self) -> None:
+        """«Svuota»: toglie tutta la maschera di contesto manuale (resta la sagoma: contesto = posizione)."""
+        if self._ctx_manual is not None:
+            self._ctx_undo.append(self._ctx_manual.copy())
+        self._ctx_manual = self._new_ctx_image(); self._ctx_touched = True
+        self._ctx_redo.clear()
+        self.refresh_integrate_overlay(force=True)
+
+    @staticmethod
+    def _tint(alpha_src: QImage, rgb) -> QImage:
+        out = QImage(alpha_src.width(), alpha_src.height(), QImage.Format_ARGB32); out.fill(QColor(rgb[0], rgb[1], rgb[2]))
+        out.setAlphaChannel(alpha_src.convertToFormat(QImage.Format_Alpha8))
+        return out
+
+    def _ovl_signature(self):
+        """(firma della scena, firma delle impostazioni): la prima cambia se muovi/ridimensioni/aggiungi layer o disegni la posizione, la seconda se
+        cambi modo/percentuale/contesto manuale. Cosi un tratto di pennello CONTESTO non rifa il calcolo della sagoma."""
+        ents = []
+        for e in self._entries:
+            it = e["item"]
+            pm = it.pixmap()
+            ents.append((id(it), round(it.x(), 2), round(it.y(), 2), round(it.scale(), 4), round(it.rotation(), 3),
+                         pm.cacheKey() if not pm.isNull() else 0, e["mask"].cacheKey(), it.isVisible()))
+        scene_sig = (self._active, self.aspect_w, self.aspect_h, tuple(ents))
+        set_sig = (self.integrate_ctx_mode, self.integrate_ctx_enabled, self.integrate_context_pct, self.integrate_context_px,
+                   self.ovl_show_cb.isChecked() if hasattr(self, "ovl_show_cb") else True,
+                   self._ctx_manual.cacheKey() if self._ctx_manual is not None else 0)
+        return scene_sig, set_sig
+
+    def refresh_integrate_overlay(self, force: bool = False) -> None:
+        """Ridisegna in tempo reale le due sovrapposizioni: POSIZIONE (rosso) e CONTESTO (giallo), calcolate con lo STESSO codice dell'export.
+        Sono item separati dalla foto: non finiscono mai nell'immagine esportata."""
+        if self._ovl_pos is None:
+            return
+        sig = self._ovl_signature()
+        if not force and sig == self._ovl_sig:
+            return
+        scene_changed = self._ovl_sig is None or sig[0] != self._ovl_sig[0]
+        self._ovl_sig = sig
+        self._apply_overlay_opacity()
+        show = self.ovl_show_cb.isChecked() if hasattr(self, "ovl_show_cb") else True
+        empty = QPixmap()
+        try:
+            if scene_changed or getattr(self, "_ovl_base", None) is None:
+                obj, region, _w, any_region = self._build_integrate_masks()
+                # posizione = sagoma; dove la maschera del layer selezionato e gia mostrata dal pennello (mask_item) non la ridisegno (niente rosso doppio)
+                pos_alpha = obj.copy()
+                act = self._entries[self._active] if 0 <= self._active < len(self._entries) else None
+                if act is not None and self._mask_filled(act["mask"]):
+                    pp = QPainter(pos_alpha); pp.setCompositionMode(QPainter.CompositionMode_DestinationOut)
+                    pp.drawImage(0, 0, act["mask"].convertToFormat(QImage.Format_ARGB32)); pp.end()
+                self._ovl_base = (obj, region, any_region, QPixmap.fromImage(self._tint(pos_alpha, POS_RGB)) if any_region else empty)
+            obj, region, any_region, pos_pm = self._ovl_base
+        except Exception:                                        # noqa: BLE001  (l'anteprima non deve mai rompere il canvas)
+            self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
+        if not any_region or not show:
+            self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
+        self._ovl_pos.setPixmap(pos_pm)
+        if not self.integrate_ctx_enabled:
+            self._ovl_ctx.setPixmap(empty); return
+        if self.integrate_ctx_mode == "manual" and self._ctx_manual is not None:
+            ctx_show = self._ctx_manual                            # in manuale si vede il TRATTO (giallo) cosi come e disegnato
+        else:
+            ctx_show, _px = self._integrate_context(obj, region, any_region)
+        self._ovl_ctx.setPixmap(QPixmap.fromImage(self._tint(ctx_show, CTX_RGB)))
+
+
+    def _build_integrate_masks(self):
+        """Costruisce le tre maschere di base di Integra (senza contesto allargato): oggetto/sagoma, zona di edit e alone da sbiancare.
+        Usata da export_integrate e dall'anteprima sul canvas, cosi quello che vedi e quello che parte."""
         W, H = self.aspect_w, self.aspect_h
         frame = QRectF(0, 0, W, H)
         grow = max(24, int(0.05 * max(W, H)))
-        self._auto_cutout_opaque_layers()
-        comp = QImage(self._composite(out_dir)).convertToFormat(QImage.Format_ARGB32)
         obj = QImage(W, H, QImage.Format_ARGB32); obj.fill(Qt.transparent)        # dove c'è l'oggetto
         region = QImage(W, H, QImage.Format_ARGB32); region.fill(Qt.transparent)  # zona di edit
         wreg = QImage(W, H, QImage.Format_ARGB32); wreg.fill(Qt.transparent)      # zona da SBIANCARE
@@ -1418,16 +1696,59 @@ class MaskCanvas(QWidget):
                             QColor(255, 255, 255))
                 any_region = True
         po.end(); pr.end(); pv.end()
+        return obj, region, wreg, any_region
+
+    def _integrate_context(self, obj: QImage, region: QImage, any_region: bool):
+        """Maschera di CONTESTO finale (zona che il modello puo rigenerare) = contesto UNITO alla sagoma, e i pixel di dilatazione usati.
+        Automatica: la zona di sempre, allargata dilatando la stessa forma di `integrate_context_pct` (frazione del lato lungo della sagoma, senza tetto:
+        l'unico limite e il bordo dell'immagine). Manuale: la zona disegnata col pennello giallo."""
+        if not any_region:
+            return region, 0
+        if self.integrate_ctx_mode == "manual" and self.integrate_ctx_enabled and self._ctx_manual is not None:
+            return self._alpha_union_alpha(self._binarize(self._ctx_manual, 1), obj), 0
         ctx_px = 0
         if self.integrate_context_px is not None:
             ctx_px = int(self.integrate_context_px)
-        elif self.integrate_context_pct is not None and any_region:
+        elif self.integrate_context_pct is not None:
             _b = self._mask_bounds(obj) if np is not None else QRectF()
             if _b.isNull():
                 _b = self._mask_bounds(region)
             ctx_px = int(round(float(self.integrate_context_pct) * max(_b.width(), _b.height())))
-        if ctx_px > 0 and any_region:
-            region = self._dilate_alpha(region, ctx_px)           # CONTESTO: stessa forma, allargata di ctx_px
+        if ctx_px > 0:
+            region = self._dilate_alpha(region, ctx_px)           # stessa forma, allargata di ctx_px
+        return self._alpha_union_alpha(region, obj), ctx_px
+
+    @staticmethod
+    def _alpha_union_alpha(a: QImage, b: QImage) -> QImage:
+        """Unione di due maschere (alpha): il risultato e bianco dove una delle due ha alpha."""
+        out = QImage(a.width(), a.height(), QImage.Format_ARGB32); out.fill(Qt.transparent)
+        p = QPainter(out); p.drawImage(0, 0, a); p.drawImage(0, 0, b); p.end()
+        return out
+
+    def export_integrate(self, out_dir: Path) -> dict:
+        """Input stile MagicQuill `foreground_edit` — la ricetta che INTEGRA DAVVERO (validata il 3/06).
+
+        L'OGGETTO (maschera disegnata del layer, o in fallback il suo bbox) resta come seme; la ZONA DI
+        EDIT attorno (bbox cresciuto) va a BIANCO; il resto = base. Il modello rigenera quella zona: ed è
+        LARGA di proposito, perché lì dentro ci finiscono anche mano e braccio — così può PIEGARE IL
+        BRACCIO e far CHIUDERE LE DITA attorno all'oggetto, invece di limitarsi a rifinirne i bordi.
+
+        Due strade sbagliate già percorse (13/07, entrambe verificate a occhio sul risultato):
+          · ring-mask sottile attorno alla sagoma → non c'è spazio per la mano: l'oggetto resta appoggiato;
+          · sagoma protetta + niente alone → l'oggetto è intatto ma la scena non lo accoglie.
+        La cucitura del riquadro NON si cura restringendo la maschera: si cura sfumandola (feather ampio
+        passato al backend da generate_integrate).
+
+        Se non c'è NESSUN layer ma hai mascherato un'area della foto del canvas, quella è la regione da
+        integrare: stessa logica, l'oggetto è ciò che hai mascherato.
+        """
+        out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+        W, H = self.aspect_w, self.aspect_h
+        frame = QRectF(0, 0, W, H)
+        self._auto_cutout_opaque_layers()
+        comp = QImage(self._composite(out_dir)).convertToFormat(QImage.Format_ARGB32)
+        obj, region, wreg, any_region = self._build_integrate_masks()
+        region, ctx_px = self._integrate_context(obj, region, any_region)         # CONTESTO (auto o manuale) UNITO alla sagoma
         # alone bianco = zona da sbiancare (solo foto opache) MENO l'oggetto
         whiten = wreg.copy()
         pw = QPainter(whiten); pw.setCompositionMode(QPainter.CompositionMode_DestinationOut)
@@ -1474,6 +1795,7 @@ class MaskCanvas(QWidget):
             self.scene.removeItem(e["item"])
         del self._entries[1:]
         self._active = 0
+        self._ctx_reset()
         self._rebuild_layer_list()
 
     def load_result(self, path: str):
