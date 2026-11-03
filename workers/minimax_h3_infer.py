@@ -234,6 +234,15 @@ def purge_big_quantized_tensors(min_bytes: int = 32 << 20, device_type: str = "c
     import torch
     freed = 0
     seen = set()
+    if log:                                                          # diagnosi (una sola riga): chi tiene il tensore quantizzato piu grande ancora vivo
+        try:
+            _big = max((o for o in gc.get_objects() if isinstance(o, torch.Tensor) and o.device.type == device_type
+                        and o.dtype in (torch.int8, torch.uint8, torch.float8_e4m3fn, torch.float8_e5m2) and o.numel() * o.element_size() >= min_bytes),
+                       key=lambda t: t.numel() * t.element_size(), default=None)
+            if _big is not None:
+                log("proprietari del tensore quantizzato piu grande ancora vivo: " + ", ".join(sorted({type(r).__name__ for r in gc.get_referrers(_big)})[:8]))
+        except Exception:                                            # noqa: BLE001
+            pass
     for o in gc.get_objects():
         try:
             if isinstance(o, torch.Tensor) and o.device.type == device_type and o.dtype in (torch.int8, torch.uint8, torch.float8_e4m3fn, torch.float8_e5m2):
