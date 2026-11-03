@@ -168,6 +168,22 @@ def _load_pipeline_single_file(model_dir: str, variant: str, loras: tuple, dit: 
     return pipe
 
 
+def _load_transformer_fp8_direct(model_dir: str, loras: tuple, device: str):
+    """Transformer Krea 2 caricato DIRETTAMENTE sul device (device_map), con le LoRA fuse e il cast fp8 fatti LI: la CPU non vede mai la copia bf16 da 25 GB.
+    Prima: from_pretrained su CPU (35,8 GB di commit con il TE) + cast fp8 su CPU (52 GB, restano committati anche dopo) + LoRA = 58-63 GB di processo
+    (giro A del 03/11, guardiano commit a 16-18 GB liberi). Ora il commit e circa il bf16 sulla GPU (che WDDM addebita) e scende a ~13 GB dopo il cast.
+    Stessi pesi del percorso di prima (stesso cast bf16->fp8; la fusione LoRA gira sul device invece che su CPU)."""
+    from diffusers import Krea2Transformer2DModel
+    tr = Krea2Transformer2DModel.from_pretrained(os.path.join(model_dir, "transformer"), torch_dtype=torch.bfloat16, device_map=device)
+    if loras:
+        from workers import krea2_custom as K
+        K.apply_loras(tr, list(loras), log=lambda m: print(m, flush=True))
+    tr.enable_layerwise_casting(storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    return tr
+
+
 def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = "", te: str = ""):
     key = (model_dir, variant, tuple(loras), dit, te)
     if key in _PIPE_CACHE:
@@ -197,16 +213,40 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = "
     from diffusers import DiffusionPipeline
     print(f"[krea2] carico Krea2Pipeline: {model_dir} (variant={variant})", flush=True)
     _te = _te_kwargs(model_dir, te)
+    # CARICO DIRETTO SU GPU (fp8): se il piano e fp8 e la VRAM libera basta per il transformer bf16 (+ margine), lo si carica su cuda con LoRA e cast fp8 li
+    # (vedi _load_transformer_fp8_direct): niente picco di 52-63 GB di commit di processo. Spento con KREA2_FP8_DIRECT=0; ogni errore -> percorso di prima.
+    _pre_tr = None
+    if os.environ.get("KREA2_FP8_DIRECT", "1") == "1" and torch.cuda.is_available():
+        try:
+            _free0 = _free_vram_mb()
+            _plan0 = "legacy"
+            try:
+                from core import vram_calibration as _vc0, vram_estimate as _ve0
+                _plan0 = _vc0.plan_krea2_placement(_free0, _ve0.cache_get(model_dir), _ve0.cache_get(model_dir, "fp8"))
+            except Exception:                                  # noqa: BLE001
+                _plan0 = "legacy"
+            _want0 = (_plan0 in ("cuda_fp8", "offload_fp8")) if _plan0 != "legacy" else (_free0 < 40000)
+            if _want0 and _free0 >= 28000:
+                _pre_tr = _load_transformer_fp8_direct(model_dir, tuple(loras), "cuda")
+                print(f"[krea2] transformer caricato DIRETTO su GPU in fp8 (VRAM libera {_free0}MB, LoRA fuse sul device)", flush=True)
+        except Exception as ex:                                # noqa: BLE001
+            print(f"[krea2] carico diretto fp8 non riuscito ({type(ex).__name__}: {str(ex)[:200]}) -> percorso di prima", flush=True)
+            _pre_tr = None
+            import gc as _gc0
+            _gc0.collect()
+            torch.cuda.empty_cache()
+    _tkw = {"transformer": _pre_tr} if _pre_tr is not None else {}
     try:
         from krea2 import Krea2Pipeline as _Pipe                # se il pacchetto è installato
-        pipe = _Pipe.from_pretrained(model_dir, torch_dtype=torch.bfloat16, **_te)
+        pipe = _Pipe.from_pretrained(model_dir, torch_dtype=torch.bfloat16, **_tkw, **_te)
     except Exception:                                          # noqa: BLE001 — fallback custom-code HF
         pipe = DiffusionPipeline.from_pretrained(model_dir, torch_dtype=torch.bfloat16, trust_remote_code=True,
-                                                 **_te)
+                                                 **_tkw, **_te)
 
     # LoRA PRIMA del fp8: si caricano e si FONDONO nei pesi bf16, poi si casta a fp8 (altrimenti la matmul
     # della LoRA su pesi Float8_e4m3fn non è implementata).
-    _apply_loras(pipe, list(loras))
+    if _pre_tr is None:
+        _apply_loras(pipe, list(loras))
 
     # ── PLACEMENT PLANNER-DRIVEN (unificazione, commit 3): decide dal footprint MISURATO nel DB
     # canonico (core/vram_estimate, popolato al primo load) invece delle soglie fisse. Prima run
@@ -223,7 +263,9 @@ def _load_pipeline(model_dir: str, variant: str, loras: tuple = (), dit: str = "
     _fp8_applied = False
     try:
         _want_fp8 = (_plan in ("cuda_fp8", "offload_fp8")) if _plan != "legacy" else (free < 40000)
-        if _want_fp8 and hasattr(pipe, "transformer"):
+        if _pre_tr is not None:
+            _fp8_applied = True                                # gia fp8 (caricato diretto): niente secondo cast/hook
+        elif _want_fp8 and hasattr(pipe, "transformer"):
             pipe.transformer.enable_layerwise_casting(
                 storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
             _fp8_applied = True
