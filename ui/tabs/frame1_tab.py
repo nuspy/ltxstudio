@@ -84,6 +84,8 @@ KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
 # ── Tabella dei motori di Integra: cosa sa fare ciascuno ────────────────────────────────────────────────────────────────
 # `context_mask`: il motore usa le DUE maschere (posizione = dove sta il soggetto, contesto = zona che puo ridisegnare). Un motore nuovo che non e
 # elencato qui la EREDITA (default True): basta aggiungere una riga solo per i motori che NON la usano. Krea 2 Edit lavora per riferimenti, senza maschera.
+from ui.mask_canvas import DEFAULT_CTX_PX  # noqa: E402  (margine di contesto predefinito, px)
+
 INTEGRATE_ENGINE_CAPS = {
     "kontext":      {"context_mask": True},
     "flux2":        {"context_mask": True},
@@ -1815,19 +1817,23 @@ class Frame1Tab(QWidget):
         self.integrate_ctx_mode = QComboBox()
         self.integrate_ctx_mode.addItem(tr("f1.ctx.mode_auto", "Automatica"), "auto")
         self.integrate_ctx_mode.addItem(tr("f1.ctx.mode_manual", "Manuale (pennello)"), "manual")
-        self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = allargata di una percentuale; Manuale = la disegni tu."))
+        self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = la sagoma allargata di N pixel; Manuale = la disegni tu."))
         self._ctx_mode_lbl = QLabel(tr("f1.ctx.mode_lbl", "Zona di contesto"))
         g.addRow(self._ctx_mode_lbl, self.integrate_ctx_mode)
-        self.integrate_ctx_slider = QSlider(Qt.Horizontal); self.integrate_ctx_slider.setRange(0, 300); self.integrate_ctx_slider.setValue(0)
-        self.integrate_ctx_spin = QSpinBox(); self.integrate_ctx_spin.setRange(0, 10000); self.integrate_ctx_spin.setSuffix(" %"); self.integrate_ctx_spin.setValue(0)
-        self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine in piu attorno al soggetto, in % del suo lato lungo. 0 = come prima (riquadro + 5 % della scena). Nessun tetto: il cursore arriva a 300 %, il campo accetta di piu; il limite e il bordo dell'immagine."))
+        self.integrate_ctx_slider = QSlider(Qt.Horizontal); self.integrate_ctx_slider.setRange(0, self.canvas.integrate_range_max()); self.integrate_ctx_slider.setValue(DEFAULT_CTX_PX)
+        self.integrate_ctx_spin = QSpinBox(); self.integrate_ctx_spin.setRange(0, 100000); self.integrate_ctx_spin.setSuffix(" px"); self.integrate_ctx_spin.setValue(DEFAULT_CTX_PX)
+        self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine attorno alla sagoma, in pixel (la forma della sagoma allargata tutto intorno). 0 = solo la sagoma; 87 = circa la zona di prima. Nessun tetto: il cursore arriva a meta del lato lungo dell'immagine, il campo accetta di piu; il limite e il bordo dell'immagine."))
         self.integrate_ctx_spin.setToolTip(self.integrate_ctx_slider.toolTip())
-        _cr = QHBoxLayout(); _cr.addWidget(self.integrate_ctx_slider, 1); _cr.addWidget(self.integrate_ctx_spin)
+        # a fianco, piccola e in sola lettura: la % equivalente sulla LARGHEZZA della sagoma (larga 200 px, 100 px = 50 %)
+        self.integrate_ctx_pct_lbl = QLabel("")
+        self.integrate_ctx_pct_lbl.setStyleSheet("color:#9aa; font-size:10px;")
+        self.integrate_ctx_pct_lbl.setToolTip(tr("f1.ctx.pct_equiv.tt", "Percentuale equivalente sulla larghezza della sagoma (solo lettura)."))
+        _cr = QHBoxLayout(); _cr.addWidget(self.integrate_ctx_slider, 1); _cr.addWidget(self.integrate_ctx_spin); _cr.addWidget(self.integrate_ctx_pct_lbl)
         self._ctx_pct_row = self._wrapw(_cr)
         self._ctx_pct_lbl = QLabel(tr("f1.ctx.pct_lbl", "Margine di contesto"))
         g.addRow(self._ctx_pct_lbl, self._ctx_pct_row)
         self.integrate_ctx_from_auto_btn = QPushButton(tr("f1.ctx.from_auto", "Da automatica"))
-        self.integrate_ctx_from_auto_btn.setToolTip(tr("f1.ctx.from_auto.tt", "Riempie la zona di contesto con quella automatica del momento (al valore % scelto)."))
+        self.integrate_ctx_from_auto_btn.setToolTip(tr("f1.ctx.from_auto.tt", "Riempie la zona di contesto con quella automatica del momento (al margine in pixel scelto)."))
         self.integrate_ctx_clear_btn = QPushButton(tr("f1.ctx.clear", "Svuota"))
         self.integrate_ctx_clear_btn.setToolTip(tr("f1.ctx.clear.tt", "Cancella tutta la zona di contesto disegnata: resta solo la sagoma del soggetto."))
         _mb = QHBoxLayout(); _mb.addWidget(self.integrate_ctx_from_auto_btn); _mb.addWidget(self.integrate_ctx_clear_btn); _mb.addStretch(1)
@@ -1837,6 +1843,8 @@ class Frame1Tab(QWidget):
         self.integrate_ctx_mode.currentIndexChanged.connect(self._on_ctx_changed)
         self.integrate_ctx_slider.valueChanged.connect(self._on_ctx_slider)
         self.integrate_ctx_spin.valueChanged.connect(self._on_ctx_spin)
+        self.canvas.integrate_range_changed.connect(self._on_ctx_range)
+        self.canvas.ctx_geometry_changed.connect(self._update_ctx_pct_label)
         self.integrate_ctx_from_auto_btn.clicked.connect(lambda: self.canvas.context_from_auto())
         self.integrate_ctx_clear_btn.clicked.connect(lambda: self.canvas.clear_context())
         self._on_ctx_changed(); self._sync_ctx_controls()
@@ -2330,7 +2338,23 @@ class Frame1Tab(QWidget):
         self._ctx_manual_lbl.setVisible(manual); self._ctx_manual_row.setVisible(manual)
         cv = getattr(self, "canvas", None)
         if cv is not None:
-            cv.set_integrate_context(self.integrate_ctx_mode.currentData() or "auto", self.integrate_ctx_spin.value() / 100.0)
+            cv.set_integrate_context(self.integrate_ctx_mode.currentData() or "auto", self.integrate_ctx_spin.value())
+        self._update_ctx_pct_label()
+
+    def _on_ctx_range(self, mx: int):
+        """Il cursore arriva a meta del lato lungo dell'immagine (cambia con le proporzioni); il campo resta libero."""
+        sl = self.integrate_ctx_slider
+        sl.blockSignals(True); sl.setRange(0, max(1, int(mx))); sl.setValue(min(self.integrate_ctx_spin.value(), sl.maximum())); sl.blockSignals(False)
+
+    def _update_ctx_pct_label(self, *_):
+        """% equivalente sulla LARGHEZZA della sagoma (sola lettura): sagoma larga 200 px, 100 px = 50 %."""
+        lab = getattr(self, "integrate_ctx_pct_lbl", None)
+        cv = getattr(self, "canvas", None)
+        if lab is None or cv is None:
+            return
+        w = cv.silhouette_width()
+        px = self.integrate_ctx_spin.value()
+        lab.setText(tr("f1.ctx.pct_equiv", "≈ {p} % della larghezza").format(p=int(round(100.0 * px / w))) if w > 0 else "")
 
     def _sync_ctx_controls(self, idx: int | None = None):
         """Abilita/disabilita la zona di contesto in base al motore (tabella INTEGRATE_ENGINE_CAPS) e spiega il perche."""
@@ -2346,9 +2370,9 @@ class Frame1Tab(QWidget):
             for w in (self.integrate_ctx_mode, self._ctx_mode_lbl, self.integrate_ctx_slider, self.integrate_ctx_spin):
                 w.setToolTip(why)
         else:
-            self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = allargata di una percentuale; Manuale = la disegni tu."))
+            self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = la sagoma allargata di N pixel; Manuale = la disegni tu."))
             self._ctx_mode_lbl.setToolTip("")
-            self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine in piu attorno al soggetto, in % del suo lato lungo. 0 = come prima (riquadro + 5 % della scena). Nessun tetto: il cursore arriva a 300 %, il campo accetta di piu; il limite e il bordo dell'immagine."))
+            self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine attorno alla sagoma, in pixel (la forma della sagoma allargata tutto intorno). 0 = solo la sagoma; 87 = circa la zona di prima. Nessun tetto: il cursore arriva a meta del lato lungo dell'immagine, il campo accetta di piu; il limite e il bordo dell'immagine."))
             self.integrate_ctx_spin.setToolTip(self.integrate_ctx_slider.toolTip())
         cv = getattr(self, "canvas", None)
         if cv is not None:

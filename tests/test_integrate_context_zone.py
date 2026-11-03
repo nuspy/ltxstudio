@@ -81,7 +81,7 @@ def test_banner_text_and_colour_follow_the_selector(tab):
     cv = tab.canvas
     assert _contrast(BANNER_POS_FG, BANNER_BG) >= 4.5 and _contrast(BANNER_CTX_FG, BANNER_BG) >= 4.5
     tab.integrate_ctx_spin.setValue(80)
-    assert cv.draw_banner.text() == tr("canvas.banner_auto", "Contesto automatico: {n} %").format(n=80)
+    assert cv.draw_banner.text() == tr("canvas.banner_auto", "Contesto automatico: {n} px").format(n=80) and "px" in cv.draw_banner.text()
     assert cv.draw_banner_color == BANNER_CTX_FG and BANNER_CTX_FG in cv.draw_banner.styleSheet() and BANNER_BG in cv.draw_banner.styleSheet()
     tab.integrate_ctx_mode.setCurrentIndex(tab.integrate_ctx_mode.findData("manual"))
     assert cv.draw_banner.text() == tr("canvas.banner_pos", "Stai disegnando: POSIZIONE")
@@ -98,17 +98,18 @@ def test_banner_text_and_colour_follow_the_selector(tab):
 
 def test_auto_margin_widgets_change_the_mask_that_is_sent_and_have_no_cap(tab):
     areas, pos_areas, px = {}, {}, {}
-    for pct in (0, 25, 60, 150, 400):
-        tab.integrate_ctx_spin.setValue(pct)                          # il CAMPO e libero: oltre il massimo del cursore (300) accetta lo stesso
-        r, ctx, pos = _export(tab, f"p{pct}")
-        areas[pct], pos_areas[pct], px[pct] = int(ctx.sum()), int(pos.sum()), r["context_px"]
+    for v in (0, 40, 100, 300, 900):
+        tab.integrate_ctx_spin.setValue(v)                            # il CAMPO e in pixel e libero: oltre il massimo del cursore accetta lo stesso
+        r, ctx, pos = _export(tab, f"p{v}")
+        areas[v], pos_areas[v], px[v] = int(ctx.sum()), int(pos.sum()), r["context_px"]
         assert not (pos & ~ctx).any(), "la posizione sta dentro il contesto"
-    assert tab.integrate_ctx_slider.value() == 300 and tab.integrate_ctx_spin.value() == 400
+        assert px[v] == v                                              # i pixel inviati sono ESATTAMENTE quelli del campo
+    assert tab.integrate_ctx_slider.value() == tab.integrate_ctx_slider.maximum() and tab.integrate_ctx_spin.value() == 900
+    assert tab.integrate_ctx_slider.maximum() == max(tab.canvas.aspect_w, tab.canvas.aspect_h) // 2     # il cursore arriva a meta del lato lungo
     assert len(set(pos_areas.values())) == 1                           # la posizione non cambia mai
-    assert areas[0] < areas[25] < areas[60] < areas[150]
-    assert areas[400] >= areas[150]                                    # oltre: limitato solo dal bordo
-    assert px[0] == 0 and px[25] > 0 and px[150] == pytest.approx(px[60] * 150 / 60, rel=0.05)    # i pixel di margine sono proporzionali al %
-    assert areas[400] <= 1024 * 768
+    assert areas[0] < areas[40] < areas[100] < areas[300]
+    assert areas[900] >= areas[300]                                    # oltre: limitato solo dal bordo
+    assert areas[900] <= 1024 * 768
 
 
 def test_manual_mode_prefills_from_auto_and_the_context_stroke_is_in_the_sent_mask(tab):
@@ -210,12 +211,28 @@ def test_context_selector_is_disabled_with_a_reason_for_engines_without_context_
     assert tab.integrate_ctx_mode.isEnabled() and tab.canvas.integrate_ctx_enabled
 
 
-def test_default_export_is_unchanged_when_nothing_is_touched(tab):
-    """Valori di default (automatica, 0 %): la maschera e quella di sempre (riquadro del soggetto + 5 % della scena)."""
-    r, ctx, pos = _export(tab, "default")
-    assert r["context_px"] == 0 and tab.canvas.integrate_context_pct is None
-    ys, xs = np.nonzero(ctx)
-    grow = max(24, int(0.05 * 1024))
-    bbox = tab.canvas._entries[1]["item"].sceneBoundingRect()
-    assert xs.min() == max(0, int(bbox.left()) - grow) or abs(xs.min() - (bbox.left() - grow)) <= 2
-    assert (ctx.sum()) >= pos.sum()
+def test_margin_is_in_pixels_around_the_true_silhouette_and_zero_means_the_silhouette(tab):
+    """Decisione dell'utente 03/11: base = la maschera VERA (sagoma), margine in PIXEL tutto intorno con la sua forma; 0 px = contesto = sagoma;
+    valore iniziale 87 px (circa l'area di prima: riquadro + 5 %); accanto la % equivalente sulla larghezza della sagoma (sola lettura)."""
+    from ui.mask_canvas import DEFAULT_CTX_PX
+    assert DEFAULT_CTX_PX == 87 and tab.integrate_ctx_spin.value() == 87 and tab.integrate_ctx_slider.value() == 87    # valore iniziale
+    tab.integrate_ctx_spin.setValue(0)
+    r0, ctx0, pos0 = _export(tab, "w0")
+    assert r0["context_px"] == 0 and pos0.any()
+    assert abs(int(ctx0.sum()) - int(pos0.sum())) <= 0.01 * pos0.sum()                              # 0 px = solo la sagoma
+    ys, xs = np.nonzero(pos0)
+    width = int(xs.max() - xs.min() + 1)
+    assert abs(tab.canvas.silhouette_width() - width) <= 1
+    for px in (30, 87, 100, 250):
+        tab.integrate_ctx_spin.setValue(px)
+        r, ctx, pos = _export(tab, f"w{px}")
+        assert r["context_px"] == px and (pos == pos0).all() and not (pos & ~ctx).any()
+        want = int(round(100.0 * px / tab.canvas.silhouette_width()))
+        assert f"{want}" in tab.integrate_ctx_pct_lbl.text(), (px, width, tab.integrate_ctx_pct_lbl.text())    # es. larga 200: 100 px = 50 %
+    # la zona NON e il riquadro: a 30 px la forma segue la sagoma (ellisse) e non riempie gli angoli del riquadro che la contiene
+    tab.integrate_ctx_spin.setValue(30)
+    _, ctx30, _ = _export(tab, "w30b")
+    box = ctx30[ys.min() - 5:ys.min() + 5, xs.min() - 5:xs.min() + 5]                              # angolo alto-sinistro del riquadro della sagoma
+    assert not box.all()
+    tab.canvas.set_aspect(512, 512)                                                                 # il cursore segue le proporzioni dell'immagine
+    assert tab.integrate_ctx_slider.maximum() == 256

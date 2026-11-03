@@ -41,6 +41,9 @@ CTX_RGB = (255, 204, 0)
 BANNER_POS_FG = "#ff6b6b"          # rosso leggibile su fondo scuro (contrasto > 4,5:1 su #14141c)
 BANNER_CTX_FG = "#ffd23f"          # giallo (contrasto > 10:1 su #14141c)
 BANNER_BG = "#14141c"
+# Contesto automatico: margine in PIXEL attorno alla sagoma vera (decisione dell'utente 03/11). 87 px = stessa area della zona di prima (riquadro + 5 % della
+# scena) sui casi di prova (scena 1152x832 + ritratto largo 389 px, scontornato: 87-88 px), cosi il comportamento predefinito resta vicino a quello di sempre.
+DEFAULT_CTX_PX = 87
 
 # strumenti: (modo, icona, chiave_titolo, chiave_descrizione)
 TOOLS = [
@@ -210,6 +213,8 @@ class MaskCanvas(QWidget):
     request_integrate = Signal()        # integra le immagini posizionate (composito + maschere)
     request_segment_region = Signal()   # selezione oggetto via click/riquadro (SAM)
     image_changed = Signal(str)         # nuova foto base nel canvas (path) → abilita i bottoni "usa canvas"
+    integrate_range_changed = Signal(int)   # massimo del cursore del margine di contesto = meta del lato lungo dell'immagine (px)
+    ctx_geometry_changed = Signal()     # sagoma ridisegnata (larghezza cambiata): il pannello aggiorna la % equivalente
 
     def __init__(self, store: MaskStore | None = None):
         super().__init__()
@@ -747,6 +752,7 @@ class MaskCanvas(QWidget):
         if self._ctx_manual is not None:
             self._ctx_manual = self._ctx_manual.scaled(self.aspect_w, self.aspect_h)
         self._refresh_mask(); self._fit()
+        self.integrate_range_changed.emit(self.integrate_range_max())
         self.set_resolution_label(self.aspect_w, self.aspect_h)   # sincronizza etichetta menu Proporzioni
 
     def _load_dialog(self):
@@ -1475,13 +1481,16 @@ class MaskCanvas(QWidget):
         return res
 
     # ── Integra: parametri dal pannello, sovrapposizioni, banner ─────────────────────────────────────────────────────────
-    def set_integrate_context(self, mode: str | None = None, pct: float | None = None, enabled: bool | None = None) -> None:
-        """Il pannello Integra comanda il canvas. `mode` = "auto" | "manual"; `pct` = frazione (0.25 = 25 % del lato lungo del soggetto; None/0 = come
-        prima); `enabled` = il motore usa la maschera di contesto (False per Krea 2 Edit: niente sovrapposizione gialla, selettore spento)."""
+    def set_integrate_context(self, mode: str | None = None, px: int | None = None, enabled: bool | None = None, pct: float | None = None) -> None:
+        """Il pannello Integra comanda il canvas. `mode` = "auto" | "manual"; `px` = margine in PIXEL attorno alla sagoma (0 = contesto = sagoma);
+        `pct` = alias: frazione della LARGHEZZA della sagoma (casi vecchi); `enabled` = il motore usa la maschera di contesto (False per Krea 2 Edit:
+        niente sovrapposizione gialla, selettore spento)."""
         if enabled is not None:
             self.integrate_ctx_enabled = bool(enabled)
-        if pct is not None:
-            self.integrate_context_pct = None if not pct else max(0.0, float(pct))
+        if px is not None:
+            self.integrate_context_px = max(0, int(px)); self.integrate_context_pct = None
+        elif pct is not None:
+            self.integrate_context_pct = max(0.0, float(pct)); self.integrate_context_px = None
         if mode in ("auto", "manual") and mode != self.integrate_ctx_mode:
             self.integrate_ctx_mode = mode
             if mode == "manual":
@@ -1523,8 +1532,33 @@ class MaskCanvas(QWidget):
         self._ovl_pos.setOpacity(1.0 - self._ovl_transp["position"] / 100.0)
         self._ovl_ctx.setOpacity(1.0 - self._ovl_transp["context"] / 100.0)
 
+    def silhouette_width(self) -> int:
+        """Larghezza (px) della sagoma vera dei soggetti incollati (estensione orizzontale), 0 se non c'e nulla: serve alla % equivalente del pannello."""
+        base = getattr(self, "_ovl_base", None)
+        if base is None:
+            try:
+                obj, region, _w, anyr = self._build_integrate_masks()
+            except Exception:                                    # noqa: BLE001
+                return 0
+        else:
+            obj, region, anyr = base[0], base[1], base[2]
+        if not anyr or np is None:
+            return 0
+        b = self._mask_bounds(obj)
+        if b.isNull():
+            b = self._mask_bounds(region)
+        return 0 if b.isNull() else int(round(b.width()))
+
+    def integrate_range_max(self) -> int:
+        """Massimo del cursore del margine: meta del lato lungo dell'immagine (il campo numerico accetta di piu)."""
+        return max(1, int(max(self.aspect_w, self.aspect_h) // 2))
+
     def _ctx_pct_label(self) -> int:
-        return int(round((self.integrate_context_pct or 0.0) * 100))
+        if self.integrate_context_px is not None:
+            return int(self.integrate_context_px)
+        if self.integrate_context_pct is not None:
+            return int(round(self.integrate_context_pct * (self.silhouette_width() or 0)))
+        return DEFAULT_CTX_PX
 
     def _update_banner(self) -> None:
         """Scritta sopra il canvas: quale maschera si sta disegnando, nel colore di quella maschera, su fondo scuro (leggibile anche su foto chiare)."""
@@ -1537,7 +1571,7 @@ class MaskCanvas(QWidget):
             else:
                 txt, col = tr("canvas.banner_pos", "Stai disegnando: POSIZIONE"), BANNER_POS_FG
         elif self.integrate_ctx_enabled:
-            txt, col = tr("canvas.banner_auto", "Contesto automatico: {n} %").format(n=self._ctx_pct_label()), BANNER_CTX_FG
+            txt, col = tr("canvas.banner_auto", "Contesto automatico: {n} px").format(n=self._ctx_pct_label()), BANNER_CTX_FG
         else:
             txt, col = tr("canvas.banner_pos", "Stai disegnando: POSIZIONE"), BANNER_POS_FG
         self.draw_banner_color = col
@@ -1636,6 +1670,7 @@ class MaskCanvas(QWidget):
             obj, region, any_region, pos_pm = self._ovl_base
         except Exception:                                        # noqa: BLE001  (l'anteprima non deve mai rompere il canvas)
             self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
+        self.ctx_geometry_changed.emit()
         if not any_region or not show:
             self._ovl_pos.setPixmap(empty); self._ovl_ctx.setPixmap(empty); return
         self._ovl_pos.setPixmap(pos_pm)
@@ -1646,6 +1681,7 @@ class MaskCanvas(QWidget):
         else:
             ctx_show, _px = self._integrate_context(obj, region, any_region)
         self._ovl_ctx.setPixmap(QPixmap.fromImage(self._tint(ctx_show, CTX_RGB)))
+        self.ctx_geometry_changed.emit()
 
 
     def _build_integrate_masks(self):
@@ -1700,23 +1736,28 @@ class MaskCanvas(QWidget):
 
     def _integrate_context(self, obj: QImage, region: QImage, any_region: bool):
         """Maschera di CONTESTO finale (zona che il modello puo rigenerare) = contesto UNITO alla sagoma, e i pixel di dilatazione usati.
-        Automatica: la zona di sempre, allargata dilatando la stessa forma di `integrate_context_pct` (frazione del lato lungo della sagoma, senza tetto:
-        l'unico limite e il bordo dell'immagine). Manuale: la zona disegnata col pennello giallo."""
+        Automatica (decisione dell'utente 03/11): si espande la maschera VERA della persona (la sagoma), non il riquadro che la contiene, di
+        `integrate_context_px` PIXEL tutto intorno, con la sua forma (distance transform), senza tetto: il limite e il bordo dell'immagine. 0 px = il
+        contesto coincide con la sagoma. Senza valore: DEFAULT_CTX_PX. `integrate_context_pct` (frazione della LARGHEZZA della sagoma) resta come alias
+        per i casi vecchi. Manuale: la zona disegnata col pennello giallo."""
         if not any_region:
             return region, 0
         if self.integrate_ctx_mode == "manual" and self.integrate_ctx_enabled and self._ctx_manual is not None:
             return self._alpha_union_alpha(self._binarize(self._ctx_manual, 1), obj), 0
-        ctx_px = 0
+        base = obj
+        _b = self._mask_bounds(obj) if np is not None else QRectF()
+        if _b.isNull():
+            base = region
+            _b = self._mask_bounds(region)
         if self.integrate_context_px is not None:
             ctx_px = int(self.integrate_context_px)
         elif self.integrate_context_pct is not None:
-            _b = self._mask_bounds(obj) if np is not None else QRectF()
-            if _b.isNull():
-                _b = self._mask_bounds(region)
-            ctx_px = int(round(float(self.integrate_context_pct) * max(_b.width(), _b.height())))
-        if ctx_px > 0:
-            region = self._dilate_alpha(region, ctx_px)           # stessa forma, allargata di ctx_px
-        return self._alpha_union_alpha(region, obj), ctx_px
+            ctx_px = int(round(max(0.0, float(self.integrate_context_pct)) * _b.width()))
+        else:
+            ctx_px = DEFAULT_CTX_PX
+        ctx_px = max(0, ctx_px)
+        ctx = self._dilate_alpha(base, ctx_px) if ctx_px > 0 else base.copy()          # stessa forma della sagoma, allargata di ctx_px
+        return self._alpha_union_alpha(ctx, obj), ctx_px
 
     @staticmethod
     def _alpha_union_alpha(a: QImage, b: QImage) -> QImage:
