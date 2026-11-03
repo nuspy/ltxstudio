@@ -1184,7 +1184,9 @@ class VideoEditAITab(QWidget):
         self.h3_turbo = QComboBox()
         self.h3_turbo_lbl = QLabel(tr("vedit.h3.turbo_lbl", "Velocita (LoRA turbo)"))
         _lbl = {"v4": tr("vedit.h3.turbo.v4", "Turbo v4 · 8 passi (predefinita)"), "4": tr("vedit.h3.turbo.4", "Turbo 4 passi (Ref2VA, piu veloce)"),
-                "8": tr("vedit.h3.turbo.8", "Turbo 8 passi — solo FL2VA"), "dmad": tr("vedit.h3.turbo.dmad", "Turbo DMAD + v4 — solo FL2VA")}
+                "8": tr("vedit.h3.turbo.8", "Turbo 8 passi — solo FL2VA"), "dmad": tr("vedit.h3.turbo.dmad", "Turbo DMAD + v4 — solo FL2VA"),
+                "r4v10": tr("vedit.h3.turbo.r4v10", "Turbo 4 passi v1.0 768p (lightx2v, Ref2VA)"),
+                "r8v11": tr("vedit.h3.turbo.r8v11", "Turbo 8 passi v1.1 768p (lightx2v, Ref2VA)")}
         # prima le turbo che esistono per Ref2VA (v4 predefinita in testa), poi quelle solo FL2VA: visibili ma disattivate, col motivo
         order = sorted(vh3.turbo_choices(), key=lambda t: (not t["ref2va"], t["key"] != vh3.DEFAULT_TURBO))
         for t in order:

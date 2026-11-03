@@ -3048,6 +3048,66 @@
       "convert": "mmh3_lora"
     },
     {
+      "id": "mmh3-turbo-ref2v-4-v10",
+      "module": "Video",
+      "label": "MiniMax H3 Turbo LoRA 4 passi Ref2V v1.0 768p (lightx2v, diffusers)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.38,
+      "scan_names": [
+        "minimax_h3_ref2v_turbo_4step_v1.0_768p-native.safetensors",
+        "minimax_h3_ref2v_turbo_4step_v1.0_768p_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "lightx2v/Minimax-h3-Turbo",
+      "url": "https://huggingface.co/lightx2v/Minimax-h3-Turbo",
+      "filename": "minimax_h3_ref2v_turbo_4step_v1.0_768p-native.safetensors",
+      "remote_filename": "minimax_h3_ref2v_turbo_4step_v1.0_768p_bf16.safetensors",
+      "note": "formato diffusers (q/k/v separati, alpha 8 rank 128 nei metadati): la conversione fonde q/k/v e cuoce alpha/rank in B; niente coppie AdaLN nel file",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "distill_lora",
+        "lora_style",
+        "ref_omni"
+      ],
+      "convert": "mmh3_lora_diffusers"
+    },
+    {
+      "id": "mmh3-turbo-ref2v-8-v11",
+      "module": "Video",
+      "label": "MiniMax H3 Turbo LoRA 8 passi Ref2V v1.1 768p (lightx2v, diffusers)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.38,
+      "scan_names": [
+        "minimax_h3_ref2v_turbo_8step_v1.1_768p-native.safetensors",
+        "minimax_h3_ref2v_turbo_8step_v1.1_768p_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "lightx2v/Minimax-h3-Turbo",
+      "url": "https://huggingface.co/lightx2v/Minimax-h3-Turbo",
+      "filename": "minimax_h3_ref2v_turbo_8step_v1.1_768p-native.safetensors",
+      "remote_filename": "minimax_h3_ref2v_turbo_8step_v1.1_768p_bf16.safetensors",
+      "note": "formato diffusers come la 4 passi v1.0; 8 passi, shift video 6",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "use": [
+        "distill_lora",
+        "lora_style",
+        "ref_omni"
+      ],
+      "convert": "mmh3_lora_diffusers"
+    },
+    {
       "id": "mmh3-configs",
       "module": "Video",
       "label": "MiniMax H3 config + tokenizer (ufficiali, ~25MB)",

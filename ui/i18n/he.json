@@ -3789,5 +3789,8 @@
   "vedit.h3.te.profile": "של הפרופיל (ברירת מחדל)",
   "vedit.h3.te.tt": "מקודד הטקסט של H3. ברירת מחדל: זה של הפרופיל שנבחר. בחירה ידנית נועדה להשוואות (אותו מקודד לכל המודלים).",
   "vedit.h3.lora.why.convert": "לא בפורמט מקורי: המירו בלשונית «משקולות» (העריכה משתמשת רק ב-LoRA מקוריות)",
-  "vedit.h3.lora.why.guide": "דורשת מדריך לטנטים מיושר (AddGuide, פריים 0) שעריכת H3 של LTX Studio עדיין אינה כוללת"
+  "vedit.h3.lora.why.guide": "דורשת מדריך לטנטים מיושר (AddGuide, פריים 0) שעריכת H3 של LTX Studio עדיין אינה כוללת",
+  "vedit.h3.turbo.r4v10": "Turbo 4 צעדים v1.0 768p (lightx2v, Ref2VA)",
+  "vedit.h3.turbo.r8v11": "Turbo 8 צעדים v1.1 768p (lightx2v, Ref2VA)",
+  "vedit.h3.lora.why.twin": "הגרסה המקורית (-native) כבר קיימת: השתמשו בה"
 }

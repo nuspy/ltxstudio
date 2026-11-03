@@ -51,8 +51,10 @@ _TURBO_DEFECT_CACHE: dict = {}
 
 
 def turbo_lora_defect(key: str) -> str:
-    """"adaln" se la LoRA turbo Ref2VA di `key` e sul disco ma NON ha gli adattatori AdaLN (`transformer_blocks.N.adaln_proj.*`): difetto noto della conversione ComfyUI sui
-    pruned (issue ModelTC/Minimax-H3-Turbo#7), la turbo v4 ne ha 100 e la 4 passi v0.1 zero → distillazione monca, resa non attendibile. "" se a posto o non installata."""
+    """"adaln" se la LoRA turbo Ref2VA di `key` e sul disco, e stata convertita da una versione ComfyUI (metadato `source` con «comfyui») e NON ha gli adattatori AdaLN
+    (`transformer_blocks.N.adaln_proj.*`): difetto noto della conversione ComfyUI sui pruned (issue ModelTC/Minimax-H3-Turbo#7: la sorgente tocca l'AdaLN a 2688 canali,
+    il pruned ne ha 8, le 51 coppie si perdono), la turbo v4 ne ha 100 e la 4 passi v0.1 zero → distillazione monca. Le turbo lightx2v in formato DIFFUSERS (r4v10, r8v11)
+    non hanno coppie AdaLN per costruzione (1,38 GB contro 1,96 della versione Comfy) e NON sono segnate: la resa si giudica dal giro dal vivo. "" se a posto o non installata."""
     import json as _j
     import re as _re
     import struct as _st
@@ -70,9 +72,11 @@ def turbo_lora_defect(key: str) -> str:
         try:
             with open(path, "rb") as f:
                 n = _st.unpack("<Q", f.read(8))[0]
-                keys = [k for k in _j.loads(f.read(n)) if k != "__metadata__"] if 0 < n < 100_000_000 else []
+                hdr = _j.loads(f.read(n)) if 0 < n < 100_000_000 else {}
+            keys = [k for k in hdr if k != "__metadata__"]
+            src = str((hdr.get("__metadata__") or {}).get("source", "")).lower()
             has = any(_re.search(r"transformer_blocks\.\d+\.adaln_proj", k) for k in keys)
-            _TURBO_DEFECT_CACHE[sig] = "" if (has or not keys) else "adaln"
+            _TURBO_DEFECT_CACHE[sig] = "" if (has or not keys or "comfyui" not in src) else "adaln"
         except Exception:                                    # noqa: BLE001
             _TURBO_DEFECT_CACHE[sig] = ""
     return _TURBO_DEFECT_CACHE[sig]
@@ -105,7 +109,7 @@ _FL2VA_ONLY_TOKENS = ("fl2v", "i2v")          # LoRA addestrate per prima/ultima
 _LORA_CACHE: dict = {}
 
 
-LORA_REASONS = {"": "", "missing": "file non trovato",
+LORA_REASONS = {"": "", "missing": "file non trovato", "twin": "esiste gia la versione nativa (-native): usa quella",
                 "convert": "non e in formato nativo: convertila dal tab «Pesi» (l'edit usa solo LoRA native)",
                 "guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora",
                 "arch": "non e una LoRA di MiniMax H3 (le chiavi dell'header non hanno i moduli del DiT H3)",
@@ -149,7 +153,8 @@ def lora_edit_check(path: str, name: str = "") -> tuple[bool, str]:
     try:
         from core import native_convert as _nc
         if not _nc.is_native(path):
-            return False, "convert"
+            stem, ext = os.path.splitext(path)
+            return False, ("twin" if os.path.isfile(stem + "-native" + ext) else "convert")
     except Exception:                                        # noqa: BLE001
         pass
     if any(t in low for t in _GUIDE_TOKENS):

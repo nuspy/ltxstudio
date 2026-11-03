@@ -3789,5 +3789,8 @@
   "vedit.h3.te.profile": "A profilé (alapértelmezett)",
   "vedit.h3.te.tt": "H3 szövegkódoló. Alapértelmezett: a választott profilé. Kézi választása összehasonlításhoz való (minden modellhez ugyanaz a kódoló).",
   "vedit.h3.lora.why.convert": "nem natív formátumú: alakítsd át a «Súlyok» lapon (a szerkesztés csak natív LoRA-kat használ)",
-  "vedit.h3.lora.why.guide": "igazított látens vezetőre (AddGuide, 0. kép) van szüksége, amit az LTX Studio H3-szerkesztése még nem tud"
+  "vedit.h3.lora.why.guide": "igazított látens vezetőre (AddGuide, 0. kép) van szüksége, amit az LTX Studio H3-szerkesztése még nem tud",
+  "vedit.h3.turbo.r4v10": "Turbo 4 lépés v1.0 768p (lightx2v, Ref2VA)",
+  "vedit.h3.turbo.r8v11": "Turbo 8 lépés v1.1 768p (lightx2v, Ref2VA)",
+  "vedit.h3.lora.why.twin": "a natív verzió (-native) már megvan: azt használd"
 }

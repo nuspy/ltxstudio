@@ -35,10 +35,10 @@ def _cfg(clip, **kw):
     return c
 
 
-def _lora(path: Path, keys, native=True):
+def _lora(path: Path, keys, native=True, source=None):
     hdr = {k: {"dtype": "F32", "shape": [1], "data_offsets": [0, 4]} for k in keys}
     if native:
-        hdr["__metadata__"] = {"ltx_native": "ltx-native-1"}
+        hdr["__metadata__"] = {"ltx_native": "ltx-native-1", **({"source": source} if source else {})}
     raw = json.dumps(hdr).encode()
     path.write_bytes(struct.pack("<Q", len(raw)) + raw + b"\0\0\0\0")
     return str(path)
@@ -158,12 +158,14 @@ def test_loras_not_native_or_needing_the_aligned_guide_are_disabled_with_a_reaso
 def test_turbo_lora_without_adaln_adapters_is_refused(clip, tmp_path, monkeypatch):
     """4 passi Ref2V v0.1 (conversione ComfyUI sui pruned): 0 chiavi transformer_blocks.N.adaln_proj, la v4 ne ha 100 (ModelTC/Minimax-H3-Turbo#7)."""
     from core import model_paths as mp
-    bad = _lora(tmp_path / "turbo4.safetensors", H3_KEYS)                           # nessuna adaln_proj
+    bad = _lora(tmp_path / "turbo4.safetensors", H3_KEYS, source="minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors")     # da ComfyUI, nessuna adaln_proj
     ok = _lora(tmp_path / "turbov4.safetensors", H3_KEYS + [f"transformer_blocks.{i}.adaln_proj.lora_A.weight" for i in range(3)])
-    monkeypatch.setattr(mp, "p", lambda i, sub="": bad if i == "mmh3-turbo-lora-ref2v" else ok)
+    diffusers = _lora(tmp_path / "turbo_r4v10.safetensors", H3_KEYS, source="minimax_h3_ref2v_turbo_4step_v1.0_768p_bf16.safetensors")    # lightx2v diffusers: senza AdaLN per costruzione
+    monkeypatch.setattr(mp, "p", lambda i, sub="": bad if i == "mmh3-turbo-lora-ref2v" else (diffusers if i == "mmh3-turbo-ref2v-4-v10" else ok))
     monkeypatch.setattr(V, "turbo_lora_defect", _REAL_DEFECT)
     V._TURBO_DEFECT_CACHE.clear()
     assert V.turbo_lora_defect("4") == "adaln" and V.turbo_lora_defect("v4") == "" and V.turbo_lora_defect("8") == ""
+    assert V.turbo_lora_defect("r4v10") == ""                                       # la versione diffusers NON e segnata (si giudica dal giro dal vivo)
     ch = {t["key"]: t for t in V.turbo_choices()}
     assert ch["4"]["defect"] == "adaln" and ch["v4"]["defect"] == ""
     with pytest.raises(V.H3EditError, match="AdaLN"):
@@ -191,3 +193,25 @@ def test_rockerboo_nvfp4_is_a_custom_ref2va_model_in_the_menu(clip):
     assert p["h3_dit"] == "mmh3-dit-rockerboo-nvfp4" and S.weight_ids({**p, "references": [{"kind": "image"}]})["dit"] == "mmh3-dit-rockerboo-nvfp4"
     from core import model_paths as mp
     assert mp.entry("mmh3-dit-rockerboo-nvfp4")["filename"].startswith("minimax_h3_ref2va_pruned_nvfp4_convrot_int8")
+
+
+def test_new_lightx2v_ref2va_turbos_are_registered_with_their_steps_and_catalog_entries(clip):
+    assert S.TURBO["r4v10"][1:] == (4, 12.0) and S.TURBO["r8v11"][1:] == (8, 6.0)
+    ids = {k: S.weight_ids({"h3_profile": "nvfp4", "h3_turbo": k, "references": [{"kind": "image"}]})["turbo"] for k in ("r4v10", "r8v11")}
+    assert ids == {"r4v10": "mmh3-turbo-ref2v-4-v10", "r8v11": "mmh3-turbo-ref2v-8-v11"}
+    from core import model_paths as mp
+    for cid, fn in (("mmh3-turbo-ref2v-4-v10", "minimax_h3_ref2v_turbo_4step_v1.0_768p-native.safetensors"),
+                    ("mmh3-turbo-ref2v-8-v11", "minimax_h3_ref2v_turbo_8step_v1.1_768p-native.safetensors")):
+        e = mp.entry(cid)
+        assert e["filename"] == fn and e["convert"] == "mmh3_lora_diffusers" and e["type"] == "LoRA"
+    for k in ("r4v10", "r8v11"):
+        assert V.build_params(_cfg(clip, h3_turbo=k), "o.mp4", present=ALL)["h3_turbo"] == k
+        assert V.turbo_info(k) == S.TURBO[k][1:]
+
+
+def test_original_lora_with_a_native_twin_is_hidden_behind_the_native_one(tmp_path):
+    orig = _lora(tmp_path / "h3_character_swap_v1.5.safetensors", H3_KEYS, native=False)
+    assert V.lora_edit_check(orig) == (False, "convert")
+    _lora(tmp_path / "h3_character_swap_v1.5-native.safetensors", H3_KEYS)
+    assert V.lora_edit_check(orig) == (False, "twin")
+    assert V.lora_edit_check(str(tmp_path / "h3_character_swap_v1.5-native.safetensors")) == (True, "")

@@ -3828,5 +3828,8 @@
   "vedit.h3.te.profile": "Quello del profilo (predefinito)",
   "vedit.h3.te.tt": "Text encoder di H3. Predefinito: quello del profilo scelto. Sceglierlo a mano serve ai confronti (stesso encoder per tutti i modelli).",
   "vedit.h3.lora.why.convert": "non è in formato nativo: convertila dal tab «Pesi» (l'edit usa solo LoRA native)",
-  "vedit.h3.lora.why.guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora"
+  "vedit.h3.lora.why.guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora",
+  "vedit.h3.turbo.r4v10": "Turbo 4 passi v1.0 768p (lightx2v, Ref2VA)",
+  "vedit.h3.turbo.r8v11": "Turbo 8 passi v1.1 768p (lightx2v, Ref2VA)",
+  "vedit.h3.lora.why.twin": "esiste già la versione nativa (-native): usa quella"
 }

@@ -3789,5 +3789,8 @@
   "vedit.h3.te.profile": "O do perfil (padrão)",
   "vedit.h3.te.tt": "Text encoder do H3. Padrão: o do perfil escolhido. Escolher à mão serve para comparações (mesmo codificador para todos os modelos).",
   "vedit.h3.lora.why.convert": "não está em formato nativo: converta-a na aba «Pesos» (a edição só usa LoRAs nativas)",
-  "vedit.h3.lora.why.guide": "precisa do guia de latentes alinhado (AddGuide, quadro 0), que a edição H3 do LTX Studio ainda não tem"
+  "vedit.h3.lora.why.guide": "precisa do guia de latentes alinhado (AddGuide, quadro 0), que a edição H3 do LTX Studio ainda não tem",
+  "vedit.h3.turbo.r4v10": "Turbo 4 passos v1.0 768p (lightx2v, Ref2VA)",
+  "vedit.h3.turbo.r8v11": "Turbo 8 passos v1.1 768p (lightx2v, Ref2VA)",
+  "vedit.h3.lora.why.twin": "a versão nativa (-native) já existe: use essa"
 }

@@ -3789,5 +3789,8 @@
   "vedit.h3.te.profile": "프로필 기본값",
   "vedit.h3.te.tt": "H3 텍스트 인코더. 기본값: 선택한 프로필의 것. 직접 고르는 것은 비교용입니다(모든 모델에 같은 인코더).",
   "vedit.h3.lora.why.convert": "네이티브 형식이 아닙니다: “가중치” 탭에서 변환하세요(편집은 네이티브 LoRA만 사용)",
-  "vedit.h3.lora.why.guide": "정렬된 잠재 가이드(AddGuide, 0번 프레임)가 필요하지만 LTX Studio의 H3 편집에는 아직 없습니다"
+  "vedit.h3.lora.why.guide": "정렬된 잠재 가이드(AddGuide, 0번 프레임)가 필요하지만 LTX Studio의 H3 편집에는 아직 없습니다",
+  "vedit.h3.turbo.r4v10": "Turbo 4스텝 v1.0 768p (lightx2v, Ref2VA)",
+  "vedit.h3.turbo.r8v11": "Turbo 8스텝 v1.1 768p (lightx2v, Ref2VA)",
+  "vedit.h3.lora.why.twin": "네이티브 버전(-native)이 이미 있습니다: 그것을 사용하세요"
 }

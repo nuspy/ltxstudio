@@ -3789,5 +3789,8 @@
   "vedit.h3.te.profile": "沿用所选配置（默认）",
   "vedit.h3.te.tt": "H3 文本编码器。默认：所选配置自带的那个。手动选择用于对比（所有模型使用同一编码器）。",
   "vedit.h3.lora.why.convert": "不是原生格式：请在“权重”标签页转换（编辑只使用原生 LoRA）",
-  "vedit.h3.lora.why.guide": "需要对齐的潜变量引导（AddGuide，第 0 帧），LTX Studio 的 H3 编辑尚未支持"
+  "vedit.h3.lora.why.guide": "需要对齐的潜变量引导（AddGuide，第 0 帧），LTX Studio 的 H3 编辑尚未支持",
+  "vedit.h3.turbo.r4v10": "Turbo 4 步 v1.0 768p（lightx2v，Ref2VA）",
+  "vedit.h3.turbo.r8v11": "Turbo 8 步 v1.1 768p（lightx2v，Ref2VA）",
+  "vedit.h3.lora.why.twin": "已有原生版本（-native）：请使用它"
 }

@@ -3789,5 +3789,8 @@
   "vedit.h3.te.profile": "Der des Profils (Standard)",
   "vedit.h3.te.tt": "H3-Text-Encoder. Standard: der des gewählten Profils. Von Hand wählen dient Vergleichen (gleicher Encoder für alle Modelle).",
   "vedit.h3.lora.why.convert": "nicht im nativen Format: im Tab «Gewichte» konvertieren (der Edit nutzt nur native LoRAs)",
-  "vedit.h3.lora.why.guide": "braucht die ausgerichtete Latent-Guide (AddGuide, Frame 0), die der H3-Edit von LTX Studio noch nicht hat"
+  "vedit.h3.lora.why.guide": "braucht die ausgerichtete Latent-Guide (AddGuide, Frame 0), die der H3-Edit von LTX Studio noch nicht hat",
+  "vedit.h3.turbo.r4v10": "Turbo 4 Schritte v1.0 768p (lightx2v, Ref2VA)",
+  "vedit.h3.turbo.r8v11": "Turbo 8 Schritte v1.1 768p (lightx2v, Ref2VA)",
+  "vedit.h3.lora.why.twin": "die native Version (-native) existiert bereits: nutze diese"
 }

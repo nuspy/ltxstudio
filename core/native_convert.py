@@ -266,6 +266,63 @@ def _mmh3_lora():
     return _renamer(rename, extra=extra)
 
 
+def _mmh3_lora_diffusers():
+    """LoRA H3 in formato diffusers/peft (lightx2v «minimax-h3-diffusers»: Turbo ref2v 4 passi v1.0 / 8 passi v1.1 768p) → nomi nativi del DiT montato.
+
+    Chiavi sorgente: `transformer_blocks.N.attn.{to_q,to_k,to_v,to_out.0}` e `ff.net.0.proj` / `ff.net.2` (+ `token_refiner.refiner_blocks.N.*`), con
+    `lora_A.default.weight` / `lora_B.default.weight` e SENZA chiavi alpha (alpha nei metadati del file, rank dalle forme: scala = alpha/rank).
+    Nativo: q, k, v FUSI in `to_qkv` (A = A_q;A_k;A_v impilate sul rank, B = blocco-diagonale di B_q,B_k,B_v: stesso delta di ogni proiezione),
+    `ff.net.0.proj` → `ff.gate_up`, `ff.net.2` → `ff.out`. La scala alpha/rank e COTTA in B (il nativo senza chiavi alpha applica scala 1; con alpha 8 e rank
+    128 e 1/16, una potenza di 2: nessuna perdita in bf16). Non ci sono coppie AdaLN nel file (la LoRA non le ha)."""
+    torch = _torch()
+    pat = re.compile(r"^((?:transformer_blocks|token_refiner\.refiner_blocks)\.\d+)\.(attn\.(to_q|to_k|to_v|to_out\.0)|ff\.net\.(0\.proj|2))\.lora_([AB])\.default\.weight$")
+
+    def plan(key, info, header):
+        m = pat.match(key)
+        if m is None:
+            return []                                   # tutto cio che non e una coppia LoRA del DiT (non ce ne sono) non entra nel nativo
+        blk, mod, which = m.group(1), m.group(2), m.group(5)
+        meta = header.get("__srcmeta__") or {}
+        ctx = header.get("__ctx__", {})
+        alpha = float(meta.get("alpha") or 0)
+
+        def scale_of(a_key):
+            r = header[a_key]["shape"][0]
+            return (alpha / r) if alpha else 1.0
+
+        if mod in ("attn.to_k", "attn.to_v"):
+            return []                                   # consumate insieme a quella di to_q
+        if mod == "attn.to_q":
+            ks = {n: f"{blk}.attn.{n}.lora_{which}.default.weight" for n in ("to_q", "to_k", "to_v")}
+            a_keys = {n: f"{blk}.attn.{n}.lora_A.default.weight" for n in ("to_q", "to_k", "to_v")}
+            if which == "A":
+                def fuse_a(t, _ks=ks):
+                    if t.device.type == "meta":
+                        return torch.empty((3 * t.shape[0], t.shape[1]), dtype=t.dtype, device="meta")
+                    return torch.cat([t, ctx["get"](_ks["to_k"]), ctx["get"](_ks["to_v"])], 0).contiguous()
+                return [(f"{blk}.attn.to_qkv.lora_A.weight", fuse_a)]
+
+            def fuse_b(t, _ks=ks, _ak=a_keys):
+                if t.device.type == "meta":
+                    return torch.empty((3 * t.shape[0], 3 * t.shape[1]), dtype=t.dtype, device="meta")
+                parts = [t, ctx["get"](_ks["to_k"]), ctx["get"](_ks["to_v"])]
+                out = torch.zeros((sum(p.shape[0] for p in parts), sum(p.shape[1] for p in parts)), dtype=t.dtype)
+                r0 = c0 = 0
+                for p in parts:
+                    out[r0:r0 + p.shape[0], c0:c0 + p.shape[1]] = (p.float() * scale_of(_ak["to_q"])).to(t.dtype)
+                    r0 += p.shape[0]; c0 += p.shape[1]
+                return out
+            return [(f"{blk}.attn.to_qkv.lora_B.weight", fuse_b)]
+        target = {"attn.to_out.0": "attn.to_out.0", "ff.net.0.proj": "ff.gate_up", "ff.net.2": "ff.out"}[mod]
+        nk = f"{blk}.{target}.lora_{which}.weight"
+        if which == "A":
+            return [(nk, lambda t: t)]
+        a_key = key.replace("lora_B", "lora_A")
+        sc = scale_of(a_key)
+        return [(nk, lambda t, _s=sc: t if _s == 1.0 else (t.float() * _s).to(t.dtype))]
+    return plan
+
+
 def _mmh3_lora_guide():
     """LoRA H3 che porta nell'intestazione la geometria della guida (h3upscale: reference_downscale_factor,
     minimax_h3_guide_*). Stessa conversione di _mmh3_lora; in più il metadata del sorgente SOPRAVVIVE: senza,
@@ -498,6 +555,7 @@ CONVERTERS = {
     "mmh3_te": _mmh3_te,              # MiniMax H3 TE Qwen3-VL-32B (nvfp4-AWQ / fp8) → Qwen3VLForConditionalGeneration
     "mmh3_vae": _mmh3_vae,            # MiniMax H3 VAE video fp16 → AutoencoderKLMiniMaxH3
     "mmh3_lora": _mmh3_lora,
+    "mmh3_lora_diffusers": _mmh3_lora_diffusers,   # LoRA H3 in formato diffusers/peft (lightx2v turbo ref2v v1.0/v1.1 768p): q/k/v fusi, alpha/rank cotto in B
     "mmh3_lora_guide": _mmh3_lora_guide,   # LoRA H3 di GUIDA (h3upscale): come mmh3_lora ma conserva l'intestazione (fattore e geometria della guida)
     "mmh3_lora_fl": lambda: _mmh3_lora_released("fl2va"),    # LoRA H3 del modello completo → DiT pruned FL2VA
     "mmh3_lora_ref": lambda: _mmh3_lora_released("ref2va"),  # idem per il DiT pruned Ref2VA          # MiniMax H3 LoRA (turbo 4/8 passi ecc.) → nomi del modello nativo
@@ -570,6 +628,7 @@ def convert(converter: str, src: str | os.PathLike, dst: str | os.PathLike, *, d
             pass
     header = dict(header)
     header["__qconf__"], header["__ctx__"] = qconf, ctx
+    header["__srcmeta__"] = meta                                # metadati del sorgente (es. `alpha` delle LoRA diffusers lightx2v)
     order = [(k, v) for k, v in order if not k.startswith("__")]
     plan, out_header, off = [], {}, 0
     for key, info in order:
