@@ -512,7 +512,7 @@ def _sent_mask_area(w, spy):
 
 def case_integrate_context_zone(w, spy):
     """Integra «Zona di contesto»: i widget (selettore, cursore/campo %, pennello contesto, trasparenza) cambiano DAVVERO la maschera inviata
-    al backend; la trasparenza no; con Krea 2 Edit (niente maschera) il selettore e spento con spiegazione; la scritta segue il selettore."""
+    al backend; la trasparenza no; con Krea 2 Edit (niente maschera) i controlli sono nascosti; la scritta segue il selettore."""
     _force_native_up()
     _populate_inventory(w)
     f = w.frame1_tab
@@ -545,10 +545,12 @@ def case_integrate_context_zone(w, spy):
     cv.set_mode("brush"); cv.set_brush(80); cv.push_undo(); cv.paint_at(QPointF(cv.aspect_w * 0.9, cv.aspect_h * 0.9))
     amb, _ = _sent_mask_area(w, spy)
     assert amb > am, f"il tratto di contesto non e nella maschera inviata: {am} -> {amb}"
-    # Krea 2 Edit: niente maschera → selettore spento con tooltip
+    # Krea 2 Edit: niente maschera → selettore, scritta, legenda, cursori di trasparenza NASCOSTI (non disattivati) e nessuna maschera inviata
     f.integrate_engine.setCurrentIndex(2)
-    assert not f.integrate_ctx_mode.isEnabled() and f.integrate_ctx_mode.toolTip().strip(), "Krea: selettore contesto non disabilitato/spiegato"
+    assert f.integrate_ctx_mode.isHidden() and f._ctx_mode_lbl.isHidden(), "Krea: selettore contesto ancora visibile"
+    assert cv.draw_banner.isHidden() and cv.ovl_legend.isHidden() and cv.ovl_transp_box.isHidden(), "Krea: controlli del canvas ancora visibili"
     f.integrate_engine.setCurrentIndex(0)
+    assert not f.integrate_ctx_mode.isHidden() and not cv.ovl_transp_box.isHidden() and not cv.draw_banner.isHidden(), "Kontext: controlli non tornati"
 
 
 def case_integrate_pulid_separation(w, spy):

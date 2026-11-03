@@ -193,7 +193,8 @@ def test_overlay_is_live_with_the_slider(tab):
     assert area(a1) > area(a0) > 0
 
 
-def test_context_selector_is_disabled_with_a_reason_for_engines_without_context_mask(tab):
+def test_context_selector_is_hidden_for_engines_without_context_mask(tab):
+    """03/11 sera: con i motori che non usano le due maschere i controlli sono NASCOSTI (non piu disattivati con tooltip)."""
     from ui.tabs.frame1_tab import INTEGRATE_ENGINE_CAPS, integrate_engine_supports_context_mask
     assert integrate_engine_supports_context_mask("qwen_image21") and integrate_engine_supports_context_mask("flux2")
     assert integrate_engine_supports_context_mask("kontext") and integrate_engine_supports_context_mask("flux3")
@@ -202,13 +203,19 @@ def test_context_selector_is_disabled_with_a_reason_for_engines_without_context_
     assert INTEGRATE_ENGINE_CAPS["krea2"]["context_mask"] is False
     for idx, engine in ((0, "kontext"), (1, "flux2"), (3, "qwen_image21"), (4, "flux3")):
         tab.integrate_engine.setCurrentIndex(idx)
-        assert tab.integrate_ctx_mode.isEnabled() and tab.integrate_ctx_spin.isEnabled(), engine
+        assert not tab.integrate_ctx_mode.isHidden() and not tab._ctx_mode_lbl.isHidden(), engine
+        assert tab.canvas.integrate_ctx_enabled and not tab.canvas.draw_banner.isHidden(), engine
     tab.integrate_engine.setCurrentIndex(2)                                            # Krea 2 Edit
-    assert not tab.integrate_ctx_mode.isEnabled() and not tab.integrate_ctx_spin.isEnabled() and not tab.integrate_ctx_slider.isEnabled()
-    assert tab.integrate_ctx_mode.toolTip().strip() and tab.integrate_ctx_spin.toolTip().strip()
-    assert not tab.canvas.integrate_ctx_enabled and tab.canvas._ovl_ctx.pixmap().isNull()    # niente giallo se il motore non la usa
+    for w in (tab.integrate_ctx_mode, tab._ctx_mode_lbl, tab._ctx_pct_row, tab._ctx_pct_lbl, tab._ctx_manual_row, tab._ctx_manual_lbl):
+        assert w.isHidden(), w                                                         # slider/campo/% stanno dentro _ctx_pct_row
+    cv = tab.canvas
+    assert not cv.integrate_ctx_enabled and cv._ovl_ctx.pixmap().isNull() and cv._ovl_pos.pixmap().isNull()   # niente giallo ne rosso
+    for w in (cv.draw_banner, cv.ovl_legend, cv.ovl_transp_box, cv.draw_target_lbl, cv._draw_target_cb):
+        assert w.isHidden(), w
     tab.integrate_engine.setCurrentIndex(0)
-    assert tab.integrate_ctx_mode.isEnabled() and tab.canvas.integrate_ctx_enabled
+    assert not tab.integrate_ctx_mode.isHidden() and cv.integrate_ctx_enabled
+    for w in (cv.draw_banner, cv.ovl_legend, cv.ovl_transp_box):
+        assert not w.isHidden(), w
 
 
 def test_margin_is_in_pixels_around_the_true_silhouette_and_zero_means_the_silhouette(tab):

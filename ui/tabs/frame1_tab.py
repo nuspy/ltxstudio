@@ -83,21 +83,38 @@ KONTEXT_GUIDANCE_DEFAULT = 2.5
 KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
 # ── Tabella dei motori di Integra: cosa sa fare ciascuno ────────────────────────────────────────────────────────────────
 # `context_mask`: il motore usa le DUE maschere (posizione = dove sta il soggetto, contesto = zona che puo ridisegnare). Un motore nuovo che non e
-# elencato qui la EREDITA (default True): basta aggiungere una riga solo per i motori che NON la usano. Krea 2 Edit lavora per riferimenti, senza maschera.
+# elencato qui la EREDITA (default True): basta aggiungere una riga solo per i motori che NON la usano. Con False i controlli (selettore «Zona di
+# contesto», margine, cursori di trasparenza, scritta «Stai disegnando», legenda, sovrapposizioni rossa/gialla) sono NASCOSTI, non disattivati.
+# Verificato sul codice (03/11): export_integrate (ui/mask_canvas.py) scrive integrate_mask.png = contesto UNITO alla sagoma (la posizione) e
+# integrate_input.png (composito col soggetto-seme); generate_integrate (ui/main_window.py) li passa cosi:
+#   kontext      -> _start_native_kontext (main_window.py): mask_path = integrate_mask -> FluxInpaintPipeline / Flux2KleinInpaintPipeline
+#                   (inference_server/backends/image_flux.py, _MASK_ARCHS); con «puzzle LoRA» -> _start_native_mq_foreground: mask_path = zona di edit
+#                   per la ricomposizione (magicquill_v2.py: prepared=True, blend_mask = grow(mask, 25))
+#   flux2        -> stesso ramo di kontext (arch flux2_inpaint, mask_path); nessun backend riceve la maschera di posizione da sola
+#   qwen_image21 -> _start_native_qwen21_edit(mask=integrate_mask) -> workers/qwen_image21_infer.py (_annotate, _latent_mask, _paste_back)
+#   flux3        -> _start_native_flux3_edit(mask=integrate_mask) -> workers/flux3_infer.py (_paste_back)
+#   krea2        -> _start_native_krea2_edit([exp["image"]]): solo il composito, NESSUNA maschera -> controlli nascosti
+# `composes_layers`: la funzione compone davvero i layer importati sulla scena (il composito exp["image"] li contiene, ed export_integrate li scontorna
+# da se se opachi: _auto_cutout_opaque_layers). Vale per tutti i motori di Integra: «✂ Scontorna» / «↺ Sfondo» restano visibili (se ci sono layer).
 from ui.mask_canvas import DEFAULT_CTX_PX  # noqa: E402  (margine di contesto predefinito, px)
 
 INTEGRATE_ENGINE_CAPS = {
-    "kontext":      {"context_mask": True},
-    "flux2":        {"context_mask": True},
-    "qwen_image21": {"context_mask": True},
-    "flux3":        {"context_mask": True},
-    "krea2":        {"context_mask": False},
+    "kontext":      {"context_mask": True,  "composes_layers": True},
+    "flux2":        {"context_mask": True,  "composes_layers": True},
+    "qwen_image21": {"context_mask": True,  "composes_layers": True},
+    "flux3":        {"context_mask": True,  "composes_layers": True},
+    "krea2":        {"context_mask": False, "composes_layers": True},
 }
 
 
 def integrate_engine_supports_context_mask(engine: str) -> bool:
-    """True se il motore di Integra usa la maschera di contesto (default True per i motori non ancora in tabella)."""
+    """True se il motore di Integra usa le due maschere (default True per i motori non ancora in tabella)."""
     return bool(INTEGRATE_ENGINE_CAPS.get(str(engine), {}).get("context_mask", True))
+
+
+def integrate_engine_composes_layers(engine: str) -> bool:
+    """True se il motore di Integra compone i layer importati sulla scena (default True per i motori non ancora in tabella)."""
+    return bool(INTEGRATE_ENGINE_CAPS.get(str(engine), {}).get("composes_layers", True))
 
 
 QWEN21_ENGINE_IDX = 3       # posizione di «Qwen-Image 2.1» nei combo motore di Integra/Componi/Colore
@@ -168,10 +185,12 @@ class Frame1Tab(QWidget):
         # «Genera immagine» col bottone-azione in FOOTER ANCORATO (fuori dallo scroll → sempre
         # visibile). self.gen_btn è creato da _gen_box ma NON messo nel form.
         sub.addTab(self._anchored(self._scroll(self._gen_box()), self.gen_btn), tr("f1.tab.gen"))
-        sub.addTab(self._scroll(self._inpaint_box()), tr("f1.tab.inpaint"))
+        self._inpaint_tab_index = sub.addTab(self._scroll(self._inpaint_box()), tr("f1.tab.inpaint"))   # Inpaint/Outpaint, Integra, MagicQuill, Componi
         sub.addTab(self._scroll(self._color_box()), tr("f1.tab.color"))
         sub.addTab(self._scroll(self._upscale_box()), tr("f1.tab.upscale"))
         self.segment_box = self._segment_box()    # selezione AI (sotto il canvas, nel pannello principale)
+        sub.currentChanged.connect(self._sync_layer_tools)      # ✂/↺ solo dove i layer sono composti
+        self._sync_layer_tools()
 
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(sub)
@@ -2333,9 +2352,10 @@ class Frame1Tab(QWidget):
 
     def _on_ctx_changed(self, *_):
         """Modo/percentuale cambiati: aggiorna i controlli visibili e passa i parametri al canvas (che ridisegna la sovrapposizione dal vivo)."""
+        ok = getattr(self, "_ctx_supported", True)                  # motore che non usa le maschere: tutto nascosto
         manual = self.integrate_ctx_mode.currentData() == "manual"
-        self._ctx_pct_lbl.setVisible(not manual); self._ctx_pct_row.setVisible(not manual)
-        self._ctx_manual_lbl.setVisible(manual); self._ctx_manual_row.setVisible(manual)
+        self._ctx_pct_lbl.setVisible(ok and not manual); self._ctx_pct_row.setVisible(ok and not manual)
+        self._ctx_manual_lbl.setVisible(ok and manual); self._ctx_manual_row.setVisible(ok and manual)
         cv = getattr(self, "canvas", None)
         if cv is not None:
             cv.set_integrate_context(self.integrate_ctx_mode.currentData() or "auto", self.integrate_ctx_spin.value())
@@ -2357,26 +2377,32 @@ class Frame1Tab(QWidget):
         lab.setText(tr("f1.ctx.pct_equiv", "≈ {p} % della larghezza").format(p=int(round(100.0 * px / w))) if w > 0 else "")
 
     def _sync_ctx_controls(self, idx: int | None = None):
-        """Abilita/disabilita la zona di contesto in base al motore (tabella INTEGRATE_ENGINE_CAPS) e spiega il perche."""
+        """Mostra la zona di contesto (e le due maschere sul canvas) SOLO se il motore la usa (tabella INTEGRATE_ENGINE_CAPS); altrimenti la NASCONDE.
+        Aggiorna anche la visibilita di «✂ Scontorna» / «↺ Sfondo» (funzione che compone i layer)."""
         if not hasattr(self, "integrate_ctx_mode") or not hasattr(self, "integrate_engine"):
             return
         engine = self._engine_val(self.integrate_engine.currentIndex() if idx is None else idx)
         ok = integrate_engine_supports_context_mask(engine)
-        why = "" if ok else tr("f1.ctx.unsupported", "Questo motore non usa la maschera di contesto: lavora per riferimenti, senza maschera.")
-        for w in (self.integrate_ctx_mode, self.integrate_ctx_slider, self.integrate_ctx_spin,
-                  self.integrate_ctx_from_auto_btn, self.integrate_ctx_clear_btn, self._ctx_mode_lbl):
-            w.setEnabled(ok)
-        if not ok:
-            for w in (self.integrate_ctx_mode, self._ctx_mode_lbl, self.integrate_ctx_slider, self.integrate_ctx_spin):
-                w.setToolTip(why)
-        else:
-            self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = la sagoma allargata di N pixel; Manuale = la disegni tu."))
-            self._ctx_mode_lbl.setToolTip("")
-            self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine attorno alla sagoma, in pixel (la forma della sagoma allargata tutto intorno). 0 = solo la sagoma; 87 = circa la zona di prima. Nessun tetto: il cursore arriva a meta del lato lungo dell'immagine, il campo accetta di piu; il limite e il bordo dell'immagine."))
-            self.integrate_ctx_spin.setToolTip(self.integrate_ctx_slider.toolTip())
+        self._ctx_supported = ok
+        self.integrate_ctx_mode.setVisible(ok); self._ctx_mode_lbl.setVisible(ok)
+        self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = la sagoma allargata di N pixel; Manuale = la disegni tu."))
+        self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine attorno alla sagoma, in pixel (la forma della sagoma allargata tutto intorno). 0 = solo la sagoma; 87 = circa la zona di prima. Nessun tetto: il cursore arriva a meta del lato lungo dell'immagine, il campo accetta di piu; il limite e il bordo dell'immagine."))
+        self.integrate_ctx_spin.setToolTip(self.integrate_ctx_slider.toolTip())
+        self._on_ctx_changed()                                      # righe margine / pennello secondo modo e motore
         cv = getattr(self, "canvas", None)
         if cv is not None:
             cv.set_integrate_context(enabled=ok)
+        self._sync_layer_tools()
+
+    def _sync_layer_tools(self, *_):
+        """«✂ Scontorna» / «↺ Sfondo» (pannello dei layer importati) compaiono solo dove i layer vengono composti sulla scena: sotto-tab
+        Inpaint/Integra (non in Genera, Colore, Upscale, che lavorano sul file della foto di base) con un motore di Integra che li compone."""
+        cv = getattr(self, "canvas", None)
+        if cv is None or not hasattr(self, "sub") or not hasattr(self, "integrate_engine") or not hasattr(self, "_inpaint_tab_index"):
+            return                                                  # costruzione in corso: lo richiama il costruttore a fine giro
+        engine = self._engine_val(self.integrate_engine.currentIndex())
+        on_page = self.sub.currentIndex() == self._inpaint_tab_index
+        cv.set_layer_tools_allowed(on_page and integrate_engine_composes_layers(engine))
 
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
