@@ -45,8 +45,14 @@ class Sam31Watcher(QObject):
         try:
             from ui.download_manager import manager
             manager().finished.connect(self._on_download_finished)
-            manager().changed.connect(lambda: self.changed.emit())
+            manager().changed.connect(self._on_manager_changed)
         except Exception:                                    # noqa: BLE001
+            pass
+
+    def _on_manager_changed(self) -> None:
+        try:
+            self.changed.emit()
+        except RuntimeError:                                 # il watcher e gia stato distrutto (chiusura dell'app)
             pass
 
     # ── ciclo ──
