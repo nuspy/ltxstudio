@@ -316,12 +316,16 @@ class _VideoEditAIWorker(QThread):
             params = _vh3.build_params(cfg, out)
         except _vh3.H3EditError as e:
             self.done.emit({"status": "error", "error": str(e)}); return
-        self.progress.emit("[edit] SAM2: traccio la persona sul clip…")
-        try:
-            _vi.attach_tracking({}, cfg["video"], cfg["object"], _os.path.join(self.out_dir, f"_h3guide_{stamp}.mp4"), 0,
-                                log=lambda m: self.progress.emit(m))
-        except RuntimeError as e:
-            self.done.emit({"status": "error", "error": str(e)}); return
+        if cfg.get("mask_dir"):
+            # maschere GIA calcolate (tab «Scambia»: una per ruolo, tracciate sul video originale): niente nuovo tracking
+            params["h3_edit"]["mask_dir"] = cfg["mask_dir"]
+        else:
+            self.progress.emit("[edit] SAM2: traccio la persona sul clip…")
+            try:
+                _vi.attach_tracking({}, cfg["video"], cfg["object"], _os.path.join(self.out_dir, f"_h3guide_{stamp}.mp4"), 0,
+                                    log=lambda m: self.progress.emit(m))
+            except RuntimeError as e:
+                self.done.emit({"status": "error", "error": str(e)}); return
         if not _os.path.isdir(params["h3_edit"]["mask_dir"]):
             self.done.emit({"status": "error", "error": f"il tracking SAM2 non ha prodotto le maschere in {params['h3_edit']['mask_dir']}"}); return
         py, worker = runner_for({"arch": "minimax_h3"})
@@ -1163,6 +1167,13 @@ class MainWindow(QMainWindow):
         self.video_edit_ai_tab.set_canvas_image_getter(lambda: (self.frame1_tab.image_path or ""))
         self.video_tab.request_motion_tracks.connect(self._open_motion_tracks_from_video)
         self.tabs.addTab(self.video_edit_ai_tab, tr("tab.video_edit_ai", "✨ Modifica Video AI"))
+        from ui.tabs.swap_tab import SwapTab                            # Fase 2 Openjutsu: studio «Scambia» (persone, ruoli, passate H3)
+        self.swap_tab = SwapTab()
+        self.swap_tab.request_find.connect(self._swap_find)
+        self.swap_tab.request_generate.connect(self._swap_generate)
+        self.swap_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
+        self.swap_tab.request_open_quality_tab.connect(lambda: self.tabs.setCurrentWidget(self.quality_tab))
+        self.tabs.addTab(self.swap_tab, tr("tab.swap", "🎭 Scambia"))
         # Avatar parlante (LongCat 1.5): foto/testo + voce → persona che parla, durata dall'audio
         self.avatar_tab.get_canvas_image = lambda: (self.frame1_tab.image_path or "")
         self.frame1_tab.canvas.image_changed.connect(self.avatar_tab.on_canvas_image_changed)
@@ -1209,7 +1220,7 @@ class MainWindow(QMainWindow):
         _tab_emoji = {
             id(self.frame1_tab): "🖼️", id(self.audio_tab): "🎙️", id(self.video_tab): "🎬",
             id(self.controlnet_tab): "🎛️", id(self.video_extend_tab): "⏩",
-            id(self.video_edit_ai_tab): "✨", id(self.avatar_tab): "🗣️", id(self.quality_tab): "💎",
+            id(self.video_edit_ai_tab): "✨", id(self.swap_tab): "🎭", id(self.avatar_tab): "🗣️", id(self.quality_tab): "💎",
             id(self.trellis_tab): "🧊", id(self.rig_tab): "🦴", id(self.convert_tab): "🔄",
             id(self.anim_tab): "🕺", id(self.train_tab): "🎓", id(self.lora_video_tab): "🎞️",
             id(self.lora_image_tab): "🖌️", id(self.music_tab): "🎵", id(self.world_tab): "🌍",
@@ -4235,6 +4246,45 @@ class MainWindow(QMainWindow):
         self._edit_ai_worker = _VideoEditAIWorker(cfg, str(OUTPUT_DIR))
         self._enqueue(tr("queue.job.video_edit", "Modifica Video AI"), self._edit_ai_worker,
                       self._on_video_edit_ai_done, on_progress=self.video_edit_ai_tab.log.appendPlainText)
+
+    # ── tab «Scambia» ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    def _swap_find(self, req: dict):
+        if not self._feature_gate("cap.video_swap_studio"):
+            return
+        from ui.swap_workers import SwapFindWorker
+        self._swap_find_worker = SwapFindWorker(req)
+        self._enqueue(tr("queue.job.swap_find", "Scambia · trova persone"), self._swap_find_worker, self._on_swap_find_done,
+                      on_progress=self.swap_tab.log.appendPlainText)
+
+    def _on_swap_find_done(self, res: dict):
+        if res.get("status") == "success" and res.get("output"):
+            from core import swap_project as SP
+            try:
+                self.swap_tab.set_tracks(SP.load_tracks(res["output"][0]))
+                return
+            except Exception as e:                                       # noqa: BLE001
+                res = {"status": "error", "error": f"{type(e).__name__}: {e}"}
+        self.swap_tab.find_status.setText(tr("swap.find_fail", "❌ Ricerca non riuscita: {e}").format(e=res.get("error", "")))
+        self.swap_tab.log.appendPlainText(tr("vedit.fail", "❌ Errore: {e}").format(e=res.get("error", "")))
+
+    def _swap_generate(self, req: dict):
+        if not self._feature_gate("cap.video_swap_studio") or not self._feature_gate("cap.video_h3_edit"):
+            return
+        from core import video_edit_engines as _E
+        msg = _E.missing_message("h3_edit")
+        if msg:
+            self.swap_tab.log.appendPlainText("❌ " + msg)
+            return
+        from ui.swap_workers import SwapRunWorker
+        self._swap_run_worker = SwapRunWorker(req, str(OUTPUT_DIR))
+        self._enqueue(tr("queue.job.swap_run", "Scambia · genera"), self._swap_run_worker, self._on_swap_run_done,
+                      on_progress=self.swap_tab.log.appendPlainText)
+
+    def _on_swap_run_done(self, res: dict):
+        if res.get("status") == "success" and res.get("output"):
+            self.swap_tab.log.appendPlainText(tr("vedit.done", "✅ Pronto: {o}").format(o=res["output"][0]))
+        else:
+            self.swap_tab.log.appendPlainText(tr("vedit.fail", "❌ Errore: {e}").format(e=res.get("error", "")))
 
     def _open_motion_tracks_from_video(self):
         """Dal tab Video a Modifica Video AI nella modalita' «Movimento da tracce», con l'immagine di partenza del tab Video

@@ -139,6 +139,98 @@ def track_object(video: str, *, point=None, box=None, text: str = "", dilate: in
     return {"frames": frames, "masks": out_masks, "fps": fps}
 
 
+def detect_boxes(frame_png: str, text: str, device: str, threshold: float = 0.35) -> list[list[float]]:
+    """GroundingDINO: testo -> TUTTI i riquadri [x0,y0,x1,y1,punteggio] sul frame (multi-box; `_gdino_box` ne da uno solo)."""
+    import torch
+    from PIL import Image
+    from transformers import AutoProcessor, GroundingDinoForObjectDetection
+    if not os.path.isdir(GDINO_DIR) or not os.path.isdir(SAM2_DIR):
+        raise RuntimeError(f"Pesi segmentazione assenti ({GDINO_DIR} / {SAM2_DIR}): scaricali dal tab «Pesi modelli» (grounding-dino-base + sam2-hiera-large).")
+    proc = AutoProcessor.from_pretrained(GDINO_DIR)
+    model = GroundingDinoForObjectDetection.from_pretrained(GDINO_DIR).to(device).eval()
+    img = Image.open(frame_png).convert("RGB")
+    q = text if text.strip().endswith(".") else text.strip() + "."
+    inp = proc(images=img, text=q, return_tensors="pt").to(device)
+    with torch.no_grad():
+        out = model(**inp)
+    res = proc.post_process_grounded_object_detection(out, inp["input_ids"], threshold=threshold, target_sizes=[img.size[::-1]])[0]
+    boxes = [[float(v) for v in b.tolist()] + [float(sc)] for b, sc in zip(res["boxes"], res["scores"])]
+    del model
+    try:
+        torch.cuda.empty_cache()
+    except Exception:                                      # noqa: BLE001
+        pass
+    return boxes
+
+
+def find_people(video: str, work_dir: str, *, text: str = "person", max_people: int = 4, device: str = "cuda", engine: str | None = None) -> list:
+    """«Trova persone» del tab «Scambia»: GroundingDINO multi-box sul frame-0 (senza doppioni) + una traccia SAM2 per riquadro. Scrive in `work_dir`:
+    frames/, track_<k>/masks/*.png, thumb_<k>.jpg e tracks.json. Ritorna la lista di core.swap_project.Track (ordinata: la piu grande per prima).
+    SAM 3.1 non utilizzabile -> RuntimeError chiara (mai ripiego silenzioso su SAM2)."""
+    from core import segmentation_engine as _SE
+    from core import swap_project as SP
+    _eng, _err = _SE.resolve_for_job(engine)
+    if _err:
+        raise RuntimeError(_err)
+    if _eng == _SE.SAM31:
+        raise RuntimeError("SAM 3.1: il caricatore nativo non e collegato a «Trova persone».")
+    import numpy as np
+    import torch
+    from PIL import Image
+    from transformers import Sam2VideoModel, Sam2VideoProcessor
+    os.makedirs(work_dir, exist_ok=True)
+    frames, _fps = _frames_of(video, os.path.join(work_dir, "frames"))
+    if not frames:
+        raise RuntimeError("Nessun frame estratto dal video.")
+    frames_np = [np.asarray(Image.open(f).convert("RGB")) for f in frames]
+    H, W = frames_np[0].shape[:2]
+    sproc = Sam2VideoProcessor.from_pretrained(SAM2_DIR)
+    smodel = Sam2VideoModel.from_pretrained(SAM2_DIR).to(device).eval()
+
+    def _detect(_v):
+        return detect_boxes(frames[0], text, device)
+
+    def _track(_v, box, mask_dir):
+        os.makedirs(mask_dir, exist_ok=True)
+        sess = sproc.init_video_session(video=frames_np, inference_device=device)
+        sproc.add_inputs_to_inference_session(sess, frame_idx=0, obj_ids=1, input_boxes=[[[float(b) for b in box[:4]]]])
+        n, area = 0, 0.0
+        with torch.no_grad():
+            for out in smodel.propagate_in_video_iterator(sess, start_frame_idx=0):
+                m = sproc.post_process_masks([out.pred_masks], original_sizes=[(H, W)], binarize=True)[0][0].squeeze().cpu().numpy().astype(np.uint8)
+                idx = int(getattr(out, "frame_idx", n))
+                Image.fromarray(m * 255).save(os.path.join(mask_dir, f"{idx:05d}.png"))
+                area += float(m.mean())
+                n += 1
+        return {"frames": n, "area": area / max(1, n)}
+
+    def _thumb(t):
+        md = t.mask_dir
+        names = sorted(os.listdir(md))
+        best, best_a = None, -1.0
+        for f in names[::max(1, len(names) // 24)]:
+            a = float((np.asarray(Image.open(os.path.join(md, f))) > 127).mean())
+            if a > best_a:
+                best, best_a = f, a
+        if best is None:
+            return ""
+        m = np.asarray(Image.open(os.path.join(md, best))) > 127
+        ys, xs = np.where(m)
+        if len(xs) == 0:
+            return ""
+        i = min(int(best.split(".")[0]), len(frames_np) - 1)
+        crop = Image.fromarray(frames_np[i]).crop((int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1))
+        crop.thumbnail((256, 256))
+        tp = os.path.join(work_dir, f"thumb_{t.id}.jpg")
+        crop.save(tp, quality=88)
+        return tp
+
+    tracks = SP.find_people(video, work_dir, detect_boxes=_detect, track_box=_track, make_thumb=_thumb, max_people=max_people,
+                            log=lambda m: print(m, flush=True))
+    SP.save_tracks(tracks, os.path.join(work_dir, "tracks.json"))
+    return tracks
+
+
 def build_masked_guide(frames: list[str], masks: list[str], out_video: str, *, fps: float = 25.0,
                        mask_color=(255, 0, 255), feather: int = 0) -> str:
     """#59 Costruisce il GUIDE video per ltx23_inpaint_masked: i frame originali con l'area mascherata
@@ -202,6 +294,10 @@ def composite_inpaint(original: str, edited: str, masks: list[str], out_video: s
 
 if __name__ == "__main__":   # CLI: track oggetto + costruisci guide magenta. Stampa "GUIDE:<path>".
     import sys
+    if len(sys.argv) >= 4 and sys.argv[1] == "--find-people":          # «Trova persone» (tab Scambia): --find-people <video> <work_dir> [testo]
+        find_people(sys.argv[2], sys.argv[3], text=(sys.argv[4] if len(sys.argv) > 4 else "person"), device="cuda")
+        print("TRACKS:" + os.path.join(sys.argv[3], "tracks.json"), flush=True)
+        sys.exit(0)
     if len(sys.argv) < 4:
         print("uso: video_segment.py <video> <text> <out_guide.mp4> [dilate]"); sys.exit(2)
     video, text, out_guide = sys.argv[1], sys.argv[2], sys.argv[3]
