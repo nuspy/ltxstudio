@@ -5797,7 +5797,8 @@ class MainWindow(QMainWindow):
             src = getattr(self.frame1_tab.canvas, "_image_path", None)
             image_path = src if (src and os.path.exists(src)) else ""
         img = image_path or self.frame1_tab.canvas._composite(OUTPUT_DIR)
-        params = {"image_path": img}
+        from core import segmentation_engine as _SE
+        params = {"image_path": img, "seg_engine": _SE.current()}     # il server di inferenza e un processo vecchio: la scelta del menu va passata, non riletta dalle preferenze
         if region_mask:
             params["region_mask"] = region_mask
             if region_pick:

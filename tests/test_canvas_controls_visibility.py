@@ -114,3 +114,16 @@ def test_cutout_buttons_hidden_for_an_engine_that_does_not_compose_layers(tab, m
     assert not cv._cutout_btns[0].isHidden()
     tab.integrate_engine.setCurrentIndex(2)
     assert cv._cutout_btns[0].isHidden() and cv._cutout_btns[1].isHidden()
+
+
+def test_driver_visibility_helper_sees_hidden_rows_and_canvas_controls(tab):
+    """Lo stesso criterio che usano i casi dal vivo (tests/app_live/driver.widget_hidden): righe nascoste = widget nascosti anche se annidati."""
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "app_live"))
+    from driver import widget_hidden
+    tab.integrate_engine.setCurrentIndex(0)
+    assert not widget_hidden(tab.integrate_ctx_spin) and not widget_hidden(tab.canvas.draw_banner) and not widget_hidden(tab.canvas.ovl_transp_pos_sl)
+    tab.integrate_engine.setCurrentIndex(2)
+    for w in (tab.integrate_ctx_mode, tab.integrate_ctx_spin, tab.integrate_ctx_slider, tab.canvas.draw_banner, tab.canvas.ovl_legend,
+              tab.canvas.ovl_transp_pos_sl, tab.canvas.ovl_transp_ctx_sl):
+        assert widget_hidden(w), w

@@ -185,6 +185,19 @@ def resolve(w, path: str):
     return obj
 
 
+def widget_hidden(wd) -> bool:
+    """True se il widget o un contenitore (risalendo fino al canvas, alla pagina di una QScrollArea/QStackedWidget o alla finestra) e nascosto in modo esplicito."""
+    from PySide6.QtWidgets import QScrollArea, QStackedWidget
+    cur = wd
+    while cur is not None:
+        if isinstance(cur, (QScrollArea, QStackedWidget)) or type(cur).__name__ in ("MaskCanvas", "MainWindow", "Frame1Tab"):
+            break                                            # la pagina di tab inattiva e nascosta per forza: non conta
+        if cur.isHidden():
+            return True
+        cur = cur.parentWidget()
+    return False
+
+
 def _hidden(cb, i) -> bool:
     """Voce nascosta dal filtro (setRowHidden sulla view del combo): l'utente non puo sceglierla."""
     try:
@@ -445,6 +458,11 @@ class Driver:
         if "set" in op:
             wd = resolve(w, op["set"])
             return {"op": f"set {op['set']}", "val": set_widget(wd, op["value"])}
+        if "seg_engine" in op:                               # {"seg_engine": "sam31"}: voce VERA del menu «Segmentazione» (come il clic dell'utente)
+            act = w._seg_actions[op["seg_engine"]]
+            act.setChecked(True)
+            act.trigger()
+            return {"op": f"menu Segmentazione -> {op['seg_engine']}", "scelto": __import__("core.segmentation_engine", fromlist=["x"]).current()}
         if "click" in op:
             wd = resolve(w, op["click"])
             wd.click()
@@ -689,8 +707,12 @@ class Driver:
     # i casi ----------------------------------------------------------------------------------------------
     def case_ops(self, case):
         out = []
+        mism = []
         for o in case.get("ops", []):
             if self.dry and o.get("live_only"):                  # passi che hanno senso solo con i job veri (es. dopo «Trova persone»)
+                continue
+            if "expect_visible" in o or "expect_hidden" in o:    # visibilita dei widget (nascosti, non disattivati): vedi widget_hidden()
+                out.append(self.gui(lambda o=o: self._check_visibility(o, mism), 60))
                 continue
             if "wait_job" in o:                                  # attesa FUORI dal thread della GUI (i job girano nel suo event loop)
                 self.wait_job(float(o["wait_job"]))
@@ -699,7 +721,19 @@ class Driver:
             out.append(self.gui(lambda o=o: self.op(o), 60))
         if case.get("wait_job", any("click" in o for o in case.get("ops", []))):
             self.wait_job(float(case.get("timeout", 600)))
-        return {"ops_eseguite": out}
+        return {"ops_eseguite": out, "mismatch": mism}
+
+    def _check_visibility(self, o: dict, mism: list) -> dict:
+        """{"expect_visible": [percorsi], "expect_hidden": [percorsi]}: un widget conta come NASCOSTO se lui o un suo contenitore (fino alla pagina di tab o al canvas)
+        e nascosto in modo esplicito. Una divergenza finisce nei `problemi` del caso."""
+        got = {}
+        for key, want_hidden in (("expect_visible", False), ("expect_hidden", True)):
+            for path in o.get(key, []):
+                hid = widget_hidden(resolve(self.w, path))
+                got[path] = "nascosto" if hid else "visibile"
+                if hid != want_hidden:
+                    mism.append(f"visibilita {path}: atteso {'nascosto' if want_hidden else 'visibile'}, trovato {got[path]}")
+        return {"op": "visibilita", "stato": got}
 
     def case_create_image(self, case):
         """Crea → Immagine: arch, modello, LoRA, prompt, formato; bottone VERO «Genera»."""
@@ -749,7 +783,7 @@ class Driver:
 
     def _compare_image(self, case, steps, res):
         q = [c for c in self.rec.calls if c["via"] == "queue"]
-        mis = []
+        mis = list(vis_mism)
         if q:
             p = q[0]["params"]
             res["handler"] = f"{q[0]['worker']}:{q[0].get('module')}"
@@ -925,6 +959,7 @@ class Driver:
         w = self.w
         steps = {}
         kind = case["kind"]
+        vis_mism = []                                                 # divergenze di visibilita (expect_visible / expect_hidden dopo la scelta del motore)
 
         def setup():
             from PySide6.QtCore import QRectF, Qt
@@ -973,6 +1008,8 @@ class Driver:
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])
                 if case.get("model"):
                     steps["model"] = select_combo(f.integrate_model, case["model"])
+                if case.get("expect_visible") or case.get("expect_hidden"):
+                    steps["visibilita"] = self._check_visibility(case, vis_mism)["stato"]
                 # ── «Zona di contesto» dai widget VERI del pannello Integra (azzerati a ogni caso) ──────────────────────────────────────────
                 # `ctx_px` = margine in PIXEL attorno alla sagoma (campo px); `ctx_pct` (percento, anche > 100) e il vecchio `ctx_margin_pct` (frazione) restano come
                 # ALIAS per i casi vecchi e si convertono in px con la LARGHEZZA della sagoma (sagoma larga 200: 50 % = 100 px). Senza nessuno dei tre: il valore
@@ -1042,6 +1079,9 @@ class Driver:
             for k, v in (case.get("expect_params") or {}).items():
                 if p.get(k) != v:
                     mis.append(f"parametro atteso {k}={v!r}, inviato {p.get(k)!r}")
+            for k in case.get("expect_absent") or []:                 # es. Krea 2 Edit non riceve nessuna maschera
+                if p.get(k):
+                    mis.append(f"parametro {k} non atteso ma inviato: {p.get(k)!r}")
         _exp = getattr(self.w, "_last_integrate_export", None)
         if kind == "integrate" and isinstance(_exp, dict) and _exp.get("mask") and (case.get("ctx_expect_in") or case.get("ctx_expect_out")):
             try:                                                                        # i punti attesi dentro/fuori dalla maschera di contesto INVIATA
