@@ -2876,6 +2876,23 @@ class MainWindow(QMainWindow):
             if backend.is_native("image") and engine == "kontext" and aux:
                 self._start_native_mq_foreground(exp, model, ptxt, steps, seed, guidance)
                 return
+            if (engine == "flux2" and backend.is_native("image") and getattr(self.frame1_tab.canvas, "integrate_regenerate", False)
+                    and exp.get("base") and exp.get("layer_refs")):
+                # RIGENERA (prova, default spento): FLUX.2 Klein multi-riferimento VERO = scena (immagine 1) + soggetto (immagine 2), posizione nel testo
+                try:
+                    from PIL import Image as _PI
+                    import numpy as _np
+                    _pm = _np.asarray(_PI.open(exp["position_mask"]).convert("L")) > 127
+                    _xs = _np.where(_pm.any(0))[0]
+                    _cx = float(_xs.mean()) / _pm.shape[1] if len(_xs) else 0.5
+                    _where = "on the left side" if _cx < 0.4 else ("on the right side" if _cx > 0.6 else "in the middle")
+                except Exception:                              # noqa: BLE001
+                    _where = "in the middle"
+                _regen = ("Add the person from image 2 to image 1, standing " + _where + " of the scene, as a real part of it: match the perspective, scale, lighting and "
+                          "colour grading, add contact shadows, let the foreground objects overlap her where they should. Keep her face, hair and clothes identical to "
+                          "image 2. Do not change anything else in the scene and do not add anyone else. " + (ptxt or ""))
+                self._start_native_klein_multiref([exp["base"], exp["layer_refs"][0]], _regen.strip(), model, seed=seed, steps=steps, guidance=guidance)
+                return
             if backend.is_native("image") and engine in ("kontext", "flux2") and not aux:
                 # PuLID DEDICATO all'Image to Image (container proprio nel pannello, separato da
                 # quello di «Genera immagine» che agisce solo sulla generazione).
