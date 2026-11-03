@@ -91,3 +91,23 @@ def test_first_clip_two_pass_boundaries_and_wiring():
     assert 'os.environ.get("H3_EDIT_FIRST_TWO_PASS") or e.get("first_clip_two_pass")' in src
     assert 'meta["two_pass"] = int(two_n)' in src and "comp[:two_n] = comp_a[:two_n]" in src
     assert 'f"clip_{ci:02d}b"' in src                                                       # la passata B ha la sua cartella (la A resta riusabile)
+
+
+def test_erase_area_fills_the_person_zone_from_the_surrounding_background():
+    n, h, w = 3, 96, 160
+    img = torch.zeros(n, h, w, 3); img[..., 1] = 0.4                       # sfondo verde uniforme
+    img[:, :, :, 0] += torch.linspace(0, 0.2, w)[None, None, :]            # con un gradiente orizzontale (la stima deve seguirlo)
+    person = torch.zeros(n, h, w); person[:, 20:90, 60:90] = 1
+    img[person > 0] = torch.tensor([0.9, 0.2, 0.2])                        # persona rossa
+    out = M.erase_area(img, person, grow_px=4)
+    inside = out[:, 30:80, 66:84]
+    assert float(inside[..., 0].max()) < 0.4 and float(inside[..., 1].min()) > 0.3, inside.mean((0, 1, 2))   # niente rosso: sfondo
+    assert torch.allclose(out[:, :10], img[:, :10], atol=1e-4)               # lontano dalla zona non cambia nulla
+    ref = img[:, 30:80, 40:56].mean((0, 1, 2)); fill = inside.mean((0, 1, 2))
+    assert float((fill - ref).abs().max()) < 0.15
+
+
+def test_erase_option_is_wired():
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'bg_person_ref == "erase"' in src and "M.erase_area(ref_frames, pers" in src
+    assert '"bgref", bg_person_ref' in src                                                    # nella chiave dei checkpoint (e quindi nel runkey)

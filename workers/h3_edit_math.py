@@ -308,6 +308,33 @@ def gaussian_blur(x: torch.Tensor, sigma: float) -> torch.Tensor:
     return F.conv2d(F.pad(x, (0, 0, r, r), mode="replicate"), k.view(x.shape[1], 1, -1, 1), groups=x.shape[1])
 
 
+def erase_area(frames: torch.Tensor, area: torch.Tensor, grow_px: int = 8, sigma_frac: float = 0.03) -> torch.Tensor:
+    """Cancella dal video di riferimento la zona `area` (maschera 1 = persona), dilatata di `grow_px`: viene riempita dallo sfondo circostante (nel riferimento del
+    cambia-sfondo gia sfocato) per diffusione dal bordo (convoluzione normalizzata a scale crescenti, a 1/4 di risoluzione), cosi NESSUNA figura resta nel
+    riferimento e il modello non ha nulla da «ridisegnare» col suo orologio. frames [n,h,w,3] float 0..1; area [n,h,w]."""
+    n, h, w = frames.shape[:3]
+    out = torch.empty_like(frames, dtype=torch.float32)
+    hole_all = grow_mask(area.float(), int(grow_px))
+    ds = 4
+    sig0 = max(1.0, sigma_frac * h / ds)
+    for i in range(0, n, CHUNK):
+        f = frames[i:i + CHUNK].float().movedim(-1, 1)
+        hole = hole_all[i:i + CHUNK, None].clamp(0, 1)
+        fs = F.interpolate(f, size=(max(1, h // ds), max(1, w // ds)), mode="area")
+        hs = F.interpolate(hole, size=fs.shape[-2:], mode="area")
+        known = (hs < 0.5).float()                                  # pixel noti (fuori dalla zona cancellata)
+        val, est = fs * known, None
+        for mult in (16, 8, 4, 2, 1):                               # dal largo allo stretto: la scala piu fine con abbastanza appoggio vince
+            nv, nw = gaussian_blur(val, sig0 * mult), gaussian_blur(known, sig0 * mult)
+            cur = nv / nw.clamp_min(1e-4)
+            est = cur if est is None else torch.where(nw > 0.08, cur, est)
+        fill = torch.lerp(fs, est, 1.0 - known)                     # a bassa risoluzione: noto = originale, ignoto = stima
+        fill = F.interpolate(fill, size=(h, w), mode="bilinear", align_corners=False)
+        soft = gaussian_blur(hole, 1.5).clamp(0, 1)                 # bordo morbido
+        out[i:i + CHUNK] = torch.lerp(f, fill, soft).movedim(1, -1)
+    return out
+
+
 def grey_mannequins(images: torch.Tensor, mask: torch.Tensor, size: torch.Tensor, blur: float = 0.02,
                     neutral_background: bool = False) -> torch.Tensor:
     """Le persone mascherate diventano figure grigie e lisce che tengono posa e ombreggiatura ma non volto, capelli, vestiti: un video di

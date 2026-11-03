@@ -295,7 +295,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         W._log(f"preroll: {preroll} frame fermi anteposti ({N} frame in totale, tolti alla fine)")
 
     # 2) video di riferimento (<Video 1>) — la zona rigenerata e nascosta: niente dettagli originali da copiare
-    bg_person_ref = str(os.environ.get("H3_EDIT_BG_PERSON_REF") or e.get("bg_person_ref") or "sharp").lower()   # sharp (oggi) | mannequin
+    bg_person_ref = str(os.environ.get("H3_EDIT_BG_PERSON_REF") or e.get("bg_person_ref") or "sharp").lower()   # sharp (oggi) | mannequin | erase (nessuna figura nel riferimento del cambia-sfondo)
     # matte a pixel della persona (solo composizione): DI DEFAULT nel cambia-sfondo (03/11: testa fedele 0.124 -> 0.007); si spegne con H3_EDIT_BG_MATTE=0 o bg_matte=0/false
     bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")
     if invert:
@@ -303,6 +303,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                                 grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)
         if bg_person_ref == "mannequin":                               # la persona del riferimento diventa una figura grigia liscia (posizione e posa, niente volto/vestiti):
             ref_frames = M.grey_mannequins(ref_frames, pers, size, blur=0.02)   # il modello non ha una persona nitida da rifare (doppione spostato nel clip 1)
+        elif bg_person_ref == "erase":                                 # NESSUNA figura nel riferimento: la zona della persona (dilatata) si riempie dallo sfondo sfocato intorno
+            ref_frames = M.erase_area(ref_frames, pers, grow_px=max(4, int(round(8 * scale))))
     else:
         ref_frames = M.grey_mannequins(f01, pers, size, blur=0.02)
 

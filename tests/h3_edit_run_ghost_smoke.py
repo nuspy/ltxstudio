@@ -131,6 +131,7 @@ assert np.array_equal(ca[:, :, 7:], cb[:, :, 7:])                               
 sa, sb = np.load(tdir / "clip_00" / "clip_src.npy"), np.load(tdir / "clip_00b" / "clip_src.npy")
 assert not np.array_equal(sa[:22], sb[:22]) and np.array_equal(sa[22:], sb[22:])   # solo i primi 22 sono i frame puliti della passata A
 assert not (tdir / "clip_01" / "meta.json").exists() or json.loads((tdir / "clip_01" / "meta.json").read_text("utf-8"))["ctx"] == 39
+era, c6, r6 = run("erase", {"H3_EDIT_BG_PERSON_REF": "erase", "H3_EDIT_BG_MATTE": "0"})   # riferimento senza persona: dove c'era la figura rossa c'e lo sfondo sfocato
 print("clip base", c0, "preroll", c1, "two-pass", c5)
 
 # PREROLL: stesso numero di frame in uscita, ma si genera di piu (clip 1 piu lungo di 17 frame)
@@ -143,6 +144,9 @@ def person_color(ref_path):
     reg = f[60:150, 40 + 5 * 4 % 200:40 + 5 * 4 % 200 + 40].reshape(-1, 3).astype(int)
     return reg.mean(0)
 sharp, mq = person_color(r0[0]), person_color(r2[0])
+er = person_color(r6[0])
+print("colore nella zona della persona, riferimento erase", er.round(), "bordo/sfondo vicino", frames_of(r6[0])[5][60:150, 10:30].reshape(-1, 3).mean(0).round())
+assert era.shape == base.shape and er[0] - er[2] < 30 and er[0] < 120 and sharp[0] - er[0] > 100, (er, sharp)
 print("colore persona nel riferimento: standard", sharp.round(), "manichino", mq.round())
 assert sharp[0] - sharp[2] > 60 and abs(mq[0] - mq[2]) < 40, (sharp, mq)
 # MATTE: dentro la sagoma (erosa) i pixel sono quelli del video originale; senza matte (gen casuale) no
