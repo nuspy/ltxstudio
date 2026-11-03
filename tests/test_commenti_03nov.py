@@ -59,3 +59,17 @@ def test_click_selection_keeps_a_person_that_fills_most_of_the_frame():
     assert pick_point_mask([18, 152, 62], [0.17, 0.54, 0.62], T) == 1            # polpo cliccato sulla testa: polpo + giacca, non solo la testa
     assert pick_point_mask([20, 990, 30], [0.2, 0.9, 0.5], T) == 2              # una maschera = scena intera (99 %) non e mai l'oggetto
     assert pick_point_mask([950, 960, 990], [0.1, 0.9, 0.5], T) == 1            # tutte enormi: ripiego sul punteggio SAM
+
+
+def test_tone_dump_is_off_by_default_and_never_raises(tmp_path, monkeypatch):
+    from PIL import Image
+    from inference_server.backends import image_flux as F
+    monkeypatch.delenv("NATIVE_TONE_DEBUG", raising=False)
+    monkeypatch.delenv("LTX_TEST_DRIVER", raising=False)
+    img = Image.new("RGB", (8, 8), (10, 20, 30))
+    F._tone_dump(str(tmp_path), {"arch": "inpaint", "seed": 5}, "raw", img)
+    assert not (tmp_path / "_tone_debug").exists()                     # funzionamento normale: nessun file in piu
+    monkeypatch.setenv("NATIVE_TONE_DEBUG", "1")
+    F._tone_dump(str(tmp_path), {"arch": "inpaint", "seed": 5}, "raw", img)
+    assert (tmp_path / "_tone_debug" / "inpaint_5_raw.png").is_file()
+    F._tone_dump(str(tmp_path / "x\0y"), {}, "raw", img)               # percorso impossibile: nessuna eccezione

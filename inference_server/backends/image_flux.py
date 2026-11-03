@@ -1855,6 +1855,20 @@ def _default_model(arch: str) -> str:
     raise RuntimeError("nessun modello specificato e nessun FLUX trovato in diffusion_models")
 
 
+def _tone_dump(output_dir: str, params: dict, tag: str, img) -> None:
+    """Salva copie intermedie (generato grezzo, originale, maschera, generato corretto) per misurare dal vivo dove nascono i salti di tono e le
+    cornici (03/11: senza il grezzo non si puo dire se e la correzione o il modello). Solo con NATIVE_TONE_DEBUG=1 o nell'app di prova
+    (LTX_TEST_DRIVER=1); mai nel funzionamento normale. Non fa mai fallire il job."""
+    if os.environ.get("NATIVE_TONE_DEBUG") != "1" and os.environ.get("LTX_TEST_DRIVER") != "1":
+        return
+    try:
+        d = Path(output_dir) / "_tone_debug"
+        d.mkdir(parents=True, exist_ok=True)
+        img.save(str(d / f"{params.get('arch', 'x')}_{params.get('seed', 0)}_{tag}.png"))
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def _seam_tone_match(res_img, orig_img, mask_bool, feather: int, *, gain: bool = True,
                      tau_mult: float = 3.0, clamp: int = 40):
     """Elimina la LINEA di giunzione e il salto di tono (luminosità/saturazione/contrasto) tra la parte
@@ -2309,6 +2323,9 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
             import numpy as _np
             from core import tone_match as _tm                       # tono GLOBALE del generato ← zona-foto (task 14)
             _mk_bool = (_np.asarray(_m, dtype=_np.uint8) > 127)      # True = pixel da (ri)generare
+            _tone_dump(output_dir, params, "raw", res_img)           # diagnosi salti di tono/cornici (solo con NATIVE_TONE_DEBUG=1 o app di prova)
+            _tone_dump(output_dir, params, "orig", _orig)
+            _tone_dump(output_dir, params, "mask", _m)
             if params.get("outpaint"):
                 _feather = int(params.get("feather") or 0) or max(12, min(48, int(round(min(res_img.size) / 40))))
                 # COLOR-MATCH al bordo (outpaint): l'estensione ha tono/luminosità un filo diversi dalla foto →
@@ -2345,6 +2362,7 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
                     else:
                         res_img = _seam_tone_match(res_img, _orig, _mk_bool, _feather, gain=True, tau_mult=6.0, clamp=32)
                 _m = _m.filter(ImageFilter.GaussianBlur(_feather))
+            _tone_dump(output_dir, params, "toned", res_img)         # generato DOPO la correzione di tono, prima della ricomposizione
             res_img = Image.composite(res_img, _orig, _m)            # bianco=generato · nero=pixel originali
         except Exception as _e:                                      # noqa: BLE001
             print(f"[inpaint] ricomposizione originale fuori-maschera fallita ({_e})", flush=True)
