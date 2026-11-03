@@ -797,7 +797,7 @@ NEW = [
     N("mmh3-dit-rockerboo-nvfp4", "Video", "MiniMax H3 Ref2VA NVFP4 mista rockerBOO (bordi/out_proj BF16, 20GB)", category="video",
       arch="minimax_h3", repo="rockerBOO/minimax-h3-nvfp4-convrot", remote="minimax_h3_ref2va_pruned_nvfp4_convrot_int8.safetensors",
       filename="minimax_h3_ref2va_pruned_nvfp4_convrot_int8-native.safetensors", convert="mmh3_dit",
-      type="diffusion_models", family="MiniMax-H3", gb=20.07, deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8", "mmh3-video-vae", "mmh3-audio-vae"],
+      type="diffusion_models", family="MiniMax", gb=20.07, deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
       note="confronto nvfp4: qkv int8-ConvRot + bordi e out_proj BF16 (con minimax_h3_layer_config.json). Scaricato a mano dall'utente; conversione nativa da verificare "
            "al primo arrivo del file. Licenza H3 Community (no UE/UK/USA/Corea)"),

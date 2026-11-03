@@ -4419,7 +4419,7 @@
       "label": "MiniMax H3 Ref2VA NVFP4 mista rockerBOO (bordi/out_proj BF16, 20GB)",
       "kind": "file",
       "type": "diffusion_models",
-      "family": "MiniMax-H3",
+      "family": "MiniMax",
       "gated": false,
       "approx_gb": 20.07,
       "scan_names": [
