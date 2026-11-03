@@ -200,9 +200,14 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     obj = read_masks(e["mask_dir"], N, tw, th)
     scale = tw / float(sw)
     pers, size = M.person_mask(obj, float(e.get("headroom", 0.10)), int(e.get("hold_frames", 2)))
+    pers = pers.float()
     invert = action == "change_background"
     person_grow = max(0, int(round(float(e.get("person_grow_px", 40)) * scale)))
     grow = max(0, int(round(float(e.get("grow_px", 16)) * scale)))
+    # SFUMATURA (feather, in celle da 16 px fuori dalla zona rigenerata): nel cambia-sfondo la zona rigenerata e lo sfondo, quindi la rampa cade
+    # DENTRO il bordo della persona; con 2 px (= 1 cella a 0,5) la rampa era larga ~15 px con la linea a 0,5 a ~20 px dentro la sagoma; con 0 e larga
+    # ~9 px a ~10 px dentro (misurato sui frame del 03/11). Nel cambia-sfondo si usa 0 (parametro bg_feather_px), per sostituisci resta feather_px.
+    feather_px = int(e.get("bg_feather_px", 0)) if invert else int(e.get("feather_px", 2))
     regen_pix = M.regen_region(pers, invert, person_grow, grow)        # cio che si rigenera (prima dell'eventuale inversione)
     if not invert:
         pers = M.grow_mask(pers.float(), person_grow)                  # il manichino grigio del riferimento copre la persona cresciuta
@@ -244,7 +249,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         clip_src = src_t[sl].clone()
         if ctx and prev_tail is not None:                              # contesto = frame GIA generati (non la sorgente): continuita fra clip
             clip_src[:ctx] = (prev_tail[-ctx:] * 255).round().to(torch.uint8)
-        cells, counts = M.cell_mask(regen_pix[sl], tw, th, invert=invert, feather_px=int(e.get("feather_px", 2)), width=tw)
+        cells, counts = M.cell_mask(regen_pix[sl], tw, th, invert=invert, feather_px=feather_px, width=tw)
         if ctx:                                                        # i frame di contesto non si rigenerano
             cells = cells.clone()
             cells[:, :, :_latents_of_frames(counts, ctx)] = 0
