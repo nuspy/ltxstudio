@@ -802,7 +802,7 @@ class Driver:
 
     def _compare_image(self, case, steps, res):
         q = [c for c in self.rec.calls if c["via"] == "queue"]
-        mis = list(vis_mism)
+        mis = []
         if q:
             p = q[0]["params"]
             res["handler"] = f"{q[0]['worker']}:{q[0].get('module')}"
@@ -1080,7 +1080,7 @@ class Driver:
         self.wait_job(float(case.get("timeout", 900)))
         res = {"widget_state": steps}
         q = [c for c in self.rec.calls if c["via"] == "queue"]
-        mis = []
+        mis = list(vis_mism)                                          # divergenze di visibilita raccolte in setup
         if q:
             p = q[0]["params"]
             res["handler"] = f"{q[0]['worker']}:{q[0].get('module')}"
