@@ -96,3 +96,32 @@ def test_guard_load_frees_parked_monolithic_pipelines(monkeypatch):
     monkeypatch.setattr(mem_budget, "avail_commit_mb", lambda: 90000.0)
     F._guard_load("x.safetensors", "flux", mm2)
     assert len(mm2._cpu_cache) == 1
+
+
+def test_integrate_context_mask_is_wider_than_position_mask_and_default_is_unchanged(tmp_path):
+    """Integra: la maschera di POSIZIONE (sagoma) e il CONTESTO (zona rigenerabile) sono separate; il contesto si allarga dilatando la stessa forma;
+    senza parametro il tracciato e quello di sempre (nessun cambiamento per i casi esistenti)."""
+    import numpy as np
+    from PIL import Image
+    fx = FX
+    if not (fx / "scena_1152x832.png").exists() or not (Path.home() / ".u2net" / "u2net.onnx").exists():
+        pytest.skip("servono le foto di prova e u2net")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    from ui.mask_canvas import MaskCanvas
+    areas = {}
+    for name, pct in (("base", None), ("p25", 0.25), ("p60", 0.60)):
+        cv = MaskCanvas()
+        cv.load_image(str(fx / "scena_1152x832.png"), "canvas")
+        cv.add_layer(str(fx / "ritratto_960x1024.png"))
+        cv.integrate_context_pct = pct
+        d = tmp_path / name
+        r = cv.export_integrate(d)
+        ctx = np.asarray(Image.open(r["mask"]).convert("L")) > 127
+        pos = np.asarray(Image.open(r["position_mask"]).convert("L")) > 127
+        areas[name] = (int(ctx.sum()), int(pos.sum()))
+        assert not (pos & ~ctx).any(), "la posizione deve stare dentro il contesto"
+        assert pos.any() and r["context_px"] == (0 if pct is None else r["context_px"])
+    assert areas["base"][1] == areas["p25"][1] == areas["p60"][1]                 # la posizione non cambia
+    assert areas["base"][0] < areas["p25"][0] < areas["p60"][0]                  # il contesto cresce
