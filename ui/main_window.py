@@ -2942,6 +2942,19 @@ class MainWindow(QMainWindow):
             negative = cfg.get("integrate_negative") or ""
             aux = cfg.get("integrate_puzzle_lora") or None    # puzzle_lora opzionale (solo Kontext)
             guidance = cfg.get("integrate_guidance", 2.5)
+            if engine == "qwen_image21" and getattr(self.frame1_tab.canvas, "integrate_regenerate", False) and exp.get("base") and exp.get("layer_refs"):
+                # RIGENERA (prova): scena senza foto + maschera + soggetto come riferimento: il modello ridisegna la persona nella zona, non la ricopia
+                _n = len(exp["layer_refs"])
+                _who = "the person shown in image 2" if _n == 1 else f"the {_n} people shown in images 2 to {_n + 1}"
+                _regen = (f"Image 1 is the scene; the red area marks where to place {_who}. Redraw {_who} naturally inside the red area: "
+                          "match the perspective, scale, lighting and colour grading, add contact shadows, let foreground objects such as the counter or "
+                          "table overlap her body where they should, blend all edges, and keep her face, hair and clothes identical to the reference. "
+                          "Do not leave a pasted cut-out. " + (ptxt or ""))
+                self._start_native_qwen21_edit(
+                    cfg.get("integrate_qwen21_dit"), _regen.strip(), init_image=exp["base"], mask=exp.get("mask") or "", strength=1.0,
+                    refs=list(exp["layer_refs"]), negative=negative, seed=seed, mode="integrazione",
+                    label=tr("queue.job.qwen21edit", "Qwen-Image 2.1 Edit"), enhance=False)
+                return
             if engine == "qwen_image21":                      # Qwen: armonizza solo l'area dei layer incollati
                 self._start_native_qwen21_edit(
                     cfg.get("integrate_qwen21_dit"), ptxt or self._QWEN21_INTEGRATE_PROMPT,
@@ -2956,6 +2969,24 @@ class MainWindow(QMainWindow):
                     init_image=exp["image"] if exp.get("mask") else "", mask=exp.get("mask") or "",
                     refs=[] if exp.get("mask") else [exp["image"]], seed=seed, boxes=cfg.get("boxes"),
                     pup=cfg.get("flux3_pup", True), mode="integrazione")
+                return
+            if engine == "krea2" and getattr(self.frame1_tab.canvas, "integrate_regenerate", False) and exp.get("base") and exp.get("layer_refs"):
+                # RIGENERA (prova): Krea 2 Edit multi-riferimento VERO = scena (immagine 1) + soggetto (immagine 2): prima il composito con la foto incollata
+                # faceva sparire la ragazza e inventava clienti (giudizio 03/11). Krea non usa la maschera: la posizione va nel testo.
+                try:
+                    from PIL import Image as _PI
+                    import numpy as _np
+                    _pm = _np.asarray(_PI.open(exp["position_mask"]).convert("L")) > 127
+                    _xs = _np.where(_pm.any(0))[0]
+                    _cx = float(_xs.mean()) / _pm.shape[1] if len(_xs) else 0.5
+                    _where = "on the left side" if _cx < 0.4 else ("on the right side" if _cx > 0.6 else "in the middle")
+                except Exception:                              # noqa: BLE001
+                    _where = "in the middle"
+                _regen = ("Add the person from the second image to the first image, standing " + _where + " of the scene, as a real part of it: match the perspective, "
+                          "scale, lighting and colour grading, add contact shadows, let the foreground objects overlap her where they should. Keep her face, hair and "
+                          "clothes identical to the second image. Do not change anything else in the scene and do not add anyone else. " + (ptxt or ""))
+                self._start_native_krea2_edit([exp["base"], exp["layer_refs"][0]], _regen.strip(), negative, cfg.get("grounding", 768),
+                                              cfg.get("integrate_variant", "turbo"), seed, label=tr("queue.job.krea2edit", "Krea 2 Edit"))
                 return
             if engine == "krea2":                             # motore Krea 2 Edit → edit del composito (single)
                 self._start_native_krea2_edit([exp["image"]], ptxt, negative,

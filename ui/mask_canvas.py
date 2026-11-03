@@ -1328,6 +1328,10 @@ class MaskCanvas(QWidget):
     # dopo l'ok dell'utente.
     integrate_context_pct: float | None = None
     integrate_context_px: int | None = None
+    # «Rigenera»: invece di dare al modello il composito con la foto incollata (che lui riproduce quasi identico = «solo incollata», giudizio 03/11),
+    # export_integrate scrive anche la SCENA SENZA le foto (`base`) e i soggetti scontornati su fondo neutro (`layer_refs`): il modello li usa come
+    # riferimenti e RIDISEGNA la persona nella zona della maschera. Parametro interno dei casi di prova (`_rigenera`), non ancora un comando in GUI.
+    integrate_regenerate: bool = False
 
     @staticmethod
     def _dilate_alpha(img: QImage, px: int) -> QImage:
@@ -1438,9 +1442,31 @@ class MaskCanvas(QWidget):
         posm = QImage(W, H, QImage.Format_ARGB32); posm.fill(Qt.black)
         ppm = QPainter(posm); ppm.drawImage(0, 0, obj); ppm.end()
         pospath = out_dir / "integrate_position_mask.png"; posm.save(str(pospath))
+        base_path, layer_refs = "", []
+        if any_region and len(self._entries) > 1:
+            try:
+                vis = [(e["item"], e["item"].isVisible()) for e in self._entries[1:]]
+                for it, _v in vis:
+                    it.setVisible(False)
+                try:
+                    bimg = QImage(self._composite(out_dir)).convertToFormat(QImage.Format_RGB32)      # la sola scena (nessuna foto incollata)
+                    base_path = str(out_dir / "integrate_base.png"); bimg.save(base_path)
+                finally:
+                    for it, _v in vis:
+                        it.setVisible(_v)
+                for k, e in enumerate(self._entries[1:], 1):                                          # soggetti scontornati su fondo neutro, per i riferimenti
+                    pm = e["item"].pixmap()
+                    if pm.isNull():
+                        continue
+                    im = pm.toImage().convertToFormat(QImage.Format_ARGB32)
+                    bg = QImage(im.size(), QImage.Format_RGB32); bg.fill(QColor(128, 128, 128))
+                    pq = QPainter(bg); pq.drawImage(0, 0, im); pq.end()
+                    lp = out_dir / f"integrate_layer_{k}.png"; bg.save(str(lp)); layer_refs.append(str(lp))
+            except Exception:                                # noqa: BLE001
+                base_path, layer_refs = "", []
         # has_region NON dipende da has_layers(): senza layer ma con una maschera sulla foto del canvas
         # c'è eccome qualcosa da integrare (era il blocco «aggiungi una o più immagini»).
-        return {"image": str(ipath), "mask": str(mpath), "position_mask": str(pospath), "context_px": int(ctx_px),
+        return {"image": str(ipath), "mask": str(mpath), "position_mask": str(pospath), "context_px": int(ctx_px), "base": base_path, "layer_refs": layer_refs,
                 "layers": [e.get("path") for e in self._entries[1:] if e.get("path")], "has_region": bool(any_region)}
 
     def _drop_layers(self):
