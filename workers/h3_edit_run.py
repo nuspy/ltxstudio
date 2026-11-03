@@ -157,14 +157,37 @@ def _sha(*parts) -> str:
     return h.hexdigest()[:16]
 
 
-def _subprocess_clip_runner(W, job_dir: str) -> None:
+STREAM_ALL_ENV = {"H3_STREAM_ALL": "1", "H3_BLOCK_CHUNK": "2048", "H3_ATTN_QCHUNK": "2048"}   # ripiego: blocchi del DiT in RAM + temporanei piccoli
+
+
+def is_oom_error(ex: BaseException) -> bool:
+    m = str(ex).lower()
+    return "out of memory" in m or "outofmemoryerror" in m or "vram) esaurita" in m
+
+
+def run_clip_with_fallback(W, clip_runner, job_dir: str) -> bool:
+    """Genera UN clip; se il figlio muore per memoria GPU lo rifa DA CAPO (stesso clip, stessa chiave, stesso checkpoint: cambia solo il piano di memoria)
+    con lo streaming completo dei blocchi del DiT e blocchi di token piu piccoli. Ritorna True se e servito il ripiego. Un secondo OOM resta un errore."""
+    try:
+        clip_runner(W, job_dir)
+        return False
+    except RuntimeError as ex:
+        if not is_oom_error(ex):
+            raise
+        W._log("[h3] memoria insufficiente, riprovo con piu pezzi del modello in RAM (piu lento)")
+    clip_runner(W, job_dir, stream_all=True)
+    return True
+
+
+def _subprocess_clip_runner(W, job_dir: str, stream_all: bool = False) -> None:
     """Lancia il figlio che genera UN clip; il suo log passa su stdout del genitore (finisce nel log completo del job)."""
     import collections
     import subprocess
     import sys
     worker = str(Path(W.__file__).resolve())
+    env = dict(os.environ, **STREAM_ALL_ENV) if stream_all else None
     proc = subprocess.Popen([sys.executable, "-u", worker, "--h3-edit-clip", str(job_dir)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, encoding="utf-8", errors="replace")
+                            text=True, encoding="utf-8", errors="replace", env=env)
     tail = collections.deque(maxlen=80)
     for ln in proc.stdout:
         sys.stdout.write(ln)
@@ -282,7 +305,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 gen_p.unlink()
             (jd / "want_key.txt").write_text(key)
             W._log(f"--- clip {ci + 1}/{len(clips)}: {length} frame (contesto {ctx}) — processo dedicato ---")
-            clip_runner(W, str(jd))
+            run_clip_with_fallback(W, clip_runner, str(jd))
             _ensure(gen_p.exists(), f"il clip {ci + 1} non ha prodotto {gen_p}")
             key_p.write_text(key)
         gen_f = torch.from_numpy(_np.load(gen_p)).float() / 255.0

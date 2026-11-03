@@ -90,9 +90,33 @@ def check_oom():
     print(f"  OOM simulato assorbito, err={err:.2e}")
 
 
+def check_no_leak():
+    """Giro 03/11: il flusso residuo di OGNI blocco restava vivo fino al GC ciclico (each_chunk ricorsiva = ciclo di riferimenti): 50 x [1, N, C] = 19 GB
+    sulla GPU. Con 6 blocchi in fila i tensori [1, N, C] vivi non devono crescere."""
+    import gc
+    os.environ["H3_BLOCK_CHUNK"] = "7"
+    gc.disable()
+    try:
+        for fused in (True, False):
+            blocks = [make(torch.bfloat16, fused) for _ in range(6)]
+            hs, temb, idx, rope = inputs(torch.bfloat16)
+            K.enable_chunked_blocks(type("T", (), {"transformer_blocks": blocks})())
+            counts, h = [], hs.clone()
+            with torch.no_grad():
+                for b in blocks:
+                    h = b(h, temb, idx, rope)
+                    counts.append(sum(1 for o in gc.get_objects() if torch.is_tensor(o) and tuple(o.shape) == tuple(hs.shape)))
+            assert max(counts) <= counts[0] + 1, f"fused={fused}: tensori [1,N,C] vivi crescono blocco dopo blocco {counts} (perdita di memoria)"
+            print(f"  nessuna perdita fused={fused} vivi={counts}")
+            del h
+    finally:
+        gc.enable()
+
+
 if __name__ == "__main__":
     for fused in (False, True):
         check(torch.float32, fused, 1e-5)
         check(torch.bfloat16, fused, 6e-2)
     check_oom()
+    check_no_leak()
     print("OK")

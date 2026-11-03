@@ -68,7 +68,12 @@ def alloc_qkv(qkv: list, B: int, N: int, q, k, v, dev) -> None:
 def each_chunk(n: int, ch: int, fn, device=None) -> None:
     """fn(i, j) su [0, n) a blocchi di `ch`. Va in OOM -> dimezza quel blocco (fn deve essere idempotente: scrive
     solo in buffer indicizzati da [i, j)) e ricorda il tetto appreso. A MIN_CHUNK token senza spazio risolleva."""
-    def go(i: int, j: int) -> None:
+    # Iterativo, NON ricorsivo: una `go` che richiama se stessa e' un ciclo di riferimenti (funzione <-> cella della chiusura). Quel ciclo teneva in vita
+    # `fn` e con lei il flusso residuo in ingresso e i buffer di OGNI blocco fino al passaggio del GC ciclico: giro 03/11, 50 x bf16 [1, 37929, 5376] =
+    # 19 GB vivi all'OOM (uno per blocco del DiT); la memoria GPU non fa scattare il GC, quindi si accumulavano per tutto il passo.
+    work = [(i, min(n, i + ch)) for i in range(0, n, ch)][::-1]
+    while work:
+        i, j = work.pop()
         try:
             fn(i, j)
         except torch.OutOfMemoryError:
@@ -78,10 +83,8 @@ def each_chunk(n: int, ch: int, fn, device=None) -> None:
                 torch.cuda.empty_cache()
                 _CAP[str(torch.device(device))] = max(MIN_CHUNK, (j - i) // 2)
             m = (i + j) // 2
-            go(i, m)
-            go(m, j)
-    for i in range(0, n, ch):
-        go(i, min(n, i + ch))
+            work.append((m, j))
+            work.append((i, m))
 
 
 CAP_BYTES = None            # tetto per-processo impostato dal worker (set_per_process_memory_fraction)
@@ -144,7 +147,13 @@ def ensure_headroom(need: int, dev, protect=None) -> bool:
 
 def _trace(k: int, last: int, dev) -> None:
     """Primo passaggio: memoria dopo alcuni blocchi (dato di calibrazione per le prossime prove)."""
-    if not _TRACE["on"] or LOG is None or torch.device(dev).type != "cuda":
+    if LOG is None or torch.device(dev).type != "cuda":
+        return
+    if not _TRACE["on"]:
+        if k == last:                                  # dopo il primo passaggio: una riga per passo di denoise (calibrazione del piano, giro 03/11)
+            LOG(f"[mem] fine passo: allocata {torch.cuda.memory_allocated() / 2**30:.1f} GB, picco del passo "
+                f"{torch.cuda.max_memory_allocated() / 2**30:.1f}, riservata {torch.cuda.memory_reserved() / 2**30:.1f}")
+            torch.cuda.reset_peak_memory_stats()
         return
     if k in (0, 1, 2) or k % 10 == 0 or k == last:
         LOG(f"[mem] blocco {k}: allocata {torch.cuda.memory_allocated() / 2**30:.1f} GB, "

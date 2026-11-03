@@ -415,6 +415,9 @@ def _fit_after_load(tr, dims: dict, plan0, kw: dict, frames: int) -> None:
     need = plan0["act_gb"] + HP.RESERVE_GB
     blocks = getattr(tr, "transformer_blocks", [])
     n = O.blocks_for_deficit(blocks, need - free) if free < need else 0
+    if os.environ.get("H3_STREAM_ALL") == "1":          # ripiego dopo un OOM: tutti i blocchi del DiT che si possono spostare restano in RAM (streaming)
+        n = max(n, int(HP.OFFLOADABLE * len(blocks)))
+        _log(f"memoria insufficiente al primo tentativo: streaming completo del modello, {n}/{len(blocks)} blocchi del DiT in RAM (piu lento)")
     # l'offloader esiste SEMPRE (anche con n = 0): se a runtime la VRAM non basta, workers/h3_chunk libera altri
     # blocchi al volo invece di andare in OOM (la prova del 30/10 aveva ~11 GB residenti non previsti)
     O.enable_block_offload(blocks, n, "cuda", _log)
@@ -727,8 +730,69 @@ def dump_gpu_state(log=print, top: int = 10) -> None:
         log(f"[oom] gruppi (forma, dtype) per byte totali:")
         for (shape, dt), (n, nb) in sorted(groups.items(), key=lambda kv: -kv[1][1])[:top]:
             log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt} {list(shape)}")
+        _oom_table(log, gc, torch, storages, groups)
     except Exception as e:                                           # noqa: BLE001
         log(f"[oom] dump non riuscito: {e}")
+
+
+def _oom_table(log, gc, torch, storages: dict, groups: dict) -> None:
+    """TABELLA per categoria al momento dell'OOM (giro 03/11: 27,1 GB allocati, il piano ne prevedeva 24,4): pesi residenti del DiT, blocchi offloadati,
+    LoRA, VAE, token di sequenza (flusso residuo / Q-K-V / riferimenti), buffer h3_chunk, altro. E CHI TIENE IN VITA il gruppo piu grande di tensori
+    non-peso (referrer: classe e funzione del frame): e cosi che si e trovato il ciclo di riferimenti di each_chunk (50 flussi residui da 0,38 GB vivi)."""
+    try:
+        wptr = set()
+        by_root = {}
+        for o in gc.get_objects():
+            if isinstance(o, torch.nn.Module):
+                for t in list(o.parameters(recurse=True)) + list(o.buffers(recurse=True)):
+                    if t.is_cuda:
+                        wptr.add(t.untyped_storage().data_ptr())
+        weights = sum(v[0] for k, v in storages.items() if k in wptr)
+        seq = other = 0
+        for k, (nb, shape, dt) in storages.items():
+            if k in wptr:
+                continue
+            if len(shape) >= 3 and shape[1] >= 4096:
+                seq += nb
+            else:
+                other += nb
+        try:
+            import h3_offload as _O
+            off = _O.CURRENT
+            n_off = len(getattr(off, "hosted", ()) or ()) if off is not None else 0
+        except Exception:                                            # noqa: BLE001
+            n_off = 0
+        log("[oom] TABELLA per categoria:")
+        log(f"[oom]   pesi sulla GPU (DiT residente + LoRA + VAE + encoder): {weights / 2**30:6.2f} GB  (blocchi del DiT in RAM: {n_off})")
+        log(f"[oom]   attivazioni di sequenza (flusso residuo, Q/K/V, token dei riferimenti video+immagine, latente sorgente): {seq / 2**30:6.2f} GB")
+        log(f"[oom]   altro (condizionamenti, tabelle rotary, buffer piccoli): {other / 2**30:6.2f} GB")
+        # i non-pesi piu grandi: chi li tiene vivi
+        big = [(g[1], k) for k, g in groups.items() if len(k[0]) >= 3 and k[0][1] >= 4096 and g[0] >= 2]
+        if big:
+            big.sort(reverse=True)
+            (nb, (shape, dt)) = big[0]
+            cnt = groups[(shape, dt)][0]
+            log(f"[oom] il gruppo piu grande di attivazioni: {cnt} x {dt} {list(shape)} = {nb / 2**30:.2f} GB; chi li tiene vivi (primi 3):")
+            done = 0
+            for o in gc.get_objects():
+                try:
+                    if torch.is_tensor(o) and o.is_cuda and tuple(o.shape) == tuple(shape) and str(o.dtype) == dt:
+                        refs = []
+                        for r in gc.get_referrers(o)[:6]:
+                            if type(r).__name__ == "frame":
+                                refs.append(f"frame {r.f_code.co_name}")
+                            elif type(r).__name__ == "cell":
+                                refs.append("cella-chiusura")
+                            else:
+                                refs.append(type(r).__name__)
+                        log(f"[oom]   referrer: {', '.join(refs)}")
+                        done += 1
+                        if done >= 3:
+                            break
+                except Exception:                                    # noqa: BLE001
+                    continue
+    except Exception as ex:                                          # noqa: BLE001
+        log(f"[oom] tabella non riuscita: {ex}")
 
 
 def main() -> int:
