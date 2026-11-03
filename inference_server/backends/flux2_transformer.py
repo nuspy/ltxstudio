@@ -311,6 +311,15 @@ def load_flux2_klein_transformer(ckpt_path: str, cfg: dict | None = None):
         raw_keys = list(h.keys())
         # mappa base(senza prefisso) → chiave reale nel file
         base2real = {_strip_prefix(k): k for k in raw_keys}
+        # FP8 «SCALATO» (formato ComfyUI, es. realDream_klein9B): accanto a ogni `X.weight` fp8 ci sono `X.weight_scale` (scalare F32), `X.input_scale` e
+        # `X.comfy_quant` (U8). Peso vero = fp8 * weight_scale. Prima quelle chiavi finivano nel mapping dei pesi e il caricamento moriva con «chunk
+        # expects at least a 1-dimensional tensor» (qkv.weight_scale e scalare); la scala veniva comunque ignorata (1.0). Ora la scala va nel buffer
+        # `weight_scale` di Fp8Linear (che la moltiplica nel forward); input_scale e comfy_quant non servono (compute bf16).
+        file_scales: dict[str, float] = {}
+        for b in [b for b in base2real if b.endswith(".weight_scale")]:
+            file_scales[b[:-len(".weight_scale")]] = float(h.get_tensor(base2real[b]).float().item())
+        for b in [b for b in base2real if b.endswith((".weight_scale", ".input_scale", ".comfy_quant"))]:
+            del base2real[b]
         weight_bases = {b for b in base2real if b.endswith(".weight")}
 
         # 1) quali moduli diffusers diventano Fp8Linear: ogni weight in dtype fp8
@@ -326,7 +335,10 @@ def load_flux2_klein_transformer(ckpt_path: str, cfg: dict | None = None):
             old = modules.get(mod_name)
             if not isinstance(old, nn.Linear):
                 continue
-            new = Fp8Linear(old.in_features, old.out_features, bias=old.bias is not None)
+            # su 'meta': prima il costruttore allocava davvero un buffer fp8 vuoto da out*in byte per OGNI Linear (9,4 GB per la Klein 9B, poi sostituiti dai
+            # pesi veri): commit del solo transformer 22,5 GB invece di ~10 (giro A del 03/11, Klein 9B a 59 GB di processo)
+            with torch.device("meta"):
+                new = Fp8Linear(old.in_features, old.out_features, bias=old.bias is not None)
             # moduli top-level (es. proj_out, anch'esso fp8 nella miraclein) non hanno parent → tr
             parent_name, child = (mod_name.rsplit(".", 1) if "." in mod_name else ("", mod_name))
             setattr(modules.get(parent_name, tr), child, new)
@@ -347,7 +359,7 @@ def load_flux2_klein_transformer(ckpt_path: str, cfg: dict | None = None):
                 if isinstance(modules.get(mod), Fp8Linear) and attr == "weight":
                     set_module_tensor_to_device(tr, nk, "cpu", value=t.contiguous())   # resta fp8
                     set_module_tensor_to_device(tr, mod + ".weight_scale", "cpu",
-                                                value=torch.ones((), dtype=torch.float32))
+                                                value=torch.tensor(file_scales.get(b[:-len(".weight")], 1.0), dtype=torch.float32))
                 else:
                     set_module_tensor_to_device(tr, nk, "cpu", value=t.to(torch.bfloat16),
                                                 dtype=torch.bfloat16)
