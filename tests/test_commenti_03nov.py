@@ -73,3 +73,26 @@ def test_tone_dump_is_off_by_default_and_never_raises(tmp_path, monkeypatch):
     F._tone_dump(str(tmp_path), {"arch": "inpaint", "seed": 5}, "raw", img)
     assert (tmp_path / "_tone_debug" / "inpaint_5_raw.png").is_file()
     F._tone_dump(str(tmp_path / "x\0y"), {}, "raw", img)               # percorso impossibile: nessuna eccezione
+
+
+def test_guard_load_frees_parked_monolithic_pipelines(monkeypatch):
+    """Giro A 03/11: una Klein 8B parcheggiata in mm._cpu_cache (~26 GB) restava mentre si caricava la Klein 9B (59 GB di processo): il guard di
+    caricamento ora libera anche le pipeline monolitiche parcheggiate quando il carico e grosso."""
+    import types
+    from inference_server.backends import image_flux as F
+
+    class E:
+        def __init__(self, mb):
+            self.obj, self.vram_mb = object(), mb
+
+    mm = types.SimpleNamespace(_cpu_cache={"a": E(26000), "b": E(9000)}, flush=lambda *a, **k: None)
+    monkeypatch.setattr(F, "_predicted_load_mb", lambda *a, **k: 22000.0)          # >= soglia «carico grosso» (15000)
+    from core import mem_budget
+    monkeypatch.setattr(mem_budget, "check_load", lambda *a, **k: None)
+    F._guard_load("x.safetensors", "flux2_inpaint", mm)
+    assert mm._cpu_cache == {}
+    mm2 = types.SimpleNamespace(_cpu_cache={"a": E(1000)}, flush=lambda *a, **k: None)
+    monkeypatch.setattr(F, "_predicted_load_mb", lambda *a, **k: 3000.0)           # piccolo e commit abbondante: non tocca nulla
+    monkeypatch.setattr(mem_budget, "avail_commit_mb", lambda: 90000.0)
+    F._guard_load("x.safetensors", "flux", mm2)
+    assert len(mm2._cpu_cache) == 1

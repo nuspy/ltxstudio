@@ -1302,7 +1302,34 @@ def _predicted_load_mb(model_path: str, arch: str) -> float:
     return sz
 
 
-def _guard_load(model_path: str, arch: str) -> None:
+def _free_parked_pipelines(mm) -> float:
+    """Distrugge le pipeline MONOLITICHE parcheggiate in RAM da `mm` (`_cpu_cache`: Klein/Z-Image/Ernie... scaricate dalla VRAM con demote). Non sono nello
+    STORE, quindi `STORE.free_cpu_mb` non le vede: nel giro A del 03/11 una Klein 8B parcheggiata (~26 GB: transformer + Qwen3-8B) si sommava al load
+    della Klein 9B seguente (altri ~26 GB + transitorio) = 59 GB di processo e il guardiano a 18,6 GB di commit libero. Tornano dal disco al prossimo uso."""
+    cache = getattr(mm, "_cpu_cache", None)
+    if not cache:
+        return 0.0
+    freed = 0.0
+    for k in list(cache):
+        e = cache.pop(k, None)
+        if e is None:
+            continue
+        freed += float(getattr(e, "vram_mb", 0) or 0)
+        try:
+            del e.obj
+        except Exception:                                   # noqa: BLE001
+            pass
+        del e
+    import gc
+    gc.collect()
+    try:
+        mm.flush()
+    except Exception:                                       # noqa: BLE001
+        pass
+    return freed
+
+
+def _guard_load(model_path: str, arch: str, mm=None) -> None:
     """Prima di OGNI assemblaggio/caricamento: commit libero − carico previsto < pavimento (core/mem_budget) →
     prima si libera la cache CPU dei modelli PARCHEGGIATI (LRU), solo se non basta errore chiaro (`LoadRefused`)
     invece di procedere. Disattivabile solo con LS_COMMIT_FLOOR_MB=0."""
@@ -1319,12 +1346,17 @@ def _guard_load(model_path: str, arch: str) -> None:
                 print(f"[mem] carico grosso (~{need / 1024:.0f} GB): liberati {freed / 1024:.1f} GB di modelli parcheggiati in RAM", flush=True)
         except Exception:                                   # noqa: BLE001
             pass
+        _pf = _free_parked_pipelines(mm)
+        if _pf > 0:
+            print(f"[mem] carico grosso (~{need / 1024:.0f} GB): liberate anche le pipeline monolitiche parcheggiate ({_pf / 1024:.1f} GB)", flush=True)
     if need > 0:
         deficit = need + mem_budget.commit_floor_mb() + 8192.0 - mem_budget.avail_commit_mb()   # 8GB di margine per i transitori
         if deficit > 0:
             try:
                 from inference_server.component_store import STORE
                 freed = STORE.free_cpu_mb(deficit)          # i parcheggiati si ricaricano dal disco: meglio di un crash
+                if freed < deficit:
+                    freed += _free_parked_pipelines(mm)
                 print(f"[mem] commit scarso: liberati {freed / 1024:.1f} GB di modelli parcheggiati in RAM (servivano {deficit / 1024:.1f} GB)", flush=True)
             except Exception:                               # noqa: BLE001
                 pass
@@ -1534,7 +1566,7 @@ def _load(model_path: str, arch: str, mm=None, klein_te: str = ""):
     _src = None
     _destroy_same_ident(mm, _ident)
     if is_file:
-        _guard_load(model_path, arch)                        # commit libero − carico < pavimento → errore chiaro
+        _guard_load(model_path, arch, mm)                    # commit libero − carico < pavimento → errore chiaro
     if arch == "ernie":
         pipe = _assemble_ernie(model_path if (is_file and str(model_path).lower().endswith(".safetensors")) else None)
         # assemblaggio locale (shim transformers <5); il PE (6.4GB) NON entra qui: ernie_pe lo carica solo su «Migliora prompt»
