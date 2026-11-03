@@ -123,6 +123,8 @@ def main():
     ap.add_argument("--no-review", action="store_true")
     ap.add_argument("--allow-existing-app", action="store_true")
     ap.add_argument("--keep-app", action="store_true")
+    ap.add_argument("--stop-file", default="", help="se questo file esiste PRIMA di un caso, il giro si ferma li (turno GPU finito): scrive rimasti.json e non lancia altro")
+    ap.add_argument("--force-review", action="store_true", help="costruisce la pagina di revisione anche con casi non ok (default: solo se TUTTI i casi del giro sono ok)")
     ap.add_argument("--no-open", action="store_true", help="non aprire la pagina di revisione nel browser a fine giro")
     ap.add_argument("--inventory-out", default="", help="salva l'inventario REALE dei menu dell'app in questo JSON e termina (nessun caso)")
     a = ap.parse_args()
@@ -163,7 +165,7 @@ def main():
     applog = open(os.path.join(out, "app_stdout.log"), "a", encoding="utf-8", errors="replace")
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=applog, stderr=subprocess.STDOUT)
     cl = Client()
-    results, stop = [], False
+    results, stop, stopped = [], False, False
     try:
         try:
             cl.connect(timeout=150, proc=proc)
@@ -193,6 +195,11 @@ def main():
             json.dump(inv.get("inventory", inv), open(a.inventory_out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
             say("inventario salvato in " + a.inventory_out)
         for k, c in enumerate(cases, 1):
+            if a.stop_file and os.path.exists(a.stop_file):           # turno GPU finito: nessun altro caso
+                say(f"STOP richiesto ({a.stop_file}): il giro si ferma prima di {c['id']}")
+                json.dump({"rimasti": [x["id"] for x in cases[k - 1:]]}, open(os.path.join(out, "rimasti.json"), "w", encoding="utf-8"))
+                stopped = True
+                break
             c = dict(c)
             if a.dry:
                 c["dry"] = True
@@ -244,7 +251,7 @@ def main():
     say(f"FINE: {ok}/{len(results)} ok; risultati in {res_path}")
     json.dump({"nome": spec.get("nome"), "modo": mode, "dry": a.dry, "risultati": len(results), "ok": ok},
               open(os.path.join(out, "sommario.json"), "w", encoding="utf-8"))
-    if mode == "sweep" and results and results[-1].get("esito") == "crash" and not a.inventory_out:
+    if mode == "sweep" and results and results[-1].get("esito") == "crash" and not a.inventory_out and not stopped:
         ids = [c["id"] for c in spec["cases"]]
         last = results[-1]["id"]
         nxt = ids[ids.index(last) + 1] if last in ids and ids.index(last) + 1 < len(ids) else None
@@ -257,10 +264,25 @@ def main():
                 argv.append("--dry")
             if a.no_open:
                 argv.append("--no-open")
+            if a.no_review:
+                argv.append("--no-review")                   # prima il riavvio la perdeva e la pagina si apriva a meta giro (03/11)
+            if a.stop_file:
+                argv += ["--stop-file", a.stop_file]
+            if a.force_review:
+                argv.append("--force-review")
             if a.max_proc_gb:
                 argv += ["--max-proc-gb", str(a.max_proc_gb)]
             return subprocess.run(argv).returncode
-    if not a.no_review and results and not a.inventory_out:
+    _all = {}
+    if os.path.exists(res_path):
+        for _l in open(res_path, encoding="utf-8"):
+            try:
+                _r = json.loads(_l)
+                _all[_r["id"]] = _r.get("esito") == "ok"
+            except Exception:                                # noqa: BLE001
+                pass
+    _green = bool(_all) and all(_all.values()) and not stopped
+    if not a.no_review and results and not a.inventory_out and (_green or a.force_review):   # la pagina all'utente solo con TUTTO verde (regola 03/11)
         import importlib.util
         _sp = importlib.util.spec_from_file_location("ltx_review", os.path.join(HERE, "review.py"))
         review = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(review)
