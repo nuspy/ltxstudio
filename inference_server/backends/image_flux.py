@@ -2315,6 +2315,12 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
     if type(pipe).__name__ == "FluxInpaintPipeline":
         kw["strength"] = float(params.get("denoise") or 0.9)
         kw["guidance_scale"] = min(float(kw.get("guidance_scale", 3.5)), 5.0)
+        # PROVA (03/11, opt-in: senza la chiave nulla cambia): ritaglio attorno alla maschera + `padding_mask_crop` px di margine, riscalato alla
+        # misura di generazione e rimesso al suo posto da diffusers. Con una maschera piccola (una bussola = ~65 token su 1152x832) il FLUX base
+        # non ha token per disegnare l'oggetto e produce «una chiazza»; con il ritaglio la stessa maschera occupa tutta l'immagine di generazione.
+        if params.get("padding_mask_crop") and not params.get("outpaint"):
+            kw["padding_mask_crop"] = int(params["padding_mask_crop"])
+            print(f"[inpaint] padding_mask_crop={kw['padding_mask_crop']} px (ritaglio attorno alla maschera)", flush=True)
         if params.get("outpaint"):
             # Task 16a — a strength 1.0 la schedule parte da rumore puro: il pre-riempimento non arriva al modello e
             # l'estensione e' un'altra scena (live 18/10, O2). In outpaint: min(denoise, 0.9) (env NATIVE_OUTPAINT_STRENGTH).
@@ -2328,6 +2334,17 @@ def _run_impl(params: dict, mm, output_dir: str) -> dict:
         from core import outpaint_prefill as _opf2
         if _opf2.enabled():
             kw["strength"] = float(params.get("denoise") or 1.0)
+    # PROVE Integra (03/11, opt-in: senza le chiavi nulla cambia). Il Klein inpaint ha `image_reference` (il soggetto come riferimento della
+    # zona mascherata: l'immagine di partenza e la SCENA, non il composito) e `strength` (default 0.8 della pipeline, mai impostato prima).
+    if type(pipe).__name__ == "Flux2KleinInpaintPipeline" and not params.get("outpaint"):
+        _kr = [r for r in (params.get("ref_images") or []) if r and Path(str(r)).exists()]
+        if _kr:
+            _kim = [Image.open(str(r)).convert("RGB") for r in _kr]
+            kw["image_reference"] = _kim if len(_kim) > 1 else _kim[0]
+            print(f"[klein-inpaint] {len(_kim)} riferimento/i del soggetto (image_reference)", flush=True)
+        if params.get("strength") is not None:
+            kw["strength"] = float(params["strength"])
+            print(f"[klein-inpaint] strength={kw['strength']:.2f}", flush=True)
 
     # Preview live per-step (task #88): anteprima del latente ad ogni ~1/8 degli step sul preview_bus,
     # che la GUI polla via GET /preview. Best-effort: se la pipeline non supporta callback_on_step_end
