@@ -35,7 +35,8 @@ def _ensure(cond, msg):
 
 # ── ingressi: video, maschere ─────────────────────────────────────────────────────────────────────
 def read_frames(path: str, tw: int, th: int, max_frames: int = 0):
-    """Video -> (uint8 [N, th, tw, 3] a 24 fps, durata s). Il ricampionamento prende il frame piu vicino nel tempo."""
+    """Video -> (uint8 [N, th, tw, 3] a 24 fps, durata s, indice del frame sorgente di ogni frame a 24 fps, frame sorgente totali).
+    Il ricampionamento prende il frame piu vicino nel tempo."""
     import av
     with av.open(path) as c:
         vs = c.streams.video[0]
@@ -53,15 +54,25 @@ def read_frames(path: str, tw: int, th: int, max_frames: int = 0):
     ts = np.asarray(times)
     idx = np.clip(np.searchsorted(ts, (np.arange(n) + 0.5) / FPS) - 1, 0, len(frames) - 1)
     out = np.stack([frames[i] for i in idx])
-    return out, dur
+    return out, dur, idx, len(frames)
 
 
-def read_masks(mask_dir: str, n24: int, tw: int, th: int, src_fps_hint: float = 0.0) -> torch.Tensor:
-    """Maschere SAM2 (png per frame del sorgente, bianco = oggetto) -> [n24, th, tw] float, una per frame a 24 fps."""
+def read_masks(mask_dir: str, src_idx, n_src: int, tw: int, th: int) -> torch.Tensor:
+    """Maschere SAM2 (png per frame del sorgente, bianco = oggetto) -> [len(src_idx), th, tw] float, una per frame a 24 fps.
+    `src_idx` = frame sorgente usato da read_frames per ogni frame a 24 fps: la maschera e quella DELLO STESSO frame sorgente.
+    (Fino al 03/11 le maschere venivano stirate sui soli N frame usati: con 286 maschere e 277 frame la maschera finiva 9 frame avanti,
+    la persona tenuta «in ritardo» lasciava sfondo vecchio da un lato e veniva rigenerata dall'altro.) Se il numero di maschere non
+    coincide con i frame sorgente (tracking a un altro passo) si mappa per tempo sull'intera durata."""
     from PIL import Image
     files = sorted(Path(mask_dir).glob("*.png"))
     _ensure(files, f"nessuna maschera in {mask_dir}: il tracking SAM2 non ha prodotto nulla")
-    idx = np.clip(np.round(np.arange(n24) * (len(files) - 1) / max(1, n24 - 1)).astype(int), 0, len(files) - 1)
+    src_idx = np.asarray(src_idx)
+    n24 = len(src_idx)
+    if len(files) == n_src:
+        idx = src_idx
+    else:
+        idx = np.round(src_idx * (len(files) - 1) / max(1, n_src - 1)).astype(int)
+    idx = np.clip(idx, 0, len(files) - 1)
     cache, out = {}, torch.zeros(n24, th, tw)
     for k, i in enumerate(idx):
         if i not in cache:
@@ -214,13 +225,13 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     with __import__("av").open(src) as c0:
         sw, sh = c0.streams.video[0].codec_context.width, c0.streams.video[0].codec_context.height
     tw, th = M.short_edge_size(sw, sh, short)
-    frames_u8, dur = read_frames(src, tw, th, int(e.get("max_frames") or 0))
+    frames_u8, dur, src_idx, n_src = read_frames(src, tw, th, int(e.get("max_frames") or 0))
     N = M.usable_frames(frames_u8.shape[0])
     frames_u8 = frames_u8[:N]
     W._log(f"edit {action}: {N} frame ({N / FPS:.1f}s) a {tw}x{th} da {sw}x{sh}")
     src_t = torch.from_numpy(frames_u8)                                # uint8 [N, th, tw, 3]
     f01 = src_t.float() / 255.0
-    obj = read_masks(e["mask_dir"], N, tw, th)
+    obj = read_masks(e["mask_dir"], src_idx[:N], n_src, tw, th)
     scale = tw / float(sw)
     invert = action == "change_background"
     # Spazio sopra la testa e posa tenuta servono a sostituisci (personaggio nuovo piu alto, gesti diversi). Nel cambia-sfondo la persona e TENUTA
@@ -268,7 +279,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
-                  *((("bgmask_v2", headroom, hold_frames),) if invert else ()))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
+                  "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
