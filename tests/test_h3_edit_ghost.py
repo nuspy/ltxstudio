@@ -48,7 +48,7 @@ def test_options_defaults_and_not_in_the_checkpoint_key_unless_they_change_the_c
     assert 'or e.get("bg_person_ref") or "sharp"' in src
     assert 'str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")' in src   # matte DI DEFAULT nel cambia-sfondo
     assert '"bgref", bg_person_ref' in src and '"preroll", preroll' in src                 # cambiano i clip: nella chiave
-    key_line = [l for l in src.splitlines() if l.strip().startswith('"maskalign_v2"')][0] + src.split('"maskalign_v2"')[1].split("*opts_key(p))")[0]
+    key_line = [l for l in src.splitlines() if l.strip().startswith('"maskalign_v2"')][0] + src.split('"maskalign_v2"')[1].split("*opts_key(p)")[0]
     assert "bg_matte" not in key_line                                                         # il matte e solo composizione: i clip si riusano
 
 
