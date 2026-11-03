@@ -3789,8 +3789,18 @@
   "vedit.h3.te.profile": "Του προφίλ (προεπιλογή)",
   "vedit.h3.te.tt": "Κωδικοποιητής κειμένου του H3. Προεπιλογή: του επιλεγμένου προφίλ. Η χειροκίνητη επιλογή είναι για συγκρίσεις (ίδιος κωδικοποιητής για όλα τα μοντέλα).",
   "vedit.h3.lora.why.convert": "δεν είναι σε εγγενή μορφή: μετατρέψτε το από την καρτέλα «Βάρη» (η επεξεργασία χρησιμοποιεί μόνο εγγενή LoRA)",
-  "vedit.h3.lora.why.guide": "χρειάζεται την ευθυγραμμισμένη καθοδήγηση latents (AddGuide, καρέ 0) που η επεξεργασία H3 του LTX Studio δεν έχει ακόμη",
   "vedit.h3.turbo.r4v10": "Turbo 4 βήματα v1.0 768p (lightx2v, Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo 8 βήματα v1.1 768p (lightx2v, Ref2VA)",
-  "vedit.h3.lora.why.twin": "υπάρχει ήδη η εγγενής έκδοση (-native): χρησιμοποιήστε εκείνη"
+  "vedit.h3.lora.why.twin": "υπάρχει ήδη η εγγενής έκδοση (-native): χρησιμοποιήστε εκείνη",
+  "vedit.h3.guide": "Ευθυγραμμισμένος οδηγός λανθανόντων (δοκιμή)",
+  "vedit.h3.guide.tt": "Το βίντεο-πηγή μπαίνει επίσης ως μπλοκ καθαρών λανθανόντων στο ίδιο πλέγμα (χώρος και χρόνος) με το αποτέλεσμα, επιπλέον της αναφοράς <Video 1>. Τα LoRA οδηγού (VFX Edit, Style Transfer, Head Swap, Motion Transfer, ευκρίνεια) το απαιτούν και το ενεργοποιούν μόνα τους. Απενεργοποιημένο = όπως πάντα.",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: ο οδηγός είναι ενεργός· το «{trigger}» προστίθεται αυτόματα στο prompt.",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: ο οδηγός είναι ενεργός· το prompt γίνεται η σταθερή λεζάντα του LoRA.",
+  "vedit.h3.lora.why.tara": "Το Motion Transfer TARA χρησιμοποιεί εγγενή αναφορά βίντεο με ένα patch προσοχής του μοντέλου που δεν διαθέτει το LTX Studio: χρησιμοποιήστε την έκδοση «guide latents»",
+  "h3.guide.kind.lms": "LMS (ευκρίνεια)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

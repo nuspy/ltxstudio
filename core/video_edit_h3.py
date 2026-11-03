@@ -103,15 +103,15 @@ def turbo_info(key: str, model: str = "") -> tuple[int, float]:
 # ── LoRA dell'utente per l'edit: architettura dalle CHIAVI dell'header (mai dai metadati); Ref2VA/FL2VA non si distinguono dalle chiavi (stesse chiavi e forme) ──
 _H3_LORA_KEY = None
 # LoRA di Alissonerdx (VFX Edit, Style Transfer, Motion Transfer «guide latents», Head Swap, LMS): il video sorgente entra come LATENTI ALLINEATI (MiniMaxH3AddGuide,
-# frame_idx 0), non come riferimento nativo <Video 1>: il nostro edit (Ref2VA + riferimento video) non ha questa guida → fuori dal menu finche non c'e (DECISIONE RICHIESTA).
-_GUIDE_TOKENS = ("vfx_edit", "style_transfer", "motion_transfer", "head_swap", "_lms_")
+# frame_idx 0), non come riferimento nativo <Video 1>. Dal 03/11 la guida c'e (workers/h3_guide.py, core/h3_guide.py): queste LoRA si attivano e portano da sole il loro
+# trigger nel prompt. Resta fuori solo Motion Transfer TARA (altra tecnica: riferimento video nativo + patch di attenzione del modello).
 _FL2VA_ONLY_TOKENS = ("fl2v", "i2v")          # LoRA addestrate per prima/ultima immagine: l'edit lavora in Ref2VA (DiT diverso, adaln diverso)
 _LORA_CACHE: dict = {}
 
 
 LORA_REASONS = {"": "", "missing": "file non trovato", "twin": "esiste gia la versione nativa (-native): usa quella",
                 "convert": "non e in formato nativo: convertila dal tab «Pesi» (l'edit usa solo LoRA native)",
-                "guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora",
+                "tara": "Motion Transfer TARA usa un riferimento video nativo con una patch di attenzione del modello che LTX Studio non ha: usa la versione «guide latents»",
                 "arch": "non e una LoRA di MiniMax H3 (le chiavi dell'header non hanno i moduli del DiT H3)",
                 "fl2va": "solo FL2VA (prima/ultima immagine): l'edit lavora in Ref2VA"}
 
@@ -123,7 +123,7 @@ def lora_edit_compat(path: str, name: str = "") -> tuple[bool, str]:
 
 
 def lora_edit_check(path: str, name: str = "") -> tuple[bool, str]:
-    """(utilizzabile nell'edit H3, codice del motivo: "" | missing | arch | fl2va). 1) architettura: dalle chiavi dell'header deve avere i moduli del DiT H3 (`transformer_blocks.N.attn.to_qkv`
+    """(utilizzabile nell'edit H3, codice del motivo: "" | missing | convert | arch | tara | fl2va). 1) architettura: dalle chiavi dell'header deve avere i moduli del DiT H3 (`transformer_blocks.N.attn.to_qkv`
     con pesi LoRA); 2) modalita: dalle chiavi non si distingue (le turbo ref2va e fl2va hanno le stesse chiavi e forme), quindi vale la modalita DICHIARATA nel
     nome del file (fl2v/i2v = solo FL2VA → disattivata col motivo; ref2v/ref2va = verificata; altrimenti ammessa, modalita non dichiarata)."""
     import json as _j
@@ -157,8 +157,9 @@ def lora_edit_check(path: str, name: str = "") -> tuple[bool, str]:
             return False, ("twin" if os.path.isfile(stem + "-native" + ext) else "convert")
     except Exception:                                        # noqa: BLE001
         pass
-    if any(t in low for t in _GUIDE_TOKENS):
-        return False, "guide"
+    from core import h3_guide as CG
+    if CG.is_tara(low):
+        return False, "tara"
     if _re.search(r"ref2v", low):
         return True, ""
     if any(t in low for t in _FL2VA_ONLY_TOKENS):
@@ -173,23 +174,56 @@ def installed_profiles(present=None) -> list[str]:
     return [p for p in H3_PROFILES if present(ids[p])]
 
 
+def _guide_for(loras: list | None, pic: str, act: str | None = None) -> dict | None:
+    """Scheda della LoRA di guida tra quelle scelte (core/h3_guide.guide_info) o None. Controlla che le LoRA di guida non siano due e che la foto richiesta ci sia."""
+    from core import h3_guide as CG
+    try:
+        gi = CG.guide_of_loras(loras)
+    except ValueError as ex:
+        raise H3EditError(str(ex))
+    if gi and gi["picture"] == "required" and not pic:
+        raise H3EditError(f"La LoRA «{gi['kind']}» vuole una foto di riferimento (nel canale nativo <Picture 1>): scegli la foto.")
+    return gi
+
+
+def build_guide_params(cfg: dict, out: str, *, present=None) -> dict:
+    """`params` per workers/minimax_h3_infer.py per l'«Edit a parole» con GUIDA di latenti allineata, SENZA maschera ne tracking (proposta di prodotto,
+    non ancora nella GUI: DECISIONE RICHIESTA). Il video sorgente entra tutto come guida (stessa griglia del risultato), il prompt e la richiesta in una frase.
+
+    cfg: video, prompt (la richiesta, es. «change the coat to red»), loras (almeno UNA LoRA di guida: vfx_edit / style_transfer / head_swap / motion_transfer / lms),
+    ref_image (foto, opzionale o obbligatoria secondo la LoRA), h3_profile, h3_turbo ..., max_s (tetto di durata, opz.), frame_idx (opz., 0), keep_audio (True)."""
+    prof, turbo, extra = _validated_options(cfg, present)
+    video = str(cfg.get("video") or "")
+    if not os.path.isfile(video):
+        raise H3EditError(f"Video sorgente non trovato: {video}")
+    pic = str(cfg.get("ref_image") or "").strip()
+    pic = pic if pic and os.path.isfile(pic) else ""
+    gi = _guide_for(extra.get("loras"), pic)
+    if not gi:
+        raise H3EditError("Scegli una LoRA di guida (VFX Edit, Style Transfer, Head Swap, Motion Transfer o nitidezza LMS): senza, il video guida non ha nulla da fare.")
+    prompt = str(cfg.get("prompt") or "").strip()
+    if not prompt and not gi.get("caption"):
+        raise H3EditError("Scrivi la richiesta a parole (una frase, es. «change the coat to red»).")
+    from core import h3_guide as CG
+    g = {"video": video, "frame_idx": int(cfg.get("frame_idx") or 0), "keep_audio": bool(cfg.get("keep_audio", True))}
+    if cfg.get("max_s"):
+        g["max_s"] = float(cfg["max_s"])
+    out_p = {"arch": "minimax_h3", "h3_guide": g, "h3_guide_lora": gi["id"], "prompt": CG.apply_trigger(prompt, gi), "h3_profile": prof, "h3_turbo": turbo,
+             "h3_video_shift": float(S.TURBO[turbo][2]), "seed": int(cfg.get("seed") or 42), "output": out, **extra}
+    if cfg.get("h3_canvas"):
+        out_p["h3_canvas"] = str(cfg["h3_canvas"])
+    if pic:
+        out_p["references"] = [{"kind": "image", "path": pic, "role": "subject"}]
+    return out_p
+
+
 def track_dir_of(video: str) -> str:
     return os.path.splitext(video)[0] + "_track"
 
 
-def build_params(cfg: dict, out: str, *, action: str | None = None, present=None) -> dict:
-    """`params` per workers/minimax_h3_infer.py (senza il tracking SAM2, che lo fa il chiamante e riempie `mask_dir`).
-
-    cfg: video, mode (change_background|replace_char), object (cosa tenere / chi sostituire), prompt (il nuovo luogo / note), ref_image
-    (foto del luogo, opzionale, o del nuovo personaggio, obbligatoria), h3_profile, short_edge, seed, engine."""
-    mode = cfg.get("mode")
-    act = action or E.action_of_mode(mode or "")
-    if act not in (E.CHANGE_BACKGROUND, E.REPLACE_CHARACTER):
-        raise H3EditError(f"Il motore H3 non fa l'azione «{act}».")
-    eng = cfg.get("engine") or "h3_edit"
-    msg = E.missing_message(eng, present)
-    if msg:
-        raise H3EditError(msg)
+def _validated_options(cfg: dict, present=None) -> tuple[str, str, dict]:
+    """Modello e opzioni di velocita dell'edit H3, validati: (profilo, turbo, extra). `extra` ha SOLO le chiavi scelte dall'utente (h3_dit, h3_te, h3_veda,
+    h3_lightvae, loras): con i default i params sono quelli di sempre. Condiviso da build_params (edit con maschera) e build_guide_params (guida allineata)."""
     prof = str(cfg.get("h3_profile") or "")                    # voce del menu «Modello H3»: un profilo ufficiale o un DiT personalizzato
     custom = prof if prof in CUSTOM_MODELS else str(cfg.get("h3_dit") or "")
     if custom:
@@ -236,6 +270,34 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
         miss = [i for i in S.LIGHTVAE[lv] if not pres(i)]
         if miss:
             raise H3EditError("LightVAE: pesi mancanti " + ", ".join(miss) + ": scaricali dal tab «Pesi».")
+    extra = {}
+    if custom:
+        extra["h3_dit"] = custom
+    if te:
+        extra["h3_te"] = te
+    if cfg.get("h3_veda"):
+        extra["h3_veda"] = True
+    if lv:
+        extra["h3_lightvae"] = lv
+    if loras:
+        extra["loras"] = loras
+    return prof, turbo, extra
+
+
+def build_params(cfg: dict, out: str, *, action: str | None = None, present=None) -> dict:
+    """`params` per workers/minimax_h3_infer.py (senza il tracking SAM2, che lo fa il chiamante e riempie `mask_dir`).
+
+    cfg: video, mode (change_background|replace_char), object (cosa tenere / chi sostituire), prompt (il nuovo luogo / note), ref_image
+    (foto del luogo, opzionale, o del nuovo personaggio, obbligatoria), h3_profile, short_edge, seed, engine."""
+    mode = cfg.get("mode")
+    act = action or E.action_of_mode(mode or "")
+    if act not in (E.CHANGE_BACKGROUND, E.REPLACE_CHARACTER):
+        raise H3EditError(f"Il motore H3 non fa l'azione «{act}».")
+    eng = cfg.get("engine") or "h3_edit"
+    msg = E.missing_message(eng, present)
+    if msg:
+        raise H3EditError(msg)
+    prof, turbo, extra = _validated_options(cfg, present)
     video = str(cfg.get("video") or "")
     if not os.path.isfile(video):
         raise H3EditError(f"Video sorgente non trovato: {video}")
@@ -258,17 +320,14 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
          "person_grow_px": int(ep["person_grow_px"]), "replace_expand": float(ep.get("replace_expand", 0.0))}
     out_p = {"arch": "minimax_h3", "h3_edit": e, "h3_profile": prof, "h3_turbo": turbo, "h3_video_shift": float(ep["video_shift"]),
              "seed": int(cfg.get("seed") or 42), "output": out, **E.engine_params(act, eng)}
-    # opzioni di velocita / modello: presenti SOLO se l'utente le ha scelte (default invariati: senza, i params sono quelli di sempre)
-    if custom:
-        out_p["h3_dit"] = custom
-    if te:
-        out_p["h3_te"] = te
-    if cfg.get("h3_veda"):
-        out_p["h3_veda"] = True
-    if lv:
-        out_p["h3_lightvae"] = lv
-    if loras:
-        out_p["loras"] = loras
+    out_p.update(extra)                                          # opzioni di velocita / modello: presenti SOLO se scelte (default invariati)
+    gi = _guide_for(extra.get("loras"), pic, act)
+    if gi or cfg.get("h3_guide"):                                # guida di latenti allineata (workers/h3_guide.py): scelta dall'utente o richiesta da una LoRA di guida
+        if extra.get("h3_veda"):
+            raise H3EditError("La guida allineata non funziona con l'attenzione sparsa Veda (il predittore e addestrato senza righe di guida): spegni Veda o la guida.")
+        out_p["h3_edit"]["guide"] = True
+        if gi:
+            out_p["h3_edit"]["guide_lora"] = gi["id"]
     return out_p
 
 

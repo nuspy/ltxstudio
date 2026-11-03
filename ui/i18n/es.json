@@ -3789,8 +3789,18 @@
   "vedit.h3.te.profile": "El del perfil (predeterminado)",
   "vedit.h3.te.tt": "Text encoder de H3. Predeterminado: el del perfil elegido. Elegirlo a mano sirve para comparaciones (mismo codificador para todos los modelos).",
   "vedit.h3.lora.why.convert": "no está en formato nativo: conviértela desde la pestaña «Pesos» (la edición solo usa LoRA nativas)",
-  "vedit.h3.lora.why.guide": "necesita la guía de latentes alineada (AddGuide, fotograma 0) que la edición H3 de LTX Studio aún no tiene",
   "vedit.h3.turbo.r4v10": "Turbo 4 pasos v1.0 768p (lightx2v, Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo 8 pasos v1.1 768p (lightx2v, Ref2VA)",
-  "vedit.h3.lora.why.twin": "ya existe la versión nativa (-native): usa esa"
+  "vedit.h3.lora.why.twin": "ya existe la versión nativa (-native): usa esa",
+  "vedit.h3.guide": "Guía de latentes alineada (prueba)",
+  "vedit.h3.guide.tt": "El vídeo de origen entra también como bloque de latentes limpios en la misma rejilla (espacio y tiempo) del resultado, además de la referencia <Video 1>. Las LoRA de guía (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidez) la exigen y la activan solas. Desactivada = como siempre.",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: guía activa; «{trigger}» se añade solo al prompt.",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: guía activa; el prompt pasa a ser la descripción fija de la LoRA.",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA usa una referencia de vídeo nativa con un parche de atención del modelo que LTX Studio no tiene: usa la versión «guide latents»",
+  "h3.guide.kind.lms": "LMS (nitidez)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

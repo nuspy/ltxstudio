@@ -3789,8 +3789,18 @@
   "vedit.h3.te.profile": "Из профиля (по умолчанию)",
   "vedit.h3.te.tt": "Текстовый энкодер H3. По умолчанию — из выбранного профиля. Ручной выбор нужен для сравнений (один энкодер для всех моделей).",
   "vedit.h3.lora.why.convert": "не в нативном формате: конвертируйте на вкладке «Веса» (редактирование использует только нативные LoRA)",
-  "vedit.h3.lora.why.guide": "требует выровненной латентной направляющей (AddGuide, кадр 0), которой в H3-редактировании LTX Studio пока нет",
   "vedit.h3.turbo.r4v10": "Turbo 4 шага v1.0 768p (lightx2v, Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo 8 шагов v1.1 768p (lightx2v, Ref2VA)",
-  "vedit.h3.lora.why.twin": "нативная версия (-native) уже есть: используйте её"
+  "vedit.h3.lora.why.twin": "нативная версия (-native) уже есть: используйте её",
+  "vedit.h3.guide": "Выровненное латентное управление (тест)",
+  "vedit.h3.guide.tt": "Исходное видео дополнительно подаётся блоком чистых латентов на той же сетке (пространство и время), что и результат, помимо референса <Video 1>. LoRA с управлением (VFX Edit, Style Transfer, Head Swap, Motion Transfer, резкость) требуют его и включают сами. Выключено = как раньше.",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: управление включено; «{trigger}» добавляется в промпт автоматически.",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: управление включено; промпт становится фиксированной подписью LoRA.",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA использует нативный видеореференс с патчем внимания модели, которого нет в LTX Studio: используйте версию «guide latents»",
+  "h3.guide.kind.lms": "LMS (резкость)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

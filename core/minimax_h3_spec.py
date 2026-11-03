@@ -74,7 +74,8 @@ VEDA_BUDGET = "32"
 
 
 def mode_for(params: dict) -> str:
-    return "ref2va" if params.get("references") else "fl2va"
+    # la guida di latenti allineata (workers/h3_guide.py) vive nei DiT Ref2VA anche senza riferimenti nativi: le LoRA di guida sono addestrate su quei pesi
+    return "ref2va" if (params.get("references") or params.get("h3_guide") or params.get("_h3_guide_latents") is not None) else "fl2va"
 
 
 def snap_frames(seconds: float) -> int:

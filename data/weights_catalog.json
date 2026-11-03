@@ -9718,6 +9718,173 @@
         "lora_style",
         "uncensored"
       ]
+    },
+    {
+      "id": "mmh3-lora-vfx-edit-r128",
+      "module": "Video",
+      "label": "H3 VFX Edit r128 (guida allineata, 1.24GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.24,
+      "scan_names": [
+        "minimax_h3_vfx_edit_v1.0_r128-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Alissonerdx/Minimax-H3-ComfyUI",
+      "url": "https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI",
+      "filename": "minimax_h3_vfx_edit_v1.0_r128-native.safetensors",
+      "remote_filename": "loras/minimax_h3_vfx_edit_v1.0_r128.safetensors",
+      "deps": [
+        "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"
+      ],
+      "note": "edit a parole di un video con la GUIDA allineata del sorgente (clip 73 fotogrammi a 384): prompt = una frase che inizia con «vfx_edit:». Sperimentale: deriva d'identita, testi e loghi riscritti, clip lunghi peggiori",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "vfx_edit:"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "ref_omni"
+      ]
+    },
+    {
+      "id": "mmh3-lora-vfx-edit-r128-ffp",
+      "module": "Video",
+      "label": "H3 VFX Edit r128 FFP (guida allineata, 1.24GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.24,
+      "scan_names": [
+        "minimax_h3_vfx_edit_v1.0_r128_ffp-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Alissonerdx/Minimax-H3-ComfyUI",
+      "url": "https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI",
+      "filename": "minimax_h3_vfx_edit_v1.0_r128_ffp-native.safetensors",
+      "remote_filename": "loras/minimax_h3_vfx_edit_v1.0_r128_ffp.safetensors",
+      "deps": [
+        "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"
+      ],
+      "note": "VFX Edit continuato a 512 e 124 fotogrammi, con propagazione del primo fotogramma modificato (foto nel canale nativo <Picture 1>); trigger «vfx_edit:»",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "vfx_edit:"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "ref_omni"
+      ]
+    },
+    {
+      "id": "mmh3-lora-style-transfer-r64",
+      "module": "Video",
+      "label": "H3 Style Transfer r64 (guida allineata, 0.62GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.62,
+      "scan_names": [
+        "minimax_h3_style_transfer_v1.0_r64-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Alissonerdx/Minimax-H3-ComfyUI",
+      "url": "https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI",
+      "filename": "minimax_h3_style_transfer_v1.0_r64-native.safetensors",
+      "remote_filename": "loras/minimax_h3_style_transfer_v1.0_r64.safetensors",
+      "deps": [
+        "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"
+      ],
+      "note": "ri-disegna tutto il video in uno stile (foto di stile come <Picture 1> o solo testo) tenendo moto e tempi; forza 1.0, 0.7 se cambia troppo il movimento",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "style_transfer:"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "ref_omni"
+      ]
+    },
+    {
+      "id": "mmh3-lora-motion-transfer",
+      "module": "Video",
+      "label": "H3 Motion Transfer (guide latents, adattatore V2 fuso, 0.18GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.18,
+      "scan_names": [
+        "minimax_h3_motion_transfer_v1.0_ref2va-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Alissonerdx/Minimax-H3-ComfyUI",
+      "url": "https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI",
+      "filename": "minimax_h3_motion_transfer_v1.0_ref2va-native.safetensors",
+      "remote_filename": "loras/minimax_h3_motion_transfer_v1.0_ref2va.safetensors",
+      "deps": [
+        "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"
+      ],
+      "note": "il personaggio della foto di riferimento esegue il movimento del video guida; licenza Motion Transfer di Alissonerdx (credito sopra 1 M$ di ricavi, niente API/SaaS ospitati)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "triggers": [
+        "motion_transfer:"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "ref_omni"
+      ]
+    },
+    {
+      "id": "mmh3-lora-lms-r64",
+      "module": "Video",
+      "label": "H3 LMS nitidezza r64 (guida allineata, 1.24GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.24,
+      "scan_names": [
+        "minimax_h3_lms_v1.0_r64-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "Alissonerdx/Minimax-H3-ComfyUI",
+      "url": "https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI",
+      "filename": "minimax_h3_lms_v1.0_r64-native.safetensors",
+      "remote_filename": "loras/minimax_h3_lms_v1.0_r64.safetensors",
+      "deps": [
+        "mmh3-ref2va-nvfp4|mmh3-ref2va-int4|mmh3-ref2va-int8|mmh3-ref2va-fp8"
+      ],
+      "note": "seconda passata di nitidezza su un clip esistente (guida allineata, stessa risoluzione e fotogrammi): didascalia FISSA «Enhance this video with sharp, crisp details while preserving a natural photorealistic appearance.»",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora",
+      "use": [
+        "lora_style",
+        "ref_omni"
+      ]
     }
   ],
   "schema": 2,

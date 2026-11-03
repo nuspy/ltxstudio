@@ -3828,8 +3828,18 @@
   "vedit.h3.te.profile": "Quello del profilo (predefinito)",
   "vedit.h3.te.tt": "Text encoder di H3. Predefinito: quello del profilo scelto. Sceglierlo a mano serve ai confronti (stesso encoder per tutti i modelli).",
   "vedit.h3.lora.why.convert": "non è in formato nativo: convertila dal tab «Pesi» (l'edit usa solo LoRA native)",
-  "vedit.h3.lora.why.guide": "richiede la guida di latenti allineata (AddGuide, frame 0) che l'edit H3 di LTX Studio non ha ancora",
   "vedit.h3.turbo.r4v10": "Turbo 4 passi v1.0 768p (lightx2v, Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo 8 passi v1.1 768p (lightx2v, Ref2VA)",
-  "vedit.h3.lora.why.twin": "esiste già la versione nativa (-native): usa quella"
+  "vedit.h3.lora.why.twin": "esiste già la versione nativa (-native): usa quella",
+  "vedit.h3.guide": "Guida di latenti allineata (prova)",
+  "vedit.h3.guide.tt": "Il video sorgente entra anche come blocco di latenti puliti sulla stessa griglia (spazio e tempo) del risultato, oltre al riferimento <Video 1>. Le LoRA di guida (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidezza) la richiedono e la attivano da sole. Spenta = come sempre.",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: guida attiva; nel prompt entra da sola «{trigger}».",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: guida attiva; il prompt diventa la didascalia fissa della LoRA.",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA usa un riferimento video nativo con una patch di attenzione del modello che LTX Studio non ha: usa la versione «guide latents»",
+  "h3.guide.kind.lms": "LMS (nitidezza)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

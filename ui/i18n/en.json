@@ -3861,8 +3861,18 @@
   "vedit.h3.te.profile": "The profile's own (default)",
   "vedit.h3.te.tt": "H3 text encoder. Default: the one of the chosen profile. Picking it by hand is for comparisons (same encoder for every model).",
   "vedit.h3.lora.why.convert": "not in native format: convert it from the «Weights» tab (the edit only uses native LoRAs)",
-  "vedit.h3.lora.why.guide": "needs the aligned latent guide (AddGuide, frame 0) which the LTX Studio H3 edit does not have yet",
   "vedit.h3.turbo.r4v10": "Turbo 4 steps v1.0 768p (lightx2v, Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo 8 steps v1.1 768p (lightx2v, Ref2VA)",
-  "vedit.h3.lora.why.twin": "the native version (-native) already exists: use that one"
+  "vedit.h3.lora.why.twin": "the native version (-native) already exists: use that one",
+  "vedit.h3.guide": "Aligned latent guide (experimental)",
+  "vedit.h3.guide.tt": "The source video also enters as a block of clean latents on the same grid (space and time) as the result, in addition to the <Video 1> reference. Guide LoRAs (VFX Edit, Style Transfer, Head Swap, Motion Transfer, sharpness) require it and switch it on by themselves. Off = as always.",
+  "vedit.h3.guide.lora_info": "LoRA \"{kind}\": guide on; \"{trigger}\" is added to the prompt automatically.",
+  "vedit.h3.guide.lora_info_caption": "LoRA \"{kind}\": guide on; the prompt becomes the LoRA's fixed caption.",
+  "vedit.h3.lora.why.tara": "Motion Transfer TARA uses a native video reference with an attention patch of the model that LTX Studio does not have: use the \"guide latents\" version",
+  "h3.guide.kind.lms": "LMS (sharpness)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

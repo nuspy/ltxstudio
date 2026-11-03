@@ -40,6 +40,8 @@ class _ThumbLoader(QThread):
 
 
 class LoraTab(QWidget):
+    selection_changed = Signal()               # l'utente (o gui_set_state) ha cambiato la spunta di una LoRA: serve a chi mostra effetti collegati alla scelta
+
     def __init__(self, allow_nsfw_getter=lambda: True, embedded: bool = False, arch: str | None = "LTX"):
         super().__init__()
         self.allow_nsfw_getter = allow_nsfw_getter
@@ -190,6 +192,7 @@ class LoraTab(QWidget):
                     cb.setChecked(False); cb.setEnabled(False); sp.setEnabled(False)
                     cb.setText(cb.text() + "  ⛔ " + _why)
                     w.setToolTip(_why); cb.setToolTip(_why)
+            cb.toggled.connect(lambda *_: self.selection_changed.emit())     # DOPO il filtro di riga (che puo spegnere la spunta): scatta per click e per setChecked
             it.setSizeHint(w.sizeHint())
             self.list.setItemWidget(it, w)
             self._rows[e.name] = {"item": it, "cb": cb, "sp": sp, "entry": e, "star": star}
@@ -385,6 +388,7 @@ class LoraTab(QWidget):
         # volute non ancora presenti → applicate quando l'inventario le carica
         self._restore_pending = want or None
         self.refresh()
+        self.selection_changed.emit()
 
     def auto_insert_triggers(self) -> bool:
         return self.auto_triggers.isChecked()

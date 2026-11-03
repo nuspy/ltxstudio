@@ -277,7 +277,43 @@ def load_audio_vae(W: dict):
 def build_prompt(p: dict, duration_s: float) -> str:
     """Prompt nel formato ufficiale H3 (core/h3_prompt): campi strutturati, speaker (S1), <d>[Lingua] …</d>."""
     from core import h3_prompt
-    return h3_prompt.compose(p, duration_s)
+    if not _guided(p):
+        return h3_prompt.compose(p, duration_s)
+    # Con la guida allineata: il prompt e quello che la LoRA di guida vuole (una frase, trigger davanti, caption fissa per LMS), non la struttura
+    # «integrated_multimodal_description»; un prompt GIA strutturato (l'edit con maschera) passa invariato e riceve solo il trigger.
+    from core import h3_guide as CG
+    info = CG.guide_of_loras(p.get("loras"))
+    prompt = (p.get("prompt") or "").strip() if (info or not p.get("references")) else h3_prompt.compose(p, duration_s)
+    return CG.apply_trigger(prompt, info)
+
+
+def _guided(p: dict) -> bool:
+    """La richiesta porta una guida di latenti allineata (video sorgente da codificare o latenti gia pronti dell'edit)."""
+    return bool(p.get("h3_guide")) or p.get("_h3_guide_latents") is not None
+
+
+def _guide_setup(p: dict, edit) -> dict | None:
+    """Piano della guida: None se la richiesta non ne ha. `latents` pronti (edit: sono gia quelli del clip) oppure `video` da leggere e codificare dopo il text encoder.
+    Il video generato ha i fotogrammi della guida (17n+5, tetto `max_s`); la tela ha il rapporto del video guida."""
+    if not _guided(p):
+        return None
+    from core import h3_guide as CG
+    spec = dict(p.get("h3_guide") or {})
+    fi = int(spec.get("frame_idx") or 0)
+    if p.get("h3_veda"):
+        raise RuntimeError("La guida allineata non funziona con l'attenzione sparsa Veda (il predittore e addestrato senza righe di guida): spegni Veda.")
+    lat = p.get("_h3_guide_latents")
+    if lat is not None:
+        return {"latents": lat, "frame_idx": fi, "steps": int(lat.shape[2]), "video": None, "frames": None, "info": None, "spec": spec}
+    video = str(spec.get("video") or "")
+    if not os.path.isfile(video):
+        raise RuntimeError(f"video guida non trovato: {video}")
+    import h3_guide as HG
+    info = HG.probe(video)
+    plan = CG.plan_guide(info["n24"], frame_idx=fi, max_frames=int(round(float(spec.get("max_s") or 0) * S.FPS)),
+                         target_frames=int(spec.get("target_frames") or 0))
+    return {"latents": None, "frame_idx": plan["frame_idx"], "steps": plan["steps"], "video": video, "frames": plan["frames"],
+            "guide_frames": plan["guide_frames"], "info": info, "spec": spec}
 
 
 AUDIO_VAE_SR = 32000                     # sample rate dell'audio VAE di H3
@@ -378,6 +414,10 @@ def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: in
     keyframes = int(bool(p.get("image_path"))) + int(bool(p.get("last_image_path")))
     refs = (HP.ref_rows_estimate(p.get("references"), int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE), h, w)
             if mode == "ref2va" else 0)
+    gsteps = int(kw.get("_guide_steps") or 0)
+    if gsteps:                                       # la guida e un blocco di righe condizione in piu, come un riferimento video
+        from core import h3_guide as CG
+        refs += CG.guide_rows(gsteps, h, w)
     tokens = HP.sequence_tokens(frames, h, w, keyframes=keyframes, ref_rows=refs)
     w_gb = _weights_gb(W["dit"])
     # TUTTE le LoRA (turbo + utente); +25 %: le LoRA «diff» tengono in VRAM anche una matrice identità per modulo
@@ -389,7 +429,7 @@ def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: in
                            f"{te_gb:.1f} GB + 2 di lavoro, liberi {avail:.1f} GB). Scegli un text encoder più "
                            f"leggero (nvfp4) o chiudi i programmi che usano la GPU.")
     plan0 = HP.plan(avail, tokens, dims, weights_gb=w_gb, lora_gb=l_gb, chunked=_chunked(),
-                    act_factor=HP.VIDEO_REF_ACT_FACTOR if (mode == "ref2va" and HP.has_video_refs(p.get("references"))) else 1.0)
+                    act_factor=HP.VIDEO_REF_ACT_FACTOR if (mode == "ref2va" and (HP.has_video_refs(p.get("references")) or gsteps)) else 1.0)
     modo = "tutto residente" if plan0["offload_gb"] <= 0 else f"blocchi in RAM: {plan0['offload_gb']:.1f} GB"
     _log(f"piano VRAM: {tokens // 1000}k token · pesi {w_gb:.1f} + LoRA {l_gb:.1f} + attivazioni "
          f"{plan0['act_gb']:.1f} + riserva = {plan0['need_gb']:.1f} GB · liberi {avail:.1f} GB → {modo}")
@@ -486,15 +526,22 @@ def run(p: dict) -> str:
     cfgdir = Path(W["configs"])
     wf = "ref2va" if mode == "ref2va" else ("fl2va" if (p.get("image_path") or p.get("last_image_path")) else "t2va")
     blocks = MiniMaxH3Blocks().get_workflow(wf)
+    guide_only = bool(guide) and not p.get("references")           # solo guida (LMS, VFX Edit, Style Transfer a parole): niente riferimenti nativi
+    blocks_text = MiniMaxH3Blocks().get_workflow("t2va") if guide_only else blocks
+    if guide:
+        import h3_guide as HG
+        HG.install(blocks)                                         # layout + condizioni del denoise Ref2VA conoscono la guida; senza `guide_latents` restano quelli di diffusers
     names = list(blocks.sub_blocks.keys())
-    g_text = [n for n in names if n in ("before_encode", "text_encoder")]
-    g_venc = [n for n in names if n == "vae_encoder"]
+    g_text = [n for n in blocks_text.sub_blocks.keys() if n in ("before_encode", "text_encoder")]
+    g_venc = [] if guide_only else [n for n in names if n == "vae_encoder"]
     g_den = [n for n in names if n.startswith("denoise")]
     g_dec = [n for n in names if n.startswith("decode")]
 
     # ingressi della richiesta
     edit = p.get("_h3_edit")                                     # edit con maschera a clip (workers/h3_edit_run.py): lunghezza e tela le decide lui
-    frames = int(edit["frames"]) if edit else S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))
+    guide = _guide_setup(p, edit)                                # None senza guida: tutto quel che segue e come sempre
+    frames = (int(edit["frames"]) if edit else
+              (guide["frames"] if guide and guide["frames"] else S.snap_frames(float(p.get("duration_s") or (int(p.get("num_frames") or 121) / S.FPS)))))
     kw = {"prompt": build_prompt(p, S.frames_seconds(frames)), "num_frames": frames}
     if p.get("image_path"):
         kw["image"] = Image.open(p["image_path"]).convert("RGB")
@@ -506,6 +553,8 @@ def run(p: dict) -> str:
     key = kw.get("image") or kw.get("last_image")
     if key is not None:
         ratio = key.size                                             # (w, h)
+    elif guide and guide.get("info"):
+        ratio = (guide["info"]["w"], guide["info"]["h"])             # la guida occupa la STESSA griglia del video generato: il rapporto e quello del sorgente
     elif str(p.get("h3_aspect") or "") in S.ASPECTS:
         ratio = S.ASPECTS[p["h3_aspect"]]
     elif int(p.get("width") or 0) and int(p.get("height") or 0):
@@ -514,9 +563,10 @@ def run(p: dict) -> str:
         ratio = (16, 9)
     kw["height"], kw["width"] = tuple(edit["canvas"]) if edit else resolve_canvas_size(ratio[0], ratio[1], 32, short, maxpx)
     if mode == "ref2va":
-        kw["references"] = build_references(p)
-        if not kw["references"]:
-            raise RuntimeError("Ref2VA senza riferimenti validi")
+        if p.get("references") or not guide:
+            kw["references"] = build_references(p)
+            if not kw["references"]:
+                raise RuntimeError("Ref2VA senza riferimenti validi")
     fused = S.CUSTOM_DITS.get(str(p.get("h3_dit") or ""), {})
     turbo = "" if fused.get("turbo_fused") else str(p.get("h3_turbo") or "")
     if fused.get("turbo_fused"):                       # DiT col turbo nei pesi (10Eros-Max): passi e shift suoi
@@ -531,6 +581,8 @@ def run(p: dict) -> str:
     _log("prompt:\n" + kw["prompt"])
 
     # pianificazione VRAM PRIMA di caricare qualunque cosa: errore chiaro invece di un OOM a metà denoise
+    if guide:
+        kw["_guide_steps"] = guide["steps"]
     dims, plan0 = _preflight(W, p, mode, kw, free0, frames)
 
     # 1) text encoder
@@ -539,8 +591,8 @@ def run(p: dict) -> str:
     _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
     comps = dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
                  processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor")))
-    st = _stage(blocks, g_text, comps)
-    if mode == "ref2va":
+    st = _stage(blocks_text, g_text, comps)
+    if mode == "ref2va" and kw.get("references"):
         # il pipeline porta ogni immagine di riferimento a 2048 px di lato corto (anche ingrandendola): con 32 GB
         # l'attenzione del Qwen3-VL su quei token va in OOM (visto 27/09). 1024 = 4× meno token, identità intatta.
         st.update_components(reference_image_short_edge=int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE))
@@ -589,15 +641,27 @@ def run(p: dict) -> str:
     _log(f"testo codificato in {time.time() - t0:.0f}s")
 
     # 2) VAE encoder (keyframe / riferimenti)
-    if g_venc:
+    if guide and guide["latents"] is not None:                   # edit: la guida e il latente del clip, gia codificato dal chiamante
+        kw["guide_latents"], kw["guide_frame_idx"] = guide["latents"], guide["frame_idx"]
+    if guide_only:                                               # nessun riferimento nativo: il denoise Ref2VA parte con liste vuote (layout = testo + guida + video)
+        kw.update(normalized_references=[], condition_latents=[], audio_condition_latents=[])
+    if g_venc or (guide and guide["latents"] is None):
         t0 = time.time()
         comps = {"vae": load_vae(W)}
-        if mode == "ref2va":
+        if mode == "ref2va" and g_venc:
             comps["audio_vae"] = load_audio_vae(W)
-        st = _stage(blocks, g_venc, comps)
-        state = st(state=state, **_inputs_for(st, kw))
+        if g_venc:
+            st = _stage(blocks, g_venc, comps)
+            state = st(state=state, **_inputs_for(st, kw))
+            del st
+        if guide and guide["latents"] is None:
+            t2 = time.time()
+            fr = HG.read_guide_frames(guide["video"], int(kw["width"]), int(kw["height"]), guide["guide_frames"])
+            kw["guide_latents"], kw["guide_frame_idx"] = HG.encode_guide(comps["vae"], fr), guide["frame_idx"]
+            _log(f"guida allineata: {guide['guide_frames']} fotogrammi -> {tuple(kw['guide_latents'].shape)} in {time.time() - t2:.0f}s (frame_idx {guide['frame_idx']})")
+            del fr
         _enc_modules = list(comps.values())
-        del st, comps
+        del comps
         # Il VAE fp32 (9,7 GB) restava vivo in VRAM durante il denoise: lo teneva ancora qualcosa dentro `blocks`/`state` (il `del` non basta;
         # per il TE funziona, per il VAE no). Giro 31/10 22:27, 10Eros int8: dump «per RADICE» = AutoencoderKLMiniMaxH3 9,70 GB fp32 -> OOM.
         # Si svuotano i pesi sul posto: la VRAM torna libera comunque, e al decode il VAE viene ricaricato da load_vae.
@@ -666,9 +730,10 @@ def run(p: dict) -> str:
     out = p.get("output") or str(REPO / "output" / f"minimax_h3_{time.strftime('%Y%m%d_%H%M%S')}.mp4")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     with_audio = p.get("generate_audio", True) is not False
-    encode_video(res["videos"][0], fps=S.FPS, output_path=out,
-                 audio=res["audio"][0].float().cpu() if with_audio else None,
-                 audio_sample_rate=int(res["sampling_rate"]) if with_audio else None)
+    a_out, a_sr = (res["audio"][0].float().cpu(), int(res["sampling_rate"])) if with_audio else (None, None)
+    if guide and guide["video"] and guide["info"]["has_audio"] and (guide["spec"] or {}).get("keep_audio", True):
+        a_out, a_sr = HG.trim_audio(_decode_audio_av(guide["video"]), frames), AUDIO_VAE_SR       # il suono e quello del sorgente (come nel «tieni l'audio» dell'edit)
+    encode_video(res["videos"][0], fps=S.FPS, output_path=out, audio=a_out, audio_sample_rate=a_sr)
     _log(f"fatto in {time.time() - t_all:.0f}s → {out}")
     return out
 

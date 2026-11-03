@@ -3789,8 +3789,18 @@
   "vedit.h3.te.profile": "مشفّر الملف الشخصي (افتراضي)",
   "vedit.h3.te.tt": "مشفّر نص H3. الافتراضي: مشفّر الملف الشخصي المختار. الاختيار اليدوي للمقارنات (نفس المشفّر لكل النماذج).",
   "vedit.h3.lora.why.convert": "ليست بالصيغة الأصلية: حوّلها من تبويب «الأوزان» (التحرير يستخدم LoRA الأصلية فقط)",
-  "vedit.h3.lora.why.guide": "تحتاج إلى دليل الكامنات المحاذي (AddGuide، الإطار 0) وهو غير متوفر بعد في تحرير H3 في LTX Studio",
   "vedit.h3.turbo.r4v10": "Turbo بـ 4 خطوات v1.0 768p (lightx2v، Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo بـ 8 خطوات v1.1 768p (lightx2v، Ref2VA)",
-  "vedit.h3.lora.why.twin": "النسخة الأصلية (-native) موجودة بالفعل: استخدمها"
+  "vedit.h3.lora.why.twin": "النسخة الأصلية (-native) موجودة بالفعل: استخدمها",
+  "vedit.h3.guide": "دليل كامنات محاذٍ (تجريبي)",
+  "vedit.h3.guide.tt": "يدخل الفيديو المصدر أيضًا ككتلة من الكامنات النظيفة على الشبكة نفسها (المكان والزمن) التي للنتيجة، إضافةً إلى المرجع <Video 1>. تتطلب LoRA الدليل (VFX Edit وStyle Transfer وHead Swap وMotion Transfer والحدّة) هذا الخيار وتفعّله بنفسها. إيقاف = كما كان دائمًا.",
+  "vedit.h3.guide.lora_info": "LoRA «{kind}»: الدليل مفعّل؛ تُضاف «{trigger}» إلى الوصف تلقائيًا.",
+  "vedit.h3.guide.lora_info_caption": "LoRA «{kind}»: الدليل مفعّل؛ يصبح الوصف هو العنوان الثابت لـ LoRA.",
+  "vedit.h3.lora.why.tara": "يستخدم Motion Transfer TARA مرجع فيديو أصليًا مع رقعة انتباه للنموذج لا تملكها LTX Studio: استخدم نسخة «guide latents»",
+  "h3.guide.kind.lms": "LMS (حدّة)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

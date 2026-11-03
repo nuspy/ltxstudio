@@ -3789,8 +3789,18 @@
   "vedit.h3.te.profile": "A profilé (alapértelmezett)",
   "vedit.h3.te.tt": "H3 szövegkódoló. Alapértelmezett: a választott profilé. Kézi választása összehasonlításhoz való (minden modellhez ugyanaz a kódoló).",
   "vedit.h3.lora.why.convert": "nem natív formátumú: alakítsd át a «Súlyok» lapon (a szerkesztés csak natív LoRA-kat használ)",
-  "vedit.h3.lora.why.guide": "igazított látens vezetőre (AddGuide, 0. kép) van szüksége, amit az LTX Studio H3-szerkesztése még nem tud",
   "vedit.h3.turbo.r4v10": "Turbo 4 lépés v1.0 768p (lightx2v, Ref2VA)",
   "vedit.h3.turbo.r8v11": "Turbo 8 lépés v1.1 768p (lightx2v, Ref2VA)",
-  "vedit.h3.lora.why.twin": "a natív verzió (-native) már megvan: azt használd"
+  "vedit.h3.lora.why.twin": "a natív verzió (-native) már megvan: azt használd",
+  "vedit.h3.guide": "Igazított látens vezetés (kísérleti)",
+  "vedit.h3.guide.tt": "A forrásvideó a <Video 1> hivatkozás mellett tiszta látensek blokkjaként is bekerül, az eredménnyel azonos rácson (tér és idő). A vezető LoRA-k (VFX Edit, Style Transfer, Head Swap, Motion Transfer, élesség) igénylik, és maguktól bekapcsolják. Kikapcsolva = a megszokott módon.",
+  "vedit.h3.guide.lora_info": "LoRA „{kind}”: a vezetés be van kapcsolva; a(z) „{trigger}” automatikusan bekerül a promptba.",
+  "vedit.h3.guide.lora_info_caption": "LoRA „{kind}”: a vezetés be van kapcsolva; a prompt a LoRA rögzített felirata lesz.",
+  "vedit.h3.lora.why.tara": "A Motion Transfer TARA natív videóhivatkozást használ a modell figyelemfoltjával, ami az LTX Studióban nincs meg: használd a „guide latents” változatot",
+  "h3.guide.kind.lms": "LMS (élesség)",
+  "h3.guide.kind.vfx_edit": "VFX Edit",
+  "h3.guide.kind.style_transfer": "Style Transfer",
+  "h3.guide.kind.head_swap": "Head Swap",
+  "h3.guide.kind.motion_transfer": "Motion Transfer",
+  "h3.guide.kind.motion_transfer_ffp": "Motion Transfer FFP"
 }

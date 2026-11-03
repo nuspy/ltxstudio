@@ -143,16 +143,17 @@ def test_options_flow_to_the_clip_child_params():
     assert ids["dit"] == "mmh3-dit-pinkcherry18" and ids["veda"] == S.VEDA_R2VA and ids["vae_dec_lite"] == "mmh3-lightvae-dec" and ids["turbo"] == "mmh3-turbo-lora-ref2v"
 
 
-def test_loras_not_native_or_needing_the_aligned_guide_are_disabled_with_a_reason(tmp_path):
+def test_loras_not_native_are_disabled_with_a_reason_and_guide_loras_are_now_enabled(tmp_path):
     nonnative = _lora(tmp_path / "style_h3.safetensors", H3_KEYS, native=False)
     assert V.lora_edit_check(nonnative) == (False, "convert")                       # l'edit usa solo LoRA native: «convertila dal tab Pesi»
     for nm in ("minimax_h3_vfx_edit_v1.0_r128-native.safetensors", "minimax_h3_style_transfer_v1.0_r64-native.safetensors",
                "minimax_h3_motion_transfer_v1.0_ref2va-native.safetensors", "minimax_h3_head_swap_v1.0_r32-native.safetensors"):
-        assert V.lora_edit_check(_lora(tmp_path / nm, H3_KEYS)) == (False, "guide"), nm         # Alissonerdx: guida di latenti allineata (AddGuide) non supportata
+        assert V.lora_edit_check(_lora(tmp_path / nm, H3_KEYS)) == (True, ""), nm               # Alissonerdx: dal 03/11 la guida allineata c'e (workers/h3_guide.py)
+    assert V.lora_edit_check(_lora(tmp_path / "minimax_h3_motion_transfer_tara_v1.0_ref2va-native.safetensors", H3_KEYS)) == (False, "tara")   # altra tecnica: patch del modello
     for nm in ("h3_character_swap_v1.5-native.safetensors", "H3-Person-Remover-V1-native.safetensors",
                "minimax_h3_character_swap_v1.1_ref2va_fro-native.safetensors"):
         assert V.lora_edit_check(_lora(tmp_path / nm, H3_KEYS)) == (True, ""), nm               # akatz: <Video 1> nativo, e il nostro caso
-    assert "guida" in V.LORA_REASONS["guide"] and "nativo" in V.LORA_REASONS["convert"]
+    assert "TARA" in V.LORA_REASONS["tara"] and "nativo" in V.LORA_REASONS["convert"]
 
 
 def test_turbo_lora_without_adaln_adapters_is_refused(clip, tmp_path, monkeypatch):
