@@ -78,10 +78,125 @@ def _overlay(img_path: str, mask_path: str, dst_dir: str, name: str):
         return None
 
 
+_PREFIX = re.compile(r"^(?:out|init_image|mask_path|mask|image_path|control_image|frame)_\d+_", re.I)
+
+
+def _key(path) -> str:
+    """Nome «pulito» di un file per riconoscere la stessa immagine anche con la copia del driver (out_1_integrate_input.png == integrate_input.png)."""
+    return _PREFIX.sub("", os.path.basename(str(path or ""))).lower()
+
+
+ROLE_LABEL = {
+    "result": "RISULTATO – DA VALUTARE",
+    "original": "ORIGINALE (prima della modifica)",
+    "model_input": "INPUT AL MODELLO – NON VALUTARE",
+    "mask": "MASCHERA (zona che il modello può cambiare)",
+    "mask_overlay": "MASCHERA SOVRAPPOSTA all'originale (rosso = zona che il modello può cambiare)",
+    "ref": "FOTO DI RIFERIMENTO",
+    "source_video": "VIDEO SORGENTE",
+    "service": "File di servizio – non valutare",
+}
+
+
+def classify_roles(c: dict, r: dict, p: dict) -> dict:
+    """Ruolo di ogni file, dai dati che il driver conosce: parametri del job (init_image/image_path = ingresso, mask/mask_path = maschera, ref_images /
+    references = riferimenti, video = sorgente) e uscite del job. Ritorna {chiave-file-pulita: ruolo}. Un file senza ruolo noto NON e un risultato."""
+    kind = str(c.get("kind") or "")
+    roles: dict[str, str] = {}
+    for k in ("init_image", "image_path"):
+        v = p.get(k)
+        if isinstance(v, str) and v:
+            # inpaint/outpaint: l'ingresso e la foto ORIGINALE; Integra/Componi: e il composito con la foto incollata (input al modello, da non giudicare)
+            roles[_key(v)] = "original" if kind in ("inpaint", "outpaint") else "model_input"
+    for k in ("mask", "mask_path"):
+        v = p.get(k)
+        if isinstance(v, str) and v:
+            roles[_key(v)] = "mask"
+    for v in (p.get("ref_images") or []):
+        if isinstance(v, str):
+            roles[_key(v)] = "ref"
+    for rr in (p.get("references") or []):
+        v = rr.get("path") if isinstance(rr, dict) else rr
+        if isinstance(v, str):
+            roles[_key(v)] = "ref"
+    if isinstance(p.get("control_image"), str):
+        roles[_key(p["control_image"])] = "ref"
+    if isinstance(p.get("video"), str):
+        roles[_key(p["video"])] = "source_video"
+    return roles
+
+
+def build_items(c: dict, r: dict, p: dict, media: list, origs: list, iniz: dict | None) -> list:
+    """Elenco unico di file da mostrare, ciascuno con ruolo + etichetta chiara. Il primo/i primi sono i RISULTATI da valutare (numerati se piu di uno)."""
+    roles = classify_roles(c, r, p)
+    finals = []
+    for f in (r.get("finiti") or []):
+        for o in (f.get("outputs") or []):
+            finals.append(_key(o))
+    items, seen = [], set()
+    results = []
+    for m in media:                                              # uscite del job, nell'ordine del driver
+        k = _key(m.get("path"))
+        role = roles.get(k)
+        if role is None:
+            role = "result" if (k in finals or not finals) else "service"
+        results.append(dict(m, role=role, key=k))
+    if results and not any(x["role"] == "result" for x in results):    # nessuna uscita riconosciuta: la prima del job e il risultato
+        results[0]["role"] = "result"
+    if not any(x["role"] == "result" for x in results):
+        pass
+    # se i candidati risultato sono piu di uno ma il driver ne conosce uno solo (primo di finiti), gli altri non si valutano
+    cand = [x for x in results if x["role"] == "result"]
+    if len(cand) > 1 and len(set(finals)) >= 1:
+        keep = [x for x in cand if x["key"] in finals] or cand[:1]
+        for x in cand:
+            if x not in keep:
+                x["role"] = "service"
+    for x in results:
+        if x["key"] in seen:
+            continue
+        seen.add(x["key"])
+        items.append(x)
+    for o in origs:                                              # ingressi e riferimenti dai parametri
+        lab = str(o.get("label") or "")
+        k = _key(o.get("path"))
+        if "SOVRAPPOSTA" in lab:
+            role = "mask_overlay"
+        elif k in seen:
+            continue
+        else:
+            role = roles.get(k) or {"video originale": "source_video"}.get(lab) or ("ref" if ("riferimento" in lab or lab == "SFONDO") else "model_input")
+        seen.add(k if role != "mask_overlay" else k + "#ov")
+        items.append(dict(o, role=role, key=k, video=False))
+    if iniz and iniz.get("path") and _key(iniz["path"]) not in seen:
+        items.append({"role": "ref", "path": iniz["path"], "thumb": iniz.get("thumb"), "big": iniz.get("big"), "video": False, "key": _key(iniz["path"]),
+                      "label_extra": "immagine di partenza"})
+    if c.get("fn") == "segment":                                  # selezione: il frame e la foto ORIGINALE, la maschera/regione e il risultato
+        for x in items:
+            if x["role"] in ("model_input", "service") and x["key"].startswith("frame1"):
+                x["role"] = "original"
+    res = [x for x in items if x["role"] == "result"]
+    for n, x in enumerate(res, 1):
+        x["label"] = ROLE_LABEL["result"] + (f" – Risultato {n}" if len(res) > 1 else "")
+    for x in items:
+        if x["role"] != "result":
+            x["label"] = ROLE_LABEL.get(x["role"], ROLE_LABEL["service"]) + (f" ({x['label_extra']})" if x.get("label_extra") else "")
+    order = {"result": 0, "mask_overlay": 1, "original": 2, "model_input": 3, "mask": 4, "ref": 5, "source_video": 6, "service": 7}
+    items.sort(key=lambda x: order.get(x["role"], 9))
+    return items
+
+
 def _what_to_check(c: dict, r: dict) -> str:
     if c.get("verify"):
         return c["verify"]
     fn = c.get("fn")
+    kind = str(c.get("kind") or "")
+    if kind == "integrate":
+        return "La persona è stata RIDISEGNATA dentro la scena (luce, ombre, contatto con il tavolo, prospettiva), non soltanto incollata?"
+    if kind == "inpaint":
+        return "Nella zona della maschera è comparso l'oggetto richiesto, ben inserito nella scena (luce e prospettiva)?"
+    if kind == "outpaint":
+        return "L'immagine è stata estesa ai lati senza una linea di giunzione e con la stessa luce?"
     bits = []
     if r.get("dry"):
         return "PROVA A SECCO: nessuna generazione. Controllare solo che modello, LoRA, forza e prompt qui sotto siano quelli impostati."
@@ -147,7 +262,22 @@ def build(run_dir: str, nome: str = "giro") -> str:
                 origs.append({"label": "MASCHERA SOVRAPPOSTA (rosso = zona rigenerata)", "path": _mk, **ov})
         loras = [{"file": os.path.basename(str(L.get("file"))), "strength": L.get("strength"), "trigger": ", ".join(L.get("triggers") or [])}
                  for L in (ws.get("loras") or [])]
+        for _o in (c.get("ops") or []):                          # casi «ops» (H3, Scambia): video sorgente e foto di riferimento dai passi della GUI
+            if not isinstance(_o, dict):
+                continue
+            _a = _o.get("args") or []
+            _v, _lab = None, None
+            if str(_o.get("call", "")).endswith("set_video") and _a:
+                _v, _lab = _a[0], "video originale"
+            elif str(_o.get("set", "")).endswith("ref_img") and isinstance(_o.get("value"), str):
+                _v, _lab = _o["value"], "riferimento ops"
+            elif str(_o.get("call", "")).endswith("set_role_photo") and len(_a) > 1:
+                _v, _lab = _a[1], "riferimento ops"
+            if isinstance(_v, str) and os.path.isfile(_v) and not any(x.get("path") == _v for x in origs):
+                origs.append({"label": _lab, "path": _v, "thumb": _thumb(_v, rd, f"{safe}_ops{len(origs)}"), "big": _thumb(_v, rd, f"{safe}_ops{len(origs)}", True)})
+        _items = build_items(c, r, p, media, origs, iniz)
         cards.append({
+            "items": _items,
             "id": cid, "fn": c.get("fn"), "esito": r.get("esito"), "motivo": r.get("motivo") or "", "dry": bool(r.get("dry")),
             "tempo": r.get("tempo_s"), "vram": r.get("vram_peak_mb"), "ram": r.get("ram_peak_mb"), "commit": r.get("commit_free_min_mb"),
             "handler": r.get("handler"), "arch": p.get("arch") or c.get("arch"), "modello": p.get("model") or (ws.get("model") or c.get("model")),
@@ -247,7 +377,7 @@ button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}button:focus-v
 .cap{font-size:.78rem;color:var(--mut)}.box{background:var(--bg);border-radius:8px;padding:8px;font-size:.88rem;overflow-wrap:anywhere;white-space:pre-wrap}
 .todo{border-left:4px solid var(--ac);padding:4px 10px;margin:8px 0}textarea{width:100%;min-height:76px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:inherit;padding:8px}
 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut)}
-.vb{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.vbtn{min-width:96px}.vbtn.okb.on{background:var(--ok);color:#fff;border-color:var(--ok)}.vbtn.kob.on{background:var(--ko);color:#fff;border-color:var(--ko)}.err{color:var(--ko)}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:8px}#lb.on{display:flex}#lb img,#lb video{max-width:100%;max-height:100%}
+.vb{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.vbtn{min-width:96px}.vbtn.okb.on{background:var(--ok);color:#fff;border-color:var(--ok)}.vbtn.kob.on{background:var(--ko);color:#fff;border-color:var(--ko)}.err{color:var(--ko)}.look{font-size:1.05rem;font-weight:600}.lab{font-weight:800;font-size:.95rem;padding:3px 8px;border-radius:6px;margin-bottom:4px;display:inline-block;background:var(--bd);color:var(--fg)}.lab.result{background:var(--ok);color:#fff;font-size:1.15rem}.lab.model_input,.lab.service{background:var(--wa);color:#fff}.it.result{border:4px solid var(--ok);border-radius:10px;padding:6px;max-width:100%}.it.result img{max-width:min(100%,720px)}.row.big{align-items:flex-start}.row.small .it img{max-width:240px}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:8px}#lb.on{display:flex}#lb img,#lb video{max-width:100%;max-height:100%}
 .foot{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:6}
 </style></head><body>
 <h1 id="t"></h1><div class="sub" id="s"></div>
@@ -267,12 +397,14 @@ const fileUrl=p=>location.protocol==='file:'?('file:///'+p.replace(/\\/g,'/')):(
 document.getElementById('t').textContent='Revisione: '+D.nome;
 document.getElementById('s').textContent=D.creato+' · '+D.cards.length+' casi · cartella '+D.run;
 function card(c,i){const m=c.media.map(x=>`<div><a class="thumb" href="#" data-big="${H(x.video?fileUrl(x.path):x.big||'')}" data-video="${x.video?1:0}" aria-label="Apri ${H(c.id)}">${x.thumb?`<img loading="lazy" src="${x.thumb}" alt="risultato ${H(c.id)}">`:'<span class=meta>(nessuna miniatura)</span>'}</a><div class="cap">${x.video?'▶ video · ':''}${H(x.path)}</div></div>`).join('');
+const fmt=(x)=>`<div class="it ${H(x.role)}"><div class="lab ${H(x.role)}">${H(x.label)}</div><a class="thumb" href="#" data-big="${H(x.video?fileUrl(x.path):x.big||'')}" data-video="${x.video?1:0}" aria-label="${H(x.label)}">${x.thumb?`<img loading="lazy" src="${x.thumb}" alt="${H(x.label)}">`:'<span class=meta>(nessuna miniatura)</span>'}</a><div class="cap">${x.video?'▶ video · ':''}${H(x.path)}</div></div>`;
+const its=c.items||[];const resH=its.filter(x=>x.role==='result').map(fmt).join('');const othH=its.filter(x=>x.role!=='result').map(fmt).join('');
 const o=c.orig.map(x=>`<div><a class="thumb" href="#" data-big="${H(x.big||'')}"><img loading="lazy" src="${x.thumb||''}" alt="${H(x.label)}"></a><div class="cap">ORIGINALE · ${H(x.label)}</div></div>`).join('');
 const lo=c.loras.length?c.loras.map(l=>`${H(l.file)} @${H(l.strength)}${l.trigger?' · trigger: '+H(l.trigger):''}`).join('<br>'):'nessuna';
 return `<section class="card" data-i="${i}"><div class="head"><span class="id">${H(c.id)}</span><span class="tag ${H(c.esito)}">${H(c.esito)}</span>${c.dry?'<span class="tag dry">prova a secco</span>':''}<span class="meta">${H(c.fn)} · ${c.tempo!=null?c.tempo+' s':''}${c.vram?' · VRAM '+c.vram+' MB':''}${c.ram?' · RAM '+c.ram+' MB':''}</span></div>
 ${c.descr?`<div class="meta">${H(c.descr)}</div>`:''}${c.motivo?`<div class="err">${H(c.motivo)}</div>`:''}${c.dialoghi.length?`<div class="err">Errore in GUI: ${H(c.dialoghi.join(' | '))}</div>`:''}
-<div class="row">${o}${m||'<span class=meta>nessuna uscita</span>'}</div>
-<div class="todo"><b>Da verificare:</b> ${H(c.verifica)}</div>
+<div class="todo look"><b>Cosa guardare:</b> ${H(c.verifica)}</div>
+${its.length?`<div class="row big">${resH||'<span class=meta>nessun risultato</span>'}</div><div class="row small">${othH}</div>`:`<div class="row">${o}${m||'<span class=meta>nessuna uscita</span>'}</div>`}
 <div class="meta">arch <b>${H(c.arch)}</b> · modello <b>${H(c.modello)}</b> · handler ${H(c.handler)}<br>LoRA: ${lo}</div>
 <details><summary>Prompt e parametri</summary><div class="box"><b>Prompt:</b> ${H(c.prompt)}\n<b>Negativo:</b> ${H(c.negativo)}\n<b>Parametri al backend:</b> ${H(JSON.stringify(c.params))}</div></details>
 <div class="vb" role="group" aria-label="Giudizio su ${H(c.id)}"><button type="button" class="vbtn okb${verdict(c)==='ok'?' on':''}" data-v="ok" data-i="${i}" aria-pressed="${verdict(c)==='ok'}">✓ ok</button><button type="button" class="vbtn kob${verdict(c)==='ko'?' on':''}" data-v="ko" data-i="${i}" aria-pressed="${verdict(c)==='ko'}">✗ non ok</button>${isBad(c)?'<span class="err">il driver lo ha dato come NON riuscito: finisce comunque nel file pubblicato, con il suo errore</span>':''}</div><label class="cap" for="n${i}">Il tuo giudizio (facoltativo; un «ok» da solo = superato)</label><textarea id="n${i}" data-i="${i}" placeholder="Scrivi solo se c'è un problema…">${H(notes[c.id]||'')}</textarea></section>`}
