@@ -222,9 +222,14 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     f01 = src_t.float() / 255.0
     obj = read_masks(e["mask_dir"], N, tw, th)
     scale = tw / float(sw)
-    pers, size = M.person_mask(obj, float(e.get("headroom", 0.10)), int(e.get("hold_frames", 2)))
-    pers = pers.float()
     invert = action == "change_background"
+    # Spazio sopra la testa e posa tenuta servono a sostituisci (personaggio nuovo piu alto, gesti diversi). Nel cambia-sfondo la persona e TENUTA
+    # dall'originale: quello spazio restava sfondo vecchio (pennacchio del mercato sopra la testa, misurato 03/11: fascia 0-24 px 40-54 % a 10-12 s);
+    # la cella di latente unisce gia 4 frame, quindi la posa tenuta li e ridondante. Parametri bg_headroom / bg_hold_frames (default 0).
+    headroom = float(e.get("bg_headroom", 0.0)) if invert else float(e.get("headroom", 0.10))
+    hold_frames = int(e.get("bg_hold_frames", 0)) if invert else int(e.get("hold_frames", 2))
+    pers, size = M.person_mask(obj, headroom, hold_frames)
+    pers = pers.float()
     person_grow = max(0, int(round(float(e.get("person_grow_px", 40)) * scale)))
     grow = max(0, int(round(float(e.get("grow_px", 16)) * scale)))
     # SFUMATURA (feather, in celle da 16 px fuori dalla zona rigenerata): nel cambia-sfondo la zona rigenerata e lo sfondo, quindi la rampa cade
@@ -262,7 +267,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     st = os.stat(src)
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
-                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"))
+                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
+                  *((("bgmask_v2", headroom, hold_frames),) if invert else ()))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)
