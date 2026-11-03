@@ -679,6 +679,12 @@ class Driver:
     def case_ops(self, case):
         out = []
         for o in case.get("ops", []):
+            if self.dry and o.get("live_only"):                  # passi che hanno senso solo con i job veri (es. dopo «Trova persone»)
+                continue
+            if "wait_job" in o:                                  # attesa FUORI dal thread della GUI (i job girano nel suo event loop)
+                self.wait_job(float(o["wait_job"]))
+                out.append({"op": f"wait_job {o['wait_job']}"})
+                continue
             out.append(self.gui(lambda o=o: self.op(o), 60))
         if case.get("wait_job", any("click" in o for o in case.get("ops", []))):
             self.wait_job(float(case.get("timeout", 600)))

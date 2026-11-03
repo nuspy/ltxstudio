@@ -300,6 +300,19 @@ class SwapTab(QWidget):
     def roles(self) -> list[SP.Role]:
         return [r.role() for r in self._roles]
 
+    # API pubblica per i test dal vivo (stessi widget dell'utente, senza finestre di scelta file)
+    def set_role_photo(self, i: int, path: str) -> None:
+        self._roles[int(i)].set_photo(path)
+
+    def set_role_person(self, i: int, index: int) -> None:
+        self._roles[int(i)].person.setCurrentIndex(int(index))
+
+    def set_profile(self, prof: str) -> bool:
+        k = self.profile.findData(prof)
+        if k >= 0:
+            self.profile.setCurrentIndex(k)
+        return k >= 0
+
     # ── anteprima ──────────────────────────────────────────────────────────────────────────────────
     def _frames_dir(self) -> str:
         return os.path.join(self.work_dir, "frames")

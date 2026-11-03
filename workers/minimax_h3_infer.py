@@ -225,6 +225,30 @@ def _drop_module_weights(m) -> None:
     _log(f"{type(m).__name__}: pesi liberati ({freed / 2**30:.2f} GB su GPU)")
 
 
+def purge_big_quantized_tensors(min_bytes: int = 32 << 20, device_type: str = "cuda", log=None) -> float:
+    """Dopo il denoise il DiT non serve piu e il decode ha bisogno di ogni GB: i pesi quantizzati (int8/fp8/uint8) ancora vivi sulla scheda si svuotano SUL POSTO
+    qualunque sia l'oggetto che li tiene. Giro del 03/11 (video_minimax_h3_04, 736x1376, int8): dopo `_drop_module_weights(tr)` (14,86 GB liberati) restavano vivi
+    14,3 GB di int8 dei blocchi del DiT (37 blocchi x 4 matrici) — 29,15 GB allocati al decode e OOM per 164 MiB. Chi li tenesse (offload/chunk/hook) non e stato
+    individuato: qui si agisce sui tensori, non sui proprietari. Il VAE e in fp32/bf16, quindi non viene toccato. Ritorna i GB liberati."""
+    import gc
+    import torch
+    freed = 0
+    seen = set()
+    for o in gc.get_objects():
+        try:
+            if isinstance(o, torch.Tensor) and o.device.type == device_type and o.dtype in (torch.int8, torch.uint8, torch.float8_e4m3fn, torch.float8_e5m2):
+                nb = o.numel() * o.element_size()
+                if nb >= min_bytes and o.untyped_storage().data_ptr() not in seen:
+                    seen.add(o.untyped_storage().data_ptr())
+                    freed += nb
+                    o.data = torch.empty(0, dtype=o.dtype, device=o.device)
+        except Exception:                                            # noqa: BLE001
+            pass
+    if log:
+        log(f"tensori quantizzati ancora vivi dopo il DiT: {freed / 2**30:.2f} GB liberati sul posto")
+    return freed / 2**30
+
+
 def load_audio_vae(W: dict):
     import torch
     from accelerate import init_empty_weights
@@ -587,6 +611,11 @@ def run(p: dict) -> str:
     _drop_module_weights(tr)
     del st, tr
     _gc()
+    try:
+        purge_big_quantized_tensors(log=_log)                 # sicurezza: vedi la funzione (14,3 GB di int8 sopravvissuti al giro del 03/11)
+        _gc()
+    except Exception as _pe:                                  # noqa: BLE001 — mai far fallire il job per la pulizia
+        _log(f"pulizia dei pesi quantizzati saltata ({_pe})")
 
     # 4) decode
     t0 = time.time()

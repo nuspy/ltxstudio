@@ -123,3 +123,17 @@ def test_subprocess_clip_runner_streams_log_and_reports_the_failure_tail(tmp_pat
     with pytest.raises(RuntimeError) as ei:
         ER._subprocess_clip_runner(_t.SimpleNamespace(__file__=str(bad)), str(tmp_path))
     assert "OutOfMemoryError: finto" in str(ei.value) and "codice 1" in str(ei.value)
+
+
+def test_purge_big_quantized_tensors_empties_survivors_even_if_something_still_references_them():
+    """Giro 03/11 (video_minimax_h3_04): dopo `_drop_module_weights` restavano 14,3 GB di int8 dei blocchi del DiT e il decode moriva per OOM. La pulizia agisce
+    sui tensori, qualunque sia l'oggetto che li tiene; i tensori float (VAE) e quelli piccoli restano."""
+    import torch
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workers"))
+    import minimax_h3_infer as M
+    holder = {"w": torch.ones(2048, 1024, dtype=torch.int8), "f8": torch.ones(1024, 1024, dtype=torch.float8_e4m3fn),
+              "vae": torch.ones(1024, 1024, dtype=torch.float32), "small": torch.ones(8, dtype=torch.int8)}
+    freed = M.purge_big_quantized_tensors(min_bytes=1 << 20, device_type="cpu")
+    assert holder["w"].numel() == 0 and holder["f8"].numel() == 0
+    assert holder["vae"].numel() == 1024 * 1024 and holder["small"].numel() == 8
+    assert abs(freed - (2048 * 1024 + 1024 * 1024) / 2**30) < 1e-6
