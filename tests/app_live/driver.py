@@ -554,6 +554,10 @@ class Driver:
                 return path
         res["uscite_originali"] = list(res.get("uscite") or [])
         res["uscite"] = [cp(x, "out") for x in res.get("uscite") or []]
+        _exp = getattr(self.w, "_last_integrate_export", None)                # Integra: maschera di POSIZIONE e di CONTESTO dello stesso caso
+        if isinstance(_exp, dict) and case.get("kind") == "integrate" and _exp.get("position_mask"):
+            res["maschere"] = {"posizione": cp(_exp["position_mask"], "posizione"), "contesto": cp(_exp.get("mask"), "contesto"),
+                               "context_px": _exp.get("context_px", 0)}
         for c in self.rec.calls:
             pr = c.get("params")
             if not isinstance(pr, dict):
@@ -956,6 +960,9 @@ class Driver:
                 if case.get("lora"):
                     steps["lora"] = select_combo(f.inp_lora, case["lora"])
             else:
+                # margine di CONTESTO di Integra (parametro interno dei casi `_maschera_larga`): None = il tracciato di sempre; azzerato a ogni caso
+                cv.integrate_context_pct = case.get("ctx_margin_pct")
+                cv.integrate_context_px = case.get("ctx_margin_px")
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
                     steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])

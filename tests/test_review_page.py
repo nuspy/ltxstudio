@@ -118,3 +118,32 @@ def test_page_shows_big_labels_and_cosa_guardare_first(tmp_path):
     out = subprocess.run(["node", str(f)], capture_output=True, text=True, encoding="utf-8").stdout
     assert out.index("Cosa guardare") < out.index("RISULTATO – DA VALUTARE") < out.index("INPUT AL MODELLO – NON VALUTARE"), out[:600]
     assert 'class="lab result"' in out and "Guarda se la persona e ridisegnata." in out
+
+
+def test_wide_mask_case_shows_two_masks_and_the_result_with_todays_mask_next_to_it(tmp_path, monkeypatch):
+    """Casi `_maschera_larga`: due maschere sovrapposte (posizione rossa, contesto gialla) con etichetta chiara e, accanto al risultato da valutare, quello con la
+    maschera di oggi (dallo stesso caso base di un giro precedente)."""
+    import json
+    from PIL import Image
+    monkeypatch.setattr(review, "ORCH", str(tmp_path))
+    base = tmp_path / "base"
+    base.mkdir()
+    Image.new("RGB", (32, 24), (200, 10, 10)).save(base / "out_0_base.png")
+    (base / "results.jsonl").write_text(json.dumps({"id": "c0", "esito": "ok", "uscite": [str(base / "out_0_base.png")]}), encoding="utf-8")
+    rd = _fake_run(tmp_path, "integrate", {"image_path": "out_1_integrate_input.png", "mask_path": "out_2_integrate_mask.png"},
+                   ["out_0_native.png", "out_1_integrate_input.png", "out_2_integrate_mask.png"], ["native.png"],
+                   case_extra={"id": "c0_maschera_larga_25", "baseline_id": "c0"})
+    row = json.loads((rd / "results.jsonl").read_text(encoding="utf-8"))
+    for n, (x0, x1) in (("pos", (8, 16)), ("ctx", (2, 28))):
+        im = Image.new("L", (32, 24), 0)
+        im.paste(255, (x0, 4, x1, 20))
+        im.save(rd / f"{n}.png")
+    row["maschere"] = {"posizione": str(rd / "pos.png"), "contesto": str(rd / "ctx.png"), "context_px": 120}
+    (rd / "results.jsonl").write_text(json.dumps(row), encoding="utf-8")
+    idx = review.build(str(rd), "t", baseline_dirs=[str(base)])
+    card = json.load(open(Path(idx).with_name("data.json"), encoding="utf-8"))["cards"][0]
+    roles = [i["role"] for i in card["items"]]
+    assert roles[0] == "result" and roles[1] == "result_base"                    # il confronto sta accanto al risultato da valutare
+    two = next(i for i in card["items"] if i["role"] == "mask_two")
+    assert "ROSSO = POSIZIONE" in two["label"] and "GIALLO = CONTESTO" in two["label"] and "120 px" in two["label"]
+    assert next(i for i in card["items"] if i["role"] == "result_base")["label"].startswith("RISULTATO CON LA MASCHERA DI OGGI")

@@ -95,6 +95,8 @@ ROLE_LABEL = {
     "ref": "FOTO DI RIFERIMENTO",
     "source_video": "VIDEO SORGENTE",
     "service": "File di servizio – non valutare",
+    "result_base": "RISULTATO CON LA MASCHERA DI OGGI – per confronto (valuta quello sopra)",
+    "mask_two": "DUE MASCHERE sull'immagine: ROSSO = POSIZIONE del soggetto · GIALLO = CONTESTO (zona che il modello può cambiare)",
 }
 
 
@@ -126,7 +128,7 @@ def classify_roles(c: dict, r: dict, p: dict) -> dict:
     return roles
 
 
-def build_items(c: dict, r: dict, p: dict, media: list, origs: list, iniz: dict | None) -> list:
+def build_items(c: dict, r: dict, p: dict, media: list, origs: list, iniz: dict | None, extra: list | None = None) -> list:
     """Elenco unico di file da mostrare, ciascuno con ruolo + etichetta chiara. Il primo/i primi sono i RISULTATI da valutare (numerati se piu di uno)."""
     roles = classify_roles(c, r, p)
     finals = []
@@ -175,15 +177,42 @@ def build_items(c: dict, r: dict, p: dict, media: list, origs: list, iniz: dict 
         for x in items:
             if x["role"] in ("model_input", "service") and x["key"].startswith("frame1"):
                 x["role"] = "original"
+    for x in (extra or []):                                       # confronto con la maschera di oggi / due maschere (casi `_maschera_larga`)
+        items.append(dict(x, key=x.get("key") or _key(x.get("path")), video=x.get("video", False)))
     res = [x for x in items if x["role"] == "result"]
     for n, x in enumerate(res, 1):
         x["label"] = ROLE_LABEL["result"] + (f" – Risultato {n}" if len(res) > 1 else "")
     for x in items:
         if x["role"] != "result":
             x["label"] = ROLE_LABEL.get(x["role"], ROLE_LABEL["service"]) + (f" ({x['label_extra']})" if x.get("label_extra") else "")
-    order = {"result": 0, "mask_overlay": 1, "original": 2, "model_input": 3, "mask": 4, "ref": 5, "source_video": 6, "service": 7}
+    order = {"result": 0, "result_base": 0.5, "mask_two": 0.8, "mask_overlay": 1, "original": 2, "model_input": 3, "mask": 4, "ref": 5, "source_video": 6, "service": 7}
     items.sort(key=lambda x: order.get(x["role"], 9))
     return items
+
+
+def _overlay2(img_path: str, ctx_path: str, pos_path: str, dst_dir: str, name: str):
+    """Immagine con DUE maschere: CONTESTO in giallo (cosa il modello puo cambiare) e POSIZIONE in rosso (dove sta il soggetto)."""
+    try:
+        from PIL import Image
+        import numpy as np
+        im = Image.open(img_path).convert("RGB")
+        a = np.asarray(im).astype(np.float32)
+        ctx = np.asarray(Image.open(ctx_path).convert("L").resize(im.size, Image.NEAREST)) > 127
+        pos = np.asarray(Image.open(pos_path).convert("L").resize(im.size, Image.NEAREST)) > 127
+        a[ctx] = 0.62 * a[ctx] + 0.38 * np.array([255, 220, 0], np.float32)
+        a[pos] = 0.55 * a[pos] + 0.45 * np.array([255, 0, 0], np.float32)
+        out = Image.fromarray(a.clip(0, 255).astype("uint8"))
+        res = {}
+        os.makedirs(os.path.join(dst_dir, "img"), exist_ok=True)
+        for big in (False, True):
+            o = out.copy()
+            o.thumbnail((1600, 1600) if big else (480, 480))
+            rel = f"img/{name}{'_big' if big else ''}.jpg"
+            o.save(os.path.join(dst_dir, rel), quality=88 if big else 80)
+            res["big" if big else "thumb"] = rel
+        return res
+    except Exception:                                        # noqa: BLE001
+        return None
 
 
 def _what_to_check(c: dict, r: dict) -> str:
@@ -213,11 +242,23 @@ def _what_to_check(c: dict, r: dict) -> str:
     return " ".join(bits)
 
 
-def build(run_dir: str, nome: str = "giro") -> str:
+def build(run_dir: str, nome: str = "giro", baseline_dirs: list | None = None) -> str:
     rows = [json.loads(l) for l in open(os.path.join(run_dir, "results.jsonl"), encoding="utf-8") if l.strip()]
     stamp = time.strftime("%Y%m%d_%H%M")
     rd = os.path.join(ORCH, f"review_{stamp}")
     os.makedirs(rd, exist_ok=True)
+    base_rows = {}
+    for bd in (baseline_dirs or []):                              # giri precedenti: per i casi `_maschera_larga` il risultato con la maschera di oggi
+        bp = os.path.join(bd, "results.jsonl")
+        if os.path.isfile(bp):
+            for ln in open(bp, encoding="utf-8"):
+                if ln.strip():
+                    try:
+                        br = json.loads(ln)
+                        if br.get("esito") == "ok":
+                            base_rows[br.get("id")] = br
+                    except Exception:                            # noqa: BLE001
+                        pass
     cards = []
     for i, r in enumerate(rows):
         c = r.get("case", {})
@@ -275,7 +316,22 @@ def build(run_dir: str, nome: str = "giro") -> str:
                 _v, _lab = _a[1], "riferimento ops"
             if isinstance(_v, str) and os.path.isfile(_v) and not any(x.get("path") == _v for x in origs):
                 origs.append({"label": _lab, "path": _v, "thumb": _thumb(_v, rd, f"{safe}_ops{len(origs)}"), "big": _thumb(_v, rd, f"{safe}_ops{len(origs)}", True)})
-        _items = build_items(c, r, p, media, origs, iniz)
+        _extra = []
+        _mk2 = r.get("maschere") or {}
+        _imgp = next((p.get(k) for k in ("init_image", "image_path") if isinstance(p.get(k), str) and os.path.isfile(p.get(k))), None)
+        if _imgp and _mk2.get("contesto") and _mk2.get("posizione") and os.path.isfile(str(_mk2["contesto"])) and os.path.isfile(str(_mk2["posizione"])):
+            _ov2 = _overlay2(_imgp, _mk2["contesto"], _mk2["posizione"], rd, f"{safe}_due_maschere")
+            if _ov2:
+                _extra.append({"role": "mask_two", "path": _mk2["contesto"], **_ov2,
+                               "label_extra": f"margine di contesto {_mk2.get('context_px', 0)} px" if _mk2.get("context_px") else "tracciato di oggi"})
+        _bid = c.get("baseline_id")
+        _brow = base_rows.get(_bid) if _bid else None
+        if _brow:
+            _bo = next((o for o in (_brow.get("uscite") or []) if os.path.isfile(str(o))), None)
+            if _bo:
+                _extra.append({"role": "result_base", "path": _bo, "thumb": _thumb(_bo, rd, f"{safe}_base"), "big": _thumb(_bo, rd, f"{safe}_base", True),
+                               "video": str(_bo).lower().endswith(VID)})
+        _items = build_items(c, r, p, media, origs, iniz, _extra)
         cards.append({
             "items": _items,
             "id": cid, "fn": c.get("fn"), "esito": r.get("esito"), "motivo": r.get("motivo") or "", "dry": bool(r.get("dry")),
@@ -377,7 +433,7 @@ button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}button:focus-v
 .cap{font-size:.78rem;color:var(--mut)}.box{background:var(--bg);border-radius:8px;padding:8px;font-size:.88rem;overflow-wrap:anywhere;white-space:pre-wrap}
 .todo{border-left:4px solid var(--ac);padding:4px 10px;margin:8px 0}textarea{width:100%;min-height:76px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:inherit;padding:8px}
 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mut)}
-.vb{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.vbtn{min-width:96px}.vbtn.okb.on{background:var(--ok);color:#fff;border-color:var(--ok)}.vbtn.kob.on{background:var(--ko);color:#fff;border-color:var(--ko)}.err{color:var(--ko)}.look{font-size:1.05rem;font-weight:600}.lab{font-weight:800;font-size:.95rem;padding:3px 8px;border-radius:6px;margin-bottom:4px;display:inline-block;background:var(--bd);color:var(--fg)}.lab.result{background:var(--ok);color:#fff;font-size:1.15rem}.lab.model_input,.lab.service{background:var(--wa);color:#fff}.it.result{border:4px solid var(--ok);border-radius:10px;padding:6px;max-width:100%}.it.result img{max-width:min(100%,720px)}.row.big{align-items:flex-start}.row.small .it img{max-width:240px}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:8px}#lb.on{display:flex}#lb img,#lb video{max-width:100%;max-height:100%}
+.vb{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.vbtn{min-width:96px}.vbtn.okb.on{background:var(--ok);color:#fff;border-color:var(--ok)}.vbtn.kob.on{background:var(--ko);color:#fff;border-color:var(--ko)}.err{color:var(--ko)}.look{font-size:1.05rem;font-weight:600}.lab{font-weight:800;font-size:.95rem;padding:3px 8px;border-radius:6px;margin-bottom:4px;display:inline-block;background:var(--bd);color:var(--fg)}.lab.result{background:var(--ok);color:#fff;font-size:1.15rem}.lab.model_input,.lab.service{background:var(--wa);color:#fff}.it.result{border:4px solid var(--ok);border-radius:10px;padding:6px;max-width:100%}.it.result img{max-width:min(100%,720px)}.lab.result_base{background:var(--bd);color:var(--fg)}.it.result_base img{max-width:min(100%,520px);opacity:.92}.row.big{align-items:flex-start}.row.small .it img{max-width:240px}#lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:8px}#lb.on{display:flex}#lb img,#lb video{max-width:100%;max-height:100%}
 .foot{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;z-index:6}
 </style></head><body>
 <h1 id="t"></h1><div class="sub" id="s"></div>
@@ -398,7 +454,7 @@ document.getElementById('t').textContent='Revisione: '+D.nome;
 document.getElementById('s').textContent=D.creato+' · '+D.cards.length+' casi · cartella '+D.run;
 function card(c,i){const m=c.media.map(x=>`<div><a class="thumb" href="#" data-big="${H(x.video?fileUrl(x.path):x.big||'')}" data-video="${x.video?1:0}" aria-label="Apri ${H(c.id)}">${x.thumb?`<img loading="lazy" src="${x.thumb}" alt="risultato ${H(c.id)}">`:'<span class=meta>(nessuna miniatura)</span>'}</a><div class="cap">${x.video?'▶ video · ':''}${H(x.path)}</div></div>`).join('');
 const fmt=(x)=>`<div class="it ${H(x.role)}"><div class="lab ${H(x.role)}">${H(x.label)}</div><a class="thumb" href="#" data-big="${H(x.video?fileUrl(x.path):x.big||'')}" data-video="${x.video?1:0}" aria-label="${H(x.label)}">${x.thumb?`<img loading="lazy" src="${x.thumb}" alt="${H(x.label)}">`:'<span class=meta>(nessuna miniatura)</span>'}</a><div class="cap">${x.video?'▶ video · ':''}${H(x.path)}</div></div>`;
-const its=c.items||[];const resH=its.filter(x=>x.role==='result').map(fmt).join('');const othH=its.filter(x=>x.role!=='result').map(fmt).join('');
+const its=c.items||[];const resH=its.filter(x=>x.role==='result'||x.role==='result_base').map(fmt).join('');const othH=its.filter(x=>x.role!=='result'&&x.role!=='result_base').map(fmt).join('');
 const o=c.orig.map(x=>`<div><a class="thumb" href="#" data-big="${H(x.big||'')}"><img loading="lazy" src="${x.thumb||''}" alt="${H(x.label)}"></a><div class="cap">ORIGINALE · ${H(x.label)}</div></div>`).join('');
 const lo=c.loras.length?c.loras.map(l=>`${H(l.file)} @${H(l.strength)}${l.trigger?' · trigger: '+H(l.trigger):''}`).join('<br>'):'nessuna';
 return `<section class="card" data-i="${i}"><div class="head"><span class="id">${H(c.id)}</span><span class="tag ${H(c.esito)}">${H(c.esito)}</span>${c.dry?'<span class="tag dry">prova a secco</span>':''}<span class="meta">${H(c.fn)} · ${c.tempo!=null?c.tempo+' s':''}${c.vram?' · VRAM '+c.vram+' MB':''}${c.ram?' · RAM '+c.ram+' MB':''}</span></div>
