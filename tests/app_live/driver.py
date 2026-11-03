@@ -652,6 +652,13 @@ class Driver:
                     sp.clear()
             except Exception:                                     # noqa: BLE001
                 pass
+            try:                                                   # Modifica Video: l'immagine di un caso (ritratto di Sostituisci) non deve restare nel campo dei casi dopo
+                ve = self.w.video_edit_ai_tab
+                ve.ref_img.setText("")
+                if hasattr(ve, "_ref_by_mode"):
+                    ve._ref_by_mode.clear()
+            except Exception:                                     # noqa: BLE001
+                pass
             return f.image_path
         left = self.gui(r, 60)
         if left:

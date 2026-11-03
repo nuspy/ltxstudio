@@ -18,6 +18,8 @@ LIP_SYNC = ("The visible people lip-sync any vocals in <Audio 1> where the sourc
             "the soundtrack itself is unchanged. ")
 NO_LIP_SYNC = ("Nobody on screen sings, speaks or lip-syncs; the music in <Audio 1> is a background track added later. "
                "Mouths stay closed or keep the source expressions such as smiles; the soundtrack itself is unchanged. ")
+ALIGN_SENTENCE = ("<Video 1> is frame-accurate: frame k of the target video shows exactly the moment of frame k of <Video 1>; the person's steps, head and "
+                  "mouth must match <Video 1> frame by frame, with no delay.")
 DEFAULT_SHOTS = "The framing, shot sizes and subject positions follow <Video 1> in every shot."
 
 
@@ -31,9 +33,15 @@ def _sentence(text: str) -> str:
 
 
 def background_prompt(setting: str, subject: str, length_frames: int, overlap_frames: int, *, has_picture: bool = False,
-                      picture_desc: str = "", shots: str = "", lip_sync: bool = True) -> str:
+                      picture_desc: str = "", shots: str = "", lip_sync: bool = True, variant: str = "base") -> str:
     """CAMBIA SFONDO: `subject` = chi si tiene (es. «the woman»), `setting` = il nuovo luogo a parole. Nel video di riferimento
-    (<Video 1>) lo sfondo e una sfocatura grigia liscia: porta solo il movimento di camera e la disposizione grossolana."""
+    (<Video 1>) lo sfondo e una sfocatura grigia liscia: porta solo il movimento di camera e la disposizione grossolana.
+    `variant` (ABLAZIONE 03/11, un fattore alla volta; "base" = il prompt di sempre):
+      · no_performance: senza «keeps their exact look and performance» e senza la retention «the actions ... are retained» (si descrive solo il nuovo ambiente);
+      · replace_like:   come il prompt di Sostituisci: la persona «segue i tempi della performance della figura» e compie le stesse azioni agli stessi istanti, senza «exact look»;
+      · carryover:      il prompt di sempre (il chiamante passa overlap_frames > 0 anche senza contesto: la frase «Its first N seconds are already-edited footage» da sola);
+      · align:          il prompt di sempre + la frase esplicita di allineamento temporale (ALIGN_SENTENCE) dopo la definizione di <Video 1>;
+      · carryover_align: le due cose insieme."""
     sec = length_frames / FPS
     new = "<Subject 1>" + (", " + _sentence(setting).rstrip(".") if setting and has_picture else "")
     lines = ["subject_definitions:"]
@@ -45,24 +53,78 @@ def background_prompt(setting: str, subject: str, length_frames: int, overlap_fr
         "<Video 1> is the source footage being edited, a %.3f-second section at 24 fps, in which the setting around %s is shown as a smooth "
         "grey blur that supplies only the camera movement and rough layout. It supplies the exact camera framing, camera movement, people, "
         "performance timing and hard cuts." % (sec, subject),
+        *([ALIGN_SENTENCE] if "align" in variant else []),
         "<Audio 1> is the synchronized original soundtrack supplied with <Video 1>, reused unchanged as the complete final soundtrack.",
         "", "summary:",
-        "[video editing + reference generation + audio reuse] The target video is an edited version of <Video 1>. %s keeps their exact look and "
-        "performance, while the setting around them becomes %s. " % (_first_upper(subject), new)
+        "[video editing + reference generation + audio reuse] The target video is an edited version of <Video 1>. %s" % _bg_summary(variant, subject, new)
         + ("Its first %.3f seconds are already-edited footage carried over from the preceding section. " % (overlap_frames / FPS)
            if overlap_frames else "") + "Everything else keeps its source look, timing and layout.",
         "", "retention_analysis:",
         "<Subject 1> (setting): partially_preserved - the look, materials and lighting of the new setting come from it; the camera framing and "
         "movement are those of <Video 1>.",
-        "<Video 1> (edited source): partially_preserved - only the setting changes; %s, the actions, camera movement, cuts and timing are retained."
-        % subject,
+        _bg_retention(variant, subject),
         "<Audio 1>: fully_copy - the original synchronized soundtrack is the complete final audio, without additional generated vocals or "
         "sound effects.",
         "", "detailed_description:", "Live-action footage with the source lighting and lens perspective.",
         shots.strip() or DEFAULT_SHOTS,
         "Throughout all shots, the surroundings are %s, lit to match %s; no part of the original location remains." % (new, subject),
-        "Continue the original camera movement and performance through the last frame without adding transitions or changing speed. "
+        ("%s performs every action of the figure in <Video 1>: the same gestures, steps, gaze, expressions and mouth shapes at the same moments. " % _first_upper(subject)
+         if variant == "replace_like" else "")
+        + "Continue the original camera movement and performance through the last frame without adding transitions or changing speed. "
         + (LIP_SYNC if lip_sync else NO_LIP_SYNC),
+        "", SOUND,
+    ]
+    return "\n".join(lines)
+
+
+def _bg_summary(variant: str, subject: str, new: str) -> str:
+    if variant == "no_performance":
+        return "The setting around the person becomes %s. " % new
+    if variant == "replace_like":
+        return "%s follows the timing of the performance of the figure in <Video 1>, while the setting around them becomes %s. " % (_first_upper(subject), new)
+    return "%s keeps their exact look and performance, while the setting around them becomes %s. " % (_first_upper(subject), new)
+
+
+def _bg_retention(variant: str, subject: str) -> str:
+    if variant == "no_performance":
+        return "<Video 1> (edited source): partially_preserved - only the setting changes; the camera movement, cuts and timing are retained."
+    if variant == "replace_like":
+        return ("<Video 1> (edited source): partially_preserved - only the setting changes; camera movement, shot composition, actions, interaction, "
+                "cuts and timing are retained.")
+    return "<Video 1> (edited source): partially_preserved - only the setting changes; %s, the actions, camera movement, cuts and timing are retained." % subject
+
+
+def background_empty_person_prompt(setting: str, length_frames: int, overlap_frames: int, *, has_picture: bool = False,
+                                   picture_desc: str = "", shots: str = "") -> str:
+    """CAMBIA SFONDO, variante «zona della persona vuota» (bg_prompt_mode=empty_person, attiva con bg_person_ref=erase): nel riferimento (<Video 1>) non c'e
+    nessuna persona, solo l'ambiente sfocato; la persona vera e gia nel contenuto tenuto e viene ricomposta dopo. Il modello genera SOLO l'ambiente, coerente
+    con camera e luce, e non disegna ne ridisegna nessuna persona: niente lip sync."""
+    sec = length_frames / FPS
+    lines = ["subject_definitions:"]
+    if has_picture:
+        lines.append(("<Subject 1> is the new setting from <Picture 1>. %s" % _sentence(picture_desc or setting)).strip())
+    else:
+        lines.append("<Subject 1> is the new setting: %s" % (_sentence(setting) or "a new location, unlike the original."))
+    lines += [
+        "<Video 1> is the source footage, a %.3f-second section at 24 fps, shown as a smooth blur of the surroundings with no person in it: it "
+        "supplies only the exact camera framing, camera movement, light direction and rough layout of the environment." % sec,
+        "<Audio 1> is the synchronized original soundtrack supplied with <Video 1>, reused unchanged as the complete final soundtrack.",
+        "", "summary:",
+        "[video editing + environment generation + audio reuse] The target video shows only the new environment, <Subject 1>, seen through the "
+        "camera of <Video 1>. The area where a person would stand is empty space: no person, figure, silhouette or double is drawn there, "
+        "because the real person is composed over it afterwards. Footage already present in the content is kept exactly as given. "
+        + ("Its first %.3f seconds are already-edited footage carried over from the preceding section. " % (overlap_frames / FPS)
+           if overlap_frames else ""),
+        "", "retention_analysis:",
+        "<Subject 1> (setting): partially_preserved - the look, materials and lighting of the new setting come from it; the camera framing and "
+        "movement are those of <Video 1>.",
+        "<Video 1> (camera reference): partially_preserved - only the camera framing, movement, cuts and timing are retained; it contains no person to copy.",
+        "<Audio 1>: fully_copy - the original synchronized soundtrack is the complete final audio, without additional generated vocals or "
+        "sound effects.",
+        "", "detailed_description:", "Live-action footage of an environment with the source lighting and lens perspective, lit consistently with the camera.",
+        shots.strip() or "The framing and camera movement follow <Video 1> in every shot.",
+        "Throughout all shots only the environment is generated; add no person, face, body, shadow of a person or any new figure anywhere, "
+        "and do not redraw or duplicate any person already present in the carried-over content. " + NO_LIP_SYNC,
         "", SOUND,
     ]
     return "\n".join(lines)

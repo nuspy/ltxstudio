@@ -601,6 +601,21 @@ class VideoEditAITab(QWidget):
         self.mode.blockSignals(False)
         self._on_mode()
 
+    def _swap_ref_for_mode(self, key: str) -> None:
+        """Il campo immagine ha un significato diverso per ogni azione (personaggio sostitutivo, foto del luogo, immagine di stile, foto dell'oggetto):
+        cambiando azione NON si porta dietro il valore dell'altra. Ogni azione ricorda la SUA immagine (se l'utente torna indietro la ritrova), le altre
+        partono vuote. Prima (turno 11 del 03/11) il ritratto di Sostituisci finiva nel cambia-sfondo come <Subject 1> e il doppione ne dipendeva."""
+        by = self.__dict__.setdefault("_ref_by_mode", {})
+        prev = self.__dict__.get("_ref_mode")
+        if prev is None:                                        # prima volta (stato ripristinato all'avvio): il testo c'e e appartiene a questa azione
+            self._ref_mode = key
+            return
+        if prev == key:
+            return
+        by[prev] = self.ref_img.text()
+        self.ref_img.setText(by.get(key, ""))
+        self._ref_mode = key
+
     def _pick_ref(self):
         p, _ = QFileDialog.getOpenFileName(self, tr("vedit.ref.browse", "Sfoglia…"), "",
                                            "Immagini (*.png *.jpg *.jpeg *.webp *.bmp)")
@@ -999,6 +1014,7 @@ class VideoEditAITab(QWidget):
             return
         sp = self.current_spec()
         key = sp.key
+        self._swap_ref_for_mode(key)
         is_rc = (key == "replace_char")
         is_restyle = (key == "restyle")
         is_cam = (key == "cameraman")

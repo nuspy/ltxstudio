@@ -147,3 +147,23 @@ def test_text_encoder_menu_defaults_to_the_profile_and_reaches_the_cfg(tab):
     assert tab.h3_te.currentData() == "" and "h3_te" not in _go(tab)
     tab.h3_te.setCurrentIndex(tab.h3_te.findData("mmh3-te-nvfp4"))
     assert _go(tab)["h3_te"] == "mmh3-te-nvfp4"
+
+
+def test_image_field_does_not_leak_between_actions(tab):
+    """Il ritratto impostato per Sostituisci non entra nel cambia-sfondo (come <Subject 1>); tornando a Sostituisci si ritrova."""
+    tab.select_mode("replace_char")
+    tab.ref_img.setText("C:/x/ritratto.png")
+    tab.select_mode("change_background")
+    assert tab.ref_img.text() == ""
+    cfg = _go(tab)
+    assert cfg["ref_image"] == ""                                              # al motore non arriva il ritratto dell'altra azione
+    tab.ref_img.setText("C:/x/luogo.png")                                       # foto del luogo, impostata per QUESTA azione
+    tab.select_mode("replace_char")
+    assert tab.ref_img.text() == "C:/x/ritratto.png"
+    tab.select_mode("change_background")
+    assert tab.ref_img.text() == "C:/x/luogo.png"
+
+
+def test_driver_reset_state_clears_the_edit_image_field():
+    src = open(os.path.join(os.path.dirname(__file__), "app_live", "driver.py"), encoding="utf-8").read()
+    assert "ve.ref_img.setText(" in src and "video_edit_ai_tab" in src.split("def reset_state")[1].split("def _wait_inventory")[0]

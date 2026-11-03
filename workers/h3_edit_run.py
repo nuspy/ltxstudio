@@ -244,7 +244,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     with __import__("av").open(src) as c0:
         sw, sh = c0.streams.video[0].codec_context.width, c0.streams.video[0].codec_context.height
     tw, th = M.short_edge_size(sw, sh, short)
-    frames_u8, dur, src_idx, n_src = read_frames(src, tw, th, int(e.get("max_frames") or 0))
+    frames_u8, dur, src_idx, n_src = read_frames(src, tw, th, int(os.environ.get("H3_EDIT_MAX_FRAMES") or e.get("max_frames") or 0))
     N = M.usable_frames(frames_u8.shape[0])
     frames_u8 = frames_u8[:N]
     W._log(f"edit {action}: {N} frame ({N / FPS:.1f}s) a {tw}x{th} da {sw}x{sh}")
@@ -256,8 +256,13 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # Spazio sopra la testa e posa tenuta servono a sostituisci (personaggio nuovo piu alto, gesti diversi). Nel cambia-sfondo la persona e TENUTA
     # dall'originale: quello spazio restava sfondo vecchio (pennacchio del mercato sopra la testa, misurato 03/11: fascia 0-24 px 40-54 % a 10-12 s);
     # la cella di latente unisce gia 4 frame, quindi la posa tenuta li e ridondante. Parametri bg_headroom / bg_hold_frames (default 0).
+    # H3_EDIT_BG_GROW_LIKE_REPLACE=1 (ABLAZIONE 03/11, spento di default): nel cambia-sfondo la maschera TENUTA e quella di Sostituisci (persona cresciuta di person_grow + grow,
+    # spazio sopra la testa 0,10, posa +-2 frame); matte e riferimento restano sulla sagoma vera.
+    like_replace = invert and str(os.environ.get("H3_EDIT_BG_GROW_LIKE_REPLACE") or e.get("bg_grow_like_replace") or "0").strip().lower() not in ("0", "", "false", "no", "off")
     headroom = float(e.get("bg_headroom", 0.0)) if invert else float(e.get("headroom", 0.10))
     hold_frames = int(e.get("bg_hold_frames", 0)) if invert else int(e.get("hold_frames", 2))
+    if like_replace:
+        headroom, hold_frames = float(e.get("headroom", 0.10)), int(e.get("hold_frames", 2))
     # bg_hold_cover (env H3_EDIT_BG_HOLD_COVER): quota minima di persona per TENERE una cella nel cambia-sfondo (0 = spento: serve il 100 %, basta un pixel
     # di sfondo per rigenerarla). Con 0,5 volto e spalle restano ancorati; il matte a pixel pulisce lo sfondo vecchio nei bordi delle celle tenute.
     hold_cover = float(os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0) or 0.0) if invert else 0.0
@@ -281,6 +286,10 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     regen_pix = M.regen_region(pers, invert, person_grow, grow, expand=0.0 if invert else float(os.environ.get("H3_EDIT_REPLACE_EXPAND") or e.get("replace_expand", 0.0)))   # cio che si rigenera (prima dell'inversione)
     if not invert:
         pers = M.grow_mask(pers.float(), person_grow)                  # il manichino grigio del riferimento copre la persona cresciuta
+    if like_replace:                                                   # persona e margine TENUTI come in Sostituisci; matte e riferimento sulla sagoma vera
+        regen_pix = M.regen_region(pers, False, person_grow, grow)
+        pers, size = M.person_mask(obj, 0.0, 0)
+        pers = pers.float()
 
     # 1b) PREROLL (opzionale, default 0): frame fermi anteposti perche il clip 1 non parta «a freddo» (vedi M.preroll_pad). H3_EDIT_PREROLL=17 / `preroll_frames`.
     preroll = int(os.environ.get("H3_EDIT_PREROLL") or e.get("preroll_frames") or 0)
@@ -298,6 +307,13 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     bg_person_ref = str(os.environ.get("H3_EDIT_BG_PERSON_REF") or e.get("bg_person_ref") or "sharp").lower()   # sharp (oggi) | mannequin | erase (nessuna figura nel riferimento del cambia-sfondo)
     # matte a pixel della persona (solo composizione): DI DEFAULT nel cambia-sfondo (03/11: testa fedele 0.124 -> 0.007); si spegne con H3_EDIT_BG_MATTE=0 o bg_matte=0/false
     bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")
+    # bg_prompt_mode (env H3_EDIT_BG_PROMPT): "empty_person" = il prompt dice che la zona della persona e vuota e verra ricomposta (il modello genera SOLO l'ambiente, niente
+    # persona ne lip sync); si attiva da solo con bg_person_ref=erase, "standard" lo spegne. Nel riferimento senza persona il prompt di sempre («<soggetto> keeps their exact look»)
+    # chiederebbe di ridisegnarla.
+    # Valori: base (= standard, il prompt di sempre) | empty_person | no_performance | carryover | replace_like | align | carryover_align (ablazione 03/11: un fattore alla volta, vedi core/h3_edit_prompt).
+    _bp = str(os.environ.get("H3_EDIT_BG_PROMPT") or e.get("bg_prompt_mode") or ("empty_person" if bg_person_ref == "erase" else "base")).strip().lower()
+    bg_prompt = _bp if (invert and _bp in ("empty_person", "no_performance", "carryover", "replace_like", "align", "carryover_align")) else ""
+    lipsync_off = str(os.environ.get("H3_EDIT_LIPSYNC") if os.environ.get("H3_EDIT_LIPSYNC") is not None else e.get("lipsync", "1")).strip().lower() in ("0", "false", "no", "off")
     if invert:
         ref_frames = M.blur_area(f01, 1.0 - pers, radius=max(6.0, 0.02 * th * float(os.environ.get("H3_EDIT_BG_BLUR") or e.get("bg_blur", 1.0))),
                                 grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)
@@ -329,7 +345,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
@@ -381,6 +397,10 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                     meta["guide"]["mode"] = "person"
                     mm = M.gaussian_blur(M.grow_mask(pers[sl].float(), 6)[:, None], 2.0)[:, 0].clamp(0, 1)[..., None]
                     _np.save(jd / "guide_src.npy", ((clip_src.float() / 255.0 * mm + 0.5 * (1 - mm)) * 255).round().to(torch.uint8).numpy())
+            if bg_prompt:                                                  # solo se attivo: senza, meta (e la chiave del clip) restano quelli di sempre
+                meta["bg_prompt"] = bg_prompt
+            if lipsync_off:
+                meta["lipsync"] = False
             if e.get("ref_clock_align"):                                   # variante sperimentale: SOLO se scelta (altrimenti meta e chiave restano quelle di sempre)
                 meta["ref_clock_align"] = True
             _np.save(jd / "clip_src.npy", clip_src.numpy())
@@ -476,10 +496,14 @@ def generate_clip(job_dir: str, W) -> None:
     if m["picture"]:
         refs.append({"kind": "image", "path": m["picture"], "role": "subject"})
     refs.append({"kind": "video", "path": m["refvid"], "role": "motion", "frames": int(length)})   # `frames`: serve al piano di memoria
-    lip = bool(m["has_audio"])
-    if m["action"] == "change_background":
-        prompt = PR.background_prompt(m["prompt_text"], m["keep_text"], length, ctx, has_picture=bool(m["picture"]), picture_desc=m["picture_desc"],
-                                      shots=m["shots"], lip_sync=lip)
+    lip = bool(m["has_audio"]) and m.get("lipsync", True)
+    if m["action"] == "change_background" and m.get("bg_prompt") == "empty_person":
+        prompt = PR.background_empty_person_prompt(m["prompt_text"], length, ctx, has_picture=bool(m["picture"]), picture_desc=m["picture_desc"], shots=m["shots"])
+        lip = False
+    elif m["action"] == "change_background":
+        bgv = m.get("bg_prompt") or "base"
+        prompt = PR.background_prompt(m["prompt_text"], m["keep_text"], length, (ctx or 39) if "carryover" in bgv else ctx, has_picture=bool(m["picture"]),
+                                      picture_desc=m["picture_desc"], shots=m["shots"], lip_sync=lip, variant=bgv)
     else:
         prompt = PR.replace_prompt(m["keep_text"], length, ctx, picture_desc=m["picture_desc"], shots=m["shots"], lip_sync=lip)
     pc = dict(base)

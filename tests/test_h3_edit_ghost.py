@@ -111,3 +111,52 @@ def test_erase_option_is_wired():
     src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
     assert 'bg_person_ref == "erase"' in src and "M.erase_area(ref_frames, pers" in src
     assert '"bgref", bg_person_ref' in src                                                    # nella chiave dei checkpoint (e quindi nel runkey)
+
+
+def test_empty_person_prompt_says_the_person_zone_is_empty_and_has_no_lip_sync():
+    sys.path.insert(0, str(ROOT))
+    from core import h3_edit_prompt as PR
+    std = PR.background_prompt("a snowy cabin", "the man", 141, 0)
+    emp = PR.background_empty_person_prompt("a snowy cabin", 141, 0)
+    assert "keeps their exact look" in std and "keeps their exact look" not in emp                          # il prompt di sempre chiede di ridisegnare la persona
+    assert "lip-sync any vocals" in std and "lip-sync any vocals" not in emp and "Nobody on screen sings" in emp
+    assert "no person" in emp and "empty space" in emp and "only the environment" in emp
+    assert "Its first" in PR.background_empty_person_prompt("x", 141, 39) and "Its first" not in emp         # contesto dei clip successivi
+
+
+def test_empty_person_prompt_is_automatic_with_erase_and_wired_in_key_meta_and_worker():
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("H3_EDIT_BG_PROMPT") or e.get("bg_prompt_mode") or ("empty_person" if bg_person_ref == "erase" else "base")' in src
+    assert '"bgprompt", bg_prompt' in src and 'meta["bg_prompt"] = bg_prompt' in src
+    assert 'm.get("bg_prompt") == "empty_person"' in src and "PR.background_empty_person_prompt(" in src
+
+
+def test_ablation_prompt_variants_change_one_thing_and_base_is_untouched():
+    sys.path.insert(0, str(ROOT))
+    from core import h3_edit_prompt as PR
+    base = PR.background_prompt("a snowy cabin", "the man", 141, 0)
+    assert PR.background_prompt("a snowy cabin", "the man", 141, 0, variant="base") == base
+    npf = PR.background_prompt("a snowy cabin", "the man", 141, 0, variant="no_performance")
+    assert "exact look" not in npf and "the actions" not in npf and "camera movement, cuts and timing are retained" in npf
+    rl = PR.background_prompt("a snowy cabin", "the man", 141, 0, variant="replace_like")
+    assert "exact look" not in rl and "follows the timing of the performance of the figure" in rl and "performs every action" in rl
+    co = PR.background_prompt("a snowy cabin", "the man", 141, 39, variant="carryover")
+    assert "Its first 1.625 seconds" in co and "exact look" in co
+    assert PR.background_prompt("a snowy cabin", "the man", 141, 0, lip_sync=False).count("Nobody on screen sings") == 1
+
+
+def test_ablation_switches_are_wired_with_defaults_unchanged_and_in_the_key():
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("H3_EDIT_MAX_FRAMES")' in src and 'os.environ.get("H3_EDIT_LIPSYNC")' in src and 'os.environ.get("H3_EDIT_BG_GROW_LIKE_REPLACE")' in src
+    assert '("lipoff", 1)' in src and '("bglike", 1)' in src and '"bgprompt", bg_prompt' in src
+    assert 'meta["lipsync"] = False' in src and 'm.get("lipsync", True)' in src
+
+
+def test_ablation_alignment_sentence_variants():
+    sys.path.insert(0, str(ROOT))
+    from core import h3_edit_prompt as PR
+    base = PR.background_prompt("a snowy cabin", "the man", 141, 0)
+    al = PR.background_prompt("a snowy cabin", "the man", 141, 0, variant="align")
+    assert PR.ALIGN_SENTENCE in al and PR.ALIGN_SENTENCE not in base and al.replace(PR.ALIGN_SENTENCE + chr(10), "") == base          # UN solo cambiamento
+    ca = PR.background_prompt("a snowy cabin", "the man", 141, 39, variant="carryover_align")
+    assert PR.ALIGN_SENTENCE in ca and "Its first 1.625 seconds" in ca and "exact look" in ca

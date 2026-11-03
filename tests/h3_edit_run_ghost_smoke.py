@@ -48,7 +48,7 @@ def make_masks(d):
         Image.fromarray(m).save(d / f"{i:05d}.png")
 
 
-calls, refs = [], []
+calls, refs, prompts = [], [], []
 
 
 class FakeW:
@@ -80,6 +80,7 @@ class FakeW:
     def run(pc):
         th, tw = pc["_h3_edit"]["canvas"]
         calls.append(pc["num_frames"])
+        prompts.append(pc["prompt"])
         refs.append(pc["references"][-1]["path"])
         g = torch.Generator().manual_seed(7)
         return {"videos": [(torch.rand(pc["num_frames"], th, tw, 3, generator=g) * 255).to(torch.uint8)], "audio": [None], "sampling_rate": 32000}
@@ -102,10 +103,10 @@ def frames_of(path):
 
 
 def run(tag, env):
-    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS"):
+    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES"):
         os.environ.pop(k, None)
     os.environ.update(env)
-    calls.clear(); refs.clear()
+    calls.clear(); refs.clear(); prompts.clear()
     out = ER.run_edit({"output": str(TMP / tag / "out.mp4"), "seed": 1,
                        "h3_edit": {"action": "change_background", "video": str(src), "mask_dir": str(TMP / "masks"), "short_edge": 192,
                                    "clip_s": 6.0, "overlap": 39, "keep_audio": True, "prompt_text": "x"}}, FakeW,
@@ -132,6 +133,29 @@ sa, sb = np.load(tdir / "clip_00" / "clip_src.npy"), np.load(tdir / "clip_00b" /
 assert not np.array_equal(sa[:22], sb[:22]) and np.array_equal(sa[22:], sb[22:])   # solo i primi 22 sono i frame puliti della passata A
 assert not (tdir / "clip_01" / "meta.json").exists() or json.loads((tdir / "clip_01" / "meta.json").read_text("utf-8"))["ctx"] == 39
 era, c6, r6 = run("erase", {"H3_EDIT_BG_PERSON_REF": "erase", "H3_EDIT_BG_MATTE": "0"})   # riferimento senza persona: dove c'era la figura rossa c'e lo sfondo sfocato
+# ABLAZIONE (un fattore alla volta, solo clip 1): un solo clip con H3_EDIT_MAX_FRAMES; prompt, lip sync e maschera come Sostituisci
+one, cb, _r = run("abl0", {"H3_EDIT_MAX_FRAMES": "141"}); p0 = list(prompts)
+assert cb == [141] and "exact look" in p0[0] and "the actions" in p0[0], (cb, p0[0][:200])
+_k = lambda tag: next((TMP / tag / "_h3edit_tmp").iterdir())                          # noqa: E731
+_, _c, _ = run("abl1", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "no_performance"})
+assert _c == [141] and "exact look" not in prompts[0] and "the actions" not in prompts[0] and "setting around the person becomes" in prompts[0], prompts[0][:300]
+_, _c, _ = run("abl2", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_LIPSYNC": "0"})
+assert json.loads((_k("abl2") / "clip_00" / "meta.json").read_text("utf-8"))["lipsync"] is False and _k("abl2").name != _k("abl0").name   # runkey diversa
+_, _c, _ = run("abl3", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "carryover"})
+assert "Its first 1.625 seconds are already-edited footage" in prompts[0] and "exact look" in prompts[0], prompts[0][:300]
+_, _c, _ = run("abl4", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PERSON_REF": "erase", "H3_EDIT_BG_PROMPT": "base"})
+assert "exact look" in prompts[0] and "no person" not in prompts[0].split("summary:")[0], prompts[0][:200]          # erase con prompt base: il prompt di sempre
+assert json.loads((_k("abl4") / "clip_00" / "meta.json").read_text("utf-8")).get("bg_prompt") is None
+_, _c, _ = run("abl5", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_GROW_LIKE_REPLACE": "1"})
+c_base, c_like = np.load(_k("abl0") / "clip_00" / "cells.npy"), np.load(_k("abl5") / "clip_00" / "cells.npy")
+assert float((c_like < 0.5).sum()) > float((c_base < 0.5).sum()), (float((c_like < 0.5).sum()), float((c_base < 0.5).sum()))   # persona e margine TENUTI: piu celle tenute
+_, _c, _ = run("abl6", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "replace_like"})
+assert "exact look" not in prompts[0] and "follows the timing of the performance of the figure" in prompts[0] and "performs every action" in prompts[0], prompts[0][:300]
+_, _c, _ = run("abl7", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "align"})
+assert "frame-accurate" in prompts[0] and "exact look" in prompts[0] and "Its first" not in prompts[0], prompts[0][:300]
+_, _c, _ = run("abl8", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_PROMPT": "carryover_align"})
+assert "frame-accurate" in prompts[0] and "Its first 1.625 seconds" in prompts[0], prompts[0][:300]
+print("ABLAZIONE OK: kept cells base", int((c_base < 0.5).sum()), "like-replace", int((c_like < 0.5).sum()))
 print("clip base", c0, "preroll", c1, "two-pass", c5)
 
 # PREROLL: stesso numero di frame in uscita, ma si genera di piu (clip 1 piu lungo di 17 frame)
@@ -146,6 +170,10 @@ def person_color(ref_path):
 sharp, mq = person_color(r0[0]), person_color(r2[0])
 er = person_color(r6[0])
 print("colore nella zona della persona, riferimento erase", er.round(), "bordo/sfondo vicino", frames_of(r6[0])[5][60:150, 10:30].reshape(-1, 3).mean(0).round())
+_ed = next((TMP / "erase" / "_h3edit_tmp").iterdir())
+assert json.loads((_ed / "clip_00" / "meta.json").read_text("utf-8")).get("bg_prompt") == "empty_person"     # con erase il prompt dice «zona vuota»
+_bd = next((TMP / "base" / "_h3edit_tmp").iterdir())
+assert "bg_prompt" not in json.loads((_bd / "clip_00" / "meta.json").read_text("utf-8"))                      # senza erase meta e quello di sempre
 assert era.shape == base.shape and er[0] - er[2] < 30 and er[0] < 120 and sharp[0] - er[0] > 100, (er, sharp)
 print("colore persona nel riferimento: standard", sharp.round(), "manichino", mq.round())
 assert sharp[0] - sharp[2] > 60 and abs(mq[0] - mq[2]) < 40, (sharp, mq)
