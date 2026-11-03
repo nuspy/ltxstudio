@@ -88,6 +88,13 @@ def _load(_model: str = "", _arch: str = "segment"):
 
 
 def run(params: dict, mm, output_dir: str) -> dict:
+    # Motore scelto dall'utente (menu «Segmentazione»): SAM 3.1 non utilizzabile -> errore CHIARO, mai ripiego silenzioso su SAM2.
+    from core import segmentation_engine as _SE
+    _eng, _err = _SE.resolve_for_job(params.get("seg_engine"))
+    if _err:
+        return {"status": "error", "error": _err}
+    if _eng == _SE.SAM31:
+        return {"status": "error", "error": "SAM 3.1: il caricatore nativo non e collegato a questo percorso."}
     import numpy as np
     import torch
     from PIL import Image

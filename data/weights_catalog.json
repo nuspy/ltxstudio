@@ -2135,6 +2135,27 @@
       ]
     },
     {
+      "id": "sam3.1-multiplex",
+      "module": "Segmentazione",
+      "label": "SAM 3.1 (Meta, multi-oggetto) — alternativa a SAM2",
+      "kind": "snapshot",
+      "type": "Segmentation",
+      "family": "",
+      "gated": true,
+      "approx_gb": 3.5,
+      "scan_names": [
+        "sam3.1"
+      ],
+      "category": "aux",
+      "arch": "sam",
+      "repo_id": "facebook/sam3.1",
+      "url": "https://huggingface.co/facebook/sam3.1",
+      "note": "Accesso a richiesta su Hugging Face (licenza SAM di Meta, approvazione anche dopo giorni). Uso commerciale consentito; vietati usi militari, nucleari, di spionaggio e reverse engineering.",
+      "use": [
+        "segment"
+      ]
+    },
+    {
       "id": "grounding-dino-base",
       "module": "Segmentazione",
       "label": "GroundingDINO base (detect da testo)",

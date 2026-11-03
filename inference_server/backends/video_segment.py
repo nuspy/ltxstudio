@@ -78,10 +78,17 @@ def _gdino_box(frame0_png: str, text: str, device: str):
 
 
 def track_object(video: str, *, point=None, box=None, text: str = "", dilate: int = 0,
-                 device: str = "cuda", work_dir: str = "") -> dict:
+                 device: str = "cuda", work_dir: str = "", engine: str | None = None) -> dict:
     """Traccia un oggetto nel video e ritorna le maschere per-frame.
     Selezione frame-0: `point` (x,y) | `box` (x0,y0,x1,y1) | `text` (GroundingDINO).
+    `engine`: motore del menu «Segmentazione» (None = quello salvato); SAM 3.1 non utilizzabile -> RuntimeError chiara, mai ripiego silenzioso su SAM2.
     Ritorna {frames:[png...], masks:[png...], fps:float}."""
+    from core import segmentation_engine as _SE
+    _eng, _err = _SE.resolve_for_job(engine)
+    if _err:
+        raise RuntimeError(_err)
+    if _eng == _SE.SAM31:
+        raise RuntimeError("SAM 3.1: il caricatore nativo non e collegato al tracking video.")
     import numpy as np
     import torch
     from PIL import Image

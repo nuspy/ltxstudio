@@ -1417,6 +1417,7 @@ class MainWindow(QMainWindow):
                 grp.addAction(a)
         self._grp_models.triggered.connect(lambda a: self._set_models_variant(a.data()))
         self._grp_fs.triggered.connect(lambda a: self._set_filmstudio_variant(a.data()))
+        self._build_segmentation_menu()
         # ── selettore lingua (sempre visibile nella status bar) ──────────────────────
         self._lang_btn = QToolButton()
         self._lang_btn.setText(f"{LANG_FLAGS.get(i18n.current_lang(), '🌐')} {LANGUAGES.get(i18n.current_lang(), '')}")
@@ -1432,6 +1433,50 @@ class MainWindow(QMainWindow):
             act.triggered.connect(lambda _=False, c=code: self._change_language(c))
         self._lang_btn.setMenu(lang_menu)
         self.statusBar().addPermanentWidget(self._lang_btn)
+
+    # ── menu «Segmentazione»: SAM2 (predefinito) o SAM 3.1, valido ovunque si usa SAM2 (clic/lazo, maschere, tracking video, Scambia) ──────────────
+    def _build_segmentation_menu(self):
+        from PySide6.QtGui import QActionGroup
+        from core import segmentation_engine as SE
+        seg = self.menuBar().addMenu(tr("menu.segmentation", "🎯 Segmentazione"))
+        self._seg_menu = seg
+        self._seg_group = QActionGroup(self)
+        self._seg_group.setExclusive(True)
+        self._seg_actions = {}
+        cur = SE.current()
+        for ent in SE.menu_entries():
+            a = seg.addAction(self._seg_label(ent))
+            a.setCheckable(True)
+            a.setData(ent["id"])
+            self._seg_group.addAction(a)
+            self._seg_actions[ent["id"]] = a
+        # la voce spuntata e quella scelta se utilizzabile; altrimenti resta SAM2 (la scelta salvata non viene toccata)
+        self._seg_actions.get(cur if SE.is_selectable(cur) else SE.SAM2).setChecked(True)
+        seg.addSeparator()
+        a_help = seg.addAction(tr("seg.help.menu", "Come ottenere SAM 3.1…"))
+        a_help.triggered.connect(lambda *_: self._show_sam31_help())
+        self._seg_group.triggered.connect(self._on_segmentation_chosen)
+
+    @staticmethod
+    def _seg_label(ent: dict) -> str:
+        keys = {"sam2": "seg.engine.sam2", "missing": "seg.engine.sam31_missing", "partial": "seg.engine.sam31_partial",
+                "loader": "seg.engine.sam31_loader", "ok": "seg.engine.sam31"}
+        return tr(keys["sam2"] if ent["id"] == "sam2" else keys.get(ent["state"], "seg.engine.sam31"), ent["label"])
+
+    def _on_segmentation_chosen(self, action):
+        from core import segmentation_engine as SE
+        eng = action.data()
+        if not SE.is_selectable(eng):
+            # SAM 3.1 non utilizzabile: nessuna scelta (e nessun ripiego silenzioso): resta quella di prima e si apre l'aiuto non modale
+            self._seg_actions[SE.current() if SE.is_selectable(SE.current()) else SE.SAM2].setChecked(True)
+            self._show_sam31_help()
+            return
+        SE.set_current(eng)
+        self.statusBar().showMessage(tr("seg.chosen", "Segmentazione: {n}").format(n=action.text()), 5000)
+
+    def _show_sam31_help(self):
+        from ui.widgets import sam31_help
+        sam31_help.show(self, on_use_sam2=lambda: self._seg_actions['sam2'].setChecked(True))
 
     def _change_language(self, lang_code: str):
         """Cambia lingua, aggiorna il pulsante e avvisa di riavviare."""
