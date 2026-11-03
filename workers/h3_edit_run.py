@@ -247,6 +247,11 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # la cella di latente unisce gia 4 frame, quindi la posa tenuta li e ridondante. Parametri bg_headroom / bg_hold_frames (default 0).
     headroom = float(e.get("bg_headroom", 0.0)) if invert else float(e.get("headroom", 0.10))
     hold_frames = int(e.get("bg_hold_frames", 0)) if invert else int(e.get("hold_frames", 2))
+    # bg_hold_cover (env H3_EDIT_BG_HOLD_COVER): quota minima di persona per TENERE una cella nel cambia-sfondo (0 = spento: serve il 100 %, basta un pixel
+    # di sfondo per rigenerarla). Con 0,5 volto e spalle restano ancorati; il matte a pixel pulisce lo sfondo vecchio nei bordi delle celle tenute.
+    hold_cover = float(os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0) or 0.0) if invert else 0.0
+    if not 0.0 < hold_cover < 1.0:
+        hold_cover = 0.0
     pers, size = M.person_mask(obj, headroom, hold_frames)
     pers = pers.float()
     person_grow = max(0, int(round(float(e.get("person_grow_px", 40)) * scale)))
@@ -304,7 +309,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
@@ -316,7 +321,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         clip_src = src_t[sl].clone()
         if ctx and prev_tail is not None:                              # contesto = frame GIA generati (non la sorgente): continuita fra clip
             clip_src[:ctx] = (prev_tail[-ctx:] * 255).round().to(torch.uint8)
-        cells, counts = M.cell_mask(regen_pix[sl], tw, th, invert=invert, feather_px=feather_px, width=tw)
+        cells, counts = M.cell_mask(regen_pix[sl], tw, th, invert=invert, feather_px=feather_px, width=tw, hold_cover=hold_cover or None)
         if ctx:                                                        # i frame di contesto non si rigenerano
             cells = cells.clone()
             cells[:, :, :_latents_of_frames(counts, ctx)] = 0

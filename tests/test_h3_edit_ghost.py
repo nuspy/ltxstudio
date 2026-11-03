@@ -57,3 +57,29 @@ def test_ghost_options_end_to_end_smoke_with_a_fake_worker():
     r = subprocess.run([VENV_PY, "-I", str(ROOT / "tests" / "h3_edit_run_ghost_smoke.py")], capture_output=True, text=True, timeout=900,
                        env=dict(os.environ, CUDA_VISIBLE_DEVICES=""))
     assert r.returncode == 0 and "GHOST SMOKE OK" in r.stdout, r.stdout[-1200:] + r.stderr[-1200:]
+
+
+def test_hold_cover_keeps_cells_the_person_mostly_covers():
+    n = 5
+    obj = torch.zeros(n, 32, 64)                      # 2 x 4 celle da 16 px
+    obj[:, :, 0:16] = 1                               # cella 0: persona 100 %
+    obj[:, :, 16:24] = 1                              # cella 1: persona 50 %
+    obj[:, :, 32:36] = 1                              # cella 2: persona 25 %
+    base, _ = M.cell_mask(obj, 64, 32, invert=True)
+    off, _ = M.cell_mask(obj, 64, 32, invert=True, hold_cover=None)
+    c50, _ = M.cell_mask(obj, 64, 32, invert=True, hold_cover=0.5)
+    c30, _ = M.cell_mask(obj, 64, 32, invert=True, hold_cover=0.3)
+    assert torch.equal(base, off)                                                       # spento = comportamento di sempre
+    row = lambda c: [int(v) for v in c[0, 0, 0, 0]]                                     # noqa: E731
+    assert row(base) == [0, 1, 1, 1]                                                    # oggi: basta un pixel di sfondo
+    assert row(c50) == [0, 0, 1, 1]                                                     # >= 50 %: tenuta
+    assert row(c30) == [0, 0, 1, 1]                                                     # il 25 % non basta nemmeno a 0,3
+    assert M.cell_mask(obj, 64, 32, invert=True, hold_cover=1.0)[0].equal(base)         # 1.0 = come oggi
+    assert M.cell_mask(obj, 64, 32, invert=False, hold_cover=0.5)[0].equal(M.cell_mask(obj, 64, 32, invert=False)[0])   # solo cambia-sfondo
+
+
+def test_hold_cover_option_is_wired_and_in_the_checkpoint_key_only_when_set():
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0)' in src
+    assert "hold_cover=hold_cover or None" in src
+    assert '"bgcover", hold_cover' in src and "if hold_cover else ()" in src

@@ -102,7 +102,7 @@ def frames_of(path):
 
 
 def run(tag, env):
-    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE"):
+    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER"):
         os.environ.pop(k, None)
     os.environ.update(env)
     calls.clear(); refs.clear()
@@ -117,6 +117,8 @@ base, c0, r0 = run("base", {"H3_EDIT_BG_MATTE": "0"})                       # il
 pre, c1, r1 = run("preroll", {"H3_EDIT_PREROLL": "17", "H3_EDIT_BG_MATTE": "0"})
 man, c2, r2 = run("mann", {"H3_EDIT_BG_PERSON_REF": "mannequin", "H3_EDIT_BG_MATTE": "0"})
 mat, c3, r3 = run("matte", {})                                                 # senza variabili: matte di DEFAULT
+cov, c4, r4 = run("cover", {"H3_EDIT_BG_HOLD_COVER": "0.5"})                    # celle tenute con persona >= 50 %: gira e produce lo stesso numero di frame
+assert cov.shape == base.shape and c4 == c0, (c4, c0)
 print("clip base", c0, "preroll", c1)
 
 # PREROLL: stesso numero di frame in uscita, ma si genera di piu (clip 1 piu lungo di 17 frame)

@@ -151,15 +151,22 @@ def feather_latent(mask: torch.Tensor, cells: int) -> torch.Tensor:
     return out.movedim(1, 0)[None]
 
 
-def cell_mask(obj: torch.Tensor, tw: int, th: int, invert: bool = False, feather_px: int = 0, width: int | None = None):
+def cell_mask(obj: torch.Tensor, tw: int, th: int, invert: bool = False, feather_px: int = 0, width: int | None = None,
+              hold_cover: float | None = None):
     """Cio che l'edit rigenera, sulla griglia delle celle: `obj` [n, mh, mw] (maschera cresciuta, 1 = oggetto/persona) -> maschera di
-    latente [1,1,T,th/16,tw/16] (+ conteggi). Invertita DOPO il ridimensionamento (cambia-sfondo: si rigenera tutto tranne la persona)."""
+    latente [1,1,T,th/16,tw/16] (+ conteggi). Invertita DOPO il ridimensionamento (cambia-sfondo: si rigenera tutto tranne la persona).
+    `hold_cover` (solo invert, 0 < x < 1): una cella si TIENE se la persona ne copre almeno quella quota (es. 0.5), invece del 100 % di sempre
+    (basta UN pixel di sfondo per rigenerarla): volto e spalle restano ancorati da celle tenute. None/0/>=1 = comportamento di sempre."""
     n = obj.shape[0]
     counts = latent_frame_counts(n)
     rows = []
     for i in range(0, n, CHUNK):
         m = resize_mask(obj[i:i + CHUNK], tw, th)
-        rows.append(F.adaptive_max_pool2d((1.0 - m if invert else m)[:, None], (th // CELL, tw // CELL))[:, 0])
+        if invert and hold_cover and 0.0 < hold_cover < 1.0:
+            cover = F.adaptive_avg_pool2d(m[:, None], (th // CELL, tw // CELL))[:, 0]        # quota di persona in ogni cella
+            rows.append((cover < float(hold_cover)).float())
+        else:
+            rows.append(F.adaptive_max_pool2d((1.0 - m if invert else m)[:, None], (th // CELL, tw // CELL))[:, 0])
     cells = latent_mask(torch.cat(rows), counts, th // CELL, tw // CELL)
     feather_cells = math.ceil(feather_px * tw / float(width or tw) / CELL) if feather_px else 0
     return feather_latent(cells, feather_cells), counts
