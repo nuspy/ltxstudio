@@ -81,6 +81,23 @@ GEN_REF_ARCHS = {"Qwen-Image 2.1": ("qwen21", 10), "Krea 2": ("krea2_edit", 2), 
 # Guidance di FLUX.1 Kontext: regolabile (default 2.5). Valori piu' bassi attenuano contrasto/saturazione eccessivi.
 KONTEXT_GUIDANCE_DEFAULT = 2.5
 KONTEXT_GUIDANCE_RANGE = (1.0, 4.0)
+# ── Tabella dei motori di Integra: cosa sa fare ciascuno ────────────────────────────────────────────────────────────────
+# `context_mask`: il motore usa le DUE maschere (posizione = dove sta il soggetto, contesto = zona che puo ridisegnare). Un motore nuovo che non e
+# elencato qui la EREDITA (default True): basta aggiungere una riga solo per i motori che NON la usano. Krea 2 Edit lavora per riferimenti, senza maschera.
+INTEGRATE_ENGINE_CAPS = {
+    "kontext":      {"context_mask": True},
+    "flux2":        {"context_mask": True},
+    "qwen_image21": {"context_mask": True},
+    "flux3":        {"context_mask": True},
+    "krea2":        {"context_mask": False},
+}
+
+
+def integrate_engine_supports_context_mask(engine: str) -> bool:
+    """True se il motore di Integra usa la maschera di contesto (default True per i motori non ancora in tabella)."""
+    return bool(INTEGRATE_ENGINE_CAPS.get(str(engine), {}).get("context_mask", True))
+
+
 QWEN21_ENGINE_IDX = 3       # posizione di «Qwen-Image 2.1» nei combo motore di Integra/Componi/Colore
 FLUX3_ENGINE_IDX = 4        # posizione di «FLUX.3 Klein» nei combo motore (task 13)
 # FLUX.3 Image Klein: DiT di catalogo (core/flux3_spec.DITS). Oggi uno solo (opzione A: distillato fp8 per riga).
@@ -1792,6 +1809,37 @@ class Frame1Tab(QWidget):
         # Label dinamica: aggiornata da _on_integrate_engine_changed.
         self._integrate_model_label = QLabel(tr("f1.model_lbl"))
         g.addRow(self._integrate_model_label, self.integrate_model)
+        # ── ZONA DI CONTESTO (maschera che il modello puo ridisegnare attorno al soggetto) ──
+        # Automatica = la zona di sempre (riquadro del soggetto + 5 % della scena), allargabile dilatando la STESSA forma; il margine e LIBERO
+        # (nessun tetto: l'unico limite e il bordo dell'immagine). Manuale = la disegni tu col pennello giallo, partendo dall'automatica.
+        self.integrate_ctx_mode = QComboBox()
+        self.integrate_ctx_mode.addItem(tr("f1.ctx.mode_auto", "Automatica"), "auto")
+        self.integrate_ctx_mode.addItem(tr("f1.ctx.mode_manual", "Manuale (pennello)"), "manual")
+        self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = allargata di una percentuale; Manuale = la disegni tu."))
+        self._ctx_mode_lbl = QLabel(tr("f1.ctx.mode_lbl", "Zona di contesto"))
+        g.addRow(self._ctx_mode_lbl, self.integrate_ctx_mode)
+        self.integrate_ctx_slider = QSlider(Qt.Horizontal); self.integrate_ctx_slider.setRange(0, 300); self.integrate_ctx_slider.setValue(0)
+        self.integrate_ctx_spin = QSpinBox(); self.integrate_ctx_spin.setRange(0, 10000); self.integrate_ctx_spin.setSuffix(" %"); self.integrate_ctx_spin.setValue(0)
+        self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine in piu attorno al soggetto, in % del suo lato lungo. 0 = come prima (riquadro + 5 % della scena). Nessun tetto: il cursore arriva a 300 %, il campo accetta di piu; il limite e il bordo dell'immagine."))
+        self.integrate_ctx_spin.setToolTip(self.integrate_ctx_slider.toolTip())
+        _cr = QHBoxLayout(); _cr.addWidget(self.integrate_ctx_slider, 1); _cr.addWidget(self.integrate_ctx_spin)
+        self._ctx_pct_row = self._wrapw(_cr)
+        self._ctx_pct_lbl = QLabel(tr("f1.ctx.pct_lbl", "Margine di contesto"))
+        g.addRow(self._ctx_pct_lbl, self._ctx_pct_row)
+        self.integrate_ctx_from_auto_btn = QPushButton(tr("f1.ctx.from_auto", "Da automatica"))
+        self.integrate_ctx_from_auto_btn.setToolTip(tr("f1.ctx.from_auto.tt", "Riempie la zona di contesto con quella automatica del momento (al valore % scelto)."))
+        self.integrate_ctx_clear_btn = QPushButton(tr("f1.ctx.clear", "Svuota"))
+        self.integrate_ctx_clear_btn.setToolTip(tr("f1.ctx.clear.tt", "Cancella tutta la zona di contesto disegnata: resta solo la sagoma del soggetto."))
+        _mb = QHBoxLayout(); _mb.addWidget(self.integrate_ctx_from_auto_btn); _mb.addWidget(self.integrate_ctx_clear_btn); _mb.addStretch(1)
+        self._ctx_manual_row = self._wrapw(_mb)
+        self._ctx_manual_lbl = QLabel(tr("f1.ctx.manual_lbl", "Contesto manuale"))
+        g.addRow(self._ctx_manual_lbl, self._ctx_manual_row)
+        self.integrate_ctx_mode.currentIndexChanged.connect(self._on_ctx_changed)
+        self.integrate_ctx_slider.valueChanged.connect(self._on_ctx_slider)
+        self.integrate_ctx_spin.valueChanged.connect(self._on_ctx_spin)
+        self.integrate_ctx_from_auto_btn.clicked.connect(lambda: self.canvas.context_from_auto())
+        self.integrate_ctx_clear_btn.clicked.connect(lambda: self.canvas.clear_context())
+        self._on_ctx_changed(); self._sync_ctx_controls()
         # Campi duplicati (negativo/steps/seed) dedicati all'integrazione: il pipeline
         # generate_integrate userà questi al posto di quelli inpaint.
         self.int_neg = QPlainTextEdit(DEFAULT_NEG); self.int_neg.setMaximumHeight(36)
@@ -2263,8 +2311,52 @@ class Frame1Tab(QWidget):
             self.int_guidance.setRange(10, 100)
             self.int_guidance.setToolTip(tr("f1.integrate.guidance.tt"))
 
+    # ── zona di contesto: pannello → canvas ──
+    def _on_ctx_slider(self, v: int):
+        if self.integrate_ctx_spin.value() != v and not (v == self.integrate_ctx_slider.maximum() and self.integrate_ctx_spin.value() > v):
+            self.integrate_ctx_spin.setValue(int(v))          # il campo e libero: se e gia oltre il massimo del cursore non lo riporto indietro
+        self._on_ctx_changed()
+
+    def _on_ctx_spin(self, v: int):
+        sl = self.integrate_ctx_slider
+        if sl.value() != min(int(v), sl.maximum()):
+            sl.blockSignals(True); sl.setValue(min(int(v), sl.maximum())); sl.blockSignals(False)
+        self._on_ctx_changed()
+
+    def _on_ctx_changed(self, *_):
+        """Modo/percentuale cambiati: aggiorna i controlli visibili e passa i parametri al canvas (che ridisegna la sovrapposizione dal vivo)."""
+        manual = self.integrate_ctx_mode.currentData() == "manual"
+        self._ctx_pct_lbl.setVisible(not manual); self._ctx_pct_row.setVisible(not manual)
+        self._ctx_manual_lbl.setVisible(manual); self._ctx_manual_row.setVisible(manual)
+        cv = getattr(self, "canvas", None)
+        if cv is not None:
+            cv.set_integrate_context(self.integrate_ctx_mode.currentData() or "auto", self.integrate_ctx_spin.value() / 100.0)
+
+    def _sync_ctx_controls(self, idx: int | None = None):
+        """Abilita/disabilita la zona di contesto in base al motore (tabella INTEGRATE_ENGINE_CAPS) e spiega il perche."""
+        if not hasattr(self, "integrate_ctx_mode") or not hasattr(self, "integrate_engine"):
+            return
+        engine = self._engine_val(self.integrate_engine.currentIndex() if idx is None else idx)
+        ok = integrate_engine_supports_context_mask(engine)
+        why = "" if ok else tr("f1.ctx.unsupported", "Questo motore non usa la maschera di contesto: lavora per riferimenti, senza maschera.")
+        for w in (self.integrate_ctx_mode, self.integrate_ctx_slider, self.integrate_ctx_spin,
+                  self.integrate_ctx_from_auto_btn, self.integrate_ctx_clear_btn, self._ctx_mode_lbl):
+            w.setEnabled(ok)
+        if not ok:
+            for w in (self.integrate_ctx_mode, self._ctx_mode_lbl, self.integrate_ctx_slider, self.integrate_ctx_spin):
+                w.setToolTip(why)
+        else:
+            self.integrate_ctx_mode.setToolTip(tr("f1.ctx.mode.tt", "Zona di contesto: la parte attorno al soggetto che il modello puo ridisegnare (mano, ombre, contatto). Automatica = allargata di una percentuale; Manuale = la disegni tu."))
+            self._ctx_mode_lbl.setToolTip("")
+            self.integrate_ctx_slider.setToolTip(tr("f1.ctx.pct.tt", "Margine in piu attorno al soggetto, in % del suo lato lungo. 0 = come prima (riquadro + 5 % della scena). Nessun tetto: il cursore arriva a 300 %, il campo accetta di piu; il limite e il bordo dell'immagine."))
+            self.integrate_ctx_spin.setToolTip(self.integrate_ctx_slider.toolTip())
+        cv = getattr(self, "canvas", None)
+        if cv is not None:
+            cv.set_integrate_context(enabled=ok)
+
     def _on_integrate_engine_changed(self, _idx: int):
         """Cambio motore Integra → ricarica modelli compatibili + label dinamica + slider grounding."""
+        self._sync_ctx_controls(_idx)
         if hasattr(self, "int_guidance"):
             self._sync_int_guidance(_idx)
         if hasattr(self, "int_steps"):
