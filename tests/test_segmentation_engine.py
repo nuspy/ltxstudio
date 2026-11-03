@@ -95,6 +95,6 @@ def test_video_segment_runs_as_a_script_without_the_repo_on_the_path(tmp_path):
     seg = Path(__file__).resolve().parents[1] / "inference_server" / "backends" / "video_segment.py"
     code = ("import sys, runpy; sys.path = [p for p in sys.path if 'ltxstudio' not in p.lower()];"
             f"m = runpy.run_path(r'{seg}', run_name='x');"
-            "\ntry:\n    m['track_object']('v.mp4', point=(1, 1), engine='sam31')\nexcept RuntimeError as e:\n    print('OK:' + str(e)[:40])")
+            "\ntry:\n    m['track_object']('v.mp4', point=(1, 1), engine='sam2')\nexcept Exception as e:\n    print('OK:' + type(e).__name__)")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(tmp_path))
-    assert "OK:" in r.stdout, r.stdout + r.stderr[-400:]
+    assert "OK:" in r.stdout and "ModuleNotFoundError" not in r.stdout, r.stdout + r.stderr[-400:]

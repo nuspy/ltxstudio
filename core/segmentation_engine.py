@@ -32,7 +32,7 @@ SAM31_DIRNAME = "sam3.1"
 SAM31_CHECKPOINT = "model.safetensors"
 # dimensioni ESATTE (byte) dei file del repo: un download a pezzi (.part) o troncato non conta come installato. None = basta che il file esista.
 SAM31_FILES = {
-    "model.safetensors": None,                   # BF16 ~1,68 GB (la misura esatta e fissata da SAM31_MODEL_SIZE sotto, se nota)
+    "model.safetensors": 1_680_935_372,          # BF16 1,68 GB
     "config.json": 6_517,
     "processor_config.json": 613,
     "tokenizer.json": 3_642_073,
@@ -47,9 +47,9 @@ SAM31_FILES = {
 MULTIPLEX_CATALOG_ID = "sam31-comfy-multiplex"
 MULTIPLEX_TRACKER_USABLE = False
 
-# Il caricatore (transformers Sam3Model, core/sam31_loader.py) e provato: SAM 3.1 si puo scegliere dal menu quando i file ci sono.
+# Il caricatore (transformers Sam3Model, core/sam31_loader.py) e provato su CPU con un fotogramma vero (03/11): SAM 3.1 si puo scegliere dal menu quando i file ci sono.
 # Si accende SOLO dopo la prova su un fotogramma vero (nessuna promessa a vuoto).
-LOADER_READY = False
+LOADER_READY = True
 
 LICENSE_SUMMARY_IT = (
     "Licenza SAM (Meta, 19/11/2025): uso commerciale consentito. Vietati gli usi militari, nucleari, di spionaggio e il reverse engineering. "
