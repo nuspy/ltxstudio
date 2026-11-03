@@ -259,22 +259,37 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     if not invert:
         pers = M.grow_mask(pers.float(), person_grow)                  # il manichino grigio del riferimento copre la persona cresciuta
 
+    # 1b) PREROLL (opzionale, default 0): frame fermi anteposti perche il clip 1 non parta «a freddo» (vedi M.preroll_pad). H3_EDIT_PREROLL=17 / `preroll_frames`.
+    preroll = int(os.environ.get("H3_EDIT_PREROLL") or e.get("preroll_frames") or 0)
+    wav = W._decode_audio_av(src) if e.get("keep_audio", True) else None
+    if wav is not None:
+        wav = to_stereo(wav)
+    if preroll:
+        src_t, pers, wav = M.preroll_pad(src_t, pers, wav, preroll, _SRC_AUDIO_SR)
+        size = torch.cat([size[:1].expand(preroll, -1, -1), size], 0)
+        f01 = src_t.float() / 255.0
+        N = src_t.shape[0]
+        W._log(f"preroll: {preroll} frame fermi anteposti ({N} frame in totale, tolti alla fine)")
+
     # 2) video di riferimento (<Video 1>) — la zona rigenerata e nascosta: niente dettagli originali da copiare
+    bg_person_ref = str(os.environ.get("H3_EDIT_BG_PERSON_REF") or e.get("bg_person_ref") or "sharp").lower()   # sharp (oggi) | mannequin
+    bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte") or "") not in ("", "0")                # matte a pixel della persona (solo composizione)
     if invert:
         ref_frames = M.blur_area(f01, 1.0 - pers, radius=max(6.0, 0.02 * th * float(os.environ.get("H3_EDIT_BG_BLUR") or e.get("bg_blur", 1.0))),
                                 grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)
+        if bg_person_ref == "mannequin":                               # la persona del riferimento diventa una figura grigia liscia (posizione e posa, niente volto/vestiti):
+            ref_frames = M.grey_mannequins(ref_frames, pers, size, blur=0.02)   # il modello non ha una persona nitida da rifare (doppione spostato nel clip 1)
     else:
         ref_frames = M.grey_mannequins(f01, pers, size, blur=0.02)
 
     # 3) piano dei clip
+    if preroll:                                                        # maschere e regione rigenerata anche per i frame anteposti
+        regen_pix = M.regen_region(pers, invert, person_grow, grow, expand=0.0 if invert else float(os.environ.get("H3_EDIT_REPLACE_EXPAND") or e.get("replace_expand", 0.0)))
     clip_frames = int(float(e.get("clip_s", 6.0)) * FPS)
     cuts = [a for a, _b in M.find_shots(f01[:, ::4, ::4], 40.0)[1:]]
     clips = M.enforce_min_length(M.clip_plan(N, clip_frames, int(e.get("overlap", 39)), cuts), N)   # nessun clip sotto i 5 s (minimo del pacchetto H3)
     W._log(f"piano: {len(clips)} clip (lunghezza, contesto) = {clips}")
 
-    wav = W._decode_audio_av(src) if e.get("keep_audio", True) else None
-    if wav is not None:
-        wav = to_stereo(wav)
     pic = e.get("picture") or ""
     base = dict(p)
     base.pop("h3_edit", None)
@@ -288,6 +303,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()),
                   *opts_key(p))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
@@ -341,6 +357,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         if gen_f.shape[1:3] != (th, tw):
             gen_f = F.interpolate(gen_f.movedim(-1, 1), size=(th, tw), mode="bilinear", align_corners=False).movedim(1, -1)
         comp = composite(gen_f, clip_src.float() / 255.0, cells, counts)          # clip_src ha gia il contesto = frame del clip prima
+        if invert and bg_matte:                                                    # la persona e quella ORIGINALE a pixel (bordo morbido), non quella ridisegnata nelle celle di bordo
+            comp = M.person_matte(comp, clip_src.float() / 255.0, pers[sl])
         out_frames[start + ctx:start + length] = comp[ctx:]
         prev_tail = comp
         done = start + length
@@ -354,8 +372,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     from diffusers.utils.export_utils import encode_video
     audio = None
     if wav is not None:
-        audio = wav[:, : int(done / FPS * _SRC_AUDIO_SR)]
-    encode_video((out_frames[:done].clamp(0, 1) * 255).round().to(torch.uint8), fps=FPS, output_path=out,
+        audio = wav[:, int(preroll / FPS * _SRC_AUDIO_SR): int(done / FPS * _SRC_AUDIO_SR)]
+    encode_video((out_frames[preroll:done].clamp(0, 1) * 255).round().to(torch.uint8), fps=FPS, output_path=out,
                  audio=audio, audio_sample_rate=_SRC_AUDIO_SR if audio is not None else None)
     W._log(f"edit finito in {time.time() - t_all:.0f}s -> {out}")
     return out

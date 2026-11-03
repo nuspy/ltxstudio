@@ -248,6 +248,38 @@ def person_mask(m: torch.Tensor, headroom: float, hold_frames: int) -> tuple[tor
     return person, person * (height / mh).view(n, 1, 1)
 
 
+def preroll_pad(frames_u8: torch.Tensor, masks: torch.Tensor, wav: torch.Tensor | None, p: int, sample_rate: int, fps: int = FPS):
+    """PREROLL (prova 03/11): si antepongono `p` frame al video (il primo frame ripetuto, la sua maschera, audio SILENZIOSO) cosi il primo clip non parte «a freddo».
+    Nei giri del 03/11 i primi secondi del clip 1 (senza contesto) avevano il doppione della persona (cambia-sfondo) e il parlato senza lip sync (sostituisci), i clip
+    2-3 (con 39 frame di contesto) no. `p` deve far restare il totale nella griglia 17k+5 (multiplo di 17). Ritorna (frames, maschere, audio)."""
+    if p <= 0:
+        return frames_u8, masks, wav
+    if p % 17:
+        raise ValueError(f"preroll di {p} frame: deve essere un multiplo di 17 (griglia 17k+5 del clip)")
+    pad = frames_u8[:1].expand(p, -1, -1, -1).clone()
+    mpad = masks[:1].expand(p, -1, -1).clone()
+    out_w = wav
+    if wav is not None:
+        n = int(round(p / float(fps) * sample_rate))
+        out_w = torch.cat([torch.zeros(wav.shape[0], n, dtype=wav.dtype), wav], 1)
+    return torch.cat([pad, frames_u8], 0), torch.cat([mpad, masks], 0), out_w
+
+
+def person_matte(comp: torch.Tensor, orig: torch.Tensor, person: torch.Tensor, soft_px: float = 1.5) -> torch.Tensor:
+    """MATTE A PIXEL (prova 03/11, cambia-sfondo): dentro la sagoma della persona i pixel sono quelli ORIGINALI (non quelli che il modello ridisegna nelle celle di
+    bordo: la sua persona e spostata a sinistra di ~60 px nel clip 1 e lascia un doppione), con un bordo morbido di ~soft_px. comp/orig [n,h,w,3] float 0..1;
+    person [n,h,w] (1 = persona, alla stessa risoluzione)."""
+    n = comp.shape[0]
+    out = torch.empty_like(comp, dtype=torch.float32)
+    for i in range(0, n, CHUNK):
+        a = person[i:i + CHUNK].float()[:, None]
+        if soft_px > 0:
+            a = gaussian_blur(a, float(soft_px))
+        a = a.movedim(1, -1)
+        out[i:i + CHUNK] = a * orig[i:i + CHUNK].float() + (1 - a) * comp[i:i + CHUNK].float()
+    return out
+
+
 def gaussian_blur(x: torch.Tensor, sigma: float) -> torch.Tensor:
     """[n, c, h, w] con gaussiana separabile esatta (bordi estesi, non scuriti)."""
     r = max(1, math.ceil(3 * sigma))
