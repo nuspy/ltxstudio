@@ -62,3 +62,20 @@ def test_each_chunk_halving_recovers_and_fills_every_row(monkeypatch):
     want = torch.arange(N, dtype=torch.float32)[None]
     assert torch.equal(q[:, :, 0, 0], want) and torch.equal(k[:, :, 0, 0], want + 0.5) and torch.equal(v[:, :, 0, 0], want + 1.0)
     assert torch.equal(q[:, :, 1:, :], q[:, :, :1, :].expand_as(q[:, :, 1:, :]))           # tutte le teste riempite
+
+
+def test_defrag_cache_releases_only_when_cuda_slack_exceeds_one_gib(monkeypatch):
+    """Giro 03/11 (fixture 12 s): riservata 28,8 GB con allocata 15-21 GB -> OOM al passo 5/8 con 5,1 GB 'riservati ma non allocati'. A inizio blocco si rilascia
+    la cache se lo slack supera 1 GiB; H3_DEFRAG=0 disattiva; su CPU non fa nulla."""
+    calls = {"empty": 0}
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: calls.__setitem__("empty", calls["empty"] + 1))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda d=None: 18 * 2**30)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda d=None: 24 * 2**30)
+    assert K.defrag_cache("cuda:0") is True and calls["empty"] == 1          # slack 6 GiB: rilascia
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda d=None: int(18.5 * 2**30))
+    assert K.defrag_cache("cuda:0") is False and calls["empty"] == 1         # slack 0,5 GiB: niente
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda d=None: 24 * 2**30)
+    monkeypatch.setenv("H3_DEFRAG", "0")
+    assert K.defrag_cache("cuda:0") is False and calls["empty"] == 1         # disattivato
+    monkeypatch.delenv("H3_DEFRAG")
+    assert K.defrag_cache("cpu") is False

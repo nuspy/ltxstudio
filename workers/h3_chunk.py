@@ -101,6 +101,25 @@ def headroom_bytes(dev) -> float:
     return 0.5 * (res - alloc) + max(0, min(cap - res, drv_free))
 
 
+DEFRAG_GAP_BYTES = 1 << 30      # slack riservato-ma-non-usato oltre il quale, a inizio blocco, si rilascia la cache dell'allocatore
+
+
+def defrag_cache(dev) -> bool:
+    """A INIZIO di ogni blocco i temporanei del blocco precedente sono liberi: se il PyTorch tiene riservato oltre 1 GiB non usato (frammentazione,
+    Windows non ha expandable_segments), `empty_cache` rilascia i segmenti interamente vuoti. Giro 03/11 (fixture 12 s, 864x480): la riservata saliva da 22 a
+    28,8 GB con l'allocata ferma a 15-21 GB e al passo 5/8 un buffer Q/K/V da 520 MB andava in OOM con 5,1 GB 'riservati ma non allocati'; `ensure_headroom`
+    contava lo slack al 50 % e non liberava nulla. H3_DEFRAG=0 disattiva. True se ha rilasciato."""
+    if os.environ.get("H3_DEFRAG", "1") == "0":
+        return False
+    d = torch.device(dev)
+    if d.type != "cuda":
+        return False
+    if torch.cuda.memory_reserved(d) - torch.cuda.memory_allocated(d) <= DEFRAG_GAP_BYTES:
+        return False
+    torch.cuda.empty_cache()
+    return True
+
+
 def ensure_headroom(need: int, dev, protect=None) -> bool:
     """Garantisce `need` byte di margine: prima rilascia la cache dell'allocatore, poi mette in RAM altri blocchi
     del DiT (mai quello in esecuzione). False se non si riesce."""
@@ -157,6 +176,7 @@ def block_forward(blk, hidden_states, temb, adaln_indices, rotary_emb, attention
     # margine per Q/K/V pieni + nuovo flusso residuo (nel caso peggiore fp32) + un blocco di temporanei + 0,3 GiB
     # di lavoro del kernel di attenzione
     inner = int(getattr(attn, "inner_dim", C))
+    defrag_cache(dev)
     ensure_headroom(int(1.15 * N * (3 * inner * 2 + C * 4) + ch * _row_bytes(blk, C) + 0.3 * 2**30), dev, protect=blk)
 
     # ── attenzione ──────────────────────────────────────────────────────────────────────────────

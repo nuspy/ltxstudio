@@ -967,8 +967,6 @@ class Driver:
                 if case.get("lora"):
                     steps["lora"] = select_combo(f.inp_lora, case["lora"])
             else:
-                # margine di CONTESTO di Integra (parametro interno dei casi `_maschera_larga`): None = il tracciato di sempre; azzerato a ogni caso
-                cv.integrate_context_pct = case.get("ctx_margin_pct")
                 cv.integrate_context_px = case.get("ctx_margin_px")
                 cv.integrate_regenerate = bool(case.get("regenera"))       # prova «rigenera» (scena senza foto + soggetto come riferimento)
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
@@ -976,6 +974,33 @@ class Driver:
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])
                 if case.get("model"):
                     steps["model"] = select_combo(f.integrate_model, case["model"])
+                # ── «Zona di contesto» dai widget VERI del pannello Integra (azzerati a ogni caso) ──────────────────────────────────────────
+                # `ctx_pct` (percento, anche > 100) o il vecchio `ctx_margin_pct` (frazione) → campo %; `ctx_mode: "manual"` → selettore «Manuale (pennello)»;
+                # `ctx_clear` → «Svuota»; `ctx_strokes` → tratti col pennello/gomma sulla maschera scelta dal selettore «Stai disegnando».
+                f.integrate_ctx_mode.setCurrentIndex(f.integrate_ctx_mode.findData("auto"))
+                _pct = case.get("ctx_pct")
+                if _pct is None and case.get("ctx_margin_pct"):
+                    _pct = float(case["ctx_margin_pct"]) * 100.0
+                f.integrate_ctx_spin.setValue(int(round(float(_pct or 0))))
+                if case.get("ctx_mode") == "manual":
+                    f.integrate_ctx_mode.setCurrentIndex(f.integrate_ctx_mode.findData("manual"))
+                    if case.get("ctx_clear"):
+                        f.integrate_ctx_clear_btn.click()
+                    from PySide6.QtCore import QPointF
+                    for st in case.get("ctx_strokes") or []:
+                        tgt = st.get("target", "context")
+                        cv._draw_target_cb.setCurrentIndex(cv._draw_target_cb.findData(tgt))
+                        cv.set_mode("erase" if st.get("erase") else "brush"); cv.set_brush(int(st.get("size", 60)))
+                        pts = [tuple(q) for q in st["pts"]]
+                        cv.push_undo()
+                        for (x0, y0), (x1, y1) in zip(pts, pts[1:] or [pts[0]]):
+                            n = max(1, int(max(abs(x1 - x0), abs(y1 - y0)) // 8))
+                            for i in range(n + 1):
+                                cv.paint_at(QPointF(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n))
+                    cv.set_mode("move")
+                    cv._draw_target_cb.setCurrentIndex(cv._draw_target_cb.findData("position"))
+                steps["ctx"] = {"mode": f.integrate_ctx_mode.currentData(), "pct": f.integrate_ctx_spin.value(), "banner": cv.draw_banner.text(),
+                                "banner_color": cv.draw_banner_color}
                 f.integrate_prompt.setPlainText(case["prompt"])
                 f.int_seed_rand.setChecked(False)
                 f.int_seed.setValue(int(case.get("seed", 1)))
@@ -1012,6 +1037,21 @@ class Driver:
             for k, v in (case.get("expect_params") or {}).items():
                 if p.get(k) != v:
                     mis.append(f"parametro atteso {k}={v!r}, inviato {p.get(k)!r}")
+        _exp = getattr(self.w, "_last_integrate_export", None)
+        if kind == "integrate" and isinstance(_exp, dict) and _exp.get("mask") and (case.get("ctx_expect_in") or case.get("ctx_expect_out")):
+            try:                                                                        # i punti attesi dentro/fuori dalla maschera di contesto INVIATA
+                import numpy as _np
+                from PIL import Image as _PI
+                _cm = _np.asarray(_PI.open(_exp["mask"]).convert("L")) > 127
+                for (x, y) in case.get("ctx_expect_in") or []:
+                    if not _cm[int(y), int(x)]:
+                        mis.append(f"punto ({x},{y}) atteso DENTRO la maschera di contesto inviata, e fuori")
+                for (x, y) in case.get("ctx_expect_out") or []:
+                    if _cm[int(y), int(x)]:
+                        mis.append(f"punto ({x},{y}) atteso FUORI dalla maschera di contesto inviata, e dentro")
+                res["widget_state"]["area_contesto_inviata"] = int(_cm.sum())
+            except Exception as _e:                                                     # noqa: BLE001
+                mis.append(f"verifica della maschera inviata non riuscita: {_e}")
         res["mismatch"] = mis
         return res
 
