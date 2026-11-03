@@ -76,7 +76,9 @@ ENGINES: dict[str, Engine] = {e.id: e for e in (
            ref_optional=True,
            weights=(_H3_DIT, _H3_TE, ("mmh3-video-vae",), ("mmh3-audio-vae",), ("mmh3-configs",)),
            params={"clip_s": 6.0, "overlap_frames": 39, "grow_px": 16, "feather_px": 2, "headroom": 0.10,
-                   "pose_hold_frames": 2, "person_grow_px": 40, "replace_expand": 0.0, "steps": 6, "video_shift": 12.0, "audio_shift": 2.0},
+                   "pose_hold_frames": 2, "person_grow_px": 40, "replace_expand": 0.0, "video_shift": 12.0, "audio_shift": 2.0},
+           # NB: niente `steps`: il worker usa i passi della LoRA turbo scelta (core.minimax_h3_spec.TURBO: v4 = 8 passi, «4» = 4 passi) e il parametro
+           # del motore (6) era IGNORATO (workers/minimax_h3_infer.py: nfe = TURBO[turbo][1]). Passi e shift si vedono in core.video_edit_h3.turbo_info().
            note_key="vedit.engine.h3_edit.note"),
 )}
 

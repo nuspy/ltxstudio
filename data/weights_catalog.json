@@ -4354,6 +4354,40 @@
       ]
     },
     {
+      "id": "mmh3-dit-rockerboo-nvfp4",
+      "module": "Video",
+      "label": "MiniMax H3 Ref2VA NVFP4 mista rockerBOO (bordi/out_proj BF16, 20GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 20.07,
+      "scan_names": [
+        "minimax_h3_ref2va_pruned_nvfp4_convrot_int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "rockerBOO/minimax-h3-nvfp4-convrot",
+      "url": "https://huggingface.co/rockerBOO/minimax-h3-nvfp4-convrot",
+      "filename": "minimax_h3_ref2va_pruned_nvfp4_convrot_int8-native.safetensors",
+      "remote_filename": "minimax_h3_ref2va_pruned_nvfp4_convrot_int8.safetensors",
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ],
+      "note": "confronto nvfp4: qkv int8-ConvRot + bordi e out_proj BF16 (con minimax_h3_layer_config.json). Scaricato a mano dall'utente; conversione nativa da verificare al primo arrivo del file. Licenza H3 Community (no UE/UK/USA/Corea)",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "use": [
+        "ckpt_video",
+        "q_nvfp4"
+      ]
+    },
+    {
       "id": "mmh3-dit-10erosmax-b6",
       "module": "Video",
       "label": "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)",

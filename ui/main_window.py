@@ -1156,6 +1156,9 @@ class MainWindow(QMainWindow):
         self.video_edit_ai_tab.request_edit.connect(self._gen_video_edit_ai)
         # checkpoint scelto nel tab Video: lo si MOSTRA (e si avvisa/blocca) nel tab Modifica Video AI, mai cambiato
         self.video_edit_ai_tab.set_model_getter(self.video_tab.get_values)
+        # LoRA di H3 nel pannello opzioni dell'edit H3: le 18+ compaiono solo col selettore 18+ acceso (come nel tab Video)
+        self.video_edit_ai_tab.set_nsfw_getter(lambda: self.video_tab.nsfw.currentText() == "NSFW")
+        self.video_tab.nsfw.currentTextChanged.connect(lambda _t: self.video_edit_ai_tab.h3_lora.refresh())
         self.video_tab.model.currentIndexChanged.connect(self.video_edit_ai_tab.refresh_checkpoint_hint)
         self.video_edit_ai_tab.request_open_video_tab.connect(lambda: self.tabs.setCurrentWidget(self.video_tab))
         self.video_edit_ai_tab.request_open_weights_tab.connect(lambda: self.tabs.setCurrentWidget(self.weights_tab))
@@ -4265,6 +4268,8 @@ class MainWindow(QMainWindow):
             return                                           # «Cambia sfondo» (Openjutsu): gate proprio
         if cfg.get("engine") == "h3_edit" and not self._feature_gate("cap.video_h3_edit"):
             return                                           # motore MiniMax H3 per l'edit con maschera: gate proprio
+        if cfg.get("engine") == "h3_edit" and cfg.get("h3_veda") and not self._feature_gate("cap.video_h3_veda"):
+            return                                           # attenzione sparsa Veda anche nell'edit H3: stesso gate del tab Video
         vv = self.video_tab.get_values()
         _fps = int(vv.get("fps", 25) or 25)
         _r64e = lambda x: max(64, round(int(x) / 64) * 64)   # #95 V2: LTX richiede multipli di 64

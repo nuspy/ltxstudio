@@ -55,7 +55,13 @@ class LoraTab(QWidget):
         # serve perché l'inventario LoRA si popola in modo asincrono (come i modelli).
         self._restore_pending: dict[str, float] | None = None
         self._thumb: _ThumbLoader | None = None
+        self._row_filter = None               # fn(entry) -> (ok, motivo): le righe non ok restano visibili ma DISATTIVATE col motivo (Modifica Video H3)
         self._build()
+        self.refresh()
+
+    def set_row_filter(self, fn) -> None:
+        """Imposta il filtro per riga (fn(entry) -> (ok, motivo)) e ricarica la lista."""
+        self._row_filter = fn
         self.refresh()
 
     def set_arch(self, new_arch: str):
@@ -175,6 +181,15 @@ class LoraTab(QWidget):
             # quando l'utente cambia la strength a mano → diventa il nuovo default per quella LoRA
             sp.valueChanged.connect(lambda val, ent=e: user_prefs.set_lora_strength(ent.comfy_name, val))
             h.addWidget(sp)
+            if self._row_filter is not None:
+                try:
+                    _ok, _why = self._row_filter(e)
+                except Exception:                                   # noqa: BLE001
+                    _ok, _why = True, ""
+                if not _ok:
+                    cb.setChecked(False); cb.setEnabled(False); sp.setEnabled(False)
+                    cb.setText(cb.text() + "  ⛔ " + _why)
+                    w.setToolTip(_why); cb.setToolTip(_why)
             it.setSizeHint(w.sizeHint())
             self.list.setItemWidget(it, w)
             self._rows[e.name] = {"item": it, "cb": cb, "sp": sp, "entry": e, "star": star}

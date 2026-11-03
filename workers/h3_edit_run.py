@@ -190,6 +190,14 @@ def run_clip_with_fallback(W, clip_runner, job_dir: str) -> bool:
     return True
 
 
+def opts_key(p: dict) -> tuple:
+    """Scelte di velocita/modello dell'utente nell'edit (DiT personalizzato, Veda, LightVAE, LoRA): cambiano il risultato, quindi entrano nella chiave dei
+    checkpoint. Presenti SOLO se scelte: con i default la chiave e quella di sempre e i checkpoint gia fatti restano validi."""
+    if not (p.get("h3_dit") or p.get("h3_veda") or p.get("h3_lightvae") or p.get("loras") or p.get("h3_te")):
+        return ()
+    return (("opts", p.get("h3_dit"), bool(p.get("h3_veda")), p.get("h3_lightvae"), json.dumps(p.get("loras") or [], sort_keys=True)) + ((p.get("h3_te"),) if p.get("h3_te") else ()),)
+
+
 def _subprocess_clip_runner(W, job_dir: str, stream_all: bool = False) -> None:
     """Lancia il figlio che genera UN clip; il suo log passa su stdout del genitore (finisce nel log completo del job)."""
     import collections
@@ -279,7 +287,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
-                  "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
+                  "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
+                  *opts_key(p))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
     prev_tail = None                                                   # ultimi frame composti del clip prima (contesto del successivo)

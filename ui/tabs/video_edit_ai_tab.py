@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
 from core import video_dub_translate as vdt
 from core import motion_tracks as mt
 from core import features
+from core import minimax_h3_spec as h3s
 from core import video_edit_engines as veng
 from core import video_edit_h3 as vh3
 from core import video_edit_ic as vic
@@ -158,15 +159,22 @@ class VideoEditAITab(QWidget):
         _er = QHBoxLayout(); _er.addWidget(self.engine_info, 1); _er.addWidget(self.engine_open_weights)
         self.engine_info_row = QWidget(); self.engine_info_row.setLayout(_er)
         f.addRow("", self.engine_info_row)
+        # «Modello H3» (DiT per l'edit): profili ufficiali + DiT personalizzati che sanno fare Ref2VA; le voci non sul disco restano in lista e alla scelta
+        # si offre il download col dialog dei pesi (mai in silenzio, mai scelta automatica). Il nome `h3_profile` resta (test/driver): il dato e il profilo
+        # (nvfp4/fp8/int8/int4) o l'ID del DiT personalizzato.
         self.h3_profile = QComboBox()
-        self.h3_profile_lbl = QLabel(tr("vedit.h3_profile_lbl", "Profilo H3"))
+        self.h3_profile.setToolTip(tr("vedit.h3.model.tt", "DiT di MiniMax H3 usato per l'edit (solo quelli che sanno fare Ref2VA). Se non e sul disco, "
+                                      "alla scelta si chiede il download. Nessuna scelta automatica del checkpoint."))
+        self.h3_profile_lbl = QLabel(tr("vedit.h3_model_lbl", "Modello H3"))
         f.addRow(self.h3_profile_lbl, self.h3_profile)
+        self.h3_profile.activated.connect(self._on_h3_model_picked)
         self.h3_edge = QComboBox()
         for _e in (480, 576, 736):
             self.h3_edge.addItem(f"{_e}p", _e)
         self.h3_edge_lbl = QLabel(tr("vedit.h3_edge_lbl", "Risoluzione (lato corto)"))
         f.addRow(self.h3_edge_lbl, self.h3_edge)
         v.addLayout(f)
+        self._build_h3_opts(v)
 
         # riga di stato del checkpoint (icona + testo: il colore non è l'unico veicolo)
         self.ckpt_lbl = QLabel(""); self.ckpt_lbl.setWordWrap(True)
@@ -1154,16 +1162,168 @@ class VideoEditAITab(QWidget):
         self.engine_open_weights.setVisible(bool(miss))
         for w in (self.h3_profile, self.h3_profile_lbl, self.h3_edge, self.h3_edge_lbl):
             w.setVisible(is_h3 and bool(self.mode.count()))
+        self.h3_opts_box.setVisible(is_h3 and bool(self.mode.count()))            # opzioni di velocita/modello: SOLO col motore H3
         if is_h3:
-            cur = self.h3_profile.currentData()
-            self.h3_profile.blockSignals(True)
-            self.h3_profile.clear()
-            for p in vh3.installed_profiles():
-                self.h3_profile.addItem(vh3.H3_PROFILE_I18N[p], p)
-            j = self.h3_profile.findData(cur)
-            self.h3_profile.setCurrentIndex(j if j >= 0 else 0)
-            self.h3_profile.blockSignals(False)
+            self._fill_h3_models()
+            self._sync_h3_turbo_info()
         self._sync_engine_fields()
+
+    # ── opzioni di velocita e modello dell'edit H3 (brief 03/11): tutte opzionali, i default non cambiano ───────────────────────────────────────────────
+    def set_nsfw_getter(self, fn) -> None:
+        """Il pannello LoRA H3 mostra le LoRA 18+ solo se il selettore 18+ dell'app e acceso (main_window)."""
+        self._nsfw_getter = fn
+        if hasattr(self, "h3_lora"):
+            self.h3_lora.refresh()
+
+    def _build_h3_opts(self, v) -> None:
+        from PySide6.QtWidgets import QGroupBox
+        from ui.tabs.lora_tab import LoraTab
+        self._nsfw_getter = lambda: False
+        self.h3_opts_box = QGroupBox(tr("vedit.h3.opts.group", "Opzioni di velocita e modello (MiniMax H3)"))
+        g = QFormLayout(self.h3_opts_box)
+        self.h3_turbo = QComboBox()
+        self.h3_turbo_lbl = QLabel(tr("vedit.h3.turbo_lbl", "Velocita (LoRA turbo)"))
+        _lbl = {"v4": tr("vedit.h3.turbo.v4", "Turbo v4 · 8 passi (predefinita)"), "4": tr("vedit.h3.turbo.4", "Turbo 4 passi (Ref2VA, piu veloce)"),
+                "8": tr("vedit.h3.turbo.8", "Turbo 8 passi — solo FL2VA"), "dmad": tr("vedit.h3.turbo.dmad", "Turbo DMAD + v4 — solo FL2VA")}
+        # prima le turbo che esistono per Ref2VA (v4 predefinita in testa), poi quelle solo FL2VA: visibili ma disattivate, col motivo
+        order = sorted(vh3.turbo_choices(), key=lambda t: (not t["ref2va"], t["key"] != vh3.DEFAULT_TURBO))
+        for t in order:
+            self.h3_turbo.addItem(_lbl.get(t["key"], t["key"]), t["key"])
+            if not t["ref2va"]:
+                it = self.h3_turbo.model().item(self.h3_turbo.count() - 1)
+                it.setEnabled(False)
+                it.setToolTip(tr("vedit.h3.turbo.only_fl2va", "Questa turbo esiste solo per FL2VA (prima/ultima immagine): l'edit lavora in Ref2VA."))
+        for t in order:                                        # turbo sul disco ma monca (senza adattatori AdaLN): disattivata col motivo
+            if t["ref2va"] and t["defect"]:
+                it = self.h3_turbo.model().item(self.h3_turbo.findData(t["key"]))
+                it.setEnabled(False)
+                it.setToolTip(tr("vedit.h3.turbo.defect", "Questa LoRA turbo non ha gli adattatori AdaLN (difetto della conversione ComfyUI sui pruned, "
+                                 "ModelTC/Minimax-H3-Turbo#7): distillazione monca. Usa la v4 o attendi la versione diffusers."))
+        self.h3_turbo.setCurrentIndex(self.h3_turbo.findData(vh3.DEFAULT_TURBO))
+        self.h3_turbo.setToolTip(tr("vedit.h3.turbo.tt", "LoRA turbo per Ref2VA. Scegliere una turbo imposta i SUOI passi e il SUO shift (vedi sotto): non serve indovinarli."))
+        self.h3_turbo.currentIndexChanged.connect(self._on_h3_turbo_changed)
+        g.addRow(self.h3_turbo_lbl, self.h3_turbo)
+        self.h3_turbo_info = QLabel("")
+        self.h3_turbo_info.setStyleSheet("color:#74c0fc;")
+        g.addRow("", self.h3_turbo_info)
+        # Encoder testo: di default quello del profilo; sceglierlo a mano serve ai confronti di quantizzazione (stesso encoder per tutti i DiT)
+        self.h3_te = QComboBox()
+        self.h3_te.addItem(tr("vedit.h3.te.profile", "Quello del profilo (predefinito)"), "")
+        for _t in h3s.TE_IDS:
+            self.h3_te.addItem(_t.replace("mmh3-te-", "").replace("-", " "), _t)
+        self.h3_te.setToolTip(tr("vedit.h3.te.tt", "Text encoder di H3. Predefinito: quello del profilo scelto. Sceglierlo a mano serve ai confronti (stesso encoder per tutti i modelli)."))
+        self.h3_te.activated.connect(self._on_h3_te_picked)
+        g.addRow(QLabel(tr("vedit.h3.te_lbl", "Encoder testo")), self.h3_te)
+        self.h3_veda = QCheckBox(tr("vedit.h3.veda", "Attenzione sparsa Veda (piu veloce)"))
+        self.h3_veda.setToolTip(tr("vedit.h3.veda.tt", "Predittore di attenzione sparsa per Ref2VA (addestrato con il Turbo a 8 passi): meno calcolo per passo. "
+                                   "Spento = come sempre. Funzione della tua edizione."))
+        self.h3_veda.toggled.connect(self._on_h3_veda_toggled)
+        g.addRow("", self.h3_veda)
+        self.h3_lightvae = QCheckBox(tr("vedit.h3.lightvae", "Decoder leggero (LightVAE)"))
+        self.h3_lightvae.setToolTip(tr("vedit.h3.lightvae.tt", "Decoder del VAE video potato (lightx2v): stessi latenti, decodifica piu veloce e meno VRAM; il modello non cambia. "
+                                       "Spento = decoder originale."))
+        self.h3_lightvae.toggled.connect(self._on_h3_lightvae_toggled)
+        g.addRow("", self.h3_lightvae)
+        self.h3_lora_lbl = QLabel(tr("vedit.h3.lora_group", "LoRA di H3 (compatibili con Ref2VA)"))
+        g.addRow(self.h3_lora_lbl)
+        self.h3_lora = LoraTab(allow_nsfw_getter=lambda: bool(self._nsfw_getter()), embedded=True, arch="MiniMax-H3")
+        self.h3_lora.setMinimumHeight(190)
+        self.h3_lora.set_row_filter(self._h3_lora_row_filter)
+        g.addRow(self.h3_lora)
+        self.h3_opts_box.setVisible(False)
+        v.addWidget(self.h3_opts_box)
+
+    def _h3_lora_row_filter(self, entry):
+        """Riga LoRA disattivata col motivo se non e una LoRA H3 (chiavi dell'header) o e solo FL2VA."""
+        ok, code = vh3.lora_edit_check(entry.path, entry.comfy_name)
+        if ok:
+            return True, ""
+        return False, tr(f"vedit.h3.lora.why.{code}", vh3.LORA_REASONS.get(code, code))
+
+    def _fill_h3_models(self) -> None:
+        """Menu «Modello H3»: TUTTE le voci (profili ufficiali + DiT personalizzati Ref2VA); le non installate sono segnate. La scelta corrente resta; senza
+        scelta si parte dal primo profilo installato (come prima)."""
+        cur = self.h3_profile.currentData()
+        self.h3_profile.blockSignals(True)
+        self.h3_profile.clear()
+        first = None
+        for c in vh3.model_choices():
+            lab = c["label"] if c["installed"] else tr("vedit.h3.model.missing", "{label} — non installato").format(label=c["label"])
+            self.h3_profile.addItem(lab, c["id"])
+            if c["installed"] and first is None and c["kind"] == "profile":
+                first = c["id"]
+        j = self.h3_profile.findData(cur)
+        if j < 0:
+            j = self.h3_profile.findData(first) if first else 0
+        self.h3_profile.setCurrentIndex(max(0, j))
+        self.h3_profile.blockSignals(False)
+        self._h3_model_prev = self.h3_profile.currentData()
+
+    def _ensure_ids(self, ids: list[str]) -> bool:
+        """Dialog dei pesi (consenso, GB, download con log): True se sono tutti sul disco. Mai in silenzio."""
+        try:
+            from core import ensure_weights as ew
+            return bool(ew.offer_download_gui(self, ids, "MiniMax H3"))
+        except Exception:                                    # noqa: BLE001 — senza il dialog il lancio da' l'errore chiaro dei controlli
+            return False
+
+    def _on_h3_model_picked(self, _i: int) -> None:
+        """Scelta di un modello non installato: download col dialog (alla prima selezione). Se rifiuti o fallisce si torna alla scelta di prima."""
+        m = self.h3_profile.currentData()
+        dit = vh3.model_dit_id(m) if m else ""
+        if dit and not veng._present(dit):
+            if self._ensure_ids([dit]):
+                self._fill_h3_models(); j = self.h3_profile.findData(m); self.h3_profile.setCurrentIndex(max(0, j)); self._h3_model_prev = m
+            else:
+                self.h3_profile.blockSignals(True); self.h3_profile.setCurrentIndex(max(0, self.h3_profile.findData(getattr(self, "_h3_model_prev", m))))
+                self.h3_profile.blockSignals(False)
+                return
+        self._h3_model_prev = m
+        self._sync_h3_turbo_info()
+
+    def _on_h3_te_picked(self, _i: int) -> None:
+        te = self.h3_te.currentData()
+        if te and not veng._present(te) and not self._ensure_ids([te]):
+            self.h3_te.setCurrentIndex(0)
+
+    def _on_h3_turbo_changed(self, *_):
+        key = self.h3_turbo.currentData()
+        ids = [i for i in (h3s.TURBO[key][0].get("ref2va"),) if i] if key in h3s.TURBO else []
+        if ids and not veng._present(ids[0]) and not self._ensure_ids(ids):
+            self.h3_turbo.blockSignals(True); self.h3_turbo.setCurrentIndex(max(0, self.h3_turbo.findData(vh3.DEFAULT_TURBO))); self.h3_turbo.blockSignals(False)
+        self._sync_h3_turbo_info()
+
+    def _sync_h3_turbo_info(self) -> None:
+        """Passi e shift che il worker usera: quelli della turbo scelta (o del DiT con la turbo nei pesi, che spegne il menu)."""
+        model = self.h3_profile.currentData() or ""
+        fused = bool(h3s.CUSTOM_DITS.get(model, {}).get("turbo_fused"))
+        self.h3_turbo.setEnabled(not fused)
+        n, s = vh3.turbo_info(self.h3_turbo.currentData() or vh3.DEFAULT_TURBO, model)
+        self.h3_turbo_info.setText((tr("vedit.h3.turbo.fused", "Turbo nei pesi del DiT: {n} passi · shift video {s}") if fused
+                                    else tr("vedit.h3.turbo.info", "{n} passi · shift video {s}")).format(n=n, s=s))
+
+    def _on_h3_veda_toggled(self, on: bool) -> None:
+        if on and not veng._present(h3s.VEDA_R2VA) and not self._ensure_ids([h3s.VEDA_R2VA]):
+            self.h3_veda.blockSignals(True); self.h3_veda.setChecked(False); self.h3_veda.blockSignals(False)
+
+    def _on_h3_lightvae_toggled(self, on: bool) -> None:
+        ids = list(h3s.LIGHTVAE["dec"])
+        if on and any(not veng._present(i) for i in ids) and not self._ensure_ids(ids):
+            self.h3_lightvae.blockSignals(True); self.h3_lightvae.setChecked(False); self.h3_lightvae.blockSignals(False)
+
+    def h3_option_cfg(self) -> dict:
+        """Chiavi di velocita/modello da aggiungere al cfg dell'edit H3 (SOLO quelle scelte: default invariati)."""
+        out = {"h3_turbo": self.h3_turbo.currentData() or vh3.DEFAULT_TURBO}
+        if self.h3_te.currentData():
+            out["h3_te"] = self.h3_te.currentData()
+        if self.h3_veda.isChecked():
+            out["h3_veda"] = True
+        if self.h3_lightvae.isChecked():
+            out["h3_lightvae"] = "dec"
+        sel = [{"name": l["name"], "strength": float(l["strength"])} for l in self.h3_lora.selected_loras()]
+        if sel:
+            out["loras"] = sel
+        return out
 
     def _sync_engine_fields(self):
         """Campi che cambiano col motore scelto (oggi: l'oggetto/personaggio e la foto servono al motore H3 anche dove LTX non li vuole)."""
@@ -1331,6 +1491,7 @@ class VideoEditAITab(QWidget):
         cfg = {"video": self._video, "mode": sp.key, "engine": eng, "object": self.obj.text().strip(),
                "prompt": self.prompt.toPlainText().strip(), "ref_image": self.ref_img.text().strip(), "h3_profile": prof,
                "short_edge": int(self.h3_edge.currentData() or vh3.DEFAULT_SHORT_EDGE), "keep_audio": True}
+        cfg.update(self.h3_option_cfg())                       # turbo / Veda / LightVAE / LoRA scelti (i default restano quelli di sempre)
         try:
             vh3.build_params(dict(cfg), os.path.join(tempfile.gettempdir(), "_h3edit_check.mp4"))      # SOLO i controlli: nessun lavoro
         except vh3.H3EditError as e:

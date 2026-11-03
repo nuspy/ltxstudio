@@ -782,6 +782,13 @@ NEW = [
       type="diffusion_models", family="MiniMax-H3", gb=21.06, sens="adult", deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
       note="finetune NSFW per FL2VA e Ref2VA (stesse chiavi del DiT ufficiale pruned). Licenza H3 Community (no UE/UK/USA/Corea)"),
+    N("mmh3-dit-rockerboo-nvfp4", "Video", "MiniMax H3 Ref2VA NVFP4 mista rockerBOO (bordi/out_proj BF16, 20GB)", category="video",
+      arch="minimax_h3", repo="rockerBOO/minimax-h3-nvfp4-convrot", remote="minimax_h3_ref2va_pruned_nvfp4_convrot_int8.safetensors",
+      filename="minimax_h3_ref2va_pruned_nvfp4_convrot_int8-native.safetensors", convert="mmh3_dit",
+      type="diffusion_models", family="MiniMax-H3", gb=20.07, deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8", "mmh3-video-vae", "mmh3-audio-vae"],
+      used_by=["cap.video_minimax_h3"],
+      note="confronto nvfp4: qkv int8-ConvRot + bordi e out_proj BF16 (con minimax_h3_layer_config.json). Scaricato a mano dall'utente; conversione nativa da verificare "
+           "al primo arrivo del file. Licenza H3 Community (no UE/UK/USA/Corea)"),
     N("mmh3-dit-10erosmax-b6", "Video", "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)", category="video",
       arch="minimax_h3", repo="TenStrip/10Eros-Max", remote="10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors",
       filename="10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors", convert="mmh3_dit",
