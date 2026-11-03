@@ -7276,7 +7276,6 @@ class MainWindow(QMainWindow):
         self._log(f"[ERR] install Blender: {msg}")
         QMessageBox.warning(self, tr("rig.blender_fail.title"),
                             tr("rig.blender_fail.msg").format(err=msg))
-        self._log(f"[Restauro] Immagine canvas inviata al tab Migliora qualità → Foto: {img}")
 
     def _on_catalog_updated(self):
         """Ricarica il catalogo LoRA dopo un ingest completato + RIFÀ l'inventario dropdown

@@ -3049,6 +3049,7 @@ class Frame1Tab(QWidget):
             it.setText(key + "  🎭")
 
     def _compose_completion_entries(self) -> list:
+        import os
         from PySide6.QtGui import QIcon, QPixmap
         out = []
         for i in range(self.compose_list.count()):
