@@ -105,8 +105,7 @@ def test_a_case_redone_counts_only_with_its_latest_run(tmp_path):
             {"case": "s43", "id": "a", "model": "m1", "esito": "errore"}, {"case": "s43", "id": "a", "model": "m1", "esito": "ok"},
             {"case": "altro", "id": "a", "model": "m1", "esito": "ok"}]
     path = tmp_path / "casi.jsonl"
-    path.write_text("
-".join(json.dumps(row) for row in rows), encoding="utf-8")
+    path.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
     entries = QC.read_entries(str(path))
     assert [(e["case"], e["id"], e["esito"]) for e in entries] == [("s43", "b", "ok"), ("s43", "a", "ok"), ("altro", "a", "ok")]
     assert QC.read_entries(str(tmp_path / "manca.jsonl")) == []
