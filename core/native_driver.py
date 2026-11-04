@@ -15,6 +15,10 @@ import urllib.parse    # NB: DEVE stare qui in cima. Se importato DENTRO preview
                        # variabile LOCALE dell'intera funzione → la 1ª riga urllib.request.Request(...) dà
                        # UnboundLocalError → preview() tornava sempre None (progress/anteprima mai aggiornati).
 
+from core import loopback
+
+loopback.install()      # connessioni verso 127.0.0.1 da una porta sorgente che il filtro di rete locale non scarta (vedi core/loopback.py)
+
 BASE = "http://127.0.0.1:8189"
 
 _LAUNCH_LOCK = threading.Lock()         # serializza i riavvii: N chiamanti → UN solo server, non N
@@ -54,17 +58,15 @@ def ensure_up(*, timeout: float = 180.0, log=None) -> bool:
     with _LAUNCH_LOCK:
         if is_up():                                         # rialzato da un altro chiamante mentre attendevamo
             return True
-        from core.native_launcher import launch
+        from core.native_launcher import launch, supervise_startup
         ok, msg = launch()
         _say(log, f"[nativo] server non risponde → RIAVVIO AUTOMATICO: {msg}")
         if not ok:
             return False
         t0 = time.monotonic()
-        while time.monotonic() - t0 < timeout:
-            time.sleep(1.0)
-            if is_up():
-                _say(log, f"[nativo] server di nuovo pronto ({int(time.monotonic() - t0)}s)")
-                return True
+        if supervise_startup(is_up, log=lambda text: _say(log, text), total_timeout=timeout):
+            _say(log, f"[nativo] server di nuovo pronto ({int(time.monotonic() - t0)}s)")
+            return True
         _say(log, f"[nativo] il server non è tornato su entro {int(timeout)}s")
         return False
 

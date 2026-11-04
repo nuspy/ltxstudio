@@ -1988,8 +1988,8 @@ class MainWindow(QMainWindow):
             from core import native_driver
             if native_driver.is_up():
                 return
-            from core.native_launcher import launch
-            ok, msg = launch()
+            from core.native_launcher import launch_supervised_in_background
+            ok, msg = launch_supervised_in_background(native_driver.is_up, log=self._log)      # rilancia da solo se l'avvio si blocca
             self._log(f"[Nativo] {msg}" if ok else f"[Nativo] auto-avvio saltato: {msg}")
         except Exception as e:                   # noqa: BLE001
             self._log(f"[Nativo] auto-avvio errore: {e}")
