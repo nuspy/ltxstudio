@@ -75,7 +75,7 @@ def test_turbo_fused_dit_uses_its_own_steps_and_shift():
 
 
 def test_custom_dit_is_a_checkpoint_the_user_chooses_and_must_be_installed(clip):
-    assert set(V.CUSTOM_MODELS) == {"mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-rockerboo-nvfp4"}
+    assert set(V.CUSTOM_MODELS) == {"mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-singularity-v2-int8", "mmh3-dit-rockerboo-nvfp4"}
     p = V.build_params(_cfg(clip, h3_profile="mmh3-dit-dasiwa-v4"), "o.mp4", present=ALL)
     assert p["h3_dit"] == "mmh3-dit-dasiwa-v4" and p["h3_profile"] == V.CUSTOM_TE_PROFILE
     ids = S.weight_ids({**p, "references": [{"kind": "image"}]})
@@ -86,7 +86,7 @@ def test_custom_dit_is_a_checkpoint_the_user_chooses_and_must_be_installed(clip)
         V.build_params(_cfg(clip, h3_profile="gguf-q4"), "o.mp4", present=ALL)
     # menu: tutte le voci, anche quelle non sul disco (la GUI le segna), con il DiT del catalogo pesi
     ch = {c["id"]: c for c in V.model_choices(lambda i: i == "mmh3-ref2va-nvfp4")}
-    assert list(ch) == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-rockerboo-nvfp4"]
+    assert list(ch) == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-singularity-v2-int8", "mmh3-dit-rockerboo-nvfp4"]
     assert ch["nvfp4"]["installed"] and not ch["int8"]["installed"] and ch["int8"]["dit"] == "mmh3-ref2va-int8" and ch["nvfp4"]["kind"] == "profile"
     assert ch["mmh3-dit-pinkcherry18"]["kind"] == "custom" and ch["mmh3-dit-pinkcherry18"]["dit"] == "mmh3-dit-pinkcherry18"
 
@@ -194,6 +194,20 @@ def test_rockerboo_nvfp4_is_a_custom_ref2va_model_in_the_menu(clip):
     assert p["h3_dit"] == "mmh3-dit-rockerboo-nvfp4" and S.weight_ids({**p, "references": [{"kind": "image"}]})["dit"] == "mmh3-dit-rockerboo-nvfp4"
     from core import model_paths as mp
     assert mp.entry("mmh3-dit-rockerboo-nvfp4")["filename"].startswith("minimax_h3_ref2va_pruned_nvfp4_convrot_int8")
+
+
+def test_singularity_v2_is_a_custom_ref2va_model_not_turbo_with_a_hint_in_15_languages(clip):
+    meta = S.CUSTOM_DITS["mmh3-dit-singularity-v2-int8"]
+    assert meta["modes"] == ("ref2va",) and not meta.get("turbo_fused")              # non e turbo: la LoRA turbo si sceglie dal menu Turbo
+    p = V.build_params(_cfg(clip, h3_profile="mmh3-dit-singularity-v2-int8"), "o.mp4", present=ALL)
+    assert S.weight_ids({**p, "references": [{"kind": "image"}]})["dit"] == "mmh3-dit-singularity-v2-int8"
+    from core import model_paths as mp
+    entry = mp.entry("mmh3-dit-singularity-v2-int8")
+    assert entry["convert"] == "mmh3_dit" and entry["keep_source"] and entry["sha256"].startswith("d7637c2c") and entry["scan_names"] == [entry["filename"]]
+    languages = [f for f in (Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")]
+    assert len(languages) == 15
+    for language in languages:
+        assert meta["hint_key"] in json.loads(language.read_text("utf-8")), language.name
 
 
 def test_new_lightx2v_ref2va_turbos_are_registered_with_their_steps_and_catalog_entries(clip):

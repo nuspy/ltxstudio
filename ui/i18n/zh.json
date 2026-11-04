@@ -3858,5 +3858,6 @@
   "vedit.h3.int8_attn": "Int8 注意力（更快，试验）",
   "vedit.h3.int8_attn.tt": "使用 comfy_kitchen 的 int8 注意力（8 位 Q/K/V，softmax 用 fp32），与原版 ComfyUI 相同：长序列上更快，但会量化注意力，需要自行评判画质。需要带该内核的较新 NVIDIA GPU；若缺失，或首次与常规注意力比对误差过大，则保留常规注意力，原因写入日志。关闭 = 与以前相同。",
   "vedit.h3.turbo.pika6": "Pika Flex · 6 步（试验，re-noise 采样器）",
-  "vid.h3.turbo.pika6": "Pika Flex · 6 步（试验，re-noise 采样器）"
+  "vid.h3.turbo.pika6": "Pika Flex · 6 步（试验，re-noise 采样器）",
+  "vedit.h3.model.singularityhint": "作者建议：在提示词中写明风格（photorealistic、3D CG、cinematic CG），并将提示词控制在约 5000 个字符以内。这不是 Turbo 模型：如需加速，请在「Turbo」菜单中选择一个 LoRA。"
 }

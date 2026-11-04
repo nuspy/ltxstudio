@@ -56,7 +56,7 @@ def test_model_menu_lists_profiles_and_custom_dits_with_missing_ones_marked(qapp
     monkeypatch.setattr(veng, "_present", lambda item: item not in ("mmh3-ref2va-int8", "mmh3-ref2va-fp8"))
     tab._fill_h3_models()
     ids = [tab.h3_profile.itemData(i) for i in range(tab.h3_profile.count())]
-    assert ids == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-rockerboo-nvfp4"]
+    assert ids == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-singularity-v2-int8", "mmh3-dit-rockerboo-nvfp4"]
     assert "non installato" in tab.h3_profile.itemText(0).lower() and "non installato" not in tab.h3_profile.itemText(2).lower()
     assert tab.h3_profile.currentData() == "nvfp4"                                       # come prima: il primo profilo installato
 

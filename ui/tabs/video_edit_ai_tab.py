@@ -51,6 +51,8 @@ MODES = vem.legacy_modes()
 _MODEL_HINTS = {          # note dell'autore sulle voci del menu «Modello H3» (testo di ripiego in italiano; le traduzioni sono nei file i18n)
     "vedit.h3.model.b7hint": "Consiglio dell'autore: rende meglio con attenzione sparsa video (VSA) e sparsità 90 %. "
                              "Qui l'attenzione sparsa si accende con la casella «Attenzione sparsa Veda».",
+    "vedit.h3.model.singularityhint": "Scheda dell'autore: scrivi lo stile nel prompt (photorealistic, 3D CG, cinematic CG) e tienilo sotto i 5000 caratteri circa. "
+                                      "Non è turbo: per andare veloce scegli una LoRA nel menu «Turbo».",
 }
 
 _MODE_DEFAULT = {

@@ -3930,5 +3930,6 @@
   "vedit.h3.int8_attn": "Int8 attention (faster, experimental)",
   "vedit.h3.int8_attn.tt": "Uses comfy_kitchen's int8 attention (8-bit Q/K/V, fp32 softmax), like the original ComfyUI: faster on long sequences, but it quantizes attention, so quality must be judged. Needs a recent NVIDIA GPU with the kernel; if it is missing, or the first check against normal attention finds a high error, normal attention stays and the reason is in the log. Off = as before.",
   "vedit.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)",
-  "vid.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)"
+  "vid.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)",
+  "vedit.h3.model.singularityhint": "Author's notes: write the style in the prompt (photorealistic, 3D CG, cinematic CG) and keep it under about 5,000 characters. It is not a turbo model: for speed pick a LoRA in the «Turbo» menu."
 }

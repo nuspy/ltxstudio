@@ -3858,5 +3858,6 @@
   "vedit.h3.int8_attn": "Attention int8 (plus rapide, essai)",
   "vedit.h3.int8_attn.tt": "Utilise l'attention int8 de comfy_kitchen (Q/K/V sur 8 bits, softmax en fp32), comme le ComfyUI d'origine : plus rapide sur les longues séquences, mais elle quantifie l'attention, donc la qualité est à juger. Il faut un GPU NVIDIA récent avec le noyau ; s'il manque, ou si le premier contrôle contre l'attention normale trouve une erreur élevée, l'attention normale reste et la raison est dans le journal. Décochée = comme avant.",
   "vedit.h3.turbo.pika6": "Pika Flex · 6 étapes (essai, échantillonneur re-noise)",
-  "vid.h3.turbo.pika6": "Pika Flex · 6 étapes (essai, échantillonneur re-noise)"
+  "vid.h3.turbo.pika6": "Pika Flex · 6 étapes (essai, échantillonneur re-noise)",
+  "vedit.h3.model.singularityhint": "Conseil de l'auteur : indiquez le style dans le prompt (photorealistic, 3D CG, cinematic CG) et gardez-le sous 5000 caractères environ. Ce n'est pas un modèle turbo : pour aller vite, choisissez une LoRA dans le menu «Turbo»."
 }

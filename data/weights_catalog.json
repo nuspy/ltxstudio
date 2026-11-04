@@ -5824,6 +5824,42 @@
       ]
     },
     {
+      "id": "mmh3-dit-singularity-v2-int8",
+      "module": "Video",
+      "label": "Singularity v2 Ref2VA (INT8, 21GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 20.97,
+      "scan_names": [
+        "Minimax-h3_Singularity_ref2va_v2_pruned_int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "WarmBloodAban/Minimax-h3_Singularity",
+      "url": "https://huggingface.co/WarmBloodAban/Minimax-h3_Singularity",
+      "filename": "Minimax-h3_Singularity_ref2va_v2_pruned_int8-native.safetensors",
+      "remote_filename": "Minimax-h3_Singularity_ref2va_v2_pruned_int8.safetensors",
+      "sha256": "d7637c2c35cd30facd9e93778c491f6d82f91c4a441aecbdb4c384a62a5f3d9f",
+      "note": "Singularity v2 pruned INT8 (WarmBloodAban, licenza Apache-2.0 sulla scheda, base MiniMax-H3 quindi vale anche la Community License di MiniMax): fusione ref/fl/b25-49 con fine-tuning HDR, volti lontani piu nitidi, piu azione, audio di riferimento corretto, stili photorealistic / East Asian realism / 3D CG / cinematic CG da scrivere nel prompt (entro ~5000 caratteri). NON e turbo: LoRA turbo consigliata dall'autore minimax_h3_ref2v_turbo_4step_v0.1 (4 passi). Chiavi con prefisso model.diffusion_model. (il convertitore lo toglie). Solo Ref2VA.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "keep_source": true,
+      "use": [
+        "ckpt_video",
+        "q_int8"
+      ],
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ]
+    },
+    {
       "id": "mmh3-lora-civ-better-human-motion-minimax-h3-v1-0-mh3",
       "module": "Video",
       "label": "Better Human Motion Minimax H3 · v1.0-MH3 (18+, 0.303GB)",

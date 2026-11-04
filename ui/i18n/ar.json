@@ -3858,5 +3858,6 @@
   "vedit.h3.int8_attn": "انتباه int8 (أسرع، تجريبي)",
   "vedit.h3.int8_attn.tt": "يستخدم انتباه int8 من comfy_kitchen (‏Q/K/V بثمانية بتات وsoftmax بـ fp32) كما في ComfyUI الأصلي: أسرع في التسلسلات الطويلة لكنه يكمّم الانتباه فيجب تقييم الجودة. يتطلب بطاقة NVIDIA حديثة مع النواة؛ وإن غابت أو وجد الفحص الأول مقابل الانتباه العادي خطأً كبيرًا يبقى العادي ويُكتب السبب في السجل. معطّل = كما كان.",
   "vedit.h3.turbo.pika6": "Pika Flex · 6 خطوات (تجريبي، مُخرِّج re-noise)",
-  "vid.h3.turbo.pika6": "Pika Flex · 6 خطوات (تجريبي، مُخرِّج re-noise)"
+  "vid.h3.turbo.pika6": "Pika Flex · 6 خطوات (تجريبي، مُخرِّج re-noise)",
+  "vedit.h3.model.singularityhint": "ملاحظة المؤلف: اكتب الأسلوب في الموجّه (photorealistic وَ 3D CG وَ cinematic CG) وأبقِه دون نحو 5000 حرف. هذا ليس نموذج تيربو: للسرعة اختر LoRA من قائمة «Turbo»."
 }

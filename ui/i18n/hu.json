@@ -3858,5 +3858,6 @@
   "vedit.h3.int8_attn": "Int8 figyelem (gyorsabb, kísérleti)",
   "vedit.h3.int8_attn.tt": "A comfy_kitchen int8 figyelmét használja (8 bites Q/K/V, fp32 softmax), mint az eredeti ComfyUI: hosszú sorozatokon gyorsabb, de kvantálja a figyelmet, ezért a minőséget meg kell ítélni. Friss NVIDIA GPU kell a maggal; ha hiányzik, vagy az első összevetés a normál figyelemmel nagy hibát talál, a normál marad és az ok a naplóba kerül. Kikapcsolva = mint eddig.",
   "vedit.h3.turbo.pika6": "Pika Flex · 6 lépés (kísérleti, re-noise mintavételező)",
-  "vid.h3.turbo.pika6": "Pika Flex · 6 lépés (kísérleti, re-noise mintavételező)"
+  "vid.h3.turbo.pika6": "Pika Flex · 6 lépés (kísérleti, re-noise mintavételező)",
+  "vedit.h3.model.singularityhint": "A szerző tanácsa: a stílust írd bele a promptba (photorealistic, 3D CG, cinematic CG), és tartsd kb. 5000 karakter alatt. Nem turbó modell: a gyorsasághoz válassz egy LoRA-t a «Turbo» menüben."
 }

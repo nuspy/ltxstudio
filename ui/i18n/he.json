@@ -3858,5 +3858,6 @@
   "vedit.h3.int8_attn": "קשב int8 (מהיר יותר, ניסיוני)",
   "vedit.h3.int8_attn.tt": "משתמש בקשב int8 של comfy_kitchen (‏Q/K/V ב-8 סיביות, softmax ב-fp32) כמו ComfyUI המקורי: מהיר יותר ברצפים ארוכים אך מכמת את הקשב, ולכן יש לשפוט את האיכות. דורש כרטיס NVIDIA עדכני עם הליבה; אם חסרה, או שהבדיקה הראשונה מול הקשב הרגיל מצאה שגיאה גבוהה, נשאר הקשב הרגיל והסיבה נרשמת ביומן. כבוי = כמו קודם.",
   "vedit.h3.turbo.pika6": "Pika Flex · 6 צעדים (ניסיוני, דוגם re-noise)",
-  "vid.h3.turbo.pika6": "Pika Flex · 6 צעדים (ניסיוני, דוגם re-noise)"
+  "vid.h3.turbo.pika6": "Pika Flex · 6 צעדים (ניסיוני, דוגם re-noise)",
+  "vedit.h3.model.singularityhint": "הערת היוצר: כתבו את הסגנון בפרומפט (photorealistic, 3D CG, cinematic CG) והשאירו אותו מתחת ל-5000 תווים בערך. זה אינו מודל טורבו: למהירות בחרו LoRA בתפריט «Turbo»."
 }
