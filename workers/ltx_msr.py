@@ -26,6 +26,7 @@ import os
 SLOT_PREFIX = "reference_slot_embedding."
 MAX_REFERENCES = 5                      # 4 soggetti + 1 sfondo (2.3) · 5 slot (2.5)
 MAX_SUBJECTS = 4                        # nel nodo LiconMSR gli ingressi soggetto sono 4
+REFERENCE_CRF = 33                      # compressione H.264 simulata sul riferimento (predefinito di ltx_pipelines per le immagini di condizionamento); `msr_ref_crf` la cambia
 FRAME_COUNTS = (17, 25, 33, 41, 49, 57, 65)      # lunghezze ammesse della pseudo-sequenza
 
 
@@ -264,7 +265,7 @@ def frame_offsets(num_slots: int, spacing: int = 1) -> list[int]:
     return [-(num_slots - i) * max(1, int(spacing)) for i in range(num_slots)]
 
 
-def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = 33,
+def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = REFERENCE_CRF,
                          spacing: int = 1) -> list:
     """`references` del pannello → ImageConditioningInput a frame NEGATIVI (solo 2.5)."""
     from ltx_pipelines.utils.args import ImageConditioningInput

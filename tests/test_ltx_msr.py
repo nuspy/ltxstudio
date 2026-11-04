@@ -225,3 +225,11 @@ def test_worker_wires_msr_crop_guides_to_the_frame_count_and_the_encoder():
     source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "workers", "ltx2_infer.py"), encoding="utf-8").read()
     assert 'if p.get("msr_crop_guides"):' in source and 'p["num_frames"] = int(p.get("num_frames", 41)) + _msr_crop_frames' in source
     assert "video = ltx_msr.drop_leading_frames(video, _msr_crop_frames)" in source
+
+
+def test_reference_crf_is_the_pipeline_default_unless_msr_ref_crf_is_set():
+    """Prova 2.5 del 04/11: `msr_ref_crf` (0 = riferimento senza compressione simulata) arriva a ImageConditioningInput; senza il parametro resta 33 come sempre."""
+    from workers import ltx_msr
+    assert ltx_msr.REFERENCE_CRF == 33
+    source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "workers", "ltx2_infer.py"), encoding="utf-8").read()
+    assert 'crf=int(p.get("msr_ref_crf", ltx_msr.REFERENCE_CRF))' in source

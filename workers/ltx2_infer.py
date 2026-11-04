@@ -2788,7 +2788,7 @@ def run_generation(p: dict) -> str:
             if ltx_msr.install_slot_embedding(
                     p["msr_lora"], reference_frames=int(p.get("msr_reference_frames", 1) or 1)):
                 _refs = ltx_msr.references_to_inputs(
-                    p["references"], float(p.get("ref_strength", 1.0)),
+                    p["references"], float(p.get("ref_strength", 1.0)), crf=int(p.get("msr_ref_crf", ltx_msr.REFERENCE_CRF)),
                     spacing=int(p.get("msr_spacing", 1) or 1))
                 images.extend(_refs)
                 print(f"[msr] {len(_refs)} riferimenti a frame {[i.frame_idx for i in _refs]}", flush=True)

@@ -3036,7 +3036,16 @@ class MainWindow(QMainWindow):
                 _regen = ("Add the person from the second image to the first image, standing " + _where + " of the scene, as a real part of it: match the perspective, "
                           "scale, lighting and colour grading, add contact shadows, let the foreground objects overlap her where they should. Keep her face, hair and "
                           "clothes identical to the second image. Do not change anything else in the scene and do not add anyone else. " + (ptxt or ""))
-                self._start_native_krea2_edit([exp["base"], exp["layer_refs"][0]], _regen.strip(), negative, cfg.get("grounding", 768),
+                _scene = exp["base"]
+                if getattr(self.frame1_tab.canvas, "integrate_position_box", False):           # prova 04/11: il posto del soggetto anche come riquadro rosso sulla scena
+                    from core import integrate_position_box as _ipb
+                    _boxed = _ipb.draw_position_box(exp["base"], exp["position_mask"], os.path.join(OUTPUT_DIR, "integrate_scena_riquadro.png"))
+                    if _boxed:
+                        _scene, _regen = _boxed[0], _ipb.box_prompt(_where, ptxt or "")
+                        self._log(f"[integra] Krea 2 Edit: riquadro di posizione {_boxed[1]} disegnato sulla scena")
+                    else:
+                        self._log("[integra] Krea 2 Edit: la sagoma di posizione e vuota, nessun riquadro: resta il solo testo")
+                self._start_native_krea2_edit([_scene, exp["layer_refs"][0]], _regen.strip(), negative, cfg.get("grounding", 768),
                                               cfg.get("integrate_variant", "turbo"), seed, label=tr("queue.job.krea2edit", "Krea 2 Edit"))
                 return
             if engine == "krea2":                             # motore Krea 2 Edit → edit del composito (single)

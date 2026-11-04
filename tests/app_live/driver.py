@@ -1024,6 +1024,7 @@ class Driver:
                 cv.integrate_approach = str(case.get("approach") or "")      # prove 03/11: armonizza / klein_ref_inpaint / klein_armonizza / kontext_stitch
                 cv.integrate_strength = float(case["approach_strength"]) if case.get("approach_strength") is not None else None
                 cv.integrate_hold_face = bool(case.get("hold_face"))                    # prove 04/11: volto del soggetto fuori dalla zona rigenerata
+                cv.integrate_position_box = bool(case.get("position_box"))                # prove 04/11: Krea 2 Edit con riquadro di posizione sulla scena
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
                     steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])

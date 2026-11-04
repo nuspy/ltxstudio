@@ -1490,6 +1490,8 @@ class MaskCanvas(QWidget):
     integrate_strength: float | None = None
     # Il volto del soggetto incollato resta fuori dalla zona rigenerata degli approcci armonizza / klein_* (core/integrate_face_hold): parametro delle prove, come l'approccio.
     integrate_hold_face: bool = False
+    # Krea 2 Edit «rigenera»: il posto del soggetto anche come riquadro rosso disegnato sulla scena (core/integrate_position_box), oltre al testo. Parametro delle prove.
+    integrate_position_box: bool = False
 
     @staticmethod
     def _dilate_alpha(img: QImage, px: int) -> QImage:
