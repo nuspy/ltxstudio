@@ -5785,6 +5785,45 @@
       ]
     },
     {
+      "id": "mmh3-dit-dasiwa-v4turbo-int8",
+      "module": "Video",
+      "label": "DaSiWa Hybrid V4 Turbo (18+, INT8, 4 passi, 21GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 20.97,
+      "scan_names": [
+        "DasiwaMinimaxH3_dasiwaHybridV4Turbo_int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "releaseworthy/dasiwa-minimax-h3-turbo-int8",
+      "url": "https://huggingface.co/releaseworthy/dasiwa-minimax-h3-turbo-int8",
+      "filename": "DasiwaMinimaxH3_dasiwaHybridV4Turbo_int8-native.safetensors",
+      "remote_filename": "DasiwaMinimaxH3_dasiwaHybridV4Turbo_int8.safetensors",
+      "sha256": "36471afb817747b711b9abad3d8e6b7c88a7c2b91b4887d040a8dcb7ee82b2d6",
+      "sensitivity": "adult",
+      "note": "DaSiWa Hybrid V4 Turbo: turbo gia nei pesi (scheda Civitai 2877206, versione 3392061: «4step Turbo»; euler/simple o LCM/simple, shift video 6-12, audio 3-5, 4 o 8 passi), NIENTE LoRA turbo. Mirror HF releaseworthy; sorgente Civitai 3281858. NON sostituisce la V4 non-turbo (int4, 20-25 passi): e un'altra versione dell'autore, distillata. Licenza MiniMax H3 Community (no UE/UK/USA/Corea).",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "keep_source": true,
+      "use": [
+        "ckpt_video",
+        "distilled",
+        "q_int8",
+        "uncensored"
+      ],
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ]
+    },
+    {
       "id": "mmh3-lora-civ-better-human-motion-minimax-h3-v1-0-mh3",
       "module": "Video",
       "label": "Better Human Motion Minimax H3 · v1.0-MH3 (18+, 0.303GB)",

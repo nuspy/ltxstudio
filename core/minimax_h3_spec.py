@@ -34,6 +34,9 @@ CUSTOM_DITS = {
                               "turbo_fused": True, "nfe": 8, "video_shift": 12.0, "hint_key": "vedit.h3.model.b7hint"},
     # base Ref2VA (adaln_t_table e norme identici al pruned Ref2VA ufficiale), «Hybrid» per l'autore: int4 W4A8
     "mmh3-dit-dasiwa-v4": {"label": "DaSiWa Hybrid v4 (int4)", "modes": ("fl2va", "ref2va")},
+    # DaSiWa Hybrid V4 Turbo int8 (Civitai 2877206, versione 3392061): turbo «4 step» gia nei pesi, int8 ConvRot per riga su tutti i 200 layer (formato ComfyUI come l'int8 ufficiale).
+    # Scheda: euler/simple o LCM/simple, shift video 6-12, audio 3-5, 4 o 8 passi. Si parte da 4 passi e shift 12 (come le altre turbo a 4 passi); H3_NFE=8 per provare gli 8.
+    "mmh3-dit-dasiwa-v4turbo-int8": {"label": "DaSiWa Hybrid V4 Turbo (int8, 4 passi)", "modes": ("ref2va",), "turbo_fused": True, "nfe": 4, "video_shift": 12.0},
     # nvfp4 MISTA di rockerBOO (Ref2VA pruned: qkv int8-ConvRot, bordi e out_proj in BF16, resto nvfp4; layer config a parte): risposta al sospetto che i nostri nvfp4
     # (Abiray, stessa dimensione esatta di coolthor/wsjLL: tutti i 200 layer in nvfp4) siano fatti peggio. Serve per il confronto a parita di seme/prompt/encoder.
     "mmh3-dit-rockerboo-nvfp4": {"label": "MiniMax-H3 Ref2VA nvfp4 + int8 ConvRot (rockerBOO, bordi BF16)", "modes": ("ref2va",), "official": True},   # quantizzazione del modello ufficiale, non un finetune
