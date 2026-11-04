@@ -10,17 +10,85 @@ Formati riconosciuti dalle chiavi del safetensors, modulo per modulo:
   · embedding int8 nativo:                 <m>.weight I8 + weight_scale F32 [num,1]
   · W4A8/W6A8 comfy-kitchen (H3 DaSiWa):   <m>.weight I8 impacchettato + weight_s_rel F8 + weight_s_channel F32
                                            (+ weight_codebook / weight_correction) + marcatore nativo <m>.w4a8
-I pesi restano compressi in VRAM e si dequantizzano in bf16 un layer alla volta nel forward (matmul bf16:
-qualità identica, niente quantizzazione delle attivazioni). Ogni layer accetta LoRA «al volo»
-(y = base(x) + s·B(A(x))), perché PEFT non sa avvolgere moduli personalizzati.
+I pesi restano compressi in VRAM. Percorso di riferimento: si dequantizzano in bf16 un layer alla volta nel forward (matmul bf16: qualita identica, niente
+quantizzazione delle attivazioni). Percorsi veloci di comfy_kitchen, come l'originale ComfyUI: GEMM int8 vero (`int8_linear`, attivazioni int8 per riga, torch._int_mm)
+per RowInt8Linear, acceso di default (spento con H3_INT8_GEMM=0); GEMM FP4 vero (`scaled_mm_nvfp4`, solo Blackwell) per Nvfp4Linear, SPENTO di default (H3_NVFP4_GEMM=1:
+attivazioni a 4 bit, qualita da giudicare). Ogni percorso veloce si verifica sul primo layer contro il riferimento e, se manca il kernel, la GPU non lo regge o l'errore e
+alto, si scarta con il motivo scritto nel log. Ogni layer accetta LoRA «al volo» (y = base(x) + s·B(A(x))), perché PEFT non sa avvolgere moduli personalizzati.
 """
 from __future__ import annotations
 
+import importlib
 import os
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+
+_LOGGED_ONCE = set()
+
+
+def log_line(message: str) -> None:
+    print(f"[h3] {message}", flush=True)
+
+
+def log_once(message: str) -> None:
+    """Una riga di log per messaggio e per processo (un ripiego puo scattare a ogni layer)."""
+    if message not in _LOGGED_ONCE:
+        _LOGGED_ONCE.add(message)
+        log_line(message)
+
+
+class FastGemm:
+    """Un percorso veloce di comfy_kitchen per processo: provato una volta, verificato sul primo layer contro il riferimento, scartato (con il motivo nel log) se manca il
+    kernel, la GPU non lo regge o l'errore e troppo alto. Nessun ripiego silenzioso: ogni scarto scrive `[h3] GEMM <nome> non usato: <motivo>`."""
+
+    def __init__(self, name: str, env_name: str, default_on: bool, max_error: float, min_capability: tuple):
+        self.name, self.env_name, self.default_on = name, env_name, default_on
+        self.max_error, self.min_capability = max_error, min_capability
+        self.verified = False
+        self.reason = None                                  # None = non ancora valutato, "" = utilizzabile, altro = motivo dello scarto
+
+    def disable(self, reason: str) -> None:
+        self.reason = reason
+        log_once(f"GEMM {self.name} non usato: {reason}")
+
+    def usable(self, device: torch.device) -> bool:
+        if self.reason is None:
+            self.reason = self._static_reason(device)
+            if self.reason:
+                log_once(f"GEMM {self.name} non usato: {self.reason}")
+        return self.reason == ""
+
+    def _static_reason(self, device: torch.device) -> str:
+        switch = os.environ.get(self.env_name, "1" if self.default_on else "0")
+        if switch == "0":
+            return f"{self.env_name}=0" if self.default_on else f"spento di default (si attiva con {self.env_name}=1)"
+        try:
+            importlib.import_module("comfy_kitchen")
+        except ImportError as error:
+            return f"comfy_kitchen non importabile ({error})"
+        if device.type != "cuda":
+            return f"dispositivo {device.type}, serve CUDA"
+        capability = torch.cuda.get_device_capability(device)
+        if capability < self.min_capability:
+            return f"la GPU (SM {capability[0]}.{capability[1]}) e sotto il minimo SM {self.min_capability[0]}.{self.min_capability[1]}"
+        return ""
+
+    def verify(self, fast: torch.Tensor, reference: torch.Tensor, where: str) -> bool:
+        """Confronta il primo risultato veloce col riferimento (errore RMS relativo); True se resta in uso."""
+        error = float((fast.detach().float() - reference.detach().float()).norm() / reference.detach().float().norm().clamp_min(1e-12))
+        if not (error <= self.max_error):                     # anche NaN
+            self.disable(f"errore relativo {error:.3f} > {self.max_error} contro il riferimento (primo layer: {where})")
+            return False
+        self.verified = True
+        log_line(f"GEMM {self.name} attivo: errore relativo {error:.4f} contro il riferimento sul primo layer ({where})")
+        return True
+
+
+INT8_GEMM = FastGemm("int8", "H3_INT8_GEMM", True, 0.1, (7, 5))
+NVFP4_GEMM = FastGemm("NVFP4", "H3_NVFP4_GEMM", False, 0.5, (10, 0))
 
 
 def lokr_apply(x: torch.Tensor, w1: torch.Tensor, w2: torch.Tensor) -> torch.Tensor:
@@ -195,13 +263,40 @@ class RowInt8Linear(nn.Module, _LoraMixin):
 
     def forward(self, x):
         cd = torch.bfloat16 if x.dtype == torch.float32 else x.dtype
+        y = self._forward_gemm(x, cd) if INT8_GEMM.usable(x.device) and self._has_no_zero_point() else None
+        if y is None:
+            y = self._forward_dequant(x, cd)
+        return self._lora(x, y).to(x.dtype)       # la LoRA legge l'ingresso NON ruotato (cast per blocco)
+
+    def _has_no_zero_point(self) -> bool:
+        """Il GEMM int8 di comfy_kitchen non ha zero point: vale solo per i pesi simmetrici (int8 convrot ufficiale). Controllo una volta sola per layer."""
+        if not hasattr(self, "_symmetric"):
+            self._symmetric = not bool(self.zero_point.any())
+        return self._symmetric
+
+    def _forward_dequant(self, x, cd):
+        """Riferimento: peso dequantizzato in bf16 (W8A16)."""
         w = (self.weight.to(cd) - self.zero_point.to(cd)) * self.scale.to(cd)
         xin = x.to(cd)
         if self.convrot:
             from core.native_convert import rotate
             xin = rotate(xin, self.convrot)
-        y = F.linear(xin, w, self.bias.to(cd) if self.bias is not None else None)
-        return self._lora(x, y).to(x.dtype)       # la LoRA legge l'ingresso NON ruotato (cast per blocco)
+        return F.linear(xin, w, self.bias.to(cd) if self.bias is not None else None)
+
+    def _forward_gemm(self, x, cd):
+        """GEMM int8 vero di comfy_kitchen (W8A8: attivazioni int8 per riga). None = non usabile: si usa il riferimento (motivo gia nel log)."""
+        import comfy_kitchen as ck
+        bias = self.bias.to(cd) if self.bias is not None else None
+        try:
+            y = ck.int8_linear(x.to(cd), self.weight, self.scale.reshape(-1), bias, out_dtype=cd, convrot=bool(self.convrot), convrot_groupsize=self.convrot or 256)
+        except Exception as error:                              # noqa: BLE001  qualunque errore del kernel: si scarta il percorso, con il motivo nel log
+            INT8_GEMM.disable(f"{type(error).__name__}: {error} (RowInt8Linear._forward_gemm, {tuple(x.shape)} x {tuple(self.weight.shape)})")
+            return None
+        if not INT8_GEMM.verified:
+            sample = x.reshape(-1, x.shape[-1])[:8]
+            if not INT8_GEMM.verify(y.reshape(-1, y.shape[-1])[:8], self._forward_dequant(sample, cd), str(tuple(self.weight.shape))):
+                return None
+        return y
 
 
 class Nvfp4Linear(nn.Module, _LoraMixin):
@@ -219,13 +314,36 @@ class Nvfp4Linear(nn.Module, _LoraMixin):
         self._lora_init()
 
     def forward(self, x):
-        import comfy_kitchen as ck
-        w = ck.dequantize_nvfp4(self.weight, self.weight_scale_2, self.weight_scale, output_type=torch.bfloat16)
-        w = w[: self.out_features, : self.in_features]
         xb = x.to(torch.bfloat16)
         xq = xb * self.pre_quant_scale.to(torch.bfloat16) if self.pre_quant_scale is not None else xb
-        y = F.linear(xq, w, self.bias.to(torch.bfloat16) if self.bias is not None else None)
+        y = self._forward_gemm(xq) if NVFP4_GEMM.usable(x.device) else None
+        if y is None:
+            y = self._forward_dequant(xq)
         return self._lora(xb, y).to(x.dtype)            # la LoRA vede l'ingresso ORIGINALE (non scalato AWQ)
+
+    def _forward_dequant(self, xq):
+        """Riferimento: peso dequantizzato in bf16 (W4A16)."""
+        import comfy_kitchen as ck
+        w = ck.dequantize_nvfp4(self.weight, self.weight_scale_2, self.weight_scale, output_type=torch.bfloat16)[: self.out_features, : self.in_features]
+        return F.linear(xq, w, self.bias.to(torch.bfloat16) if self.bias is not None else None)
+
+    def _forward_gemm(self, xq):
+        """GEMM FP4 vero di comfy_kitchen (W4A4, solo Blackwell): attivazioni quantizzate a nvfp4 con scala globale amax/(448·6), come il layout TensorCoreNVFP4 di ComfyUI."""
+        import comfy_kitchen as ck
+        rows = xq.reshape(-1, xq.shape[-1])
+        padded = (-(-rows.shape[0] // 16) * 16, -(-rows.shape[1] // 16) * 16) != tuple(rows.shape)
+        scale_a = rows.abs().amax().float() / (448.0 * 6.0)
+        bias = self.bias.to(torch.bfloat16) if self.bias is not None else None
+        try:
+            quantized, block_scale_a = ck.quantize_nvfp4(rows, scale_a, pad_16x=padded)
+            out = ck.scaled_mm_nvfp4(quantized, self.weight, scale_a, self.weight_scale_2, block_scale_a, self.weight_scale, bias, out_dtype=torch.bfloat16)
+        except Exception as error:                              # noqa: BLE001  qualunque errore del kernel: si scarta il percorso, con il motivo nel log
+            NVFP4_GEMM.disable(f"{type(error).__name__}: {error} (Nvfp4Linear._forward_gemm, {tuple(rows.shape)} x {tuple(self.weight.shape)})")
+            return None
+        out = out[: rows.shape[0], : self.out_features]
+        if not NVFP4_GEMM.verified and not NVFP4_GEMM.verify(out[:8], self._forward_dequant(rows[:8]), str(tuple(self.weight.shape))):
+            return None
+        return out.reshape(*xq.shape[:-1], self.out_features)
 
 
 class W4A8Linear(nn.Module, _LoraMixin):
@@ -257,7 +375,8 @@ class W4A8Linear(nn.Module, _LoraMixin):
         try:
             y = ck.w4a8_int8_linear(xb, *args, bias=b, group_size=self.group, convrot_groupsize=self.convrot,
                                     out_dtype=cd)
-        except Exception:  # noqa: BLE001  (nessun backend capace: forma/GPU non supportate)
+        except Exception as error:                              # noqa: BLE001  nessun backend capace (forma o GPU non supportate): dequantizza, ma scrive il motivo (una volta)
+            log_once(f"GEMM W4A8 non usato: {type(error).__name__}: {error} (W4A8Linear.forward, {tuple(xb.shape)} x {tuple(self.weight.shape)}): dequantizzazione bf16")
             w = ck.dequantize_w4a8_int8_weight(*args, group_size=self.group, convrot_groupsize=self.convrot,
                                                output_dtype=cd)
             y = F.linear(xb, w, b)
