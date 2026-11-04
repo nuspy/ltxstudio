@@ -34,6 +34,10 @@ MODEL_LABELS = {
     "margine20_t40": "turno 40: margine 20 px (~26 px a 1312), int8 + DMAD 6 passi",
     "margine10": "margine 10 px (~13 px a 1312) + attenzione int8",
     "margine4": "margine 4 px (~5 px a 1312) + attenzione int8",
+    # turno 44: ipotesi 1 sul mercato che resta (riferimento con lo sfondo grigio al 100% come l'originale)
+    "margine4_colore65": "margine 4 px di oggi (turno 42b): sfondo del riferimento con il colore al 65%",
+    "m4_grigio100_clip1": "margine 4 px + sfondo del riferimento in sola luminanza (grigio 100%), solo clip 1",
+    "m4_grigio100_intero": "margine 4 px + sfondo del riferimento in sola luminanza (grigio 100%), TUTTO il video (3 clip)",
     # turno 43: confronto turbo sullo stesso caso del turno 41
     "pika6_int8": "int8 ufficiale + Pika Flex 6 passi (renoise)",
     "pika6_nvfp4": "nvfp4 Abiray + Pika Flex 6 passi (renoise)",
