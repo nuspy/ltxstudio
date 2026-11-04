@@ -103,4 +103,4 @@ def test_forced_steps_for_fused_turbo_and_runkey(monkeypatch, capsys):
     monkeypatch.setenv("H3_NFE", "8")
     assert worker.fused_turbo_steps(fused) == 8 and "H3_NFE=8" in capsys.readouterr().out
     edit = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
-    assert '(("nfe", os.environ["H3_NFE"]),)' in edit                                  # i clip a 4 e a 8 passi non si scambiano nei checkpoint
+    assert '(("numerics", numerics_options()),)' in edit                               # i clip a 4 e a 8 passi non si scambiano nei checkpoint

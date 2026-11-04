@@ -191,6 +191,16 @@ def run_clip_with_fallback(W, clip_runner, job_dir: str) -> bool:
     return True
 
 
+NUMERICS_ENV = ("H3_INT8_GEMM", "H3_NVFP4_GEMM", "H3_VAE_DECODE_DTYPE", "H3_NFE", "H3_INT8_ATTENTION")
+
+
+def numerics_options() -> tuple:
+    """Variabili d'ambiente che cambiano la NUMERICA di un clip (GEMM int8 / FP4, dtype del decode, passi forzati, attenzione int8): (nome, valore) di quelle impostate.
+    Entrano nella chiave della cartella del job e nel meta del clip: senza, un clip generato con un'impostazione veniva RIUSATO da un'altra (turno 42 del 04/11:
+    s42_con_gemm_int8 e s42_con_gemm_fp4 ripresero il clip di «tutto attivo», 118 s e video identici)."""
+    return tuple((name, os.environ[name]) for name in NUMERICS_ENV if os.environ.get(name))
+
+
 def opts_key(p: dict) -> tuple:
     """Scelte di velocita/modello dell'utente nell'edit (DiT personalizzato, Veda, LightVAE, LoRA): cambiano il risultato, quindi entrano nella chiave dei
     checkpoint. Presenti SOLO se scelte: con i default la chiave e quella di sempre e i checkpoint gia fatti restano validi."""
@@ -365,7 +375,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), ("refmaxside", int(p.get("h3_ref_max_side", REF_VIDEO_MAX_SIDE))), *((("nfe", os.environ["H3_NFE"]),) if os.environ.get("H3_NFE") else ()), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), ("refmaxside", int(p.get("h3_ref_max_side", REF_VIDEO_MAX_SIDE))), *((("numerics", numerics_options()),) if numerics_options() else ()), *((("int8attn", 1),) if p.get("h3_int8_attention") else ()), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
@@ -425,6 +435,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 meta["bg_prompt"] = bg_prompt
             if lipsync_off:
                 meta["lipsync"] = False
+            if numerics_options():                                          # GEMM / decode / passi / attenzione int8: la chiave del clip cambia, niente ripresa di un clip fatto altrimenti
+                meta["numerics"] = [list(item) for item in numerics_options()]
             if e.get("ref_clock_align"):                                   # variante sperimentale: SOLO se scelta (altrimenti meta e chiave restano quelle di sempre)
                 meta["ref_clock_align"] = True
             _np.save(jd / "clip_src.npy", clip_src.numpy())

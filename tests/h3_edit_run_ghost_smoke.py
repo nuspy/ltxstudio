@@ -103,7 +103,7 @@ def frames_of(path):
 
 
 def run(tag, env, extra=None):
-    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES", "H3_EDIT_BG_MASK", "H3_EDIT_BG_MASK_MARGIN", "H3_EDIT_BG_MASK_FILL_HOLES"):
+    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES", "H3_EDIT_BG_MASK", "H3_EDIT_BG_MASK_MARGIN", "H3_EDIT_BG_MASK_FILL_HOLES", "H3_INT8_GEMM", "H3_NVFP4_GEMM", "H3_VAE_DECODE_DTYPE", "H3_NFE", "H3_INT8_ATTENTION"):
         os.environ.pop(k, None)
     os.environ.update(env)
     calls.clear(); refs.clear(); prompts.clear()
@@ -165,6 +165,13 @@ assert _k("orig").name != _k("abl0").name                                       
 _, _c, _ = run("orig_fh", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_MASK": "original", "H3_EDIT_BG_MASK_MARGIN": "40", "H3_EDIT_BG_MATTE": "0", "H3_EDIT_BG_MASK_FILL_HOLES": "1"})
 c_fh = np.load(_k("orig_fh") / "clip_00" / "cells.npy")
 assert float((c_fh < 0.5).sum()) <= float((c_orig < 0.5).sum()) and _k("orig_fh").name != _k("orig").name           # fill_holes: non tiene di piu e ha una chiave sua
+# NUMERICA nella chiave: stessa cartella di uscita, env diverso => il clip si rigenera (turno 42: i GEMM riprendevano il clip di «tutto attivo»); stesso env => ripresa
+_, c_first, _r = run("numerics", {"H3_EDIT_MAX_FRAMES": "141"})
+_, c_second, _r = run("numerics", {"H3_EDIT_MAX_FRAMES": "141", "H3_INT8_GEMM": "1"})
+_, c_third, _r = run("numerics", {"H3_EDIT_MAX_FRAMES": "141", "H3_INT8_GEMM": "1"})
+_, c_fourth, _r = run("numerics", {"H3_EDIT_MAX_FRAMES": "141", "H3_VAE_DECODE_DTYPE": "fp32"})
+assert c_first == [141] and c_second == [141] and c_third == [] and c_fourth == [141], (c_first, c_second, c_third, c_fourth)
+assert len(list((TMP / "numerics" / "_h3edit_tmp").iterdir())) == 3                                        # tre numeriche diverse, tre cartelle di job
 print("ABLAZIONE OK: kept cells base", int((c_base < 0.5).sum()), "like-replace", int((c_like < 0.5).sum()))
 print("clip base", c0, "preroll", c1, "two-pass", c5)
 
