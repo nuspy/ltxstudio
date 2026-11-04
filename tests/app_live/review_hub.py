@@ -45,25 +45,73 @@ def list_reviews(reviews_dir: str) -> list[tuple[str, float]]:
     return sorted(entries, key=lambda entry: entry[1], reverse=True)
 
 
+PAGE_STYLE = """:root{--bg:#f6f7f9;--fg:#15171c;--mut:#5b6270;--card:#fff;--bd:#d9dde4;--ac:#2456d6}
+@media (prefers-color-scheme:dark){:root{--bg:#101216;--fg:#e8eaee;--mut:#9aa3b2;--card:#181b21;--bd:#2b303a;--ac:#8aa8ff}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;
+padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 32px max(16px,env(safe-area-inset-left))}
+h1{font-size:1.3rem}h2{font-size:1.1rem;margin:28px 0 8px}ul{list-style:none;padding:0;margin:0}
+li{background:var(--card);border:1px solid var(--bd);border-radius:10px;margin:8px 0;display:flex;flex-direction:column}
+a{color:var(--ac);padding:12px 14px 2px;min-height:44px;overflow-wrap:anywhere}a:focus-visible{outline:3px solid var(--ac)}
+span{color:var(--mut);font-size:.9rem;padding:0 14px 10px}.big{display:block;padding:14px;font-weight:600}
+summary{min-height:44px;padding:10px 0;cursor:pointer}
+iframe{width:100%;border:1px solid var(--bd);border-radius:10px;background:var(--card);min-height:400px}"""
+
+
+def pending_reviews(reviews_dir: str) -> list[dict]:
+    """Revisioni ancora da giudicare: l'elenco curato in da_rivedere.json, meno quelle già pubblicate."""
+    listing = os.path.join(reviews_dir, "da_rivedere.json")
+    if not os.path.isfile(listing):
+        return []
+    with open(listing, encoding="utf-8") as handle:
+        entries = json.load(handle)
+    return [entry for entry in entries
+            if os.path.isfile(os.path.join(reviews_dir, entry["cartella"], "index.html")) and not is_published(reviews_dir, entry["cartella"])]
+
+
+def is_published(reviews_dir: str, name: str) -> bool:
+    return any(f.startswith("pubblicato_") for f in os.listdir(os.path.join(reviews_dir, name)))
+
+
+def page(title: str, content: str) -> bytes:
+    return (f'<!doctype html><html lang="it"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+            f'<title>{html.escape(title)}</title><style>{PAGE_STYLE}</style></head><body>{content}</body></html>').encode("utf-8")
+
+
 def index_page(reviews_dir: str) -> bytes:
-    rows = []
+    pending = pending_reviews(reviews_dir)
+    pending_names = {entry["cartella"] for entry in pending}
+    pending_rows = "".join(f'<li><a href="/r/{quote(entry["cartella"])}/">{html.escape(entry["titolo"])}</a>'
+                           f'<span>{html.escape(entry["cartella"])}</span></li>' for entry in pending)
+    archive_rows = []
     for name, modified in list_reviews(reviews_dir):
-        published = [f for f in os.listdir(os.path.join(reviews_dir, name)) if f.startswith("pubblicato_")]
-        mark = " · pubblicata" if published else ""
-        rows.append(f'<li><a href="/r/{quote(name)}/">{html.escape(name)}</a>'
-                    f'<span>{time.strftime("%d/%m %H:%M", time.localtime(modified))}{mark}</span></li>')
-    body = f"""<!doctype html><html lang="it"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Revisioni LTX</title>
-<style>:root{{--bg:#f6f7f9;--fg:#15171c;--mut:#5b6270;--card:#fff;--bd:#d9dde4;--ac:#2456d6}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#101216;--fg:#e8eaee;--mut:#9aa3b2;--card:#181b21;--bd:#2b303a;--ac:#8aa8ff}}}}
-body{{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-serif;
-padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 32px max(16px,env(safe-area-inset-left))}}
-h1{{font-size:1.3rem}}ul{{list-style:none;padding:0;margin:0}}
-li{{background:var(--card);border:1px solid var(--bd);border-radius:10px;margin:8px 0;display:flex;flex-direction:column}}
-a{{color:var(--ac);padding:12px 14px 2px;min-height:44px;overflow-wrap:anywhere}}a:focus-visible{{outline:3px solid var(--ac)}}
-span{{color:var(--mut);font-size:.9rem;padding:0 14px 10px}}</style></head>
-<body><h1>Revisioni LTX Studio</h1><ul>{''.join(rows) or '<li><span>nessuna revisione</span></li>'}</ul></body></html>"""
-    return body.encode("utf-8")
+        if name in pending_names:
+            continue
+        mark = " · pubblicata" if is_published(reviews_dir, name) else ""
+        archive_rows.append(f'<li><a href="/r/{quote(name)}/">{html.escape(name)}</a>'
+                            f'<span>{time.strftime("%d/%m %H:%M", time.localtime(modified))}{mark}</span></li>')
+    unified = (f'<li><a class="big" href="/tutte">Apri tutte le {len(pending)} revisioni in una pagina</a></li>'
+               if pending else '<li><span>niente da rivedere</span></li>')
+    content = (f'<h1>Revisioni LTX Studio</h1><h2>Da rivedere ({len(pending)})</h2><ul>{unified}{pending_rows}</ul>'
+               f'<details><summary>Archivio ({len(archive_rows)}): giri vecchi, a secco o già giudicati</summary>'
+               f'<ul>{"".join(archive_rows)}</ul></details>')
+    return page("Revisioni LTX", content)
+
+
+def unified_page(reviews_dir: str) -> bytes:
+    """Tutte le revisioni da giudicare una dopo l'altra: ogni pagina resta intera (note e «Pubblica» suoi) in un riquadro
+    che si allunga quanto il suo contenuto."""
+    sections = "".join(f'<h2>{index + 1}. {html.escape(entry["titolo"])}</h2>'
+                       f'<iframe src="/r/{quote(entry["cartella"])}/" title="{html.escape(entry["titolo"])}" loading="lazy"></iframe>'
+                       for index, entry in enumerate(pending_reviews(reviews_dir)))
+    script = """<script>
+function fit(frame){try{frame.style.height=frame.contentDocument.documentElement.scrollHeight+'px'}catch(e){console.log('fit',e)}}
+document.querySelectorAll('iframe').forEach(function(frame){frame.addEventListener('load',function(){fit(frame)});});
+setInterval(function(){document.querySelectorAll('iframe').forEach(fit)},1500);
+</script>"""
+    content = (f'<h1>Da rivedere: tutte in una pagina</h1><p><a href="/">← elenco</a></p>'
+               f'{sections or "<p>niente da rivedere</p>"}{script}')
+    return page("Da rivedere", content)
 
 
 def parse_range(header: str, size: int) -> tuple[int, int] | None:
@@ -130,6 +178,8 @@ def make_handler(reviews_dir: str):
             url = urlparse(self.path)
             if url.path == "/":
                 return self.send_bytes(200, index_page(reviews_root), CONTENT_TYPES[".html"])
+            if url.path == "/tutte":
+                return self.send_bytes(200, unified_page(reviews_root), CONTENT_TYPES[".html"])
             if url.path == "/file":
                 path = os.path.abspath(unquote(parse_qs(url.query).get("p", [""])[0]))
                 if not any(path.lower().startswith(root) for root in media_roots) or not os.path.isfile(path):
