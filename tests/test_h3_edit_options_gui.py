@@ -56,7 +56,7 @@ def test_model_menu_lists_profiles_and_custom_dits_with_missing_ones_marked(qapp
     monkeypatch.setattr(veng, "_present", lambda item: item not in ("mmh3-ref2va-int8", "mmh3-ref2va-fp8"))
     tab._fill_h3_models()
     ids = [tab.h3_profile.itemData(i) for i in range(tab.h3_profile.count())]
-    assert ids == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b6", "mmh3-dit-dasiwa-v4", "mmh3-dit-rockerboo-nvfp4"]
+    assert ids == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-rockerboo-nvfp4"]
     assert "non installato" in tab.h3_profile.itemText(0).lower() and "non installato" not in tab.h3_profile.itemText(2).lower()
     assert tab.h3_profile.currentData() == "nvfp4"                                       # come prima: il primo profilo installato
 
@@ -105,8 +105,8 @@ def test_turbo_without_ref2va_version_is_listed_but_disabled_with_the_reason(tab
 
 
 def test_turbo_fused_dit_disables_the_turbo_menu_and_shows_its_own_steps(tab):
-    tab.h3_profile.setCurrentIndex(tab.h3_profile.findData("mmh3-dit-10erosmax-b6")); tab._sync_h3_turbo_info()
-    assert not tab.h3_turbo.isEnabled() and "8" in tab.h3_turbo_info.text() and "10" in tab.h3_turbo_info.text()
+    tab.h3_profile.setCurrentIndex(tab.h3_profile.findData("mmh3-dit-10erosmax-b7")); tab._sync_h3_turbo_info()
+    assert not tab.h3_turbo.isEnabled() and "8" in tab.h3_turbo_info.text() and "12" in tab.h3_turbo_info.text()
 
 
 def test_lora_rows_are_checked_by_header_keys_and_fl2va_only_ones_are_disabled(tab):

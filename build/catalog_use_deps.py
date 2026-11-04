@@ -208,7 +208,7 @@ MAP: dict[str, tuple[list[str], list[str]]] = {
     "mmh3-veda-r2va": (["veda_sparse"], []),
     "mmh3-adaln-affine-fl": (["distill_lora"], []), "mmh3-adaln-affine-ref": (["distill_lora"], []),
     "mmh3-turbo-v4-fl2v": (["distill_lora"], []), "mmh3-turbo-v4-ref2v": (["distill_lora"], []),
-    "mmh3-dit-10erosmax-b6": (["ckpt_video", "distilled", "q_int8", "uncensored"], []),
+    "mmh3-dit-10erosmax-b7": (["ckpt_video", "distilled", "q_int8", "uncensored"], []),
     "mmh3-lora-unlocked-v2": (["lora_style", "uncensored"], []),
     "mmh3-lora-aftermidnight": (["lora_style", "uncensored"], []),
     "krea2-noct-v4": (["ckpt_image", "distilled", "q_int8", "uncensored"], []),

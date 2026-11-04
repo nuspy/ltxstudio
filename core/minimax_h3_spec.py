@@ -29,8 +29,9 @@ PROFILES = {
 # chiavi del DiT pruned ufficiale). turbo_fused = turbo già nei pesi: niente LoRA turbo, passi e shift propri.
 CUSTOM_DITS = {
     "mmh3-dit-pinkcherry18": {"label": "PinkCherry H3 v1.8", "modes": ("fl2va", "ref2va")},
-    "mmh3-dit-10erosmax-b6": {"label": "10Eros-Max beta6 Turbo", "modes": ("fl2va", "ref2va"),
-                              "turbo_fused": True, "nfe": 8, "video_shift": 10.0},
+    # beta7 fix1 (int8 «HQ», bordi BF16): turbo gia fuso, 8 passi, shift video 12 / audio 3. L'autore la consiglia con attenzione sparsa video (VSA) e sparsita 90 %.
+    "mmh3-dit-10erosmax-b7": {"label": "10Eros-Max beta7 Turbo", "modes": ("fl2va", "ref2va"),
+                              "turbo_fused": True, "nfe": 8, "video_shift": 12.0, "hint_key": "vedit.h3.model.b7hint"},
     # base Ref2VA (adaln_t_table e norme identici al pruned Ref2VA ufficiale), «Hybrid» per l'autore: int4 W4A8
     "mmh3-dit-dasiwa-v4": {"label": "DaSiWa Hybrid v4 (int4)", "modes": ("fl2va", "ref2va")},
     # nvfp4 MISTA di rockerBOO (Ref2VA pruned: qkv int8-ConvRot, bordi e out_proj in BF16, resto nvfp4; layer config a parte): risposta al sospetto che i nostri nvfp4

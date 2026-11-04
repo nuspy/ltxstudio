@@ -3851,5 +3851,6 @@
   "vedit.h3.translate": "Traduzir e enriquecer o texto em inglês",
   "vedit.h3.translate.tt": "O modelo entende inglês: o local, a descrição da foto e o sujeito escritos em outro idioma são traduzidos (local e foto também enriquecidos com detalhes) com o enhancer local, uma vez por trabalho e antes dos clipes. O sujeito é apenas traduzido, nunca enriquecido (é o rótulo para o SAM). Texto já em inglês: nada é feito. Se o enhancer não estiver disponível, o texto original é enviado.",
   "vedit.h3.text_result": "Texto enviado ao modelo: {t}",
-  "vedit.h3.turbo.dmad4": "Turbo DMAD 4 passos full · 6 passos (como o Openjutsu, Ref2VA)"
+  "vedit.h3.turbo.dmad4": "Turbo DMAD 4 passos full · 6 passos (como o Openjutsu, Ref2VA)",
+  "vedit.h3.model.b7hint": "Conselho do autor: rende melhor com atenção esparsa de vídeo (VSA) e esparsidade de 90 %. Aqui a atenção esparsa liga-se com a caixa «Atenção esparsa Veda»."
 }

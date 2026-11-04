@@ -4503,29 +4503,30 @@
       ]
     },
     {
-      "id": "mmh3-dit-10erosmax-b6",
+      "id": "mmh3-dit-10erosmax-b7",
       "module": "Video",
-      "label": "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)",
+      "label": "10Eros-Max H3 beta7 fix1 Turbo 8 passi (18+, INT8 HQ, bordi BF16, ~22GB)",
       "kind": "file",
       "type": "diffusion_models",
       "family": "MiniMax-H3",
       "gated": false,
-      "approx_gb": 21.71,
+      "approx_gb": 22.9,
       "scan_names": [
-        "10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors"
+        "10Eros_Max_h3_8stepTURBO_beta7_fix1_int8HQ-native.safetensors"
       ],
       "category": "video",
       "arch": "minimax_h3",
       "repo_id": "TenStrip/10Eros-Max",
       "url": "https://huggingface.co/TenStrip/10Eros-Max",
-      "filename": "10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors",
-      "remote_filename": "10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors",
+      "filename": "10Eros_Max_h3_8stepTURBO_beta7_fix1_int8HQ-native.safetensors",
+      "remote_filename": "10Eros_Max_h3_8stepTURBO_beta7_fix1-native_int8_protected_edges_HQ.safetensors",
       "sensitivity": "adult",
-      "note": "turbo già fuso: 8-12 passi, shift 10/3, NIENTE LoRA turbo. Licenza H3 Community (no UE/UK/USA/Corea)",
+      "note": "turbo gia fuso: 8 passi, shift video 12 / audio 3, NIENTE LoRA turbo. L'autore la consiglia con attenzione sparsa video (VSA) e sparsita 90 %. Il file dell'autore si chiama «-native» ma ha chiavi ComfyUI (adaln_t_table, audio_patch_proj, 892 tensori): la conversione le porta al nostro formato. Licenza H3 Community (no UE/UK/USA/Corea)",
       "used_by": [
         "cap.video_minimax_h3"
       ],
       "convert": "mmh3_dit",
+      "keep_source": true,
       "use": [
         "ckpt_video",
         "distilled",

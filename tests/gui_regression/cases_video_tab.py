@@ -623,11 +623,11 @@ def case_h3_custom_dit(w, spy):
     assert not any(keys()), f"DiT 18+ visibili in SFW: {keys()}"
     t.nsfw.setCurrentText("NSFW")
     i = next((i for i in range(t.model.count())
-              if (t.model.itemData(i) or {}).get("h3_dit") == "mmh3-dit-10erosmax-b6"), -1)
+              if (t.model.itemData(i) or {}).get("h3_dit") == "mmh3-dit-10erosmax-b7"), -1)
     assert i >= 0, f"10Eros-Max assente in NSFW: {keys()}"
     t.model.setCurrentIndex(i)
     v = t.get_values()
-    assert v.get("model_kind") == "minimax_h3" and v.get("h3_dit") == "mmh3-dit-10erosmax-b6", v
+    assert v.get("model_kind") == "minimax_h3" and v.get("h3_dit") == "mmh3-dit-10erosmax-b7", v
     t.nsfw.setCurrentText("SFW")
     t.video_arch.setCurrentIndex(t.video_arch.findData("ltx"))
 

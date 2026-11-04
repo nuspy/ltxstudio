@@ -48,6 +48,11 @@ _LORA = "LTX-2/"
 MODES = vem.legacy_modes()
 
 # default italiani (i18n: chiavi vedit.*, 15 lingue)
+_MODEL_HINTS = {          # note dell'autore sulle voci del menu «Modello H3» (testo di ripiego in italiano; le traduzioni sono nei file i18n)
+    "vedit.h3.model.b7hint": "Consiglio dell'autore: rende meglio con attenzione sparsa video (VSA) e sparsità 90 %. "
+                             "Qui l'attenzione sparsa si accende con la casella «Attenzione sparsa Veda».",
+}
+
 _MODE_DEFAULT = {
     "edit": "Modifica globale (edit-anything)", "inpaint": "Inpaint oggetto (sperimentale)",
     "change_background": "Cambia sfondo (tieni la persona)",
@@ -1339,6 +1344,9 @@ class VideoEditAITab(QWidget):
         for c in vh3.model_choices():
             lab = c["label"] if c["installed"] else tr("vedit.h3.model.missing", "{label} — non installato").format(label=c["label"])
             self.h3_profile.addItem(lab, c["id"])
+            hint_key = h3s.CUSTOM_DITS.get(c["id"], {}).get("hint_key")
+            if hint_key:                                     # nota dell'autore del modello, mostrata sulla voce del menu
+                self.h3_profile.setItemData(self.h3_profile.count() - 1, tr(hint_key, _MODEL_HINTS[hint_key]), Qt.ToolTipRole)
             if c["installed"] and first is None and c["kind"] == "profile":
                 first = c["id"]
         j = self.h3_profile.findData(cur)
