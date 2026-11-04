@@ -80,7 +80,7 @@ class FakeW:
     def _drop_module_weights(m): events.append("drop:" + type(m).__name__)
 
     @staticmethod
-    def load_vae(W):
+    def load_vae(W, encoder_only=False):
         events.append("load:vae")
         return torch.nn.Linear(1, 1)
 

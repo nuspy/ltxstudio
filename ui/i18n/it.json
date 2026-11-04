@@ -3891,5 +3891,7 @@
   "vedit.h3.translate.tt": "Il modello capisce l'inglese: luogo, descrizione della foto e soggetto scritti in un'altra lingua vengono tradotti (luogo e foto anche arricchiti di dettagli) con l'enhancer locale, una volta per lavoro e prima dei clip. Il soggetto e solo tradotto, mai arricchito (e l'etichetta per SAM). Testo gia inglese: nessuna elaborazione. Se l'enhancer non e disponibile parte il testo originale.",
   "vedit.h3.text_result": "Testo inviato al modello: {t}",
   "vedit.h3.turbo.dmad4": "Turbo DMAD 4 passi full · 6 passi (come Openjutsu, Ref2VA)",
-  "vedit.h3.model.b7hint": "Consiglio dell'autore: rende meglio con attenzione sparsa video (VSA) e sparsità 90 %. Qui l'attenzione sparsa si accende con la casella «Attenzione sparsa Veda»."
+  "vedit.h3.model.b7hint": "Consiglio dell'autore: rende meglio con attenzione sparsa video (VSA) e sparsità 90 %. Qui l'attenzione sparsa si accende con la casella «Attenzione sparsa Veda».",
+  "vedit.h3.ref_full": "Video di movimento a risoluzione piena (più lento)",
+  "vedit.h3.ref_full.tt": "Il riferimento di movimento porta posa e tempi, non i dettagli: di solito bastano ~512 px sul lato lungo (come l'originale), con molto meno testo da codificare e meno memoria. Spuntato lo tiene alla risoluzione del video generato: più lento, senza un vantaggio dimostrato."
 }

@@ -416,6 +416,13 @@ def _weights_gb(path: str) -> float:
         return 0.0
 
 
+def reference_video_canvas_for(p: dict, height: int, width: int) -> dict:
+    """Tela del video di movimento di una richiesta: negli edit (`_h3_edit`) lato lungo `h3_ref_max_side` (default S.REF_VIDEO_MAX_SIDE, 0 = tela piena);
+    altrimenti la tela del bersaglio, come il pipeline di default."""
+    max_side = int(p.get("h3_ref_max_side", S.REF_VIDEO_MAX_SIDE)) if p.get("_h3_edit") else 0
+    return S.reference_video_canvas(height, width, max_side)
+
+
 def _canvas_hw(kw: dict, canvas: tuple) -> tuple:
     """(altezza, larghezza) che avrebbe la tela 544p con lo stesso rapporto della richiesta."""
     from diffusers.modular_pipelines.minimax_h3.modular_pipeline import resolve_canvas_size
@@ -433,7 +440,8 @@ def _preflight(W: dict, p: dict, mode: str, kw: dict, free_gb: float, frames: in
         dims = dict(HP.DEFAULT_DIMS)
     h, w = int(kw["height"]), int(kw["width"])
     keyframes = int(bool(p.get("image_path"))) + int(bool(p.get("last_image_path")))
-    refs = (HP.ref_rows_estimate(p.get("references"), int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE), h, w)
+    video_canvas = reference_video_canvas_for(p, h, w)
+    refs = (HP.ref_rows_estimate(p.get("references"), int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE), h, w, (video_canvas["height"], video_canvas["width"]))
             if mode == "ref2va" else 0)
     gsteps = int(kw.get("_guide_steps") or 0)
     if gsteps:                                       # la guida e un blocco di righe condizione in piu, come un riferimento video
@@ -625,9 +633,12 @@ def run(p: dict) -> str:
     if edit:
         # I VIDEO di riferimento vengono portati sulla tela di `canvas_short_edge` (default del pacchetto 768, max 768x1344): il riferimento dell'edit
         # va alla STESSA tela del bersaglio (480p), altrimenti ha 2,5x i token del previsto (giro 02/11: righe di riferimento 26k invece di 10k,
-        # OOM nel DiT; sequenza del TE ~9k token, OOM da 9 GB nell'attenzione).
+        # OOM nel DiT; sequenza del TE ~9k token, OOM da 9 GB nell'attenzione). Dal 04/11 il riferimento sta a ~512 px sul lato lungo come nell'originale
+        # (S.REF_VIDEO_MAX_SIDE; h3_ref_max_side=0 = tela del bersaglio): posa e tempi non vogliono piu pixel.
         _th, _tw = edit["canvas"]
-        st.update_components(canvas_short_edge=int(min(_th, _tw)), canvas_max_pixels=int(_th * _tw))
+        video_canvas = reference_video_canvas_for(p, _th, _tw)
+        st.update_components(canvas_short_edge=int(video_canvas["short_edge"]), canvas_max_pixels=int(video_canvas["max_pixels"]))
+        _log(f"video di riferimento (movimento): tela {video_canvas['width']}x{video_canvas['height']} (bersaglio {_tw}x{_th}, lato lungo {int(p.get('h3_ref_max_side', S.REF_VIDEO_MAX_SIDE)) or 'pieno'})")
         # Anche le FOTO di riferimento alla tela del bersaglio: nel workflow MIT di Openjutsu (simple.api.json, nodo MiniMaxH3ReferenceToVideo) l'input
         # `ref_image_size` e «match». A 1024 di lato corto una foto vale ~1,7k token nel TE e nel DiT, alla tela 480 sono ~0,4k.
         st.update_components(reference_image_short_edge=int(min(_th, _tw)))

@@ -95,9 +95,10 @@ def sequence_tokens(num_frames: int, height: int, width: int, *, text_tokens: in
     return int(text_tokens) + int(keyframes) * rpf + audio + latent_frames(num_frames) * rpf + int(ref_rows)
 
 
-def ref_rows_estimate(references: list | None, short_edge: int, height: int, width: int) -> int:
+def ref_rows_estimate(references: list | None, short_edge: int, height: int, width: int, video_hw: tuple | None = None) -> int:
     """Righe dei riferimenti Ref2VA: ogni immagine a `short_edge` di lato corto (≈16:9 se ignoto), ogni video
-    come 8 fotogrammi latenti alla tela. Stima per eccesso, serve solo a non sbagliare di molto."""
+    come 8 fotogrammi latenti alla tela (`video_hw` = (altezza, larghezza) della tela del video di riferimento, se e piu piccola di quella del bersaglio).
+    Stima per eccesso, serve solo a non sbagliare di molto."""
     total = 0
     step = VAE_SPATIAL * PATCH
     for r in references or []:
@@ -108,7 +109,7 @@ def ref_rows_estimate(references: list | None, short_edge: int, height: int, wid
             # un riferimento di MOVIMENTO e breve (8 frame di latente), ma nell'edit il video di riferimento e il clip INTERO: se la richiesta
             # dice quanti frame ha (`frames`) si contano i suoi frame di latente veri (giro 02/11: stimati 8, erano 42 -> piano sbagliato, OOM)
             n = int((r or {}).get("frames") or 0)
-            total += (latent_frames(n) if n >= 5 else 8) * rows_per_latent_frame(height, width)
+            total += (latent_frames(n) if n >= 5 else 8) * rows_per_latent_frame(*(video_hw or (height, width)))
     return total
 
 

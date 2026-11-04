@@ -1264,6 +1264,13 @@ class VideoEditAITab(QWidget):
         self.h3_text_result.setStyleSheet("color:#74c0fc;")
         self.h3_text_result.setVisible(False)
         g.addRow("", self.h3_text_result)
+        # Video di movimento (<Video 1>): di default a ~512 px sul lato lungo, come l'originale; a tela piena e piu lento e pesa di piu in memoria.
+        self.h3_ref_full_res = QCheckBox(tr("vedit.h3.ref_full", "Video di movimento a risoluzione piena (piu lento)"))
+        self.h3_ref_full_res.setMinimumHeight(32)
+        self.h3_ref_full_res.setToolTip(tr("vedit.h3.ref_full.tt", "Il riferimento di movimento porta posa e tempi, non i dettagli: di solito basta ~512 px sul lato lungo (come "
+                                           "l'originale), con molto meno testo da codificare e meno memoria. Spuntato lo tiene alla risoluzione del video generato: piu lento, "
+                                           "senza un vantaggio dimostrato."))
+        g.addRow("", self.h3_ref_full_res)
         self.h3_guide = QCheckBox(tr("vedit.h3.guide", "Guida di latenti allineata (prova)"))
         self.h3_guide.setToolTip(tr("vedit.h3.guide.tt", "Il video sorgente entra anche come blocco di latenti puliti sulla stessa griglia (spazio e tempo) del risultato, "
                                     "oltre al riferimento <Video 1>. Le LoRA di guida (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidezza) la richiedono "
@@ -1419,6 +1426,8 @@ class VideoEditAITab(QWidget):
         out = {"h3_turbo": self.h3_turbo.currentData() or vh3.DEFAULT_TURBO}
         if self.h3_translate.isChecked():
             out["h3_translate"] = True
+        if self.h3_ref_full_res.isChecked():
+            out["h3_ref_full_res"] = True
         if self.h3_te.currentData():
             out["h3_te"] = self.h3_te.currentData()
         if self.h3_veda.isChecked():

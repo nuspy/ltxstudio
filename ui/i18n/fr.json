@@ -3852,5 +3852,7 @@
   "vedit.h3.translate.tt": "Le modèle comprend l'anglais : le lieu, la description de la photo et le sujet écrits dans une autre langue sont traduits (lieu et photo aussi enrichis de détails) avec l'enhancer local, une fois par tâche et avant les clips. Le sujet est seulement traduit, jamais enrichi (c'est l'étiquette pour SAM). Texte déjà en anglais : rien n'est fait. Si l'enhancer n'est pas disponible, le texte original est envoyé.",
   "vedit.h3.text_result": "Texte envoyé au modèle : {t}",
   "vedit.h3.turbo.dmad4": "Turbo DMAD 4 étapes full · 6 étapes (comme Openjutsu, Ref2VA)",
-  "vedit.h3.model.b7hint": "Conseil de l'auteur : meilleur rendu avec l'attention parcimonieuse vidéo (VSA) et 90 % de parcimonie. Ici elle s'active avec la case « Attention parcimonieuse Veda »."
+  "vedit.h3.model.b7hint": "Conseil de l'auteur : meilleur rendu avec l'attention parcimonieuse vidéo (VSA) et 90 % de parcimonie. Ici elle s'active avec la case « Attention parcimonieuse Veda ».",
+  "vedit.h3.ref_full": "Vidéo de mouvement en pleine résolution (plus lent)",
+  "vedit.h3.ref_full.tt": "La référence de mouvement porte la pose et le rythme, pas les détails : ~512 px sur le grand côté suffisent en général (comme l'original), avec bien moins de texte à encoder et moins de mémoire. Cochée, elle reste à la résolution de la vidéo générée : plus lent, sans avantage démontré."
 }

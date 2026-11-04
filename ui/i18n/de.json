@@ -3852,5 +3852,7 @@
   "vedit.h3.translate.tt": "Das Modell versteht Englisch: Ort, Fotobeschreibung und Motiv in einer anderen Sprache werden mit dem lokalen Enhancer übersetzt (Ort und Foto zusätzlich mit Details angereichert), einmal pro Auftrag und vor den Clips. Das Motiv wird nur übersetzt, nie angereichert (es ist das SAM-Label). Bereits englischer Text: nichts passiert. Ist der Enhancer nicht verfügbar, wird der Originaltext gesendet.",
   "vedit.h3.text_result": "An das Modell gesendeter Text: {t}",
   "vedit.h3.turbo.dmad4": "Turbo DMAD 4 Schritte full · 6 Schritte (wie Openjutsu, Ref2VA)",
-  "vedit.h3.model.b7hint": "Empfehlung des Autors: bessere Ergebnisse mit Video-Sparse-Attention (VSA) und 90 % Sparsity. Hier schaltet das Kästchen «Veda Sparse Attention» sie ein."
+  "vedit.h3.model.b7hint": "Empfehlung des Autors: bessere Ergebnisse mit Video-Sparse-Attention (VSA) und 90 % Sparsity. Hier schaltet das Kästchen «Veda Sparse Attention» sie ein.",
+  "vedit.h3.ref_full": "Bewegungsvideo in voller Auflösung (langsamer)",
+  "vedit.h3.ref_full.tt": "Die Bewegungsreferenz trägt Pose und Timing, keine Details: meist reichen ~512 px an der langen Seite (wie im Original), mit viel weniger Text zu kodieren und weniger Speicher. Aktiviert bleibt sie in der Auflösung des erzeugten Videos: langsamer, ohne nachgewiesenen Vorteil."
 }

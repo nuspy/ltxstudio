@@ -187,3 +187,15 @@ def test_translate_strings_exist_in_all_15_languages():
         for k in ("vedit.h3.translate", "vedit.h3.translate.tt", "vedit.h3.text_result"):
             assert d.get(k), (f.name, k)
         assert "{t}" in d["vedit.h3.text_result"]
+
+
+def test_ref_full_res_checkbox_is_off_by_default_and_reaches_the_cfg(tab):
+    assert not tab.h3_ref_full_res.isChecked() and tab.h3_ref_full_res.isVisibleTo(tab)
+    assert "h3_ref_full_res" not in _go(tab)                                    # default: il video di movimento sta a ~512 px
+    tab.h3_ref_full_res.setChecked(True)
+    assert _go(tab)["h3_ref_full_res"] is True
+    import json
+    from pathlib import Path
+    for f in sorted((Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")):
+        d = json.loads(f.read_text("utf-8"))
+        assert d.get("vedit.h3.ref_full") and d.get("vedit.h3.ref_full.tt"), f.name

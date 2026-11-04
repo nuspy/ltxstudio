@@ -360,11 +360,12 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     done = 0
     seed0 = int(p.get("seed") or 0)
     st = os.stat(src)
+    from core.minimax_h3_spec import REF_VIDEO_MAX_SIDE                 # il riferimento di movimento cambia i clip: nella chiave dei checkpoint
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), ("refmaxside", int(p.get("h3_ref_max_side", REF_VIDEO_MAX_SIDE))), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)

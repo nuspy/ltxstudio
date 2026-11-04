@@ -63,6 +63,24 @@ ASPECTS = {"16:9": (16, 9), "9:16": (9, 16), "21:9": (21, 9), "4:3": (4, 3), "3:
 CANVAS = {"768": (768, 768 * 1344), "544": (544, 544 * 960)}     # lato corto, area massima
 
 MAX_REFS = {"image": 9, "video": 3, "audio": 3, "total": 12}
+
+# Lato lungo del video di MOVIMENTO (<Video 1>) negli edit: come l'originale Openjutsu (object/simple.api.json, nodo «Motion reference video (~512 px)»,
+# ImageScaleToMaxDimension 512). Il riferimento porta posa e tempi, non i dettagli: a 736p (1344x736) a tela piena ha ~6,7 volte i pixel (token del testo,
+# codifica VAE e righe di riferimento nel DiT). 0 = tela del bersaglio, come prima del 04/11.
+REF_VIDEO_MAX_SIDE = 512
+
+
+def reference_video_canvas(height: int, width: int, max_side: int = REF_VIDEO_MAX_SIDE, multiple: int = 32) -> dict:
+    """Tela del video di riferimento di un edit: {short_edge, max_pixels, height, width}. `short_edge` e `max_pixels` sono i valori da dare a
+    `canvas_short_edge` / `canvas_max_pixels` del pipeline (resolve_canvas_size ricava la tela dal rapporto del video, arrotondata a `multiple`);
+    `height`/`width` la tela che ne risulta. `max_side` <= 0 o non piu piccolo della tela: la tela del bersaglio."""
+    if max_side <= 0 or max_side >= max(height, width):
+        return {"short_edge": min(height, width), "max_pixels": height * width, "height": height, "width": width}
+    short_edge = max(multiple, round(min(height, width) * max_side / max(height, width)))
+    ratio = width / height
+    float_width, float_height = (short_edge * ratio, float(short_edge)) if ratio >= 1.0 else (float(short_edge), short_edge / ratio)
+    return {"short_edge": short_edge, "max_pixels": 4 * max_side * max_side, "height": max(multiple, round(float_height / multiple) * multiple),
+            "width": max(multiple, round(float_width / multiple) * multiple)}
 DIALOGUE_LANGS = ("Italian", "English", "Chinese", "Spanish", "French", "German", "Portuguese",
                   "Japanese", "Korean", "Russian", "Arabic")
 

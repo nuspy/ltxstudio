@@ -68,7 +68,7 @@ class FakeW:
     def _drop_module_weights(m): pass
 
     @staticmethod
-    def load_vae(W): return torch.nn.Linear(1, 1)
+    def load_vae(W, encoder_only=False): return torch.nn.Linear(1, 1)
 
     @staticmethod
     def load_audio_vae(W): return torch.nn.Linear(1, 1)
