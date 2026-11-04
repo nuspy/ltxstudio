@@ -46,3 +46,33 @@ def test_worker_selects_the_scheduler_class_and_default_table_is_empty():
 def test_scheduler_against_the_reference_formulas_with_the_real_base_class():
     result = subprocess.run([VENV_PY, str(ROOT / "tests" / "h3_renoise_scheduler_check.py")], capture_output=True, text=True, timeout=600)
     assert "RENOISE OK" in result.stdout, result.stdout[-800:] + result.stderr[-1000:]
+
+
+def test_keyframe_conditions_are_rounded_to_bf16_only_for_fl2va_with_a_turbo_that_declares_it(monkeypatch, capsys):
+    worker = pytest.importorskip("minimax_h3_infer")
+    from core import minimax_h3_spec as spec
+    monkeypatch.setitem(spec.TURBO_SAMPLER, "pika_probe", {"method": "renoise", "knots": KNOTS, "keyframe_bf16": True})
+
+    class State:
+        def __init__(self, latents):
+            self.values = {"condition_latents": latents}
+
+        def get(self, key):
+            return self.values.get(key)
+
+        def set(self, key, value):
+            self.values[key] = value
+
+    latent = torch.randn(1, 24, 1, 4, 4)
+    state = State([latent.clone()])
+    worker.round_keyframe_conditions(state, "pika_probe", "fl2va")
+    rounded = state.values["condition_latents"][0]
+    assert rounded.dtype == torch.float32 and torch.equal(rounded, latent.to(torch.bfloat16).to(torch.float32)) and not torch.equal(rounded, latent)
+    assert "bf16_conditioning_v1" in capsys.readouterr().out
+    for turbo, mode in (("pika_probe", "ref2va"), ("v4", "fl2va"), ("", "fl2va")):                  # Ref2VA, turbo normali: niente
+        untouched = State([latent.clone()])
+        worker.round_keyframe_conditions(untouched, turbo, mode)
+        assert torch.equal(untouched.values["condition_latents"][0], latent)
+    worker.round_keyframe_conditions(State([]), "pika_probe", "fl2va")                              # senza keyframe: nessun errore
+    source = (ROOT / "workers" / "minimax_h3_infer.py").read_text(encoding="utf-8")
+    assert "round_keyframe_conditions(state, turbo, mode)" in source

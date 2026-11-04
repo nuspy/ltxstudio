@@ -503,6 +503,18 @@ def cap_fraction(free_gb: float, total_gb: float, reserved_gb: float = 0.0) -> f
     return max(0.2, min(1.0, (free_gb + reserved_gb - 0.4) / total_gb))
 
 
+def round_keyframe_conditions(state, turbo: str, mode: str) -> None:
+    """Pika H3 Flex FL2VA (`bf16_conditioning_v1` del manifest, diffusers d0b9b1b5 encoders.py:~373): i latenti di condizionamento dei keyframe si arrotondano a bf16 prima
+    del denoise. Solo con una turbo che lo dichiara (S.TURBO_SAMPLER[...]["keyframe_bf16"]) e solo in FL2VA: Ref2VA usa `fp32_conditioning_v1`, cioe quello di sempre."""
+    import torch
+    sampler = S.TURBO_SAMPLER.get(turbo or "") or {}
+    latents = state.get("condition_latents")
+    if mode != "fl2va" or not sampler.get("keyframe_bf16") or not latents:
+        return
+    state.set("condition_latents", [item.to(torch.bfloat16).to(torch.float32) for item in latents])
+    _log(f"condizionamento dei keyframe arrotondato a bf16 ({len(latents)} latenti): politica bf16_conditioning_v1 della turbo {turbo}")
+
+
 def scheduler_classes(turbo: str, seed: int) -> tuple:
     """(classe dello scheduler video, classe dello scheduler audio): l'Euler di diffusers, o per le turbo con campionatore proprio (S.TURBO_SAMPLER, es. Pika a 6 passi)
     la sottoclasse «renoise» con la griglia dei nodi dell'adattatore. Video e audio hanno semi di rumore diversi."""
@@ -743,6 +755,7 @@ def run(p: dict) -> str:
             st = _stage(blocks, g_venc, comps)
             state = st(state=state, **_inputs_for(st, kw))
             del st
+            round_keyframe_conditions(state, turbo, mode)
         if guide and guide["latents"] is None:
             t2 = time.time()
             fr = HG.read_guide_frames(guide["video"], int(kw["width"]), int(kw["height"]), guide["guide_frames"])
