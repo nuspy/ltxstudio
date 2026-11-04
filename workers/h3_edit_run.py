@@ -446,6 +446,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 run_clip_with_fallback(W, clip_runner, str(jd))
                 _ensure(gen_p.exists(), f"il clip {ci + 1} non ha prodotto {gen_p}")
                 key_p.write_text(key)
+                (jd / "te_state.pt").unlink(missing_ok=True)               # la cache del testo serve solo a un riavvio dopo OOM: a clip riuscito si toglie
             gen_f = torch.from_numpy(_np.load(gen_p)).float() / 255.0
             _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")
             gen_f = gen_f[:length]
@@ -478,6 +479,12 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                  audio=audio, audio_sample_rate=_SRC_AUDIO_SR if audio is not None else None)
     W._log(f"edit finito in {time.time() - t_all:.0f}s -> {out}")
     return out
+
+
+def _want_key(job_dir: Path) -> str:
+    """Chiave del clip che run_edit scrive prima di lanciare il figlio ('' se manca: allora la cache del testo non si usa)."""
+    path = job_dir / "want_key.txt"
+    return path.read_text(encoding="utf-8").strip() if path.is_file() else ""
 
 
 def generate_clip(job_dir: str, W) -> None:
@@ -533,7 +540,8 @@ def generate_clip(job_dir: str, W) -> None:
     pc = dict(base)
     pc.update(prompt=prompt, references=refs, seed=m["seed"], num_frames=length, duration_s=length / FPS, width=tw, height=th,
               generate_audio=False, _h3_edit={"noise": noise, "audio_noise": audio_noise, "video_hold": video_hold, "audio_hold": audio_hold,
-                                              "frames": length, "canvas": (th, tw)})
+                                              "frames": length, "canvas": (th, tw),
+                                              "text_cache": {"path": str(jd / "te_state.pt"), "key": _want_key(jd)}})
     if m.get("guide"):
         # Guida allineata: il clip sorgente (i suoi latenti, GIA calcolati per le righe tenute) entra anche come blocco di condizione sulla griglia del
         # video generato (workers/h3_guide.py). Si aggiunge al riferimento nativo <Video 1>; le LoRA di guida (VFX Edit, Style Transfer...) la vogliono.

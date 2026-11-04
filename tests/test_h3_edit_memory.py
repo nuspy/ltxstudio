@@ -60,7 +60,7 @@ def test_decode_frees_both_vaes_even_if_something_still_references_them():
             return {"videos": ["v"], "audio": ["a"], "sampling_rate": 32000}
         return run_stage
 
-    res = REAL._decode_and_free(None, ["decode"], {}, {}, load_vae_fn=lambda W: mk("vae"), load_avae_fn=lambda W: mk("avae"), stage_fn=fake_stage)
+    res = REAL._decode_and_free(None, ["decode"], {}, {}, load_vae_fn=lambda W, **kw: mk("vae"), load_avae_fn=lambda W: mk("avae"), stage_fn=fake_stage)
     assert res["videos"] == ["v"] and events == ["load:vae", "load:avae", "stage", "decode"]
     assert len(keep) == 2 and all(p.numel() == 0 for m in keep for p in m.parameters()), "VAE ancora carichi dopo la decodifica"
 

@@ -201,8 +201,8 @@ def load_transformer(W: dict, mode: str, p: dict):
     return tr
 
 
-def load_vae(W: dict, encoder_only: bool = False, device: str = "cuda"):
-    """VAE video in fp32. `encoder_only`: solo encoder e quant_conv (0,7 GB invece di 9,7: il decoder e 4,5 dei 4,85 GB del file fp16), per le codifiche di riferimenti,
+def load_vae(W: dict, encoder_only: bool = False, device: str = "cuda", dtype=None):
+    """VAE video in fp32 (`dtype` None) o nel dtype dato (il decode lo vuole fp16, vedi `decode_dtype`). `encoder_only`: solo encoder e quant_conv (0,7 GB invece di 9,7: il decoder e 4,5 dei 4,85 GB del file fp16), per le codifiche di riferimenti,
     guida e clip sorgente. I pesi dell'encoder sono gli stessi fp16 del file portati a fp32: nessuna differenza numerica rispetto al VAE intero.
     A 736p il VAE intero (9,7 GB) piu il testo non liberato mandava in OOM la codifica del riferimento (turno 40 del 04/11)."""
     import torch
@@ -225,7 +225,7 @@ def load_vae(W: dict, encoder_only: bool = False, device: str = "cuda"):
     if W.get("vae_dec_lite") or W.get("vae_enc_lite"):
         _log("VAE video LightVAE Lite: " + " + ".join(n for n, k in (("decoder", "vae_dec_lite"),
                                                                     ("encoder", "vae_enc_lite")) if W.get(k)))
-    miss, unex = Q.load_into(vae, sd, device=device, dtype=torch.float32)
+    miss, unex = Q.load_into(vae, sd, device=device, dtype=dtype or torch.float32)
     del sd
     if encoder_only:                                   # il decoder resta su meta: si sostituisce, cosi .to(device) non lo tocca e nessuno lo usa per sbaglio
         miss = [key for key in miss if not key.startswith(VAE_DECODER_PREFIXES)]
@@ -503,12 +503,20 @@ def cap_fraction(free_gb: float, total_gb: float, reserved_gb: float = 0.0) -> f
     return max(0.2, min(1.0, (free_gb + reserved_gb - 0.4) / total_gb))
 
 
+def decode_dtype():
+    """Dtype dei pesi del VAE video al decode: fp16 (default) o fp32 (H3_VAE_DECODE_DTYPE=fp32). Il pipeline decodifica gia dentro un `torch.autocast(float16)` (diffusers
+    modular_pipelines/minimax_h3/decoders.py:~187) e il file del VAE e fp16: con i pesi fp16 i valori sono gli stessi dell'autocast (fp32 -> fp16 e esatto), meta memoria
+    (4,9 invece di 9,7 GB) e meta tempo di caricamento. Come ComfyUI (sd.py: working_dtypes del VAE H3 = fp16, fp32). Verificato su CPU: fp16 contro fp32 PSNR 63,5 dB."""
+    import torch
+    return torch.float32 if os.environ.get("H3_VAE_DECODE_DTYPE", "fp16").lower() == "fp32" else torch.float16
+
+
 def _decode_and_free(blocks, g_dec, W, state, *, load_vae_fn=None, load_avae_fn=None, stage_fn=None):
-    """Decodifica col VAE video (fp32, ~9,7 GB) e il VAE audio e LI SVUOTA SUBITO. Il `del st` da solo non li liberava (giro 02/11, edit a clip in
+    """Decodifica col VAE video (fp16, ~4,9 GB; fp32 con H3_VAE_DECODE_DTYPE=fp32) e il VAE audio e LI SVUOTA SUBITO. Il `del st` da solo non li liberava (giro 02/11, edit a clip in
     catena: dopo il decode del clip 1 restavano ~10 GB di VAE in VRAM e il DiT del clip 2 moriva per OOM a 27,7 GB allocati). Con un solo clip il
     problema non si vedeva perche il processo finiva."""
     lv, la, sf = load_vae_fn or load_vae, load_avae_fn or load_audio_vae, stage_fn or _stage
-    v, a = lv(W), la(W)
+    v, a = (lv(W, dtype=decode_dtype()) if lv is load_vae else lv(W)), la(W)
     st = sf(blocks, g_dec, {"vae": v, "audio_vae": a})
     try:
         return st(state=state, output=["videos", "audio", "sampling_rate"])
@@ -517,6 +525,90 @@ def _decode_and_free(blocks, g_dec, W, state, *, load_vae_fn=None, load_avae_fn=
         _drop_module_weights(a)
         del st, v, a
         _gc()
+
+
+def _encode_text(W: dict, p: dict, mode: str, kw: dict, edit, blocks_text, g_text: list):
+    """Fase del testo: carica il text encoder, codifica prompt e riferimenti, lo libera e ritorna lo stato del pipeline."""
+    import torch
+    from transformers import AutoTokenizer, Qwen3VLProcessor
+    cfgdir = Path(W["configs"])
+    t0 = time.time()
+    te = load_text_encoder(W)
+    _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
+    comps = dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
+                 processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor")))
+    st = _stage(blocks_text, g_text, comps)
+    if mode == "ref2va" and kw.get("references"):
+        # il pipeline porta ogni immagine di riferimento a 2048 px di lato corto (anche ingrandendola): con 32 GB
+        # l'attenzione del Qwen3-VL su quei token va in OOM (visto 27/09). 1024 = 4× meno token, identità intatta.
+        st.update_components(reference_image_short_edge=int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE))
+    if edit:
+        # I VIDEO di riferimento vengono portati sulla tela di `canvas_short_edge` (default del pacchetto 768, max 768x1344): il riferimento dell'edit
+        # va alla STESSA tela del bersaglio (480p), altrimenti ha 2,5x i token del previsto (giro 02/11: righe di riferimento 26k invece di 10k,
+        # OOM nel DiT; sequenza del TE ~9k token, OOM da 9 GB nell'attenzione). Dal 04/11 il riferimento sta a ~512 px sul lato lungo come nell'originale
+        # (S.REF_VIDEO_MAX_SIDE; h3_ref_max_side=0 = tela del bersaglio): posa e tempi non vogliono piu pixel.
+        _th, _tw = edit["canvas"]
+        video_canvas = reference_video_canvas_for(p, _th, _tw)
+        st.update_components(canvas_short_edge=int(video_canvas["short_edge"]), canvas_max_pixels=int(video_canvas["max_pixels"]))
+        _log(f"video di riferimento (movimento): tela {video_canvas['width']}x{video_canvas['height']} (bersaglio {_tw}x{_th}, lato lungo {int(p.get('h3_ref_max_side', S.REF_VIDEO_MAX_SIDE)) or 'pieno'})")
+        # Anche le FOTO di riferimento alla tela del bersaglio: nel workflow MIT di Openjutsu (simple.api.json, nodo MiniMaxH3ReferenceToVideo) l'input
+        # `ref_image_size` e «match». A 1024 di lato corto una foto vale ~1,7k token nel TE e nel DiT, alla tela 480 sono ~0,4k.
+        st.update_components(reference_image_short_edge=int(min(_th, _tw)))
+    import h3_te_attn as _TA                   # attenzione del TE a blocchi di query (esatta): niente matrice L x L in un colpo solo
+    # Cronometro per parte (03/11: ~100 s per clip nell'Edit H3 senza sapere dove): visione vs linguaggio, chiamate e lunghezza della sequenza
+    _tt, _hooks = {}, []
+
+    def _timed(name, mod):
+        def pre(_m, args, kwargs):
+            torch.cuda.synchronize()
+            _tt.setdefault(name, [0.0, 0, 0])[2] = time.time()
+        def post(_m, args, kwargs, out):
+            torch.cuda.synchronize()
+            r = _tt[name]
+            r[0] += time.time() - r[2]
+            r[1] += 1
+            x = kwargs.get("inputs_embeds") if isinstance(kwargs, dict) else None
+            if x is not None:
+                _tt[name + "_len"] = int(x.shape[-2])
+        _hooks.append(mod.register_forward_pre_hook(pre, with_kwargs=True))
+        _hooks.append(mod.register_forward_hook(post, with_kwargs=True))
+    inner = getattr(te, "model", te)
+    for _n in ("visual", "language_model"):
+        if getattr(inner, _n, None) is not None:
+            _timed(_n, getattr(inner, _n))
+    t1 = time.time()
+    with _TA.query_chunked_attention():
+        state = st(**_inputs_for(st, kw))
+    for h in _hooks:
+        h.remove()
+    _log("codifica TE: " + f"totale {time.time() - t1:.0f}s · " + " · ".join(
+        f"{k} {v[0]:.0f}s in {v[1]} chiamate" for k, v in _tt.items() if isinstance(v, list))
+        + (f" · sequenza {_tt['language_model_len']} token" if "language_model_len" in _tt else ""))
+    _drop_module_weights(te)                   # il `del` da solo non basta (visto sul DiT e sul VAE): i pesi del TE escono dalla VRAM comunque
+    del st, te, comps                          # comps teneva ancora il TE: senza, resta in VRAM
+    # Dopo `_drop_module_weights` restavano vivi ~12 GB di pesi quantizzati del TE (150 tensori uint8 da 65 MB, 100 da 21 MB, scale fp8): turno 40 del 04/11, 736p,
+    # OOM nella codifica del VAE con 28,75 GB allocati; e a 480p «transformer pronto» a 26,1 GB con DiT+LoRA da 12,6. Il DiT non e ancora caricato, quindi ogni tensore
+    # quantizzato grande ancora su GPU e del TE e si svuota sul posto.
+    _log(f"pesi quantizzati del testo ancora vivi: {purge_big_quantized_tensors(log=_log):.2f} GB liberati")
+    _gc()
+    _log(f"testo codificato in {time.time() - t0:.0f}s")
+
+    return state
+
+
+def _text_state(W: dict, p: dict, mode: str, kw: dict, edit, blocks_text, g_text: list):
+    """Stato del testo del clip: dalla cache del job se c'e (riavvio dopo OOM: niente ricodifica), altrimenti lo codifica e lo salva."""
+    from diffusers.modular_pipelines import PipelineState
+    import h3_te_cache
+    cache = h3_te_cache.TextStateCache.for_request(p, _log)
+    payload = cache.load() if cache else None
+    if payload is not None:
+        _log("testo: ripreso dalla cache del clip (nessuna ricodifica)")
+        return h3_te_cache.TextStateCache.restore(payload, kw, "cuda", PipelineState())
+    state = _encode_text(W, p, mode, kw, edit, blocks_text, g_text)
+    if cache:
+        cache.save(state.values, kw, state.kwargs_mapping)
+    return state
 
 
 def run(p: dict) -> str:
@@ -531,7 +623,6 @@ def run(p: dict) -> str:
     from diffusers.modular_pipelines.minimax_h3.modular_pipeline import resolve_canvas_size
     from diffusers.utils.export_utils import encode_video
     from PIL import Image
-    from transformers import AutoTokenizer, Qwen3VLProcessor
     torch.set_grad_enabled(False)
     t_all = time.time()
     try:
@@ -555,7 +646,6 @@ def run(p: dict) -> str:
     _log(f"{mode} · {p.get('h3_dit') or 'profilo ' + str(p.get('h3_profile') or 'nvfp4')} · "
          f"VRAM libera {free0:.1f}/{total:.1f} GB")
 
-    cfgdir = Path(W["configs"])
     wf = "ref2va" if mode == "ref2va" else ("fl2va" if (p.get("image_path") or p.get("last_image_path")) else "t2va")
     blocks = MiniMaxH3Blocks().get_workflow(wf)
     edit = p.get("_h3_edit")                                     # edit con maschera a clip (workers/h3_edit_run.py): lunghezza e tela le decide lui
@@ -622,67 +712,8 @@ def run(p: dict) -> str:
         kw["_guide_steps"] = guide["steps"]
     dims, plan0 = _preflight(W, p, mode, kw, free0, frames)
 
-    # 1) text encoder
-    t0 = time.time()
-    te = load_text_encoder(W)
-    _log(f"text encoder pronto in {time.time() - t0:.0f}s — VRAM {_vram()}")
-    comps = dict(text_encoder=te, tokenizer=AutoTokenizer.from_pretrained(str(cfgdir / "tokenizer")),
-                 processor=Qwen3VLProcessor.from_pretrained(str(cfgdir / "processor")))
-    st = _stage(blocks_text, g_text, comps)
-    if mode == "ref2va" and kw.get("references"):
-        # il pipeline porta ogni immagine di riferimento a 2048 px di lato corto (anche ingrandendola): con 32 GB
-        # l'attenzione del Qwen3-VL su quei token va in OOM (visto 27/09). 1024 = 4× meno token, identità intatta.
-        st.update_components(reference_image_short_edge=int(p.get("h3_ref_short_edge") or REF_SHORT_EDGE))
-    if edit:
-        # I VIDEO di riferimento vengono portati sulla tela di `canvas_short_edge` (default del pacchetto 768, max 768x1344): il riferimento dell'edit
-        # va alla STESSA tela del bersaglio (480p), altrimenti ha 2,5x i token del previsto (giro 02/11: righe di riferimento 26k invece di 10k,
-        # OOM nel DiT; sequenza del TE ~9k token, OOM da 9 GB nell'attenzione). Dal 04/11 il riferimento sta a ~512 px sul lato lungo come nell'originale
-        # (S.REF_VIDEO_MAX_SIDE; h3_ref_max_side=0 = tela del bersaglio): posa e tempi non vogliono piu pixel.
-        _th, _tw = edit["canvas"]
-        video_canvas = reference_video_canvas_for(p, _th, _tw)
-        st.update_components(canvas_short_edge=int(video_canvas["short_edge"]), canvas_max_pixels=int(video_canvas["max_pixels"]))
-        _log(f"video di riferimento (movimento): tela {video_canvas['width']}x{video_canvas['height']} (bersaglio {_tw}x{_th}, lato lungo {int(p.get('h3_ref_max_side', S.REF_VIDEO_MAX_SIDE)) or 'pieno'})")
-        # Anche le FOTO di riferimento alla tela del bersaglio: nel workflow MIT di Openjutsu (simple.api.json, nodo MiniMaxH3ReferenceToVideo) l'input
-        # `ref_image_size` e «match». A 1024 di lato corto una foto vale ~1,7k token nel TE e nel DiT, alla tela 480 sono ~0,4k.
-        st.update_components(reference_image_short_edge=int(min(_th, _tw)))
-    import h3_te_attn as _TA                   # attenzione del TE a blocchi di query (esatta): niente matrice L x L in un colpo solo
-    # Cronometro per parte (03/11: ~100 s per clip nell'Edit H3 senza sapere dove): visione vs linguaggio, chiamate e lunghezza della sequenza
-    _tt, _hooks = {}, []
-
-    def _timed(name, mod):
-        def pre(_m, args, kwargs):
-            torch.cuda.synchronize()
-            _tt.setdefault(name, [0.0, 0, 0])[2] = time.time()
-        def post(_m, args, kwargs, out):
-            torch.cuda.synchronize()
-            r = _tt[name]
-            r[0] += time.time() - r[2]
-            r[1] += 1
-            x = kwargs.get("inputs_embeds") if isinstance(kwargs, dict) else None
-            if x is not None:
-                _tt[name + "_len"] = int(x.shape[-2])
-        _hooks.append(mod.register_forward_pre_hook(pre, with_kwargs=True))
-        _hooks.append(mod.register_forward_hook(post, with_kwargs=True))
-    inner = getattr(te, "model", te)
-    for _n in ("visual", "language_model"):
-        if getattr(inner, _n, None) is not None:
-            _timed(_n, getattr(inner, _n))
-    t1 = time.time()
-    with _TA.query_chunked_attention():
-        state = st(**_inputs_for(st, kw))
-    for h in _hooks:
-        h.remove()
-    _log("codifica TE: " + f"totale {time.time() - t1:.0f}s · " + " · ".join(
-        f"{k} {v[0]:.0f}s in {v[1]} chiamate" for k, v in _tt.items() if isinstance(v, list))
-        + (f" · sequenza {_tt['language_model_len']} token" if "language_model_len" in _tt else ""))
-    _drop_module_weights(te)                   # il `del` da solo non basta (visto sul DiT e sul VAE): i pesi del TE escono dalla VRAM comunque
-    del st, te, comps                          # comps teneva ancora il TE: senza, resta in VRAM
-    # Dopo `_drop_module_weights` restavano vivi ~12 GB di pesi quantizzati del TE (150 tensori uint8 da 65 MB, 100 da 21 MB, scale fp8): turno 40 del 04/11, 736p,
-    # OOM nella codifica del VAE con 28,75 GB allocati; e a 480p «transformer pronto» a 26,1 GB con DiT+LoRA da 12,6. Il DiT non e ancora caricato, quindi ogni tensore
-    # quantizzato grande ancora su GPU e del TE e si svuota sul posto.
-    _log(f"pesi quantizzati del testo ancora vivi: {purge_big_quantized_tensors(log=_log):.2f} GB liberati")
-    _gc()
-    _log(f"testo codificato in {time.time() - t0:.0f}s")
+    # 1) text encoder (con cache nel job del clip)
+    state = _text_state(W, p, mode, kw, edit, blocks_text, g_text)
 
     # 2) VAE encoder (keyframe / riferimenti)
     if guide and guide["latents"] is not None:                   # edit: la guida e il latente del clip, gia codificato dal chiamante
