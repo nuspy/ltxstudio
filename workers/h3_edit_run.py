@@ -263,6 +263,9 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # (workflow object.api.json, lib/object.ts: margine 10/20/40 px a 1008 px di SAM, di default 20) inverte la maschera e POI la allarga: lo sfondo entra nel bordo della
     # persona. Persona = SAM con posa tenuta 2 frame e senza spazio sopra la testa. Nessun matte a pixel nell'originale: nel caso di confronto va spento (H3_EDIT_BG_MATTE=0).
     original_mask = invert and str(os.environ.get("H3_EDIT_BG_MASK") or e.get("bg_mask") or "").strip().lower() == "original"
+    # fill_holes (H3_EDIT_BG_MASK_FILL_HOLES=1, spento di default): l'originale lo ha acceso; nei fotogrammi in cui la persona (ristretta) non tocca il bordo riempie la «buca» e
+    # rigenera tutto il fotogramma, persona compresa. Sul video del rifugio sono 94 fotogrammi su 141: opzione a parte, da usare solo se l'originale mostra davvero quel comportamento.
+    fill_holes = str(os.environ.get("H3_EDIT_BG_MASK_FILL_HOLES") or e.get("bg_mask_fill_holes") or "0").strip().lower() not in ("0", "false", "no", "off")
     like_replace = invert and str(os.environ.get("H3_EDIT_BG_GROW_LIKE_REPLACE") or e.get("bg_grow_like_replace") or "0").strip().lower() not in ("0", "", "false", "no", "off")
     headroom = float(e.get("bg_headroom", 0.0)) if invert else float(e.get("headroom", 0.10))
     hold_frames = int(e.get("bg_hold_frames", 0)) if invert else int(e.get("hold_frames", 2))
@@ -300,8 +303,12 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     if original_mask:                                                  # la persona tenuta e quella ristretta del margine: la usano anche il riferimento (zona grigia = zona rigenerata) e l'eventuale matte
         margin_px = int(round(float(os.environ.get("H3_EDIT_BG_MASK_MARGIN") or e.get("bg_mask_margin", 20)) * max(tw, th) / ORIGINAL_SAM_CANVAS_PX))
         pers = M.erode_cross(pers, margin_px)
+        enclosed_frames = 0
+        if fill_holes:                                                 # come l'originale: una persona tutta dentro il fotogramma sparisce dalla maschera (si rigenera tutto)
+            pers, enclosed_frames = M.drop_enclosed_regions(pers)
         regen_pix = pers
-        W._log(f"maschera come Openjutsu: persona ristretta di {margin_px} px (20 px a 1008 -> {max(tw, th)} px), posa tenuta {hold_frames} frame")
+        W._log(f"maschera come Openjutsu: persona ristretta di {margin_px} px (20 px a 1008 -> {max(tw, th)} px), posa tenuta {hold_frames} frame; "
+               f"fill_holes {'attivo' if fill_holes else 'spento'}: {enclosed_frames} fotogrammi con la persona tutta dentro il fotogramma (rigenerati per intero)")
 
     # 1b) PREROLL (opzionale, default 0): frame fermi anteposti perche il clip 1 non parta «a freddo» (vedi M.preroll_pad). H3_EDIT_PREROLL=17 / `preroll_frames`.
     preroll = int(os.environ.get("H3_EDIT_PREROLL") or e.get("preroll_frames") or 0)
@@ -357,7 +364,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgmaskorig", margin_px),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)

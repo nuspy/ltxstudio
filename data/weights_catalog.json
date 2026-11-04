@@ -3151,7 +3151,7 @@
       "deps": [
         "mmh3-adaln-affine-ref"
       ],
-      "note": "Civitai modelVersion 3382801. Usata dall'originale Openjutsu (DMAD 6 passi): forza 1, 6 passi, shift video 12 / audio 2. Formato ComfyUI: la conversione prova le coppie AdaLN (mmh3_lora_ref).",
+      "note": "Civitai modelVersion 3382801. Usata dall'originale Openjutsu (DMAD 6 passi): forza 1, 6 passi, shift video 12 / audio 2. Formato ComfyUI: convertita con mmh3_lora_ref il 04/11 (624 tensori, 0.34 GB): il sorgente non ha coppie AdaLN (0 chiavi adaln_proj), come per l'originale Openjutsu.",
       "used_by": [
         "cap.video_minimax_h3"
       ],

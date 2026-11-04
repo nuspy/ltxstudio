@@ -63,6 +63,25 @@ def erode_cross(mask: torch.Tensor, iterations: int) -> torch.Tensor:
     return out
 
 
+def drop_enclosed_regions(mask: torch.Tensor) -> tuple[torch.Tensor, int]:
+    """Toglie da ogni fotogramma [N, H, W] le regioni della maschera (1 = persona) che NON toccano il bordo dell'immagine; ritorna (maschera, fotogrammi toccati).
+    E il `fill_holes` di KJNodes GrowMaskWithBlur sulla maschera dello SFONDO (flip_input): le «buche» (non connesse al bordo, connettivita 4, come
+    scipy.ndimage.binary_fill_holes) vengono riempite, cioe una persona tutta dentro il fotogramma sparisce dalla maschera e si rigenera l'intero fotogramma."""
+    import cv2
+    import numpy
+    out = mask.clone()
+    changed = 0
+    for index in range(out.shape[0]):
+        binary = (out[index] > 0.5).numpy().astype("uint8")
+        count, labels = cv2.connectedComponents(binary, connectivity=4)
+        border = set(labels[0].tolist()) | set(labels[-1].tolist()) | set(labels[:, 0].tolist()) | set(labels[:, -1].tolist())
+        enclosed = [label for label in range(1, count) if label not in border]
+        if enclosed:
+            out[index][torch.from_numpy(numpy.isin(labels, enclosed))] = 0.0
+            changed += 1
+    return out, changed
+
+
 def latent_boundary_floor(frames: int) -> int:
     """Il piu grande confine di frame di latente (1, 5, 9, ..., 17, 18, 22, ... cumulati di 1,4,4,4,4) <= `frames`: un contesto che finisce su un confine
     non lascia mezzo frame di latente fra tenuto e rigenerato. 0 se `frames` < 1."""
