@@ -3850,5 +3850,6 @@
   "sam31.btn_comfy": "或下载 Comfy-Org 副本（无需审批，1.75 GB）",
   "vedit.h3.translate": "将文本翻译成英文并丰富细节",
   "vedit.h3.translate.tt": "模型理解英文：用其他语言写的地点、照片描述和主体会由本地增强器翻译（地点和照片还会补充细节），每个任务一次，在生成片段之前完成。主体只翻译，绝不补充（它是 SAM 的标签）。文本已是英文：不做处理。增强器不可用时发送原文。",
-  "vedit.h3.text_result": "发送给模型的文本：{t}"
+  "vedit.h3.text_result": "发送给模型的文本：{t}",
+  "vedit.h3.turbo.dmad4": "Turbo DMAD 4 步 full · 6 步（同 Openjutsu，Ref2VA）"
 }

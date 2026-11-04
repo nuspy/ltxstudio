@@ -98,7 +98,7 @@ def test_turbo_veda_lightvae_lora_and_model_reach_the_edit_cfg_and_the_worker_pa
 
 def test_turbo_without_ref2va_version_is_listed_but_disabled_with_the_reason(tab):
     en = {tab.h3_turbo.itemData(i): tab.h3_turbo.model().item(i).isEnabled() for i in range(tab.h3_turbo.count())}
-    assert en == {"v4": True, "4": True, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
+    assert en == {"v4": True, "4": True, "dmad4": True, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
     i8 = tab.h3_turbo.findData("8")
     assert "FL2VA" in tab.h3_turbo.model().item(i8).toolTip() or tab.h3_turbo.model().item(i8).toolTip()
     assert tab.h3_turbo.itemData(0) == "v4"                                                          # la predefinita in testa
@@ -139,7 +139,7 @@ def test_defective_turbo_on_disk_is_disabled_in_the_menu_with_the_reason(qapp, m
     from ui.tabs.video_edit_ai_tab import VideoEditAITab
     t = VideoEditAITab()
     en = {t.h3_turbo.itemData(i): t.h3_turbo.model().item(i).isEnabled() for i in range(t.h3_turbo.count())}
-    assert en == {"v4": True, "4": False, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
+    assert en == {"v4": True, "4": False, "dmad4": True, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
     assert "AdaLN" in t.h3_turbo.model().item(t.h3_turbo.findData("4")).toolTip()
 
 

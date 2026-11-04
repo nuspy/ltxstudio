@@ -51,6 +51,8 @@ TURBO = {
     "dmad": ({"fl2va": "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m"}, 8, 12.0),
     # lightx2v Minimax-h3-Turbo in formato DIFFUSERS (1,38 GB, senza le coppie AdaLN della versione ComfyUI/Comfy-Org): ref2v 4 passi v1.0 e 8 passi v1.1, 768p.
     # Passi e shift video come le altre turbo lightx2v (4 passi shift 12, 8 passi shift 6): da confermare dalla resa nel giro dal vivo.
+    # DMAD 4 passi «full» (Civitai 3382801, rank 39): la LoRA dell'originale Openjutsu (workflow object/simple: 6 passi, shift video 12, forza 1)
+    "dmad4": ({"ref2va": "mmh3-turbo-dmad4full-ref2v"}, 6, 12.0),
     "r4v10": ({"ref2va": "mmh3-turbo-ref2v-4-v10"}, 4, 12.0),
     "r8v11": ({"ref2va": "mmh3-turbo-ref2v-8-v11"}, 8, 6.0),
 }

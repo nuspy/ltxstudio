@@ -103,7 +103,7 @@ def frames_of(path):
 
 
 def run(tag, env, extra=None):
-    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES"):
+    for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES", "H3_EDIT_BG_MASK", "H3_EDIT_BG_MASK_MARGIN"):
         os.environ.pop(k, None)
     os.environ.update(env)
     calls.clear(); refs.clear(); prompts.clear()
@@ -158,6 +158,10 @@ assert "frame-accurate" in prompts[0] and "Its first 1.625 seconds" in prompts[0
 _, _c, _ = run("txt", {"H3_EDIT_MAX_FRAMES": "141"}, extra={"text_info": {"status": "ok", "seconds": 3.0, "original": {"prompt": "un rifugio"}, "sent": {"prompt": "A refuge."}}})
 _tj = json.loads((_k("txt") / "text_job.json").read_text("utf-8"))
 assert _tj["original"] == {"prompt": "un rifugio"} and _tj["sent"] == {"prompt": "A refuge."} and "text_info" not in json.loads((_k("txt") / "clip_00" / "meta.json").read_text("utf-8"))
+_, _c, _ = run("orig", {"H3_EDIT_MAX_FRAMES": "141", "H3_EDIT_BG_MASK": "original", "H3_EDIT_BG_MASK_MARGIN": "40", "H3_EDIT_BG_MATTE": "0"})
+c_orig = np.load(_k("orig") / "clip_00" / "cells.npy")
+assert float((c_orig < 0.5).sum()) < float((c_base < 0.5).sum()), (float((c_orig < 0.5).sum()), float((c_base < 0.5).sum()))   # persona ristretta: meno celle tenute dello standard
+assert _k("orig").name != _k("abl0").name                                                                                      # runkey diversa
 print("ABLAZIONE OK: kept cells base", int((c_base < 0.5).sum()), "like-replace", int((c_like < 0.5).sum()))
 print("clip base", c0, "preroll", c1, "two-pass", c5)
 

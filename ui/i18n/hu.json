@@ -3850,5 +3850,6 @@
   "sam31.btn_comfy": "Vagy töltsd le a Comfy-Org másolatot (jóváhagyás nélkül, 1,75 GB)",
   "vedit.h3.translate": "Szöveg fordítása és gazdagítása angolra",
   "vedit.h3.translate.tt": "A modell érti az angolt: a más nyelven írt helyszínt, fotóleírást és alanyt a helyi enhancer lefordítja (a helyszínt és a fotót részletekkel is gazdagítja), feladatonként egyszer, a klipek előtt. Az alanyt csak lefordítja, soha nem gazdagítja (ez a SAM címkéje). Már angol szöveg: nem történik semmi. Ha az enhancer nem érhető el, az eredeti szöveg kerül elküldésre.",
-  "vedit.h3.text_result": "A modellnek küldött szöveg: {t}"
+  "vedit.h3.text_result": "A modellnek küldött szöveg: {t}",
+  "vedit.h3.turbo.dmad4": "Turbo DMAD 4 lépés full · 6 lépés (mint az Openjutsu, Ref2VA)"
 }

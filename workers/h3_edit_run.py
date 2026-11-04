@@ -24,6 +24,7 @@ import torch.nn.functional as F
 
 import h3_edit_math as M
 
+ORIGINAL_SAM_CANVAS_PX = 1008                  # lato lungo del video che SAM vede in Openjutsu: i margini dell'originale (10/20/40 px) sono a questa scala
 FPS = M.FPS
 _SRC_AUDIO_SR = 32000
 
@@ -238,7 +239,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     clip_runner = clip_runner or _subprocess_clip_runner
     t_all = time.time()
     short = int(e.get("short_edge") or 480)
-    from core import h3_edit_prompt as PR  # noqa: F401  (usato dal figlio; qui si verifica che l'import funzioni prima di spendere minuti)
+    __import__("core.h3_edit_prompt")                                  # il figlio usa il prompt: qui si verifica che l'import funzioni prima di spendere minuti
 
     # 1) tela, sorgente e maschere
     with __import__("av").open(src) as c0:
@@ -258,11 +259,17 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # la cella di latente unisce gia 4 frame, quindi la posa tenuta li e ridondante. Parametri bg_headroom / bg_hold_frames (default 0).
     # H3_EDIT_BG_GROW_LIKE_REPLACE=1 (ABLAZIONE 03/11, spento di default): nel cambia-sfondo la maschera TENUTA e quella di Sostituisci (persona cresciuta di person_grow + grow,
     # spazio sopra la testa 0,10, posa +-2 frame); matte e riferimento restano sulla sagoma vera.
+    # H3_EDIT_BG_MASK=original (confronto con Openjutsu, 03/11): la zona rigenerata del cambia-sfondo e quella dell'originale. KJNodes GrowMaskWithBlur con flip_input=true
+    # (workflow object.api.json, lib/object.ts: margine 10/20/40 px a 1008 px di SAM, di default 20) inverte la maschera e POI la allarga: lo sfondo entra nel bordo della
+    # persona. Persona = SAM con posa tenuta 2 frame e senza spazio sopra la testa. Nessun matte a pixel nell'originale: nel caso di confronto va spento (H3_EDIT_BG_MATTE=0).
+    original_mask = invert and str(os.environ.get("H3_EDIT_BG_MASK") or e.get("bg_mask") or "").strip().lower() == "original"
     like_replace = invert and str(os.environ.get("H3_EDIT_BG_GROW_LIKE_REPLACE") or e.get("bg_grow_like_replace") or "0").strip().lower() not in ("0", "", "false", "no", "off")
     headroom = float(e.get("bg_headroom", 0.0)) if invert else float(e.get("headroom", 0.10))
     hold_frames = int(e.get("bg_hold_frames", 0)) if invert else int(e.get("hold_frames", 2))
     if like_replace:
         headroom, hold_frames = float(e.get("headroom", 0.10)), int(e.get("hold_frames", 2))
+    if original_mask:
+        headroom, hold_frames = 0.0, 2
     # bg_hold_cover (env H3_EDIT_BG_HOLD_COVER): quota minima di persona per TENERE una cella nel cambia-sfondo (0 = spento: serve il 100 %, basta un pixel
     # di sfondo per rigenerarla). Con 0,5 volto e spalle restano ancorati; il matte a pixel pulisce lo sfondo vecchio nei bordi delle celle tenute.
     hold_cover = float(os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0) or 0.0) if invert else 0.0
@@ -290,6 +297,11 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         regen_pix = M.regen_region(pers, False, person_grow, grow)
         pers, size = M.person_mask(obj, 0.0, 0)
         pers = pers.float()
+    if original_mask:                                                  # la persona tenuta e quella ristretta del margine: la usano anche il riferimento (zona grigia = zona rigenerata) e l'eventuale matte
+        margin_px = int(round(float(os.environ.get("H3_EDIT_BG_MASK_MARGIN") or e.get("bg_mask_margin", 20)) * max(tw, th) / ORIGINAL_SAM_CANVAS_PX))
+        pers = M.erode_cross(pers, margin_px)
+        regen_pix = pers
+        W._log(f"maschera come Openjutsu: persona ristretta di {margin_px} px (20 px a 1008 -> {max(tw, th)} px), posa tenuta {hold_frames} frame")
 
     # 1b) PREROLL (opzionale, default 0): frame fermi anteposti perche il clip 1 non parta «a freddo» (vedi M.preroll_pad). H3_EDIT_PREROLL=17 / `preroll_frames`.
     preroll = int(os.environ.get("H3_EDIT_PREROLL") or e.get("preroll_frames") or 0)
@@ -345,7 +357,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgmaskorig", margin_px),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)

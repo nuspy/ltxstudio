@@ -3131,6 +3131,37 @@
       "convert": "mmh3_lora_diffusers"
     },
     {
+      "id": "mmh3-turbo-dmad4full-ref2v",
+      "module": "Video",
+      "label": "LoRA H3 Turbo DMAD 4 passi full rank 39 (Civitai, 0.34GB): quella dell'originale Openjutsu",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.34,
+      "scan_names": [
+        "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16-native.safetensors",
+        "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3382801",
+      "filename": "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16-native.safetensors",
+      "remote_filename": "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16.safetensors",
+      "deps": [
+        "mmh3-adaln-affine-ref"
+      ],
+      "note": "Civitai modelVersion 3382801. Usata dall'originale Openjutsu (DMAD 6 passi): forza 1, 6 passi, shift video 12 / audio 2. Formato ComfyUI: la conversione prova le coppie AdaLN (mmh3_lora_ref).",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_ref",
+      "keep_source": true,
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
       "id": "mmh3-configs",
       "module": "Video",
       "label": "MiniMax H3 config + tokenizer (ufficiali, ~25MB)",

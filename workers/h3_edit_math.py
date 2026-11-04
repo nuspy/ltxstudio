@@ -49,6 +49,20 @@ def latent_frame_counts(n_pixel_frames: int) -> list[int]:
     return counts
 
 
+def erode_cross(mask: torch.Tensor, iterations: int) -> torch.Tensor:
+    """Restringe la maschera [N, H, W] (1 = persona) di `iterations` pixel con il nucleo a croce 3x3 (L1: bordi diagonali piu stretti di quelli dritti).
+    E la zona rigenerata di Openjutsu nel cambia-sfondo: KJNodes GrowMaskWithBlur con flip_input=true inverte la maschera PRIMA di allargarla
+    (tapered_corners = nucleo a croce), quindi lo sfondo cresce DENTRO il bordo della persona."""
+    out = mask.float()
+    for start in range(0, out.shape[0], CHUNK):
+        background = 1.0 - out[start:start + CHUNK, None]
+        for _ in range(max(0, int(iterations))):
+            background = torch.maximum(F.max_pool2d(background, (3, 1), stride=1, padding=(1, 0)),
+                                       F.max_pool2d(background, (1, 3), stride=1, padding=(0, 1)))
+        out[start:start + CHUNK] = (1.0 - background)[:, 0]
+    return out
+
+
 def latent_boundary_floor(frames: int) -> int:
     """Il piu grande confine di frame di latente (1, 5, 9, ..., 17, 18, 22, ... cumulati di 1,4,4,4,4) <= `frames`: un contesto che finisce su un confine
     non lascia mezzo frame di latente fra tenuto e rigenerato. 0 se `frames` < 1."""

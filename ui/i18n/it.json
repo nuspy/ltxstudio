@@ -3889,5 +3889,6 @@
   "sam31.btn_comfy": "Oppure scarica la copia Comfy-Org (non gated, 1,75 GB)",
   "vedit.h3.translate": "Traduci e arricchisci il testo in inglese",
   "vedit.h3.translate.tt": "Il modello capisce l'inglese: luogo, descrizione della foto e soggetto scritti in un'altra lingua vengono tradotti (luogo e foto anche arricchiti di dettagli) con l'enhancer locale, una volta per lavoro e prima dei clip. Il soggetto e solo tradotto, mai arricchito (e l'etichetta per SAM). Testo gia inglese: nessuna elaborazione. Se l'enhancer non e disponibile parte il testo originale.",
-  "vedit.h3.text_result": "Testo inviato al modello: {t}"
+  "vedit.h3.text_result": "Testo inviato al modello: {t}",
+  "vedit.h3.turbo.dmad4": "Turbo DMAD 4 passi full · 6 passi (come Openjutsu, Ref2VA)"
 }
