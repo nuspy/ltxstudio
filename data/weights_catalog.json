@@ -3162,6 +3162,68 @@
       ]
     },
     {
+      "id": "mmh3-turbo-pika6-ref2v",
+      "module": "Video",
+      "label": "LoRA H3 Pika Flex 6 passi Ref2VA (Pika Labs, campionatore renoise, 1,8GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.82,
+      "scan_names": [
+        "pika_h3_flex_ref2va_6step_v1_bf16-native.safetensors",
+        "pika_h3_flex_ref2va_6step_v1_bf16.safetensors",
+        "pika_h3_flex_ref2va_adapter_fp32.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://huggingface.co/Pika-Labs/Pika-H3-Flex/resolve/main/ref2va/adapter.safetensors",
+      "page": "https://huggingface.co/Pika-Labs/Pika-H3-Flex",
+      "filename": "pika_h3_flex_ref2va_6step_v1_bf16-native.safetensors",
+      "remote_filename": "pika_h3_flex_ref2va_adapter_fp32.safetensors",
+      "sha256": "eef684ba1258f0cdbbbda6128188ad2688417f2eb17ff875375e74a32b6d61b5",
+      "note": "Adattatore Pika H3 Flex (rank/alpha 128, formato diffusers): 6 passi coi nodi 1000-750-500-250-100-40-0, shift video 12 / audio 3 e campionatore «renoise» (scheduler dedicato, workers/h3_renoise_scheduler.py). Un Euler a 6 passi generico NON e equivalente. Licenza MiniMax H3 Community (derivato, NOTICE richiesto). Download dell'adattatore fp32 ufficiale (2,8 GB, nome unico per non sovrapporre ref2va e fl2va): la conversione nativa fonde q/k/v. Provata sul file bf16 (1,4 GB) dell'autore.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_diffusers",
+      "keep_source": true,
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-pika6-fl2v",
+      "module": "Video",
+      "label": "LoRA H3 Pika Flex 6 passi FL2VA (Pika Labs, campionatore renoise, 1,8GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.82,
+      "scan_names": [
+        "pika_h3_flex_fl2va_6step_v1_bf16-native.safetensors",
+        "pika_h3_flex_fl2va_6step_v1_bf16.safetensors",
+        "pika_h3_flex_fl2va_adapter_fp32.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://huggingface.co/Pika-Labs/Pika-H3-Flex/resolve/main/fl2va/adapter.safetensors",
+      "page": "https://huggingface.co/Pika-Labs/Pika-H3-Flex",
+      "filename": "pika_h3_flex_fl2va_6step_v1_bf16-native.safetensors",
+      "remote_filename": "pika_h3_flex_fl2va_adapter_fp32.safetensors",
+      "sha256": "8ed6115d647ab11c1b38d04e63c4c6e1594128ae312f7b5635cd50563b7b9327",
+      "note": "Adattatore Pika H3 Flex (rank/alpha 128, formato diffusers): 6 passi coi nodi 1000-750-500-250-100-40-0, shift video 12 / audio 3 e campionatore «renoise» (scheduler dedicato, workers/h3_renoise_scheduler.py). Un Euler a 6 passi generico NON e equivalente. Licenza MiniMax H3 Community (derivato, NOTICE richiesto). Download dell'adattatore fp32 ufficiale (2,8 GB, nome unico per non sovrapporre ref2va e fl2va): la conversione nativa fonde q/k/v. Provata sul file bf16 (1,4 GB) dell'autore.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_diffusers",
+      "keep_source": true,
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
       "id": "mmh3-configs",
       "module": "Video",
       "label": "MiniMax H3 config + tokenizer (ufficiali, ~25MB)",

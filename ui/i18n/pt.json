@@ -3856,5 +3856,7 @@
   "vedit.h3.ref_full": "Vídeo de movimento em resolução total (mais lento)",
   "vedit.h3.ref_full.tt": "A referência de movimento traz pose e tempos, não detalhes: ~512 px no lado maior costumam bastar (como no original), com muito menos texto a codificar e menos memória. Marcada, fica na resolução do vídeo gerado: mais lento, sem vantagem comprovada.",
   "vedit.h3.int8_attn": "Atenção int8 (mais rápida, teste)",
-  "vedit.h3.int8_attn.tt": "Usa a atenção int8 do comfy_kitchen (Q/K/V de 8 bits, softmax em fp32), como o ComfyUI original: mais rápida em sequências longas, mas quantiza a atenção, então a qualidade deve ser avaliada. Precisa de uma GPU NVIDIA recente com o kernel; se faltar, ou se a primeira verificação contra a atenção normal achar erro alto, fica a normal e o motivo está no log. Desligada = como sempre."
+  "vedit.h3.int8_attn.tt": "Usa a atenção int8 do comfy_kitchen (Q/K/V de 8 bits, softmax em fp32), como o ComfyUI original: mais rápida em sequências longas, mas quantiza a atenção, então a qualidade deve ser avaliada. Precisa de uma GPU NVIDIA recente com o kernel; se faltar, ou se a primeira verificação contra a atenção normal achar erro alto, fica a normal e o motivo está no log. Desligada = como sempre.",
+  "vedit.h3.turbo.pika6": "Pika Flex · 6 passos (teste, amostrador re-noise)",
+  "vid.h3.turbo.pika6": "Pika Flex · 6 passos (teste, amostrador re-noise)"
 }

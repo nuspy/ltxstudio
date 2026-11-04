@@ -54,6 +54,8 @@ TURBO = {
     # Passi e shift video come le altre turbo lightx2v (4 passi shift 12, 8 passi shift 6): da confermare dalla resa nel giro dal vivo.
     # DMAD 4 passi «full» (Civitai 3382801, rank 39): la LoRA dell'originale Openjutsu (workflow object/simple: 6 passi, shift video 12, forza 1)
     "dmad4": ({"ref2va": "mmh3-turbo-dmad4full-ref2v"}, 6, 12.0),
+    # Pika H3 Flex (Pika-Labs/Pika-H3-Flex, manifest: nodi 1000-750-500-250-100-40-0, shift 12/3, campionatore «renoise»): 6 passi con lo scheduler dedicato (TURBO_SAMPLER)
+    "pika6": ({"fl2va": "mmh3-turbo-pika6-fl2v", "ref2va": "mmh3-turbo-pika6-ref2v"}, 6, 12.0),
     "r4v10": ({"ref2va": "mmh3-turbo-ref2v-4-v10"}, 4, 12.0),
     "r8v11": ({"ref2va": "mmh3-turbo-ref2v-8-v11"}, 8, 6.0),
 }
@@ -66,7 +68,7 @@ MAX_REFS = {"image": 9, "video": 3, "audio": 3, "total": 12}
 
 # Campionatore proprio di alcune LoRA turbo (chiave di TURBO -> {"method", "knots"}): `renoise` = passo stocastico con griglia fissa di nodi (scala 1000), come gli adattatori
 # Pika H3 Flex a 6 passi (workers/h3_renoise_scheduler.py). Le turbo senza voce qui usano l'Euler uniforme di sempre.
-TURBO_SAMPLER: dict = {}
+TURBO_SAMPLER: dict = {"pika6": {"method": "renoise", "knots": (1000, 750, 500, 250, 100, 40, 0), "keyframe_bf16": True}}
 
 # Lato lungo del video di MOVIMENTO (<Video 1>) negli edit: come l'originale Openjutsu (object/simple.api.json, nodo «Motion reference video (~512 px)»,
 # ImageScaleToMaxDimension 512). Il riferimento porta posa e tempi, non i dettagli: a 736p (1344x736) a tela piena ha ~6,7 volte i pixel (token del testo,

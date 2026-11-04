@@ -76,3 +76,20 @@ def test_keyframe_conditions_are_rounded_to_bf16_only_for_fl2va_with_a_turbo_tha
     worker.round_keyframe_conditions(State([]), "pika_probe", "fl2va")                              # senza keyframe: nessun errore
     source = (ROOT / "workers" / "minimax_h3_infer.py").read_text(encoding="utf-8")
     assert "round_keyframe_conditions(state, turbo, mode)" in source
+
+
+def test_pika6_is_registered_in_spec_catalog_and_menus():
+    import json
+    from core import minimax_h3_spec as spec
+    assert spec.TURBO["pika6"] == ({"fl2va": "mmh3-turbo-pika6-fl2v", "ref2va": "mmh3-turbo-pika6-ref2v"}, 6, 12.0)
+    assert spec.TURBO_SAMPLER["pika6"]["knots"] == KNOTS and spec.TURBO_SAMPLER["pika6"]["keyframe_bf16"] is True
+    ids = {task: spec.weight_ids({"h3_profile": "int8", "h3_turbo": "pika6", "references": [{"kind": "image"}] if task == "ref2va" else []})["turbo"] for task in ("ref2va", "fl2va")}
+    assert ids == {"ref2va": "mmh3-turbo-pika6-ref2v", "fl2va": "mmh3-turbo-pika6-fl2v"}
+    catalog = {e["id"]: e for e in json.loads((ROOT / "data" / "weights_catalog.json").read_text(encoding="utf-8"))["weights"]}
+    for entry_id in ids.values():
+        entry = catalog[entry_id]
+        assert entry["convert"] == "mmh3_lora_diffusers" and entry["keep_source"] and len(entry["sha256"]) == 64 and entry["filename"].endswith("-native.safetensors")
+    assert catalog["mmh3-turbo-pika6-ref2v"]["remote_filename"] != catalog["mmh3-turbo-pika6-fl2v"]["remote_filename"]        # nomi remoti diversi: non si sovrappongono nello stesso cartella
+    for language in ("it", "en", "ar", "zh"):
+        table = json.loads((ROOT / "ui" / "i18n" / f"{language}.json").read_text(encoding="utf-8"))
+        assert table["vedit.h3.turbo.pika6"] and table["vid.h3.turbo.pika6"]

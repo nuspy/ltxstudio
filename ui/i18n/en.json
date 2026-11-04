@@ -3928,5 +3928,7 @@
   "vedit.h3.ref_full": "Motion video at full resolution (slower)",
   "vedit.h3.ref_full.tt": "The motion reference carries pose and timing, not detail: ~512 px on the long side is usually enough (as in the original), with far less text to encode and less memory. Checked, it stays at the generated video's resolution: slower, with no proven benefit.",
   "vedit.h3.int8_attn": "Int8 attention (faster, experimental)",
-  "vedit.h3.int8_attn.tt": "Uses comfy_kitchen's int8 attention (8-bit Q/K/V, fp32 softmax), like the original ComfyUI: faster on long sequences, but it quantizes attention, so quality must be judged. Needs a recent NVIDIA GPU with the kernel; if it is missing, or the first check against normal attention finds a high error, normal attention stays and the reason is in the log. Off = as before."
+  "vedit.h3.int8_attn.tt": "Uses comfy_kitchen's int8 attention (8-bit Q/K/V, fp32 softmax), like the original ComfyUI: faster on long sequences, but it quantizes attention, so quality must be judged. Needs a recent NVIDIA GPU with the kernel; if it is missing, or the first check against normal attention finds a high error, normal attention stays and the reason is in the log. Off = as before.",
+  "vedit.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)",
+  "vid.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)"
 }

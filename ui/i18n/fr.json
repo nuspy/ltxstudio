@@ -3856,5 +3856,7 @@
   "vedit.h3.ref_full": "Vidéo de mouvement en pleine résolution (plus lent)",
   "vedit.h3.ref_full.tt": "La référence de mouvement porte la pose et le rythme, pas les détails : ~512 px sur le grand côté suffisent en général (comme l'original), avec bien moins de texte à encoder et moins de mémoire. Cochée, elle reste à la résolution de la vidéo générée : plus lent, sans avantage démontré.",
   "vedit.h3.int8_attn": "Attention int8 (plus rapide, essai)",
-  "vedit.h3.int8_attn.tt": "Utilise l'attention int8 de comfy_kitchen (Q/K/V sur 8 bits, softmax en fp32), comme le ComfyUI d'origine : plus rapide sur les longues séquences, mais elle quantifie l'attention, donc la qualité est à juger. Il faut un GPU NVIDIA récent avec le noyau ; s'il manque, ou si le premier contrôle contre l'attention normale trouve une erreur élevée, l'attention normale reste et la raison est dans le journal. Décochée = comme avant."
+  "vedit.h3.int8_attn.tt": "Utilise l'attention int8 de comfy_kitchen (Q/K/V sur 8 bits, softmax en fp32), comme le ComfyUI d'origine : plus rapide sur les longues séquences, mais elle quantifie l'attention, donc la qualité est à juger. Il faut un GPU NVIDIA récent avec le noyau ; s'il manque, ou si le premier contrôle contre l'attention normale trouve une erreur élevée, l'attention normale reste et la raison est dans le journal. Décochée = comme avant.",
+  "vedit.h3.turbo.pika6": "Pika Flex · 6 étapes (essai, échantillonneur re-noise)",
+  "vid.h3.turbo.pika6": "Pika Flex · 6 étapes (essai, échantillonneur re-noise)"
 }

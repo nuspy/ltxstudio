@@ -3856,5 +3856,7 @@
   "vedit.h3.ref_full": "모션 영상을 전체 해상도로 (느림)",
   "vedit.h3.ref_full.tt": "모션 레퍼런스는 디테일이 아니라 포즈와 타이밍을 담습니다. 보통 긴 변 ~512 px이면 충분하며(원본과 동일) 인코딩할 텍스트와 메모리가 훨씬 적습니다. 선택하면 생성 영상 해상도를 유지합니다. 더 느리고 입증된 이점은 없습니다.",
   "vedit.h3.int8_attn": "Int8 어텐션 (더 빠름, 시험)",
-  "vedit.h3.int8_attn.tt": "원본 ComfyUI처럼 comfy_kitchen의 int8 어텐션(8비트 Q/K/V, fp32 softmax)을 사용합니다. 긴 시퀀스에서 더 빠르지만 어텐션을 양자화하므로 품질을 직접 판단해야 합니다. 커널이 있는 최신 NVIDIA GPU가 필요하며, 없거나 첫 비교에서 오차가 크면 일반 어텐션을 유지하고 이유를 로그에 남깁니다. 끄면 기존과 같습니다."
+  "vedit.h3.int8_attn.tt": "원본 ComfyUI처럼 comfy_kitchen의 int8 어텐션(8비트 Q/K/V, fp32 softmax)을 사용합니다. 긴 시퀀스에서 더 빠르지만 어텐션을 양자화하므로 품질을 직접 판단해야 합니다. 커널이 있는 최신 NVIDIA GPU가 필요하며, 없거나 첫 비교에서 오차가 크면 일반 어텐션을 유지하고 이유를 로그에 남깁니다. 끄면 기존과 같습니다.",
+  "vedit.h3.turbo.pika6": "Pika Flex · 6스텝 (시험, re-noise 샘플러)",
+  "vid.h3.turbo.pika6": "Pika Flex · 6스텝 (시험, re-noise 샘플러)"
 }
