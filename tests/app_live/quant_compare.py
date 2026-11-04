@@ -2,7 +2,7 @@
 Per ogni prova registra tempo totale e per fase (dal log del job H3), VRAM di picco (campionata da run_suite con core/gpu_mem, mai torch.cuda nella GUI),
 RAM e controlli automatici; a fine turno scrive la tabella modello x (tempo, VRAM) e la pagina di revisione con i video dei modelli AFFIANCATI per caso.
 
-    python quant_compare.py add    <casi.jsonl> <id caso> <modello> <cartella run> <marcatore>   # dopo ogni caso
+    python quant_compare.py add    <casi.jsonl> <id caso> <modello> <cartella run> <marcatore> [gruppo]   # dopo ogni caso (gruppo: scheda di confronto)
     python quant_compare.py report <casi.jsonl> <misure.txt> [<cartella revisione>]               # a fine turno
 """
 from __future__ import annotations
@@ -21,7 +21,14 @@ MODEL_LABELS = {
     "nvfp4": "nvfp4 Abiray (predefinito, 12,5 GB)",
     "int8": "int8 ufficiale (21,0 GB)",
     "mmh3-dit-rockerboo-nvfp4": "nvfp4+int8 rockerBOO (20,1 GB)",
+    # turno 42: accelerazioni dall'originale (stesso caso, 736p, un fattore alla volta rispetto a «tutto attivo»)
+    "tutto_attivo": "TUTTO ATTIVO (rif. 512 px, GEMM int8, decode fp16)",
+    "rif_pieno": "riferimento a tela piena (senza accelerazione 1)",
+    "senza_gemm_int8": "senza GEMM int8 (dequantizzazione bf16)",
+    "attenzione_int8": "tutto attivo + attenzione int8",
+    "decode_fp32": "decode VAE in fp32 (senza accelerazione 4)",
 }
+KEY_LINES = re.compile(r"\[h3\] (GEMM|attenzione int8|video di riferimento|pesi quantizzati|cache del testo|testo: ripreso|piano VRAM|memoria insufficiente)")
 LOG_DIRS = (r"E:\ai\ltxstudio\output", r"E:\ai\ltxstudio\.claude\worktrees\prove\output")
 PHASES = (
     ("te_load_s", r"text encoder pronto in (\d+)s"),
@@ -63,6 +70,11 @@ def last_result(run_dir: str, case_id: str) -> dict:
     return next((row for row in reversed(rows) if row.get("id") == case_id), {})
 
 
+def key_log_lines(text: str, limit: int = 8) -> list:
+    """Righe del log del job che dicono quali accelerazioni hanno girato (GEMM, riferimento, piano VRAM, cache del testo)."""
+    return [line.strip()[:200] for line in text.splitlines() if KEY_LINES.search(line)][:limit]
+
+
 def checks_summary(result: dict) -> dict:
     """Misure dei controlli automatici (somiglianza del volto ArcFace, invariato) in forma piatta."""
     summary = {}
@@ -72,14 +84,15 @@ def checks_summary(result: dict) -> dict:
     return summary
 
 
-def build_entry(case_id: str, model: str, run_dir: str, marker: str) -> dict:
+def build_entry(case_id: str, model: str, run_dir: str, marker: str, group: str = "") -> dict:
     result = last_result(run_dir, case_id)
     log_path = newest_job_log(marker)
-    phases = parse_phase_log(open(log_path, encoding="utf-8", errors="replace").read()) if log_path else {}
+    log_text = open(log_path, encoding="utf-8", errors="replace").read() if log_path else ""
+    phases = parse_phase_log(log_text) if log_text else {}
     outputs = [path for path in (result.get("uscite") or []) if isinstance(path, str) and os.path.isfile(path)]
-    return {"case": case_id.rsplit("_", 1)[0], "id": case_id, "model": model, "esito": result.get("esito") or "assente", "motivo": result.get("motivo") or "",
+    return {"case": group or case_id.rsplit("_", 1)[0], "id": case_id, "model": model, "esito": result.get("esito") or "assente", "motivo": result.get("motivo") or "",
             "tempo_s": result.get("tempo_s"), "vram_peak_mb": result.get("vram_peak_mb"), "vram_base_mb": result.get("vram_base_mb"),
-            "ram_peak_mb": result.get("ram_peak_mb"), "video": outputs[0] if outputs else "", "log": log_path, "phases": phases, "checks": checks_summary(result)}
+            "ram_peak_mb": result.get("ram_peak_mb"), "video": outputs[0] if outputs else "", "log": log_path, "phases": phases, "checks": checks_summary(result), "notes": key_log_lines(log_text)}
 
 
 def delta_vram_gb(entry: dict):
@@ -109,6 +122,9 @@ def table(entries: list) -> str:
                      fmt(mean([e["tempo_s"] for e in ok if e.get("tempo_s") is not None]), "%.0f"), fmt(mean([e["phases"].get("dit_load_s") for e in ok if e["phases"].get("dit_load_s") is not None]), "%.0f"),
                      fmt(mean([e["phases"].get("s_per_step") for e in ok if e["phases"].get("s_per_step") is not None])),
                      fmt(mean([delta_vram_gb(e) for e in ok if delta_vram_gb(e) is not None])), fmt(mean([e["phases"].get("worker_peak_gb") for e in ok if e["phases"].get("worker_peak_gb") is not None]))))
+    lines += ["", "RIGHE DEL LOG PER PROVA (cosa ha girato davvero)"]
+    for entry in entries:
+        lines += ["-- %s / %s" % (entry["case"], entry["model"])] + ["   " + note for note in entry.get("notes") or ["(nessuna riga)"]]
     return "\n".join(lines)
 
 
@@ -132,7 +148,8 @@ def card_for_case(case: str, entries: list, review_dir: str, source_items: list)
     return {"items": items, "id": case, "fn": "ops", "esito": "ok" if not bad else "fallito", "motivo": "; ".join("%s: %s" % (e["model"], e["motivo"][:120]) for e in bad), "dry": False,
             "tempo": None, "vram": None, "ram": None, "commit": None, "handler": "h3_edit", "arch": "minimax_h3", "modello": ", ".join(e["model"] for e in entries),
             "prompt": "", "negativo": "", "params": {}, "loras": [], "media": media, "orig": [], "dialoghi": [], "iniz": None,
-            "descr": "Stesso caso, modelli affiancati: stessi seme, passi (turbo v4, 8), tela 480p, encoder testo nvfp4, solo clip 1.",
+            "descr": ("Stesso caso, prove affiancate: stesso seme, solo clip 1. Turno 41: passi turbo v4 (8), tela 480p, encoder testo nvfp4. "
+                      "Turno 42: 736p, int8 + DMAD a 6 passi, maschera dell'originale."),
             "verifica": "Quale modello rende meglio? Volto uguale al ritratto, gesti e labbra come l'originale, nitidezza, artefatti ai bordi, voce originale. "
                         "Scrivi nel riquadro il modello migliore e i difetti degli altri (vuoto = nessuna differenza che conti)."}
 
@@ -143,7 +160,8 @@ def source_items_for(case: str, review_dir: str) -> list:
     video = os.path.join(fixtures, "persona_parlante_11s.mp4" if "parlante" in case else "persona_intera_12s.mp4")
     portrait = os.path.join(fixtures, "ritratto_sfondo_neutro_pulito.png")
     items = []
-    for label, path, is_video in (("video originale", video, True), ("ritratto (personaggio nuovo)", portrait, False)):
+    sources = [("video originale", video, True)] + ([("ritratto (personaggio nuovo)", portrait, False)] if case.startswith("q41") else [])
+    for label, path, is_video in sources:
         if os.path.isfile(path):
             items.append({"role": "orig", "label": label, "path": path, "thumb": review._thumb(path, review_dir, f"{case}_src_{len(items)}"),
                           "big": review._thumb(path, review_dir, f"{case}_src_{len(items)}", True), "video": is_video})
@@ -171,7 +189,7 @@ def read_entries(jsonl: str) -> list:
 def main(argv=None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if len(args) >= 6 and args[0] == "add":
-        entry = build_entry(args[2], args[3], args[4], args[5])
+        entry = build_entry(args[2], args[3], args[4], args[5], args[6] if len(args) > 6 else "")
         with open(args[1], "a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
         print("registrato:", entry["id"], entry["model"], entry["esito"], entry["tempo_s"])

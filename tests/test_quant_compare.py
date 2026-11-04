@@ -77,3 +77,23 @@ def test_entry_from_results_and_review_page(tmp_path):
     results = [item for item in card["items"] if item["role"] == "result"]
     assert len(results) == 2 and "int8 ufficiale" in results[0]["label"] and "min" in results[0]["label"] and "Pubblica" in page      # i due modelli affiancati nella stessa scheda
     assert card["esito"] == "ok" and card["id"] == "q41_intera"
+
+
+def test_key_log_lines_and_notes_in_the_table():
+    text = ("[h3] GEMM int8 attivo: errore relativo 0.0088 contro il riferimento sul primo layer" + chr(10) + "rumore" + chr(10) +
+            "[h3] video di riferimento (movimento): tela 512x288" + chr(10) + "[h3] decode in 12s")
+    lines = QC.key_log_lines(text)
+    assert lines == ["[h3] GEMM int8 attivo: errore relativo 0.0088 contro il riferimento sul primo layer", "[h3] video di riferimento (movimento): tela 512x288"]
+    entry = make_entry("s42", "tutto_attivo", 500, 20000)
+    entry["notes"] = lines
+    assert "RIGHE DEL LOG PER PROVA" in QC.table([entry]) and "tela 512x288" in QC.table([entry])
+    assert "tutto_attivo" in QC.MODEL_LABELS and "rif_pieno" in QC.MODEL_LABELS
+
+
+def test_explicit_group_puts_all_variants_in_one_card(tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "results.jsonl").write_text(json.dumps({"id": "s42_rif_pieno", "esito": "ok", "tempo_s": 100.0}) + chr(10), encoding="utf-8")
+    entry = QC.build_entry("s42_rif_pieno", "rif_pieno", str(run), str(tmp_path / "nessun_marcatore"), "s42")
+    assert entry["case"] == "s42" and entry["model"] == "rif_pieno"
+    assert QC.build_entry("q41_intera_int8", "int8", str(run), str(tmp_path / "x"))["case"] == "q41_intera"
