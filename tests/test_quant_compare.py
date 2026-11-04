@@ -97,3 +97,16 @@ def test_explicit_group_puts_all_variants_in_one_card(tmp_path):
     entry = QC.build_entry("s42_rif_pieno", "rif_pieno", str(run), str(tmp_path / "nessun_marcatore"), "s42")
     assert entry["case"] == "s42" and entry["model"] == "rif_pieno"
     assert QC.build_entry("q41_intera_int8", "int8", str(run), str(tmp_path / "x"))["case"] == "q41_intera"
+
+
+def test_a_case_redone_counts_only_with_its_latest_run(tmp_path):
+    """Turno 43r: s43_pika6_nvfp4 compariva tre volte (assente, errore, ok) e s43_dasiwa_8 due: la tabella conta l'ultima esecuzione."""
+    rows = [{"case": "s43", "id": "a", "model": "m1", "esito": "assente"}, {"case": "s43", "id": "b", "model": "m2", "esito": "ok"},
+            {"case": "s43", "id": "a", "model": "m1", "esito": "errore"}, {"case": "s43", "id": "a", "model": "m1", "esito": "ok"},
+            {"case": "altro", "id": "a", "model": "m1", "esito": "ok"}]
+    path = tmp_path / "casi.jsonl"
+    path.write_text("
+".join(json.dumps(row) for row in rows), encoding="utf-8")
+    entries = QC.read_entries(str(path))
+    assert [(e["case"], e["id"], e["esito"]) for e in entries] == [("s43", "b", "ok"), ("s43", "a", "ok"), ("altro", "a", "ok")]
+    assert QC.read_entries(str(tmp_path / "manca.jsonl")) == []

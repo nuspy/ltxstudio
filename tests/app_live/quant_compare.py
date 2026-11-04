@@ -201,7 +201,17 @@ def build_review(entries: list, review_dir: str) -> str:
 
 
 def read_entries(jsonl: str) -> list:
-    return [json.loads(line) for line in open(jsonl, encoding="utf-8") if line.strip()] if os.path.isfile(jsonl) else []
+    """Le schede del file, UNA per (gruppo, caso, modello): un caso rifatto (turno 43r: assente/errore e poi ok) conta solo con la sua ULTIMA esecuzione."""
+    if not os.path.isfile(jsonl):
+        return []
+    latest: dict = {}
+    for line in open(jsonl, encoding="utf-8"):
+        if line.strip():
+            entry = json.loads(line)
+            key = (entry.get("case"), entry.get("id"), entry.get("model"))
+            latest.pop(key, None)                  # la riga piu recente prende il posto in fondo: l'ordine resta quello delle ultime esecuzioni
+            latest[key] = entry
+    return list(latest.values())
 
 
 def main(argv=None) -> int:
