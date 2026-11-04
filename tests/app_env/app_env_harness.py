@@ -8,7 +8,7 @@ l'InferenceServer :8189 (ComponentStore vivo), il mem_coordinator coordina i /fr
 si avviano quando la feature li richiede. Si patcha SOLO i QMessageBox modali (altrimenti offscreen si pianta).
 
 Uso tipico in un caso di test:
-    from tests.app_env import harness as H
+    from tests.app_env import app_env_harness as H
     w = H.boot_full_app()                      # MainWindow vera + :8189 su
     before = H.snapshot()                      # VRAM/servers/processi PRIMA
     ... pilota i widget e clicca il bottone ...

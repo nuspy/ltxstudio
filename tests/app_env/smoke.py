@@ -11,9 +11,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-sys.path.insert(0, str(Path(__file__).resolve().parent))       # per `import harness`
+sys.path.insert(0, str(Path(__file__).resolve().parent))       # per `import app_env_harness`
 
-import harness as H  # noqa: E402
+import app_env_harness as H  # noqa: E402
 
 
 def main() -> int:

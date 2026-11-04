@@ -23,7 +23,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import harness as H  # noqa: E402
+import app_env_harness as H  # noqa: E402
 
 OUT = r"E:\ai\ltxstudio\output"
 # stessi riferimenti del test 2.3: già su disco, e il confronto fra le due release resta diretto
