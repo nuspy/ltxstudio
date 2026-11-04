@@ -64,6 +64,10 @@ CANVAS = {"768": (768, 768 * 1344), "544": (544, 544 * 960)}     # lato corto, a
 
 MAX_REFS = {"image": 9, "video": 3, "audio": 3, "total": 12}
 
+# Campionatore proprio di alcune LoRA turbo (chiave di TURBO -> {"method", "knots"}): `renoise` = passo stocastico con griglia fissa di nodi (scala 1000), come gli adattatori
+# Pika H3 Flex a 6 passi (workers/h3_renoise_scheduler.py). Le turbo senza voce qui usano l'Euler uniforme di sempre.
+TURBO_SAMPLER: dict = {}
+
 # Lato lungo del video di MOVIMENTO (<Video 1>) negli edit: come l'originale Openjutsu (object/simple.api.json, nodo «Motion reference video (~512 px)»,
 # ImageScaleToMaxDimension 512). Il riferimento porta posa e tempi, non i dettagli: a 736p (1344x736) a tela piena ha ~6,7 volte i pixel (token del testo,
 # codifica VAE e righe di riferimento nel DiT). 0 = tela del bersaglio, come prima del 04/11.

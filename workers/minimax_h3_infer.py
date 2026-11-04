@@ -503,6 +503,21 @@ def cap_fraction(free_gb: float, total_gb: float, reserved_gb: float = 0.0) -> f
     return max(0.2, min(1.0, (free_gb + reserved_gb - 0.4) / total_gb))
 
 
+def scheduler_classes(turbo: str, seed: int) -> tuple:
+    """(classe dello scheduler video, classe dello scheduler audio): l'Euler di diffusers, o per le turbo con campionatore proprio (S.TURBO_SAMPLER, es. Pika a 6 passi)
+    la sottoclasse «renoise» con la griglia dei nodi dell'adattatore. Video e audio hanno semi di rumore diversi."""
+    from diffusers import MiniMaxH3Scheduler
+    sampler = S.TURBO_SAMPLER.get(turbo or "")
+    if not sampler:
+        return MiniMaxH3Scheduler, MiniMaxH3Scheduler
+    if sampler["method"] != "renoise":
+        raise RuntimeError(f"campionatore sconosciuto per la turbo {turbo}: {sampler['method']}")
+    import h3_renoise_scheduler
+    knots = tuple(sampler["knots"])
+    return (h3_renoise_scheduler.make_renoise_scheduler_class(MiniMaxH3Scheduler, knots, seed),
+            h3_renoise_scheduler.make_renoise_scheduler_class(MiniMaxH3Scheduler, knots, seed + 1))
+
+
 def decode_dtype():
     """Dtype dei pesi del VAE video al decode: fp16 (default) o fp32 (H3_VAE_DECODE_DTYPE=fp32). Il pipeline decodifica gia dentro un `torch.autocast(float16)` (diffusers
     modular_pipelines/minimax_h3/decoders.py:~187) e il file del VAE e fp16: con i pesi fp16 i valori sono gli stessi dell'autocast (fp32 -> fp16 e esatto), meta memoria
@@ -618,7 +633,6 @@ def run(p: dict) -> str:
                       what="MiniMax H3")
     resources.start_commit_guard(2.0, what="MiniMax H3")
     import torch
-    from diffusers import MiniMaxH3Scheduler
     from diffusers.modular_pipelines.minimax_h3 import MiniMaxH3Blocks
     from diffusers.modular_pipelines.minimax_h3.modular_pipeline import resolve_canvas_size
     from diffusers.utils.export_utils import encode_video
@@ -754,14 +768,16 @@ def run(p: dict) -> str:
     tname = "transformer_ref" if mode == "ref2va" else "transformer"
     if edit:                                                     # righe tenute legate alla sorgente
         import h3_edit_hold as _EH
-        _Hold = _EH.make_hold_scheduler_class(MiniMaxH3Scheduler)
-        _vs, _as = _Hold(shift=vshift), _Hold(shift=S.AUDIO_SHIFT)
+        video_class, audio_class = scheduler_classes(turbo, seed)
+        _vs = _EH.make_hold_scheduler_class(video_class)(shift=vshift)
+        _as = _EH.make_hold_scheduler_class(audio_class)(shift=S.AUDIO_SHIFT)
         _ps = tuple(tr.config.patch_size)
         _vs.set_hold(*edit["video_hold"](_ps))
         if edit.get("audio_hold") is not None:
             _as.set_hold(*edit["audio_hold"]())
     else:
-        _vs, _as = MiniMaxH3Scheduler(shift=vshift), MiniMaxH3Scheduler(shift=S.AUDIO_SHIFT)
+        video_class, audio_class = scheduler_classes(turbo, seed)
+        _vs, _as = video_class(shift=vshift), audio_class(shift=S.AUDIO_SHIFT)
     st = _stage(blocks, g_den, {tname: tr, "scheduler": _vs, "audio_scheduler": _as})
     t1 = time.time()
     torch.cuda.synchronize()
