@@ -29,6 +29,13 @@ MODEL_LABELS = {
     "nvfp4_base": "DiT nvfp4 Abiray, tutto attivo (base del GEMM FP4)",
     "con_gemm_fp4": "DiT nvfp4 Abiray + GEMM FP4 vero (W4A4)",
     "decode_fp32": "decode VAE in fp32 (senza accelerazione 4)",
+    # turno 43: confronto turbo sullo stesso caso del turno 41
+    "pika6_int8": "int8 ufficiale + Pika Flex 6 passi (renoise)",
+    "pika6_nvfp4": "nvfp4 Abiray + Pika Flex 6 passi (renoise)",
+    "dasiwa_4": "DaSiWa Hybrid V4 Turbo int8, 4 passi",
+    "dasiwa_8": "DaSiWa Hybrid V4 Turbo int8, 8 passi",
+    "int8_v4_turno41": "RIFERIMENTO turno 41: int8 + turbo v4 8 passi",
+    "nvfp4_v4_turno41": "RIFERIMENTO turno 41: nvfp4 Abiray + turbo v4 8 passi",
 }
 KEY_LINES = re.compile(r"\[h3\] (GEMM|attenzione int8|video di riferimento|pesi quantizzati|cache del testo|testo: ripreso|piano VRAM|memoria insufficiente)")
 LOG_DIRS = (r"E:\ai\ltxstudio\output", r"E:\ai\ltxstudio\.claude\worktrees\prove\output")

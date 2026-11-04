@@ -93,3 +93,14 @@ def test_pika6_is_registered_in_spec_catalog_and_menus():
     for language in ("it", "en", "ar", "zh"):
         table = json.loads((ROOT / "ui" / "i18n" / f"{language}.json").read_text(encoding="utf-8"))
         assert table["vedit.h3.turbo.pika6"] and table["vid.h3.turbo.pika6"]
+
+
+def test_forced_steps_for_fused_turbo_and_runkey(monkeypatch, capsys):
+    worker = pytest.importorskip("minimax_h3_infer")
+    fused = {"nfe": 4, "video_shift": 12.0}
+    monkeypatch.delenv("H3_NFE", raising=False)
+    assert worker.fused_turbo_steps(fused) == 4
+    monkeypatch.setenv("H3_NFE", "8")
+    assert worker.fused_turbo_steps(fused) == 8 and "H3_NFE=8" in capsys.readouterr().out
+    edit = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert '(("nfe", os.environ["H3_NFE"]),)' in edit                                  # i clip a 4 e a 8 passi non si scambiano nei checkpoint

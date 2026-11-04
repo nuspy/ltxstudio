@@ -503,6 +503,15 @@ def cap_fraction(free_gb: float, total_gb: float, reserved_gb: float = 0.0) -> f
     return max(0.2, min(1.0, (free_gb + reserved_gb - 0.4) / total_gb))
 
 
+def fused_turbo_steps(fused: dict) -> int:
+    """Passi di un DiT con la turbo nei pesi: quelli della scheda (`nfe`), o quelli forzati da H3_NFE (solo per le prove, es. DaSiWa Turbo a 4 contro 8 passi)."""
+    forced = os.environ.get("H3_NFE")
+    if forced:
+        _log(f"passi forzati da H3_NFE={forced} (scheda: {int(fused['nfe'])})")
+        return int(forced)
+    return int(fused["nfe"])
+
+
 def round_keyframe_conditions(state, turbo: str, mode: str) -> None:
     """Pika H3 Flex FL2VA (`bf16_conditioning_v1` del manifest, diffusers d0b9b1b5 encoders.py:~373): i latenti di condizionamento dei keyframe si arrotondano a bf16 prima
     del denoise. Solo con una turbo che lo dichiara (S.TURBO_SAMPLER[...]["keyframe_bf16"]) e solo in FL2VA: Ref2VA usa `fp32_conditioning_v1`, cioe quello di sempre."""
@@ -723,7 +732,7 @@ def run(p: dict) -> str:
     fused = S.CUSTOM_DITS.get(str(p.get("h3_dit") or ""), {})
     turbo = "" if fused.get("turbo_fused") else str(p.get("h3_turbo") or "")
     if fused.get("turbo_fused"):                       # DiT col turbo nei pesi (10Eros-Max): passi e shift suoi
-        nfe, vshift = int(fused["nfe"]), float(fused["video_shift"])
+        nfe, vshift = fused_turbo_steps(fused), float(fused["video_shift"])
     else:
         nfe = S.TURBO[turbo][1] if turbo else int(p.get("steps") or S.DEFAULT_NFE)
         vshift = S.TURBO[turbo][2] if turbo else float(p.get("h3_video_shift") or S.VIDEO_SHIFT)
