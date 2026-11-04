@@ -1852,6 +1852,7 @@ def _make_diffdiff_cb(pipe, init_image, change_map, steps, width, height, dtype,
     Best-effort: qualsiasi problema → si torna al comportamento normale (la generazione non si rompe).
     """
     import numpy as np
+    from PIL import Image                                   # mancava: NameError ingoiato dal best-effort, la differential diffusion non e mai partita
     import torch
 
     try:

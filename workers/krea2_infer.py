@@ -79,26 +79,58 @@ def _evict_pipes() -> None:
         print(f"[krea2] single-slot: sfrattati {n} pipe per liberare la VRAM prima del nuovo load", flush=True)
 
 
+def _pipe_mb(pipe) -> float:
+    """MB di parametri del pipe (transformer+vae+text_encoder), per decidere se ci sta in RAM."""
+    mb = 0.0
+    for _m in ("transformer", "vae", "text_encoder"):
+        _mod = getattr(pipe, _m, None)
+        if _mod is None:
+            continue
+        try:
+            mb += sum(p.numel() * p.element_size() for p in _mod.parameters()) / 2**20
+        except Exception:                                      # noqa: BLE001
+            pass
+    return mb
+
+
 def _demote_pipes() -> float:
     """M-park (unified-model-manager): parcheggia i pipe in cache su CPU-RAM invece di distruggerli
     (la pipeline successiva è di un'altra categoria, o ignota: se si torna a Krea2 il pipe rientra
     dalla RAM senza rileggere l'SSD). I pipe con cpu_offload hanno già i pesi in RAM → no-op.
-    Ritorna i MB (stimati) lasciati parcheggiati."""
+    Ritorna i MB (stimati) lasciati parcheggiati.
+
+    Il parcheggio è una CACHE, non un obbligo: si misura PRIMA quanto pesa il pipe e si chiede a
+    core/mem_budget se ci sta (RAM fisica + COMMIT + budget, gli stessi tre vincoli di
+    ComponentStore/_CpuParkRegistry). Se non ci sta → destroy: la VRAM si libera lo stesso e al
+    prossimo uso _load_pipeline rilegge da SSD. Spostare in RAM senza guardare significherebbe
+    solo trasferire la pressione dalla VRAM al commit di Windows, dove non si paga con un OOM
+    pulito ma con un access violation (vedi core/st_direct)."""
     import gc
     mb = 0.0
     for key, pipe in list(_PIPE_CACHE.items()):
         try:
             if getattr(pipe, "_hf_hook", None) or getattr(getattr(pipe, "transformer", None), "_hf_hook", None):
                 continue                                       # cpu_offload: pesi già in RAM, hook fragili
+            _sz = _pipe_mb(pipe)
+            try:
+                from core import mem_budget
+                _ok = mem_budget.fits(_sz, mb)
+            except Exception:                                  # noqa: BLE001 — senza politica: non rischiare
+                _ok = False
+            if not _ok:
+                print(f"[krea2] {key[0]}: {_sz:.0f}MB non entrano in RAM → destroy "
+                      f"(si rileggerà da SSD al prossimo uso)", flush=True)
+                _PIPE_CACHE.pop(key, None)
+                del pipe
+                try:                                           # F3: il ledger non deve mostrarlo parcheggiato
+                    from core import vram_ledger
+                    vram_ledger.unregister(f"krea2:{key[0]}")
+                except Exception:                              # noqa: BLE001
+                    pass
+                continue
             pipe.to("cpu")
             pipe._ls_parked_cpu = True                         # ri-promosso al prossimo cache-hit
-            for _m in ("transformer", "vae", "text_encoder"):
-                _mod = getattr(pipe, _m, None)
-                if _mod is not None:
-                    try:
-                        mb += sum(p.numel() * p.element_size() for p in _mod.parameters()) / 2**20
-                    except Exception:                          # noqa: BLE001
-                        pass
+            mb += _sz
             try:                                               # F3: ledger live
                 from core import vram_ledger
                 vram_ledger.set_state(f"krea2:{key[0]}", "ram_parked")

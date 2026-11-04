@@ -30,8 +30,16 @@ from pathlib import Path
 # ── Percorsi (layout E:\AI\Tools come il modulo training) ────────────────────
 TOOLS = Path(r"E:\AI\Tools")
 HEARTLIB_DIR = TOOLS / "heartlib"
+# VENV DEDICATO PRIMA del consolidato (27/08). heartlib pinna `torchao==0.9.0` in modo esatto e
+# `torch<2.11`; il server IMMAGINI, che condivideva il venv consolidato, ha bisogno di torchao
+# recente perché peft possa applicare LoRA sui moduli quantizzati. Con un venv solo le due
+# esigenze si escludevano: aggiornando torchao la musica smette di importare
+# (`No module named 'torchao.dtypes.nf4tensor'`, misurato), tenendolo fermo le LoRA restano
+# bloccate. Separati, ciascuno tiene le sue versioni.
+# Il consolidato resta come fallback: se il venv dedicato non c'è, si torna al comportamento #61.
+_DEDICATO = HEARTLIB_DIR / "venv" / "Scripts" / "python.exe"
 _CONS = Path(r"E:\AI\Tools\inference_server_venv\Scripts\python.exe")   # venv consolidato (#61)
-HEARTLIB_VENV_PY = _CONS if _CONS.exists() else HEARTLIB_DIR / "venv" / "Scripts" / "python.exe"
+HEARTLIB_VENV_PY = _DEDICATO if _DEDICATO.exists() else _CONS
 HEARTLIB_CKPT = HEARTLIB_DIR / "ckpt"
 HEARTLIB_RUN = HEARTLIB_DIR / "examples" / "run_music_generation.py"
 # Wrapper NOSTRO: monkey-patcha torchaudio.save → soundfile prima di lanciare HeartMuLa
