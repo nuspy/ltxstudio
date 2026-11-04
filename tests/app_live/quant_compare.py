@@ -22,10 +22,12 @@ MODEL_LABELS = {
     "int8": "int8 ufficiale (21,0 GB)",
     "mmh3-dit-rockerboo-nvfp4": "nvfp4+int8 rockerBOO (20,1 GB)",
     # turno 42: accelerazioni dall'originale (stesso caso, 736p, un fattore alla volta rispetto a «tutto attivo»)
-    "tutto_attivo": "TUTTO ATTIVO (rif. 512 px, GEMM int8, decode fp16)",
+    "tutto_attivo": "TUTTO ATTIVO (rif. 512 px, decode fp16; GEMM e attenzione int8 spenti)",
+    "con_gemm_int8": "tutto attivo + GEMM int8 vero (W8A8)",
     "rif_pieno": "riferimento a tela piena (senza accelerazione 1)",
-    "senza_gemm_int8": "senza GEMM int8 (dequantizzazione bf16)",
     "attenzione_int8": "tutto attivo + attenzione int8",
+    "nvfp4_base": "DiT nvfp4 Abiray, tutto attivo (base del GEMM FP4)",
+    "con_gemm_fp4": "DiT nvfp4 Abiray + GEMM FP4 vero (W4A4)",
     "decode_fp32": "decode VAE in fp32 (senza accelerazione 4)",
 }
 KEY_LINES = re.compile(r"\[h3\] (GEMM|attenzione int8|video di riferimento|pesi quantizzati|cache del testo|testo: ripreso|piano VRAM|memoria insufficiente)")

@@ -12,7 +12,7 @@ Formati riconosciuti dalle chiavi del safetensors, modulo per modulo:
                                            (+ weight_codebook / weight_correction) + marcatore nativo <m>.w4a8
 I pesi restano compressi in VRAM. Percorso di riferimento: si dequantizzano in bf16 un layer alla volta nel forward (matmul bf16: qualita identica, niente
 quantizzazione delle attivazioni). Percorsi veloci di comfy_kitchen, come l'originale ComfyUI: GEMM int8 vero (`int8_linear`, attivazioni int8 per riga, torch._int_mm)
-per RowInt8Linear, acceso di default (spento con H3_INT8_GEMM=0); GEMM FP4 vero (`scaled_mm_nvfp4`, solo Blackwell) per Nvfp4Linear, SPENTO di default (H3_NVFP4_GEMM=1:
+per RowInt8Linear, SPENTO di default (H3_INT8_GEMM=1: attivazioni int8, W8A8, errore ~1 %: non e lo stesso risultato numerico del riferimento W8A16); GEMM FP4 vero (`scaled_mm_nvfp4`, solo Blackwell) per Nvfp4Linear, SPENTO di default (H3_NVFP4_GEMM=1:
 attivazioni a 4 bit, qualita da giudicare). Ogni percorso veloce si verifica sul primo layer contro il riferimento e, se manca il kernel, la GPU non lo regge o l'errore e
 alto, si scarta con il motivo scritto nel log. Ogni layer accetta LoRA «al volo» (y = base(x) + s·B(A(x))), perché PEFT non sa avvolgere moduli personalizzati.
 """
@@ -87,7 +87,7 @@ class FastGemm:
         return True
 
 
-INT8_GEMM = FastGemm("int8", "H3_INT8_GEMM", True, 0.1, (7, 5))
+INT8_GEMM = FastGemm("int8", "H3_INT8_GEMM", False, 0.1, (7, 5))
 NVFP4_GEMM = FastGemm("NVFP4", "H3_NVFP4_GEMM", False, 0.5, (10, 0))
 
 

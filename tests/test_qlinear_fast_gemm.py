@@ -1,4 +1,4 @@
-"""GEMM veloci di comfy_kitchen nei Linear quantizzati (04/11): int8 vero acceso di default, FP4 spento; ogni scarto e scritto nel log, mai ingoiato."""
+"""GEMM veloci di comfy_kitchen nei Linear quantizzati (04/11): int8 vero (W8A8) e FP4 (W4A4) SPENTI di default, si accendono con H3_INT8_GEMM=1 / H3_NVFP4_GEMM=1; ogni scarto e scritto nel log, mai ingoiato."""
 import os
 import subprocess
 import sys
@@ -25,14 +25,18 @@ def fresh_state(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_default_switches_and_reasons_are_logged(capsys, monkeypatch):
+def test_both_gemms_are_off_by_default_and_the_switch_turns_them_on(capsys, monkeypatch):
     cpu = torch.device("cpu")
-    assert q.INT8_GEMM.usable(cpu) is False and "serve CUDA" in q.INT8_GEMM.reason or "comfy_kitchen non importabile" in q.INT8_GEMM.reason
+    for gemm, variable in ((q.INT8_GEMM, "H3_INT8_GEMM"), (q.NVFP4_GEMM, "H3_NVFP4_GEMM")):
+        assert gemm.usable(cpu) is False and "spento di default" in gemm.reason and f"{variable}=1" in gemm.reason
     assert "GEMM int8 non usato" in capsys.readouterr().out                             # il motivo e nel log
-    assert q.NVFP4_GEMM.usable(cpu) is False and "spento di default" in q.NVFP4_GEMM.reason and "H3_NVFP4_GEMM=1" in q.NVFP4_GEMM.reason
+    monkeypatch.setattr(q.INT8_GEMM, "reason", None)
+    monkeypatch.setenv("H3_INT8_GEMM", "1")
+    assert q.INT8_GEMM.usable(cpu) is False                                            # acceso, ma su CPU il kernel CUDA non serve: motivo diverso
+    assert "spento di default" not in q.INT8_GEMM.reason and (("serve CUDA" in q.INT8_GEMM.reason) or ("comfy_kitchen non importabile" in q.INT8_GEMM.reason))
     monkeypatch.setattr(q.INT8_GEMM, "reason", None)
     monkeypatch.setenv("H3_INT8_GEMM", "0")
-    assert q.INT8_GEMM.usable(cpu) is False and q.INT8_GEMM.reason == "H3_INT8_GEMM=0"
+    assert q.INT8_GEMM.usable(cpu) is False and "spento di default" in q.INT8_GEMM.reason
 
 
 def test_verify_accepts_close_results_and_rejects_far_ones_with_a_log_line(capsys):
