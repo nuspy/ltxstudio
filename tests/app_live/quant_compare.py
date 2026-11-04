@@ -29,6 +29,11 @@ MODEL_LABELS = {
     "nvfp4_base": "DiT nvfp4 Abiray, tutto attivo (base del GEMM FP4)",
     "con_gemm_fp4": "DiT nvfp4 Abiray + GEMM FP4 vero (W4A4)",
     "decode_fp32": "decode VAE in fp32 (senza accelerazione 4)",
+    # turno 42b: margine della maschera dell'originale (restringimento della persona a 1008 px), accanto al turno 40 e all'originale Openjutsu
+    "originale_openjutsu": "ORIGINALE Openjutsu (ComfyUI, maschera 20 px, stesso rifugio; video intero)",
+    "margine20_t40": "turno 40: margine 20 px (~26 px a 1312), int8 + DMAD 6 passi",
+    "margine10": "margine 10 px (~13 px a 1312) + attenzione int8",
+    "margine4": "margine 4 px (~5 px a 1312) + attenzione int8",
     # turno 43: confronto turbo sullo stesso caso del turno 41
     "pika6_int8": "int8 ufficiale + Pika Flex 6 passi (renoise)",
     "pika6_nvfp4": "nvfp4 Abiray + Pika Flex 6 passi (renoise)",
