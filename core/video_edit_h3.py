@@ -324,6 +324,8 @@ def build_params(cfg: dict, out: str, *, action: str | None = None, present=None
     out_p = {"arch": "minimax_h3", "h3_edit": e, "h3_profile": prof, "h3_turbo": turbo, "h3_video_shift": float(ep["video_shift"]),
              "seed": int(cfg.get("seed") or 42), "output": out, **E.engine_params(act, eng)}
     out_p.update(extra)                                          # opzioni di velocita / modello: presenti SOLO se scelte (default invariati)
+    if cfg.get("h3_int8_attention"):                             # attenzione int8 di comfy_kitchen (prova, spenta di default)
+        out_p["h3_int8_attention"] = True
     if cfg.get("h3_ref_full_res"):                               # video di movimento a tela piena (default: ~512 px sul lato lungo, come l'originale)
         out_p["h3_ref_max_side"] = 0
     gi = _guide_for(extra.get("loras"), pic, act)

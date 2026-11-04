@@ -3854,5 +3854,7 @@
   "vedit.h3.turbo.dmad4": "Turbo DMAD 4 lépés full · 6 lépés (mint az Openjutsu, Ref2VA)",
   "vedit.h3.model.b7hint": "A szerző tanácsa: jobban teljesít videó ritka figyelemmel (VSA) és 90%-os ritkítással. Itt a ritka figyelmet a «Veda ritka figyelem» jelölőnégyzet kapcsolja be.",
   "vedit.h3.ref_full": "Mozgásvideó teljes felbontásban (lassabb)",
-  "vedit.h3.ref_full.tt": "A mozgásreferencia testtartást és időzítést hordoz, nem részleteket: általában elég ~512 px a hosszabb oldalon (mint az eredetiben), sokkal kevesebb kódolandó szöveggel és memóriával. Bejelölve a generált videó felbontásán marad: lassabb, bizonyított előny nélkül."
+  "vedit.h3.ref_full.tt": "A mozgásreferencia testtartást és időzítést hordoz, nem részleteket: általában elég ~512 px a hosszabb oldalon (mint az eredetiben), sokkal kevesebb kódolandó szöveggel és memóriával. Bejelölve a generált videó felbontásán marad: lassabb, bizonyított előny nélkül.",
+  "vedit.h3.int8_attn": "Int8 figyelem (gyorsabb, kísérleti)",
+  "vedit.h3.int8_attn.tt": "A comfy_kitchen int8 figyelmét használja (8 bites Q/K/V, fp32 softmax), mint az eredeti ComfyUI: hosszú sorozatokon gyorsabb, de kvantálja a figyelmet, ezért a minőséget meg kell ítélni. Friss NVIDIA GPU kell a maggal; ha hiányzik, vagy az első összevetés a normál figyelemmel nagy hibát talál, a normál marad és az ok a naplóba kerül. Kikapcsolva = mint eddig."
 }

@@ -1264,6 +1264,13 @@ class VideoEditAITab(QWidget):
         self.h3_text_result.setStyleSheet("color:#74c0fc;")
         self.h3_text_result.setVisible(False)
         g.addRow("", self.h3_text_result)
+        # Attenzione int8 di comfy_kitchen (come «Comfy Kitchen Attention» dell'originale ComfyUI): piu veloce, ma quantizza Q/K/V: spenta di default, da giudicare.
+        self.h3_int8_attention = QCheckBox(tr("vedit.h3.int8_attn", "Attenzione int8 (piu veloce, prova)"))
+        self.h3_int8_attention.setMinimumHeight(32)
+        self.h3_int8_attention.setToolTip(tr("vedit.h3.int8_attn.tt", "Usa l'attenzione int8 di comfy_kitchen (Q/K/V a 8 bit, softmax in fp32), come l'originale ComfyUI: piu veloce sulle "
+                                             "sequenze lunghe, ma quantizza l'attenzione: la qualita va giudicata. Serve una GPU NVIDIA recente con il kernel; se manca, "
+                                             "o se il primo controllo contro l'attenzione normale trova un errore alto, resta quella normale e il motivo e nel log. Spenta = come sempre."))
+        g.addRow("", self.h3_int8_attention)
         # Video di movimento (<Video 1>): di default a ~512 px sul lato lungo, come l'originale; a tela piena e piu lento e pesa di piu in memoria.
         self.h3_ref_full_res = QCheckBox(tr("vedit.h3.ref_full", "Video di movimento a risoluzione piena (piu lento)"))
         self.h3_ref_full_res.setMinimumHeight(32)
@@ -1428,6 +1435,8 @@ class VideoEditAITab(QWidget):
             out["h3_translate"] = True
         if self.h3_ref_full_res.isChecked():
             out["h3_ref_full_res"] = True
+        if self.h3_int8_attention.isChecked():
+            out["h3_int8_attention"] = True
         if self.h3_te.currentData():
             out["h3_te"] = self.h3_te.currentData()
         if self.h3_veda.isChecked():

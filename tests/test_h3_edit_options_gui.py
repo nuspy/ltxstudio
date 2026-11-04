@@ -199,3 +199,15 @@ def test_ref_full_res_checkbox_is_off_by_default_and_reaches_the_cfg(tab):
     for f in sorted((Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")):
         d = json.loads(f.read_text("utf-8"))
         assert d.get("vedit.h3.ref_full") and d.get("vedit.h3.ref_full.tt"), f.name
+
+
+def test_int8_attention_checkbox_is_off_by_default_and_reaches_the_cfg(tab):
+    assert not tab.h3_int8_attention.isChecked() and tab.h3_int8_attention.isVisibleTo(tab)
+    assert "h3_int8_attention" not in _go(tab)
+    tab.h3_int8_attention.setChecked(True)
+    assert _go(tab)["h3_int8_attention"] is True
+    import json
+    from pathlib import Path
+    for f in sorted((Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")):
+        d = json.loads(f.read_text("utf-8"))
+        assert d.get("vedit.h3.int8_attn") and d.get("vedit.h3.int8_attn.tt"), f.name

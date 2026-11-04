@@ -190,6 +190,9 @@ def load_transformer(W: dict, mode: str, p: dict):
             tr.set_attention_backend(backend)
         except Exception as e:                                       # noqa: BLE001
             _log(f"backend attenzione {backend} non disponibile ({e}): uso quello di default")
+    if p.get("h3_int8_attention"):                     # attenzione int8 di comfy_kitchen (casella della GUI, spenta di default): al posto del backend native
+        import h3_int8_attention
+        h3_int8_attention.install()
     if W.get("veda"):                                  # DOPO il backend: i processor originali restano il ripiego
         import veda_h3
         if not (W.get("turbo") or S.CUSTOM_DITS.get(str(p.get("h3_dit") or ""), {}).get("turbo_fused")):

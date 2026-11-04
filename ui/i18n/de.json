@@ -3854,5 +3854,7 @@
   "vedit.h3.turbo.dmad4": "Turbo DMAD 4 Schritte full · 6 Schritte (wie Openjutsu, Ref2VA)",
   "vedit.h3.model.b7hint": "Empfehlung des Autors: bessere Ergebnisse mit Video-Sparse-Attention (VSA) und 90 % Sparsity. Hier schaltet das Kästchen «Veda Sparse Attention» sie ein.",
   "vedit.h3.ref_full": "Bewegungsvideo in voller Auflösung (langsamer)",
-  "vedit.h3.ref_full.tt": "Die Bewegungsreferenz trägt Pose und Timing, keine Details: meist reichen ~512 px an der langen Seite (wie im Original), mit viel weniger Text zu kodieren und weniger Speicher. Aktiviert bleibt sie in der Auflösung des erzeugten Videos: langsamer, ohne nachgewiesenen Vorteil."
+  "vedit.h3.ref_full.tt": "Die Bewegungsreferenz trägt Pose und Timing, keine Details: meist reichen ~512 px an der langen Seite (wie im Original), mit viel weniger Text zu kodieren und weniger Speicher. Aktiviert bleibt sie in der Auflösung des erzeugten Videos: langsamer, ohne nachgewiesenen Vorteil.",
+  "vedit.h3.int8_attn": "Int8-Attention (schneller, Test)",
+  "vedit.h3.int8_attn.tt": "Nutzt die Int8-Attention von comfy_kitchen (8-Bit-Q/K/V, Softmax in fp32) wie das ursprüngliche ComfyUI: schneller bei langen Sequenzen, quantisiert aber die Attention, die Qualität ist also zu beurteilen. Braucht eine aktuelle NVIDIA-GPU mit dem Kernel; fehlt er oder findet die erste Prüfung gegen die normale Attention einen hohen Fehler, bleibt die normale und der Grund steht im Log. Aus = wie bisher."
 }
