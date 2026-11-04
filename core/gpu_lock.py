@@ -63,22 +63,42 @@ def holder() -> dict | None:
         return None
 
 
+UNREADABLE_LOCK_GRACE_S = 10.0                          # chi crea il lock lo scrive entro pochi ms: un file illeggibile piu vecchio di cosi e rimasto a meta
+
+
+def _orphan_reason(holder_info: dict | None) -> str:
+    """Perche il lock esistente non puo avere un proprietario vivo ("" = proprietario vivo o lock appena creato)."""
+    if holder_info is None:
+        try:
+            age_s = time.time() - os.path.getmtime(_LOCK_PATH)
+        except OSError:                                 # il file e sparito nel frattempo: lo riprova il chiamante
+            return ""
+        if age_s > UNREADABLE_LOCK_GRACE_S:
+            return f"illeggibile da {age_s:.0f} s (vuoto o corrotto: scritto male da un riavvio o da un crash del PC)"
+        return ""
+    pid = int(holder_info.get("pid", 0) or 0)
+    if not _pid_alive(pid, float(holder_info.get("ts", 0) or 0)):
+        return f"del pid {pid} ({holder_info.get('tag')}), non piu vivo"
+    return ""
+
+
 def _try_take(tag: str) -> bool:
     os.makedirs(os.path.dirname(_LOCK_PATH), exist_ok=True)
     try:
         fd = os.open(_LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        h = holder()
-        if h and not _pid_alive(int(h.get("pid", 0) or 0), float(h.get("ts", 0) or 0)):
-            try:                                        # proprietario MORTO → lock orfano, rimuovi
+        reason = _orphan_reason(holder())
+        if reason:
+            try:                                        # proprietario MORTO o file corrotto -> lock orfano, rimuovi
                 os.remove(_LOCK_PATH)
-                print(f"[gpu-lock] lock orfano di pid {h.get('pid')} ({h.get('tag')}) rimosso",
-                      flush=True)
-            except OSError:
-                pass
+                print(f"[gpu-lock] lock orfano {reason}: rimosso", flush=True)
+            except OSError as exc:
+                print(f"[gpu-lock] ERRORE: lock orfano {reason} ma non si riesce a rimuoverlo ({_LOCK_PATH}): {exc}", flush=True)
         return False
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump({"pid": os.getpid(), "tag": tag, "ts": time.time()}, f)
+        f.flush()
+        os.fsync(f.fileno())                            # senza, un riavvio subito dopo lasciava 72 byte a zero (04/11) e il lock non era piu ne valido ne rimovibile
     return True
 
 

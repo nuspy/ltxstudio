@@ -14,6 +14,7 @@ Uso (in main_window):
 from __future__ import annotations
 
 import itertools
+import time
 
 from PySide6.QtCore import QObject, QTimer, Signal, Qt
 from PySide6.QtWidgets import (
@@ -100,6 +101,8 @@ class GenerationQueue(QObject):
         self._jobs: list[_Job] = []
         self._running: _Job | None = None
         self._ids = itertools.count(1)
+        self._gpu_wait_started: float | None = None
+        self._gpu_wait_logged = 0.0
 
     # ---------- API ----------
     def jobs(self) -> list[_Job]:
@@ -153,10 +156,12 @@ class GenerationQueue(QObject):
             if not gpu_lock.acquire(f"gui:{nxt.label}", timeout_s=0):
                 h = gpu_lock.holder() or {}
                 self.gpu_waiting.emit(str(h.get("tag", "?")))
+                self._log_gpu_wait(nxt, h)
                 QTimer.singleShot(2000, self._pump)
                 return
-        except Exception:                                    # noqa: BLE001 — senza lock: comportamento storico
-            pass
+            self._gpu_wait_started = None
+        except Exception as exc:                             # noqa: BLE001 — senza lock il job parte lo stesso, ma si dice perche
+            print(f"[gpu-lock] ERRORE nel lock GPU ({type(exc).__name__}: {exc}): il job «{nxt.label}» parte senza lock", flush=True)
         self._running = nxt
         nxt.status = "running"
         w = nxt.worker
@@ -169,6 +174,19 @@ class GenerationQueue(QObject):
         self.job_started.emit(nxt)
         self.changed.emit()
         w.start()
+
+    GPU_WAIT_LOG_EVERY_S = 60.0
+
+    def _log_gpu_wait(self, job: _Job, holder_info: dict) -> None:
+        """Una riga nel log ogni minuto con CHI tiene la GPU e da quanto il job aspetta: prima l'attesa era muta (04/11: lock a zeri dopo un riavvio, job fermo per ore senza una riga)."""
+        now = time.monotonic()
+        if self._gpu_wait_started is None:
+            self._gpu_wait_started, self._gpu_wait_logged = now, now - self.GPU_WAIT_LOG_EVERY_S
+        if now - self._gpu_wait_logged < self.GPU_WAIT_LOG_EVERY_S:
+            return
+        self._gpu_wait_logged = now
+        owner = f"pid {holder_info.get('pid')} ({holder_info.get('tag')})" if holder_info else "illeggibile (lock vuoto o corrotto)"
+        print(f"[gpu-lock] il job «{job.label}» aspetta la GPU da {now - self._gpu_wait_started:.0f} s: tenuta da {owner}", flush=True)
 
     @staticmethod
     def _release_lock() -> None:
