@@ -204,3 +204,24 @@ def test_pannello_sfondo_e_limiti(qtbot):
         assert p.get_references()[0]["token"] == "<Picture 1>"
     finally:
         user_prefs.set("video_arch", prev)
+
+
+def test_crop_guides_padding_keeps_the_length_8k_plus_1_and_drops_the_guide_frames():
+    """msr_crop_guides (prova 04/11): guida di 65 fotogrammi + video di 97 = 161 generati, i primi 64 scartati, 97 consegnati."""
+    import torch
+    from workers import ltx_msr
+    pad = ltx_msr.crop_guides_padding(65)
+    assert pad == 64 and (97 + pad - 1) % 8 == 0
+    video = torch.arange(161).reshape(161, 1, 1, 1).float()
+    kept = ltx_msr.drop_leading_frames(video, pad)
+    assert kept.shape[0] == 97 and kept[0, 0, 0, 0] == 64
+    chunks = [video[:50], video[50:100], video[100:161]]                         # il taglio cade a meta del secondo blocco
+    streamed = torch.cat(list(ltx_msr.drop_leading_frames(iter(chunks), pad)))
+    assert torch.equal(streamed, kept)
+    assert ltx_msr.drop_leading_frames(video, 0) is video and ltx_msr.crop_guides_padding(1) == 0
+
+
+def test_worker_wires_msr_crop_guides_to_the_frame_count_and_the_encoder():
+    source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "workers", "ltx2_infer.py"), encoding="utf-8").read()
+    assert 'if p.get("msr_crop_guides"):' in source and 'p["num_frames"] = int(p.get("num_frames", 41)) + _msr_crop_frames' in source
+    assert "video = ltx_msr.drop_leading_frames(video, _msr_crop_frames)" in source

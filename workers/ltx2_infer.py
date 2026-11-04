@@ -2466,6 +2466,7 @@ def run_generation(p: dict) -> str:
     # · slot embedding (2.5): riferimenti a posizioni temporali negative, innestati nel conditioning.
     _msr_guide = None
     _msr_strategy = ""
+    _msr_crop_frames = 0                                     # fotogrammi iniziali (guida) da scartare dall'uscita: solo con msr_crop_guides
     if p.get("references") and p.get("msr_lora") and os.path.exists(p["msr_lora"]):
         from workers import ltx_msr
         _msr_strategy = ltx_msr.strategy_for(p["msr_lora"])
@@ -2491,6 +2492,10 @@ def run_generation(p: dict) -> str:
                 width=_mw, height=_mh, frame_count=_mf, fps=int(p.get("fps", 24)))
             p["control_video"] = _msr_guide
             p.setdefault("control_strength", 1.0)            # la guida MSR va seguita, non suggerita
+            if p.get("msr_crop_guides"):                     # prova 04/11: guida + video, poi i fotogrammi della guida si scartano (vedi ltx_msr.crop_guides_padding)
+                _msr_crop_frames = ltx_msr.crop_guides_padding(_mf)
+                p["num_frames"] = int(p.get("num_frames", 41)) + _msr_crop_frames
+                print(f"[msr] msr_crop_guides: genero {p['num_frames']} fotogrammi e scarto i primi {_msr_crop_frames} (guida di {_mf})", flush=True)
         elif _msr_strategy == "slot_embedding" and p.get("msr_apply_lora", True):
             # 2.5: la LoRA MSR porta 480 coppie lora_A/lora_B per il DiT (oltre ai 5 tensori degli slot): senza i suoi PESI applicati il modello non e
             # addestrato a leggere i riferimenti a frame negativi e li ignora (03/11: video MSR 2.5 senza ragazza ne astronauta; `loras` era []).
@@ -2866,6 +2871,9 @@ def run_generation(p: dict) -> str:
             video = next(_nan_guard([video]))
         else:
             video = _nan_guard(video)
+        if _msr_crop_frames:
+            from workers import ltx_msr
+            video = ltx_msr.drop_leading_frames(video, _msr_crop_frames)
         # None (assente) = decide l'encoder dalla frequenza di uscita; 0 = nessun filtro, banda piena.
         _lp = p.get("audio_lowpass")
         encode_video(video=video, fps=fps, audio=audio, output_path=out,
