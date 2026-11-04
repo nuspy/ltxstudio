@@ -1488,6 +1488,8 @@ class MaskCanvas(QWidget):
     # in GUI: diventano comandi solo dopo l'ok dell'utente sulle misure (DECISIONE RICHIESTA).
     integrate_approach: str = ""
     integrate_strength: float | None = None
+    # Il volto del soggetto incollato resta fuori dalla zona rigenerata degli approcci armonizza / klein_* (core/integrate_face_hold): parametro delle prove, come l'approccio.
+    integrate_hold_face: bool = False
 
     @staticmethod
     def _dilate_alpha(img: QImage, px: int) -> QImage:

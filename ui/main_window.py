@@ -3104,6 +3104,8 @@ class MainWindow(QMainWindow):
             where = "on the left side" if _cx < 0.4 else ("on the right side" if _cx > 0.6 else "in the middle")
         except Exception as errore:                            # noqa: BLE001  senza maschera di posizione il testo dice «al centro»
             self._log(f"[integra] _start_integrate_approach: posizione del soggetto non letta ({errore!r}), uso «in the middle»")
+        if getattr(cv, "integrate_hold_face", False) and appr in ("armonizza", "klein_ref_inpaint", "klein_armonizza"):
+            exp = self._hold_subject_face(exp)               # il volto incollato resta fuori dalla zona rigenerata (prove 04/11: senza, somiglianza 0,05-0,34)
         if engine == "qwen_image21" and appr == "armonizza" and exp.get("mask"):
             # nessun riferimento (mask_ref=False): la zona (sagoma + contesto) e GENERATIVA, riparte dai pixel del composito rumorati al livello `strength`
             self._start_native_qwen21_edit(
@@ -3124,7 +3126,7 @@ class MainWindow(QMainWindow):
                       "steps": max(int(steps or 0), 12), "guidance": max(3.5, float(guidance or 0)), "seed": seed,
                       "denoise": 1.0, "feather": 48, "strength": float(S if S is not None else (1.0 if ref_mode else 0.55))}
             if ref_mode:
-                params["ref_images"] = list(exp["layer_refs"][:1])
+                params["ref_images"] = list(exp["layer_refs"][:1]) + ([exp["face_crop"]] if exp.get("face_crop") else [])
             self._log(f"Integra {appr} (Klein inpaint, strength={params['strength']:.2f}, rif.={len(params.get('ref_images') or [])}) inviato...")
             self._inpaint_mode = "integrazione"
             self._native_worker = _NativeImageWorker(params)
@@ -3147,6 +3149,15 @@ class MainWindow(QMainWindow):
                                        target_wh={"width": a.width, "height": a.height})
             return True
         return False
+
+    def _hold_subject_face(self, exp: dict) -> dict:
+        """`exp` con la maschera senza il volto del soggetto incollato (core/integrate_face_hold). Un errore nel rilevamento si scrive nel log e l'Integra parte con la maschera di prima."""
+        from core import integrate_face_hold as _hold
+        try:
+            return _hold.hold_face_of_subject(exp, OUTPUT_DIR, self._log)
+        except (RuntimeError, OSError, ValueError, KeyError) as errore:
+            self._log(f"[integra] volto da tenere: rilevamento non riuscito ({type(errore).__name__}: {errore}); la maschera resta com'e")
+            return exp
 
     def _layers_from_compose_list(self) -> int:
         """Porta sul canvas le foto elencate nella lista laterale, con la loro maschera.
