@@ -88,9 +88,23 @@ def resolve(p: dict) -> dict:
     return out
 
 
-def _read(path: str, device: str = "cuda"):
+def _read(path: str, device: str = "cuda", skip=()):
     import _qlinear as Q
-    return Q.read_safetensors(path, device)
+    return Q.read_safetensors(path, device, skip=skip)
+
+
+def _header_keys(path: str) -> list:
+    """Nomi dei tensori di un .safetensors, dal solo header (nessun dato letto)."""
+    import json
+    import struct
+    with open(path, "rb") as handle:
+        header_size = struct.unpack("<Q", handle.read(8))[0]
+        header = json.loads(handle.read(header_size))
+    header.pop("__metadata__", None)
+    return list(header)
+
+
+VAE_DECODER_PREFIXES = ("decoder.", "post_quant_conv.")
 
 
 def load_text_encoder(W: dict):
@@ -143,7 +157,6 @@ def lora_specs(W: dict, p: dict) -> list:
 
 
 def load_transformer(W: dict, mode: str, p: dict):
-    import torch
     from accelerate import init_empty_weights
     import _qlinear as Q
     from minimax_h3_pruned import MiniMaxH3PrunedTransformer3DModel
@@ -185,30 +198,38 @@ def load_transformer(W: dict, mode: str, p: dict):
     return tr
 
 
-def load_vae(W: dict):
+def load_vae(W: dict, encoder_only: bool = False, device: str = "cuda"):
+    """VAE video in fp32. `encoder_only`: solo encoder e quant_conv (0,7 GB invece di 9,7: il decoder e 4,5 dei 4,85 GB del file fp16), per le codifiche di riferimenti,
+    guida e clip sorgente. I pesi dell'encoder sono gli stessi fp16 del file portati a fp32: nessuna differenza numerica rispetto al VAE intero.
+    A 736p il VAE intero (9,7 GB) piu il testo non liberato mandava in OOM la codifica del riferimento (turno 40 del 04/11)."""
     import torch
     from accelerate import init_empty_weights
     from diffusers import AutoencoderKLMiniMaxH3
     import _qlinear as Q
     import h3_lightvae as LV
     cfg = AutoencoderKLMiniMaxH3.load_config(str(Path(W["configs"]) / "vae"))
-    if W.get("vae_dec_lite"):                          # LightVAE: decoder con 12 dei 36 blocchi (rinumerati)
+    if W.get("vae_dec_lite") and not encoder_only:     # LightVAE: decoder con 12 dei 36 blocchi (rinumerati)
         cfg = {**cfg, "decoder_num_layers": LV.decoder_layers(W["vae_dec_lite"])}
     with init_empty_weights():
         vae = AutoencoderKLMiniMaxH3.from_config(cfg)
     if W.get("vae_enc_lite"):
         LV.prune_encoder(vae, LV.kept_residuals(W["vae_enc_lite"]))
-    sd = LV.merge_state(_read(W["vae"]),
-                        dec=_read(W["vae_dec_lite"]) if W.get("vae_dec_lite") else None,
-                        enc=_read(W["vae_enc_lite"]) if W.get("vae_enc_lite") else None)
+    skip = frozenset(key for key in _header_keys(W["vae"]) if key.startswith(VAE_DECODER_PREFIXES)) if encoder_only else frozenset()
+    use_decoder_lite = bool(W.get("vae_dec_lite")) and not encoder_only
+    sd = LV.merge_state(_read(W["vae"], device, skip),
+                        dec=_read(W["vae_dec_lite"], device) if use_decoder_lite else None,
+                        enc=_read(W["vae_enc_lite"], device) if W.get("vae_enc_lite") else None)
     if W.get("vae_dec_lite") or W.get("vae_enc_lite"):
         _log("VAE video LightVAE Lite: " + " + ".join(n for n, k in (("decoder", "vae_dec_lite"),
                                                                     ("encoder", "vae_enc_lite")) if W.get(k)))
-    miss, unex = Q.load_into(vae, sd, dtype=torch.float32)
+    miss, unex = Q.load_into(vae, sd, device=device, dtype=torch.float32)
     del sd
+    if encoder_only:                                   # il decoder resta su meta: si sostituisce, cosi .to(device) non lo tocca e nessuno lo usa per sbaglio
+        miss = [key for key in miss if not key.startswith(VAE_DECODER_PREFIXES)]
+        vae.decoder, vae.post_quant_conv = torch.nn.Identity(), torch.nn.Identity()
     if miss or unex:
         raise RuntimeError(f"VAE video: chiavi mancanti {miss[:6]} / inattese {unex[:6]}")
-    return vae.to("cuda").eval()
+    return vae.to(device).eval()
 
 
 def _drop_module_weights(m) -> None:
@@ -642,6 +663,10 @@ def run(p: dict) -> str:
         + (f" · sequenza {_tt['language_model_len']} token" if "language_model_len" in _tt else ""))
     _drop_module_weights(te)                   # il `del` da solo non basta (visto sul DiT e sul VAE): i pesi del TE escono dalla VRAM comunque
     del st, te, comps                          # comps teneva ancora il TE: senza, resta in VRAM
+    # Dopo `_drop_module_weights` restavano vivi ~12 GB di pesi quantizzati del TE (150 tensori uint8 da 65 MB, 100 da 21 MB, scale fp8): turno 40 del 04/11, 736p,
+    # OOM nella codifica del VAE con 28,75 GB allocati; e a 480p «transformer pronto» a 26,1 GB con DiT+LoRA da 12,6. Il DiT non e ancora caricato, quindi ogni tensore
+    # quantizzato grande ancora su GPU e del TE e si svuota sul posto.
+    _log(f"pesi quantizzati del testo ancora vivi: {purge_big_quantized_tensors(log=_log):.2f} GB liberati")
     _gc()
     _log(f"testo codificato in {time.time() - t0:.0f}s")
 
@@ -652,7 +677,7 @@ def run(p: dict) -> str:
         kw.update(normalized_references=[], condition_latents=[], audio_condition_latents=[])
     if g_venc or (guide and guide["latents"] is None):
         t0 = time.time()
-        comps = {"vae": load_vae(W)}
+        comps = {"vae": load_vae(W, encoder_only=True)}            # qui il VAE codifica soltanto (riferimenti, guida); il decode lo ricarica intero
         if mode == "ref2va" and g_venc:
             comps["audio_vae"] = load_audio_vae(W)
         if g_venc:
@@ -824,7 +849,7 @@ def dump_gpu_state(log=print, top: int = 10) -> None:
                 log(f"[oom]   {tot / 2**30:6.2f} GB  {cls}  ({nl} Linear)  [{det}]")
         except Exception as e3:                                      # noqa: BLE001
             log(f"[oom] attribuzione per radice non riuscita: {e3}")
-        log(f"[oom] gruppi (forma, dtype) per byte totali:")
+        log("[oom] gruppi (forma, dtype) per byte totali:")
         for (shape, dt), (n, nb) in sorted(groups.items(), key=lambda kv: -kv[1][1])[:top]:
             log(f"[oom]   {nb / 2**30:6.2f} GB  {n} x {dt} {list(shape)}")
         _oom_table(log, gc, torch, storages, groups)
@@ -838,7 +863,6 @@ def _oom_table(log, gc, torch, storages: dict, groups: dict) -> None:
     non-peso (referrer: classe e funzione del frame): e cosi che si e trovato il ciclo di riferimenti di each_chunk (50 flussi residui da 0,38 GB vivi)."""
     try:
         wptr = set()
-        by_root = {}
         for o in gc.get_objects():
             if isinstance(o, torch.nn.Module):
                 for t in list(o.parameters(recurse=True)) + list(o.buffers(recurse=True)):

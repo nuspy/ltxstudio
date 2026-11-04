@@ -490,7 +490,7 @@ def generate_clip(job_dir: str, W) -> None:
     cells = torch.from_numpy(_np.load(jd / "cells.npy"))
     base = dict(m["base"])
     Wd = W.resolve({**base, "references": [{"kind": "image"}]})        # solo per i percorsi di VAE/configurazioni (modo ref2va)
-    vae = W.load_vae(Wd)
+    vae = W.load_vae(Wd, encoder_only=True)                            # codifica solo il clip sorgente: serve l'encoder, non il decoder
     lat = encode_source_latent(vae, clip_src, _Const)
     guide_lat = lat
     if (m.get("guide") or {}).get("mode") == "person":                 # guida = persona su grigio (guide_src.npy), non il clip intero
