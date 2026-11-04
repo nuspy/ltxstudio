@@ -13,6 +13,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, QUrl
 from ui.i18n_manager import tr
+from ui.widgets.lazy_viewer import LazyViewer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QPushButton,
@@ -201,9 +202,8 @@ class TrellisTab(QWidget):
                             "la geometria 3D migliora. Max 3 viste extra."))
         mv_info.setWordWrap(True); mv_info.setStyleSheet("color:#9aa1b0; font-size:11px;")
         mv.addWidget(mv_info)
-        from PySide6.QtWidgets import QListWidget, QListWidgetItem
+        from PySide6.QtWidgets import QListWidget
         from PySide6.QtCore import QSize
-        from PySide6.QtGui import QIcon, QPixmap
         self.views_list = QListWidget()
         self.views_list.setViewMode(QListWidget.IconMode)
         self.views_list.setIconSize(QSize(72, 72))
@@ -324,7 +324,7 @@ class TrellisTab(QWidget):
         scroll.setWidget(container)
 
         # ═══ Destra: visore 3D (interattivo se disponibile) ════════════════
-        self.viewer = make_viewer()
+        self.viewer = LazyViewer(make_viewer)         # il visore Chromium nasce alla prima apertura del tab
 
         split.addWidget(scroll)
         split.addWidget(self.viewer)

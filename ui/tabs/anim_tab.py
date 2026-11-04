@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from ui.i18n_manager import tr
 from ui.tabs.trellis_tab import make_viewer
+from ui.widgets.lazy_viewer import LazyViewer
 
 
 class AnimTab(QWidget):
@@ -107,7 +108,7 @@ class AnimTab(QWidget):
         v.addWidget(note); v.addStretch()
         scroll.setWidget(container)
 
-        self.viewer = make_viewer()
+        self.viewer = LazyViewer(make_viewer)         # il visore Chromium nasce alla prima apertura del tab
         split.addWidget(scroll); split.addWidget(self.viewer)
         split.setStretchFactor(0, 0); split.setStretchFactor(1, 1)
         split.setSizes([440, 600])
