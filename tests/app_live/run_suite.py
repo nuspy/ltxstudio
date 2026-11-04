@@ -263,8 +263,8 @@ def main():
         if ac is not None:
             try:
                 ac.save_history(ac_hist)
-            except Exception:                                # noqa: BLE001
-                pass
+            except OSError as errore:
+                say(f"storia dei controlli automatici non salvata: {errore!r}")
     try:                                                     # l'app di test scrive le preferenze (es. video_arch) nel worktree: ripristino la copia pulita
         shutil.copy2(os.path.join(MAIN_ROOT, "data", "user_prefs.json"), os.path.join(ROOT, "data", "user_prefs.json"))
         gs = os.path.join(ROOT, "data", "gui_state.json")

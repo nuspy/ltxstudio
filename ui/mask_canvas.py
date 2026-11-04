@@ -23,7 +23,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QBrush, QWheelEvent, QMouseEvent
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGraphicsView, QGraphicsScene,
-    QGraphicsPixmapItem, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem,
+    QGraphicsPixmapItem, QGraphicsRectItem,
     QPushButton, QSlider, QLabel, QFileDialog,
     QListWidget, QListWidgetItem, QComboBox, QFrame, QGraphicsOpacityEffect,
     QToolButton, QMenu, QDialog, QSpinBox, QDialogButtonBox, QFormLayout, QCheckBox,
@@ -645,7 +645,7 @@ class MaskCanvas(QWidget):
         self._lasso_fallback = None
 
     def _draw_lasso(self):
-        from PySide6.QtGui import QPolygonF, QPainterPath
+        from PySide6.QtGui import QPainterPath
         if self._lasso_item is not None:
             self.scene.removeItem(self._lasso_item); self._lasso_item = None
         if len(self._lasso_pts) < 2:
@@ -1859,7 +1859,6 @@ class MaskCanvas(QWidget):
         """
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
         W, H = self.aspect_w, self.aspect_h
-        frame = QRectF(0, 0, W, H)
         self._auto_cutout_opaque_layers()
         comp = QImage(self._composite(out_dir)).convertToFormat(QImage.Format_ARGB32)
         obj, region, wreg, any_region = self._build_integrate_masks()

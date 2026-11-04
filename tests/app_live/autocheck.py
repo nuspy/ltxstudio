@@ -67,16 +67,26 @@ def file_hash(path: str) -> str:
     return hashlib.md5(Image.open(path).convert("RGB").tobytes()).hexdigest()
 
 
+def _log_errore(dove: str, errore: Exception) -> None:
+    """Un ripiego voluto non e mai silenzioso: messaggio e funzione su stderr."""
+    print(f"[autocheck] {dove}: {errore!r}", file=sys.stderr, flush=True)
+
+
 def load_history() -> dict:
+    if not os.path.isfile(HISTORY):
+        return {}
     try:
-        return json.load(open(HISTORY, encoding="utf-8"))
-    except Exception:                                        # noqa: BLE001
+        with open(HISTORY, encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, ValueError) as errore:
+        _log_errore("load_history: storia illeggibile, riparto da vuota", errore)
         return {}
 
 
 def save_history(h: dict) -> None:
     os.makedirs(os.path.dirname(HISTORY), exist_ok=True)
-    json.dump(h, open(HISTORY, "w", encoding="utf-8"), ensure_ascii=False, indent=0)
+    with open(HISTORY, "w", encoding="utf-8") as handle:
+        json.dump(h, handle, ensure_ascii=False, indent=0)
 
 
 def seed_history(orch: str = ORCH) -> dict:
@@ -87,7 +97,8 @@ def seed_history(orch: str = ORCH) -> dict:
         for ln in open(rj, encoding="utf-8"):
             try:
                 r = json.loads(ln)
-            except Exception:                                # noqa: BLE001
+            except ValueError as errore:
+                _log_errore(f"seed_history: riga non valida in {rj}", errore)
                 continue
             if r.get("esito") not in ("ok", "rosso") or r.get("dry") or not r.get("uscite"):
                 continue
@@ -96,7 +107,8 @@ def seed_history(orch: str = ORCH) -> dict:
                 continue
             try:
                 hv = file_hash(p)
-            except Exception:                                # noqa: BLE001
+            except (OSError, ValueError) as errore:
+                _log_errore(f"seed_history: hash non calcolabile per {p}", errore)
                 continue
             lst = h.setdefault(str(r.get("id")), [])
             if not any(e["hash"] == hv and e["run"] == run for e in lst):
@@ -241,8 +253,9 @@ def evaluate(case: dict, r: dict, run: str, hist: dict) -> list:
     res = []
     try:
         res.append(check_unchanged(str(case.get("id")), out, run, hist))
-    except Exception as e:                                   # noqa: BLE001
-        res.append({"nome": "unchanged", "esito": "n/d", "motivo": repr(e)[:200], "misure": {}})
+    except (OSError, ValueError) as errore:
+        _log_errore("evaluate: controllo unchanged", errore)
+        res.append({"nome": "unchanged", "esito": "n/d", "motivo": repr(errore)[:200], "misure": {}})
     kind = spec.get("kind") or ("integra" if case.get("kind") == "integrate" else "inpaint" if case.get("kind") == "inpaint"
                                 else "video_refs" if case.get("refs") else "")
     try:
@@ -269,8 +282,9 @@ def evaluate(case: dict, r: dict, run: str, hist: dict) -> list:
                 res += check_video_refs(out, subj)
             else:
                 res.append({"nome": "video", "esito": "n/d", "motivo": "manca `autocheck.subjects` nel caso", "misure": {}})
-    except Exception as e:                                   # noqa: BLE001
-        res.append({"nome": kind or "controllo", "esito": "n/d", "motivo": repr(e)[:300], "misure": {}})
+    except Exception as errore:                              # noqa: BLE001  un controllo che non gira (venv, modello) non deve bloccare il giro
+        _log_errore(f"evaluate: controllo {kind or 'generico'} non riuscito", errore)
+        res.append({"nome": kind or "controllo", "esito": "n/d", "motivo": repr(errore)[:300], "misure": {}})
     if case.get("baseline"):                                  # confronto col default: misurato e mostrato, mai rosso
         for x in res:
             if x["esito"] == "ROSSO":
@@ -292,8 +306,8 @@ def apply(case: dict, r: dict, run: str, hist: dict) -> None:
     if outs:
         try:
             hist.setdefault(str(case.get("id")), []).append({"hash": file_hash(outs[0]), "run": run})
-        except Exception:                                    # noqa: BLE001
-            pass
+        except (OSError, ValueError) as errore:
+            _log_errore(f"apply: hash non registrato per {outs[0]}", errore)
 
 
 # ── taratura sui casi di oggi ─────────────────────────────────────────────────────────────────────────────────────────
@@ -340,8 +354,9 @@ def calibra() -> int:
                 for x in check_video_refs(r["uscite"][0], [{"nome": "ragazza", "face_ref": ref},
                                                            {"nome": "astronauta", "text": "an astronaut in a spacesuit"}]):
                     tags.append(f"{x['nome']}={x['esito']}{json.dumps(x['misure'])}")
-        except Exception as e:                               # noqa: BLE001
-            tags.append("ERRORE " + repr(e)[:150])
+        except Exception as errore:                          # noqa: BLE001  la taratura continua sugli altri casi
+            _log_errore(f"calibra: {i}", errore)
+            tags.append("ERRORE " + repr(errore)[:150])
         if tags:
             rosso = any("=ROSSO" in t for t in tags)
             if i in bocciati and not rosso:

@@ -45,7 +45,7 @@ if sys.platform == "win32":
     if not _pac:
         os.environ.pop("PYTORCH_CUDA_ALLOC_CONF", None)
 
-from core.qwen21_spec import (DITS, TURBO, TURBO_SIGMAS, ASPECTS_2K, MAX_REFS, PE, CONTROLNET,  # noqa: E402
+from core.qwen21_spec import (TURBO, TURBO_SIGMAS, ASPECTS_2K, MAX_REFS, PE, CONTROLNET,  # noqa: E402
                               RGBA_TEMPLATE, MASK_HINT, DEFAULT_STEPS, DEFAULT_GUIDANCE, DEFAULT_STRENGTH,
                               dit_for, is_turbo, te_for)
 

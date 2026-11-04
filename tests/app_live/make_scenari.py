@@ -123,6 +123,11 @@ M_LTX25 = "ltx-2.5-22b-distilled-transformer-nvfp4.safetensors  · diffusion"
 M_LTX23 = "LTXVideo\\v2\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors  · diffusion"
 
 
+def scenario_di_turno(indice: int) -> str:
+    """Rotazione fra gli scenari: l'indice 0..5 sceglie lo scenario, oltre il sesto si riparte."""
+    return ORDINE[indice % len(ORDINE)]
+
+
 def fx(scen, nome):
     return os.path.join(FIX, scen, nome)
 
@@ -163,7 +168,7 @@ def _base_inpaint(sc, k, model, arch="Flux", **kw):
     return c
 
 
-def _base_msr(sc, k, model, release, subj=("A", "B"), prompt_style="breve", **kw):
+def _base_msr(sc, k, model, subj=("A", "B"), prompt_style="breve", **kw):
     d = SCENARI[sc]
     toks = {s: f"@image_{i + 1}" for i, s in enumerate(subj)}
     pr = d["msr"].format(**toks)
@@ -177,29 +182,28 @@ def _base_msr(sc, k, model, release, subj=("A", "B"), prompt_style="breve", **kw
 
 
 def esperimenti_integra() -> dict:
-    S = lambda i: ORDINE[i % 6]          # noqa: E731  rotazione
     spec = [  # (id, scenario, parametri)
         # ── Qwen-Image 2.1 Turbo NVFP4: 5 scenari diversi ──
-        ("int_qwen_base", S(0), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, baseline=True)),
-        ("int_qwen_armonizza45", S(1), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, approach="armonizza", approach_strength=0.45,
+        ("int_qwen_base", scenario_di_turno(0), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, baseline=True)),
+        ("int_qwen_armonizza45", scenario_di_turno(1), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, approach="armonizza", approach_strength=0.45,
                                             expect_params={"mask_ref": False})),
-        ("int_qwen_armonizza65", S(2), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, approach="armonizza", approach_strength=0.65,
+        ("int_qwen_armonizza65", scenario_di_turno(2), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, approach="armonizza", approach_strength=0.65,
                                             expect_params={"mask_ref": False})),
-        ("int_qwen_soggetto_rif", S(3), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, regenera=True)),
-        ("int_qwen_armonizza55_ctx212", S(4), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, approach="armonizza", approach_strength=0.55, ctx_px=212,
+        ("int_qwen_soggetto_rif", scenario_di_turno(3), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, regenera=True)),
+        ("int_qwen_armonizza55_ctx212", scenario_di_turno(4), dict(engine="Qwen-Image 2.1", model=M_QWEN_TURBO, approach="armonizza", approach_strength=0.55, ctx_px=212,
                                                    expect_params={"mask_ref": False})),
         # ── FLUX.2 Klein (realDream 9B): 4 scenari diversi ──
-        ("int_klein_base", S(5), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, baseline=True, expect_params={"arch": "flux2_inpaint"})),
-        ("int_klein_rif_inpaint100", S(0), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, approach="klein_ref_inpaint", approach_strength=1.0,
+        ("int_klein_base", scenario_di_turno(5), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, baseline=True, expect_params={"arch": "flux2_inpaint"})),
+        ("int_klein_rif_inpaint100", scenario_di_turno(0), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, approach="klein_ref_inpaint", approach_strength=1.0,
                                                 expect_params={"arch": "flux2_inpaint", "strength": 1.0})),
-        ("int_klein_rif_inpaint85", S(1), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, approach="klein_ref_inpaint", approach_strength=0.85,
+        ("int_klein_rif_inpaint85", scenario_di_turno(1), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, approach="klein_ref_inpaint", approach_strength=0.85,
                                                expect_params={"arch": "flux2_inpaint", "strength": 0.85})),
-        ("int_klein_armonizza50", S(2), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, approach="klein_armonizza", approach_strength=0.5,
+        ("int_klein_armonizza50", scenario_di_turno(2), dict(engine="FLUX.2 (sperimentale)", model=M_KLEIN, approach="klein_armonizza", approach_strength=0.5,
                                              expect_params={"arch": "flux2_inpaint", "strength": 0.5})),
         # ── Kontext FLUX.1: 3 scenari diversi ──
-        ("int_kontext_base", S(3), dict(engine="Kontext (FLUX.1)", model=M_KONTEXT, baseline=True, expect_params={"arch": "inpaint"})),
-        ("int_kontext_stitch_a", S(4), dict(engine="Kontext (FLUX.1)", model=M_KONTEXT, approach="kontext_stitch", expect_params={"arch": "kontext"})),
-        ("int_kontext_stitch_b", S(5), dict(engine="Kontext (FLUX.1)", model=M_KONTEXT, approach="kontext_stitch", expect_params={"arch": "kontext"})),
+        ("int_kontext_base", scenario_di_turno(3), dict(engine="Kontext (FLUX.1)", model=M_KONTEXT, baseline=True, expect_params={"arch": "inpaint"})),
+        ("int_kontext_stitch_a", scenario_di_turno(4), dict(engine="Kontext (FLUX.1)", model=M_KONTEXT, approach="kontext_stitch", expect_params={"arch": "kontext"})),
+        ("int_kontext_stitch_b", scenario_di_turno(5), dict(engine="Kontext (FLUX.1)", model=M_KONTEXT, approach="kontext_stitch", expect_params={"arch": "kontext"})),
     ]
     cases = []
     for k, (cid, sc, kw) in enumerate(spec):
@@ -211,23 +215,22 @@ def esperimenti_integra() -> dict:
 
 
 def esperimenti_inpaint() -> dict:
-    S = lambda i: ORDINE[i % 6]          # noqa: E731
     DEV, KREA, GETPHAT, FUX = ("FLUX_Dev  · FLUX base: inpaint, outpaint, sostituzione di oggetti", "FLUX_Krea_Dev  (base, foto)",
                                "getphat Flux Reality v30 Hardcore FP8  (base, NSFW)",
                                "fuxCapacityNSFWPornFlux_20_(SwarmUI)  · FLUX base: inpaint, outpaint, sostituzione di oggetti")
     spec = [
-        ("inp_dev_base", S(0), DEV, {"baseline": True}),
-        ("inp_dev_crop128", S(1), DEV, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
-        ("inp_dev_crop64", S(2), DEV, {"inject": {"padding_mask_crop": 64}, "expect_params": {"padding_mask_crop": 64}}),
-        ("inp_dev_maschera_grande", S(3), DEV, {"mask_scale": 1.5}),
-        ("inp_dev_maschera_grande_crop128", S(4), DEV, {"mask_scale": 1.5, "inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
-        ("inp_dev_crop128_guid5", S(5), DEV, {"inject": {"padding_mask_crop": 128}, "widgets": {"frame1_tab.inp_guidance": 5.0}, "expect_params": {"padding_mask_crop": 128}}),
-        ("inp_krea_crop128", S(0), KREA, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
-        ("inp_getphat_crop128", S(1), GETPHAT, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
-        ("inp_fuxcapacity_crop128", S(2), FUX, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
-        ("inp_fill_controllo", S(3), "FLUX_DEV_Fill  (Fill inpaint/outpaint, 22GB)", {"baseline": True}),
-        ("inp_klein_controllo", S(4), "miraclein_flux2klein_nsfw_v2  (FLUX.2 Klein, edit)", {"arch": "Flux2", "baseline": True}),
-        ("inp_solo_oggetto_crop128", S(0), DEV, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}, "solo_oggetto": True}),
+        ("inp_dev_base", scenario_di_turno(0), DEV, {"baseline": True}),
+        ("inp_dev_crop128", scenario_di_turno(1), DEV, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
+        ("inp_dev_crop64", scenario_di_turno(2), DEV, {"inject": {"padding_mask_crop": 64}, "expect_params": {"padding_mask_crop": 64}}),
+        ("inp_dev_maschera_grande", scenario_di_turno(3), DEV, {"mask_scale": 1.5}),
+        ("inp_dev_maschera_grande_crop128", scenario_di_turno(4), DEV, {"mask_scale": 1.5, "inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
+        ("inp_dev_crop128_guid5", scenario_di_turno(5), DEV, {"inject": {"padding_mask_crop": 128}, "widgets": {"frame1_tab.inp_guidance": 5.0}, "expect_params": {"padding_mask_crop": 128}}),
+        ("inp_krea_crop128", scenario_di_turno(0), KREA, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
+        ("inp_getphat_crop128", scenario_di_turno(1), GETPHAT, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
+        ("inp_fuxcapacity_crop128", scenario_di_turno(2), FUX, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}}),
+        ("inp_fill_controllo", scenario_di_turno(3), "FLUX_DEV_Fill  (Fill inpaint/outpaint, 22GB)", {"baseline": True}),
+        ("inp_klein_controllo", scenario_di_turno(4), "miraclein_flux2klein_nsfw_v2  (FLUX.2 Klein, edit)", {"arch": "Flux2", "baseline": True}),
+        ("inp_solo_oggetto_crop128", scenario_di_turno(0), DEV, {"inject": {"padding_mask_crop": 128}, "expect_params": {"padding_mask_crop": 128}, "solo_oggetto": True}),
     ]
     cases = []
     for k, (cid, sc, model, kw) in enumerate(spec):
@@ -248,24 +251,23 @@ def esperimenti_inpaint() -> dict:
 
 
 def esperimenti_msr() -> dict:
-    S = lambda i: ORDINE[i % 6]          # noqa: E731
     spec = [
         # LTX 2.5 (slot embedding): la LoRA era applicata? base = comportamento di oggi (senza pesi della LoRA)
-        ("msr25_base_senza_lora", S(0), M_LTX25, "2.5", {"baseline": True, "inject": {"msr_apply_lora": False}}),
-        ("msr25_lora", S(1), M_LTX25, "2.5", {}),
-        ("msr25_lora_dettagliato", S(2), M_LTX25, "2.5", {"prompt_style": "dettagliato"}),
-        ("msr25_lora_forza07", S(3), M_LTX25, "2.5", {"inject": {"msr_strength": 0.7}}),
-        ("msr25_lora_3soggetti", S(4), M_LTX25, "2.5", {"subj": ("A", "B", "C")}),
+        ("msr25_base_senza_lora", scenario_di_turno(0), M_LTX25, "2.5", {"baseline": True, "inject": {"msr_apply_lora": False}}),
+        ("msr25_lora", scenario_di_turno(1), M_LTX25, "2.5", {}),
+        ("msr25_lora_dettagliato", scenario_di_turno(2), M_LTX25, "2.5", {"prompt_style": "dettagliato"}),
+        ("msr25_lora_forza07", scenario_di_turno(3), M_LTX25, "2.5", {"inject": {"msr_strength": 0.7}}),
+        ("msr25_lora_3soggetti", scenario_di_turno(4), M_LTX25, "2.5", {"subj": ("A", "B", "C")}),
         # LTX 2.3 (pseudo-video, IC-LoRA)
-        ("msr23_base", S(5), M_LTX23, "2.3", {"baseline": True}),
-        ("msr23_dettagliato", S(0), M_LTX23, "2.3", {"prompt_style": "dettagliato"}),
-        ("msr23_forza_guida08", S(1), M_LTX23, "2.3", {"prompt_style": "dettagliato", "inject": {"control_strength": 0.8}}),
-        ("msr23_lora_forza12", S(2), M_LTX23, "2.3", {"prompt_style": "dettagliato", "inject": {"msr_strength": 1.2}}),
-        ("msr23_3soggetti", S(3), M_LTX23, "2.3", {"prompt_style": "dettagliato", "subj": ("A", "B", "C")}),
+        ("msr23_base", scenario_di_turno(5), M_LTX23, "2.3", {"baseline": True}),
+        ("msr23_dettagliato", scenario_di_turno(0), M_LTX23, "2.3", {"prompt_style": "dettagliato"}),
+        ("msr23_forza_guida08", scenario_di_turno(1), M_LTX23, "2.3", {"prompt_style": "dettagliato", "inject": {"control_strength": 0.8}}),
+        ("msr23_lora_forza12", scenario_di_turno(2), M_LTX23, "2.3", {"prompt_style": "dettagliato", "inject": {"msr_strength": 1.2}}),
+        ("msr23_3soggetti", scenario_di_turno(3), M_LTX23, "2.3", {"prompt_style": "dettagliato", "subj": ("A", "B", "C")}),
     ]
     cases = []
     for k, (cid, sc, model, rel, kw) in enumerate(spec):
-        c = _base_msr(sc, k, model, rel, **kw)
+        c = _base_msr(sc, k, model, **kw)
         c["id"] = cid
         c["descr"] = f"Video MSR LTX {rel} · {', '.join(f'{a}={b}' for a, b in (kw.get('inject') or {}).items()) or kw.get('prompt_style', 'comportamento di oggi')} · scenario {sc}"
         cases.append(c)
@@ -340,8 +342,9 @@ def raccogli(run_dir: str) -> int:
                 txt = SCENARI[sc]["titolo"]
                 cos = ac.clip_scores([{"image": dest, "mask": None, "texts": ["a photo of " + txt]}])[0][0]
                 note.append(f"clip_ambientazione={cos:.3f}")
-        except Exception as e:                               # noqa: BLE001
-            note.append("controllo n/d: " + repr(e)[:100])
+        except Exception as errore:                          # noqa: BLE001  la raccolta prosegue sulle altre fixture
+            print(f"[make_scenari] raccogli: controllo n/d per {dest}: {errore!r}", file=sys.stderr, flush=True)
+            note.append("controllo n/d: " + repr(errore)[:100])
         print(f"fixture {r['id']} -> {dest} | " + " ".join(note))
     print(f"fixture copiate: {n_ok}")
     return 0

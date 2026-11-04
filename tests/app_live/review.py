@@ -8,7 +8,6 @@ Aperta da disco (file://) «Pubblica» scarica il file (ripiego).
 """
 from __future__ import annotations
 
-import html
 import json
 import os
 import re

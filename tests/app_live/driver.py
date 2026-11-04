@@ -295,7 +295,6 @@ class Driver:
         self.dry = False
         self.inject = None
         self._dry_png = None
-        drv = self
 
         class _Inv(QObject):
             call = Signal(object)
@@ -761,7 +760,6 @@ class Driver:
 
         def setup():
             f, vt = w.frame1_tab, w.video_tab
-            from core import offline_inventory as oi
             if case.get("nsfw"):
                 f.img_nsfw.setCurrentText("NSFW")
             f.gen_arch.setCurrentText(case["arch"]) if isinstance(case["arch"], str) and \

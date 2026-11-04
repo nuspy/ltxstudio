@@ -3102,8 +3102,8 @@ class MainWindow(QMainWindow):
             _xs = _np.where(_pm.any(0))[0]
             _cx = float(_xs.mean()) / _pm.shape[1] if len(_xs) else 0.5
             where = "on the left side" if _cx < 0.4 else ("on the right side" if _cx > 0.6 else "in the middle")
-        except Exception:                                      # noqa: BLE001
-            pass
+        except Exception as errore:                            # noqa: BLE001  senza maschera di posizione il testo dice «al centro»
+            self._log(f"[integra] _start_integrate_approach: posizione del soggetto non letta ({errore!r}), uso «in the middle»")
         if engine == "qwen_image21" and appr == "armonizza" and exp.get("mask"):
             # nessun riferimento (mask_ref=False): la zona (sagoma + contesto) e GENERATIVA, riparte dai pixel del composito rumorati al livello `strength`
             self._start_native_qwen21_edit(
