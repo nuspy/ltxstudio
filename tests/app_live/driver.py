@@ -34,7 +34,8 @@ _KEEP = ("module", "arch", "task", "model", "model_gguf", "krea2_variant", "krea
          "ref_images", "control_image", "control_type", "outpaint", "output", "native_audio", "h3_dit", "h3_profile",
          "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes",
          "mask_ref", "padding_mask_crop", "msr_strength", "msr_apply_lora", "msr_spacing", "control_strength", "msr_frames", "feather",
-         "h3_turbo", "h3_te", "h3_veda", "h3_lightvae", "h3_guide", "h3_guide_lora")      # opzioni H3 della tab Modifica Video (velocita / modello / guida allineata)
+         "h3_turbo", "h3_te", "h3_veda", "h3_lightvae", "h3_guide", "h3_guide_lora",
+         "seg_engine", "text", "threshold", "use_sam")      # opzioni H3 della tab Modifica Video (velocita / modello / guida allineata)
 
 
 def _safe(v, depth=0):
