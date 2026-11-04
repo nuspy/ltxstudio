@@ -46,7 +46,7 @@ def test_options_defaults_and_not_in_the_checkpoint_key_unless_they_change_the_c
     src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
     assert '"H3_EDIT_PREROLL") or e.get("preroll_frames") or 0' in src
     assert 'or e.get("bg_person_ref") or "sharp"' in src
-    assert 'str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")' in src   # matte DI DEFAULT nel cambia-sfondo
+    assert 'str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", DEFAULT_BG_MATTE)).strip().lower() not in ("", "0", "false", "no", "off")' in src   # matte DI DEFAULT nel cambia-sfondo
     assert '"bgref", bg_person_ref' in src and '"preroll", preroll' in src                 # cambiano i clip: nella chiave
     key_line = [l for l in src.splitlines() if l.strip().startswith('"maskalign_v2"')][0] + src.split('"maskalign_v2"')[1].split("*opts_key(p)")[0]
     assert "bg_matte" not in key_line                                                         # il matte e solo composizione: i clip si riusano
@@ -196,3 +196,11 @@ def test_fill_holes_option_is_off_by_default_and_in_the_key_when_on():
     src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
     assert 'os.environ.get("H3_EDIT_BG_MASK_FILL_HOLES") or e.get("bg_mask_fill_holes") or "0"' in src
     assert '"bgmaskorig", margin_px, fill_holes' in src and "M.drop_enclosed_regions(pers)" in src
+
+
+def test_background_defaults_follow_the_openjutsu_comparison_and_the_grey_level_is_in_the_checkpoint_key():
+    """Dopo i turni 40-44: maschera dell'originale, margine 4, sfondo del riferimento grigio al 100%, niente matte; il grigio EFFETTIVO nella chiave (non solo l'env)."""
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'DEFAULT_BG_MASK = "original"' in src and "DEFAULT_BG_MASK_MARGIN = 4" in src and "DEFAULT_BG_GREY = 1.0" in src and 'DEFAULT_BG_MATTE = "0"' in src
+    assert 'e.get("bg_mask", DEFAULT_BG_MASK)' in src and 'e.get("bg_mask_margin", DEFAULT_BG_MASK_MARGIN)' in src and 'e.get("bg_grey", DEFAULT_BG_GREY)' in src
+    assert "os.environ.get(\"H3_EDIT_REPLACE_EXPAND\"), bg_grey," in src          # cambiare il default non fa riprendere clip fatti col grigio di prima
