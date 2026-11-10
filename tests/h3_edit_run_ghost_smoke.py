@@ -102,6 +102,11 @@ def frames_of(path):
         return np.stack([f.to_ndarray(format="rgb24") for f in c.decode(c.streams.video[0])])
 
 
+# i casi di questo smoke descrivono le opzioni UNA PER VOLTA sopra il comportamento storico del cambia-sfondo (maschera cresciuta, sfondo grigio al 35%, matte acceso):
+# i default di oggi (maschera dell'originale, margine 4, grigio 1.0, niente matte) li prova il caso «defaults» in fondo
+LEGACY_BACKGROUND_DEFAULTS = {"bg_mask": "legacy", "bg_mask_margin": 20, "bg_grey": 0.35, "bg_matte": "1"}
+
+
 def run(tag, env, extra=None):
     for k in ("H3_EDIT_PREROLL", "H3_EDIT_BG_PERSON_REF", "H3_EDIT_BG_MATTE", "H3_EDIT_BG_HOLD_COVER", "H3_EDIT_FIRST_TWO_PASS", "H3_EDIT_BG_PROMPT", "H3_EDIT_LIPSYNC", "H3_EDIT_BG_GROW_LIKE_REPLACE", "H3_EDIT_MAX_FRAMES", "H3_EDIT_BG_MASK", "H3_EDIT_BG_MASK_MARGIN", "H3_EDIT_BG_MASK_FILL_HOLES", "H3_INT8_GEMM", "H3_NVFP4_GEMM", "H3_VAE_DECODE_DTYPE", "H3_NFE", "H3_INT8_ATTENTION"):
         os.environ.pop(k, None)
@@ -109,7 +114,7 @@ def run(tag, env, extra=None):
     calls.clear(); refs.clear(); prompts.clear()
     out = ER.run_edit({"output": str(TMP / tag / "out.mp4"), "seed": 1,
                        "h3_edit": {"action": "change_background", "video": str(src), "mask_dir": str(TMP / "masks"), "short_edge": 192,
-                                   "clip_s": 6.0, "overlap": 39, "keep_audio": True, "prompt_text": "x", **(extra or {})}}, FakeW,
+                                   "clip_s": 6.0, "overlap": 39, "keep_audio": True, "prompt_text": "x", **LEGACY_BACKGROUND_DEFAULTS, **(extra or {})}}, FakeW,
                       clip_runner=lambda W, jd: ER.generate_clip(jd, FakeW))
     return frames_of(out), list(calls), list(refs)
 

@@ -24,6 +24,12 @@ import torch.nn.functional as F
 
 import h3_edit_math as M
 
+# Default del cambia-sfondo scelti dopo i turni 40-44 del 04/11 (confronto con Openjutsu): maschera dell'originale con restringimento di 4 px (a 1008), sfondo del riferimento
+# in sola luminanza (grigio 1.0) e niente matte a pixel (come l'originale). Ogni valore si cambia con la sua variabile H3_EDIT_BG_* o col parametro dell'edit.
+DEFAULT_BG_MASK = "original"
+DEFAULT_BG_MASK_MARGIN = 4
+DEFAULT_BG_GREY = 1.0
+DEFAULT_BG_MATTE = "0"
 ORIGINAL_SAM_CANVAS_PX = 1008                  # lato lungo del video che SAM vede in Openjutsu: i margini dell'originale (10/20/40 px) sono a questa scala
 FPS = M.FPS
 _SRC_AUDIO_SR = 32000
@@ -272,7 +278,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # H3_EDIT_BG_MASK=original (confronto con Openjutsu, 03/11): la zona rigenerata del cambia-sfondo e quella dell'originale. KJNodes GrowMaskWithBlur con flip_input=true
     # (workflow object.api.json, lib/object.ts: margine 10/20/40 px a 1008 px di SAM, di default 20) inverte la maschera e POI la allarga: lo sfondo entra nel bordo della
     # persona. Persona = SAM con posa tenuta 2 frame e senza spazio sopra la testa. Nessun matte a pixel nell'originale: nel caso di confronto va spento (H3_EDIT_BG_MATTE=0).
-    original_mask = invert and str(os.environ.get("H3_EDIT_BG_MASK") or e.get("bg_mask") or "").strip().lower() == "original"
+    original_mask = invert and str(os.environ.get("H3_EDIT_BG_MASK") or e.get("bg_mask", DEFAULT_BG_MASK)).strip().lower() == "original"
     # fill_holes (H3_EDIT_BG_MASK_FILL_HOLES=1, spento di default): l'originale lo ha acceso; nei fotogrammi in cui la persona (ristretta) non tocca il bordo riempie la «buca» e
     # rigenera tutto il fotogramma, persona compresa. Sul video del rifugio sono 94 fotogrammi su 141: opzione a parte, da usare solo se l'originale mostra davvero quel comportamento.
     fill_holes = str(os.environ.get("H3_EDIT_BG_MASK_FILL_HOLES") or e.get("bg_mask_fill_holes") or "0").strip().lower() not in ("0", "false", "no", "off")
@@ -311,7 +317,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         pers, size = M.person_mask(obj, 0.0, 0)
         pers = pers.float()
     if original_mask:                                                  # la persona tenuta e quella ristretta del margine: la usano anche il riferimento (zona grigia = zona rigenerata) e l'eventuale matte
-        margin_px = int(round(float(os.environ.get("H3_EDIT_BG_MASK_MARGIN") or e.get("bg_mask_margin", 20)) * max(tw, th) / ORIGINAL_SAM_CANVAS_PX))
+        margin_px = int(round(float(os.environ.get("H3_EDIT_BG_MASK_MARGIN") or e.get("bg_mask_margin", DEFAULT_BG_MASK_MARGIN)) * max(tw, th) / ORIGINAL_SAM_CANVAS_PX))
         pers = M.erode_cross(pers, margin_px)
         enclosed_frames = 0
         if fill_holes:                                                 # come l'originale: una persona tutta dentro il fotogramma sparisce dalla maschera (si rigenera tutto)
@@ -335,7 +341,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # 2) video di riferimento (<Video 1>) — la zona rigenerata e nascosta: niente dettagli originali da copiare
     bg_person_ref = str(os.environ.get("H3_EDIT_BG_PERSON_REF") or e.get("bg_person_ref") or "sharp").lower()   # sharp (oggi) | mannequin | erase (nessuna figura nel riferimento del cambia-sfondo)
     # matte a pixel della persona (solo composizione): DI DEFAULT nel cambia-sfondo (03/11: testa fedele 0.124 -> 0.007); si spegne con H3_EDIT_BG_MATTE=0 o bg_matte=0/false
-    bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", "1")).strip().lower() not in ("", "0", "false", "no", "off")
+    bg_matte = str(os.environ.get("H3_EDIT_BG_MATTE") or e.get("bg_matte", DEFAULT_BG_MATTE)).strip().lower() not in ("", "0", "false", "no", "off")
     # bg_prompt_mode (env H3_EDIT_BG_PROMPT): "empty_person" = il prompt dice che la zona della persona e vuota e verra ricomposta (il modello genera SOLO l'ambiente, niente
     # persona ne lip sync); si attiva da solo con bg_person_ref=erase, "standard" lo spegne. Nel riferimento senza persona il prompt di sempre («<soggetto> keeps their exact look»)
     # chiederebbe di ridisegnarla.
@@ -343,9 +349,10 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     _bp = str(os.environ.get("H3_EDIT_BG_PROMPT") or e.get("bg_prompt_mode") or ("empty_person" if bg_person_ref == "erase" else "base")).strip().lower()
     bg_prompt = _bp if (invert and _bp in ("empty_person", "no_performance", "carryover", "replace_like", "align", "carryover_align")) else ""
     lipsync_off = str(os.environ.get("H3_EDIT_LIPSYNC") if os.environ.get("H3_EDIT_LIPSYNC") is not None else e.get("lipsync", "1")).strip().lower() in ("0", "false", "no", "off")
+    bg_grey = float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", DEFAULT_BG_GREY))      # valore EFFETTIVO: entra nella chiave dei checkpoint (cambiare il default non riprende clip vecchi)
     if invert:
         ref_frames = M.blur_area(f01, 1.0 - pers, radius=max(6.0, 0.02 * th * float(os.environ.get("H3_EDIT_BG_BLUR") or e.get("bg_blur", 1.0))),
-                                grey=float(os.environ.get("H3_EDIT_BG_GREY") or e.get("bg_grey", 0.35)))   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)
+                                grey=bg_grey)   # H3_EDIT_BG_BLUR = moltiplicatore del raggio (prova 03/11, default 1)
         if bg_person_ref == "mannequin":                               # la persona del riferimento diventa una figura grigia liscia (posizione e posa, niente volto/vestiti):
             ref_frames = M.grey_mannequins(ref_frames, pers, size, blur=0.02)   # il modello non ha una persona nitida da rifare (doppione spostato nel clip 1)
         elif bg_person_ref == "erase":                                 # NESSUNA figura nel riferimento: la zona della persona (dilatata) si riempie dallo sfondo sfocato intorno
@@ -373,7 +380,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     from core.minimax_h3_spec import REF_VIDEO_MAX_SIDE                 # il riferimento di movimento cambia i clip: nella chiave dei checkpoint
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
-                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
+                  e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), bg_grey, os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
                   *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), ("refmaxside", int(p.get("h3_ref_max_side", REF_VIDEO_MAX_SIDE))), *((("numerics", numerics_options()),) if numerics_options() else ()), *((("int8attn", 1),) if p.get("h3_int8_attention") else ()), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
