@@ -34,7 +34,8 @@ _KEEP = ("module", "arch", "task", "model", "model_gguf", "krea2_variant", "krea
          "ref_images", "control_image", "control_type", "outpaint", "output", "native_audio", "h3_dit", "h3_profile",
          "engine", "mode", "scale", "images", "audio_path", "klein_te", "video", "references", "msr_lora", "edit_lora", "ltx_release", "keyframes",
          "mask_ref", "padding_mask_crop", "msr_strength", "msr_apply_lora", "msr_spacing", "control_strength", "msr_frames", "feather",
-         "h3_turbo", "h3_te", "h3_veda", "h3_lightvae", "h3_guide", "h3_guide_lora")      # opzioni H3 della tab Modifica Video (velocita / modello / guida allineata)
+         "h3_turbo", "h3_te", "h3_veda", "h3_lightvae", "h3_guide", "h3_guide_lora",
+         "seg_engine", "text", "threshold", "use_sam")      # opzioni H3 della tab Modifica Video (velocita / modello / guida allineata)
 
 
 def _safe(v, depth=0):
@@ -295,7 +296,6 @@ class Driver:
         self.dry = False
         self.inject = None
         self._dry_png = None
-        drv = self
 
         class _Inv(QObject):
             call = Signal(object)
@@ -761,7 +761,6 @@ class Driver:
 
         def setup():
             f, vt = w.frame1_tab, w.video_tab
-            from core import offline_inventory as oi
             if case.get("nsfw"):
                 f.img_nsfw.setCurrentText("NSFW")
             f.gen_arch.setCurrentText(case["arch"]) if isinstance(case["arch"], str) and \
@@ -1024,6 +1023,8 @@ class Driver:
                 cv.integrate_regenerate = bool(case.get("regenera"))       # prova «rigenera» (scena senza foto + soggetto come riferimento)
                 cv.integrate_approach = str(case.get("approach") or "")      # prove 03/11: armonizza / klein_ref_inpaint / klein_armonizza / kontext_stitch
                 cv.integrate_strength = float(case["approach_strength"]) if case.get("approach_strength") is not None else None
+                cv.integrate_hold_face = bool(case.get("hold_face"))                    # prove 04/11: volto del soggetto fuori dalla zona rigenerata
+                cv.integrate_position_box = bool(case.get("position_box"))                # prove 04/11: Krea 2 Edit con riquadro di posizione sulla scena
                 if case.get("layer"):                                 # Integra fonde una foto incollata sul canvas (+ Img)
                     steps["layer_ok"] = bool(cv.add_layer(case["layer"]))
                 steps["engine"] = select_combo(f.integrate_engine, case["engine"])

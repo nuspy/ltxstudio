@@ -49,6 +49,39 @@ def latent_frame_counts(n_pixel_frames: int) -> list[int]:
     return counts
 
 
+def erode_cross(mask: torch.Tensor, iterations: int) -> torch.Tensor:
+    """Restringe la maschera [N, H, W] (1 = persona) di `iterations` pixel con il nucleo a croce 3x3 (L1: bordi diagonali piu stretti di quelli dritti).
+    E la zona rigenerata di Openjutsu nel cambia-sfondo: KJNodes GrowMaskWithBlur con flip_input=true inverte la maschera PRIMA di allargarla
+    (tapered_corners = nucleo a croce), quindi lo sfondo cresce DENTRO il bordo della persona."""
+    out = mask.float()
+    for start in range(0, out.shape[0], CHUNK):
+        background = 1.0 - out[start:start + CHUNK, None]
+        for _ in range(max(0, int(iterations))):
+            background = torch.maximum(F.max_pool2d(background, (3, 1), stride=1, padding=(1, 0)),
+                                       F.max_pool2d(background, (1, 3), stride=1, padding=(0, 1)))
+        out[start:start + CHUNK] = (1.0 - background)[:, 0]
+    return out
+
+
+def drop_enclosed_regions(mask: torch.Tensor) -> tuple[torch.Tensor, int]:
+    """Toglie da ogni fotogramma [N, H, W] le regioni della maschera (1 = persona) che NON toccano il bordo dell'immagine; ritorna (maschera, fotogrammi toccati).
+    E il `fill_holes` di KJNodes GrowMaskWithBlur sulla maschera dello SFONDO (flip_input): le «buche» (non connesse al bordo, connettivita 4, come
+    scipy.ndimage.binary_fill_holes) vengono riempite, cioe una persona tutta dentro il fotogramma sparisce dalla maschera e si rigenera l'intero fotogramma."""
+    import cv2
+    import numpy
+    out = mask.clone()
+    changed = 0
+    for index in range(out.shape[0]):
+        binary = (out[index] > 0.5).numpy().astype("uint8")
+        count, labels = cv2.connectedComponents(binary, connectivity=4)
+        border = set(labels[0].tolist()) | set(labels[-1].tolist()) | set(labels[:, 0].tolist()) | set(labels[:, -1].tolist())
+        enclosed = [label for label in range(1, count) if label not in border]
+        if enclosed:
+            out[index][torch.from_numpy(numpy.isin(labels, enclosed))] = 0.0
+            changed += 1
+    return out, changed
+
+
 def latent_boundary_floor(frames: int) -> int:
     """Il piu grande confine di frame di latente (1, 5, 9, ..., 17, 18, 22, ... cumulati di 1,4,4,4,4) <= `frames`: un contesto che finisce su un confine
     non lascia mezzo frame di latente fra tenuto e rigenerato. 0 se `frames` < 1."""

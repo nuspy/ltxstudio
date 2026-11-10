@@ -722,6 +722,7 @@ class VideoTab(QWidget):
         self.h3_turbo.addItem(tr("vid.h3.turbo.8", "Turbo 8 passi (più dettaglio)"), "8")
         self.h3_turbo.addItem(tr("vid.h3.turbo.v4", "Turbo v4 8 passi (larryvrh, anche coi riferimenti)"), "v4")
         self.h3_turbo.addItem(tr("vid.h3.turbo.dmad", "Turbo DMAD + v4 8 passi (audio migliore, sperimentale)"), "dmad")
+        self.h3_turbo.addItem(tr("vid.h3.turbo.pika6", "Pika Flex 6 passi (prova, campionatore re-noise)"), "pika6")
         self.h3_turbo.setToolTip(tr("vid.h3.turbo.tt",
             "LoRA di distillazione lightx2v: da ~49 a 4 o 8 passi (10× più veloce). Con i riferimenti "
             "(Ref2VA) esiste solo la 4 passi, in anteprima."))
@@ -921,10 +922,8 @@ class VideoTab(QWidget):
         """Popola il dropdown con le varianti LingBot (Dense/MoE) risolte dal catalogo pesi.
         A differenza di LTX (file singoli) i modelli LingBot sono snapshot diffusers → voci logiche."""
         from core import weights_catalog as wc
-        from core import model_precision as _mp
         from PySide6.QtGui import QColor
         entries = {e["id"]: e for e in wc.load()}
-        _free_gb = _mp.gpu_free_gb()
         from ui import model_menu as _mm
         prev = _mm.current_key(self.model, lambda i: self._model_key(self.model, i))
         self.model.blockSignals(True)

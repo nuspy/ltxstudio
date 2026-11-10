@@ -3850,5 +3850,14 @@
   "sam31.btn_comfy": "或下载 Comfy-Org 副本（无需审批，1.75 GB）",
   "vedit.h3.translate": "将文本翻译成英文并丰富细节",
   "vedit.h3.translate.tt": "模型理解英文：用其他语言写的地点、照片描述和主体会由本地增强器翻译（地点和照片还会补充细节），每个任务一次，在生成片段之前完成。主体只翻译，绝不补充（它是 SAM 的标签）。文本已是英文：不做处理。增强器不可用时发送原文。",
-  "vedit.h3.text_result": "发送给模型的文本：{t}"
+  "vedit.h3.text_result": "发送给模型的文本：{t}",
+  "vedit.h3.turbo.dmad4": "Turbo DMAD 4 步 full · 6 步（同 Openjutsu，Ref2VA）",
+  "vedit.h3.model.b7hint": "作者建议：配合视频稀疏注意力（VSA）和 90% 稀疏度效果更好。这里的稀疏注意力对应“Veda 稀疏注意力”复选框。",
+  "vedit.h3.ref_full": "运动视频使用完整分辨率（较慢）",
+  "vedit.h3.ref_full.tt": "运动参考提供姿态和节奏，而不是细节：通常长边约 512 px 就够了（与原版相同），需要编码的文本和占用的内存都少得多。勾选后保持与生成视频相同的分辨率：更慢，且没有已证明的好处。",
+  "vedit.h3.int8_attn": "Int8 注意力（更快，试验）",
+  "vedit.h3.int8_attn.tt": "使用 comfy_kitchen 的 int8 注意力（8 位 Q/K/V，softmax 用 fp32），与原版 ComfyUI 相同：长序列上更快，但会量化注意力，需要自行评判画质。需要带该内核的较新 NVIDIA GPU；若缺失，或首次与常规注意力比对误差过大，则保留常规注意力，原因写入日志。关闭 = 与以前相同。",
+  "vedit.h3.turbo.pika6": "Pika Flex · 6 步（试验，re-noise 采样器）",
+  "vid.h3.turbo.pika6": "Pika Flex · 6 步（试验，re-noise 采样器）",
+  "vedit.h3.model.singularityhint": "作者建议：在提示词中写明风格（photorealistic、3D CG、cinematic CG），并将提示词控制在约 5000 个字符以内。这不是 Turbo 模型：如需加速，请在「Turbo」菜单中选择一个 LoRA。"
 }

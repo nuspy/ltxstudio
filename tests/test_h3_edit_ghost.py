@@ -160,3 +160,39 @@ def test_ablation_alignment_sentence_variants():
     assert PR.ALIGN_SENTENCE in al and PR.ALIGN_SENTENCE not in base and al.replace(PR.ALIGN_SENTENCE + chr(10), "") == base          # UN solo cambiamento
     ca = PR.background_prompt("a snowy cabin", "the man", 141, 39, variant="carryover_align")
     assert PR.ALIGN_SENTENCE in ca and "Its first 1.625 seconds" in ca and "exact look" in ca
+
+
+def test_erode_cross_shrinks_the_person_like_flipped_grow_mask_with_blur():
+    person = torch.zeros(2, 60, 80)
+    person[:, 10:50, 20:60] = 1
+    same = M.erode_cross(person, 0)
+    assert torch.equal(same, person)
+    eroded = M.erode_cross(person, 5)
+    expected = torch.zeros_like(person)
+    expected[:, 15:45, 25:55] = 1                                    # un rettangolo si restringe di 5 px per lato
+    assert torch.equal(eroded, expected)
+    assert torch.equal(person, torch.cat([person[:1], person[1:]]))  # l'ingresso non cambia
+
+
+def test_original_mask_mode_is_wired_scaled_to_the_sam_canvas_and_in_the_key():
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("H3_EDIT_BG_MASK")' in src and "ORIGINAL_SAM_CANVAS_PX = 1008" in src
+    assert "M.erode_cross(pers, margin_px)" in src and '"bgmaskorig", margin_px' in src
+    assert "headroom, hold_frames = 0.0, 2" in src
+
+
+def test_drop_enclosed_regions_is_fill_holes_of_the_flipped_background_mask():
+    person = torch.zeros(3, 40, 60)
+    person[0, 10:30, 20:40] = 1                    # tutta dentro: sparisce (si rigenera tutto)
+    person[1, 20:40, 20:40] = 1                    # tocca il bordo in basso: resta
+    person[2, 5:15, 5:15] = 1                      # isola dentro...
+    person[2, 25:40, 30:50] = 1                    # ...e regione sul bordo: resta solo la seconda
+    out, changed = M.drop_enclosed_regions(person)
+    assert float(out[0].sum()) == 0 and torch.equal(out[1], person[1]) and float(out[2, 5:15, 5:15].sum()) == 0 and float(out[2, 25:40, 30:50].sum()) == 15 * 20
+    assert changed == 2 and torch.equal(person[0, 10:30, 20:40], torch.ones(20, 20))      # l'ingresso non cambia
+
+
+def test_fill_holes_option_is_off_by_default_and_in_the_key_when_on():
+    src = (ROOT / "workers" / "h3_edit_run.py").read_text(encoding="utf-8")
+    assert 'os.environ.get("H3_EDIT_BG_MASK_FILL_HOLES") or e.get("bg_mask_fill_holes") or "0"' in src
+    assert '"bgmaskorig", margin_px, fill_holes' in src and "M.drop_enclosed_regions(pers)" in src

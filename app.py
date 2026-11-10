@@ -20,6 +20,8 @@ if os.environ.get("LTX_TEST_DRIVER") == "1" and not getattr(sys, "frozen", False
 # .exe compilato in modo sistematico). Prima di qualunque import che possa aprire connessioni.
 from core.net_tls import use_system_ca                       # noqa: E402
 use_system_ca()
+from core import loopback                                     # noqa: E402
+loopback.install()        # connessioni locali (:8189, :8765, :8200) da una porta sorgente che il filtro di rete non scarta
 
 # NB: il visore 3D WebGL (WebEngine) è ATTIVO di default. Il crash 3D NON era WebEngine (era l'accesso Qt
 # cross-thread in _log, corretto): gli errori Chromium "kFatalFailure" all'avvio sono rumore innocuo (ripiega su

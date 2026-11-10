@@ -24,6 +24,7 @@ import torch.nn.functional as F
 
 import h3_edit_math as M
 
+ORIGINAL_SAM_CANVAS_PX = 1008                  # lato lungo del video che SAM vede in Openjutsu: i margini dell'originale (10/20/40 px) sono a questa scala
 FPS = M.FPS
 _SRC_AUDIO_SR = 32000
 
@@ -190,6 +191,16 @@ def run_clip_with_fallback(W, clip_runner, job_dir: str) -> bool:
     return True
 
 
+NUMERICS_ENV = ("H3_INT8_GEMM", "H3_NVFP4_GEMM", "H3_VAE_DECODE_DTYPE", "H3_NFE", "H3_INT8_ATTENTION")
+
+
+def numerics_options() -> tuple:
+    """Variabili d'ambiente che cambiano la NUMERICA di un clip (GEMM int8 / FP4, dtype del decode, passi forzati, attenzione int8): (nome, valore) di quelle impostate.
+    Entrano nella chiave della cartella del job e nel meta del clip: senza, un clip generato con un'impostazione veniva RIUSATO da un'altra (turno 42 del 04/11:
+    s42_con_gemm_int8 e s42_con_gemm_fp4 ripresero il clip di «tutto attivo», 118 s e video identici)."""
+    return tuple((name, os.environ[name]) for name in NUMERICS_ENV if os.environ.get(name))
+
+
 def opts_key(p: dict) -> tuple:
     """Scelte di velocita/modello dell'utente nell'edit (DiT personalizzato, Veda, LightVAE, LoRA): cambiano il risultato, quindi entrano nella chiave dei
     checkpoint. Presenti SOLO se scelte: con i default la chiave e quella di sempre e i checkpoint gia fatti restano validi."""
@@ -238,7 +249,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     clip_runner = clip_runner or _subprocess_clip_runner
     t_all = time.time()
     short = int(e.get("short_edge") or 480)
-    from core import h3_edit_prompt as PR  # noqa: F401  (usato dal figlio; qui si verifica che l'import funzioni prima di spendere minuti)
+    __import__("core.h3_edit_prompt")                                  # il figlio usa il prompt: qui si verifica che l'import funzioni prima di spendere minuti
 
     # 1) tela, sorgente e maschere
     with __import__("av").open(src) as c0:
@@ -258,11 +269,20 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     # la cella di latente unisce gia 4 frame, quindi la posa tenuta li e ridondante. Parametri bg_headroom / bg_hold_frames (default 0).
     # H3_EDIT_BG_GROW_LIKE_REPLACE=1 (ABLAZIONE 03/11, spento di default): nel cambia-sfondo la maschera TENUTA e quella di Sostituisci (persona cresciuta di person_grow + grow,
     # spazio sopra la testa 0,10, posa +-2 frame); matte e riferimento restano sulla sagoma vera.
+    # H3_EDIT_BG_MASK=original (confronto con Openjutsu, 03/11): la zona rigenerata del cambia-sfondo e quella dell'originale. KJNodes GrowMaskWithBlur con flip_input=true
+    # (workflow object.api.json, lib/object.ts: margine 10/20/40 px a 1008 px di SAM, di default 20) inverte la maschera e POI la allarga: lo sfondo entra nel bordo della
+    # persona. Persona = SAM con posa tenuta 2 frame e senza spazio sopra la testa. Nessun matte a pixel nell'originale: nel caso di confronto va spento (H3_EDIT_BG_MATTE=0).
+    original_mask = invert and str(os.environ.get("H3_EDIT_BG_MASK") or e.get("bg_mask") or "").strip().lower() == "original"
+    # fill_holes (H3_EDIT_BG_MASK_FILL_HOLES=1, spento di default): l'originale lo ha acceso; nei fotogrammi in cui la persona (ristretta) non tocca il bordo riempie la «buca» e
+    # rigenera tutto il fotogramma, persona compresa. Sul video del rifugio sono 94 fotogrammi su 141: opzione a parte, da usare solo se l'originale mostra davvero quel comportamento.
+    fill_holes = str(os.environ.get("H3_EDIT_BG_MASK_FILL_HOLES") or e.get("bg_mask_fill_holes") or "0").strip().lower() not in ("0", "false", "no", "off")
     like_replace = invert and str(os.environ.get("H3_EDIT_BG_GROW_LIKE_REPLACE") or e.get("bg_grow_like_replace") or "0").strip().lower() not in ("0", "", "false", "no", "off")
     headroom = float(e.get("bg_headroom", 0.0)) if invert else float(e.get("headroom", 0.10))
     hold_frames = int(e.get("bg_hold_frames", 0)) if invert else int(e.get("hold_frames", 2))
     if like_replace:
         headroom, hold_frames = float(e.get("headroom", 0.10)), int(e.get("hold_frames", 2))
+    if original_mask:
+        headroom, hold_frames = 0.0, 2
     # bg_hold_cover (env H3_EDIT_BG_HOLD_COVER): quota minima di persona per TENERE una cella nel cambia-sfondo (0 = spento: serve il 100 %, basta un pixel
     # di sfondo per rigenerarla). Con 0,5 volto e spalle restano ancorati; il matte a pixel pulisce lo sfondo vecchio nei bordi delle celle tenute.
     hold_cover = float(os.environ.get("H3_EDIT_BG_HOLD_COVER") or e.get("bg_hold_cover", 0.0) or 0.0) if invert else 0.0
@@ -290,6 +310,15 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
         regen_pix = M.regen_region(pers, False, person_grow, grow)
         pers, size = M.person_mask(obj, 0.0, 0)
         pers = pers.float()
+    if original_mask:                                                  # la persona tenuta e quella ristretta del margine: la usano anche il riferimento (zona grigia = zona rigenerata) e l'eventuale matte
+        margin_px = int(round(float(os.environ.get("H3_EDIT_BG_MASK_MARGIN") or e.get("bg_mask_margin", 20)) * max(tw, th) / ORIGINAL_SAM_CANVAS_PX))
+        pers = M.erode_cross(pers, margin_px)
+        enclosed_frames = 0
+        if fill_holes:                                                 # come l'originale: una persona tutta dentro il fotogramma sparisce dalla maschera (si rigenera tutto)
+            pers, enclosed_frames = M.drop_enclosed_regions(pers)
+        regen_pix = pers
+        W._log(f"maschera come Openjutsu: persona ristretta di {margin_px} px (20 px a 1008 -> {max(tw, th)} px), posa tenuta {hold_frames} frame; "
+               f"fill_holes {'attivo' if fill_holes else 'spento'}: {enclosed_frames} fotogrammi con la persona tutta dentro il fotogramma (rigenerati per intero)")
 
     # 1b) PREROLL (opzionale, default 0): frame fermi anteposti perche il clip 1 non parta «a freddo» (vedi M.preroll_pad). H3_EDIT_PREROLL=17 / `preroll_frames`.
     preroll = int(os.environ.get("H3_EDIT_PREROLL") or e.get("preroll_frames") or 0)
@@ -341,11 +370,12 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     done = 0
     seed0 = int(p.get("seed") or 0)
     st = os.stat(src)
+    from core.minimax_h3_spec import REF_VIDEO_MAX_SIDE                 # il riferimento di movimento cambia i clip: nella chiave dei checkpoint
     runkey = _sha(os.path.abspath(src), st.st_size, int(st.st_mtime), action, short, e.get("keep_text"), e.get("prompt_text"), e.get("picture_desc"),
                   pic, os.path.getmtime(pic) if pic and os.path.isfile(pic) else 0, seed0, p.get("h3_profile"), p.get("h3_turbo"), e.get("clip_s"),
                   e.get("overlap"), N, e.get("replace_expand"), os.environ.get("H3_EDIT_REPLACE_EXPAND"), os.environ.get("H3_EDIT_BG_GREY"), os.environ.get("H3_EDIT_BG_BLUR"), e.get("bg_feather_px"),
                   "maskalign_v2", *((("bgmask_v2", headroom, hold_frames),) if invert else ()),
-                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
+                  *((("bgref", bg_person_ref),) if (invert and bg_person_ref != "sharp") else ()), *((("preroll", preroll),) if preroll else ()), *((("bgprompt", bg_prompt),) if bg_prompt else ()), *((("lipoff", 1),) if lipsync_off else ()), *((("bglike", 1),) if like_replace else ()), ("refmaxside", int(p.get("h3_ref_max_side", REF_VIDEO_MAX_SIDE))), *((("numerics", numerics_options()),) if numerics_options() else ()), *((("int8attn", 1),) if p.get("h3_int8_attention") else ()), *((("bgmaskorig", margin_px, fill_holes),) if original_mask else ()), *((("bgcover", hold_cover),) if hold_cover else ()),
                   *opts_key(p), *guide_key(e))   # solo il cambia-sfondo cambia chiave: i checkpoint di sostituisci restano validi
     tmp = Path(p.get("output") or W.REPO / "output").parent / "_h3edit_tmp" / runkey
     tmp.mkdir(parents=True, exist_ok=True)
@@ -405,6 +435,8 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 meta["bg_prompt"] = bg_prompt
             if lipsync_off:
                 meta["lipsync"] = False
+            if numerics_options():                                          # GEMM / decode / passi / attenzione int8: la chiave del clip cambia, niente ripresa di un clip fatto altrimenti
+                meta["numerics"] = [list(item) for item in numerics_options()]
             if e.get("ref_clock_align"):                                   # variante sperimentale: SOLO se scelta (altrimenti meta e chiave restano quelle di sempre)
                 meta["ref_clock_align"] = True
             _np.save(jd / "clip_src.npy", clip_src.numpy())
@@ -426,6 +458,7 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
                 run_clip_with_fallback(W, clip_runner, str(jd))
                 _ensure(gen_p.exists(), f"il clip {ci + 1} non ha prodotto {gen_p}")
                 key_p.write_text(key)
+                (jd / "te_state.pt").unlink(missing_ok=True)               # la cache del testo serve solo a un riavvio dopo OOM: a clip riuscito si toglie
             gen_f = torch.from_numpy(_np.load(gen_p)).float() / 255.0
             _ensure(gen_f.shape[0] >= length, f"il clip {ci + 1} ha {gen_f.shape[0]} frame, attesi {length}")
             gen_f = gen_f[:length]
@@ -460,6 +493,12 @@ def run_edit(p: dict, W, clip_runner=None) -> str:
     return out
 
 
+def _want_key(job_dir: Path) -> str:
+    """Chiave del clip che run_edit scrive prima di lanciare il figlio ('' se manca: allora la cache del testo non si usa)."""
+    path = job_dir / "want_key.txt"
+    return path.read_text(encoding="utf-8").strip() if path.is_file() else ""
+
+
 def generate_clip(job_dir: str, W) -> None:
     """FIGLIO: genera UN clip (VAE sorgente -> latente + maschera + audio -> Ref2VA con hold -> frame). Processo fresco = VRAM pulita."""
     import numpy as _np
@@ -471,7 +510,7 @@ def generate_clip(job_dir: str, W) -> None:
     cells = torch.from_numpy(_np.load(jd / "cells.npy"))
     base = dict(m["base"])
     Wd = W.resolve({**base, "references": [{"kind": "image"}]})        # solo per i percorsi di VAE/configurazioni (modo ref2va)
-    vae = W.load_vae(Wd)
+    vae = W.load_vae(Wd, encoder_only=True)                            # codifica solo il clip sorgente: serve l'encoder, non il decoder
     lat = encode_source_latent(vae, clip_src, _Const)
     guide_lat = lat
     if (m.get("guide") or {}).get("mode") == "person":                 # guida = persona su grigio (guide_src.npy), non il clip intero
@@ -513,7 +552,8 @@ def generate_clip(job_dir: str, W) -> None:
     pc = dict(base)
     pc.update(prompt=prompt, references=refs, seed=m["seed"], num_frames=length, duration_s=length / FPS, width=tw, height=th,
               generate_audio=False, _h3_edit={"noise": noise, "audio_noise": audio_noise, "video_hold": video_hold, "audio_hold": audio_hold,
-                                              "frames": length, "canvas": (th, tw)})
+                                              "frames": length, "canvas": (th, tw),
+                                              "text_cache": {"path": str(jd / "te_state.pt"), "key": _want_key(jd)}})
     if m.get("guide"):
         # Guida allineata: il clip sorgente (i suoi latenti, GIA calcolati per le righe tenute) entra anche come blocco di condizione sulla griglia del
         # video generato (workers/h3_guide.py). Si aggiunge al riferimento nativo <Video 1>; le LoRA di guida (VFX Edit, Style Transfer...) la vogliono.

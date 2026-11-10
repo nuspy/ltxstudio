@@ -801,12 +801,13 @@ NEW = [
       used_by=["cap.video_minimax_h3"],
       note="confronto nvfp4: qkv int8-ConvRot + bordi e out_proj BF16 (con minimax_h3_layer_config.json). Scaricato a mano dall'utente; conversione nativa da verificare "
            "al primo arrivo del file. Licenza H3 Community (no UE/UK/USA/Corea)"),
-    N("mmh3-dit-10erosmax-b6", "Video", "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)", category="video",
-      arch="minimax_h3", repo="TenStrip/10Eros-Max", remote="10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors",
-      filename="10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors", convert="mmh3_dit",
-      type="diffusion_models", family="MiniMax-H3", gb=21.71, sens="adult", deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8", "mmh3-video-vae", "mmh3-audio-vae"],
+    N("mmh3-dit-10erosmax-b7", "Video", "10Eros-Max H3 beta7 fix1 Turbo 8 passi (18+, INT8 HQ, bordi BF16, ~22GB)", category="video",
+      arch="minimax_h3", repo="TenStrip/10Eros-Max", remote="10Eros_Max_h3_8stepTURBO_beta7_fix1-native_int8_protected_edges_HQ.safetensors",
+      filename="10Eros_Max_h3_8stepTURBO_beta7_fix1_int8HQ-native.safetensors", convert="mmh3_dit",
+      type="diffusion_models", family="MiniMax-H3", gb=22.9, sens="adult", deps=["mmh3-configs", "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8", "mmh3-video-vae", "mmh3-audio-vae"],
       used_by=["cap.video_minimax_h3"],
-      note="turbo già fuso: 8-12 passi, shift 10/3, NIENTE LoRA turbo. Licenza H3 Community (no UE/UK/USA/Corea)"),
+      note="turbo gia fuso: 8 passi, shift video 12 / audio 3, NIENTE LoRA turbo. L'autore la consiglia con attenzione sparsa video (VSA) e sparsita 90 %. Il file dell'autore si chiama "
+           "«-native» ma ha chiavi ComfyUI (adaln_t_table, audio_patch_proj, 892 tensori): la conversione le porta al nostro formato. Licenza H3 Community (no UE/UK/USA/Corea)"),
     N("mmh3-lora-unlocked-v2", "Video", "LoRA H3 NSFW Unlocked V2 (18+, 0.3GB)", category="video", arch="minimax_h3",
       repo="lynaNSFW/minimaxH3_Collection", remote="Minimax_H3_Unlocked_V2.safetensors",
       filename="Minimax_H3_Unlocked_V2-native.safetensors", convert="mmh3_lora", type="LoRA", family="MiniMax-H3",

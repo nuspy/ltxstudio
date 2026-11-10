@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 # Riusa il visore 3D del tab TRELLIS (interattivo se disponibile)
 from ui.tabs.trellis_tab import make_viewer
+from ui.widgets.lazy_viewer import LazyViewer
 
 
 class RigTab(QWidget):
@@ -120,7 +121,7 @@ class RigTab(QWidget):
         v.addStretch()
         scroll.setWidget(container)
 
-        self.viewer = make_viewer()
+        self.viewer = LazyViewer(make_viewer)         # il visore Chromium nasce alla prima apertura del tab
         split.addWidget(scroll)
         split.addWidget(self.viewer)
         split.setStretchFactor(0, 0)

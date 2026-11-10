@@ -89,6 +89,30 @@ def patch_fp32_cpu():
     return n
 
 
+def wide_sdpa_kernel(real_sdpa_kernel, backends):
+    """`sdpa_kernel` che ignora la lista richiesta dal codice di Meta (solo FLASH_ATTENTION) e ne usa una piu larga.
+    Perche: il torch Windows del venv e compilato SENZA flash attention («Torch was not compiled with flash attention»): con la sola FLASH_ATTENTION
+    scaled_dot_product_attention fa «No available kernel» (turno 36 del 04/11, tracker multiplex su cuda). Efficient/cuDNN/math danno gli stessi numeri."""
+    def sdpa_kernel(_requested, *args, **kwargs):
+        return real_sdpa_kernel(list(backends), *args, **kwargs)
+    return sdpa_kernel
+
+
+def patch_sdpa_backends():
+    """Sostituisce `sdpa_kernel` nel decoder di Meta (l'unico punto che forza la sola FLASH_ATTENTION, decoder.py:1065) con la versione larga."""
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+    import sam3.model.decoder as decoder
+    decoder.sdpa_kernel = wide_sdpa_kernel(sdpa_kernel, (SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.CUDNN_ATTENTION, SDPBackend.MATH))
+
+
+def gpu_autocast(dev):
+    """Su GPU il codice di Meta presume l'autocast bf16 (come nei suoi notebook): senza, i pesi float32 incontrano le attivazioni bf16 di addmm_act e
+    nn.Linear dice «mat1 and mat2 must have the same dtype, but got BFloat16 and Float» (turno 36 del 04/11, trova persone). Su CPU niente autocast."""
+    import contextlib
+    import torch
+    return torch.autocast("cuda", dtype=torch.bfloat16) if dev.startswith("cuda") else contextlib.nullcontext()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", required=True)
@@ -113,11 +137,13 @@ def main():
     print(f"[sam31] checkpoint {os.path.basename(a.checkpoint)}: {len(det)} chiavi detector, mancanti {len(missing)} {list(missing)[:6]}, in piu {len(unexpected)}", file=sys.stderr, flush=True)
     del sd, det
     if dev.startswith("cuda"):
+        patch_sdpa_backends()
         model = model.cuda()
     proc = Sam3Processor(model, device=dev, confidence_threshold=a.threshold)
     img = Image.open(a.image).convert("RGB")
-    state = proc.set_image(img)
-    state = proc.set_text_prompt(a.text.strip().rstrip("."), state)
+    with gpu_autocast(dev):
+        state = proc.set_image(img)
+        state = proc.set_text_prompt(a.text.strip().rstrip("."), state)
     masks = state["masks"].squeeze(1).cpu().numpy().astype(bool) if "masks" in state else np.zeros((0, img.height, img.width), bool)
     boxes = state["boxes"].float().cpu().numpy() if "boxes" in state else np.zeros((0, 4), "float32")
     scores = state["scores"].float().cpu().numpy() if "scores" in state else np.zeros((0,), "float32")

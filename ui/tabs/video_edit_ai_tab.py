@@ -48,6 +48,13 @@ _LORA = "LTX-2/"
 MODES = vem.legacy_modes()
 
 # default italiani (i18n: chiavi vedit.*, 15 lingue)
+_MODEL_HINTS = {          # note dell'autore sulle voci del menu «Modello H3» (testo di ripiego in italiano; le traduzioni sono nei file i18n)
+    "vedit.h3.model.b7hint": "Consiglio dell'autore: rende meglio con attenzione sparsa video (VSA) e sparsità 90 %. "
+                             "Qui l'attenzione sparsa si accende con la casella «Attenzione sparsa Veda».",
+    "vedit.h3.model.singularityhint": "Scheda dell'autore: scrivi lo stile nel prompt (photorealistic, 3D CG, cinematic CG) e tienilo sotto i 5000 caratteri circa. "
+                                      "Non è turbo: per andare veloce scegli una LoRA nel menu «Turbo».",
+}
+
 _MODE_DEFAULT = {
     "edit": "Modifica globale (edit-anything)", "inpaint": "Inpaint oggetto (sperimentale)",
     "change_background": "Cambia sfondo (tieni la persona)",
@@ -1201,6 +1208,8 @@ class VideoEditAITab(QWidget):
         self.h3_turbo_lbl = QLabel(tr("vedit.h3.turbo_lbl", "Velocita (LoRA turbo)"))
         _lbl = {"v4": tr("vedit.h3.turbo.v4", "Turbo v4 · 8 passi (predefinita)"), "4": tr("vedit.h3.turbo.4", "Turbo 4 passi (Ref2VA, piu veloce)"),
                 "8": tr("vedit.h3.turbo.8", "Turbo 8 passi — solo FL2VA"), "dmad": tr("vedit.h3.turbo.dmad", "Turbo DMAD + v4 — solo FL2VA"),
+                "dmad4": tr("vedit.h3.turbo.dmad4", "Turbo DMAD 4 passi full · 6 passi (come Openjutsu, Ref2VA)"),
+                "pika6": tr("vedit.h3.turbo.pika6", "Pika Flex · 6 passi (prova, campionatore re-noise)"),
                 "r4v10": tr("vedit.h3.turbo.r4v10", "Turbo 4 passi v1.0 768p (lightx2v, Ref2VA)"),
                 "r8v11": tr("vedit.h3.turbo.r8v11", "Turbo 8 passi v1.1 768p (lightx2v, Ref2VA)")}
         # prima le turbo che esistono per Ref2VA (v4 predefinita in testa), poi quelle solo FL2VA: visibili ma disattivate, col motivo
@@ -1258,6 +1267,20 @@ class VideoEditAITab(QWidget):
         self.h3_text_result.setStyleSheet("color:#74c0fc;")
         self.h3_text_result.setVisible(False)
         g.addRow("", self.h3_text_result)
+        # Attenzione int8 di comfy_kitchen (come «Comfy Kitchen Attention» dell'originale ComfyUI): piu veloce, ma quantizza Q/K/V: spenta di default, da giudicare.
+        self.h3_int8_attention = QCheckBox(tr("vedit.h3.int8_attn", "Attenzione int8 (piu veloce, prova)"))
+        self.h3_int8_attention.setMinimumHeight(32)
+        self.h3_int8_attention.setToolTip(tr("vedit.h3.int8_attn.tt", "Usa l'attenzione int8 di comfy_kitchen (Q/K/V a 8 bit, softmax in fp32), come l'originale ComfyUI: piu veloce sulle "
+                                             "sequenze lunghe, ma quantizza l'attenzione: la qualita va giudicata. Serve una GPU NVIDIA recente con il kernel; se manca, "
+                                             "o se il primo controllo contro l'attenzione normale trova un errore alto, resta quella normale e il motivo e nel log. Spenta = come sempre."))
+        g.addRow("", self.h3_int8_attention)
+        # Video di movimento (<Video 1>): di default a ~512 px sul lato lungo, come l'originale; a tela piena e piu lento e pesa di piu in memoria.
+        self.h3_ref_full_res = QCheckBox(tr("vedit.h3.ref_full", "Video di movimento a risoluzione piena (piu lento)"))
+        self.h3_ref_full_res.setMinimumHeight(32)
+        self.h3_ref_full_res.setToolTip(tr("vedit.h3.ref_full.tt", "Il riferimento di movimento porta posa e tempi, non i dettagli: di solito basta ~512 px sul lato lungo (come "
+                                           "l'originale), con molto meno testo da codificare e meno memoria. Spuntato lo tiene alla risoluzione del video generato: piu lento, "
+                                           "senza un vantaggio dimostrato."))
+        g.addRow("", self.h3_ref_full_res)
         self.h3_guide = QCheckBox(tr("vedit.h3.guide", "Guida di latenti allineata (prova)"))
         self.h3_guide.setToolTip(tr("vedit.h3.guide.tt", "Il video sorgente entra anche come blocco di latenti puliti sulla stessa griglia (spazio e tempo) del risultato, "
                                     "oltre al riferimento <Video 1>. Le LoRA di guida (VFX Edit, Style Transfer, Head Swap, Motion Transfer, nitidezza) la richiedono "
@@ -1338,6 +1361,9 @@ class VideoEditAITab(QWidget):
         for c in vh3.model_choices():
             lab = c["label"] if c["installed"] else tr("vedit.h3.model.missing", "{label} — non installato").format(label=c["label"])
             self.h3_profile.addItem(lab, c["id"])
+            hint_key = h3s.CUSTOM_DITS.get(c["id"], {}).get("hint_key")
+            if hint_key:                                     # nota dell'autore del modello, mostrata sulla voce del menu
+                self.h3_profile.setItemData(self.h3_profile.count() - 1, tr(hint_key, _MODEL_HINTS[hint_key]), Qt.ToolTipRole)
             if c["installed"] and first is None and c["kind"] == "profile":
                 first = c["id"]
         j = self.h3_profile.findData(cur)
@@ -1410,6 +1436,10 @@ class VideoEditAITab(QWidget):
         out = {"h3_turbo": self.h3_turbo.currentData() or vh3.DEFAULT_TURBO}
         if self.h3_translate.isChecked():
             out["h3_translate"] = True
+        if self.h3_ref_full_res.isChecked():
+            out["h3_ref_full_res"] = True
+        if self.h3_int8_attention.isChecked():
+            out["h3_int8_attention"] = True
         if self.h3_te.currentData():
             out["h3_te"] = self.h3_te.currentData()
         if self.h3_veda.isChecked():

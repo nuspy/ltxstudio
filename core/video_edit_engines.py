@@ -55,7 +55,7 @@ class Engine:
 
 
 _H3_DIT = ("mmh3-ref2va-int8", "mmh3-ref2va-fp8", "mmh3-ref2va-nvfp4", "mmh3-ref2va-int4",
-           "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b6", "mmh3-dit-dasiwa-v4")
+           "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-singularity-v2-int8")
 _H3_TE = ("mmh3-te-nvfp4", "mmh3-te-fp8", "mmh3-te-int8", "mmh3-te-heretic-nvfp4")
 
 ENGINES: dict[str, Engine] = {e.id: e for e in (

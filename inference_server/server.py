@@ -485,4 +485,8 @@ def free(req: _FreeReq | None = None):
 
 if __name__ == "__main__":
     import uvicorn
+    from core import loopback
+    # La self-pipe di asyncio su Windows e un socketpair via TCP in loopback: se il filtro di rete locale scarta la connect, accept() resta
+    # li per sempre e la porta 8189 non si apre (3 blocchi il 03-04/11). Si usa una versione con porta sorgente buona, timeout e nuovo tentativo.
+    loopback.install()
     uvicorn.run(app, host="127.0.0.1", port=8189)

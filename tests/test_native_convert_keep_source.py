@@ -33,3 +33,13 @@ def test_rockerboo_entry_has_keep_source():
     d = d["weights"]
     e = next(x for x in d if x.get("id") == "mmh3-dit-rockerboo-nvfp4")
     assert e["keep_source"] is True
+
+
+def test_mmh3_dit_toglie_il_prefisso_comfy():
+    """Singularity v2 ha le chiavi «model.diffusion_model.blocks.N...» e rope.inv_freq: senza togliere il prefisso la conversione produceva un file con 932 chiavi «model.*» (non nativo)."""
+    plan = nc._mmh3_dit()
+    info = {"dtype": "BF16", "shape": [128]}
+    with_prefix = plan("model.diffusion_model.blocks.0.attn.q_norm.weight", info, {})
+    without_prefix = plan("blocks.0.attn.q_norm.weight", info, {})
+    assert [name for name, _ in with_prefix] == [name for name, _ in without_prefix] == ["transformer_blocks.0.attn.norm_q.weight"]
+    assert plan("model.diffusion_model.rope.inv_freq", info, {}) == []          # la chiave da scartare si riconosce anche con il prefisso

@@ -3922,5 +3922,14 @@
   "sam31.btn_comfy": "Or download the Comfy-Org copy (not gated, 1.75 GB)",
   "vedit.h3.translate": "Translate and enrich the text in English",
   "vedit.h3.translate.tt": "The model understands English: place, photo description and subject written in another language are translated (place and photo also enriched with detail) with the local enhancer, once per job and before the clips. The subject is only translated, never enriched (it is the SAM label). Text already in English: nothing is done. If the enhancer is unavailable the original text is sent.",
-  "vedit.h3.text_result": "Text sent to the model: {t}"
+  "vedit.h3.text_result": "Text sent to the model: {t}",
+  "vedit.h3.turbo.dmad4": "Turbo DMAD 4-step full · 6 steps (as Openjutsu, Ref2VA)",
+  "vedit.h3.model.b7hint": "Author's advice: it performs better with video sparse attention (VSA) and 90 % sparsity. Here sparse attention is the «Veda sparse attention» checkbox.",
+  "vedit.h3.ref_full": "Motion video at full resolution (slower)",
+  "vedit.h3.ref_full.tt": "The motion reference carries pose and timing, not detail: ~512 px on the long side is usually enough (as in the original), with far less text to encode and less memory. Checked, it stays at the generated video's resolution: slower, with no proven benefit.",
+  "vedit.h3.int8_attn": "Int8 attention (faster, experimental)",
+  "vedit.h3.int8_attn.tt": "Uses comfy_kitchen's int8 attention (8-bit Q/K/V, fp32 softmax), like the original ComfyUI: faster on long sequences, but it quantizes attention, so quality must be judged. Needs a recent NVIDIA GPU with the kernel; if it is missing, or the first check against normal attention finds a high error, normal attention stays and the reason is in the log. Off = as before.",
+  "vedit.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)",
+  "vid.h3.turbo.pika6": "Pika Flex · 6 steps (experimental, re-noise sampler)",
+  "vedit.h3.model.singularityhint": "Author's notes: write the style in the prompt (photorealistic, 3D CG, cinematic CG) and keep it under about 5,000 characters. It is not a turbo model: for speed pick a LoRA in the «Turbo» menu."
 }

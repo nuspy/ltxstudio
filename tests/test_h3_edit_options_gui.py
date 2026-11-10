@@ -56,7 +56,7 @@ def test_model_menu_lists_profiles_and_custom_dits_with_missing_ones_marked(qapp
     monkeypatch.setattr(veng, "_present", lambda item: item not in ("mmh3-ref2va-int8", "mmh3-ref2va-fp8"))
     tab._fill_h3_models()
     ids = [tab.h3_profile.itemData(i) for i in range(tab.h3_profile.count())]
-    assert ids == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b6", "mmh3-dit-dasiwa-v4", "mmh3-dit-rockerboo-nvfp4"]
+    assert ids == ["int8", "fp8", "nvfp4", "int4", "mmh3-dit-pinkcherry18", "mmh3-dit-10erosmax-b7", "mmh3-dit-dasiwa-v4", "mmh3-dit-dasiwa-v4turbo-int8", "mmh3-dit-singularity-v2-int8", "mmh3-dit-rockerboo-nvfp4"]
     assert "non installato" in tab.h3_profile.itemText(0).lower() and "non installato" not in tab.h3_profile.itemText(2).lower()
     assert tab.h3_profile.currentData() == "nvfp4"                                       # come prima: il primo profilo installato
 
@@ -98,15 +98,15 @@ def test_turbo_veda_lightvae_lora_and_model_reach_the_edit_cfg_and_the_worker_pa
 
 def test_turbo_without_ref2va_version_is_listed_but_disabled_with_the_reason(tab):
     en = {tab.h3_turbo.itemData(i): tab.h3_turbo.model().item(i).isEnabled() for i in range(tab.h3_turbo.count())}
-    assert en == {"v4": True, "4": True, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
+    assert en == {"v4": True, "4": True, "dmad4": True, "pika6": True, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
     i8 = tab.h3_turbo.findData("8")
     assert "FL2VA" in tab.h3_turbo.model().item(i8).toolTip() or tab.h3_turbo.model().item(i8).toolTip()
     assert tab.h3_turbo.itemData(0) == "v4"                                                          # la predefinita in testa
 
 
 def test_turbo_fused_dit_disables_the_turbo_menu_and_shows_its_own_steps(tab):
-    tab.h3_profile.setCurrentIndex(tab.h3_profile.findData("mmh3-dit-10erosmax-b6")); tab._sync_h3_turbo_info()
-    assert not tab.h3_turbo.isEnabled() and "8" in tab.h3_turbo_info.text() and "10" in tab.h3_turbo_info.text()
+    tab.h3_profile.setCurrentIndex(tab.h3_profile.findData("mmh3-dit-10erosmax-b7")); tab._sync_h3_turbo_info()
+    assert not tab.h3_turbo.isEnabled() and "8" in tab.h3_turbo_info.text() and "12" in tab.h3_turbo_info.text()
 
 
 def test_lora_rows_are_checked_by_header_keys_and_fl2va_only_ones_are_disabled(tab):
@@ -139,7 +139,7 @@ def test_defective_turbo_on_disk_is_disabled_in_the_menu_with_the_reason(qapp, m
     from ui.tabs.video_edit_ai_tab import VideoEditAITab
     t = VideoEditAITab()
     en = {t.h3_turbo.itemData(i): t.h3_turbo.model().item(i).isEnabled() for i in range(t.h3_turbo.count())}
-    assert en == {"v4": True, "4": False, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
+    assert en == {"v4": True, "4": False, "dmad4": True, "pika6": True, "r4v10": True, "r8v11": True, "8": False, "dmad": False}
     assert "AdaLN" in t.h3_turbo.model().item(t.h3_turbo.findData("4")).toolTip()
 
 
@@ -187,3 +187,27 @@ def test_translate_strings_exist_in_all_15_languages():
         for k in ("vedit.h3.translate", "vedit.h3.translate.tt", "vedit.h3.text_result"):
             assert d.get(k), (f.name, k)
         assert "{t}" in d["vedit.h3.text_result"]
+
+
+def test_ref_full_res_checkbox_is_off_by_default_and_reaches_the_cfg(tab):
+    assert not tab.h3_ref_full_res.isChecked() and tab.h3_ref_full_res.isVisibleTo(tab)
+    assert "h3_ref_full_res" not in _go(tab)                                    # default: il video di movimento sta a ~512 px
+    tab.h3_ref_full_res.setChecked(True)
+    assert _go(tab)["h3_ref_full_res"] is True
+    import json
+    from pathlib import Path
+    for f in sorted((Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")):
+        d = json.loads(f.read_text("utf-8"))
+        assert d.get("vedit.h3.ref_full") and d.get("vedit.h3.ref_full.tt"), f.name
+
+
+def test_int8_attention_checkbox_is_off_by_default_and_reaches_the_cfg(tab):
+    assert not tab.h3_int8_attention.isChecked() and tab.h3_int8_attention.isVisibleTo(tab)
+    assert "h3_int8_attention" not in _go(tab)
+    tab.h3_int8_attention.setChecked(True)
+    assert _go(tab)["h3_int8_attention"] is True
+    import json
+    from pathlib import Path
+    for f in sorted((Path(__file__).resolve().parents[1] / "ui" / "i18n").glob("*.json")):
+        d = json.loads(f.read_text("utf-8"))
+        assert d.get("vedit.h3.int8_attn") and d.get("vedit.h3.int8_attn.tt"), f.name

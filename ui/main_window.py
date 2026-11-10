@@ -1988,8 +1988,8 @@ class MainWindow(QMainWindow):
             from core import native_driver
             if native_driver.is_up():
                 return
-            from core.native_launcher import launch
-            ok, msg = launch()
+            from core.native_launcher import launch_supervised_in_background
+            ok, msg = launch_supervised_in_background(native_driver.is_up, log=self._log)      # rilancia da solo se l'avvio si blocca
             self._log(f"[Nativo] {msg}" if ok else f"[Nativo] auto-avvio saltato: {msg}")
         except Exception as e:                   # noqa: BLE001
             self._log(f"[Nativo] auto-avvio errore: {e}")
@@ -3036,7 +3036,16 @@ class MainWindow(QMainWindow):
                 _regen = ("Add the person from the second image to the first image, standing " + _where + " of the scene, as a real part of it: match the perspective, "
                           "scale, lighting and colour grading, add contact shadows, let the foreground objects overlap her where they should. Keep her face, hair and "
                           "clothes identical to the second image. Do not change anything else in the scene and do not add anyone else. " + (ptxt or ""))
-                self._start_native_krea2_edit([exp["base"], exp["layer_refs"][0]], _regen.strip(), negative, cfg.get("grounding", 768),
+                _scene = exp["base"]
+                if getattr(self.frame1_tab.canvas, "integrate_position_box", False):           # prova 04/11: il posto del soggetto anche come riquadro rosso sulla scena
+                    from core import integrate_position_box as _ipb
+                    _boxed = _ipb.draw_position_box(exp["base"], exp["position_mask"], os.path.join(OUTPUT_DIR, "integrate_scena_riquadro.png"))
+                    if _boxed:
+                        _scene, _regen = _boxed[0], _ipb.box_prompt(_where, ptxt or "")
+                        self._log(f"[integra] Krea 2 Edit: riquadro di posizione {_boxed[1]} disegnato sulla scena")
+                    else:
+                        self._log("[integra] Krea 2 Edit: la sagoma di posizione e vuota, nessun riquadro: resta il solo testo")
+                self._start_native_krea2_edit([_scene, exp["layer_refs"][0]], _regen.strip(), negative, cfg.get("grounding", 768),
                                               cfg.get("integrate_variant", "turbo"), seed, label=tr("queue.job.krea2edit", "Krea 2 Edit"))
                 return
             if engine == "krea2":                             # motore Krea 2 Edit → edit del composito (single)
@@ -3102,8 +3111,10 @@ class MainWindow(QMainWindow):
             _xs = _np.where(_pm.any(0))[0]
             _cx = float(_xs.mean()) / _pm.shape[1] if len(_xs) else 0.5
             where = "on the left side" if _cx < 0.4 else ("on the right side" if _cx > 0.6 else "in the middle")
-        except Exception:                                      # noqa: BLE001
-            pass
+        except Exception as errore:                            # noqa: BLE001  senza maschera di posizione il testo dice «al centro»
+            self._log(f"[integra] _start_integrate_approach: posizione del soggetto non letta ({errore!r}), uso «in the middle»")
+        if getattr(cv, "integrate_hold_face", False) and appr in ("armonizza", "klein_ref_inpaint", "klein_armonizza"):
+            exp = self._hold_subject_face(exp)               # il volto incollato resta fuori dalla zona rigenerata (prove 04/11: senza, somiglianza 0,05-0,34)
         if engine == "qwen_image21" and appr == "armonizza" and exp.get("mask"):
             # nessun riferimento (mask_ref=False): la zona (sagoma + contesto) e GENERATIVA, riparte dai pixel del composito rumorati al livello `strength`
             self._start_native_qwen21_edit(
@@ -3124,7 +3135,7 @@ class MainWindow(QMainWindow):
                       "steps": max(int(steps or 0), 12), "guidance": max(3.5, float(guidance or 0)), "seed": seed,
                       "denoise": 1.0, "feather": 48, "strength": float(S if S is not None else (1.0 if ref_mode else 0.55))}
             if ref_mode:
-                params["ref_images"] = list(exp["layer_refs"][:1])
+                params["ref_images"] = list(exp["layer_refs"][:1]) + ([exp["face_crop"]] if exp.get("face_crop") else [])
             self._log(f"Integra {appr} (Klein inpaint, strength={params['strength']:.2f}, rif.={len(params.get('ref_images') or [])}) inviato...")
             self._inpaint_mode = "integrazione"
             self._native_worker = _NativeImageWorker(params)
@@ -3147,6 +3158,15 @@ class MainWindow(QMainWindow):
                                        target_wh={"width": a.width, "height": a.height})
             return True
         return False
+
+    def _hold_subject_face(self, exp: dict) -> dict:
+        """`exp` con la maschera senza il volto del soggetto incollato (core/integrate_face_hold). Un errore nel rilevamento si scrive nel log e l'Integra parte con la maschera di prima."""
+        from core import integrate_face_hold as _hold
+        try:
+            return _hold.hold_face_of_subject(exp, OUTPUT_DIR, self._log)
+        except (RuntimeError, OSError, ValueError, KeyError) as errore:
+            self._log(f"[integra] volto da tenere: rilevamento non riuscito ({type(errore).__name__}: {errore}); la maschera resta com'e")
+            return exp
 
     def _layers_from_compose_list(self) -> int:
         """Porta sul canvas le foto elencate nella lista laterale, con la loro maschera.

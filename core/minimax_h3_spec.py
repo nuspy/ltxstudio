@@ -29,10 +29,17 @@ PROFILES = {
 # chiavi del DiT pruned ufficiale). turbo_fused = turbo già nei pesi: niente LoRA turbo, passi e shift propri.
 CUSTOM_DITS = {
     "mmh3-dit-pinkcherry18": {"label": "PinkCherry H3 v1.8", "modes": ("fl2va", "ref2va")},
-    "mmh3-dit-10erosmax-b6": {"label": "10Eros-Max beta6 Turbo", "modes": ("fl2va", "ref2va"),
-                              "turbo_fused": True, "nfe": 8, "video_shift": 10.0},
+    # beta7 fix1 (int8 «HQ», bordi BF16): turbo gia fuso, 8 passi, shift video 12 / audio 3. L'autore la consiglia con attenzione sparsa video (VSA) e sparsita 90 %.
+    "mmh3-dit-10erosmax-b7": {"label": "10Eros-Max beta7 Turbo", "modes": ("fl2va", "ref2va"),
+                              "turbo_fused": True, "nfe": 8, "video_shift": 12.0, "hint_key": "vedit.h3.model.b7hint"},
     # base Ref2VA (adaln_t_table e norme identici al pruned Ref2VA ufficiale), «Hybrid» per l'autore: int4 W4A8
     "mmh3-dit-dasiwa-v4": {"label": "DaSiWa Hybrid v4 (int4)", "modes": ("fl2va", "ref2va")},
+    # DaSiWa Hybrid V4 Turbo int8 (Civitai 2877206, versione 3392061): turbo «4 step» gia nei pesi, int8 ConvRot per riga su tutti i 200 layer (formato ComfyUI come l'int8 ufficiale).
+    # Scheda: euler/simple o LCM/simple, shift video 6-12, audio 3-5, 4 o 8 passi. Si parte da 4 passi e shift 12 (come le altre turbo a 4 passi); H3_NFE=8 per provare gli 8.
+    "mmh3-dit-dasiwa-v4turbo-int8": {"label": "DaSiWa Hybrid V4 Turbo (int8, 4 passi)", "modes": ("ref2va",), "turbo_fused": True, "nfe": 4, "video_shift": 12.0},
+    # Singularity v2 (WarmBloodAban, Apache-2.0): fusione di checkpoint ref/fl/b25-49 con fine-tuning HDR e potatura, Ref2VA, int8 ConvRot come l'ufficiale; NON e turbo
+    # (la scheda consiglia la LoRA minimax_h3_ref2v_turbo_4step_v0.1 per i 4 passi: si sceglie dal menu Turbo). Stile esplicito nel prompt, prompt entro ~5000 caratteri.
+    "mmh3-dit-singularity-v2-int8": {"label": "Singularity v2 Ref2VA (int8)", "modes": ("ref2va",), "hint_key": "vedit.h3.model.singularityhint"},
     # nvfp4 MISTA di rockerBOO (Ref2VA pruned: qkv int8-ConvRot, bordi e out_proj in BF16, resto nvfp4; layer config a parte): risposta al sospetto che i nostri nvfp4
     # (Abiray, stessa dimensione esatta di coolthor/wsjLL: tutti i 200 layer in nvfp4) siano fatti peggio. Serve per il confronto a parita di seme/prompt/encoder.
     "mmh3-dit-rockerboo-nvfp4": {"label": "MiniMax-H3 Ref2VA nvfp4 + int8 ConvRot (rockerBOO, bordi BF16)", "modes": ("ref2va",), "official": True},   # quantizzazione del modello ufficiale, non un finetune
@@ -51,6 +58,10 @@ TURBO = {
     "dmad": ({"fl2va": "mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m"}, 8, 12.0),
     # lightx2v Minimax-h3-Turbo in formato DIFFUSERS (1,38 GB, senza le coppie AdaLN della versione ComfyUI/Comfy-Org): ref2v 4 passi v1.0 e 8 passi v1.1, 768p.
     # Passi e shift video come le altre turbo lightx2v (4 passi shift 12, 8 passi shift 6): da confermare dalla resa nel giro dal vivo.
+    # DMAD 4 passi «full» (Civitai 3382801, rank 39): la LoRA dell'originale Openjutsu (workflow object/simple: 6 passi, shift video 12, forza 1)
+    "dmad4": ({"ref2va": "mmh3-turbo-dmad4full-ref2v"}, 6, 12.0),
+    # Pika H3 Flex (Pika-Labs/Pika-H3-Flex, manifest: nodi 1000-750-500-250-100-40-0, shift 12/3, campionatore «renoise»): 6 passi con lo scheduler dedicato (TURBO_SAMPLER)
+    "pika6": ({"fl2va": "mmh3-turbo-pika6-fl2v", "ref2va": "mmh3-turbo-pika6-ref2v"}, 6, 12.0),
     "r4v10": ({"ref2va": "mmh3-turbo-ref2v-4-v10"}, 4, 12.0),
     "r8v11": ({"ref2va": "mmh3-turbo-ref2v-8-v11"}, 8, 6.0),
 }
@@ -60,6 +71,28 @@ ASPECTS = {"16:9": (16, 9), "9:16": (9, 16), "21:9": (21, 9), "4:3": (4, 3), "3:
 CANVAS = {"768": (768, 768 * 1344), "544": (544, 544 * 960)}     # lato corto, area massima
 
 MAX_REFS = {"image": 9, "video": 3, "audio": 3, "total": 12}
+
+# Campionatore proprio di alcune LoRA turbo (chiave di TURBO -> {"method", "knots"}): `renoise` = passo stocastico con griglia fissa di nodi (scala 1000), come gli adattatori
+# Pika H3 Flex a 6 passi (workers/h3_renoise_scheduler.py). Le turbo senza voce qui usano l'Euler uniforme di sempre.
+TURBO_SAMPLER: dict = {"pika6": {"method": "renoise", "knots": (1000, 750, 500, 250, 100, 40, 0), "keyframe_bf16": True}}
+
+# Lato lungo del video di MOVIMENTO (<Video 1>) negli edit: come l'originale Openjutsu (object/simple.api.json, nodo «Motion reference video (~512 px)»,
+# ImageScaleToMaxDimension 512). Il riferimento porta posa e tempi, non i dettagli: a 736p (1344x736) a tela piena ha ~6,7 volte i pixel (token del testo,
+# codifica VAE e righe di riferimento nel DiT). 0 = tela del bersaglio, come prima del 04/11.
+REF_VIDEO_MAX_SIDE = 512
+
+
+def reference_video_canvas(height: int, width: int, max_side: int = REF_VIDEO_MAX_SIDE, multiple: int = 32) -> dict:
+    """Tela del video di riferimento di un edit: {short_edge, max_pixels, height, width}. `short_edge` e `max_pixels` sono i valori da dare a
+    `canvas_short_edge` / `canvas_max_pixels` del pipeline (resolve_canvas_size ricava la tela dal rapporto del video, arrotondata a `multiple`);
+    `height`/`width` la tela che ne risulta. `max_side` <= 0 o non piu piccolo della tela: la tela del bersaglio."""
+    if max_side <= 0 or max_side >= max(height, width):
+        return {"short_edge": min(height, width), "max_pixels": height * width, "height": height, "width": width}
+    short_edge = max(multiple, round(min(height, width) * max_side / max(height, width)))
+    ratio = width / height
+    float_width, float_height = (short_edge * ratio, float(short_edge)) if ratio >= 1.0 else (float(short_edge), short_edge / ratio)
+    return {"short_edge": short_edge, "max_pixels": 4 * max_side * max_side, "height": max(multiple, round(float_height / multiple) * multiple),
+            "width": max(multiple, round(float_width / multiple) * multiple)}
 DIALOGUE_LANGS = ("Italian", "English", "Chinese", "Spanish", "French", "German", "Portuguese",
                   "Japanese", "Korean", "Russian", "Arabic")
 

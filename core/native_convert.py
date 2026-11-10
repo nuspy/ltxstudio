@@ -184,7 +184,12 @@ def _workers_path():
 def _mmh3_dit():
     _workers_path()
     import minimax_h3_convert as M
-    return _renamer(lambda k: None if k in M.DIT_SKIP else M.dit_key(k), fp32=("folded_bias",))
+    comfy_prefix = "model.diffusion_model."          # Singularity v2 e altri checkpoint «Comfy completi» portano il prefisso: senza toglierlo i nomi non diventano nativi
+
+    def native_name(key):
+        key = key[len(comfy_prefix):] if key.startswith(comfy_prefix) else key
+        return None if key in M.DIT_SKIP else M.dit_key(key)
+    return _renamer(native_name, fp32=("folded_bias",))
 
 
 def _mmh3_te():

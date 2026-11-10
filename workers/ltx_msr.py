@@ -26,6 +26,7 @@ import os
 SLOT_PREFIX = "reference_slot_embedding."
 MAX_REFERENCES = 5                      # 4 soggetti + 1 sfondo (2.3) · 5 slot (2.5)
 MAX_SUBJECTS = 4                        # nel nodo LiconMSR gli ingressi soggetto sono 4
+REFERENCE_CRF = 33                      # compressione H.264 simulata sul riferimento (predefinito di ltx_pipelines per le immagini di condizionamento); `msr_ref_crf` la cambia
 FRAME_COUNTS = (17, 25, 33, 41, 49, 57, 65)      # lunghezze ammesse della pseudo-sequenza
 
 
@@ -189,6 +190,33 @@ def build_pseudo_video(subject_paths: list[str], background_path: str, out_path:
     return out_path
 
 
+def crop_guides_padding(guide_frames: int) -> int:
+    """Fotogrammi da generare IN PIU e poi scartare dall'inizio perche la guida non finisca nell'uscita (`msr_crop_guides`, prova del 04/11).
+    La guida pseudo-video e allineata nel tempo ai primi `guide_frames`: nei turni 33-34 l'uscita ricopiava per ~2,7 s i riferimenti sul fondo dello studio e finita la guida
+    l'identita spariva (somiglianza al volto da 0,47 a 0,0). Con `guide_frames - 1` fotogrammi in piu (lunghezza ancora 8k+1) il primo fotogramma tenuto e l'ultimo della guida
+    (lo sfondo) e il video vero comincia dopo i soggetti, come nel taglio `LTXVCropGuides` di ComfyUI."""
+    return max(0, int(guide_frames) - 1)
+
+
+def drop_leading_frames(video, count: int):
+    """Toglie i primi `count` fotogrammi da un tensore [F,H,W,C] o da un iteratore di blocchi [f,H,W,C] (la forma che `encode_video` accetta). Ritorna lo stesso tipo."""
+    import torch
+    if count <= 0:
+        return video
+    if torch.is_tensor(video):
+        return video[count:]
+
+    def chunks():
+        left = count
+        for chunk in video:
+            if left >= chunk.shape[0]:
+                left -= chunk.shape[0]
+                continue
+            yield chunk[left:]
+            left = 0
+    return chunks()
+
+
 def _write_mp4(frames, out_path: str, fps: int) -> None:
     import av
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
@@ -237,7 +265,7 @@ def frame_offsets(num_slots: int, spacing: int = 1) -> list[int]:
     return [-(num_slots - i) * max(1, int(spacing)) for i in range(num_slots)]
 
 
-def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = 33,
+def references_to_inputs(references: list[dict], strength: float = 1.0, crf: int = REFERENCE_CRF,
                          spacing: int = 1) -> list:
     """`references` del pannello → ImageConditioningInput a frame NEGATIVI (solo 2.5)."""
     from ltx_pipelines.utils.args import ImageConditioningInput

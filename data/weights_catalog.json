@@ -3131,6 +3131,99 @@
       "convert": "mmh3_lora_diffusers"
     },
     {
+      "id": "mmh3-turbo-dmad4full-ref2v",
+      "module": "Video",
+      "label": "LoRA H3 Turbo DMAD 4 passi full rank 39 (Civitai, 0.34GB): quella dell'originale Openjutsu",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 0.34,
+      "scan_names": [
+        "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16-native.safetensors",
+        "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://civitai.com/api/download/models/3382801",
+      "filename": "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16-native.safetensors",
+      "remote_filename": "minimax_h3_DMAD_4step_full_lora_avg_rank_39_bf16.safetensors",
+      "deps": [
+        "mmh3-adaln-affine-ref"
+      ],
+      "note": "Civitai modelVersion 3382801. Usata dall'originale Openjutsu (DMAD 6 passi): forza 1, 6 passi, shift video 12 / audio 2. Formato ComfyUI: convertita con mmh3_lora_ref il 04/11 (624 tensori, 0.34 GB): il sorgente non ha coppie AdaLN (0 chiavi adaln_proj), come per l'originale Openjutsu.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_ref",
+      "keep_source": true,
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-pika6-ref2v",
+      "module": "Video",
+      "label": "LoRA H3 Pika Flex 6 passi Ref2VA (Pika Labs, campionatore renoise, 1,8GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.82,
+      "scan_names": [
+        "pika_h3_flex_ref2va_6step_v1_bf16-native.safetensors",
+        "pika_h3_flex_ref2va_6step_v1_bf16.safetensors",
+        "pika_h3_flex_ref2va_adapter_fp32.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://huggingface.co/Pika-Labs/Pika-H3-Flex/resolve/main/ref2va/adapter.safetensors",
+      "page": "https://huggingface.co/Pika-Labs/Pika-H3-Flex",
+      "filename": "pika_h3_flex_ref2va_6step_v1_bf16-native.safetensors",
+      "remote_filename": "pika_h3_flex_ref2va_adapter_fp32.safetensors",
+      "sha256": "eef684ba1258f0cdbbbda6128188ad2688417f2eb17ff875375e74a32b6d61b5",
+      "note": "Adattatore Pika H3 Flex (rank/alpha 128, formato diffusers): 6 passi coi nodi 1000-750-500-250-100-40-0, shift video 12 / audio 3 e campionatore «renoise» (scheduler dedicato, workers/h3_renoise_scheduler.py). Un Euler a 6 passi generico NON e equivalente. Licenza MiniMax H3 Community (derivato, NOTICE richiesto). Download dell'adattatore fp32 ufficiale (2,8 GB, nome unico per non sovrapporre ref2va e fl2va): la conversione nativa fonde q/k/v. Provata sul file bf16 (1,4 GB) dell'autore.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_diffusers",
+      "keep_source": true,
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
+      "id": "mmh3-turbo-pika6-fl2v",
+      "module": "Video",
+      "label": "LoRA H3 Pika Flex 6 passi FL2VA (Pika Labs, campionatore renoise, 1,8GB)",
+      "kind": "file",
+      "type": "LoRA",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 1.82,
+      "scan_names": [
+        "pika_h3_flex_fl2va_6step_v1_bf16-native.safetensors",
+        "pika_h3_flex_fl2va_6step_v1_bf16.safetensors",
+        "pika_h3_flex_fl2va_adapter_fp32.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "url": "https://huggingface.co/Pika-Labs/Pika-H3-Flex/resolve/main/fl2va/adapter.safetensors",
+      "page": "https://huggingface.co/Pika-Labs/Pika-H3-Flex",
+      "filename": "pika_h3_flex_fl2va_6step_v1_bf16-native.safetensors",
+      "remote_filename": "pika_h3_flex_fl2va_adapter_fp32.safetensors",
+      "sha256": "8ed6115d647ab11c1b38d04e63c4c6e1594128ae312f7b5635cd50563b7b9327",
+      "note": "Adattatore Pika H3 Flex (rank/alpha 128, formato diffusers): 6 passi coi nodi 1000-750-500-250-100-40-0, shift video 12 / audio 3 e campionatore «renoise» (scheduler dedicato, workers/h3_renoise_scheduler.py). Un Euler a 6 passi generico NON e equivalente. Licenza MiniMax H3 Community (derivato, NOTICE richiesto). Download dell'adattatore fp32 ufficiale (2,8 GB, nome unico per non sovrapporre ref2va e fl2va): la conversione nativa fonde q/k/v. Provata sul file bf16 (1,4 GB) dell'autore.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_lora_diffusers",
+      "keep_source": true,
+      "use": [
+        "distill_lora"
+      ]
+    },
+    {
       "id": "mmh3-configs",
       "module": "Video",
       "label": "MiniMax H3 config + tokenizer (ufficiali, ~25MB)",
@@ -4472,29 +4565,30 @@
       ]
     },
     {
-      "id": "mmh3-dit-10erosmax-b6",
+      "id": "mmh3-dit-10erosmax-b7",
       "module": "Video",
-      "label": "10Eros-Max H3 beta6 Turbo 8 passi (18+, INT8, 21.7GB)",
+      "label": "10Eros-Max H3 beta7 fix1 Turbo 8 passi (18+, INT8 HQ, bordi BF16, ~22GB)",
       "kind": "file",
       "type": "diffusion_models",
       "family": "MiniMax-H3",
       "gated": false,
-      "approx_gb": 21.71,
+      "approx_gb": 22.9,
       "scan_names": [
-        "10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors"
+        "10Eros_Max_h3_8stepTURBO_beta7_fix1_int8HQ-native.safetensors"
       ],
       "category": "video",
       "arch": "minimax_h3",
       "repo_id": "TenStrip/10Eros-Max",
       "url": "https://huggingface.co/TenStrip/10Eros-Max",
-      "filename": "10Eros_Max_h3_8stepTURBO_beta6_int8-native.safetensors",
-      "remote_filename": "10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors",
+      "filename": "10Eros_Max_h3_8stepTURBO_beta7_fix1_int8HQ-native.safetensors",
+      "remote_filename": "10Eros_Max_h3_8stepTURBO_beta7_fix1-native_int8_protected_edges_HQ.safetensors",
       "sensitivity": "adult",
-      "note": "turbo già fuso: 8-12 passi, shift 10/3, NIENTE LoRA turbo. Licenza H3 Community (no UE/UK/USA/Corea)",
+      "note": "turbo gia fuso: 8 passi, shift video 12 / audio 3, NIENTE LoRA turbo. L'autore la consiglia con attenzione sparsa video (VSA) e sparsita 90 %. Il file dell'autore si chiama «-native» ma ha chiavi ComfyUI (adaln_t_table, audio_patch_proj, 892 tensori): la conversione le porta al nostro formato. Licenza H3 Community (no UE/UK/USA/Corea)",
       "used_by": [
         "cap.video_minimax_h3"
       ],
       "convert": "mmh3_dit",
+      "keep_source": true,
       "use": [
         "ckpt_video",
         "distilled",
@@ -5688,6 +5782,81 @@
         "ckpt_video",
         "av_joint",
         "uncensored"
+      ]
+    },
+    {
+      "id": "mmh3-dit-dasiwa-v4turbo-int8",
+      "module": "Video",
+      "label": "DaSiWa Hybrid V4 Turbo (18+, INT8, 4 passi, 21GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 20.97,
+      "scan_names": [
+        "DasiwaMinimaxH3_dasiwaHybridV4Turbo_int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "releaseworthy/dasiwa-minimax-h3-turbo-int8",
+      "url": "https://huggingface.co/releaseworthy/dasiwa-minimax-h3-turbo-int8",
+      "filename": "DasiwaMinimaxH3_dasiwaHybridV4Turbo_int8-native.safetensors",
+      "remote_filename": "DasiwaMinimaxH3_dasiwaHybridV4Turbo_int8.safetensors",
+      "sha256": "36471afb817747b711b9abad3d8e6b7c88a7c2b91b4887d040a8dcb7ee82b2d6",
+      "sensitivity": "adult",
+      "note": "DaSiWa Hybrid V4 Turbo: turbo gia nei pesi (scheda Civitai 2877206, versione 3392061: «4step Turbo»; euler/simple o LCM/simple, shift video 6-12, audio 3-5, 4 o 8 passi), NIENTE LoRA turbo. Mirror HF releaseworthy; sorgente Civitai 3281858. NON sostituisce la V4 non-turbo (int4, 20-25 passi): e un'altra versione dell'autore, distillata. Licenza MiniMax H3 Community (no UE/UK/USA/Corea).",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "keep_source": true,
+      "use": [
+        "ckpt_video",
+        "distilled",
+        "q_int8",
+        "uncensored"
+      ],
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
+      ]
+    },
+    {
+      "id": "mmh3-dit-singularity-v2-int8",
+      "module": "Video",
+      "label": "Singularity v2 Ref2VA (INT8, 21GB)",
+      "kind": "file",
+      "type": "diffusion_models",
+      "family": "MiniMax-H3",
+      "gated": false,
+      "approx_gb": 20.97,
+      "scan_names": [
+        "Minimax-h3_Singularity_ref2va_v2_pruned_int8-native.safetensors"
+      ],
+      "category": "video",
+      "arch": "minimax_h3",
+      "repo_id": "WarmBloodAban/Minimax-h3_Singularity",
+      "url": "https://huggingface.co/WarmBloodAban/Minimax-h3_Singularity",
+      "filename": "Minimax-h3_Singularity_ref2va_v2_pruned_int8-native.safetensors",
+      "remote_filename": "Minimax-h3_Singularity_ref2va_v2_pruned_int8.safetensors",
+      "sha256": "d7637c2c35cd30facd9e93778c491f6d82f91c4a441aecbdb4c384a62a5f3d9f",
+      "note": "Singularity v2 pruned INT8 (WarmBloodAban, licenza Apache-2.0 sulla scheda, base MiniMax-H3 quindi vale anche la Community License di MiniMax): fusione ref/fl/b25-49 con fine-tuning HDR, volti lontani piu nitidi, piu azione, audio di riferimento corretto, stili photorealistic / East Asian realism / 3D CG / cinematic CG da scrivere nel prompt (entro ~5000 caratteri). NON e turbo: LoRA turbo consigliata dall'autore minimax_h3_ref2v_turbo_4step_v0.1 (4 passi). Chiavi con prefisso model.diffusion_model. (il convertitore lo toglie). Solo Ref2VA.",
+      "used_by": [
+        "cap.video_minimax_h3"
+      ],
+      "convert": "mmh3_dit",
+      "keep_source": true,
+      "use": [
+        "ckpt_video",
+        "q_int8"
+      ],
+      "deps": [
+        "mmh3-configs",
+        "mmh3-te-nvfp4|mmh3-te-fp8|mmh3-te-int8",
+        "mmh3-video-vae",
+        "mmh3-audio-vae"
       ]
     },
     {

@@ -93,6 +93,22 @@ def patch_fp32_cpu():
     return n
 
 
+def wide_sdpa_kernel(real_sdpa_kernel, backends):
+    """`sdpa_kernel` che ignora la lista richiesta dal codice di Meta (solo FLASH_ATTENTION) e ne usa una piu larga.
+    Perche: il torch Windows del venv e compilato SENZA flash attention («Torch was not compiled with flash attention»): con la sola FLASH_ATTENTION
+    scaled_dot_product_attention fa «No available kernel» (turno 36 del 04/11, tracker multiplex su cuda). Efficient/cuDNN/math danno gli stessi numeri."""
+    def sdpa_kernel(_requested, *args, **kwargs):
+        return real_sdpa_kernel(list(backends), *args, **kwargs)
+    return sdpa_kernel
+
+
+def patch_sdpa_backends():
+    """Sostituisce `sdpa_kernel` nel decoder di Meta (l'unico punto che forza la sola FLASH_ATTENTION, decoder.py:1065) con la versione larga."""
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+    import sam3.model.decoder as decoder
+    decoder.sdpa_kernel = wide_sdpa_kernel(sdpa_kernel, (SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.CUDNN_ATTENTION, SDPBackend.MATH))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", required=True, help="file video o cartella di fotogrammi JPEG")
@@ -108,6 +124,8 @@ def main():
     from sam3.model_builder import build_sam3_multiplex_video_predictor
     dev = a.device or ("cuda" if torch.cuda.is_available() else "cpu")
     patch_torch_load()
+    if dev.startswith("cuda"):
+        patch_sdpa_backends()
     if dev == "cpu":
         print(f"[sam31] CPU: addmm_act float32 in {patch_fp32_cpu()} moduli", file=sys.stderr, flush=True)
     t0 = time.time()

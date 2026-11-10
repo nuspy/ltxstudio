@@ -31,6 +31,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 MAIN_ROOT = r"E:\ai\ltxstudio"
 ORCH = r"C:\Users\atain\.claude\projects\E--ai-ltxstudio\orch\app_live"
 PORT = int(os.environ.get("LTX_TEST_DRIVER_PORT", "8765"))
+SERVER_WAIT_S = 3 * 60.0     # tre sonde da 60 s: se la prima si blocca (porta mai aperta) l'app chiude il server e lo rilancia, di solito passa al secondo tentativo
 
 
 def say(m):
@@ -197,11 +198,13 @@ def main():
             cl.connect(timeout=240, proc=proc)
         say("driver collegato: " + json.dumps(cl.send({"cmd": "ping"})))
         t0 = time.time()
-        while time.time() - t0 < 900:                        # InferenceServer pronto (autostart dell'app; il 02/11 ci ha messo 306 s)
+        while time.time() - t0 < SERVER_WAIT_S:              # InferenceServer pronto: l'app lo rilancia da sola se l'avvio si blocca (core/native_launcher.py)
             r = cl.send({"cmd": "ready"}, timeout=60)
             if r.get("server_up"):
                 break
             time.sleep(3)
+        else:
+            say(f"ATTENZIONE: il server di inferenza non e pronto dopo {SERVER_WAIT_S:.0f} s (3 sonde da 60 s con rilancio automatico): i casi falliranno")
         say(f"app pronta (server_up={r.get('server_up')}) in {time.time() - t0:.0f}s")
         if a.inventory_out:
             inv = cl.send({"cmd": "inventory"}, timeout=180)
@@ -263,8 +266,8 @@ def main():
         if ac is not None:
             try:
                 ac.save_history(ac_hist)
-            except Exception:                                # noqa: BLE001
-                pass
+            except OSError as errore:
+                say(f"storia dei controlli automatici non salvata: {errore!r}")
     try:                                                     # l'app di test scrive le preferenze (es. video_arch) nel worktree: ripristino la copia pulita
         shutil.copy2(os.path.join(MAIN_ROOT, "data", "user_prefs.json"), os.path.join(ROOT, "data", "user_prefs.json"))
         gs = os.path.join(ROOT, "data", "gui_state.json")
