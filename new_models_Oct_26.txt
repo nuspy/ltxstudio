@@ -1,0 +1,523 @@
+NUOVI MODELLI — richiesta del 14/10/2026 (file generato dallo stato reale di catalogo e disco)
+Tutte le voci Civitai sono marcate 18+ (visibili solo in modalità NSFW / edizioni 18+).
+Formati: preferiti fp8 e int4 quando il modello ne offre più d'uno.
+
+====================================================================================================
+FLUX.1 (immagini)
+====================================================================================================
+[INSTALLATO] FLUX.1 schnell fp8 (punto 8)
+    tipo: Checkpoints · 17.24 GB · id catalogo: flux1-schnell-fp8
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\Checkpoints\Flux\flux1-schnell-fp8.safetensors
+    pagina: https://huggingface.co/Comfy-Org/flux1-schnell
+
+====================================================================================================
+FLUX.2 Klein (immagini)
+====================================================================================================
+[INSTALLATO] Encoder uncensored FLUX.2 Klein 9B (ponpoke)
+    tipo: diffusers · 16.39 GB · id catalogo: klein9b-te-uncensored
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusers\_te\qwen3_8b_uncensored
+    pagina: https://huggingface.co/ponpoke/flux2-klein-9b-uncensored-text-encoder
+
+====================================================================================================
+Krea 2 (immagini)
+====================================================================================================
+[INSTALLATO] BFS - Best Face Swap · Krea 2 Body Swap Exp. V1
+    tipo: LoRA · 0.893 GB · id catalogo: krea2-lora-civ-bfs-best-face-swap-krea-2-body-swap-exp
+    parole trigger: body_swap: replace the person with the reference person.
+    file: E:\AI\Models\LoRA\Krea2\krea2_bodyswap_v1.safetensors
+    pagina: https://civitai.red/models/2027766?modelVersionId=3188610
+
+[INSTALLATO] Cinematic Shot ✨ · KREA 2
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-cinematic-shot-krea-2
+    parole trigger: zy_cinematic
+    file: E:\AI\Models\LoRA\Krea2\zy_Cinematic_Shot_K2.safetensors
+    pagina: https://civitai.red/models/432586?modelVersionId=3085969
+
+[INSTALLATO] BREAST SUCKING KREA · V1
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-breast-sucking-krea-v1
+    parole trigger: he is sucking on her right nipple
+    file: E:\AI\Models\LoRA\Krea2\breastSUCKINGKREA_v1.safetensors
+    pagina: https://civitai.red/models/2974216?modelVersionId=3370739
+
+[INSTALLATO] Realistic & Detailed Penis [Krea 2] · V1
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-realistic-detailed-penis-krea-2-v1
+    parole trigger: crd1ck
+    file: E:\AI\Models\LoRA\Krea2\realisticAvaragePenisKREA2_v1.safetensors
+    pagina: https://civitai.red/models/2971337?modelVersionId=3367178
+
+[INSTALLATO] Real Beauty (Krea 2) · Krea 2
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-real-beauty-krea-2-krea-2
+    parole trigger: Real_beauty
+    file: E:\AI\Models\LoRA\Krea2\Real_beauty_2_krea2_3267534_epoch_9.safetensors
+    pagina: https://civitai.red/models/2899741?modelVersionId=3278683
+
+[INSTALLATO] Krea 2 Missionary Position LoRA | 传教士体位 · v1.0
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-krea-2-missionary-position-lora-v1-0
+    parole trigger: missionary position
+    file: E:\AI\Models\LoRA\Krea2\Missionary_Position_Krea2.safetensors
+    pagina: https://civitai.red/models/2974642?modelVersionId=3371260
+
+[INSTALLATO] Erotic Photography · Erotic Phot. v1 - Krea2
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-erotic-photography-erotic-phot-v1-krea2
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Krea2\eroticPhotography_v1.safetensors
+    pagina: https://civitai.red/models/2966553?modelVersionId=3361321
+
+[INSTALLATO] Penis on face · Krea2
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-penis-on-face-krea2
+    parole trigger: large penis pressed on face, penis against face,
+    file: E:\AI\Models\LoRA\Krea2\K_cockonface.safetensors
+    pagina: https://civitai.red/models/2927477?modelVersionId=3312847
+
+[INSTALLATO] Pressed Down Deepthroat · Krea2
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-pressed-down-deepthroat-krea2
+    parole trigger: deepthroat, rough deepthroat, struggling, blush, forceful head grab, | wide eyes, frown, | close up, from side,
+    file: E:\AI\Models\LoRA\Krea2\k_forceddeepthroat.safetensors
+    pagina: https://civitai.red/models/2937576?modelVersionId=3325478
+
+[INSTALLATO] Fit Body, Round Ass · v1.0-Krea2
+    tipo: LoRA · 0.057 GB · id catalogo: krea2-lora-civ-fit-body-round-ass-v1-0-krea2
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Krea2\gs_ass_v1_krea2.safetensors
+    pagina: https://civitai.red/models/2947122?modelVersionId=3337382
+
+[INSTALLATO] Horror and creepy atmosphere · ✨ Krea 2
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-horror-and-creepy-atmosphere-krea-2
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Krea2\horror-and-creepy-atmosphere-epoch-09.safetensors
+    pagina: https://civitai.red/models/2992349?modelVersionId=3393346
+
+[INSTALLATO] PERKY BREASTS · v1.0
+    tipo: LoRA · 0.229 GB · id catalogo: krea2-lora-civ-perky-breasts-v1-0
+    parole trigger: perkybreasts
+    file: E:\AI\Models\LoRA\Krea2\Perkybreasts26017_430step.safetensors
+    pagina: https://civitai.red/models/2997219?modelVersionId=3399448
+
+[INSTALLATO] Facial expressions Krea · v1
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-facial-expressions-krea-v1
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Krea2\facialExpressions_v1.safetensors
+    pagina: https://civitai.red/models/2998861?modelVersionId=3401507
+
+[INSTALLATO] Realistic Snapshot (Z-Image-Turbo + Krea 2) · Krea2 (v0.5)
+    tipo: LoRA · 0.223 GB · id catalogo: krea2-lora-civ-realistic-snapshot-z-image-turbo-krea-2
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Krea2\RealisticSnapshotKrea2.safetensors
+    pagina: https://civitai.red/models/2268008?modelVersionId=3084537
+
+[INSTALLATO] Realism Engine Ideogram 4 + Krea 2 · Krea2 v3.0
+    tipo: LoRA · 1.526 GB · id catalogo: krea2-lora-civ-realism-engine-ideogram-4-krea-2-krea2-v
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Krea2\realism_engine_krea2_v3.1.safetensors
+    pagina: https://civitai.red/models/2688234?modelVersionId=3109006
+
+[INSTALLATO] Krea2 SickRealism · v2.0 fp8
+    tipo: diffusion_models · 12.83 GB · id catalogo: krea2-sickrealism-v2
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\Krea2\krea2Sickrealism_v20_fp8-native.safetensors
+    pagina: https://civitai.red/models/2970908?modelVersionId=3367838
+
+====================================================================================================
+LTX-2.3 (video)
+====================================================================================================
+[INSTALLATO] LTX 10Eros · v1.4
+    tipo: diffusion_models · 28.478 GB · id catalogo: ltx23-eros14
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\LTX\ltx10eros_v14_2989669.safetensors
+    pagina: https://civitai.red/models/2447875?modelVersionId=3109610
+
+[INSTALLATO] BFS - Best Face Swap · LTX-2.3 -  V3 Focus Head
+    tipo: LoRA · 1.327 GB · id catalogo: ltx23-lora-civ-bfs-best-face-swap-ltx-2-3-v3-focus-head
+    parole trigger: head_swap: FACE: [describe the new face here] ACTION: [describe the action from original video here]
+    file: E:\AI\Models\LoRA\LTX-2\head_swap_v3_rank_adaptive_fro_098.safetensors
+    pagina: https://civitai.red/models/2027766?modelVersionId=2783974
+
+[INSTALLATO] Better Human Motion Minimax H3 · v2.0-LTX23
+    tipo: LoRA · 0.658 GB · id catalogo: ltx23-lora-civ-better-human-motion-minimax-h3-v2-0-ltx2
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\LTX-2\mvmt_lora_v2_600.safetensors
+    pagina: https://civitai.red/models/2734359?modelVersionId=3087364
+
+====================================================================================================
+LTX-2.5 (video)
+====================================================================================================
+[INSTALLATO] BFS - Best Face Swap · LTX 2.5 Head v1.1
+    tipo: LoRA · 1.205 GB · id catalogo: ltx25-lora-civ-bfs-best-face-swap-ltx-2-5-head-v1-1
+    parole trigger: head_swap: FACE: [Face Description]
+    file: E:\AI\Models\LoRA\LTX-2.5\head_swap_ltx25_v1_1_r64.safetensors
+    pagina: https://civitai.red/models/2027766?modelVersionId=3228916
+
+[INSTALLATO] TE Gemma 4 uncensored LTX-2.5, ora in int8 (13 GB al posto del bf16 24.5 GB)
+    tipo: text_encoders · 13.16 GB · id catalogo: ltx25-te-uncensored
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\text_encoders\gemma4-12b-with-proj-ltx-2.5-uncensored-v1.1-int8-native.safetensors
+    pagina: https://huggingface.co/ChrisColeTech/LTX-2.5-uncensored-v1.1-FP8
+
+====================================================================================================
+MiniMax H3 (video)
+====================================================================================================
+[INSTALLATO] BFS - Best Face Swap · H3 Head Swap - Ref2VA
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-bfs-best-face-swap-h3-head-swap-ref2va
+    parole trigger: Use the workflow auto-prompt.
+    file: E:\AI\Models\LoRA\MiniMax-H3\minimax_h3_head_swap_v1.0_r32-native.safetensors
+    pagina: https://civitai.red/models/2027766?modelVersionId=3352167
+
+[INSTALLATO] BFS - Best Face Swap · H3 Character Swap V1.0
+    tipo: LoRA · 0.606 GB · id catalogo: mmh3-lora-civ-bfs-best-face-swap-h3-character-swap-v1
+    parole trigger: body_swap:  subject_definitions: <Subject 1> is the {details} shown in <Picture 1>, whose identity, face, head, hair or fur, skin, body shape, proportions and clothing define the character in the target video. The guide video provides the scene and the performance: its background, environment, lighting, camera, framing, body pose, hand and arm movement, head rotation, gaze direction, lip movement and facial expression, frame by frame; only the main subject of the guide video is replaced: its face, hair, body and clothing become <Subject 1>.  summary: [video generation + reference] Replace the guide subject with <Subject 1>, keeping the scene, camera and the complete motion and performance of the guide video.  detailed_description: [Shot 1] <Subject 1> takes the exact place of the guide subject and moves with the same timing, body pose, gestures, head motion, gaze, speech and facial expressions, while keeping the complete look from <Picture 1>: head, face, skin, hair or fur, body shape and clothing stay stable in every frame, with no trace of the original subject's face, hair or clothing. The background, lighting, colors and camera of the guide video are preserved. Prevent identity drift, clothing changes, texture crawling and flicker. The result is a real, photographic video. | body_swap:  subject_definitions: <Subject 1> is the {details} shown in <Picture 1>, whose identity, face, head, hair or fur, skin, body shape, proportions and clothing define the character in the target video. The guide video provides the scene and the performance: its background, environment, lighting, camera, framing, body pose, hand and arm movement, head rotation, gaze direction, lip movement and facial expression, frame by frame; only {target} is replaced: their face, hair, body and clothing become <Subject 1>.  summary: [video generation + reference] Replace {target} in the guide video with <Subject 1>, keeping the scene, camera and the complete motion and performance of the guide video.  detailed_description: [Shot 1] <Subject 1> takes the exact place of {target} and moves with the same timing, body pose, gestures, head motion, gaze, speech and facial expressions, while keeping the complete look from <Picture 1>: head, face, skin, hair or fur, body shape and clothing stay stable in every frame, with no trace of the original subject's face, hair or clothing. The background, lighting, colors and camera of the guide video are preserved. Prevent identity drift, clothing changes, texture crawling and flicker. The result is a real, photographic video.
+    file: E:\AI\Models\LoRA\MiniMax-H3\minimax_h3_character_swap_v1.0_ref2va_r64_gl-native.safetensors
+    pagina: https://civitai.red/models/2027766?modelVersionId=3401556
+
+[INSTALLATO] Free Pussy · Minimax H3
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-free-pussy-minimax-h3
+    parole trigger: pussy
+    file: E:\AI\Models\LoRA\MiniMax-H3\MM-H3_-_Pussy_Lora-native.safetensors
+    pagina: https://civitai.red/models/2934054?modelVersionId=3321019
+
+[INSTALLATO] H3 - LTX 2.3 - I2V T2V Video Reasoning lora VBVR · H3 VBVR Pro
+    tipo: LoRA · 0.064 GB · id catalogo: mmh3-lora-civ-h3-ltx-2-3-i2v-t2v-video-reasoning-lora
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\H3_VBVR_Pro_attn_only-native.safetensors
+    pagina: https://civitai.red/models/2497207?modelVersionId=3306139
+
+[INSTALLATO] H3 Ass jiggle (I2V) · fl2va - i2v v1.0
+    tipo: LoRA · 0.241 GB · id catalogo: mmh3-lora-civ-h3-ass-jiggle-i2v-fl2va-i2v-v1-0
+    parole trigger: rear-entry pose | reverse cowgirl | doggy style pose | her ass jiggles from impact | creating ass jiggle | causing her body to jiggle with each movement | causing her buttocks to jiggle | creating an ass ripple/jiggle effect | jiggle with each thrust | creating a noticeable ass ripple/jiggle | causing her buttocks to jiggle and ripple with each impact
+    file: E:\AI\Models\LoRA\MiniMax-H3\ass_jiggle_H3_i2v_v1.0-native.safetensors
+    pagina: https://civitai.red/models/2880033?modelVersionId=3255024
+
+[INSTALLATO] Daring's Deepthroat H3/LTX2.3 · MiniMax H3 FL2VA v0.2
+    tipo: LoRA · 0.291 GB · id catalogo: mmh3-lora-civ-daring-s-deepthroat-h3-ltx2-3-minimax-h3
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\deepthroat_v02-native.safetensors
+    pagina: https://civitai.red/models/2476698?modelVersionId=3226989
+
+[INSTALLATO] Faster! Harder! Shake Harder! | H3 Motion Booster(ANIME Edition Update) · V0.2
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-faster-harder-shake-harder-h3-motion-boo
+    parole trigger: dynv2
+    file: E:\AI\Models\LoRA\MiniMax-H3\H3_Motion_BoosterV2-native.safetensors
+    pagina: https://civitai.red/models/2840146?modelVersionId=3228867
+
+[INSTALLATO] Can't Stop Shaking! | H3 Ending Reaction Booster · v1.0
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-can-t-stop-shaking-h3-ending-reaction-bo
+    parole trigger: endface1 | endbody1
+    file: E:\AI\Models\LoRA\MiniMax-H3\Ending_Reaction_Booster-native.safetensors
+    pagina: https://civitai.red/models/2867574?modelVersionId=3239680
+
+[INSTALLATO] ⛩️💀 DaSiWa MiniMax H3 💀⛩️ · DaSiWa Hybrid v4
+    tipo: diffusion_models · 12.247 GB · id catalogo: mmh3-dit-dasiwa-v4
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\MiniMax-H3\DasiwaMinimaxH3_dasiwaHybridV4_3281517-native.safetensors
+    pagina: https://civitai.red/models/2877206?modelVersionId=3391862
+
+[INSTALLATO] Better Human Motion Minimax H3 · v1.0-MH3
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-better-human-motion-minimax-h3-v1-0-mh3
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\mvmt_h3_lora_v1_500-native.safetensors
+    pagina: https://civitai.red/models/2734359?modelVersionId=3256084
+
+[INSTALLATO] Deeper... Hold It. | H3 Deep Motion Booster · V1
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-deeper-hold-it-h3-deep-motion-booster-v1
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\H3_Deeper-native.safetensors
+    pagina: https://civitai.red/models/2879661?modelVersionId=3254522
+
+[INSTALLATO] Breast Play & Jiggle for MiniMax H3 · v2.0
+    tipo: LoRA · 0.291 GB · id catalogo: mmh3-lora-civ-breast-play-jiggle-for-minimax-h3-v2-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\breastplayjiggle_h3_v2-native.safetensors
+    pagina: https://civitai.red/models/2856004?modelVersionId=3278283
+
+[INSTALLATO] Breast Play & Jiggle for MiniMax H3 · v1.0
+    tipo: LoRA · 0.291 GB · id catalogo: mmh3-lora-civ-breast-play-jiggle-for-minimax-h3-v1-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\breastplayjiggle_h3_v1-native.safetensors
+    pagina: https://civitai.red/models/2856004?modelVersionId=3225638
+
+[INSTALLATO] Minimax H3 Turbo LoRas · dmad_larryvrhv4_merge
+    tipo: LoRA · 0.934 GB · id catalogo: mmh3-lora-civ-minimax-h3-turbo-loras-dmad-larryvrhv4-m
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\minimax_h3_dmad_full_dareties_v4_step600_comfy_fro-native.safetensors
+    pagina: https://civitai.red/models/2837571?modelVersionId=3391964
+
+[INSTALLATO] MiniMax H3 Combat BASE ｜Fight Motion / Impact / Drama Booster · V2 BASE
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-minimax-h3-combat-base-fight-motion-impa
+    parole trigger: prfight2 | prfin1
+    file: E:\AI\Models\LoRA\MiniMax-H3\H3_Combat_V2-native.safetensors
+    pagina: https://civitai.red/models/2853878?modelVersionId=3246572
+
+[INSTALLATO] [MinimaxH3] Blowjob (NSFW) INT8 Convrot · v1.0
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-minimaxh3-blowjob-nsfw-int8-convrot-v1-0
+    parole trigger: blowjob | sucking penis
+    file: E:\AI\Models\LoRA\MiniMax-H3\MinimaxH3-Blowjob-512_000000510-native.safetensors
+    pagina: https://civitai.red/models/2929639?modelVersionId=3315548
+
+[INSTALLATO] Minimax H3_rimjob_ass licking_anal · v1.0
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-minimax-h3-rimjob-ass-licking-anal-v1-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\rimjob_h3_v1-native.safetensors
+    pagina: https://civitai.red/models/2962318?modelVersionId=3356109
+
+[INSTALLATO] Doggy Style Sex · Minimax H3 - V1
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-doggy-style-sex-minimax-h3-v1
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\MM-H3_-_Doggy_Style_v1-native.safetensors
+    pagina: https://civitai.red/models/2920568?modelVersionId=3317042
+
+[INSTALLATO] H3BJHJSmileV1 · A lineup BJ HJ Smiles V1
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-h3bjhjsmilev1-a-lineup-bj-hj-smiles-v1
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\h3lineupbjhjsmilev1_v1-native.safetensors
+    pagina: https://civitai.red/models/2980221?modelVersionId=3378264
+
+[INSTALLATO] Messy Blowjob H3 · v1.0
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-messy-blowjob-h3-v1-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\MessyBlowjob_v1_H3-native.safetensors
+    pagina: https://civitai.red/models/2997232?modelVersionId=3399472
+
+[INSTALLATO] H3 Throat Time · v2.0
+    tipo: LoRA · 0.146 GB · id catalogo: mmh3-lora-civ-h3-throat-time-v2-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\thr0at_H3_AV_v2-000100-native.safetensors
+    pagina: https://civitai.red/models/2992566?modelVersionId=3399886
+
+[INSTALLATO] Cum Shots · Minimax H3
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-cum-shots-minimax-h3
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\MM-H3_-_Cumshots_v1.2-native.safetensors
+    pagina: https://civitai.red/models/2987064?modelVersionId=3386680
+
+[INSTALLATO] Face Slap Motion LoRA - MiniMax H3 Ref2VA · v1.0
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-face-slap-motion-lora-minimax-h3-ref2va
+    parole trigger: f4c3sl4p
+    file: E:\AI\Models\LoRA\MiniMax-H3\f4c3sl4p_lora_v1-native.safetensors
+    pagina: https://civitai.red/models/2996117?modelVersionId=3398038
+
+[INSTALLATO] Nipple Sucking · Minimax H3
+    tipo: LoRA · 0.37 GB · id catalogo: mmh3-lora-civ-nipple-sucking-minimax-h3
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\MM-H3_-_Nipple_Sucking-native.safetensors
+    pagina: https://civitai.red/models/2985148?modelVersionId=3384367
+
+[INSTALLATO] mosaic restoration · v1.0
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-mosaic-restoration-v1-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\DecensoreH3_000002500-native.safetensors
+    pagina: https://civitai.red/models/2990026?modelVersionId=3390424
+
+[INSTALLATO] NSFW | Posing + Touching + Round Breasts | H3 LoRA | T2V / I2V / FL2V · nsfw-round-breasts-posing
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-nsfw-posing-touching-round-breasts-h3-lo
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\nsfwPosingTouchingRoundBreasts_v1-native.safetensors
+    pagina: https://civitai.red/models/2985832?modelVersionId=3385163
+
+[INSTALLATO] Minimax - Cumshot · v1.0
+    tipo: LoRA · 0.303 GB · id catalogo: mmh3-lora-civ-minimax-cumshot-v1-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\cum_facial_000005400-native.safetensors
+    pagina: https://civitai.red/models/2909163?modelVersionId=3290361
+
+[INSTALLATO] Fingering · Minimax H3
+    tipo: LoRA · 0.151 GB · id catalogo: mmh3-lora-civ-fingering-minimax-h3
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\MiniMax-H3\MM-H3_-_Fingering-native.safetensors
+    pagina: https://civitai.red/models/2923170?modelVersionId=3307530
+
+[INSTALLATO] MiniMax H3 FL2VA · int4 AsymW4A8
+    tipo: diffusion_models · 12.25 GB · id catalogo: mmh3-fl2va-int4
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\MiniMax\MiniMax_H3_fl2va_pruned_w4a8-native.safetensors
+    pagina: https://civitai.red/models/2830065?modelVersionId=3207975
+
+[INSTALLATO] MiniMax H3 Ref2VA · int4 AsymW4A8
+    tipo: diffusion_models · 11.49 GB · id catalogo: mmh3-ref2va-int4
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\MiniMax\MiniMax_H3_ref2va_pruned_w4a8-native.safetensors
+    pagina: https://civitai.red/models/2830065?modelVersionId=3207975
+
+[INSTALLATO] MiniMax H3 FL2VA INT8 Pruned (Civitai 2830065 = file ufficiale Comfy-Org, identico byte per byte)
+    tipo: diffusion_models · 20.97 GB · id catalogo: mmh3-fl2va-int8
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\MiniMax\minimax_h3_fl2va_pruned_int8_convrot-native.safetensors
+    pagina: https://huggingface.co/Comfy-Org/MiniMax-H3
+
+[INSTALLATO] LightVAE Lite decoder H3 (punto 3)
+    tipo: vae · 3.1 GB · id catalogo: mmh3-lightvae-dec
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\vae\lightvae-lite-h3-decoder.safetensors
+    pagina: https://huggingface.co/lightx2v/LightVAE
+
+[INSTALLATO] LightVAE Lite encoder H3 (punto 3)
+    tipo: vae · 0.39 GB · id catalogo: mmh3-lightvae-enc
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\vae\lightvae-lite-h3-encoder.safetensors
+    pagina: https://huggingface.co/lightx2v/LightVAE
+
+====================================================================================================
+Qwen-Image 2.1 (immagini)
+====================================================================================================
+[INSTALLATO] qwen 2.1 FELLATIO · v2.0
+    tipo: LoRA · 0.082 GB · id catalogo: qwen21-lora-civ-qwen-2-1-fellatio-v2-0
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\LoRA\Qwen21\FELLATIO-v2.safetensors
+    pagina: https://civitai.red/models/2981555?modelVersionId=3382947
+
+====================================================================================================
+NON INSTALLATI (motivo)
+====================================================================================================
+- Minimax H3 INT8/INT6/INT4 ConvRot · FL2VA INT8 Pruned: FL2VA INT8 Pruned: identico byte per byte all'int8 ufficiale Comfy-Org già a catalogo (mmh3-fl2va-int8, scaricato da lì); come int4 aggiunte le varianti AsymW4A8 FL/REF dello stesso autore (profilo «int4»)
+- NSFW LORA | Qwen Image 2.1 · v2.0: NSFW Qwen 2.1 v1+v2: già installate (sha256 identici a Civitai)
+- Krea2 - SickRealism · v3.0: uscita dall'Early Access il 17/10, NON scaricata (v4.0 la sostituisce, vedi AGGIORNAMENTO 29/10)
+- MiniMax H3 NSFW Unlocked · Minimax_H3_V2: già installata (mmh3-lora-unlocked-v2, stesso file da HF); la V2.1 è installata dal 29/10
+- REALITY BOOSTER · v1.0: REALITY BOOSTER: architettura «Anima», non supportata da LTX Studio
+
+Totale al 14/10: 57 voci, installate 57. Al 29/10: 62 voci installate (vedi AGGIORNAMENTO 29/10 in fondo).
+
+====================================================================================================
+VALUTAZIONI (punti 3–9)
+====================================================================================================
+3) LightVAE (lightx2v/LightVAE) — INTEGRATO per MiniMax H3
+   - È il VAE video di H3 potato con la stessa interfaccia latente: decoder con 12 dei 36 blocchi, encoder con 6
+     dei 12 blocchi residui. Il DiT e lo scheduler non cambiano.
+   - Misura su RTX 5090 (clip 5 s 544p, stessa architettura): decode da 21,8 a 7,3 s, picco VRAM da 11,8 a 5,8 GB.
+   - Tab Video → opzioni H3 → «VAE video»: Originale / decoder Lite / encoder + decoder Lite.
+   - Wan2.1/2.2 (Krea Realtime, MultiTalk): esistono decoder Pro/Lite, ma usano convoluzioni «TLR» con kernel
+     Triton propri e i nostri worker Wan passano da WanVideoWrapper. Il guadagno va misurato là: non integrato.
+4) honwee/mynah — NON aggiunge nulla ai nostri avatar
+   - È un «digital human» in tempo reale (core Go + WebRTC + console, motori FlashHead/MuseTalk/wav2lip):
+     conversazione vocale dal vivo, non generazione di video. I nostri avatar (H3, LongCat, MultiTalk) producono
+     clip offline di qualità superiore. L'unico pezzo interessante è FlashHead (Apache-2.0) come anteprima veloce.
+5) mflux qwen-image-edit-2511-mflux-q4 — NON applicabile
+   - È formato MLX solo per Apple Silicon, ed è Qwen-Image-Edit-2511 (prima generazione), non la nostra 2.1.
+6) H3 Video Upsampler (sandpies / dntpi, MIT) — DA DECIDERE (funzione maggiore)
+   - Upscaler latente H3 (LBH-123-AI) + un ri-disegno a tile a denoise 0,1 con la LoRA h3upscale x2, che usa il
+     clip a metà risoluzione come guida «IC-LoRA». Si appoggia al percorso keyframe/PackedLayout di H3 dentro
+     ComfyUI: va ricostruito nel nostro pipeline diffusers (guida a griglia strided, tiling, rete dell'upscaler).
+     Stima: 1–2 giorni di lavoro. Vedi domande in fondo.
+   - MosaicDiff (dotaku22): de-censura video = detector RF-DETR + BasicVSR++ (codice AGPL-3.0 di Lada) + ri-disegno
+     H3 con la LoRA DecensoreH3 (già installata: «mosaic restoration») + RTX VSR. L'AGPL obbligherebbe a
+     pubblicare i sorgenti dell'app: vedi domande.
+7) SUPIR — NON serve: nessun motore del progetto lo usa (l'upscale passa da SeedVR2/FlashVSR/RIFE).
+8) FLUX.1 schnell fp8 — presente e integro (E:\AI\Models\Checkpoints\Flux\flux1-schnell-fp8.safetensors), a catalogo.
+9) Controllo generale — vedi output\DIAG_check_modelli.txt (integrità di ogni safetensors a catalogo) e
+   output\DIAG_doppioni_modelli.txt (doppioni e file non referenziati: SOLO elenco, niente cancellato).
+
+NOTE SUI FORMATI
+- DaSiWa H3 Hybrid v4: scelta la variante int4 W4A8 (12,2 GB). Il formato int4/int6 di DaSiWa (codebook a 16
+  livelli + GEMM int8 di comfy-kitchen) ora è letto nativamente (W4A8Linear); comfy-kitchen aggiornato a 0.2.37.
+- Profilo H3 «int4» (base, non 18+): FL2VA e Ref2VA AsymW4A8 della pagina 2830065, ~12 GB l'uno.
+- Krea SickRealism: la v4.0 e la v3.0 sono in Early Access a pagamento (v3 libera dal 17/10, v4 dal 25/10);
+  installata la v2.0 fp8. La «int8» da 6,7 GB della v2 è in realtà int4 W4A4 (attivazioni a 4 bit, qualità più
+  bassa): scartata.
+- 10Eros v1.4 (fp8, Civitai) installata accanto alla v1.5 (fp8, HF LokkenJP, link dal repo ufficiale TenStrip):
+  sono build diverse, da confrontare.
+- LoRA «Nipple Sucking»: il file contiene TRE LoRA diverse sugli stessi moduli in tre convenzioni di nomi. Come
+  ComfyUI (che ne applica una per modulo) vale la precedenza nomi nudi > diffusion_model. > lora_unet_.
+
+PROVE LIVE DALLA GUI (14/10, RTX 5090, video 1344×768 5 s) — file in output\DIAG_*
+- H3 DaSiWa v4 int4 (FL2VA, turbo 8): PASS, denoise 15,3 s/passo (nvfp4: 20,3), video+audio stereo
+  → output\DIAG_h3_cavaliere_t8_5s_mmh3-dit-dasiwa-v4.mp4
+- H3 profilo int4 + turbo dmad + LoRA «Better Human Motion» + LightVAE decoder: PASS, decode 13 s
+  → output\DIAG_h3_cavaliere_tdmad_5s_int4_lvae-dec_lora-mvmt_h3.mp4
+- H3 Ref2VA int4 + turbo v4 + LightVAE encoder+decoder (riferimento = foto SickRealism): PASS
+  → output\DIAG_h3_ukulele_tv4_5s_ref_int4_lvae-encdec.mp4
+- Krea SickRealism v2 fp8: PASS → output\DIAG_krea2_krea2-sickrealism-v2.png
+- Krea 2 Turbo + LoRA kohya «Fit Body» e + LoKr «Realism Engine»: PASS (le due immagini, stesso seme,
+  differiscono → LoRA applicate) → output\DIAG_krea2_krea2_turbo_lora-*.png
+- Klein 9B inpaint, encoder ufficiale vs uncensored (stesso seme): PASS entrambi; l'ufficiale ripetuto è
+  identico (diff 0), l'uncensored diverso → encoder applicato. → output\DIAG_klein_te_confronto.jpg
+- LTX-2.5 Stubelius: PASS · Stubelius + TE uncensored INT8 (13 GB, nuovo): PASS → il bf16 da 24,5 GB è stato
+  cancellato come richiesto · 10Eros v1.4: PASS · PinkCherry v1.8: PASS
+- LTX-2.5 uncensored GGUF Q8 (la tua risposta 1: «riprova, se non riesci scaricala»): il caricamento ora funziona (mancava il pacchetto
+  gguf nel venv della 2.5, aggiunto), ma il video esce RUMORE PURO e lento (23 min per 2 s). Quindi, come da tua
+  istruzione «se non riesci scaricala», ho scaricato la versione INT8 safetensors (21,5 GB): PASS in 140 s, video
+  valido (controllato a vista e con l'indice di rumore). È la versione da usare.
+- 10Eros v1.5: FALLITO per memoria (MemoryError sul commit di Windows, NON un difetto del modello): in quel
+  momento i servizi di callAPIcall (avatar_worker, STT, xtts, main) occupavano ~32 GB di commit e il
+  transformer da 30 GB in offload CPU non ci stava. Da ripetere a servizi spenti (vedi domande).
+
+BUG TROVATI E CORRETTI DURANTE IL LAVORO (importanti anche fuori da questa lista)
+- Le LoRA H3 e Krea scelte nella GUI NON venivano applicate: pannello LoRA disabilitato con H3, «Krea 2» che
+  mostrava le LoRA FLUX, e worker che scartavano in silenzio i nomi relativi. Ora funzionano (validato live).
+- I test live saltavano tutto con «app utente aperta» per colpa di tray_app.py (vllm_gui): corretto.
+- Il fold int8 di ltx-core non funzionava sul Gemma (lm_head): corretto in LTX-2 e LTX-2.5.
+- Il downloader ignorava il token di `hf auth login` per i repo con licenza da accettare: corretto.
+
+====================================================================================================
+DOMANDE APERTE (non ho deciso al posto tuo)
+====================================================================================================
+1. H3 Video Upsampler: lo porto in nativo? È una funzione grossa (1–2 giorni): ricostruire la «guida» a griglia
+   del ri-disegno, il tiling e la rete dell'upscaler latente. Il risultato dichiarato: 2 MP che batte il render
+   nativo al confronto alla cieca.
+2. MosaicDiff: il restauro BasicVSR++ è codice AGPL-3.0 (obbligherebbe a pubblicare i sorgenti dell'app
+   venduta). Alternative: (a) lasciar perdere; (b) solo la parte H3: LoRA «mosaic restoration» (già installata)
+   + riferimento del ritaglio, senza BasicVSR++; (c) BasicVSR++ come download separato a carico dell'utente.
+3. Doppioni (output\DIAG_doppioni_modelli.txt, ~90 GB recuperabili), es.:
+   mistral_3_small_flux2.safetensors = mistral_3_small_flux2_fp4_mixed.safetensors (11,4 GB, identici),
+   gemma_3_12B_it.safetensors = gemma3\model.safetensors (12,8 GB), t5xxl_fp16 = diffusers\_te\t5xxl (9,1 GB),
+   qwen_3_4b = diffusers\_te\qwen3_4b (7,5 GB), HunyuanVideo duplicato fra cache HF e TextEncoders (~14 GB).
+   Quali cancello? Nessuno è stato toccato.
+4. 10Eros v1.5: la ripeto a servizi callAPIcall spenti? Oppure preferisci che il worker, quando il commit non
+   basta per l'offload CPU, passi da solo all'offload su disco (più lento ma non fallisce)?
+5. MiniMax H3: il profilo int4 (W4A8) è risultato più veloce dell'nvfp4 (15–17 s/passo contro 20) con
+   qualità da confrontare. Vuoi che diventi il profilo predefinito, o resta nvfp4?
+6. Encoder Klein uncensored: il menu sta nel pannello Inpaint e vale per tutti i lavori Klein 9B. Va bene lì?
+7. Krea SickRealism v3 (libera dal 17/10) e v4 (dal 25/10): la scarico quando esce dall'Early Access?
+   [RISOLTA 29/10: v4.0 fp8 scaricata e a catalogo (krea2-sickrealism-v4), nel menu Krea 2 solo in NSFW; v3 non scaricata; v2 resta, la cancella solo l'utente]
+8. LTX-2.5 uncensored GGUF Q8 (23 GB): dà rumore. Lo cancello ora che c'è l'INT8, o vuoi che indaghi il percorso
+   GGUF della 2.5 (il dequant al volo + config dal «compagno»)? Nel frattempo è ancora nel menu modelli.
+9. Il venv di LTX-2.5 (E:\AI\Tools\lingbot_venv, Python 3.12) non ha uno script d'installazione nel repo: per la
+   distribuzione va creato (ora contiene anche gguf 0.18.0).
+
+====================================================================================================
+AGGIORNAMENTO 29/10/2026 (task 17: verifica voce per voce di tutta la lista del 14/10 sull'API Civitai)
+====================================================================================================
+Regole: tutte 18+ (sens=adult), pannello dell'architettura giusta, trigger a catalogo e mostrati dal pannello LoRA (all'inserimento
+automatico va il PRIMO trigger; le didascalie di training lunghe sono solo note). Nessun test dal vivo dei modelli.
+Dettaglio completo: orch\task17_AUDIT.md §5.
+
+NUOVE VERSIONI USCITE DOPO IL 14/10 — INSTALLATE (le versioni vecchie RESTANO: le cancella solo l'utente)
+[INSTALLATO] Krea2 SickRealism · v4.0 fp8 (12.84 GB, sha OK, già nativo)
+    id catalogo: krea2-sickrealism-v4 · Public dal 25/10 · menu Krea 2 «Krea SickRealism v4 (18+, fp8, 8 step)»
+    parole trigger: — (nessuna dichiarata dall'autore)
+    file: E:\AI\Models\diffusion_models\Krea2\krea2Sickrealism_v40_fp8-native.safetensors
+    pagina: https://civitai.red/models/2970908?modelVersionId=3402173
+[INSTALLATO] MiniMax H3 NSFW Unlocked · V2.1 (0.28 GB)
+    id catalogo: mmh3-lora-unlocked-v21 · uscita il 18/10
+    parole trigger: nude | topless | bare breasts | naked | completely unclothed   (altre parole della pagina nella nota del catalogo)
+    file: E:\AI\Models\LoRA\MiniMax-H3\Minimax_H3_Unlocked_V2.1-native.safetensors
+    pagina: https://civitai.red/models/2925727?modelVersionId=3413468
+[INSTALLATO] PERKY BREASTS · v1.1 (0.235 GB, fp16)
+    id catalogo: krea2-lora-civ-perky-breasts-v1-1 · uscita il 20/10
+    parole trigger: perky breasts | puffy nipples   (la v1.0 usava «perkybreasts»)
+    file: E:\AI\Models\LoRA\Krea2\Perkybreasts55880_1000step.safetensors
+    pagina: https://civitai.red/models/2997219?modelVersionId=3418708
+[INSTALLATO] NSFW | Posing + Touching + Round Breasts | H3 LoRA · v1.5 (0.29 GB)
+    id catalogo: mmh3-lora-civ-nsfw-posing-touching-round-breasts-h3-v1-5 · uscita il 16/10
+    parole trigger: — (l'autore: nessun token, prompt naturale)
+    file: E:\AI\Models\LoRA\MiniMax-H3\H3-nsfw-round-breasts-posing-V1.5-native.safetensors
+    pagina: https://civitai.red/models/2985832?modelVersionId=3406313
+[INSTALLATO] BFS - Best Face Swap · H3 Character Swap v1.1 (0.08 GB)
+    id catalogo: mmh3-lora-civ-bfs-best-face-swap-h3-character-swap-v1-1 · uscita il 18/10
+    parole trigger: body_swap: subject_definitions: <Subject 1> is the {details} shown in <Picture 1>... (template lungo, come la v1.0)
+    file: E:\AI\Models\LoRA\MiniMax-H3\minimax_h3_character_swap_v1.1_ref2va_fro-native.safetensors
+    pagina: https://civitai.red/models/2027766?modelVersionId=3412620
+
+TRIGGER AGGIUNTI A VOCI GIÀ INSTALLATE (erano nella descrizione della pagina, non in trainedWords)
+- Minimax H3_rimjob_ass licking_anal · v1.0: rjvideo
+- Messy Blowjob H3 · v1.0: ME$$Y
+- H3 Throat Time · v2.0: thr0at
+- MiniMax H3 NSFW Unlocked V2 (e V2.1): nude | topless | bare breasts | naked | completely unclothed
+
+ALTRE VERIFICHE
+- Pagine che oggi rispondono 404 all'API Civitai (file installati e integrati, aggiornamenti non verificabili): Free Pussy (2.5),
+  Doggy Style Sex (2.25), Cum Shots (2.39), Nipple Sucking (2.41), Fingering (2.51).
+- NON APPLICABILI: REALITY BOOSTER (architettura Anima); MosaicDiff (app separata, decisione del 14/10); Realistic Snapshot MOSS-Image v1.0
+  del 23/10 (base «MOSS Image», non supportata; la versione Krea2 v0.5 resta installata); mynah, mflux (valutazioni 14/10 confermate).
+- Non installate, non richieste: SickRealism v3.0, DaSiWa Hybrid v4 Turbo, MiniMax H3 REF2VA INT8 e INT6 W6A8.
+- H3 Video Upsampler (punto 6): codice nel task 10; pesi (0.69 + 0.62 GB) scaricati dalla campagna notturna.
+- Pulizie correlate: le versioni vecchie sostituite (SickRealism v2, Perky v1.0, Round Breasts v1, NSFW Unlocked V2, BFS H3 Character Swap v1.0)
+  sono ancora a catalogo e su disco: decide l'utente se cancellarle.
